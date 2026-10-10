@@ -90,7 +90,8 @@ about languages or length: use defaults and state them in the start message.
    for the same project, reuse it (take `file` from the status). If another project is
    recording, stop and tell the user, do not mix.
 2. Build `prompt` for Whisper: max ~200 chars of proper names and terms from the config
-   (team names, client names, product and module names). It improves spelling of names.
+   (team names, client names, product and module names) plus `settings.user.name_aliases`.
+   It improves spelling of names.
 3. Write `control/start.json` with a small python one-liner inside device_bash
    (`json.dump`, UTF-8, `ensure_ascii=False`):
    `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "langs": "xx+yy", "me_label": "...", "them_label": "...", "prompt": "..."}`
@@ -127,6 +128,7 @@ Then collect in parallel, everything scoped to this project (relation `Project` 
 | Threads DB | `Awaiting Reply` / `Need Follow-up` |
 | Meetings DB | last 2 meetings of this type: unclosed action items, promises |
 | Task tracker | per `task_tracker.api_access`: in progress, blocked, awaiting client (else `fallback_source`) |
+| Reports DB | today's prep report for this meeting (scheduled `daily-team-prep` / `client-meeting-prep` run, or one made earlier in the session); else the latest one of this meeting type |
 | Config | Team tables + Transcript Alias Map, `pm_profile.milestones`, `decision_rights` |
 | User | agenda items or goals the user typed in the request |
 
@@ -137,10 +139,21 @@ Compress into the **Live Brief**, max ~1200 words, saved next to the transcript 
 2. Topic map: topic -> keywords (in every language of `langs`) and Jira keys -> 1-line status.
 3. Commitments in flight: who promised what by when.
 4. Red lines: decided items not to reopen, out-of-scope areas, decision rights.
-5. Names and aliases (how Whisper may spell people).
+5. Names and aliases (how Whisper may spell people), including the PM's own
+   `settings.user.name_aliases`.
+6. **My update**: what the PM reports when it is their turn, prepared now so the tip is
+   instant later. From the prep report and the tracker: 3-4 points in priority order
+   (done since last time, in progress, blocked or needing a decision, next), each max 8
+   words, in the language of the call, plus a ready opening sentence. For a meeting that
+   covers several projects (e.g. an internal PM sync), one short line per project.
 
 Show the user only the checklist (max 6 short lines, no abbreviations, ~45 characters per
 line) and `Мовчу, поки нема що сказати.`
+
+**If the PM opens the meeting** (the PM hosts it, the user says so, or the first 30 s of the
+call are silent on the other side): right after the checklist post the "Your turn" tip
+(see Tip format) as an opening: greeting plus the goal of the meeting in one sentence, then
+the agenda order, or "My update" if the meeting starts with it.
 
 ## Step 3 - Live loop
 
@@ -179,6 +192,7 @@ Then:
 
 | Level | Trigger | Tip |
 |---|---|---|
+| 🔴 | Your turn: `{them_label}` addresses the PM by any of `settings.user.name_aliases` (any grammatical form, e.g. vocative "Богдане", or a misspelling) with a request for an update or opinion ("розкажи", "що в тебе", "які апдейти", "your updates", "over to you", "what about you"), or the round of updates reaches the PM | "Your turn" tip from "My update": opening sentence + points in order. Immediate, ignores the rate limit |
 | 🔴 | `{them_label}` asks for something new, "could you also", "can we add", a change in behaviour or scope | "Нова вимога. Не погоджуй зараз." + phrase, e.g. "Good idea. I will write it down. We will check it and come back to you." |
 | 🔴 | `{me_label}` commits a date or an estimate | compare with milestones / tracker; "Оцінку дає виконавець. Не називай цифру." + phrase |
 | 🔴 | A statement contradicts a Decision or red line | "Суперечить рішенню {дата}" + the decision in a few words |
@@ -275,6 +289,23 @@ Examples (English call):
 > Сумніваються, чи встигнуть протестувати до релізу.
 
 Internal Ukrainian call: the gist and the phrase are both in Ukrainian.
+
+**"Your turn" tip** (the only tip allowed up to 7 lines): gist line, then a ready opening
+sentence in quotes, then the points in the order to say them, numbered, max 8 words each,
+all in the language of the call. If the question was about one topic, answer that topic
+only, not the whole update.
+
+> **🔴 Твоя черга: апдейт**
+> "Коротко по Acme: все за планом, одне питання."
+> 1. Звіт по транзакціях на тестуванні
+> 2. Оплати: чекаємо відповідь клієнта
+> 3. Потрібне рішення: дата релізу
+
+> **🔴 Your turn: update**
+> "Short update from my side. We are on track."
+> 1. Transaction report is in testing
+> 2. Payments: waiting for the client
+> 3. We need a decision on the release date
 
 ### The PM's questions during the call
 

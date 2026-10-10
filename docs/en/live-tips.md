@@ -199,6 +199,28 @@ project, do the prep first, and write `live tips` right before the call.
    map. It is a priority, not a limit: the rest of the project context (decisions, risks,
    tracker, past meetings) is still loaded and used when the conversation goes elsewhere.
 
+**Opening and "your turn".** At start the skill prepares "My update" in advance: 3-4 points
+by priority (done, in progress, blockers or decisions needed, next) and a ready opening
+sentence. It takes them from the prep report for this meeting in the Reports DB (the one a
+scheduled task generates, e.g. `daily-team-prep`, or one made earlier in the session) and
+from the tracker. For a meeting across several projects, like an internal PM sync, one line
+per project.
+
+- **You open the meeting** (you host it, you said so, or the other side is silent for the
+  first 30 s): right after the checklist an opening arrives: greeting, the goal of the
+  meeting in one sentence, the order of topics or your update.
+- **You are called on:** when someone addresses you by any name in
+  `settings.user.name_aliases` (all forms and languages, including Whisper misspellings)
+  and asks for your updates, a 🔴 "Your turn" tip arrives immediately, with no rate limit:
+  the opening sentence and the points in the order to say them. If the question was about
+  one topic, only that topic.
+
+> **🔴 Your turn: update**
+> "Short update from my side. We are on track."
+> 1. Transaction report is in testing
+> 2. Payments: waiting for the client
+> 3. We need a decision on the release date
+
 **Client interview.** When the prep or your words make it clear this is an interview on a
 topic, the skill switches to interview mode: the checklist is your planned questions. It
 tracks which were asked and how fully they were answered. It tips where an answer is vague
@@ -349,6 +371,7 @@ the package).
 |---|---|
 | `user.me_label`, `user.them_label` | Channel labels in the transcript |
 | `user.tips_language` | Language of tips and the wrap-up |
+| `user.name_aliases` | How people call you on calls (all forms and languages): the "Your turn" trigger and a hint for Whisper |
 | `user.timezone` | Fallback IANA zone. Usually not needed: live-transcriber writes the Mac clock zone and offset into `status.json` itself (Notion accepts `Europe/Kiev`) |
 | `paths.work_root` | Mac folder connected to Cowork |
 | `paths.tool_root` | Where live-transcriber lives |

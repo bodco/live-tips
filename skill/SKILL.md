@@ -18,6 +18,7 @@ the system audio, transcribes each phrase with Whisper on the Mac and appends li
 **Settings.** Everything personal (labels, paths, language defaults, tip rules, model hint)
 is in `settings.yaml` next to this file. Read it first. Nothing user-specific is hard-coded
 in this file; examples below use the author's values only as illustration.
+Full human documentation: `docs/uk/17-live-tips.md` in the pm-control-tower repository.
 
 This skill starts it, reads only the NEW lines, matches them against a pre-built Live
 Brief of the project and posts a tip only when a trigger fires. Silence is the default.
@@ -88,7 +89,8 @@ about languages or length: use defaults and state them in the start message.
    (`json.dump`, UTF-8, `ensure_ascii=False`):
    `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "langs": "xx+yy", "me_label": "...", "them_label": "...", "prompt": "..."}`
    (labels from `settings.user`).
-   The LaunchAgent opens a Terminal window "Live transcriber" with the recording.
+   The LaunchAgent opens a Terminal window "Live transcriber" with the recording by itself;
+   the PM does not start it, may minimise it, should not close it.
 4. Poll `state/status.json` every 3 s up to 60 s (model load takes 5-20 s):
    - `recording` -> take `file`, map it to the device_bash path, go on;
    - `error` or nothing after 60 s -> rename `control/start.json` to `control/start.json.pending`
@@ -166,17 +168,17 @@ Then:
 |---|---|---|
 | 🔴 | `{them_label}` asks for something new, "could you also", "can we add", a change in behaviour or scope | "Нова вимога. Не погоджуй зараз." + phrase, e.g. "Good idea. I will write it down. We will check it and come back to you." |
 | 🔴 | `{me_label}` commits a date or an estimate | compare with milestones / tracker; "Оцінку дає виконавець. Не називай цифру." + phrase |
-| 🔴 | A statement contradicts a Decision or red line | "Це суперечить рішенню {дата}: {рішення}" |
-| 🔴 | Frustration, escalation, "disappointed", "again", threat to timeline or contract | "Сигнал незадоволення: {що саме}. Визнай, дай план і дату наступного апдейту." |
-| 🔴 | Answer check: `{me_label}` states a fact that contradicts the brief, tracker or a Decision (wrong status, date, owner, scope) | "Неточно: ти сказав {X}, а {джерело} каже {Y}." + correction phrase |
-| 🟠 | Answer check: `{me_label}` answered, but not the question that was asked, or only part of it | "Питали: {питання}. Ти відповів про {інше}. Не закрито: {що}." + short phrase to close it |
-| 🟠 | Answer check: `{me_label}` answered vaguely where the other side wanted a concrete thing (date, owner, yes/no) | "Відповідь розмита: дай {дату / власника / так-ні} або скажи, коли повернешся з нею." |
-| 🟠 | Side talk: 2+ consecutive `{them_label}` lines in a language other than the one the PM is speaking (e.g. `es` while the call is `en`) | 1-2 line summary: "Між собою іспанською: {суть}". Skip small talk. |
-| 🟠 | A topic or Jira key from the brief comes up | 1-line status from the brief |
-| 🟠 | A question to the PM stays unanswered for ~2 min | "Без відповіді: {питання}" |
+| 🔴 | A statement contradicts a Decision or red line | "Суперечить рішенню {дата}" + the decision in a few words |
+| 🔴 | Frustration, escalation, "disappointed", "again", threat to timeline or contract | "Клієнт незадоволений: {що саме}" + phrase that acknowledges, gives a plan and the date of the next update |
+| 🔴 | Answer check: `{me_label}` states a fact that contradicts the brief, tracker or a Decision (wrong status, date, owner, scope) | "Неточно: {Y}, не {X}" + correction phrase + source |
+| 🟠 | Answer check: `{me_label}` answered, but not the question that was asked, or only part of it | "Питали про {що}, не про {інше}" + short phrase to close it |
+| 🟠 | Answer check: `{me_label}` answered vaguely where the other side wanted a concrete thing (date, owner, yes/no) | "Розмито. Дай {дату / власника / так-ні}" + phrase |
+| 🟠 | Side talk: 2+ consecutive `{them_label}` lines in a language other than the one the PM is speaking (e.g. `es` while the call is `en`) | "Між собою іспанською" + the gist in 1-2 lines. Skip small talk. |
+| 🟠 | A topic from the brief comes up | gist + up to 3 status facts from the brief |
+| 🟠 | A question to the PM stays unanswered for ~2 min | "Без відповіді: {питання}" + phrase |
 | 🟠 | At 2/3 of the meeting length | uncovered checklist items |
 | 🟠 | 5 min before the end | "Decisions to obtain" not obtained yet |
-| silent | Action item (who / what / when), CR candidate, commitment | log to state, show in the wrap-up |
+| silent | Action item (who / what / when), new request, commitment | log to state, show in the wrap-up |
 
 ### Answer check (the PM's own replies)
 
@@ -251,9 +253,9 @@ Internal Ukrainian call: the gist and the phrase are both in Ukrainian.
 
 ### The PM's questions during the call
 
-If the user writes in chat during the loop, answer first (short, from the brief, state
-and transcript tail; a deep lookup is allowed), then continue the loop from `offset`.
-"продовжуй" resumes after an interruption.
+If the user writes in chat during the loop, answer first (short, in the same tip format,
+from the brief, state and transcript tail; a deep lookup is allowed), then continue the
+loop from `offset`. "продовжуй" resumes after an interruption.
 
 ### How the meeting ends (Stop)
 
@@ -261,8 +263,8 @@ Three ways, all equivalent; the transcript file is closed with a `--- кінец
 
 1. **In chat** (normal way): the user writes "стоп", "все", "кінець", "кінець дзвінка",
    "end live" -> write an empty file `control/stop` (`touch`).
-2. **In Terminal**: Ctrl+C in the "Live transcriber" window -> the next poll returns
-   `@@STATUS stopped`.
+2. **In the "Live transcriber" Terminal window** (it opened by itself at the start): Ctrl+C
+   or closing the window -> the next poll returns `@@STATUS stopped`. A backup path.
 3. **Automatically**: no new lines for `tips.idle_stop_minutes` after at least 20 lines ->
    ask once "Дзвінок закінчився? Зупиняю запис через 2 хв", then write `control/stop`;
    planned length + 20 min, or `tips.hard_cap_minutes` -> write `control/stop`.
@@ -275,7 +277,7 @@ the last phrases), read the final delta, then Step 4 and Step 5 without waiting 
 
 ## Step 4 - Wrap-up
 
-One short message, Ukrainian:
+One short message, Ukrainian, no abbreviations:
 
 ```
 ## Підсумок дзвінка {title}

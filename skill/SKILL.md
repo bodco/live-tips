@@ -270,7 +270,8 @@ data source first for exact property names). Hosted Notion MCP (`notion-create-p
      `date:Date:is_datetime = 1`; no end. Write it with the offset of
      `settings.user.timezone` (e.g. `2026-10-10T23:48:00+03:00`), never as UTC-naive.
      If `settings.user.timezone` is missing (older settings.yaml), take the zone named in the
-     config Meetings Schedule; if none is named, ask once.
+     config Meetings Schedule; if none is named, ask once. Notion accepts `Europe/Kiev`
+     (verified); write `Europe/Kyiv` from a config as `Europe/Kiev`.
    - `Project`: the project page (`{config.notion.project_page_id}`) as a URL in a JSON array.
    - `Workspace`: read the `Workspace` relation of that project page (fetch it); fallback
      `{config.notion.workspace_page_id}`. Never guess.

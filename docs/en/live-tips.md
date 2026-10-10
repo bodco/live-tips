@@ -175,6 +175,40 @@ Next to it the skill keeps `<title>.brief.md` (the Live Brief) and `<title>.stat
 
 ## 5. Running a call
 
+### 5.0 Before the call: model and preparation
+
+**Which model to use for the session.** Every second of the model's thinking adds to the
+tip delay, so the choice depends on the call:
+
+| Call | Model | Why |
+|---|---|---|
+| Regular syncs, stand-ups, status calls | Sonnet 5.5, low or medium effort | Keeps up with the conversation and is careful enough for the answer check |
+| Client interview, escalation, steering, hard negotiation | Opus 5.5 | Sees contradictions and gaps better; a 10-30 s delay is acceptable on such calls |
+| Haiku | not recommended | Too shallow for the answer check and multilingual nuance |
+
+**Preparation in the same session.** Works best like this: open a session in the Cowork
+project, do the prep first, and write `live tips` right before the call.
+
+1. Prep: `client-meeting-prep` or `daily-team-prep`, or a free-form request like "prepare
+   me for a client interview about transaction reports, take these Notion pages <links>
+   and this folder <path> first". Meeting details, goals, questions, pages and folders to
+   load first go here.
+2. Right before the call: `live tips <project>`. The skill sees everything prepared
+   earlier in the session and builds the Live Brief around it: goals and questions from
+   the prep become the checklist, the named pages and folder become the core of the topic
+   map. It is a priority, not a limit: the rest of the project context (decisions, risks,
+   tracker, past meetings) is still loaded and used when the conversation goes elsewhere.
+
+**Client interview.** When the prep or your words make it clear this is an interview on a
+topic, the skill switches to interview mode: the checklist is your planned questions. It
+tracks which were asked and how fully they were answered. It tips where an answer is vague
+and worth a follow-up (as a ready English question), where it contradicts what is known,
+where a new topic deserves a question, and which questions are still not asked near the
+end. The wrap-up adds "answers to the interview questions": question → one-line answer →
+status.
+
+### 5.1 During the call
+
 1. A minute before the call, write in Cowork: **`live tips <project>`** (or "лайв
    підказки", "я на дзвінку", "дзвінок почався"). If no project is named, the skill asks.
    Language and length can be added: "live tips acme, internal, Ukrainian, 30 min".
@@ -325,7 +359,13 @@ the package).
 | `tips.answer_check` | Check the PM's own answers |
 | `tips.side_talk_summary` | Summarise the other side talking among themselves in another language |
 | `tips.idle_stop_minutes`, `tips.hard_cap_minutes` | Auto-stop |
-| `model_hint` | Which Claude model to use for the session: every second of its thinking adds to the tip delay |
+| `model_hint` | Which Claude model to use for the session (see section 5.0) |
+
+**Where `settings.yaml` lives.** It is a file inside the `live-tips` skill in your Claude
+account, not a separate file on the Mac. To change it, edit the file in the skill folder and
+upload the skill again (a zip with the `live-tips/` folder holding `SKILL.md` and
+`settings.yaml`) in Claude settings, Skills section. The template in this repository is
+`plugin/skills/live-tips/settings.yaml`.
 
 Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo window) are in
 `DEFAULTS` in `src/transcriber.py` and can be overridden in `config.json`.

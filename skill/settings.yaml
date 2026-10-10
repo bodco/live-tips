@@ -32,5 +32,8 @@ tips:
   hard_cap_minutes: 120
 
 model_hint: >
-  Fast mid-size model (Sonnet class), low or medium effort, for everyday calls.
-  Larger model for high-stakes calls if a tip delay of tens of seconds is fine.
+  Pick the session model before "live tips". Everyday calls: Sonnet class (Sonnet 5.5),
+  low or medium effort: fast enough for the loop, good judgement for the answer check.
+  Interviews, escalations, steering and other high-stakes calls: Opus class (Opus 5.5)
+  if a tip delay of 10-30 s is fine. Not Haiku class: too shallow for the answer check
+  and multilingual nuance.

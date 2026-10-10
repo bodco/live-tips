@@ -25,8 +25,14 @@ Brief of the project and posts a tip only when a trigger fires. Silence is the d
 Notion AI Meeting Notes is the fallback source (section "Fallback: Notion").
 
 Model: every iteration's thinking time adds to the tip delay. See `model_hint` in
-settings. Not a small/fast-only model: the answer check and multilingual nuance need
-judgement.
+settings: Sonnet class with low or medium effort for everyday calls, Opus class for
+interviews and high-stakes calls when a delay of 10-30 s is fine. Not Haiku class: the
+answer check and multilingual nuance need judgement.
+
+Typical session: the PM first runs a prep in the same session (`client-meeting-prep`,
+`daily-team-prep` or a free-form "prepare me for X" with meeting details, Notion pages or a
+folder to focus on), then starts this skill right before the call. Everything prepared
+earlier in the session is input for the Live Brief (Step 2).
 
 Hard rules:
 - No writes to Notion, Jira, Slack or email during or after the call without an explicit
@@ -103,7 +109,14 @@ about languages or length: use defaults and state them in the start message.
 
 ## Step 2 - Live Brief (while the first minutes are being recorded)
 
-Collect in parallel, everything scoped to this project (relation `Project` =
+**Focus sources first.** If this session already holds a meeting prep, an agenda, interview
+questions, or the user named specific Notion pages, documents or a folder for this call,
+read those first. Their goals and questions become the checklist, their facts the core of
+the topic map. They are a priority, not a limit: the standard project sources below are
+still collected and used when the conversation goes elsewhere. Copy the key prep points into
+the brief file so they survive a long session.
+
+Then collect in parallel, everything scoped to this project (relation `Project` =
 `{config.notion.project_page_id}`; tracker queries via the JQL Isolation Validator):
 
 | Source | What to take |
@@ -176,9 +189,21 @@ Then:
 | 🟠 | Side talk: 2+ consecutive `{them_label}` lines in a language other than the one the PM is speaking (e.g. `es` while the call is `en`) | "Між собою іспанською" + the gist in 1-2 lines. Skip small talk. |
 | 🟠 | A topic from the brief comes up | gist + up to 3 status facts from the brief |
 | 🟠 | A question to the PM stays unanswered for ~2 min | "Без відповіді: {питання}" + phrase |
-| 🟠 | At 2/3 of the meeting length | uncovered checklist items |
+| 🟠 | Interview: an answer opens a follow-up worth asking, or a planned question is skipped | "Уточни: {що}" + the question as a ready phrase |
+| 🟠 | At 2/3 of the meeting length | uncovered checklist items (for an interview: questions not asked yet) |
 | 🟠 | 5 min before the end | "Decisions to obtain" not obtained yet |
 | silent | Action item (who / what / when), new request, commitment | log to state, show in the wrap-up |
+
+### Interview mode
+
+When the meeting is an interview with the client on a topic (discovery, requirements,
+feedback; from the user's words or the prep), the roles flip: the client answers, the PM
+asks. The checklist is the list of planned questions. Track each one in state as `asked`,
+`answered`, `partial` or `not asked`, with a one-line answer summary. Tips focus on gaps:
+a vague or partial answer ("Уточни: ..."), a contradiction with what is known, a new topic
+worth a follow-up, planned questions left near the end. The answer check of the PM's own
+replies still runs but matters less. The wrap-up adds "Відповіді на питання інтерв'ю":
+question -> answer in one line -> status.
 
 ### Answer check (the PM's own replies)
 
@@ -287,6 +312,7 @@ Action items: ... (хто / що / коли)
 Зобов'язання з нашого боку: ...
 Відкриті питання: ...
 Відповіді, до яких варто повернутись: ... (питання -> що не так -> як закрити)
+Відповіді на питання інтерв'ю: ... (лише для інтерв'ю: питання -> відповідь -> статус)
 Не покрито з чекліста: ...
 Транскрипт: {project folder}/live/{file}
 Notion: {посилання на сторінку з Step 5}

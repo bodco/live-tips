@@ -33,8 +33,8 @@ Hard rules:
   (internal hub, never the client's workspace). Nothing is ever sent to the client. The only
   local files written are the control files of live-transcriber and this skill's own
   state/brief under `<project_root>/live/`.
-- Tips in `{settings.user.tips_language}`. A phrase the PM may say aloud is given in the language of the call.
-  Never use the long dash.
+- Tips follow the section "Tip format": a short gist in `{settings.user.tips_language}`,
+  then a ready phrase in the language of the call. No abbreviations. Never use the long dash.
 - Restricted internal sources (`projects/SKILL.md`) may shape a tip, but such a tip is
   marked 🔒 so the PM never repeats it aloud to the client.
 - Estimates: never suggest a number (`_standards.md`, rule 7). Only "оцінку дає
@@ -124,13 +124,14 @@ Compress into the **Live Brief**, max ~1200 words, saved next to the transcript 
 4. Red lines: decided items not to reopen, out-of-scope areas, decision rights.
 5. Names and aliases (how Whisper may spell people).
 
-Show the user only the checklist (max 6 lines) and `Мовчу, поки нема що сказати.`
+Show the user only the checklist (max 6 short lines, no abbreviations, ~45 characters per
+line) and `Мовчу, поки нема що сказати.`
 
 ## Step 3 - Live loop
 
 State file `<transcript name>.state.json` next to the transcript: `offset` (bytes read),
 `covered`, `tips_given`, `answers`, `action_items`, `cr_candidates`, `side_talk`, `last_tip_at`,
-`started_at` (Mac local time without offset, from `status.json`; its zone is `settings.user.timezone`). Long state lives there, not in the conversation.
+`started_at` and `timezone` (from `status.json`: start time with the Mac's UTC offset and the Mac's IANA zone). Long state lives there, not in the conversation.
 
 Each iteration is ONE device_bash call that long-polls for new lines:
 
@@ -163,8 +164,8 @@ Then:
 
 | Level | Trigger | Tip |
 |---|---|---|
-| 🔴 | `{them_label}` asks for something new, "could you also", "can we add", a change in behaviour or scope | "Схоже на CR. Не погоджуй зараз." + phrase, e.g. "Let me log this and come back with an estimate." |
-| 🔴 | `{me_label}` commits a date or an estimate | compare with milestones / tracker; "оцінку дає виконавець, не фіксуй цифру на дзвінку" |
+| 🔴 | `{them_label}` asks for something new, "could you also", "can we add", a change in behaviour or scope | "Нова вимога. Не погоджуй зараз." + phrase, e.g. "Good idea. I will write it down. We will check it and come back to you." |
+| 🔴 | `{me_label}` commits a date or an estimate | compare with milestones / tracker; "Оцінку дає виконавець. Не називай цифру." + phrase |
 | 🔴 | A statement contradicts a Decision or red line | "Це суперечить рішенню {дата}: {рішення}" |
 | 🔴 | Frustration, escalation, "disappointed", "again", threat to timeline or contract | "Сигнал незадоволення: {що саме}. Визнай, дай план і дату наступного апдейту." |
 | 🔴 | Answer check: `{me_label}` states a fact that contradicts the brief, tracker or a Decision (wrong status, date, owner, scope) | "Неточно: ти сказав {X}, а {джерело} каже {Y}." + correction phrase |
@@ -202,9 +203,51 @@ an uncertain tip "(?)", never quote a garbled line as fact.
 
 - 🔴 immediately.
 - 🟠 / 🔵 max one message per `tips.rate_seconds`; batch several into one message.
-- Max 3 lines per message: `{emoji} {суть}` / `Фраза: "{phrase}"` (optional) /
-  `Джерело: {Decision 2026-09-30 | ACME-123 | brief}`.
+- One tip = the block from "Tip format". Max 2 tips per message, separated by an empty line.
 - Never repeat a tip already in `tips_given` unless the situation changed.
+
+### Tip format (small window under the camera)
+
+The PM keeps the Cowork window small, at the top centre of the screen under the camera, and
+reads tips with a glance while talking. Every tip is built for that:
+
+1. **Gist line**, bold: emoji + what is happening, in `{settings.user.tips_language}`, max
+   7 words. Always first, so the PM understands the point in one second.
+2. **Phrase to say**, in quotes, in the language of the call. A ready speech the PM can read
+   aloud as is, not theses. 1-2 sentences.
+   - English: simple sentences, max 12 words each, everyday words, present or future
+     simple, active voice. No idioms, no long subordinate clauses, no rare phrasal verbs.
+     "We will check it and come back to you on Friday." Not "Let me circle back once we've
+     had a chance to scope it out."
+   - Ukrainian or another call language: the same rules, in that language.
+   - No phrase when there is nothing to say (pure status or a side-talk summary).
+3. **Facts** (only for status and side-talk tips): max 3 short lines, max 8 words each, in
+   the language of the call for status (so they can be read out), in
+   `{settings.user.tips_language}` for side talk.
+4. **Source** (only for 🔴 contradictions and inaccuracies): one short italic line, e.g.
+   `_рішення від 30.09_`.
+
+Layout rules: max ~45 characters per line, max 5 lines per tip; no tables, headings, code
+blocks or links. **No abbreviations** anywhere in tips, the checklist or the wrap-up: write
+"нова вимога" / "a new request", not CR; "термін" / "date", not ETA; no ticket keys either,
+name the topic instead. Product and people names stay as they are.
+
+Examples (English call):
+
+> **🔴 Нова вимога. Не погоджуй зараз.**
+> "Good idea. I will write it down. We will check it and come back to you."
+
+> **🔴 Неточно: реліз 15.10, не 10.10**
+> "Sorry, a small correction. The release date is October 15."
+> _рішення від 30.09_
+
+> **🟠 Питали про термін, не про обсяг**
+> "About the date: I will confirm it with the team by Friday."
+
+> **🟠 Між собою іспанською**
+> Сумніваються, чи встигнуть протестувати до релізу.
+
+Internal Ukrainian call: the gist and the phrase are both in Ukrainian.
 
 ### The PM's questions during the call
 
@@ -238,7 +281,7 @@ One short message, Ukrainian:
 ## Підсумок дзвінка {title}
 Джерела: Transcript OK ({N} рядків, {мови}) · Brief OK · Jira {state} · Notion DBs {state}
 Action items: ... (хто / що / коли)
-CR-кандидати: ...
+Нові вимоги (кандидати на зміну обсягу): ...
 Зобов'язання з нашого боку: ...
 Відкриті питання: ...
 Відповіді, до яких варто повернутись: ... (питання -> що не так -> як закрити)
@@ -260,17 +303,19 @@ data source first for exact property names). Hosted Notion MCP (`notion-create-p
 1. **Name.** Generate a short meaningful meeting name in the language of the call from what
    was actually discussed (2-6 words, e.g. "Fraud Engine scope sync"), not "Meeting".
    Title = `<name> @<start date-time>`, where the date-time is a Notion date mention:
-   `<name> <mention-date start="YYYY-MM-DD" startTime="HH:mm" timeZone="<settings.user.timezone>"/>`.
+   `<name> <mention-date start="YYYY-MM-DD" startTime="HH:mm" timeZone="<zone>"/>`.
    `notion-create-pages` stores a mention in the title as literal text, so create the page
    with the plain `<name>` and then set the title with `notion-update-page`
    `update_properties` (that call parses the mention). Verify with a fetch: the title must
    read `<name> @...`.
 2. **Properties.**
-   - `Date`: start date-time of the meeting (`started_at` from status / state), with
-     `date:Date:is_datetime = 1`; no end. Write it with the offset of
-     `settings.user.timezone` (e.g. `2026-10-10T23:48:00+03:00`), never as UTC-naive.
-     If `settings.user.timezone` is missing (older settings.yaml), take the zone named in the
-     config Meetings Schedule; if none is named, ask once.
+   - `Date`: start date-time of the meeting = `started_at` from `status.json` (it already
+     carries the Mac's offset, e.g. `2026-10-10T23:48:02+03:00`), with
+     `date:Date:is_datetime = 1`; no end.
+   - `<zone>` for the title mention: `timezone` from `status.json` (the Mac clock). Missing
+     (older live-transcriber): `settings.user.timezone`, else the zone named in the config
+     Meetings Schedule, else ask once. Notion accepts `Europe/Kiev` (verified): write
+     `Europe/Kyiv` as `Europe/Kiev`.
    - `Project`: the project page (`{config.notion.project_page_id}`) as a URL in a JSON array.
    - `Workspace`: read the `Workspace` relation of that project page (fetch it); fallback
      `{config.notion.workspace_page_id}`. Never guess.
@@ -287,7 +332,7 @@ data source first for exact property names). Hosted Notion MCP (`notion-create-p
    	</notes>
    </meeting-notes>
    ## Підсумок
-   <the Step 4 wrap-up as Notion blocks: action items as to-dos, CR candidates, open questions>
+   <the Step 4 wrap-up as Notion blocks: action items as to-dos, new requests, open questions>
    ```
    One line of the transcript = one paragraph; escape `[ ] < > *` per the Notion markdown
    spec. Header and footer lines of the transcript file are not copied.

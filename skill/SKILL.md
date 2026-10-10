@@ -192,7 +192,7 @@ Then:
 
 | Level | Trigger | Tip |
 |---|---|---|
-| 🔴 | Your turn: `{them_label}` addresses the PM by any of `settings.user.name_aliases` (any grammatical form, e.g. vocative "Богдане", or a misspelling) with a request for an update or opinion ("розкажи", "що в тебе", "які апдейти", "your updates", "over to you", "what about you"), or the round of updates reaches the PM | "Your turn" tip from "My update": opening sentence + points in order. Immediate, ignores the rate limit |
+| 🔴 | Your turn: `{them_label}` addresses the PM by any of `settings.user.name_aliases` (any grammatical form, e.g. vocative "Іване", or a misspelling) with a request for an update or opinion ("розкажи", "що в тебе", "які апдейти", "your updates", "over to you", "what about you"), or the round of updates reaches the PM | "Your turn" tip from "My update": opening sentence + points in order. Immediate, ignores the rate limit |
 | 🔴 | `{them_label}` asks for something new, "could you also", "can we add", a change in behaviour or scope | "Нова вимога. Не погоджуй зараз." + phrase, e.g. "Good idea. I will write it down. We will check it and come back to you." |
 | 🔴 | `{me_label}` commits a date or an estimate | compare with milestones / tracker; "Оцінку дає виконавець. Не називай цифру." + phrase |
 | 🔴 | A statement contradicts a Decision or red line | "Суперечить рішенню {дата}" + the decision in a few words |

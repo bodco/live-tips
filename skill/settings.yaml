@@ -5,7 +5,7 @@ user:
   me_label: "Я"                  # how the PM's own mic lines are labelled in the transcript
   them_label: "Співрозмовник"    # label for everyone else (system audio)
   tips_language: uk              # language of tips and the wrap-up
-  timezone: Europe/Kiev          # IANA zone (Notion accepts Europe/Kiev, verified) of the Mac clock: Meetings DB Date and the title date mention
+  timezone: Europe/Kiev          # fallback only: live-transcriber reports the Mac zone itself (Notion accepts Europe/Kiev)
 
 paths:
   work_root: ~~home-folder/work                          # Mac folder connected to Cowork

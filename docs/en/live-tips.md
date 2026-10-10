@@ -91,7 +91,7 @@ Runtime folders (not in git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `cont
 |---|---|---|
 | `control/start.json` | the skill or a person | Start request: `project_dir`, `title`, `slug`, `me_lang`, `langs`, `me_label`, `them_label`, `prompt`. Renamed to `control/active.json` on start |
 | `control/stop` | the skill or a person (`touch`) | Stop request. Content does not matter |
-| `state/status.json` | transcriber | `state` (`loading_model` → `recording` → `stopping` → `stopped`, or `error`), `file`, `started_at`, `lines`, `queue`, `mic`, `system_audio`, `errors` |
+| `state/status.json` | transcriber | `state` (`loading_model` → `recording` → `stopping` → `stopped`, or `error`), `file`, `started_at` (with offset), `timezone`, `lines`, `queue`, `mic`, `system_audio`, `errors` |
 | `state/pid`, `state/launching` | transcriber / on-control.sh | Guard against a double start |
 | `logs/transcriber.log`, `logs/launcher.log`, `logs/install.log`, `logs/audiocap-*.log` | all | First place to look when something fails |
 
@@ -179,20 +179,50 @@ Next to it the skill keeps `<title>.brief.md` (the Live Brief) and `<title>.stat
    підказки", "я на дзвінку", "дзвінок почався"). If no project is named, the skill asks.
    Language and length can be added: "live tips acme, internal, Ukrainian, 30 min".
 2. The skill checks the install and that nothing else is recording, drops
-   `control/start.json` and waits for `recording` (5-20 s to load the model). A "Live
-   transcriber" Terminal window opens. Do not close it.
+   `control/start.json` and waits for `recording` (5-20 s to load the model). The "Live
+   transcriber" Terminal window opens by itself: you do not start it. The recording lives
+   in it, because the macOS microphone and system audio permissions belong to Terminal.
+   Minimise it (Cmd+M) or keep it behind other windows, but do not close it. If it is
+   closed anyway, the recording stops cleanly and the transcript so far is kept.
 3. The chat shows `Запис іде: <file>. Мови: я en, дозволені en+es.` ("Recording: …"), and
    a minute later the meeting checklist from the Live Brief (open topics, decisions, risks,
    promises from previous meetings, tickets) and "Мовчу, поки нема що сказати." ("Staying
    quiet until there is something to say").
-4. From then on the skill is silent until a trigger fires. A tip is at most three lines:
-   the point, a phrase the PM can say aloud in the language of the call, the source.
+4. From then on the skill is silent until a trigger fires.
 
 | Level | When |
 |---|---|
-| 🔴 immediately | A request that looks like a CR; the PM names a date or an estimate; a contradiction with a recorded decision; a dissatisfaction signal; the PM states a fact that contradicts the tracker or decisions |
+| 🔴 immediately | A request that looks like a new requirement; the PM names a date or an estimate; a contradiction with a recorded decision; a dissatisfaction signal; the PM states a fact that contradicts the tracker or decisions |
 | 🟠 at most once per `rate_seconds` | The PM answered a different question or only part of it; a vague answer where a date or an owner was expected; the other side switched to another language (short gist); a topic or ticket from the brief came up; a question unanswered for ~2 min; 2/3 of the time with checklist items uncovered; 5 min before the end with decisions not obtained |
-| silent | Action items, CR candidates, commitments: they go into the wrap-up |
+| silent | Action items, new requests, commitments: they go into the wrap-up |
+
+### What a tip looks like
+
+Built for a small Cowork window at the top centre of the screen, under the camera, so the
+eyes do not wander. Every tip is 2-5 short lines (~45 characters), no tables, headings or
+links.
+
+1. **Gist**, bold: emoji and what is happening, in the tips language (Ukrainian for the
+   author), max 7 words. Always first, to get the point in one second.
+2. **Phrase**, in quotes, in the language of the call. A ready speech to read aloud as is,
+   not bullet points. 1-2 sentences. In English: simple sentences up to 12 words,
+   everyday words, present or future simple, active voice, no idioms or long clauses.
+3. **Facts** (only for status and side-talk tips): up to 3 lines of up to 8 words.
+4. **Source** (only for 🔴 contradictions and inaccuracies): one short italic line.
+
+**No abbreviations:** "a new request", not CR; "date", not ETA. No ticket keys either, the
+topic name instead. People and product names stay as they are.
+
+Examples on an English call:
+
+> **🔴 Нова вимога. Не погоджуй зараз.** (New request. Do not agree now.)
+> "Good idea. I will write it down. We will check it and come back to you."
+
+> **🔴 Неточно: реліз 15.10, не 10.10** (Inaccurate: release 15.10, not 10.10)
+> "Sorry, a small correction. The release date is October 15."
+> _рішення від 30.09_ (decision of 30.09)
+
+On an internal Ukrainian call both the gist and the phrase are in Ukrainian.
 
 A 🔒 tip relies on an internal source and must never be repeated to the client. The skill
 never suggests an estimate in hours: "the assignee gives the estimate, log it and come back".
@@ -211,8 +241,9 @@ Three equivalent ways. Each closes the transcript with a
 1. **In the chat (the normal way):** write `стоп`, `все`, `кінець`, `кінець дзвінка` or
    `end live`. The skill creates `control/stop`, waits up to 60 s for the last phrases to be
    transcribed and reads the final lines.
-2. **In Terminal:** Ctrl+C in the "Live transcriber" window. The skill sees `stopped` on
-   the next poll.
+2. **In the "Live transcriber" Terminal window** (it opened by itself at the start): Ctrl+C
+   or close the window. A backup path when the chat is not at hand. The skill sees
+   `stopped` on the next poll.
 3. **Automatically:** after at least 20 lines, if there are no new lines for
    `idle_stop_minutes`, the skill asks once "Has the call ended? Stopping in 2 min" and
    stops. Hard limit: planned length + 20 min, or `hard_cap_minutes`.
@@ -228,7 +259,7 @@ By hand, without the skill: `touch ~/work/Tools/live-transcriber/control/stop`.
 
 ### 7.1 Wrap-up in the chat
 
-Action items (who / what / when), CR candidates, our commitments, open questions, "answers
+Action items (who / what / when), new requests, our commitments, open questions, "answers
 worth coming back to" (question → what is wrong → how to close it), checklist items not
 covered, the transcript path, the link to the Notion page. Then the skill only offers next
 steps (report, change-request, risk-register) and runs nothing without a command.
@@ -240,12 +271,12 @@ The skill creates one page in the project's `notion.meetings_db`:
 | What | Value |
 |---|---|
 | Title | `<generated name> @<start date-time>`. The skill writes the name from what was actually discussed (2-6 words, in the language of the call). The date-time in the title is a Notion date mention, a clickable date like in native AI Meeting Notes |
-| `Date` | Meeting start date and time (`started_at` from `status.json`) in `settings.user.timezone` |
+| `Date` | Meeting start date and time (`started_at` from `status.json`, with the Mac's UTC offset) |
 | `Project` | The project page (`notion.project_page_id`) |
 | `Workspace` | The workspace the project belongs to: read from the `Workspace` relation on the project page (fallback `notion.workspace_page_id`). Example: the project belongs to the workspace of the company you work for |
 | `Meeting type` | Only if the meeting type exactly matches an existing option; the skill never creates options |
 | `Summary` | 1-2 sentences |
-| Body | An AI Meeting Notes block with the transcript, then a "Підсумок" (wrap-up) section: action items as to-dos, CR candidates, open questions |
+| Body | An AI Meeting Notes block with the transcript, then a "Підсумок" (wrap-up) section: action items as to-dos, new requests, open questions |
 
 **Notion API limit (verified 2026-10-11).** The `Transcript` and `Summary` sections of an AI
 Meeting Notes block cannot be written through the API: the Notion spec says writing
@@ -284,7 +315,7 @@ the package).
 |---|---|
 | `user.me_label`, `user.them_label` | Channel labels in the transcript |
 | `user.tips_language` | Language of tips and the wrap-up |
-| `user.timezone` | IANA zone of the Mac clock: the `Date` property and the date in the page title (Notion accepts `Europe/Kiev`) |
+| `user.timezone` | Fallback IANA zone. Usually not needed: live-transcriber writes the Mac clock zone and offset into `status.json` itself (Notion accepts `Europe/Kiev`) |
 | `paths.work_root` | Mac folder connected to Cowork |
 | `paths.tool_root` | Where live-transcriber lives |
 | `languages.internal` | Microphone language and allowed languages for internal calls |

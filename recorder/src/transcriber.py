@@ -80,6 +80,16 @@ def norm(text: str) -> str:
     return re.sub(r"[^\w\s]", "", text.lower()).strip()
 
 
+def mac_timezone() -> str | None:
+    """IANA zone of the Mac clock, e.g. Europe/Kyiv (from the /etc/localtime symlink)."""
+    try:
+        real = os.path.realpath("/etc/localtime")
+        i = real.find("zoneinfo/")
+        return real[i + len("zoneinfo/"):] if i >= 0 else None
+    except OSError:
+        return None
+
+
 def slugify(s: str) -> str:
     s = re.sub(r"[^\w\s-]", "", s, flags=re.UNICODE).strip().lower()
     return re.sub(r"[\s_]+", "-", s)[:60] or "meeting"
@@ -478,7 +488,8 @@ def main() -> int:
         stop_file.unlink()
 
     status = {"state": "loading_model", "pid": os.getpid(), "file": str(out), "title": title,
-              "slug": cfg.get("slug"), "started_at": dt.datetime.fromtimestamp(started).isoformat(timespec="seconds"),
+              "slug": cfg.get("slug"), "started_at": dt.datetime.fromtimestamp(started).astimezone().isoformat(timespec="seconds"),
+              "timezone": mac_timezone(),
               "langs": cfg["langs"], "me_lang": cfg["me_lang"], "lines": 0, "queue": 0,
               "system_audio": "starting", "mic": "starting", "errors": []}
     write_json_atomic(STATE / "status.json", status)
@@ -513,6 +524,7 @@ def main() -> int:
         stop_ev.set()
     signal.signal(signal.SIGINT, on_signal)
     signal.signal(signal.SIGTERM, on_signal)
+    signal.signal(signal.SIGHUP, on_signal)   # Terminal window closed: stop cleanly, keep the transcript
 
     last_lang = {"me": cfg["me_lang"] if cfg["me_lang"] != "auto" else cfg["langs"][0],
                  "them": cfg["langs"][0]}

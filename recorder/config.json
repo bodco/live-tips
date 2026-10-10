@@ -1,0 +1,11 @@
+{
+  "model": "mlx-community/whisper-large-v3-turbo",
+  "me_label": "Я",
+  "them_label": "Співрозмовник",
+  "me_lang": "uk",
+  "langs": [
+    "uk",
+    "ru"
+  ],
+  "launchd_label": "com.pm-control-tower.live-transcriber"
+}

@@ -1,0 +1,36 @@
+# live-tips: personal settings. Everything user- or machine-specific lives here.
+# Sharing the skill: a colleague edits only this file (and installs live-transcriber).
+
+user:
+  me_label: "Я"                  # how the PM's own mic lines are labelled in the transcript
+  them_label: "Співрозмовник"    # label for everyone else (system audio)
+  tips_language: uk              # language of tips and the wrap-up
+  timezone: Europe/Kiev          # IANA zone (Notion accepts Europe/Kiev, verified) of the Mac clock: Meetings DB Date and the title date mention
+
+paths:
+  work_root: ~~home-folder/work                          # Mac folder connected to Cowork
+  tool_root: ~~home-folder/work/Tools/live-transcriber
+  # Inside device_bash the work_root is mounted as $HOME/mnt/<basename of work_root>
+
+languages:
+  # The PM's own mic language is FIXED per call (better accuracy than auto-detect).
+  internal:                      # calls with our own team
+    me_lang: uk
+    langs: [uk, ru]              # everything that may be spoken on the call
+  client:                        # client calls: defaults when the project has no override
+    me_lang: from_project        # = client_language of the project config
+    langs: [from_project]
+  per_project:                   # overrides by project slug and call kind
+    acme-portal:                 # example: an English-speaking client whose team talks Spanish between themselves
+      client: {me_lang: en, langs: [en, es]}
+
+tips:
+  rate_seconds: 90               # min gap between non-urgent tips
+  answer_check: true             # judge the PM's own answers (relevance, accuracy, commitments)
+  side_talk_summary: true        # summarise when others switch to another language
+  idle_stop_minutes: 6           # no new lines this long -> offer to stop
+  hard_cap_minutes: 120
+
+model_hint: >
+  Fast mid-size model (Sonnet class), low or medium effort, for everyday calls.
+  Larger model for high-stakes calls if a tip delay of tens of seconds is fine.

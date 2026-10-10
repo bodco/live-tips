@@ -70,8 +70,9 @@ user to connect the `work_root` folder.
 3. **Meeting type, title, length.** From the user's words, else from the config Meetings
    Schedule by day and time (the `Type` column is the title), else title "Meeting", 60 min.
    Type decides: client call (client phrasing, 🔒 rule) or internal call.
-4. **Languages.** `me_lang` = the PM's own mic language on this call (fixed, not
-   detected), `langs` = all languages expected on the call. Resolution order:
+4. **Languages.** `me_lang` = the PM's main mic language on this call, `me_langs` = the
+   languages the PM may switch to on this call (the mic picks only among them, so Ukrainian
+   is never heard as Russian), `langs` = all languages expected on the call. Resolution order:
    1. the user's words ("сьогодні англійською", "будуть іспанською");
    2. `settings.languages.per_project.{slug}.{internal|client}`;
    3. `settings.languages.internal` or `settings.languages.client`, where `from_project`
@@ -94,7 +95,7 @@ about languages or length: use defaults and state them in the start message.
    It improves spelling of names.
 3. Write `control/start.json` with a small python one-liner inside device_bash
    (`json.dump`, UTF-8, `ensure_ascii=False`):
-   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "langs": "xx+yy", "me_label": "...", "them_label": "...", "prompt": "..."}`
+   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "..."}`
    (labels from `settings.user`).
    The LaunchAgent opens a Terminal window "Live transcriber" with the recording by itself;
    the PM does not start it, may minimise it, should not close it.
@@ -105,7 +106,7 @@ about languages or length: use defaults and state them in the start message.
      `logs/launcher.log`, say what failed. Common fixes: install.sh not run, Terminal has no
      microphone / system audio permission, LaunchAgent not loaded
      (`launchctl list | grep live-transcriber` on the Mac).
-5. One message: `Запис іде: {file name}. Мови: я {me_lang}, дозволені {langs}.` plus the
+5. One message: `Запис іде: {file name}. Мови: я {me_langs or me_lang}, дозволені {langs}.` plus the
    checklist from Step 2 when ready.
 
 ## Step 2 - Live Brief (while the first minutes are being recorded)
@@ -188,6 +189,25 @@ Then:
    `mic=silent` likewise; `queue` > 6 -> "Транскрипція відстає на ~{queue} фраз";
    `errors>0` -> tail of `logs/transcriber.log`. Each warning once.
 
+### Language of the moment
+
+The call language can change mid-call, mostly on internal calls (Ukrainian, Russian and
+English all possible). Keep `answer_lang` in state = the language the PM is expected to
+speak right now; every phrase in a tip goes in `answer_lang`, the gist line always stays
+in `{settings.user.tips_language}`.
+
+- Start: `answer_lang = me_lang`.
+- Switch when someone asks the PM to say or explain something in another language
+  ("розкажи це англійською", "скажи по-английски", "can you say it in English", "for Mark
+  in English please"), or when a question to the PM comes in a language of `me_langs` other
+  than the current one (e.g. an English-speaking guest asks in English). Post at once a
+  🟠 tip: gist in Ukrainian with what to say, phrase in the new language:
+  > **🟠 Тепер англійською: статус релізу**
+  > "Short update in English. The release is on track for Friday."
+- Switch back when the PM's own lines return to the main language for 2+ lines, or the
+  request is clearly answered.
+- Ukrainian and Russian on the same internal call are one conversation, not side talk.
+
 ### Triggers
 
 | Level | Trigger | Tip |
@@ -200,7 +220,7 @@ Then:
 | 🔴 | Answer check: `{me_label}` states a fact that contradicts the brief, tracker or a Decision (wrong status, date, owner, scope) | "Неточно: {Y}, не {X}" + correction phrase + source |
 | 🟠 | Answer check: `{me_label}` answered, but not the question that was asked, or only part of it | "Питали про {що}, не про {інше}" + short phrase to close it |
 | 🟠 | Answer check: `{me_label}` answered vaguely where the other side wanted a concrete thing (date, owner, yes/no) | "Розмито. Дай {дату / власника / так-ні}" + phrase |
-| 🟠 | Side talk: 2+ consecutive `{them_label}` lines in a language other than the one the PM is speaking (e.g. `es` while the call is `en`) | "Між собою іспанською" + the gist in 1-2 lines. Skip small talk. |
+| 🟠 | Side talk: 2+ consecutive `{them_label}` lines in a language the PM does not use on this call (not in `me_langs`; uk and ru count as one on internal calls), e.g. `es` while the call is `en` | "Між собою іспанською" + the gist in 1-2 lines. Skip small talk. |
 | 🟠 | A topic from the brief comes up | gist + up to 3 status facts from the brief |
 | 🟠 | A question to the PM stays unanswered for ~2 min | "Без відповіді: {питання}" + phrase |
 | 🟠 | Interview: an answer opens a follow-up worth asking, or a planned question is skipped | "Уточни: {що}" + the question as a ready phrase |
@@ -254,7 +274,7 @@ reads tips with a glance while talking. Every tip is built for that:
 
 1. **Gist line**, bold: emoji + what is happening, in `{settings.user.tips_language}`, max
    7 words. Always first, so the PM understands the point in one second.
-2. **Phrase to say**, in quotes, in the language of the call. A ready speech the PM can read
+2. **Phrase to say**, in quotes, in `answer_lang` (see "Language of the moment"). A ready speech the PM can read
    aloud as is, not theses. 1-2 sentences.
    - English: simple sentences, max 12 words each, everyday words, present or future
      simple, active voice. No idioms, no long subordinate clauses, no rare phrasal verbs.

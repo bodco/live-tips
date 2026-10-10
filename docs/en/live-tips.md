@@ -221,6 +221,17 @@ per project.
 > 2. Payments: waiting for the client
 > 3. We need a decision on the release date
 
+**Switching language mid-call.** Internal calls can mix Ukrainian, Russian and English.
+Your microphone is recognised only among your own languages (`me_langs`, e.g. Ukrainian and
+English), so Ukrainian never turns into Russian and an English part is recognised
+correctly. The skill keeps a "language of the moment": when you are asked "say it in
+English" or a guest asks you in English, a tip arrives at once with the gist in your
+language and the phrase already in English, and phrases stay in English until you switch
+back. Ukrainian and Russian on one internal call count as one conversation, not side talk.
+
+> **🟠 Тепер англійською: статус релізу** (Now in English: release status)
+> "Short update in English. The release is on track for Friday."
+
 **Client interview.** When the prep or your words make it clear this is an interview on a
 topic, the skill switches to interview mode: the checklist is your planned questions. It
 tracks which were asked and how fully they were answered. It tips where an answer is vague
@@ -375,7 +386,7 @@ the package).
 | `user.timezone` | Fallback IANA zone. Usually not needed: live-transcriber writes the Mac clock zone and offset into `status.json` itself (Notion accepts `Europe/Kiev`) |
 | `paths.work_root` | Mac folder connected to Cowork |
 | `paths.tool_root` | Where live-transcriber lives |
-| `languages.internal` | Microphone language and allowed languages for internal calls |
+| `languages.internal` | `me_lang` (main mic language), `me_langs` (languages you may switch to, e.g. `[uk, en]`), `langs` (all call languages, e.g. `[uk, ru, en]`) for internal calls |
 | `languages.client` | The same for client calls; `from_project` = `client_language` from the config |
 | `languages.per_project.<slug>.<internal\|client>` | Override for a specific project |
 | `tips.rate_seconds` | Minimum gap between non-urgent tips |

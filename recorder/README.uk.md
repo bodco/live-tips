@@ -27,7 +27,7 @@ bash ~/work/Tools/live-transcriber/install.sh
 ## Керування
 
 - Старт: файл `control/start.json`, напр.
-  `{"project_dir": "/Users/you/work/Acme Portal", "title": "Sync", "slug": "acme-portal", "me_lang": "uk", "langs": "uk+ru", "prompt": "Acme, Portal, Jira"}`.
+  `{"project_dir": "/Users/you/work/Acme Portal", "title": "Sync", "slug": "acme-portal", "me_lang": "uk", "me_langs": "uk+en", "langs": "uk+ru+en", "prompt": "Acme, Portal, Jira"}`.
   LaunchAgent побачить файл і відкриє вікно Terminal "Live transcriber".
 - Стоп: `touch control/stop` або Ctrl+C у цьому вікні. Закриття Zoom/Meet запис НЕ зупиняє.
 - Стан: `state/status.json` (`state`, `file`, `started_at`, `lines`, `queue`, `mic`, `system_audio`, `errors`).

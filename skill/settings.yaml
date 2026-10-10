@@ -16,10 +16,12 @@ paths:
 languages:
   # The PM's own mic language is FIXED per call (better accuracy than auto-detect).
   internal:                      # calls with our own team
-    me_lang: uk
-    langs: [uk, ru]              # everything that may be spoken on the call
+    me_lang: uk                  # main language of your mic
+    me_langs: [uk, en]           # languages YOU may switch to on the call ("say it in English")
+    langs: [uk, ru, en]          # everything that may be spoken on the call
   client:                        # client calls: defaults when the project has no override
     me_lang: from_project        # = client_language of the project config
+    me_langs: [from_project]     # add your own language if you may switch to it
     langs: [from_project]
   per_project:                   # overrides by project slug and call kind
     acme-portal:                 # example: an English-speaking client whose team talks Spanish between themselves

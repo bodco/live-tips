@@ -27,7 +27,7 @@ the `sys` test).
 ## Control
 
 - Start: write `control/start.json`, e.g.
-  `{"project_dir": "/Users/you/work/Acme Portal", "title": "Sync", "slug": "acme-portal", "me_lang": "uk", "langs": "uk+ru", "prompt": "Acme, Portal, Jira"}`.
+  `{"project_dir": "/Users/you/work/Acme Portal", "title": "Sync", "slug": "acme-portal", "me_lang": "uk", "me_langs": "uk+en", "langs": "uk+ru+en", "prompt": "Acme, Portal, Jira"}`.
   The LaunchAgent sees it and opens a "Live transcriber" Terminal window.
 - Stop: `touch control/stop`, or Ctrl+C in that window. Closing Zoom/Meet does NOT stop it.
 - State: `state/status.json` (`state`, `file`, `started_at`, `lines`, `queue`, `mic`, `system_audio`, `errors`).

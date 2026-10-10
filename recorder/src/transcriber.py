@@ -47,6 +47,7 @@ DEFAULTS = {
     "me_label": "Я",
     "them_label": "Співрозмовник",
     "me_lang": "uk",            # language of the PM's own mic; "auto" = pick from langs
+    "me_langs": [],             # optional: languages the PM may switch between (e.g. uk+en); mic picks among them
     "langs": ["uk", "ru"],      # allowed languages in this meeting
     "vad_mode": 2,              # webrtcvad aggressiveness 0..3
     "end_silence": 0.7,         # s of silence that closes a segment
@@ -261,13 +262,14 @@ class Whisper:
             self.detector = None
             log(f"restricted language detection unavailable ({e!r}); using whisper auto + check")
 
-    def pick_language(self, audio: np.ndarray) -> str | None:
-        if len(self.langs) == 1:
-            return self.langs[0]
+    def pick_language(self, audio: np.ndarray, allowed: list[str] | None = None) -> str | None:
+        allowed = allowed or self.langs
+        if len(allowed) == 1:
+            return allowed[0]
         if self.detector is None:
-            return None
+            return None if allowed is self.langs else allowed[0]
         probs = self.detector(audio)
-        return max(self.langs, key=lambda l: probs.get(l, 0.0))
+        return max(allowed, key=lambda l: probs.get(l, 0.0))
 
     def transcribe(self, audio: np.ndarray, language: str | None, prompt: str | None) -> tuple[str, str]:
         res = self.mlx_whisper.transcribe(
@@ -296,8 +298,8 @@ class FakeWhisper:
     def __init__(self, cfg: dict):
         self.langs = cfg["langs"]
 
-    def pick_language(self, audio):
-        return self.langs[0]
+    def pick_language(self, audio, allowed=None):
+        return (allowed or self.langs)[0]
 
     def transcribe(self, audio, language, prompt):
         import hashlib
@@ -450,17 +452,25 @@ def load_request(args) -> dict:
             sys.exit("control/start.json not found")
         req = json.loads(start.read_text(encoding="utf-8"))
         os.replace(start, CONTROL / "active.json")
-    for k in ("project_dir", "title", "slug", "prompt", "me_lang", "langs", "model"):
+    for k in ("project_dir", "title", "slug", "prompt", "me_lang", "me_langs", "langs", "model"):
         v = getattr(args, k, None)
         if v:
             req[k] = v
-    if isinstance(req.get("langs"), str):
-        req["langs"] = [l.strip() for l in req["langs"].replace("+", ",").split(",") if l.strip()]
+    for key in ("langs", "me_langs"):
+        if isinstance(req.get(key), str):
+            req[key] = [l.strip() for l in req[key].replace("+", ",").split(",") if l.strip()]
     cfg.update({k: v for k, v in req.items() if v not in (None, "")})
     if not cfg.get("project_dir"):
         sys.exit("project_dir is required")
     if cfg["me_lang"] not in ("auto", None) and cfg["me_lang"] not in cfg["langs"]:
         cfg["langs"] = [cfg["me_lang"]] + list(cfg["langs"])
+    me_langs = [l for l in (cfg.get("me_langs") or []) if l]
+    if me_langs and cfg["me_lang"] not in ("auto", None) and cfg["me_lang"] not in me_langs:
+        me_langs = [cfg["me_lang"]] + me_langs
+    cfg["me_langs"] = me_langs
+    for l in me_langs:
+        if l not in cfg["langs"]:
+            cfg["langs"] = list(cfg["langs"]) + [l]
     return cfg
 
 
@@ -472,6 +482,7 @@ def main() -> int:
     ap.add_argument("--slug")
     ap.add_argument("--prompt")
     ap.add_argument("--me-lang", dest="me_lang")
+    ap.add_argument("--me-langs", dest="me_langs", help="languages the PM may switch between, e.g. uk+en")
     ap.add_argument("--langs")
     ap.add_argument("--model")
     ap.add_argument("--fake-whisper", action="store_true", help="test mode without MLX")
@@ -490,7 +501,7 @@ def main() -> int:
     status = {"state": "loading_model", "pid": os.getpid(), "file": str(out), "title": title,
               "slug": cfg.get("slug"), "started_at": dt.datetime.fromtimestamp(started).astimezone().isoformat(timespec="seconds"),
               "timezone": mac_timezone(),
-              "langs": cfg["langs"], "me_lang": cfg["me_lang"], "lines": 0, "queue": 0,
+              "langs": cfg["langs"], "me_lang": cfg["me_lang"], "me_langs": cfg["me_langs"], "lines": 0, "queue": 0,
               "system_audio": "starting", "mic": "starting", "errors": []}
     write_json_atomic(STATE / "status.json", status)
     log(f"live-transcriber: {title} -> {out}")
@@ -507,7 +518,7 @@ def main() -> int:
     header = (f"# Live transcript: {title}\n\n"
               f"- Проєкт: {cfg.get('slug') or Path(cfg['project_dir']).name}\n"
               f"- Початок: {dt.datetime.fromtimestamp(started):%Y-%m-%d %H:%M:%S}\n"
-              f"- Мови: {cfg['me_label']} = {cfg['me_lang']}, дозволені = {'+'.join(cfg['langs'])}\n"
+              f"- Мови: {cfg['me_label']} = {'+'.join(cfg['me_langs']) or cfg['me_lang']}, дозволені = {'+'.join(cfg['langs'])}\n"
               f"- Модель: {cfg['model']}\n"
               f"- Канали: {cfg['me_label']} = мікрофон, {cfg['them_label']} = системний звук\n\n")
     writer = Writer(out, cfg, header)
@@ -531,10 +542,14 @@ def main() -> int:
     prompt = cfg.get("prompt")
 
     def process(seg: Segment) -> None:
-        if seg.channel == "me" and cfg["me_lang"] != "auto":
+        me_set = cfg["me_langs"] if len(cfg["me_langs"]) > 1 else None
+        if seg.channel == "me" and cfg["me_lang"] != "auto" and not me_set:
             lang = cfg["me_lang"]
         elif seg.duration < cfg["sticky_short"]:
             lang = last_lang[seg.channel]
+        elif seg.channel == "me" and me_set:
+            # The PM switches only between own languages (e.g. uk <-> en), never to ru by mistake.
+            lang = whisper.pick_language(seg.audio, me_set)
         else:
             lang = whisper.pick_language(seg.audio)
         text, lang = whisper.transcribe(seg.audio, lang, prompt)

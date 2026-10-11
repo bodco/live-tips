@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Суфлер</title>
+<style>
+  :root {
+    --bg: #15171c; --panel: #1e2129; --text: #eef0f4; --muted: #9aa1ad; --line: #2c303a;
+    --red: #ff5a5a; --orange: #ffa53d; --blue: #5aa9ff; --green: #4cc38a; --size: 17px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: var(--size)/1.35 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px;
+    color: var(--muted); border-bottom: 1px solid var(--line); -webkit-user-select: none; }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  #dot.rec { background: var(--red); animation: pulse 1.6s infinite; }
+  #dot.ok { background: var(--green); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  #status { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header button { background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; font-size: 12px; padding: 2px 7px; cursor: pointer; }
+  header button.off { color: var(--muted); }
+  #list { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+  .tip { background: var(--panel); border-left: 4px solid var(--blue); border-radius: 8px;
+    padding: 8px 10px; opacity: .55; font-size: .82em; }
+  .tip.latest { opacity: 1; font-size: 1em; }
+  .tip.red { border-left-color: var(--red); }
+  .tip.orange { border-left-color: var(--orange); }
+  .tip.ask { border-left-color: var(--muted); background: transparent; }
+  .gist { font-weight: 700; }
+  .q { color: var(--muted); font-size: .85em; margin-bottom: 3px; }
+  .phrase { margin-top: 4px; }
+  .phrase::before { content: "\201C"; } .phrase::after { content: "\201D"; }
+  ol, ul { margin: 4px 0 0; padding-left: 1.3em; }
+  .note { margin-top: 4px; color: var(--muted); font-style: italic; font-size: .85em; }
+  .time { float: right; color: var(--muted); font-size: 11px; font-weight: 400; }
+  #empty { color: var(--muted); text-align: center; margin-top: 18px; font-size: 14px; }
+  form { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+  #q { flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 14px; outline: none; }
+  #q:focus { border-color: var(--blue); }
+  form button { background: var(--blue); color: #fff; border: 0; border-radius: 8px;
+    padding: 0 12px; font-size: 14px; cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <span id="dot"></span>
+  <span id="status">Чекаю на запис...</span>
+  <button id="smaller" title="Менший шрифт">A-</button>
+  <button id="bigger" title="Більший шрифт">A+</button>
+  <button id="fade" title="Прозорість вікна">◐</button>
+  <button id="pin" title="Завжди поверх інших вікон">📌</button>
+</header>
+<div id="list"><div id="empty">Підказки з'являться тут. Мовчу, поки нема що сказати.</div></div>
+<form id="ask" autocomplete="off">
+  <input id="q" placeholder="Питання або коментар для скіла, Enter щоб надіслати">
+  <button type="submit">↵</button>
+</form>
+<script>
+(function () {
+  var list = document.getElementById('list');
+  var empty = document.getElementById('empty');
+  var native = window.webkit && window.webkit.messageHandlers;
+  function send(name, value) { try { native[name].postMessage(value); } catch (e) {} }
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  var size = parseFloat(load('size')) || 17;
+  function applySize() { document.documentElement.style.setProperty('--size', size + 'px'); }
+  applySize();
+  document.getElementById('smaller').onclick = function () { size = Math.max(12, size - 1); applySize(); store('size', size); };
+  document.getElementById('bigger').onclick = function () { size = Math.min(30, size + 1); applySize(); store('size', size); };
+
+  var fades = [0.94, 0.8, 0.65, 1.0], fi = 0;
+  document.getElementById('fade').onclick = function () { fi = (fi + 1) % fades.length; send('opacity', fades[fi]); };
+  var pinned = true, pinBtn = document.getElementById('pin');
+  pinBtn.onclick = function () { pinned = !pinned; pinBtn.classList.toggle('off', !pinned); send('pin', pinned); };
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function inline(s) {
+    return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|\s)_(.+?)_(?=\s|$)/g, '$1<i>$2</i>');
+  }
+  function render(it) {
+    if (empty) { empty.remove(); empty = null; }
+    var el = document.createElement('div');
+    var kind = it.kind || 'tip';
+    el.className = 'tip ' + (it.level || 'info') + ' ' + kind;
+    var html = '';
+    if (it.t) html += '<span class="time">' + esc(it.t) + '</span>';
+    if (it.q) html += '<div class="q">Ти: ' + inline(it.q) + '</div>';
+    if (it.gist) html += '<div class="gist">' + inline(it.gist) + '</div>';
+    if (it.phrase) html += '<div class="phrase">' + inline(it.phrase) + '</div>';
+    if (it.items && it.items.length) {
+      html += (it.ordered === false ? '<ul>' : '<ol>');
+      it.items.forEach(function (x) { html += '<li>' + inline(x) + '</li>'; });
+      html += (it.ordered === false ? '</ul>' : '</ol>');
+    }
+    if (it.note) html += '<div class="note">' + inline(it.note) + '</div>';
+    el.innerHTML = html;
+    if (kind !== 'ask') {
+      var prev = list.querySelectorAll('.latest');
+      for (var i = 0; i < prev.length; i++) prev[i].classList.remove('latest');
+      el.classList.add('latest');
+    }
+    list.insertBefore(el, list.firstChild);
+    list.scrollTop = 0;
+    while (list.children.length > 40) list.removeChild(list.lastChild);
+  }
+  window.addItems = function (items) { (items || []).forEach(render); };
+
+  var dot = document.getElementById('dot'), statusEl = document.getElementById('status');
+  window.setStatus = function (s) {
+    var st = s.state || '';
+    dot.className = st === 'recording' ? 'rec' : (st === 'stopped' ? 'ok' : '');
+    var text = {
+      loading_model: 'Завантажую модель...', recording: 'Запис іде', stopping: 'Зупиняю...',
+      stopped: 'Запис завершено', error: 'Помилка запису'
+    }[st] || st;
+    if (st === 'recording' && s.lines != null) text += ' · ' + s.lines + ' рядків';
+    if (s.system_audio === 'silent') text += ' · не чую співрозмовників';
+    if (s.title) text = s.title + ' · ' + text;
+    statusEl.textContent = text;
+  };
+
+  var input = document.getElementById('q');
+  document.getElementById('ask').onsubmit = function (e) {
+    e.preventDefault();
+    var text = input.value.trim();
+    if (!text) return;
+    send('ask', text);
+    render({ kind: 'ask', level: 'info', gist: 'Ти: ' + text,
+             t: new Date().toTimeString().slice(0, 8), note: 'надіслано, відповідь прийде сюди' });
+    input.value = '';
+  };
+  send('ready', true);
+})();
+</script>
+</body>
+</html>

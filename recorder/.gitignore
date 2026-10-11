@@ -1,6 +1,7 @@
 # runtime, created by install.sh and by recordings
 .venv/
 bin/audiocap
+bin/prompter
 logs/
 state/
 control/

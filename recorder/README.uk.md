@@ -40,6 +40,14 @@ cd ~/work/Tools/live-transcriber
 .venv/bin/python src/transcriber.py --project-dir "$HOME/work/Test" --title "Тест" --me-lang uk --langs uk+en
 ```
 
+## Вікно-суфлер
+
+`bin/prompter` (`install.sh` збирає його з `src/prompter.swift` і `src/prompter.html`) - це
+маленьке вікно поверх усіх інших, яке показує підказки скіла і передає назад набрані
+питання. Відкривається на старті запису (`"prompter": false` у `start.json` чи `config.json`
+вимикає), рухається, згортається і закривається, просить macOS не потрапляти в демонстрацію
+екрана. Спробувати без дзвінка: `bin/prompter --demo`.
+
 ## Налаштування
 
 `config.json`: модель, мітки каналів, мови за замовчуванням, `launchd_label` (назва

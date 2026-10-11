@@ -35,6 +35,15 @@ xcrun swiftc -O -o "$ROOT/bin/audiocap" "$ROOT/src/audiocap.swift" \
   || fail "swiftc"
 codesign -s - -f --identifier "$LABEL.audiocap" "$ROOT/bin/audiocap" || echo "WARN: codesign"
 
+# 3b. Build the tips window (optional: without it tips stay in the chat)
+echo "--- build prompter (tips window)"
+if xcrun swiftc -O -o "$ROOT/bin/prompter" "$ROOT/src/prompter.swift" -framework AppKit -framework WebKit; then
+  codesign -s - -f --identifier "$LABEL.prompter" "$ROOT/bin/prompter" || echo "WARN: codesign prompter"
+  echo "prompter OK. Try it: $ROOT/bin/prompter --demo"
+else
+  echo "WARN: prompter not built, tips will stay in the chat (see the swiftc errors above)"
+fi
+
 # 4. Python
 echo "--- python"
 PY=""

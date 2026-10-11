@@ -40,6 +40,14 @@ cd ~/work/Tools/live-transcriber
 .venv/bin/python src/transcriber.py --project-dir "$HOME/work/Test" --title "Test" --me-lang uk --langs uk+en
 ```
 
+## Tips window
+
+`bin/prompter` (built by `install.sh` from `src/prompter.swift` and `src/prompter.html`) is a
+small always-on-top window that shows the skill's tips and sends typed questions back. It
+opens when a recording starts (`"prompter": false` in `start.json` or `config.json` turns it
+off), can be moved, minimised and closed, and asks macOS to stay out of screen sharing.
+Try it without a call: `bin/prompter --demo`.
+
 ## Configuration
 
 `config.json`: model, channel labels, default languages, `launchd_label` (LaunchAgent name,

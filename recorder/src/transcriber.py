@@ -58,6 +58,7 @@ DEFAULTS = {
     "echo_window": 4.0,         # s, mic line equal to a system line within this window = echo
     "echo_similarity": 0.6,
     "mic_hold": 3.0,            # s, mic lines wait this long for a matching system line
+    "prompter": True,           # open the always-on-top tips window (bin/prompter) on start
 }
 
 # Phrases Whisper invents on silence or noise. Compared after normalisation.
@@ -105,6 +106,33 @@ def log(msg: str) -> None:
             f.write(line + "\n")
     except OSError:
         pass
+
+
+def launch_prompter(title: str, tips: Path, inbox: Path) -> None:
+    """Open the tips window. Closes a window left from a previous call first. Never fatal."""
+    exe = ROOT / "bin" / "prompter"
+    if not exe.exists():
+        log("prompter: bin/prompter not built (re-run install.sh), tips stay in the chat")
+        return
+    pid_file = STATE / "prompter.pid"
+    try:
+        os.kill(int(pid_file.read_text().strip()), signal.SIGTERM)
+    except (OSError, ValueError):
+        pass
+    try:
+        tips.parent.mkdir(parents=True, exist_ok=True)
+        tips.touch(exist_ok=True)
+        inbox.touch(exist_ok=True)
+        logf = open(LOGS / "prompter.log", "a", encoding="utf-8")
+        proc = subprocess.Popen(
+            [str(exe), "--tips", str(tips), "--inbox", str(inbox),
+             "--status", str(STATE / "status.json"), "--html", str(ROOT / "src" / "prompter.html"),
+             "--title", f"Суфлер · {title}"],
+            stdout=logf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+        pid_file.write_text(str(proc.pid))
+        log(f"prompter: window opened (pid {proc.pid})")
+    except Exception as e:  # noqa: BLE001
+        log(f"prompter: could not start ({e!r}), tips stay in the chat")
 
 
 def write_json_atomic(path: Path, data: dict) -> None:
@@ -452,7 +480,7 @@ def load_request(args) -> dict:
             sys.exit("control/start.json not found")
         req = json.loads(start.read_text(encoding="utf-8"))
         os.replace(start, CONTROL / "active.json")
-    for k in ("project_dir", "title", "slug", "prompt", "me_lang", "me_langs", "langs", "model"):
+    for k in ("project_dir", "title", "slug", "prompt", "me_lang", "me_langs", "langs", "model", "prompter"):
         v = getattr(args, k, None)
         if v:
             req[k] = v
@@ -492,6 +520,8 @@ def main() -> int:
     title = cfg.get("title") or "Meeting"
     started = now()
     out = Path(cfg["project_dir"]) / "live" / f"{dt.datetime.fromtimestamp(started):%Y-%m-%d-%H%M}-{slugify(title)}.md"
+    tips_file = out.with_name(out.stem + ".tips.jsonl")
+    inbox_file = out.with_name(out.stem + ".inbox.jsonl")
     STATE.mkdir(parents=True, exist_ok=True)
     (STATE / "pid").write_text(str(os.getpid()))
     stop_file = CONTROL / "stop"
@@ -501,10 +531,13 @@ def main() -> int:
     status = {"state": "loading_model", "pid": os.getpid(), "file": str(out), "title": title,
               "slug": cfg.get("slug"), "started_at": dt.datetime.fromtimestamp(started).astimezone().isoformat(timespec="seconds"),
               "timezone": mac_timezone(),
-              "langs": cfg["langs"], "me_lang": cfg["me_lang"], "me_langs": cfg["me_langs"], "lines": 0, "queue": 0,
+              "langs": cfg["langs"], "me_lang": cfg["me_lang"], "me_langs": cfg["me_langs"],
+              "tips_file": str(tips_file), "inbox_file": str(inbox_file), "lines": 0, "queue": 0,
               "system_audio": "starting", "mic": "starting", "errors": []}
     write_json_atomic(STATE / "status.json", status)
     log(f"live-transcriber: {title} -> {out}")
+    if cfg.get("prompter", True) not in (False, "false", "0", 0):
+        launch_prompter(title, tips_file, inbox_file)
     log(f"languages: me={cfg['me_lang']} allowed={'+'.join(cfg['langs'])} model={cfg['model']}")
 
     try:

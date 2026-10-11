@@ -95,19 +95,20 @@ about languages or length: use defaults and state them in the start message.
    It improves spelling of names.
 3. Write `control/start.json` with a small python one-liner inside device_bash
    (`json.dump`, UTF-8, `ensure_ascii=False`):
-   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "..."}`
-   (labels from `settings.user`).
+   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "...", "prompter": true}`
+   (labels from `settings.user`; `prompter` = `settings.tips.output` is not `chat`).
    The LaunchAgent opens a Terminal window "Live transcriber" with the recording by itself;
    the PM does not start it, may minimise it, should not close it.
 4. Poll `state/status.json` every 3 s up to 60 s (model load takes 5-20 s):
-   - `recording` -> take `file`, map it to the device_bash path, go on;
+   - `recording` -> take `file`, `tips_file` and `inbox_file`, map them to device_bash paths, go on;
    - `error` or nothing after 60 s -> rename `control/start.json` to `control/start.json.pending`
      (`mv -n`, so the recording does not start by surprise later), then show `logs/transcriber.log` tail (last 15 lines) and
      `logs/launcher.log`, say what failed. Common fixes: install.sh not run, Terminal has no
      microphone / system audio permission, LaunchAgent not loaded
      (`launchctl list | grep live-transcriber` on the Mac).
 5. One message: `Запис іде: {file name}. Мови: я {me_langs or me_lang}, дозволені {langs}.` plus the
-   checklist from Step 2 when ready.
+   checklist from Step 2 when ready. With the tips window on, add `Підказки у вікні-суфлері.`
+   and emit the checklist into the window too (kind `checklist`).
 
 ## Step 2 - Live Brief (while the first minutes are being recorded)
 
@@ -162,16 +163,42 @@ State file `<transcript name>.state.json` next to the transcript: `offset` (byte
 `covered`, `tips_given`, `answers`, `action_items`, `cr_candidates`, `side_talk`, `last_tip_at`,
 `started_at` and `timezone` (from `status.json`: start time with the Mac's UTC offset and the Mac's IANA zone). Long state lives there, not in the conversation.
 
-Each iteration is ONE device_bash call that long-polls for new lines:
+Each iteration is ONE device_bash call that first writes any pending tips into the tips
+window and then long-polls for new transcript lines and for questions typed in the window:
 
 ```
 python3 <tool_root>/bin/read_delta.py "<transcript>" <offset> \
-  --wait 25 --settle 2 --status <tool_root>/state/status.json
+  --wait 25 --settle 2 --status <tool_root>/state/status.json \
+  --tips "<tips_file>" --inbox "<inbox_file>" --inbox-offset <inbox_offset> --emit-stdin <<'EOF'
+<zero or more tip JSON lines, one per line>
+EOF
 ```
 
-It returns as soon as new complete lines exist (plus 2 s to collect a burst), or after
-25 s with nothing. Output: the new lines, then `@@OFFSET <n>` and
-`@@STATUS <state> lines=.. queue=.. mic=.. system=.. errors=..`. No sleep calls are needed.
+Drop `--emit-stdin` and the heredoc when there is nothing to emit, and drop `--tips`,
+`--inbox`, `--inbox-offset` when `settings.tips.output` is `chat`. It returns as soon as new
+transcript lines or new window questions exist (plus 2 s to collect a burst), or after 25 s
+with nothing. Output: the new lines, `@@ASK [time] <text>` per new window question,
+`@@OFFSET <n>`, `@@INBOX_OFFSET <n>`, `@@EMITTED <n>` (an `@@EMIT_ERROR` line means a tip
+was not valid JSON: fix and re-emit it) and `@@STATUS <state> lines=.. queue=.. mic=..
+system=.. errors=..`. No sleep calls are needed.
+
+### Tips window (settings.tips.output)
+
+- `window`: tips go only to the window; the chat gets the start message, health warnings
+  and the wrap-up. `both` (default): window and chat. `chat`: no window, as before.
+- One tip = one JSON line (UTF-8, `ensure_ascii` not needed):
+  `{"t":"HH:MM:SS","kind":"tip","level":"red","gist":"🔴 Нова вимога. Не погоджуй зараз.","phrase":"Good idea. I will write it down.","items":["..."],"note":"рішення від 30.09"}`
+  - `kind`: `tip` | `answer` (reply to a window question, add `"q":"<the question>"`) |
+    `checklist` | `status` | `wrapup`;
+  - `level`: `red` | `orange` | `info`; `gist` keeps its emoji;
+  - `phrase` without quotes (the window adds them), `items` for numbered points, `note`
+    for the source; omit empty fields. The same "Tip format" rules apply.
+- `@@ASK` lines are the PM's questions or comments typed in the window: treat them exactly
+  like chat messages during the loop (answer first, briefly), and send the answer back to
+  the window as `kind: answer` (and to the chat too in `both`). "стоп" typed in the window
+  stops the call like in the chat.
+- Keep `inbox_offset` in state next to `offset`.
+- The window may be closed or minimised by the PM; keep emitting, it does not matter.
 
 Then:
 
@@ -182,7 +209,8 @@ Then:
    languages (a Russian or Spanish line can match a Ukrainian/English topic).
 4. Deep lookup (Jira ticket, Notion page) only when a trigger fires and the brief does not
    answer it. Max one per 2 min.
-5. Post a tip with `SendUserMessage` if the rate rules allow. Otherwise produce no text and
+5. Post a tip if the rate rules allow: emit it to the window in the next read call and/or
+   send it with `SendUserMessage`, per `settings.tips.output`. Otherwise produce no text and
    go straight to the next read.
 6. Health from `@@STATUS`: `system=silent` for 2 polls while the call is on -> one message
    "Не чую співрозмовників: перевір дозвіл на запис системного звуку для Terminal";
@@ -372,6 +400,10 @@ Notion: {посилання на сторінку з Step 5}
 
 The Data Completeness line follows `projects/SKILL.md` (OK / EMPTY / STALE / SKIPPED /
 FAILED). Do not run the next skills without the user's command.
+
+With the tips window on, also emit a short `kind: wrapup` item: gist "Дзвінок завершено",
+up to 5 `items` (action items and open questions), `note` = the Notion page link once Step 5
+is done (one extra read call with `--wait 0` just to emit it).
 
 ## Step 5 - Meetings DB page (automatic after every stop)
 

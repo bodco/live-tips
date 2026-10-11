@@ -28,6 +28,7 @@ languages:
       client: {me_lang: en, langs: [en, es]}
 
 tips:
+  output: both                   # window | chat | both: where tips go (window = always-on-top prompter)
   rate_seconds: 90               # min gap between non-urgent tips
   answer_check: true             # judge the PM's own answers (relevance, accuracy, commitments)
   side_talk_summary: true        # summarise when others switch to another language

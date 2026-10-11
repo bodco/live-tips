@@ -78,7 +78,8 @@ The code is in [`tools/live-transcriber/`](../../tools/live-transcriber/), the s
 | `src/transcriber.py` | The core: two capture threads, VAD (webrtcvad, or an energy VAD without it), Whisper, hallucination filter, echo removal, writing lines, `status.json` |
 | `bin/run.command` | Runs `transcriber.py --from-control` in the "Live transcriber" Terminal window |
 | `bin/on-control.sh` | Called by the LaunchAgent when `control/` changes. If `start.json` is there and nothing is recording, opens Terminal |
-| `bin/read_delta.py` | Long-poll for the skill: waits up to `--wait` s for new lines, prints only new complete lines, `@@OFFSET` and `@@STATUS` |
+| `bin/read_delta.py` | One call per skill iteration: appends new tips for the window (`--emit-stdin`), waits up to `--wait` s for new transcript lines or window questions, prints only what is new, `@@ASK`, `@@OFFSET`, `@@INBOX_OFFSET`, `@@STATUS` |
+| `src/prompter.swift`, `src/prompter.html` | The tips window: always on top, movable, minimisable, closable, asks macOS to stay out of screen sharing; shows `*.tips.jsonl`, writes questions to `*.inbox.jsonl`. Built into `bin/prompter` |
 | `launchd/live-transcriber.plist.template` | LaunchAgent template (`WatchPaths` on `control/`) |
 | `plugin/skills/live-tips/SKILL.md` | The skill: start, Live Brief, tip loop, stop, wrap-up, Meetings DB page |
 | `plugin/skills/live-tips/settings.yaml` | Everything personal: labels, paths, languages, tip rules, time zone |
@@ -263,6 +264,36 @@ status.
 | 🟠 at most once per `rate_seconds` | The PM answered a different question or only part of it; a vague answer where a date or an owner was expected; the other side switched to another language (short gist); a topic or ticket from the brief came up; a question unanswered for ~2 min; 2/3 of the time with checklist items uncovered; 5 min before the end with decisions not obtained |
 | silent | Action items, new requests, commitments: they go into the wrap-up |
 
+### The tips window
+
+So you do not have to look at the Cowork window during a call, tips appear in a separate
+small window on top of everything else. The recorder opens it when the recording starts,
+at the top centre of the screen, under the camera.
+
+- **What is in it:** the newest tip on top in a large font, older ones below and dimmer.
+  The title bar area shows the recording state (on, line count, whether the other side is
+  heard). Buttons: `A-` / `A+` font size, `◐` transparency, `📌` always on top (turn off
+  if it gets in the way).
+- **The field at the bottom:** type a question or a comment and press Enter. The skill gets
+  it in the same loop that reads the transcript and answers in the same window. Typing
+  "стоп" (stop) there ends the call like in the chat.
+- **It is an ordinary window:** drag it, resize it, minimise it (yellow button or Cmd+M)
+  and close it (red button or Cmd+W). Closing it does not stop the recording. It remembers
+  its position and size.
+- **Screen sharing:** the window asks macOS to stay out of screen capture
+  (`sharingType = none`). Whether a given meeting app honours that depends on how it
+  captures the screen, so check it once yourself (section 10). **Verified 2026-10-11:**
+  Google Meet in Chrome on macOS 26, sharing the entire screen, the window is not in the
+  shared image. Other apps (Zoom, Teams) not verified yet. If in doubt: share a window or a
+  tab, not the entire screen.
+- **Where tips go** is set by `tips.output` in `settings.yaml`: `window`, `chat` or `both`
+  (default). The chat stays as a fallback.
+- **Demo without a call:** `~/work/Tools/live-transcriber/bin/prompter --demo`.
+
+Under the hood: the skill appends tips as JSON lines to `<transcript>.tips.jsonl`, the
+window shows them; questions typed in the window go to `<transcript>.inbox.jsonl`, and
+`read_delta.py` hands them to the skill as `@@ASK` lines.
+
 ### What a tip looks like
 
 Built for a small Cowork window at the top centre of the screen, under the camera, so the
@@ -392,6 +423,7 @@ the package).
 | `tips.rate_seconds` | Minimum gap between non-urgent tips |
 | `tips.answer_check` | Check the PM's own answers |
 | `tips.side_talk_summary` | Summarise the other side talking among themselves in another language |
+| `tips.output` | Where tips go: `window` (the tips window), `chat` or `both` |
 | `tips.idle_stop_minutes`, `tips.hard_cap_minutes` | Auto-stop |
 | `model_hint` | Which Claude model to use for the session (see section 5.0) |
 
@@ -410,6 +442,8 @@ Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo wind
 
 | Symptom | Cause and fix |
 |---|---|
+| The tips window did not open | `bin/prompter` is not built: re-run `install.sh` and check the `build prompter` block in `logs/install.log`; launch errors are in `logs/prompter.log`. Tips go to the chat meanwhile |
+| Participants see the window while you share the entire screen | The meeting app captures the screen in a way that ignores `sharingType = none`. Share a window or a tab instead of the entire screen, or minimise the window while sharing |
 | `start.json` is there but the recording does not start within 60 s | The LaunchAgent is not loaded or the install was never run. `launchctl list \| grep live-transcriber`; if empty, run `install.sh`. The skill then renames the file to `start.json.pending` so the recording does not start by surprise later |
 | `system=silent`, the transcript has only "Я" lines | No permission to record system audio. System Settings → Privacy & Security → Screen & System Audio Recording → System Audio Recording Only → Terminal. Check: play sound and run `bin/audiocap --source system --seconds 5 \| wc -c`, it must be above zero |
 | `mic=silent` | Microphone permission for Terminal (Privacy & Security → Microphone) or the wrong input device |

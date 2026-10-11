@@ -185,7 +185,8 @@ system=.. errors=..`. No sleep calls are needed.
 ### Tips window (settings.tips.output)
 
 - `window`: tips go only to the window; the chat gets the start message, health warnings
-  and the wrap-up. `both` (default): window and chat. `chat`: no window, as before.
+  and the wrap-up. `both` (default): window and chat. `chat`: no window, as before. A missing
+  `tips.output` (older settings.yaml) means `both`.
 - One tip = one JSON line (UTF-8, `ensure_ascii` not needed):
   `{"t":"HH:MM:SS","kind":"tip","level":"red","gist":"🔴 Нова вимога. Не погоджуй зараз.","phrase":"Good idea. I will write it down.","items":["..."],"note":"рішення від 30.09"}`
   - `kind`: `tip` | `answer` (reply to a window question, add `"q":"<the question>"`) |

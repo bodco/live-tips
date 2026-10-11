@@ -46,6 +46,7 @@ cd ~/work/Tools/live-transcriber
 small always-on-top window that shows the skill's tips and sends typed questions back. It
 opens when a recording starts (`"prompter": false` in `start.json` or `config.json` turns it
 off), can be moved, minimised and closed, and asks macOS to stay out of screen sharing.
+Closed it by accident during a call? `touch control/prompter` reopens it with all tips so far.
 Try it without a call: `bin/prompter --demo`.
 
 ## Configuration

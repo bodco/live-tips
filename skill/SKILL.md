@@ -200,6 +200,9 @@ system=.. errors=..`. No sleep calls are needed.
   stops the call like in the chat.
 - Keep `inbox_offset` in state next to `offset`.
 - The window may be closed or minimised by the PM; keep emitting, it does not matter.
+- Reopen on request ("відкрий суфлер", "поверни вікно", "open the prompter"): `touch
+  <tool_root>/control/prompter`. The recorder reopens the window within a second with all
+  tips so far. Answer in the chat: `Суфлер відкрито знову.`
 
 Then:
 

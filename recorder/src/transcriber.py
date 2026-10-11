@@ -527,6 +527,8 @@ def main() -> int:
     stop_file = CONTROL / "stop"
     if stop_file.exists():
         stop_file.unlink()
+    if (CONTROL / "prompter").exists():
+        (CONTROL / "prompter").unlink()
 
     status = {"state": "loading_model", "pid": os.getpid(), "file": str(out), "title": title,
               "slug": cfg.get("slug"), "started_at": dt.datetime.fromtimestamp(started).astimezone().isoformat(timespec="seconds"),
@@ -617,6 +619,15 @@ def main() -> int:
         writer.tick()
         if stop_file.exists():
             stop_ev.set()
+        reopen = CONTROL / "prompter"
+        if reopen.exists():
+            # Reopen the tips window (closed by accident): `touch control/prompter`,
+            # or ask the skill ("відкрий суфлер"). The window reloads all tips so far.
+            try:
+                reopen.unlink()
+            except OSError:
+                pass
+            launch_prompter(title, tips_file, inbox_file)
         if now() - last_status >= 2:
             last_status = now()
             errs = [c.error for c in caps if c.error]
@@ -644,7 +655,7 @@ def main() -> int:
     writer.close(f"\n--- кінець запису {hhmmss(now())} ---\n")
     status.update(state="stopped", lines=writer.lines, stopped_at=hhmmss(now()))
     write_json_atomic(STATE / "status.json", status)
-    for f in (CONTROL / "active.json", stop_file, STATE / "pid", STATE / "launching"):
+    for f in (CONTROL / "active.json", stop_file, CONTROL / "prompter", STATE / "pid", STATE / "launching"):
         try:
             f.unlink()
         except FileNotFoundError:

@@ -280,6 +280,9 @@ at the top centre of the screen, under the camera.
 - **It is an ordinary window:** drag it, resize it, minimise it (yellow button or Cmd+M)
   and close it (red button or Cmd+W). Closing it does not stop the recording. It remembers
   its position and size.
+- **Closed it by accident?** Write "відкрий суфлер" (open the prompter) in the chat, or run
+  `touch ~/work/Tools/live-transcriber/control/prompter` in Terminal. The window opens again
+  within a second with every tip since the start of the call.
 - **Screen sharing:** the window asks macOS to stay out of screen capture
   (`sharingType = none`). Whether a given meeting app honours that depends on how it
   captures the screen, so check it once yourself (section 10). **Verified 2026-10-11:**

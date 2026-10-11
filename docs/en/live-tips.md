@@ -445,6 +445,7 @@ Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo wind
 
 | Symptom | Cause and fix |
 |---|---|
+| Closed the tips window by accident during a call | Write "відкрий суфлер" (open the prompter) in the chat, or `touch ~/work/Tools/live-transcriber/control/prompter`. It reopens within a second with every tip so far; the recording never stopped |
 | The tips window did not open | `bin/prompter` is not built: re-run `install.sh` and check the `build prompter` block in `logs/install.log`; launch errors are in `logs/prompter.log`. Tips go to the chat meanwhile |
 | Participants see the window while you share the entire screen | The meeting app captures the screen in a way that ignores `sharingType = none`. Share a window or a tab instead of the entire screen, or minimise the window while sharing |
 | `start.json` is there but the recording does not start within 60 s | The LaunchAgent is not loaded or the install was never run. `launchctl list \| grep live-transcriber`; if empty, run `install.sh`. The skill then renames the file to `start.json.pending` so the recording does not start by surprise later |

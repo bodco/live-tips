@@ -106,6 +106,7 @@ Runtime folders (not in git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `cont
 - Проєкт: acme-portal
 - Початок: 2026-10-10 23:48:02
 - Мови: Я = en, дозволені = en+es
+- Мікрофон: системний вхід за замовчуванням (навушники або Мак)
 ...
 [23:48:11] Я (en): Can you hear me?
 [23:48:15] Співрозмовник (es): Sí, perfecto.
@@ -496,6 +497,7 @@ Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo wind
 | `queue` grows, tips arrive late | The Mac is busy (video, builds). Transcription catches up; the skill warns once |
 | Ukrainian recognised as another language, names garbled | Check `me_lang` and that the main language is first in `langs`; the skill puts names into `prompt` as one short sentence |
 | Lines like "Субтитры создавал ...", "Продолжение следует...", "Thanks for watching", a list of names repeated many times | Whisper artefacts: the model learned subtitle credits from internet videos and recalls them on silence, music or chopped audio, and repeats the `prompt` names in a loop. Not in the audio, not a virus. Filtered by `HALLUCINATION_PATTERNS` and the loop check in `transcriber.py`; add new patterns there |
+| One-word lines such as "Дзвінок.", "Наступного року.", "Відповідь.", "м-м-м", and Ukrainian lines tagged `(en)` | The first is Whisper repeating the first word of the `prompt` on noise, the others are its noise phrases and fillers. They are dropped (`clean_text`: one or two words that all come from the prompt, standalone noise phrases, pure fillers). A Cyrillic line tagged `(en)` is a wrong language tag by the model: the tag now follows the script of the text. Order of lines can differ by up to ~15 s from the real order: every line carries the time its phrase started |
 | The transcript is readable but weak for Ukrainian | Try `"model": "mlx-community/whisper-large-v3-mlx"` in `config.json`: more accurate, 2-3 times slower |
 | After reinstalling with another `launchd_label` Terminal opens twice | Two LaunchAgents are running. Unload the old one: `launchctl bootout gui/$(id -u)/<old label>` and delete its plist in `~/Library/LaunchAgents` |
 | The Notion page title shows `<mention-date …>` as text | The title was set on create, not on update. See section 7.2 |

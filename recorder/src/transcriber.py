@@ -83,6 +83,10 @@ HALLUCINATION_PATTERNS = [re.compile(p, re.I) for p in (
     r"спасибо за просмотр", r"дякую за перегляд", r"thanks? (you )?for watching",
     r"подписывайтесь", r"підписуйтесь", r"ставьте лайк", r"ставте лайк",
     r"^\W*(динамичная |спокойная |веселая |тревожная )?музыка\W*$", r"^\W*музика\W*$", r"^\W*music\W*$",
+    # Seen on real calls as a whole line on noise or silence (not inside a longer sentence):
+    r"^\W*наступного( року)?\W*$", r"^\W*відповідь( на екран)?\W*$", r"^\W*au revoir\W*$",
+    # Pure fillers ("м-м-м", "мгм", "е-е"): nothing to read, only clutter.
+    r"^\W*(([мме]+[\s-]*)+|мгм+|угу+|гм+|хм+)\W*$",
 )]
 
 _REPEAT = re.compile(r"((?:\w[\w'’-]*\W+){1,4}?)\1{2,}")
@@ -110,7 +114,32 @@ def clean_text(text: str, prompt_words: set[str]) -> str:
     # Prompt echo: on noise Whisper repeats the names it was given in the prompt.
     if prompt_words and len(words) >= 2 and sum(w in prompt_words for w in words) / len(words) >= 0.7:
         return ""
+    # One or two words that all come from the prompt ("Дзвінок." when the prompt starts with
+    # "Дзвінок команди ..."): Whisper echoes the start of the prompt on noise.
+    if prompt_words and 1 <= len(words) <= 2 and all(w in prompt_words for w in words):
+        return ""
     return text
+
+
+CYRILLIC_LANGS = ("uk", "ru", "be", "bg")
+
+
+def fix_lang_by_script(text: str, lang: str, langs: list[str]) -> str:
+    """Whisper (turbo) sometimes tags Ukrainian speech as "en" while the text is Cyrillic.
+    The text is what was heard, so the tag follows the script of the text."""
+    letters = re.findall(r"[^\W\d_]", text)
+    if len(letters) < 3:
+        return lang
+    cyr = sum(1 for c in letters if "\u0400" <= c <= "\u04ff") / len(letters)
+    if cyr >= 0.7 and lang not in CYRILLIC_LANGS:
+        for l in langs:
+            if l in CYRILLIC_LANGS:
+                return l
+    if cyr <= 0.1 and lang in CYRILLIC_LANGS:
+        for l in langs:
+            if l not in CYRILLIC_LANGS:
+                return l
+    return lang
 
 
 def now() -> float:
@@ -398,7 +427,7 @@ class Whisper:
                 continue   # low confidence or a repetition loop
             parts.append(s.get("text", "").strip())
         text = " ".join(p for p in parts if p).strip()
-        return text, lang
+        return text, fix_lang_by_script(text, lang, self.langs)
 
 
 class FakeWhisper:
@@ -655,7 +684,8 @@ def main() -> int:
               f"- Початок: {dt.datetime.fromtimestamp(started):%Y-%m-%d %H:%M:%S}\n"
               f"- Мови: {cfg['me_label']} = {'+'.join(cfg['me_langs']) or cfg['me_lang']}, дозволені = {'+'.join(cfg['langs'])}\n"
               f"- Модель: {cfg['model']}\n"
-              f"- Канали: {cfg['me_label']} = мікрофон, {cfg['them_label']} = системний звук\n\n")
+              f"- Канали: {cfg['me_label']} = мікрофон, {cfg['them_label']} = системний звук\n"
+              f"- Мікрофон: {'вбудований мікрофон Мака' if cfg['mic_device'] == 'builtin' else 'системний вхід за замовчуванням (навушники або Мак)'}\n\n")
     writer = Writer(out, cfg, header)
 
     segq: "queue.Queue[Segment]" = queue.Queue()

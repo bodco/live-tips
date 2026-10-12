@@ -3,7 +3,7 @@
 
 Run:
   transcriber.py --from-control                      (what the LaunchAgent / run.command does)
-  transcriber.py --project-dir "$HOME/work/Acme Portal" --title "Sync" --me-lang uk --langs uk,ru
+  transcriber.py --project-dir "$HOME/work/Acme Portal" --title "Sync" --me-lang uk --langs uk,en
 
 The md file is written to <project-dir>/live/<YYYY-MM-DD-HHMM>-<title>.md, one line per utterance:
   [12:30:11] Я (uk): ...
@@ -29,6 +29,7 @@ import subprocess
 import sys
 import threading
 import time
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,7 +49,8 @@ DEFAULTS = {
     "them_label": "Співрозмовник",
     "me_lang": "uk",            # language of the PM's own mic; "auto" = pick from langs
     "me_langs": [],             # optional: languages the PM may switch between (e.g. uk+en); mic picks among them
-    "langs": ["uk", "ru"],      # allowed languages in this meeting
+    "langs": ["uk", "en"],      # allowed languages in this meeting, the first one is the main one
+    "lang_bias": 2.0,           # another allowed language wins only if it is this many times likelier than the main one
     "vad_mode": 2,              # webrtcvad aggressiveness 0..3
     "end_silence": 0.7,         # s of silence that closes a segment
     "max_segment": 12.0,        # s, hard cut for long monologues
@@ -59,6 +61,8 @@ DEFAULTS = {
     "echo_similarity": 0.6,
     "mic_hold": 3.0,            # s, mic lines wait this long for a matching system line
     "prompter": True,           # open the always-on-top tips window (bin/prompter) on start
+    "mic_device": "default",    # "default" = system default input (AirPods, Jabra, ...), "builtin" = the Mac's own microphone
+    "gap_resync": 1.5,          # s, audio missing from a source longer than this moves its clock forward
 }
 
 # Phrases Whisper invents on silence or noise. Compared after normalisation.
@@ -68,6 +72,45 @@ HALLUCINATIONS = {
     "спасибо за просмотр", "спасибо", "субтитры", "редактор субтитров",
     "gracias", "gracias por ver", "subtítulos", "amara.org",
 }
+
+# Whisper was trained on subtitled internet videos. On silence, music or chopped audio it "recalls"
+# their credit lines ("Субтитры создавал DimaTorzok", "Редактор субтитров ...", "Продолжение
+# следует..."). These are not in the audio and not a virus: they come from the model itself.
+# A sentence matching any pattern is removed; a line left empty is dropped.
+HALLUCINATION_PATTERNS = [re.compile(p, re.I) for p in (
+    r"субтитр", r"subtit", r"dimatorzok", r"корректор", r"amara\.org",
+    r"продолжение следует", r"продовження (далі|буде|слідує)",
+    r"спасибо за просмотр", r"дякую за перегляд", r"thanks? (you )?for watching",
+    r"подписывайтесь", r"підписуйтесь", r"ставьте лайк", r"ставте лайк",
+    r"^\W*(динамичная |спокойная |веселая |тревожная )?музыка\W*$", r"^\W*музика\W*$", r"^\W*music\W*$",
+)]
+
+_REPEAT = re.compile(r"((?:\w[\w'’-]*\W+){1,4}?)\1{2,}")
+
+
+def clean_text(text: str, prompt_words: set[str]) -> str:
+    """Remove Whisper artefacts. Returns "" when nothing real is left."""
+    text = (text or "").strip()
+    parts = re.split(r"(?<=[.!?…])\s+", text)
+    text = " ".join(p for p in parts if p and not any(rx.search(p) for rx in HALLUCINATION_PATTERNS)).strip()
+    if not text or norm(text) in HALLUCINATIONS:
+        return ""
+    # Repetition loop ("Маша, Льоша, Маша, Льоша, ..." or "сьому сьому сьому"): collapse repeats;
+    # if the repeats were most of the line, the whole line is noise.
+    collapsed = _REPEAT.sub(r"\1", text + " ").strip()
+    if len(collapsed) < 0.5 * len(text):
+        return ""
+    text = collapsed
+    words = re.findall(r"\w+", text.lower())
+    if len(words) >= 8 and len(set(words)) / len(words) < 0.4:
+        return ""
+    raw = text.encode("utf-8")
+    if len(raw) > 80 and len(raw) / max(1, len(zlib.compress(raw))) > 2.6:
+        return ""
+    # Prompt echo: on noise Whisper repeats the names it was given in the prompt.
+    if prompt_words and len(words) >= 2 and sum(w in prompt_words for w in words) / len(words) >= 0.7:
+        return ""
+    return text
 
 
 def now() -> float:
@@ -125,7 +168,7 @@ def launch_prompter(title: str, tips: Path, inbox: Path) -> None:
         inbox.touch(exist_ok=True)
         logf = open(LOGS / "prompter.log", "a", encoding="utf-8")
         proc = subprocess.Popen(
-            [str(exe), "--tips", str(tips), "--inbox", str(inbox),
+            [str(exe), "--tips", str(tips), "--inbox", str(inbox), "--control", str(CONTROL),
              "--status", str(STATE / "status.json"), "--html", str(ROOT / "src" / "prompter.html"),
              "--title", f"Суфлер · {title}"],
             stdout=logf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
@@ -197,13 +240,41 @@ class Segmenter:
         self.samples = 0
         self.seg_start_sample = 0
         self.peak_window: list[float] = []
+        self.lost = 0.0               # s of audio that never arrived (device restarts etc.)
+        self.muted = False            # PM pressed mute in the tips window: mic audio is ignored
 
     def wall(self, sample_idx: int) -> float:
         return (self.t0 or now()) + sample_idx / SR
 
+    def set_muted(self, on: bool) -> None:
+        if on:
+            if self.in_speech:
+                self._close()         # keep what was said before the click
+            self.samples += len(self.pending)
+            self.pending = np.zeros(0, dtype=np.float32)
+            self.pre = []
+        self.muted = on
+
     def feed(self, chunk: np.ndarray) -> None:
+        t = now()
         if self.t0 is None:
-            self.t0 = now() - len(chunk) / SR
+            self.t0 = t - len(chunk) / SR
+        else:
+            # Timestamps come from the sample count. If the source lost audio (mic restarts when
+            # Meet or AirPods switch modes), the count falls behind the clock and every later line
+            # would get an old time. Close the open phrase (do not glue audio across a hole) and
+            # move this source's clock forward.
+            gap = t - (self.t0 + (self.samples + len(self.pending) + len(chunk)) / SR)
+            if gap > self.cfg["gap_resync"]:
+                if self.in_speech:
+                    self._close()
+                self.t0 += gap
+                self.lost += gap
+        if self.muted:
+            # Muted in the tips window (the PM is muted in the meeting): music and people around
+            # are not transcribed as the PM. The clock keeps running.
+            self.samples += len(chunk)
+            return
         self.pending = np.concatenate([self.pending, chunk])
         while len(self.pending) >= FRAME:
             frame, self.pending = self.pending[:FRAME], self.pending[FRAME:]
@@ -260,6 +331,7 @@ class Whisper:
         self.mlx_whisper = mlx_whisper
         self.repo = cfg["model"]
         self.langs = [l for l in cfg["langs"] if l] or ["uk"]
+        self.bias = float(cfg.get("lang_bias") or 1.0)
         self.detector = None
         # Warm up and download the model on first run.
         mlx_whisper.transcribe(np.zeros(SR, dtype=np.float32), path_or_hf_repo=self.repo,
@@ -297,7 +369,13 @@ class Whisper:
         if self.detector is None:
             return None if allowed is self.langs else allowed[0]
         probs = self.detector(audio)
-        return max(allowed, key=lambda l: probs.get(l, 0.0))
+        base = allowed[0]
+        best = max(allowed, key=lambda l: probs.get(l, 0.0))
+        # The first language is the main one: switch away only on a clear win, so short or
+        # noisy phrases stay in the main language instead of flipping to another one.
+        if best != base and probs.get(best, 0.0) < self.bias * probs.get(base, 0.0):
+            return base
+        return best
 
     def transcribe(self, audio: np.ndarray, language: str | None, prompt: str | None) -> tuple[str, str]:
         res = self.mlx_whisper.transcribe(
@@ -313,8 +391,11 @@ class Whisper:
             return self.transcribe(audio, self.langs[0], prompt)
         parts = []
         for s in res.get("segments", []):
-            if s.get("no_speech_prob", 0) > 0.6 and s.get("avg_logprob", 0) < -0.8:
+            nsp, lp = s.get("no_speech_prob", 0), s.get("avg_logprob", 0)
+            if nsp > 0.6 and lp < -0.8:
                 continue
+            if lp < -1.25 or s.get("compression_ratio", 0) > 2.4:
+                continue   # low confidence or a repetition loop
             parts.append(s.get("text", "").strip())
         text = " ".join(p for p in parts if p).strip()
         return text, lang
@@ -391,6 +472,13 @@ class Writer:
         with self.lock:
             self._release()
 
+    def marker(self, text: str) -> None:
+        """A service line in the transcript, e.g. mic muted / unmuted."""
+        with self.lock:
+            self._release(force=True)
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(f"--- {text} {hhmmss(now())} ---\n")
+
     def _release(self, force: bool = False) -> None:
         keep = []
         for m in sorted(self.held_me, key=lambda x: x.t):
@@ -419,9 +507,10 @@ class Writer:
 # --------------------------------------------------------------------------- Capture
 
 class Capture(threading.Thread):
-    def __init__(self, source: str, seg: Segmenter, stop: threading.Event):
+    def __init__(self, source: str, seg: Segmenter, stop: threading.Event, device: str = "default"):
         super().__init__(daemon=True)
         self.source = source
+        self.device = device
         self.seg = seg
         self.stop_ev = stop
         self.proc: subprocess.Popen | None = None
@@ -433,7 +522,10 @@ class Capture(threading.Thread):
         while not self.stop_ev.is_set():
             errlog = open(LOGS / f"audiocap-{self.source}.log", "a")
             try:
-                self.proc = subprocess.Popen([str(BIN), "--source", self.source],
+                cmd = [str(BIN), "--source", self.source]
+                if self.source == "mic" and self.device == "builtin":
+                    cmd += ["--device", "builtin"]
+                self.proc = subprocess.Popen(cmd,
                                              stdout=subprocess.PIPE, stderr=errlog)
             except OSError as e:
                 self.error = f"cannot start audiocap: {e}"
@@ -480,7 +572,7 @@ def load_request(args) -> dict:
             sys.exit("control/start.json not found")
         req = json.loads(start.read_text(encoding="utf-8"))
         os.replace(start, CONTROL / "active.json")
-    for k in ("project_dir", "title", "slug", "prompt", "me_lang", "me_langs", "langs", "model", "prompter"):
+    for k in ("project_dir", "title", "slug", "prompt", "me_lang", "me_langs", "langs", "model", "prompter", "mic_device"):
         v = getattr(args, k, None)
         if v:
             req[k] = v
@@ -488,6 +580,8 @@ def load_request(args) -> dict:
         if isinstance(req.get(key), str):
             req[key] = [l.strip() for l in req[key].replace("+", ",").split(",") if l.strip()]
     cfg.update({k: v for k, v in req.items() if v not in (None, "")})
+    md = str(cfg.get("mic_device") or "default").strip().lower().replace(" ", "_")
+    cfg["mic_device"] = "builtin" if md in ("builtin", "built-in", "mac", "mac_mic", "macbook", "internal") else "default"
     if not cfg.get("project_dir"):
         sys.exit("project_dir is required")
     if cfg["me_lang"] not in ("auto", None) and cfg["me_lang"] not in cfg["langs"]:
@@ -512,6 +606,7 @@ def main() -> int:
     ap.add_argument("--me-lang", dest="me_lang")
     ap.add_argument("--me-langs", dest="me_langs", help="languages the PM may switch between, e.g. uk+en")
     ap.add_argument("--langs")
+    ap.add_argument("--mic-device", dest="mic_device", help="default | builtin (the Mac's own microphone)")
     ap.add_argument("--model")
     ap.add_argument("--fake-whisper", action="store_true", help="test mode without MLX")
     args = ap.parse_args()
@@ -529,11 +624,15 @@ def main() -> int:
         stop_file.unlink()
     if (CONTROL / "prompter").exists():
         (CONTROL / "prompter").unlink()
+    mute_file = CONTROL / "mic_muted"     # created / removed by the mute button in the tips window
+    if mute_file.exists():
+        mute_file.unlink()                # every call starts unmuted
 
     status = {"state": "loading_model", "pid": os.getpid(), "file": str(out), "title": title,
               "slug": cfg.get("slug"), "started_at": dt.datetime.fromtimestamp(started).astimezone().isoformat(timespec="seconds"),
               "timezone": mac_timezone(),
               "langs": cfg["langs"], "me_lang": cfg["me_lang"], "me_langs": cfg["me_langs"],
+              "mic_device": cfg["mic_device"],
               "tips_file": str(tips_file), "inbox_file": str(inbox_file), "lines": 0, "queue": 0,
               "system_audio": "starting", "mic": "starting", "errors": []}
     write_json_atomic(STATE / "status.json", status)
@@ -541,6 +640,7 @@ def main() -> int:
     if cfg.get("prompter", True) not in (False, "false", "0", 0):
         launch_prompter(title, tips_file, inbox_file)
     log(f"languages: me={cfg['me_lang']} allowed={'+'.join(cfg['langs'])} model={cfg['model']}")
+    log("microphone: " + ("the Mac's built-in microphone" if cfg["mic_device"] == "builtin" else "system default input"))
 
     try:
         whisper = FakeWhisper(cfg) if args.fake_whisper else Whisper(cfg)
@@ -562,7 +662,7 @@ def main() -> int:
     stop_ev = threading.Event()
     flushed = threading.Event()
     segs = {"me": Segmenter("me", cfg, segq), "them": Segmenter("them", cfg, segq)}
-    caps = [Capture("mic", segs["me"], stop_ev), Capture("system", segs["them"], stop_ev)]
+    caps = [Capture("mic", segs["me"], stop_ev, cfg["mic_device"]), Capture("system", segs["them"], stop_ev)]
     for c in caps:
         c.start()
 
@@ -575,6 +675,7 @@ def main() -> int:
     last_lang = {"me": cfg["me_lang"] if cfg["me_lang"] != "auto" else cfg["langs"][0],
                  "them": cfg["langs"][0]}
     prompt = cfg.get("prompt")
+    prompt_words = set(re.findall(r"\w+", (prompt or "").lower()))
 
     def process(seg: Segment) -> None:
         me_set = cfg["me_langs"] if len(cfg["me_langs"]) > 1 else None
@@ -588,7 +689,8 @@ def main() -> int:
         else:
             lang = whisper.pick_language(seg.audio)
         text, lang = whisper.transcribe(seg.audio, lang, prompt)
-        if not text or norm(text) in HALLUCINATIONS or not norm(text):
+        text = clean_text(text, prompt_words)
+        if not text or not norm(text):
             return
         last_lang[seg.channel] = lang
         writer.add(Line(seg.channel, seg.t_start, lang, text))
@@ -619,6 +721,11 @@ def main() -> int:
         writer.tick()
         if stop_file.exists():
             stop_ev.set()
+        muted = mute_file.exists()
+        if muted != segs["me"].muted:
+            segs["me"].set_muted(muted)
+            writer.marker("мікрофон вимкнено" if muted else "мікрофон увімкнено")
+            log("mic muted in the tips window" if muted else "mic unmuted")
         reopen = CONTROL / "prompter"
         if reopen.exists():
             # Reopen the tips window (closed by accident): `touch control/prompter`,
@@ -633,7 +740,8 @@ def main() -> int:
             errs = [c.error for c in caps if c.error]
             status.update(lines=writer.lines, queue=segq.qsize(), errors=errs,
                           last_line_at=hhmmss(writer.last_line_at) if writer.last_line_at else None,
-                          mic="ok" if segs["me"].recent_peak() > 0.001 else "silent",
+                          audio_lost_s={k: round(v.lost) for k, v in segs.items()},
+                          mic="muted" if segs["me"].muted else ("ok" if segs["me"].recent_peak() > 0.001 else "silent"),
                           system_audio="ok" if segs["them"].recent_peak() > 0.0005 else "silent")
             write_json_atomic(STATE / "status.json", status)
             if segq.qsize() > 6:
@@ -655,7 +763,7 @@ def main() -> int:
     writer.close(f"\n--- кінець запису {hhmmss(now())} ---\n")
     status.update(state="stopped", lines=writer.lines, stopped_at=hhmmss(now()))
     write_json_atomic(STATE / "status.json", status)
-    for f in (CONTROL / "active.json", stop_file, CONTROL / "prompter", STATE / "pid", STATE / "launching"):
+    for f in (CONTROL / "active.json", stop_file, CONTROL / "prompter", mute_file, STATE / "pid", STATE / "launching"):
         try:
             f.unlink()
         except FileNotFoundError:

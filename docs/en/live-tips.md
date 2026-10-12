@@ -222,13 +222,14 @@ per project.
 > 2. Payments: waiting for the client
 > 3. We need a decision on the release date
 
-**Switching language mid-call.** Internal calls can mix Ukrainian, Russian and English.
+**Switching language mid-call.** Internal calls can mix Ukrainian and English.
 Your microphone is recognised only among your own languages (`me_langs`, e.g. Ukrainian and
 English), so Ukrainian never turns into Russian and an English part is recognised
 correctly. The skill keeps a "language of the moment": when you are asked "say it in
 English" or a guest asks you in English, a tip arrives at once with the gist in your
 language and the phrase already in English, and phrases stay in English until you switch
-back. Ukrainian and Russian on one internal call count as one conversation, not side talk.
+back. Russian is not in the default sets on purpose: a Russian phrase is written as
+Ukrainian. Add `ru` to `langs` only if a call really needs it.
 
 > **🟠 Тепер англійською: статус релізу** (Now in English: release status)
 > "Short update in English. The release is on track for Friday."
@@ -254,13 +255,16 @@ status.
    closed anyway, the recording stops cleanly and the transcript so far is kept.
 3. The chat shows `Запис іде: <file>. Мови: я en, дозволені en+es.` ("Recording: …"), and
    a minute later the meeting checklist from the Live Brief (open topics, decisions, risks,
-   promises from previous meetings, tickets) and "Мовчу, поки нема що сказати." ("Staying
-   quiet until there is something to say").
-4. From then on the skill is silent until a trigger fires.
+   promises from previous meetings, tickets) and "Підкажу, коли буде що додати." ("I will
+   prompt you when there is something to add").
+4. From then on the skill speaks only when a trigger fires. It does not wait for a direct
+   question: when someone finishes a thought on a work topic and a reaction from you is
+   expected, it suggests what you can add ("Можеш додати: ...", 1-2 ready phrases).
 
 | Level | When |
 |---|---|
 | 🔴 immediately | A request that looks like a new requirement; the PM names a date or an estimate; a contradiction with a recorded decision; a dissatisfaction signal; the PM states a fact that contradicts the tracker or decisions |
+| 🟠 at most once per `comment_rate_seconds` | A comment moment: someone finished a complete thought (idea, finding, plan, worry, summary) and the PM has not reacted: 1-2 phrases to add a fact, ask a useful question or propose a next step |
 | 🟠 at most once per `rate_seconds` | The PM answered a different question or only part of it; a vague answer where a date or an owner was expected; the other side switched to another language (short gist); a topic or ticket from the brief came up; a question unanswered for ~2 min; 2/3 of the time with checklist items uncovered; 5 min before the end with decisions not obtained |
 | silent | Action items, new requests, commitments: they go into the wrap-up |
 
@@ -272,8 +276,39 @@ at the top centre of the screen, under the camera.
 
 - **What is in it:** the newest tip on top in a large font, older ones below and dimmer.
   The title bar area shows the recording state (on, line count, whether the other side is
-  heard). Buttons: `A-` / `A+` font size, `◐` transparency, `📌` always on top (turn off
-  if it gets in the way).
+  heard). Buttons (hover for a hint): `🎙` mic mute, `💬` how often comment hints come,
+  `A-` / `A+` font size, `◐` transparency, `📌` always on top (turn off if it gets in the way).
+- **`🎙` mute.** The recorder listens to the Mac's microphone and cannot see whether you are
+  muted in Meet or Zoom: the state of a meeting app's mute button is not readable from outside,
+  and a wrong guess would silently drop your words, so it is a manual button on purpose. Why it
+  exists: in a cafe, with music or people talking nearby, you are muted in the meeting, but
+  the microphone still hears the room and Whisper would write it down as if you said it. What
+  the button does: it turns red (`🔇`), the recorder stops transcribing the microphone (the
+  other side is still recorded), the transcript gets the lines `--- мікрофон вимкнено HH:MM:SS ---`
+  and `--- мікрофон увімкнено HH:MM:SS ---`, the status shows `mic=muted`, and the skill does
+  not count your silence as a problem and does not run the answer check for that time. Press
+  it again when you unmute. Every call starts unmuted.
+- **`💬` comment hints, and what the seconds mean.** People rarely ask you a direct
+  question; more often someone finishes a thought and waits for your reaction. For such moments
+  the skill sends a "you can add" hint (a "comment moment"). The number on the button is the
+  **minimum pause between two such hints**, not a timer and not a delay: `45s` means "at most one
+  comment hint per 45 seconds". Without a limit the window would comment on every phrase, and
+  with a very long one it would miss the moment. The button cycles through 45 s (default, also
+  the default of `tips.comment_rate_seconds`), 20 s (a lively discussion, more hints), off
+  (`0`, no comment hints, only the direct triggers) and 90 s (rare hints). The choice is
+  remembered for the next calls and is sent to the skill, so it applies at once. Urgent
+  tips (a new request, a wrong date, "your turn") ignore this limit.
+- **Choices at the start of a call.** When you start the skill it asks, in one card: the
+  project (if you did not name it), the call language (Ukrainian, English, a mix or
+  another one) and the microphone (default input or the Mac's own). They are asked at the
+  start, and not as buttons in the window, because they cannot change during a call: the
+  recorder fixes the language list and the microphone when it starts. Switching a microphone
+  in the middle of a call makes the audio engine restart, and with headsets this was the cause
+  of broken audio and of Whisper inventing text. The microphone question exists because the
+  Mac's default input can be the Mac itself, AirPods or any of several headsets, and a headset
+  in call mode gives a thin, low-quality voice: "Mac mic" records your voice from the Mac while
+  the headset stays in the meeting app. Anything you already said in the request is not
+  asked again. Turn the questions off with `start.ask: false` in `settings.yaml`.
 - **The field at the bottom:** type a question or a comment and press Enter. The skill gets
   it in the same loop that reads the transcript and answers in the same window. Typing
   "стоп" (stop) there ends the call like in the chat.
@@ -418,13 +453,16 @@ the package).
 | `user.tips_language` | Language of tips and the wrap-up |
 | `user.name_aliases` | How people call you on calls (all forms and languages): the "Your turn" trigger and a hint for Whisper |
 | `user.timezone` | Fallback IANA zone. Usually not needed: live-transcriber writes the Mac clock zone and offset into `status.json` itself (Notion accepts `Europe/Kiev`) |
+| `start.ask` | `true` (default): at every start the assistant asks in chat, in one card, the project (if you did not name it), the call language (Ukrainian, English, mix or another one) and the microphone (default input or the Mac's own). `false`: no questions, the defaults from this file are used. Anything you already said in the request is not asked again |
+| `audio.mic` | Which microphone to record: `default` = whatever the Mac uses as input now (AirPods, Jabra or other headsets, or the Mac itself), `mac_mic` = always the Mac's own microphone. You can also say it when starting: "live tips, mac mic" |
 | `paths.work_root` | Mac folder connected to Cowork |
 | `paths.tool_root` | Where live-transcriber lives |
-| `languages.internal` | `me_lang` (main mic language), `me_langs` (languages you may switch to, e.g. `[uk, en]`), `langs` (all call languages, e.g. `[uk, ru, en]`) for internal calls |
+| `languages.internal` | `me_lang` (main mic language), `me_langs` (languages you may switch to, e.g. `[uk, en]`), `langs` (all call languages, the first is the main one, e.g. `[uk, en]`) for internal calls |
 | `languages.client` | The same for client calls; `from_project` = `client_language` from the config |
 | `languages.per_project.<slug>.<internal\|client>` | Override for a specific project |
 | `tips.rate_seconds` | Minimum gap between non-urgent tips |
 | `tips.answer_check` | Check the PM's own answers |
+| `tips.comment_prompts`, `tips.comment_rate_seconds` | Suggest what to add when others finish a thought, without a direct question; minimum gap between such tips |
 | `tips.side_talk_summary` | Summarise the other side talking among themselves in another language |
 | `tips.output` | Where tips go: `window` (the tips window), `chat` or `both` |
 | `tips.idle_stop_minutes`, `tips.hard_cap_minutes` | Auto-stop |
@@ -436,7 +474,8 @@ upload the skill again (a zip with the `live-tips/` folder holding `SKILL.md` an
 `settings.yaml`) in Claude settings, Skills section. The template in this repository is
 `plugin/skills/live-tips/settings.yaml`.
 
-Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo window) are in
+Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo window,
+`lang_bias`, `gap_resync`) are in
 `DEFAULTS` in `src/transcriber.py` and can be overridden in `config.json`.
 
 ---
@@ -450,12 +489,14 @@ Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo wind
 | Participants see the window while you share the entire screen | The meeting app captures the screen in a way that ignores `sharingType = none`. Share a window or a tab instead of the entire screen, or minimise the window while sharing |
 | `start.json` is there but the recording does not start within 60 s | The LaunchAgent is not loaded or the install was never run. `launchctl list \| grep live-transcriber`; if empty, run `install.sh`. The skill then renames the file to `start.json.pending` so the recording does not start by surprise later |
 | `system=silent`, the transcript has only "Я" lines | No permission to record system audio. System Settings → Privacy & Security → Screen & System Audio Recording → System Audio Recording Only → Terminal. Check: play sound and run `bin/audiocap --source system --seconds 5 \| wc -c`, it must be above zero |
+| Your voice is thin or garbled with a headset (the headset switched to its call mode) | Record the Mac's own microphone: `audio.mic: mac_mic`, or say "mac mic" when starting. Keep the headset in the meeting app. In a noisy place the Mac microphone also picks up the room, so use the `🎙` mute |
 | `mic=silent` | Microphone permission for Terminal (Privacy & Security → Microphone) or the wrong input device |
-| Many `mic restart: engine configuration change` in `audiocap-mic.log` | Normal when headphones connect or disconnect: the microphone reconnects by itself |
+| Many `mic restart: engine configuration change` in `audiocap-mic.log`, several a minute; "Я" lines garbled and their times lag behind | A restart loop, fixed in 1.6.3: re-run `install.sh` to rebuild `audiocap`. The `health` line shows `restarts=N`; one restart per headphone switch is normal |
 | `no IO from tap-only aggregate, retrying with output device as clock` | Normal: the fallback clock mode of the system tap |
 | `queue` grows, tips arrive late | The Mac is busy (video, builds). Transcription catches up; the skill warns once |
-| Ukrainian recognised as Russian, names garbled | Check `me_lang`; add names to `prompt` (the skill builds ~200 chars of names and terms from the config) |
-| Lines like "Дякую за перегляд", "Thanks for watching" | Whisper hallucinations on silence; the common ones are filtered (`HALLUCINATIONS` in `transcriber.py`), add new ones there |
+| Ukrainian recognised as another language, names garbled | Check `me_lang` and that the main language is first in `langs`; the skill puts names into `prompt` as one short sentence |
+| Lines like "Субтитры создавал ...", "Продолжение следует...", "Thanks for watching", a list of names repeated many times | Whisper artefacts: the model learned subtitle credits from internet videos and recalls them on silence, music or chopped audio, and repeats the `prompt` names in a loop. Not in the audio, not a virus. Filtered by `HALLUCINATION_PATTERNS` and the loop check in `transcriber.py`; add new patterns there |
+| The transcript is readable but weak for Ukrainian | Try `"model": "mlx-community/whisper-large-v3-mlx"` in `config.json`: more accurate, 2-3 times slower |
 | After reinstalling with another `launchd_label` Terminal opens twice | Two LaunchAgents are running. Unload the old one: `launchctl bootout gui/$(id -u)/<old label>` and delete its plist in `~/Library/LaunchAgents` |
 | The Notion page title shows `<mention-date …>` as text | The title was set on create, not on update. See section 7.2 |
 

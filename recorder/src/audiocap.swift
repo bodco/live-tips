@@ -2,6 +2,7 @@
 //
 //   audiocap --source system   system audio via Core Audio process tap (macOS 14.2+), no virtual driver
 //   audiocap --source mic      default input device, follows device changes (AirPods on/off etc.)
+//   audiocap --source mic --device builtin   the Mac's own microphone, whatever the default input is
 //   audiocap --source system --seconds 5 > /tmp/test.raw   short test run
 //
 // Diagnostics go to stderr. A broken stdout pipe ends the process quietly.
@@ -220,13 +221,76 @@ final class SystemCapture {
 
 // MARK: - Microphone
 
+var micRestarts: Int64 = 0
+var micMode = "default"          // "default" = system default input, "builtin" = the Mac's own microphone
+var warnedNoBuiltin = false
+
+func allDevices() -> [AudioDeviceID] {
+    var addr = systemAddress(kAudioHardwarePropertyDevices)
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size) == noErr,
+          size > 0 else { return [] }
+    var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+    guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &ids) == noErr
+    else { return [] }
+    return ids
+}
+
+func hasInputChannels(_ dev: AudioDeviceID) -> Bool {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreamConfiguration,
+                                          mScope: kAudioObjectPropertyScopeInput,
+                                          mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(dev, &addr, 0, nil, &size) == noErr, size > 0 else { return false }
+    let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+    defer { raw.deallocate() }
+    guard AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, raw) == noErr else { return false }
+    let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+    return list.reduce(0) { $0 + Int($1.mNumberChannels) } > 0
+}
+
+func isBuiltIn(_ dev: AudioDeviceID) -> Bool {
+    var addr = systemAddress(kAudioDevicePropertyTransportType)
+    var t: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    guard AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, &t) == noErr else { return false }
+    return t == UInt32(kAudioDeviceTransportTypeBuiltIn)
+}
+
+/// The input device to record: the system default, or the Mac's own microphone when --device builtin.
+/// With builtin the choice does not change when AirPods, Jabra or other headsets connect.
+func targetMicDevice() -> AudioDeviceID? {
+    if micMode == "builtin" {
+        if let b = allDevices().first(where: { hasInputChannels($0) && isBuiltIn($0) }) { return b }
+        if !warnedNoBuiltin {
+            warnedNoBuiltin = true
+            log("built-in microphone not found, using the default input")
+        }
+    }
+    return defaultDevice(kAudioHardwarePropertyDefaultInputDevice)
+}
+
+func currentDevice(of au: AudioUnit) -> AudioDeviceID? {
+    var dev = AudioDeviceID(kAudioObjectUnknown)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    let st = AudioUnitGetProperty(au, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                                  &dev, &size)
+    return (st == noErr && dev != kAudioObjectUnknown) ? dev : nil
+}
+
 final class MicCapture {
     private var engine = AVAudioEngine()
     private var restartPending = false
+    private var device = AudioDeviceID(kAudioObjectUnknown)
+    private var rate: Double = 0
+    private var channels: AVAudioChannelCount = 0
 
     func start() throws {
-        if let dev = defaultDevice(kAudioHardwarePropertyDefaultInputDevice),
-           let au = engine.inputNode.audioUnit {
+        if let dev = targetMicDevice(),
+           let au = engine.inputNode.audioUnit,
+           currentDevice(of: au) != dev {
+            // Switch only when needed: setting the device posts a configuration change, and a
+            // restart on every change used to loop several times a second, losing the audio.
             var d = dev
             let st = AudioUnitSetProperty(au, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
                                           &d, UInt32(MemoryLayout<AudioDeviceID>.size))
@@ -241,12 +305,38 @@ final class MicCapture {
         }
         engine.prepare()
         try engine.start()
+        device = input.audioUnit.flatMap { currentDevice(of: $0) }
+            ?? targetMicDevice() ?? AudioDeviceID(kAudioObjectUnknown)
+        rate = fmt.sampleRate
+        channels = fmt.channelCount
         log("mic: \(fmt.sampleRate) Hz, \(fmt.channelCount) ch")
+    }
+
+    /// AVAudioEngine posts a configuration change right after start and whenever another app
+    /// (Meet, Zoom, AirPods switching to the headset profile) touches the input. Rebuild the
+    /// engine only when the device or its format really changed; otherwise keep it running.
+    func configurationChanged() {
+        let dev = targetMicDevice() ?? device
+        let fmt = engine.inputNode.outputFormat(forBus: 0)
+        if dev == device && fmt.sampleRate == rate && fmt.channelCount == channels && fmt.sampleRate > 0 {
+            if !engine.isRunning {
+                do { try engine.start(); return } catch { log("mic resume failed: \(error)") }
+            } else {
+                return
+            }
+        }
+        scheduleRestart("engine configuration change (\(fmt.sampleRate) Hz, \(fmt.channelCount) ch)")
+    }
+
+    func defaultInputChanged() {
+        if let dev = targetMicDevice(), dev == device { return }   // builtin: a new headset changes nothing
+        scheduleRestart("default input changed")
     }
 
     func scheduleRestart(_ reason: String) {
         if restartPending { return }
         restartPending = true
+        micRestarts += 1
         log("mic restart: \(reason)")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
             guard let self else { return }
@@ -268,14 +358,14 @@ final class MicCapture {
         if let o = observer { NotificationCenter.default.removeObserver(o) }
         observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange,
                                                           object: engine, queue: .main) { [weak self] _ in
-            self?.scheduleRestart("engine configuration change")
+            self?.configurationChanged()
         }
     }
 
     func installDefaultInputListener() {
         var addr = systemAddress(kAudioHardwarePropertyDefaultInputDevice)
         AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, .main) { [weak self] _, _ in
-            self?.scheduleRestart("default input changed")
+            self?.defaultInputChanged()
         }
     }
 }
@@ -302,8 +392,9 @@ while let a = argv.next() {
     switch a {
     case "--source": source = argv.next() ?? ""
     case "--seconds": seconds = Double(argv.next() ?? "0") ?? 0
+    case "--device": micMode = (argv.next() ?? "default") == "builtin" ? "builtin" : "default"
     case "-h", "--help":
-        print("usage: audiocap --source system|mic [--seconds N]")
+        print("usage: audiocap --source system|mic [--device default|builtin] [--seconds N]")
         exit(0)
     default:
         log("unknown argument \(a)")
@@ -334,6 +425,7 @@ case "mic":
     mic.installDefaultInputListener()
     do { try mic.start() } catch { log("\(error)"); exit(1) }
     keepAlive.append(mic)
+    log("mic input: " + (micMode == "builtin" ? "the Mac's built-in microphone" : "system default input"))
 default:
     log("usage: audiocap --source system|mic [--seconds N]")
     exit(64)
@@ -344,7 +436,7 @@ let health = DispatchSource.makeTimerSource(queue: .main)
 health.schedule(deadline: .now() + 10, repeating: 10)
 health.setEventHandler {
     writeQueue.async {
-        log(String(format: "health source=%@ frames=%lld peak=%.4f", source, framesWritten, peakSinceReport))
+        log(String(format: "health source=%@ frames=%lld peak=%.4f restarts=%lld", source, framesWritten, peakSinceReport, micRestarts))
         peakSinceReport = 0
     }
 }

@@ -12,7 +12,7 @@ the system audio, transcribes each phrase with Whisper on the Mac and appends li
 
 ```
 [12:30:11] {me_label} (uk): ...
-[12:30:15] {them_label} (ru): ...
+[12:30:15] {them_label} (en): ...
 ```
 
 **Settings.** Everything personal (labels, paths, language defaults, tip rules, model hint)
@@ -78,8 +78,25 @@ user to connect the `work_root` folder.
    3. `settings.languages.internal` or `settings.languages.client`, where `from_project`
       means the project config `client_language` (as an ISO code: English -> en).
 
-The only allowed questions: the project (if not explicit) and nothing else. Do not ask
-about languages or length: use defaults and state them in the start message.
+5. **Start questions (in chat, before anything is written or started).** Ask with the
+   AskUserQuestion tool, ONE call, in this order, and skip any question the user's words
+   or the claude.ai Project instructions already answered:
+   1. **Project** (only if not explicit, Default Project Rule): options = the configs in
+      `projects/`.
+   2. **Call language**: options `Українська` (me_lang `uk`, me_langs `uk+en`, langs `uk+en`),
+      `English` (me_lang `en`, me_langs `en+uk`, langs `en+uk`), `Мікс` (main language and
+      lists from the resolution order in item 4, which already default to a mix). Mark as
+      recommended the option that matches the resolved default for this project and call kind.
+      "Other" = free text: take the language(s) named there (for example Spanish) as the
+      main language and add `uk` and `en` to `me_langs` / `langs`. Never offer Russian.
+   3. **Microphone**: options `За замовчуванням` (`mic_device` `default`: the Mac's current
+      input, headset or built-in) and `Мікрофон Мака` (`builtin`: the Mac's own microphone,
+      even when AirPods or another headset are connected). Mark as recommended the option
+      from `settings.audio.mic`.
+   If `settings.start.ask` is `false`, do not ask the language and microphone questions:
+   use the defaults and state them in the start message. If the AskUserQuestion tool is
+   not available, or nobody is there to answer (scheduled run), use the defaults and state
+   them. Meeting length is never asked: use the default.
 
 ## Step 1 - Start the recording (first, before the brief)
 
@@ -90,13 +107,20 @@ about languages or length: use defaults and state them in the start message.
 1. Check that nothing is recording: read `state/status.json`. If `state` is `recording`
    for the same project, reuse it (take `file` from the status). If another project is
    recording, stop and tell the user, do not mix.
-2. Build `prompt` for Whisper: max ~200 chars of proper names and terms from the config
-   (team names, client names, product and module names) plus `settings.user.name_aliases`.
-   It improves spelling of names.
+2. Build `prompt` for Whisper: ONE short natural sentence in the main call language, max
+   ~150 chars, with the key proper names and terms from the config (team, client, product,
+   module names) plus `settings.user.name_aliases`, e.g. "Дзвінок команди Acme Portal: Іван,
+   Олена, реліз, Jira." It improves spelling of names. Not a bare comma list of names: on
+   silence Whisper repeats such a list back in a loop (live-transcriber drops those lines).
 3. Write `control/start.json` with a small python one-liner inside device_bash
    (`json.dump`, UTF-8, `ensure_ascii=False`):
-   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "...", "prompter": true}`
-   (labels from `settings.user`; `prompter` = `settings.tips.output` is not `chat`).
+   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "...", "prompter": true, "mic_device": "default"}`
+   (labels from `settings.user`; `prompter` = `settings.tips.output` is not `chat`;
+   `mic_device` = `default` (the Mac's current input: AirPods, other headsets) or `builtin`
+   (the Mac's own microphone). Take it from the answer to the start question (Step 0, item 5), else from the user's words ("з мікрофона маку", "mac mic",
+   "на мікрофон ноутбука" -> `builtin`; "на навушниках" -> `default`), else from
+   `settings.audio.mic` (`default` | `mac_mic`; missing = `default`). It cannot change during
+   a call: to switch, stop and start again.)
    The LaunchAgent opens a Terminal window "Live transcriber" with the recording by itself;
    the PM does not start it, may minimise it, should not close it.
 4. Poll `state/status.json` every 3 s up to 60 s (model load takes 5-20 s):
@@ -106,7 +130,7 @@ about languages or length: use defaults and state them in the start message.
      `logs/launcher.log`, say what failed. Common fixes: install.sh not run, Terminal has no
      microphone / system audio permission, LaunchAgent not loaded
      (`launchctl list | grep live-transcriber` on the Mac).
-5. One message: `Запис іде: {file name}. Мови: я {me_langs or me_lang}, дозволені {langs}.` plus the
+5. One message: `Запис іде: {file name}. Мови: я {me_langs or me_lang}, дозволені {langs}. Мікрофон: {навушники або системний за замовчуванням | мікрофон Мака}.` plus the
    checklist from Step 2 when ready. With the tips window on, add `Підказки у вікні-суфлері.`
    and emit the checklist into the window too (kind `checklist`).
 
@@ -150,7 +174,7 @@ Compress into the **Live Brief**, max ~1200 words, saved next to the transcript 
    covers several projects (e.g. an internal PM sync), one short line per project.
 
 Show the user only the checklist (max 6 short lines, no abbreviations, ~45 characters per
-line) and `Мовчу, поки нема що сказати.`
+line) and `Підкажу, коли буде що додати.`
 
 **If the PM opens the meeting** (the PM hosts it, the user says so, or the first 30 s of the
 call are silent on the other side): right after the checklist post the "Your turn" tip
@@ -178,7 +202,7 @@ Drop `--emit-stdin` and the heredoc when there is nothing to emit, and drop `--t
 `--inbox`, `--inbox-offset` when `settings.tips.output` is `chat`. It returns as soon as new
 transcript lines or new window questions exist (plus 2 s to collect a burst), or after 25 s
 with nothing. Output: the new lines, `@@ASK [time] <text>` per new window question,
-`@@OFFSET <n>`, `@@INBOX_OFFSET <n>`, `@@EMITTED <n>` (an `@@EMIT_ERROR` line means a tip
+`@@SET <key>=<value>` per setting changed with a window button, `@@OFFSET <n>`, `@@INBOX_OFFSET <n>`, `@@EMITTED <n>` (an `@@EMIT_ERROR` line means a tip
 was not valid JSON: fix and re-emit it) and `@@STATUS <state> lines=.. queue=.. mic=..
 system=.. errors=..`. No sleep calls are needed.
 
@@ -199,6 +223,16 @@ system=.. errors=..`. No sleep calls are needed.
   the window as `kind: answer` (and to the chat too in `both`). "стоп" typed in the window
   stops the call like in the chat.
 - Keep `inbox_offset` in state next to `offset`.
+- Window buttons. `💬` sets how often comment moments may fire for this call: it arrives as
+  `@@SET comment_rate_seconds=N` (also once at the start when the PM's last choice is not
+  45); store it in state, it overrides `settings.tips.comment_rate_seconds`, `0` = comment
+  moments off. No chat reply needed. `🎙` is the mic mute: the PM is muted in the meeting
+  (cafe, music, people around), so the recorder stops transcribing the mic. `@@STATUS` shows
+  `mic=muted`, and the transcript gets `--- мікрофон вимкнено HH:MM:SS ---` and
+  `--- мікрофон увімкнено HH:MM:SS ---` lines. While muted: expect no `{me_label}` lines,
+  skip the answer check for that time and the `mic=silent` warning; other tips go on. A 🔴
+  "Your turn" while muted starts the gist with "Увімкни мікрофон." Treat a `{me_label}`
+  line right after an unmute as a normal reply.
 - The window may be closed or minimised by the PM; keep emitting, it does not matter.
 - Reopen on request ("відкрий суфлер", "поверни вікно", "open the prompter"): `touch
   <tool_root>/control/prompter`. The recorder reopens the window within a second with all
@@ -210,7 +244,9 @@ Then:
 2. Speakers: `{me_label}` = the PM (mic), `{them_label}` = everyone else (system audio). The
    language tag `(xx)` is per line.
 3. Match the new lines against the Live Brief and the triggers below, by meaning, across
-   languages (a Russian or Spanish line can match a Ukrainian/English topic).
+   languages (a Spanish line can match a Ukrainian/English topic). Never react to Whisper
+   artefacts that slipped through the filters (subtitle credits, a list of names repeated,
+   one word repeated many times): skip them silently.
 4. Deep lookup (Jira ticket, Notion page) only when a trigger fires and the brief does not
    answer it. Max one per 2 min.
 5. Post a tip if the rate rules allow: emit it to the window in the next read call and/or
@@ -218,13 +254,12 @@ Then:
    go straight to the next read.
 6. Health from `@@STATUS`: `system=silent` for 2 polls while the call is on -> one message
    "Не чую співрозмовників: перевір дозвіл на запис системного звуку для Terminal";
-   `mic=silent` likewise; `queue` > 6 -> "Транскрипція відстає на ~{queue} фраз";
+   `mic=silent` likewise (never for `mic=muted`); `queue` > 6 -> "Транскрипція відстає на ~{queue} фраз";
    `errors>0` -> tail of `logs/transcriber.log`. Each warning once.
 
 ### Language of the moment
 
-The call language can change mid-call, mostly on internal calls (Ukrainian, Russian and
-English all possible). Keep `answer_lang` in state = the language the PM is expected to
+The call language can change mid-call, mostly on internal calls (Ukrainian and English). Keep `answer_lang` in state = the language the PM is expected to
 speak right now; every phrase in a tip goes in `answer_lang`, the gist line always stays
 in `{settings.user.tips_language}`.
 
@@ -238,7 +273,8 @@ in `{settings.user.tips_language}`.
   > "Short update in English. The release is on track for Friday."
 - Switch back when the PM's own lines return to the main language for 2+ lines, or the
   request is clearly answered.
-- Ukrainian and Russian on the same internal call are one conversation, not side talk.
+- Russian is not in the default language sets on purpose: a Russian phrase on an internal
+  call is written as Ukrainian. Add `ru` to `langs` only if a call really needs it.
 
 ### Triggers
 
@@ -252,13 +288,39 @@ in `{settings.user.tips_language}`.
 | 🔴 | Answer check: `{me_label}` states a fact that contradicts the brief, tracker or a Decision (wrong status, date, owner, scope) | "Неточно: {Y}, не {X}" + correction phrase + source |
 | 🟠 | Answer check: `{me_label}` answered, but not the question that was asked, or only part of it | "Питали про {що}, не про {інше}" + short phrase to close it |
 | 🟠 | Answer check: `{me_label}` answered vaguely where the other side wanted a concrete thing (date, owner, yes/no) | "Розмито. Дай {дату / власника / так-ні}" + phrase |
-| 🟠 | Side talk: 2+ consecutive `{them_label}` lines in a language the PM does not use on this call (not in `me_langs`; uk and ru count as one on internal calls), e.g. `es` while the call is `en` | "Між собою іспанською" + the gist in 1-2 lines. Skip small talk. |
+| 🟠 | Side talk: 2+ consecutive `{them_label}` lines in a language the PM does not use on this call (not in `me_langs`), e.g. `es` while the call is `en` | "Між собою іспанською" + the gist in 1-2 lines. Skip small talk. |
+| 🟠 | Comment moment: `{them_label}` finished a complete thought on a work topic and the PM has not reacted yet (see "Comment moments") | "Можеш додати: {тема}" + 1-2 ready phrases. Own rate `tips.comment_rate_seconds` |
 | 🟠 | A topic from the brief comes up | gist + up to 3 status facts from the brief |
 | 🟠 | A question to the PM stays unanswered for ~2 min | "Без відповіді: {питання}" + phrase |
 | 🟠 | Interview: an answer opens a follow-up worth asking, or a planned question is skipped | "Уточни: {що}" + the question as a ready phrase |
 | 🟠 | At 2/3 of the meeting length | uncovered checklist items (for an interview: questions not asked yet) |
 | 🟠 | 5 min before the end | "Decisions to obtain" not obtained yet |
 | silent | Action item (who / what / when), new request, commitment | log to state, show in the wrap-up |
+
+### Comment moments (do not wait for a direct question)
+
+Only when `tips.comment_prompts: true` (missing = true; missing `tips.comment_rate_seconds` = 45; the `💬` window button overrides the rate for the call, `0` = off). On calls people rarely ask the PM directly. More
+often someone finishes a thought and expects a reaction: an idea, a finding, a plan, a
+worry, a summary ("ну от якось так", "що думаєте?", "виглядає валідно", "make sense?",
+a pause after a long monologue). Treat such a moment as an implicit question to the PM.
+
+It is a comment moment when all three hold:
+1. `{them_label}` said 2+ lines (or one long line) on one work topic and the batch ended
+   (read_delta returns after a pause, so a returned batch usually means a pause);
+2. the thought is complete: a conclusion, proposal, finding, plan, worry, a question to the
+   whole team, or a turn-yielding cue. Not the middle of a story, not small talk, not a joke;
+3. the PM has not reacted to it in the new lines.
+
+Then emit a 🟠 tip "Можеш додати: {тема}" with 1-2 ready phrases in `answer_lang`, each a
+different useful move: agree and add a fact from the brief or the tracker; a clarifying
+question that moves the work forward; a concrete next step with an owner; a risk or
+dependency the speaker missed. Project facts beat generic praise. Never a phrase that
+commits a date, estimate or scope (the commitment trigger still applies). If the PM reacts
+before the tip lands, drop it. One comment tip per topic.
+
+> **🟠 Можеш додати: порівняння цін**
+> "Згоден. Пропоную таблицю: продукт, функції, ціна, ліміти."
+> "Хто з нас збирає дані по двох конкурентах?"
 
 ### Interview mode
 
@@ -289,13 +351,14 @@ Good answers produce no tip. Log every pair with a verdict in state (`answers`) 
 the weak ones in the wrap-up under "Відповіді, до яких варто повернутись". Judge the
 content, not the person: no comments on tone, confidence or emotions.
 
-Whisper can still mistake Ukrainian for Russian or misspell names: judge by meaning, mark
+Whisper can still garble words or misspell names: judge by meaning, mark
 an uncertain tip "(?)", never quote a garbled line as fact.
 
 ### Rate rules
 
 - 🔴 immediately.
 - 🟠 / 🔵 max one message per `tips.rate_seconds`; batch several into one message.
+- Comment moments have their own limit: max one per `tips.comment_rate_seconds`.
 - One tip = the block from "Tip format". Max 2 tips per message, separated by an empty line.
 - Never repeat a tip already in `tips_given` unless the situation changed.
 

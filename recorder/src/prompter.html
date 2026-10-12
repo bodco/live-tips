@@ -23,6 +23,7 @@
   header button { background: var(--panel); color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; font-size: 12px; padding: 2px 7px; cursor: pointer; }
   header button.off { color: var(--muted); }
+  header button.muted { background: var(--red); border-color: var(--red); color: #fff; }
   #list { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
   .tip { background: var(--panel); border-left: 4px solid var(--blue); border-radius: 8px;
     padding: 8px 10px; opacity: .55; font-size: .82em; }
@@ -50,12 +51,14 @@
 <header>
   <span id="dot"></span>
   <span id="status">Чекаю на запис...</span>
-  <button id="smaller" title="Менший шрифт">A-</button>
-  <button id="bigger" title="Більший шрифт">A+</button>
-  <button id="fade" title="Прозорість вікна">◐</button>
-  <button id="pin" title="Завжди поверх інших вікон">📌</button>
+  <button id="mute" title="Mute: stop transcribing your microphone. Press it when you are muted in the meeting (cafe, music, people around), press again when you unmute.">🎙</button>
+  <button id="cmt" title="Comment hints: how often the window suggests what you can add when others finish a thought, without a direct question. Click to cycle: normal (45 s), often (20 s), off, rare (90 s).">💬 45s</button>
+  <button id="smaller" title="Smaller font">A-</button>
+  <button id="bigger" title="Bigger font">A+</button>
+  <button id="fade" title="Window transparency">◐</button>
+  <button id="pin" title="Keep on top of other windows">📌</button>
 </header>
-<div id="list"><div id="empty">Підказки з'являться тут. Мовчу, поки нема що сказати.</div></div>
+<div id="list"><div id="empty">Підказки з'являться тут. Підкажу, коли буде що додати.</div></div>
 <form id="ask" autocomplete="off">
   <input id="q" placeholder="Питання або коментар для скіла, Enter щоб надіслати">
   <button type="submit">↵</button>
@@ -77,6 +80,25 @@
 
   var fades = [0.94, 0.8, 0.65, 1.0], fi = 0;
   document.getElementById('fade').onclick = function () { fi = (fi + 1) % fades.length; send('opacity', fades[fi]); };
+  var muted = false, muteBtn = document.getElementById('mute');
+  function applyMute() {
+    muteBtn.classList.toggle('muted', muted);
+    muteBtn.textContent = muted ? '🔇' : '🎙';
+  }
+  var muteClick = 0;
+  muteBtn.onclick = function () { muted = !muted; muteClick = Date.now(); applyMute(); send('mute', muted); };
+
+  // Comment hint frequency for this call: the skill gets it as @@SET comment_rate_seconds=N (0 = off).
+  var rates = [45, 20, 0, 90], cmtBtn = document.getElementById('cmt');
+  var ri = Math.max(0, rates.indexOf(parseInt(load('cmt'), 10)));
+  function applyRate() { cmtBtn.textContent = rates[ri] ? '💬 ' + rates[ri] + 's' : '💬 off'; cmtBtn.classList.toggle('off', !rates[ri]); }
+  applyRate();
+  cmtBtn.onclick = function () {
+    ri = (ri + 1) % rates.length; applyRate(); store('cmt', rates[ri]);
+    send('setting', { key: 'comment_rate_seconds', value: rates[ri] });
+  };
+  if (rates[ri] !== 45) send('setting', { key: 'comment_rate_seconds', value: rates[ri] });
+
   var pinned = true, pinBtn = document.getElementById('pin');
   pinBtn.onclick = function () { pinned = !pinned; pinBtn.classList.toggle('off', !pinned); send('pin', pinned); };
 
@@ -124,6 +146,11 @@
     }[st] || st;
     if (st === 'recording' && s.lines != null) text += ' · ' + s.lines + ' рядків';
     if (s.system_audio === 'silent') text += ' · не чую співрозмовників';
+    if (s.mic === 'muted') text += ' · мікрофон вимкнено';
+    // Follow the recorder (e.g. a new call starts unmuted), but not right after a click.
+    if (st === 'recording' && Date.now() - muteClick > 5000 && (s.mic === 'muted') !== muted) {
+      muted = s.mic === 'muted'; applyMute();
+    }
     if (s.title) text = s.title + ' · ' + text;
     statusEl.textContent = text;
   };

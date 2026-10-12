@@ -6,7 +6,7 @@
 // it out of screen sharing (NSWindow.sharingType = .none); whether a given app honours
 // that depends on how it captures the screen, so check it once with your meeting app.
 //
-//   prompter --tips FILE --inbox FILE --status FILE --html FILE [--title T]
+//   prompter --tips FILE --inbox FILE --status FILE --html FILE [--control DIR] [--title T]
 //   prompter --demo        sample tips, typed questions get a demo answer
 //
 // Launched by transcriber.py when a recording starts. Closing the window does not stop
@@ -20,6 +20,7 @@ struct Args {
     var inbox = ""
     var status = ""
     var html = ""
+    var control = ""      // live-transcriber control dir: the mute button writes mic_muted here
     var title = "Суфлер"
     var demo = false
 }
@@ -33,6 +34,7 @@ func parseArgs() -> Args {
         case "--inbox": a.inbox = it.next() ?? ""
         case "--status": a.status = it.next() ?? ""
         case "--html": a.html = it.next() ?? ""
+        case "--control": a.control = it.next() ?? ""
         case "--title": a.title = it.next() ?? a.title
         case "--demo": a.demo = true
         default: break
@@ -134,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         buildMenu()
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting"] { uc.add(self, name: name) }
         let cfg = WKWebViewConfiguration()
         cfg.userContentController = uc
 
@@ -245,6 +247,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             window.level = on ? .floating : .normal
         case "opacity":
             if let v = message.body as? Double { window.alphaValue = CGFloat(max(0.35, min(1.0, v))) }
+        case "mute":
+            // The recorder checks this file twice a second and stops transcribing the mic.
+            let on = (message.body as? Bool) ?? false
+            guard !args.control.isEmpty else { return }
+            let path = (args.control as NSString).appendingPathComponent("mic_muted")
+            if on {
+                FileManager.default.createFile(atPath: path, contents: Data())
+            } else {
+                try? FileManager.default.removeItem(atPath: path)
+            }
+        case "setting":
+            // {"key": ..., "value": ...} -> the skill reads it from the inbox as @@SET key=value
+            guard let d = message.body as? [String: Any], let key = d["key"] as? String,
+                  !args.inbox.isEmpty else { return }
+            appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": key, "value": d["value"] ?? NSNull()]),
+                       to: args.inbox)
         default:
             break
         }

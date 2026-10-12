@@ -13,6 +13,7 @@ usage: read_delta.py FILE OFFSET [--wait 20] [--settle 2] [--status STATUS_JSON]
    a burst arrives together.
 3. Prints the new complete transcript lines, then:
      @@ASK [HH:MM:SS] <text>         one per new question from the tips window
+     @@SET <key>=<value>             a setting changed with a button in the tips window
      @@OFFSET <new transcript offset>
      @@INBOX_OFFSET <new inbox offset>  (only with --inbox)
      @@EMITTED <n>                   (only with --emit-stdin)
@@ -107,7 +108,11 @@ if a.inbox:
     for line in itext.splitlines():
         try:
             q = json.loads(line)
-            print(f"@@ASK [{q.get('t', '')}] {q.get('text', '').strip()}")
+            if q.get("kind") == "setting":
+                # A control in the tips window changed a setting for this call.
+                print(f"@@SET {q.get('key')}={q.get('value')}")
+            else:
+                print(f"@@ASK [{q.get('t', '')}] {q.get('text', '').strip()}")
         except Exception:  # noqa: BLE001
             if line.strip():
                 print(f"@@ASK [] {line.strip()}")

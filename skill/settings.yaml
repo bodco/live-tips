@@ -8,6 +8,12 @@ user:
   name_aliases: []               # how people call you on calls, e.g. [Іван, Ваня, Ivan]: "your turn" trigger, Whisper prompt
   timezone: Europe/Kiev          # fallback only: live-transcriber reports the Mac zone itself (Notion accepts Europe/Kiev)
 
+start:
+  ask: true                     # true = ask the call language and the microphone in chat at every start; false = use the defaults below
+
+audio:
+  mic: default                   # default = the Mac's current input (AirPods, Jabra, ...); mac_mic = always the Mac's own microphone
+
 paths:
   work_root: ~~home-folder/work                          # Mac folder connected to Cowork
   tool_root: ~~home-folder/work/Tools/live-transcriber
@@ -18,7 +24,7 @@ languages:
   internal:                      # calls with our own team
     me_lang: uk                  # main language of your mic
     me_langs: [uk, en]           # languages YOU may switch to on the call ("say it in English")
-    langs: [uk, ru, en]          # everything that may be spoken on the call
+    langs: [uk, en]              # everything that may be spoken on the call (first = main; no ru on purpose)
   client:                        # client calls: defaults when the project has no override
     me_lang: from_project        # = client_language of the project config
     me_langs: [from_project]     # add your own language if you may switch to it
@@ -31,6 +37,8 @@ tips:
   output: both                   # window | chat | both: where tips go (window = always-on-top prompter)
   rate_seconds: 90               # min gap between non-urgent tips
   answer_check: true             # judge the PM's own answers (relevance, accuracy, commitments)
+  comment_prompts: true          # suggest what to add when others finish a thought, without a direct question
+  comment_rate_seconds: 45       # min gap between such comment tips
   side_talk_summary: true        # summarise when others switch to another language
   idle_stop_minutes: 6           # no new lines this long -> offer to stop
   hard_cap_minutes: 120

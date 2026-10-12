@@ -8,7 +8,7 @@ and appends lines to `<project folder>/live/<YYYY-MM-DD-HHMM>-<title>.md`:
 
 ```
 [12:30:11] Я (uk): ...
-[12:30:15] Співрозмовник (ru): ...
+[12:30:15] Співрозмовник (en): ...
 ```
 
 Nothing goes to the network except the one-time model download.
@@ -27,7 +27,7 @@ the `sys` test).
 ## Control
 
 - Start: write `control/start.json`, e.g.
-  `{"project_dir": "/Users/you/work/Acme Portal", "title": "Sync", "slug": "acme-portal", "me_lang": "uk", "me_langs": "uk+en", "langs": "uk+ru+en", "prompt": "Acme, Portal, Jira"}`.
+  `{"project_dir": "/Users/you/work/Acme Portal", "title": "Sync", "slug": "acme-portal", "me_lang": "uk", "me_langs": "uk+en", "langs": "uk+en", "prompt": "Acme, Portal, Jira"}`.
   The LaunchAgent sees it and opens a "Live transcriber" Terminal window.
 - Stop: `touch control/stop`, or Ctrl+C in that window. Closing Zoom/Meet does NOT stop it.
 - State: `state/status.json` (`state`, `file`, `started_at`, `lines`, `queue`, `mic`, `system_audio`, `errors`).
@@ -48,6 +48,9 @@ opens when a recording starts (`"prompter": false` in `start.json` or `config.js
 off), can be moved, minimised and closed, and asks macOS to stay out of screen sharing.
 Closed it by accident during a call? `touch control/prompter` reopens it with all tips so far.
 Try it without a call: `bin/prompter --demo`.
+Buttons: `🎙` mutes the mic transcription (creates `control/mic_muted`; the recorder drops mic
+audio and writes "мікрофон вимкнено / увімкнено" lines), `💬` sets how often the skill may
+suggest a comment (written to the inbox as `{"kind":"setting",...}`, read as `@@SET`).
 
 ## Configuration
 
@@ -55,3 +58,35 @@ Try it without a call: `bin/prompter --demo`.
 default `com.pm-control-tower.live-transcriber`). Fields from `start.json` override it.
 Fine parameters (VAD, phrase length, echo window, hallucination list) are in `DEFAULTS` and
 `HALLUCINATIONS` in `src/transcriber.py`.
+
+## Which microphone
+
+`"mic_device": "default"` (default) records whatever the Mac uses as input now: AirPods, Jabra or
+other headsets, or the Mac itself. `"mic_device": "builtin"` always records the Mac's own
+microphone, whatever headset is connected (set it in `config.json` or `start.json`, or run
+`bin/audiocap --source mic --device builtin`). The headset stays your output and your voice in
+the meeting app. Use it when a headset switches to its low-quality call mode and your voice is
+transcribed badly. The choice is fixed for the call.
+
+## Transcript quality
+
+- **Main language first.** The first language in `langs` (and in `me_langs`) is the main one.
+  Another allowed language wins only when Whisper finds it `lang_bias` (2x) more likely, so
+  short or noisy phrases do not flip language. Russian is not in the default sets: a Russian
+  phrase is written as Ukrainian on purpose.
+- **Whisper artefacts are dropped.** Whisper was trained on subtitled internet videos, and on
+  silence, music or chopped audio it "recalls" their credit lines ("Субтитры создавал ...",
+  "Редактор субтитров ...", "Продолжение следует..."). They are not in the audio and come from
+  the model itself. `HALLUCINATION_PATTERNS` removes them, repetition loops ("one, two, one,
+  two, ...") are collapsed or dropped, and a line that only repeats the names from `prompt`
+  is dropped.
+- **Mic restarts.** `audiocap` rebuilds the mic engine only when the input device or its
+  format really changes. Before 1.6.3 a configuration change caused by the restart itself
+  started a loop (several restarts a second), the mic lost about a quarter of its audio and
+  the "me" lines were garbled and late. `health ... restarts=N` in `logs/audiocap-mic.log`
+  shows the count; one restart per headphone switch is normal.
+- **Times follow the clock.** If a source loses audio, its clock moves forward
+  (`gap_resync`), so lines keep the right time and order; `status.json` shows
+  `audio_lost_s` per channel.
+- **Model.** `whisper-large-v3-turbo` is fast. If the Mac has room, `mlx-community/whisper-large-v3-mlx`
+  in `config.json` is more accurate for Ukrainian and about 2-3 times slower.

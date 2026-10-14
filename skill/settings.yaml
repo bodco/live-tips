@@ -5,14 +5,33 @@ user:
   me_label: "Я"                  # how the PM's own mic lines are labelled in the transcript
   them_label: "Співрозмовник"    # label for everyone else (system audio)
   tips_language: uk              # language of tips and the wrap-up
-  name_aliases: []               # how people call you on calls, e.g. [Іван, Ваня, Ivan]: "your turn" trigger, Whisper prompt
+  name_aliases: []               # how people call you on calls, e.g. [Іван, Іване, Ваня, Ivan]: "your turn" trigger, instant cards, Whisper prompt
   timezone: Europe/Kiev          # fallback only: live-transcriber reports the Mac zone itself (Notion accepts Europe/Kiev)
 
 start:
-  ask: true                     # true = ask the call language and the microphone in chat at every start; false = use the defaults below
+  mode: window                   # window = start recording at once with defaults, set meeting type / role / language / mic in the gear row of the tips window; chat = ask them in chat first
+  ask: true                      # chat mode only: true = ask the call language and the microphone; false = use the defaults
 
 audio:
   mic: default                   # default = the Mac's current input (AirPods, Jabra, ...); mac_mic = always the Mac's own microphone
+
+workspaces: {}                   # optional: general calls about several projects, listed FIRST in the project question
+#  company:
+#    title: "Company workspace"
+#    project_root: ~~home-folder/work/PM/Company
+#    projects: [acme-portal, orbit]
+#    kind: internal
+
+project_roots: {}                # optional: live recording folder per project slug (overrides the project config)
+#  acme-portal: ~~home-folder/work/Acme Portal
+
+hiring:
+  candidate:                     # optional: your own job interviews (role "Candidate (me)")
+    root: ~~home-folder/work/PM/Job Search   # recordings go to <root>/live
+    job_tracker: ""              # Notion data source of your job tracker (collection://...), rows with Company, Vacancy, Status, Stages log
+    hub_page: ""                 # Notion page of your job search
+    recap_page: ""               # Notion page with prep pages per company
+    truth_bank_page: ""          # Notion page with your CV facts: the only source of facts about you
 
 paths:
   work_root: ~~home-folder/work                          # Mac folder connected to Cowork

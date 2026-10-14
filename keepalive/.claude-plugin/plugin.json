@@ -1,0 +1,7 @@
+{
+  "name": "live-tips-keepalive",
+  "version": "0.1.0",
+  "description": "Keeps a live-tips call loop alive: while a call is being recorded, Claude cannot end its turn until the PM says stop.",
+  "author": { "name": "PM Control Tower" },
+  "keywords": ["live-tips", "meetings", "hooks"]
+}

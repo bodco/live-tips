@@ -4,11 +4,14 @@
 
 Live tips listens to a call together with the PM and posts tips in the Cowork chat. Audio is
 transcribed locally on the Mac and never leaves it. The skill reads the transcript line by
-line and checks it against the project context. It stays silent until a trigger fires: a
-request that looks like a change request, a date or an estimate being promised, a statement
-that contradicts a recorded decision, an inaccurate or incomplete answer from the PM, the
-client team switching to another language between themselves. After the call, a page with
-the transcript and a wrap-up appears in the Meetings DB.
+line and checks it against the project context. It shows your speech or status at the start, then tips when they help: a request that
+looks like a change request, a date or an estimate being promised, a statement that
+contradicts a recorded decision, an inaccurate or incomplete answer, the other side switching
+language, a moment where you can add a fact or ask a question. Instant cards from the prep
+appear within 1-2 s of a trigger phrase. Job interviews are covered too (observer,
+candidate, interviewer). After the call the wrap-up
+goes into the Meetings DB: into the meeting's existing page (for example the one Notion AI
+Meeting Notes created) or into a new one when there is none.
 
 This document is written for three situations:
 
@@ -161,6 +164,11 @@ Next to it the skill keeps `<title>.brief.md` (the Live Brief) and `<title>.stat
 5. **The skill.** The `pm-control-tower` plugin (1.6.0+) already contains `live-tips`. Fill
    in `plugin/skills/live-tips/settings.yaml`: `paths.work_root`, `paths.tool_root`, labels,
    languages, `user.timezone`. Plugin setup substitutes `~~home-folder` for you.
+5a. **Keepalive plugin (recommended).** Install `tools/live-tips-keepalive` as a Cowork
+   plugin (zip the folder into `live-tips-keepalive.plugin`). While a call is recorded, its
+   Stop hook does not let Claude end its turn, so the tips loop cannot fall silent by itself.
+   It fails open: no marker, an expired marker (2.5 h) or 400 blocks and it does nothing.
+   The skill writes the marker at the start and removes it after the wrap-up.
 6. **Cowork.** Connect the `work_root` folder in Claude desktop ("Add folder"). The skill
    reaches it as `$HOME/mnt/<folder name>`.
 7. **Project config.** `projects/<slug>.md` needs `Local Paths` (the project folder, where
@@ -235,13 +243,28 @@ Ukrainian. Add `ru` to `langs` only if a call really needs it.
 > **🟠 Тепер англійською: статус релізу** (Now in English: release status)
 > "Short update in English. The release is on track for Friday."
 
-**Client interview.** When the prep or your words make it clear this is an interview on a
-topic, the skill switches to interview mode: the checklist is your planned questions. It
-tracks which were asked and how fully they were answered. It tips where an answer is vague
-and worth a follow-up (as a ready English question), where it contradicts what is known,
-where a new topic deserves a question, and which questions are still not asked near the
-end. The wrap-up adds "answers to the interview questions": question → one-line answer →
-status.
+**Meeting types.** Set in the window (the gear row) or said in the request:
+
+| Type | What you get |
+|---|---|
+| Internal standup | A team sync, whoever leads it. When others ask you: your update ready at once (done, in progress, next, blockers) and a "your turn" tip. When you lead: who to ask about what, follow-ups on vague updates, owners and dates to fix, who has not reported yet |
+| Client meeting | Client-safe phrasing; alerts on new requests, promised dates and estimates, contradictions with decisions; comment and initiative tips |
+| Working session | One subject (an incident, a decision, a contract): your position and key points, then what to add or ask |
+| Job interview | Pick your role. **Observer**: someone else is interviewed, you see what a strong answer contains, then a ✓ / ~ / ✗ line on the answer. **Candidate**: a ready "tell me about yourself" from the first second and ready answers from your CV facts; the company replaces the project and the context comes from your job search pages in Notion. **Interviewer**: follow-up questions on weak answers and planned questions not asked yet. After the call: a full analysis (answers table, strengths, gaps, signals, recommendation, how the prompter performed) |
+
+**When you ask the questions.** Any call can switch between you asking and you being asked.
+The skill notices the stretches where you ask and the other side answers, tracks your
+planned questions (asked, answered, partial) and tips where an answer is vague. The wrap-up
+lists your questions with the answers.
+
+**Prep ahead, and how early to start.** For an important call write "підготуй live tips до
+<call>" (prepare live tips for <call>) any time before it. The skill reads every source in a
+subagent (meetings, threads, topics, decisions, risks, reports, the tracker, project
+documents, the newest files in the project folder, `live/lessons.md`) and saves the brief and
+the instant cards. At the start a prep younger than 3 hours is picked up, so facts are there
+from the first second. Without a prep, start a minute before the call or during it: the
+recording starts at once, the brief is built in the first 1-3 minutes, and you can ask for a
+fresh one any time (🔄 or "refresh context").
 
 ### 5.1 During the call
 
@@ -269,6 +292,24 @@ status.
 | 🟠 at most once per `rate_seconds` | The PM answered a different question or only part of it; a vague answer where a date or an owner was expected; the other side switched to another language (short gist); a topic or ticket from the brief came up; a question unanswered for ~2 min; 2/3 of the time with checklist items uncovered; 5 min before the end with decisions not obtained |
 | silent | Action items, new requests, commitments: they go into the wrap-up |
 
+**Fast start.** By default (`start.mode: window`) the chat asks only what decides where
+the recording goes: the project when you did not name it, or the company for your own
+interview. Everything else starts from defaults and you correct it in the gear row of the
+window: the language and the microphone switch at once without losing the transcript, the
+meeting type and your role rebuild the prep. `start.mode: chat` keeps the start questions in
+the chat.
+
+**Context refresh during a call.** For an unexpected call, or when the talk moves to
+something the brief does not cover: press 🔄 or write "онови контекст" / "refresh context" /
+"глянь треди по X" (look at the threads about X). A subagent re-reads the sources plus the
+topics of the last 10 minutes, the brief and the cards are updated, and the skill catches up
+with everything said meanwhile: 1-3 minutes without new facts, nothing is lost.
+
+**The loop must not fall silent.** Tips exist only while Claude's turn runs. The skill never
+ends its turn with a text answer during a call, the keepalive plugin (section 4) blocks it
+mechanically, and the window turns its status line red ("Claude is not listening") after
+75 s without a poll: then write "continue" in the Cowork chat.
+
 ### The tips window
 
 So you do not have to look at the Cowork window during a call, tips appear in a separate
@@ -276,8 +317,8 @@ small window on top of everything else. The recorder opens it when the recording
 at the top centre of the screen, under the camera.
 
 - **What is in it:** the newest tip on top in a large font, older ones below and dimmer.
-  The title bar area shows the recording state (on, line count, whether the other side is
-  heard). Buttons (hover for a hint): `🎙` mic mute, `💬` how often comment hints come,
+  The status line at the bottom shows the recording
+  state. Buttons (hover for a hint): `🎙` mic mute, `💬` how often comment hints come,
   `A-` / `A+` font size, `◐` transparency, `📌` always on top (turn off if it gets in the way).
 - **`🎙` mute.** The recorder listens to the Mac's microphone and cannot see whether you are
   muted in Meet or Zoom: the state of a meeting app's mute button is not readable from outside,
@@ -299,17 +340,32 @@ at the top centre of the screen, under the camera.
   (`0`, no comment hints, only the direct triggers) and 90 s (rare hints). The choice is
   remembered for the next calls and is sent to the skill, so it applies at once. Urgent
   tips (a new request, a wrong date, "your turn") ignore this limit.
-- **Choices at the start of a call.** When you start the skill it asks, in one card: the
-  project (if you did not name it), the call language (Ukrainian, English, a mix or
-  another one) and the microphone (default input or the Mac's own). They are asked at the
-  start, and not as buttons in the window, because they cannot change during a call: the
-  recorder fixes the language list and the microphone when it starts. Switching a microphone
-  in the middle of a call makes the audio engine restart, and with headsets this was the cause
-  of broken audio and of Whisper inventing text. The microphone question exists because the
-  Mac's default input can be the Mac itself, AirPods or any of several headsets, and a headset
-  in call mode gives a thin, low-quality voice: "Mac mic" records your voice from the Mac while
-  the headset stays in the meeting app. Anything you already said in the request is not
-  asked again. Turn the questions off with `start.ask: false` in `settings.yaml`.
+- **Gear (setup row).** Meeting type, your interview role, language, microphone; it opens
+  by itself after a fast start. Language and microphone are applied by the recorder at once
+  (a `--- мова ---` / `--- мікрофон ---` line marks the switch in the transcript); type and
+  role go to the skill. Each change shows whether it was applied.
+- **ⓘ** explains every button and option in the window itself. **🔄** refreshes the
+  context (above).
+- **⚡ Instant cards.** The prep writes 15-40 cards (trigger phrases in every call language
+  and a ready tip) into `<transcript>.cards.json`. The recorder matches every new line itself
+  and shows a card within 1-2 s, before Claude thinks; Claude then only adds what the card
+  could not know.
+- **Agenda strip** under the buttons: the points to cover with ✓ / ○ and a counter (for an
+  interview the questions, when you lead a standup the people). Click the title to fold it.
+- **Quick asks** above the input field: **Suggest reply** (a ready answer or comment on the
+  current topic, for when a question is coming or you want to join in), **Catch me up**
+  (the last ~5 minutes in 3-5 lines), **Decided so far** (decisions and action items with
+  owners and dates), **What to ask now** (1-2 questions for the open points). Answers come
+  from the transcript, no lookups, in a few seconds.
+- **✓ / ✕ on every tip.** Used it, or not useful. A card with ✕ is switched off for the rest
+  of the call, two ✕ on the same kind of tip make it rarer, and the wrap-up counts them.
+- **Delay on view.** Each tip shows how long after the phrase it appeared ("+18s", orange
+  over 20 s); the status line shows the median ("tips ~N s behind") and "transcript N s
+  behind" when speech recognition is slow.
+- **Talk meter** in the status line: your share of the talk time and your current
+  monologue ("You 41% · speaking 1:35", orange after 1:30).
+- **Status line** at the bottom, under the input field: recording, line count, warnings; a
+  red "Claude is not listening (N s)" when the loop stalls.
 - **The field at the bottom:** type a question or a comment and press Enter. The skill gets
   it in the same loop that reads the transcript and answers in the same window. Typing
   "стоп" (stop) there ends the call like in the chat.
@@ -327,7 +383,9 @@ at the top centre of the screen, under the camera.
   tab, not the entire screen.
 - **Where tips go** is set by `tips.output` in `settings.yaml`: `window`, `chat` or `both`
   (default). The chat stays as a fallback.
-- **Demo without a call:** `~/work/Tools/live-transcriber/bin/prompter --demo`.
+- **Demo without a call:** `python3 ~/work/Tools/live-transcriber/bin/demo_prompter.py`
+  opens the real window with a scripted call (cards, tips, agenda, setup row, quick asks,
+  the red warning; about 2 minutes). `bin/prompter --demo` shows only three static tips.
 
 Under the hood: the skill appends tips as JSON lines to `<transcript>.tips.jsonl`, the
 window shows them; questions typed in the window go to `<transcript>.inbox.jsonl`, and
@@ -403,7 +461,14 @@ steps (report, change-request, risk-register) and runs nothing without a command
 
 ### 7.2 The Meetings DB page (automatic)
 
-The skill creates one page in the project's `notion.meetings_db`:
+**No duplicates.** You often record the same call with Notion AI Meeting Notes. So the skill
+first looks for this meeting's page: the link you gave, else Notion AI meeting notes started
+within 20 minutes of the recording, else Meetings DB pages of that time window (it searches
+again after ~60 s: Notion AI may finish its page late). Found one: it appends one section
+"Live Tips: підсумок і роздуми" at the end, whatever the page already holds, never edits
+existing blocks, adds its transcript only when the page has none, and fills `Project`,
+`Workspace`, `Date` only when empty. Several candidates: it asks which one. None: it creates
+one page in the project's `notion.meetings_db`:
 
 | What | Value |
 |---|---|
@@ -436,6 +501,18 @@ page is created: the real transcript is already in Notion.
 
 ---
 
+### 7.3 Lessons from your notes
+
+Anything you write during the call that is not a question ("here the better answer was ...",
+"no such tips", "too late") is collected together with the ✓ / ✕ ratings and loop problems.
+After the call the skill shows two numbered lists: **project lessons** (they go into
+`<project folder>/live/lessons.md`, which every next prep of that project reads first and
+turns into brief rules and cards) and **skill changes** (problem, change, where). Nothing
+changes without your "yes"; approved skill changes come as a card to save (or a `.skill`
+package) plus a line in `Skills/live-tips-changelog.md`.
+
+---
+
 ## 8. Fallback: Notion AI Meeting Notes
 
 If the Mac is offline or live-transcriber does not start, turn on Notion AI Meeting Notes
@@ -454,8 +531,12 @@ the package).
 | `user.tips_language` | Language of tips and the wrap-up |
 | `user.name_aliases` | How people call you on calls (all forms and languages): the "Your turn" trigger and a hint for Whisper |
 | `user.timezone` | Fallback IANA zone. Usually not needed: live-transcriber writes the Mac clock zone and offset into `status.json` itself (Notion accepts `Europe/Kiev`) |
-| `start.ask` | `true` (default): at every start the assistant asks in chat, in one card, the project (if you did not name it), the call language (Ukrainian, English, mix or another one) and the microphone (default input or the Mac's own). `false`: no questions, the defaults from this file are used. Anything you already said in the request is not asked again |
+| `start.mode` | `window` (default): the recording starts at once with defaults; meeting type, role, language and microphone are set in the gear row of the window. `chat`: the start questions are asked in the chat first |
+| `start.ask` | Only with `start.mode: chat`: `true` asks the call language and the microphone; `false` uses the defaults from this file |
 | `audio.mic` | Which microphone to record: `default` = whatever the Mac uses as input now (AirPods, Jabra or other headsets, or the Mac itself), `mac_mic` = always the Mac's own microphone. You can also say it when starting: "live tips, mac mic" |
+| `workspaces` | Optional: general calls about several projects (title, `project_root`, list of project slugs); listed first in the project question |
+| `project_roots` | Optional: the recording folder per project slug, overrides the project config |
+| `hiring.candidate` | Optional, for your own interviews: `root` (recordings), `job_tracker` (Notion data source with Company, Vacancy, Status, Stages log), `hub_page`, `recap_page`, `truth_bank_page` (your CV facts, the only source of facts about you) |
 | `paths.work_root` | Mac folder connected to Cowork |
 | `paths.tool_root` | Where live-transcriber lives |
 | `languages.internal` | `me_lang` (main mic language), `me_langs` (languages you may switch to, e.g. `[uk, en]`), `langs` (all call languages, the first is the main one, e.g. `[uk, en]`) for internal calls |
@@ -485,6 +566,9 @@ Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo wind
 
 | Symptom | Cause and fix |
 |---|---|
+| Red "Claude is not listening" in the window | Claude's turn ended and nothing reads the call. Write "continue" in the Cowork chat. Install the keepalive plugin (section 4) so it does not happen |
+| No ⚡ cards appear | Cards come from the prep: there is no `<transcript>.cards.json` yet (the brief is still being built, or there was no prep). Press 🔄 or prep ahead |
+| Two pages for one meeting in the Meetings DB | An older skill version created a page without looking for the Notion AI one. Current versions search first; merge the two by hand once |
 | Closed the tips window by accident during a call | Write "відкрий суфлер" (open the prompter) in the chat, or `touch ~/work/Tools/live-transcriber/control/prompter`. It reopens within a second with every tip so far; the recording never stopped |
 | The tips window did not open | `bin/prompter` is not built: re-run `install.sh` and check the `build prompter` block in `logs/install.log`; launch errors are in `logs/prompter.log`. Tips go to the chat meanwhile |
 | Participants see the window while you share the entire screen | The meeting app captures the screen in a way that ignores `sharingType = none`. Share a window or a tab instead of the entire screen, or minimise the window while sharing |
@@ -498,7 +582,7 @@ Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo wind
 | Ukrainian recognised as another language, names garbled | Check `me_lang` and that the main language is first in `langs`; the skill puts names into `prompt` as one short sentence |
 | Lines like "Субтитры создавал ...", "Продолжение следует...", "Thanks for watching", a list of names repeated many times | Whisper artefacts: the model learned subtitle credits from internet videos and recalls them on silence, music or chopped audio, and repeats the `prompt` names in a loop. Not in the audio, not a virus. Filtered by `HALLUCINATION_PATTERNS` and the loop check in `transcriber.py`; add new patterns there |
 | One-word lines such as "Дзвінок.", "Наступного року.", "Відповідь.", "м-м-м", and Ukrainian lines tagged `(en)` | The first is Whisper repeating the first word of the `prompt` on noise, the others are its noise phrases and fillers. They are dropped (`clean_text`: one or two words that all come from the prompt, standalone noise phrases, pure fillers). A Cyrillic line tagged `(en)` is a wrong language tag by the model: the tag now follows the script of the text. Order of lines can differ by up to ~15 s from the real order: every line carries the time its phrase started |
-| The transcript is readable but weak for Ukrainian | Try `"model": "mlx-community/whisper-large-v3-mlx"` in `config.json`: more accurate, 2-3 times slower |
+| The transcript is readable but weak for Ukrainian | Try `"model": "mlx-community/whisper-large-v3-mlx"` in `config.json`: more accurate, but it needs 2-3 times more processing time per phrase, so lines and tips appear later. First compare both models on your own audio with `bin/bench.py` (section "Comparing models" in the tools README) |
 | After reinstalling with another `launchd_label` Terminal opens twice | Two LaunchAgents are running. Unload the old one: `launchctl bootout gui/$(id -u)/<old label>` and delete its plist in `~/Library/LaunchAgents` |
 | The Notion page title shows `<mention-date …>` as text | The title was set on create, not on update. See section 7.2 |
 

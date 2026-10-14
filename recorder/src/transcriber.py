@@ -85,11 +85,18 @@ HALLUCINATION_PATTERNS = [re.compile(p, re.I) for p in (
     r"^\W*(динамичная |спокойная |веселая |тревожная )?музыка\W*$", r"^\W*музика\W*$", r"^\W*music\W*$",
     # Seen on real calls as a whole line on noise or silence (not inside a longer sentence):
     r"^\W*наступного( року)?\W*$", r"^\W*відповідь( на екран)?\W*$", r"^\W*au revoir\W*$",
+    # Sound descriptions the large model writes for non-speech (163 of 401 lines on one real call):
+    r"^\W*(звучить|грає|лунає|звучала|звучать)\s+\w*\s*(музика|музику|пісня|мелодія)\W*$",
+    r"^\W*(звук|шум|звуки)\s+[\w\s]{0,30}\W*$", r"^\W*(закінчення|кінець( брифінгу| відео| запису)?|продовження)\W*$",
+    r"^\W*\[?(music|applause|laughter|silence|noise)\]?\W*$", r"^\W*(оплески|сміх|тиша|шум)\W*$",
     # Pure fillers ("м-м-м", "мгм", "е-е"): nothing to read, only clutter.
     r"^\W*(([мме]+[\s-]*)+|мгм+|угу+|гм+|хм+)\W*$",
 )]
 
 _REPEAT = re.compile(r"((?:\w[\w'’-]*\W+){1,4}?)\1{2,}")
+
+
+PROMPT_HEAD: list[str] = []   # first two words of the Whisper prompt, set in main()
 
 
 def clean_text(text: str, prompt_words: set[str]) -> str:
@@ -118,6 +125,17 @@ def clean_text(text: str, prompt_words: set[str]) -> str:
     # "Дзвінок команди ..."): Whisper echoes the start of the prompt on noise.
     if prompt_words and 1 <= len(words) <= 2 and all(w in prompt_words for w in words):
         return ""
+    # A short line that starts like the prompt ("Дзвінок команди Санкт-Петербурга." when the
+    # prompt is "Дзвінок команди Acme Portal: ..."): Whisper echoes the prompt's opening on
+    # silence and garbles the rest, so the word-overlap check above misses it.
+    if PROMPT_HEAD and len(words) <= 6 and words[:len(PROMPT_HEAD)] == PROMPT_HEAD:
+        return ""
+    # Same echo glued in front of real speech: "Дзвінок команди, а також, що це нормально..."
+    if PROMPT_HEAD and words[:len(PROMPT_HEAD)] == PROMPT_HEAD:
+        m = re.match(r"^\W*" + r"\W+".join(map(re.escape, PROMPT_HEAD)) + r"\s*,\s*(.+)$", text, re.I)
+        if m:
+            rest = m.group(1).strip()
+            text = rest[:1].upper() + rest[1:]
     return text
 
 
@@ -533,6 +551,88 @@ class Writer:
                 f.write(footer)
 
 
+# --------------------------------------------------------------------------- Instant cards
+
+class Cards:
+    """Pre-built tips ("battlecards") shown the moment a trigger phrase is transcribed, with no
+    model in the loop. The skill writes <transcript stem>.cards.json during its prep:
+      [{"id": "cr", "triggers": ["could you also", "можна ще", "re:\\bcan we add\\b"],
+        "on": "them" | "me" | "any", "level": "red", "gist": "...", "phrase": "...",
+        "items": [...], "note": "...", "cooldown_s": 300, "off": false}, ...]
+    Triggers match the normalised line text (case-insensitive, plain substring, or a regex
+    after "re:"). Each fired card is written to the tips file (kind "card") and to
+    <stem>.cards-fired.jsonl, which read_delta.py reports to the skill as @@CARD lines."""
+
+    def __init__(self, transcript: Path, tips: Path):
+        self.path = transcript.with_name(transcript.stem + ".cards.json")
+        self.fired_path = transcript.with_name(transcript.stem + ".cards-fired.jsonl")
+        self.tips = tips
+        self.mtime = None
+        self.cards: list[dict] = []
+        self.last: dict[str, float] = {}
+        self.lock = threading.Lock()
+
+    def _load(self) -> None:
+        try:
+            m = self.path.stat().st_mtime
+        except OSError:
+            self.cards = []
+            return
+        if m == self.mtime:
+            return
+        self.mtime = m
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            cards = data.get("cards", data) if isinstance(data, dict) else data
+            self.cards = [c for c in cards if isinstance(c, dict) and c.get("triggers")]
+            log(f"cards: {len(self.cards)} loaded from {self.path.name}")
+        except Exception as e:  # noqa: BLE001
+            log(f"cards: cannot read {self.path.name} ({e!r})")
+            self.cards = []
+
+    @staticmethod
+    def _hit(trigger: str, low: str, plain: str) -> bool:
+        t = str(trigger).strip()
+        if not t:
+            return False
+        if t.startswith("re:"):
+            try:
+                return re.search(t[3:], low, re.I) is not None
+            except re.error:
+                return False
+        return norm(t) in plain
+
+    def check(self, line: "Line") -> None:
+        with self.lock:
+            self._load()
+            if not self.cards:
+                return
+            low = line.text.lower()
+            plain = " " + norm(line.text) + " "
+            for c in self.cards:
+                if c.get("off"):
+                    continue
+                on = c.get("on", "any")
+                if on != "any" and on != line.channel:
+                    continue
+                cid = str(c.get("id") or c.get("gist", "")[:30])
+                if now() - self.last.get(cid, 0) < float(c.get("cooldown_s", 300)):
+                    continue
+                if not any(self._hit(t, low, plain) for t in c.get("triggers", [])):
+                    continue
+                self.last[cid] = now()
+                tip = {k: c[k] for k in ("level", "gist", "phrase", "items", "note") if c.get(k)}
+                tip.update(t=hhmmss(line.t), src=hhmmss(line.t), at=hhmmss(now()), kind="card", card=cid)
+                try:
+                    with open(self.tips, "a", encoding="utf-8") as f:
+                        f.write(json.dumps(tip, ensure_ascii=False) + "\n")
+                    with open(self.fired_path, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"id": cid, "t": hhmmss(line.t), "ch": line.channel,
+                                            "line": line.text[:160]}, ensure_ascii=False) + "\n")
+                except OSError:
+                    pass
+
+
 # --------------------------------------------------------------------------- Capture
 
 class Capture(threading.Thread):
@@ -545,6 +645,16 @@ class Capture(threading.Thread):
         self.proc: subprocess.Popen | None = None
         self.error: str | None = None
         self.restarts = 0
+        self.switching = False   # a device switch from the tips window, not a failure
+
+    def switch_device(self, device: str) -> None:
+        """Restart the mic capture on another input (default | builtin) during the call."""
+        if self.source != "mic" or device == self.device:
+            return
+        self.device = device
+        self.switching = True
+        if self.proc and self.proc.poll() is None:
+            self.proc.terminate()
 
     def run(self) -> None:
         LOGS.mkdir(parents=True, exist_ok=True)
@@ -567,9 +677,16 @@ class Capture(threading.Thread):
                     break
                 usable = len(data) - len(data) % 4
                 self.seg.feed(np.frombuffer(data[:usable], dtype=np.float32))
+                if self.error:
+                    log(f"audiocap {self.source} recovered after restart")
+                    self.error = None   # audio flows again: do not report a stale error
             if self.stop_ev.is_set():
                 break
             code = self.proc.wait()
+            if self.switching:
+                self.switching = False
+                log(f"audiocap {self.source}: switched to {self.device}")
+                continue
             self.restarts += 1
             self.error = f"audiocap {self.source} exited with {code} (see logs/audiocap-{self.source}.log)"
             log(self.error)
@@ -589,6 +706,16 @@ class Capture(threading.Thread):
 
 # --------------------------------------------------------------------------- Main
 
+def listener_age() -> int | None:
+    """Seconds since the skill's last read_delta poll (it touches state/listener).
+    None until the first poll. The tips window warns when it grows: the skill stopped
+    listening (its chat turn ended) and the PM must write "продовжуй" in the chat."""
+    try:
+        return round(time.time() - (STATE / "listener").stat().st_mtime)
+    except OSError:
+        return None
+
+
 def load_request(args) -> dict:
     cfg = dict(DEFAULTS)
     user_cfg = ROOT / "config.json"
@@ -601,7 +728,8 @@ def load_request(args) -> dict:
             sys.exit("control/start.json not found")
         req = json.loads(start.read_text(encoding="utf-8"))
         os.replace(start, CONTROL / "active.json")
-    for k in ("project_dir", "title", "slug", "prompt", "me_lang", "me_langs", "langs", "model", "prompter", "mic_device"):
+    for k in ("project_dir", "title", "slug", "prompt", "me_lang", "me_langs", "langs", "model", "prompter", "mic_device",
+              "setup", "call_type", "hiring_role", "prompt_en", "prompt_uk"):
         v = getattr(args, k, None)
         if v:
             req[k] = v
@@ -648,6 +776,10 @@ def main() -> int:
     inbox_file = out.with_name(out.stem + ".inbox.jsonl")
     STATE.mkdir(parents=True, exist_ok=True)
     (STATE / "pid").write_text(str(os.getpid()))
+    try:
+        (STATE / "listener").unlink()   # a poll from a previous call must not count
+    except OSError:
+        pass
     stop_file = CONTROL / "stop"
     if stop_file.exists():
         stop_file.unlink()
@@ -663,7 +795,9 @@ def main() -> int:
               "langs": cfg["langs"], "me_lang": cfg["me_lang"], "me_langs": cfg["me_langs"],
               "mic_device": cfg["mic_device"],
               "tips_file": str(tips_file), "inbox_file": str(inbox_file), "lines": 0, "queue": 0,
-              "system_audio": "starting", "mic": "starting", "errors": []}
+              "system_audio": "starting", "mic": "starting", "errors": [],
+              "setup_open": bool(cfg.get("setup")), "call_type": cfg.get("call_type") or "",
+              "hiring_role": cfg.get("hiring_role") or ""}
     write_json_atomic(STATE / "status.json", status)
     log(f"live-transcriber: {title} -> {out}")
     if cfg.get("prompter", True) not in (False, "false", "0", 0):
@@ -706,6 +840,14 @@ def main() -> int:
                  "them": cfg["langs"][0]}
     prompt = cfg.get("prompt")
     prompt_words = set(re.findall(r"\w+", (prompt or "").lower()))
+    global PROMPT_HEAD
+    PROMPT_HEAD = re.findall(r"\w+", (prompt or "").lower())[:2]
+    # The Whisper prompt biases the language: a Ukrainian prompt makes English speech come out
+    # as Ukrainian gibberish. When the window switches the call language, the prompt follows.
+    cards = Cards(out, tips_file)
+    talk = {"me": 0.0, "them": 0.0, "last_ch": None, "mono": 0.0, "mono_end": 0.0, "lags": []}
+    pcell = [prompt]
+    pwords = [prompt_words]
 
     def process(seg: Segment) -> None:
         me_set = cfg["me_langs"] if len(cfg["me_langs"]) > 1 else None
@@ -718,12 +860,40 @@ def main() -> int:
             lang = whisper.pick_language(seg.audio, me_set)
         else:
             lang = whisper.pick_language(seg.audio)
-        text, lang = whisper.transcribe(seg.audio, lang, prompt)
-        text = clean_text(text, prompt_words)
+        t_asr0 = time.time()
+        text, lang = whisper.transcribe(seg.audio, lang, pcell[0])
+        t_asr1 = time.time()
+        text = clean_text(text, pwords[0])
         if not text or not norm(text):
             return
         last_lang[seg.channel] = lang
-        writer.add(Line(seg.channel, seg.t_start, lang, text))
+        line_obj = Line(seg.channel, seg.t_start, lang, text)
+        writer.add(line_obj)
+        try:
+            cards.check(line_obj)
+        except Exception as e:  # noqa: BLE001
+            log(f"cards: {e!r}")
+        # Talk meter and transcription lag (shown in the tips window footer).
+        talk[seg.channel] += seg.duration
+        if seg.channel == "me" and talk["last_ch"] == "me" and seg.t_start - talk["mono_end"] < 6:
+            talk["mono"] += seg.duration
+        elif seg.channel == "me":
+            talk["mono"] = seg.duration
+        talk["last_ch"], talk["mono_end"] = seg.channel, seg.t_end
+        talk["lags"] = (talk["lags"] + [t_asr1 - seg.t_end])[-5:]
+        # Timing sidecar (latency analysis): where time goes between speech and the line.
+        try:
+            with open(str(out) + ".timing.jsonl", "a", encoding="utf-8") as tf:
+                tf.write(json.dumps({
+                    "t": dt.datetime.fromtimestamp(seg.t_start).strftime("%H:%M:%S"),
+                    "ch": seg.channel, "lang": lang, "dur": round(seg.duration, 1),
+                    "seg_end": dt.datetime.fromtimestamp(seg.t_end).strftime("%H:%M:%S.%f")[:-3],
+                    "queued_s": round(t_asr0 - seg.t_end, 2),
+                    "asr_s": round(t_asr1 - t_asr0, 2),
+                    "written": dt.datetime.fromtimestamp(t_asr1).strftime("%H:%M:%S.%f")[:-3],
+                    "chars": len(text)}, ensure_ascii=False) + "\n")
+        except Exception:  # noqa: BLE001
+            pass
 
     def worker() -> None:
         while True:
@@ -745,10 +915,58 @@ def main() -> int:
     status["state"] = "recording"
     log("recording. Stop: Ctrl+C here, or the skill writes control/stop")
 
+    # Settings chosen in the tips window after a fast start (⚙︎): the window appends them to
+    # the inbox; language and mic are applied here at once, type and role are for the skill.
+    LANG_SETS = {"uk": ("uk", ["uk", "en"], ["uk", "en"]), "en": ("en", ["en", "uk"], ["en", "uk"]),
+                 "mix": ("uk", ["uk", "en"], ["uk", "en"])}
+    inbox_pos = [0]
+
+    def apply_window_settings() -> None:
+        try:
+            size = inbox_file.stat().st_size
+        except OSError:
+            return
+        if size <= inbox_pos[0]:
+            return
+        with open(inbox_file, "rb") as f:
+            f.seek(inbox_pos[0])
+            chunk = f.read()
+        cut = chunk.rfind(b"\n")
+        if cut < 0:
+            return
+        inbox_pos[0] += cut + 1
+        for raw in chunk[:cut].decode("utf-8", errors="replace").splitlines():
+            try:
+                d = json.loads(raw)
+            except Exception:  # noqa: BLE001
+                continue
+            if d.get("kind") != "setting":
+                continue
+            key, val = d.get("key"), d.get("value")
+            if key == "call_lang" and val in LANG_SETS:
+                me, me_langs, langs = LANG_SETS[val]
+                cfg.update(me_lang=me, me_langs=me_langs, langs=langs)
+                whisper.langs = list(langs)
+                last_lang["me"], last_lang["them"] = me, langs[0]
+                status.update(call_lang=val, me_lang=me, me_langs=me_langs, langs=langs)
+                newp = cfg.get("prompt_" + val) or (None if val == "en" else cfg.get("prompt"))
+                pcell[0] = newp
+                pwords[0] = set(re.findall(r"\w+", (newp or "").lower()))
+                writer.marker(f"мова: {'+'.join(langs)}")
+                log(f"languages switched in the tips window: me={me} allowed={'+'.join(langs)}")
+            elif key == "mic_device" and val in ("default", "builtin"):
+                caps[0].switch_device(val)
+                cfg["mic_device"] = val
+                status["mic_device"] = val
+                writer.marker("мікрофон: " + ("Мак" if val == "builtin" else "за замовчуванням"))
+            elif key in ("call_type", "hiring_role"):
+                status[key] = val   # shown back in the window; the skill reads it as @@SET
+
     last_status = 0.0
     while not stop_ev.is_set():
         time.sleep(0.5)
         writer.tick()
+        apply_window_settings()
         if stop_file.exists():
             stop_ev.set()
         muted = mute_file.exists()
@@ -772,7 +990,14 @@ def main() -> int:
                           last_line_at=hhmmss(writer.last_line_at) if writer.last_line_at else None,
                           audio_lost_s={k: round(v.lost) for k, v in segs.items()},
                           mic="muted" if segs["me"].muted else ("ok" if segs["me"].recent_peak() > 0.001 else "silent"),
-                          system_audio="ok" if segs["them"].recent_peak() > 0.0005 else "silent")
+                          system_audio="ok" if segs["them"].recent_peak() > 0.0005 else "silent",
+                          listener_age_s=listener_age(),
+                          talk_me_pct=(round(100 * talk["me"] / (talk["me"] + talk["them"]))
+                                       if talk["me"] + talk["them"] > 30 else None),
+                          monologue_s=(round(talk["mono"]) if talk["last_ch"] == "me"
+                                       and now() - talk["mono_end"] < 8 else 0),
+                          asr_lag_s=(round(sorted(talk["lags"])[len(talk["lags"]) // 2], 1)
+                                     if talk["lags"] else None))
             write_json_atomic(STATE / "status.json", status)
             if segq.qsize() > 6:
                 log(f"warning: {segq.qsize()} segments waiting, transcription is behind")

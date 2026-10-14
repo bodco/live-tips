@@ -47,7 +47,17 @@ small always-on-top window that shows the skill's tips and sends typed questions
 opens when a recording starts (`"prompter": false` in `start.json` or `config.json` turns it
 off), can be moved, minimised and closed, and asks macOS to stay out of screen sharing.
 Closed it by accident during a call? `touch control/prompter` reopens it with all tips so far.
-Try it without a call: `bin/prompter --demo`.
+Try it without a call: `python3 bin/demo_prompter.py` plays a scripted call in the real
+window (cards, tips, agenda, setup row, quick asks, the red warning); `bin/prompter --demo`
+shows three static tips.
+
+Since 1.7.0 the recorder also: shows **instant cards** from `<transcript>.cards.json` the
+moment a trigger phrase is transcribed (and logs them to `<transcript>.cards-fired.jsonl`,
+which `read_delta.py` reports as `@@CARD`); applies the language and the microphone chosen
+in the window's gear row on the fly; writes `talk_me_pct`, `monologue_s`, `asr_lag_s` and
+`listener_age_s` (seconds since the skill's last poll) into `status.json`. `read_delta.py`
+keeps `<transcript>.state.json` (offsets, polls, longest gap) and stamps every tip with
+`at`, so the window can show the delay of each tip.
 Buttons: `🎙` mutes the mic transcription (creates `control/mic_muted`; the recorder drops mic
 audio and writes "мікрофон вимкнено / увімкнено" lines), `💬` sets how often the skill may
 suggest a comment (written to the inbox as `{"kind":"setting",...}`, read as `@@SET`).
@@ -88,5 +98,20 @@ transcribed badly. The choice is fixed for the call.
 - **Times follow the clock.** If a source loses audio, its clock moves forward
   (`gap_resync`), so lines keep the right time and order; `status.json` shows
   `audio_lost_s` per channel.
-- **Model.** `whisper-large-v3-turbo` is fast. If the Mac has room, `mlx-community/whisper-large-v3-mlx`
-  in `config.json` is more accurate for Ukrainian and about 2-3 times slower.
+- **Model.** `whisper-large-v3-turbo` is the default and is fast. `mlx-community/whisper-large-v3-mlx`
+  is the larger model: it is more accurate for Ukrainian, but it needs 2-3 times more processing time
+  per phrase. Each phrase is transcribed after it ends, so transcript lines and tips appear that much
+  later. Set it in `config.json` (`"model"`); the skill does not ask about it. Compare the two on your
+  own audio before you switch: `bin/bench.py SAMPLE` (see "Comparing models").
+
+## Comparing models
+
+Record 2-3 minutes of a real call (Voice Memos or QuickTime, export as m4a), then run in Terminal:
+
+```
+~/work/Tools/live-transcriber/.venv/bin/python ~/work/Tools/live-transcriber/bin/bench.py ~/Desktop/sample.m4a
+```
+
+For each model the script prints the load time, the transcription time, the speed (`x realtime`)
+and writes `sample.<model>.txt` with timestamps next to the file. Compare the two text files
+line by line. The first run downloads the model (several GB), so it can take a long time.

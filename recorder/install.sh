@@ -25,20 +25,17 @@ if ! xcrun --find swiftc >/dev/null 2>&1; then
   fail "немає swiftc"
 fi
 
-# LaunchAgent label (config.json "launchd_label"); the audiocap signing identity uses the same prefix
-LABEL=$(/usr/bin/python3 -c "import json;print(json.load(open('$ROOT/config.json')).get('launchd_label','com.pm-control-tower.live-transcriber'))" 2>/dev/null || echo com.pm-control-tower.live-transcriber)
-
 # 3. Build audiocap
 echo "--- build audiocap"
 xcrun swiftc -O -o "$ROOT/bin/audiocap" "$ROOT/src/audiocap.swift" \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$ROOT/src/Info.plist" \
   || fail "swiftc"
-codesign -s - -f --identifier "$LABEL.audiocap" "$ROOT/bin/audiocap" || echo "WARN: codesign"
+codesign -s - -f --identifier com.pm-control-tower.live-transcriber.audiocap "$ROOT/bin/audiocap" || echo "WARN: codesign"
 
 # 3b. Build the tips window (optional: without it tips stay in the chat)
 echo "--- build prompter (tips window)"
 if xcrun swiftc -O -o "$ROOT/bin/prompter" "$ROOT/src/prompter.swift" -framework AppKit -framework WebKit; then
-  codesign -s - -f --identifier "$LABEL.prompter" "$ROOT/bin/prompter" || echo "WARN: codesign prompter"
+  codesign -s - -f --identifier com.pm-control-tower.live-transcriber.prompter "$ROOT/bin/prompter" || echo "WARN: codesign prompter"
   echo "prompter OK. Try it: $ROOT/bin/prompter --demo"
 else
   echo "WARN: prompter not built, tips will stay in the chat (see the swiftc errors above)"
@@ -81,15 +78,22 @@ except Exception as e:
     print("restricted language detection: UNAVAILABLE", repr(e))
 PYEOF
 
+# 5b. Speaker identification (optional: sherpa-onnx + a 26 MB voice model). Never fatal.
+#     Skip with LT_SKIP_VOICES=1; install later with: bash "$ROOT/bin/install-voices.sh"
+if [ "${LT_SKIP_VOICES:-0}" != "1" ]; then
+  echo "--- voices (speaker identification, optional)"
+  bash "$ROOT/bin/install-voices.sh" || echo "WARN: speaker identification not installed; calls work as before. Later: bash $ROOT/bin/install-voices.sh"
+fi
+
 # 6. LaunchAgent
 echo "--- launchd"
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+PLIST="$HOME/Library/LaunchAgents/com.pm-control-tower.live-transcriber.plist"
 mkdir -p "$HOME/Library/LaunchAgents"
-sed -e "s#__ROOT__#$ROOT#g" -e "s#__LABEL__#$LABEL#g" "$ROOT/launchd/live-transcriber.plist.template" > "$PLIST"
+sed "s#__ROOT__#$ROOT#g" "$ROOT/launchd/com.pm-control-tower.live-transcriber.plist.template" > "$PLIST"
 chmod +x "$ROOT/bin/"*.sh "$ROOT/bin/"*.command "$ROOT/bin/read_delta.py"
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null
+launchctl bootout "gui/$(id -u)/com.pm-control-tower.live-transcriber" 2>/dev/null
 launchctl bootstrap "gui/$(id -u)" "$PLIST" || fail "launchctl bootstrap"
-echo "LaunchAgent loaded: $LABEL"
+echo "LaunchAgent loaded"
 
 # 7. Permissions test (prompts appear for Terminal)
 echo "--- permissions test: 5 c мікрофона і 5 c системного звуку"

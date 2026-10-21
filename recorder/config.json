@@ -5,7 +5,19 @@
   "me_lang": "uk",
   "langs": [
     "uk",
-    "ru"
+    "en"
   ],
-  "launchd_label": "com.pm-control-tower.live-transcriber"
+  "model_large": "mlx-community/whisper-large-v3-mlx",
+  "speakers_enabled": true,
+  "speaker_join": 0.45,
+  "speaker_suggest": 0.5,
+  "speaker_prompt_s": 8,
+  "semantic_enabled": true,
+  "ollama_url": "http://127.0.0.1:11434",
+  "semantic_model": "bge-m3",
+  "semantic_fact_min": 0.55,
+  "semantic_card_min": 0.6,
+  "semantic_margin": 0.08,
+  "index_enabled": true,
+  "index_extra": []
 }

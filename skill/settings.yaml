@@ -4,12 +4,12 @@
 user:
   me_label: "Я"                  # how the PM's own mic lines are labelled in the transcript
   them_label: "Співрозмовник"    # label for everyone else (system audio)
-  tips_language: uk              # language of tips and the wrap-up
+  tips_language: uk              # language of the chat wrap-up; tip gists follow the window language (ui_lang, default en) unless the call is in Ukrainian
   name_aliases: []               # how people call you on calls, e.g. [Іван, Іване, Ваня, Ivan]: "your turn" trigger, instant cards, Whisper prompt
   timezone: Europe/Kiev          # fallback only: live-transcriber reports the Mac zone itself (Notion accepts Europe/Kiev)
 
 start:
-  mode: window                   # window = start recording at once with defaults, set meeting type / role / language / mic in the gear row of the tips window; chat = ask them in chat first
+  mode: window                   # window = start recording at once with defaults (audience and type auto), correct them in the gear menu of the tips window; chat = ask them in chat first
   ask: true                      # chat mode only: true = ask the call language and the microphone; false = use the defaults
 
 audio:
@@ -53,11 +53,14 @@ languages:
       client: {me_lang: en, langs: [en, es]}
 
 tips:
-  output: both                   # window | chat | both: where tips go (window = always-on-top prompter)
-  rate_seconds: 90               # min gap between non-urgent tips
-  answer_check: true             # judge the PM's own answers (relevance, accuracy, commitments)
-  comment_prompts: true          # suggest what to add when others finish a thought, without a direct question
-  comment_rate_seconds: 45       # min gap between such comment tips
+  output: window                 # window | both | chat
+  active_rate_seconds: 45        # min gap between non-red tips that do not answer the live topic
+  rate_seconds: 90               # same, only when active_mode is false
+  proactive: off                 # comment moments and initiative tips (references/proactive.md); also in the window menu
+  comment_rate_seconds: 60       # proactive tips only; the window menu overrides it
+  late_after_s: 6                # read_delta marks a tip late if the PM already started answering
+  research: {enabled: true, max_jobs: 6, max_running: 2}   # background research team (references/research.md)
+  answer_check: true             # judge the PM's own answers (client and boss calls; silent on team calls)
   side_talk_summary: true        # summarise when others switch to another language
   idle_stop_minutes: 6           # no new lines this long -> offer to stop
   hard_cap_minutes: 120

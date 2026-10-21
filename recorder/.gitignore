@@ -5,3 +5,8 @@ bin/prompter
 logs/
 state/
 control/
+__pycache__/
+voices/
+models/
+.livetips-index/
+*.bak-*

@@ -23,3 +23,12 @@ def test_parity_with_live_transcriber():
     assert set(r.index["skip_dirs"]) == S.SKIP_DIRS
     assert r.index["secret_name_regex"] == S.SECRET_NAME.pattern
     assert r.index["max_bytes"] == S.MAX_BYTES and r.index["format_version"] == S.INDEX_VERSION
+    import json
+    from pathlib import Path
+    cfg = Path(os.environ["LIVETIPS_LT_SRC"]).parent / "config.json"
+    if cfg.exists():
+        c = json.loads(cfg.read_text())
+        t = r.semantic["thresholds"]
+        assert c.get("semantic_margin", t["fact_margin"]) == t["fact_margin"]
+        assert c.get("semantic_fact_min", t["fact_min"]) == t["fact_min"]
+        assert c.get("semantic_card_min", t["card_min"]) == t["card_min"]

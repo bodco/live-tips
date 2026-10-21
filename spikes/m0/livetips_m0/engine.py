@@ -145,7 +145,8 @@ class Engine:
                             "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
                             "usd": round(usd, 6) if usd is not None else None, "error": c.error,
                             "stop": c.stop_reason,
-                            "text_head": None if c.error else c.text[:160]})
+                            "text_head": None if c.error else c.text[:160],
+                            "text": c.text if (self.cfg.get("debug_log_text") and not c.error) else None})
         return c
 
     def _submit_classify(self, line: Line, span: dict) -> None:
@@ -212,10 +213,12 @@ class Engine:
             span["error"] = c.error
             self.out_timing.write(span)
             return
-        errs = [e.message for e in self.tip_validator.iter_errors(obj)]
+        errs = list(self.tip_validator.iter_errors(obj))
         if errs:
+            import jsonschema
+            best = jsonschema.exceptions.best_match(errs)
             span["outcome"] = "tip_invalid"
-            span["error"] = errs[0][:200]
+            span["error"] = "{}: {}".format("/".join(str(p) for p in best.absolute_path), best.message[:160])
             self.out_timing.write(span)
             return
         if obj.get("skip"):

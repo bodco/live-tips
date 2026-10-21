@@ -45,8 +45,8 @@ of the question line and `tip_at` = the `at` time that read_delta stamps on the 
      organisation, a client, a panel), what kind of conversation it is (a rehearsal, a client
      Q&A, a pitch, an interview) and what they care about. If a project is named, its config
      and Current State as usual.
-  2. **Your facts**: the Knowledge Base doc `facts_doc` (your CV, stories, numbers,
-     results): the ONLY allowed source of facts about the PM. Prep notes for this occasion:
+  2. **Your facts**: the Knowledge Base doc `facts_doc` (your talking points: key
+     messages, numbers and results of your work, prepared answers): the ONLY allowed source of facts about the PM. Prep notes for this occasion:
      Knowledge Base docs linked to the Workspace `workspace` whose title names the
      organisation or the occasion, the last Coach calls in the Meetings DB with that
      Workspace (what was asked, the Ретро), and the local `notes_folder` when set.
@@ -66,10 +66,10 @@ of the question line and `tip_at` = the `at` time that read_delta stamps on the 
   sentences + up to 3 facts (project, numbers, result) ONLY from your facts and project
   documents. Never invent experience, dates or numbers: a generic answer is marked
   "(загальна)".
-  **First item, right at the start: "Розкажи про себе".** Emit it before anything else as
-  `kind: speech`, gist "🟢 Про себе", in the call language: an opening sentence as `phrase`
-  and 6-8 short lines as `items` (current role, years and domain, 2-3 projects with one
-  result each, and why this conversation matters), about 60-90 s when said aloud. It stays
+  **First item, right at the start: the opening.** Emit it before anything else as
+  `kind: speech`, gist "🟢 Вступ", in the call language: an opening sentence as `phrase`
+  and 4-6 short lines as `items` (who you are in this conversation, your key message,
+  2-3 results with numbers, and what you want from this conversation), about 60-90 s when said aloud. It stays
   on top of the window so the PM is calm from the first minute. Then emit the 5 next most
   likely questions as a second prep item.
 - `interviewer`: the planned questions (from the user's words, the session or a prep) as the

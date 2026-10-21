@@ -356,13 +356,13 @@ dates to fix.
 
 **Interview** (type `interview`), pick your role. **Observer**: someone else is
 interviewed, you see what a strong answer contains, then a ✓ / ~ / ✗ line on the answer.
-**Coach** (you are the one being asked; value `coach`, the old `candidate` still works): like
-call coaching in sales tools, where a manager listens in and whispers advice only the rep hears,
-except that the coach is local and quiet. It keeps your own prepared stories, numbers and
-results at hand, reminds you of the part of a question you have not answered yet and helps you
-structure the answer. It uses only the facts you prepared (a facts doc in your Knowledge Base:
-CV, stories, numbers, results) and never invents experience. Good for rehearsals, pitch practice and client
-Q&A; without a project, the call is filed under your personal Workspace. **Interviewer**: follow-up questions on weak answers and planned questions
+**Coach** (you are the one being asked; value `coach`, the old `candidate` still works): a
+steering committee, questions after a demo, a quarterly review, an audit, or a rehearsal before
+any of these. Like a coach at the edge of the field: short cues during the game, while you play
+it yourself. It keeps your prepared talking points, numbers and results at hand, reminds you of
+the part of a question you have not answered yet and helps you keep the answer short and
+structured. It uses only what you prepared (a talking points doc in your Knowledge Base: key
+messages, numbers, results, prepared answers) and never invents facts; without a project, the call is filed under your personal Workspace. **Interviewer**: follow-up questions on weak answers and planned questions
 not asked yet. After the call: a full analysis (answers table, strengths, gaps, signals,
 recommendation, how the prompter performed).
 
@@ -806,7 +806,7 @@ the package).
 | `audio.mic` | Which microphone to record: `default` = whatever the Mac uses as input now (AirPods, Jabra or other headsets, or the Mac itself), `mac_mic` = always the Mac's own microphone. You can also say it when starting: "live tips, mac mic" |
 | `workspaces` | Optional: general calls about several projects (title, `project_root`, list of project slugs); listed first in the project question |
 | `project_roots` | Optional: the recording folder per project slug, overrides the project config |
-| `hiring.coach` | Optional, for the Coach role (the old key `hiring.candidate` is still read): `root` (recordings of calls without a project), `workspace` (your personal area in the Workspaces DB: Coach calls without a project are filed there, and Knowledge Base docs linked to it serve as prep notes), `facts_doc` (a Knowledge Base doc with your facts: CV, stories, numbers, results; the only source of facts about you), `notes_folder` (optional local prep notes) |
+| `hiring.coach` | Optional, for the Coach role (the old key `hiring.candidate` is still read): `root` (recordings of calls without a project), `workspace` (your personal area in the Workspaces DB: Coach calls without a project are filed there, and Knowledge Base docs linked to it serve as prep notes), `facts_doc` (a Knowledge Base doc with your talking points: key messages, numbers, results, prepared answers; the only source of facts about you), `notes_folder` (optional local prep notes) |
 | `paths.work_root` | Mac folder connected to Cowork |
 | `paths.tool_root` | Where live-transcriber lives |
 | `languages.internal` | `me_lang` (main mic language), `me_langs` (languages you may switch to, e.g. `[uk, en]`), `langs` (all call languages, the first is the main one, e.g. `[uk, en]`) for internal calls |

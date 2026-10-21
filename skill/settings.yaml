@@ -29,7 +29,7 @@ hiring:
   coach:                         # optional: calls where you are the one being asked (role "Coach (me)"); the old key "candidate" is still read
     root: ~~home-folder/work/PM/Coach    # recordings of calls without a project go to <root>/live
     workspace: ""                # Workspaces DB page of your personal area: Coach calls without a project are filed there
-    facts_doc: ""                # Knowledge Base doc with your facts (CV, stories, numbers, results): the only source of facts about you
+    facts_doc: ""                # Knowledge Base doc with your talking points (key messages, numbers, results, prepared answers): the only source of facts about you
     notes_folder: ""             # optional local folder with prep notes, e.g. ~~home-folder/work/PM/Coach/notes
 
 paths:

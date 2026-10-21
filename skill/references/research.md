@@ -75,16 +75,17 @@ generic or steers away, while the facts sit in the PM's own documents. So:
   metric, "tell me more about X", "how did you decide") that the Answer Bank covers with fewer
   than 2 facts. The PM is speaking most of the time, so the "hiring answer is open" exception
   does not apply here; the T1 tip still goes first, from the Answer Bank, in the same poll.
-- Sources (agents A-D are replaced by): A. the Truth Bank and the RECAP/prep pages
-  (`settings.hiring.coach`); B. the PM's own project documents in the claude.ai Project and
+- Sources (agents A-D are replaced by): A. your facts and prep notes
+  (`settings.hiring.coach.facts_doc` in the Knowledge Base, Knowledge Base docs and past Coach
+  meetings linked to `workspace`, `notes_folder`); B. the PM's own project documents in the claude.ai Project and
   the project folder (design, investigation, incident, review, routine documents) for the
   project the question names; C. Notion pages of that project (Meetings, Decisions, Reports);
-  D. the Job Tracker row and the job post (what the role actually needs).
+  D. a short web check of the other side when it is an organisation (what it cares about).
 - Output: facts about the PM (numbers, names of decisions, steps of the work, outcome) with the
-  source. A fact found only in a project document and not in the Truth Bank is marked
+  source. A fact found only in a project document and not in your facts is marked
   "(з документів, перевір)"; never state it as certain. Never invent. Client names, internal
   estimates and security findings are 🔒: give the shape of the answer without the client's name
-  or confidential numbers, unless the Truth Bank allows them.
+  or confidential numbers, unless your facts allow them.
 - Delivery: the "Деталі" tip is a short STAR-shaped phrase (situation, action, result, 2-3
   sentences) in the interview language plus up to 3 facts, so the PM can say it at once.
 - Before the interview (Step 2a prep): the coach prep subagent runs the topic documents

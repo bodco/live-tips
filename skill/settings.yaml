@@ -27,11 +27,10 @@ project_roots: {}                # optional: live recording folder per project s
 
 hiring:
   coach:                         # optional: calls where you are the one being asked (role "Coach (me)"); the old key "candidate" is still read
-    root: ~~home-folder/work/PM/Job Search   # recordings go to <root>/live
-    job_tracker: ""              # Notion data source of your job tracker (collection://...), rows with Company, Vacancy, Status, Stages log
-    hub_page: ""                 # Notion page of your job search
-    recap_page: ""               # Notion page with prep pages per company
-    truth_bank_page: ""          # Notion page with your CV facts: the only source of facts about you
+    root: ~~home-folder/work/PM/Coach    # recordings of calls without a project go to <root>/live
+    workspace: ""                # Workspaces DB page of your personal area: Coach calls without a project are filed there
+    facts_doc: ""                # Knowledge Base doc with your facts (CV, stories, numbers, results): the only source of facts about you
+    notes_folder: ""             # optional local folder with prep notes, e.g. ~~home-folder/work/PM/Coach/notes
 
 paths:
   work_root: ~~home-folder/work                          # Mac folder connected to Cowork

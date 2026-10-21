@@ -41,42 +41,37 @@ of the question line and `tip_at` = the `at` time that read_delta stamps on the 
 - `coach`: the prep is done by the **coach prep subagent** (see "Context sweep"
   for how subagents are used) with this brief, everything from `settings.hiring.coach`
   (fallback `settings.hiring.candidate`):
-  1. The Job Tracker row of the company (match `Company` / `Vacancy`, newest if several):
-     `Vacancy`, `Role type`, `Status`, `Stage #`, `Stages log`, `Next step on`, `Notes`,
-     `Feedback`, `Salary range`, `Що ми знаємо про компанію`, `Recruiter contact`, the page
-     body and the job post at `Vacancy URL` if reachable.
-  2. Prep pages for this company under the RECAP page (`recap_page`, titles like
-     "Підготовка до співбесіди: {company}"), and the Truth Bank (`truth_bank_page`): the
-     ONLY allowed source of facts about the PM (numbers, projects, dates).
-  3. A short web check of the company (max ~5 searches): product, size, market, funding or
-     news of the last 6 months, who the interviewers are if their names are known.
-  4. **Stage** of this interview: from the user's words, else from `Status`, `Stages log`
-     and `Next step on` (recruiter screen, technical or PM case, final with management,
-     client interview). If unclear, say "етап не визначено" and prep for both likely ones.
-  5. **Story cards from the PM's own work (mandatory).** Topic documents rule applied to the
+  1. **The other side and the occasion** from the user's words: who will ask (an
+     organisation, a client, a panel), what kind of conversation it is (a rehearsal, a client
+     Q&A, a pitch, an interview) and what they care about. If a project is named, its config
+     and Current State as usual.
+  2. **Your facts**: the Knowledge Base doc `facts_doc` (your CV, stories, numbers,
+     results): the ONLY allowed source of facts about the PM. Prep notes for this occasion:
+     Knowledge Base docs linked to the Workspace `workspace` whose title names the
+     organisation or the occasion, the last Coach calls in the Meetings DB with that
+     Workspace (what was asked, the Ретро), and the local `notes_folder` when set.
+  3. A short web check of the other side when it is an organisation (max ~5 searches):
+     product, size, market, news of the last 6 months.
+  4. **Story cards from the PM's own work (mandatory).** Topic documents rule applied to the
      PM: from the claude.ai Project and the project folder take the newest design,
      investigation, incident, review and report documents of the PM's current projects and
-     the 3-5 that best match the role's requirements and the stage. For each write a story
-     card: context, the PM's role, the hardest decision or investigation (steps, not prose),
+     the 3-5 that best match what the other side cares about. For each write a story card:
+     context, the PM's role, the hardest decision or investigation (steps, not prose),
      numbers, outcome, file and date; mark what is confidential. Put them into the Answer
-     Bank. Facts only from documents or the Truth Bank, never from memory of the model.
-  The subagent writes `<transcript name>.brief.md` (company card, stage, Answer Bank,
-  "Розкажи про себе", questions to ask them, red lines: salary floor and notice period only
-  if the hub states them) and returns the compact part: stage, the "Розкажи про себе" item,
-  the 6 most likely questions, 3 questions to ask them. Main session emits them.
-  The **Answer Bank**: 10-20 likely questions for THIS stage -> a ready answer of 2-3
-  sentences + up to 3 facts (project, numbers, result) ONLY from the Truth Bank, the CV and
-  the PM Profile. Never invent experience, dates or numbers: a generic answer is marked
-  "(загальна)". By stage: screening = motivation, why leaving, expectations, availability,
-  English, short self-intro; technical / case = delivery process, estimates and risks,
-  metrics, conflicts with clients, a failed project, tools, AI in PM work; final = leadership,
-  stakeholder management, decision making, culture, questions to them.
+     Bank. Facts only from documents or your facts, never from memory of the model.
+  The subagent writes `<transcript name>.brief.md` (context card, Answer Bank, "Розкажи про
+  себе", questions to ask them, red lines from your notes) and returns the compact part: the
+  opening item, the 6 most likely questions, 3 questions to ask them. Main session emits them.
+  The **Answer Bank**: 10-20 likely questions for THIS occasion -> a ready answer of 2-3
+  sentences + up to 3 facts (project, numbers, result) ONLY from your facts and project
+  documents. Never invent experience, dates or numbers: a generic answer is marked
+  "(загальна)".
   **First item, right at the start: "Розкажи про себе".** Emit it before anything else as
-  `kind: speech`, gist "🟢 Про себе", in the interview language: an opening sentence as
-  `phrase` and 6-8 short lines as `items` (current role, years and domain, 2-3 projects with
-  one result each, what the PM is looking for and why this role), about 60-90 s when said
-  aloud. It stays on top of the window so the PM is calm from the first minute. Then emit
-  the 5 next most likely questions as a second prep item.
+  `kind: speech`, gist "🟢 Про себе", in the call language: an opening sentence as `phrase`
+  and 6-8 short lines as `items` (current role, years and domain, 2-3 projects with one
+  result each, and why this conversation matters), about 60-90 s when said aloud. It stays
+  on top of the window so the PM is calm from the first minute. Then emit the 5 next most
+  likely questions as a second prep item.
 - `interviewer`: the planned questions (from the user's words, the session or a prep) as the
   checklist; if none, propose 8-10 for the position and the level and emit them, marked
   "запропоновані".
@@ -107,8 +102,8 @@ poll); speed matters more than batching. Never deep lookups during an answer.
      (situation, action, result) with "(загальна)", never invented facts.
   2. The answer check runs on the PM's reply: a missed part of the question -> 🟠 "Питали ще
      про {що}" + one sentence to add. No comments on tone or confidence.
-  3. Salary, notice period, start date, other offers: 🔴 "Без цифр зараз" + a neutral phrase
-     unless the PM's sources give a number to use.
+  3. Money, dates and commitments (a price, a start date, a scope): 🔴 "Без цифр зараз" + a
+     neutral phrase unless your notes give a number to use.
 - `interviewer` (the PM asks):
   1. After each answer: a weak, vague or partial answer -> 🟠 "Уточни: {що}" + the follow-up
      question as `phrase`; a strong one -> nothing, or the next planned question as an
@@ -160,16 +155,12 @@ candidate's answer VERBATIM as plain paragraphs, "Question: ..." then "Answer: .
 call order. Build the list with a script from the transcript (the lines are often one channel:
 merge consecutive lines of one speaker, attribute by content, merge rephrased questions into
 the question, keep ASR errors as they are, add one caveat line about that), save it locally as
-`<transcript name>.qa.md`, and append to Notion in chunks if it is too large. The `coach`
-branch below gets the same two sections in the Job Tracker row page.
-`coach`: no Meetings DB page. Write into the company's Job Tracker row page: append a
-section `## Співбесіда {YYYY-MM-DD}: {stage}` with the full analysis, plus the transcript in a
-toggle "Транскрипт"; append one line to `Stages log` ("N. YYYY-MM-DD {stage} - очікуємо
-результат", N = `Stage #` + 1) and set `Stage #` to N. `Status`, `Last response` and
-`Next step on` change only on the PM's word. If no row exists, create one with `Company`,
-`Vacancy`, `Status` = `Interview`, then write as above. The coach analysis adds a
-**Ретро** block: the weakest answer, where the PM spoke too long, the question that
-surprised, what to add to the Truth Bank or the recap, what to prepare for the next stage.
+`<transcript name>.qa.md`, and append to Notion in chunks if it is too large. 
+`coach`: the Meetings DB page follows the same destination rule, with the analysis as the
+"Підсумок" section; without a project, the page gets `Workspace` = `settings.hiring.coach.workspace`
+and no `Project` (when no workspace is set, only the local files). The coach
+analysis adds a **Ретро** block: the weakest answer, where the PM spoke too long, the
+question that surprised, what to add to your facts, what to prepare next time.
 The local `.analysis.md` stays too in every role.
 
 ### Reference answers: depth and speed (moved from SPEED in SKILL.md)

@@ -25,8 +25,8 @@ files; during the call model tips are few, short and only with facts.
 
 **Settings.** Everything personal (labels, paths, languages, tip rules, model hint) is in
 `settings.yaml` next to this file: read it first. If it is missing, the package is incomplete:
-say so in one line and stop. Interview settings of the PM's own job search live under
-`hiring.coach`; an older file may still have `hiring.candidate`: read `hiring.coach` and fall
+say so in one line and stop. Settings of the Coach role (where your prepared facts and notes are) live
+under `hiring.coach`; an older file may still have `hiring.candidate`: read `hiring.coach` and fall
 back to `hiring.candidate` when only the old key exists (written below as `settings.hiring.coach`). Model: Sonnet class with low or medium effort for everyday calls,
 Opus class for interviews and high-stakes calls (`model_hint`); the model is chosen in Cowork
 before the call and is never offered as a switch in the window.
@@ -109,7 +109,7 @@ lines (tips only for what is still relevant), back to the loop.
 
 1. **Step 0: project, audience, type, languages, mic** (`references/start.md`; read `../projects/{slug}.md`, Default Project Rule). Ask in chat ONLY what
    decides where the recording goes: the project when not explicit (never guess the project,
-   list the configs), or the company for a `coach` interview. Everything else defaults to
+   list the configs), or the other side (who will ask) for a `coach` call. Everything else defaults to
    `auto` and is corrected in the ⚙ menu. Done when slug, title, audience, type, languages and
    mic are known or `auto`.
 2. **Whisper prompt** (rules in `start.md`): one natural sentence in the call language with the

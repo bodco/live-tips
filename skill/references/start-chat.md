@@ -27,14 +27,11 @@ Part of Step 0, item 5 (`references/start.md`). Legacy flow: the answers map to 
       When `Співбесіда (hiring)` was picked as the call type, ask the role right after in a
       second AskUserQuestion call (the only case with two calls). The words settle the role
       when they say it ("я спостерігаю", "мене співбесідують", "я наймаю", "я інтерв'юю").
-      **Company (role `coach` only).** When the role is or may be `coach` and the
-      words do not name the company: before asking, query the Job Tracker
-      (`settings.hiring.coach.job_tracker`, fallback `settings.hiring.candidate.job_tracker`) for rows with `Status` in `Recruiter screen`,
-      `Interview`, `Final`, nearest `Next step on` first; ask `З якою компанією?` with up to 3
-      of them (`Company` + `Vacancy`) as options, "Other" = free text. When the role is
-      still unknown, put this question in the same call as the role and label it "(якщо
-      мене інтерв'юють)". The Project question is skipped for `coach`. If the query tool
-      fails, ask with "Other" only and find the row by name later.
+      **Other side (role `coach` only).** When the role is or may be `coach` and the words
+      do not say who will ask, ask `Хто питатиме?` with "Other" = free text (an
+      organisation, a client, a panel). When the role is still unknown, put this question in
+      the same call as the role and label it "(якщо питають мене)". The Project question is
+      skipped for `coach` unless the user names a project.
    3. **Call language**: options `Українська` (me_lang `uk`, me_langs `uk+en`, langs `uk+en`),
       `English` (me_lang `en`, me_langs `en+uk`, langs `en+uk`), `Мікс` (main language and
       lists from the resolution order in item 4, which already default to a mix). Mark as

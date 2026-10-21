@@ -39,7 +39,7 @@ wait for the user to find the button.
      needs the outline (`references/presentation.md`), an interview needs a role
      (`hiring_role` = `observer` | `coach` | `interviewer`, `references/hiring.md`; `coach` = the
      PM is the one being asked, the legacy value `candidate` maps to `coach`; the
-     `coach` role takes the company instead of the project). Words like "співбесіда",
+     `coach` role may have no project: then the other side, an organisation or a person, takes its place). Words like "співбесіда",
      "інтерв'ю з кандидатом", "hiring" set `interview`; "моя доповідь", "презентація",
      "demo" set `presentation`. Legacy words and values map: status, standup, topic, working
      session, discussion -> `auto`; client -> `auto` + audience `client`; hiring -> `interview`.
@@ -61,8 +61,8 @@ wait for the user to find the button.
 5. **Fast start (default, `settings.start.mode: window`).** Speed first: the recording must
    start within ~20 s of the request, nothing said on the call may be lost to questions.
    - In chat ask ONLY what decides where the recording goes: the Project when it is not
-     explicit (Default Project Rule), or the company for a `coach` interview when the
-     words say it is one and do not name the company. One AskUserQuestion call, or none.
+     explicit (Default Project Rule), or the other side for a `coach` call when the
+     words say it is one and do not name who will ask. One AskUserQuestion call, or none.
    - Everything else starts from defaults: audience and type per item 3 (`auto` when not
      settled), language from item 4, mic from `settings.audio.mic`, `proactive` from
      `settings.tips.proactive` (default `off`). Pass `"setup": true`, `call_type`, `audience`
@@ -86,7 +86,7 @@ wait for the user to find the button.
    - A **prep ahead** makes the start instant: "підготуй live tips до {дзвінок}" (any time
      before the call) runs Step 0 and Step 2 without recording and saves the brief as
      `<project_root>/live/prep-<YYYY-MM-DD-HHMM>-<title>.brief.md`. At the start, a prep brief
-     of the same project (or company) younger than 3 hours is reused: no sweep, the speech
+     of the same project (or the same other side for `coach`) younger than 3 hours is reused: no sweep, the speech
      and tips are ready from the first second. Say "Бриф з підготовки {час} підхоплено".
    `settings.start.mode: chat` keeps the start questions (module `references/start-chat.md`).
 

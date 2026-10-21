@@ -28,5 +28,8 @@ def test_signals():
     assert d.detect(ls[4]).new_requirement and d.detect(ls[4]).route == "direct"
     assert d.detect(ls[5]).commitment and d.detect(ls[5]).trigger_hint == "pm_commitment"
     assert d.detect(ls[6]).route is None
+    from livetips_m0.transcript import Line
+    mention = d.detect(Line(99, "10:01:00", "them", "Other", None, "en", "As Alex said, the export works."))
+    assert mention.name_mention and mention.route == "classify"
     q = d.detect(ls[7])
     assert q.question and not q.second_person and q.route == "classify"

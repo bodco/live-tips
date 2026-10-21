@@ -31,11 +31,14 @@ class Signals:
     @property
     def route(self):
         """'direct' (straight to tip), 'classify', or None."""
-        if self.name_mention or self.new_requirement or self.commitment:
+        if self.new_requirement or self.commitment:
+            return "direct"
+        if self.name_mention and (self.question or self.update_request):
             return "direct"
         if self.question and self.second_person:
             return "direct"
-        if self.question or self.frustration or self.update_request:
+        # A name alone is often a mention while someone else speaks (judged as false "your turn").
+        if self.name_mention or self.question or self.frustration or self.update_request:
             return "classify"
         return None
 

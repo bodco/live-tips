@@ -27,6 +27,13 @@ Priority, highest first: {priorities}. The live topic always beats the plan.
 Triggers (level, id, when, what to give):
 {triggers}
 
+Context discipline (most common failures, check every time):
+- Read the whole transcript you get. If the fact, owner or date was already said aloud by anyone, or the PM already answered, return skip.
+- "your_turn" only when the PM is addressed by name AND asked for an update or opinion now. If someone else is giving the update, skip.
+- Never answer a question with a fact that is not in the brief, fact book, cards or transcript. No fact = skip.
+- The phrase uses the language the PM speaks with these people on this call (look at the PM's own lines).
+- Prefer the newest topic. A tip about something the talk has left is noise.
+
 Tip diet: one gist line plus at most one phrase or up to {fact_lines} fact lines of max {fact_words} words. One tip per topic, never repeat a tip already given. The topic must be what is discussed in the last {live_topic}s.
 
 Tip format (JSON, keys in this order, gist first):
@@ -100,7 +107,8 @@ class PromptBuilder:
             {"text": "FACT BOOK AND CARDS:\n" + (facts_block(facts_path, cards_path) or "(none)"), "cache": True},
         ]
 
-    def user(self, role: str, event: str, tail_lines: List[str], state: dict) -> str:
+    def user(self, role: str, event: str, tail_lines: List[str], state: dict, earlier_lines: List[str] = ()) -> str:
         task = CLASSIFY_TASK if role == "classify" else TIP_TASK.format(event=event)
         st = json.dumps(state, ensure_ascii=False)
-        return "STATE: {}\n\nTRANSCRIPT (last 90 s, newest last):\n{}\n\n{}".format(st, "\n".join(tail_lines), task)
+        earlier = "EARLIER IN THE CALL (older lines, for what was already said):\n{}\n\n".format("\n".join(earlier_lines)) if earlier_lines else ""
+        return "STATE: {}\n\n{}LIVE TRANSCRIPT (last 90 s, newest last):\n{}\n\n{}".format(st, earlier, "\n".join(tail_lines), task)

@@ -114,6 +114,20 @@ class Engine:
             self._submit_classify(line, span)
 
     # ---------- model roles ----------
+    def _earlier(self, line: Line) -> List[str]:
+        """Lines older than the live tail, up to `context_earlier_s` back (default 8 min)."""
+        span = self.cfg.get("context_earlier_s", 480)
+        if not span:
+            return []
+        with self.lock:
+            hist = [h for h in self.history if h.line_id <= line.line_id]
+        end = line.t_s
+        out = []
+        for h in hist:
+            if 90 < end - h.t_s <= 90 + span:
+                out.append("[{}] {}: {}".format(h.t, h.label, h.text[:300]))
+        return out[-80:]
+
     def _tail(self, line: Line) -> List[str]:
         with self.lock:
             hist = [h for h in self.history if h.line_id <= line.line_id]
@@ -131,7 +145,7 @@ class Engine:
         return {"tips_given": gists, "now": s_to_hms(self.clock())}
 
     def _call(self, role: str, line: Line, event: str):
-        user = self.prompt.user(role, event, self._tail(line), self._state())
+        user = self.prompt.user(role, event, self._tail(line), self._state(), self._earlier(line))
         max_tokens = self.cfg.get("max_tokens", {}).get(role, 120 if role == "classify" else 300)
         extra = (self.cfg.get("request_extra") or {}).get(role)
         c = self.provider.complete(model=self.models[role], system=self.prompt.blocks, user=user,

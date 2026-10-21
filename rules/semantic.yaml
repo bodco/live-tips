@@ -12,7 +12,7 @@ topic_window_s: 60            # rolling live-topic vector
 thresholds:
   fact_min: 0.55              # cosine of an other-side line to a fact for an automatic 📌
   card_min: 0.60              # cosine of a line to a card (gist or trigger)
-  fact_margin: 0.08           # must beat the entry's small-talk noise floor by this much
+  fact_margin: 0.08           # must beat the entry's small-talk noise floor by this much. M0 proposal: 0.10 (pending owner decision)
   card_margin: 0.10
   sos_min: 0.45               # SOS picks by the live topic
   index_min: 0.40             # SOS and search: project index snippets

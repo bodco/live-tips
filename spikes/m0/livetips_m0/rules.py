@@ -16,6 +16,8 @@ class Rules:
         self.priorities = self._y("priorities.yaml")
         self.meeting = self._y("meeting.yaml")
         self.asr_filters = self._y("asr_filters.yaml")
+        self.semantic = self._y("semantic.yaml")
+        self.index = self._y("index.yaml")
         self.tip_schema = self._j("tip_schema.json")
         self.model_tip_schema = self._j("model_tip_schema.json")
         self.classify_schema = self._j("classify_schema.json")

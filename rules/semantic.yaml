@@ -1,0 +1,45 @@
+# Local semantic layer (embeddings). Shared by live-transcriber (skill) and LiveTips.app.
+# Values mirror live-transcriber v38 defaults; they are estimates until calibrated in M0
+# (spikes/m0/livetips_m0/semantic_eval.py on recorded calls).
+schema_version: 1
+model: bge-m3                 # multilingual (uk, en, es), 1024 dimensions
+engine_default: ollama        # ollama | embedded (decided in M0)
+ollama_url: http://127.0.0.1:11434
+timeout_s: 2.0                # per live embedding call; a line that misses it is skipped
+min_words: 3                  # shorter lines are not embedded
+queue: 6                      # lines waiting; when behind, the oldest is dropped
+topic_window_s: 60            # rolling live-topic vector
+thresholds:
+  fact_min: 0.55              # cosine of an other-side line to a fact for an automatic 📌
+  card_min: 0.60              # cosine of a line to a card (gist or trigger)
+  fact_margin: 0.08           # must beat the entry's small-talk noise floor by this much
+  card_margin: 0.10
+  sos_min: 0.45               # SOS picks by the live topic
+  index_min: 0.40             # SOS and search: project index snippets
+fact_gate: question_or_topic_held   # a fact shows on an other-side line that is a question, or the topic held 2+ lines
+# Neutral small talk and call logistics; the highest cosine of an entry to these is its noise floor.
+neutral_anchors:
+  - "Hello, can you hear me?"
+  - "Добрий день, мене чути?"
+  - "Hola, ¿me escuchan?"
+  - "Let me share my screen."
+  - "Зараз покажу екран."
+  - "Déjame compartir mi pantalla."
+  - "Sorry, I was on mute."
+  - "Вибачте, у мене був вимкнений мікрофон."
+  - "Perdón, estaba en silencio."
+  - "Okay, sounds good, thank you."
+  - "Так, добре, дякую."
+  - "Vale, perfecto, gracias."
+  - "The weather is nice today."
+  - "Сьогодні гарна погода."
+  - "Hoy hace buen tiempo."
+  - "See you next week, bye."
+  - "До зустрічі, бувайте."
+  - "Nos vemos la próxima semana, chao."
+  - "One moment, my internet is slow."
+  - "Хвилинку, щось інтернет гальмує."
+  - "How was your weekend?"
+  - "Як пройшли вихідні?"
+  - "Let's wait a minute for the others to join."
+  - "Почекаємо ще хвилину, поки всі підключаться."

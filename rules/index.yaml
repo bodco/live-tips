@@ -1,0 +1,16 @@
+# Project index (<project_root>/.livetips-index/), format version 1. One index per project, never
+# one for the whole work folder. Skill (lt index / lt search) and app read and write the same index.
+schema_version: 1
+dir: .livetips-index
+format_version: 1
+files: {vectors: "*.npy (float16, L2-normalised)", meta: meta.jsonl, manifest: manifest.json}
+text_ext: [.md, .txt, .csv, .json]
+max_bytes: 2097152
+json_max_bytes: 262144
+csv_rows: 30
+chunk: {target_chars: 1000, max_chars: 1200, overlap_chars: 120}
+skip_dirs: [.git, node_modules, repos, _archived, .livetips-index, __pycache__, .venv, venv, .idea, .vscode, .Trash, .cache, Secrets, secrets, _to_delete, _archive, _Archive]
+skip_hidden: true
+secret_name_regex: "(secret|credential|password|token|\\.env$|apikey|api_key)"
+call_artefacts: only transcripts (<stem>.md); never tips, state, timing, prep, named or clean copies
+during_call: incremental, changed files only, small batches, only while the ASR queue is empty

@@ -133,8 +133,9 @@ class Engine:
     def _call(self, role: str, line: Line, event: str):
         user = self.prompt.user(role, event, self._tail(line), self._state())
         max_tokens = self.cfg.get("max_tokens", {}).get(role, 120 if role == "classify" else 300)
+        extra = (self.cfg.get("request_extra") or {}).get(role)
         c = self.provider.complete(model=self.models[role], system=self.prompt.blocks, user=user,
-                                   max_tokens=max_tokens, cache_ttl=self.ttl)
+                                   max_tokens=max_tokens, cache_ttl=self.ttl, extra=extra)
         usd = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)
         if self.budget and usd:
             self.budget.add(usd)
@@ -143,7 +144,8 @@ class Engine:
                             "input": c.input_tokens, "cache_read": c.cache_read, "cache_write_5m": c.cache_write_5m,
                             "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
                             "usd": round(usd, 6) if usd is not None else None, "error": c.error,
-                            "stop": c.stop_reason})
+                            "stop": c.stop_reason,
+                            "text_head": None if c.error else c.text[:160]})
         return c
 
     def _submit_classify(self, line: Line, span: dict) -> None:

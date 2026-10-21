@@ -54,7 +54,8 @@ class Provider:
     name = "base"
 
     def complete(self, *, model: str, system: List[dict], user: str, max_tokens: int,
-                 cache_ttl: Optional[str], on_text: Optional[Callable[[str], None]] = None) -> Completion:
+                 cache_ttl: Optional[str], on_text: Optional[Callable[[str], None]] = None,
+                 extra: Optional[dict] = None) -> Completion:
         raise NotImplementedError
 
 
@@ -72,7 +73,7 @@ class AnthropicProvider(Provider):
         headers = {"anthropic-workspace-id": workspace_id} if workspace_id else None
         self.client = anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=1, default_headers=headers)
 
-    def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None):
+    def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         blocks = []
         for b in system:
             blk = {"type": "text", "text": b["text"]}
@@ -82,8 +83,8 @@ class AnthropicProvider(Provider):
         c = Completion(model=model, t_start=time.monotonic())
         try:
             with self.client.messages.stream(
-                model=model, max_tokens=max_tokens, temperature=0, system=blocks,
-                messages=[{"role": "user", "content": user}],
+                model=model, max_tokens=max_tokens, system=blocks,  # no temperature: deprecated on current models
+                messages=[{"role": "user", "content": user}], **(extra or {}),
             ) as stream:
                 for ev in stream:
                     if ev.type == "content_block_delta" and getattr(ev.delta, "type", "") == "text_delta":
@@ -128,7 +129,7 @@ class OpenAICompatProvider(Provider):
         self.api_key = api_key
         self.timeout = timeout
 
-    def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None):
+    def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         body = {
             "model": model, "max_tokens": max_tokens, "temperature": 0, "stream": True,
             "stream_options": {"include_usage": True},
@@ -176,7 +177,7 @@ class FakeProvider(Provider):
         self.total = total
         self.calls = []
 
-    def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None):
+    def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         c = Completion(model=model, t_start=time.monotonic())
         self.calls.append({"model": model, "user": user})
         time.sleep(self.ttft)

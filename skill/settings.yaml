@@ -26,7 +26,7 @@ project_roots: {}                # optional: live recording folder per project s
 #  acme-portal: ~~home-folder/work/Acme Portal
 
 hiring:
-  candidate:                     # optional: your own job interviews (role "Candidate (me)")
+  coach:                         # optional: calls where you are the one being asked (role "Coach (me)"); the old key "candidate" is still read
     root: ~~home-folder/work/PM/Job Search   # recordings go to <root>/live
     job_tracker: ""              # Notion data source of your job tracker (collection://...), rows with Company, Vacancy, Status, Stages log
     hub_page: ""                 # Notion page of your job search

@@ -23,17 +23,17 @@ Part of Step 0, item 5 (`references/start.md`). Legacy flow: the answers map to 
       (status, client, topic, hiring) and the title.
       **Hiring role.** When the user's words already say it is a hiring interview, ask
       instead of the call type: `Твоя роль на співбесіді` with options `Спостерігач`
-      (observer), `Мене інтерв'юють` (candidate), `Я питаю` (interviewer); "Other" = details.
+      (observer), `Мене інтерв'юють` (coach), `Я питаю` (interviewer); "Other" = details.
       When `Співбесіда (hiring)` was picked as the call type, ask the role right after in a
       second AskUserQuestion call (the only case with two calls). The words settle the role
       when they say it ("я спостерігаю", "мене співбесідують", "я наймаю", "я інтерв'юю").
-      **Company (role `candidate` only).** When the role is or may be `candidate` and the
+      **Company (role `coach` only).** When the role is or may be `coach` and the
       words do not name the company: before asking, query the Job Tracker
-      (`settings.hiring.candidate.job_tracker`) for rows with `Status` in `Recruiter screen`,
+      (`settings.hiring.coach.job_tracker`, fallback `settings.hiring.candidate.job_tracker`) for rows with `Status` in `Recruiter screen`,
       `Interview`, `Final`, nearest `Next step on` first; ask `З якою компанією?` with up to 3
       of them (`Company` + `Vacancy`) as options, "Other" = free text. When the role is
       still unknown, put this question in the same call as the role and label it "(якщо
-      мене інтерв'юють)". The Project question is skipped for `candidate`. If the query tool
+      мене інтерв'юють)". The Project question is skipped for `coach`. If the query tool
       fails, ask with "Other" only and find the row by name later.
    3. **Call language**: options `Українська` (me_lang `uk`, me_langs `uk+en`, langs `uk+en`),
       `English` (me_lang `en`, me_langs `en+uk`, langs `en+uk`), `Мікс` (main language and

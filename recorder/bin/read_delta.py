@@ -532,6 +532,8 @@ def main():
                     raise ValueError("not an object")
                 if q.get("kind") == "setting":
                     # A control in the tips window changed a setting for this call.
+                    if q.get("key") == "hiring_role" and str(q.get("value") or "").strip().lower() == "candidate":
+                        q["value"] = "coach"          # legacy role name (the PM is the one being asked)
                     print(f"@@SET {q.get('key')}={q.get('value')}")
                     settings.append((str(q.get("key")), q.get("value")))
                     if q.get("key") == "tip_feedback":   # kept for the after-call analysis

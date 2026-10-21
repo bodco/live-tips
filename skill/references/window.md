@@ -62,7 +62,7 @@ Read once early in the call (in a quiet poll after the speech), and again when a
 - **Talk meter** (status `talk_me_pct`, `monologue_s`, also in `@@STATUS` as `talk_me=`,
   `mono=`): the window shows it to the PM. Tip only on a client call or when the PM leads,
   when the PM's monologue passes ~2 minutes and a question from the other side is waiting:
-  🟠 "Дай слово: {хто / питання}". Never in an interview where the PM is the candidate.
+  🟠 "Дай слово: {хто / питання}". Never in an interview where the PM is being asked (coach role).
 - `@@ASK` lines are the PM's questions or comments typed in the window: treat them exactly
   like chat messages during the loop (answer first, briefly), and send the answer back to
   the window as `kind: answer` (and to the chat too in `both`). "стоп" typed in the window

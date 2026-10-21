@@ -25,7 +25,9 @@ files; during the call model tips are few, short and only with facts.
 
 **Settings.** Everything personal (labels, paths, languages, tip rules, model hint) is in
 `settings.yaml` next to this file: read it first. If it is missing, the package is incomplete:
-say so in one line and stop. Model: Sonnet class with low or medium effort for everyday calls,
+say so in one line and stop. Interview settings of the PM's own job search live under
+`hiring.coach`; an older file may still have `hiring.candidate`: read `hiring.coach` and fall
+back to `hiring.candidate` when only the old key exists (written below as `settings.hiring.coach`). Model: Sonnet class with low or medium effort for everyday calls,
 Opus class for interviews and high-stakes calls (`model_hint`); the model is chosen in Cowork
 before the call and is never offered as a switch in the window.
 
@@ -107,7 +109,7 @@ lines (tips only for what is still relevant), back to the loop.
 
 1. **Step 0: project, audience, type, languages, mic** (`references/start.md`; read `../projects/{slug}.md`, Default Project Rule). Ask in chat ONLY what
    decides where the recording goes: the project when not explicit (never guess the project,
-   list the configs), or the company for a `candidate` interview. Everything else defaults to
+   list the configs), or the company for a `coach` interview. Everything else defaults to
    `auto` and is corrected in the ⚙ menu. Done when slug, title, audience, type, languages and
    mic are known or `auto`.
 2. **Whisper prompt** (rules in `start.md`): one natural sentence in the call language with the
@@ -188,7 +190,7 @@ every 5 minutes; `@@DUE state` means it is overdue. After a compaction: re-read
 | `@@SET tips_paused=on` (⏸ in the window) | The PM paused tips (the talk went aside). Ack, then emit NOTHING except answers to `@@ASK`, `@@SOS` and acks; keep polling, keep state, keep logging action items. `off` (▶): ack and continue from the live topic of the last ~2 min, not from where you stopped. Log both in `pm_notes`. |
 | `@@SPEAKERS S2="Full Name" S3=?` | Speaker names or late tags changed (the PM named or merged voices, or a voice tag arrived after its line). Lines arrive with names when known, else as `{them_label}`; use names in tips, action items and the wrap-up. **Never wait for a speaker name before a tip**: speaker identification runs in parallel and may tag a line seconds later. Never guess or assign a name yourself. |
 | `@@ASK [t] <text>` | The PM typed in the window: answer like a chat message, briefly, as `kind: answer` (`references/window.md` for `find:`, `фокус:`, quick asks, "онови спіч", "стоп"). |
-| `@@SET <key>=<value>` | Ack in the very next call with `{"kind":"ack","key":..,"value":..}` (except `call_lang`, `mic_device`, `tip_feedback`, which the recorder or the log handles), then apply: `audience` -> language default, 🔒 strictness, culture lens; `call_type` -> read `presentation.md` / `hiring.md` and rebuild the prep; `proactive` -> read or drop `proactive.md`; `tip_feedback` -> `window.md`, "Tip rating". |
+| `@@SET <key>=<value>` | Ack in the very next call with `{"kind":"ack","key":..,"value":..}` (except `call_lang`, `mic_device`, `tip_feedback`, which the recorder or the log handles), then apply: `audience` -> language default, 🔒 strictness, culture lens; `call_type` -> read `presentation.md` / `hiring.md` and rebuild the prep; `hiring_role` -> the legacy value `candidate` means `coach` (ack and apply as `coach`); `proactive` -> read or drop `proactive.md`; `tip_feedback` -> `window.md`, "Tip rating". |
 | `@@CARD [t] id: line` | An instant card already showed; do not repeat it, add only what it could not know. |
 | `@@LATE <n>s: <gist>` | The tip landed after the PM started answering; it is logged, do not re-send. |
 | `@@MODE presenting|discussion` | `presenting`: no interrupting tips, only 🔴, 📌 facts and direct answers. `discussion`: normal. |

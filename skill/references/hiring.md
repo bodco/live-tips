@@ -11,7 +11,7 @@ scope, no commitments. Tips are about the questions asked and the answers given.
 
 **What is off in hiring mode:** the speech (status) and "Your turn" from the speech, comment
 moments, initiative tips, the new-request, commitment, frustration and contradiction
-triggers, the answer check of the PM's own replies (except in the `candidate` role, below),
+triggers, the answer check of the PM's own replies (except in the `coach` role, below),
 the 2/3 and 5-minute checklist triggers (except `interviewer`). Side talk in another
 language stays on. The Insight Bank sweep of project documents is skipped unless the
 position belongs to the PM's own project (then only Team tables, stack and the open roles).
@@ -21,6 +21,10 @@ interviewer(s), the candidate and any colleague are not separated in the transcr
 apart by content: who asks (short questions, "tell me about", "how would you") and who answers
 (long first-person replies, "I", "in my last project"). Use names said aloud (introductions)
 and keep them in state. If unsure who spoke, mark the tip "(?)".
+
+**Roles** (`hiring_role`): `observer`, `coach` (the PM is the one being asked; the legacy
+value `candidate` means `coach`), `interviewer`. In this file "the candidate" is always the
+OTHER person being interviewed (roles `observer` and `interviewer`), never the PM.
 
 **State.** `hiring`: `role`, `position`, `candidate` (first name only), `questions`: a list of
 `{q_at, topic, question, answer_summary, verdict, tip_at}` where `q_at` = the transcript time
@@ -34,8 +38,9 @@ of the question line and `tip_at` = the `at` time that read_delta stamps on the 
   flaky tests, bug life cycle and severity, test strategy for a new feature, SQL, mobile or
   web specifics, behavioural questions). No status, no project facts. Then, silently, write into the brief a full-depth reference answer
   (4-5 sentences) for each of those topics (see "Reference answers: depth and speed" at the end of this file).
-- `candidate`: the prep is done by the **candidate prep subagent** (see "Context sweep"
-  for how subagents are used) with this brief, everything from `settings.hiring.candidate`:
+- `coach`: the prep is done by the **coach prep subagent** (see "Context sweep"
+  for how subagents are used) with this brief, everything from `settings.hiring.coach`
+  (fallback `settings.hiring.candidate`):
   1. The Job Tracker row of the company (match `Company` / `Vacancy`, newest if several):
      `Vacancy`, `Role type`, `Status`, `Stage #`, `Stages log`, `Next step on`, `Notes`,
      `Feedback`, `Salary range`, `Що ми знаємо про компанію`, `Recruiter contact`, the page
@@ -89,7 +94,7 @@ poll); speed matters more than batching. Never deep lookups during an answer.
      candidate said. Keep notes silently for the final analysis.
   3. No tips on small talk, introductions or company pitches; one 🔵 line at most when the
      client describes the project, the team or the process (useful for the analysis).
-- `candidate` (the PM answers):
+- `coach` (the PM answers):
   0. Small talk is not idle: the interview often starts with it and questions grow out of it
      ("so where are you based?", "how is the weather in Ukraine?", "what are you working on
      these days?", "how long have you been at your company?"). Treat any question to the PM
@@ -116,7 +121,7 @@ transcript as `<transcript name>.analysis.md`. Judge the content of the answers 
 communication clarity, never personality, appearance, accent, age, health or other personal
 traits. Sections:
 1. **Підсумок**: one paragraph, how it went and the likely outcome for the client (or for the
-   PM in `candidate`), with confidence (висока / середня / низька) and why.
+   PM in `coach`), with confidence (висока / середня / низька) and why.
 2. **Питання і відповіді**: table: питання (тема) | що відповів | оцінка (сильна /
    прийнятна / слабка / не почули) | чого бракувало для сильної відповіді.
 3. **Сильні сторони** and **Прогалини і ризики**: 2-5 items each, every one with a quote or
@@ -124,7 +129,7 @@ traits. Sections:
 4. **Сигнали з боку того, хто питав**: depth of follow-ups, topics they returned to, what
    they explained about the project, the next step they named.
 5. **Рекомендації**: `observer`: what to tell the candidate before the next round and
-   whether to put them forward again; `candidate`: what to prepare for the next round;
+   whether to put them forward again; `coach`: what to prepare for the next round;
    `interviewer`: hire / no hire / one more round, with evidence.
 6. **Рішення на місці клієнта** (`observer` and `interviewer`): a verdict (hire / скоріше так /
    скоріше ні / no hire / one more round), 3-5 reasons each with a time or quote, what would
@@ -155,14 +160,14 @@ candidate's answer VERBATIM as plain paragraphs, "Question: ..." then "Answer: .
 call order. Build the list with a script from the transcript (the lines are often one channel:
 merge consecutive lines of one speaker, attribute by content, merge rephrased questions into
 the question, keep ASR errors as they are, add one caveat line about that), save it locally as
-`<transcript name>.qa.md`, and append to Notion in chunks if it is too large. The `candidate`
+`<transcript name>.qa.md`, and append to Notion in chunks if it is too large. The `coach`
 branch below gets the same two sections in the Job Tracker row page.
-`candidate`: no Meetings DB page. Write into the company's Job Tracker row page: append a
+`coach`: no Meetings DB page. Write into the company's Job Tracker row page: append a
 section `## Співбесіда {YYYY-MM-DD}: {stage}` with the full analysis, plus the transcript in a
 toggle "Транскрипт"; append one line to `Stages log` ("N. YYYY-MM-DD {stage} - очікуємо
 результат", N = `Stage #` + 1) and set `Stage #` to N. `Status`, `Last response` and
 `Next step on` change only on the PM's word. If no row exists, create one with `Company`,
-`Vacancy`, `Status` = `Interview`, then write as above. The candidate analysis adds a
+`Vacancy`, `Status` = `Interview`, then write as above. The coach analysis adds a
 **Ретро** block: the weakest answer, where the PM spoke too long, the question that
 surprised, what to add to the Truth Bank or the recap, what to prepare for the next stage.
 The local `.analysis.md` stays too in every role.

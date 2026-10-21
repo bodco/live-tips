@@ -1054,6 +1054,16 @@ def normalize_meeting(call_type, audience=None) -> tuple[str, str]:
     return ct, au
 
 
+HIRING_ROLES = ("observer", "coach", "interviewer")
+
+
+def normalize_hiring_role(v) -> str:
+    """Interview role: observer|coach|interviewer ("" = not set). The legacy value `candidate`
+    (the PM is the one being asked) is accepted and mapped to `coach`. Unknown values pass through."""
+    r = _s(v).lower()
+    return "coach" if r == "candidate" else r
+
+
 def normalize_proactive(v) -> str:
     return "on" if _s(v).lower() in ("on", "true", "1", "yes") else "off"
 
@@ -2782,7 +2792,7 @@ def main() -> int:
               "system_audio": "starting", "mic": "starting", "errors": [],
               "setup_open": bool(cfg.get("setup")), "call_type": call_type, "audience": audience,
               "proactive": normalize_proactive(cfg.get("proactive")),
-              "hiring_role": cfg.get("hiring_role") or "", "req_id": cfg.get("req_id"), "seq": 0,
+              "hiring_role": normalize_hiring_role(cfg.get("hiring_role")), "req_id": cfg.get("req_id"), "seq": 0,
               "mic_stall_restarts": 0, "mic_stall_streak": 0, "mic_auto_switched": False,
               "last_question": None, "tips_paused": "off",
               "speakers": "loading" if cfg.get("speakers_enabled", True) not in (False, "false", "off", "0", 0) else "off",
@@ -3080,7 +3090,9 @@ def main() -> int:
                 status["audience"] = normalize_meeting(status.get("call_type"), val)[1]
             elif key == "proactive":
                 status["proactive"] = normalize_proactive(val)
-            elif key in ("hiring_role", "comment_rate_seconds"):
+            elif key == "hiring_role":
+                status[key] = normalize_hiring_role(val)
+            elif key == "comment_rate_seconds":
                 status[key] = val
             elif key == "ui_lang":
                 if _s(val).lower() in ("en", "uk"):

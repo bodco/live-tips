@@ -219,6 +219,8 @@ def cmd_start(args):
                 seen.add(n.casefold())
                 clean.append(n)
         req["people"] = clean
+    if str(req.get("hiring_role") or "").strip().lower() == "candidate":
+        req["hiring_role"] = "coach"       # legacy role name: the PM is the one being asked
     for k in ("me_langs", "langs"):        # Russian is never used (skill rule)
         if isinstance(req.get(k), str):
             req[k] = "+".join(x for x in req[k].split("+") if x != "ru")

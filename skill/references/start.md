@@ -37,8 +37,9 @@ wait for the user to find the button.
    - **Type** (`call_type`): `auto` (default) | `presentation` | `interview`. Only these two
      custom types need an explicit choice, because they need a special prep: a presentation
      needs the outline (`references/presentation.md`), an interview needs a role
-     (`hiring_role` = `observer` | `candidate` | `interviewer`, `references/hiring.md`; the
-     `candidate` role takes the company instead of the project). Words like "співбесіда",
+     (`hiring_role` = `observer` | `coach` | `interviewer`, `references/hiring.md`; `coach` = the
+     PM is the one being asked, the legacy value `candidate` maps to `coach`; the
+     `coach` role takes the company instead of the project). Words like "співбесіда",
      "інтерв'ю з кандидатом", "hiring" set `interview`; "моя доповідь", "презентація",
      "demo" set `presentation`. Legacy words and values map: status, standup, topic, working
      session, discussion -> `auto`; client -> `auto` + audience `client`; hiring -> `interview`.
@@ -60,7 +61,7 @@ wait for the user to find the button.
 5. **Fast start (default, `settings.start.mode: window`).** Speed first: the recording must
    start within ~20 s of the request, nothing said on the call may be lost to questions.
    - In chat ask ONLY what decides where the recording goes: the Project when it is not
-     explicit (Default Project Rule), or the company for a `candidate` interview when the
+     explicit (Default Project Rule), or the company for a `coach` interview when the
      words say it is one and do not name the company. One AskUserQuestion call, or none.
    - Everything else starts from defaults: audience and type per item 3 (`auto` when not
      settled), language from item 4, mic from `settings.audio.mic`, `proactive` from
@@ -115,7 +116,7 @@ prep check, state, wrap-up numbers). Call it inside device_bash as `python3 <too
    give `prompt_en` and `prompt_uk` in `start.json`: when the window switches the language
    the recorder swaps to the matching prompt (or drops it for `en` if none).
 3. Start: `python3 <tool_root>/bin/lt start '<json>'` with this JSON (one device_bash call):
-   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "...", "prompter": true, "mic_device": "default", "setup": true, "call_type": "auto|presentation|interview", "audience": "auto|team|client|boss", "proactive": "off|on", "hiring_role": "observer|candidate|interviewer", "people": ["First Last", "..."]}`
+   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "...", "prompter": true, "mic_device": "default", "setup": true, "call_type": "auto|presentation|interview", "audience": "auto|team|client|boss", "proactive": "off|on", "hiring_role": "observer|coach|interviewer", "people": ["First Last", "..."]}`
    (`setup`, `call_type`, `audience`, `proactive`, `hiring_role` only in the fast start; omit unknown ones;
    `prompt_en` / `prompt_uk` are optional and allowed)
    (labels from `settings.user`; `prompter` = `settings.tips.output` is not `chat`;

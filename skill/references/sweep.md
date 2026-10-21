@@ -10,7 +10,7 @@ refresh or before a read-modify-write of the cards or the fact book.
 in its context for the whole call, and the loop itself adds a little every poll. Raw
 documents read at the start can fill the context mid-call; Cowork then compacts the
 conversation, which costs tens of seconds without tips and loses detail. So:
-- The sweep (this section) and the `candidate` prep run in a **subagent** (the Agent tool,
+- The sweep (this section) and the `coach` prep run in a **subagent** (the Agent tool,
   general-purpose type) when the session has it. The subagent reads the raw sources in its
   own context, writes the full `<transcript name>.brief.md`, `<transcript name>.cards.json` and
   `<transcript name>.facts.json` (plus `<transcript name>.outline.json` for a presentation) itself (device_bash, the path

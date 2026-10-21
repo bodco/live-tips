@@ -403,7 +403,7 @@
       <span class="pill" id="p_call_type"></span></div>
     <div class="rowf" id="l_role" style="display:none"><span data-i18n="l_role">My role</span>
       <select id="s_role"><option value="" data-i18n="o_notset">not set</option><option value="observer" data-i18n="o_observer">Observer</option>
-        <option value="candidate" data-i18n="o_candidate">Candidate (me)</option><option value="interviewer" data-i18n="o_interviewer">Interviewer (me)</option></select>
+        <option value="coach" data-i18n="o_coach">Coach (me)</option><option value="interviewer" data-i18n="o_interviewer">Interviewer (me)</option></select>
       <span class="pill" id="p_hiring_role"></span></div>
     <div class="rowf"><span data-i18n="l_aud">Audience</span>
       <select id="s_aud" data-i18n-title="s_aud_tt">
@@ -527,7 +527,7 @@
       l_role: 'My role',
       o_notset: 'not set',
       o_observer: 'Observer',
-      o_candidate: 'Candidate (me)',
+      o_coach: 'Coach (me)',
       o_interviewer: 'Interviewer (me)',
       l_aud: 'Audience',
       s_aud_tt: 'Who is on the other side. Sets default language, strictness and tone.',
@@ -745,7 +745,7 @@
         '</dl><h5>Call setup</h5><dl>' +
         '<dt>Type: Auto</dt><dd>Default. The window detects when you present (you talk most) and when it is a discussion.</dd>' +
         '<dt>Presentation</dt><dd>Your talk with an outline: Now / Next on top, short points, no interrupting tips.</dd>' +
-        '<dt>Interview</dt><dd>Pick your role: Observer (strong answer contents), Candidate (ready answers from your CV), Interviewer (follow-ups and gaps).</dd>' +
+        '<dt>Interview</dt><dd>Pick your role: Observer (strong answer contents), Coach: you are the one being asked; your own prepared stories, numbers and facts at hand, and the parts of a question you have not answered yet. Interviewer (follow-ups and gaps).</dd>' +
         '<dt>Audience</dt><dd>Auto, Team, Client or Boss (your manager plays the client: client rules, Ukrainian by default).</dd>' +
         '<dt>Language</dt><dd>What is spoken. Switches at once, nothing is lost.</dd>' +
         '<dt>Mic</dt><dd>System default (headset or Mac) or Mac built-in, even with AirPods on. Switches in about a second.</dd>' +
@@ -806,7 +806,7 @@
       l_role: 'Моя роль',
       o_notset: 'не вибрано',
       o_observer: 'Спостерігач',
-      o_candidate: 'Кандидат (я)',
+      o_coach: 'Коуч (я)',
       o_interviewer: 'Проводжу співбесіду (я)',
       l_aud: 'Хто з того боку',
       s_aud_tt: 'Хто з того боку. Від цього залежать мова за замовчуванням, суворість і тон.',
@@ -1019,7 +1019,7 @@
         '</dl><h5>Налаштування дзвінка</h5><dl>' +
         '<dt>Тип: Авто</dt><dd>За замовчуванням. Вікно саме бачить, коли ти виступаєш (говориш найбільше), а коли йде обговорення.</dd>' +
         '<dt>Презентація</dt><dd>Твій виступ за планом: угорі «Зараз / Далі», короткі пункти, без підказок, що відволікають.</dd>' +
-        '<dt>Співбесіда</dt><dd>Вибери роль: Спостерігач (що має бути в сильній відповіді), Кандидат (готові відповіді з твого резюме), Проводжу співбесіду (уточнювальні питання і прогалини).</dd>' +
+        '<dt>Співбесіда</dt><dd>Вибери роль: Спостерігач (що має бути в сильній відповіді), Коуч: питають тебе; під рукою твої підготовлені історії, цифри й факти, а також частини питання, на які ти ще не відповів. Проводжу співбесіду (уточнювальні питання і прогалини).</dd>' +
         '<dt>Хто з того боку</dt><dd>Авто, Команда, Клієнт або Керівник (твій керівник у ролі клієнта: правила як для клієнта, українською за замовчуванням).</dd>' +
         '<dt>Мова дзвінка</dt><dd>Якою мовою говорять. Перемикається одразу, нічого не губиться.</dd>' +
         '<dt>Мікрофон</dt><dd>Системний (гарнітура або Mac) або вбудований у Mac, навіть з AirPods. Перемикається приблизно за секунду.</dd>' +
@@ -1259,6 +1259,7 @@
   }, 1000);
   window.ackSetting = function (key, value) {
     var p = pend[key];
+    if (value != null) value = normVal(key, value);
     if (p && (value == null || String(value) === p.value || p.failed || !p.done)) {
       p.failed = false; settingDone(key, t('how_claude'));
     }
@@ -1322,6 +1323,7 @@
       if (v === 'presentation') return 'presentation';
       return 'auto';
     }
+    if (k === 'hiring_role') { v = String(v); return v === 'candidate' ? 'coach' : v; }   // legacy role name
     return String(v);
   }
   // Keep the menu in line with what the recorder really uses, but never fight a pending change
@@ -1334,7 +1336,7 @@
       else if (s.me_lang) sLang.value = s.me_lang === 'en' ? 'en' : 'uk';
     }
     if (s.call_type != null && !busy('call_type', sType)) { sType.value = normVal('call_type', s.call_type); showRole(); }
-    if (s.hiring_role != null && !busy('hiring_role', sRole)) sRole.value = s.hiring_role;
+    if (s.hiring_role != null && !busy('hiring_role', sRole)) sRole.value = normVal('hiring_role', s.hiring_role);
     if (!busy('audience', sAud)) {
       if (s.audience) sAud.value = s.audience;
       else if (s.call_type === 'client') sAud.value = 'client';      // legacy "client meeting"

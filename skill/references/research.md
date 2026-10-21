@@ -10,7 +10,7 @@ project material in parallel while the main session keeps listening, then add th
 soon as they arrive, if the topic is still alive. Defaults when `settings.tips.research` is
 missing: enabled, `max_jobs` 6 per call, `max_running` 2, `agents_per_job` 4, `topic_cooldown_s`
 300, `job_deadline_s` 90. Off in the hiring roles `observer` and `interviewer`. ON in the role
-`candidate`, with its own sources and rules (paragraph "Candidate variant" below). Needs the
+`coach`, with its own sources and rules (paragraph "Coach variant" below). Needs the
 Workflow tool; without it, T1 tips only and one line in the wrap-up.
 
 **Triggers** (any one, after the first 60 s of the call, not while a hiring answer is open):
@@ -68,7 +68,7 @@ one will answer it).
 5. Add the useful insights as new cards to `<transcript name>.cards.json` when the topic can
    come back (read-modify-write in a poll call).
 
-**Candidate variant (the PM is being interviewed).** The failure to avoid: the interviewer digs
+**Coach variant (the PM is being asked, coach role).** The failure to avoid: the interviewer digs
 into the PM's own past work (a project, an investigation, a number, a decision) and the tip is
 generic or steers away, while the facts sit in the PM's own documents. So:
 - Trigger: a question or follow-up about the PM's own experience (a project, a case, a tool, a
@@ -76,7 +76,7 @@ generic or steers away, while the facts sit in the PM's own documents. So:
   than 2 facts. The PM is speaking most of the time, so the "hiring answer is open" exception
   does not apply here; the T1 tip still goes first, from the Answer Bank, in the same poll.
 - Sources (agents A-D are replaced by): A. the Truth Bank and the RECAP/prep pages
-  (`settings.hiring.candidate`); B. the PM's own project documents in the claude.ai Project and
+  (`settings.hiring.coach`); B. the PM's own project documents in the claude.ai Project and
   the project folder (design, investigation, incident, review, routine documents) for the
   project the question names; C. Notion pages of that project (Meetings, Decisions, Reports);
   D. the Job Tracker row and the job post (what the role actually needs).
@@ -87,7 +87,7 @@ generic or steers away, while the facts sit in the PM's own documents. So:
   or confidential numbers, unless the Truth Bank allows them.
 - Delivery: the "Деталі" tip is a short STAR-shaped phrase (situation, action, result, 2-3
   sentences) in the interview language plus up to 3 facts, so the PM can say it at once.
-- Before the interview (Step 2a prep): the candidate prep subagent runs the topic documents
+- Before the interview (Step 2a prep): the coach prep subagent runs the topic documents
   rule for the PM's strongest 3-5 projects and writes a story card per project (context, the
   PM's role, the hardest decision, numbers, outcome, the document it came from) into the
   Answer Bank, so most deep questions are already in T1.

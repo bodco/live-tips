@@ -66,9 +66,11 @@ class AnthropicProvider(Provider):
     """
     name = "anthropic"
 
-    def __init__(self, api_key: str, timeout: float = 30.0):
+    def __init__(self, api_key: str, timeout: float = 30.0, workspace_id: str = ""):
         import anthropic  # imported lazily so tests run without the SDK
-        self.client = anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=1)
+        # Keys not scoped to a workspace must name one in the anthropic-workspace-id header.
+        headers = {"anthropic-workspace-id": workspace_id} if workspace_id else None
+        self.client = anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=1, default_headers=headers)
 
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None):
         blocks = []
@@ -192,7 +194,13 @@ class FakeProvider(Provider):
 def make_provider(cfg: dict, secret_loader: Callable[[str], str]) -> Provider:
     kind = cfg.get("provider", "anthropic")
     if kind == "anthropic":
-        return AnthropicProvider(secret_loader(cfg.get("api_key_env", "CLAUDE_API")))
+        ws = cfg.get("workspace_id", "")
+        if not ws and cfg.get("workspace_id_env"):
+            try:
+                ws = secret_loader(cfg["workspace_id_env"])
+            except KeyError:
+                ws = ""
+        return AnthropicProvider(secret_loader(cfg.get("api_key_env", "CLAUDE_API")), workspace_id=ws)
     if kind == "openai_compat":
         key_env = cfg.get("api_key_env")
         return OpenAICompatProvider(cfg["base_url"], secret_loader(key_env) if key_env else "")

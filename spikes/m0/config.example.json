@@ -2,6 +2,7 @@
   "variant": "haiku-classify+sonnet-tip",
   "provider": "anthropic",
   "api_key_env": "CLAUDE_API",
+  "workspace_id_env": "CLAUDE_WORKSPACE_ID",
   "secrets_file": "~/path/to/secrets.env",
   "models": {"classify": "<classify model id, Haiku class>", "tip": "<tip model id, Sonnet class>"},
   "cache_ttl": "1h",

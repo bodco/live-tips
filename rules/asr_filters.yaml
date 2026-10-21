@@ -1,0 +1,11 @@
+# Whisper hallucination and noise filters (to be moved here from live-transcriber's transcriber.py in M1).
+schema_version: 1
+drop_exact_lowercase:
+  - "дякую за перегляд!"
+  - "субтитри зроблені спільнотою"
+  - "thanks for watching!"
+  - "thank you."
+  - "звучить музика"
+drop_if_only_prompt_echo: true      # a line that only repeats the Whisper prompt words
+echo_window_s: 1.5                  # speakers instead of headphones: a mic line that repeats a system line within N s is echo
+never_languages: [ru]

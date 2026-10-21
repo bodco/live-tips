@@ -1,0 +1,24 @@
+# Tip diet: rate and length limits. Enforced in code by the app and stated in the skill.
+schema_version: 1
+active_rate_seconds: 45        # min gap between non-red tips that do not answer the live topic
+rate_seconds: 90               # same when active_mode is off
+pm_speaking_window_s: 5        # no non-red tip while the PM has a line in the last N seconds
+live_topic_window_s: 60        # a tip topic must match the talk of the last N seconds
+one_tip_per_topic: true
+topic_similarity_min: 0.5      # token Jaccard at or above this = same topic
+stale_after_s: 20              # a tip ready later than N s after the trigger's end of speech is shown dimmed ("late")
+proactive_default: off
+limits:
+  gist_words_max: 7
+  phrase_sentences_max: 2
+  phrase_words_max_en: 12
+  fact_lines_max: 3
+  fact_words_max: 8
+  line_chars_max: 45
+  lines_max: 5
+long_kinds: [speech, agenda, sos, catch_up, your_turn]   # may exceed the length limits
+forbidden:
+  - long_dash                 # never the em dash
+  - abbreviations_in_tips
+  - ticket_keys_in_tips
+  - russian

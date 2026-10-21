@@ -1,0 +1,20 @@
+{
+  "variant": "haiku-classify+sonnet-tip",
+  "provider": "anthropic",
+  "api_key_env": "CLAUDE_API",
+  "secrets_file": "~/path/to/secrets.env",
+  "models": {"classify": "<classify model id, Haiku class>", "tip": "<tip model id, Sonnet class>"},
+  "cache_ttl": "1h",
+  "direct_route": true,
+  "periodic_classify_s": 20,
+  "max_parallel_calls": 4,
+  "max_tokens": {"classify": 120, "tip": 300},
+  "me_label": "Me",
+  "them_label": "Other",
+  "name_aliases": ["Alex", "Alexander"],
+  "langs": ["en", "uk"],
+  "tips_lang": "en",
+  "audience": "auto",
+  "call_type": "auto",
+  "budget": {"ledger": "~/.livetips/spend.json", "call_soft_usd": 2.0, "call_hard_usd": 5.0, "monthly_hard_usd": 100.0}
+}

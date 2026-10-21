@@ -1,0 +1,21 @@
+[
+ {
+  "id": "F1",
+  "title": "Payment retries",
+  "text": "retries ship in release 2.4, QA done",
+  "keywords": [
+   "retries",
+   "payment"
+  ],
+  "source": "tracker, 04.01"
+ },
+ {
+  "id": "F2",
+  "title": "Release",
+  "text": "release 2.4 planned for 15.01",
+  "keywords": [
+   "release"
+  ],
+  "source": "plan, 03.01"
+ }
+]

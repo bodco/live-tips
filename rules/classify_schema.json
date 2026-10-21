@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "livetips/classify_schema.json",
+  "title": "Output of the classify role",
+  "type": "object",
+  "properties": {
+    "need_tip": {"type": "boolean"},
+    "level": {"enum": ["red", "orange", "none"]},
+    "trigger": {"enum": ["your_turn", "direct_question", "new_requirement", "pm_commitment", "contradicts_decision", "frustration", "pm_factual_error", "fix_owner_date", "add_fact", "side_talk", "none"]},
+    "topic": {"type": "string", "maxLength": 80},
+    "reason": {"type": "string", "maxLength": 120}
+  },
+  "required": ["need_tip", "level", "trigger"],
+  "additionalProperties": false
+}

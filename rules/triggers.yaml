@@ -1,0 +1,119 @@
+# Live Tips shared rules: triggers.
+# Single source for the Cowork skill (the "Triggers" table in SKILL.md is generated from
+# `triggers` below by tools/gen_skill_section.py) and for LiveTips.app (local cue detection,
+# routing and the model prompt).
+#
+# route:
+#   direct   - a strong local signal sends the event straight to the `tip` role (no classify step)
+#   classify - the `classify` role decides first (cheap, fast model)
+#   local    - handled by local code, no model
+#   state    - logged into call state only, never shown
+#
+# cues: word lists for local, model-free detection. Lowercase; a cue matches a word that starts
+# with it (so inflected forms match). Name aliases of the PM come from the user config, never here.
+schema_version: 1
+section_title: Triggers (reactive; proactive ones live in `proactive.md`)
+triggers:
+- id: your_turn
+  level: red
+  level_label: 🔴
+  route: direct
+  skill_trigger: '**Your turn**: `{them_label}` addresses the PM by any of `settings.user.name_aliases` (any grammatical form or misspelling) with a request for an update or opinion, or a round of updates reaches the PM'
+  skill_tip: opening sentence + the speech theses not used yet, in order (format in `speech.md`); one topic asked = that topic only. Immediate
+- id: direct_question
+  level: red
+  level_label: 🔴
+  route: direct
+  skill_trigger: A direct question to the PM
+  skill_tip: gist "🎯 {тема}" + the answer as a ready phrase + up to 2 facts with sources, from the brief, cards, fact book
+- id: new_requirement
+  level: red
+  level_label: 🔴
+  route: direct
+  skill_trigger: '`{them_label}` asks for something new ("could you also", "can we add", a change of scope or behaviour)'
+  skill_tip: '"Нова вимога. Не погоджуй зараз." + "Good idea. I will write it down. We will check it and come back to you."'
+- id: pm_commitment
+  level: red
+  level_label: 🔴
+  route: direct
+  skill_trigger: '`{me_label}` commits a date or an estimate'
+  skill_tip: '"Оцінку дає виконавець. Не називай цифру." + a phrase that defers'
+- id: contradicts_decision
+  level: red
+  level_label: 🔴
+  route: classify
+  skill_trigger: A statement contradicts a Decision or a red line of the brief
+  skill_tip: '"Суперечить рішенню {дата}" + the decision in a few words'
+- id: frustration
+  level: red
+  level_label: 🔴
+  route: classify
+  skill_trigger: Frustration, escalation, "disappointed", "again", a threat to the timeline or contract
+  skill_tip: '"Клієнт незадоволений: {що}" + a phrase that acknowledges, gives a plan and the date of the next update'
+- id: pm_factual_error
+  level: red
+  level_label: 🔴
+  route: classify
+  skill_trigger: 'Client or boss call only: the PM states a fact that contradicts the brief, tracker or a Decision (wrong date, price, scope)'
+  skill_tip: '"Неточно: {Y}, не {X}" + correction phrase + source (`checks.md`)'
+- id: fix_owner_date
+  level: orange
+  level_label: 🟠
+  route: classify
+  skill_trigger: A decision, owner or date was discussed and not fixed
+  skill_tip: '"Зафіксуй: {що}" + "So, {owner} will {action} by {day}. Is that right?" (never a number for an estimate)'
+- id: add_fact
+  level: orange
+  level_label: 🟠
+  route: classify
+  skill_trigger: A topic of the brief is being discussed and the brief, cards or fact book hold a fact the others did not say
+  skill_tip: '"Додай: {тема}" + one fact line with the number and source'
+- id: side_talk
+  level: orange
+  level_label: 🟠
+  route: local
+  skill_trigger: 2+ `{them_label}` lines in a language the PM does not use on this call
+  skill_tip: '"Між собою {мовою}" + the gist in 1-2 lines (skip small talk)'
+- id: unanswered_question
+  level: orange
+  level_label: 🟠
+  route: local
+  skill_trigger: A question to the PM unanswered for ~2 min
+  skill_tip: '"Без відповіді: {питання}" + phrase'
+- id: timer_checkpoint
+  level: orange
+  level_label: 🟠
+  route: local
+  skill_trigger: At 2/3 of the length and 5 min before the end
+  skill_tip: the open checklist items and "Decisions to obtain" not obtained yet
+- id: silent_log
+  level: silent
+  level_label: silent
+  route: state
+  skill_trigger: Action items, new requests, commitments, answers (internal calls)
+  skill_tip: log in state, list in the wrap-up
+cues:
+  question_words:
+    uk: [що, як, коли, чому, навіщо, хто, де, куди, чи, скільки, який, яка, яке, які, якого, можеш, можете, зможеш, зможете]
+    en: [what, how, when, why, who, where, which, can, could, would, should, will, is, are, do, does, did, have, has]
+    es: [qué, cómo, cuándo, por qué, quién, dónde, cuál, cuánto, puedes, puede, podrías, podría]
+  second_person:
+    uk: [ти, тебе, тобі, тобою, твій, твоя, твоє, твої, ви, вас, вам, вами, ваш, ваша, ваше, ваші, скажи, скажіть, подивись, подивіться]
+    en: [you, your, yours]
+    es: [tú, tu, usted, ustedes, puedes, puede]
+  update_request:
+    uk: [апдейт, оновлен, статус, що в тебе, що у тебе, як у тебе, твоя черга, по твоїй, по твоєму]
+    en: [update, status, your turn, over to you, what about you, anything from you]
+    es: [actualización, estado, tu turno]
+  new_requirement:
+    uk: [а можна ще, можна додати, треба ще, давайте додамо, а можете, хотілося б, ще одне прохання]
+    en: [could you also, can you also, can we add, can you add, we also need, we would like, would it be possible, one more thing]
+    es: [podrían también, pueden agregar, necesitamos también, sería posible]
+  commitment_units:
+    uk: [годин, години, день, дні, днів, тиждень, тижні, тижнів, спринт, спринти, до понеділка, до вівторка, до середи, до четверга, до пʼятниці, до кінця тижня, завтра]
+    en: [hours, hour, days, day, week, weeks, sprint, sprints, by monday, by tuesday, by wednesday, by thursday, by friday, end of week, tomorrow]
+    es: [horas, días, semana, semanas, sprint, mañana, el lunes, el viernes]
+  frustration:
+    uk: [знову, незадоволен, розчарован, скільки можна, неприйнятно, затримк]
+    en: [again, disappointed, frustrated, unacceptable, not happy, delay, escalate]
+    es: [otra vez, decepcionado, inaceptable, retraso]

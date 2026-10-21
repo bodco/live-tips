@@ -1,0 +1,12 @@
+# Priority, highest first. The live topic always beats the plan.
+schema_version: 1
+order:
+  - sos              # 🆘 HELP NOW pressed
+  - red              # direct question, your turn, new requirement, commitment, serious error on a client call
+  - ask              # answers to questions typed in the window, acks
+  - live_fact        # a fact for the topic discussed right now
+  - due              # overdue state or prep
+  - proactive        # only when proactive is on
+  - plan             # speech theses, checklist
+bypass_rate: [sos, red, ask]     # never delayed by active_rate_seconds
+while_paused: [sos, ask, ack]    # the only things shown while tips are paused

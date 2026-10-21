@@ -1,0 +1,11 @@
+__pycache__/
+.pytest_cache/
+.venv/
+spikes/m0/runs/
+spikes/m0/my*.json
+voices/
+live/
+models/
+*.named.md
+*.jsonl
+!Fixtures/*.jsonl

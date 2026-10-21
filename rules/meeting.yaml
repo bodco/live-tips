@@ -1,0 +1,22 @@
+# Call concept: audience, type, live mode. Shared by skill and app.
+schema_version: 1
+audience:
+  values: [auto, team, client, boss]
+  boss: internal project where the PM's manager acts as the client; client rules, default language Ukrainian
+  effects: [language_default, restricted_marker_strictness, culture_lens]
+call_type:
+  values: [auto, presentation, interview, coach]
+  presentation: {requires: outline.json}
+  interview: {roles: [interviewer, observer]}
+  coach:
+    # Coach mode: someone is supported while another person (or the PM) speaks.
+    roles:
+      mentor: a mentor watches a mentee's call; tips and the wrap-up analyse the mentee
+      self: the PM is the one being interviewed and gets support for their own answers
+mode:
+  values: [presenting, discussion]
+  presenting_enter_share: 0.65     # PM talk share over the last window
+  presenting_exit_share: 0.55      # hysteresis
+  window_s: 120
+timers:
+  checkpoints: [two_thirds, five_minutes_left]

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "livetips/model_tip_schema.json",
+  "title": "Output of the tip role",
+  "description": "Either a tip (gist first) or an explicit skip ('facts or silence').",
+  "oneOf": [
+    {"type": "object",
+     "properties": {
+       "gist": {"type": "string", "minLength": 2, "maxLength": 80},
+       "level": {"enum": ["red", "orange", "info"]},
+       "phrase": {"type": "string", "maxLength": 300},
+       "items": {"type": "array", "items": {"type": "string", "maxLength": 80}, "maxItems": 3},
+       "note": {"type": "string", "maxLength": 60},
+       "topic": {"type": "string", "maxLength": 80},
+       "trigger": {"type": "string"},
+       "fact_ids": {"type": "array", "items": {"type": "string"}}
+     },
+     "required": ["gist", "level", "topic"],
+     "additionalProperties": false},
+    {"type": "object",
+     "properties": {"skip": {"const": true}, "reason": {"type": "string", "maxLength": 120}},
+     "required": ["skip"],
+     "additionalProperties": false}
+  ]
+}

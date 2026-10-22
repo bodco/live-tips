@@ -1,8 +1,8 @@
-# LiveTips.app (work in progress)
+# LiveTips.app (beta)
 
 Native macOS companion for the `live-tips` skill: records the call locally, transcribes it on
-the Mac and asks a model for tips on events instead of polling. Status: **M0 spike**, nothing
-here is a usable app yet.
+the Mac and asks a model for tips on events instead of polling. Status: **beta 0.4.0**, a
+downloadable app (see Install below); the M0 spike that measured the approach is kept further down.
 
 The skill and the app are both supported and behave the same way. Behaviour lives in one
 place, [`rules/`](rules/), which both read.
@@ -17,6 +17,21 @@ place, [`rules/`](rules/), which both read.
 | `tools/gen_skill_section.py` | regenerates the skill sections; `--check` fails when they are stale, `--compare SKILL.md` fails on drift |
 | `tools/check_anonymized.py` | fails on user paths, keys, IDs, long dashes and terms from a private deny list |
 | `Fixtures/` | synthetic demo call used by the tests |
+
+## Install (beta)
+
+1. Download the dmg from the release page:
+   [LiveTips-0.4.0-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.4.0/LiveTips-0.4.0-beta.dmg).
+   Open it and drag **Live Tips** into Applications.
+2. **First open: right-click > Open**, then confirm. The beta is not notarized by Apple yet, so a
+   plain double-click is blocked the first time. After that it opens normally.
+3. The **Setup** window checks what is there and installs the rest: the Python modules, the speech
+   model and the local AI model. Each step gets a tick when it is done. In total it is about
+   2.5 GB, and nothing needs an administrator password.
+4. Add your Claude API key in Settings > Keys (it is stored in Keychain) and check the spending limits in Settings > AI.
+
+Requirements: macOS 14.4 or newer on Apple silicon, Python 3.10 or newer (Setup checks it and
+says what to do when it is missing). Expect rough edges: this is a beta.
 
 ## Using Live Tips: start a call
 
@@ -35,6 +50,38 @@ A prep is a brief, fact cards and, for a presentation, an outline and slides tha
 - **Which prep is used:** on Start the app takes `prep-*` files younger than 3 hours from that folder. Only a prep whose name matches the call title is used ("Weekly Sync" matches `...-weekly-sync`); a prep made for another call is never used, so its brief and internal facts cannot leak into the wrong meeting. Each file kind is taken separately, so a prep without slides still gives the brief and the facts.
 - **How to check before Start:** the **Prep** block says "Prep found: <title>" in green when a prep matches the title. When the only fresh prep is for another call, it says so in orange and that prep is not used. In every state there is a button that copies the Cowork request for this call (title, time, project, call context), so the next prep can be made while an older one is still in the folder. The block rechecks the folder every 5 seconds and when the project or the title changes.
 - **Without a prep:** the call still works. Claude uses the call context, the project's current state and local search, and the local layer (fact cards, the "❓" question cards, HELP NOW) runs as usual.
+
+### Standby: open the window before the call
+
+**Recording starts: When the call begins** (in Start call) opens the tips window early, while you
+wait for the others. Nothing is recorded and there are no microphone warnings yet. Recording
+starts by itself when the other side has been speaking for about 5 seconds, or at once when you
+press the green **Start** in the window. The red **End call** ends the call. The Cowork skill has
+the same standby.
+
+### Presentation: split view
+
+With meeting type **Presentation** and a prep that has slides (`<stem>.slides.json`), the tips
+window splits into 2 halves: slide cards with the full text of your speech, and the usual tips
+stream.
+
+- Cards scroll one slide at a time (snap); move with the arrows, the ◀ ▶ buttons or the wheel.
+- A timer with a limit in minutes scales the time of each slide to fit. **Auto** turns the slides
+  on schedule with a short signal and warns 10 s before the end of a slide. The pace line shows
+  your words per minute.
+- **Trim** hides the paragraphs marked as safe to skip. **My slides / All slides** switches between
+  your part and the whole deck.
+- Paragraph kinds: read aloud, may skip, a hint (not to be read), a colleague's line right before
+  your part.
+- At the end a table compares the plan with the actual time of every slide.
+- 📑 hides or shows the cards, ⇄ swaps the 2 sides (remembered). The window grows towards the
+  cards, so the tips stream stays where you put it.
+
+### See-through window
+
+In the tips window, ⚙ > Display > **Opacity** fades only the window background. The text stays fully opaque and
+gets a soft halo in the background colour, so it stays readable over whatever is behind the
+window, even at low opacity.
 
 ### FAQ
 

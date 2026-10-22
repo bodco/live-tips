@@ -125,10 +125,17 @@ prep check, state, wrap-up numbers). Call it inside device_bash as `python3 <too
    "на мікрофон ноутбука" -> `builtin`; "на навушниках" -> `default`), else from
    `settings.audio.mic` (`default` | `mac_mic`; missing = `default`). It cannot change during
    a call: to switch, stop and start again.)
+   **Standby** (`"standby": true`): when the PM starts the skill ahead of the call ("запусти
+   заздалегідь", "the call starts at 15:00", or more than 2 min before the calendar time), add it.
+   The window opens at once, nothing is recorded and no mic or silence warnings show; recording
+   starts when the other side speaks for about 5 s (`standby_auto_s`) or the PM presses the green
+   Start in the window (or `touch <tool_root>/control/go`). The last 20 s before the start are kept.
+   `lt start` then returns `result` = `standby`: tell the PM one line ("Window is ready, recording
+   starts when the call begins") and begin polling as usual; nothing arrives until the start.
    The LaunchAgent opens a Terminal window "Live transcriber" with the recording by itself;
    the PM does not start it, may minimise it, should not close it.
-4. `lt start` waits up to 60 s (model load 5-20 s) and prints JSON: `result` = `recording` or
-   `reused` with `file`, `local_file`, `tips_file`, `inbox_file` (already device_bash paths),
+4. `lt start` waits up to 60 s (model load 5-20 s) and prints JSON: `result` = `recording`,
+   `standby` or `reused` with `file`, `local_file`, `tips_file`, `inbox_file` (already device_bash paths),
    `started_at`, `timezone` -> go on with them. `NOT INSTALLED` -> tell the user to run
    `install.sh` once in Terminal and stop. `BUSY` -> tell the user, do not mix. `START FAILED`
    -> it already parked `start.json` as `.pending` and printed the log tails: show the cause in

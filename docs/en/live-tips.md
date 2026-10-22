@@ -17,6 +17,10 @@ Live tips is in **beta**, and it is mostly glue around other people's open-sourc
 goes into the Meetings DB: into the meeting's existing page (for example the one Notion AI
 Meeting Notes created) or into a new one when there is none.
 
+There is also a **Live Tips app (beta)**: a native macOS menu bar app that runs the same loop
+without a Cowork chat, with your own Claude API key. It reads the same rules and shows the same
+tips window. See [section 14](#14-live-tips-app-beta).
+
 This document is written for three situations:
 
 1. rebuilding everything from scratch on a new Mac;
@@ -396,6 +400,11 @@ start a minute before the call or during it: the recording starts at once, the b
 in the first 1-3 minutes, and you can ask for a fresh one any time (⚙ Context, Refresh, or
 "refresh context").
 
+**Which prep is picked up.** Only a prep whose title matches the call title is used. The match
+ignores case, spaces and hyphens, and one title may contain the other: "Weekly Standup" matches
+`prep-...-acme-weekly-stand-up`. A prep made for another call is never used, so its brief and
+internal facts cannot leak into the wrong meeting. Give the prep and the call the same title.
+
 **The prep is done only when the files exist.** A sweep that returns a nice summary but no
 `cards.json` and `facts.json` gave you nothing instant. So the sweep counts as done only when
 `lt prep-check "<transcript>"` prints `verdict: OK` (brief, cards, facts and, for a
@@ -440,6 +449,15 @@ transcript, audience, type and your interview role rebuild the prep. `start.mode
 keeps the start questions in the chat. You can also steer with one line at any moment:
 the format ("discussion", "my presentation", "with the boss") and where to look ("look at
 epic X", "the thread about Y").
+
+**Standby start: open the window before the call.** Start a few minutes early (`"standby": true`
+in `lt start`; in the app, **Recording starts: When the call begins**). The tips window opens at
+once, but nothing is transcribed or written and there are no microphone warnings while you wait
+(`state: standby` in `status.json`). Recording starts by itself when the other side has been
+speaking for about 5 seconds (`standby_auto_s` in `config.json`), or at once when you press the
+green **Start** in the window (or `touch control/go`). Your own voice in the room never starts
+it. The last 20 s heard before the switch are transcribed, so the first sentence is not lost, and
+the transcript gets a `--- дзвінок почався ---` (call started) marker.
 
 **Context refresh during a call.** For an unexpected call, or when the talk moves to
 something the brief does not cover: press ⚙ Context, Refresh, or write "онови контекст" / "refresh context" /
@@ -508,6 +526,9 @@ The layout since 1.8.0, top to bottom (hover any control for a hint):
   the exact number after the call."). It ignores every rate limit.
 - **❓ question marker.** When the other side asks something, the recorder marks it in the
   window at once (`❓` and the first words of the question); Claude's answer replaces it.
+  Since 2026-10-22 only real work questions get it: a line that names you and asks, a line
+  with a work word (estimate, deadline, status, price, release...) or a question about time or
+  amount ("when...?", "how much...?"). Songs, small talk and a bare "?" do not.
 - **Quick asks** (chips by the input): **Suggest reply** (a ready answer or comment on the
   current topic), **Catch me up** (the last ~5 minutes in 3-5 lines), **Decided so far**
   (decisions and action items with owners and dates), **What to ask now** (1-2 questions for
@@ -517,7 +538,8 @@ The layout since 1.8.0, top to bottom (hover any control for a hint):
     comment rate when on). Language and microphone are applied by the recorder at once (a
     `--- мова ---` / `--- мікрофон ---` line marks the switch); the rest goes to the skill and
     shows as pending until the skill confirms it.
-  - **Display:** text size slider (also Cmd+ and Cmd-), opacity, always on top, the interface
+  - **Display:** text size slider (also Cmd+ and Cmd-), opacity (only the background fades: the text stays fully opaque
+    with a soft halo and stays readable at low opacity), always on top, the interface
     language (English by default, or Ukrainian), Stealth (below) and the "Local AI (Ollama)"
     switch (the semantic layer on or off for this call).
   - **Context:** "Brief from HH:MM" and Refresh (a context refresh, above).
@@ -568,6 +590,28 @@ window shows them; questions typed in the window go to `<transcript>.inbox.jsonl
 `read_delta.py` hands them to the skill as `@@ASK` lines. Settings, ratings, 🆘 and ⏸ go
 the same way and arrive as `@@SET` and `@@SOS`.
 
+### Presentation split view
+
+With meeting type **Presentation** and a prep that has slides (`<stem>.slides.json`, written by
+the presentation prep next to the outline), the tips window becomes twice as wide and splits into
+2 halves: slide cards with the full text of your speech, and the usual tips stream. The skill and
+the app behave the same.
+
+- **One slide at a time.** Cards snap into place; move with the arrow keys, the ◀ ▶ buttons or
+  the mouse wheel.
+- **Timer.** Set the limit in minutes: the planned time of every slide scales to fit it. The
+  pace line shows your words per minute (slow, ok, fast).
+- **Auto** turns the cards on schedule with a short signal and warns 10 s before the end of a
+  slide. Turn it off to move by hand.
+- **Trim** hides the paragraphs marked as safe to skip, for when you run late.
+- **My slides / All slides.** When several people present, show only your part or the whole deck.
+- **Paragraph kinds** on a card: read aloud; may skip (dimmed, labelled); a hint for you, not to
+  be read (small, grey); a colleague's line right before your part (orange), so you know when to
+  start.
+- **Plan vs actual.** At the end a table compares the planned and the actual time of every slide.
+- **📑** hides or shows the cards, **⇄** swaps the 2 sides (remembered between calls). The window
+  grows towards the cards, so the tips stream stays where you put it.
+
 ### Speaker identification (optional)
 
 The system channel holds everyone on the other side, so without this layer they are all
@@ -608,6 +652,10 @@ recorder watches for it:
 - **Automatic switch.** After 2 failed restarts in a row it switches to the Mac's own
   microphone (`--- мікрофон: перемкнув на мікрофон Мака ---` in the transcript). The window
   alert offers "Back to headset"; while the mic is stalled it offers "Use Mac mic".
+- **Direct capture (2026-10-22).** Some USB headsets and dongles deliver no audio at all to
+  macOS's usual audio engine (AVAudioEngine), and a start could hang there. `audiocap` now reads the input device
+  directly when the engine gives no frames (`--mic-backend direct`), and the recorder starts the
+  microphone before the system audio tap, because starting both at once could hang the mic.
 - **Start-up watchdog.** `audiocap` that hangs at start (for example on a permission prompt
   nobody answers) is stopped after a timeout and started again, so the recording does not
   sit silently.
@@ -977,3 +1025,52 @@ Licences change; the links above are the authority, this table is a snapshot of 
 - Something wrong or missing: open an issue in the
   [repository](https://github.com/bodco/pm-control-tower/issues) with the log lines (never with
   transcripts or client data).
+
+---
+
+## 14. Live Tips app (beta)
+
+A native macOS menu bar app that runs the same live-tips loop without a Cowork chat. Code and
+details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
+
+**Download:**
+[LiveTips-0.4.0-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.4.0/LiveTips-0.4.0-beta.dmg)
+
+What it does:
+
+- records the call on the Mac and transcribes it there with MLX Whisper (the same recorder core);
+- calls the Claude API directly with your own key, stored in the macOS Keychain, on events
+  (a question, your name, a new request) instead of a chat loop that can fall silent;
+- spending limits: a soft and a hard limit per call and a monthly cap; at the hard limit only the
+  local layer runs. Usually $0.10 to $1.20 per hour of a call;
+- built-in local AI (`bge-m3`) for facts and cards by meaning, 🆘 HELP NOW and project search,
+  with no Ollama needed;
+- standby start, a choice of microphone that stays put when macOS switches devices, the
+  presentation split view and the same tips window.
+
+**It is a beta.**
+
+- Not notarized yet: the first time, right-click the app, choose **Open** and confirm.
+- macOS 14.4 or newer on Apple silicon.
+- Python 3.10 or newer. The **Setup** window checks it and installs the rest (Python modules,
+  the speech model, the local AI model; about 2.5 GB in total) with a tick next to each step.
+  Nothing needs an administrator password.
+- Expect rough edges, and report them with log lines, never with transcripts.
+
+### 14.1 App or skill
+
+Both do roughly the same job: the same rules (the app and the skill read one shared
+`rules/` folder), "facts or silence", the same tips window. It is your choice.
+
+| | Skill in Cowork | App |
+|---|---|---|
+| Model access | Your Claude plan, no API key | Your own Claude API key, billed per use |
+| During the call | The Cowork chat stays busy for the whole call | Nothing to keep open, one click from the menu bar |
+| Context lookups mid-call | Notion, the tracker, project files through a subagent | The call context, the prep, local search over the project folder |
+| Cost control | Plan limits | Per call and monthly limits in Settings |
+
+They work best together. Make the prep in Cowork (brief, fact cards, an outline and slides for a
+presentation): the app picks it up by itself when the prep title matches the call title (rule
+in section 5.0). In **Start call** press **Copy request for Cowork** to get a ready prep request.
+Without a prep the app uses the call context you type in Start call, the project's current state
+and local search over the project folder.

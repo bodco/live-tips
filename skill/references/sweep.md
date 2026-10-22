@@ -176,7 +176,7 @@ adds what the card does not cover. A JSON list of 15-40 cards:
   "наступний слайд", "next slide", "slide", "make sense"), never a slide number. The "Your
   turn" card needs a name alias AND a request in the same line, as a regex, for example
   `re:(іван\w*|ван[яьі]\w*|ivan)\W+.{0,40}(розкаж|що в тебе|апдейт|update|over to you|your turn)` (built from `settings.user.name_aliases`).
-  A name alone never fires: people mention the PM in passing ("як Іван казав").
+  A name alone never fires: people mention the PM in passing ("як Mike казав").
 - `on`: `them` (default for requests and questions), `me` (the PM's own risky phrases, e.g.
   a promised date), `any`.
 - What to turn into cards: the PM's name aliases with an update request ("Your turn" with

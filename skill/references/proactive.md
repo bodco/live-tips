@@ -52,7 +52,7 @@ rates of "Tip diet and rates".
 - **Ask a question.** Offer one sharp question that unblocks the work: who owns it, what is
   the date, what is the dependency, what happens if it slips.
 - **Fix the outcome.** When a topic ends without an owner, a date or a yes/no, offer the
-  closing phrase ("So Ivan checks the variable today. Right?").
+  closing phrase ("So Mike checks the variable today. Right?").
 - **Steer back.** When the talk drifts and an open checklist item or a "Decision to obtain"
   remains, offer a polite steer back.
 - **Use the speech.** If a speech thesis fits the current topic, offer the exact phrase for it.

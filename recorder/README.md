@@ -44,7 +44,7 @@ the `sys` test).
   Besides the transcript it prints `@@` lines: `@@ASK`, `@@SOS`, `@@OFFTOPIC`, `@@SET`, `@@OFFSET`, `@@CARD`,
   `@@LATE`, `@@STATUS` (or `@@STATUS stale ...` when the recorder stopped updating), `@@MODE`, `@@SPEAKERS`
   and `@@DUE` reminders (`prep`, `state`, `ack <key>`, `wrapup`). The full list is in the script's docstring.
-  Lines tagged `Співрозмовник [S2]` are printed with the speaker's name (`Ірина`, or `Speaker 2`).
+  Lines tagged `Співрозмовник [S2]` are printed with the speaker's name (`Emily`, or `Speaker 2`).
 
 By hand, without the skill:
 

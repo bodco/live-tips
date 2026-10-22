@@ -145,13 +145,13 @@ SCRIPT = [
     (19, lambda: auto({"kind": "answer", "level": "info", "gist": "🟢 Cutoff fix: 2 days dev + 1 day QA",
                        "phrase": "Two days of development and one day of QA on stage, so Thursday.",
                        "src": now(-5), "at": now()})),
-    (22, lambda: ask_speaker("S1", [{"name": "Ірина Мельник", "score": 0.71}, {"name": "Тарас Бондар", "score": 0.52}],
-                             ["Андрій Шевчук", "Carlos Andrés Gómez Ruiz"])),
+    (22, lambda: ask_speaker("S1", [{"name": "Emily Johnson", "score": 0.71}, {"name": "David Miller", "score": 0.52}],
+                             ["Chris Taylor", "Jessica Brown"])),
     (30, lambda: agenda(1)),
     (36, lambda: auto({"kind": "tip", "level": "orange", "gist": "🟠 Fix owner and date",
                        "phrase": "So Andres owns the stage check, and we confirm on Thursday?",
                        "src": now(-4), "at": now()})),
-    (48, lambda: ask_speaker("S2", [{"name": "Carlos Andrés Gómez Ruiz", "score": 0.66}], ["Андрій Шевчук", "Ірина Мельник"])),
+    (48, lambda: ask_speaker("S2", [{"name": "Jessica Brown", "score": 0.66}], ["Chris Taylor", "Emily Johnson"])),
     (56, lambda: start_mic_stall()),
     (66, lambda: agenda(2)),
     (72, lambda: auto({"kind": "question", "gist": "❓ When can we switch 3DS on in production?"})),
@@ -283,7 +283,7 @@ def read_inbox(pos):
 
 
 # In --dry the "user" clicks are simulated by writing what the window would write.
-DRY_CLICKS = [(26, {"kind": "setting", "key": "speaker_name", "value": "S1|Ірина Мельник"}),
+DRY_CLICKS = [(26, {"kind": "setting", "key": "speaker_name", "value": "S1|Emily Johnson"}),
               (40, {"kind": "setting", "key": "tips_paused", "value": "on"}),
               (50, {"kind": "setting", "key": "tips_paused", "value": "off"}),
               (52, {"kind": "setting", "key": "speaker_skip", "value": "S2"}),

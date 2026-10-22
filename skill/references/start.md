@@ -105,7 +105,7 @@ prep check, state, wrap-up numbers). Call it inside device_bash as `python3 <too
    stale status, and drops `ru` from the language lists.
 2. Build `prompt` for Whisper: ONE short natural sentence in the main call language, max
    ~150 chars, with the key proper names and terms from the config (team, client, product,
-   module names) plus `settings.user.name_aliases`, e.g. "Іван, Олена і Петро обговорюють
+   module names) plus `settings.user.name_aliases`, e.g. "Mike, Emily і John обговорюють
    Acme Portal, реліз і Jira." It improves spelling of names. Never start the prompt with a
    framing word ("Дзвінок ...", "Call about ...", "Зустріч ..."): on silence or noise Whisper
    echoes the opening of the prompt as a fake line ("Дзвінок по ..." with a garbled end).

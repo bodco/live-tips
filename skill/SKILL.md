@@ -268,7 +268,7 @@ keys (name the topic). Examples:
 
 > **🔴 Нова вимога. Не погоджуй зараз.** / "Good idea. I will write it down. We will check it and come back to you."
 > **🔴 Неточно: реліз 15.10, не 10.10** / "Sorry, a small correction. The release date is October 15." / _рішення від 30.09_
-> **🟠 Зафіксуй: хто і коли** / "So Ivan checks the variable today. Is that right?"
+> **🟠 Зафіксуй: хто і коли** / "So Mike checks the variable today. Is that right?"
 
 On a 5-minute quiet stretch with no tip, send one `SendUserMessage` line (what is discussed and
 why no tips), not more often than every 5 minutes.

@@ -900,7 +900,7 @@ QUESTION_CUE = re.compile(
 
 class FactBook:
     """The project fact book (<transcript stem>.facts.json), written by the skill's prep:
-      [{"id": "AUTH-123", "title": "Admin logs", "text": "estimate 16 h, In Progress, Ivan",
+      [{"id": "AUTH-123", "title": "Admin logs", "text": "estimate 16 h, In Progress, Mike",
         "keywords": ["logs", "логи", "audit"], "source": "Jira 18.10"}, ...]
     The tips window gets the whole book once (kind "facts") for its instant search box.
     When the other side asks a question (a cue word or "?") that names something in the book,

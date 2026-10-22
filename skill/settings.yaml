@@ -5,7 +5,7 @@ user:
   me_label: "Я"                  # how the PM's own mic lines are labelled in the transcript
   them_label: "Співрозмовник"    # label for everyone else (system audio)
   tips_language: uk              # language of the chat wrap-up; tip gists follow the window language (ui_lang, default en) unless the call is in Ukrainian
-  name_aliases: []               # how people call you on calls, e.g. [Іван, Іване, Ваня, Ivan]: "your turn" trigger, instant cards, Whisper prompt
+  name_aliases: []               # how people call you on calls, e.g. [Mike, Michael, Mikey]: "your turn" trigger, instant cards, Whisper prompt
   timezone: Europe/Kiev          # fallback only: live-transcriber reports the Mac zone itself (Notion accepts Europe/Kiev)
 
 start:

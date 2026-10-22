@@ -36,7 +36,7 @@ OFFSET `auto` takes `offset` (and `inbox_offset`, unless --inbox-offset is given
                                      status.json (seq unchanged > 6 s, or mtime > 15 s without seq)
      @@MODE <presenting|discussion> talk_me=<pct>   (auto call type, only when the mode changes)
      @@SPEAKERS S1=<name> S2=? ...   the speaker mapping (a name with spaces or quotes is JSON-quoted:
-                                     S1="Ірина Петрівна"), printed when <stem>.speakers.json `rev`
+                                     S1="Emily Johnson"), printed when <stem>.speakers.json `rev`
                                      (= status speakers_rev) changed since the last poll
      @@DUE prep <what>               recording and cards.json or facts.json missing or invalid
      @@DUE state <why>               recording and skill_state_at older than 300 s
@@ -46,7 +46,7 @@ OFFSET `auto` takes `offset` (and `inbox_offset`, unless --inbox-offset is given
                                      within 2 polls
      @@DUE wrapup                    the recording is stopped and the tips file has no kind wrapup
 Transcript lines of the other side tagged by the recorder as `{them_label} [S2]` are printed with the
-speaker's name instead (`Ірина`, or `Speaker 2` while unnamed), merges and per-line fixes from
+speaker's name instead (`Emily`, or `Speaker 2` while unnamed), merges and per-line fixes from
 <stem>.speakers.json applied. The md file itself keeps the tags; offsets are byte offsets of the file.
 Exit code 0 always; an empty delta is just the @@ lines.
 """
@@ -151,7 +151,7 @@ def name_lines(text, sp, me_label):
 
 
 def speakers_line(sp):
-    """@@SPEAKERS S1=Ірина S2=? (clusters by number; merged-away clusters are not listed)."""
+    """@@SPEAKERS S1=Emily S2=? (clusters by number; merged-away clusters are not listed)."""
     cl = sp.get("clusters") if isinstance(sp.get("clusters"), dict) else {}
     keys = sorted(cl, key=lambda s: int(SID_RX.match(s).group(1)) if SID_RX.match(str(s)) else 10 ** 6)
     parts = []
@@ -161,7 +161,7 @@ def speakers_line(sp):
         if not name:
             parts.append(f"{k}=?")
         elif re.search(r"[\s\"'=]", str(name)):
-            parts.append(f"{k}={json.dumps(str(name), ensure_ascii=False)}")   # S2="Ірина Петрівна"
+            parts.append(f"{k}={json.dumps(str(name), ensure_ascii=False)}")   # S2="Emily Johnson"
         else:
             parts.append(f"{k}={name}")
     return "@@SPEAKERS " + (" ".join(parts) if parts else "none")

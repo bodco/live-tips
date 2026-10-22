@@ -35,42 +35,6 @@ func probe(request: Bool) {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    var item: NSStatusItem?
-
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        let it = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        it.button?.title = "LT"
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "LiveTips M0 (mic: \(micStatus()))", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Request microphone access", action: #selector(requestMic), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: "Show demo tips window", action: #selector(openDemo), keyEquivalent: ""))
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        for m in menu.items where [#selector(requestMic), #selector(openSettings), #selector(openDemo)].contains(m.action) { m.target = self }
-        it.menu = menu
-        item = it
-    }
-
-    var demo: PrompterController?
-
-    @objc func openSettings() {
-        MainActor.assumeIsolated { SettingsWindow.show() }
-    }
-
-    @objc func openDemo() {
-        MainActor.assumeIsolated {
-            let c = PrompterController(args: prompterArgs(["LiveTips", "--prompter-demo"]))
-            c.show()
-            demo = c
-        }
-    }
-
-    @objc func requestMic() {
-        AVCaptureDevice.requestAccess(for: .audio) { _ in }
-    }
-}
 
 /// Runs the bundled audiocap helper for each source and reports bytes captured and its log tail.
 /// Launch through LaunchServices (`open -W LiveTips.app --args --capture-test 5`) so that macOS
@@ -212,5 +176,4 @@ if args.contains("--probe") {
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.accessory)
 app.run()

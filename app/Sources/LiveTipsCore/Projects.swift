@@ -33,7 +33,17 @@ public struct Project: Codable, Equatable {
 
 public struct ProjectRegistry: Codable, Equatable {
     public var projects: [Project] = []
+    /// Workspaces for general calls about several projects (recordings go to the workspace folder).
+    public var workspaces: [Workspace] = []
+    public var lastUsed: String = ""        // "project:<slug>" or "workspace:<name>"
     public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        projects = (try? c.decode([Project].self, forKey: .projects)) ?? []
+        workspaces = (try? c.decode([Workspace].self, forKey: .workspaces)) ?? []
+        lastUsed = (try? c.decode(String.self, forKey: .lastUsed)) ?? ""
+    }
 
     public static func load(from url: URL) -> ProjectRegistry {
         guard let d = try? Data(contentsOf: url), let r = try? JSONDecoder().decode(ProjectRegistry.self, from: d) else {

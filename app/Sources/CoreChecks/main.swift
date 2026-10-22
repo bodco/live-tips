@@ -119,6 +119,31 @@ func secretsAndConfig() {
     try? FileManager.default.removeItem(at: url)
 }
 
+func mirrorAndWorkspaces() {
+    let st = MirrorStatus.parse("# Notion mirror status\n\n- result: OK\n- last_run_utc: 2026-10-22T05:07:05.000Z\n- pages_in_mirror: 3586\n- mode: incremental\n")
+    expect(st.result == "OK" && st.pages == 3586, "mirror parse")
+    let iso = ISO8601DateFormatter()
+    expect(st.health(now: iso.date(from: "2026-10-22T10:00:00Z")!) == "ok", "fresh mirror")
+    expect(st.health(now: iso.date(from: "2026-10-24T10:00:00Z")!) == "stale", "stale mirror")
+    expect(MirrorStatus.parse("").health() == "missing", "missing mirror")
+    let tmp = NSTemporaryDirectory() + "lt-ws-check-\(getpid())"
+    let fm = FileManager.default
+    try? fm.createDirectory(atPath: tmp + "/Acme/_notion", withIntermediateDirectories: true)
+    try? fm.createDirectory(atPath: tmp + "/Acme/Alpha", withIntermediateDirectories: true)
+    fm.createFile(atPath: tmp + "/Acme/_notion/workspace.md", contents: Data("x".utf8))
+    try? fm.createDirectory(atPath: tmp + "/Notes", withIntermediateDirectories: true)
+    let ws = WorkspaceScanner.scan(workRoot: tmp, projects: [Project(name: "Alpha", slug: "alpha", root: tmp + "/Acme/Alpha"),
+                                                             Project(name: "Beta", slug: "beta", root: tmp + "/Other/Beta")])
+    expect(ws.count == 1 && ws[0].name == "Acme" && ws[0].projects == ["alpha"], "workspace scan")
+    try? fm.removeItem(atPath: tmp)
+    var c = AppConfig()
+    expect(c.effectiveAppRoot(appSupport: "/AS") == "/AS", "app root default")
+    c.workRoot = "/w"
+    expect(c.effectiveAppRoot(appSupport: "/AS") == "/w/Tools/LiveTips", "app root in work folder")
+    let old = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"uiLanguage\":\"uk\"}".utf8))
+    expect(old?.uiLanguage == "uk" && old?.showInDock == true, "config decodes older files")
+}
+
 frameRoundTripAcrossChunks()
 frameResyncAfterGarbage()
 watchdogStartGraceThenStallTerminateKillRestart()
@@ -127,5 +152,6 @@ watchdogTwoFailedRestartsSwitchToBuiltInMic()
 projectConfigParse()
 registryMergeKeepsUserFields()
 secretsAndConfig()
+mirrorAndWorkspaces()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

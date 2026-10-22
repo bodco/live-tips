@@ -28,10 +28,40 @@ public struct AppConfig: Codable, Equatable {
     public var localAI = LocalAI()
     public var uiLanguage = "en"           // en | uk
     public var stealthDefault = true
+    public var showInDock = true
     public var notionWriteSummary = false
-    public var notionMirrorPath = ""
-    public var appRoot = ""                // control/ and state/ live here (visible to the skill)
+    /// The work folder connected to Cowork: project folders and the Notion mirror (_notion/) live here.
+    public var workRoot = ""
+    /// Advanced override; empty = <workRoot>/Tools/LiveTips (or Application Support without a work folder).
+    public var appRoot = ""
+    /// Model ids the API returned on the last successful key test (for the model pickers).
+    public var knownModels: [String] = []
     public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AppConfig()
+        models = (try? c.decode(Models.self, forKey: .models)) ?? d.models
+        budget = (try? c.decode(Budget.self, forKey: .budget)) ?? d.budget
+        localAI = (try? c.decode(LocalAI.self, forKey: .localAI)) ?? d.localAI
+        uiLanguage = (try? c.decode(String.self, forKey: .uiLanguage)) ?? d.uiLanguage
+        stealthDefault = (try? c.decode(Bool.self, forKey: .stealthDefault)) ?? d.stealthDefault
+        showInDock = (try? c.decode(Bool.self, forKey: .showInDock)) ?? d.showInDock
+        notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
+        workRoot = (try? c.decode(String.self, forKey: .workRoot)) ?? d.workRoot
+        appRoot = (try? c.decode(String.self, forKey: .appRoot)) ?? d.appRoot
+        knownModels = (try? c.decode([String].self, forKey: .knownModels)) ?? d.knownModels
+    }
+
+    /// Where control/ and state/ live. Inside the work folder by default, so the Cowork skill sees the status.
+    public func effectiveAppRoot(appSupport: String) -> String {
+        if !appRoot.isEmpty { return (appRoot as NSString).expandingTildeInPath }
+        if !workRoot.isEmpty { return ((workRoot as NSString).expandingTildeInPath as NSString).appendingPathComponent("Tools/LiveTips") }
+        return appSupport
+    }
+
+    /// Default model choices when the API was not asked yet.
+    public static let fallbackModels = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-sonnet-5", "claude-opus-5"]
 
     public static func load(from url: URL) -> AppConfig {
         guard let d = try? Data(contentsOf: url), let c = try? JSONDecoder().decode(AppConfig.self, from: d) else {

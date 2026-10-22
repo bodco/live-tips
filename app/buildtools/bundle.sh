@@ -11,8 +11,11 @@ APP="${LIVETIPS_APP_OUT:-$SCRATCH}/LiveTips.app"
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$SCRATCH/release/LiveTips" "$APP/Contents/MacOS/LiveTips"
 # Shared tips window (same file as the skill's live-transcriber; parity).
-PROMPTER_HTML="${LIVETIPS_PROMPTER_HTML:-$HERE/../../live-transcriber/src/prompter.html}"
+PROMPTER_HTML="${LIVETIPS_PROMPTER_HTML:-$HERE/Resources/prompter.html}"
 cp "$PROMPTER_HTML" "$APP/Contents/Resources/prompter.html"
+# App icon, drawn at build time (no binary assets in the repo)
+ICONSET="$(mktemp -d)/AppIcon.iconset"; mkdir -p "$ICONSET"
+xcrun swift "$HERE/buildtools/make_icon.swift" "$ICONSET" >/dev/null && iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" || echo "icon: skipped"
 mkdir -p "$APP/Contents/Helpers"
 xcrun swiftc -O -o "$APP/Contents/Helpers/audiocap" "$HERE/Helpers/audiocap.swift"
 codesign --force --sign "$IDENT" --identifier "$BUNDLE_ID.audiocap" "$APP/Contents/Helpers/audiocap"
@@ -21,13 +24,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
-<key>CFBundleName</key><string>LiveTips</string>
+<key>CFBundleName</key><string>Live Tips</string>
+<key>CFBundleDisplayName</key><string>Live Tips</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundleExecutable</key><string>LiveTips</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VER</string>
 <key>CFBundleVersion</key><string>$BUILD</string>
 <key>LSMinimumSystemVersion</key><string>14.4</string>
-<key>LSUIElement</key><true/>
 <key>NSMicrophoneUsageDescription</key><string>LiveTips transcribes your side of the call locally on this Mac.</string>
 <key>NSAudioCaptureUsageDescription</key><string>LiveTips transcribes the other side of the call locally on this Mac.</string>
 </dict></plist>

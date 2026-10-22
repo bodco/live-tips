@@ -1034,7 +1034,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Download:**
-[LiveTips-0.4.0-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.4.0/LiveTips-0.4.0-beta.dmg)
+[LiveTips-0.4.3-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.4.3/LiveTips-0.4.3-beta.dmg)
 
 What it does:
 

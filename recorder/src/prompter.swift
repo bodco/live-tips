@@ -13,6 +13,7 @@
 // the recording.
 
 import AppKit
+import Carbon.HIToolbox
 import WebKit
 
 struct Args {
@@ -138,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
+        installHotKeys()
 
         let uc = WKUserContentController()
         for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split"] { uc.add(self, name: name) }
@@ -316,6 +318,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     func applicationWillTerminate(_ notification: Notification) { setSplit(false, animate: false) }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    // Global shortcuts, also while the meeting app has the focus (Carbon hot keys: no Accessibility
+    // permission, no other keystrokes are read). Control-Option-H = HELP NOW, Control-Option-P = pause.
+    // If the Live Tips app already holds them, registration fails quietly and the buttons still work.
+    var hotKeyRefs: [EventHotKeyRef?] = []
+    func installHotKeys() {
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        let me = Unmanaged.passUnretained(self).toOpaque()
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, ctx in
+            var id = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
+            guard let ctx else { return noErr }
+            let d = Unmanaged<AppDelegate>.fromOpaque(ctx).takeUnretainedValue()
+            let js = id.id == 1 ? "document.getElementById('sos').click()" : "document.getElementById('pause').click()"
+            DispatchQueue.main.async { MainActor.assumeIsolated { d.web?.evaluateJavaScript(js, completionHandler: nil) } }
+            return noErr
+        }, 1, &spec, me, nil)
+        for (id, key) in [(UInt32(1), UInt32(kVK_ANSI_H)), (UInt32(2), UInt32(kVK_ANSI_P))] {
+            var ref: EventHotKeyRef?
+            if RegisterEventHotKey(key, UInt32(controlKey | optionKey), EventHotKeyID(signature: OSType(0x4C545052), id: id),
+                                   GetApplicationEventTarget(), 0, &ref) == noErr { hotKeyRefs.append(ref) }
+        }
+    }
 }
 
 let parsed = parseArgs()

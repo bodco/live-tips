@@ -36,6 +36,8 @@ public struct ProjectRegistry: Codable, Equatable {
     /// Workspaces for general calls about several projects (recordings go to the workspace folder).
     public var workspaces: [Workspace] = []
     public var lastUsed: String = ""        // "project:<slug>" or "workspace:<name>"
+    /// When each target was last used for a call (target -> ISO 8601), for "Last call" in Start call.
+    public var lastUsedAt: [String: String] = [:]
     public init() {}
 
     public init(from decoder: Decoder) throws {
@@ -43,6 +45,7 @@ public struct ProjectRegistry: Codable, Equatable {
         projects = (try? c.decode([Project].self, forKey: .projects)) ?? []
         workspaces = (try? c.decode([Workspace].self, forKey: .workspaces)) ?? []
         lastUsed = (try? c.decode(String.self, forKey: .lastUsed)) ?? ""
+        lastUsedAt = (try? c.decode([String: String].self, forKey: .lastUsedAt)) ?? [:]
     }
 
     public static func load(from url: URL) -> ProjectRegistry {

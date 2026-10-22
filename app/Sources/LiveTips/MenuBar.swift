@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item = it
         refresh()
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
+        NotionMirrorService.shared.startSchedule()
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
@@ -335,13 +336,33 @@ final class StartCallModel: ObservableObject {
     var workspace: Workspace? { registry.workspaces.first { "workspace:" + $0.name == target } }
     var root: String? { project?.root ?? workspace?.root }
 
+    /// Two seconds to see the right project is chosen: people from its config, Claude on or off,
+    /// the last call with it and how fresh the Notion mirror is.
     var details: String {
+        var parts: [String] = []
         if let p = project {
             let team = p.people.filter { $0.side == "team" }.count, client = p.people.filter { $0.side == "client" }.count
-            return "Team \(team) · client \(client) · " + (p.apiAllowed ? "Claude tips on" : "local only (Claude off for this project)")
+            parts.append("Team \(team) · client \(client)")
+            parts.append(p.apiAllowed ? "Claude tips on" : "local only (Claude off for this project)")
+        } else if let w = workspace {
+            parts.append("Projects: " + w.projects.joined(separator: ", "))
+        } else { return "" }
+        let rel = RelativeDateTimeFormatter()
+        if let s = registry.lastUsedAt[target], let d = ISO8601DateFormatter().date(from: s) {
+            parts.append("last call " + rel.localizedString(for: d, relativeTo: Date()))
+        } else {
+            parts.append("first call here")
         }
-        if let w = workspace { return "Projects: " + w.projects.joined(separator: ", ") }
-        return ""
+        let cfg = AppConfig.load(from: AppPaths.config)
+        if !cfg.workRoot.isEmpty {
+            let st = MirrorStatus.load(workRoot: cfg.workRoot)
+            switch st.health() {
+            case "ok", "stale": parts.append("Notion mirror " + rel.localizedString(for: st.lastRunUTC ?? Date(), relativeTo: Date()) + (st.health() == "stale" ? " (stale)" : ""))
+            case "failed": parts.append("Notion mirror: last run failed")
+            default: parts.append("no Notion mirror")
+            }
+        }
+        return parts.joined(separator: " · ")
     }
 
     func applyProjectDefaults() {
@@ -353,6 +374,7 @@ final class StartCallModel: ObservableObject {
         let langs: (String, [String]) = language == "en" ? ("en", ["en"]) : language == "en+es" ? ("en", ["en", "es"]) : ("uk", ["uk", "en"])
         var reg = registry
         reg.lastUsed = target
+        reg.lastUsedAt[target] = ISO8601DateFormatter().string(from: Date())
         try? reg.save(to: AppPaths.projects)
         return ["project_dir": root, "title": title.isEmpty ? (project?.name ?? workspace?.name ?? "Meeting") : title,
                 "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,

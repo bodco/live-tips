@@ -92,6 +92,20 @@ final class SettingsModel: ObservableObject {
     @Published var note = ""
     @Published var tab = "general"
     @Published var aliasesText = ""
+    @Published var mirrorNote = ""
+
+    /// The folder with the imported project configs (projects/<slug>.md) feeds the mirror's layout.
+    func setUpMirror() {
+        let configsDir = registry.projects.first.map { ($0.config as NSString).deletingLastPathComponent } ?? ""
+        mirrorNote = "Setting up: finding your Control Tower databases…"
+        NotionMirrorService.shared.setUp(configsDir: configsDir) { ok, msg in
+            DispatchQueue.main.async { [weak self] in
+                self?.mirrorNote = msg
+                self?.refreshMirror()
+                if ok { DispatchQueue.main.asyncAfter(deadline: .now() + 60) { self?.refreshMirror() } }
+            }
+        }
+    }
     let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
 
     init() {
@@ -534,10 +548,24 @@ struct SettingsView: View {
                           path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder("Choose your work folder") })
                     .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
                 LabeledContent {
-                    HStack {
-                        mirrorLine
-                        Spacer()
-                        Button("Check") { model.refreshMirror() }
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            mirrorLine
+                            Spacer()
+                            switch NotionMirrorService.mode(workRoot: model.config.workRoot) {
+                            case "managed": Button("Sync now") { NotionMirrorService.shared.syncNow(); model.mirrorNote = "Syncing in the background…" }
+                            case "none": Button("Set up sync…") { model.setUpMirror() }.disabled(model.config.workRoot.isEmpty)
+                            default: EmptyView()
+                            }
+                            Button("Check") { model.refreshMirror() }
+                        }
+                        if !model.mirrorNote.isEmpty {
+                            Text(model.mirrorNote).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        } else if NotionMirrorService.mode(workRoot: model.config.workRoot) == "external" {
+                            Text("Run by your own schedule (notion-mirror in Tools). Live Tips only reads it.").font(.caption).foregroundStyle(.secondary)
+                        } else if NotionMirrorService.mode(workRoot: model.config.workRoot) == "managed" {
+                            Text("Live Tips runs it every 2 hours (7:00-22:00), never during a call.").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 } label: {
                     Text("Notion mirror").help("A read-only copy of your Notion as .md files, refreshed by a background job every 2 hours. Live Tips reads it for facts and search; anything newer comes from the Notion API.")

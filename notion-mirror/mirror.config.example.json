@@ -1,0 +1,23 @@
+{
+ "work_root": "/Users/you/work",
+ "secrets_file": "/Users/you/work/Secrets/secrets.env",
+ "token_env": "NOTION_TOKEN",
+ "configs_dir": "/Users/you/work/Control Tower/projects",
+ "notion_version": "2025-09-03",
+ "markdown_version": "2025-09-03",
+ "pause_seconds": 0.34,
+ "full_every_days": 7,
+ "relation_project": "Project",
+ "relation_workspace": "Workspace",
+ "projects_ds": "",
+ "databases": {},
+ "child_pages_for": ["reports", "knowledge"],
+ "workspace_folders": {},
+ "project_folders": {},
+ "date_property": {
+  "meetings": ["Date"], "threads": ["Reported at", "Date"], "tasks": ["Due date", "Due"],
+  "reports": ["Date"], "risks": ["Date", "Identified"], "decisions": ["Date"],
+  "topics": ["Date"], "knowledge": ["Date"], "inbox": ["Date", "Received"]
+ },
+ "transcript_dbs": ["meetings"]
+}

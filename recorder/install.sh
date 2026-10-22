@@ -34,7 +34,7 @@ codesign -s - -f --identifier com.pm-control-tower.live-transcriber.audiocap "$R
 
 # 3b. Build the tips window (optional: without it tips stay in the chat)
 echo "--- build prompter (tips window)"
-if xcrun swiftc -O -o "$ROOT/bin/prompter" "$ROOT/src/prompter.swift" -framework AppKit -framework WebKit; then
+if xcrun swiftc -O -o "$ROOT/bin/prompter" "$ROOT/src/prompter.swift" -framework AppKit -framework WebKit -framework Carbon; then
   codesign -s - -f --identifier com.pm-control-tower.live-transcriber.prompter "$ROOT/bin/prompter" || echo "WARN: codesign prompter"
   echo "prompter OK. Try it: $ROOT/bin/prompter --demo"
 else

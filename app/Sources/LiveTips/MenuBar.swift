@@ -236,26 +236,48 @@ final class StartCallModel: ObservableObject {
         applyProjectDefaults()
     }
 
-    struct PrepInfo { var heading: String; var made: Date; var file: String }
+    /// `matches` = the prep was made for this call's title; only such a prep is adopted on start.
+    struct PrepInfo { var heading: String; var made: Date; var file: String; var matches: Bool }
+
+    /// Same as `slugify` in live-transcriber `lt` and transcriber.py.
+    static func slugify(_ s: String) -> String {
+        let cleaned = s.replacingOccurrences(of: "[^\\p{L}\\p{M}\\p{N}_\\s-]", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let slug = cleaned.replacingOccurrences(of: "[\\s_]+", with: "-", options: .regularExpression)
+        return slug.isEmpty ? "meeting" : String(slug.prefix(60))
+    }
+
+    /// Same as `title_match` in `lt`: equal, or one contains the other (4+ characters).
+    static func titleMatch(_ a: String, _ b: String) -> Bool {
+        let a = slugify(a), b = slugify(b)
+        return a == b || (min(a.count, b.count) >= 4 && (a.contains(b) || b.contains(a)))
+    }
+
+    /// The title the call will get (the same fallback as `requestJSON`).
+    var effectiveTitle: String { title.isEmpty ? (project?.name ?? workspace?.name ?? "Meeting") : title }
 
     /// A prep made in Cowork (prep-*.brief.md in <project folder>/live, younger than 3 h). The recorder
-    /// adopts it on start: the one whose name matches the title, else the newest.
+    /// adopts only a prep whose name matches the call title (`lt prep-check --adopt-prep`). The newest
+    /// matching prep is shown; when none matches, the newest prep of another call is shown as not used.
     func scanPrep() {
-        prep = nil
-        guard let root = root else { return }
+        guard let root = root else { prep = nil; return }
         let live = (root as NSString).appendingPathComponent("live")
         let fm = FileManager.default
-        guard let names = try? fm.contentsOfDirectory(atPath: live) else { return }
+        guard let names = try? fm.contentsOfDirectory(atPath: live) else { prep = nil; return }
+        let callTitle = effectiveTitle
         var best: PrepInfo?
         for n in names where n.hasPrefix("prep-") && n.hasSuffix(".brief.md") {
             let path = (live as NSString).appendingPathComponent(n)
             guard let m = (try? fm.attributesOfItem(atPath: path))?[.modificationDate] as? Date,
                   Date().timeIntervalSince(m) < 3 * 3600 else { continue }
-            if let b = best, b.made > m { continue }
+            let core = String(n.dropFirst("prep-".count).dropLast(".brief.md".count))
+                .replacingOccurrences(of: "^(\\d{4}-\\d\\d-\\d\\d(-\\d{4})?-)+", with: "", options: .regularExpression)
+            let matches = Self.titleMatch(core, callTitle)
+            if let b = best, b.matches && !matches || (b.matches == matches && b.made > m) { continue }
             let first = (try? String(contentsOfFile: path, encoding: .utf8))?.split(separator: "\n").first.map(String.init) ?? n
             let heading = first.replacingOccurrences(of: "# Live Brief (prep):", with: "").replacingOccurrences(of: "#", with: "")
                 .trimmingCharacters(in: .whitespaces)
-            best = PrepInfo(heading: heading.isEmpty ? n : heading, made: m, file: n)
+            best = PrepInfo(heading: heading.isEmpty ? n : heading, made: m, file: n, matches: matches)
         }
         prep = best
     }
@@ -325,7 +347,7 @@ struct StartCallView: View {
                     }
                 }
                 .help("Recordings and notes go to this folder. A workspace is for general calls about several projects.")
-                .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep() }
+                .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false }
                 if let r = model.root {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(r).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
@@ -333,6 +355,7 @@ struct StartCallView: View {
                     }
                 }
                 TextField("Title", text: $model.title, prompt: Text("e.g. Weekly sync with the client"))
+                    .onChange(of: model.title) { model.scanPrep(); copied = false }
             }
             Section {
                 ZStack(alignment: .topLeading) {
@@ -354,14 +377,25 @@ struct StartCallView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
-                if let p = model.prep {
+                if let p = model.prep, p.matches {
                     Label {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text("Prep found: \(p.heading)").lineLimit(2)
                             Text("Made \(p.made.formatted(date: .omitted, time: .shortened)) in Cowork; it will be used for this call.")
                                 .font(.caption).foregroundStyle(.secondary)
+                            copyButton("Copy request for a new prep")
                         }
                     } icon: { Image(systemName: "checkmark.seal.fill").foregroundStyle(.green) }
+                } else if let p = model.prep {
+                    Label {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("No prep for \u{201C}\(model.effectiveTitle)\u{201D} yet.")
+                            Text("The prep made \(p.made.formatted(date: .omitted, time: .shortened)) is for another call (\(p.heading)) and will not be used. Copy the request, paste it into Cowork, then start the call here when the new prep shows up.")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            copyButton("Copy request for Cowork")
+                        }
+                    } icon: { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
                 } else {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
@@ -369,13 +403,7 @@ struct StartCallView: View {
                             Text("A prep is a brief, fact cards and an outline that Claude builds in Cowork from your project files, Notion and Jira 10-30 minutes before the call. Copy the request, paste it into Cowork, then start the call here: the prep is picked up from the project's live folder automatically.")
                                 .font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Button(copied ? "Copied" : "Copy request for Cowork") {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(model.prepPhrase, forType: .string)
-                                copied = true
-                            }
-                            .controlSize(.small)
-                            .disabled(model.target.isEmpty)
+                            copyButton("Copy request for Cowork")
                         }
                     } icon: { Image(systemName: "doc.badge.clock").foregroundStyle(.secondary) }
                 }
@@ -417,6 +445,17 @@ struct StartCallView: View {
         .frame(width: 540, height: 680)
         .onAppear { model.scanPrep(); model.loadMicInputs() }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
+    }
+
+    /// Copies the Cowork request for this call (title, time, project, call context).
+    private func copyButton(_ label: String) -> some View {
+        Button(copied ? "Copied" : label) {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(model.prepPhrase, forType: .string)
+            copied = true
+        }
+        .controlSize(.small)
+        .disabled(model.target.isEmpty)
     }
 }
 

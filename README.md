@@ -32,8 +32,8 @@ A prep is a brief, fact cards and, for a presentation, an outline and slides tha
 
 - **How to make one:** in Start call press **Copy request for Cowork** and paste it into Cowork in the same project. The request already names the call title, time and your context.
 - **Where it lands:** `<project folder>/live/prep-<date>-<HHMM>-<title>.brief.md`, `.cards.json`, `.facts.json` (plus `.outline.json` and `.slides.json` for a presentation).
-- **Which prep is used:** on Start the app takes `prep-*` files younger than 3 hours from that folder. A prep whose name matches the call title wins ("Weekly Sync" matches `...-weekly-sync`); with no match, the newest one is used. Each file kind is taken separately, so a prep without slides still gives the brief and the facts.
-- **How to check before Start:** the **Prep** block says "Prep found: <title>" in green. The block checks the folder when the window opens and when you change the project; if the prep was finished after you opened the window, switch the project away and back (an automatic refresh is planned).
+- **Which prep is used:** on Start the app takes `prep-*` files younger than 3 hours from that folder. Only a prep whose name matches the call title is used ("Weekly Sync" matches `...-weekly-sync`); a prep made for another call is never used, so its brief and internal facts cannot leak into the wrong meeting. Each file kind is taken separately, so a prep without slides still gives the brief and the facts.
+- **How to check before Start:** the **Prep** block says "Prep found: <title>" in green when a prep matches the title. When the only fresh prep is for another call, it says so in orange and that prep is not used. In every state there is a button that copies the Cowork request for this call (title, time, project, call context), so the next prep can be made while an older one is still in the folder. The block rechecks the folder every 5 seconds and when the project or the title changes.
 - **Without a prep:** the call still works. Claude uses the call context, the project's current state and local search, and the local layer (fact cards, the "❓" question cards, HELP NOW) runs as usual.
 
 ### FAQ

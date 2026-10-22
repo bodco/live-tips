@@ -336,7 +336,7 @@ struct StartCallView: View {
                 } else {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("No Cowork prep for this project in the last 3 hours.")
+                            Text(model.target.isEmpty ? "Choose a project to check for a Cowork prep." : "No Cowork prep for this project in the last 3 hours.")
                             Text("A prep is a brief, fact cards and an outline that Claude builds in Cowork from your project files, Notion and Jira 10-30 minutes before the call. Copy the request, paste it into Cowork, then start the call here: the prep is picked up from the project's live folder automatically.")
                                 .font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -374,7 +374,7 @@ struct StartCallView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 540, height: 720)
+        .frame(width: 540, height: 640)
         .onAppear { model.scanPrep() }
     }
 }
@@ -398,7 +398,7 @@ final class StartCallWindow {
         let w = window ?? NSWindow(contentViewController: host)
         w.contentViewController = host
         w.styleMask.insert(.resizable)
-        w.setContentSize(NSSize(width: 540, height: 720))
+        w.setContentSize(NSSize(width: 540, height: 640))
         w.title = "Start call"
         w.isReleasedWhenClosed = false
         window = w

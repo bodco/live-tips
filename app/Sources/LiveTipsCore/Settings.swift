@@ -23,6 +23,16 @@ public struct AppConfig: Codable, Equatable {
         public var ollamaURL = "http://127.0.0.1:11434"
         public init() {}
     }
+    /// Engine processes (M1-M2: Python core). Not shown in the UI; set by the installer.
+    public struct Engine: Codable, Equatable {
+        public var python = ""            // python that runs <appRoot>/src/transcriber.py (MLX Whisper)
+        public var sidecarPython = ""     // python with the model-tips engine (livetips_m0)
+        public var sidecarDir = ""        // folder that contains livetips_m0/
+        public init() {}
+    }
+    public var engine = Engine()
+    /// How people address the PM on calls (any form); the "your turn" trigger.
+    public var nameAliases: [String] = []
     public var models = Models()
     public var budget = Budget()
     public var localAI = LocalAI()
@@ -41,6 +51,8 @@ public struct AppConfig: Codable, Equatable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = AppConfig()
+        engine = (try? c.decode(Engine.self, forKey: .engine)) ?? d.engine
+        nameAliases = (try? c.decode([String].self, forKey: .nameAliases)) ?? d.nameAliases
         models = (try? c.decode(Models.self, forKey: .models)) ?? d.models
         budget = (try? c.decode(Budget.self, forKey: .budget)) ?? d.budget
         localAI = (try? c.decode(LocalAI.self, forKey: .localAI)) ?? d.localAI

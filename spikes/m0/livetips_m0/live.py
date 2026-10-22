@@ -49,14 +49,46 @@ class Tail:
         return lines
 
 
+ACK_KEYS = {"call_type", "hiring_role", "audience", "comment_rate_seconds", "proactive", "ui_lang", "tips_paused"}
+
+
+def handle_inbox(eng, raw: str) -> None:
+    """Questions, HELP NOW and settings from the tips window (the skill gets the same via read_delta)."""
+    try:
+        d = json.loads(raw)
+    except ValueError:
+        return
+    if d.get("kind") == "setting":
+        key, value = d.get("key"), d.get("value")
+        if key == "tips_paused":
+            eng.paused = str(value).lower() in ("on", "true", "1")
+        if key in ACK_KEYS:
+            eng.out_tips.write({"kind": "ack", "key": key, "value": value, "t": time.strftime("%H:%M:%S")})
+        return
+    text = (d.get("text") or "").strip()
+    if not text:
+        return
+    low = text.lower()
+    if low == "sos":
+        eng.on_request("sos")
+    elif low in ("off topic", "refresh context"):
+        return
+    else:
+        eng.on_request("ask", text)
+
+
 def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, poll_s: float = 0.15,
-        from_start: bool = False, provider=None, max_s: float = None):
+        from_start: bool = False, provider=None, max_s: float = None, inbox: Path = None, state_dir: Path = None):
     out.mkdir(parents=True, exist_ok=True)
     eng, stem = build_engine(cfg, md, out, now_sod, provider)
     (out / (stem + ".app.run.json")).write_text(json.dumps({
         "md": md.name, "mode": "live", "variant": cfg.get("variant"), "models": cfg["models"],
         "cache_ttl": cfg.get("cache_ttl"), "started": time.strftime("%Y-%m-%d %H:%M:%S")}, ensure_ascii=False, indent=1))
     t_md, t_tm = Tail(md), Tail(Path(str(md) + ".timing.jsonl"))
+    t_in = Tail(inbox) if inbox else None
+    if t_in and t_in.path.exists():
+        t_in.pos = t_in.path.stat().st_size      # only requests made after the engine attached
+    last_touch = 0.0
     if not from_start:                   # join a running call: skip what is already there
         for t in (t_md, t_tm):
             if t.path.exists():
@@ -96,6 +128,18 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
             else:
                 keep.append((ln, seen))
         pending = keep
+        if t_in:
+            for raw in t_in.read():
+                handle_inbox(eng, raw)
+        if state_dir and time.monotonic() - last_touch > 5:
+            last_touch = time.monotonic()
+            try:
+                (state_dir / "listener").touch()      # the window shows "not listening" without it
+                (state_dir / "llm.json").write_text(json.dumps({
+                    "spent_usd": round(eng.budget.call_spent, 4) if eng.budget else 0, "tips": len(eng.tips),
+                    "budget": eng.budget.state() if eng.budget else "ok", "updated": time.strftime("%H:%M:%S")}))
+            except OSError:
+                pass
         if status and status.exists():
             try:
                 if json.loads(status.read_text()).get("state") == "stopped" and time.monotonic() - last_new > 5:
@@ -123,9 +167,14 @@ def main(argv=None):
     ap.add_argument("--status", type=Path)
     ap.add_argument("--idle-min", type=float, default=6.0)
     ap.add_argument("--from-start", action="store_true")
+    ap.add_argument("--tips-out", type=Path, help="write tips into this file (the recorder's tips file in app mode)")
+    ap.add_argument("--inbox", type=Path)
+    ap.add_argument("--state-dir", type=Path)
     a = ap.parse_args(argv)
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
-    run(cfg, a.md, a.out, a.status, a.idle_min, from_start=a.from_start)
+    if a.tips_out:
+        cfg["tips_out"] = str(a.tips_out)
+    run(cfg, a.md, a.out, a.status, a.idle_min, from_start=a.from_start, inbox=a.inbox, state_dir=a.state_dir)
 
 
 if __name__ == "__main__":

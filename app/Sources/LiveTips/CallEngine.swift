@@ -1,0 +1,125 @@
+import AppKit
+import LiveTipsCore
+
+/// Runs a call: the recorder core (transcriber, MLX Whisper, local layer) and the model-tips
+/// engine, both as child processes of Live Tips so macOS permissions belong to the app.
+/// M1-M2 core is Python (see SPEC 2.0); the protocol is the call files and app_root/control|state.
+final class CallEngine {
+    static let shared = CallEngine()
+    var recorder: Process?
+    var sidecar: Process?
+    var poll: Timer?
+    var onReady: ((EngineStatus) -> Void)?
+
+    var config: AppConfig { AppConfig.load(from: AppPaths.config) }
+    var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
+    var statusPath: String { (appRoot as NSString).appendingPathComponent("state/status.json") }
+    var isRunning: Bool { recorder?.isRunning ?? false }
+
+    func problems() -> [String] {
+        let c = config
+        var p: [String] = []
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: (appRoot as NSString).appendingPathComponent("src/transcriber.py")) {
+            p.append("Recorder core not installed in \(appRoot)")
+        }
+        if c.engine.python.isEmpty || !fm.isExecutableFile(atPath: c.engine.python) { p.append("Recorder Python not set") }
+        return p
+    }
+
+    /// Starts recording. `request` goes to control/start.json (project_dir, title, slug, langs, call_type, audience).
+    func start(request: [String: Any], apiAllowed: Bool, onReady: @escaping (EngineStatus) -> Void) -> String? {
+        if isRunning { return "A call is already running" }
+        if let first = problems().first { return first }
+        let c = config
+        let control = (appRoot as NSString).appendingPathComponent("control")
+        let logs = (appRoot as NSString).appendingPathComponent("logs")
+        try? FileManager.default.createDirectory(atPath: control, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(atPath: logs, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(atPath: statusPath)
+        var req = request
+        req["prompter"] = false            // Live Tips shows its own window
+        guard let d = try? JSONSerialization.data(withJSONObject: req, options: [.prettyPrinted, .sortedKeys]) else { return "Bad request" }
+        try? d.write(to: URL(fileURLWithPath: (control as NSString).appendingPathComponent("start.json")), options: .atomic)
+
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.python)
+        p.arguments = [(appRoot as NSString).appendingPathComponent("src/transcriber.py"), "--from-control"]
+        p.currentDirectoryURL = URL(fileURLWithPath: appRoot)
+        let log = FileHandle.forAppending(path: (logs as NSString).appendingPathComponent("recorder.log"))
+        p.standardOutput = log
+        p.standardError = log
+        do { try p.run() } catch { return "Could not start the recorder: \(error.localizedDescription)" }
+        recorder = p
+        self.onReady = onReady
+        poll?.invalidate()
+        var sidecarStarted = false
+        poll = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
+            guard let self = self else { t.invalidate(); return }
+            let st = EngineStatus.load(path: self.statusPath)
+            if !sidecarStarted, let file = st.file, st.state == "recording" || st.state == "loading_model" {
+                sidecarStarted = true
+                self.onReady?(st)
+                if apiAllowed { self.startSidecar(file: file, status: st) }
+            }
+            if !(self.recorder?.isRunning ?? false) {
+                t.invalidate()
+                self.sidecar?.terminate()
+            }
+        }
+        return nil
+    }
+
+    func startSidecar(file: String, status: EngineStatus) {
+        let c = config
+        guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
+        let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
+        guard let key = store.get(.claudeAPIKey) else { return }
+        let state = (appRoot as NSString).appendingPathComponent("state")
+        let cfgPath = (state as NSString).appendingPathComponent("sidecar-config.json")
+        let core = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: (appRoot as NSString).appendingPathComponent("config.json"))))) as? [String: Any] ?? [:]
+        let sc: [String: Any] = [
+            "variant": "app", "provider": "anthropic", "api_key_env": "CLAUDE_API",
+            "models": ["classify": c.models.classify, "tip": c.models.tip], "cache_ttl": "1h", "direct_route": true,
+            "periodic_classify_s": 20, "max_parallel_calls": 4, "max_tokens": ["classify": 120, "tip": 300],
+            "request_extra": ["classify": ["thinking": ["type": "disabled"]], "tip": ["thinking": ["type": "between_tools"]]],
+            "me_label": core["me_label"] ?? "Me", "them_label": core["them_label"] ?? "Other",
+            "name_aliases": c.nameAliases, "langs": core["langs"] ?? ["en"], "tips_lang": (c.uiLanguage == "uk" || (core["me_lang"] as? String) == "uk") ? "uk" : "en",
+            "budget": ["ledger": SpendLedger.defaultPath, "call_soft_usd": c.budget.callSoftUSD,
+                       "call_hard_usd": c.budget.callHardUSD, "monthly_hard_usd": c.budget.monthlyHardUSD]]
+        if let d = try? JSONSerialization.data(withJSONObject: sc, options: [.prettyPrinted]) {
+            try? d.write(to: URL(fileURLWithPath: cfgPath), options: .atomic)
+        }
+        let stem = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
+        p.arguments = ["-m", "livetips_m0.live", "--config", cfgPath, "--md", file,
+                       "--out", (appRoot as NSString).appendingPathComponent("runs/" + stem),
+                       "--status", statusPath, "--from-start", "--state-dir", state,
+                       "--tips-out", status.tipsFile ?? (file + ".tips.jsonl"),
+                       "--inbox", status.inboxFile ?? ""]
+        p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
+        var env = ProcessInfo.processInfo.environment
+        env["CLAUDE_API"] = key                 // passed to the child only, never written or logged
+        p.environment = env
+        let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/tips-engine.log"))
+        p.standardOutput = log
+        p.standardError = log
+        try? p.run()
+        sidecar = p
+    }
+
+    func stop() {
+        let control = (appRoot as NSString).appendingPathComponent("control")
+        FileManager.default.createFile(atPath: (control as NSString).appendingPathComponent("stop"), contents: Data())
+    }
+}
+
+extension FileHandle {
+    static func forAppending(path: String) -> FileHandle? {
+        if !FileManager.default.fileExists(atPath: path) { FileManager.default.createFile(atPath: path, contents: nil) }
+        let h = FileHandle(forWritingAtPath: path)
+        _ = try? h?.seekToEnd()
+        return h
+    }
+}

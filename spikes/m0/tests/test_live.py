@@ -39,3 +39,22 @@ def test_live_tail_picks_up_appended_lines(tmp_path):
     assert any(json.loads(t)["level"] == "red" for t in tips)
     summ = json.loads((tmp_path / "out" / "live-call.app.summary.json").read_text())
     assert summ["lines"] == 3
+
+
+def test_inbox_requests_and_acks(tmp_path):
+    from livetips_m0.live import handle_inbox
+    from livetips_m0.replay import build_engine
+    cfg = dict(CFG, budget=dict(CFG["budget"], ledger=str(tmp_path / "spend.json")), tips_out=str(tmp_path / "t.jsonl"))
+    md = tmp_path / "c.md"
+    md.write_text("# Live transcript: c\n")
+    eng, stem = build_engine(cfg, md, tmp_path, lambda: 36000.0, FakeProvider(responder, 0.0, 0.0))
+    handle_inbox(eng, json.dumps({"t": "10:00:00", "kind": "setting", "key": "audience", "value": "client"}))
+    handle_inbox(eng, json.dumps({"t": "10:00:00", "kind": "setting", "key": "tips_paused", "value": "on"}))
+    handle_inbox(eng, json.dumps({"t": "10:00:01", "text": "sos"}))
+    handle_inbox(eng, json.dumps({"t": "10:00:02", "text": "What is the release date?"}))
+    eng.drain(5)
+    items = [json.loads(l) for l in (tmp_path / "t.jsonl").read_text().splitlines()]
+    assert eng.paused is True
+    assert any(i.get("kind") == "ack" and i["key"] == "audience" for i in items)
+    assert any(i.get("kind") == "tip" and i["level"] == "red" for i in items)
+    assert any(i.get("kind") == "answer" and i.get("q") == "What is the release date?" for i in items)

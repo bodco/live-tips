@@ -81,7 +81,7 @@ class Engine:
         self.classify_busy = False
         self.classify_pending: Optional[Line] = None
         self.tipped_lines = set()
-        self.out_tips = JsonlWriter(out_dir / (stem + ".app.tips.jsonl"))
+        self.out_tips = JsonlWriter(Path(cfg["tips_out"]) if cfg.get("tips_out") else out_dir / (stem + ".app.tips.jsonl"))
         self.out_llm = JsonlWriter(out_dir / (stem + ".app.llm.jsonl"))
         self.out_timing = JsonlWriter(out_dir / (stem + ".app.timing.jsonl"))
         self.tip_validator = jsonschema.Draft202012Validator(rules.model_tip_schema)
@@ -284,6 +284,45 @@ class Engine:
         if topic and any(jaccard(topic, t) >= self.topic_sim for t in topics):
             return "same_topic"
         return None
+
+    # ---------- requests from the tips window (asks, HELP NOW) ----------
+    def on_request(self, kind: str, text: str = "") -> None:
+        """kind: "ask" (a question typed in the window) or "sos" (HELP NOW). Never rate-limited."""
+        if self.budget and self.budget.state() == "hard":
+            return
+        now = self.clock()
+        with self.lock:
+            last = self.history[-1] if self.history else None
+        line = last or Line(-1, s_to_hms(now), "them", "", None, "en", "")
+        span = {"line_id": line.line_id, "src": s_to_hms(now), "request": kind, "available_at": now}
+        self.futures.append(self.pool.submit(self._run_request, kind, text, line, span))
+
+    def _run_request(self, kind: str, text: str, line: Line, span: dict) -> None:
+        if kind == "sos":
+            event = ("HELP NOW pressed: the PM is speaking and cannot type. Give ONE red tip now: gist starting with "
+                     "'🆘 ', the next sentence the PM can say right now (answer to the open question, a fact with its number, "
+                     "or a bridge such as 'Let me give you the exact number after the call.'), up to 2 fact lines. Never skip.")
+        else:
+            event = "The PM typed a question in the tips window: " + text + ". Answer it briefly as a tip (gist = the answer in a few words). Skip only if nothing in the context answers it, then say so in the gist."
+        span["tip_start"] = self.clock()
+        c = self._call("tip", line, event)
+        done = self.clock()
+        obj = first_json(c.text) if not c.error else None
+        if not obj or obj.get("skip"):
+            gist = "🆘 Nothing concrete found" if kind == "sos" else "No answer in the brief or the call so far"
+            obj = {"gist": gist, "level": "info", "topic": kind}
+        item = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": span["src"],
+                "kind": "tip" if kind == "sos" else "answer", "level": "red" if kind == "sos" else obj.get("level", "info"),
+                "gist": obj.get("gist", ""), "phrase": obj.get("phrase", ""), "items": obj.get("items", []),
+                "note": obj.get("note", ""), "at": s_to_hms(done)}
+        if kind == "ask":
+            item["q"] = text
+        item = {k: v for k, v in item.items() if v not in ("", [], None)}
+        with self.lock:
+            self.tips.append(item)
+        self.out_tips.write(item)
+        span.update({"outcome": "emitted", "emit_at": done, "tip_ms": c.ms(c.t_done), "error": c.error})
+        self.out_timing.write(span)
 
     def drain(self, timeout: float = 60.0) -> None:
         end = time.monotonic() + timeout

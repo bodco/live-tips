@@ -66,6 +66,9 @@ public struct EngineStatus {
     public var tips = 0
     public var callSpentUSD = 0.0
     public var project: String?
+    public var file: String?
+    public var tipsFile: String?
+    public var inboxFile: String?
 
     public static func load(path: String) -> EngineStatus {
         var s = EngineStatus()
@@ -76,7 +79,16 @@ public struct EngineStatus {
         s.lines = (o["lines"] as? Int) ?? 0
         s.tips = (o["tips"] as? Int) ?? 0
         s.callSpentUSD = (o["spent_usd"] as? Double) ?? 0
-        s.project = o["project"] as? String
+        s.project = (o["project"] as? String) ?? (o["slug"] as? String) ?? (o["title"] as? String)
+        s.file = o["file"] as? String
+        s.tipsFile = o["tips_file"] as? String
+        s.inboxFile = o["inbox_file"] as? String
+        // model-tips engine numbers (state/llm.json next to status.json)
+        let llm = ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent("llm.json")
+        if let d2 = FileManager.default.contents(atPath: llm), let o2 = try? JSONSerialization.jsonObject(with: d2) as? [String: Any] {
+            s.callSpentUSD = (o2["spent_usd"] as? Double) ?? (o2["spent_usd"] as? NSNumber)?.doubleValue ?? 0
+            s.tips = (o2["tips"] as? Int) ?? s.tips
+        }
         return s
     }
 }

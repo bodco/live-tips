@@ -12,6 +12,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var timer: Timer?
     let statusLines = [NSMenuItem(), NSMenuItem(), NSMenuItem(), NSMenuItem()]
     var micItem = NSMenuItem()
+    var startItem = NSMenuItem()
+    var endItem = NSMenuItem()
+    var tipsItem = NSMenuItem()
+    var lastStatus = EngineStatus()
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
@@ -26,8 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         for l in statusLines { l.isEnabled = false; menu.addItem(l) }
         menu.addItem(.separator())
-        add(menu, "Start call…", #selector(startCall), "n")
-        add(menu, "Show tips window", #selector(showTips), "t")
+        startItem = add(menu, "Start call…", #selector(startCall), "n")
+        endItem = add(menu, "End call", #selector(endCall), "")
+        tipsItem = add(menu, "Open tips window", #selector(showTips), "t")
         micItem = add(menu, "Allow microphone…", #selector(requestMic), "")
         menu.addItem(.separator())
         add(menu, "Settings…", #selector(openSettings), ",")
@@ -45,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { startCall() }        // clicking the Dock icon opens Start call
+        if !flag { if lastStatus.state == "recording" { showTips() } else { startCall() } }   // Dock icon
         return true
     }
 
@@ -94,13 +99,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let cfg = config
         let st = EngineStatus.load(path: (appRoot as NSString).appendingPathComponent("state/status.json"))
         let month = SpendLedger.monthSpent()
-        let recording = st.state == "recording"
+        let recording = st.state == "recording" || st.state == "loading_model"
+        lastStatus = st
+        startItem.isHidden = recording
+        endItem.isHidden = !recording
+        tipsItem.title = recording ? "Open tips window" : "Preview tips window"
         statusLines[0].title = recording ? "● Recording" + (st.project.map { ": \($0)" } ?? "") : "Not recording"
         statusLines[1].title = recording ? "Lines \(st.lines) · tips \(st.tips)" : "Start a call to see live numbers"
         statusLines[2].title = String(format: "This call: $%.2f (warning $%.0f, stop $%.0f)", st.callSpentUSD, cfg.budget.callSoftUSD, cfg.budget.callHardUSD)
+        statusLines[2].isHidden = !recording
         statusLines[3].title = String(format: "This month: $%.2f of $%.0f", month, cfg.budget.monthlyHardUSD)
         micItem.isHidden = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-        item?.button?.title = recording ? " REC" : ""
+        item?.button?.image = NSImage(systemSymbolName: recording ? "record.circle.fill" : "text.bubble", accessibilityDescription: "Live Tips")
         if st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9 {
             item?.button?.contentTintColor = .systemOrange
         } else {
@@ -110,10 +120,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
     @objc func openSettings() { MainActor.assumeIsolated { SettingsWindow.show() } }
-    @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show() } }
+    @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
+    @objc func openSettingsTab() { MainActor.assumeIsolated { SettingsWindow.show() } }
+
+    @objc func endCall() {
+        let a = NSAlert()
+        a.messageText = "End the call?"
+        a.informativeText = "Recording stops; the transcript and tips stay in the project folder."
+        a.addButton(withTitle: "End call")
+        a.addButton(withTitle: "Cancel")
+        if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop() }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard CallEngine.shared.isRunning else { return .terminateNow }
+        let a = NSAlert()
+        a.messageText = "A call is being recorded"
+        a.informativeText = "Quitting stops the recording."
+        a.addButton(withTitle: "Stop and quit")
+        a.addButton(withTitle: "Cancel")
+        if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop(); return .terminateNow }
+        return .terminateCancel
+    }
     @objc func requestMic() { AVCaptureDevice.requestAccess(for: .audio) { _ in } }
 
     @objc func showTips() {
+        if lastStatus.state == "recording", let t = lastStatus.tipsFile {
+            openTips(for: CallFiles(tips: t, inbox: lastStatus.inboxFile ?? "", status: CallEngine.shared.statusPath,
+                                    control: (CallEngine.shared.appRoot as NSString).appendingPathComponent("control")))
+            return
+        }
         if tips == nil {
             MainActor.assumeIsolated {
                 let c = PrompterController(args: prompterArgs(["LiveTips", "--prompter-demo"]))
@@ -154,83 +190,98 @@ final class StartCallModel: ObservableObject {
     @Published var title = ""
     @Published var audience = "auto"
     @Published var callType = "auto"
+    @Published var language = "uk+en"
     @Published var note = ""
     let registry = ProjectRegistry.load(from: AppPaths.projects)
     let config = AppConfig.load(from: AppPaths.config)
 
-    init() { target = registry.lastUsed }
-
-    var targets: [(String, String)] {
-        registry.workspaces.map { ("workspace:" + $0.name, "◆ " + $0.name + " (workspace)") } +
-        registry.projects.filter { $0.status != "archived" }.map { ("project:" + $0.slug, $0.name) }
+    init() {
+        target = registry.lastUsed
+        applyProjectDefaults()
     }
 
-    var root: String? {
-        if target.hasPrefix("project:") {
-            return registry.projects.first { "project:" + $0.slug == target }?.root
+    var project: Project? { registry.projects.first { "project:" + $0.slug == target } }
+    var workspace: Workspace? { registry.workspaces.first { "workspace:" + $0.name == target } }
+    var root: String? { project?.root ?? workspace?.root }
+
+    var details: String {
+        if let p = project {
+            let team = p.people.filter { $0.side == "team" }.count, client = p.people.filter { $0.side == "client" }.count
+            return "Team \(team) · client \(client) · " + (p.apiAllowed ? "Claude tips on" : "local only (Claude off for this project)")
         }
-        return registry.workspaces.first { "workspace:" + $0.name == target }?.root
+        if let w = workspace { return "Projects: " + w.projects.joined(separator: ", ") }
+        return ""
     }
 
-    /// Writes control/start.json for the engine and returns the call file paths.
-    func start() -> CallFiles? {
-        guard !target.isEmpty, let root = root, !root.isEmpty else { note = "Choose a project or workspace with a folder."; return nil }
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd-HHmm"
-        let slugTitle = title.isEmpty ? "call" : title.lowercased().replacingOccurrences(of: " ", with: "-")
-        let stem = df.string(from: Date()) + "-" + slugTitle
-        let live = (root as NSString).appendingPathComponent("live")
-        let appRoot = config.effectiveAppRoot(appSupport: AppPaths.support.path)
-        let control = (appRoot as NSString).appendingPathComponent("control")
-        try? FileManager.default.createDirectory(atPath: live, withIntermediateDirectories: true)
-        try? FileManager.default.createDirectory(atPath: control, withIntermediateDirectories: true)
-        try? FileManager.default.createDirectory(atPath: (appRoot as NSString).appendingPathComponent("state"), withIntermediateDirectories: true)
-        let req: [String: Any] = ["schema_version": 1, "engine": "app", "target": target, "root": root, "title": title,
-                                  "stem": stem, "audience": audience, "call_type": callType,
-                                  "requested_at": ISO8601DateFormatter().string(from: Date())]
-        if let d = try? JSONSerialization.data(withJSONObject: req, options: [.prettyPrinted, .sortedKeys]) {
-            try? d.write(to: URL(fileURLWithPath: (control as NSString).appendingPathComponent("start.json")), options: .atomic)
-        }
+    func applyProjectDefaults() {
+        if let p = project, p.clientLanguage.lowercased().hasPrefix("english"), language == "uk+en" { language = "en" }
+    }
+
+    func requestJSON() -> [String: Any]? {
+        guard let root = root, !root.isEmpty else { note = "This project has no folder in its config."; return nil }
+        let langs: (String, [String]) = language == "en" ? ("en", ["en"]) : language == "en+es" ? ("en", ["en", "es"]) : ("uk", ["uk", "en"])
         var reg = registry
         reg.lastUsed = target
         try? reg.save(to: AppPaths.projects)
-        let base = (live as NSString).appendingPathComponent(stem)
-        return CallFiles(tips: base + ".app.tips.jsonl", inbox: base + ".app.inbox.jsonl",
-                         status: (appRoot as NSString).appendingPathComponent("state/status.json"), control: control)
+        return ["project_dir": root, "title": title.isEmpty ? (project?.name ?? workspace?.name ?? "Meeting") : title,
+                "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,
+                "me_lang": langs.0, "langs": langs.1, "me_langs": langs.0 == "uk" ? ["uk", "en"] : [langs.0]]
     }
 }
 
 struct StartCallView: View {
     @ObservedObject var model: StartCallModel
-    var onStart: (CallFiles) -> Void
+    var onStart: () -> Void
+    var onCancel: () -> Void
 
     var body: some View {
         Form {
-            Picker("Project or workspace", selection: $model.target) {
+            Picker("Project", selection: $model.target) {
                 Text("Choose…").tag("")
-                ForEach(model.targets, id: \.0) { Text($0.1).tag($0.0) }
+                if !model.registry.workspaces.isEmpty {
+                    Section("Workspaces") {
+                        ForEach(model.registry.workspaces, id: \.name) { w in
+                            Label(w.name, systemImage: "square.stack.3d.up").tag("workspace:" + w.name)
+                        }
+                    }
+                }
+                Section("Projects") {
+                    ForEach(model.registry.projects.filter { $0.status != "archived" }, id: \.slug) { p in
+                        Label(p.name, systemImage: "folder").tag("project:" + p.slug)
+                    }
+                }
             }
             .help("Recordings and notes go to this folder. A workspace is for general calls about several projects.")
-            if let r = model.root { Text(r).font(.caption).foregroundStyle(.secondary) }
-            TextField("Call title (optional)", text: $model.title)
-            Picker("Who is on the other side", selection: $model.audience) {
-                Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client"); Text("Boss").tag("boss")
+            .onChange(of: model.target) { model.applyProjectDefaults() }
+            if let r = model.root {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(r).font(.caption).foregroundStyle(.secondary)
+                    Text(model.details).font(.caption).foregroundStyle(.secondary)
+                }
             }
+            TextField("Title", text: $model.title, prompt: Text("optional"))
+            Picker("Audience", selection: $model.audience) {
+                Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client")
+            }
+            .pickerStyle(.segmented)
+            .help("Who is on the other side. Team: internal call, you think aloud, no corrections of your facts. Client: stricter, restricted internal numbers are never shown, client's culture profile is used, answer check is on. The language is chosen separately.")
             Picker("Meeting type", selection: $model.callType) {
-                Text("Standard").tag("auto"); Text("Presentation (my talk)").tag("presentation"); Text("Interview").tag("interview")
+                Text("Standard").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
             }
-            .help("Standard: a usual meeting; Live Tips tells talk from discussion by itself. Presentation and Interview need a prep.")
+            .help("Standard: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview need a prep in Cowork first.")
+            Picker("Languages", selection: $model.language) {
+                Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
+            }
+            .help("What may be spoken on the call; transcription is restricted to these.")
             HStack {
                 Text(model.note).font(.caption).foregroundStyle(.orange)
                 Spacer()
-                Button("Start") { if let f = model.start() { onStart(f) } }
-                    .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
+                Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
+                Button("Start") { onStart() }.keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
             }
-            Text("Recording starts when the engine is installed (next build). For now Start prepares the call and opens the tips window.")
-                .font(.caption).foregroundStyle(.secondary)
         }
-        .padding()
-        .frame(width: 460)
+        .formStyle(.grouped)
+        .frame(width: 500)
     }
 }
 
@@ -240,10 +291,15 @@ final class StartCallWindow {
 
     static func show(delegate: AppDelegate) {
         let model = StartCallModel()
-        let view = StartCallView(model: model) { files in
-            window?.close()
-            delegate.openTips(for: files)
-        }
+        let view = StartCallView(model: model, onStart: {
+            guard let req = model.requestJSON() else { return }
+            let err = CallEngine.shared.start(request: req, apiAllowed: model.project?.apiAllowed ?? true) { st in
+                delegate.openTips(for: CallFiles(tips: st.tipsFile ?? "", inbox: st.inboxFile ?? "",
+                                                 status: CallEngine.shared.statusPath,
+                                                 control: (CallEngine.shared.appRoot as NSString).appendingPathComponent("control")))
+            }
+            if let err = err { model.note = err } else { window?.close() }
+        }, onCancel: { window?.close() })
         let w = window ?? NSWindow(contentViewController: NSHostingController(rootView: view))
         w.contentViewController = NSHostingController(rootView: view)
         w.title = "Start call"

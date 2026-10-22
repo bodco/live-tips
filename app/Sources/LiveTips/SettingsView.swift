@@ -63,6 +63,8 @@ final class SettingsModel: ObservableObject {
     @Published var masks: [SecretStore.Key: String] = [:]
     @Published var mirror = MirrorStatus(result: "", lastRunUTC: nil, pages: nil, mode: "")
     @Published var note = ""
+    @Published var tab = "general"
+    @Published var aliasesText = ""
     let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
 
     init() {
@@ -71,6 +73,27 @@ final class SettingsModel: ObservableObject {
         }
         refreshMasks()
         refreshMirror()
+        aliasesText = config.nameAliases.joined(separator: ", ")
+        for k in [SecretStore.Key.claudeAPIKey, .notionToken] where store.get(k) != nil { test(k) }
+    }
+
+    func saveAliases() {
+        config.nameAliases = aliasesText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    func removeProject(_ slug: String) { registry.projects.removeAll { $0.slug == slug } }
+
+    static func friendly(_ msg: String) -> String {
+        let m = msg.lowercased()
+        if m.contains("401") || m.contains("invalid x-api-key") || m.contains("authentication") || m.contains("unauthorized") {
+            return "Key rejected. Copy the whole key and paste it again."
+        }
+        if m.contains("403") || m.contains("permission") { return "The key works but has no access. Check its workspace or integration access." }
+        if m.contains("429") || m.contains("rate") { return "Rate limited. Try again in a minute." }
+        if m.contains("offline") || m.contains("network") || m.contains("internet") || m.contains("timed out") {
+            return "No connection. Check the internet and press Test."
+        }
+        return msg
     }
 
     var mirrorHealth: String { mirror.health() }
@@ -110,11 +133,11 @@ final class SettingsModel: ObservableObject {
         Task {
             if key == .claudeAPIKey {
                 let (ok, msg, ids) = await KeyTester.claude(key: v, workspace: store.get(.claudeWorkspaceID))
-                keyState[key] = ok ? .ok(msg) : .failed(msg)
+                keyState[key] = ok ? .ok(msg) : .failed(SettingsModel.friendly(msg))
                 if ok, !ids.isEmpty { config.knownModels = ids }
             } else {
                 let (ok, msg) = await KeyTester.notion(token: v)
-                keyState[key] = ok ? .ok(msg) : .failed(msg)
+                keyState[key] = ok ? .ok(msg) : .failed(SettingsModel.friendly(msg))
             }
         }
     }
@@ -151,23 +174,32 @@ final class SettingsModel: ObservableObject {
 
 // MARK: - Small views
 
-struct Hint: View {
-    let text: String
-    var body: some View {
-        Image(systemName: "questionmark.circle").foregroundStyle(.secondary).help(text)
-    }
-}
-
 struct StateIcon: View {
     let state: KeyState
     var body: some View {
-        switch state {
-        case .notSet: Image(systemName: "circle.dashed").foregroundStyle(.secondary).help("Not set")
-        case .untested: Image(systemName: "circle.fill").foregroundStyle(.yellow).help("Saved, not tested yet")
-        case .testing: ProgressView().controlSize(.small)
-        case .ok(let m): Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help(m)
-        case .failed(let m): Image(systemName: "xmark.octagon.fill").foregroundStyle(.red).help(m)
+        Group {
+            switch state {
+            case .notSet: Image(systemName: "circle.dashed").foregroundStyle(.secondary).help("Not set")
+            case .untested: Image(systemName: "circle.fill").foregroundStyle(.yellow).help("Saved, checking…")
+            case .testing: ProgressView().controlSize(.small)
+            case .ok(let m): Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help(m)
+            case .failed(let m): Image(systemName: "xmark.octagon.fill").foregroundStyle(.red).help(m)
+            }
         }
+        .frame(width: 16, height: 16)
+    }
+}
+
+struct IconButton: View {
+    let symbol: String
+    let label: String
+    var role: ButtonRole? = nil
+    let action: () -> Void
+    var body: some View {
+        Button(role: role, action: action) {
+            Label(label, systemImage: symbol).labelStyle(.iconOnly).frame(width: 18, height: 18)
+        }
+        .help(label)
     }
 }
 
@@ -179,25 +211,34 @@ struct KeyRow: View {
     @State private var value = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(title).frame(width: 130, alignment: .leading)
-                Hint(text: hint)
-                SecureField("", text: $value).frame(minWidth: 240).onSubmit { model.save(key, value); value = "" }
-                Button { model.save(key, value); value = "" } label: { Image(systemName: "square.and.arrow.down") }
-                    .help("Save to Keychain").disabled(value.isEmpty)
-                Button { model.test(key) } label: { Image(systemName: "bolt.horizontal") }
-                    .help("Test with one request").disabled(!model.isSet(key))
-                Button(role: .destructive) { model.remove(key) } label: { Image(systemName: "trash") }
-                    .help("Remove from Keychain").disabled(!model.isSet(key))
-                StateIcon(state: model.keyState[key] ?? .notSet)
-                Text(model.masks[key] ?? "").font(.caption).foregroundStyle(.secondary)
+        LabeledContent {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    SecureField("", text: $value)
+                        .onSubmit { model.save(key, value); value = "" }
+                    IconButton(symbol: "square.and.arrow.down", label: "Save to Keychain") { model.save(key, value); value = "" }
+                        .disabled(value.isEmpty)
+                    IconButton(symbol: "checkmark.seal", label: "Test with one request") { model.test(key) }
+                        .disabled(!model.isSet(key))
+                    IconButton(symbol: "trash", label: "Remove from Keychain", role: .destructive) { model.remove(key) }
+                        .disabled(!model.isSet(key))
+                    StateIcon(state: model.keyState[key] ?? .notSet)
+                    Text(model.masks[key] ?? "").font(.caption.monospaced()).foregroundStyle(.secondary)
+                        .frame(width: 64, alignment: .leading)
+                }
+                statusText
             }
-            if case .failed(let m) = model.keyState[key] ?? .notSet {
-                Text(m).font(.caption).foregroundStyle(.red).padding(.leading, 140)
-            } else if case .ok(let m) = model.keyState[key] ?? .notSet {
-                Text(m).font(.caption).foregroundStyle(.green).padding(.leading, 140)
-            }
+        } label: {
+            Text(title).help(hint)
+        }
+    }
+
+    @ViewBuilder var statusText: some View {
+        switch model.keyState[key] ?? .notSet {
+        case .ok(let m): Label(m, systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
+        case .failed(let m): Label(m, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.red)
+        case .notSet: Text(hint).font(.caption).foregroundStyle(.secondary)
+        default: EmptyView()
         }
     }
 }
@@ -209,11 +250,13 @@ struct FolderRow: View {
     let placeholder: String
     let choose: () -> String?
     var body: some View {
-        HStack {
-            Text(title).frame(width: 130, alignment: .leading)
-            Hint(text: hint)
-            TextField(placeholder, text: $path)
-            Button("Browse…") { if let p = choose() { path = p } }
+        LabeledContent {
+            HStack {
+                TextField("", text: $path, prompt: Text(placeholder))
+                Button("Browse…") { if let p = choose() { path = p } }
+            }
+        } label: {
+            Text(title).help(hint)
         }
     }
 }
@@ -224,216 +267,244 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
 
     var body: some View {
-        TabView {
-            keys.tabItem { Text("Keys") }
-            models.tabItem { Text("Models and limits") }
-            localAI.tabItem { Text("Local AI") }
-            projects.tabItem { Text("Projects") }
-            general.tabItem { Text("General") }
-            AboutView(model: model).tabItem { Text("About") }
+        TabView(selection: $model.tab) {
+            general.tag("general").tabItem { Label("General", systemImage: "gearshape") }
+            keys.tag("keys").tabItem { Label("Keys", systemImage: "key") }
+            projects.tag("projects").tabItem { Label("Projects", systemImage: "folder") }
+            ai.tag("ai").tabItem { Label("AI", systemImage: "cpu") }
+            AboutView(model: model).tag("about").tabItem { Label("About", systemImage: "info.circle") }
         }
-        .padding()
-        .frame(minWidth: 760, minHeight: 460)
+        .frame(minWidth: 760, minHeight: 520)
     }
 
     var keys: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            KeyRow(title: "Claude API key", hint: "From console.anthropic.com > API keys. Used for model tips during the call and the summary after it. Stored only in the macOS Keychain.", key: .claudeAPIKey, model: model)
-            KeyRow(title: "Notion token", hint: "Internal integration token (notion.so/my-integrations). Used to read changes newer than your local mirror and, if enabled, to write the call summary. Stored only in the macOS Keychain.", key: .notionToken, model: model)
-            Text("Paste with ⌘V and press Return or the save icon. Each key is checked with one request; a green check means it works.")
-                .font(.caption).foregroundStyle(.secondary)
-            Spacer()
-        }
-    }
-
-    var models: some View {
         Form {
-            Section("Models") {
-                Picker("Classify (is a tip needed?)", selection: $model.config.models.classify) {
-                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
-                }.help("Fast and cheap; runs often. Recommended: Haiku class.")
-                Picker("Tip (the text you see)", selection: $model.config.models.tip) {
-                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
-                }.help("Quality matters most here. Recommended: Sonnet class. Opus is too slow for live tips.")
-                Picker("After the call (summary, analysis)", selection: $model.config.models.analysis) {
-                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
-                }.help("Not time-critical. Recommended: Opus class.")
-                Text(model.config.knownModels.isEmpty ? "Test the Claude key to load the models available to it." : "Models available to your key.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("Spending limits (USD)") {
-                HStack {
-                    TextField("Warning per call", value: $model.config.budget.callSoftUSD, format: .number)
-                    Hint(text: "When one call reaches this, the tips window shows a warning. Nothing stops.")
-                }
-                HStack {
-                    TextField("Stop per call", value: $model.config.budget.callHardUSD, format: .number)
-                    Hint(text: "When one call reaches this, model tips stop for the rest of the call. Local facts, cards and HELP NOW keep working.")
-                }
-                HStack {
-                    TextField("Stop per month", value: $model.config.budget.monthlyHardUSD, format: .number)
-                    Hint(text: "When the month reaches this, model tips stay off until the next month. Local layer keeps working.")
-                }
-                Text(String(format: "This month: $%.2f of $%.0f. A typical hour costs about $0.10 to $1.20.", SpendLedger.monthSpent(), model.config.budget.monthlyHardUSD))
+            Section {
+                KeyRow(title: "Claude API key", hint: "From console.anthropic.com > API keys. Used for tips during the call and the summary after it.", key: .claudeAPIKey, model: model)
+                KeyRow(title: "Notion token", hint: "Internal integration token (notion.so/my-integrations). Optional: fresh changes and the call summary in Notion.", key: .notionToken, model: model)
+            } footer: {
+                Text("Paste with ⌘V and press Return. Each key is checked with one request. Keys live only in the macOS Keychain and survive app updates.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
+        .formStyle(.grouped)
     }
 
-    var localAI: some View {
+    var ai: some View {
         Form {
-            Toggle("Local AI", isOn: $model.config.localAI.enabled)
-                .help("Local models on this Mac: finds facts and cards by meaning, picks material for HELP NOW, searches the project index. Off: keywords only, no local model and no indexing.")
-            Picker("Engine", selection: $model.config.localAI.engine) {
-                Text("Built-in (recommended)").tag("embedded")
-                Text("Ollama").tag("ollama")
+            Section {
+                Picker("Classify", selection: $model.config.models.classify) {
+                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
+                }.help("Decides if a tip is needed. Runs often: fast and cheap. Recommended: Haiku.")
+                Picker("Tip", selection: $model.config.models.tip) {
+                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
+                }.help("Writes the tip you see. Recommended: Sonnet. Opus is too slow for live tips.")
+                Picker("After the call", selection: $model.config.models.analysis) {
+                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
+                }.help("Summary and analysis. Not time-critical. Recommended: Opus.")
+            } header: { Text("Models") } footer: {
+                Text(model.config.knownModels.isEmpty ? "Test the Claude key to load the models your key can use." : "Models your key can use.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            .disabled(!model.config.localAI.enabled)
-            .help("Built-in: bge-m3 runs inside Live Tips, nothing else to install. Ollama: uses your local Ollama server with bge-m3, shared with the skill.")
-            if model.config.localAI.engine == "ollama" {
-                TextField("Ollama URL", text: $model.config.localAI.ollamaURL).disabled(!model.config.localAI.enabled)
+            Section {
+                TextField("Warning per call", value: $model.config.budget.callSoftUSD, format: .currency(code: "USD"))
+                    .help("At this amount in one call the tips window shows a warning. Nothing stops.")
+                TextField("Stop per call", value: $model.config.budget.callHardUSD, format: .currency(code: "USD"))
+                    .help("At this amount Claude tips stop for the rest of the call. Local facts, cards and HELP NOW keep working.")
+                TextField("Stop per month", value: $model.config.budget.monthlyHardUSD, format: .currency(code: "USD"))
+                    .help("At this amount Claude tips stay off until the next month. The local layer keeps working.")
+            } header: { Text("Spending limits") } footer: {
+                Text(String(format: "This month: $%.2f of $%.0f. A typical hour of a call costs $0.10 to $1.20.", SpendLedger.monthSpent(), model.config.budget.monthlyHardUSD))
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            Text("Audio and voice prints never leave the Mac; only text goes to the Claude API.").font(.caption).foregroundStyle(.secondary)
+            Section {
+                Toggle("Local AI", isOn: $model.config.localAI.enabled)
+                    .help("Local models on this Mac: facts and cards by meaning, material for HELP NOW, project search. Off: keywords only.")
+                Picker("Engine", selection: $model.config.localAI.engine) {
+                    Text("Built-in (recommended)").tag("embedded")
+                    Text("Ollama").tag("ollama")
+                }
+                .disabled(!model.config.localAI.enabled)
+                .help("Built-in: nothing else to install. Ollama: your local Ollama server with bge-m3, shared with the Cowork skill.")
+                if model.config.localAI.engine == "ollama" {
+                    TextField("Ollama URL", text: $model.config.localAI.ollamaURL).disabled(!model.config.localAI.enabled)
+                }
+            } header: { Text("Local AI") } footer: {
+                Text("Audio and voice prints never leave the Mac; only text goes to the Claude API.").font(.caption).foregroundStyle(.secondary)
+            }
         }
+        .formStyle(.grouped)
     }
 
     var projects: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Button { model.importProjects() } label: { Label("Import from Control Tower…", systemImage: "square.and.arrow.down.on.square") }
-                Hint(text: "Pick the folder with your project configs (projects/<slug>.md). Name, folder, team and client people are read from there; switches below are kept on re-import.")
-                Button { model.rescanWorkspaces() } label: { Image(systemName: "arrow.clockwise") }.help("Find workspaces in the work folder again")
-                Spacer()
-                Text(model.note).font(.caption).foregroundStyle(.secondary)
-            }
-            List {
-                if !model.registry.workspaces.isEmpty {
-                    Section("Workspaces (general calls about several projects)") {
-                        ForEach(model.registry.workspaces, id: \.name) { w in
-                            HStack {
-                                Image(systemName: "square.stack.3d.up")
-                                Text(w.name).bold()
-                                Text(w.projects.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
+        Form {
+            if model.registry.projects.isEmpty {
+                ContentUnavailableView {
+                    Label("No projects yet", systemImage: "folder.badge.plus")
+                } description: {
+                    Text("Live Tips reads projects from your Control Tower configs (projects/<slug>.md): name, folder, team and client people. Import the folder once; re-import any time to pick up changes.")
+                } actions: {
+                    Button("Import from Control Tower…") { model.importProjects() }
                 }
-                Section("Projects") {
+            } else {
+                Section {
                     ForEach($model.registry.projects, id: \.slug) { $p in
-                        HStack(alignment: .top) {
-                            Image(systemName: "folder")
+                        HStack(alignment: .center) {
+                            Image(systemName: "folder").foregroundStyle(.secondary)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("\(p.name)  ·  \(p.slug)").bold()
-                                Text(p.root.isEmpty ? "folder not set in the config" : p.root).font(.caption).foregroundStyle(.secondary)
+                                Text(p.name)
+                                Text(p.root.isEmpty ? "No folder in the config" : p.root).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Toggle(isOn: $p.apiAllowed) { Image(systemName: "network") }
-                                .help("Allowed to send this project's call text to the Claude API. Off: local layer only.")
-                            Toggle(isOn: $p.index.enabled) { Image(systemName: "magnifyingglass") }
-                                .help("Project index for search and HELP NOW")
+                            Toggle("Claude", isOn: $p.apiAllowed).toggleStyle(.checkbox)
+                                .help("Send this project's call text to the Claude API. Off: local layer only.")
+                            Toggle("Index", isOn: $p.index.enabled).toggleStyle(.checkbox)
+                                .help("Search the project folder for HELP NOW and questions.")
+                        }
+                        .contextMenu { Button("Remove from Live Tips", role: .destructive) { model.removeProject(p.slug) } }
+                    }
+                } header: {
+                    HStack {
+                        Text("Projects")
+                        Spacer()
+                        Button("Re-import…") { model.importProjects() }
+                    }
+                } footer: {
+                    Text("Projects come from your Control Tower configs. Re-import updates names, folders and people; your switches stay. To add a project, add its config and re-import. To remove one, right-click it (or archive it in its config). \(model.note)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section {
+                    if model.registry.workspaces.isEmpty {
+                        Text("No workspaces found. Set the work folder in General.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(model.registry.workspaces, id: \.name) { w in
+                        HStack {
+                            Image(systemName: "square.stack.3d.up").foregroundStyle(.secondary)
+                            Text(w.name)
+                            Spacer()
+                            Text(w.projects.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                } header: {
+                    HStack {
+                        Text("Workspaces")
+                        Spacer()
+                        Button("Rescan") { model.rescanWorkspaces() }
+                    }
+                } footer: {
+                    Text("A workspace is a folder in your work folder with a Notion mirror (_notion/workspace.md), for general calls about several projects.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
+        .formStyle(.grouped)
     }
 
     var general: some View {
         Form {
-            FolderRow(title: "Work folder",
-                      hint: "The folder you connected to Cowork (where your project folders live). Live Tips keeps its control files in <work folder>/Tools/LiveTips so the skill can see the app's status, and finds the Notion mirror in <work folder>/_notion.",
-                      path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder("Choose your work folder") })
-                .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
-            HStack {
-                Text("Notion mirror").frame(width: 130, alignment: .leading)
-                Hint(text: "A read-only copy of your Notion in .md files, refreshed by a background job (every 2 hours). Live Tips reads it for facts and search; changes newer than the last run come from the Notion API.")
-                mirrorLine
-                Spacer()
-                Button { model.refreshMirror() } label: { Image(systemName: "arrow.clockwise") }.help("Check again")
+            Section {
+                FolderRow(title: "Work folder",
+                          hint: "The folder you connected to Cowork, where your project folders live. Live Tips keeps its files in <work folder>/Tools/LiveTips (the skill sees them) and reads the Notion mirror from <work folder>/_notion.",
+                          path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder("Choose your work folder") })
+                    .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
+                LabeledContent {
+                    HStack {
+                        mirrorLine
+                        Spacer()
+                        Button("Check") { model.refreshMirror() }
+                    }
+                } label: {
+                    Text("Notion mirror").help("A read-only copy of your Notion as .md files, refreshed by a background job every 2 hours. Live Tips reads it for facts and search; anything newer comes from the Notion API.")
+                }
+                LabeledContent("Your name on calls") {
+                    TextField("", text: $model.aliasesText, prompt: Text("e.g. Alex, Alexander, Sasha"))
+                        .onSubmit { model.saveAliases() }
+                        .onChange(of: model.aliasesText) { model.saveAliases() }
+                }
+                .help("Every form people use when they address you. When the other side says it with a question, you get a red \"your turn\" tip.")
+            } header: { Text("Setup") }
+            Section {
+                Picker("Interface language", selection: $model.config.uiLanguage) {
+                    Text("English").tag("en")
+                    Text("Українська").tag("uk")
+                }
+                Toggle("Hide the tips window from screen sharing and screenshots", isOn: $model.config.stealthDefault)
+                Toggle("Show Live Tips in the Dock", isOn: $model.config.showInDock)
+                    .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
+                Toggle("Write the call summary to Notion", isOn: $model.config.notionWriteSummary)
+                    .help("After the call: updates the meeting's Notion page (or creates one) in your Meetings database. The Cowork skill can do it instead.")
+            } header: { Text("Behaviour") } footer: {
+                HStack {
+                    Text("Settings save automatically and survive updates: options in Application Support/LiveTips, keys in the Keychain.")
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.config]) }.buttonStyle(.link)
+                }
+                .font(.caption).foregroundStyle(.secondary)
             }
-            DisclosureGroup("Advanced") {
+            Section {
                 FolderRow(title: "App folder",
-                          hint: "Leave empty. Default: <work folder>/Tools/LiveTips. Set only if the skill should look for the app's status somewhere else.",
+                          hint: "Leave empty. Default: <work folder>/Tools/LiveTips. Change only if the skill should look for the app's status elsewhere.",
                           path: $model.config.appRoot, placeholder: "default", choose: { model.chooseFolder("Choose the app folder") })
-            }
-            Picker("Interface language", selection: $model.config.uiLanguage) {
-                Text("English").tag("en")
-                Text("Українська").tag("uk")
-            }
-            Toggle("Hide the tips window from screen sharing and screenshots", isOn: $model.config.stealthDefault)
-            Toggle("Show Live Tips in the Dock", isOn: $model.config.showInDock)
-                .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
-            Toggle("Write the call summary to Notion", isOn: $model.config.notionWriteSummary)
-                .help("After the call: updates the meeting's existing Notion page (or creates one) in your Meetings database. Off by default; the Cowork skill can do it instead.")
-            HStack {
-                Image(systemName: "externaldrive.badge.checkmark").foregroundStyle(.green)
-                Text("Settings are saved automatically and kept across updates: options and projects in Application Support/LiveTips, keys in the macOS Keychain.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.config]) }
-            }
+            } header: { Text("Advanced") }
         }
+        .formStyle(.grouped)
     }
 
     @ViewBuilder var mirrorLine: some View {
-        let h = model.mirrorHealth
-        switch h {
-        case "ok":
-            Label(lastRunText, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-        case "stale":
-            Label("Stale: " + lastRunText, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-        case "failed":
-            Label("Last run failed", systemImage: "xmark.octagon.fill").foregroundStyle(.red)
-        default:
-            Label(model.config.workRoot.isEmpty ? "Set the work folder first" : "No mirror found (sync not set up)", systemImage: "circle.dashed").foregroundStyle(.secondary)
+        switch model.mirrorHealth {
+        case "ok": Label(model.mirrorLastRunText, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        case "stale": Label("Stale: " + model.mirrorLastRunText, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        case "failed": Label("Last run failed", systemImage: "xmark.octagon.fill").foregroundStyle(.red)
+        default: Label(model.config.workRoot.isEmpty ? "Set the work folder first" : "No mirror found (sync not set up)", systemImage: "circle.dashed").foregroundStyle(.secondary)
         }
     }
-
-    var lastRunText: String { model.mirrorLastRunText }
 }
 
 struct AboutView: View {
     @ObservedObject var model: SettingsModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+        Form {
+            Section {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Live Tips").font(.largeTitle).bold()
                     Text("by PM Control Tower").foregroundStyle(.secondary)
                     Spacer()
                     Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")").foregroundStyle(.secondary)
                 }
-                Text("A quiet co-pilot for video calls. Live Tips transcribes the call on your Mac and shows a small window with the right fact or a ready phrase when you need it: a direct question to you, a new request, a date or an owner to fix. Prepared facts and cards appear instantly; model tips arrive in about 5 seconds. Audio never leaves your Mac.")
+                Text("A quiet co-pilot for video calls. Live Tips transcribes the call on your Mac and shows a small window with the right fact or a ready phrase when you need it: a direct question to you, a new request, a date or an owner to fix. Prepared facts and cards appear instantly; Claude tips arrive in about 5 seconds. Audio never leaves your Mac.")
                 HStack(spacing: 16) {
                     Link("Website", destination: URL(string: "https://tower.bodco.pm")!)
                     Link("GitHub", destination: URL(string: "https://github.com/bodco/pm-control-tower")!)
                     Link("Notion template", destination: URL(string: "https://bodco.notion.site/pm-control-tower")!)
                 }
-                Divider()
-                Text("For the full experience").font(.headline)
-                check(model.keyState[.claudeAPIKey].map { if case .ok = $0 { return true } else { return false } } ?? false,
-                      "Claude API key works", "Keys tab: paste the key; the check turns green after a test request.")
-                check(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
-                      "Microphone allowed", "macOS asks on the first recording.")
-                check(true, "System audio recording", "macOS asks on the first recording (System Audio Recording Only).", unknown: true)
-                check(!model.registry.projects.isEmpty, "Projects imported", "Projects tab: Import from Control Tower.")
-                check(!model.config.workRoot.isEmpty, "Work folder set", "General tab.")
-                check(model.mirrorHealth == "ok", "Notion mirror is fresh", "General tab shows when it last ran.")
-                check(model.config.localAI.enabled, "Local AI on", "Local AI tab.")
-                check(model.isSet(.notionToken), "Notion token (optional)", "Needed only for the summary in Notion and fresh changes.")
-                Text("Before a call: click Live Tips in the menu bar (or the Dock icon) > Start call, pick the project or workspace, and Start. The tips window opens under your camera.")
-                    .font(.callout).padding(.top, 6)
             }
-            .padding(4)
+            Section {
+                check(isOK(.claudeAPIKey), "Claude API key works", "Keys")
+                check(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, "Microphone allowed", "asked on the first call")
+                check(!model.registry.projects.isEmpty, "Projects imported", "Projects")
+                check(!model.config.workRoot.isEmpty, "Work folder set", "General")
+                check(!model.config.nameAliases.isEmpty, "Your name on calls", "General")
+                check(model.mirrorHealth == "ok", "Notion mirror is fresh", "General")
+                check(model.config.localAI.enabled, "Local AI on", "AI")
+            } header: { Text("Ready for a call") } footer: {
+                Text("Before a call: click Live Tips in the Dock or the menu bar > Start call, choose the project or workspace, Start. The tips window opens under your camera.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
+        .formStyle(.grouped)
     }
 
-    func check(_ ok: Bool, _ title: String, _ how: String, unknown: Bool = false) -> some View {
+    func isOK(_ k: SecretStore.Key) -> Bool {
+        if case .ok = model.keyState[k] ?? .notSet { return true }
+        return false
+    }
+
+    func check(_ ok: Bool, _ title: String, _ whereTo: String) -> some View {
         HStack {
-            Image(systemName: unknown ? "questionmark.circle" : (ok ? "checkmark.circle.fill" : "circle"))
-                .foregroundStyle(unknown ? Color.secondary : (ok ? Color.green : Color.secondary))
+            Image(systemName: ok ? "checkmark.circle.fill" : "circle").foregroundStyle(ok ? Color.green : Color.secondary)
             Text(title)
-            if !ok || unknown { Text(how).font(.caption).foregroundStyle(.secondary) }
+            Spacer()
+            if !ok { Text(whereTo).font(.caption).foregroundStyle(.secondary) }
         }
     }
 }
@@ -443,11 +514,12 @@ final class SettingsWindow {
     static var window: NSWindow?
     static let model = SettingsModel()
 
-    static func show(tab: Int = 0) {
+    static func show(tab: String = "general") {
+        model.tab = tab
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
             w.title = "Live Tips Settings"
-            w.setContentSize(NSSize(width: 820, height: 520))
+            w.setContentSize(NSSize(width: 820, height: 560))
             w.isReleasedWhenClosed = false
             window = w
         }

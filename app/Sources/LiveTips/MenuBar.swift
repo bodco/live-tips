@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         micItem = add(menu, "Allow microphone…", #selector(requestMic), "")
         menu.addItem(.separator())
         add(menu, "Settings…", #selector(openSettings), ",")
+        add(menu, "Setup…", #selector(openSetup), "")
         add(menu, "About Live Tips", #selector(openAbout), "")
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Live Tips", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -45,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh()
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
+        if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
         if !UserDefaults.standard.bool(forKey: "onboarded") {
             UserDefaults.standard.set(true, forKey: "onboarded")
             openSettings()
@@ -122,6 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
+    @objc func openSetup() { MainActor.assumeIsolated { SetupWindow.show() } }
     @objc func openSettings() { MainActor.assumeIsolated { SettingsWindow.show() } }
     @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
     @objc func openSettingsTab() { MainActor.assumeIsolated { SettingsWindow.show() } }

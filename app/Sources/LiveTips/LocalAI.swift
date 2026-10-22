@@ -34,6 +34,9 @@ final class LocalAIService: @unchecked Sendable {
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
         p.arguments = ["-m", "livetips_m0.embed_server", "--model-dir", modelDir, "--port", String(Self.builtinPort)]
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
+        var env = ProcessInfo.processInfo.environment
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        p.environment = env
         let logs = (appRoot as NSString).appendingPathComponent("logs")
         try? FileManager.default.createDirectory(atPath: logs, withIntermediateDirectories: true)
         let log = FileHandle.forAppending(path: (logs as NSString).appendingPathComponent("local-ai.log"))

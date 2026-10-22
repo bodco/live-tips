@@ -16,6 +16,21 @@ cp "$PROMPTER_HTML" "$APP/Contents/Resources/prompter.html"
 # App icon, drawn at build time (no binary assets in the repo)
 ICONSET="$(mktemp -d)/AppIcon.iconset"; mkdir -p "$ICONSET"
 xcrun swift "$HERE/buildtools/make_icon.swift" "$ICONSET" >/dev/null && iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" || echo "icon: skipped"
+# Self-contained beta (2026-10-22): the recorder core and the tips engine travel inside the app;
+# the Setup window copies the core into the app folder and installs Python modules and models.
+LT="$HERE/../../live-transcriber"
+CORE="$APP/Contents/Resources/core"; mkdir -p "$CORE/src" "$CORE/bin"
+cp "$LT/src/transcriber.py" "$LT/src/semantic.py" "$CORE/src/"
+cp "$LT/bin/lt" "$LT/bin/read_delta.py" "$CORE/bin/"
+cp "$LT/config.json" "$CORE/config.json"
+xcrun swiftc -O -o "$CORE/bin/audiocap" "$LT/src/audiocap.swift" \
+  -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$LT/src/Info.plist"
+codesign --force --sign "$IDENT" --identifier "$BUNDLE_ID.recorder-audiocap" "$CORE/bin/audiocap"
+echo "$VER-$BUILD" > "$CORE/VERSION"
+ENG="$APP/Contents/Resources/engine"; mkdir -p "$ENG/spikes/m0"
+rsync -a --exclude __pycache__ --exclude generated "$HERE/../rules/" "$ENG/rules/"
+rsync -a --exclude __pycache__ "$HERE/../spikes/m0/livetips_m0" "$ENG/spikes/m0/"
+cp "$HERE/Resources/setup.sh" "$APP/Contents/Resources/setup.sh"
 mkdir -p "$APP/Contents/Helpers"
 xcrun swiftc -O -o "$APP/Contents/Helpers/audiocap" "$HERE/Helpers/audiocap.swift"
 codesign --force --sign "$IDENT" --identifier "$BUNDLE_ID.audiocap" "$APP/Contents/Helpers/audiocap"

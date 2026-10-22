@@ -134,7 +134,8 @@ final class CallEngine {
                        "--inbox", status.inboxFile ?? ""]
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = ProcessInfo.processInfo.environment
-        env["CLAUDE_API"] = key                 // passed to the child only, never written or logged
+        env["CLAUDE_API"] = key
+        env["PYTHONDONTWRITEBYTECODE"] = "1"     // the engine may live inside the signed app bundle                 // passed to the child only, never written or logged
         p.environment = env
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/tips-engine.log"))
         p.standardOutput = log

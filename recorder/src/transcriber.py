@@ -2973,8 +2973,13 @@ def main() -> int:
     segs = {"me": Segmenter("me", cfg, segq), "them": Segmenter("them", cfg, segq)}
     writer = Writer(out, cfg, header, them_speech=lambda: segs["them"].last_speech_at)
     caps = [Capture("mic", segs["me"], stop_ev, cfg["mic_device"]), Capture("system", segs["them"], stop_ev)]
-    for c in caps:
-        c.start()
+    # Mic first, the system tap once the mic delivers audio (max 6 s): started together, the tap's
+    # aggregate device creation blocked the mic start in CoreAudio (2026-10-22, 17:08: four 10 s hangs).
+    caps[0].start()
+    t_mic = now()
+    while segs["me"].last_feed is None and now() - t_mic < 6:
+        time.sleep(0.1)
+    caps[1].start()
     threading.Thread(target=mic_inputs_poller, args=(stop_ev,), daemon=True).start()
 
     def on_signal(*_):

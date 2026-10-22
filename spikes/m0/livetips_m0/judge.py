@@ -58,11 +58,12 @@ def main(argv=None):
     ap.add_argument("--run", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--model", default="claude-opus-5-5")
+    ap.add_argument("--app-only", action="store_true", help="judge only the app's tips (the skill's were judged before)")
     a = ap.parse_args(argv)
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
     lines = load_call(a.md, cfg["me_label"])
     stem = a.md.name[:-3]
-    skill = tips_of(a.md.parent / (stem + ".tips.jsonl"), "skill")
+    skill = [] if a.app_only else tips_of(a.md.parent / (stem + ".tips.jsonl"), "skill")
     app = tips_of(a.run / (stem + ".app.tips.jsonl"), "app")
     t0, t1 = (min(l.written for l in lines if l.written), max(l.written for l in lines if l.written))
     items = [t for t in skill + app if t0 - 60 <= t["src_s"] <= t1]

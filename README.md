@@ -101,6 +101,10 @@ window, even at low opacity.
 - **Shortcuts?** Control-Option-H is HELP NOW and Control-Option-P pauses tips, also while the meeting app has the focus. They are shown in the menu bar menu, on the HELP button and in Settings > General > Shortcuts.
 - **Where are the files?** Transcript, tips and wrap-up data: `<project folder>/live/`. App logs: `<app folder>/logs/`.
 
+## How tips are decided (0.5.1)
+
+Local signals route a line (vocative name + request, second-person question, new request, the PM's commitment go straight to the tip model; a name in the third person never counts). The gist is shown first and the full tip replaces it. Before showing, the engine checks the tip is still open (the PM has not answered, the numbers were not said) and that every number exists in the brief, facts, cards or transcript. Presentation: keyword facts and question cards only on explicit questions. Details: docs, section 14.5.
+
 ## M0 spike
 
 Measures whether direct, event-driven model calls reach the target: from the end of the

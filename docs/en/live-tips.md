@@ -1148,3 +1148,33 @@ The same two actions are in the menu bar menu during a call, with the shortcut n
 The HELP button shows its shortcut, the pause button shows it in its tooltip, and
 **Settings > General > Shortcuts** lists both. The skill's tips window (live-transcriber) has
 the same shortcuts since 2026-10-22; when both run, the one started first owns them.
+### 14.5 How the tips engine decides (since 0.5.1)
+
+Built from a review of 41 recorded calls (2026-10-23): most weak tips were not slow, they were
+late (the PM had already answered), repeated, or carried a number nobody had said.
+
+1. **Local signals first.** A line that names the PM in the vocative with a question or a
+   request, a question in the second person, a new request or the PM's own commitment goes
+   straight to the tip model. A name in the third person ("as Mike said", "Mike will check")
+   never counts as an address. Other questions and name mentions run classify and the tip
+   in parallel; classify can only veto.
+2. **The gist is shown first.** The first line of the tip appears as soon as the model has
+   written it (about 1 s before the full tip); the full tip replaces it in place. If the
+   model then decides to skip, the line disappears.
+3. **Still open?** Before anything is shown, the engine re-reads the lines since the trigger:
+   the PM has answered (two lines or one long one), the talk moved on (three other lines),
+   or the tip's numbers were said aloud, and the tip is dropped as stale.
+4. **Numbers only from sources.** A number in a tip must exist in the brief, the fact book,
+   the cards or the transcript so far; otherwise that line is dropped and a phrase with an
+   unseen number is not shown. Facts marked unverified are never stated.
+5. **What is new.** The model must name what in the tip was not said aloud yet; "tips_given"
+   in the state carries the numbers already shown, so the same figure is not repeated.
+6. **Presentation.** While the meeting type is Presentation, keyword facts and question
+   cards appear only on explicit questions, so the PM's own block stays quiet; only red tips
+   pass while the PM leads the talk (above 55% of the words in the last 2 minutes).
+7. **Shorter segments.** The recorder closes a segment after 6 s on a 0.35 s pause and at
+   9 s at the latest (12 s before), so a question reaches the engine a few seconds earlier.
+
+The skill's rules got the same changes in words (`SKILL.md` "Still open?", "A name is not an
+address", `references/sweep.md`, `references/presentation.md`).
+

@@ -393,6 +393,8 @@
     border-radius: 5px; border: 1px solid var(--line); color: var(--muted); flex: none; }
   .dk-who.me { color: var(--blue); border-color: var(--blue); }
   .dk-who.other { color: var(--orange); border-color: var(--orange); }
+  .dk-txt p.nums, #nowbox .nums { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; margin: 4px 0 6px; }
   .dk-bud { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
   .dk-go { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
   .dk-txt p { font-size: calc(var(--size) * 1.12); line-height: 1.45; margin: 0 0 .6em; }
@@ -2074,12 +2076,13 @@
   var nowbox = $('nowbox');
   function secById(id) { for (var i = 0; i < outline.length; i++) if (outline[i].id === id) return outline[i]; return null; }
   function pts(sec) { return (sec.points || []).slice(0, 4).map(function (p) { return '<li>' + inline(p) + '</li>'; }).join(''); }
+  function nums(sec) { return sec.numbers && sec.numbers.length ? '<div class="nums">' + sec.numbers.map(esc).join('  ·  ') + '</div>' : ''; }
   function renderNow() {
     if (!outline.length) { nowbox.className = ''; nowbox.innerHTML = ''; return; }
     var c = secById(posCur), n = secById(posNext) || (posCur == null ? outline[0] : null);
     var html = '';
-    if (c) html += '<div class="now">' + esc(t('now_now')) + ' ' + inline(c.title) + '</div><ul>' + pts(c) + '</ul>';
-    if (n) html += '<div class="nxt">' + esc(t('now_next')) + ' <b>' + inline(n.title) + '</b><ul>' + pts(n) + '</ul></div>';
+    if (c) html += '<div class="now">' + esc(t('now_now')) + ' ' + inline(c.title) + '</div>' + nums(c) + '<ul>' + pts(c) + '</ul>';
+    if (n) html += '<div class="nxt">' + esc(t('now_next')) + ' <b>' + inline(n.title) + '</b>' + nums(n) + '<ul>' + pts(n) + '</ul></div>';
     nowbox.innerHTML = html; nowbox.className = html ? 'has' : '';
   }
   window.addItems = function (items) {
@@ -2307,6 +2310,7 @@
       a.appendChild(hd);
       a.appendChild(el('div', 'dk-go', (d.who === 'other' ? t('silent') + ' ' : '') + t('onSlide') + ' ' + d.n + '.'));
       var tx = el('div', 'dk-txt');
+      if (d.numbers && d.numbers.length) tx.appendChild(el('p', 'nums', d.numbers.join('  ·  ')));
       (d.body || []).forEach(function (b) { var p = el('p', b.k === 'p' ? '' : b.k, b.t); if (b.k === 's') p.setAttribute('data-l', t('skip')); tx.appendChild(p); });
       a.appendChild(tx);
       var nx = S[i + 1];

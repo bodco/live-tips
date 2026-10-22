@@ -728,7 +728,8 @@ def parse_outline(data) -> list[dict]:
             continue
         g = dict(x)
         g.update(id=_s(x.get("id")) or f"s{i + 1}", title=_s(x.get("title")),
-                 keywords=_strs(x.get("keywords")), points=_strs(x.get("points")))
+                 keywords=_strs(x.get("keywords")), points=_strs(x.get("points")),
+                 numbers=_strs(x.get("numbers"))[:6])
         out.append(g)
     return out
 
@@ -752,7 +753,8 @@ def parse_slides(data) -> list[dict]:
             sec = 60
         out.append({"n": x.get("n", i + 1), "title": _s(x.get("title")),
                     "who": who if who in ("me", "shared", "other") else "other",
-                    "speaker": _s(x.get("speaker")), "sec": sec, "body": body})
+                    "speaker": _s(x.get("speaker")), "sec": sec, "body": body,
+                    "numbers": _strs(x.get("numbers"))[:6]})     # 2026-10-23: the figures of this slide, shown on the card
     return out
 
 

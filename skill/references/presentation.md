@@ -5,7 +5,9 @@ outline file written in Step 2b, and the live rules of Step 3.
 
 **Presentation outline (`<transcript name>.outline.json`, presentation only).** A JSON
 object `{"sections": [...]}` with 5-15 sections in speaking order:
-`{"id": "s3", "title": "Demo: reports", "points": ["Open the monthly report", "Filter by company", "Export to Excel"], "keywords": ["report", "звіт", "filter", "фільтр", "export", "експорт"]}`.
+`{"id": "s3", "title": "Demo: reports", "points": ["Open the monthly report", "Filter by company", "Export to Excel"], "keywords": ["report", "звіт", "filter", "фільтр", "export", "експорт"], "numbers": ["12 reports/month", "2.4 s export"]}`.
+`numbers` (optional, up to 6) are the figures the PM says in this section; the window shows
+them in one bold line on the Now card (and on the slide card from `slides.json`).
 `title` max 6 words, 2-4 `points` of max 8 words in the call language (what to say, not a
 script), 4-10 `keywords` the PM will actually say in that section. The recorder follows the
 PM's mic lines through the sections and the window pins **Now** (the current section with

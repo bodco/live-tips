@@ -56,7 +56,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Runs the bundled audiocap helper for each source and reports bytes captured and its log tail.
+/// Launch through LaunchServices (`open -W LiveTips.app --args --capture-test 5`) so that macOS
+/// attributes the permission prompts to LiveTips and not to Terminal.
+func captureTest(seconds: Int) {
+    let helper = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/audiocap").path
+    var out: [String: Any] = ["mic_permission": micStatus(), "seconds": seconds]
+    for source in ["mic", "system"] {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: helper)
+        p.arguments = ["--source", source, "--seconds", String(seconds)]
+        let so = Pipe(), se = Pipe()
+        p.standardOutput = so
+        p.standardError = se
+        var bytes = 0
+        var peak: Float = 0
+        do {
+            try p.run()
+            let data = so.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            bytes = data.count
+            data.withUnsafeBytes { raw in
+                for v in raw.bindMemory(to: Float.self) where abs(v) > peak { peak = abs(v) }
+            }
+            let err = String(data: se.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            out[source] = ["bytes": bytes, "peak": Double(peak), "exit": Int(p.terminationStatus),
+                           "log_tail": Array(err.split(separator: "\n").suffix(4)).map(String.init)]
+        } catch {
+            out[source] = ["error": "\(error)"]
+        }
+    }
+    out["mic_permission_after"] = micStatus()
+    let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/LiveTips")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    if let data = try? JSONSerialization.data(withJSONObject: out, options: [.sortedKeys, .prettyPrinted]) {
+        try? data.write(to: dir.appendingPathComponent("capture-test.json"))
+        print(String(data: data, encoding: .utf8) ?? "")
+    }
+}
+
+/// Stealth test: a floating window like the prompter, excluded from screen sharing and screenshots
+/// (`sharingType = .none`, best effort). `--stealth-window off` shows the same window shareable.
+final class StealthDelegate: NSObject, NSApplicationDelegate {
+    let hidden: Bool
+    var window: NSWindow?
+    init(hidden: Bool) { self.hidden = hidden }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let w = NSPanel(contentRect: NSRect(x: 200, y: 600, width: 420, height: 160),
+                        styleMask: [.titled, .closable, .nonactivatingPanel], backing: .buffered, defer: false)
+        w.title = "LiveTips stealth test"
+        w.level = .floating
+        w.sharingType = hidden ? .none : .readOnly
+        let label = NSTextField(labelWithString: hidden
+            ? "STEALTH ON: this window should NOT appear\nin screen sharing or screenshots."
+            : "STEALTH OFF: this window SHOULD appear\nin screen sharing and screenshots.")
+        label.font = .systemFont(ofSize: 18, weight: .semibold)
+        label.frame = NSRect(x: 20, y: 50, width: 380, height: 60)
+        w.contentView?.addSubview(label)
+        w.makeKeyAndOrderFront(nil)
+        window = w
+    }
+}
+
 let args = CommandLine.arguments
+if let i = args.firstIndex(of: "--stealth-window") {
+    let hidden = !(i + 1 < args.count && args[i + 1] == "off")
+    let app = NSApplication.shared
+    let d = StealthDelegate(hidden: hidden)
+    app.delegate = d
+    app.setActivationPolicy(.regular)
+    app.run()
+}
+if let i = args.firstIndex(of: "--capture-test") {
+    let n = i + 1 < args.count ? Int(args[i + 1]) ?? 5 : 5
+    captureTest(seconds: n)
+    exit(0)
+}
 if args.contains("--probe") {
     probe(request: args.contains("--request"))
     exit(0)

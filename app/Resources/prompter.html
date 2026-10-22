@@ -1331,7 +1331,29 @@
   // Keep the menu in line with what the recorder really uses, but never fight a pending change
   // or a select the user is working with.
   function busy(k, el) { var p = pend[k]; return (p && !p.done && !p.failed) || document.activeElement === el; }
+  // Mic menu from the inputs the Mac sees now (status.mic_inputs, from audiocap --list-inputs).
+  // Without the list (older recorder) the two fixed options stay.
+  var micSig = '';
+  function syncMicOptions(s) {
+    var list = Array.isArray(s.mic_inputs) ? s.mic_inputs : [];
+    if (!list.length) return;
+    var cur = s.mic_device || sMic.value;
+    var sig = JSON.stringify(list.map(function (d) { return [d.uid, d.name, d.def ? 1 : 0, d['default'] ? 1 : 0, d.builtin ? 1 : 0]; })) +
+      '|' + cur + '|' + t('o_default') + '|' + t('o_builtin');
+    if (sig === micSig || document.activeElement === sMic) return;
+    micSig = sig;
+    var def = list.filter(function (d) { return d['default']; })[0];
+    function opt(v, label) { var o = document.createElement('option'); o.value = v; o.textContent = label; sMic.appendChild(o); }
+    sMic.innerHTML = '';
+    opt('default', t('o_default') + (def ? ' (' + def.name + ')' : ''));
+    opt('builtin', t('o_builtin'));
+    list.forEach(function (d) { if (!d.builtin) opt('uid:' + d.uid, d.name); });
+    if (cur && !Array.prototype.some.call(sMic.options, function (o) { return o.value === cur; }))
+      opt(cur, cur.indexOf('uid:') === 0 ? '\u26a0 ' + cur.slice(4) : cur);
+    sMic.value = cur;
+  }
   function syncSetup(s) {
+    syncMicOptions(s);
     if (s.mic_device && !busy('mic_device', sMic)) sMic.value = s.mic_device;
     if (!busy('call_lang', sLang)) {
       if (s.call_lang) sLang.value = s.call_lang;

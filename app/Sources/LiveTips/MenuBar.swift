@@ -199,6 +199,33 @@ final class StartCallModel: ObservableObject {
     @Published var note = ""
     @Published var context = ""
     @Published var prep: PrepInfo?
+    /// "default" | "builtin" | "uid:<UID>" (same values as the recorder's mic_device and the window's Mic menu).
+    @Published var micDevice = UserDefaults.standard.string(forKey: "micDevice") ?? "default" {
+        didSet { UserDefaults.standard.set(micDevice, forKey: "micDevice") }
+    }
+    @Published var micInputs: [MicInput] = []
+    struct MicInput: Decodable, Hashable { var uid: String; var name: String; var builtin: Bool; var `default`: Bool }
+
+    /// Inputs the Mac sees now, from the recorder's audiocap (--list-inputs). Empty with an older audiocap.
+    func loadMicInputs() {
+        let appRoot = config.effectiveAppRoot(appSupport: AppPaths.support.path)
+        let bin = (appRoot as NSString).appendingPathComponent("bin/audiocap")
+        guard FileManager.default.isExecutableFile(atPath: bin) else { return }
+        DispatchQueue.global().async {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: bin)
+            p.arguments = ["--list-inputs"]
+            let pipe = Pipe()
+            p.standardOutput = pipe
+            p.standardError = FileHandle.nullDevice
+            guard (try? p.run()) != nil else { return }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            let list = (try? JSONDecoder().decode([MicInput].self, from: data)) ?? []
+            DispatchQueue.main.async { self.micInputs = list }
+        }
+    }
+    var defaultInputName: String? { micInputs.first { $0.default }?.name }
     let registry = ProjectRegistry.load(from: AppPaths.projects)
     let config = AppConfig.load(from: AppPaths.config)
 
@@ -267,7 +294,7 @@ final class StartCallModel: ObservableObject {
         return ["project_dir": root, "title": title.isEmpty ? (project?.name ?? workspace?.name ?? "Meeting") : title,
                 "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,
                 "me_lang": langs.0, "langs": langs.1, "me_langs": langs.0 == "uk" ? ["uk", "en"] : [langs.0],
-                "context": context.trimmingCharacters(in: .whitespacesAndNewlines)]
+                "context": context.trimmingCharacters(in: .whitespacesAndNewlines), "mic_device": micDevice]
     }
 }
 
@@ -361,6 +388,17 @@ struct StartCallView: View {
                     Text("Standard").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
                 }
                 .help("Standard: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview work best with a Cowork prep.")
+                Picker("Microphone", selection: $model.micDevice) {
+                    Text("System default" + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
+                    Text("Mac built-in microphone").tag("builtin")
+                    ForEach(model.micInputs.filter { !$0.builtin }, id: \.uid) { d in
+                        Text(d.name).tag("uid:" + d.uid)
+                    }
+                    if model.micDevice.hasPrefix("uid:") && !model.micInputs.contains(where: { "uid:" + $0.uid == model.micDevice }) {
+                        Text("Not connected: " + String(model.micDevice.dropFirst(4))).tag(model.micDevice)
+                    }
+                }
+                .help("Your voice. System default follows macOS (AirPods, a headset or the Mac). Pick a device to keep it even if macOS switches. Can be changed during the call in the tips window.")
                 Picker("Languages", selection: $model.language) {
                     Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
                 }
@@ -374,8 +412,8 @@ struct StartCallView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 540, height: 640)
-        .onAppear { model.scanPrep() }
+        .frame(width: 540, height: 680)
+        .onAppear { model.scanPrep(); model.loadMicInputs() }
     }
 }
 
@@ -398,7 +436,7 @@ final class StartCallWindow {
         let w = window ?? NSWindow(contentViewController: host)
         w.contentViewController = host
         w.styleMask.insert(.resizable)
-        w.setContentSize(NSSize(width: 540, height: 640))
+        w.setContentSize(NSSize(width: 540, height: 680))
         w.title = "Start call"
         w.isReleasedWhenClosed = false
         window = w

@@ -107,6 +107,7 @@
     background: var(--panel); border: 1px solid var(--blue); border-left: 4px solid var(--blue);
     max-height: 60%; overflow-y: auto; font-size: 13px; }
   #spkask.show { display: block; }
+  .tip.partial .gist::after { content: " …"; opacity: .6; }
   #spkask.mini { max-height: none; padding-top: 4px; padding-bottom: 4px; cursor: pointer; }
   #spkask.mini .quote, #spkask.mini .names, #spkask.mini .nrow { display: none; }
   #spkask .h { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -1563,9 +1564,14 @@
     var qs = list.querySelectorAll('.qline');
     for (var i = 0; i < qs.length; i++) qs[i].remove();
   }
+  function byUid(uid) { return uid ? list.querySelector('[data-uid="' + String(uid).replace(/"/g, '') + '"]') || $('pinbox').querySelector('[data-uid="' + String(uid).replace(/"/g, '') + '"]') : null; }
   function render(it) {
     if (empty) { empty.remove(); empty = null; }
     var kind = it.kind || 'tip';
+    // Streamed tips: the engine sends the gist first (partial) and the full tip with the same uid;
+    // "retract" removes a gist whose tip was dropped. The card keeps its place and pin.
+    if (kind === 'retract') { var gone = byUid(it.uid); if (gone) gone.remove(); return; }
+    var oldEl = byUid(it.uid);
     // A "question heard" line lives until the next tip, answer or question replaces it.
     if (kind !== 'ask') dropQuestions();
     if (working && kind !== 'ask' && kind !== 'question' && !/^\s*\u{1F198}\s*Asking Claude/u.test(it.gist || '')) hideWorking();
@@ -1578,7 +1584,8 @@
       list.scrollTop = 0;
       return;
     }
-    el.className = 'tip ' + (it.level || 'info') + ' ' + kind + (it.late ? ' late' : '') + (SOS_RE.test(it.gist || '') ? ' sos' : '');
+    el.className = 'tip ' + (it.level || 'info') + ' ' + kind + (it.late ? ' late' : '') + (SOS_RE.test(it.gist || '') ? ' sos' : '') + (it.partial ? ' partial' : '');
+    if (it.uid) el.dataset.uid = String(it.uid);
     var html = '';
     var lag = lagOf(it);
     if (it.q) html += '<div class="q">' + i18nSpan('you') + ': ' + inline(it.q) + '</div>';
@@ -1639,6 +1646,13 @@
       el.classList.add('latest');
     }
     if (kind === 'speech' || kind === 'checklist') setBrief(it.at || it.t, !!refreshAt);
+    if (oldEl) {
+      el.dataset.seq = oldEl.dataset.seq;
+      if (oldEl.classList.contains('pinned')) { el.classList.add('pinned'); var pb2 = el.querySelector('.fb .pin'); if (pb2) pb2.classList.add('on'); }
+      if (oldEl.classList.contains('latest')) el.classList.add('latest');
+      oldEl.replaceWith(el);
+      return;
+    }
     list.insertBefore(el, list.firstChild);
     list.scrollTop = 0;
     while (list.children.length > 40) list.removeChild(list.lastChild);

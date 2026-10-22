@@ -683,8 +683,8 @@
       sec_diag: 'Diagnostics',
       help_sum: 'Help: what every element means',
       // alerts
-      al_deaf: 'Claude is not listening ({n} s)',
-      al_deaf_sub: 'Tips stopped. Write "continue" in the Cowork chat',
+      al_deaf: 'Tips engine is not responding ({n} s)',
+      al_deaf_sub: 'Live Tips restarts it by itself. If it stays, end the call and start it again',
       al_copy: 'Copy "continue"',
       al_copied: 'Copied',
       al_mic_streak: 'Mic still not recording after {n} restarts',
@@ -753,7 +753,7 @@
       st_mic_stall: '⚠ YOUR MIC IS NOT RECORDING, restarting it',
       st_tips_lag: 'tips ~{n} s behind',
       st_asr_lag: 'transcript {n} s behind',
-      st_deaf: '⚠ Claude is not listening ({n} s). Write "continue" in the Cowork chat',
+      st_deaf: '⚠ Tips engine is not responding ({n} s)',
       d_mic: 'mic {v}',
       d_restarts: 'mic restarts {n}',
       d_streak: ', streak {n}',
@@ -822,7 +822,7 @@
         '<dt>Who is speaking?</dt><dd>A new voice talked for a few seconds. Pick a name (a dot = voice match: green strong, orange fair), type one and press Enter, or Skip. Picking a name already used in this call merges the two. Names are never set by themselves.</dd>' +
         '</dl><h5>Strip under the bar</h5><dl>' +
         '<dt>One alert</dt><dd>Only the most important problem, with a one-click fix: Claude not listening, mic not recording (Use Mac mic), mic switched (Back to headset), other side silent, transcript behind, setting confirmed.</dd>' +
-        '<dt>Claude not listening</dt><dd>Write "continue" in the Cowork chat.</dd>' +
+        '<dt>Tips engine not responding</dt><dd>Live Tips restarts it by itself; if it stays, end the call and start again.</dd>' +
         '</dl><h5>Bottom</h5><dl>' +
         '<dt>🆘 HELP NOW</dt><dd>Stuck right now: the best facts for what is being said appear at once, then Claude\'s answer.</dd>' +
         '<dt>⏸ / ▶</dt><dd>Pause tips: Claude keeps recording and listening but shows nothing new (the top bar says "Tips paused"). HELP NOW and your typed questions still work. ▶ resumes; held items then appear.</dd>' +
@@ -962,8 +962,8 @@
       refresh_note: 'оновлюю довідку, 1-3 хв, запис триває',
       sec_diag: 'Діагностика',
       help_sum: 'Пояснення: що означає кожен елемент',
-      al_deaf: 'Claude не слухає ({n} с)',
-      al_deaf_sub: 'Підказки зупинилися. Напиши "continue" у чаті Cowork',
+      al_deaf: 'Рушій підказок не відповідає ({n} с)',
+      al_deaf_sub: 'Live Tips перезапускає його сам. Якщо не минає, заверши дзвінок і почни знову',
       al_copy: 'Скопіювати "continue"',
       al_copied: 'Скопійовано',
       al_mic_streak: 'Мікрофон досі не записує після {n} перезапусків',
@@ -1029,7 +1029,7 @@
       st_mic_stall: '⚠ ТВІЙ МІКРОФОН НЕ ЗАПИСУЄ, перезапускаю',
       st_tips_lag: 'підказки відстають на ~{n} с',
       st_asr_lag: 'розшифровка відстає на {n} с',
-      st_deaf: '⚠ Claude не слухає ({n} с). Напиши "continue" у чаті Cowork',
+      st_deaf: '⚠ Рушій підказок не відповідає ({n} с)',
       d_mic: 'мікрофон {v}',
       d_restarts: 'перезапусків мікрофона {n}',
       d_streak: ', поспіль {n}',
@@ -1097,7 +1097,7 @@
         '<dt>Хто говорить?</dt><dd>Новий голос говорив кілька секунд. Вибери ім\'я (крапка = збіг голосу: зелена сильний, помаранчева середній), введи своє і натисни Enter або «Пропустити». Ім\'я, яке вже є в цьому дзвінку, об\'єднає двох. Імена ніколи не ставляться самі.</dd>' +
         '</dl><h5>Смуга під верхньою</h5><dl>' +
         '<dt>Одне попередження</dt><dd>Лише найважливіша проблема з виправленням в один клік: Claude не слухає, мікрофон не записує («Мікрофон Mac»), мікрофон перемкнувся («Назад на гарнітуру»), не чути співрозмовників, розшифровка відстає, налаштування підтверджено.</dd>' +
-        '<dt>Claude не слухає</dt><dd>Напиши "continue" у чаті Cowork.</dd>' +
+        '<dt>Рушій підказок не відповідає</dt><dd>Live Tips перезапускає його сам; якщо не минає, заверши дзвінок і почни знову.</dd>' +
         '</dl><h5>Унизу</h5><dl>' +
         '<dt>🆘 ДОПОМОЖИ</dt><dd>Застряг просто зараз: одразу з\'являються найкращі факти до того, що говорять, а потім відповідь Claude.</dd>' +
         '<dt>⏸ / ▶</dt><dd>Пауза підказок: Claude і далі записує та слухає, але нічого нового не показує (угорі напис «На паузі»). ДОПОМОЖИ і твої питання працюють. ▶ відновлює, і тоді з\'являється все, що чекало.</dd>' +
@@ -1258,7 +1258,7 @@
     var out = [], rec = S.state === 'recording';
     if (rec && S.listener_age_s != null && S.listener_age_s > 75)
       out.push({ id: 'deaf', cls: 'crit', text: t('al_deaf', { n: S.listener_age_s }),
-                 sub: t('al_deaf_sub'), act: 'copy', actText: t('al_copy') });
+                 sub: t('al_deaf_sub') });   // Live Tips app: no Cowork chat to write "continue" in
     var streak = +S.mic_stall_streak || 0;
     if (rec && S.mic !== 'muted' && (S.mic === 'stalled' || streak >= 3)) {
       var onMac = S.mic_device === 'builtin';

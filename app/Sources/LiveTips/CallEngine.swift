@@ -16,6 +16,7 @@ final class CallEngine {
     var statusPath: String { (appRoot as NSString).appendingPathComponent("state/status.json") }
     var isRunning: Bool { recorder?.isRunning ?? false }
     var callContext = ""
+    var sidecarRestarts = 0
     var projectRoot = ""
 
     func problems() -> [String] {
@@ -36,6 +37,7 @@ final class CallEngine {
         LocalAIService.shared.apply()                       // core config: semantic on/off, engine URL
         if config.localAI.enabled { _ = LocalAIService.shared.waitReady(timeout: 6) }
         callContext = (request["context"] as? String) ?? ""
+        sidecarRestarts = 0
         projectRoot = (request["project_dir"] as? String) ?? ""
         let c = config
         let control = (appRoot as NSString).appendingPathComponent("control")
@@ -69,6 +71,12 @@ final class CallEngine {
                 self.onReady?(st)
                 if apiAllowed { self.startSidecar(file: file, status: st) }
             }
+            // The tips engine must live as long as the recording: restart it if it ended (it reads on from now).
+            if sidecarStarted, apiAllowed, st.state == "recording", let file = st.file,
+               let sc = self.sidecar, !sc.isRunning, self.sidecarRestarts < 5 {
+                self.sidecarRestarts += 1
+                self.startSidecar(file: file, status: st, fromStart: false)
+            }
             if !(self.recorder?.isRunning ?? false) {
                 t.invalidate()
                 self.sidecar?.terminate()
@@ -92,7 +100,7 @@ final class CallEngine {
         p.waitUntilExit()
     }
 
-    func startSidecar(file: String, status: EngineStatus) {
+    func startSidecar(file: String, status: EngineStatus, fromStart: Bool = true) {
         let c = config
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
@@ -119,9 +127,9 @@ final class CallEngine {
         let stem = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
-        p.arguments = ["-m", "livetips_m0.live", "--config", cfgPath, "--md", file,
+        p.arguments = ["-m", "livetips_m0.live", "--config", cfgPath, "--md", file] + (fromStart ? ["--from-start"] : []) + [
                        "--out", (appRoot as NSString).appendingPathComponent("runs/" + stem),
-                       "--status", statusPath, "--from-start", "--state-dir", state,
+                       "--status", statusPath, "--idle-min", "0", "--state-dir", state,
                        "--tips-out", status.tipsFile ?? (file + ".tips.jsonl"),
                        "--inbox", status.inboxFile ?? ""]
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)

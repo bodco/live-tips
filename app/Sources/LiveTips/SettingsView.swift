@@ -57,7 +57,34 @@ enum KeyTester {
 
 @MainActor
 final class SettingsModel: ObservableObject {
-    @Published var config = AppConfig.load(from: AppPaths.config) { didSet { if config != oldValue { saveConfig() } } }
+    @Published var config = AppConfig.load(from: AppPaths.config) {
+        didSet {
+            guard config != oldValue else { return }
+            saveConfig()
+            let support = AppPaths.support.path
+            let was = oldValue.effectiveAppRoot(appSupport: support), now = config.effectiveAppRoot(appSupport: support)
+            if was != now { scheduleFolderMove(from: was) }
+        }
+    }
+    /// The app folder follows the work folder (or the override). Its files move once the path has
+    /// stayed the same for 1.5 s and its parent folder exists, so typing a path does not move anything.
+    private var moveFrom: String?
+    private var moveWork: DispatchWorkItem?
+    func scheduleFolderMove(from old: String) {
+        if moveFrom == nil { moveFrom = old }
+        moveWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, let from = self.moveFrom else { return }
+                let to = self.config.effectiveAppRoot(appSupport: AppPaths.support.path)
+                guard FileManager.default.fileExists(atPath: (to as NSString).deletingLastPathComponent) else { return }
+                self.moveFrom = nil
+                AppFolderMover.relocate(from: from, to: to)
+            }
+        }
+        moveWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: w)
+    }
     @Published var registry = ProjectRegistry.load(from: AppPaths.projects) { didSet { if registry != oldValue { saveRegistry() } } }
     @Published var keyState: [SecretStore.Key: KeyState] = [:]
     @Published var masks: [SecretStore.Key: String] = [:]
@@ -470,9 +497,17 @@ struct SettingsView: View {
                 .font(.caption).foregroundStyle(.secondary)
             }
             Section {
-                FolderRow(title: "App folder",
-                          hint: "Leave empty. Default: <work folder>/Tools/LiveTips. Change only if the skill should look for the app's status elsewhere.",
-                          path: $model.config.appRoot, placeholder: "default", choose: { model.chooseFolder("Choose the app folder") })
+                LabeledContent {
+                    HStack {
+                        Text(model.config.effectiveAppRoot(appSupport: AppPaths.support.path))
+                            .font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Button("Choose…") { if let p = model.chooseFolder("Choose the app folder") { model.config.appRoot = p } }
+                        if !model.config.appRoot.isEmpty { Button("Default") { model.config.appRoot = "" } }
+                    }
+                } label: {
+                    Text("App folder").help("Where the app keeps its recorder core, local AI model, state and logs. Default: <work folder>/Tools/LiveTips. When it changes, the files move there by themselves (not during a call).")
+                }
             } header: { Text("Advanced") }
         }
         .formStyle(.grouped)

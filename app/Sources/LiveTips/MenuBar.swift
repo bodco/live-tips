@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import LiveTipsCore
 import SwiftUI
+import Combine
 
 /// Menu bar item and the main app delegate: live status, spending against limits, Start call,
 /// tips window, settings. The Dock icon is on by default so the app is visible even when the
@@ -415,6 +416,7 @@ struct StartCallView: View {
         .formStyle(.grouped)
         .frame(width: 540, height: 680)
         .onAppear { model.scanPrep(); model.loadMicInputs() }
+        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
     }
 }
 

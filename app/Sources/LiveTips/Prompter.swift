@@ -115,6 +115,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         window.delegate = self
         window.isReleasedWhenClosed = false
         _ = window.setFrameAutosaveName("LiveTipsAppPrompter")   // remembers position and size
+        addEndCallButton()
 
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
         web.navigationDelegate = self
@@ -236,4 +237,34 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     /// Back to the normal width before the frame is saved, so the next call does not open twice as wide.
     func windowWillClose(_ notification: Notification) { setSplit(false, animate: false) }
+
+    /// "End call" in the window's title bar: stops the recording; the transcript and tips stay in the project folder.
+    var endButton: NSButton?
+    func addEndCallButton() {
+        let b = NSButton(title: "End call", target: self, action: #selector(endCallClicked))
+        b.bezelStyle = .rounded
+        b.controlSize = .small
+        b.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        b.contentTintColor = .systemRed
+        b.toolTip = "Stop recording this call"
+        b.sizeToFit()
+        let holder = NSView(frame: NSRect(x: 0, y: 0, width: b.frame.width + 12, height: 28))
+        b.frame.origin = NSPoint(x: 4, y: (28 - b.frame.height) / 2)
+        holder.addSubview(b)
+        let acc = NSTitlebarAccessoryViewController()
+        acc.view = holder
+        acc.layoutAttribute = .trailing
+        window.addTitlebarAccessoryViewController(acc)
+        endButton = b
+    }
+
+    @objc func endCallClicked() {
+        guard CallEngine.shared.isRunning else { window.close(); return }
+        let a = NSAlert()
+        a.messageText = "End the call?"
+        a.informativeText = "Recording stops; the transcript and tips stay in the project folder."
+        a.addButton(withTitle: "End call")
+        a.addButton(withTitle: "Cancel")
+        if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop() }
+    }
 }

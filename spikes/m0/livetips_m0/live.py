@@ -146,7 +146,7 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
                     break
             except ValueError:
                 pass
-        if time.monotonic() - last_new > idle_min * 60:
+        if idle_min and time.monotonic() - last_new > idle_min * 60:     # 0 = never (app mode)
             break
         if max_s and time.monotonic() - t0 > max_s:
             break

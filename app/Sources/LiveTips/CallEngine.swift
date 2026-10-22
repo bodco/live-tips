@@ -59,6 +59,7 @@ final class CallEngine {
             let st = EngineStatus.load(path: self.statusPath)
             if !sidecarStarted, let file = st.file, st.state == "recording" || st.state == "loading_model" {
                 sidecarStarted = true
+                self.adoptPrep(file: file)
                 self.onReady?(st)
                 if apiAllowed { self.startSidecar(file: file, status: st) }
             }
@@ -68,6 +69,21 @@ final class CallEngine {
             }
         }
         return nil
+    }
+
+    /// Picks up a prep made ahead in Cowork (prep-<time>-<title>.brief.md, cards.json, facts.json).
+    func adoptPrep(file: String) {
+        let c = config
+        let lt = (appRoot as NSString).appendingPathComponent("bin/lt")
+        guard FileManager.default.fileExists(atPath: lt) else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.python)
+        p.arguments = [lt, "prep-check", file, "--adopt-prep"]
+        let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/prep.log"))
+        p.standardOutput = log
+        p.standardError = log
+        try? p.run()
+        p.waitUntilExit()
     }
 
     func startSidecar(file: String, status: EngineStatus) {

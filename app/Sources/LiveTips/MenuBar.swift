@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         it.menu = menu
         item = it
         refresh()
+        MainActor.assumeIsolated { LocalAIService.shared.apply() }
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         if !UserDefaults.standard.bool(forKey: "onboarded") {
             UserDefaults.standard.set(true, forKey: "onboarded")
@@ -132,6 +133,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop() }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated { LocalAIService.shared.stop() }
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard CallEngine.shared.isRunning else { return .terminateNow }
         let a = NSAlert()
@@ -192,12 +197,48 @@ final class StartCallModel: ObservableObject {
     @Published var callType = "auto"
     @Published var language = "uk+en"
     @Published var note = ""
+    @Published var context = ""
+    @Published var prep: PrepInfo?
     let registry = ProjectRegistry.load(from: AppPaths.projects)
     let config = AppConfig.load(from: AppPaths.config)
 
     init() {
         target = registry.lastUsed
         applyProjectDefaults()
+    }
+
+    struct PrepInfo { var heading: String; var made: Date; var file: String }
+
+    /// A prep made in Cowork (prep-*.brief.md in <project folder>/live, younger than 3 h). The recorder
+    /// adopts it on start: the one whose name matches the title, else the newest.
+    func scanPrep() {
+        prep = nil
+        guard let root = root else { return }
+        let live = (root as NSString).appendingPathComponent("live")
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: live) else { return }
+        var best: PrepInfo?
+        for n in names where n.hasPrefix("prep-") && n.hasSuffix(".brief.md") {
+            let path = (live as NSString).appendingPathComponent(n)
+            guard let m = (try? fm.attributesOfItem(atPath: path))?[.modificationDate] as? Date,
+                  Date().timeIntervalSince(m) < 3 * 3600 else { continue }
+            if let b = best, b.made > m { continue }
+            let first = (try? String(contentsOfFile: path, encoding: .utf8))?.split(separator: "\n").first.map(String.init) ?? n
+            let heading = first.replacingOccurrences(of: "# Live Brief (prep):", with: "").replacingOccurrences(of: "#", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            best = PrepInfo(heading: heading.isEmpty ? n : heading, made: m, file: n)
+        }
+        prep = best
+    }
+
+    var targetName: String { project?.name ?? workspace?.name ?? "the project" }
+
+    /// Phrase to paste into Cowork to make a prep for this call.
+    var prepPhrase: String {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"
+        let t = title.isEmpty ? "the call" : "\"\(title)\""
+        return "Prepare live tips for \(t) at \(f.string(from: Date().addingTimeInterval(15 * 60))), project \(targetName)" +
+            (context.isEmpty ? "" : ". Context: \(context)")
     }
 
     var project: Project? { registry.projects.first { "project:" + $0.slug == target } }
@@ -225,7 +266,8 @@ final class StartCallModel: ObservableObject {
         try? reg.save(to: AppPaths.projects)
         return ["project_dir": root, "title": title.isEmpty ? (project?.name ?? workspace?.name ?? "Meeting") : title,
                 "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,
-                "me_lang": langs.0, "langs": langs.1, "me_langs": langs.0 == "uk" ? ["uk", "en"] : [langs.0]]
+                "me_lang": langs.0, "langs": langs.1, "me_langs": langs.0 == "uk" ? ["uk", "en"] : [langs.0],
+                "context": context.trimmingCharacters(in: .whitespacesAndNewlines)]
     }
 }
 
@@ -233,46 +275,97 @@ struct StartCallView: View {
     @ObservedObject var model: StartCallModel
     var onStart: () -> Void
     var onCancel: () -> Void
+    @State private var copied = false
 
     var body: some View {
         Form {
-            Picker("Project", selection: $model.target) {
-                Text("Choose…").tag("")
-                if !model.registry.workspaces.isEmpty {
-                    Section("Workspaces") {
-                        ForEach(model.registry.workspaces, id: \.name) { w in
-                            Label(w.name, systemImage: "square.stack.3d.up").tag("workspace:" + w.name)
+            Section {
+                Picker("Project", selection: $model.target) {
+                    Text("Choose…").tag("")
+                    if !model.registry.workspaces.isEmpty {
+                        Section("Workspaces") {
+                            ForEach(model.registry.workspaces, id: \.name) { w in
+                                Label(w.name, systemImage: "square.stack.3d.up").tag("workspace:" + w.name)
+                            }
+                        }
+                    }
+                    Section("Projects") {
+                        ForEach(model.registry.projects.filter { $0.status != "archived" }, id: \.slug) { p in
+                            Label(p.name, systemImage: "folder").tag("project:" + p.slug)
                         }
                     }
                 }
-                Section("Projects") {
-                    ForEach(model.registry.projects.filter { $0.status != "archived" }, id: \.slug) { p in
-                        Label(p.name, systemImage: "folder").tag("project:" + p.slug)
+                .help("Recordings and notes go to this folder. A workspace is for general calls about several projects.")
+                .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep() }
+                if let r = model.root {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(r).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        Text(model.details).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                TextField("Title", text: $model.title, prompt: Text("e.g. Weekly sync with the client"))
             }
-            .help("Recordings and notes go to this folder. A workspace is for general calls about several projects.")
-            .onChange(of: model.target) { model.applyProjectDefaults() }
-            if let r = model.root {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(r).font(.caption).foregroundStyle(.secondary)
-                    Text(model.details).font(.caption).foregroundStyle(.secondary)
+            Section {
+                ZStack(alignment: .topLeading) {
+                    if model.context.isEmpty {
+                        Text("What the call is about and where to look: goal, open questions, people, the docs or tickets that matter (for example \"pricing for phase 2, see the estimate and last week's notes\"). Claude reads it with the project's current state and searches the project files for it before the call starts.")
+                            .font(.callout).foregroundStyle(.tertiary)
+                            .padding(.top, 1).padding(.leading, 5)
+                            .allowsHitTesting(false)
+                    }
+                    TextEditor(text: $model.context)
+                        .font(.callout)
+                        .scrollContentBackground(.hidden)
+                        .frame(height: 84)
                 }
+            } header: {
+                Text("Call context")
+            } footer: {
+                Text("Optional, but tips get much better with it. Works with or without a Cowork prep.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            TextField("Title", text: $model.title, prompt: Text("optional"))
-            Picker("Audience", selection: $model.audience) {
-                Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client")
+            Section {
+                if let p = model.prep {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Prep found: \(p.heading)").lineLimit(2)
+                            Text("Made \(p.made.formatted(date: .omitted, time: .shortened)) in Cowork; it will be used for this call.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: { Image(systemName: "checkmark.seal.fill").foregroundStyle(.green) }
+                } else {
+                    Label {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("No Cowork prep for this project in the last 3 hours.")
+                            Text("A prep is a brief, fact cards and an outline that Claude builds in Cowork from your project files, Notion and Jira 10-30 minutes before the call. Copy the request, paste it into Cowork, then start the call here: the prep is picked up from the project's live folder automatically.")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button(copied ? "Copied" : "Copy request for Cowork") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(model.prepPhrase, forType: .string)
+                                copied = true
+                            }
+                            .controlSize(.small)
+                            .disabled(model.target.isEmpty)
+                        }
+                    } icon: { Image(systemName: "doc.badge.clock").foregroundStyle(.secondary) }
+                }
+            } header: { Text("Prep") }
+            Section {
+                Picker("Audience", selection: $model.audience) {
+                    Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client")
+                }
+                .pickerStyle(.segmented)
+                .help("Who is on the other side. Auto: detected from who speaks. Team: internal call, no corrections of your facts. Client: stricter, internal numbers are never shown, the client's culture profile is used. The language is chosen separately.")
+                Picker("Meeting type", selection: $model.callType) {
+                    Text("Standard").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
+                }
+                .help("Standard: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview work best with a Cowork prep.")
+                Picker("Languages", selection: $model.language) {
+                    Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
+                }
+                .help("What may be spoken on the call; transcription is restricted to these.")
             }
-            .pickerStyle(.segmented)
-            .help("Who is on the other side. Team: internal call, you think aloud, no corrections of your facts. Client: stricter, restricted internal numbers are never shown, client's culture profile is used, answer check is on. The language is chosen separately.")
-            Picker("Meeting type", selection: $model.callType) {
-                Text("Standard").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
-            }
-            .help("Standard: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview need a prep in Cowork first.")
-            Picker("Languages", selection: $model.language) {
-                Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
-            }
-            .help("What may be spoken on the call; transcription is restricted to these.")
             HStack {
                 Text(model.note).font(.caption).foregroundStyle(.orange)
                 Spacer()
@@ -281,7 +374,8 @@ struct StartCallView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500)
+        .frame(width: 540, height: 720)
+        .onAppear { model.scanPrep() }
     }
 }
 
@@ -300,8 +394,11 @@ final class StartCallWindow {
             }
             if let err = err { model.note = err } else { window?.close() }
         }, onCancel: { window?.close() })
-        let w = window ?? NSWindow(contentViewController: NSHostingController(rootView: view))
-        w.contentViewController = NSHostingController(rootView: view)
+        let host = NSHostingController(rootView: view)
+        let w = window ?? NSWindow(contentViewController: host)
+        w.contentViewController = host
+        w.styleMask.insert(.resizable)
+        w.setContentSize(NSSize(width: 540, height: 720))
         w.title = "Start call"
         w.isReleasedWhenClosed = false
         window = w

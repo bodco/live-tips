@@ -169,6 +169,12 @@ final class SettingsModel: ObservableObject {
     }
 
     func saveConfig() { try? config.save(to: AppPaths.config) }
+    @Published var localAIStatus: (ok: Bool, text: String) = (false, "Checking…")
+    func refreshLocalAI(after delay: Double = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            MainActor.assumeIsolated { self?.localAIStatus = LocalAIService.shared.statusLine() }
+        }
+    }
     func saveRegistry() { try? registry.save(to: AppPaths.projects) }
 }
 
@@ -325,13 +331,36 @@ struct SettingsView: View {
                     Text("Ollama").tag("ollama")
                 }
                 .disabled(!model.config.localAI.enabled)
-                .help("Built-in: nothing else to install. Ollama: your local Ollama server with bge-m3, shared with the Cowork skill.")
+                .help("Built-in: nothing else to install. Ollama: your local Ollama server, shared with the Cowork skill.")
                 if model.config.localAI.engine == "ollama" {
                     TextField("Ollama URL", text: $model.config.localAI.ollamaURL).disabled(!model.config.localAI.enabled)
+                    TextField("Model", text: $model.config.localAI.ollamaModel, prompt: Text("bge-m3"))
+                        .disabled(!model.config.localAI.enabled)
+                        .help("An embedding model pulled in Ollama. Another model needs a project reindex (lt index --rebuild) and its own thresholds.")
+                }
+                LabeledContent("Status") {
+                    HStack(spacing: 6) {
+                        Image(systemName: model.localAIStatus.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
+                            .foregroundStyle(model.localAIStatus.ok ? .green : .orange)
+                        Text(model.localAIStatus.text).font(.caption).foregroundStyle(.secondary)
+                        Button("Check") { model.refreshLocalAI() }.controlSize(.small)
+                    }
+                }
+                DisclosureGroup("About the engines") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("**Built-in.** bge-m3 by BAAI (open model, MIT license), a multilingual text embedding model: it turns a line of the call or a piece of a project file into numbers so that texts with the same meaning sit close, in Ukrainian, English and Spanish alike. Live Tips runs the int8 ONNX build (Xenova/bge-m3 on Hugging Face, about 570 MB) with ONNX Runtime on the CPU of this Mac: about 25 ms per line, about 1 s to start. The model lives in <app folder>/models/bge-m3-int8. Text never leaves the Mac.")
+                        Text("**Ollama.** If you already run Ollama (ollama.com) for the Cowork skill, Live Tips can use the same server: `ollama pull bge-m3`, then choose Ollama here. Both engines give the same search results on the existing project index (checked: the same top result on 8 of 8 test queries), so switching needs no reindex.")
+                        Text("**Another model.** Any embedding model from the Ollama library (for example multilingual-e5 or nomic-embed-text): `ollama pull <name>`, put the name into Model, then rebuild each project index with `lt index <project folder> --rebuild`. Thresholds in rules/semantic.yaml are tuned for bge-m3, so check them on a recorded call before trusting a new model. Other built-in models (any ONNX export with tokenizer.json) are planned; for now the built-in engine is bge-m3 only.")
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             } header: { Text("Local AI") } footer: {
                 Text("Audio and voice prints never leave the Mac; only text goes to the Claude API.").font(.caption).foregroundStyle(.secondary)
             }
+            .onChange(of: model.config.localAI) { LocalAIService.shared.apply(); model.refreshLocalAI(after: 2) }
+            .onAppear { model.refreshLocalAI() }
         }
         .formStyle(.grouped)
     }

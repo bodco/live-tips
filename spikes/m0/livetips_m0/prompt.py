@@ -90,7 +90,7 @@ def facts_block(facts_path: Optional[Path], cards_path: Optional[Path], limit: i
 
 
 class PromptBuilder:
-    def __init__(self, rules, call_meta: dict, brief_path=None, facts_path=None, cards_path=None):
+    def __init__(self, rules, call_meta: dict, brief_path=None, facts_path=None, cards_path=None, extra_context: str = ""):
         self.rules = rules
         lim = rules.diet["limits"]
         self.fmt = {"tips_lang": call_meta.get("tips_lang", "uk"), "gist_words": lim["gist_words_max"],
@@ -106,7 +106,8 @@ class PromptBuilder:
                      them_label=call_meta.get("them_label", ""), aliases=", ".join(call_meta.get("name_aliases", [])))
         self.blocks = [
             {"text": render_rules(rules), "cache": True},
-            {"text": header + "\n\nBRIEF:\n" + (_read(brief_path, 40000) or "(no brief)"), "cache": True},
+            {"text": header + "\n\nBRIEF:\n" + (_read(brief_path, 40000) or "(no brief)")
+                     + ("\n\n" + extra_context if extra_context else ""), "cache": True},
             {"text": "FACT BOOK AND CARDS:\n" + (facts_block(facts_path, cards_path) or "(none)"), "cache": True},
         ]
 

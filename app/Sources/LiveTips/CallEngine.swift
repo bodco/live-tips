@@ -15,6 +15,8 @@ final class CallEngine {
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
     var statusPath: String { (appRoot as NSString).appendingPathComponent("state/status.json") }
     var isRunning: Bool { recorder?.isRunning ?? false }
+    var callContext = ""
+    var projectRoot = ""
 
     func problems() -> [String] {
         let c = config
@@ -31,6 +33,10 @@ final class CallEngine {
     func start(request: [String: Any], apiAllowed: Bool, onReady: @escaping (EngineStatus) -> Void) -> String? {
         if isRunning { return "A call is already running" }
         if let first = problems().first { return first }
+        LocalAIService.shared.apply()                       // core config: semantic on/off, engine URL
+        if config.localAI.enabled { _ = LocalAIService.shared.waitReady(timeout: 6) }
+        callContext = (request["context"] as? String) ?? ""
+        projectRoot = (request["project_dir"] as? String) ?? ""
         let c = config
         let control = (appRoot as NSString).appendingPathComponent("control")
         let logs = (appRoot as NSString).appendingPathComponent("logs")
@@ -94,7 +100,7 @@ final class CallEngine {
         let state = (appRoot as NSString).appendingPathComponent("state")
         let cfgPath = (state as NSString).appendingPathComponent("sidecar-config.json")
         let core = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: (appRoot as NSString).appendingPathComponent("config.json"))))) as? [String: Any] ?? [:]
-        let sc: [String: Any] = [
+        var sc: [String: Any] = [
             "variant": "app", "provider": "anthropic", "api_key_env": "CLAUDE_API",
             "models": ["classify": c.models.classify, "tip": c.models.tip], "cache_ttl": "1h", "direct_route": true,
             "periodic_classify_s": 20, "max_parallel_calls": 4, "max_tokens": ["classify": 120, "tip": 300],
@@ -103,6 +109,10 @@ final class CallEngine {
             "name_aliases": c.nameAliases, "langs": core["langs"] ?? ["en"], "tips_lang": (c.uiLanguage == "uk" || (core["me_lang"] as? String) == "uk") ? "uk" : "en",
             "budget": ["ledger": SpendLedger.defaultPath, "call_soft_usd": c.budget.callSoftUSD,
                        "call_hard_usd": c.budget.callHardUSD, "monthly_hard_usd": c.budget.monthlyHardUSD]]
+        // Call context: the PM's note, the project's current state and local files found for it (lt search).
+        sc["call_context"] = callContext
+        sc["project_root"] = projectRoot
+        if c.localAI.enabled { sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")] }
         if let d = try? JSONSerialization.data(withJSONObject: sc, options: [.prettyPrinted]) {
             try? d.write(to: URL(fileURLWithPath: cfgPath), options: .atomic)
         }

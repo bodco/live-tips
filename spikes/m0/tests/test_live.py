@@ -58,3 +58,13 @@ def test_inbox_requests_and_acks(tmp_path):
     assert any(i.get("kind") == "ack" and i["key"] == "audience" for i in items)
     assert any(i.get("kind") == "tip" and i["level"] == "red" for i in items)
     assert any(i.get("kind") == "answer" and i.get("q") == "What is the release date?" for i in items)
+
+
+def test_call_context_block(tmp_path):
+    from livetips_m0.context import build
+    root = tmp_path / "proj"
+    (root / "_notion").mkdir(parents=True)
+    (root / "_notion" / "current-state.md").write_text("Release 2.4 on 15.01; payments retries in QA.")
+    txt = build("Weekly sync with the client about the release", str(root), lt_cmd=None)
+    assert "CALL CONTEXT FROM THE PM" in txt and "Release 2.4" in txt
+    assert build("", None) == ""

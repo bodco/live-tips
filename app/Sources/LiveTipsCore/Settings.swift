@@ -21,7 +21,17 @@ public struct AppConfig: Codable, Equatable {
         /// "embedded" (bge-m3 int8 via ONNX Runtime, default) or "ollama".
         public var engine = "embedded"
         public var ollamaURL = "http://127.0.0.1:11434"
+        /// Embedding model name in Ollama (bge-m3 by default; other models need a reindex and new thresholds).
+        public var ollamaModel = "bge-m3"
         public init() {}
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let d = LocalAI()
+            enabled = (try? c.decodeIfPresent(Bool.self, forKey: .enabled)) ?? d.enabled
+            engine = (try? c.decodeIfPresent(String.self, forKey: .engine)) ?? d.engine
+            ollamaURL = (try? c.decodeIfPresent(String.self, forKey: .ollamaURL)) ?? d.ollamaURL
+            ollamaModel = (try? c.decodeIfPresent(String.self, forKey: .ollamaModel)) ?? d.ollamaModel
+        }
     }
     /// Engine processes (M1-M2: Python core). Not shown in the UI; set by the installer.
     public struct Engine: Codable, Equatable {

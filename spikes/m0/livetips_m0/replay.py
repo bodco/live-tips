@@ -37,8 +37,16 @@ def build_engine(cfg, md: Path, out: Path, clock, provider=None):
     rules = Rules(Path(cfg["rules_dir"])) if cfg.get("rules_dir") else Rules()
     stem = md.name[:-3]
     base = md.parent / stem
+    extra = ""
+    if cfg.get("call_context") or cfg.get("project_root"):
+        from .context import build as build_context
+        extra = build_context(cfg.get("call_context", ""), cfg.get("project_root"), cfg.get("lt_cmd"))
+        if extra:
+            (out / (stem + ".app.context.md")).parent.mkdir(parents=True, exist_ok=True)
+            (out / (stem + ".app.context.md")).write_text(extra, encoding="utf-8")
     prompt = PromptBuilder(rules, call_meta_from_md(md, cfg), brief_path=Path(str(base) + ".brief.md"),
-                           facts_path=Path(str(base) + ".facts.json"), cards_path=Path(str(base) + ".cards.json"))
+                           facts_path=Path(str(base) + ".facts.json"), cards_path=Path(str(base) + ".cards.json"),
+                           extra_context=extra)
     if provider is None:
         provider = make_provider(cfg, lambda name: load_secret(name, cfg.get("secrets_file")))
     b = cfg.get("budget", {})

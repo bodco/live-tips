@@ -136,17 +136,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         buildMenu()
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth"] { uc.add(self, name: name) }
         let cfg = WKWebViewConfiguration()
         cfg.userContentController = uc
 
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let w: CGFloat = 520, h: CGFloat = 280
+        let w: CGFloat = 520, h: CGFloat = 420     // v36: taller default, the redesign has a dock and an action row
         let rect = NSRect(x: screen.midX - w / 2, y: screen.maxY - h - 6, width: w, height: h)
         window = NSWindow(contentRect: rect,
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
         window.title = args.title
+        window.titlebarAppearsTransparent = true   // the title bar blends with the page background
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.sharingType = .none          // ask macOS to keep the window out of screen capture
@@ -245,6 +246,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         case "pin":
             let on = (message.body as? Bool) ?? true
             window.level = on ? .floating : .normal
+        case "stealth":
+            // v37: the PM can switch stealth off to share or screenshot the window (default on).
+            let on = (message.body as? Bool) ?? true
+            window.sharingType = on ? .none : .readOnly
         case "opacity":
             if let v = message.body as? Double { window.alphaValue = CGFloat(max(0.35, min(1.0, v))) }
         case "mute":

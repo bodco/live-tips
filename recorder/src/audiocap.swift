@@ -18,8 +18,16 @@ let targetRate: Double = 16000
 let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: targetRate,
                                  channels: 1, interleaved: false)!
 
+private let logTimeFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.dateFormat = "HH:mm:ss"
+    return f
+}()
+
 func log(_ s: String) {
-    FileHandle.standardError.write(("[audiocap] " + s + "\n").data(using: .utf8)!)
+    let t = logTimeFormatter.string(from: Date())
+    FileHandle.standardError.write(("[audiocap] \(t) " + s + "\n").data(using: .utf8)!)
 }
 
 struct CapError: Error, CustomStringConvertible {
@@ -33,6 +41,7 @@ let stdoutHandle = FileHandle.standardOutput
 let writeQueue = DispatchQueue(label: "audiocap.write")
 var framesWritten: Int64 = 0
 var peakSinceReport: Float = 0
+var micStallTicks = 0             // health ticks in a row with zero mic frames (stall watchdog)
 
 func emit(_ buf: AVAudioPCMBuffer) {
     guard let ch = buf.floatChannelData else { return }
@@ -111,6 +120,71 @@ func deviceUID(_ dev: AudioDeviceID) -> String? {
     return st == noErr ? (uid as String) : nil
 }
 
+func deviceName(_ dev: AudioObjectID) -> String {
+    var addr = systemAddress(kAudioObjectPropertyName)
+    var name: CFString = "" as CFString
+    var size = UInt32(MemoryLayout<CFString>.stride)
+    let st = withUnsafeMutablePointer(to: &name) { ptr in
+        AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, ptr)
+    }
+    return st == noErr ? (name as String) : "?"
+}
+
+func hasChannels(_ dev: AudioDeviceID, _ scope: AudioObjectPropertyScope) -> Bool {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreamConfiguration,
+                                          mScope: scope, mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(dev, &addr, 0, nil, &size) == noErr, size > 0 else { return false }
+    let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+    defer { raw.deallocate() }
+    guard AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, raw) == noErr else { return false }
+    let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+    return list.reduce(0) { $0 + Int($1.mNumberChannels) } > 0
+}
+
+func nominalRate(_ dev: AudioObjectID) -> Double? {
+    var addr = systemAddress(kAudioDevicePropertyNominalSampleRate)
+    var r: Float64 = 0
+    var size = UInt32(MemoryLayout<Float64>.size)
+    return AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, &r) == noErr ? r : nil
+}
+
+func setNominalRate(_ dev: AudioObjectID, _ rate: Double) -> Bool {
+    var addr = systemAddress(kAudioDevicePropertyNominalSampleRate)
+    var r: Float64 = rate
+    return AudioObjectSetPropertyData(dev, &addr, 0, nil, UInt32(MemoryLayout<Float64>.size), &r) == noErr
+}
+
+func deviceIsBuiltIn(_ dev: AudioDeviceID) -> Bool {
+    var addr = systemAddress(kAudioDevicePropertyTransportType)
+    var t: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    guard AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, &t) == noErr else { return false }
+    return t == UInt32(kAudioDeviceTransportTypeBuiltIn)
+}
+
+/// Clock for the system tap aggregate. The Mac's built-in speakers: always 48 kHz and never switched
+/// by Bluetooth. A headset as clock breaks capture: AirPods drop to 24 kHz (HFP) when any app opens
+/// their mic, and the tap then delivers only half of the audio (seen 2026-10-15/16).
+/// Nothing is played through the clock device; it only paces the IO.
+func clockDeviceForTap() -> (AudioDeviceID, String)? {
+    var ids: [AudioDeviceID] = []
+    var addr = systemAddress(kAudioHardwarePropertyDevices)
+    var size: UInt32 = 0
+    if AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size) == noErr, size > 0 {
+        ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+        if AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &ids) != noErr { ids = [] }
+    }
+    if let b = ids.first(where: { deviceIsBuiltIn($0) && hasChannels($0, kAudioObjectPropertyScopeOutput) }) {
+        return (b, "built-in output")
+    }
+    if let d = defaultDevice(kAudioHardwarePropertyDefaultOutputDevice) { return (d, "default output") }
+    return nil
+}
+
+var systemExpectedRate: Double = 0      // tap rate, for the health check
+var systemCallbacks: Int64 = 0
+
 // MARK: - System audio (process tap)
 
 @available(macOS 14.2, *)
@@ -125,6 +199,13 @@ final class SystemCapture {
     private var listenerInstalled = false
 
     func start() throws {
+        if forceDeviceClock {
+            log("test: forcing a device clock")
+            withOutputSubdevice = true
+            try build()
+            installOutputListener()
+            return
+        }
         try build()
         // A tap-only aggregate normally runs on its own clock. If no IO arrives,
         // rebuild it with the default output device as clock source.
@@ -150,9 +231,11 @@ final class SystemCapture {
         guard err == noErr else { throw CapError("AudioHardwareCreateProcessTap failed: \(err)") }
 
         var subDevices: [[String: Any]] = []
-        if withOutputSubdevice, let out = defaultDevice(kAudioHardwarePropertyDefaultOutputDevice),
-           let uid = deviceUID(out) {
+        var clockName = "tap"
+        if withOutputSubdevice, let clk = clockDeviceForTap(), let uid = deviceUID(clk.0) {
             subDevices = [[kAudioSubDeviceUIDKey: uid]]
+            clockName = "\(clk.1) (\(deviceName(clk.0)))"
+            clockDevice = clk.0
         }
         var agg: [String: Any] = [
             kAudioAggregateDeviceNameKey: "live-transcriber-agg",
@@ -180,11 +263,20 @@ final class SystemCapture {
         guard let fmt = AVAudioFormat(streamDescription: &asbd) else { throw CapError("unsupported tap format") }
         guard let rs = Resampler(from: fmt) else { throw CapError("no converter for tap format \(fmt)") }
         resampler = rs
-        log("system tap: \(fmt.sampleRate) Hz, \(fmt.channelCount) ch, clock=\(withOutputSubdevice ? "output device" : "tap")")
+        systemExpectedRate = fmt.sampleRate
+        // The aggregate must run at the tap's rate, or it delivers only part of the audio.
+        if let aggRate = nominalRate(aggID), abs(aggRate - fmt.sampleRate) > 1 {
+            let ok = setNominalRate(aggID, fmt.sampleRate)
+            log("aggregate ran at \(aggRate) Hz, tap is \(fmt.sampleRate) Hz: set to tap rate \(ok ? "ok" : "FAILED")")
+        }
+        let aggNow = nominalRate(aggID).map { String(format: "%.0f", $0) } ?? "?"
+        log("system tap: \(fmt.sampleRate) Hz, \(fmt.channelCount) ch, clock=\(clockName), aggregate=\(aggNow) Hz")
+        installRateListener()
 
         err = AudioDeviceCreateIOProcIDWithBlock(&procID, aggID, ioQueue) { [weak self] _, inInput, _, _, _ in
             guard let self else { return }
             self.callbacks += 1
+            systemCallbacks += 1
             guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, bufferListNoCopy: inInput, deallocator: nil),
                   let out = rs.convert(buf) else { return }
             emit(out)
@@ -192,6 +284,25 @@ final class SystemCapture {
         guard err == noErr, let pid = procID else { throw CapError("IOProc create failed: \(err)") }
         err = AudioDeviceStart(aggID, pid)
         guard err == noErr else { throw CapError("AudioDeviceStart failed: \(err)") }
+    }
+
+    private var clockDevice = AudioDeviceID(kAudioObjectUnknown)
+    private var rateListenerDevice = AudioObjectID(kAudioObjectUnknown)
+
+    /// Rebuild when the aggregate's rate changes (a clock device switching modes mid-call).
+    private func installRateListener() {
+        guard aggID != kAudioObjectUnknown, rateListenerDevice != aggID else { return }
+        rateListenerDevice = aggID
+        var addr = systemAddress(kAudioDevicePropertyNominalSampleRate)
+        let watched = aggID
+        AudioObjectAddPropertyListenerBlock(watched, &addr, .main) { [weak self] _, _ in
+            guard let self, self.aggID == watched else { return }
+            log("aggregate sample rate changed to \(nominalRate(watched) ?? 0) Hz, rebuilding tap")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.teardown()
+                do { try self.build() } catch { log("rebuild failed: \(error)") }
+            }
+        }
     }
 
     private func installOutputListener() {
@@ -299,17 +410,31 @@ final class MicCapture {
         let input = engine.inputNode
         let fmt = input.outputFormat(forBus: 0)
         guard fmt.sampleRate > 0, fmt.channelCount > 0 else { throw CapError("input device has no format") }
-        guard let rs = Resampler(from: fmt) else { throw CapError("no converter for mic format \(fmt)") }
-        input.installTap(onBus: 0, bufferSize: 4096, format: fmt) { buf, _ in
-            if let out = rs.convert(buf) { emit(out) }
-        }
+        try installMicTap(fmt)
         engine.prepare()
         try engine.start()
+        // The hardware format can differ before and after start (device switch, other app on the mic).
+        // Re-read it and rebuild the tap on the SAME engine instead of restarting the whole engine:
+        // a tap with a stale format delivers zero frames.
+        let live = engine.inputNode.outputFormat(forBus: 0)
+        if live.sampleRate > 0, live.channelCount > 0,
+           (live.sampleRate != fmt.sampleRate || live.channelCount != fmt.channelCount) {
+            try installMicTap(live)
+        }
+        let fin = engine.inputNode.outputFormat(forBus: 0)
         device = input.audioUnit.flatMap { currentDevice(of: $0) }
             ?? targetMicDevice() ?? AudioDeviceID(kAudioObjectUnknown)
-        rate = fmt.sampleRate
-        channels = fmt.channelCount
-        log("mic: \(fmt.sampleRate) Hz, \(fmt.channelCount) ch")
+        rate = fin.sampleRate
+        channels = fin.channelCount
+        log("mic: \(fin.sampleRate) Hz, \(fin.channelCount) ch, device=\(deviceName(device))")
+    }
+
+    private func installMicTap(_ fmt: AVAudioFormat) throws {
+        guard let rs = Resampler(from: fmt) else { throw CapError("no converter for mic format \(fmt)") }
+        engine.inputNode.removeTap(onBus: 0)
+        engine.inputNode.installTap(onBus: 0, bufferSize: 4096, format: fmt) { buf, _ in
+            if let out = rs.convert(buf) { emit(out) }
+        }
     }
 
     /// AVAudioEngine posts a configuration change right after start and whenever another app
@@ -318,12 +443,17 @@ final class MicCapture {
     func configurationChanged() {
         let dev = targetMicDevice() ?? device
         let fmt = engine.inputNode.outputFormat(forBus: 0)
-        if dev == device && fmt.sampleRate == rate && fmt.channelCount == channels && fmt.sampleRate > 0 {
-            if !engine.isRunning {
-                do { try engine.start(); return } catch { log("mic resume failed: \(error)") }
-            } else {
-                return
+        if dev == device && fmt.sampleRate > 0 && fmt.channelCount > 0 {
+            // Same device: only the format moved (or the engine paused). Retap on the same engine.
+            if fmt.sampleRate != rate || fmt.channelCount != channels {
+                do { try installMicTap(fmt); rate = fmt.sampleRate; channels = fmt.channelCount
+                     log("mic retap: \(fmt.sampleRate) Hz, \(fmt.channelCount) ch") }
+                catch { log("mic retap failed: \(error)"); scheduleRestart("retap failed"); return }
             }
+            if !engine.isRunning {
+                do { try engine.start() } catch { log("mic resume failed: \(error)"); scheduleRestart("resume failed") }
+            }
+            return
         }
         scheduleRestart("engine configuration change (\(fmt.sampleRate) Hz, \(fmt.channelCount) ch)")
     }
@@ -333,12 +463,25 @@ final class MicCapture {
         scheduleRestart("default input changed")
     }
 
+    private var restartTimes: [Date] = []
+
     func scheduleRestart(_ reason: String) {
         if restartPending { return }
         restartPending = true
         micRestarts += 1
+        let now = Date()
+        restartTimes = restartTimes.filter { now.timeIntervalSince($0) < 20 } + [now]
+        var delay = 0.7
+        if restartTimes.count > 5 {
+            // Restart storm: back off, and a forced built-in mic falls back to the system default input.
+            delay = 3.0
+            if micMode == "builtin" {
+                micMode = "default"
+                log("mic restart storm on the built-in microphone, falling back to the default input")
+            }
+        }
         log("mic restart: \(reason)")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
             self.restartPending = false
             self.engine.stop()
@@ -377,7 +520,11 @@ func requestMicAccess() -> Bool {
         let sem = DispatchSemaphore(value: 0)
         var ok = false
         AVCaptureDevice.requestAccess(for: .audio) { granted in ok = granted; sem.signal() }
-        sem.wait()
+        // 2026-10-21: a CLI tool may never get the prompt on screen; never hang here forever.
+        if sem.wait(timeout: .now() + 10) == .timedOut {
+            log("microphone permission prompt not answered in 10 s (System Settings > Privacy > Microphone)")
+            return false
+        }
         return ok
     default: return false
     }
@@ -387,11 +534,13 @@ func requestMicAccess() -> Bool {
 
 var source = ""
 var seconds: Double = 0
+var forceDeviceClock = false   // test only: skip the tap-only clock, as when it gives no IO
 var argv = CommandLine.arguments.dropFirst().makeIterator()
 while let a = argv.next() {
     switch a {
     case "--source": source = argv.next() ?? ""
     case "--seconds": seconds = Double(argv.next() ?? "0") ?? 0
+    case "--force-device-clock": forceDeviceClock = true
     case "--device": micMode = (argv.next() ?? "default") == "builtin" ? "builtin" : "default"
     case "-h", "--help":
         print("usage: audiocap --source system|mic [--device default|builtin] [--seconds N]")
@@ -403,6 +552,8 @@ while let a = argv.next() {
 }
 
 var keepAlive: [AnyObject] = []
+var micRef: MicCapture?          // for the stall watchdog in the health timer
+var micStarted = false           // set once mic.start() returned (startup watchdog)
 
 switch source {
 case "system":
@@ -419,12 +570,20 @@ case "system":
         keepAlive.append(src as AnyObject)
     }
 case "mic":
+    // Startup watchdog (2026-10-21): at 12:21 the mic start hung for 3.5 min with no log line at
+    // all (CoreAudio). If the start does not finish in 10 s, exit, so the recorder starts a fresh one.
+    log("mic: starting (permission, device, engine)")
+    DispatchQueue.global().asyncAfter(deadline: .now() + 10) {
+        if !micStarted { log("mic start hung for 10 s, exiting so the recorder restarts it"); exit(5) }
+    }
     guard requestMicAccess() else { log("microphone access denied (System Settings > Privacy > Microphone)"); exit(1) }
     let mic = MicCapture()
     mic.observe()
     mic.installDefaultInputListener()
     do { try mic.start() } catch { log("\(error)"); exit(1) }
     keepAlive.append(mic)
+    micRef = mic
+    micStarted = true
     log("mic input: " + (micMode == "builtin" ? "the Mac's built-in microphone" : "system default input"))
 default:
     log("usage: audiocap --source system|mic [--seconds N]")
@@ -432,12 +591,30 @@ default:
 }
 
 // Health line every 10 s: frames written and peak level. Peak 0 for a long time = silence or no permission.
+var lastHealthFrames: Int64 = 0
 let health = DispatchSource.makeTimerSource(queue: .main)
 health.schedule(deadline: .now() + 10, repeating: 10)
 health.setEventHandler {
     writeQueue.async {
         log(String(format: "health source=%@ frames=%lld peak=%.4f restarts=%lld", source, framesWritten, peakSinceReport, micRestarts))
         peakSinceReport = 0
+        // 10 s at 16 kHz = 160000 frames. Much less while IO runs = part of the audio is lost.
+        let delta = framesWritten - lastHealthFrames
+        lastHealthFrames = framesWritten
+        // Stall watchdog (2026-10-21): the input tap can stop delivering buffers with no
+        // configuration change notice (Meet reconfiguring the input on unmute). Two health ticks
+        // (20 s) with zero mic frames = rebuild the engine.
+        if source == "mic" {
+            micStallTicks = delta == 0 ? micStallTicks + 1 : 0
+            if micStallTicks >= 2 {
+                micStallTicks = 0
+                DispatchQueue.main.async { micRef?.scheduleRestart("stalled: no mic frames for 20 s") }
+            }
+        }
+        if source == "system" && delta > 0 && delta < 130000 {
+            log(String(format: "WARNING system audio at %.0f%% of real time (%lld frames in 10 s), speech will be chopped",
+                       Double(delta) / 1600.0, delta))
+        }
     }
 }
 health.resume()

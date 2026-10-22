@@ -1,0 +1,1041 @@
+#!/usr/bin/env python3
+"""lt: the live-tips helper. One command per procedure, so the skill calls a command instead of
+re-enacting a page of prose. Runs inside device_bash (Linux VM) or on the Mac itself.
+
+  lt start '<start.json as JSON>' [--dry-run] [--wait 60]
+                            check install, refuse a foreign recording, write control/start.json
+                            with a unique req_id, wait until status.json shows that req_id
+                            and "recording"; reuse only a live recording with the same slug AND title
+  lt status                 one line: state, mic, system, frames growing?, stalls, status_age_s, seq
+  lt stop [--wait 60]       touch control/stop, wait for "stopped" (no wait when the status is
+                            an error, missing or stale: says so at once)
+  lt prep-check <transcript> [--adopt-prep] [--fix]
+                            brief / cards / facts / outline present, valid and of the right types?
+                            --adopt-prep copies each missing file from a prep-* file younger than
+                            3 h, preferring the prep whose name matches the call title;
+                            --fix derives cards.json from a valid facts.json when cards are missing
+  lt state <transcript> [--set k=<json>]... [--get k]...
+                            locked read-modify-write of <stem>.state.json; --set prints only
+                            the keys it set (offsets never move back)
+  lt wrapup-data <transcript>
+                            JSON stats for the wrap-up, and <stem>.clean.md: the transcript
+                            without artefacts, escaped for Notion. Speaker names: from
+                            <stem>.named.md when present, else <stem>.speakers.json is applied;
+                            `speakers` counts lines per name
+  lt speakers <transcript>  JSON: the speaker mapping of a call (S2 -> name or "Speaker 2", seconds,
+                            merges, per-line fixes) and lines per speaker
+  lt index <project_root> [--extra <dir>]... [--rebuild] [--url <ollama url>]
+                            build or update the semantic project index <project_root>/.livetips-index
+                            (local Ollama, bge-m3): .md/.txt/.csv/.json incl. the _notion/ mirror,
+                            incremental by mtime + size; run it on the Mac before calls
+  lt search "<query>" --root <project_root> [-k 5] [--json] [--url <ollama url>]
+                            search the index by meaning: path, date, score, preview. Without a
+                            reachable Ollama it asks the running recorder, else falls back to a plain
+                            text search (and says so)
+
+Global options (any position):
+  --mac-root <work_root>    the Mac folder that is mounted here as $HOME/mnt/<basename>:
+                            $HOME/mnt/<basename(work_root)>/x <-> <work_root>/x
+                            (or env LT_MAC_ROOT, or paths.work_root from --settings <json>/LT_SETTINGS)
+Exit code 0 = ok, 1 = problem (the message says what), 2 = usage.
+"""
+import itertools, json, os, re, secrets, shutil, statistics, sys, time
+from contextlib import contextmanager
+from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover
+    fcntl = None
+
+ROOT = Path(__file__).resolve().parent.parent
+STATE, CONTROL, LOGS = ROOT / "state", ROOT / "control", ROOT / "logs"
+STATUS = STATE / "status.json"
+MAC_ROOT = None
+STALE_S = 15            # status.json is written every ~2 s while recording
+LOADING_STALE_S = 180   # the model load writes nothing for a while
+
+
+class LtError(Exception):
+    """A problem the user can act on: printed as one clear line, exit 1."""
+
+
+def out(obj):
+    print(json.dumps(obj, ensure_ascii=False, indent=1) if not isinstance(obj, str) else obj)
+
+
+# ---------------------------------------------------------------- path mapping
+def mnt_dir():
+    return str(Path.home() / "mnt")
+
+
+def local(p):
+    """A Mac path (<work_root>/x) as this machine sees it ($HOME/mnt/<basename>/x)."""
+    if not p:
+        return p
+    p = str(p)
+    if os.path.exists(p) or os.path.exists(os.path.dirname(p)):
+        return p
+    if MAC_ROOT:
+        r = MAC_ROOT.rstrip("/")
+        if p == r or p.startswith(r + "/"):
+            return os.path.join(mnt_dir(), os.path.basename(r)) + p[len(r):]
+        return p
+    # No --mac-root: try the mounted folders by name (only accepted when the folder exists).
+    mnt = Path(mnt_dir())
+    if mnt.is_dir():
+        for d in mnt.iterdir():
+            key = "/" + d.name + "/"
+            if key in p:
+                cand = str(d) + "/" + p.split(key, 1)[1]
+                if os.path.exists(os.path.dirname(cand)):
+                    return cand
+    return p
+
+
+def mac(p, strict=True):
+    """Inverse of local(): the Mac path the recorder expects in start.json."""
+    if not p:
+        return p
+    p = str(p)
+    mnt = mnt_dir()
+    if MAC_ROOT:
+        pre = os.path.join(mnt, os.path.basename(MAC_ROOT.rstrip("/")))
+        if p == pre or p.startswith(pre + "/"):
+            return MAC_ROOT.rstrip("/") + p[len(pre):]
+    if p.startswith(mnt + "/"):
+        if strict:
+            raise LtError(f"cannot map {p} to a Mac path: pass --mac-root <work_root> (the Mac folder mounted as "
+                          f"{mnt}/<name>) or set LT_MAC_ROOT")
+        return p
+    return p
+
+
+# ---------------------------------------------------------------- status
+def read_status():
+    try:
+        st = json.load(open(STATUS, encoding="utf-8"))
+        return st if isinstance(st, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def status_age():
+    try:
+        return time.time() - STATUS.stat().st_mtime
+    except OSError:
+        return None
+
+
+def status_alive(st, probe=3.0):
+    """(alive, age_s). Fresh mtime = alive. An old mtime may be clock skew between the Mac and
+    this VM, so watch `seq` for `probe` s before calling the status stale."""
+    age = status_age()
+    if age is None or not st:
+        return False, age
+    limit = LOADING_STALE_S if st.get("state") == "loading_model" else STALE_S
+    if age <= limit:
+        return True, age
+    if "seq" in st and probe > 0:
+        t0 = time.time()
+        while time.time() - t0 < probe:
+            time.sleep(0.5)
+            if read_status().get("seq") != st.get("seq"):
+                return True, age
+    return False, age
+
+
+def started_ts(st):
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(st.get("started_at")).timestamp()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def tail(path, n=15):
+    try:
+        return "".join(open(path, encoding="utf-8", errors="replace").readlines()[-n:])
+    except OSError:
+        return f"({Path(path).name} missing)\n"
+
+
+def mic_frames():
+    """Last mic frame counters from the audiocap health lines (one every 10 s)."""
+    vals = re.findall(r"health source=mic frames=(\d+)", tail(LOGS / "audiocap-mic.log", 6))
+    return [int(v) for v in vals[-3:]]
+
+
+def files_of(st):
+    return {"file": st.get("file"), "local_file": local(st.get("file")),
+            "tips_file": local(st.get("tips_file")), "inbox_file": local(st.get("inbox_file")),
+            "started_at": st.get("started_at"), "timezone": st.get("timezone")}
+
+
+# ---------------------------------------------------------------- start / status / stop
+def opt(args, name, default=None):
+    if name in args:
+        i = args.index(name)
+        if i + 1 >= len(args):
+            raise LtError(f"{name} needs a value")
+        v = args[i + 1]
+        del args[i:i + 2]
+        return v
+    return default
+
+
+def cmd_start(args):
+    dry = "--dry-run" in args
+    args = [a for a in args if a != "--dry-run"]
+    wait = float(opt(args, "--wait", 60))
+    if not args:
+        print("usage: lt start '<json>' [--dry-run] [--wait 60]")
+        sys.exit(2)
+    try:
+        req = json.loads(args[0])
+    except json.JSONDecodeError as e:
+        raise LtError(f"start: the argument is not valid JSON ({e})")
+    if not isinstance(req, dict):
+        raise LtError("start: the argument must be a JSON object")
+    missing = [x for x in (ROOT / ".venv/bin/python", ROOT / "bin/audiocap") if not os.path.lexists(x)]  # venv python is a symlink to the Mac interpreter
+    if missing:
+        out(f"NOT INSTALLED: {', '.join(mac(str(m), strict=False) for m in missing)}. Run once in Terminal: "
+            f"bash {mac(str(ROOT), strict=False)}/install.sh "
+            "(5-10 min), then allow Terminal the microphone and System Audio Recording.")
+        sys.exit(1)
+    for k in ("project_dir", "title", "slug", "me_lang", "langs"):
+        if not req.get(k):
+            raise LtError(f"start.json needs '{k}'")
+    if "people" in req:                    # optional roster: full names of the team and the client
+        ppl = req["people"]
+        if isinstance(ppl, str):
+            ppl = re.split(r"[,\n;]", ppl)
+        if not isinstance(ppl, list):
+            raise LtError("start.json 'people' must be a list of full names")
+        clean, seen = [], set()
+        for x in ppl:
+            n = re.sub(r"\s+", " ", str(x if x is not None else "")).strip()
+            if n and len(n) <= 80 and n.casefold() not in seen:
+                seen.add(n.casefold())
+                clean.append(n)
+        req["people"] = clean
+    if str(req.get("hiring_role") or "").strip().lower() == "candidate":
+        req["hiring_role"] = "coach"       # legacy role name: the PM is the one being asked
+    for k in ("me_langs", "langs"):        # Russian is never used (skill rule)
+        if isinstance(req.get(k), str):
+            req[k] = "+".join(x for x in req[k].split("+") if x != "ru")
+    req["project_dir"] = mac(req["project_dir"])
+    st = read_status()
+    note = ""
+    if st.get("state") in ("recording", "loading_model"):
+        alive, age = status_alive(st)
+        if alive:
+            if st.get("slug") == req["slug"] and st.get("title") == req["title"] and st.get("state") == "recording":
+                out(dict(result="reused", **files_of(st), req_id=st.get("req_id")))
+                return
+            out(f"BUSY: '{st.get('title')}' (project '{st.get('slug')}') is {st.get('state')} now ({st.get('file')}). "
+                "Not mixing: stop it first (lt stop).")
+            sys.exit(1)
+        if dry:
+            note = f"stale {st.get('state')} status ({age:.0f} s old) would be cleared"
+        else:                                      # stale: the process died without saying so
+            CONTROL.mkdir(exist_ok=True)
+            (CONTROL / "stop").touch()
+            time.sleep(3)
+            note = f"stale {st.get('state')} status ({age:.0f} s old) cleared"
+    req_id = f"{int(time.time())}-{os.getpid()}-{secrets.token_hex(3)}"
+    req["req_id"] = req_id
+    if dry:
+        out({"result": "dry-run", "would_write": req, "note": note})
+        return
+    CONTROL.mkdir(exist_ok=True)
+    tmp = CONTROL / f"start.json.{os.getpid()}.tmp"
+    json.dump(req, open(tmp, "w", encoding="utf-8"), ensure_ascii=False)
+    t0 = time.time()
+    os.replace(tmp, CONTROL / "start.json")
+    err = None
+    while time.time() - t0 < wait:
+        time.sleep(1)
+        st = read_status()
+        age = status_age()
+        fresh = age is not None and STATUS.stat().st_mtime > t0 - 1
+        if st.get("req_id"):
+            ours = st.get("req_id") == req_id
+        else:   # a recorder older than v36 does not copy req_id: use started_at and the title
+            ts = started_ts(st)
+            ours = ts is not None and ts >= t0 - 2 and st.get("title") == req["title"]
+        if ours and st.get("state") == "recording":
+            out(dict(result="recording", **files_of(st), req_id=st.get("req_id"), note=note))
+            return
+        if st.get("state") == "error" and (ours or fresh):   # an old error from an earlier run is ignored
+            err = st.get("errors")
+            break
+    pend = CONTROL / "start.json"
+    if pend.exists():
+        os.replace(pend, CONTROL / "start.json.pending")   # no surprise start later
+    out("START FAILED after %.0f s.%s transcriber.log:\n%s\nlauncher.log:\n%s\nUsual causes: install.sh not run, "
+        "no microphone / system audio permission for Terminal, LaunchAgent not loaded "
+        "(launchctl list | grep live-transcriber)." % (
+            time.time() - t0, f" Recorder error: {err}." if err else "",
+            tail(LOGS / "transcriber.log"), tail(LOGS / "launcher.log", 5)))
+    sys.exit(1)
+
+
+def cmd_status(_args):
+    st = read_status()
+    if not st:
+        out("state=none (state/status.json missing or unreadable: no recording has run here)")
+        sys.exit(1)
+    fr = mic_frames()
+    growing = "unknown" if len(fr) < 2 else ("yes" if fr[-1] > fr[0] else "NO")
+    warn = []
+    age = status_age()
+    if st.get("state") in ("recording", "loading_model"):
+        alive, age = status_alive(st, probe=2.5)
+        if not alive:
+            warn.append(f"STATUS STALE ({age:.0f} s, seq not moving): the recorder is not running")
+        if growing == "NO" and st.get("mic") != "muted":
+            warn.append("MIC FRAMES NOT GROWING: the PM is not recorded")
+        if st.get("mic") == "stalled":
+            warn.append(f"mic stalled, restart streak {st.get('mic_stall_streak', 0)}")
+        if st.get("mic_auto_switched"):
+            warn.append("mic auto-switched to the Mac's built-in microphone")
+        if st.get("errors"):
+            warn.append("errors: " + str(st.get("errors"))[:200])
+        if (st.get("queue") or 0) > 6:
+            warn.append(f"transcription behind by {st.get('queue')} phrases")
+    sem = ""
+    if "semantic" in st:
+        sem = " semantic=%s index=%s index_files=%s index_chunks=%s" % (
+            st.get("semantic"), st.get("index_state"), st.get("index_files"), st.get("index_chunks"))
+        if st.get("semantic") == "off" and st.get("semantic_reason"):
+            sem += " semantic_reason=%s" % json.dumps(str(st["semantic_reason"])[:120], ensure_ascii=False)
+        if st.get("index_reason"):
+            sem += " index_reason=%s" % json.dumps(str(st["index_reason"])[:120], ensure_ascii=False)
+    out("state=%s lines=%s mic=%s system=%s mic_frames_growing=%s stall_restarts=%s talk_me=%s%% "
+        "status_age_s=%s seq=%s audience=%s proactive=%s call_type=%s%s%s" % (
+            st.get("state"), st.get("lines"), st.get("mic"), st.get("system_audio"), growing,
+            st.get("mic_stall_restarts", 0), st.get("talk_me_pct"),
+            None if age is None else round(age), st.get("seq"), st.get("audience"), st.get("proactive"),
+            st.get("call_type"), sem, (" | WARN " + "; ".join(warn)) if warn else ""))
+
+
+def cmd_stop(args):
+    args = list(args)
+    wait = float(opt(args, "--wait", 60))
+    st = read_status()
+    if not st:
+        out("NO STATUS: state/status.json is missing or unreadable, no recording to stop here.")
+        sys.exit(1)
+
+    def report(extra=None):
+        st2 = read_status()
+        res = {"state": st2.get("state"), "file": st2.get("file"), "local_file": local(st2.get("file")),
+               "lines": st2.get("lines"), "stopped_at": st2.get("stopped_at"),
+               "mic_stall_restarts": st2.get("mic_stall_restarts", 0)}
+        if extra:
+            res["note"] = extra
+        out(res)
+        return st2
+
+    state = st.get("state")
+    if state == "stopped":
+        report("already stopped")
+        return
+    if state == "error":
+        report(f"the recorder ended with an error, nothing to stop: {st.get('errors')}")
+        sys.exit(1)
+    alive, age = status_alive(st)
+    CONTROL.mkdir(exist_ok=True)
+    (CONTROL / "stop").touch()
+    if not alive:
+        report(f"STALE: status.json not updated for {age:.0f} s, the recorder is not running "
+               "(crashed or the Mac slept). The transcript so far is kept.")
+        sys.exit(1)
+    t0 = time.time()
+    while time.time() - t0 < wait and read_status().get("state") not in ("stopped", "error"):
+        time.sleep(2)
+    st = report()
+    if st.get("state") != "stopped":
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------- prep, state
+def stem(transcript):
+    return re.sub(r"\.md$", "", local(transcript))
+
+
+def slugify(s):
+    s = re.sub(r"[^\w\s-]", "", str(s), flags=re.UNICODE).strip().lower()
+    return re.sub(r"[\s_]+", "-", s)[:60] or "meeting"
+
+
+DATE_PREFIX = re.compile(r"^(\d{4}-\d\d-\d\d(-\d{4})?-)+")
+
+
+def call_title_slug(s):
+    """2026-10-21-1457-team-daily -> team-daily"""
+    return DATE_PREFIX.sub("", os.path.basename(s))
+
+
+def prep_core(path, ext):
+    name = os.path.basename(path)[: -len(ext)]
+    return DATE_PREFIX.sub("", re.sub(r"^prep-", "", name))
+
+
+def title_match(a, b):
+    a, b = slugify(a), slugify(b)
+    return bool(a and b) and (a == b or (min(len(a), len(b)) >= 4 and (a in b or b in a)))
+
+
+TYPES = {"id": (str, int), "triggers": (list, str), "gist": (str,), "title": (str,), "text": (str,),
+         "keywords": (list,), "points": (list,), "phrase": (str,), "on": (str,)}
+
+
+def check_json_list(path, need, key):
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except FileNotFoundError:
+        return "MISSING"
+    except Exception as e:  # noqa: BLE001
+        return f"INVALID JSON ({e})"
+    items = data.get(key, data.get("items")) if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        return f"INVALID (not a list or {{\"{key}\": [...]}})"
+    bad = [i for i, x in enumerate(items) if not isinstance(x, dict) or any(k not in x for k in need)]
+    wrong = sorted({k for x in items if isinstance(x, dict) for k, v in x.items()
+                    if k in TYPES and v is not None and not isinstance(v, TYPES[k])
+                    or (k in ("triggers", "keywords", "points") and isinstance(v, list)
+                        and any(not isinstance(e, (str, int, float)) for e in v))})
+    res = f"{len(items)} items"
+    if bad:
+        res += f", {len(bad)} without {list(need)}"
+    if wrong:
+        res += f", wrong type in {wrong}"
+    return res
+
+
+def is_problem(v):
+    return v.startswith(("MISSING", "INVALID")) or "without" in v or "wrong type" in v
+
+
+def load_list(path, key):
+    data = json.load(open(path, encoding="utf-8"))
+    items = data.get(key, data.get("items")) if isinstance(data, dict) else data
+    return [x for x in items if isinstance(x, dict)] if isinstance(items, list) else []
+
+
+STOP = set("""the and for that this with you your are was were have has will would could should can about
+from what when where which into there their they them then than just also only very але або щоб тому
+коли якщо тобто типу просто також треба можна буде було були який яка яке які цей цього цьому
+ця це ці там тут вже ще дуже нам вам вони воно його йому її мені""".split())
+
+
+def derive_cards(facts):
+    """One card per fact: triggers = pairs of 2+ distinctive keywords (both must be heard) or
+    the id; shown to the PM when the other side names it."""
+    cards = []
+    for i, f in enumerate(facts):
+        fid = str(f.get("id") or f"f{i + 1}").strip()
+        title, text = str(f.get("title") or "").strip(), str(f.get("text") or "").strip()
+        if not (title or text):
+            continue
+        kws, seen = [], set()
+        raw = f.get("keywords")
+        for k in (raw if isinstance(raw, list) else [raw] if raw else []):
+            k = str(k).strip().lower()
+            if not k or k in seen or k in STOP or (len(k) < 4 and not re.search(r"\d", k)):
+                continue
+            seen.add(k)
+            kws.append(k)
+        stems = [re.escape(k[:-1] if len(k) > 5 else k) for k in kws[:3]]
+        triggers = [f"re:(?=.*\\b{x})(?=.*\\b{y})" for x, y in itertools.combinations(stems, 2)]
+        if re.fullmatch(r"[A-Z][A-Z0-9]+-\d+", fid) or len(stems) < 2:
+            triggers.append(fid)
+        cards.append({"id": fid, "triggers": triggers, "on": "them", "level": "info",
+                      "gist": "📌 " + (title or text[:60]), "phrase": text, "cooldown_s": 300})
+    return cards
+
+
+def adopt_prep(s):
+    """Copy each missing prep file from a prep-* file younger than 3 h. When any prep file
+    matches the call title (slugified), only matching ones are used; otherwise the newest."""
+    live = Path(s).parent
+    title = call_title_slug(s)
+    adopted = {}
+    exts = (".brief.md", ".cards.json", ".facts.json", ".outline.json")
+    fresh = {ext: [p for p in live.glob("prep-*" + ext) if time.time() - p.stat().st_mtime < 3 * 3600]
+             for ext in exts}
+    any_match = any(title_match(prep_core(str(p), ext), title) for ext in exts for p in fresh[ext])
+    for ext in exts:
+        if os.path.exists(s + ext):
+            continue
+        cands = [p for p in fresh[ext] if not any_match or title_match(prep_core(str(p), ext), title)]
+        if not cands:
+            continue
+        src = max(cands, key=lambda p: p.stat().st_mtime)
+        shutil.copy(src, s + ext)
+        adopted[ext] = src.name
+    return adopted
+
+
+def cmd_prep_check(args):
+    if not args:
+        print("usage: lt prep-check <transcript> [--adopt-prep] [--fix]")
+        sys.exit(2)
+    s = stem(args[0])
+    if not os.path.isdir(os.path.dirname(s) or "."):
+        raise LtError(f"folder not found: {os.path.dirname(s)} (wrong transcript path, or pass --mac-root)")
+    adopted = adopt_prep(s) if "--adopt-prep" in args else {}
+    fixed = []
+    if "--fix" in args and not os.path.exists(s + ".cards.json"):
+        if not is_problem(check_json_list(s + ".facts.json", ("id", "title", "text", "keywords"), "facts")):
+            cards = derive_cards(load_list(s + ".facts.json", "facts"))
+            if cards:
+                tmp = s + f".cards.json.{os.getpid()}.tmp"
+                json.dump(cards, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+                os.replace(tmp, s + ".cards.json")
+                fixed.append(f"cards.json derived from {len(cards)} facts")
+        else:
+            fixed.append("cannot derive cards: facts.json missing or invalid")
+    res = {
+        "brief": (f"{os.path.getsize(s + '.brief.md')} bytes" if os.path.exists(s + ".brief.md") else "MISSING"),
+        "cards": check_json_list(s + ".cards.json", ("id", "triggers", "gist"), "cards"),
+        "facts": check_json_list(s + ".facts.json", ("id", "title", "text", "keywords"), "facts"),
+        "outline": check_json_list(s + ".outline.json", ("id", "title", "keywords"), "sections"),
+        "adopted_from_prep": list(adopted), "adopted_sources": adopted,
+    }
+    if fixed:
+        res["fixed"] = fixed
+    keys = ["brief", "cards", "facts"] + (["outline"] if res["outline"] != "MISSING" else [])
+    problems = [k for k in keys if is_problem(res[k])]
+    res["verdict"] = "OK" if not problems else "FIX: " + ", ".join(problems)
+    out(res)
+
+
+def parse_val(v):
+    try:
+        return json.loads(v)
+    except Exception:  # noqa: BLE001
+        return v
+
+
+OFFSET_KEYS = ("offset", "inbox_offset", "cards_offset")
+
+
+@contextmanager
+def state_lock(base):
+    """Same lock as read_delta.py: flock on <stem>.state.lock."""
+    fd = None
+    try:
+        fd = os.open(base + ".state.lock", os.O_CREAT | os.O_RDWR, 0o644)
+        if fcntl:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+    except OSError:
+        pass
+    try:
+        yield
+    finally:
+        if fd is not None:
+            try:
+                if fcntl:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                os.close(fd)
+            except OSError:
+                pass
+
+
+def read_json_dict(path):
+    try:
+        st = json.load(open(path, encoding="utf-8"))
+        return st if isinstance(st, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def cmd_state(args):
+    if not args:
+        print("usage: lt state <transcript> [--set k=<json>]... [--get k]...")
+        sys.exit(2)
+    base = stem(args[0])
+    path = base + ".state.json"
+    if not os.path.isdir(os.path.dirname(path) or "."):
+        raise LtError(f"folder not found: {os.path.dirname(path)} (wrong transcript path, or pass --mac-root)")
+    sets, gets, i = {}, [], 1
+    while i < len(args):
+        if args[i] == "--set" and i + 1 < len(args):
+            k, _, v = args[i + 1].partition("=")
+            if not k:
+                raise LtError(f"--set needs key=<json>, got {args[i + 1]!r}")
+            sets[k] = parse_val(v)
+            i += 2
+        elif args[i] == "--get" and i + 1 < len(args):
+            gets.append(args[i + 1])
+            i += 2
+        else:
+            print(f"unknown argument {args[i]}")
+            sys.exit(2)
+    if sets:
+        with state_lock(base):
+            st = read_json_dict(path)   # read under the lock: read_delta updates the same file on every poll
+            for k, v in sets.items():
+                if k in OFFSET_KEYS and isinstance(v, (int, float)) and isinstance(st.get(k), (int, float)):
+                    st[k] = max(st[k], v)
+                else:
+                    st[k] = v
+            tmp = f"{path}.{os.getpid()}.tmp"
+            json.dump(st, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+            os.replace(tmp, path)
+        res = {k: st.get(k) for k in sets}
+        res.update({k: st.get(k) for k in gets})
+        out(res)
+        return
+    st = read_json_dict(path)
+    out({k: st.get(k) for k in gets} if gets else st)
+
+
+# ---------------------------------------------------------------- wrap-up data
+ARTEFACT = [re.compile(p, re.I) for p in (
+    r"субтитр", r"subtit", r"dimatorzok", r"amara\.org", r"продолжение следует", r"смотрите продолжение",
+    r"спасибо за просмотр", r"дякую за перегляд", r"thanks? (you )?for watching",
+    r"^\W*(звучить|грає|лунає)\s+\w*\s*(музика|музику|пісня|мелодія)\W*$", r"^\W*(музика|music|музыка)\W*$",
+    r"^\W*(thank you|thanks|дякую|спасибо|bye|you|mm-?hmm|угу|мгм)\W*$",
+)]
+LINE = re.compile(r"^\[(\d\d:\d\d:\d\d)\]\s+(.+?)\s+\((\w+)\):\s*(.*)$")
+TAGGED = re.compile(r"^\[(\d\d:\d\d:\d\d)\] (.+?) \[(S\d+)\] \((\w+)\): ")
+PLAIN = re.compile(r"^\[(\d\d:\d\d:\d\d)\] (.+?) \((\w+)\): ")
+SID = re.compile(r"^S(\d+)$")
+
+
+def speaker_labeler(sp):
+    """label(line_time, sid) -> display name with merges and per-line overrides applied.
+    Keep in sync with read_delta.py and transcriber.py."""
+    clusters = sp.get("clusters") if isinstance(sp.get("clusters"), dict) else {}
+    merged = sp.get("merged") if isinstance(sp.get("merged"), dict) else {}
+    overrides = sp.get("overrides") if isinstance(sp.get("overrides"), dict) else {}
+
+    def resolve(s):
+        seen = set()
+        while s in merged and s not in seen:
+            seen.add(s)
+            s = merged[s]
+        return s
+
+    def label(t, sid):
+        s = resolve(overrides.get(t) or sid)
+        if not s:
+            return None
+        c = clusters.get(s)
+        name = c.get("name") if isinstance(c, dict) else None
+        if name:
+            return str(name)
+        m = SID.match(str(s))
+        return f"Speaker {m.group(1)}" if m else None
+    return label, resolve
+
+
+def apply_speakers(lines, sp, me_label="Я"):
+    """Transcript lines with `{them_label} [S2]` replaced by the speaker's display name."""
+    if not sp:
+        return lines
+    label, _ = speaker_labeler(sp)
+    overrides = sp.get("overrides") if isinstance(sp.get("overrides"), dict) else {}
+    out = []
+    for ln in lines:
+        m = TAGGED.match(ln)
+        if m:
+            lab = label(m.group(1), m.group(3))
+            if lab:
+                ln = f"[{m.group(1)}] {lab} ({m.group(4)}): " + ln[m.end():]
+        else:
+            m = PLAIN.match(ln)
+            if m and m.group(2) != me_label and m.group(1) in overrides:
+                lab = label(m.group(1), None)
+                if lab:
+                    ln = f"[{m.group(1)}] {lab} ({m.group(3)}): " + ln[m.end():]
+        out.append(ln)
+    return out
+
+
+def secs(hms):
+    try:
+        h, m, x = str(hms).split(":")
+        return int(h) * 3600 + int(m) * 60 + int(float(x))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def delay_s(at, src):
+    """Seconds from src to at on the clock, across midnight; None when not a plausible delay."""
+    a, b = secs(at), secs(src)
+    if a is None or b is None:
+        return None
+    d = (a - b) % 86400
+    return d if d < 3600 else None
+
+
+def jsonl(path):
+    rows = []
+    try:
+        for ln in open(path, encoding="utf-8"):
+            try:
+                r = json.loads(ln)
+                if isinstance(r, dict):
+                    rows.append(r)
+            except Exception:  # noqa: BLE001
+                pass
+    except OSError:
+        pass
+    return rows
+
+
+def parse_feedback(value):
+    """'verdict|<id>|<src>|<gist>[|r=a,b][|c=comment]' -> dict, or None. The gist may itself
+    contain '|', so the reason and comment are taken from the tail markers."""
+    v = str(value or "")
+    verdict, sep, rest = v.partition("|")
+    if not sep or not verdict:
+        return None
+    comment, reasons = "", []
+    i = rest.rfind("|c=")
+    if i >= 0:
+        comment, rest = rest[i + 3:].strip(), rest[:i]
+    i = rest.rfind("|r=")
+    if i >= 0:
+        reasons, rest = [r for r in rest[i + 3:].split(",") if r.strip()], rest[:i]
+    parts = rest.split("|", 2)
+    if len(parts) < 3:
+        return None
+    return {"verdict": verdict, "key": rest, "id": parts[0], "src": parts[1], "gist": parts[2],
+            "reasons": reasons, "comment": comment}
+
+
+def cmd_wrapup_data(args):
+    if not args:
+        print("usage: lt wrapup-data <transcript>")
+        sys.exit(2)
+    t = local(args[0])
+    if not os.path.exists(t):
+        raise LtError(f"transcript not found: {t} (check the path, or pass --mac-root <work_root>)")
+    s = stem(t)
+    sp = read_json_dict(s + ".speakers.json")
+    if os.path.exists(s + ".named.md"):
+        lines, sp_source = open(s + ".named.md", encoding="utf-8").read().splitlines(), "named.md"
+    elif sp.get("clusters"):
+        lines, sp_source = apply_speakers(open(t, encoding="utf-8").read().splitlines(), sp), "speakers.json"
+    else:
+        lines, sp_source = open(t, encoding="utf-8").read().splitlines(), None
+    real, dropped, langs, speakers, markers = [], 0, {}, {}, []
+    prev = None
+    for ln in lines:
+        if ln.startswith("---"):
+            markers.append(ln.strip("- ").strip())
+            continue
+        m = LINE.match(ln)
+        if not m:
+            continue
+        txt = m.group(4).strip()
+        if not txt or any(p.search(txt) for p in ARTEFACT) or (prev and txt == prev and len(txt) < 40):
+            dropped += 1
+            continue
+        prev = txt
+        real.append(m.groups())
+        langs[m.group(3)] = langs.get(m.group(3), 0) + 1
+        speakers[m.group(2)] = speakers.get(m.group(2), 0) + 1
+    esc = lambda x: re.sub(r"([\[\]<>*])", r"\\\1", x)
+    clean = s + ".clean.md"
+    with open(clean, "w", encoding="utf-8") as f:
+        for tm, who, lang, txt in real:
+            f.write(esc(f"[{tm}] {who} ({lang}): {txt}") + "\n")
+    tips = jsonl(s + ".tips.jsonl")
+    shown = [x for x in tips if x.get("kind") in ("tip", "answer")]
+    lags = [d for d in (delay_s(x.get("at"), x.get("src")) for x in shown) if d is not None]
+    late_keys = {(str(x.get("gist")), str(x.get("src"))) for x in jsonl(s + ".late.jsonl")}
+    late_keys |= {(str(x.get("gist")), str(x.get("src"))) for x in tips if x.get("late") is True}
+    fb = {}
+    for r in jsonl(s + ".feedback.jsonl"):                 # last line per tip wins
+        p = parse_feedback(r.get("value"))
+        if p:
+            fb[p["key"]] = p
+    verdicts, reasons, comments = {}, {}, []
+    for p in fb.values():
+        verdicts[p["verdict"]] = verdicts.get(p["verdict"], 0) + 1
+        for r_ in p["reasons"]:
+            reasons[r_] = reasons.get(r_, 0) + 1
+        if p["comment"]:
+            comments.append({"tip": p["gist"], "src": p["src"], "verdict": p["verdict"], "comment": p["comment"]})
+    st = read_json_dict(s + ".state.json")
+    status = read_status()
+    this = bool(status.get("file")) and os.path.basename(str(status.get("file"))) == os.path.basename(t)
+    polls = jsonl(s + ".polls.jsonl")
+    think = [p.get("think_gap_s") for p in polls if isinstance(p.get("think_gap_s"), (int, float))]
+    res = {
+        "transcript": {"lines_total": len(real) + dropped, "lines_real": len(real), "artefacts_dropped": dropped,
+                       "langs": langs, "speakers": speakers, "first": real[0][0] if real else None,
+                       "last": real[-1][0] if real else None, "clean_file": clean,
+                       "notion_ok": len(real) >= 20, "speakers_source": sp_source},
+        "markers": markers,
+        "tips": {"shown": len(shown), "by_kind": {k: sum(1 for x in tips if x.get("kind") == k)
+                                                 for k in sorted({str(x.get("kind")) for x in tips if x.get("kind")})},
+                 "facts_shown": sum(1 for x in tips if x.get("kind") == "fact"),
+                 "cards_fired": len(jsonl(s + ".cards-fired.jsonl")),
+                 "late": len(late_keys),
+                 "delay_median_s": statistics.median(lags) if lags else None, "delay_max_s": max(lags) if lags else None},
+        "ratings": {"rated_tips": len(fb), "verdicts": verdicts, "reasons": reasons, "comments": comments},
+        "loop": {"polls": st.get("polls"), "max_gap_s": st.get("max_gap_s"), "stalls_over_60s": st.get("stalls_over_60s"),
+                 "think_median_s": statistics.median(think) if think else None},
+        "mic": {"stall_restarts": status.get("mic_stall_restarts", 0) if this else None,
+                "audio_lost_s": status.get("audio_lost_s") if this else None,
+                "auto_switched": status.get("mic_auto_switched") if this else None},
+        "find_asks": sum(1 for r in jsonl(s + ".inbox.jsonl") if str(r.get("text", "")).startswith("find:")),
+        "wrapup_emitted": any(x.get("kind") == "wrapup" for x in tips),
+        "skill_state_saved": st.get("skill_state_at") is not None,
+        "semantic": semantic_wrapup(s),
+    }
+    out(res)
+
+
+def semantic_wrapup(s):
+    """The Ollama section of the wrap-up from <stem>.semantic-summary.json (written by the recorder
+    at stop), or None. `line_uk` is the ready one-liner; useful = rated used + partly."""
+    sm = read_json_dict(s + ".semantic-summary.json")
+    if not sm:
+        return None
+    hits, rated, lat = sm.get("hits") or {}, sm.get("rated") or {}, sm.get("latency_ms") or {}
+    n = int(hits.get("total") or 0)
+    useful = int(rated.get("used") or 0) + int(rated.get("partly") or 0)
+    med = lat.get("median")
+    line = f"Ollama: {n} підказок, корисних {useful}, затримка медіана {med if med is not None else '?'} мс"
+    if sm.get("switch") == "off":
+        line += " (вимкнено у вікні)"
+    elif sm.get("state_final") == "off" and not (sm.get("totals") or {}).get("lines_embedded"):
+        line = f"Ollama: недоступна ({sm.get('reason_final') or 'off'})"
+    mem = sm.get("ollama_memory") or {}
+    return {"hits": n, "facts": hits.get("facts", 0), "cards": hits.get("cards", 0), "sos": hits.get("sos", 0),
+            "useful": useful, "rated": rated, "followed": sm.get("followed"), "latency_ms": lat,
+            "embed_calls": (sm.get("totals") or {}).get("embed_calls"), "totals": sm.get("totals"),
+            "minutes": sm.get("minutes"), "model": sm.get("model"), "ollama_version": sm.get("ollama_version"),
+            "ollama_ram_mb": mem.get("size_mb"), "state_final": sm.get("state_final"), "switch": sm.get("switch"),
+            "line_uk": line}
+
+
+def cmd_speakers(args):
+    if not args:
+        print("usage: lt speakers <transcript>")
+        sys.exit(2)
+    t = local(args[0])
+    if not os.path.exists(t):
+        raise LtError(f"transcript not found: {t} (check the path, or pass --mac-root <work_root>)")
+    s = stem(t)
+    sp = read_json_dict(s + ".speakers.json")
+    if not sp:
+        out({"speakers": "none", "note": "no <stem>.speakers.json: speaker identification was off for this call"})
+        return
+    label, resolve = speaker_labeler(sp)
+    cl = sp.get("clusters") if isinstance(sp.get("clusters"), dict) else {}
+    mapping = {}
+    for k in sorted(cl, key=lambda x: int(SID.match(x).group(1)) if SID.match(str(x)) else 10 ** 6):
+        c = cl[k] if isinstance(cl[k], dict) else {}
+        mapping[k] = {"name": c.get("name"), "display": label("", k), "seconds": c.get("seconds"),
+                      "first": c.get("first"), "suggestions": c.get("suggestions") or []}
+    merged = sp.get("merged") if isinstance(sp.get("merged"), dict) else {}
+    counts = {}
+    for ln in apply_speakers(open(t, encoding="utf-8").read().splitlines(), sp):
+        m = LINE.match(ln)
+        if m:
+            counts[m.group(2)] = counts.get(m.group(2), 0) + 1
+    out({"clusters": mapping, "merged": {k: resolve(v) for k, v in merged.items()},
+         "overrides": sp.get("overrides") or {}, "skipped": sp.get("skipped") or [], "rev": sp.get("rev"),
+         "lines_per_speaker": counts, "named_file": s + ".named.md" if os.path.exists(s + ".named.md") else None})
+
+
+# ---------------------------------------------------------------- semantic index / search
+def semantic_mod():
+    sys.path.insert(0, str(ROOT / "src"))
+    try:
+        import semantic  # noqa: PLC0415
+    except Exception as e:  # noqa: BLE001
+        raise LtError(f"cannot load src/semantic.py ({e})")
+    return semantic
+
+
+def tool_cfg():
+    try:
+        c = json.load(open(ROOT / "config.json", encoding="utf-8"))
+        return c if isinstance(c, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def sem_client(S, args, timeout):
+    cfg = tool_cfg()
+    url = opt(args, "--url") or os.environ.get("LT_OLLAMA_URL") or cfg.get("ollama_url") or S.DEFAULT_URL
+    model = opt(args, "--model") or cfg.get("semantic_model") or S.DEFAULT_MODEL
+    return S.OllamaClient(url=url, model=model, timeout=timeout, keep_alive="10m")
+
+
+def cmd_index(args):
+    S = semantic_mod()
+    rebuild = "--rebuild" in args
+    args = [a for a in args if a != "--rebuild"]
+    extras = []
+    while "--extra" in args:
+        extras.append(local(opt(args, "--extra")))
+    client = sem_client(S, args, timeout=120.0)
+    if not args:
+        raise LtError("usage: lt index <project_root> [--extra <dir>]... [--rebuild]")
+    root = local(args[0])
+    if not os.path.isdir(root):
+        raise LtError(f"project folder not found: {root}")
+    for x in extras:
+        if not os.path.isdir(x):
+            raise LtError(f"--extra folder not found: {x}")
+    ok, reason = client.health(force=True)
+    if not ok:
+        raise LtError(f"the semantic index needs Ollama with {client.model}: {reason}. "
+                      f"Run on the Mac (Terminal): ollama pull {client.model}; then lt index again")
+    idx = S.ProjectIndex(root, extras, client)
+    t0 = time.time()
+
+    def progress(i, n, rel, nch):
+        if i == 1 or i % 25 == 0 or i == n:
+            el = time.time() - t0
+            print(f"  [{i}/{n}] {rel} ({nch} chunks, {el:.0f} s)", flush=True)
+    try:
+        res = idx.update(rebuild=rebuild, batch=16, progress=progress, lock_wait=120, timeout=120)
+    except S.IndexBusy:
+        raise LtError("the index is being updated by the recorder right now; try again in a minute")
+    except S.SemanticError as e:
+        raise LtError(f"embedding failed: {e.reason} (work done so far is saved; run lt index again)")
+    rate = res["chunks_added"] / res["seconds"] if res["seconds"] else 0
+    out(f"index {idx.dir}: files={res['files']} chunks={res['chunks']} new={res['new']} changed={res['changed']} "
+        f"removed={res['removed']} embedded_chunks={res['chunks_added']} seconds={res['seconds']} "
+        f"chunks_per_s={rate:.1f} model={client.model}")
+
+
+def print_hits(S, hits, header, as_json, note=None):
+    if as_json:
+        out({"note": note, "hits": [{"path": h.get("path"), "rel": h.get("rel"), "date": S.hit_date(h),
+                                     "score": h.get("score"), "heading": h.get("heading"), "preview": h.get("preview")}
+                                    for h in hits]})
+        return
+    if note:
+        print("NOTE: " + note)
+    print(header)
+    for i, h in enumerate(hits, 1):
+        head = f" > {h['heading']}" if h.get("heading") else ""
+        print(f"{i}. {h.get('score'):.3f}  {S.hit_date(h)}  {h.get('rel') or h.get('path')}{head}")
+        print(f"   {h.get('path')}")
+        print(f"   {h.get('preview')}")
+
+
+def relay_search(query, k, root):
+    """Ask the running recorder (it reaches Ollama on the Mac) when this machine cannot."""
+    st = read_status()
+    if not st or st.get("state") != "recording" or st.get("semantic") != "on":
+        return None
+    alive, _ = status_alive(st, probe=2.5)
+    if not alive:
+        return None
+    proj = local(os.path.dirname(os.path.dirname(st.get("file") or "")))
+    if not proj or os.path.realpath(proj) != os.path.realpath(root):
+        return None
+    rid = secrets.token_hex(6)
+    (CONTROL / "search").mkdir(parents=True, exist_ok=True)
+    tmp = CONTROL / "search" / f".{rid}.tmp"
+    tmp.write_text(json.dumps({"q": query, "k": k}, ensure_ascii=False))
+    os.replace(tmp, CONTROL / "search" / f"{rid}.json")
+    resp = STATE / "search" / f"{rid}.json"
+    deadline = time.time() + 12
+    while time.time() < deadline:
+        if resp.exists():
+            try:
+                r = json.load(open(resp, encoding="utf-8"))
+                resp.unlink()
+                return r
+            except Exception:  # noqa: BLE001
+                pass
+        time.sleep(0.3)
+    return None
+
+
+def cmd_search(args):
+    S = semantic_mod()
+    as_json = "--json" in args
+    args = [a for a in args if a != "--json"]
+    root = opt(args, "--root")
+    k = int(opt(args, "-k", "5") or 5)
+    client = sem_client(S, args, timeout=20.0)
+    if not args or not root:
+        raise LtError('usage: lt search "<query>" --root <project_root> [-k 5] [--json]')
+    query = " ".join(args)
+    root = local(root)
+    if not os.path.isdir(root):
+        raise LtError(f"project folder not found: {root}")
+    idx = S.ProjectIndex(root, [], client)
+    ok, reason = client.health(force=True)
+    note = None
+    if ok:
+        if not idx.load() or not idx.meta:
+            note = f"no semantic index in {idx.dir} yet (run: lt index {root}): plain text search"
+        else:
+            extras = [Path(x) for x in idx.manifest.get("extras") or []]
+            try:
+                hits = S.ProjectIndex(root, extras, client).search(query, k)
+                f_n, c_n = idx.counts()
+                print_hits(S, hits, f"semantic search ({client.model}) in {root}: {len(hits)} hits "
+                                    f"(index: {f_n} files, {c_n} chunks, updated {idx.manifest.get('updated')})", as_json)
+                return
+            except S.SemanticError as e:
+                note = f"semantic search failed ({e.reason}): plain text search"
+    else:
+        r = relay_search(query, k, root)
+        if r and r.get("hits") is not None:
+            print_hits(S, r["hits"], f"semantic search via the recorder in {root}: {len(r['hits'])} hits", as_json)
+            return
+        note = f"Ollama is off ({reason}): plain text search, not ranked by meaning"
+    roots = [(Path(root), "")] + [(Path(x), Path(x).name) for x in (idx.manifest or {}).get("extras") or [] if os.path.isdir(x)]
+    hits = S.text_search(roots, query, k)
+    print_hits(S, hits, f"text search in {root}: {len(hits)} hits", as_json, note=note)
+
+
+CMDS = {"start": cmd_start, "status": cmd_status, "stop": cmd_stop, "prep-check": cmd_prep_check,
+        "state": cmd_state, "wrapup-data": cmd_wrapup_data, "speakers": cmd_speakers,
+        "index": cmd_index, "search": cmd_search}
+
+
+def global_opts(argv):
+    """Strip --mac-root / --settings from any position and set MAC_ROOT."""
+    global MAC_ROOT
+    argv = list(argv)
+    root = opt(argv, "--mac-root") or os.environ.get("LT_MAC_ROOT")
+    settings = opt(argv, "--settings") or os.environ.get("LT_SETTINGS")
+    if not root and settings:
+        try:
+            cfg = json.load(open(local(settings), encoding="utf-8"))
+            root = ((cfg.get("settings") or cfg).get("paths") or {}).get("work_root")
+        except Exception as e:  # noqa: BLE001
+            raise LtError(f"cannot read paths.work_root from {settings} ({e})")
+    if root:
+        root = os.path.expanduser(str(root)).rstrip("/")
+        if not root.startswith("/"):
+            raise LtError(f"--mac-root must be an absolute Mac path, got {root!r}")
+    MAC_ROOT = root or None
+    return argv
+
+
+if __name__ == "__main__":
+    try:
+        argv = global_opts(sys.argv[1:])
+        if not argv or argv[0] not in CMDS:
+            print(__doc__)
+            sys.exit(2)
+        CMDS[argv[0]](argv[1:])
+    except LtError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        print(f"ERROR: file not found: {e.filename} (check the path, or pass --mac-root <work_root>)")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(1)

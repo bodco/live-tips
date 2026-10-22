@@ -42,6 +42,18 @@ let writeQueue = DispatchQueue(label: "audiocap.write")
 var framesWritten: Int64 = 0
 var peakSinceReport: Float = 0
 var micStallTicks = 0             // health ticks in a row with zero mic frames (stall watchdog)
+// LiveTips app mode (--framed): every write is a frame (1 byte kind, 4 bytes LE length, payload),
+// see LiveTipsCore/HelperFrame.swift; plus a heartbeat frame every second.
+var framed = false
+var audioFrameKind: UInt8 = 1     // 1 = mic, 2 = system
+
+func frameData(_ kind: UInt8, _ payload: Data) -> Data {
+    var d = Data([kind])
+    var n = UInt32(payload.count).littleEndian
+    withUnsafeBytes(of: &n) { d.append(contentsOf: $0) }
+    d.append(payload)
+    return d
+}
 
 func emit(_ buf: AVAudioPCMBuffer) {
     guard let ch = buf.floatChannelData else { return }
@@ -53,7 +65,7 @@ func emit(_ buf: AVAudioPCMBuffer) {
     writeQueue.async {
         framesWritten += Int64(n)
         if peak > peakSinceReport { peakSinceReport = peak }
-        do { try stdoutHandle.write(contentsOf: data) } catch { exit(0) }
+        do { try stdoutHandle.write(contentsOf: framed ? frameData(audioFrameKind, data) : data) } catch { exit(0) }
     }
 }
 
@@ -541,6 +553,7 @@ while let a = argv.next() {
     case "--source": source = argv.next() ?? ""
     case "--seconds": seconds = Double(argv.next() ?? "0") ?? 0
     case "--force-device-clock": forceDeviceClock = true
+    case "--framed": framed = true
     case "--device": micMode = (argv.next() ?? "default") == "builtin" ? "builtin" : "default"
     case "-h", "--help":
         print("usage: audiocap --source system|mic [--device default|builtin] [--seconds N]")
@@ -588,6 +601,23 @@ case "mic":
 default:
     log("usage: audiocap --source system|mic [--seconds N]")
     exit(64)
+}
+
+audioFrameKind = source == "system" ? 2 : 1
+if framed {
+    let hb = DispatchSource.makeTimerSource(queue: .main)
+    hb.schedule(deadline: .now() + 1, repeating: 1)
+    hb.setEventHandler {
+        writeQueue.async {
+            let obj: [String: Any] = ["t": Date().timeIntervalSince1970, "source": source, "frames": framesWritten,
+                                      "peak": Double(peakSinceReport), "restarts": micRestarts]
+            if let payload = try? JSONSerialization.data(withJSONObject: obj) {
+                do { try stdoutHandle.write(contentsOf: frameData(3, payload)) } catch { exit(0) }
+            }
+        }
+    }
+    hb.resume()
+    keepAlive.append(hb as AnyObject)
 }
 
 // Health line every 10 s: frames written and peak level. Peak 0 for a long time = silence or no permission.

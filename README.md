@@ -18,6 +18,33 @@ place, [`rules/`](rules/), which both read.
 | `tools/check_anonymized.py` | fails on user paths, keys, IDs, long dashes and terms from a private deny list |
 | `Fixtures/` | synthetic demo call used by the tests |
 
+## Using Live Tips: start a call
+
+1. Menu bar icon (or the Dock icon) > **Start call…**
+2. **Project**: recordings, notes and the prep live in this project's folder. A workspace is for general calls about several projects.
+3. **Title**: a short name of the call, e.g. "Weekly sync". It also links the call to its prep (see below), so keep the same title you gave the prep.
+4. **Call context** (optional, strongly recommended): what the call is about and where to look, e.g. "pricing for phase 2, see the estimate and last week's notes". Before the call starts Claude gets this text, the project's current state (`_notion/current-state.md`) and the project files that local search finds for it.
+5. **Audience**, **Meeting type**, **Microphone**, **Languages**, then **Start**.
+
+### Prep made in Cowork
+
+A prep is a brief, fact cards and, for a presentation, an outline and slides that Claude builds in Cowork from your project files, Notion and the tracker 10-30 minutes before the call. Tips are much better with it.
+
+- **How to make one:** in Start call press **Copy request for Cowork** and paste it into Cowork in the same project. The request already names the call title, time and your context.
+- **Where it lands:** `<project folder>/live/prep-<date>-<HHMM>-<title>.brief.md`, `.cards.json`, `.facts.json` (plus `.outline.json` and `.slides.json` for a presentation).
+- **Which prep is used:** on Start the app takes `prep-*` files younger than 3 hours from that folder. A prep whose name matches the call title wins ("Weekly Sync" matches `...-weekly-sync`); with no match, the newest one is used. Each file kind is taken separately, so a prep without slides still gives the brief and the facts.
+- **How to check before Start:** the **Prep** block says "Prep found: <title>" in green. The block checks the folder when the window opens and when you change the project; if the prep was finished after you opened the window, switch the project away and back (an automatic refresh is planned).
+- **Without a prep:** the call still works. Claude uses the call context, the project's current state and local search, and the local layer (fact cards, the "❓" question cards, HELP NOW) runs as usual.
+
+### FAQ
+
+- **Do I need Cowork open during the call?** No. Live Tips calls the Claude API itself with your key from Keychain. Cowork is only needed for the prep and for the wrap-up you ask for later.
+- **Can I change the microphone during the call?** Yes, in the tips window (Mic menu). "System default" follows macOS; choosing a device keeps it even if macOS switches.
+- **What is Local AI?** A small model on this Mac (built-in bge-m3, or your Ollama) that matches facts and cards by meaning and powers HELP NOW and project search. Settings > AI explains the engines and how to add another one.
+- **Which "❓" cards are shown?** Only for a line that names you and asks something, a line with a work word (estimate, deadline, status, price, release…), or a question about time or amount ("when…?", "how much…?"). Rule: `rules/triggers.yaml` > `question_card`.
+- **What does it cost?** Usually $0.10 to $1.20 per hour of a call; the menu shows this call and this month against the limits from Settings.
+- **Where are the files?** Transcript, tips and wrap-up data: `<project folder>/live/`. App logs: `<app folder>/logs/`.
+
 ## M0 spike
 
 Measures whether direct, event-driven model calls reach the target: from the end of the

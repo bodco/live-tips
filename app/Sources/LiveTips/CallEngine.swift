@@ -16,6 +16,9 @@ final class CallEngine {
     var statusPath: String { (appRoot as NSString).appendingPathComponent("state/status.json") }
     var isRunning: Bool { recorder?.isRunning ?? false }
     var callContext = ""
+    var projectConfig = ""          // projects/<slug>.md of this call (Meetings DB and page IDs for Notion)
+    var lastFile: String?
+    var notionResult = ""      // last post-call Notion write: link or error
     var sidecarRestarts = 0
     var projectRoot = ""
 
@@ -39,6 +42,7 @@ final class CallEngine {
         callContext = (request["context"] as? String) ?? ""
         sidecarRestarts = 0
         projectRoot = (request["project_dir"] as? String) ?? ""
+        projectConfig = (request["project_config"] as? String) ?? ""
         let c = config
         let control = (appRoot as NSString).appendingPathComponent("control")
         let logs = (appRoot as NSString).appendingPathComponent("logs")
@@ -65,6 +69,7 @@ final class CallEngine {
         poll = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             let st = EngineStatus.load(path: self.statusPath)
+            if let f = st.file { self.lastFile = f }
             if !sidecarStarted, let file = st.file, ["recording", "loading_model", "standby"].contains(st.state) {
                 sidecarStarted = true
                 self.adoptPrep(file: file)
@@ -80,6 +85,7 @@ final class CallEngine {
             if !(self.recorder?.isRunning ?? false) {
                 t.invalidate()
                 self.sidecar?.terminate()
+                if let file = st.file ?? self.lastFile, apiAllowed { self.writeToNotion(file: file) }
             }
         }
         return nil
@@ -142,6 +148,65 @@ final class CallEngine {
         p.standardError = log
         try? p.run()
         sidecar = p
+    }
+
+    /// After the call: wrap-up by Claude and the Meetings DB page in Notion (existing page of this meeting
+    /// first, a new one otherwise), with the transcript attached as a .md file. Same result as the skill's
+    /// wrap-up Step 5. Needs the Notion token (Settings > Keys) and a project with a config.
+    func writeToNotion(file: String) {
+        let c = config
+        guard c.notionWriteSummary else { return }
+        let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
+        guard let key = store.get(.claudeAPIKey), let notionToken = store.get(.notionToken) else {
+            notionResult = "Notion: add the Notion token in Settings > Keys"; notify(notionResult); return
+        }
+        guard !projectConfig.isEmpty, FileManager.default.fileExists(atPath: projectConfig) else {
+            notionResult = "Notion: this call has no project config, nothing written"; return
+        }
+        guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
+        p.arguments = ["-m", "livetips_m0.wrapup_notion", "--md", file, "--project-config", projectConfig,
+                       "--lt", c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt"),
+                       "--model", c.models.tip]
+        p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
+        var env = ProcessInfo.processInfo.environment
+        env["CLAUDE_API"] = key
+        env["NOTION_TOKEN"] = notionToken          // passed to the child only, never written or logged
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        p.environment = env
+        let out = Pipe()
+        p.standardOutput = out
+        let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notion.log"))
+        p.standardError = log
+        notionResult = "Notion: writing the meeting page…"
+        p.terminationHandler = { [weak self] proc in
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            log?.write(data)
+            let line = String(data: data, encoding: .utf8)?.split(separator: "\n").last.map(String.init) ?? ""
+            let d = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] ?? [:]
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if (d["ok"] as? Bool) == true, let url = d["url"] as? String {
+                    self.notionResult = url
+                    self.notify(((d["created"] as? Bool) == true ? "Meeting page created in Notion" : "Wrap-up added to the meeting page in Notion"), url: url)
+                } else {
+                    self.notionResult = "Notion: " + ((d["error"] as? String) ?? "failed, see logs/notion.log")
+                    self.notify(self.notionResult)
+                }
+            }
+        }
+        do { try p.run() } catch { notionResult = "Notion: could not start (\(error.localizedDescription))" }
+    }
+
+    func notify(_ text: String, url: String? = nil) {
+        let a = NSAlert()
+        a.messageText = "Live Tips"
+        a.informativeText = text
+        a.addButton(withTitle: url == nil ? "OK" : "Open in Notion")
+        if url != nil { a.addButton(withTitle: "Close") }
+        NSApp.activate(ignoringOtherApps: true)
+        if a.runModal() == .alertFirstButtonReturn, let u = url, let link = URL(string: u) { NSWorkspace.shared.open(link) }
     }
 
     func stop() {

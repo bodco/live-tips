@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var startItem = NSMenuItem()
     var endItem = NSMenuItem()
     var tipsItem = NSMenuItem()
+    var notionItem = NSMenuItem()
     var lastStatus = EngineStatus()
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
@@ -34,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startItem = add(menu, "Start call…", #selector(startCall), "n")
         endItem = add(menu, "End call", #selector(endCall), "")
         tipsItem = add(menu, "Open tips window", #selector(showTips), "t")
+        notionItem = add(menu, "Send last call to Notion", #selector(sendToNotion), "")
         micItem = add(menu, "Allow microphone…", #selector(requestMic), "")
         menu.addItem(.separator())
         add(menu, "Settings…", #selector(openSettings), ",")
@@ -108,6 +110,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startItem.isHidden = recording
         endItem.isHidden = !recording
         tipsItem.title = recording ? "Open tips window" : "Preview tips window"
+        notionItem.isHidden = recording || CallEngine.shared.lastFile == nil
+        notionItem.toolTip = CallEngine.shared.notionResult
         statusLines[0].title = st.state == "standby" ? "○ Waiting for the call" + (st.project.map { ": \($0)" } ?? "")
             : recording ? "● Recording" + (st.project.map { ": \($0)" } ?? "") : "Not recording"
         statusLines[1].title = recording ? "Lines \(st.lines) · tips \(st.tips)" : "Start a call to see live numbers"
@@ -124,6 +128,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
+    @objc func sendToNotion() {
+        guard let f = CallEngine.shared.lastFile, !CallEngine.shared.isRunning else { return }
+        CallEngine.shared.writeToNotion(file: f)
+    }
     @objc func openSetup() { MainActor.assumeIsolated { SetupWindow.show() } }
     @objc func openSettings() { MainActor.assumeIsolated { SettingsWindow.show() } }
     @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
@@ -327,7 +335,8 @@ final class StartCallModel: ObservableObject {
         return ["project_dir": root, "title": title.isEmpty ? (project?.name ?? workspace?.name ?? "Meeting") : title,
                 "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,
                 "me_lang": langs.0, "langs": langs.1, "me_langs": langs.0 == "uk" ? ["uk", "en"] : [langs.0],
-                "context": context.trimmingCharacters(in: .whitespacesAndNewlines), "mic_device": micDevice, "standby": standby]
+                "context": context.trimmingCharacters(in: .whitespacesAndNewlines), "mic_device": micDevice, "standby": standby,
+                "project_config": project?.config ?? ""]
     }
 }
 

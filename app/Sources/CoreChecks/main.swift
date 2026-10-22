@@ -56,10 +56,76 @@ func watchdogTwoFailedRestartsSwitchToBuiltInMic() {
     expect(w.evaluate(now: 41, startedAt: 30, lastHeartbeat: nil, lastMicAudio: nil, micMuted: false, alive: false) == .switchToBuiltInMic)
 }
 
+func projectConfigParse() {
+    let md = """
+    # Project: Demo Platform
+    ## General
+    - **project_name**: Demo Platform
+    - **project_slug**: demo   (lowercase)
+    - **status**: active
+    - **default_language**: Ukrainian
+    - **client_language**: English
+    ## Local Paths
+    - **project_root**: `~~home-folder/work/Demo`
+    ## Team - Internal (as of 2026-01-01)
+    | Name | Role | Jira Username | Report Title | Availability | Focus Areas |
+    |------|------|---------------|--------------|--------------|-------------|
+    | Alex Example | PM | alex | Project Manager | full-time | - |
+    ### Transcript Alias Map
+    | Transcript says | Actually is |
+    |----------------|-------------|
+    | Олекс | Alex Example |
+    ## Team - Client (this is the Stakeholder Register)
+    | Name | Role | Email | Influence | Interest | Channel | Cadence | Notes |
+    |------|------|-------|-----------|----------|---------|---------|-------|
+    | Jordan Client | CTO | j@example.com | H | H | Call | weekly | - |
+    """
+    let p = ProjectConfigImporter.parse(markdown: md, path: "/x/demo.md", home: "/home/test")
+    expect(p?.slug == "demo", "slug")
+    expect(p?.root == "/home/test/work/Demo", "root")
+    expect(p?.people.count == 2, "people")
+    expect(p?.people.last?.side == "client", "client side")
+    expect(p?.aliases["Олекс"] == "Alex Example", "alias")
+    expect(ProjectConfigImporter.parse(markdown: "- **project_slug**: {slug}") == nil, "template ignored")
+}
+
+func registryMergeKeepsUserFields() {
+    var r = ProjectRegistry()
+    var a = Project(name: "Demo", slug: "demo", root: "/r")
+    a.apiAllowed = false
+    a.index.extra = ["/w/_notion"]
+    r.projects = [a]
+    r.merge(imported: [Project(name: "Demo 2", slug: "demo", root: "/r2"), Project(name: "Beta", slug: "beta", root: "/b")])
+    expect(r.projects.count == 2, "two projects")
+    let d = r.projects.first { $0.slug == "demo" }
+    expect(d?.name == "Demo 2" && d?.root == "/r2", "refreshed from config")
+    expect(d?.apiAllowed == false && d?.index.extra == ["/w/_notion"], "user fields kept")
+}
+
+func secretsAndConfig() {
+    expect(maskedSecret("sk-abcdefghijkl1234") == "...1234", "mask")
+    expect(maskedSecret(nil) == "not set", "mask nil")
+    let tmp = NSTemporaryDirectory() + "livetips-check-secrets.env"
+    try? "FOO=1\nexport CLAUDE_API=\"sk-test-9999\"\n".write(toFile: tmp, atomically: true, encoding: .utf8)
+    expect(readSecretsFileValue("CLAUDE_API", path: tmp) == "sk-test-9999", "secrets file")
+    expect(readSecretsFileValue("MISSING", path: tmp) == nil, "missing var")
+    try? FileManager.default.removeItem(atPath: tmp)
+    var c = AppConfig()
+    c.localAI.enabled = false
+    c.budget.monthlyHardUSD = 50
+    let url = URL(fileURLWithPath: NSTemporaryDirectory() + "livetips-check-config.json")
+    try? c.save(to: url)
+    expect(AppConfig.load(from: url) == c, "config round trip")
+    try? FileManager.default.removeItem(at: url)
+}
+
 frameRoundTripAcrossChunks()
 frameResyncAfterGarbage()
 watchdogStartGraceThenStallTerminateKillRestart()
 watchdogMutedMicIsNotAStall()
 watchdogTwoFailedRestartsSwitchToBuiltInMic()
+projectConfigParse()
+registryMergeKeepsUserFields()
+secretsAndConfig()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

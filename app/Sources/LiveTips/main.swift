@@ -44,11 +44,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "LiveTips M0 (mic: \(micStatus()))", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Request microphone access", action: #selector(requestMic), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "Show demo tips window", action: #selector(openDemo), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        for m in menu.items where m.action == #selector(requestMic) { m.target = self }
+        for m in menu.items where [#selector(requestMic), #selector(openSettings), #selector(openDemo)].contains(m.action) { m.target = self }
         it.menu = menu
         item = it
+    }
+
+    var demo: PrompterController?
+
+    @objc func openSettings() {
+        MainActor.assumeIsolated { SettingsWindow.show() }
+    }
+
+    @objc func openDemo() {
+        MainActor.assumeIsolated {
+            let c = PrompterController(args: prompterArgs(["LiveTips", "--prompter-demo"]))
+            c.show()
+            demo = c
+        }
     }
 
     @objc func requestMic() {

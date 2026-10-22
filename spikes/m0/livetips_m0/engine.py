@@ -87,6 +87,10 @@ class Engine:
         self.tip_validator = jsonschema.Draft202012Validator(rules.model_tip_schema)
         self.cls_validator = jsonschema.Draft202012Validator(rules.classify_schema)
         self.paused = False
+        # The first tip call writes the prompt cache; parallel first calls would each pay the write.
+        self.tip_cache_warm = threading.Event()
+        self.tip_warm_lock = threading.Lock()
+        self.red_repeat_s = d.get("red_repeat_window_s", 60)
 
     # ---------- input ----------
     def on_line(self, line: Line) -> None:
@@ -213,7 +217,13 @@ class Engine:
 
     def _run_tip(self, line: Line, trigger: str, span: dict) -> None:
         span["tip_start"] = self.clock()
-        c = self._call("tip", line, trigger)
+        if self.tip_cache_warm.is_set():
+            c = self._call("tip", line, trigger)
+        else:
+            with self.tip_warm_lock:
+                c = self._call("tip", line, trigger)
+                if not c.error:
+                    self.tip_cache_warm.set()
         done = self.clock()
         span["tip_ttft_ms"] = c.ms(c.t_first_token)
         span["tip_gist_ms"] = c.ms(c.t_gist)
@@ -255,7 +265,7 @@ class Engine:
                 "at": s_to_hms(done), "late": late}
         item = {k: v for k, v in item.items() if v not in ("", [], None) or k in ("late",)}
         with self.lock:
-            self.tips.append(item)
+            self.tips.append(dict(item, _at=done))
             if item["level"] != "red":
                 self.last_nonred_emit = done
         self.out_tips.write(item)
@@ -271,6 +281,13 @@ class Engine:
     # ---------- diet (code, not prompt) ----------
     def _diet(self, obj: dict, now: float) -> Optional[str]:
         if obj.get("level") == "red":
+            # A red tip is never rate-limited, but the same red tip twice within a minute is noise
+            # (two lines of one turn can both trigger "your turn").
+            with self.lock:
+                recent = [t for t in self.tips if t.get("level") == "red" and t.get("_at", -1e9) >= now - self.red_repeat_s]
+            g, topic = obj.get("gist", ""), obj.get("topic", "")
+            if any(t.get("gist") == g or (topic and jaccard(topic, t.get("topic", "")) >= self.topic_sim) for t in recent):
+                return "red_repeat"
             return None
         if self.last_nonred_emit is not None and now - self.last_nonred_emit < self.rate_s:
             return "rate"

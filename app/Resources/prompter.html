@@ -331,9 +331,107 @@
   #helpbox h5:first-child { margin-top: 0; }
   #helpbox dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 10px; margin: 0; }
   #helpbox dt { font-weight: 600; white-space: nowrap; } #helpbox dd { margin: 0; color: var(--muted); }
+
+  /* ---------- presentation split view: slide cards (left) + the usual tips stream (right) ---------- */
+  #main { display: flex; flex-direction: column; position: relative; flex: 1 1 0; min-width: 0; height: 100%; overflow: hidden; }
+  #deckpane { display: none; }
+  body.split { flex-direction: row; }
+  body.split #deckpane { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; height: 100%; position: relative;
+    border-right: 1px solid var(--line); }
+  #dkbtn { display: none; }
+  body.dkready #dkbtn { display: inline-flex; }
+  body.split #dkbtn { background: var(--blue-bg); border-color: var(--blue); }
+  #dkswap { display: none; font-size: 17px; }
+  body.split #dkswap { display: inline-flex; }
+  body.split.swap #dkswap { background: var(--blue-bg); border-color: var(--blue); }
+  body.split.swap #deckpane { order: 2; border-right: 0; border-left: 1px solid var(--line); }
+  #dk-top { flex: none; padding: 8px 10px 6px 12px; display: flex; flex-direction: column; gap: 6px;
+    border-bottom: 1px solid var(--line); -webkit-user-select: none; user-select: none; }
+  .dk-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+  .dk-num { font-weight: 700; font-variant-numeric: tabular-nums; background: var(--text); color: var(--bg);
+    border-radius: 6px; padding: 1px 8px; font-size: 14px; flex: none; }
+  .dk-ttl { font-weight: 600; font-size: 14px; flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #dk-rem { font-size: 26px; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+  #dk-rem.warn { color: var(--orange); } #dk-rem.neg { color: var(--red); }
+  .dk-b { height: 28px; min-width: 28px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--panel); font-size: 12px; cursor: pointer; flex: none; }
+  .dk-b:hover { border-color: var(--muted); }
+  .dk-b:focus-visible, #dk-mode:focus-visible, #dk-min:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .dk-b[aria-pressed="true"] { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+  .dk-b.pri { background: var(--blue); border-color: var(--blue); color: var(--bg); font-weight: 600; }
+  #dk-mode, #dk-min { height: 28px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; padding: 0 6px; }
+  #dk-min { width: 50px; font-variant-numeric: tabular-nums; }
+  .dk-lab { font-size: 12px; color: var(--muted); }
+  #dk-clock { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #dk-pace { font-size: 12px; color: var(--muted); }
+  #dk-pace:empty { display: none; }
+  .dk-chip { padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; font-weight: 600; white-space: nowrap; }
+  .dk-chip.ok { color: var(--green); } .dk-chip.warn { color: var(--orange); } .dk-chip.bad { color: var(--red); }
+  #dk-track { position: relative; display: flex; gap: 2px; height: 8px; }
+  .dk-seg { height: 100%; background: var(--line); border-radius: 2px; min-width: 2px; }
+  .dk-seg.o { background: repeating-linear-gradient(135deg, var(--line) 0 3px, transparent 3px 6px); }
+  .dk-seg.done { background: var(--blue); opacity: .4; }
+  .dk-seg.cur { background: var(--blue); opacity: 1; }
+  .dk-seg.o.done, .dk-seg.o.cur { background: var(--orange); }
+  #dk-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); pointer-events: none; }
+  #dk-cards { flex: 1 1 0; min-height: 0; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
+  .dk-card { scroll-snap-align: start; scroll-snap-stop: always; height: 100%; overflow-y: auto; padding: 12px 16px 18px;
+    border-bottom: 1px dashed var(--line); }
+  .dk-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .dk-head h2 { font-size: 17px; line-height: 1.25; margin: 0; flex: 1 1 140px; min-width: 0; }
+  .dk-card.cur .dk-num { background: var(--blue); color: var(--bg); }
+  .dk-who { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px;
+    border-radius: 5px; border: 1px solid var(--line); color: var(--muted); flex: none; }
+  .dk-who.me { color: var(--blue); border-color: var(--blue); }
+  .dk-who.other { color: var(--orange); border-color: var(--orange); }
+  .dk-bud { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  .dk-go { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .dk-txt p { font-size: calc(var(--size) * 1.12); line-height: 1.45; margin: 0 0 .6em; }
+  .dk-txt p.s { opacity: .55; }
+  .dk-txt p.s::before { content: attr(data-l); display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; border: 1px solid var(--muted); color: var(--muted); border-radius: 4px; padding: 0 5px; margin-right: 8px; vertical-align: middle; }
+  .dk-txt p.h { font-size: 13px; line-height: 1.4; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; }
+  .dk-txt p.c { color: var(--orange); }
+  #dk-cards.comp p.s { display: none; }
+  .dk-nx { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  #dk-wrap { display: none; position: absolute; left: 8px; right: 8px; bottom: 8px; max-height: 70%; overflow: auto; z-index: 7;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 10px 12px; font-size: 13px; }
+  #dk-wrap.on { display: block; }
+  #dk-wrap table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; margin-top: 6px; }
+  #dk-wrap th, #dk-wrap td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  #dk-wrap td.r, #dk-wrap th.r { text-align: right; }
+  #dk-wrap td.bad { color: var(--red); } #dk-wrap td.ok { color: var(--green); }
+  #dk-wrap td.t { white-space: normal; }
 </style>
 </head>
 <body>
+<div id="deckpane" aria-label="Slides">
+  <div id="dk-top">
+    <div class="dk-row">
+      <span class="dk-num" id="dk-num">-</span>
+      <span class="dk-ttl" id="dk-ttl"></span>
+      <span id="dk-rem">0:00</span>
+    </div>
+    <div class="dk-row">
+      <button class="dk-b pri" id="dk-start" type="button"></button>
+      <button class="dk-b" id="dk-prev" type="button">◀</button>
+      <button class="dk-b" id="dk-next" type="button">▶</button>
+      <button class="dk-b" id="dk-auto" type="button" aria-pressed="true"></button>
+      <button class="dk-b" id="dk-comp" type="button" aria-pressed="false"></button>
+      <button class="dk-b" id="dk-snd" type="button" aria-pressed="true"></button>
+      <button class="dk-b" id="dk-reset" type="button"></button>
+      <button class="dk-b" id="dk-swap" type="button" aria-pressed="false">⇄</button>
+      <select id="dk-mode"><option value="mine"></option><option value="all"></option></select>
+      <input id="dk-min" type="number" min="1" max="180" step="1"><span class="dk-lab" id="dk-minlab"></span>
+      <span id="dk-clock"></span>
+    </div>
+    <div class="dk-row" id="dk-pace"></div>
+    <div id="dk-track"></div>
+  </div>
+  <div id="dk-cards"></div>
+  <div id="dk-wrap"></div>
+</div>
+<div id="main">
 <header id="bar">
   <span id="dot" data-i18n-title="dot_wait" title="Waiting for the recording..."></span>
   <span id="title" data-i18n="title_default">Prompter</span>
@@ -466,6 +564,7 @@
     </details>
   </div>
 </div>
+</div><!-- #main -->
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -2020,6 +2119,284 @@
 
   send('setting', { key: 'ui_lang', value: uiLang });   // once on load: the skill writes tip headlines in it
   send('ready', true);
+})();
+</script>
+<script>
+// ---------- Presentation split view (v38) ----------
+// The skill writes <stem>.slides.json; the recorder pushes it as {"kind":"slides"}. When the meeting
+// type is Presentation and slides exist, the window goes twice as wide (native "split" message):
+// slide cards with the full speech on the left, the usual tips stream on the right.
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var native = window.webkit && window.webkit.messageHandlers;
+  function send(name, value) { try { native[name].postMessage(value); } catch (e) {} }
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  var L = {
+    uk: { start: 'Старт', pause: 'Пауза', cont: 'Продовжити', auto: 'Авто', comp: 'Стиснути', snd: 'Звук', reset: 'Скинути',
+      mine: 'Мої слайди', all: 'Усі слайди', min: 'хв', left: 'лишилось', of: 'з', me: 'твоє', shared: 'спільне', other: 'говорить',
+      onSlide: 'У презентації: слайд', silent: 'Ти мовчиш.', next: 'Далі', last: 'Це останній слайд.', skip: 'можна пропустити',
+      ontrack: 'за графіком', ahead: 'уперед', back: 'назад', behind: 'відстаєш', early: 'випереджаєш', wpm: 'сл/хв',
+      slow: 'повільно', ok: 'норм', fast: 'швидко', squeeze: 'стисни', timeout: 'час слайда вийшов',
+      done: 'Прогін завершено', total: 'Загалом', limit: 'при ліміті', over: 'перебір', spare: 'запас', close: 'Закрити',
+      slide: 'Слайд', title: 'Назва', plan: 'План', fact: 'Факт', diff: 'Різниця',
+      autoTt: 'Картки гортаються самі за розкладом, з сигналом', compTt: 'Сховати абзаци «можна пропустити»', btnTt: 'Картки слайдів (split view)', swap: 'Поміняти місцями слайди і підказки' },
+    en: { start: 'Start', pause: 'Pause', cont: 'Resume', auto: 'Auto', comp: 'Trim', snd: 'Sound', reset: 'Reset',
+      mine: 'My slides', all: 'All slides', min: 'min', left: 'left', of: 'of', me: 'yours', shared: 'shared', other: 'speaks',
+      onSlide: 'On screen: slide', silent: 'You stay quiet.', next: 'Next', last: 'This is the last slide.', skip: 'can skip',
+      ontrack: 'on schedule', ahead: 'ahead', back: 'back', behind: 'behind', early: 'ahead', wpm: 'wpm',
+      slow: 'slow', ok: 'ok', fast: 'fast', squeeze: 'trim', timeout: 'slide time is up',
+      done: 'Run finished', total: 'Total', limit: 'with a limit of', over: 'over', spare: 'spare', close: 'Close',
+      slide: 'Slide', title: 'Title', plan: 'Plan', fact: 'Actual', diff: 'Diff',
+      autoTt: 'Cards turn by the schedule, with a beep', compTt: 'Hide the "can skip" paragraphs', btnTt: 'Slide cards (split view)', swap: 'Swap the slides and tips sides' }
+  };
+  function lang() { return document.documentElement.lang === 'uk' ? 'uk' : 'en'; }
+  function t(k) { return L[lang()][k] || L.en[k] || k; }
+
+  var data = null, S = [], cs = [], ce = [], total = 0, cards = [];
+  var mode = load('deck_mode') === 'all' ? 'all' : 'mine', T = 0;
+  var auto = load('deck_auto') !== '0', sound = load('deck_sound') !== '0', compress = false;
+  var running = false, elapsed = 0, offset = 0, idx = 0, last = 0, enter = {}, warned = {}, finished = false, entryLag = 0;
+  var actx = null, progScroll = false, pt = null, st = null;
+  var presenting = false, userHidden = false, isSplit = false, curLang = lang(), swap = load('deck_swap') === '1';
+
+  function fmt(x) { var n = x < 0; x = Math.abs(Math.round(x)); var m = Math.floor(x / 60), r = x % 60; return (n ? '-' : '') + m + ':' + (r < 10 ? '0' : '') + r; }
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function incl(d) { return mode === 'all' || d.who !== 'other'; }
+  function words(d) { var n = 0; (d.body || []).forEach(function (b) { if (b.k === 'p' || (b.k === 's' && !compress)) n += String(b.t).split(/\s+/).filter(Boolean).length; }); return n; }
+  function defMin() {
+    if (mode === 'all' && data.total_min) return Math.round(data.total_min);
+    var s = 0; data.slides.forEach(function (d) { if (incl(d)) s += d.sec || 60; });
+    return Math.max(1, Math.round(s / 60));
+  }
+
+  // ---------- bar button: show / hide the cards ----------
+  var dkbtn = el('button', 'ib', '📑'); dkbtn.id = 'dkbtn'; dkbtn.type = 'button';
+  var gear = $('gear'); if (gear && gear.parentNode) gear.parentNode.insertBefore(dkbtn, gear);
+  dkbtn.onclick = function () { userHidden = isSplit; applySplit(); };
+  // Swap sides button in the top bar (visible in split view): slides left/right, tips the other side.
+  var swbtn = el('button', 'ib', '⇄'); swbtn.id = 'dkswap'; swbtn.type = 'button';
+  if (gear && gear.parentNode) gear.parentNode.insertBefore(swbtn, dkbtn);
+  function toggleSwap() { swap = !swap; store('deck_swap', swap ? '1' : '0'); document.body.classList.toggle('swap', swap); labels(); }
+  swbtn.onclick = function () { toggleSwap(); };
+
+  function wantSplit() { return presenting && S.length > 0 && !userHidden; }
+  function applySplit() {
+    document.body.classList.toggle('dkready', presenting && S.length > 0);
+    document.body.classList.toggle('swap', swap);
+    var on = wantSplit();
+    if (on === isSplit) return;
+    isSplit = on;
+    document.body.classList.toggle('split', on);
+    // The window grows on the slides side, so the tips stream stays where the PM put it.
+    send('split', { on: on, grow: swap ? 'right' : 'left' });
+    if (on) setTimeout(function () { showCard(idx); }, 350);
+  }
+
+  function labels() {
+    $('dk-start').textContent = running ? t('pause') : (elapsed > 0 ? t('cont') : t('start'));
+    $('dk-auto').textContent = t('auto'); $('dk-auto').title = t('autoTt');
+    $('dk-comp').textContent = t('comp'); $('dk-comp').title = t('compTt');
+    $('dk-snd').textContent = '🔔'; $('dk-snd').title = t('snd'); $('dk-reset').textContent = '↺'; $('dk-reset').title = t('reset');
+    $('dk-mode').options[0].textContent = t('mine'); $('dk-mode').options[1].textContent = t('all');
+    $('dk-minlab').textContent = t('min'); dkbtn.title = t('btnTt');
+    $('dk-swap').title = t('swap'); $('dk-swap').setAttribute('aria-pressed', String(swap)); swbtn.title = t('swap');
+    $('dk-auto').setAttribute('aria-pressed', String(auto));
+    $('dk-snd').setAttribute('aria-pressed', String(sound));
+    $('dk-comp').setAttribute('aria-pressed', String(compress));
+  }
+
+  function build() {
+    if (!data) return;
+    var base = data.slides.filter(incl);
+    if (!T) T = parseInt(load('deck_min_' + mode) || '0', 10) || defMin();
+    var sum = base.reduce(function (a, d) { return a + (d.sec || 60); }, 0) || 1, k = T * 60 / sum, acc = 0;
+    S = base.map(function (d) { var o = {}; for (var x in d) o[x] = d[x]; o.b = (d.sec || 60) * k; return o; });
+    cs = []; ce = []; S.forEach(function (d) { cs.push(acc); acc += d.b; ce.push(acc); }); total = acc;
+    var tr = $('dk-track'); tr.innerHTML = '';
+    S.forEach(function (d) { var e = el('div', 'dk-seg' + (d.who === 'other' ? ' o' : '')); e.style.flex = String(d.b); e.title = d.n + '. ' + d.title + ' (' + fmt(d.b) + ')'; tr.appendChild(e); });
+    var m = el('div'); m.id = 'dk-mark'; tr.appendChild(m);
+    var box = $('dk-cards'); box.innerHTML = ''; cards = [];
+    S.forEach(function (d, i) {
+      var a = el('section', 'dk-card'), hd = el('div', 'dk-head');
+      hd.appendChild(el('span', 'dk-num', String(d.n)));
+      hd.appendChild(el('span', 'dk-who ' + d.who, d.who === 'other' ? (t('other') + (d.speaker ? ': ' + d.speaker : '')) : t(d.who)));
+      hd.appendChild(el('h2', null, d.title));
+      hd.appendChild(el('span', 'dk-bud', fmt(d.b)));
+      a.appendChild(hd);
+      a.appendChild(el('div', 'dk-go', (d.who === 'other' ? t('silent') + ' ' : '') + t('onSlide') + ' ' + d.n + '.'));
+      var tx = el('div', 'dk-txt');
+      (d.body || []).forEach(function (b) { var p = el('p', b.k === 'p' ? '' : b.k, b.t); if (b.k === 's') p.setAttribute('data-l', t('skip')); tx.appendChild(p); });
+      a.appendChild(tx);
+      var nx = S[i + 1];
+      a.appendChild(el('div', 'dk-nx', nx ? t('next') + ': ' + nx.n + '. ' + nx.title + ' (' + fmt(nx.b) + ')' : t('last')));
+      box.appendChild(a); cards.push(a);
+    });
+    $('dk-min').value = T; $('dk-mode').value = mode;
+    if (idx > S.length - 1) idx = Math.max(0, S.length - 1);
+    labels();
+  }
+
+  function slideAt(v) { for (var i = 0; i < S.length; i++) if (v < ce[i]) return i; return S.length - 1; }
+  function beep(kind) {
+    if (!sound) return;
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      var f = kind === 'warn' ? [520] : [660, 880], t0 = actx.currentTime;
+      f.forEach(function (fr, i) {
+        var o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = fr; o.type = 'sine';
+        g.gain.setValueAtTime(0.0001, t0 + i * 0.16); g.gain.exponentialRampToValueAtTime(0.16, t0 + i * 0.16 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.16 + 0.14);
+        o.connect(g); g.connect(actx.destination); o.start(t0 + i * 0.16); o.stop(t0 + i * 0.16 + 0.16);
+      });
+    } catch (e) {}
+  }
+  function showCard(i) {
+    var box = $('dk-cards'); if (!box.clientHeight) return;
+    progScroll = true; box.scrollTop = i * box.clientHeight;
+    clearTimeout(pt); pt = setTimeout(function () { progScroll = false; }, 250);
+  }
+  function setCur(i, withBeep, fromScroll) {
+    if (!S.length) return;
+    idx = i;
+    if (!(i in enter)) enter[i] = elapsed;
+    entryLag = elapsed + offset - cs[i];
+    if (withBeep) beep('go');
+    var segs = $('dk-track').children;
+    for (var j = 0; j < S.length; j++) {
+      segs[j].className = 'dk-seg' + (S[j].who === 'other' ? ' o' : '') + (j < i ? ' done' : j === i ? ' cur' : '');
+      cards[j].classList.toggle('cur', j === i);
+    }
+    if (!fromScroll) showCard(i);
+    render();
+  }
+  function jump(i, fromScroll) {
+    if (!S.length) return;
+    i = Math.max(0, Math.min(S.length - 1, i));
+    if (auto) offset = cs[i] - elapsed;
+    setCur(i, false, fromScroll);
+  }
+  function nextS() {
+    if (!running && !finished && elapsed === 0 && idx === 0) { startStop(); return; }
+    if (idx >= S.length - 1) { finish(); return; }
+    jump(idx + 1);
+  }
+  function startStop() {
+    if (finished || !S.length) return;
+    running = !running; last = performance.now();
+    if (running) { beep('go'); if (!(idx in enter)) enter[idx] = elapsed; }
+    labels();
+  }
+  function reset() {
+    running = false; elapsed = 0; offset = 0; idx = 0; enter = {}; warned = {}; finished = false; entryLag = 0;
+    $('dk-wrap').classList.remove('on'); labels();
+    setCur(0, false, false);
+  }
+  function finish() {
+    running = false; finished = true; labels();
+    var w = $('dk-wrap'); w.innerHTML = '';
+    var hd = el('div', 'dk-row'); hd.appendChild(el('b', null, t('done'))); hd.lastChild.style.flex = '1';
+    var cl = el('button', 'dk-b', t('close')); cl.type = 'button'; cl.onclick = function () { w.classList.remove('on'); }; hd.appendChild(cl);
+    w.appendChild(hd);
+    var dd = elapsed - T * 60;
+    w.appendChild(el('div', 'dk-lab', t('total') + ' ' + fmt(elapsed) + ' ' + t('limit') + ' ' + fmt(T * 60) + ' (' + (dd > 0 ? t('over') : t('spare')) + ' ' + fmt(Math.abs(dd)) + ')'));
+    var tb = el('table'), th = el('tr');
+    [t('slide'), t('title'), t('plan'), t('fact'), t('diff')].forEach(function (h, i) { th.appendChild(el('th', i > 1 ? 'r' : null, h)); });
+    tb.appendChild(th);
+    var keys = Object.keys(enter).map(Number).sort(function (a, b) { return a - b; });
+    keys.forEach(function (i, j) {
+      var end = j + 1 < keys.length ? enter[keys[j + 1]] : elapsed, act = end - enter[i], d = act - S[i].b, tr = el('tr');
+      tr.appendChild(el('td', null, String(S[i].n))); tr.appendChild(el('td', 't', S[i].title));
+      tr.appendChild(el('td', 'r', fmt(S[i].b))); tr.appendChild(el('td', 'r', fmt(act)));
+      tr.appendChild(el('td', 'r ' + (d > 8 ? 'bad' : d < -8 ? 'ok' : ''), (d > 0 ? '+' : '') + fmt(d)));
+      tb.appendChild(tr);
+    });
+    w.appendChild(tb); w.classList.add('on');
+    render();
+  }
+
+  function render() {
+    if (!S.length) return;
+    var d = S[idx], v = elapsed + offset, rem = ce[idx] - v;
+    $('dk-num').textContent = d.n; $('dk-ttl').textContent = d.title; $('dk-ttl').title = d.title;
+    var r = $('dk-rem'); r.textContent = fmt(rem); r.className = rem < 0 ? 'neg' : rem < 10 ? 'warn' : '';
+    $('dk-clock').textContent = fmt(elapsed) + ' ' + t('of') + ' ' + fmt(T * 60);
+    $('dk-mark').style.left = Math.min(100, Math.max(0, v / total * 100)) + '%';
+    var pc = $('dk-pace'); pc.innerHTML = '';
+    function chip(cls, txt) { pc.appendChild(el('span', 'dk-chip ' + cls, txt)); }
+    if (!running && elapsed === 0) return;
+    if (Math.abs(offset) > 8) chip(offset > 0 ? 'ok' : 'warn', (offset > 0 ? t('ahead') : t('back')) + ' ' + fmt(Math.abs(offset)));
+    else if (!auto && Math.abs(entryLag) > 8) chip(entryLag > 0 ? 'bad' : 'ok', (entryLag > 0 ? t('behind') : t('early')) + ' ' + fmt(Math.abs(entryLag)));
+    else chip('ok', t('ontrack'));
+    if (d.who !== 'other') {
+      var wn = words(d);
+      if (rem > 5 && wn > 0) {
+        var wpm = Math.round(wn / (rem / 60));
+        chip(wpm > 150 ? 'bad' : (wpm > 135 || wpm < 95) ? 'warn' : 'ok',
+          wpm + ' ' + t('wpm') + ' ' + (wpm > 150 ? t('squeeze') : wpm > 135 ? t('fast') : wpm < 95 ? t('slow') : t('ok')));
+      } else if (rem <= 5 && wn > 0) chip('bad', t('timeout'));
+    }
+  }
+
+  function tick() {
+    var sel = $('s_type'), p = !!(sel && sel.value === 'presentation');
+    if (p !== presenting) { presenting = p; if (!p) userHidden = false; applySplit(); }
+    if (lang() !== curLang) { curLang = lang(); if (data) { build(); setCur(idx, false, false); } }
+    if (!S.length) return;
+    if (running) {
+      var n = performance.now(); elapsed += (n - last) / 1000; last = n;
+      var v = elapsed + offset;
+      if (v >= total && auto) { finish(); return; }
+      if (auto) { var ni = slideAt(v); if (ni !== idx) setCur(ni, true, false); }
+      var rem = ce[idx] - v;
+      if (rem <= 10 && rem > 0 && !warned[idx]) { warned[idx] = 1; beep('warn'); }
+    }
+    render();
+  }
+
+  function loadSlides(it) {
+    if (!it || !it.slides || !it.slides.length) return;
+    var keep = running || elapsed > 0;
+    data = { title: it.title || '', total_min: it.total_min || 0, slides: it.slides };
+    T = 0; build();
+    if (keep) setCur(Math.min(idx, S.length - 1), false, false); else reset();
+    applySplit();
+  }
+
+  // The recorder's items reach the page through window.addItems; take ours, pass the rest on.
+  var orig = window.addItems;
+  window.addItems = function (items) {
+    var rest = [];
+    (items || []).forEach(function (it) { if (it && it.kind === 'slides') loadSlides(it); else rest.push(it); });
+    if (rest.length && orig) orig(rest);
+  };
+
+  $('dk-start').onclick = function () { startStop(); render(); };
+  $('dk-next').onclick = nextS;
+  $('dk-prev').onclick = function () { jump(idx - 1); };
+  $('dk-reset').onclick = reset;
+  $('dk-swap').onclick = function () { toggleSwap(); };
+  $('dk-auto').onclick = function () { auto = !auto; store('deck_auto', auto ? '1' : '0'); offset = auto ? cs[idx] - elapsed : 0; labels(); render(); };
+  $('dk-comp').onclick = function () { compress = !compress; $('dk-cards').classList.toggle('comp', compress); labels(); };
+  $('dk-snd').onclick = function () { sound = !sound; store('deck_sound', sound ? '1' : '0'); labels(); };
+  $('dk-mode').onchange = function () { mode = this.value; store('deck_mode', mode); T = 0; build(); reset(); };
+  $('dk-min').onchange = function () {
+    var x = parseInt(this.value, 10); if (!x || x < 1) x = 1; if (x > 180) x = 180;
+    T = x; store('deck_min_' + mode, String(x)); build(); reset();
+  };
+  $('dk-cards').addEventListener('scroll', function () {
+    if (progScroll) return;
+    clearTimeout(st);
+    st = setTimeout(function () {
+      var box = $('dk-cards'); if (!box.clientHeight) return;
+      var i = Math.round(box.scrollTop / box.clientHeight);
+      if (i !== idx && i >= 0 && i < S.length) jump(i, true);
+    }, 120);
+  });
+  window.addEventListener('resize', function () { if (isSplit) showCard(idx); });
+  labels();
+  setInterval(tick, 250);
 })();
 </script>
 </body>

@@ -85,13 +85,16 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     var pending: [String] = []
     var lastStatus = ""
     var ticks = 0
+    var isSplit = false              // presentation split view: slide cards on one side, tips on the other
+    var baseWidth: CGFloat = 0       // window width before the split, restored when it ends
+    var grewRight = false            // the side the window grew to (the slides side)
 
     init(args: PrompterArgs) { self.args = args }
 
     func show() {
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split"] { uc.add(self, name: name) }
         let cfg = WKWebViewConfiguration()
         cfg.userContentController = uc
 
@@ -190,6 +193,15 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             } else {
                 try? FileManager.default.removeItem(atPath: path)
             }
+        case "split":
+            // Presentation mode with slide cards: the page asks for a window twice as wide. It grows
+            // towards the cards, so the tips stream stays where the PM put it.
+            // Body: Bool (grow left), or {"on": Bool, "grow": "left" | "right"} after the PM swapped the sides.
+            if let d = message.body as? [String: Any] {
+                setSplit((d["on"] as? Bool) ?? false, growRight: (d["grow"] as? String) == "right", animate: true)
+            } else {
+                setSplit((message.body as? Bool) ?? false, growRight: false, animate: true)
+            }
         case "setting":
             // {"key": ..., "value": ...} -> the skill reads it from the inbox as @@SET key=value
             guard let d = message.body as? [String: Any], let key = d["key"] as? String,
@@ -201,5 +213,27 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         }
     }
 
-}
+    func setSplit(_ on: Bool, growRight: Bool = false, animate: Bool) {
+        guard on != isSplit, let window = window else { return }
+        isSplit = on
+        let vis = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? window.frame
+        var f = window.frame
+        if on {
+            baseWidth = f.width
+            grewRight = growRight
+            let w = min(f.width * 2, vis.width)
+            if !growRight { f.origin.x -= (w - f.width) }
+            f.size.width = w
+        } else {
+            let w = baseWidth > 0 ? baseWidth : f.width / 2
+            if !grewRight { f.origin.x += (f.width - w) }
+            f.size.width = w
+        }
+        if f.minX < vis.minX { f.origin.x = vis.minX }
+        if f.maxX > vis.maxX { f.origin.x = max(vis.minX, vis.maxX - f.width) }
+        window.setFrame(f, display: true, animate: animate)
+    }
 
+    /// Back to the normal width before the frame is saved, so the next call does not open twice as wide.
+    func windowWillClose(_ notification: Notification) { setSplit(false, animate: false) }
+}

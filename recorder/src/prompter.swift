@@ -52,6 +52,7 @@ func parseArgs() -> Args {
             #"{"t":"10:30:05","kind":"checklist","level":"info","gist":"Чекліст мітингу","items":["Статус релізу","Нова вимога від клієнта","Рішення по даті"]}"#,
             #"{"t":"10:31:40","kind":"tip","level":"red","gist":"🔴 Нова вимога. Не погоджуй зараз.","phrase":"Good idea. I will write it down. We will check it and come back to you."}"#,
             #"{"t":"10:33:12","kind":"tip","level":"red","gist":"🔴 Твоя черга: апдейт","phrase":"Short update from my side. We are on track.","items":["Transaction report is in testing","Payments: waiting for the client","We need a decision on the release date"]}"#,
+            #"{"kind":"slides","title":"Демо","total_min":3,"slides":[{"n":1,"title":"Титул","who":"shared","sec":30,"body":[{"k":"p","t":"Добрий день. Сьогодні покажемо результати ресерчу."}]},{"n":2,"title":"Ринок","who":"other","speaker":"Марія","sec":60,"body":[{"k":"h","t":"Марія: обсяг ринку і болі."},{"k":"c","t":"Її репліка перед твоїм виходом: «Богдане, тобі слово.»"}]},{"n":3,"title":"Що ми пропонуємо","who":"me","sec":90,"body":[{"k":"p","t":"Три шляхи, і чому ми пропонуємо третій."},{"k":"s","t":"Абзац, який можна пропустити, якщо відстаєш."},{"k":"h","t":"Підказка, яку не читаєш уголос."}]}]}"#,
         ]
         try? (demo.joined(separator: "\n") + "\n").write(toFile: a.tips, atomically: true, encoding: .utf8)
         try? "".write(toFile: a.inbox, atomically: true, encoding: .utf8)
@@ -129,6 +130,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     var pending: [String] = []
     var lastStatus = ""
     var ticks = 0
+    var isSplit = false              // presentation split view: slide cards left, tips right
+    var baseWidth: CGFloat = 0       // window width before the split, restored when it ends
+    var grewRight = false            // the side the window grew to (the slides side)
 
     init(args: Args) { self.args = args }
 
@@ -136,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         buildMenu()
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split"] { uc.add(self, name: name) }
         let cfg = WKWebViewConfiguration()
         cfg.userContentController = uc
 
@@ -152,7 +156,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.sharingType = .none          // ask macOS to keep the window out of screen capture
         window.isMovableByWindowBackground = true
-        window.alphaValue = 0.94
+        window.alphaValue = 1.0                 // opacity fades the page backgrounds only (text stays readable)
+        window.isOpaque = false
+        window.backgroundColor = .clear
         window.minSize = NSSize(width: 300, height: 140)
         window.delegate = self
         window.isReleasedWhenClosed = false
@@ -160,6 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
 
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
         web.navigationDelegate = self
+        web.setValue(false, forKey: "drawsBackground")   // the page's own background can be see-through
         web.autoresizingMask = [.width, .height]
         window.contentView = web
         let url = URL(fileURLWithPath: args.html)
@@ -224,6 +231,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pageReady = true
+        web.evaluateJavaScript("window.enableGlass && window.enableGlass()", completionHandler: nil)
         let queued = pending
         pending.removeAll()
         for js in queued { web.evaluateJavaScript(js, completionHandler: nil) }
@@ -250,6 +258,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             // v37: the PM can switch stealth off to share or screenshot the window (default on).
             let on = (message.body as? Bool) ?? true
             window.sharingType = on ? .none : .readOnly
+        case "split":
+            // Presentation mode with slide cards: the page asks for a window twice as wide. It grows
+            // to the left, so the tips stream stays where the PM put it (under the camera).
+            // Body: Bool (grow left), or {"on": Bool, "grow": "left" | "right"} when the PM swapped the sides.
+            if let d = message.body as? [String: Any] {
+                setSplit((d["on"] as? Bool) ?? false, growRight: (d["grow"] as? String) == "right", animate: true)
+            } else {
+                setSplit((message.body as? Bool) ?? false, growRight: false, animate: true)
+            }
         case "opacity":
             if let v = message.body as? Double { window.alphaValue = CGFloat(max(0.35, min(1.0, v))) }
         case "mute":
@@ -272,6 +289,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             break
         }
     }
+
+    func setSplit(_ on: Bool, growRight: Bool = false, animate: Bool) {
+        guard on != isSplit, let window = window else { return }
+        isSplit = on
+        let vis = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? window.frame
+        var f = window.frame
+        if on {
+            baseWidth = f.width
+            grewRight = growRight
+            let w = min(f.width * 2, vis.width)
+            if !growRight { f.origin.x -= (w - f.width) }
+            f.size.width = w
+        } else {
+            let w = baseWidth > 0 ? baseWidth : f.width / 2
+            if !grewRight { f.origin.x += (f.width - w) }
+            f.size.width = w
+        }
+        if f.minX < vis.minX { f.origin.x = vis.minX }
+        if f.maxX > vis.maxX { f.origin.x = max(vis.minX, vis.maxX - f.width) }
+        window.setFrame(f, display: true, animate: animate)
+    }
+
+    // Save the normal (single) width, so the next call does not open twice as wide.
+    func windowWillClose(_ notification: Notification) { setSplit(false, animate: false) }
+    func applicationWillTerminate(_ notification: Notification) { setSplit(false, animate: false) }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }

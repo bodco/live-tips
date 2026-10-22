@@ -12,6 +12,7 @@ The md file is written to <project-dir>/live/<YYYY-MM-DD-HHMM>-<title>.md, one l
 Control (all under the tool root):
   control/start.json   request to start (written by the Cowork skill or by hand)
   control/stop         request to stop (any content)
+  control/go           standby only: start recording now (start.json "standby": true opens the window first)
   state/status.json    live status for the skill; `seq` grows by 1 on every write, `req_id` is
                        copied from start.json so `lt start` knows the status belongs to its request
 """
@@ -728,6 +729,29 @@ def parse_outline(data) -> list[dict]:
     return out
 
 
+def parse_slides(data) -> list[dict]:
+    out = []
+    for i, x in enumerate(_as_list(data, "slides")):
+        if not isinstance(x, dict) or not _s(x.get("title")):
+            continue
+        body = []
+        for b in x.get("body") or []:
+            if isinstance(b, dict) and _s(b.get("t")):
+                k = _s(b.get("k")) or "p"
+                body.append({"k": k if k in ("p", "s", "h", "c") else "p", "t": _s(b.get("t"))})
+            elif isinstance(b, str) and b.strip():
+                body.append({"k": "p", "t": b.strip()})
+        who = _s(x.get("who")) or "me"
+        try:
+            sec = max(5, int(float(x.get("sec") or 60)))
+        except (TypeError, ValueError):
+            sec = 60
+        out.append({"n": x.get("n", i + 1), "title": _s(x.get("title")),
+                    "who": who if who in ("me", "shared", "other") else "other",
+                    "speaker": _s(x.get("speaker")), "sec": sec, "body": body})
+    return out
+
+
 # --------------------------------------------------------------------------- Instant cards
 
 class Cards:
@@ -1019,6 +1043,44 @@ class Outline:
             self._emit()
 
 
+class Slides:
+    """Slide-by-slide speech for presentation mode (<transcript stem>.slides.json), written by
+    the skill from the speaker notes:
+      {"title": "...", "total_min": 40, "slides": [{"n": 12, "title": "...",
+        "who": "me" | "shared" | "other", "speaker": "Maria", "sec": 75,
+        "body": [{"k": "p" | "s" | "h" | "c", "t": "..."}]}]}
+    k: p = read aloud, s = may be skipped, h = hint (not read), c = cue from another speaker.
+    The window shows one card per slide in the left half (split view) when the meeting type is
+    presentation. Same refresh contract as Outline: never raises, mtime only after a good parse."""
+
+    def __init__(self, transcript: Path, tips: Path):
+        self.path = transcript.with_name(transcript.stem + ".slides.json")
+        self.tips = tips
+        self.mtime = None
+        self.bad_mtime = None
+
+    def refresh(self) -> None:
+        try:
+            m = self.path.stat().st_mtime
+        except OSError:
+            return
+        if m == self.mtime:
+            return
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            slides = parse_slides(data)
+        except Exception as e:  # noqa: BLE001
+            if self.bad_mtime != m:
+                self.bad_mtime = m
+                log(f"slides: cannot read {self.path.name} ({e!r})")
+            return
+        self.mtime = m
+        meta = data if isinstance(data, dict) else {}
+        _append_json(self.tips, {"kind": "slides", "at": hhmmss(now()), "title": _s(meta.get("title")),
+                                 "total_min": meta.get("total_min"), "slides": slides})
+        log(f"slides: {len(slides)} slides from {self.path.name}")
+
+
 def _append_json(path: Path, obj: dict) -> None:
     try:
         with open(path, "a", encoding="utf-8") as f:
@@ -1078,9 +1140,28 @@ def short_gist(text: str, n: int = 60) -> str:
     return cut.rstrip(",.;:") + "…"
 
 
-def question_item(text: str, t_hms: str, at_hms: str) -> dict | None:
-    """The instant "❓" item for a `them` line with a question cue (the model tip replaces it)."""
-    if len(re.findall(r"\w+", text or "")) < 2 or not QUESTION_CUE.search(text or ""):
+# Which other-side lines get the instant "❓" card (2026-10-22, same rule as Live Tips rules/triggers.yaml
+# question_card). A bare "?" or "when" is not enough: songs and colleagues' small talk made most cards noise.
+QCARD_STRONG = re.compile(
+    r"естімейт|естимейт|оцінк|дедлайн|термін|статус|ціна|ціну|вартіст|бюджет|реліз|"
+    r"оценк|срок|стоимост|estimate|\beta\b|deadline|status|price|cost|budget|release|"
+    r"estimación|plazo|precio|presupuesto", re.I)
+QCARD_WEAK = re.compile(r"скільки|коли|як довго|сколько|когда|how long|how much|how many|when|cuánto|cuándo", re.I)
+QCARD_MUSIC = re.compile(r"[♪♫]|\[(музика|music|música)\]|\((музика|music|música)\)", re.I)
+
+
+def question_item(text: str, t_hms: str, at_hms: str, names: list | None = None) -> dict | None:
+    """The instant "❓" item for a `them` line that asks something work-related (the model tip replaces it).
+    Shown when: the line names the PM and asks (cue or "?"); or it has a work word (estimate, deadline,
+    status, price, release...); or it is a question ("?") about time or amount (when, how long, how much).
+    A bare "?" (small talk, song lyrics) or a lone "when" without "?" gets no card."""
+    text = text or ""
+    if len(re.findall(r"\w+", text)) < 2 or QCARD_MUSIC.search(text):
+        return None
+    low = text.lower()
+    named = any(n and re.search(r"(?<!\w)" + re.escape(n.lower()), low) for n in (names or []))
+    asks = "?" in text or bool(QUESTION_CUE.search(text))
+    if not ((named and asks) or QCARD_STRONG.search(text) or ("?" in text and QCARD_WEAK.search(text))):
         return None
     return {"t": t_hms, "src": t_hms, "at": at_hms, "kind": "question", "gist": "❓ " + short_gist(text, 60)}
 
@@ -2555,6 +2636,25 @@ def voices_check(cfg: dict) -> int:
 
 # --------------------------------------------------------------------------- Capture
 
+MIC_INPUTS: list = [[]]   # input devices the Mac sees now (uid, name, builtin, default); filled by mic_inputs_poller
+
+
+def mic_inputs_poller(stop: threading.Event) -> None:
+    """Every 4 s ask audiocap for the Mac's input devices, for the window's Mic menu (2026-10-22).
+    An older audiocap without --list-inputs just exits with an error: the list stays empty and the
+    window keeps its two fixed choices."""
+    while not stop.is_set():
+        try:
+            r = subprocess.run([str(BIN), "--list-inputs"], capture_output=True, text=True, timeout=6)
+            if r.returncode == 0:
+                data = json.loads(r.stdout.strip() or "[]")
+                if isinstance(data, list):
+                    MIC_INPUTS[0] = [d for d in data if isinstance(d, dict) and d.get("uid") and d.get("name")]
+        except Exception:
+            pass
+        stop.wait(4)
+
+
 class Capture(threading.Thread):
     def __init__(self, source: str, seg: Segmenter, stop: threading.Event, device: str = "default"):
         super().__init__(daemon=True)
@@ -2633,8 +2733,8 @@ class Capture(threading.Thread):
             errlog = open(LOGS / f"audiocap-{self.source}.log", "a")
             try:
                 cmd = [str(BIN), "--source", self.source]
-                if self.source == "mic" and self.device == "builtin":
-                    cmd += ["--device", "builtin"]
+                if self.source == "mic" and (self.device == "builtin" or self.device.startswith("uid:")):
+                    cmd += ["--device", self.device]
                 self.fed_samples = 0
                 self.proc = subprocess.Popen(cmd,
                                              stdout=subprocess.PIPE, stderr=errlog)
@@ -2720,8 +2820,12 @@ def load_request(args) -> dict:
         if isinstance(req.get(key), str):
             req[key] = [l.strip() for l in req[key].replace("+", ",").split(",") if l.strip()]
     cfg.update({k: v for k, v in req.items() if v not in (None, "")})
-    md = str(cfg.get("mic_device") or "default").strip().lower().replace(" ", "_")
-    cfg["mic_device"] = "builtin" if md in ("builtin", "built-in", "mac", "mac_mic", "macbook", "internal") else "default"
+    raw_md = str(cfg.get("mic_device") or "default").strip()
+    md = raw_md.lower().replace(" ", "_")
+    if raw_md.startswith("uid:") and len(raw_md) > 4:
+        cfg["mic_device"] = raw_md          # one chosen input, UID from audiocap --list-inputs
+    else:
+        cfg["mic_device"] = "builtin" if md in ("builtin", "built-in", "mac", "mac_mic", "macbook", "internal") else "default"
     if not cfg.get("project_dir"):
         sys.exit("project_dir is required")
     if cfg["me_lang"] not in ("auto", None) and cfg["me_lang"] not in cfg["langs"]:
@@ -2871,6 +2975,7 @@ def main() -> int:
     caps = [Capture("mic", segs["me"], stop_ev, cfg["mic_device"]), Capture("system", segs["them"], stop_ev)]
     for c in caps:
         c.start()
+    threading.Thread(target=mic_inputs_poller, args=(stop_ev,), daemon=True).start()
 
     def on_signal(*_):
         stop_ev.set()
@@ -2889,6 +2994,7 @@ def main() -> int:
     cards = Cards(out, tips_file)
     facts = FactBook(out, tips_file)
     outline = Outline(out, tips_file)
+    slides = Slides(out, tips_file)
     # Semantic layer (Ollama): its own thread; the transcript path never waits for it.
     sem_live: SemanticLive | None = None
     sem_index = None          # read-only project index for SOS snippets and search requests
@@ -2968,7 +3074,7 @@ def main() -> int:
         if seg.channel == "them":
             # Instant "❓" item in the window; the skill's tip for the question replaces it later.
             # While tips are paused nothing automatic is shown (v37 A); the status still tracks it.
-            q = question_item(text, hhmmss(seg.t_start), hhmmss(now()))
+            q = question_item(text, hhmmss(seg.t_start), hhmmss(now()), cfg.get("name_aliases") or [])
             if q:
                 if not paused:
                     _append_json(tips_file, q)
@@ -3004,6 +3110,37 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             pass
 
+    # Standby (2026-10-22): the window opens before the call; nothing is transcribed or written until
+    # the PM presses Start (window button, control/go) or the other side speaks for standby_auto_s.
+    standby = {"on": bool(cfg.get("standby")), "heard": [], "buf": []}
+    try:
+        (CONTROL / "go").unlink()        # a Start from a previous call must not count
+    except OSError:
+        pass
+
+    def go_live(why: str) -> None:
+        if not standby["on"]:
+            return
+        standby["on"] = False
+        status.update(state="recording", standby=False)
+        writer.marker("дзвінок почався")
+        log(f"standby -> recording: {why}")
+        # The speech that started the call (last 20 s) is transcribed, not lost.
+        for sg in standby["buf"]:
+            segq.put(sg)
+        standby["buf"] = []
+        put_status()
+
+    def standby_seg(seg: Segment) -> None:
+        cut = now() - 20
+        standby["buf"] = [x for x in standby["buf"] if x.t_end >= cut] + [seg]
+        if seg.channel != "them":
+            return                      # the PM's own voice (talking in the room) never starts the call
+        t = now()
+        standby["heard"] = [(a, d) for a, d in standby["heard"] if t - a < 30] + [(t, seg.speech_s)]
+        if sum(d for _, d in standby["heard"]) >= float(cfg.get("standby_auto_s", 5)):
+            go_live("the other side is speaking")
+
     def worker() -> None:
         while True:
             try:
@@ -3013,7 +3150,10 @@ def main() -> int:
                     return
                 continue
             try:
-                process(seg)
+                if standby["on"]:
+                    standby_seg(seg)
+                else:
+                    process(seg)
             except Exception as e:  # noqa: BLE001
                 log(f"transcribe error: {e!r}")
             finally:
@@ -3021,8 +3161,10 @@ def main() -> int:
 
     wt = threading.Thread(target=worker, daemon=True)
     wt.start()
-    status["state"] = "recording"
-    log("recording. Stop: Ctrl+C here, or the skill writes control/stop")
+    status["state"] = "standby" if standby["on"] else "recording"
+    status["standby"] = standby["on"]
+    log(("standby: waiting for the call (Start in the window, control/go, or the other side speaking). "
+         if standby["on"] else "recording. ") + "Stop: Ctrl+C here, or the skill writes control/stop")
 
     # Settings chosen in the tips window after a fast start (⚙︎): the window appends them to
     # the inbox; language and mic are applied here at once, type and role are for the skill.
@@ -3066,6 +3208,9 @@ def main() -> int:
                     sos_now()
                 continue
             key, val = d.get("key"), d.get("value")
+            if key == "go":
+                go_live("Start pressed in the window")
+                continue
             if key == "call_lang" and val in LANG_SETS:
                 me, me_langs, langs = LANG_SETS[val]
                 cfg.update(me_lang=me, me_langs=me_langs, langs=langs)
@@ -3077,11 +3222,15 @@ def main() -> int:
                 pwords[0] = set(re.findall(r"\w+", (newp or "").lower()))
                 writer.marker(f"мова: {'+'.join(langs)}")
                 log(f"languages switched in the tips window: me={me} allowed={'+'.join(langs)}")
-            elif key == "mic_device" and val in ("default", "builtin"):
+            elif key == "mic_device" and (val in ("default", "builtin") or (val.startswith("uid:") and len(val) > 4)):
                 caps[0].switch_device(val)
                 cfg["mic_device"] = val
                 status["mic_device"] = val
-                writer.marker("мікрофон: " + ("Мак" if val == "builtin" else "за замовчуванням"))
+                if val.startswith("uid:"):
+                    nm = next((i.get("name") for i in MIC_INPUTS[0] if "uid:" + str(i.get("uid")) == val), val[4:])
+                    writer.marker("мікрофон: " + str(nm))
+                else:
+                    writer.marker("мікрофон: " + ("Мак" if val == "builtin" else "за замовчуванням"))
             elif key == "call_type":
                 # Shown back in the window; the skill reads it as @@SET. Legacy values are mapped.
                 ct, au = normalize_meeting(val, status.get("audience"))
@@ -3276,10 +3425,18 @@ def main() -> int:
             try:
                 facts.refresh()
                 outline.refresh()
+                slides.refresh()
             except Exception as e:  # noqa: BLE001   (refresh never raises; belt and braces)
                 log(f"prep refresh: {e!r}")
         if stop_file.exists():
             stop_ev.set()
+        go_file = CONTROL / "go"
+        if go_file.exists():
+            try:
+                go_file.unlink()
+            except OSError:
+                pass
+            go_live("control/go")
         # Mic watchdog (2026-10-21: the mic stream froze 3 min after an unmute, audiocap logged
         # nothing, status kept saying "ok" from a stale peak, the PM's update was lost).
         # audiocap always sends audio for the mic, silence included, so no chunks = stalled;
@@ -3333,6 +3490,7 @@ def main() -> int:
                                "ok" if segs["me"].recent_peak() > 0.001 else "silent"),
                           mic_stall_restarts=caps[0].stall_restarts, mic_stall_streak=caps[0].stall_streak,
                           mic_auto_switched=caps[0].auto_switched,
+                          mic_inputs=MIC_INPUTS[0],
                           system_audio="ok" if segs["them"].recent_peak() > 0.0005 else "silent",
                           listener_age_s=listener_age(),
                           noise_dropped={k: v.noise_dropped for k, v in segs.items()},

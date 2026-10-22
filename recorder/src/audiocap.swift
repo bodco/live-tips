@@ -3,6 +3,9 @@
 //   audiocap --source system   system audio via Core Audio process tap (macOS 14.2+), no virtual driver
 //   audiocap --source mic      default input device, follows device changes (AirPods on/off etc.)
 //   audiocap --source mic --device builtin   the Mac's own microphone, whatever the default input is
+//   audiocap --source mic --device uid:<UID>   one chosen input (UIDs from --list-inputs)
+//   audiocap --source mic --mic-backend direct   IOProc on the device, no AVAudioEngine (auto: engine, then direct if it gives no frames)
+//   audiocap --list-inputs   JSON list of the inputs the Mac sees
 //   audiocap --source system --seconds 5 > /tmp/test.raw   short test run
 //
 // Diagnostics go to stderr. A broken stdout pipe ends the process quietly.
@@ -333,8 +336,10 @@ final class SystemCapture {
 // MARK: - Microphone
 
 var micRestarts: Int64 = 0
-var micMode = "default"          // "default" = system default input, "builtin" = the Mac's own microphone
+var micMode = "default"          // "default" = system default input, "builtin" = the Mac's own microphone, "uid" = the input with micUID
+var micUID = ""                  // for micMode "uid": CoreAudio device UID chosen in the window
 var warnedNoBuiltin = false
+var warnedNoUID = false
 
 func allDevices() -> [AudioDeviceID] {
     var addr = systemAddress(kAudioHardwarePropertyDevices)
@@ -378,7 +383,31 @@ func targetMicDevice() -> AudioDeviceID? {
             log("built-in microphone not found, using the default input")
         }
     }
+    if micMode == "uid" {
+        if let d = allDevices().first(where: { hasInputChannels($0) && deviceUID($0) == micUID }) { return d }
+        if !warnedNoUID {
+            warnedNoUID = true
+            log("chosen input \(micUID) not found, using the default input")
+        }
+    }
     return defaultDevice(kAudioHardwarePropertyDefaultInputDevice)
+}
+
+/// JSON list of every input device the Mac sees now (for the window's Mic menu): uid, name, builtin, default.
+func listInputsJSON() -> String {
+    let def = defaultDevice(kAudioHardwarePropertyDefaultInputDevice)
+    var items: [String] = []
+    for d in allDevices() where hasInputChannels(d) {
+        guard let uid = deviceUID(d) else { continue }
+        // Skip the aggregate devices this tool creates for the system tap.
+        let name = deviceName(d)
+        if uid.lowercased().contains("audiocap") || name.lowercased().contains("audiocap") { continue }
+        func esc(_ s: String) -> String {
+            s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        }
+        items.append("{\"uid\":\"\(esc(uid))\",\"name\":\"\(esc(name))\",\"builtin\":\(isBuiltIn(d) ? "true" : "false"),\"default\":\(d == def ? "true" : "false")}")
+    }
+    return "[" + items.joined(separator: ",") + "]"
 }
 
 func currentDevice(of au: AudioUnit) -> AudioDeviceID? {
@@ -392,6 +421,14 @@ func currentDevice(of au: AudioUnit) -> AudioDeviceID? {
 final class MicCapture {
     private var engine = AVAudioEngine()
     private var restartPending = false
+    var retired = false               // replaced by DirectMic: ignore notifications, never restart
+
+    func retire() {
+        retired = true
+        if let o = observer { NotificationCenter.default.removeObserver(o); observer = nil }
+        engine.stop()
+        engine.inputNode.removeTap(onBus: 0)
+    }
     private var device = AudioDeviceID(kAudioObjectUnknown)
     private var rate: Double = 0
     private var channels: AVAudioChannelCount = 0
@@ -441,6 +478,7 @@ final class MicCapture {
     /// (Meet, Zoom, AirPods switching to the headset profile) touches the input. Rebuild the
     /// engine only when the device or its format really changed; otherwise keep it running.
     func configurationChanged() {
+        if retired { return }
         let dev = targetMicDevice() ?? device
         let fmt = engine.inputNode.outputFormat(forBus: 0)
         if dev == device && fmt.sampleRate > 0 && fmt.channelCount > 0 {
@@ -459,6 +497,7 @@ final class MicCapture {
     }
 
     func defaultInputChanged() {
+        if retired { return }
         if let dev = targetMicDevice(), dev == device { return }   // builtin: a new headset changes nothing
         scheduleRestart("default input changed")
     }
@@ -466,6 +505,7 @@ final class MicCapture {
     private var restartTimes: [Date] = []
 
     func scheduleRestart(_ reason: String) {
+        if retired { return }
         if restartPending { return }
         restartPending = true
         micRestarts += 1
@@ -475,9 +515,9 @@ final class MicCapture {
         if restartTimes.count > 5 {
             // Restart storm: back off, and a forced built-in mic falls back to the system default input.
             delay = 3.0
-            if micMode == "builtin" {
+            if micMode == "builtin" || micMode == "uid" {
                 micMode = "default"
-                log("mic restart storm on the built-in microphone, falling back to the default input")
+                log("mic restart storm on the chosen input, falling back to the default input")
             }
         }
         log("mic restart: \(reason)")
@@ -495,7 +535,7 @@ final class MicCapture {
         }
     }
 
-    private var observer: NSObjectProtocol?
+    var observer: NSObjectProtocol?
 
     func observe() {
         if let o = observer { NotificationCenter.default.removeObserver(o) }
@@ -511,6 +551,119 @@ final class MicCapture {
             self?.defaultInputChanged()
         }
     }
+}
+
+/// Direct device capture (2026-10-22): an IOProc on the input device itself, no AVAudioEngine.
+/// Some USB headsets (Jabra Link 380 dongle) deliver no buffers at all to AVAudioEngine's input
+/// node while a call app uses them, but work through a plain IOProc, like the system tap does.
+final class DirectMic {
+    private var dev = AudioDeviceID(kAudioObjectUnknown)
+    private var procID: AudioDeviceIOProcID?
+    private let ioQueue = DispatchQueue(label: "audiocap.directmic", qos: .userInteractive)
+    private var restartPending = false
+
+    func start() throws {
+        guard let d = targetMicDevice() else { throw CapError("no input device") }
+        var addr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreamFormat,
+                                              mScope: kAudioObjectPropertyScopeInput,
+                                              mElement: kAudioObjectPropertyElementMain)
+        var asbd = AudioStreamBasicDescription()
+        var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        var err = AudioObjectGetPropertyData(d, &addr, 0, nil, &size, &asbd)
+        guard err == noErr else { throw CapError("input stream format failed: \(err)") }
+        guard let fmt = AVAudioFormat(streamDescription: &asbd) else { throw CapError("unsupported input format") }
+        guard let rs = Resampler(from: fmt) else { throw CapError("no converter for input format \(fmt)") }
+        var pid: AudioDeviceIOProcID?
+        err = AudioDeviceCreateIOProcIDWithBlock(&pid, d, ioQueue) { _, inInput, _, _, _ in
+            guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, bufferListNoCopy: inInput, deallocator: nil),
+                  let out = rs.convert(buf) else { return }
+            emit(out)
+        }
+        guard err == noErr, let p = pid else { throw CapError("IOProc create failed: \(err)") }
+        err = AudioDeviceStart(d, p)
+        guard err == noErr else { AudioDeviceDestroyIOProcID(d, p); throw CapError("AudioDeviceStart failed: \(err)") }
+        dev = d
+        procID = p
+        log("mic direct: \(fmt.sampleRate) Hz, \(fmt.channelCount) ch, device=\(deviceName(d))")
+        watch(d)
+    }
+
+    /// A headset switching between music and call mode changes its rate and format; a device can vanish.
+    private var watched = Set<AudioObjectID>()
+    private func watch(_ d: AudioDeviceID) {
+        guard !watched.contains(d) else { return }
+        watched.insert(d)
+        let sels: [(AudioObjectPropertySelector, AudioObjectPropertyScope)] = [
+            (kAudioDevicePropertyStreamFormat, kAudioObjectPropertyScopeInput),
+            (kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal),
+            (kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal)]
+        for (sel, scope) in sels {
+            var addr = AudioObjectPropertyAddress(mSelector: sel, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+            AudioObjectAddPropertyListenerBlock(d, &addr, .main) { [weak self] _, _ in
+                guard let self, self.dev == d else { return }
+                self.scheduleRestart("input device format or state changed")
+            }
+        }
+    }
+
+    func stop() {
+        if let p = procID, dev != kAudioObjectUnknown { AudioDeviceStop(dev, p); AudioDeviceDestroyIOProcID(dev, p) }
+        procID = nil
+    }
+
+    func scheduleRestart(_ reason: String) {
+        if restartPending { return }
+        restartPending = true
+        micRestarts += 1
+        log("mic direct restart: \(reason)")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+            guard let self else { return }
+            self.restartPending = false
+            self.stop()
+            do { try self.start() } catch { log("mic direct restart failed: \(error), retrying"); self.scheduleRestart("retry") }
+        }
+    }
+
+    func installDefaultInputListener() {
+        var addr = systemAddress(kAudioHardwarePropertyDefaultInputDevice)
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, .main) { [weak self] _, _ in
+            guard let self, micMode == "default" else { return }
+            self.scheduleRestart("default input changed")
+        }
+    }
+}
+
+var engineTried = false
+
+func startEngineMic(_ why: String) {
+    engineTried = true
+    log("mic: \(why), using AVAudioEngine")
+    directRef?.stop()
+    directRef = nil
+    let mic = MicCapture()
+    mic.observe()
+    mic.installDefaultInputListener()
+    do { try mic.start() } catch { log("\(error)"); exit(1) }
+    keepAlive.append(mic)
+    micRef = mic
+}
+
+var micBackend = "auto"           // auto: AVAudioEngine, switch to DirectMic when it gives no frames; engine | direct
+var directRef: DirectMic?
+
+func startDirectMic(_ why: String) {
+    log("mic: \(why): direct device capture")
+    micRef?.retire()
+    micRef = nil
+    let d = DirectMic()
+    do { try d.start() } catch {
+        log("mic direct failed: \(error)")
+        if micBackend == "auto" && !engineTried { startEngineMic("direct capture failed"); return }
+        exit(1)
+    }
+    d.installDefaultInputListener()
+    keepAlive.append(d)
+    directRef = d
 }
 
 func requestMicAccess() -> Bool {
@@ -541,9 +694,17 @@ while let a = argv.next() {
     case "--source": source = argv.next() ?? ""
     case "--seconds": seconds = Double(argv.next() ?? "0") ?? 0
     case "--force-device-clock": forceDeviceClock = true
-    case "--device": micMode = (argv.next() ?? "default") == "builtin" ? "builtin" : "default"
+    case "--device":
+        let dv = argv.next() ?? "default"
+        if dv == "builtin" { micMode = "builtin" }
+        else if dv.hasPrefix("uid:") && dv.count > 4 { micMode = "uid"; micUID = String(dv.dropFirst(4)) }
+        else { micMode = "default" }
+    case "--mic-backend": micBackend = argv.next() ?? "auto"
+    case "--list-inputs":
+        print(listInputsJSON())
+        exit(0)
     case "-h", "--help":
-        print("usage: audiocap --source system|mic [--device default|builtin] [--seconds N]")
+        print("usage: audiocap --source system|mic [--device default|builtin|uid:<UID>] [--mic-backend auto|engine|direct] [--seconds N] | --list-inputs")
         exit(0)
     default:
         log("unknown argument \(a)")
@@ -577,14 +738,16 @@ case "mic":
         if !micStarted { log("mic start hung for 10 s, exiting so the recorder restarts it"); exit(5) }
     }
     guard requestMicAccess() else { log("microphone access denied (System Settings > Privacy > Microphone)"); exit(1) }
-    let mic = MicCapture()
-    mic.observe()
-    mic.installDefaultInputListener()
-    do { try mic.start() } catch { log("\(error)"); exit(1) }
-    keepAlive.append(mic)
-    micRef = mic
+    if micBackend == "engine" {
+        startEngineMic("engine requested")
+    } else {
+        // 2026-10-22: direct device capture first. AVAudioEngine hung on start while a call app
+        // took the mic (17:08, four 10 s hangs in a row) and gave no buffers from a USB headset
+        // in call mode; a plain IOProc worked in both cases.
+        startDirectMic("direct capture first")
+    }
     micStarted = true
-    log("mic input: " + (micMode == "builtin" ? "the Mac's built-in microphone" : "system default input"))
+    log("mic input: " + (micMode == "builtin" ? "the Mac's built-in microphone" : (micMode == "uid" ? "chosen input \(micUID)" : "system default input")))
 default:
     log("usage: audiocap --source system|mic [--seconds N]")
     exit(64)
@@ -608,7 +771,11 @@ health.setEventHandler {
             micStallTicks = delta == 0 ? micStallTicks + 1 : 0
             if micStallTicks >= 2 {
                 micStallTicks = 0
-                DispatchQueue.main.async { micRef?.scheduleRestart("stalled: no mic frames for 20 s") }
+                DispatchQueue.main.async {
+                    if let d = directRef { d.scheduleRestart("stalled: no mic frames for 20 s") }
+                    else if micBackend == "auto" { startDirectMic("engine stalled: no mic frames for 20 s") }
+                    else { micRef?.scheduleRestart("stalled: no mic frames for 20 s") }
+                }
             }
         }
         if source == "system" && delta > 0 && delta < 130000 {

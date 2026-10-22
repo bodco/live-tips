@@ -130,7 +130,7 @@ def ask_done(sid):
 
 
 QUOTES = {"S1": "If the cutoff moves to Friday, QA still needs two days on stage.",
-          "S2": "From our side the 3DS certificates are ready, we only wait for CardCo."}
+          "S2": "From our side the 3DS certificates are ready, we only wait for Pomelo."}
 
 SCRIPT = [
     (1, lambda: agenda(0)),
@@ -149,20 +149,20 @@ SCRIPT = [
                              ["Андрій Шевчук", "Carlos Andrés Gómez Ruiz"])),
     (30, lambda: agenda(1)),
     (36, lambda: auto({"kind": "tip", "level": "orange", "gist": "🟠 Fix owner and date",
-                       "phrase": "So Carlos owns the stage check, and we confirm on Thursday?",
+                       "phrase": "So Andres owns the stage check, and we confirm on Thursday?",
                        "src": now(-4), "at": now()})),
     (48, lambda: ask_speaker("S2", [{"name": "Carlos Andrés Gómez Ruiz", "score": 0.66}], ["Андрій Шевчук", "Ірина Мельник"])),
     (56, lambda: start_mic_stall()),
     (66, lambda: agenda(2)),
     (72, lambda: auto({"kind": "question", "gist": "❓ When can we switch 3DS on in production?"})),
-    (78, lambda: auto({"kind": "tip", "level": "red", "gist": "🔴 3DS date depends on CardCo. Do not promise",
-                       "phrase": "It depends on CardCo's certification. We will confirm the date once they reply.",
+    (78, lambda: auto({"kind": "tip", "level": "red", "gist": "🔴 3DS date depends on Pomelo. Do not promise",
+                       "phrase": "It depends on Pomelo's certification. We will confirm the date once they reply.",
                        "src": now(-6), "at": now()})),
     (92, lambda: auto({"kind": "card", "level": "info", "gist": "📌 Deploys need client approval",
                        "phrase": "Any prod deploy goes out only after your written approval."})),
     (100, lambda: agenda(3)),
     (112, lambda: auto({"kind": "tip", "level": "orange", "gist": "🟠 Your turn: next steps",
-                        "items": ["Cutoff on stage by Thursday", "3DS date after CardCo replies",
+                        "items": ["Cutoff on stage by Thursday", "3DS date after Pomelo replies",
                                   "Next sync on Monday"], "src": now(-3), "at": now()})),
     (126, lambda: emit({"kind": "agenda", "gist": "Client sync, 4 points",
                         "items": [{"text": x, "done": True} for x in AGENDA]})),
@@ -256,11 +256,11 @@ def on_ask(text):
         # The recorder answers at once from the fact book, Claude a few seconds later.
         emit({"kind": "fact", "level": "red", "gist": "🆘 Cutoff fix: Thursday on stage",
               "phrase": "Two days of development and one day of QA, so Thursday on stage.", "note": "fact CUTOFF-ETA"})
-        emit({"kind": "card", "level": "red", "gist": "🆘 3DS: date depends on CardCo",
-              "phrase": "We will confirm the 3DS date once CardCo finishes the certification."})
+        emit({"kind": "card", "level": "red", "gist": "🆘 3DS: date depends on Pomelo",
+              "phrase": "We will confirm the 3DS date once Pomelo finishes the certification."})
         later.append((vt + 4, lambda: emit({"kind": "answer", "level": "red", "q": "HELP NOW",
-                                            "gist": "🔴 Say: Thursday for the cutoff, 3DS after CardCo",
-                                            "phrase": "Cutoff is on stage Thursday. For 3DS we wait for CardCo and confirm the date then."})))
+                                            "gist": "🔴 Say: Thursday for the cutoff, 3DS after Pomelo",
+                                            "phrase": "Cutoff is on stage Thursday. For 3DS we wait for Pomelo and confirm the date then."})))
         return
     later.append((vt + 2, lambda: emit({"kind": "answer", "level": "info", "q": text,
                                         "gist": "Demo answer: in a real call the answer comes from the brief and the transcript"})))

@@ -2,7 +2,7 @@
 """lt: the live-tips helper. One command per procedure, so the skill calls a command instead of
 re-enacting a page of prose. Runs inside device_bash (Linux VM) or on the Mac itself.
 
-  lt start '<start.json as JSON>' [--dry-run] [--wait 60]
+  lt start '<start.json as JSON>' [--dry-run] [--wait 60]   ("standby": true = open the window, record when the call starts)
                             check install, refuse a foreign recording, write control/start.json
                             with a unique req_id, wait until status.json shows that req_id
                             and "recording"; reuse only a live recording with the same slug AND title
@@ -12,7 +12,7 @@ re-enacting a page of prose. Runs inside device_bash (Linux VM) or on the Mac it
   lt prep-check <transcript> [--adopt-prep] [--fix]
                             brief / cards / facts / outline present, valid and of the right types?
                             --adopt-prep copies each missing file from a prep-* file younger than
-                            3 h, preferring the prep whose name matches the call title;
+                            3 h whose name matches the call title (another call's prep is never used);
                             --fix derives cards.json from a valid facts.json when cards are missing
   lt state <transcript> [--set k=<json>]... [--get k]...
                             locked read-modify-write of <stem>.state.json; --set prints only
@@ -227,10 +227,10 @@ def cmd_start(args):
     req["project_dir"] = mac(req["project_dir"])
     st = read_status()
     note = ""
-    if st.get("state") in ("recording", "loading_model"):
+    if st.get("state") in ("recording", "loading_model", "standby"):
         alive, age = status_alive(st)
         if alive:
-            if st.get("slug") == req["slug"] and st.get("title") == req["title"] and st.get("state") == "recording":
+            if st.get("slug") == req["slug"] and st.get("title") == req["title"] and st.get("state") in ("recording", "standby"):
                 out(dict(result="reused", **files_of(st), req_id=st.get("req_id")))
                 return
             out(f"BUSY: '{st.get('title')}' (project '{st.get('slug')}') is {st.get('state')} now ({st.get('file')}). "
@@ -264,8 +264,9 @@ def cmd_start(args):
         else:   # a recorder older than v36 does not copy req_id: use started_at and the title
             ts = started_ts(st)
             ours = ts is not None and ts >= t0 - 2 and st.get("title") == req["title"]
-        if ours and st.get("state") == "recording":
-            out(dict(result="recording", **files_of(st), req_id=st.get("req_id"), note=note))
+        if ours and st.get("state") in ("recording", "standby"):
+            # standby: the window is open and waits for the call (Start, or the other side speaking)
+            out(dict(result=st.get("state"), **files_of(st), req_id=st.get("req_id"), note=note))
             return
         if st.get("state") == "error" and (ours or fresh):   # an old error from an earlier run is ignored
             err = st.get("errors")
@@ -290,7 +291,7 @@ def cmd_status(_args):
     growing = "unknown" if len(fr) < 2 else ("yes" if fr[-1] > fr[0] else "NO")
     warn = []
     age = status_age()
-    if st.get("state") in ("recording", "loading_model"):
+    if st.get("state") in ("recording", "loading_model", "standby"):
         alive, age = status_alive(st, probe=2.5)
         if not alive:
             warn.append(f"STATUS STALE ({age:.0f} s, seq not moving): the recorder is not running")
@@ -384,7 +385,9 @@ def prep_core(path, ext):
 
 
 def title_match(a, b):
-    a, b = slugify(a), slugify(b)
+    """Equal or one contains the other, ignoring spaces and hyphens: "Weekly Standup" matches
+    prep-...-acme-weekly-stand-up (Cowork may split a word or prefix the project)."""
+    a, b = slugify(a).replace("-", ""), slugify(b).replace("-", "")
     return bool(a and b) and (a == b or (min(len(a), len(b)) >= 4 and (a in b or b in a)))
 
 
@@ -458,19 +461,19 @@ def derive_cards(facts):
 
 
 def adopt_prep(s):
-    """Copy each missing prep file from a prep-* file younger than 3 h. When any prep file
-    matches the call title (slugified), only matching ones are used; otherwise the newest."""
+    """Copy each missing prep file from a prep-* file younger than 3 h whose title matches the
+    call title (slugified). A prep of another call is never adopted: its brief and facts belong
+    to a different meeting (another audience, internal facts on a client call)."""
     live = Path(s).parent
     title = call_title_slug(s)
     adopted = {}
-    exts = (".brief.md", ".cards.json", ".facts.json", ".outline.json")
+    exts = (".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json")
     fresh = {ext: [p for p in live.glob("prep-*" + ext) if time.time() - p.stat().st_mtime < 3 * 3600]
              for ext in exts}
-    any_match = any(title_match(prep_core(str(p), ext), title) for ext in exts for p in fresh[ext])
     for ext in exts:
         if os.path.exists(s + ext):
             continue
-        cands = [p for p in fresh[ext] if not any_match or title_match(prep_core(str(p), ext), title)]
+        cands = [p for p in fresh[ext] if title_match(prep_core(str(p), ext), title)]
         if not cands:
             continue
         src = max(cands, key=lambda p: p.stat().st_mtime)
@@ -503,6 +506,7 @@ def cmd_prep_check(args):
         "cards": check_json_list(s + ".cards.json", ("id", "triggers", "gist"), "cards"),
         "facts": check_json_list(s + ".facts.json", ("id", "title", "text", "keywords"), "facts"),
         "outline": check_json_list(s + ".outline.json", ("id", "title", "keywords"), "sections"),
+        "slides": check_json_list(s + ".slides.json", ("title", "body"), "slides"),   # optional, presentation split view
         "adopted_from_prep": list(adopted), "adopted_sources": adopted,
     }
     if fixed:

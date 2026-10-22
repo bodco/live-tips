@@ -158,7 +158,7 @@ During a call:
   with the reason and the recorder retries every 30 s.
 
 Thresholds (`config.json`): `semantic_fact_min` 0.55 and `semantic_card_min` 0.60 (bge-m3 cosine),
-and `semantic_margin` 0.08: the line must also beat the entry's "small talk" score (its best cosine to
+and `semantic_margin` 0.10: the line must also beat the entry's "small talk" score (its best cosine to
 neutral phrases such as "can you hear me?") by this much, which removes most false hits on chit-chat.
 Too many 📌 on unrelated talk: raise the minimums by 0.05; too few: lower them. The scores in
 `<stem>.semantic.jsonl` show where real hits and misses fall. `semantic_enabled: false` turns it all off,
@@ -231,3 +231,6 @@ Record 2-3 minutes of a real call (Voice Memos or QuickTime, export as m4a), the
 For each model the script prints the load time, the transcription time, the speed (`x realtime`)
 and writes `sample.<model>.txt` with timestamps next to the file. Compare the two text files
 line by line. The first run downloads the model (several GB), so it can take a long time.
+
+## Mic menu lists the Mac's inputs (2026-10-22)
+The window's Mic menu shows every input the Mac sees (`audiocap --list-inputs`, polled every 4 s by the recorder into `status.json` as `mic_inputs`). A chosen device is stored as `mic_device = uid:<CoreAudio UID>` and passed to audiocap as `--device uid:<UID>`; if it disappears the recorder falls back to the default input. Needs a rebuilt audiocap (`bin/rebuild-audiocap.sh`, then `mv bin/audiocap.new bin/audiocap`). With the old binary the menu keeps its two fixed options.

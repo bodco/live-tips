@@ -89,7 +89,7 @@ fi
 echo "--- launchd"
 PLIST="$HOME/Library/LaunchAgents/com.pm-control-tower.live-transcriber.plist"
 mkdir -p "$HOME/Library/LaunchAgents"
-sed "s#__ROOT__#$ROOT#g" "$ROOT/launchd/com.pm-control-tower.live-transcriber.plist.template" > "$PLIST"
+sed "s#__ROOT__#$ROOT#g" "$ROOT/launchd/live-transcriber.plist.template" > "$PLIST"
 chmod +x "$ROOT/bin/"*.sh "$ROOT/bin/"*.command "$ROOT/bin/read_delta.py"
 launchctl bootout "gui/$(id -u)/com.pm-control-tower.live-transcriber" 2>/dev/null
 launchctl bootstrap "gui/$(id -u)" "$PLIST" || fail "launchctl bootstrap"

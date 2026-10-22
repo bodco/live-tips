@@ -104,3 +104,53 @@ def test_speaker_names_from_speakers_json(tmp_path):
     assert sp.who(fixed) == "Emily Carter"
     assert sp.who(me) == "Me"
     assert SpeakerNames(None).who(unnamed) == "Other [S3]"
+
+
+def test_hedged_provider_second_request_wins_when_first_is_slow():
+    from livetips_m0.providers import Completion, HedgedProvider, Provider
+
+    class Slow(Provider):
+        def __init__(self):
+            self.n = 0
+
+        def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
+            self.n += 1
+            slow = self.n == 1
+            c = Completion(model=model, t_start=time.monotonic())
+            time.sleep(0.6 if slow else 0.05)
+            c.t_first_token = c.t_done = time.monotonic()
+            c.text = "slow" if slow else "fast"
+            c.input_tokens, c.output_tokens = 10, 2
+            return c
+
+    extra = []
+    hp = HedgedProvider(Slow(), {"m": 0.15}, on_extra=extra.append)
+    c = hp.complete(model="m", system=[], user="u", max_tokens=10, cache_ttl=None)
+    assert c.text == "fast" and c.hedge == "hedge"
+    time.sleep(0.7)
+    assert [x.text for x in extra] == ["slow"]
+    assert hp.stats == {"calls": 1, "hedged": 1, "hedge_won": 1}
+    # fast enough: one request, no hedge
+    hp2 = HedgedProvider(Slow(), {"m": 2.0})
+    c2 = hp2.complete(model="m", system=[], user="u", max_tokens=10, cache_ttl=None)
+    assert c2.text == "slow" and c2.hedge is None and hp2.stats["hedged"] == 0
+
+
+def test_hedged_provider_retries_a_fast_failure():
+    from livetips_m0.providers import Completion, HedgedProvider, Provider
+
+    class Flaky(Provider):
+        def __init__(self):
+            self.n = 0
+
+        def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
+            self.n += 1
+            c = Completion(model=model, t_start=time.monotonic(), t_done=time.monotonic())
+            if self.n == 1:
+                c.error = "OverloadedError: 529"
+            else:
+                c.text, c.t_first_token = "ok", time.monotonic()
+            return c
+
+    c = HedgedProvider(Flaky(), {"m": 1.0}).complete(model="m", system=[], user="u", max_tokens=10, cache_ttl=None)
+    assert c.text == "ok" and c.error is None and c.hedge == "hedge"

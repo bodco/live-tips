@@ -117,7 +117,8 @@ lines (tips only for what is still relevant), back to the loop.
    `prompt_uk` when mixed) is written.
 3. **`lt start '<json>'`** (JSON fields in `start.md`, Step 1 details; include `people`: the
    full names from the project config's team and client tables, so the window offers them when
-   it asks who is speaking). Done when it prints
+   it asks who is speaking, and `people_team`: the team table only, so team voices are remembered
+   for every project and client voices for this project only). Done when it prints
    `result: recording` or `reused` with `local_file`, `tips_file`, `inbox_file`, `started_at`,
    `timezone`. `NOT INSTALLED` -> tell the user to run `install.sh` once, stop. `BUSY` (another
    project recording) -> tell the user, do not mix. `START FAILED` -> the cause in one line.

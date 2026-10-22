@@ -16,6 +16,7 @@ final class CallEngine {
     var statusPath: String { (appRoot as NSString).appendingPathComponent("state/status.json") }
     var isRunning: Bool { recorder?.isRunning ?? false }
     var callContext = ""
+    var callRequest: [String: Any] = [:]
     var projectConfig = ""          // projects/<slug>.md of this call (Meetings DB and page IDs for Notion)
     var lastFile: String?
     var notionResult = ""      // last post-call Notion write: link or error
@@ -40,6 +41,7 @@ final class CallEngine {
         LocalAIService.shared.apply()                       // core config: semantic on/off, engine URL
         if config.localAI.enabled { _ = LocalAIService.shared.waitReady(timeout: 6) }
         callContext = (request["context"] as? String) ?? ""
+        callRequest = request
         sidecarRestarts = 0
         projectRoot = (request["project_dir"] as? String) ?? ""
         projectConfig = (request["project_config"] as? String) ?? ""
@@ -128,6 +130,10 @@ final class CallEngine {
                        "call_hard_usd": c.budget.callHardUSD, "monthly_hard_usd": c.budget.monthlyHardUSD]]
         // Call context: the PM's note, the project's current state and local files found for it (lt search).
         sc["call_context"] = callContext
+        // The meeting concept of this call (Start call): type, audience, interview role, tip model.
+        for k in ["call_type", "audience", "hiring_role"] { if let v = callRequest[k] as? String, !v.isEmpty { sc[k] = v } }
+        if let m = callRequest["tip_model"] as? String, !m.isEmpty { sc["models"] = ["classify": c.models.classify, "tip": m] }
+        sc["hedge"] = ["enabled": c.hedgeEnabled]
         sc["project_root"] = projectRoot
         if c.localAI.enabled { sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")] }
         if let d = try? JSONSerialization.data(withJSONObject: sc, options: [.prettyPrinted]) {

@@ -206,19 +206,23 @@ def cmd_start(args):
     for k in ("project_dir", "title", "slug", "me_lang", "langs"):
         if not req.get(k):
             raise LtError(f"start.json needs '{k}'")
-    if "people" in req:                    # optional roster: full names of the team and the client
-        ppl = req["people"]
+    # optional rosters: full names of the team and the client (people), the team only (people_team:
+    # their voices are remembered for every project, others for this project only)
+    for key in ("people", "people_team"):
+        if key not in req:
+            continue
+        ppl = req[key]
         if isinstance(ppl, str):
             ppl = re.split(r"[,\n;]", ppl)
         if not isinstance(ppl, list):
-            raise LtError("start.json 'people' must be a list of full names")
+            raise LtError(f"start.json '{key}' must be a list of full names")
         clean, seen = [], set()
         for x in ppl:
             n = re.sub(r"\s+", " ", str(x if x is not None else "")).strip()
             if n and len(n) <= 80 and n.casefold() not in seen:
                 seen.add(n.casefold())
                 clean.append(n)
-        req["people"] = clean
+        req[key] = clean
     if str(req.get("hiring_role") or "").strip().lower() == "candidate":
         req["hiring_role"] = "coach"       # legacy role name: the PM is the one being asked
     for k in ("me_langs", "langs"):        # Russian is never used (skill rule)

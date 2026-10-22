@@ -14,6 +14,7 @@ from typing import Callable, Dict, List, Optional
 import jsonschema
 
 from .cost import cost_usd
+from .providers import HedgedProvider
 from .signals import Detector
 from .transcript import Line, s_to_hms
 
@@ -62,6 +63,15 @@ class Engine:
         self.budget = budget
         self.detector = Detector(rules, cfg.get("name_aliases", []))
         self.models = cfg["models"]                      # {"classify": id, "tip": id}
+        # M2 hedging: a second request when the first one is slow (cfg "hedge", on by default).
+        hg = cfg.get("hedge", {}) if isinstance(cfg.get("hedge"), dict) else {}
+        if hg.get("enabled", True) and not isinstance(provider, HedgedProvider):
+            after = dict({"classify": 2.0, "tip": 3.0}, **(hg.get("after_s") or {}))
+            by_model = {}
+            for role, mid in self.models.items():
+                if mid and role in after:
+                    by_model[mid] = min(after[role], by_model.get(mid, after[role]))
+            self.provider = provider = HedgedProvider(provider, by_model, on_extra=self._extra_usage)
         self.ttl = cfg.get("cache_ttl", "1h")
         self.direct_enabled = cfg.get("direct_route", True)
         self.classify_enabled = bool(self.models.get("classify"))
@@ -149,6 +159,17 @@ class Engine:
             gists = [t["gist"] for t in self.tips[-8:]]
         return {"tips_given": gists, "now": s_to_hms(self.clock())}
 
+    def _extra_usage(self, c) -> None:
+        """The losing request of a hedged pair finished: it is billed, so it counts."""
+        usd = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)
+        if self.budget and usd:
+            self.budget.add(usd)
+        self.out_llm.write({"at": s_to_hms(self.clock()), "role": "hedge_extra", "model": c.model,
+                            "ttft_ms": c.ms(c.t_first_token), "total_ms": c.ms(c.t_done),
+                            "input": c.input_tokens, "cache_read": c.cache_read, "cache_write_5m": c.cache_write_5m,
+                            "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
+                            "usd": round(usd, 6) if usd is not None else None, "error": c.error})
+
     def _call(self, role: str, line: Line, event: str):
         user = self.prompt.user(role, event, self._tail(line), self._state(), self._earlier(line))
         max_tokens = self.cfg.get("max_tokens", {}).get(role, 120 if role == "classify" else 300)
@@ -163,7 +184,7 @@ class Engine:
                             "input": c.input_tokens, "cache_read": c.cache_read, "cache_write_5m": c.cache_write_5m,
                             "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
                             "usd": round(usd, 6) if usd is not None else None, "error": c.error,
-                            "stop": c.stop_reason,
+                            "stop": c.stop_reason, "hedge": c.hedge,
                             "text_head": None if c.error else c.text[:160],
                             "text": c.text if (self.cfg.get("debug_log_text") and not c.error) else None})
         return c

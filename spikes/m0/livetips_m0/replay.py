@@ -29,7 +29,8 @@ def call_meta_from_md(md: Path, cfg: dict) -> dict:
     meta = {"title": title.group(1).strip() if title else md.stem, "project": proj.group(1) if proj else "",
             "audience": cfg.get("audience", "auto"), "call_type": cfg.get("call_type", "auto"),
             "langs": cfg.get("langs", ["uk", "en"]), "me_label": cfg["me_label"], "them_label": cfg["them_label"],
-            "name_aliases": cfg.get("name_aliases", []), "tips_lang": cfg.get("tips_lang", "uk")}
+            "name_aliases": cfg.get("name_aliases", []), "tips_lang": cfg.get("tips_lang", "uk"),
+            "hiring_role": cfg.get("hiring_role", "") if cfg.get("call_type") == "interview" else ""}
     return meta
 
 

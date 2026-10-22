@@ -89,6 +89,20 @@ def facts_block(facts_path: Optional[Path], cards_path: Optional[Path], limit: i
     return s[:limit]
 
 
+# Interview roles, same meaning as the skill's references/hiring.md (hiring_role).
+ROLE_NOTES = {
+    "observer": "Interview, role observer: the PM is silent and watches; the candidate is the OTHER person. "
+                "On a question to the candidate give ONE tip with the question itself and what a strong answer "
+                "would contain; never analyse the PM's replies.",
+    "interviewer": "Interview, role interviewer: the PM asks the questions. Tips: the next question to ask, a "
+                   "follow-up when an answer is vague (no numbers, no own role, no result), and what is still "
+                   "uncovered; never suggest answers for the candidate.",
+    "coach": "Interview, role coach: the PM is the one being interviewed (a job interview, a client asking "
+             "about the PM's experience). Tips: a short structure for the answer (situation, action, result with "
+             "a number), a strength to lead into, and a ready opening sentence; keep them calm and short.",
+}
+
+
 class PromptBuilder:
     def __init__(self, rules, call_meta: dict, brief_path=None, facts_path=None, cards_path=None, extra_context: str = ""):
         self.rules = rules
@@ -99,7 +113,8 @@ class PromptBuilder:
         tips_lang = call_meta.get("tips_lang", "uk")
         header = "Call: {title}. Project: {project}. Audience: {audience}. Type: {call_type}. Languages: {langs}. " \
                  "The PM's lines are labelled \"{me_label}\"; everyone else \"{them_label}\" (a speaker tag like [S2] may follow). " \
-                 "The PM is addressed as: {aliases}.".format(
+                 "The PM is addressed as: {aliases}.{role}".format(
+                     role=(" " + ROLE_NOTES[call_meta["hiring_role"]]) if call_meta.get("hiring_role") in ROLE_NOTES else "",
                      title=call_meta.get("title", ""), project=call_meta.get("project", ""),
                      audience=call_meta.get("audience", "auto"), call_type=call_meta.get("call_type", "auto"),
                      langs=", ".join(call_meta.get("langs", [])), me_label=call_meta.get("me_label", ""),

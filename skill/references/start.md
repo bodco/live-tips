@@ -123,7 +123,11 @@ prep check, state, wrap-up numbers). Call it inside device_bash as `python3 <too
    give `prompt_en` and `prompt_uk` in `start.json`: when the window switches the language
    the recorder swaps to the matching prompt (or drops it for `en` if none).
 3. Start: `python3 <tool_root>/bin/lt start '<json>'` with this JSON (one device_bash call):
-   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "...", "prompter": true, "mic_device": "default", "setup": true, "call_type": "auto|presentation|interview", "audience": "auto|team|client|boss", "proactive": "off|on", "hiring_role": "observer|coach|interviewer", "people": ["First Last", "..."]}`
+   `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "...", "prompter": true, "mic_device": "default", "setup": true, "call_type": "auto|presentation|interview", "audience": "auto|team|client|boss", "proactive": "off|on", "hiring_role": "observer|coach|interviewer", "people": ["First Last", "..."], "people_team": ["First Last", "..."], "voices_remember": true}`
+   (`people_team` = the names from the config's team table only: their voices are remembered for
+   every project; other names are remembered for this project only. `voices_remember: false` on a
+   public call (webinar, conference, an event with strangers): new voices are not saved at all.
+   Ask nothing about it; set false only when the user says the call is public.)
    (`setup`, `call_type`, `audience`, `proactive`, `hiring_role` only in the fast start; omit unknown ones;
    `prompt_en` / `prompt_uk` are optional and allowed)
    (labels from `settings.user`; `prompter` = `settings.tips.output` is not `chat`;

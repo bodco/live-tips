@@ -52,6 +52,8 @@ public struct AppConfig: Codable, Equatable {
     public var notionWriteSummary = false
     /// Speaker identification on the other side's audio (local voice prints, as in the skill).
     public var speakersEnabled = true
+    /// M2: a second request when Claude is slow to start answering (the first good answer wins).
+    public var hedgeEnabled = true
     /// The work folder connected to Cowork: project folders and the Notion mirror (_notion/) live here.
     public var workRoot = ""
     /// Advanced override; empty = <workRoot>/Tools/LiveTips (or Application Support without a work folder).
@@ -73,6 +75,7 @@ public struct AppConfig: Codable, Equatable {
         showInDock = (try? c.decode(Bool.self, forKey: .showInDock)) ?? d.showInDock
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
         speakersEnabled = (try? c.decode(Bool.self, forKey: .speakersEnabled)) ?? d.speakersEnabled
+        hedgeEnabled = (try? c.decode(Bool.self, forKey: .hedgeEnabled)) ?? d.hedgeEnabled
         workRoot = (try? c.decode(String.self, forKey: .workRoot)) ?? d.workRoot
         appRoot = (try? c.decode(String.self, forKey: .appRoot)) ?? d.appRoot
         knownModels = (try? c.decode([String].self, forKey: .knownModels)) ?? d.knownModels

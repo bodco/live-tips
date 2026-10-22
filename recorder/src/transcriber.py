@@ -2038,16 +2038,35 @@ def _round_emb(v) -> list:
 
 class VoiceLibrary:
     """<tool root>/voices/voices.json: {"people": {"Name": {"embeddings": [[...]], "updated": iso,
-    "calls": n}}}. Local only. Used for suggestions; a name is never assigned automatically."""
+    "calls": n, "scope": "team" | "project:<slug>"}}}. Local only. Used for suggestions; a name is
+    never assigned automatically.
+
+    Scopes (owner decision D3, 2026-10-22): the team is global (suggested on every call), a client is
+    remembered for its project only (suggested on that project's calls), and on a public call
+    (voices_remember = false: a webinar, a conference) new voices are not saved at all. A name from
+    the project's team roster (people_team) is saved as team, any other name as the project's.
+    Entries without a scope (older libraries) stay visible everywhere."""
 
     MAX = 20
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, project: str = "", team_names=(), remember: bool = True):
         self.path = path
         self.people: dict[str, dict] = {}
         self.cents: dict[str, np.ndarray] = {}
         self.broken = False
+        self.project = _s(project)
+        self.team = {re.sub(r"\s+", " ", _s(n)).strip().lower() for n in (team_names or []) if _s(n).strip()}
+        self.remember = remember
         self.load()
+
+    def visible(self, name: str) -> bool:
+        sc = (self.people.get(name) or {}).get("scope")
+        return not sc or sc == "team" or (bool(self.project) and sc == "project:" + self.project)
+
+    def scope_for(self, name: str) -> str:
+        if name.strip().lower() in self.team or not self.project:
+            return "team"
+        return "project:" + self.project
 
     def load(self) -> None:
         try:
@@ -2069,6 +2088,8 @@ class VoiceLibrary:
                 calls = 0
             if embs:
                 self.people[str(name)] = {"embeddings": embs, "updated": p.get("updated"), "calls": calls}
+                if p.get("scope"):
+                    self.people[str(name)]["scope"] = str(p["scope"])
         self._cents()
 
     def _cents(self) -> None:
@@ -2085,7 +2106,7 @@ class VoiceLibrary:
         v = unit(vec)
         out = []
         for name, c in self.cents.items():
-            if len(c) != len(v):
+            if len(c) != len(v) or not self.visible(name):
                 continue
             sc = float(np.dot(v, c))
             if sc >= min_score:
@@ -2094,7 +2115,8 @@ class VoiceLibrary:
         return out[:limit]
 
     def frequent(self, n: int = 6) -> list[str]:
-        return [k for k, _ in sorted(self.people.items(), key=lambda kv: (-int(kv[1].get("calls") or 0), kv[0]))][:n]
+        return [k for k, _ in sorted(self.people.items(), key=lambda kv: (-int(kv[1].get("calls") or 0), kv[0]))
+                if self.visible(k)][:n]
 
     def apply_call(self, prev: dict, desired: dict) -> None:
         """Replace this call's earlier contribution (prev: name -> embeddings) with `desired`.
@@ -2113,7 +2135,13 @@ class VoiceLibrary:
             if not new:
                 self.people.pop(name, None)
                 continue
-            self.people[name] = {"embeddings": prune_embeddings(new, self.MAX), "updated": stamp, "calls": calls}
+            scope = p.get("scope") or self.scope_for(name)
+            if name in desired and scope != "team" and self.scope_for(name) == "team":
+                scope = "team"            # named from the team roster: the team is global
+            elif name in desired and scope.startswith("project:") and self.project and scope != "project:" + self.project:
+                scope = "team"            # the same person on two projects' calls: suggest everywhere
+            self.people[name] = {"embeddings": prune_embeddings(new, self.MAX), "updated": stamp, "calls": calls,
+                                 "scope": scope}
         self._cents()
 
     def save(self) -> None:
@@ -2550,8 +2578,8 @@ class SpeakerTracker:
 
     # ---- library
     def _lib_sync(self) -> None:
-        if self.lib is None:
-            return
+        if self.lib is None or not self.lib.remember:
+            return                         # a public call: nothing is written to the voice library
         desired: dict[str, list] = {}
         for c in self.clusters.values():
             if not c["name"] or not c["members"]:
@@ -2950,7 +2978,9 @@ def main() -> int:
     spk: dict = {"worker": None, "ready": False}
     tracker: SpeakerTracker | None = None
     if status["speakers"] == "loading":
-        lib = VoiceLibrary(ROOT / str(cfg.get("voices_dir") or "voices") / "voices.json")
+        lib = VoiceLibrary(ROOT / str(cfg.get("voices_dir") or "voices") / "voices.json",
+                           project=cfg.get("slug") or "", team_names=cfg.get("people_team") or [],
+                           remember=cfg.get("voices_remember", True) not in (False, "false", "off", "0", 0))
         tracker = SpeakerTracker(cfg, out.with_name(out.stem + ".speakers.json"), lib,
                                  emit=lambda item: _append_json(tips_file, item))
 

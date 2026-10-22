@@ -5,6 +5,8 @@ on a vendor SDK directly, so a local model (OpenAI-compatible server such as lla
 Ollama) or another vendor can be plugged in.
 """
 import json
+import queue
+import threading
 import time
 import urllib.request
 from dataclasses import dataclass, field
@@ -26,6 +28,7 @@ class Completion:
     output_tokens: int = 0
     error: Optional[str] = None
     stop_reason: Optional[str] = None
+    hedge: Optional[str] = None   # None: one request; "primary" / "hedge": a second request ran, this one won
 
     def ms(self, t):
         return None if t is None else round((t - self.t_start) * 1000)
@@ -190,6 +193,85 @@ class FakeProvider(Provider):
         c.input_tokens = 100
         c.output_tokens = len(c.text) // 4
         return c
+
+
+class HedgedProvider(Provider):
+    """M2: hedged requests against slow answers. When the first request shows no token after
+    `after_s[model]` seconds, or fails fast (overload, network), a second identical request starts and
+    the first good answer wins. The other request finishes in the background; it is billed, so its
+    usage goes to `on_extra(completion)`. At most two requests per call."""
+    name = "hedged"
+
+    def __init__(self, inner: Provider, after_s: dict, default_after: Optional[float] = None,
+                 on_extra: Optional[Callable[[Completion], None]] = None):
+        self.inner = inner
+        self.after_s = after_s
+        self.default_after = default_after
+        self.on_extra = on_extra
+        self.stats = {"calls": 0, "hedged": 0, "hedge_won": 0}
+
+    def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
+        after = self.after_s.get(model, self.default_after)
+        self.stats["calls"] += 1
+        if not after or after <= 0:
+            return self.inner.complete(model=model, system=system, user=user, max_tokens=max_tokens,
+                                       cache_ttl=cache_ttl, on_text=on_text, extra=extra)
+        results: "queue.Queue" = queue.Queue()
+        first_token = threading.Event()
+
+        def run(tag):
+            def seen(text):
+                first_token.set()
+            try:
+                c = self.inner.complete(model=model, system=system, user=user, max_tokens=max_tokens,
+                                        cache_ttl=cache_ttl, on_text=seen, extra=extra)
+            except Exception as e:  # noqa: BLE001  never leave the waiter hanging
+                c = Completion(model=model, t_start=time.monotonic(), t_done=time.monotonic(),
+                               error="{}: {}".format(type(e).__name__, str(e)[:200]))
+            if c.t_first_token is not None:
+                first_token.set()
+            results.put((tag, c))
+
+        def launch(tag):
+            threading.Thread(target=run, args=(tag,), daemon=True).start()
+
+        launch("primary")
+        pending, hedged = 1, False
+        try:
+            tag, c = results.get(timeout=after)
+            pending -= 1
+            if not c.error:
+                return c
+            launch("hedge")                     # failed fast: one more try right away
+            pending, hedged = 1, True
+        except queue.Empty:
+            if not first_token.is_set():
+                launch("hedge")
+                pending, hedged = 2, True
+        if hedged:
+            self.stats["hedged"] += 1
+        winner, last = None, None
+        while pending:
+            tag, c = results.get()
+            pending -= 1
+            if not c.error:
+                winner = c
+                if hedged:
+                    c.hedge = tag
+                    if tag == "hedge":
+                        self.stats["hedge_won"] += 1
+                break
+            last = c
+        if pending and self.on_extra:
+            def drain():
+                for _ in range(pending):
+                    _, rest = results.get()
+                    try:
+                        self.on_extra(rest)
+                    except Exception:  # noqa: BLE001
+                        pass
+            threading.Thread(target=drain, daemon=True).start()
+        return winner or last
 
 
 def make_provider(cfg: dict, secret_loader: Callable[[str], str]) -> Provider:

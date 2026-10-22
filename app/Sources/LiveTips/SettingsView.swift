@@ -94,6 +94,35 @@ final class SettingsModel: ObservableObject {
     @Published var aliasesText = ""
     @Published var mirrorNote = ""
 
+    // Voice library (<app folder>/voices/voices.json): team voices for every project, clients per project (D3).
+    struct Voice: Identifiable { let name: String; let scope: String; let calls: Int; var id: String { name } }
+    @Published var voices: [Voice] = []
+    var voicesPath: String { (CallEngine.shared.appRoot as NSString).appendingPathComponent("voices/voices.json") }
+    func loadVoices() {
+        guard let d = try? Data(contentsOf: URL(fileURLWithPath: voicesPath)),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              let people = o["people"] as? [String: Any] else { voices = []; return }
+        voices = people.compactMap { k, v in
+            guard let p = v as? [String: Any] else { return nil }
+            return Voice(name: k, scope: (p["scope"] as? String) ?? "", calls: (p["calls"] as? Int) ?? 0)
+        }.sorted { ($0.scope, $0.name) < ($1.scope, $1.name) }
+    }
+    /// Removes one person's voice prints (not during a call: the recorder writes the file then).
+    func forgetVoice(_ name: String) {
+        guard !CallEngine.shared.isRunning, let d = try? Data(contentsOf: URL(fileURLWithPath: voicesPath)),
+              var o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              var people = o["people"] as? [String: Any] else { return }
+        people.removeValue(forKey: name)
+        o["people"] = people
+        if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
+        loadVoices()
+    }
+    static func scopeLabel(_ s: String) -> String {
+        if s == "team" { return "Team, all projects" }
+        if s.hasPrefix("project:") { return "Client of " + String(s.dropFirst(8)) }
+        return "All projects (saved before scopes)"
+    }
+
     /// The folder with the imported project configs (projects/<slug>.md) feeds the mirror's layout.
     func setUpMirror() {
         let configsDir = registry.projects.first.map { ($0.config as NSString).deletingLastPathComponent } ?? ""
@@ -378,6 +407,8 @@ struct SettingsView: View {
                 ModelPicker(title: "Classify", selection: $model.config.models.classify, choices: model.modelChoices).help("Decides if a tip is needed. Runs often: fast and cheap. Recommended: Haiku.")
                 ModelPicker(title: "Tip", selection: $model.config.models.tip, choices: model.modelChoices).help("Writes the tip you see. Recommended: Sonnet. Opus is too slow for live tips.")
                 ModelPicker(title: "After the call", selection: $model.config.models.analysis, choices: model.modelChoices).help("Summary and analysis. Not time-critical. Recommended: Opus.")
+                Toggle("Second request when Claude is slow", isOn: $model.config.hedgeEnabled)
+                    .help("If Claude shows no answer after 2 s (classify) or 3 s (tip), or fails at once, the same request is sent again and the first good answer wins. Faster tips on busy hours; costs a little more (both requests are billed and counted in the limits).")
             } header: { Text("Models") } footer: {
                 Text(model.config.knownModels.isEmpty ? "Test the Claude key to load the models your key can use." : "Models your key can use.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -447,8 +478,21 @@ struct SettingsView: View {
                         }.controlSize(.small)
                     }
                 }
+                DisclosureGroup("Voice library (\(model.voices.count))") {
+                    if model.voices.isEmpty { Text("Nobody yet. Names you give on calls appear here.").font(.caption).foregroundStyle(.secondary) }
+                    ForEach(model.voices) { v in
+                        HStack {
+                            Text(v.name)
+                            Spacer()
+                            Text(SettingsModel.scopeLabel(v.scope) + " · \(v.calls) call\(v.calls == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
+                            Button("Forget") { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
+                                .help("Removes this person's voice prints from the Mac. Not during a call.")
+                        }
+                    }
+                }
+                .onAppear { model.loadVoices() }
             } header: { Text("Speakers") } footer: {
-                Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. Names are never set by themselves. Voice prints stay in <app folder>/voices on this Mac.")
+                Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. Names are never set by themselves. Your team (the team table of a project config) is remembered for every project, a client for that project only, and nothing is saved on a call marked Public in Start call. Voice prints stay in <app folder>/voices on this Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

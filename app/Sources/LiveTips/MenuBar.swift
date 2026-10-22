@@ -232,6 +232,9 @@ final class StartCallModel: ObservableObject {
     @Published var title = ""
     @Published var audience = "auto"
     @Published var callType = "auto"
+    @Published var publicCall = false            // D3: a webinar or an event with strangers: new voices are not saved
+    @Published var hiringRole = "observer"      // interview: observer | interviewer | coach (as in the skill)
+    @Published var tipModel = ""                // "" = the model from Settings > AI
     @Published var language = "uk+en"
     @Published var note = ""
     @Published var context = ""
@@ -378,13 +381,27 @@ final class StartCallModel: ObservableObject {
         try? reg.save(to: AppPaths.projects)
         return ["project_dir": root, "title": title.isEmpty ? (project?.name ?? workspace?.name ?? "Meeting") : title,
                 "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,
+                "hiring_role": callType == "interview" ? hiringRole : "", "tip_model": tipModel,
                 "me_lang": langs.0, "langs": langs.1, "me_langs": langs.0 == "uk" ? ["uk", "en"] : [langs.0],
                 "context": context.trimmingCharacters(in: .whitespacesAndNewlines), "mic_device": micDevice, "standby": standby,
-                "project_config": project?.config ?? "", "people": people]
+                "project_config": project?.config ?? "", "people": people, "people_team": peopleTeam,
+                "voices_remember": !publicCall]
+    }
+
+    var tipModelChoices: [String] {
+        let c = AppConfig.load(from: AppPaths.config)
+        let base = c.knownModels.isEmpty ? AppConfig.fallbackModels : c.knownModels
+        return base.filter { ($0.contains("haiku") || $0.contains("sonnet") || $0.contains("opus") || $0.contains("fable")) && $0 != c.models.tip }
     }
 
     /// Full names of the team and the client from the project config (all projects of a workspace):
     /// the "Who is speaking?" card offers them, as in the skill. Names are never set by themselves.
+    var peopleTeam: [String] {
+        let ps = project.map { [$0] } ?? registry.projects.filter { workspace?.projects.contains($0.slug) ?? false }
+        var seen = Set<String>()
+        return ps.flatMap { $0.people.filter { $0.side == "team" }.map(\.name) }.filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+    }
+
     var people: [String] {
         let ps = project.map { [$0] } ?? registry.projects.filter { workspace?.projects.contains($0.slug) ?? false }
         var seen = Set<String>()
@@ -488,6 +505,17 @@ struct StartCallView: View {
                     Text("Standard").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
                 }
                 .help("Standard: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview work best with a Cowork prep.")
+                if model.callType == "interview" {
+                    Picker("Your role", selection: $model.hiringRole) {
+                        Text("Observer").tag("observer"); Text("Interviewer").tag("interviewer"); Text("Coach (I am interviewed)").tag("coach")
+                    }
+                    .help("Observer: you watch someone interview a candidate; tips show each question and what a strong answer has. Interviewer: you ask; tips give the next question and follow-ups. Coach: you are the one being interviewed (a job interview, a client asking about your experience); tips give a structure and an opening sentence for your answer.")
+                }
+                Picker("Tip model", selection: $model.tipModel) {
+                    Text("As in Settings (\(prettyModel(AppConfig.load(from: AppPaths.config).models.tip)))").tag("")
+                    ForEach(model.tipModelChoices, id: \.self) { id in Text(prettyModel(id) + "  " + id).tag(id) }
+                }
+                .help("For this call only. A faster model gives tips sooner, a stronger one gives better tips on a hard call. Settings > AI sets the default.")
                 Picker("Microphone", selection: $model.micDevice) {
                     Text("System default" + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
                     Text("Mac built-in microphone").tag("builtin")
@@ -504,6 +532,8 @@ struct StartCallView: View {
                     Text("Now").tag(false)
                 }
                 .help("When the call begins: the window opens now and waits; recording starts when the other side speaks for a few seconds, or when you press the green Start. Nothing is written and no mic warnings are shown while it waits.")
+                Toggle("Public call (do not remember new voices)", isOn: $model.publicCall)
+                    .help("For a webinar, a conference or any call with strangers: speakers can still be named during the call, but no voice prints are saved. On other calls your team's voices are remembered for every project and the client's for this project only.")
                 Picker("Languages", selection: $model.language) {
                     Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
                 }

@@ -81,7 +81,7 @@ final class SetupModel: ObservableObject {
         defer { busy = false }
         for i in steps.indices where steps[i].state != .ok && (includeOptional || !steps[i].optional) {
             steps[i].state = .installing
-            log.append("— " + steps[i].title)
+            log.append("> " + steps[i].title)
             let rc = await run("install", steps[i].id) { [weak self] l in
                 self?.log.append(l)
                 if (self?.log.count ?? 0) > 400 { self?.log.removeFirst(100) }

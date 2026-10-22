@@ -50,6 +50,8 @@ public struct AppConfig: Codable, Equatable {
     public var stealthDefault = true
     public var showInDock = true
     public var notionWriteSummary = false
+    /// Speaker identification on the other side's audio (local voice prints, as in the skill).
+    public var speakersEnabled = true
     /// The work folder connected to Cowork: project folders and the Notion mirror (_notion/) live here.
     public var workRoot = ""
     /// Advanced override; empty = <workRoot>/Tools/LiveTips (or Application Support without a work folder).
@@ -70,6 +72,7 @@ public struct AppConfig: Codable, Equatable {
         stealthDefault = (try? c.decode(Bool.self, forKey: .stealthDefault)) ?? d.stealthDefault
         showInDock = (try? c.decode(Bool.self, forKey: .showInDock)) ?? d.showInDock
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
+        speakersEnabled = (try? c.decode(Bool.self, forKey: .speakersEnabled)) ?? d.speakersEnabled
         workRoot = (try? c.decode(String.self, forKey: .workRoot)) ?? d.workRoot
         appRoot = (try? c.decode(String.self, forKey: .appRoot)) ?? d.appRoot
         knownModels = (try? c.decode([String].self, forKey: .knownModels)) ?? d.knownModels

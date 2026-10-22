@@ -268,6 +268,7 @@
   #pause:focus-visible, #sos:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
   #sos { background: var(--red); border: 0; color: #fff; padding: 0 14px; height: 40px; font-size: 13px; letter-spacing: .04em; }
   #sos:hover { filter: brightness(1.1); }
+  #sos kbd { font: 600 10px/1 -apple-system, sans-serif; opacity: .8; margin-left: 2px; letter-spacing: 0; }
   #sos:active, #pause:active { transform: translateY(1px); }
 
   /* short window (e.g. 420x280): chips hide until the field has focus, alerts lose the second line */
@@ -492,7 +493,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
   </label>
-  <button id="sos" class="act" type="button" data-i18n="sos_label" data-i18n-aria="sos_aria" data-i18n-title="sos_tt">HELP</button>
+  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt"><span data-i18n="sos_label">HELP</span><kbd>⌃⌥H</kbd></button>
 </form>
 
 <div id="scrim"></div>
@@ -614,15 +615,15 @@
       send_tt: 'Ask Claude',
       mute_aria: 'Mute my microphone',
       unmute_aria: 'Unmute my microphone',
-      pause_tt: 'Pause tips: Claude keeps recording and listening, but shows nothing until you press play. HELP NOW still works.',
-      play_tt: 'Resume tips',
+      pause_tt: 'Pause tips (Control-Option-P, works from any app): Claude keeps recording and listening, but shows nothing until you press play. HELP NOW still works.',
+      play_tt: 'Resume tips (Control-Option-P)',
       pause_aria: 'Pause tips',
       play_aria: 'Resume tips',
       pause_unconf_on: '⚠ Tips still paused: the recorder did not confirm',
       pause_unconf_off: '⚠ Tips still on: the recorder did not confirm',
       sos_aria: 'HELP NOW',
       sos_label: 'HELP',
-      sos_tt: "HELP NOW: the best facts for what is being said, at once, then Claude's answer",
+      sos_tt: "HELP NOW (Control-Option-H, works from any app): the best facts for what is being said, at once, then Claude's answer",
       work_on: '🆘 Working on it... {n} s',
       work_late: '🆘 No answer yet ({n} s). Is Claude listening?',
       sec_call: 'Call',
@@ -901,15 +902,15 @@
       send_tt: 'Запитати Claude',
       mute_aria: 'Вимкнути мій мікрофон',
       unmute_aria: 'Увімкнути мій мікрофон',
-      pause_tt: 'Пауза підказок: Claude і далі записує та слухає, але нічого не показує, доки не натиснеш «Продовжити». ДОПОМОЖИ працює і на паузі.',
-      play_tt: 'Відновити підказки',
+      pause_tt: 'Пауза підказок (Control-Option-P, з будь-якого застосунку): Claude і далі записує та слухає, але нічого не показує, доки не натиснеш «Продовжити». ДОПОМОЖИ працює і на паузі.',
+      play_tt: 'Відновити підказки (Control-Option-P)',
       pause_aria: 'Поставити підказки на паузу',
       play_aria: 'Відновити підказки',
       pause_unconf_on: '⚠ Підказки досі на паузі: програма запису не підтвердила',
       pause_unconf_off: '⚠ Підказки досі увімкнені: програма запису не підтвердила',
       sos_aria: 'ДОПОМОЖИ',
       sos_label: 'ДОПОМОЖИ',
-      sos_tt: 'ДОПОМОЖИ: одразу найкращі факти до того, що зараз говорять, а потім відповідь Claude',
+      sos_tt: 'ДОПОМОЖИ (Control-Option-H, з будь-якого застосунку): одразу найкращі факти до того, що зараз говорять, а потім відповідь Claude',
       work_on: '🆘 Шукаю... {n} с',
       work_late: '🆘 Відповіді ще немає ({n} с). Claude слухає?',
       sec_call: 'Дзвінок',

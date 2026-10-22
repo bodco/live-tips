@@ -35,8 +35,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // The main action first; the status lines below it (review P2).
         startItem = add(menu, "Start call…", #selector(startCall), "n")
         tipsItem = add(menu, "Open tips window", #selector(showTips), "t")
-        pauseItem = add(menu, "Pause tips (⌃⌥P)", #selector(togglePause), "")
-        helpItem = add(menu, "HELP NOW (⌃⌥H)", #selector(helpNow), "")
+        pauseItem = add(menu, "Pause or resume tips", #selector(togglePause), "p")
+        pauseItem.keyEquivalentModifierMask = [.control, .option]      // shown in the menu: the global shortcut
+        helpItem = add(menu, "HELP NOW", #selector(helpNow), "h")
+        helpItem.keyEquivalentModifierMask = [.control, .option]
         endItem = add(menu, "End call", #selector(endCall), "")
         menu.addItem(.separator())
         for l in statusLines { l.isEnabled = false; menu.addItem(l) }
@@ -356,7 +358,15 @@ final class StartCallModel: ObservableObject {
                 "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,
                 "me_lang": langs.0, "langs": langs.1, "me_langs": langs.0 == "uk" ? ["uk", "en"] : [langs.0],
                 "context": context.trimmingCharacters(in: .whitespacesAndNewlines), "mic_device": micDevice, "standby": standby,
-                "project_config": project?.config ?? ""]
+                "project_config": project?.config ?? "", "people": people]
+    }
+
+    /// Full names of the team and the client from the project config (all projects of a workspace):
+    /// the "Who is speaking?" card offers them, as in the skill. Names are never set by themselves.
+    var people: [String] {
+        let ps = project.map { [$0] } ?? registry.projects.filter { workspace?.projects.contains($0.slug) ?? false }
+        var seen = Set<String>()
+        return ps.flatMap { $0.people.map(\.name) }.filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
     }
 }
 

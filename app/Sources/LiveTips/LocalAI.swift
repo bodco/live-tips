@@ -71,12 +71,28 @@ final class LocalAIService: @unchecked Sendable {
         guard let d = try? Data(contentsOf: URL(fileURLWithPath: path)),
               var core = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return }
         core["semantic_enabled"] = c.localAI.enabled
+        core["speakers_enabled"] = c.speakersEnabled
         if !c.nameAliases.isEmpty { core["name_aliases"] = c.nameAliases }   // "❓" cards for lines that name the PM
         core["ollama_url"] = c.localAI.engine == "embedded" ? Self.builtinURL : c.localAI.ollamaURL
         core["semantic_model"] = c.localAI.engine == "embedded" ? "bge-m3" : (c.localAI.ollamaModel.isEmpty ? "bge-m3" : c.localAI.ollamaModel)
         if let out = try? JSONSerialization.data(withJSONObject: core, options: [.prettyPrinted, .sortedKeys]) {
             try? out.write(to: URL(fileURLWithPath: path), options: .atomic)
         }
+    }
+
+    /// Speakers: the voice model in <app folder>/models and the people in the voice library.
+    func speakersLine() -> (ok: Bool, text: String) {
+        let c = config
+        if !c.speakersEnabled { return (false, "Off: the other side is one speaker (\"Them\")") }
+        let models = (appRoot as NSString).appendingPathComponent("models")
+        let hasModel = ((try? FileManager.default.contentsOfDirectory(atPath: models)) ?? []).contains { $0.hasPrefix("wespeaker") && $0.hasSuffix(".onnx") }
+        if !hasModel { return (false, "Voice model not installed: open Setup and install Voices") }
+        let lib = (appRoot as NSString).appendingPathComponent("voices/voices.json")
+        var n = 0
+        if let d = try? Data(contentsOf: URL(fileURLWithPath: lib)), let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
+            n = ((o["people"] as? [String: Any])?.count) ?? ((o["people"] as? [Any])?.count) ?? 0
+        }
+        return (true, "On. Voice library: \(n) \(n == 1 ? "person" : "people") (stays on this Mac)")
     }
 
     /// One short status line for Settings and the menu.

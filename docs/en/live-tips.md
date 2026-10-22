@@ -1046,7 +1046,10 @@ What it does:
 - built-in local AI (`bge-m3`) for facts and cards by meaning, 🆘 HELP NOW and project search,
   with no Ollama needed;
 - standby start, a choice of microphone that stays put when macOS switches devices, the
-  presentation split view and the same tips window.
+  presentation split view and the same tips window;
+- speaker identification as in the skill: the "Who is speaking?" card offers the project's
+  people, names go into the tips and the summary, the voice library stays on the Mac
+  (**Settings > AI > Speakers**).
 
 **It is a beta.**
 
@@ -1123,4 +1126,6 @@ that scores every tip of both sides 1 to 5 without knowing which side wrote it.
 - **Control-Option-H**: HELP NOW, also when the meeting app has the focus.
 - **Control-Option-P**: pause or resume tips.
 
-The same two actions are in the menu bar menu during a call.
+The same two actions are in the menu bar menu during a call, with the shortcut next to them.
+The HELP button shows its shortcut, the pause button shows it in its tooltip, and
+**Settings > General > Shortcuts** lists both.

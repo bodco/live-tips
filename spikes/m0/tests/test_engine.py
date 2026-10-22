@@ -86,3 +86,21 @@ def test_diet_rate_blocks_second_orange(tmp_path):
 def test_gist_closed_streaming():
     assert not gist_closed('{"gist": "🔴 New req')
     assert gist_closed('{"gist": "🔴 New \\"req\\"", "lev')
+
+
+def test_speaker_names_from_speakers_json(tmp_path):
+    from livetips_m0.engine import SpeakerNames
+    from livetips_m0.transcript import parse_line
+    p = tmp_path / "call.speakers.json"
+    p.write_text(json.dumps({"clusters": {"S2": {"name": "Emily Carter"}, "S3": {}},
+                             "merged": {"S4": "S2"}, "overrides": {"10:00:09": "S2"}}), encoding="utf-8")
+    sp = SpeakerNames(p)
+    named = parse_line("[10:00:05] Other [S4] (en): Can we ship on Friday?", 1, "Me")
+    unnamed = parse_line("[10:00:07] Other [S3] (en): And the price?", 2, "Me")
+    fixed = parse_line("[10:00:09] Other [S3] (en): Thanks.", 3, "Me")
+    me = parse_line("[10:00:08] Me (en): Yes, on Friday.", 4, "Me")
+    assert sp.who(named) == "Emily Carter"
+    assert sp.who(unnamed) == "Other [S3]"
+    assert sp.who(fixed) == "Emily Carter"
+    assert sp.who(me) == "Me"
+    assert SpeakerNames(None).who(unnamed) == "Other [S3]"

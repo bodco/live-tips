@@ -91,6 +91,8 @@ class Engine:
         self.tip_cache_warm = threading.Event()
         self.tip_warm_lock = threading.Lock()
         self.red_repeat_s = d.get("red_repeat_window_s", 60)
+        # Names the PM gave to voices in the tips window (<stem>.speakers.json, written by the recorder).
+        self.speakers = SpeakerNames(cfg.get("speakers_file"))
 
     # ---------- input ----------
     def on_line(self, line: Line) -> None:
@@ -129,7 +131,7 @@ class Engine:
         out = []
         for h in hist:
             if 90 < end - h.t_s <= 90 + span:
-                out.append("[{}] {}: {}".format(h.t, h.label, h.text[:300]))
+                out.append("[{}] {}: {}".format(h.t, self.speakers.who(h), h.text[:300]))
         return out[-80:]
 
     def _tail(self, line: Line) -> List[str]:
@@ -139,8 +141,7 @@ class Engine:
         out = []
         for h in hist:
             if end - h.t_s <= 90:
-                tag = " [{}]".format(h.stag) if h.stag else ""
-                out.append("[{}] {}{}: {}".format(h.t, h.label, tag, h.text))
+                out.append("[{}] {}: {}".format(h.t, self.speakers.who(h), h.text))
         return out[-40:]
 
     def _state(self) -> dict:
@@ -349,3 +350,51 @@ class Engine:
                 break
             time.sleep(0.2)
         self.pool.shutdown(wait=False)
+
+
+class SpeakerNames:
+    """Display names for the other side's lines, as in the skill (@@SPEAKERS): the PM names a voice in
+    the tips window, the recorder writes <stem>.speakers.json (clusters, merges, per-line fixes), and
+    the prompt shows "Name" instead of "Them [S2]". Re-read when the file changes. Unnamed voices keep
+    the label and tag ("Them [S3]"); the PM's own lines keep the PM label."""
+
+    def __init__(self, path):
+        self.path = Path(path) if path else None
+        self.mtime = None
+        self.clusters, self.merged, self.overrides = {}, {}, {}
+
+    def _load(self):
+        if not self.path:
+            return
+        try:
+            m = self.path.stat().st_mtime
+        except OSError:
+            return
+        if m == self.mtime:
+            return
+        try:
+            d = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        self.mtime = m
+        g = lambda k: d.get(k) if isinstance(d.get(k), dict) else {}
+        self.clusters, self.merged, self.overrides = g("clusters"), g("merged"), g("overrides")
+
+    def name(self, t, sid):
+        self._load()
+        s, seen = self.overrides.get(t) or sid, set()
+        while s in self.merged and s not in seen:
+            seen.add(s)
+            s = self.merged[s]
+        if isinstance(s, str) and s.startswith("name:"):
+            return s[5:]
+        c = self.clusters.get(s) if s else None
+        return c.get("name") if isinstance(c, dict) and c.get("name") else None
+
+    def who(self, line) -> str:
+        if line.speaker == "me":
+            return line.label
+        n = self.name(line.t, line.stag)
+        if n:
+            return n
+        return "{} [{}]".format(line.label, line.stag) if line.stag else line.label

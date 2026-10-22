@@ -417,6 +417,26 @@ struct SettingsView: View {
             }
             .onChange(of: model.config.localAI) { LocalAIService.shared.apply(); model.refreshLocalAI(after: 2) }
             .onAppear { model.refreshLocalAI() }
+            Section {
+                Toggle("Identify speakers", isOn: $model.config.speakersEnabled)
+                    .help("Tells the voices on the other side apart (Speaker 2, Speaker 3) and asks \"Who is speaking?\" once a new voice talked for a few seconds. Names you give are used in tips and in the summary, and are remembered for the next calls.")
+                    .onChange(of: model.config.speakersEnabled) { LocalAIService.shared.apply() }
+                LabeledContent("Status") {
+                    let st = LocalAIService.shared.speakersLine()
+                    HStack(spacing: 6) {
+                        Image(systemName: st.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
+                            .foregroundStyle(st.ok ? .green : (model.config.speakersEnabled ? .orange : .secondary))
+                        Text(st.text).font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Voice library") {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: (CallEngine.shared.appRoot as NSString).appendingPathComponent("voices")))
+                        }.controlSize(.small)
+                    }
+                }
+            } header: { Text("Speakers") } footer: {
+                Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. Names are never set by themselves. Voice prints stay in <app folder>/voices on this Mac.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }
@@ -548,6 +568,13 @@ struct SettingsView: View {
                 .font(.caption).foregroundStyle(.secondary)
             }
             Section {
+                LabeledContent("HELP NOW") { Text("⌃⌥H  Control-Option-H").font(.callout.monospaced()) }
+                LabeledContent("Pause or resume tips") { Text("⌃⌥P  Control-Option-P").font(.callout.monospaced()) }
+            } header: { Text("Shortcuts") } footer: {
+                Text("They work from any app during a call, also while the meeting app has the focus. Also in the menu bar menu and on the tips window buttons.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
                 LabeledContent {
                     HStack {
                         Text(model.config.effectiveAppRoot(appSupport: AppPaths.support.path))
@@ -602,7 +629,7 @@ struct AboutView: View {
                 check(model.mirrorHealth == "ok", "Notion mirror is fresh", "General")
                 check(model.config.localAI.enabled, "Local AI on", "AI")
             } header: { Text("Ready for a call") } footer: {
-                Text("Before a call: click Live Tips in the Dock or the menu bar > Start call, choose the project or workspace, Start. The tips window opens under your camera.")
+                Text("Before a call: click Live Tips in the Dock or the menu bar > Start call, choose the project or workspace, Start. The tips window opens under your camera. During the call: Control-Option-H is HELP NOW, Control-Option-P pauses tips.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

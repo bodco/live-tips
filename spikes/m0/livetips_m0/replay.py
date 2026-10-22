@@ -52,6 +52,7 @@ def build_engine(cfg, md: Path, out: Path, clock, provider=None):
     b = cfg.get("budget", {})
     budget = BudgetGuard(b.get("ledger", "~/.livetips/spend.json"), b.get("call_soft_usd", 2.0),
                          b.get("call_hard_usd", 5.0), b.get("monthly_hard_usd", 100.0))
+    cfg.setdefault("speakers_file", str(base) + ".speakers.json")
     return Engine(cfg=cfg, rules=rules, provider=provider, prompt=prompt, out_dir=out, stem=stem,
                   clock=clock, budget=budget), stem
 

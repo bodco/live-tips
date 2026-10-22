@@ -65,7 +65,7 @@ final class CallEngine {
         poll = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             let st = EngineStatus.load(path: self.statusPath)
-            if !sidecarStarted, let file = st.file, st.state == "recording" || st.state == "loading_model" {
+            if !sidecarStarted, let file = st.file, ["recording", "loading_model", "standby"].contains(st.state) {
                 sidecarStarted = true
                 self.adoptPrep(file: file)
                 self.onReady?(st)

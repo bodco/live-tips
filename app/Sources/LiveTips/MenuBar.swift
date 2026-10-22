@@ -101,12 +101,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let cfg = config
         let st = EngineStatus.load(path: (appRoot as NSString).appendingPathComponent("state/status.json"))
         let month = SpendLedger.monthSpent()
-        let recording = st.state == "recording" || st.state == "loading_model"
+        let recording = ["recording", "loading_model", "standby"].contains(st.state)
         lastStatus = st
         startItem.isHidden = recording
         endItem.isHidden = !recording
         tipsItem.title = recording ? "Open tips window" : "Preview tips window"
-        statusLines[0].title = recording ? "● Recording" + (st.project.map { ": \($0)" } ?? "") : "Not recording"
+        statusLines[0].title = st.state == "standby" ? "○ Waiting for the call" + (st.project.map { ": \($0)" } ?? "")
+            : recording ? "● Recording" + (st.project.map { ": \($0)" } ?? "") : "Not recording"
         statusLines[1].title = recording ? "Lines \(st.lines) · tips \(st.tips)" : "Start a call to see live numbers"
         statusLines[2].title = String(format: "This call: $%.2f (warning $%.0f, stop $%.0f)", st.callSpentUSD, cfg.budget.callSoftUSD, cfg.budget.callHardUSD)
         statusLines[2].isHidden = !recording
@@ -206,6 +207,10 @@ final class StartCallModel: ObservableObject {
         didSet { UserDefaults.standard.set(micDevice, forKey: "micDevice") }
     }
     @Published var micInputs: [MicInput] = []
+    /// Open the window now and start recording when the call begins (the other side speaks, or Start).
+    @Published var standby = UserDefaults.standard.object(forKey: "standby") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(standby, forKey: "standby") }
+    }
     struct MicInput: Decodable, Hashable { var uid: String; var name: String; var builtin: Bool; var `default`: Bool }
 
     /// Inputs the Mac sees now, from the recorder's audiocap (--list-inputs). Empty with an older audiocap.
@@ -247,9 +252,10 @@ final class StartCallModel: ObservableObject {
         return slug.isEmpty ? "meeting" : String(slug.prefix(60))
     }
 
-    /// Same as `title_match` in `lt`: equal, or one contains the other (4+ characters).
+    /// Same as `title_match` in `lt`: equal, or one contains the other (4+ characters), hyphens ignored.
     static func titleMatch(_ a: String, _ b: String) -> Bool {
-        let a = slugify(a), b = slugify(b)
+        // Spaces and hyphens do not count: "Standup" = "stand-up", and a project prefix still matches.
+        let a = slugify(a).replacingOccurrences(of: "-", with: ""), b = slugify(b).replacingOccurrences(of: "-", with: "")
         return a == b || (min(a.count, b.count) >= 4 && (a.contains(b) || b.contains(a)))
     }
 
@@ -288,7 +294,7 @@ final class StartCallModel: ObservableObject {
     var prepPhrase: String {
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let t = title.isEmpty ? "the call" : "\"\(title)\""
-        return "Prepare live tips for \(t) at \(f.string(from: Date().addingTimeInterval(15 * 60))), project \(targetName)" +
+        return "Prepare live tips for \(t) at \(f.string(from: Date().addingTimeInterval(15 * 60))), project \(targetName). Use this title exactly for the prep files" +
             (context.isEmpty ? "" : ". Context: \(context)")
     }
 
@@ -318,7 +324,7 @@ final class StartCallModel: ObservableObject {
         return ["project_dir": root, "title": title.isEmpty ? (project?.name ?? workspace?.name ?? "Meeting") : title,
                 "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,
                 "me_lang": langs.0, "langs": langs.1, "me_langs": langs.0 == "uk" ? ["uk", "en"] : [langs.0],
-                "context": context.trimmingCharacters(in: .whitespacesAndNewlines), "mic_device": micDevice]
+                "context": context.trimmingCharacters(in: .whitespacesAndNewlines), "mic_device": micDevice, "standby": standby]
     }
 }
 
@@ -429,6 +435,11 @@ struct StartCallView: View {
                     }
                 }
                 .help("Your voice. System default follows macOS (AirPods, a headset or the Mac). Pick a device to keep it even if macOS switches. Can be changed during the call in the tips window.")
+                Picker("Recording starts", selection: $model.standby) {
+                    Text("When the call begins").tag(true)
+                    Text("Now").tag(false)
+                }
+                .help("When the call begins: the window opens now and waits; recording starts when the other side speaks for a few seconds, or when you press the green Start. Nothing is written and no mic warnings are shown while it waits.")
                 Picker("Languages", selection: $model.language) {
                     Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
                 }
@@ -442,7 +453,7 @@ struct StartCallView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 540, height: 680)
+        .frame(width: 540, height: 720)
         .onAppear { model.scanPrep(); model.loadMicInputs() }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
     }
@@ -478,7 +489,7 @@ final class StartCallWindow {
         let w = window ?? NSWindow(contentViewController: host)
         w.contentViewController = host
         w.styleMask.insert(.resizable)
-        w.setContentSize(NSSize(width: 540, height: 680))
+        w.setContentSize(NSSize(width: 540, height: 720))
         w.title = "Start call"
         w.isReleasedWhenClosed = false
         window = w

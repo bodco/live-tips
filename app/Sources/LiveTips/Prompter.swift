@@ -110,7 +110,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.sharingType = .none          // ask macOS to keep the window out of screen capture
         window.isMovableByWindowBackground = true
-        window.alphaValue = 0.94
+        window.alphaValue = 1.0                 // opacity fades the page backgrounds only (text stays readable)
+        window.isOpaque = false
+        window.backgroundColor = .clear
         window.minSize = NSSize(width: 300, height: 140)
         window.delegate = self
         window.isReleasedWhenClosed = false
@@ -119,6 +121,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
         web.navigationDelegate = self
+        web.setValue(false, forKey: "drawsBackground")   // the page's own background can be see-through
         web.autoresizingMask = [.width, .height]
         window.contentView = web
         let url = URL(fileURLWithPath: args.html)
@@ -143,6 +146,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
            s != lastStatus, isJSONObject(s) {
             lastStatus = s
             push("window.setStatus(" + s + ")")
+            if let d = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] {
+                startButton?.isHidden = (d["state"] as? String) != "standby"
+            }
         }
     }
 
@@ -156,6 +162,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pageReady = true
+        web.evaluateJavaScript("window.enableGlass && window.enableGlass()", completionHandler: nil)
         let queued = pending
         pending.removeAll()
         for js in queued { web.evaluateJavaScript(js, completionHandler: nil) }
@@ -240,17 +247,39 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     /// "End call" in the window's title bar: stops the recording; the transcript and tips stay in the project folder.
     var endButton: NSButton?
+    var startButton: NSButton?
+
+    @objc func startClicked() {
+        guard !args.control.isEmpty else { return }
+        FileManager.default.createFile(atPath: (args.control as NSString).appendingPathComponent("go"), contents: Data())
+        startButton?.isHidden = true
+    }
     func addEndCallButton() {
         let b = NSButton(title: "End call", target: self, action: #selector(endCallClicked))
         b.bezelStyle = .rounded
         b.controlSize = .small
         b.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        b.contentTintColor = .systemRed
+        b.bezelColor = .systemRed
+        b.contentTintColor = .white
         b.toolTip = "Stop recording this call"
         b.sizeToFit()
-        let holder = NSView(frame: NSRect(x: 0, y: 0, width: b.frame.width + 12, height: 28))
-        b.frame.origin = NSPoint(x: 4, y: (28 - b.frame.height) / 2)
+        // Green Start while the window waits for the call (standby); it starts by itself when the other side speaks.
+        let g = NSButton(title: "Start", target: self, action: #selector(startClicked))
+        g.bezelStyle = .rounded
+        g.controlSize = .small
+        g.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+        g.bezelColor = .systemGreen
+        g.contentTintColor = .white
+        g.toolTip = "Start recording now (otherwise it starts when the other side speaks)"
+        g.sizeToFit()
+        g.isHidden = true
+        let w = g.frame.width + b.frame.width + 18
+        let holder = NSView(frame: NSRect(x: 0, y: 0, width: w, height: 28))
+        g.frame.origin = NSPoint(x: 4, y: (28 - g.frame.height) / 2)
+        b.frame.origin = NSPoint(x: g.frame.maxX + 6, y: (28 - b.frame.height) / 2)
+        holder.addSubview(g)
         holder.addSubview(b)
+        startButton = g
         let acc = NSTitlebarAccessoryViewController()
         acc.view = holder
         acc.layoutAttribute = .trailing

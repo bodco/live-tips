@@ -32,6 +32,9 @@
     font: var(--size)/1.38 -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", sans-serif; }
   body { display: flex; flex-direction: column; position: relative; overflow: hidden; }
   button, select, input { font-family: inherit; color: inherit; }
+  /* see-through window: a halo keeps every letter readable over whatever is behind */
+  body.halo { --halo-c: var(--halo, var(--bg)); text-shadow: 0 0 1px var(--halo-c), 0 0 2px var(--halo-c), 0 0 4px var(--halo-c), 0 0 8px var(--halo-c); }
+  body.halo .tip, body.halo #alert, body.halo #agenda { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 
   /* ---------- top bar: state + mute + menu ---------- */
   #bar { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; font-size: 13px; flex: none;
@@ -133,6 +136,7 @@
     font-size: 12px; cursor: pointer; white-space: nowrap; font-weight: 600; min-height: 28px; }
   #alert.crit button { background: #fff; color: var(--crit); border-color: #fff; }
   #alert button.x { border: 0; padding: 4px 6px; opacity: .8; }
+  #alert.ok button[data-act="go"] { background: var(--green); color: #fff; border-color: var(--green); font-weight: 700; padding: 6px 16px; }
 
   /* ---------- dock: agenda / now-next / pinned ---------- */
   #dock { flex: 0 1 auto; min-height: 0; max-height: 46%; overflow-y: auto; margin: 0 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -695,6 +699,10 @@
       al_auto: 'Mic switched to the Mac mic',
       al_auto_sub: 'The headset mic stopped recording',
       al_back: 'Back to headset',
+      al_standby: 'Ready. Waiting for the call',
+      al_standby_sub: 'Starts by itself when the other side speaks, or press Start',
+      al_go: 'Start',
+      al_going: 'Starting…',
       al_silent: 'Cannot hear the other side',
       al_silent_sub: 'No system audio for a while. Check the meeting app output',
       al_lag: 'Transcript {n} s behind',
@@ -974,6 +982,10 @@
       al_auto: 'Перемкнув на мікрофон Mac',
       al_auto_sub: 'Мікрофон гарнітури перестав записувати',
       al_back: 'Назад на гарнітуру',
+      al_standby: 'Готово. Чекаю на дзвінок',
+      al_standby_sub: 'Почнеться сам, коли заговорить інша сторона, або натисни Start',
+      al_go: 'Start',
+      al_going: 'Починаю…',
       al_silent: 'Не чую співрозмовників',
       al_silent_sub: 'Уже якийсь час немає звуку з комп\'ютера. Перевір вихід звуку в програмі зустрічі',
       al_lag: 'Розшифровка відстає на {n} с',
@@ -1185,13 +1197,35 @@
     e.preventDefault(); applySize(); store('font_size', size);
   });
 
-  var fadeBtns = $('fade').querySelectorAll('button');
+  // Opacity (2026-10-22): with a window that can be see-through (window.LT_GLASS, set by the native
+  // window) only the backgrounds fade; text stays fully opaque with a halo in the background colour,
+  // so it is readable at 65-80 %. An older window fades as a whole, as before.
+  var fadeBtns = $('fade').querySelectorAll('button'), fadeV = 0.94;
+  function applyFade(v) {
+    fadeV = v;
+    var root = document.documentElement;
+    if (!window.LT_GLASS) { send('opacity', v); document.body.classList.toggle('halo', v < 0.9); return; }
+    send('opacity', 1);
+    root.style.removeProperty('--bg'); root.style.removeProperty('--panel'); root.style.removeProperty('--panel2');
+    var cs = getComputedStyle(root);
+    var bg = cs.getPropertyValue('--bg').trim(), pa = cs.getPropertyValue('--panel').trim(), p2 = cs.getPropertyValue('--panel2').trim();
+    root.style.setProperty('--halo', bg);
+    if (v < 1) {
+      var pct = Math.round(v * 100);
+      root.style.setProperty('--bg', 'color-mix(in srgb, ' + bg + ' ' + pct + '%, transparent)');
+      root.style.setProperty('--panel', 'color-mix(in srgb, ' + pa + ' ' + Math.min(100, pct + 6) + '%, transparent)');
+      root.style.setProperty('--panel2', 'color-mix(in srgb, ' + p2 + ' ' + Math.min(100, pct + 6) + '%, transparent)');
+    }
+    document.body.classList.toggle('halo', v < 0.9);
+  }
   [].forEach.call(fadeBtns, function (b) {
     b.onclick = function () {
       [].forEach.call(fadeBtns, function (x) { x.classList.toggle('on', x === b); });
-      send('opacity', parseFloat(b.getAttribute('data-v')));
+      applyFade(parseFloat(b.getAttribute('data-v')));
     };
   });
+  window.enableGlass = function () { window.LT_GLASS = true; applyFade(fadeV); };
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyFade(fadeV); }); } catch (e) {}
 
   var pinned = true, pinBtn = $('pin');
   pinBtn.onclick = function () {
@@ -1256,6 +1290,9 @@
   var alertEl = $('alert'), S = {}, setMsg = null, setTimer = null, silentSince = null, dismissed = {}, alertKey = '';
   function alertCandidates() {
     var out = [], rec = S.state === 'recording';
+    if (S.state === 'standby')
+      out.push({ id: 'standby', cls: 'ok', text: t('al_standby'), sub: t('al_standby_sub'), act: 'go', actText: t('al_go') });
+    if (rec && S.system_audio === 'ok') themHeard = true;
     if (rec && S.listener_age_s != null && S.listener_age_s > 75)
       out.push({ id: 'deaf', cls: 'crit', text: t('al_deaf', { n: S.listener_age_s }),
                  sub: t('al_deaf_sub') });   // Live Tips app: no Cowork chat to write "continue" in
@@ -1270,13 +1307,14 @@
     if (S.mic_auto_switched && S.mic_device !== 'default' && !dismissed.auto)
       out.push({ id: 'auto', cls: 'info', text: t('al_auto'), sub: t('al_auto_sub'),
                  act: 'mic_default', actText: t('al_back'), close: true });
-    if (rec && S.system_audio === 'silent' && silentSince && Date.now() - silentSince > 15000 && !dismissed.silent)
+    if (rec && themHeard && S.system_audio === 'silent' && silentSince && Date.now() - silentSince > 15000 && !dismissed.silent)
       out.push({ id: 'silent', cls: 'warn', text: t('al_silent'), sub: t('al_silent_sub'), close: true });
     if (rec && S.asr_lag_s != null && S.asr_lag_s > 4)
       out.push({ id: 'lag', cls: 'warn', text: t('al_lag', { n: S.asr_lag_s }), sub: t('al_lag_sub') });
     if (setMsg) out.push({ id: 'set', cls: setMsg.cls, text: setMsg.text });
     return out;
   }
+  var themHeard = false;   // "cannot hear the other side" only after they were heard once (not before the call)
   function renderAlert() {
     var a = alertCandidates()[0];
     var key = a ? [a.id, a.cls, a.text, a.sub, a.act].join('|') : '';
@@ -1293,6 +1331,7 @@
     var b = e.target.closest('button'); if (!b) return;
     var act = b.getAttribute('data-act');
     if (act === 'copy') { copyText('continue'); b.textContent = t('al_copied'); }
+    else if (act === 'go') { send('setting', { key: 'go', value: true }); b.textContent = t('al_going'); b.disabled = true; }
     else if (act === 'mic_builtin') setMic('builtin');
     else if (act === 'mic_default') { dismissed.auto = true; setMic('default'); }
     else if (act === 'close') { dismissed[b.getAttribute('data-id')] = true; }

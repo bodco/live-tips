@@ -231,7 +231,7 @@ PM investigated lately, with the numbers. A JSON list, 40-200 items:
 - `id`: the ticket key for tickets (said aloud it scores high), else a short slug.
   `title`: max 6 words, the topic the way people say it. `text`: max ~140 characters, the
   numbers first. `keywords`: 4-12 words people use in speech, in every language of `langs`,
-  including transliteration and slang ("авторайзер" and "authorizer", "логи" and "logs"),
+  including transliteration and slang ("дешборд" and "dashboard", "логи" and "logs"),
   module and product names; never common words. `source`: the system and the date.
 - Ticket keys are fine here (the window shows them in search results); the "no
   abbreviations" rule applies to tips.

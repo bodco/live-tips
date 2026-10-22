@@ -119,7 +119,63 @@ final class StealthDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// `--prompter` hosts the tips window for given files; `--prompter-demo` shows sample tips.
+final class PrompterAppDelegate: NSObject, NSApplicationDelegate {
+    let pargs: PrompterArgs
+    var controller: PrompterController?
+    init(pargs: PrompterArgs) { self.pargs = pargs }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            let c = PrompterController(args: pargs)
+            c.show()
+            controller = c
+        }
+    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+func prompterArgs(_ args: [String]) -> PrompterArgs {
+    var a = PrompterArgs()
+    var it = args.dropFirst().makeIterator()
+    while let k = it.next() {
+        switch k {
+        case "--tips": a.tips = it.next() ?? ""
+        case "--inbox": a.inbox = it.next() ?? ""
+        case "--status": a.status = it.next() ?? ""
+        case "--html": a.html = it.next() ?? ""
+        case "--control": a.control = it.next() ?? ""
+        case "--title": a.title = it.next() ?? a.title
+        case "--prompter-demo": a.demo = true
+        default: break
+        }
+    }
+    if a.html.isEmpty, let res = Bundle.main.resourceURL?.appendingPathComponent("prompter.html").path {
+        a.html = res
+    }
+    if a.demo {
+        let tmp = NSTemporaryDirectory()
+        a.tips = tmp + "livetips-app-demo.tips.jsonl"
+        a.inbox = tmp + "livetips-app-demo.inbox.jsonl"
+        a.title = "Live Tips (app, demo)"
+        let demo = [
+            #"{"t":"10:30:05","kind":"checklist","level":"info","gist":"Meeting checklist","items":["Release status","New client request","Decision on the date"]}"#,
+            #"{"t":"10:31:40","src":"10:31:36","kind":"tip","level":"red","gist":"🔴 New requirement. Do not agree now.","phrase":"Good idea. I will write it down. We will check it and come back to you.","engine":"app"}"#,
+            #"{"t":"10:33:12","src":"10:33:08","kind":"tip","level":"orange","gist":"🟠 Fix the owner and the date","phrase":"So, Alex checks the export by Friday. Is that right?","engine":"app"}"#,
+        ]
+        try? (demo.joined(separator: "\n") + "\n").write(toFile: a.tips, atomically: true, encoding: .utf8)
+        try? "".write(toFile: a.inbox, atomically: true, encoding: .utf8)
+    }
+    return a
+}
+
 let args = CommandLine.arguments
+if args.contains("--prompter") || args.contains("--prompter-demo") {
+    let app = NSApplication.shared
+    let d = PrompterAppDelegate(pargs: prompterArgs(args))
+    app.delegate = d
+    app.setActivationPolicy(.regular)
+    app.run()
+}
 if let i = args.firstIndex(of: "--stealth-window") {
     let hidden = !(i + 1 < args.count && args[i + 1] == "off")
     let app = NSApplication.shared

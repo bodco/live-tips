@@ -106,7 +106,7 @@ def claude_wrapup(transcript: str, brief: str, model: str) -> dict:
 
 # ---------------------------------------------------------------- blocks
 def rt(s: str) -> list:
-    s = s.replace("—", "-")
+    s = s.replace(chr(0x2014), "-")   # never the long dash in Notion
     return [{"type": "text", "text": {"content": s[i:i + 1900]}} for i in range(0, len(s), 1900)] or [{"type": "text", "text": {"content": ""}}]
 
 

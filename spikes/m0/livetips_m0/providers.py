@@ -186,6 +186,8 @@ class FakeProvider(Provider):
         time.sleep(self.ttft)
         c.t_first_token = time.monotonic()
         c.text = self.responder(model, user)
+        if on_text:
+            on_text(c.text)
         if gist_closed(c.text):
             c.t_gist = time.monotonic()
         time.sleep(max(0.0, self.total - self.ttft))
@@ -218,10 +220,19 @@ class HedgedProvider(Provider):
                                        cache_ttl=cache_ttl, on_text=on_text, extra=extra)
         results: "queue.Queue" = queue.Queue()
         first_token = threading.Event()
+        owner = {"tag": None}
+        olock = threading.Lock()
 
         def run(tag):
             def seen(text):
                 first_token.set()
+                # Only the request that streamed first feeds the caller (a streamed gist on screen).
+                with olock:
+                    if owner["tag"] is None:
+                        owner["tag"] = tag
+                    mine = owner["tag"] == tag
+                if mine and on_text:
+                    on_text(text)
             try:
                 c = self.inner.complete(model=model, system=system, user=user, max_tokens=max_tokens,
                                         cache_ttl=cache_ttl, on_text=seen, extra=extra)

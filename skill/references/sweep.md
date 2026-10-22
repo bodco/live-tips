@@ -228,6 +228,30 @@ PM investigated lately, with the numbers. A JSON list, 40-200 items:
      14 days or named in the sources above, with original and remaining estimate, status,
      assignee, sprint and dates. Not the whole backlog.
   6. Prices, limits and dates from the brief and the Insight Bank; people (role, area).
+  7. **The last calls of this project** (review of 41 calls, 2026-10-23: 11 times in 10 calls
+     the PM corrected a stale prep by hand, "the invite is already sent", "I told them about
+     the redeploy"): the transcripts, tips and the PM's typed lines in `<project_root>/live/`
+     of the last 7 days (`*.md`, `*.inbox.jsonl`, `*.tips.jsonl`; newest first, skip
+     `prep-*`, `.named.`, `.clean.`). Take what was said, promised, asked and answered there,
+     with the date, and prefer it over an older Notion row on the same subject.
+- **Three kinds of facts, not only numbers.** On the real calls 84% of the facts were numbers,
+  but the questions to the PM were about numbers only 50% of the time; positions, definitions
+  and coordination ("what did we decide about X", "what is Y", "who does Z") were covered at
+  30%. For every topic of the brief write facts of three kinds: `number` (estimate, date,
+  price, count, with the source), `position` (what we decided, propose or refuse, in one
+  sentence the PM can say), `meaning` (what a term, module or option is, in one sentence).
+  Put the kind into `keywords` only if useful; the format stays the same.
+- **Unverified never as a claim.** A fact with "(verify)", "to confirm", "?" or an uncertain
+  source gets `"status": "unverified"` and its `text` starts with "Перевірити:". The recorder
+  and the model may remind the PM to check it, never state it (one such fact became a claim
+  to a client and was refuted within 10 s).
+- **Cards: fewer, on the other side, two-word triggers.** Half of the fired cards were false
+  (20 on the PM's own lines, 11 on a first name or a single short word, 6 on ASR garbage).
+  `on` is `them` unless the card is about the PM's own risky phrase; every trigger has two
+  words or a digit or a long distinctive word (the recorder ignores one short word since
+  2026-10-23); never a person's first name alone; no "question" cards for a presentation
+  (34 of them fired 0 times in a Q&A): put likely questions with their answers into the fact
+  book instead.
 - `id`: the ticket key for tickets (said aloud it scores high), else a short slug.
   `title`: max 6 words, the topic the way people say it. `text`: max ~140 characters, the
   numbers first. `keywords`: 4-12 words people use in speech, in every language of `langs`,

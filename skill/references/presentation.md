@@ -33,3 +33,25 @@ part, not to interrupt.
    ("Лишилось {N} хв, ще {K} розділів: {які пропустити}").
 5. If the PM leaves the outline and improvises, do not force it back; the tracker catches
    up when the PM returns to a section's words.
+6. **Quiet local layer during the PM's block** (recorder since 2026-10-23, `call_type=presentation`):
+   no keyword 📌 facts and no "❓" cards unless a line has "?" (and the PM's name for "❓");
+   semantic facts only on questions. On the real presentation 28 keyword facts fired during
+   the colleague's talk and 71% scored 1-2.
+7. **One time line, about the PM's own slides only.** The time check (2/3 and 5 minutes before
+   the end) is ONE pinned line "⏱ {N} хв лишилось, {K} слайдів: пропусти {які}" that is
+   updated in place, never five red cards, never advice about a colleague's slides while the
+   colleague speaks.
+8. **Numbers on the slides.** `slides.json` carries, per slide, the numbers the PM will say
+   (`"numbers": ["840 680 UAH", "63 h"]`) and the 1-2 questions this slide usually raises with
+   the answer (`"qa": [{"q": "...", "a": "..."}]`); the window shows the numbers in Now, and
+   the Q&A entries go into the fact book so a question after the talk gets a local 📌 answer
+   within 2 s. The PM garbled a number from his own slide and skipped the hours figure on the
+   real call: the slide text alone does not help, the numbers must be on the Now card.
+9. **Rehearsal results go back into the files.** After a rehearsal wrap-up ("+3.5 min",
+   "slide 38 not reached", a decision not to ask for decisions today) rewrite `slides.json`
+   and the brief at once, in the same session: the real call on 22.10 ran on an unchanged
+   plan although the rehearsal had found both problems.
+10. **Handoffs between two presenters** come from `slides.json` `who`: when the position
+   moves to a slide whose `who` is `me` after a colleague's block, pin the PM's entry
+   sentence as a 🔴 card BEFORE the handoff (the colleague's last slide), not on hearing
+   the name: the handoff cues were never said as scripted and ASR wrote the name as "Body".

@@ -122,7 +122,7 @@ final class CallEngine {
         var sc: [String: Any] = [
             "variant": "app", "provider": "anthropic", "api_key_env": "CLAUDE_API",
             "models": ["classify": c.models.classify, "tip": c.models.tip], "cache_ttl": "1h", "direct_route": true,
-            "periodic_classify_s": 20, "max_parallel_calls": 4, "max_tokens": ["classify": 120, "tip": 300],
+            "periodic_classify_s": 20, "max_parallel_calls": 4, "max_tokens": ["classify": 60, "tip": 300],
             "request_extra": ["classify": ["thinking": ["type": "disabled"]], "tip": ["thinking": ["type": "between_tools"]]],
             "me_label": core["me_label"] ?? "Me", "them_label": core["them_label"] ?? "Other",
             "name_aliases": c.nameAliases, "langs": core["langs"] ?? ["en"], "tips_lang": (c.uiLanguage == "uk" || (core["me_lang"] as? String) == "uk") ? "uk" : "en",

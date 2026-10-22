@@ -155,7 +155,7 @@ start (same project, matching title, younger than 3 hours): say `Бриф з п�
 Each iteration is ONE device_bash call:
 
 ```
-python3 <tool_root>/bin/read_delta.py "<transcript>" auto --wait 25 --settle 1 \
+python3 <tool_root>/bin/read_delta.py "<transcript>" auto --wait 25 --settle 0.5 \
   --status <tool_root>/state/status.json --me-label "{settings.user.me_label}" \
   --late-after {settings.tips.late_after_s|6} --tips "<tips_file>" \
   --inbox "<inbox_file>" --inbox-offset auto --emit-stdin <<'EOF'
@@ -249,6 +249,19 @@ Whisper language or prompt; restart with the right one and tell the PM what was 
   looks for repeatable patterns. Never pad the prep with every possible tip.
 - **No corrections of the PM on team calls**: the PM thinks aloud with the team; the answer
   check runs silently there.
+- **Still open?** (review of 360 judged tips, 2026-10-23: the single largest failure, 38% of
+  weak tips). Before emitting a tip prepared from the previous poll, re-read the lines that
+  arrived since its trigger: if the PM has already answered (two of the PM's lines, or one
+  long one), or the number or owner in the tip was said aloud by anyone, or the talk moved on
+  (three other-side lines without the PM), drop the tip. Never show it dimmed, log it as stale.
+  A tip's topic must match the last two other-side lines, not the last 60 s.
+- **A name is not an address.** Of 77 lines with the PM's name only 12 addressed the PM. "Як
+  Петро казав", "Петра треба спитати", "Mike is on vacation", "Mike will check" are
+  third person: no "Your turn", no direct question tip. "Your turn" needs the vocative or
+  the bare alias plus a request or a question in the same line, and nobody else holding the
+  floor (a co-presenter who was just handed the word is not the PM's turn).
+- **Volume cap on team calls**: at most 12 model tips per hour and no `info` level unless the
+  PM asked; the live calls showed 50 items per hour with about one rated 4+.
 
 ### Tip format (a small window under the camera, read at a glance)
 

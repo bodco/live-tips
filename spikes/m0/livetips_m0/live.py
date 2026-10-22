@@ -141,6 +141,13 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
             except OSError:
                 pass
         if status and status.exists():
+            try:   # the meeting concept changed in the window's menu: the engine follows it
+                st = json.loads(status.read_text())
+                ch = {k: st.get(k) for k in ("call_type", "audience", "hiring_role") if st.get(k)}
+                if ch and eng.set_meeting(ch):
+                    print("meeting:", ch, flush=True)
+            except (OSError, ValueError):
+                pass
             try:
                 if json.loads(status.read_text()).get("state") == "stopped" and time.monotonic() - last_new > 5:
                     break

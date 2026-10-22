@@ -52,9 +52,11 @@ def test_invalid_model_output_is_not_shown(tmp_path):
 
 def test_classified_question_goes_to_tip(tmp_path):
     eng, timing, tips, prov = run(tmp_path)
-    span = next(s for s in timing if s["src"] == "10:00:47")
-    assert span["route"] == "classify" and span["classify"]["need_tip"] is True
-    assert span["outcome"] in ("skip", "emitted", "diet_rate", "diet_pm_speaking", "diet_same_topic")
+    spans = [s for s in timing if s["src"] == "10:00:47"]
+    cls = next(s for s in spans if "classify" in s)
+    assert cls["route"] in ("classify", "parallel") and cls["classify"]["need_tip"] is True
+    tip = [s for s in spans if str(s.get("outcome", "")).startswith(("skip", "emitted", "diet_", "stale_", "classify_vetoed"))]
+    assert tip, spans
 
 
 def test_tip_items_match_window_schema(tmp_path):
@@ -64,6 +66,7 @@ def test_tip_items_match_window_schema(tmp_path):
     v = jsonschema.Draft202012Validator(Rules().tip_schema)
     for t in tips:
         assert not list(v.iter_errors(t)), t
+    assert any(t.get("uid") for t in tips)
 
 
 def test_budget_hard_stop(tmp_path):
@@ -79,7 +82,7 @@ def test_diet_rate_blocks_second_orange(tmp_path):
         return json.dumps({"gist": "🟠 Add a fact " + str(time.monotonic()), "level": "orange", "topic": "topic " + str(time.monotonic())})
     cfg = dict(CFG, direct_route=False, periodic_classify_s=0)
     eng, timing, tips, prov = run(tmp_path, cfg, FakeProvider(resp, 0.0, 0.0))
-    assert len([t for t in tips if t["level"] == "orange"]) == 1
+    assert len([t for t in tips if t.get("level") == "orange" and not t.get("partial")]) == 1
     assert any(s.get("outcome") in ("diet_rate", "diet_pm_speaking") for s in timing)
 
 
@@ -154,3 +157,65 @@ def test_hedged_provider_retries_a_fast_failure():
 
     c = HedgedProvider(Flaky(), {"m": 1.0}).complete(model="m", system=[], user="u", max_tokens=10, cache_ttl=None)
     assert c.text == "ok" and c.error is None and c.hedge == "hedge"
+
+
+def test_streamed_gist_then_full_tip_with_same_uid(tmp_path):
+    eng, timing, tips, prov = run(tmp_path)
+    parts = [t for t in tips if t.get("partial")]
+    assert parts, "the gist is shown before the full tip"
+    for p in parts:
+        full = [t for t in tips if t.get("uid") == p["uid"] and not t.get("partial")]
+        retracted = [t for t in tips if t.get("kind") == "retract" and t.get("uid") == p["uid"]]
+        assert full or retracted
+        if full:
+            assert full[0]["gist"] == p["gist"]
+    span = next(s for s in timing if s["src"] == "10:00:12")
+    assert span.get("e2e_shown_s") is not None and span["e2e_shown_s"] <= span["e2e_s"]
+
+
+def test_partial_head_needs_gist_level_and_topic():
+    from livetips_m0.engine import partial_head
+    assert partial_head('{"gist": "🟠 Додай: ціна", "level": "orange"') is None
+    assert partial_head('{"gist": "🟠 Додай: ціна", "level": "orange", "topic": "ціна"')["topic"] == "ціна"
+    assert partial_head('{"gist": "🔴 Тебе питають", "level": "red"')["level"] == "red"
+    assert partial_head('{"skip": true, "reason": "x"}') is None
+
+
+def test_interview_switches_off_project_triggers():
+    from livetips_m0.prompt import disabled_triggers, render_rules
+    from livetips_m0.rules import Rules
+    off = disabled_triggers({"call_type": "interview", "hiring_role": "observer"})
+    assert {"new_requirement", "pm_commitment", "your_turn"} <= off
+    assert "pm_factual_error" in disabled_triggers({"audience": "team"})
+    assert disabled_triggers({"audience": "client"}) == set()
+    txt = render_rules(Rules(), meta={"call_type": "interview", "hiring_role": "coach"})
+    assert "new_requirement" not in txt and "your_turn" in txt
+
+
+def test_stale_question_after_pm_answered(tmp_path):
+    from livetips_m0.replay import build_engine
+    from livetips_m0.transcript import parse_line
+    cfg = dict(CFG, budget=dict(CFG["budget"], ledger=str(tmp_path / "s.json")))
+    eng, _ = build_engine(cfg, FIX / "demo-call.md", tmp_path / "o", lambda: 0.0, FakeProvider(responder))
+    q = parse_line("[10:00:00] Other (en): Alex, when is the release?", 1, "Me")
+    eng.history.append(q)
+    assert eng.stale(q, "direct_question") is None
+    eng.history.append(parse_line("[10:00:04] Me (en): The release is on Friday, after the QA round.", 2, "Me"))
+    eng.history.append(parse_line("[10:00:09] Me (en): We also fixed the login issue yesterday.", 3, "Me"))
+    assert eng.stale(q, "direct_question") == "pm_answered"
+    assert eng.stale(q, "add_fact", {"topic": "release", "phrase": "Friday", "items": ["QA round 2 days"]}) is None
+    eng.history.append(parse_line("[10:00:12] Other (en): So Friday, with 2 days of QA.", 4, "Me"))
+    assert eng.stale(q, "add_fact", {"topic": "release", "phrase": "2 days", "items": []}) == "numbers_already_said"
+
+
+def test_invented_numbers_are_dropped(tmp_path):
+    from livetips_m0.replay import build_engine
+    from livetips_m0.transcript import parse_line
+    cfg = dict(CFG, budget=dict(CFG["budget"], ledger=str(tmp_path / "s.json")))
+    eng, _ = build_engine(cfg, FIX / "demo-call.md", tmp_path / "o", lambda: 0.0, FakeProvider(responder))
+    ln = parse_line("[10:00:00] Other (en): We shipped 14 fixes this week.", 1, "Me")
+    eng.history.append(ln)
+    obj = eng.validate_facts({"gist": "x", "items": ["14 fixes shipped", "Budget left 4200 USD"], "phrase": "We shipped 14 fixes."}, ln)
+    assert obj["items"] == ["14 fixes shipped"] and obj["_dropped_items"] == 1 and "_unseen_number_in_phrase" not in obj
+    obj = eng.validate_facts({"gist": "x", "items": [], "phrase": "The estimate is 37 hours."}, ln)
+    assert obj.get("_unseen_number_in_phrase") is True

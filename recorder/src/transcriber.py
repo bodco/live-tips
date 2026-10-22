@@ -65,7 +65,10 @@ DEFAULTS = {
     "lang_bias": 2.0,           # another allowed language wins only if it is this many times likelier than the main one
     "vad_mode": 2,              # webrtcvad aggressiveness 0..3
     "end_silence": 0.7,         # s of silence that closes a segment
-    "max_segment": 12.0,        # s, hard cut for long monologues
+    "max_segment": 9.0,         # s, hard cut for long monologues (12 until 2026-10-23: the trigger line of
+                                # most tips was a 12 s cut, so the tip waited for the cut before anything ran)
+    "soft_segment": 6.0,        # s, after this a short pause (soft_silence) already closes the segment
+    "soft_silence": 0.35,       # s
     "min_segment": 0.6,         # s, shorter segments are dropped
     "pre_roll": 0.3,            # s of audio kept before speech start
     "sticky_short": 2.0,        # s, segments shorter than this keep the channel's last language
@@ -422,7 +425,8 @@ class Segmenter:
             self.voiced += 1
         self.silence = 0.0 if speech else self.silence + fd
         length = len(self.cur) * fd
-        if self.silence >= self.cfg["end_silence"] or length >= self.cfg["max_segment"]:
+        if self.silence >= self.cfg["end_silence"] or length >= self.cfg["max_segment"] or (
+                length >= self.cfg.get("soft_segment", 6.0) and self.silence >= self.cfg.get("soft_silence", 0.35)):
             self._close()
 
     def _close(self) -> None:
@@ -811,6 +815,11 @@ class Cards:
                 return re.search(t[3:], low, re.I) is not None
             except re.error:
                 return False
+        # One short word (a first name, "країн" inside "Україні") fired half of all cards falsely
+        # (review 2026-10-23): a trigger needs two words, or a digit, or a long distinctive word.
+        words = norm(t).split()
+        if len(words) == 1 and len(words[0]) < 8 and not re.search(r"\d", words[0]):
+            return False
         return norm(t) in plain
 
     def check(self, line: "Line") -> None:
@@ -823,7 +832,7 @@ class Cards:
             for c in self.cards:
                 if c.get("off"):
                     continue
-                on = c.get("on", "any")
+                on = c.get("on", "them")       # 2026-10-23: cards fire on the other side by default
                 if on != "any" and on != line.channel:
                     continue
                 cid = self.cid(c)
@@ -899,6 +908,7 @@ QUESTION_CUE = re.compile(
 
 
 class FactBook:
+    generic: set = set()
     """The project fact book (<transcript stem>.facts.json), written by the skill's prep:
       [{"id": "AUTH-123", "title": "Admin logs", "text": "estimate 16 h, In Progress, Mike",
         "keywords": ["logs", "логи", "audit"], "source": "Jira 18.10"}, ...]
@@ -944,20 +954,29 @@ class FactBook:
                 log(f"facts: cannot read {self.path.name} ({e!r})")
             return
         self.facts, self.index, self.mtime = facts, index, m
+        cnt: dict[str, int] = {}
+        for _, ft in index:
+            for x in ft:
+                cnt[x] = cnt.get(x, 0) + 1
+        self.generic = {x for x, c in sorted(cnt.items(), key=lambda kv: -kv[1])[:10] if c >= max(3, len(index) // 8)}
         _append_json(self.tips, {"kind": "facts", "at": hhmmss(now()), "facts": self.facts})
         log(f"facts: {len(self.facts)} loaded from {self.path.name}")
 
     def check(self, line: "Line") -> None:
         if not self.index or line.channel != "them" or not QUESTION_CUE.search(line.text):
             return
+        if presenting_quiet() and "?" not in line.text:
+            return                       # a presentation: keyword facts only on explicit questions (Q&A)
         q = [t for t in tokens(line.text) if not QUESTION_CUE.fullmatch(t)]
         keys = set(re.findall(r"\b[A-Z][A-Z0-9]+-\d+\b", line.text))
         scored = []
+        generic = self.generic                 # the book's 10 most shared keywords carry no signal
         for f, ft in self.index:
-            score = sum(1 for t in q if any(tok_match(t, x) for x in ft))
+            score = sum(1 for t in q if any(tok_match(t, x) for x in ft if x not in generic))
             if keys and str(f.get("id", "")) in keys:
                 score += 3
-            if score >= 2:
+            # Review 2026-10-23: 2 matching words fired on nearly every line of a 129-fact book; 3 needed.
+            if score >= (3 if len(self.index) > 40 else 2):
                 scored.append((score, f))
         scored.sort(key=lambda x: -x[0])
         shown = []
@@ -1150,6 +1169,17 @@ QCARD_WEAK = re.compile(r"скільки|коли|як довго|сколько
 QCARD_MUSIC = re.compile(r"[♪♫]|\[(музика|music|música)\]|\((музика|music|música)\)", re.I)
 
 
+# Meeting concept seen by the local layers (set from status.json in the main loop). In a presentation
+# the PM's own block must stay quiet: no keyword facts, no "❓" cards; semantic facts only on questions.
+# Review 2026-10-23: 28 keyword facts on the real presentation scored 1-2 in 71% of cases, and 4 of 5
+# "❓" cards there were not questions.
+MEETING = {"call_type": "auto", "audience": "auto"}
+
+
+def presenting_quiet() -> bool:
+    return MEETING.get("call_type") == "presentation"
+
+
 def question_item(text: str, t_hms: str, at_hms: str, names: list | None = None) -> dict | None:
     """The instant "❓" item for a `them` line that asks something work-related (the model tip replaces it).
     Shown when: the line names the PM and asks (cue or "?"); or it has a work word (estimate, deadline,
@@ -1161,6 +1191,8 @@ def question_item(text: str, t_hms: str, at_hms: str, names: list | None = None)
     low = text.lower()
     named = any(n and re.search(r"(?<!\w)" + re.escape(n.lower()), low) for n in (names or []))
     asks = "?" in text or bool(QUESTION_CUE.search(text))
+    if presenting_quiet() and not (named and "?" in text):
+        return None                      # a presentation: only an explicit question with the PM's name
     if not ((named and asks) or QCARD_STRONG.search(text) or ("?" in text and QCARD_WEAK.search(text))):
         return None
     return {"t": t_hms, "src": t_hms, "at": at_hms, "kind": "question", "gist": "❓ " + short_gist(text, 60)}
@@ -1583,7 +1615,7 @@ class SemanticLive(threading.Thread):
             fid = str(f.get("id") or f.get("title"))
             held = sum(1 for _, j in self.hist if j == i) >= 2
             why = None
-            if not (is_q or held):
+            if not (is_q or (held and not presenting_quiet())):
                 why = "not a question, topic not held"
             elif self.flags.get("tips_paused"):
                 why = "tips paused"
@@ -3107,6 +3139,8 @@ def main() -> int:
             while recent and seg.t_start - recent[0][0] > 120:
                 recent.pop(0)
         paused = flags["tips_paused"]
+        MEETING["call_type"] = status.get("call_type") or "auto"
+        MEETING["audience"] = status.get("audience") or "auto"
         q = None
         if seg.channel == "them":
             # Instant "❓" item in the window; the skill's tip for the question replaces it later.

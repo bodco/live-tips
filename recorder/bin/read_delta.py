@@ -508,7 +508,7 @@ def main():
     s = load_status()
     observe(s)
     while not (file_news() or inbox_news()) and time.time() < deadline and not is_stopped(s):
-        time.sleep(0.5)
+        time.sleep(0.25)       # 2026-10-23: 0.5 cost 0.25 s median on every tip of the skill
         heartbeat()
         s = load_status()
         observe(s)

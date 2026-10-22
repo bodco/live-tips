@@ -40,7 +40,7 @@ def window(lines, src_s, shown_s):
 def tips_of(path: Path, engine: str):
     res = []
     for t in jl(path):
-        if t.get("kind") not in ("tip", "fact", "answer") or t.get("q") or "src" not in t or "at" not in t:
+        if t.get("kind") not in ("tip", "fact", "answer") or t.get("q") or t.get("partial") or "src" not in t or "at" not in t:
             continue
         try:
             res.append({"engine": engine, "src_s": hms_to_s(t["src"][:8]), "at_s": hms_to_s(t["at"][:8]),

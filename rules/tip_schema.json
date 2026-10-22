@@ -5,34 +5,179 @@
   "description": "One line of <stem>.tips.jsonl. Written by the skill (via read_delta) or by the app. 'gist' comes first in model output so it can be shown while streaming.",
   "type": "object",
   "properties": {
-    "schema_version": {"type": "integer", "const": 1},
-    "kind": {"enum": ["tip", "answer", "fact", "card", "speech", "checklist", "agenda", "status", "wrapup", "ack", "info", "speaker_ask", "question", "outline", "outline_pos", "facts", "state"]},
-    "gist": {"type": "string", "maxLength": 120},
-    "level": {"enum": ["red", "orange", "info"]},
-    "phrase": {"type": "string", "maxLength": 400},
-    "items": {"type": "array", "items": {"anyOf": [{"type": "string", "maxLength": 200}, {"type": "object"}]}, "maxItems": 12},
-    "note": {"type": "string", "maxLength": 120},
-    "q": {"type": "string"},
-    "t": {"type": "string", "pattern": "^\\d\\d:\\d\\d:\\d\\d$"},
-    "src": {"type": "string", "pattern": "^\\d\\d:\\d\\d:\\d\\d$"},
-    "at": {"type": "string"},
-    "late": {"type": "boolean"},
-    "topic": {"type": "string", "maxLength": 80},
-    "trigger": {"type": "string"},
-    "fact_ids": {"type": "array", "items": {"type": "string"}},
-    "engine": {"enum": ["skill", "app"]},
-    "key": {"type": "string"},
-    "value": {}
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "enum": [
+        "tip",
+        "answer",
+        "fact",
+        "card",
+        "speech",
+        "checklist",
+        "agenda",
+        "status",
+        "wrapup",
+        "ack",
+        "info",
+        "speaker_ask",
+        "question",
+        "outline",
+        "outline_pos",
+        "facts",
+        "state",
+        "retract"
+      ]
+    },
+    "gist": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "level": {
+      "enum": [
+        "red",
+        "orange",
+        "info"
+      ]
+    },
+    "phrase": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 200
+          },
+          {
+            "type": "object"
+          }
+        ]
+      },
+      "maxItems": 12
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "q": {
+      "type": "string"
+    },
+    "t": {
+      "type": "string",
+      "pattern": "^\\d\\d:\\d\\d:\\d\\d$"
+    },
+    "src": {
+      "type": "string",
+      "pattern": "^\\d\\d:\\d\\d:\\d\\d$"
+    },
+    "at": {
+      "type": "string"
+    },
+    "late": {
+      "type": "boolean"
+    },
+    "topic": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "trigger": {
+      "type": "string"
+    },
+    "fact_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "engine": {
+      "enum": [
+        "skill",
+        "app"
+      ]
+    },
+    "key": {
+      "type": "string"
+    },
+    "value": {},
+    "uid": {
+      "type": "string",
+      "description": "Streamed tips: a later item with the same uid replaces this card; kind retract removes it."
+    },
+    "partial": {
+      "type": "boolean",
+      "description": "Only the gist so far; the full tip follows with the same uid."
+    }
   },
-  "required": ["kind"],
+  "required": [
+    "kind"
+  ],
   "allOf": [
-    {"if": {"properties": {"kind": {"enum": ["tip", "answer", "fact"]}}},
-     "then": {"required": ["gist", "src"]}},
-    {"if": {"properties": {"kind": {"const": "tip"}}},
-     "then": {"required": ["level"]}},
-    {"if": {"properties": {"kind": {"const": "answer"}}},
-     "then": {"required": ["q"]}},
-    {"if": {"properties": {"kind": {"const": "ack"}}},
-     "then": {"required": ["key"]}}
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "tip",
+              "answer",
+              "fact"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "gist",
+          "src"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "tip"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "level"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "answer"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "q"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ack"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "key"
+        ]
+      }
+    }
   ]
 }

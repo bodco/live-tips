@@ -47,6 +47,11 @@
           "items": {
             "type": "string"
           }
+        },
+        "new": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "What in this tip was not said aloud yet (2026-10-23)."
         }
       },
       "required": [

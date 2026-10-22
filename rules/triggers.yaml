@@ -117,3 +117,9 @@ cues:
     uk: [знову, незадоволен, розчарован, скільки можна, неприйнятно, затримк]
     en: [again, disappointed, frustrated, unacceptable, not happy, delay, escalate]
     es: [otra vez, decepcionado, inaceptable, retraso]
+question_card:                 # instant "❓" card in the window for an other-side line (recorder, both engines)
+  # shown when: the line names the PM (name_aliases) and asks; or has a strong work word;
+  # or has "?" and a weak time/amount word. A bare "?" (small talk, songs) gets no card.
+  strong: [естімейт, оцінк, дедлайн, термін, статус, ціна, вартіст, бюджет, реліз, estimate, eta, deadline, status, price, cost, budget, release, estimación, plazo, precio, presupuesto]
+  weak_with_question_mark: [скільки, коли, як довго, how long, how much, how many, when, cuánto, cuándo]
+  music_markers: ["♪", "♫", "[музика]", "[music]"]

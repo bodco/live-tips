@@ -68,6 +68,7 @@ final class LocalAIService: @unchecked Sendable {
         guard let d = try? Data(contentsOf: URL(fileURLWithPath: path)),
               var core = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return }
         core["semantic_enabled"] = c.localAI.enabled
+        if !c.nameAliases.isEmpty { core["name_aliases"] = c.nameAliases }   // "❓" cards for lines that name the PM
         core["ollama_url"] = c.localAI.engine == "embedded" ? Self.builtinURL : c.localAI.ollamaURL
         core["semantic_model"] = c.localAI.engine == "embedded" ? "bge-m3" : (c.localAI.ollamaModel.isEmpty ? "bge-m3" : c.localAI.ollamaModel)
         if let out = try? JSONSerialization.data(withJSONObject: core, options: [.prettyPrinted, .sortedKeys]) {

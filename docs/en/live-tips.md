@@ -481,8 +481,8 @@ at the top centre of the screen, under the camera.
 
 The layout since 1.8.0, top to bottom (hover any control for a hint):
 
-- **Top bar:** a recording dot, the call title, the timer, your talk share, `🎙` mic mute
-  and `⚙` (one menu for everything else). A small "Tips paused" pill shows while tips are
+- **Top bar:** a recording dot, the call title, the timer, your talk share, `⏸` pause,
+  `🎙` mic mute and `⚙` (one menu for everything else). A small "Tips paused" pill shows while tips are
   paused.
 - **"Now speaking" line** under it (with speaker identification on): `🗣 Maria` or
   `🗣 Speaker 2`. Click it to rename that speaker, move one line to someone else ("this line
@@ -496,7 +496,8 @@ The layout since 1.8.0, top to bottom (hover any control for a hint):
   status and the wrap-up can be pinned too. An unpinned card goes back to its place in the
   list.
 - **Tips:** the newest on top in a large font, older ones below and dimmer.
-- **Bottom row:** one input, `⏸` / `▶` and `🆘`, plus the quick-ask chips (below).
+- **Bottom row:** one input and the red **HELP** button (it shows its shortcut ⌃⌥H), plus the
+  quick-ask chips (below).
 - **`🎙` mute.** The recorder listens to the Mac's microphone and cannot see whether you are
   muted in Meet or Zoom: the state of a meeting app's mute button is not readable from outside,
   and a wrong guess would silently drop your words, so it is a manual button on purpose. Why it
@@ -512,13 +513,15 @@ The layout since 1.8.0, top to bottom (hover any control for a hint):
   question (`find: <words>` when the local search found nothing useful: Claude then searches
   the fact book, the project index and one narrow lookup, and adds the fact to the book).
   Typing "стоп" (stop) ends the call like in the chat.
-- **`⏸` / `▶` pause tips.** The talk went aside (small talk, an unrelated topic)? Press
+- **`⏸` / `▶` pause tips** (top bar, or Control-Option-P from any app, also while the meeting
+  app has the focus). The talk went aside (small talk, an unrelated topic)? Press
   `⏸`: the recorder keeps recording and transcribing and the skill keeps listening and
   logging action items, but nothing automatic appears: no instant cards, no 📌 auto facts, no
   ❓ markers, "Who is speaking?" cards wait in a queue. The input, 🆘 and answers to your
   questions still work. `▶` resumes from the live topic of the last ~2 minutes, not from
   where tips stopped.
-- **`🆘` HELP NOW.** For the moment you are speaking and cannot type. At once, with no model,
+- **HELP NOW** (the red HELP button, or Control-Option-H from any app). For the moment you
+  are speaking and cannot type. At once, with no model,
   the recorder shows the best matching facts and cards for the topic of the last minute (by
   meaning with the semantic layer, by keywords without it) and up to 2 snippets from the
   project folder. Claude then sends one 🔴 item with the next sentence you can say right now:
@@ -634,6 +637,12 @@ apart on the Mac (sherpa-onnx with a WeSpeaker voice model) and you name them.
   action items and the wrap-up use the names when they are known.
 - **After the call** the recorder writes `<title>.named.md`, the transcript with names (the
   original file stays untouched), and the wrap-up counts lines per person.
+- **Who is remembered where** (since 2026-10-22). Your team (the team table of the project
+  config, sent as `people_team`) is remembered for every project; anyone else is remembered for
+  this project only, so one client's voices are never suggested on another client's call. On a
+  public call (a webinar, a conference: `voices_remember: false`, or **Public call** in the app)
+  you can still name speakers, but nothing is saved. Older entries without a scope stay visible
+  everywhere. The app lists the library with **Forget** in Settings > AI > Speakers.
 - **Where voice prints live:** only on this Mac, in `<tool_root>/voices/voices.json` (at most
   20 prints per person). Never put `voices/` in a repository. Section 11 has the privacy side.
 
@@ -676,7 +685,8 @@ admin history take?" finds the fact "Admin audit logs: 16 h".
   `find:` search and `lt search` look through the project's files. Every line is embedded in
   a separate thread with a short timeout: transcription and tips never wait for it.
 - **The project index.** `lt index "<project folder>"` embeds the project's text files
-  (`.md`, `.txt`, `.csv`, small `.json`), including the local Notion mirror (`_notion/`),
+  (`.md`, `.txt`, `.csv`, small `.json`), including the local Notion mirror (`_notion/`, made by
+  [`tools/notion-mirror`](../../tools/notion-mirror/README.md)),
   into `<project>/.livetips-index/`. It is incremental (only new or changed files) and
   during a call the recorder indexes fresh files in the background, only while transcription
   is idle. Skipped: `.git`, `repos/`, archives, binaries, files over 2 MB, call artefacts
@@ -1034,7 +1044,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Download:**
-[LiveTips-0.4.3-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.4.3/LiveTips-0.4.3-beta.dmg)
+[LiveTips-0.5.0-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.0/LiveTips-0.5.0-beta.dmg)
 
 What it does:
 
@@ -1049,7 +1059,15 @@ What it does:
   presentation split view and the same tips window;
 - speaker identification as in the skill: the "Who is speaking?" card offers the project's
   people, names go into the tips and the summary, the voice library stays on the Mac
-  (**Settings > AI > Speakers**).
+  (**Settings > AI > Speakers**): your team for every project, clients per project, nothing
+  saved on a call marked **Public call**;
+- a second request when Claude is slow (no answer after 2-3 s or a fast failure: the same
+  request goes again and the first good answer wins; Settings > AI);
+- in **Start call**: your role on an interview (observer, interviewer, or coach when you are
+  the one being interviewed, as in the skill), the tip model for this call only, and a line
+  that confirms the project (people, Claude on or off, the last call, the Notion mirror);
+- the Notion mirror without a terminal: Settings > General > Notion mirror > **Set up sync**
+  (details in [`tools/notion-mirror`](../../tools/notion-mirror/README.md)).
 
 **It is a beta.**
 
@@ -1128,4 +1146,5 @@ that scores every tip of both sides 1 to 5 without knowing which side wrote it.
 
 The same two actions are in the menu bar menu during a call, with the shortcut next to them.
 The HELP button shows its shortcut, the pause button shows it in its tooltip, and
-**Settings > General > Shortcuts** lists both.
+**Settings > General > Shortcuts** lists both. The skill's tips window (live-transcriber) has
+the same shortcuts since 2026-10-22; when both run, the one started first owns them.

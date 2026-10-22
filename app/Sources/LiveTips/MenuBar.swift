@@ -56,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refresh()
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
         NotionMirrorService.shared.startSchedule()
+        updateCoreIfNeeded()
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
@@ -63,6 +64,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             UserDefaults.standard.set(true, forKey: "onboarded")
             openSettings()
         }
+    }
+
+    /// After an app update the recorder core in the app folder is refreshed from the app by itself
+    /// (setup.sh install core keeps config.json, voices and models), so a new dmg needs no Setup run.
+    func updateCoreIfNeeded() {
+        guard let res = Bundle.main.resourcePath else { return }
+        let root = appRoot
+        let bundled = (try? String(contentsOfFile: (res as NSString).appendingPathComponent("core/VERSION"), encoding: .utf8)) ?? ""
+        let installed = (try? String(contentsOfFile: (root as NSString).appendingPathComponent("core.version"), encoding: .utf8)) ?? ""
+        guard !bundled.isEmpty, bundled != installed,
+              FileManager.default.fileExists(atPath: (root as NSString).appendingPathComponent("src/transcriber.py")),
+              !CallEngine.shared.isRunning else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/bash")
+        p.arguments = [(res as NSString).appendingPathComponent("setup.sh"), "install", "core"]
+        var env = ProcessInfo.processInfo.environment
+        env["APPROOT"] = root
+        env["BUNDLE"] = res
+        p.environment = env
+        try? p.run()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

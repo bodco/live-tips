@@ -1,7 +1,7 @@
 # LiveTips.app (beta)
 
 Native macOS companion for the `live-tips` skill: records the call locally, transcribes it on
-the Mac and asks a model for tips on events instead of polling. Status: **beta 0.4.3**, a
+the Mac and asks a model for tips on events instead of polling. Status: **beta 0.5.0**, a
 downloadable app (see Install below); the M0 spike that measured the approach is kept further down.
 
 The skill and the app are both supported and behave the same way. Behaviour lives in one
@@ -21,7 +21,7 @@ place, [`rules/`](rules/), which both read.
 ## Install (beta)
 
 1. Download the dmg from the release page:
-   [LiveTips-0.4.3-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.4.3/LiveTips-0.4.3-beta.dmg).
+   [LiveTips-0.5.0-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.0/LiveTips-0.5.0-beta.dmg).
    Open it and drag **Live Tips** into Applications.
 2. **First open: right-click > Open**, then confirm. The beta is not notarized by Apple yet, so a
    plain double-click is blocked the first time. After that it opens normally.
@@ -93,6 +93,11 @@ window, even at low opacity.
 - **Does it write to Notion?** Yes, if Settings > General > "Write the call summary to Notion" is on and the Notion token in Keys can see the project's Meetings DB. After the call it appends a "Live Tips" section (wrap-up and the transcript file) to this meeting's page, found by `Date` within 20 min of the start, or creates the page. Menu bar > "Send last call to Notion" does it later. Details: docs, section 14.2.
 - **Can the app and the Cowork skill record the same call?** Yes. The app writes only `<call>.app.*` files with its own recorder, so nothing is shared; expect about twice the CPU. `livetips_m0.report` and `livetips_m0.judge` compare the two afterwards (docs, section 14.3).
 - **Speakers?** As in the skill: the "Who is speaking?" card offers the project's people, names you give appear in tips and in the Notion summary and are remembered in `<app folder>/voices`. On or off: Settings > AI > Speakers.
+- **Interviews?** Start call > Meeting type Interview > Your role: Observer (someone else interviews a candidate), Interviewer (you ask) or Coach (you are the one being interviewed). Tips follow the role, as in the skill.
+- **A different model for one call?** Start call > Tip model. Settings > AI sets the default.
+- **What if Claude is slow?** With "Second request when Claude is slow" on (Settings > AI), a request with no answer after 2 s (classify) or 3 s (tip), or one that fails at once, is sent again and the first good answer wins. Both are billed and counted in the limits.
+- **Whose voices are remembered?** Your team's for every project, a client's for that project only, nobody's on a call marked Public call in Start call. Settings > AI > Speakers lists the library; Forget removes a person.
+- **Notion mirror?** Settings > General > Notion mirror > Set up sync copies `tools/notion-mirror` to `<work>/Tools/notion-mirror`, finds your Control Tower databases with the Notion token and runs it every 2 hours outside calls. A mirror you already run yourself is left alone.
 - **Shortcuts?** Control-Option-H is HELP NOW and Control-Option-P pauses tips, also while the meeting app has the focus. They are shown in the menu bar menu, on the HELP button and in Settings > General > Shortcuts.
 - **Where are the files?** Transcript, tips and wrap-up data: `<project folder>/live/`. App logs: `<app folder>/logs/`.
 

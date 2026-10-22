@@ -97,12 +97,13 @@ IDs copied exactly from the config; never retype an ID by hand from memory, copy
 1. **Name.** Generate a short meaningful meeting name in the language of the call from what
    was actually discussed (2-6 words, e.g. "Fraud Engine scope sync"), not "Meeting".
    Property `Meeting Name` (the title property of the Meetings DB; check the schema).
-   Title = `<name> @<start date-time>`, where the date-time is a Notion date mention:
-   `<name> <mention-date start="YYYY-MM-DD" startTime="HH:mm" timeZone="<zone>"/>`.
-   `notion-create-pages` stores a mention in the title as literal text, so create the page
-   with the plain `<name>` and then set the title with `notion-update-page`
-   `update_properties` (that call parses the mention). Verify with a fetch: the title must
-   read `<name> @...`.
+   Title = `<name> @<start date-time>`, where the date-time is a Notion date mention. Create the
+   page with the plain `<name>`, then set the title with `notion-update-page` `update_properties`
+   in exactly this form (the property syntax, not the `<mention-date>` content tag):
+   `<name> <date start="YYYY-MM-DD" start-time="HH:mm" time-zone="<zone>" />`.
+   `<mention-date ...>` in a title property is stored as literal text (bug found 2026-10-22: titles
+   read "<mention-date start=..."). Verify with `notion-query-data-sources` mode `rows`: the title
+   must hold `<date start=...` with no backslash before `<`; if it is escaped, set it again.
 2. **Properties.**
    - `Date`: start date-time of the meeting = `started_at` from `status.json` (it already
      carries the Mac's offset, e.g. `2026-10-10T23:48:02+03:00`), with

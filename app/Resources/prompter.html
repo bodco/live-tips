@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Prompter</title>
+<title>Live Tips</title>
 <style>
   /* ---------- tokens: light by default, dark follows the system (or data-theme) ---------- */
   :root {
     --bg: #f4f5f7; --panel: #ffffff; --panel2: #eef0f3; --text: #14161b; --muted: #5b6270;
-    --line: #dde1e7; --red: #d23434; --orange: #b86200; --blue: #2c6bd6; --green: #1d8656;
+    --line: #dde1e7; --red: #d23434; --orange: #a35500; --blue: #2c6bd6; --green: #1d8656;
     --red-bg: #fdecec; --orange-bg: #fff3e3; --blue-bg: #eaf1fd; --green-bg: #e8f6ef;
     --crit: #c62828; --scrim: rgba(20, 22, 27, .28); --shadow: 0 12px 40px rgba(20, 22, 27, .18);
     --size: 18px;
@@ -59,7 +59,7 @@
   #mute.muted { background: var(--red); border-color: var(--red); color: #fff; }
   #gear.open { background: var(--text); color: var(--panel); border-color: var(--text); }
   /* "Tips paused" pill: only while paused; a click resumes */
-  #pausedpill { display: none; font-size: 11px; font-weight: 700; white-space: nowrap; flex: none; cursor: pointer;
+  #pausedpill { display: none; font-size: 12px; font-weight: 700; white-space: nowrap; flex: none; cursor: pointer;
     padding: 2px 8px; border-radius: 999px; border: 1px solid var(--orange); color: var(--orange); background: var(--orange-bg); }
   body.paused #pausedpill { display: inline-block; }
 
@@ -107,19 +107,21 @@
     background: var(--panel); border: 1px solid var(--blue); border-left: 4px solid var(--blue);
     max-height: 60%; overflow-y: auto; font-size: 13px; }
   #spkask.show { display: block; }
+  #spkask.mini { max-height: none; padding-top: 4px; padding-bottom: 4px; cursor: pointer; }
+  #spkask.mini .quote, #spkask.mini .names, #spkask.mini .nrow { display: none; }
   #spkask .h { display: flex; align-items: center; gap: 6px; min-width: 0; }
   #spkask .h b { font-size: 14px; white-space: nowrap; flex: none; }
   #spkask .h .sid { color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   #spkask .h .secs { flex: none; }
   #spkask .moreq, #spkask .skip { flex: none; }
   #spkask .h .grow { flex: 1; }
-  #spkask .moreq { font-size: 11px; color: var(--blue); white-space: nowrap; border: 1px solid var(--blue); border-radius: 999px; padding: 0 7px; }
+  #spkask .moreq { font-size: 12px; color: var(--blue); white-space: nowrap; border: 1px solid var(--blue); border-radius: 999px; padding: 0 7px; }
   #spkask .skip { min-height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent;
     color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 600; }
   #spkask .skip:hover { color: var(--text); border-color: var(--muted); }
   #spkask .quote { margin: 3px 0 7px; color: var(--text); font-style: italic; display: -webkit-box; -webkit-line-clamp: 2;
     -webkit-box-orient: vertical; overflow: hidden; }
-  #spkask .quote .qt { font-style: normal; color: var(--muted); font-size: 11px; margin-right: 5px; font-variant-numeric: tabular-nums; }
+  #spkask .quote .qt { font-style: normal; color: var(--muted); font-size: 12px; margin-right: 5px; font-variant-numeric: tabular-nums; }
 
   /* ---------- the single alert slot ---------- */
   #alert { display: none; margin: 0 8px 6px; padding: 6px 6px 6px 10px; border-radius: 8px; font-size: 13px;
@@ -180,8 +182,8 @@
   #fres .fr { padding: 5px 0; border-bottom: 1px solid var(--line); }
   #fres .fr:last-of-type { border-bottom: 0; }
   #fres .fid { color: var(--orange); font-weight: 700; margin-right: 6px; }
-  #fres .fsrc { color: var(--muted); font-size: 11px; }
-  #fres .hint { color: var(--muted); font-size: 11px; padding: 3px 0 2px; border-top: 1px solid var(--line); }
+  #fres .fsrc { color: var(--muted); font-size: 12px; }
+  #fres .hint { color: var(--muted); font-size: 12px; padding: 3px 0 2px; border-top: 1px solid var(--line); }
 
   /* ---------- local "working on it" pill after HELP NOW ---------- */
   #working { display: none; margin: 6px 8px 0; padding: 5px 10px; border-radius: 999px; background: var(--red-bg);
@@ -197,14 +199,14 @@
   .tip.info { border-left-color: var(--green); }
   .tip.fact { border-left-color: var(--orange); }
   .tip.card { border-left-style: double; border-left-width: 6px; }
-  .tip .q { font-size: 11px; color: var(--muted); letter-spacing: .02em; margin-bottom: 2px; }
+  .tip .q { font-size: 12px; color: var(--muted); letter-spacing: .02em; margin-bottom: 2px; }
   .gist { font-weight: 700; line-height: 1.3; }
   .phrase { margin-top: 3px; }
   .phrase::before { content: "\201C"; color: var(--muted); } .phrase::after { content: "\201D"; color: var(--muted); }
   .items { margin: 4px 0 0; padding-left: 1.3em; font-size: .92em; }
   .more { display: none; font-size: 12px; color: var(--blue); cursor: pointer; background: none; border: 0; padding: 2px 0; }
   .foot { display: flex; align-items: flex-end; gap: 6px; margin-top: 4px; min-height: 26px; }
-  .meta { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 7px; align-items: center; }
+  .meta { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 7px; align-items: center; }
   .meta .note { font-style: italic; }
   .lag { font-variant-numeric: tabular-nums; } .lag.slow { color: var(--orange); font-weight: 600; }
   .latetag { font-size: 10px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--orange); color: var(--orange); font-weight: 600; }
@@ -228,7 +230,7 @@
   .qline { border-left: 3px solid var(--muted); padding: 1px 8px; font-size: 13px; color: var(--muted);
     display: flex; gap: 8px; flex: none; }
   .qline .qtext { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .qline .qt { font-size: 11px; flex: none; }
+  .qline .qt { font-size: 12px; flex: none; }
   /* 🆘 items: strong red */
   .tip.sos, .tip.sos:not(.latest):not(.pinned) { background: var(--red-bg); border-color: var(--red); border-left-width: 6px; }
   .tip.sos .gist { color: var(--red); }
@@ -236,8 +238,8 @@
   .tip.pinned { background: var(--panel); }
   .tip.pinned .more { display: inline; }
   .tip.pinned .items { display: none; } .tip.pinned.open .items { display: block; }
-  .why { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; font-size: 11px; }
-  .why .rc { border: 1px solid var(--line); background: transparent; border-radius: 999px; font-size: 11px; padding: 3px 9px; cursor: pointer; }
+  .why { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; }
+  .why .rc { border: 1px solid var(--line); background: transparent; border-radius: 999px; font-size: 12px; padding: 3px 9px; cursor: pointer; }
   .why .rc.on { background: var(--orange); border-color: var(--orange); color: #fff; }
   .why input { flex-basis: 100%; font-size: 12px; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line);
     background: var(--bg); color: inherit; }
@@ -260,13 +262,12 @@
   #send svg { width: 15px; height: 15px; }
   .act { min-height: 40px; min-width: 44px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 700;
     padding: 0 10px; white-space: nowrap; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
-  /* the two call buttons: icon only, 40x40, as tall as the input row */
-  #pause { background: transparent; border: 0; padding: 0; width: 40px; min-width: 40px; height: 40px;
-    font-size: 32px; line-height: 40px; font-weight: 400; }   /* same as #sos: emoji only */
-  #pause:hover { filter: brightness(1.15); transform: scale(1.06); }
+  /* Pause is a mode: a small icon in the top bar next to mute. HELP NOW is the one action: a red button with text. */
+  #pause svg { width: 15px; height: 15px; }
+  #pause.on { background: var(--orange); border-color: var(--orange); color: #fff; }
   #pause:focus-visible, #sos:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
-  #sos { background: transparent; border: 0; padding: 0; width: 40px; min-width: 40px; height: 40px; font-size: 32px; line-height: 40px; }
-  #sos:hover { filter: brightness(1.15); transform: scale(1.06); }
+  #sos { background: var(--red); border: 0; color: #fff; padding: 0 14px; height: 40px; font-size: 13px; letter-spacing: .04em; }
+  #sos:hover { filter: brightness(1.1); }
   #sos:active, #pause:active { transform: translateY(1px); }
 
   /* short window (e.g. 420x280): chips hide until the field has focus, alerts lose the second line */
@@ -297,21 +298,21 @@
   body.menu #menu, body.menu #scrim { display: block; }
   .sec { padding: 9px 12px; border-bottom: 1px solid var(--line); }
   .sec:last-child { border-bottom: 0; }
-  .sec h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  .sec h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
   .rowf { display: grid; grid-template-columns: 92px 1fr minmax(0, auto); align-items: center; gap: 8px; min-height: 32px; }
   .rowf > span:first-child { color: var(--muted); }
   .rowf select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 7px;
     font-size: 13px; padding: 4px 6px; }
-  .pill { font-size: 11px; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .pill { font-size: 12px; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
   .pill.wait { color: var(--orange); } .pill.ok { color: var(--green); } .pill.warn { color: var(--red); }
-  .hintline { color: var(--muted); font-size: 11px; margin: 0 0 4px 100px; }
+  .hintline { color: var(--muted); font-size: 12px; margin: 0 0 4px 100px; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; justify-self: start; }
   .seg button { border: 0; background: transparent; padding: 5px 9px; font-size: 12px; cursor: pointer; border-right: 1px solid var(--line); }
   .seg button:last-child { border-right: 0; }
   .seg button.on { background: var(--text); color: var(--panel); }
   .slider { display: flex; align-items: center; gap: 8px; }
   .slider input { flex: 1; accent-color: var(--blue); min-width: 0; }
-  .slider .a1 { font-size: 11px; } .slider .a2 { font-size: 17px; font-weight: 600; }
+  .slider .a1 { font-size: 12px; } .slider .a2 { font-size: 17px; font-weight: 600; }
   #sizeval { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; width: 34px; text-align: right; }
   .switch { width: 38px; height: 22px; border-radius: 999px; background: var(--line); border: 0; position: relative; cursor: pointer; padding: 0; justify-self: start; }
   .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
@@ -320,18 +321,18 @@
   .switch.na { opacity: .45; }
   .ctxline { display: flex; align-items: center; gap: 8px; }
   .togline { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; min-height: 32px; margin-top: 4px; }
-  .togline .t { cursor: pointer; } .togline .t small { display: block; color: var(--muted); font-size: 11px; }
+  .togline .t { cursor: pointer; } .togline .t small { display: block; color: var(--muted); font-size: 12px; }
   #uilang button { padding: 5px 10px; }
-  .ctxline .t { flex: 1; } .ctxline .t small { display: block; color: var(--muted); font-size: 11px; }
+  .ctxline .t { flex: 1; } .ctxline .t small { display: block; color: var(--muted); font-size: 12px; }
   .btn { border: 1px solid var(--line); background: var(--bg); border-radius: 7px; padding: 6px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
   #status { font-size: 12px; color: var(--text); line-height: 1.5; }
   #status.deaf { color: #fff; background: var(--crit); border-radius: 4px; padding: 0 6px; font-weight: 600; }
-  #diag { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+  #diag { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
   details summary { cursor: pointer; color: var(--muted); font-size: 12px; list-style: none; }
   details summary::-webkit-details-marker { display: none; }
   details summary::before { content: "\25B8  "; } details[open] summary::before { content: "\25BE  "; }
   #helpbox { font-size: 12px; line-height: 1.45; margin-top: 6px; }
-  #helpbox h5 { margin: 10px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  #helpbox h5 { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
   #helpbox h5:first-child { margin-top: 0; }
   #helpbox dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 10px; margin: 0; }
   #helpbox dt { font-weight: 600; white-space: nowrap; } #helpbox dd { margin: 0; color: var(--muted); }
@@ -384,7 +385,7 @@
   .dk-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
   .dk-head h2 { font-size: 17px; line-height: 1.25; margin: 0; flex: 1 1 140px; min-width: 0; }
   .dk-card.cur .dk-num { background: var(--blue); color: var(--bg); }
-  .dk-who { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px;
+  .dk-who { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px;
     border-radius: 5px; border: 1px solid var(--line); color: var(--muted); flex: none; }
   .dk-who.me { color: var(--blue); border-color: var(--blue); }
   .dk-who.other { color: var(--orange); border-color: var(--orange); }
@@ -438,11 +439,12 @@
 <div id="main">
 <header id="bar">
   <span id="dot" data-i18n-title="dot_wait" title="Waiting for the recording..."></span>
-  <span id="title" data-i18n="title_default">Prompter</span>
+  <span id="title" data-i18n="title_default">Live Tips</span>
   <span id="elapsed"></span>
   <span id="spacer"></span>
   <span id="pausedpill" role="button" tabindex="0" data-i18n="paused_pill" data-i18n-title="paused_pill_tt">Tips paused</span>
   <span id="meter" data-i18n-title="meter_tt"></span>
+  <button id="pause" class="ib" type="button" aria-pressed="false"></button>
   <button id="mute" class="ib" data-i18n-title="mute_tt">🎙</button>
   <button id="gear" class="ib" data-i18n-title="gear_tt" data-i18n-aria="menu_aria">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -490,8 +492,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
   </label>
-  <button id="pause" class="act" type="button" aria-pressed="false"></button>
-  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt">🆘</button>
+  <button id="sos" class="act" type="button" data-i18n="sos_label" data-i18n-aria="sos_aria" data-i18n-title="sos_tt">HELP</button>
 </form>
 
 <div id="scrim"></div>
@@ -585,7 +586,7 @@
   var I18N = {
     en: {
       dot_wait: 'Waiting for the recording...',
-      title_default: 'Prompter',
+      title_default: 'Live Tips',
       paused_pill: 'Tips paused',
       paused_pill_tt: 'Tips are paused: Claude keeps recording and listening, but shows nothing new. Click to resume tips',
       meter_tt: 'Your share of talk time. Adds your monologue timer after 0:30, orange after 1:30',
@@ -611,6 +612,8 @@
       q_ph: 'Fact or question',
       q_tt: 'Typing shows matching facts at once (no AI). Enter sends the text to Claude. Esc clears.',
       send_tt: 'Ask Claude',
+      mute_aria: 'Mute my microphone',
+      unmute_aria: 'Unmute my microphone',
       pause_tt: 'Pause tips: Claude keeps recording and listening, but shows nothing until you press play. HELP NOW still works.',
       play_tt: 'Resume tips',
       pause_aria: 'Pause tips',
@@ -618,6 +621,7 @@
       pause_unconf_on: '⚠ Tips still paused: the recorder did not confirm',
       pause_unconf_off: '⚠ Tips still on: the recorder did not confirm',
       sos_aria: 'HELP NOW',
+      sos_label: 'HELP',
       sos_tt: "HELP NOW: the best facts for what is being said, at once, then Claude's answer",
       work_on: '🆘 Working on it... {n} s',
       work_late: '🆘 No answer yet ({n} s). Is Claude listening?',
@@ -673,7 +677,7 @@
       sem_on: 'on', sem_off: 'off', sem_loading: 'starting', sem_na: 'unavailable',
       pin_tt: 'Keep on top of other windows',
       l_stealth: 'Hide from screen sharing and screenshots',
-      stealth_sub: 'On: a screen share and screenshots skip this window',
+      stealth_sub: 'This call only. The default for new calls is in Settings > General',
       stealth_tt: 'On (default): colleagues do not see this window when you share your screen, and screenshots skip it. Off: the window shows in a screen share and you can take screenshots of it.',
       sec_context: 'Context',
       brief_none: 'Brief: not loaded yet',
@@ -832,8 +836,8 @@
         '<dt>One alert</dt><dd>Only the most important problem, with a one-click fix: Claude not listening, mic not recording (Use Mac mic), mic switched (Back to headset), other side silent, transcript behind, setting confirmed.</dd>' +
         '<dt>Tips engine not responding</dt><dd>Live Tips restarts it by itself; if it stays, end the call and start again.</dd>' +
         '</dl><h5>Bottom</h5><dl>' +
-        '<dt>🆘 HELP NOW</dt><dd>Stuck right now: the best facts for what is being said appear at once, then Claude\'s answer.</dd>' +
-        '<dt>⏸ / ▶</dt><dd>Pause tips: Claude keeps recording and listening but shows nothing new (the top bar says "Tips paused"). HELP NOW and your typed questions still work. ▶ resumes; held items then appear.</dd>' +
+        '<dt>HELP (red button, ⌃⌥H)</dt><dd>Stuck right now: the best facts for what is being said appear at once, then Claude\'s answer.</dd>' +
+        '<dt>⏸ / ▶ (top bar, ⌃⌥P)</dt><dd>Pause tips: Claude keeps recording and listening but shows nothing new (the top bar says "Tips paused"). HELP NOW and your typed questions still work. ▶ resumes; held items then appear.</dd>' +
         '<dt>Field</dt><dd>Type a word (logs, pricing, a person, a ticket key): matching facts show at once, no AI. Enter sends the text to Claude. Start with "find:" to make Claude search the sources.</dd>' +
         '<dt>Suggest reply</dt><dd>A ready answer or comment on the current topic.</dd>' +
         '<dt>What to ask now</dt><dd>1-2 questions for the open points.</dd>' +
@@ -851,7 +855,7 @@
         '<dt>Agenda</dt><dd>Progress bar and the current point. Click to see all: ✓ covered, ○ not yet.</dd>' +
         '<dt>Now / Next</dt><dd>Presentation: the window follows what you say through your outline.</dd>' +
         '</dl><h5>Call setup</h5><dl>' +
-        '<dt>Type: Auto</dt><dd>Default. The window detects when you present (you talk most) and when it is a discussion.</dd>' +
+        '<dt>Type: Standard</dt><dd>Default. The window detects when you present (you talk most) and when it is a discussion.</dd>' +
         '<dt>Presentation</dt><dd>Your talk with an outline: Now / Next on top, short points, no interrupting tips.</dd>' +
         '<dt>Interview</dt><dd>Pick your role: Observer (strong answer contents), Coach: you are the one being asked; your own prepared stories, numbers and facts at hand, and the parts of a question you have not answered yet. Interviewer (follow-ups and gaps).</dd>' +
         '<dt>Audience</dt><dd>Auto, Team or Client. Client: stricter, restricted internal numbers stay hidden, the culture profile is used. The language is set separately.</dd>' +
@@ -869,7 +873,7 @@
     },
     uk: {
       dot_wait: 'Чекаю на запис...',
-      title_default: 'Суфлер',
+      title_default: 'Live Tips',
       paused_pill: 'На паузі',
       paused_pill_tt: 'Підказки на паузі: Claude і далі записує та слухає, але нічого нового не показує. Натисни, щоб відновити',
       meter_tt: 'Твоя частка часу розмови. Після 0:30 додається таймер твого монологу, після 1:30 він стає помаранчевим',
@@ -895,6 +899,8 @@
       q_ph: 'Факт або питання',
       q_tt: 'Поки друкуєш, одразу видно схожі факти (без ШІ). Enter надсилає текст Claude. Esc очищає.',
       send_tt: 'Запитати Claude',
+      mute_aria: 'Вимкнути мій мікрофон',
+      unmute_aria: 'Увімкнути мій мікрофон',
       pause_tt: 'Пауза підказок: Claude і далі записує та слухає, але нічого не показує, доки не натиснеш «Продовжити». ДОПОМОЖИ працює і на паузі.',
       play_tt: 'Відновити підказки',
       pause_aria: 'Поставити підказки на паузу',
@@ -902,6 +908,7 @@
       pause_unconf_on: '⚠ Підказки досі на паузі: програма запису не підтвердила',
       pause_unconf_off: '⚠ Підказки досі увімкнені: програма запису не підтвердила',
       sos_aria: 'ДОПОМОЖИ',
+      sos_label: 'ДОПОМОЖИ',
       sos_tt: 'ДОПОМОЖИ: одразу найкращі факти до того, що зараз говорять, а потім відповідь Claude',
       work_on: '🆘 Шукаю... {n} с',
       work_late: '🆘 Відповіді ще немає ({n} с). Claude слухає?',
@@ -957,7 +964,7 @@
       sem_on: 'увімкнено', sem_off: 'вимкнено', sem_loading: 'запускається', sem_na: 'недоступний',
       pin_tt: 'Тримати вікно поверх інших',
       l_stealth: 'Ховати від показу екрана і знімків екрана',
-      stealth_sub: 'Увімкнено: показ екрана і знімки екрана це вікно пропускають',
+      stealth_sub: 'Лише для цього дзвінка. Типове значення для нових дзвінків у Settings > General',
       stealth_tt: 'Увімкнено (за замовчуванням): колеги не бачать це вікно, коли ти показуєш екран, і знімки екрана його пропускають. Вимкнено: вікно видно під час показу екрана, і його можна зняти на знімок.',
       sec_context: 'Контекст',
       brief_none: 'Довідка: ще не завантажена',
@@ -1111,8 +1118,8 @@
         '<dt>Одне попередження</dt><dd>Лише найважливіша проблема з виправленням в один клік: Claude не слухає, мікрофон не записує («Мікрофон Mac»), мікрофон перемкнувся («Назад на гарнітуру»), не чути співрозмовників, розшифровка відстає, налаштування підтверджено.</dd>' +
         '<dt>Рушій підказок не відповідає</dt><dd>Live Tips перезапускає його сам; якщо не минає, заверши дзвінок і почни знову.</dd>' +
         '</dl><h5>Унизу</h5><dl>' +
-        '<dt>🆘 ДОПОМОЖИ</dt><dd>Застряг просто зараз: одразу з\'являються найкращі факти до того, що говорять, а потім відповідь Claude.</dd>' +
-        '<dt>⏸ / ▶</dt><dd>Пауза підказок: Claude і далі записує та слухає, але нічого нового не показує (угорі напис «На паузі»). ДОПОМОЖИ і твої питання працюють. ▶ відновлює, і тоді з\'являється все, що чекало.</dd>' +
+        '<dt>ДОПОМОЖИ (червона кнопка, ⌃⌥H)</dt><dd>Застряг просто зараз: одразу з\'являються найкращі факти до того, що говорять, а потім відповідь Claude.</dd>' +
+        '<dt>⏸ / ▶ (верхня смуга, ⌃⌥P)</dt><dd>Пауза підказок: Claude і далі записує та слухає, але нічого нового не показує (угорі напис «На паузі»). ДОПОМОЖИ і твої питання працюють. ▶ відновлює, і тоді з\'являється все, що чекало.</dd>' +
         '<dt>Поле</dt><dd>Введи слово (логи, ціни, людина, номер задачі): схожі факти видно одразу, без ШІ. Enter надсилає текст Claude. Почни з "find:", щоб Claude пошукав у джерелах.</dd>' +
         '<dt>Що відповісти</dt><dd>Готова відповідь або коментар до поточної теми.</dd>' +
         '<dt>Що спитати</dt><dd>1-2 питання щодо відкритих моментів.</dd>' +
@@ -1130,7 +1137,7 @@
         '<dt>План</dt><dd>Смуга прогресу і поточний пункт. Натисни, щоб побачити все: ✓ обговорено, ○ ще ні.</dd>' +
         '<dt>Зараз / Далі</dt><dd>Презентація: вікно стежить за тим, що ти кажеш, за твоїм планом виступу.</dd>' +
         '</dl><h5>Налаштування дзвінка</h5><dl>' +
-        '<dt>Тип: Авто</dt><dd>За замовчуванням. Вікно саме бачить, коли ти виступаєш (говориш найбільше), а коли йде обговорення.</dd>' +
+        '<dt>Тип: Звичайна</dt><dd>За замовчуванням. Вікно саме бачить, коли ти виступаєш (говориш найбільше), а коли йде обговорення.</dd>' +
         '<dt>Презентація</dt><dd>Твій виступ за планом: угорі «Зараз / Далі», короткі пункти, без підказок, що відволікають.</dd>' +
         '<dt>Співбесіда</dt><dd>Вибери роль: Спостерігач (що має бути в сильній відповіді), Коуч: питають тебе; під рукою твої підготовлені історії, цифри й факти, а також частини питання, на які ти ще не відповів. Проводжу співбесіду (уточнювальні питання і прогалини).</dd>' +
         '<dt>Хто з того боку</dt><dd>Авто, Команда або Клієнт. Клієнт: суворіші правила, внутрішні цифри приховані, використовується культурний профіль. Мова задається окремо.</dd>' +
@@ -1270,6 +1277,8 @@
   function applyMute() {
     muteBtn.classList.toggle('muted', muted);
     muteBtn.textContent = muted ? '🔇' : '🎙';
+    muteBtn.setAttribute('aria-pressed', String(muted));
+    muteBtn.setAttribute('aria-label', muted ? t('unmute_aria') : t('mute_aria'));
   }
   var muteClick = 0;
   muteBtn.onclick = function () { muted = !muted; muteClick = Date.now(); applyMute(); send('mute', muted); };
@@ -1741,7 +1750,9 @@
   function applyPause() {
     document.body.classList.toggle('paused', paused);
     pauseBtn.classList.toggle('on', paused);
-    pauseBtn.textContent = paused ? '▶️' : '⏸️';   // emoji presentation, like the SOS button
+    pauseBtn.innerHTML = paused
+      ? '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
     pauseBtn.title = paused ? t('play_tt') : t('pause_tt');
     pauseBtn.setAttribute('aria-label', paused ? t('play_aria') : t('pause_aria'));
     pauseBtn.setAttribute('aria-pressed', String(paused));
@@ -1878,11 +1889,21 @@
     if (names.length) html += '<div class="names">' + names.join('') + '</div>';
     html += '<div class="nrow"><input type="text" maxlength="' + NAME_MAX + '" placeholder="' + esc(t('ask_ph')) + '" title="' + esc(t('ask_in_tt')) + '">' +
       '<button class="go" type="button" data-act="name" title="' + esc(t('ask_ok_tt', { a: label })) + '">' + esc(t('ask_ok')) + '</button></div>';
-    askBox.innerHTML = html; askBox._a = a; askBox.setAttribute('data-sid', a.sid); askBox.className = 'show';
+    if (askBox._a !== a) { askShown = Date.now(); askMini = false; }
+    askBox.innerHTML = html; askBox._a = a; askBox.setAttribute('data-sid', a.sid); askBox.className = askMini ? 'show mini' : 'show';
     var ni = askBox.querySelector('input');
     if (keep != null) { ni.value = keep; if (hadFocus) ni.focus(); }
   }
+  // After 20 s without an answer the card folds to its title line so it does not cover the tips;
+  // a click on it opens it again for another 20 s.
+  var askShown = 0, askMini = false;
+  setInterval(function () {
+    if (askMini || !askQ.length || !askShown || Date.now() - askShown < 20000) return;
+    if (askBox.contains(document.activeElement)) { askShown = Date.now(); return; }
+    askMini = true; askBox.classList.add('mini');
+  }, 2000);
   askBox.addEventListener('click', function (e) {
+    if (askMini) { askMini = false; askShown = Date.now(); askBox.classList.remove('mini'); if (!e.target.closest('button')) return; }
     var a = askQ[0]; if (!a) return;
     var b = e.target.closest('button'); if (!b) return;
     if (b.hasAttribute('data-name')) { nameSpeaker(a.sid, b.getAttribute('data-name')); return; }

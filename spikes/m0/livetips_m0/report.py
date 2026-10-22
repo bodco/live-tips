@@ -102,8 +102,10 @@ def analyse_run(run: Path, calls_root: List[Path]) -> Dict:
                            "total": (pct(v["total"], .5), pct(v["total"], .9))} for k, v in by_role.items()},
            "cache_share": round(cache_read / tot_in, 3) if tot_in else None,
            "usd": round(usd, 4), "usd_per_hour": round(usd / hours, 3) if hours else None}
+    # The app records with its own stem (<stem>.app.md); the skill's transcript is <stem>.md.
+    skill_md = meta["md"][:-7] + ".md" if meta["md"].endswith(".app.md") else meta["md"]
     for root in calls_root:
-        md = root / meta["md"]
+        md = root / skill_md
         if md.exists():
             sk = skill_tips(md)
             se = [x["e2e_s"] for x in sk if x["e2e_s"] is not None and -5 < x["e2e_s"] < 300]

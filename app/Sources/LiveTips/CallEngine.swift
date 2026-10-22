@@ -51,6 +51,7 @@ final class CallEngine {
         try? FileManager.default.removeItem(atPath: statusPath)
         var req = request
         req["prompter"] = false            // Live Tips shows its own window
+        req["stem_suffix"] = ".app"        // own files (<stem>.app.*): the skill can record the same call
         guard let d = try? JSONSerialization.data(withJSONObject: req, options: [.prettyPrinted, .sortedKeys]) else { return "Bad request" }
         try? d.write(to: URL(fileURLWithPath: (control as NSString).appendingPathComponent("start.json")), options: .atomic)
 
@@ -63,6 +64,7 @@ final class CallEngine {
         p.standardError = log
         do { try p.run() } catch { return "Could not start the recorder: \(error.localizedDescription)" }
         recorder = p
+        IndexService.shared.pause()        // the indexer waits while Whisper and the tips engine run
         self.onReady = onReady
         poll?.invalidate()
         var sidecarStarted = false
@@ -85,6 +87,7 @@ final class CallEngine {
             if !(self.recorder?.isRunning ?? false) {
                 t.invalidate()
                 self.sidecar?.terminate()
+                IndexService.shared.resume()
                 if let file = st.file ?? self.lastFile, apiAllowed { self.writeToNotion(file: file) }
             }
         }

@@ -159,7 +159,7 @@ final class SettingsModel: ObservableObject {
         keyState[key] = .testing
         Task {
             if key == .claudeAPIKey {
-                let (ok, msg, ids) = await KeyTester.claude(key: v, workspace: store.get(.claudeWorkspaceID))
+                let (ok, msg, ids) = await KeyTester.claude(key: v, workspace: nil)
                 keyState[key] = ok ? .ok(msg) : .failed(SettingsModel.friendly(msg))
                 if ok, !ids.isEmpty { config.knownModels = ids }
             } else {
@@ -195,6 +195,19 @@ final class SettingsModel: ObservableObject {
         registry.workspaces = WorkspaceScanner.scan(workRoot: config.workRoot, projects: registry.projects)
     }
 
+    struct ReadyItem { let title: String; let ok: Bool; let action: String; let tab: String? }
+    var readyItems: [ReadyItem] {
+        var keyOK = false
+        if case .ok = keyState[.claudeAPIKey] ?? .notSet { keyOK = true }
+        return [
+            ReadyItem(title: "Claude API key works", ok: keyOK, action: "Open Keys", tab: "keys"),
+            ReadyItem(title: "Work folder set", ok: !config.workRoot.isEmpty, action: "Set below", tab: nil),
+            ReadyItem(title: "Projects imported", ok: !registry.projects.isEmpty, action: "Import…", tab: nil),
+            ReadyItem(title: "Your name on calls", ok: !config.nameAliases.isEmpty, action: "Set below", tab: nil),
+            ReadyItem(title: "Microphone allowed", ok: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, action: "Asked on the first call", tab: nil),
+        ]
+    }
+
     func saveConfig() { try? config.save(to: AppPaths.config) }
     @Published var localAIStatus: (ok: Bool, text: String) = (false, "Checking…")
     func refreshLocalAI(after delay: Double = 0) {
@@ -203,6 +216,27 @@ final class SettingsModel: ObservableObject {
         }
     }
     func saveRegistry() { try? registry.save(to: AppPaths.projects) }
+}
+
+/// "claude-sonnet-4-5-20250929" -> "Sonnet 4.5"; unknown ids stay as they are.
+func prettyModel(_ id: String) -> String {
+    let parts = id.split(separator: "-").map(String.init)
+    guard let i = parts.firstIndex(where: { ["haiku", "sonnet", "opus", "fable"].contains($0) }) else { return id }
+    let nums = parts[(i + 1)...].prefix { $0.count <= 2 && Int($0) != nil }
+    return parts[i].capitalized + (nums.isEmpty ? "" : " " + nums.joined(separator: "."))
+}
+
+struct ModelPicker: View {
+    let title: String
+    @Binding var selection: String
+    let choices: [String]
+    var body: some View {
+        Picker(title, selection: $selection) {
+            ForEach(choices, id: \.self) { id in
+                (Text(prettyModel(id)) + Text("  " + id).font(.caption).foregroundColor(.secondary)).tag(id)
+            }
+        }
+    }
 }
 
 // MARK: - Small views
@@ -308,6 +342,7 @@ struct SettingsView: View {
             AboutView(model: model).tag("about").tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(minWidth: 760, minHeight: 520)
+        .onChange(of: model.tab) { SettingsWindow.window?.title = SettingsWindow.title(for: model.tab) }
     }
 
     var keys: some View {
@@ -326,15 +361,9 @@ struct SettingsView: View {
     var ai: some View {
         Form {
             Section {
-                Picker("Classify", selection: $model.config.models.classify) {
-                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
-                }.help("Decides if a tip is needed. Runs often: fast and cheap. Recommended: Haiku.")
-                Picker("Tip", selection: $model.config.models.tip) {
-                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
-                }.help("Writes the tip you see. Recommended: Sonnet. Opus is too slow for live tips.")
-                Picker("After the call", selection: $model.config.models.analysis) {
-                    ForEach(model.modelChoices, id: \.self) { Text($0).tag($0) }
-                }.help("Summary and analysis. Not time-critical. Recommended: Opus.")
+                ModelPicker(title: "Classify", selection: $model.config.models.classify, choices: model.modelChoices).help("Decides if a tip is needed. Runs often: fast and cheap. Recommended: Haiku.")
+                ModelPicker(title: "Tip", selection: $model.config.models.tip, choices: model.modelChoices).help("Writes the tip you see. Recommended: Sonnet. Opus is too slow for live tips.")
+                ModelPicker(title: "After the call", selection: $model.config.models.analysis, choices: model.modelChoices).help("Summary and analysis. Not time-critical. Recommended: Opus.")
             } header: { Text("Models") } footer: {
                 Text(model.config.knownModels.isEmpty ? "Test the Claude key to load the models your key can use." : "Models your key can use.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -351,8 +380,8 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
-                Toggle("Local AI", isOn: $model.config.localAI.enabled)
-                    .help("Local models on this Mac: facts and cards by meaning, material for HELP NOW, project search. Off: keywords only.")
+                Toggle("Local AI (default for new calls)", isOn: $model.config.localAI.enabled)
+                    .help("The tips window menu can switch it for one call only. Local models on this Mac: facts and cards by meaning, material for HELP NOW, project search. Off: keywords only.")
                 Picker("Engine", selection: $model.config.localAI.engine) {
                     Text("Built-in (recommended)").tag("embedded")
                     Text("Ollama").tag("ollama")
@@ -415,14 +444,19 @@ struct SettingsView: View {
                             Toggle("Claude", isOn: $p.apiAllowed).toggleStyle(.checkbox)
                                 .help("Send this project's call text to the Claude API. Off: local layer only.")
                             Toggle("Index", isOn: $p.index.enabled).toggleStyle(.checkbox)
-                                .help("Search the project folder for HELP NOW and questions.")
+                                .help("Search the project folder for HELP NOW and questions. The index updates by itself a minute after files change, never during a call. \(IndexService.shared.results[p.root] ?? "")")
                         }
-                        .contextMenu { Button("Remove from Live Tips", role: .destructive) { model.removeProject(p.slug) } }
+                        .contextMenu {
+                            Button("Reindex now") { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
+                            Button("Remove from Live Tips", role: .destructive) { model.removeProject(p.slug) }
+                        }
                     }
                 } header: {
                     HStack {
                         Text("Projects")
                         Spacer()
+                        Button("Reindex all") { IndexService.shared.reindexAll() }
+                            .help("Rebuild the search index of every project with Index on (incremental, in the background, paused during calls). Log: <app folder>/logs/index.log")
                         Button("Re-import…") { model.importProjects() }
                     }
                 } footer: {
@@ -458,6 +492,22 @@ struct SettingsView: View {
 
     var general: some View {
         Form {
+            if !model.readyItems.allSatisfy(\.ok) {
+                Section {
+                    ForEach(model.readyItems, id: \.title) { it in
+                        HStack {
+                            Image(systemName: it.ok ? "checkmark.circle.fill" : "circle").foregroundStyle(it.ok ? Color.green : Color.secondary)
+                            Text(it.title)
+                            Spacer()
+                            if !it.ok, let tab = it.tab { Button(it.action) { model.tab = tab } }
+                            else if !it.ok, it.action == "Import…" { Button(it.action) { model.importProjects() } }
+                            else if !it.ok { Text(it.action).font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
+                } header: { Text("Get ready for the first call") } footer: {
+                    Text("This list disappears when everything is set. The same list is in About.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
             Section {
                 FolderRow(title: "Work folder",
                           hint: "The folder you connected to Cowork, where your project folders live. Live Tips keeps its files in <work folder>/Tools/LiveTips (the skill sees them) and reads the Notion mirror from <work folder>/_notion.",
@@ -485,6 +535,7 @@ struct SettingsView: View {
                     Text("Українська").tag("uk")
                 }
                 Toggle("Hide the tips window from screen sharing and screenshots", isOn: $model.config.stealthDefault)
+                    .help("Default for new calls. The tips window menu changes it for one call only.")
                 Toggle("Show Live Tips in the Dock", isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
                 Toggle("Write the call summary to Notion", isOn: $model.config.notionWriteSummary)
@@ -578,11 +629,16 @@ final class SettingsWindow {
     static var window: NSWindow?
     static let model = SettingsModel()
 
+    static func title(for tab: String) -> String {
+        ["general": "General", "keys": "Keys", "projects": "Projects", "ai": "AI", "about": "About Live Tips"][tab] ?? "Settings"
+    }
+
     static func show(tab: String = "general") {
         model.tab = tab
+        window?.title = title(for: tab)
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
-            w.title = "Live Tips Settings"
+            w.title = title(for: tab)
             w.setContentSize(NSSize(width: 820, height: 560))
             w.isReleasedWhenClosed = false
             window = w

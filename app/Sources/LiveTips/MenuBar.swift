@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var micItem = NSMenuItem()
     var startItem = NSMenuItem()
     var endItem = NSMenuItem()
+    var pauseItem = NSMenuItem()
+    var helpItem = NSMenuItem()
     var tipsItem = NSMenuItem()
     var notionItem = NSMenuItem()
     var lastStatus = EngineStatus()
@@ -30,11 +32,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         it.button?.toolTip = "Live Tips"
         let menu = NSMenu()
         menu.delegate = self
+        // The main action first; the status lines below it (review P2).
+        startItem = add(menu, "Start call…", #selector(startCall), "n")
+        tipsItem = add(menu, "Open tips window", #selector(showTips), "t")
+        pauseItem = add(menu, "Pause tips (⌃⌥P)", #selector(togglePause), "")
+        helpItem = add(menu, "HELP NOW (⌃⌥H)", #selector(helpNow), "")
+        endItem = add(menu, "End call", #selector(endCall), "")
+        menu.addItem(.separator())
         for l in statusLines { l.isEnabled = false; menu.addItem(l) }
         menu.addItem(.separator())
-        startItem = add(menu, "Start call…", #selector(startCall), "n")
-        endItem = add(menu, "End call", #selector(endCall), "")
-        tipsItem = add(menu, "Open tips window", #selector(showTips), "t")
         notionItem = add(menu, "Send last call to Notion", #selector(sendToNotion), "")
         micItem = add(menu, "Allow microphone…", #selector(requestMic), "")
         menu.addItem(.separator())
@@ -47,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item = it
         refresh()
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
+        HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
         if !UserDefaults.standard.bool(forKey: "onboarded") {
@@ -103,20 +110,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func refresh() {
         let cfg = config
+        IndexService.shared.configure(projects: ProjectRegistry.load(from: AppPaths.projects).projects, appRoot: appRoot,
+                                      python: cfg.engine.python, enabled: cfg.localAI.enabled)
         let st = EngineStatus.load(path: (appRoot as NSString).appendingPathComponent("state/status.json"))
         let month = SpendLedger.monthSpent()
         let recording = ["recording", "loading_model", "standby"].contains(st.state)
         lastStatus = st
         startItem.isHidden = recording
         endItem.isHidden = !recording
+        pauseItem.isHidden = st.state != "recording"
+        helpItem.isHidden = st.state != "recording"
         tipsItem.title = recording ? "Open tips window" : "Preview tips window"
         notionItem.isHidden = recording || CallEngine.shared.lastFile == nil
         notionItem.toolTip = CallEngine.shared.notionResult
         statusLines[0].title = st.state == "standby" ? "○ Waiting for the call" + (st.project.map { ": \($0)" } ?? "")
             : recording ? "● Recording" + (st.project.map { ": \($0)" } ?? "") : "Not recording"
-        statusLines[1].title = recording ? "Lines \(st.lines) · tips \(st.tips)" : "Start a call to see live numbers"
-        statusLines[2].title = String(format: "This call: $%.2f (warning $%.0f, stop $%.0f)", st.callSpentUSD, cfg.budget.callSoftUSD, cfg.budget.callHardUSD)
-        statusLines[2].isHidden = !recording
+        statusLines[1].title = String(format: "Lines %d · tips %d · this call $%.2f of $%.0f", st.lines, st.tips, st.callSpentUSD, cfg.budget.callHardUSD)
+        statusLines[1].isHidden = !recording
+        statusLines[2].isHidden = true
         statusLines[3].title = String(format: "This month: $%.2f of $%.0f", month, cfg.budget.monthlyHardUSD)
         micItem.isHidden = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         item?.button?.image = NSImage(systemSymbolName: recording ? "record.circle.fill" : "text.bubble", accessibilityDescription: "Live Tips")
@@ -136,6 +147,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func openSettings() { MainActor.assumeIsolated { SettingsWindow.show() } }
     @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
     @objc func openSettingsTab() { MainActor.assumeIsolated { SettingsWindow.show() } }
+
+    /// Same as the buttons in the tips window (the window owns the pause state and HELP NOW).
+    @objc func togglePause() { pushTips("document.getElementById('pause').click()") }
+    @objc func helpNow() { pushTips("document.getElementById('sos').click()") }
+    func pushTips(_ js: String) {
+        guard lastStatus.state == "recording" else { return }
+        if tips == nil { showTips() }
+        MainActor.assumeIsolated { tips?.push(js) }
+    }
 
     @objc func endCall() {
         let a = NSAlert()
@@ -186,7 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             a.status = call.status
             a.control = call.control
             a.html = Bundle.main.resourceURL?.appendingPathComponent("prompter.html").path ?? ""
-            a.title = "Live Tips (app)"
+            a.title = lastStatus.project.map { "Live Tips: \($0)" } ?? "Live Tips"
             let c = PrompterController(args: a)
             c.show()
             tips = c

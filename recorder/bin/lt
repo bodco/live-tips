@@ -375,8 +375,9 @@ DATE_PREFIX = re.compile(r"^(\d{4}-\d\d-\d\d(-\d{4})?-)+")
 
 
 def call_title_slug(s):
-    """2026-10-21-1457-team-daily -> team-daily"""
-    return DATE_PREFIX.sub("", os.path.basename(s))
+    """2026-10-21-1457-team-daily -> team-daily; ...-team-daily.app -> team-daily
+    (the Live Tips app adds .app to its stem so it can record the same call next to the skill)."""
+    return re.sub(r"\.app$", "", DATE_PREFIX.sub("", os.path.basename(s)))
 
 
 def prep_core(path, ext):

@@ -90,6 +90,9 @@ window, even at low opacity.
 - **What is Local AI?** A small model on this Mac (built-in bge-m3, or your Ollama) that matches facts and cards by meaning and powers HELP NOW and project search. Settings > AI explains the engines and how to add another one.
 - **Which "❓" cards are shown?** Only for a line that names you and asks something, a line with a work word (estimate, deadline, status, price, release…), or a question about time or amount ("when…?", "how much…?"). Rule: `rules/triggers.yaml` > `question_card`.
 - **What does it cost?** Usually $0.10 to $1.20 per hour of a call; the menu shows this call and this month against the limits from Settings.
+- **Does it write to Notion?** Yes, if Settings > General > "Write the call summary to Notion" is on and the Notion token in Keys can see the project's Meetings DB. After the call it appends a "Live Tips" section (wrap-up and the transcript file) to this meeting's page, found by `Date` within 20 min of the start, or creates the page. Menu bar > "Send last call to Notion" does it later. Details: docs, section 14.2.
+- **Can the app and the Cowork skill record the same call?** Yes. The app writes only `<call>.app.*` files with its own recorder, so nothing is shared; expect about twice the CPU. `livetips_m0.report` and `livetips_m0.judge` compare the two afterwards (docs, section 14.3).
+- **Shortcuts?** Control-Option-H is HELP NOW and Control-Option-P pauses tips, also while the meeting app has the focus.
 - **Where are the files?** Transcript, tips and wrap-up data: `<project folder>/live/`. App logs: `<app folder>/logs/`.
 
 ## M0 spike

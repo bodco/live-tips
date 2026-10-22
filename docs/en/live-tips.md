@@ -1074,3 +1074,53 @@ presentation): the app picks it up by itself when the prep title matches the cal
 in section 5.0). In **Start call** press **Copy request for Cowork** to get a ready prep request.
 Without a prep the app uses the call context you type in Start call, the project's current state
 and local search over the project folder.
+
+### 14.2 After the call: the meeting page in Notion
+
+With **Settings > General > Write the call summary to Notion** on, the app writes the wrap-up
+into Notion by itself when you end the call. You can also send the last call later from the
+menu bar: **Send last call to Notion**.
+
+1. One Claude call turns the transcript and the tips into a wrap-up: action items with owners
+   and dates, decisions, your commitments, new requests (scope change candidates), open
+   questions and risks.
+2. The app looks for this meeting's page in the project's Meetings DB: a page whose `Date` is
+   within 20 minutes of the call start (a Notion AI Meeting Notes page created from the calendar
+   counts).
+3. Found: it appends a **Live Tips** section to that page. Not found: it creates a new page with
+   the project and workspace relations and a real date mention in the title, like the skill.
+4. The transcript is attached to the page as `<call>-transcript.md`.
+
+What it needs:
+
+- a Notion token in **Settings > Keys** (an internal integration from
+  [notion.so/my-integrations](https://www.notion.so/my-integrations)) that has access to the
+  Meetings DB;
+- the project config with `meetings_db` and `project_page_id` (section 4, step 7).
+
+Only the transcript text goes to Claude and Notion; audio never leaves the Mac. A finished
+write shows an alert with **Open in Notion**. If the skill already wrote a page for the same
+meeting, the app adds its section to that page instead of creating a second one.
+
+### 14.3 The app and the skill on the same call
+
+You can run both on one call, for a fair comparison or as a backup. The app records with its
+own recorder in its own app folder and names its files `<call>.app.*`
+(`2026-10-22-1500-team-daily.app.md`), so the two never share a transcript, control or state
+files. Both run Whisper, so expect about twice the CPU and memory. Compare afterwards:
+
+```bash
+python -m livetips_m0.report <app folder>/runs/<call>.app --calls-root <project folder>/live
+python -m livetips_m0.judge --config <cfg.json> --md <project folder>/live/<call>.md \
+  --run <app folder>/runs/<call>.app --out <app folder>/runs/judge-<call>
+```
+
+`report` gives the tip count, latency and cost of each side; `judge` is a blind quality judge
+that scores every tip of both sides 1 to 5 without knowing which side wrote it.
+
+### 14.4 Shortcuts
+
+- **Control-Option-H**: HELP NOW, also when the meeting app has the focus.
+- **Control-Option-P**: pause or resume tips.
+
+The same two actions are in the menu bar menu during a call.

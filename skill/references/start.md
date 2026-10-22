@@ -15,6 +15,13 @@ else `{work_root}/{project_name}` if it exists, else ask. If the tool folder is 
 call `device_request_folder_access` for the tool root (one request, with a reason), do not
 wait for the user to find the button.
 
+**Live Tips app on the same call.** The macOS app can record the same call next to this skill
+(for a fair comparison, or as a backup). It runs its own recorder from its own app folder and
+writes only `<stem>.app.*` files (`2026-10-22-1500-team-daily.app.md`, `.app.md.tips.jsonl`), so
+the two never share a transcript, control or state. Never read, edit or delete the `.app.*`
+files during the call. `<app folder>/bin/lt status` shows the app's recorder the same way
+`lt status` shows this one. Both recorders run Whisper, so expect about twice the CPU and memory.
+
 ## Step 0 - Project and meeting
 
 1. **Project.** Slug from the request, or from the instructions of the claude.ai Project

@@ -2812,7 +2812,7 @@ def load_request(args) -> dict:
         req = json.loads(start.read_text(encoding="utf-8"))
         os.replace(start, CONTROL / "active.json")
     for k in ("project_dir", "title", "slug", "prompt", "me_lang", "me_langs", "langs", "model", "prompter", "mic_device",
-              "setup", "call_type", "hiring_role", "prompt_en", "prompt_uk"):
+              "setup", "call_type", "hiring_role", "prompt_en", "prompt_uk", "stem_suffix"):
         v = getattr(args, k, None)
         if v:
             req[k] = v
@@ -2869,7 +2869,9 @@ def main() -> int:
     title = cfg.get("title") or "Meeting"
     started = now()
     call_type, audience = normalize_meeting(cfg.get("call_type"), cfg.get("audience"))
-    out = Path(cfg["project_dir"]) / "live" / f"{dt.datetime.fromtimestamp(started):%Y-%m-%d-%H%M}-{slugify(title)}.md"
+    # stem_suffix (".app" from the Live Tips app): two recorders on the same call never share files.
+    suffix = re.sub(r"[^a-z0-9.-]", "", str(cfg.get("stem_suffix") or "").lower())
+    out = Path(cfg["project_dir"]) / "live" / f"{dt.datetime.fromtimestamp(started):%Y-%m-%d-%H%M}-{slugify(title)}{suffix}.md"
     tips_file = out.with_name(out.stem + ".tips.jsonl")
     inbox_file = out.with_name(out.stem + ".inbox.jsonl")
     STATE.mkdir(parents=True, exist_ok=True)

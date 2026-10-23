@@ -1044,7 +1044,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Download:**
-[LiveTips-0.5.1-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.1/LiveTips-0.5.1-beta.dmg)
+[LiveTips-0.5.2-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.2/LiveTips-0.5.2-beta.dmg)
 
 What it does:
 
@@ -1178,3 +1178,23 @@ late (the PM had already answered), repeated, or carried a number nobody had sai
 The skill's rules got the same changes in words (`SKILL.md` "Still open?", "A name is not an
 address", `references/sweep.md`, `references/presentation.md`).
 
+**Since 0.5.2:**
+
+8. **Meeting types in code.** Interview: Observer gets each question verbatim with what a strong
+   answer holds and nothing after the answer; Interviewer gets at most one "Уточни" per long
+   answer; Coach gets a red answer to every question and "no numbers now" on money, dates and
+   scope. Team calls: at most 12 tips an hour, no info level. Presentation: no pacing tips from
+   the model; once the Q&A starts (the PM's share falls below 40%), questions go straight to a tip.
+9. **The last calls in the context.** `lt digest <project> --days 7` lists the questions asked to
+   the PM with the answers, the PM's promises, what was typed in the window and the action items
+   of the last calls; the app adds it to the call context and the skill's prep turns it into
+   facts.
+10. **Presentation tracker.** Now / Next follows keywords weighted by how rare they are across
+   sections, prefers the current and the next section, moves back only on two matches, uses the
+   planned time per slide, and follows a colleague's sections. `slides.json` may hold `qa` per
+   slide: a question in the Q&A gets the prepared answer locally in about a second. A red card
+   with the PM's entry line appears before the PM's next slide, and one time line ("⏱ 18:00 з
+   40:00 · behind 2 min") replaces the red timing cards.
+11. **Rated after every call.** With Settings > AI > "Rate tips after each call" on (default), the
+   app runs a quick blind judge (Sonnet, up to 25 tips of the app and the skill, about $0.10) and
+   shows "Last call: app 3.4/5, skill 2.9/5" in the menu; details in `<call>.judge/`.

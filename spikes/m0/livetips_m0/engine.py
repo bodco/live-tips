@@ -21,6 +21,46 @@ from .transcript import Line, s_to_hms
 
 WORD = re.compile(r"\w+", re.UNICODE)
 
+# Meeting concept in code (2026-10-23, from the skill's hiring.md, presentation.md, SKILL.md "Tip diet").
+# Coach role: money, dates and scope asked of the PM get a red "no numbers now" tip.
+COACH_MONEY_CUES = ["price", "cost", "rate", "salary", "start date", "notice period", "budget",
+                    "цінов", "вартіст", "ставк", "зарплат", "дата старту", "дату старту", "бюджет"]
+COACH_MONEY_WORDS = {"ціна", "ціни", "ціну", "ціні", "ціною", "rate", "rates", "cost", "costs"}
+MEETING_EXEMPT_PER_MIN = 2           # hiring tips ignore the orange rate, max 2 per minute
+INTERVIEWER_ANSWER_WORDS = 40        # a them answer this long gets at most one "Уточни" tip
+TEAM_TIPS_PER_HOUR = 12              # team audience: non-red model tips per hour
+QA_SHARE_MAX = 0.40                  # presentation Q&A: the PM's share below this for QA_WINDOW_S
+QA_WINDOW_S = 60
+PACING = re.compile(r"(time left|minutes? left|min left|pace|pacing|behind schedule|skip (the )?slides?|speed up|"
+                    r"хвилин\w* (лишил|залишил)|залишилось \d+ ?хв|лишилось \d+ ?хв|темп|пропусти слайд|прискор|\bтаймінг|⏱)",
+                    re.I | re.U)
+OBSERVER_EVENT = ("Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = "
+                  "the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not "
+                  "apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = "
+                  "'для порівняння, не для озвучення'. Never analyse the PM. trigger direct_question.")
+INTERVIEWER_EVENT = ("Interview, role interviewer: the candidate just gave a long answer to the PM's question. If the answer "
+                     "is vague (no numbers, no own role, no result) give ONE orange tip: gist starting with '🟠 Уточни: ', "
+                     "phrase = the follow-up question the PM can ask now. Never suggest answers for the candidate. If the "
+                     "answer is concrete, skip. trigger add_fact.")
+COACH_QUESTION_EVENT = ("Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, "
+                        "phrase = a ready opening sentence, items = situation, action, result with a number, only from the "
+                        "brief, the fact book or the cards. trigger direct_question.")
+COACH_MONEY_EVENT = ("Interview, role coach: the other side asks about money, dates or scope (price, rate, salary, start date, "
+                     "notice period, budget). Give ONE red tip: gist like '🔴 Без цифр зараз', phrase = a calm sentence that "
+                     "defers the number (for example 'I would like to understand the scope first and come back with a "
+                     "number'), never a number. trigger direct_question.")
+QA_EVENT = ("Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the "
+            "brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.")
+
+
+def meeting_role(meta: Optional[dict]) -> str:
+    """observer, interviewer or coach on an interview call (legacy "candidate" = coach), else ""."""
+    meta = meta or {}
+    if meta.get("call_type") != "interview":
+        return ""
+    r = meta.get("hiring_role") or ""
+    return "coach" if r == "candidate" else r
+
 
 _HEAD_STR = r'"{}"\s*:\s*"((?:[^"\\]|\\.)*)"'
 
@@ -128,6 +168,7 @@ class Engine:
         self.diet_lock = threading.Lock()     # diet check + "shown" bookkeeping are one step
         # Names the PM gave to voices in the tips window (<stem>.speakers.json, written by the recorder).
         self.speakers = SpeakerNames(cfg.get("speakers_file"))
+        self.clarified_for = set()            # interviewer: PM question line ids that already got "Уточни"
 
     # ---------- input ----------
     def on_line(self, line: Line) -> None:
@@ -141,6 +182,19 @@ class Engine:
                 "written": line.written, "available_at": now, "signals": sig.tags}
         if self.paused or (self.budget and self.budget.state() == "hard"):
             return
+        mh = self.meeting_hint(line, sig, now)
+        if mh:
+            span["route"] = "direct"
+            span["meeting"] = mh["kind"]
+            span["event"] = mh["event"]
+            if mh.get("level"):
+                span["force_level"] = mh["level"]
+            if mh.get("exempt"):
+                span["rate_exempt"] = True
+            self._submit_tip(line, mh["trigger"], span)
+            return
+        if meeting_role(self.meta()) == "observer":
+            return                            # observer: only the question tips above, nothing after the answer
         route = sig.route if self.direct_enabled else ("classify" if sig.route else None)
         # Meeting concept (2026-10-23): triggers the skill switches off for this call type / audience.
         off = disabled_triggers(getattr(self.prompt, "meta", None))
@@ -365,6 +419,11 @@ class Engine:
             part = partial_head(buf)
             if not part:
                 return
+            if span.get("force_level"):
+                part["level"] = span["force_level"]
+            if self.meeting_block(part, trigger, span):
+                early["shown"] = None
+                return
             now = self.clock()
             if self.stale(line, trigger):
                 early["shown"] = None          # the trigger is already resolved: no early card
@@ -375,11 +434,11 @@ class Engine:
                 early["shown"] = None
                 return
             with self.diet_lock:
-                if self._diet(part, now):
+                if self._diet(part, now, exempt=bool(span.get("rate_exempt"))):
                     early["shown"] = None      # decided: wait for the full tip, no early card
                     return
                 with self.lock:                # counts for the rate and same-topic checks at once
-                    self.tips.append(dict(part, uid=uid, partial=True, _at=now))
+                    self.tips.append(dict(part, uid=uid, partial=True, _at=now, _exempt=bool(span.get("rate_exempt"))))
                     if part["level"] != "red":
                         self.last_nonred_emit = now
             seg_end0 = line.seg_end if line.seg_end is not None else line.t_s
@@ -390,11 +449,12 @@ class Engine:
             span["shown_at"] = now
             span["e2e_shown_s"] = round(now - seg_end0, 2)
 
+        event = span.get("event") or trigger
         if self.tip_cache_warm.is_set():
-            c = self._call("tip", line, trigger, on_text=on_text)
+            c = self._call("tip", line, event, on_text=on_text)
         else:
             with self.tip_warm_lock:
-                c = self._call("tip", line, trigger, on_text=on_text)
+                c = self._call("tip", line, event, on_text=on_text)
                 if not c.error:
                     self.tip_cache_warm.set()
         done = self.clock()
@@ -433,6 +493,15 @@ class Engine:
             retract()
             self.out_timing.write(span)
             return
+        if span.get("force_level"):
+            obj["level"] = span["force_level"]
+        blocked = self.meeting_block(obj, obj.get("trigger", trigger), span)
+        if blocked:
+            span["outcome"] = blocked
+            span["gist"] = obj.get("gist")
+            retract()
+            self.out_timing.write(span)
+            return
         if gate is not None:
             gate["event"].wait(2.0)
             if gate["need_tip"] is False:
@@ -463,7 +532,7 @@ class Engine:
             verdict = None                     # a gist already on screen is kept
         else:
             with self.diet_lock:
-                verdict = self._diet(obj, done)
+                verdict = self._diet(obj, done, exempt=bool(span.get("rate_exempt")))
                 if not verdict and obj.get("level") != "red":
                     with self.lock:
                         self.last_nonred_emit = done
@@ -482,7 +551,7 @@ class Engine:
         item = {k: v for k, v in item.items() if v not in ("", [], None) or k in ("late",)}
         with self.lock:
             self.tips[:] = [t for t in self.tips if not (t.get("uid") == uid and t.get("partial"))]
-            self.tips.append(dict(item, _at=done))
+            self.tips.append(dict(item, _at=done, _exempt=bool(span.get("rate_exempt"))))
             if item["level"] != "red":
                 self.last_nonred_emit = done
         self.out_tips.write(item)
@@ -496,7 +565,7 @@ class Engine:
         self.out_timing.write(span)
 
     # ---------- diet (code, not prompt) ----------
-    def _diet(self, obj: dict, now: float) -> Optional[str]:
+    def _diet(self, obj: dict, now: float, exempt: bool = False) -> Optional[str]:
         if obj.get("level") == "red":
             # A red tip is never rate-limited, but the same red tip twice within a minute is noise
             # (two lines of one turn can both trigger "your turn").
@@ -508,6 +577,22 @@ class Engine:
             return None
         if self.presenting(now):
             return "presenting"
+        meta = self.meta()
+        if meta.get("audience") == "team":
+            # Team calls: no info tips (the PM did not ask; window asks and SOS do not pass the diet) and
+            # at most TEAM_TIPS_PER_HOUR non-red model tips per hour.
+            if obj.get("level") == "info":
+                return "team_info"
+            with self.lock:
+                uids = {t.get("uid") or id(t) for t in self.tips if t.get("level") != "red" and "_at" in t
+                        and t["_at"] >= now - 3600 and t.get("kind", "tip") == "tip"}
+            if len(uids) >= TEAM_TIPS_PER_HOUR:
+                return "team_hour_cap"
+        if exempt:
+            # Hiring tips ignore the orange rate (hiring.md "Live tips by role"), max 2 per minute.
+            with self.lock:
+                n = len({t.get("uid") for t in self.tips if t.get("_exempt") and t.get("_at", -1e9) >= now - 60})
+            return "meeting_rate" if n >= MEETING_EXEMPT_PER_MIN else None
         if self.last_nonred_emit is not None and now - self.last_nonred_emit < self.rate_s:
             return "rate"
         with self.lock:
@@ -522,9 +607,93 @@ class Engine:
         return None
 
     # ---------- meeting concept and live mode ----------
+    def meta(self) -> dict:
+        return getattr(self.prompt, "meta", None) or {}
+
     def set_meeting(self, change: dict) -> bool:
-        """call_type / audience / hiring_role changed in the window's menu (status.json)."""
-        return self.prompt.set_meeting(change) if hasattr(self.prompt, "set_meeting") else False
+        """call_type / audience / hiring_role changed in the window's menu (status.json). Every meeting
+        rule in the engine reads the prompt's meta live, so a change applies from the next line."""
+        changed = self.prompt.set_meeting(change) if hasattr(self.prompt, "set_meeting") else False
+        if changed:
+            with self.lock:
+                self.clarified_for.clear()
+            self._presenting = False
+        return changed
+
+    def _is_question(self, line: Line, sig=None) -> bool:
+        if sig is not None and sig.question:
+            return True
+        words = re.findall(r"[\w'ʼ’]+", line.text.lower())
+        return "?" in line.text or (bool(words) and any(w in self.detector.q for w in words[:2]))
+
+    def meeting_hint(self, line: Line, sig, now: float) -> Optional[dict]:
+        """Routing by meeting concept (hiring.md "Live tips by role", presentation.md Q&A). Returns
+        {kind, trigger, event, level?, exempt?} for a line that goes straight to a tip, or None."""
+        meta = self.meta()
+        role = meeting_role(meta)
+        if line.speaker != "them":
+            return None
+        if role == "observer":
+            if self._is_question(line, sig) and not sig.name_mention:
+                return {"kind": "observer_question", "trigger": "direct_question", "event": OBSERVER_EVENT,
+                        "level": "orange", "exempt": True}
+            return None
+        if role == "coach":
+            tl = line.text.lower()
+            words = re.findall(r"[\w'ʼ’]+", tl)
+            if any(w in COACH_MONEY_WORDS for w in words) or any(
+                    (c in tl) if " " in c else any(w.startswith(c) for w in words)
+                    for c in COACH_MONEY_CUES if c not in ("rate", "cost")):
+                return {"kind": "coach_money", "trigger": "direct_question", "event": COACH_MONEY_EVENT, "level": "red"}
+            if self._is_question(line, sig):
+                return {"kind": "coach_question", "trigger": "direct_question", "event": COACH_QUESTION_EVENT, "level": "red"}
+            return None
+        if role == "interviewer":
+            with self.lock:
+                hist = [h for h in self.history if h.line_id <= line.line_id]
+            q, answer = None, []
+            for h in reversed(hist):
+                if h.speaker == "me":
+                    q = h
+                    break
+                answer.append(h)
+            if q is None or not self._is_question(q) or q.line_id in self.clarified_for:
+                return None
+            n = sum(len(h.text.split()) for h in answer)
+            if n >= INTERVIEWER_ANSWER_WORDS:
+                with self.lock:
+                    self.clarified_for.add(q.line_id)
+                return {"kind": "interviewer_clarify", "trigger": "add_fact", "event": INTERVIEWER_EVENT,
+                        "level": "orange", "exempt": True}
+            return None
+        if meta.get("call_type") == "presentation" and self._is_question(line, sig) and self.qa_mode(now):
+            return {"kind": "presentation_qa", "trigger": "direct_question", "event": QA_EVENT}
+        return None
+
+    def qa_mode(self, now: float) -> bool:
+        """Presentation Q&A: the PM spoke before, and the PM's share of the last QA_WINDOW_S seconds
+        (characters) is below QA_SHARE_MAX over a window that covers most of it."""
+        with self.lock:
+            hist = list(self.history)
+        if not any(h.speaker == "me" for h in hist):
+            return False
+        recent = [h for h in hist if h.t_s >= now - QA_WINDOW_S]
+        if not recent or now - min(h.t_s for h in hist) < QA_WINDOW_S:
+            return False
+        me = sum(len(h.text) for h in recent if h.speaker == "me")
+        tot = sum(len(h.text) for h in recent) or 1
+        return me / tot < QA_SHARE_MAX
+
+    def meeting_block(self, obj: dict, trigger: str, span: dict) -> Optional[str]:
+        """Model tips the meeting concept does not allow, checked on the streamed gist and the full tip."""
+        meta = self.meta()
+        if meeting_role(meta) == "observer" and not span.get("meeting"):
+            return "role_observer"            # after the answer: nothing (no add_fact, no fix_owner_date)
+        if meta.get("call_type") == "presentation" and obj.get("level") != "red":
+            text = " ".join([obj.get("gist", ""), obj.get("topic", ""), obj.get("phrase", "")])
+            if trigger == "timer_checkpoint" or obj.get("trigger") == "timer_checkpoint" or PACING.search(text):
+                return "presentation_timing"  # the recorder owns the time line
+        return None
 
     def presenting(self, now: float) -> bool:
         """The skill's live mode (read_delta detect_mode): presenting when the PM has more than 65% of

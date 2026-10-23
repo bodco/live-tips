@@ -43,7 +43,7 @@ conversation, which costs tens of seconds without tips and loses detail. So:
   `offset`. They hold everything the loop needs.
 
 **Required output of every sweep (no exceptions):** `<transcript name>.brief.md`,
-`<transcript name>.cards.json` (15-40 cards) and `<transcript name>.facts.json` (40-200 facts),
+`<transcript name>.cards.json` (15-40 cards) and `<transcript name>.facts.json` (40-120 facts, never over 200),
 plus `<transcript name>.outline.json` for a presentation. The main session verifies them with
 `lt prep-check`; a sweep that returns without cards and facts is not finished.
 
@@ -230,10 +230,16 @@ PM investigated lately, with the numbers. A JSON list, 40-200 items:
   6. Prices, limits and dates from the brief and the Insight Bank; people (role, area).
   7. **The last calls of this project** (review of 41 calls, 2026-10-23: 11 times in 10 calls
      the PM corrected a stale prep by hand, "the invite is already sent", "I told them about
-     the redeploy"): the transcripts, tips and the PM's typed lines in `<project_root>/live/`
-     of the last 7 days (`*.md`, `*.inbox.jsonl`, `*.tips.jsonl`; newest first, skip
-     `prep-*`, `.named.`, `.clean.`). Take what was said, promised, asked and answered there,
-     with the date, and prefer it over an older Notion row on the same subject.
+     the redeploy"): one device_bash call, `python3 <tool_root>/bin/lt digest "<project_root>"
+     --days 7 --max-chars 6000 --pm-names "<settings.user.name_aliases, comma separated>"` (newest first: questions to the PM with
+     the PM's answer, promises and dates the PM said, what the PM typed, action items;
+     speaker names applied; prep-*, .named., .clean. and the app's copies are skipped; under
+     1 s). Do not read the raw `live/` files for this unless the digest is empty and a call is
+     known to exist. The prep writes the digest's open questions, promises and answers into
+     the fact book as `position` facts with the date in `source` ("call 2026-01-14"), and
+     prefers them over an older Notion row on the same subject. A fact contradicted by a
+     newer call (the PM said otherwise later, or the item is done) is dropped, not kept
+     next to the new one.
 - **Three kinds of facts, not only numbers.** On the real calls 84% of the facts were numbers,
   but the questions to the PM were about numbers only 50% of the time; positions, definitions
   and coordination ("what did we decide about X", "what is Y", "who does Z") were covered at
@@ -241,6 +247,11 @@ PM investigated lately, with the numbers. A JSON list, 40-200 items:
   price, count, with the source), `position` (what we decided, propose or refuse, in one
   sentence the PM can say), `meaning` (what a term, module or option is, in one sentence).
   Put the kind into `keywords` only if useful; the format stays the same.
+- **Fact kinds checklist (for the subagent, before writing facts.json).** Per topic of the
+  brief: at least one `number`, one `position` and one `meaning` fact when the sources have
+  them (say "no position in the sources" in the checklist line instead of inventing one);
+  the `position` facts from `lt digest` (item 7) first; target 40-120 facts in total, not
+  200: a fact nobody will ask about is noise that hides the right one.
 - **Unverified never as a claim.** A fact with "(verify)", "to confirm", "?" or an uncertain
   source gets `"status": "unverified"` and its `text` starts with "Перевірити:". The recorder
   and the model may remind the PM to check it, never state it (one such fact became a claim

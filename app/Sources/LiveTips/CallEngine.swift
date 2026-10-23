@@ -20,6 +20,14 @@ final class CallEngine {
     var projectConfig = ""          // projects/<slug>.md of this call (Meetings DB and page IDs for Notion)
     var lastFile: String?
     var notionResult = ""      // last post-call Notion write: link or error
+    var appTipsFile: String?   // the tips file the tips engine writes (--tips-out), for the post-call judge
+    var judgeRunning: Process?
+    /// Last post-call judge result, one line ("Last call: app 3.4/5 (12 tips), skill 2.9/5 (20 tips)").
+    var judgeResult: String {
+        get { (try? String(contentsOfFile: judgeResultPath, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
+        set { try? newValue.write(toFile: judgeResultPath, atomically: true, encoding: .utf8) }
+    }
+    var judgeResultPath: String { (appRoot as NSString).appendingPathComponent("state/last-judge.txt") }
     var sidecarRestarts = 0
     var projectRoot = ""
 
@@ -90,7 +98,10 @@ final class CallEngine {
                 t.invalidate()
                 self.sidecar?.terminate()
                 IndexService.shared.resume()
-                if let file = st.file ?? self.lastFile, apiAllowed { self.writeToNotion(file: file) }
+                if let file = st.file ?? self.lastFile, apiAllowed {
+                    self.writeToNotion(file: file)
+                    self.runJudge(file: file)          // background, optional: never blocks the UI or the call
+                }
             }
         }
         return nil
@@ -140,17 +151,20 @@ final class CallEngine {
             try? d.write(to: URL(fileURLWithPath: cfgPath), options: .atomic)
         }
         let stem = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
+        let tipsOut = status.tipsFile ?? (file + ".tips.jsonl")
+        appTipsFile = tipsOut
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
         p.arguments = ["-m", "livetips_m0.live", "--config", cfgPath, "--md", file] + (fromStart ? ["--from-start"] : []) + [
                        "--out", (appRoot as NSString).appendingPathComponent("runs/" + stem),
                        "--status", statusPath, "--idle-min", "0", "--state-dir", state,
-                       "--tips-out", status.tipsFile ?? (file + ".tips.jsonl"),
+                       "--tips-out", tipsOut,
                        "--inbox", status.inboxFile ?? ""]
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = ProcessInfo.processInfo.environment
         env["CLAUDE_API"] = key
-        env["PYTHONDONTWRITEBYTECODE"] = "1"     // the engine may live inside the signed app bundle                 // passed to the child only, never written or logged
+        env["LT_PM_NAMES"] = c.nameAliases.joined(separator: ",")   // lt digest: questions addressed to the PM
+        env["PYTHONDONTWRITEBYTECODE"] = "1"     // the engine may live inside the signed app bundle; the key goes to the child only, never written or logged
         p.environment = env
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/tips-engine.log"))
         p.standardOutput = log
@@ -206,6 +220,53 @@ final class CallEngine {
             }
         }
         do { try p.run() } catch { notionResult = "Notion: could not start (\(error.localizedDescription))" }
+    }
+
+    /// After the call: the blind judge (Sonnet, at most 25 tips) rates the app's and the skill's tips in the
+    /// background and writes <transcript dir>/<stem>.judge/judge.summary.json. Optional (Settings > AI);
+    /// any failure only leaves a line in logs/judge.log.
+    func runJudge(file: String) {
+        let c = config
+        guard c.judgeAfterCall, judgeRunning?.isRunning != true else { return }
+        guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
+        let cfgPath = (appRoot as NSString).appendingPathComponent("state/sidecar-config.json")
+        guard FileManager.default.fileExists(atPath: cfgPath) else { return }
+        let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
+        guard let key = store.get(.claudeAPIKey) else { return }
+        let dir = (file as NSString).deletingLastPathComponent
+        var stem = (file as NSString).lastPathComponent
+        if stem.hasSuffix(".md") { stem = String(stem.dropLast(3)) }
+        let out = (dir as NSString).appendingPathComponent(stem + ".judge")
+        let ct = ((callRequest["call_type"] as? String) ?? "").lowercased()
+        let callType = ct.contains("present") ? "presentation" : (ct.contains("interview") || ct.contains("hiring")) ? "interview" : "auto"
+        var args = ["-m", "livetips_m0.judge", "--config", cfgPath, "--md", file, "--call-type", callType, "--quick", "--out", out]
+        if let t = appTipsFile { args += ["--app-tips", t] }
+        if let r = callRequest["hiring_role"] as? String, !r.isEmpty { args += ["--role", r] }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
+        p.arguments = args
+        p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
+        p.qualityOfService = .background
+        var env = ProcessInfo.processInfo.environment
+        env["CLAUDE_API"] = key                    // passed to the child only, never written or logged
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        p.environment = env
+        let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/judge.log"))
+        p.standardOutput = log
+        p.standardError = log
+        p.terminationHandler = { [weak self] _ in
+            let summary = (out as NSString).appendingPathComponent("judge.summary.json")
+            let d = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: summary)))) as? [String: Any] ?? [:]
+            var parts: [String] = []
+            for eng in ["app", "skill"] {
+                if let e = d[eng] as? [String: Any], let n = e["n"] as? Int, n > 0, let m = e["mean"] as? Double {
+                    parts.append(String(format: "%@ %.1f/5 (%d tips)", eng, m, n))
+                }
+            }
+            let line = parts.isEmpty ? "Last call: no tips rated" : "Last call: " + parts.joined(separator: ", ")
+            DispatchQueue.main.async { self?.judgeResult = line; self?.judgeRunning = nil }
+        }
+        do { try p.run(); judgeRunning = p } catch { judgeResult = "Last call: judge could not start" }
     }
 
     func notify(_ text: String, url: String? = nil) {

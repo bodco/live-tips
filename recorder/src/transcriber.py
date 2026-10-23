@@ -734,6 +734,15 @@ def parse_outline(data) -> list[dict]:
     return out
 
 
+def parse_qa(v) -> list[dict]:
+    """Per-slide Q&A: [{"q": "...", "a": "...", "keywords": [...]}]; entries without q, a or keywords are dropped."""
+    out = []
+    for e in v if isinstance(v, list) else []:
+        if isinstance(e, dict) and _s(e.get("q")) and _s(e.get("a")) and _strs(e.get("keywords")):
+            out.append({"q": _s(e.get("q")), "a": _s(e.get("a")), "keywords": _strs(e.get("keywords"))})
+    return out
+
+
 def parse_slides(data) -> list[dict]:
     out = []
     for i, x in enumerate(_as_list(data, "slides")):
@@ -754,7 +763,8 @@ def parse_slides(data) -> list[dict]:
         out.append({"n": x.get("n", i + 1), "title": _s(x.get("title")),
                     "who": who if who in ("me", "shared", "other") else "other",
                     "speaker": _s(x.get("speaker")), "sec": sec, "body": body,
-                    "numbers": _strs(x.get("numbers"))[:6]})     # 2026-10-23: the figures of this slide, shown on the card
+                    "numbers": _strs(x.get("numbers"))[:6],      # 2026-10-23: the figures of this slide, shown on the card
+                    "qa": parse_qa(x.get("qa"))})
     return out
 
 
@@ -997,23 +1007,212 @@ class FactBook:
                                  "items": items, "note": " · ".join(str(f.get("source", "")) for f in shown if f.get("source"))})
 
 
+# ---- Presentation tracker helpers (2026-10-23). Pure functions, tested without audio.
+
+def section_slide_range(sec: dict, n_max: int = 200) -> tuple[int, int] | None:
+    """The slide numbers a section covers: "slides": [12, 16] or "12-16", else a trailing
+    "12-16" / "слайд 12" in the title. None when unknown."""
+    v = sec.get("slides")
+    nums: list[int] = []
+    if isinstance(v, (list, tuple)):
+        nums = [int(x) for x in v if str(x).strip().isdigit()]
+    elif v is not None:
+        nums = [int(x) for x in re.findall(r"\d+", str(v))]
+    if not nums:
+        m = re.search(r"(\d{1,3})\s*[-\u2013]\s*(\d{1,3})(?!.*\d)", _s(sec.get("title")))
+        if m:
+            nums = [int(m.group(1)), int(m.group(2))]
+        else:
+            m = re.search(r"(?:слайд\w*|slides?)\s*(\d{1,3})\b", _s(sec.get("title")), re.I)
+            if m:
+                nums = [int(m.group(1))]
+    if not nums:
+        return None
+    lo, hi = min(nums), max(nums)
+    return (lo, hi) if 0 < lo <= hi <= n_max else None
+
+
+def keyword_weights(kw_sets: list[set[str]]) -> list[dict[str, float]]:
+    """Per section: keyword token -> weight 1/df, df = how many sections share that keyword."""
+    out = []
+    for ks in kw_sets:
+        w = {}
+        for x in ks:
+            df = sum(1 for other in kw_sets if any(tok_match(x, y) for y in other))
+            w[x] = 1.0 / max(1, df)
+        out.append(w)
+    return out
+
+
+def score_section(recent: list[str], weights: dict[str, float]) -> float:
+    """Sum of the weights of this section's keywords heard in the recent words (each once)."""
+    heard = set(recent)
+    return sum(wt for x, wt in weights.items() if any(tok_match(t, x) for t in heard))
+
+
+def pick_section(scores: list[float], cur: int, allowed: list[bool] | None = None,
+                 expected: int | None = None) -> int:
+    """Position prior: cur and cur+1 get a bonus, a jump within cur-1..cur+3 needs score 2,
+    further needs 3; `expected` (planned section by elapsed time) adds a weak bonus. Returns the
+    winning index, or cur when nothing beats staying."""
+    best, best_v = cur, None
+    cur_v = scores[cur] + 0.75 if 0 <= cur < len(scores) else 0.0
+    for i, sc in enumerate(scores):
+        if i == cur or (allowed is not None and not allowed[i]) or sc <= 0:
+            continue
+        if cur < 0:
+            need, bonus = (1.5 if i <= 1 else 3.0), (0.5 if i <= 1 else 0.0)
+        elif i == cur + 1:
+            need, bonus = 1.5, 0.5
+        elif cur - 1 <= i <= cur + 3:
+            need, bonus = 2.0, 0.0
+        else:
+            need, bonus = 3.0, 0.0
+        if expected is not None and i == expected:
+            bonus += 0.4
+        if sc < need:
+            continue
+        v = sc + bonus
+        if v <= cur_v + 0.25:
+            continue
+        if best_v is None or v > best_v or (v == best_v and abs(i - cur) < abs(best - cur)):
+            best, best_v = i, v
+    return best
+
+
+def plan_spans(sections: list[dict], slides: list[dict]) -> list[tuple[int, int] | None]:
+    """Planned (start_s, end_s) of each section on the cumulative slide timeline, None if unmapped."""
+    secs = {}
+    for sl in slides:
+        try:
+            secs[int(sl.get("n"))] = int(sl.get("sec") or 0)
+        except (TypeError, ValueError):
+            continue
+    if not secs:
+        return [None] * len(sections)
+    order = sorted(secs)
+    cum, acc = {}, 0
+    for n in order:
+        cum[n] = acc
+        acc += secs[n]
+    out = []
+    for x in sections:
+        r = section_slide_range(x, max(order))
+        if not r:
+            out.append(None)
+            continue
+        ns = [n for n in order if r[0] <= n <= r[1]]
+        out.append((cum[ns[0]], cum[ns[-1]] + secs[ns[-1]]) if ns else None)
+    return out
+
+
+def expected_section(spans: list, t_plan: float) -> int | None:
+    for i, sp in enumerate(spans):
+        if sp and sp[0] <= t_plan < sp[1]:
+            return i
+    return None
+
+
+def section_who(sec: dict, slides: list[dict]) -> str:
+    """me | other | shared: the section's own "who", else from its slides (all other = other)."""
+    w = _s(sec.get("who")).lower()
+    if w in ("me", "other", "shared"):
+        return w
+    r = section_slide_range(sec)
+    if r and slides:
+        ws = {s.get("who") for s in slides if isinstance(s.get("n"), int) and r[0] <= s["n"] <= r[1]}
+        if ws == {"other"}:
+            return "other"
+    return "me"
+
+
+def handoff_slide(sec: dict, slides: list[dict]) -> dict | None:
+    """When a colleague's section ends on the last `other` slide before a `me` slide, that me slide."""
+    r = section_slide_range(sec)
+    if not r or not slides:
+        return None
+    by_n = {s["n"]: s for s in slides if isinstance(s.get("n"), int)}
+    last = by_n.get(r[1])
+    nxt = by_n.get(r[1] + 1)
+    if last and nxt and last.get("who") == "other" and nxt.get("who") == "me":
+        return nxt
+    return None
+
+
+def fmt_mmss(sec: float) -> str:
+    sec = max(0, int(sec))
+    return f"{sec // 60}:{sec % 60:02d}"
+
+
+def timeline_text(t_plan: float, total: float, span: tuple[int, int] | None) -> str:
+    """"⏱ 12:30 з 40:00 · відстаєте 3 хв" (behind the planned end of the current section),
+    "випереджаєте" (before its planned start), else "за планом"."""
+    tail = "за планом"
+    if span:
+        if t_plan > span[1] + 30:
+            tail = f"відстаєте {max(1, round((t_plan - span[1]) / 60))} хв"
+        elif t_plan < span[0] - 30:
+            tail = f"випереджаєте {max(1, round((span[0] - t_plan) / 60))} хв"
+    return f"⏱ {fmt_mmss(t_plan)} з {fmt_mmss(total)} · {tail}"
+
+
+QA_CUE = re.compile(r"\?|питан|вопрос|question|чому|почему|why|what|how|як\b|що\b|чи\b", re.I)
+
+
+def qa_kw_hit(kw: str, low: str, toks: list[str]) -> bool:
+    k = kw.lower().strip()
+    if not k:
+        return False
+    if k in low:
+        return True
+    kt = tokens(k)
+    return bool(kt) and all(any(tok_match(a, b) for b in toks) for a in kt)
+
+
+def qa_pick(text: str, entries: list[dict]) -> dict | None:
+    """The best slide Q&A entry for a question line: >= 2 keywords, or 1 keyword of 6+ letters."""
+    if not text or not (QUESTION_CUE.search(text) or QA_CUE.search(text)):
+        return None
+    low, toks = text.lower(), tokens(text)
+    best, best_n = None, 0
+    for e in entries:
+        hits = [k for k in e.get("keywords", []) if qa_kw_hit(k, low, toks)]
+        ok = len(hits) >= 2 or any(len(re.sub(r"\W", "", k)) >= 6 for k in hits)
+        if ok and len(hits) > best_n:
+            best, best_n = e, len(hits)
+    return best
+
+
 class Outline:
     """Presentation tracker (<transcript stem>.outline.json), written by the skill:
-      [{"id": "s15", "title": "Pipedrive: prices", "points": ["4 plans, 14-69 EUR", ...],
-        "keywords": ["pipedrive", "тариф", "lite", "growth"]}, ...]
+      [{"id": "s15", "title": "Pipedrive: prices 12-16", "points": [...], "keywords": [...],
+        "slides": [12, 16] (optional), "who": "me" | "other" (optional)}, ...]
     Every PM line is matched against the sections; the window pins "Now" and "Next" (kind
-    "outline_pos"). It moves forward or back only on a clear match, so a side remark does not
-    jump around; the skill may rewrite the file (e.g. the next section) during the call."""
+    "outline_pos"). 2026-10-23 (review D): keywords only (not title/points), weighted by rarity
+    across sections, with a position prior (stay, or next; far jumps need a clearly higher
+    score; going back needs two consecutive wins), a weak time prior from slides.json budgets,
+    colleague sections tracked from `them` lines, a handoff card before the PM's block and a
+    time line every 60 s in presentation mode."""
 
     def __init__(self, transcript: Path, tips: Path):
         self.path = transcript.with_name(transcript.stem + ".outline.json")
         self.tips = tips
         self.mtime = None
         self.sections: list[dict] = []
-        self.sets: list[set[str]] = []
+        self.weights: list[dict[str, float]] = []
         self.cur = -1
         self.recent: list[str] = []
+        self.recent_them: list[str] = []
+        self.back_cand: int | None = None
         self.bad_mtime = None
+        self.slides_src: "Slides | None" = None
+        self.plan_key = None
+        self.spans: list = []
+        self.who: list[str] = []
+        self.t0: float | None = None
+        self.t0_plan = 0.0
+        self.last_timeline = 0.0
+        self.handoffs_done: set = set()
 
     def refresh(self) -> None:
         """Same contract as FactBook.refresh: never raises, mtime only after a good parse."""
@@ -1025,18 +1224,31 @@ class Outline:
             return
         try:
             sections = parse_outline(json.loads(self.path.read_text(encoding="utf-8")))
-            sets = [set(tokens(" ".join([x["title"]] + x["keywords"] + x["points"]))) for x in sections]
+            weights = keyword_weights([set(tokens(" ".join(x["keywords"]))) for x in sections])
         except Exception as e:  # noqa: BLE001
             if self.bad_mtime != m:
                 self.bad_mtime = m
                 log(f"outline: cannot read {self.path.name} ({e!r})")
             return
-        self.sections, self.sets, self.mtime = sections, sets, m
+        self.sections, self.weights, self.mtime = sections, weights, m
+        self.plan_key = None
         if self.cur >= len(self.sections):      # the skill rewrote the outline shorter
             self.cur = len(self.sections) - 1
         _append_json(self.tips, {"kind": "outline", "at": hhmmss(now()), "sections": self.sections})
         self._emit()
         log(f"outline: {len(self.sections)} sections from {self.path.name}")
+
+    def _slides(self) -> list[dict]:
+        return self.slides_src.slides if self.slides_src is not None else []
+
+    def _plan(self) -> None:
+        key = (self.mtime, self.slides_src.mtime if self.slides_src is not None else None)
+        if key == self.plan_key:
+            return
+        sl = self._slides()
+        self.spans = plan_spans(self.sections, sl)
+        self.who = [section_who(x, sl) for x in self.sections]
+        self.plan_key = key
 
     def _emit(self) -> None:
         if not self.sections:
@@ -1046,22 +1258,68 @@ class Outline:
                                  "cur": self.sections[cur].get("id") if cur >= 0 else None,
                                  "next": self.sections[cur + 1].get("id") if cur + 1 < len(self.sections) else None})
 
-    def check(self, line: "Line") -> None:
-        if not self.sections or line.channel != "me":
+    def _t_plan(self, t: float) -> float | None:
+        return None if self.t0 is None else self.t0_plan + (t - self.t0)
+
+    def _move(self, i: int, t: float, paused: bool) -> None:
+        if self.t0 is None and self.who[i] == "me":
+            self.t0 = t
+            sp = self.spans[i] if i < len(self.spans) else None
+            self.t0_plan = float(sp[0]) if sp else 0.0
+        self.cur, self.back_cand = i, None
+        self.recent, self.recent_them = [], []
+        self._emit()
+        if paused or not presenting_quiet():
             return
-        self.recent = (self.recent + tokens(line.text))[-60:]   # ~the last 20-30 s of the PM's words
-        best, best_i = 0, -1
-        lo, hi = max(0, self.cur - 1), min(len(self.sections), self.cur + 4)
-        for i in range(len(self.sections)):
-            sc = sum(1 for t in set(self.recent) if any(tok_match(t, x) for x in self.sets[i]))
-            near = lo <= i < hi
-            if (near and sc >= 3) or sc >= 6:
-                if sc > best or (sc == best and i > best_i and near):
-                    best, best_i = sc, i
-        if best_i >= 0 and best_i != self.cur:
-            self.cur = best_i
-            self.recent = []
-            self._emit()
+        nxt = handoff_slide(self.sections[i], self._slides()) if self.who[i] == "other" else None
+        if nxt and nxt.get("n") not in self.handoffs_done:
+            self.handoffs_done.add(nxt.get("n"))
+            first = next((b["t"] for b in nxt.get("body", []) if b.get("k") == "p"), "")
+            _append_json(self.tips, {"t": hhmmss(t), "src": hhmmss(t), "at": hhmmss(now()), "kind": "card",
+                                     "level": "red", "gist": f"🎤 Твій вихід: слайд {nxt.get('n')} {nxt.get('title', '')}",
+                                     "phrase": first, "card": f"handoff-{nxt.get('n')}"})
+
+    def check(self, line: "Line", paused: bool = False) -> None:
+        if not self.sections or line.channel not in ("me", "them"):
+            return
+        self._plan()
+        if line.channel == "them":
+            if "other" not in self.who:
+                return                          # no colleague sections: the other side never moves us
+            self.recent_them = (self.recent_them + tokens(line.text))[-60:]
+            words, allowed = self.recent_them, [w == "other" for w in self.who]
+        else:
+            self.recent = (self.recent + tokens(line.text))[-60:]   # ~the last 20-30 s of the PM's words
+            words, allowed = self.recent, [w != "other" for w in self.who]
+        scores = [score_section(words, w) for w in self.weights]
+        tp = self._t_plan(line.t)
+        exp = expected_section(self.spans, tp) if tp is not None else None
+        i = pick_section(scores, self.cur, allowed, exp)
+        if i == self.cur:
+            return
+        if i < self.cur:                        # backwards: two consecutive wins
+            if self.back_cand != i:
+                self.back_cand = i
+                return
+        self._move(i, line.t, paused)
+
+    def tick(self, t: float) -> None:
+        """Every 60 s in presentation mode: one time line under Now (kind "timeline")."""
+        if not presenting_quiet() or self.t0 is None or not self.sections or t - self.last_timeline < 60:
+            return
+        self._plan()
+        if not any(self.spans):
+            return
+        self.last_timeline = t
+        meta_total = self.slides_src.total_min if self.slides_src is not None else None
+        try:
+            total = float(meta_total) * 60 if meta_total else 0.0
+        except (TypeError, ValueError):
+            total = 0.0
+        total = total or float(sum(int(s.get("sec") or 0) for s in self._slides()))
+        sp = self.spans[self.cur] if 0 <= self.cur < len(self.spans) else None
+        _append_json(self.tips, {"kind": "timeline", "at": hhmmss(now()),
+                                 "text": timeline_text(self._t_plan(t) or 0.0, total, sp)})
 
 
 class Slides:
@@ -1069,16 +1327,22 @@ class Slides:
     the skill from the speaker notes:
       {"title": "...", "total_min": 40, "slides": [{"n": 12, "title": "...",
         "who": "me" | "shared" | "other", "speaker": "Maria", "sec": 75,
-        "body": [{"k": "p" | "s" | "h" | "c", "t": "..."}]}]}
+        "body": [{"k": "p" | "s" | "h" | "c", "t": "..."}],
+        "qa": [{"q": "...", "a": "...", "keywords": ["...", "..."]}] (optional)}]}
     k: p = read aloud, s = may be skipped, h = hint (not read), c = cue from another speaker.
     The window shows one card per slide in the left half (split view) when the meeting type is
-    presentation. Same refresh contract as Outline: never raises, mtime only after a good parse."""
+    presentation. Same refresh contract as Outline: never raises, mtime only after a good parse.
+    2026-10-23: per-slide Q&A shown instantly as an orange card when the other side asks."""
 
     def __init__(self, transcript: Path, tips: Path):
         self.path = transcript.with_name(transcript.stem + ".slides.json")
         self.tips = tips
         self.mtime = None
         self.bad_mtime = None
+        self.slides: list[dict] = []
+        self.total_min = None
+        self.qa: list[dict] = []
+        self.qa_last: dict[str, float] = {}
 
     def refresh(self) -> None:
         try:
@@ -1097,9 +1361,22 @@ class Slides:
             return
         self.mtime = m
         meta = data if isinstance(data, dict) else {}
+        self.slides, self.total_min = slides, meta.get("total_min")
+        self.qa = [dict(e, n=s["n"], key=f"qa-{s['n']}-{j}") for s in slides for j, e in enumerate(s.get("qa", []))]
         _append_json(self.tips, {"kind": "slides", "at": hhmmss(now()), "title": _s(meta.get("title")),
                                  "total_min": meta.get("total_min"), "slides": slides})
-        log(f"slides: {len(slides)} slides from {self.path.name}")
+        log(f"slides: {len(slides)} slides from {self.path.name}" + (f", {len(self.qa)} Q&A" if self.qa else ""))
+
+    def check(self, line: "Line") -> None:
+        if not self.qa or line.channel != "them" or not presenting_quiet():
+            return
+        e = qa_pick(line.text, self.qa)
+        if not e or now() - self.qa_last.get(e["key"], 0) < 120:
+            return
+        self.qa_last[e["key"]] = now()
+        _append_json(self.tips, {"t": hhmmss(line.t), "src": hhmmss(line.t), "at": hhmmss(now()),
+                                 "kind": "card", "level": "orange", "gist": "❓ " + short_gist(e["q"], 60),
+                                 "phrase": e["a"], "card": f"qa-{e['n']}"})
 
 
 def _append_json(path: Path, obj: dict) -> None:
@@ -3066,6 +3343,7 @@ def main() -> int:
     facts = FactBook(out, tips_file)
     outline = Outline(out, tips_file)
     slides = Slides(out, tips_file)
+    outline.slides_src = slides          # 2026-10-23: plan, colleague blocks and time from slides.json
     # Semantic layer (Ollama): its own thread; the transcript path never waits for it.
     sem_live: SemanticLive | None = None
     sem_index = None          # read-only project index for SOS snippets and search requests
@@ -3158,7 +3436,8 @@ def main() -> int:
             if not paused:
                 cards.check(line_obj)
                 facts.check(line_obj)
-            outline.check(line_obj)
+                slides.check(line_obj)
+            outline.check(line_obj, paused)
         except Exception as e:  # noqa: BLE001
             log(f"cards: {e!r}")
         # Talk meter and transcription lag (shown in the tips window footer).
@@ -3499,6 +3778,7 @@ def main() -> int:
                 facts.refresh()
                 outline.refresh()
                 slides.refresh()
+                outline.tick(now())
             except Exception as e:  # noqa: BLE001   (refresh never raises; belt and braces)
                 log(f"prep refresh: {e!r}")
         if stop_file.exists():

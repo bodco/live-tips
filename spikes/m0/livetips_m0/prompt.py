@@ -114,14 +114,29 @@ def facts_block(facts_path: Optional[Path], cards_path: Optional[Path], limit: i
 # Interview roles, same meaning as the skill's references/hiring.md (hiring_role).
 ROLE_NOTES = {
     "observer": "Interview, role observer: the PM is silent and watches; the candidate is the OTHER person. "
-                "On a question to the candidate give ONE tip with the question itself and what a strong answer "
-                "would contain; never analyse the PM's replies.",
-    "interviewer": "Interview, role interviewer: the PM asks the questions. Tips: the next question to ask, a "
-                   "follow-up when an answer is vague (no numbers, no own role, no result), and what is still "
-                   "uncovered; never suggest answers for the candidate.",
+                "On a question to the candidate give ONE orange tip: gist = the question verbatim, phrase = what "
+                "a strong answer would contain (for comparison, not to be said). After the answer: nothing; never "
+                "analyse the PM's or the candidate's replies.",
+    "interviewer": "Interview, role interviewer: the PM asks the questions. Tips: the next question to ask, at most "
+                   "one orange 'Уточни' follow-up after a long answer that is vague (no numbers, no own role, no "
+                   "result), and what is still uncovered; never suggest answers for the candidate.",
     "coach": "Interview, role coach: the PM is the one being interviewed (a job interview, a client asking "
-             "about the PM's experience). Tips: a short structure for the answer (situation, action, result with "
-             "a number), a strength to lead into, and a ready opening sentence; keep them calm and short.",
+             "about the PM's experience). A question to the PM is a red tip: a short structure for the answer "
+             "(situation, action, result with a number), a strength to lead into, and a ready opening sentence. "
+             "On money, dates or scope (price, rate, salary, start date, notice period, budget) a red tip "
+             "'без цифр зараз' with a sentence that defers the number; never a number.",
+}
+
+AUDIENCE_NOTES = {
+    "client": "Client call: restricted internal facts may shape a tip, but numbers from them are never stated.",
+    "boss": "Client rules (the PM's manager acts as the client): restricted internal facts may shape a tip, "
+            "but numbers from them are never stated.",
+    "team": "Team call: no corrections of the PM, no info tips; at most a few tips per hour.",
+}
+
+TYPE_NOTES = {
+    "presentation": "Presentation: the recorder owns the time line; never a timing or pacing tip. In Q&A answer "
+                    "audience questions with one fact.",
 }
 
 
@@ -161,10 +176,13 @@ class PromptBuilder:
         if self.blocks and new == self.meta:
             return False
         self.meta = call_meta = new
+        role = "coach" if call_meta.get("hiring_role") == "candidate" else call_meta.get("hiring_role")
         header = "Call: {title}. Project: {project}. Audience: {audience}. Type: {call_type}. Languages: {langs}. " \
                  "The PM's lines are labelled \"{me_label}\"; everyone else \"{them_label}\" (a speaker tag like [S2] may follow). " \
-                 "The PM is addressed as: {aliases}.{role}".format(
-                     role=(" " + ROLE_NOTES[call_meta["hiring_role"]]) if call_meta.get("hiring_role") in ROLE_NOTES else "",
+                 "The PM is addressed as: {aliases}.{role}{aud}{typ}".format(
+                     role=(" " + ROLE_NOTES[role]) if call_meta.get("call_type") == "interview" and role in ROLE_NOTES else "",
+                     aud=(" " + AUDIENCE_NOTES[call_meta.get("audience")]) if call_meta.get("audience") in AUDIENCE_NOTES else "",
+                     typ=(" " + TYPE_NOTES[call_meta.get("call_type")]) if call_meta.get("call_type") in TYPE_NOTES else "",
                      title=call_meta.get("title", ""), project=call_meta.get("project", ""),
                      audience=call_meta.get("audience", "auto"), call_type=call_meta.get("call_type", "auto"),
                      langs=", ".join(call_meta.get("langs", [])), me_label=call_meta.get("me_label", ""),

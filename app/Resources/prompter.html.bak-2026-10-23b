@@ -1,0 +1,2487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Tips</title>
+<style>
+  /* ---------- tokens: light by default, dark follows the system (or data-theme) ---------- */
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --panel2: #eef0f3; --text: #14161b; --muted: #5b6270;
+    --line: #dde1e7; --red: #d23434; --orange: #a35500; --blue: #2c6bd6; --green: #1d8656;
+    --red-bg: #fdecec; --orange-bg: #fff3e3; --blue-bg: #eaf1fd; --green-bg: #e8f6ef;
+    --crit: #c62828; --scrim: rgba(20, 22, 27, .28); --shadow: 0 12px 40px rgba(20, 22, 27, .18);
+    --size: 18px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121418; --panel: #1b1e25; --panel2: #171a20; --text: #eef0f4; --muted: #a3aab6;
+      --line: #2a2e37; --red: #ff6b6b; --orange: #ffad4d; --blue: #6cb2ff; --green: #55cf95;
+      --red-bg: #3a1c1f; --orange-bg: #33260f; --blue-bg: #16263d; --green-bg: #143024;
+      --scrim: rgba(0, 0, 0, .45); --shadow: 0 12px 40px rgba(0, 0, 0, .55);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121418; --panel: #1b1e25; --panel2: #171a20; --text: #eef0f4; --muted: #a3aab6;
+    --line: #2a2e37; --red: #ff6b6b; --orange: #ffad4d; --blue: #6cb2ff; --green: #55cf95;
+    --red-bg: #3a1c1f; --orange-bg: #33260f; --blue-bg: #16263d; --green-bg: #143024;
+    --scrim: rgba(0, 0, 0, .45); --shadow: 0 12px 40px rgba(0, 0, 0, .55);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: var(--size)/1.38 -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", sans-serif; }
+  body { display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  button, select, input { font-family: inherit; color: inherit; }
+  /* see-through window: a halo keeps every letter readable over whatever is behind */
+  body.halo { --halo-c: var(--halo, var(--bg)); text-shadow: 0 0 1px var(--halo-c), 0 0 2px var(--halo-c), 0 0 4px var(--halo-c), 0 0 8px var(--halo-c); }
+  body.halo .tip, body.halo #alert, body.halo #agenda { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+  /* ---------- top bar: state + mute + menu ---------- */
+  #bar { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; font-size: 13px; flex: none;
+    -webkit-user-select: none; user-select: none; }
+  #dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+  #dot.rec { background: var(--red); animation: pulse 1.6s infinite; }
+  #dot.ok { background: var(--green); }
+  #dot.warn { background: var(--orange); }
+  #dot.dead { background: var(--red); box-shadow: 0 0 0 3px var(--red-bg); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  #title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #elapsed { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  #spacer { flex: 1; }
+  #meter { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none;
+    padding: 2px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+  #meter:empty { display: none; }
+  #meter.long { color: var(--orange); border-color: var(--orange); background: var(--orange-bg); font-weight: 600; }
+  .ib { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel);
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; font-size: 15px; padding: 0; }
+  .ib:hover { border-color: var(--muted); }
+  .ib svg { width: 16px; height: 16px; }
+  #mute.muted { background: var(--red); border-color: var(--red); color: #fff; }
+  #gear.open { background: var(--text); color: var(--panel); border-color: var(--text); }
+  /* "Tips paused" pill: only while paused; a click resumes */
+  #pausedpill { display: none; font-size: 12px; font-weight: 700; white-space: nowrap; flex: none; cursor: pointer;
+    padding: 2px 8px; border-radius: 999px; border: 1px solid var(--orange); color: var(--orange); background: var(--orange-bg); }
+  body.paused #pausedpill { display: inline-block; }
+
+  /* ---------- "Now speaking" line: slim, under the bar, only while someone else talks ---------- */
+  #spkline { display: none; align-items: center; gap: 6px; padding: 0 8px 5px 12px; flex: none; font-size: 12px; position: relative; }
+  #spkline.show { display: flex; }
+  #spkchip { display: inline-flex; align-items: center; gap: 5px; max-width: min(100%, 320px); min-width: 0; overflow: hidden; min-height: 24px; padding: 2px 9px 2px 7px;
+    border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer;
+    font-size: 12px; font-weight: 600; }
+  #spkchip:hover, #spkchip.open { border-color: var(--blue); color: var(--blue); }
+  #spkchip .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #spkchip.unnamed .nm { font-weight: 500; }
+  #spkchip svg { width: 11px; height: 11px; flex: none; opacity: .7; }
+  #spkpop { display: none; position: absolute; top: 100%; left: 8px; right: 8px; z-index: 6; margin-top: 2px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 8px 10px; font-size: 12px; max-height: 70vh; overflow-y: auto; }
+  #spkpop.show { display: block; }
+  #spkpop .ph { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  #spkpop .ph b { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #spkpop .ph small { flex: none; }
+  #spkpop .ph small { color: var(--muted); font-weight: 400; }
+  #spkpop h6 { margin: 8px 0 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+  #spkpop .none { color: var(--muted); font-style: italic; }
+
+  /* shared: name buttons and the name input row (speaker card and popover) */
+  .names { display: flex; flex-wrap: wrap; gap: 5px; }
+  .nb { min-height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; max-width: 100%; min-width: 0; }
+  .nb .nt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }   /* long "First Last": cut, full name in the tooltip */
+  .nb:hover { border-color: var(--blue); color: var(--blue); }
+  .nb .sc { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--muted); }
+  .nb .sc.hi { background: var(--green); } .nb .sc.mid { background: var(--orange); }
+  .nrow { display: flex; gap: 5px; margin-top: 6px; }
+  .nrow input { flex: 1; min-width: 0; min-height: 32px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 13px; outline: none; }
+  .nrow input:focus { border-color: var(--blue); }
+  .nrow .go { min-height: 32px; min-width: 44px; border-radius: 8px; border: 0; background: var(--blue); color: #fff; cursor: pointer;
+    font-size: 12px; font-weight: 700; padding: 0 10px; }
+  .xb { width: 32px; height: 32px; border: 0; background: transparent; color: var(--muted); border-radius: 8px; cursor: pointer;
+    font-size: 14px; flex: none; padding: 0; }
+  .xb:hover { background: var(--panel2); color: var(--text); }
+
+  /* ---------- "Who is speaking?" card: pinned above the list until answered or skipped ---------- */
+  #spkask { display: none; margin: 6px 8px 0; padding: 7px 8px 8px 10px; border-radius: 10px; flex: none;
+    background: var(--panel); border: 1px solid var(--blue); border-left: 4px solid var(--blue);
+    max-height: 60%; overflow-y: auto; font-size: 13px; }
+  #spkask.show { display: block; }
+  .tip.partial .gist::after { content: " …"; opacity: .6; }
+  #spkask.mini { max-height: none; padding-top: 4px; padding-bottom: 4px; cursor: pointer; }
+  #spkask.mini .quote, #spkask.mini .names, #spkask.mini .nrow { display: none; }
+  #spkask.mini { max-height: none; padding-top: 4px; padding-bottom: 4px; cursor: pointer; }
+  #spkask.mini .quote, #spkask.mini .names, #spkask.mini .nrow { display: none; }
+  #spkask .h { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  #spkask .h b { font-size: 14px; white-space: nowrap; flex: none; }
+  #spkask .h .sid { color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #spkask .h .secs { flex: none; }
+  #spkask .moreq, #spkask .skip { flex: none; }
+  #spkask .h .grow { flex: 1; }
+  #spkask .moreq { font-size: 12px; color: var(--blue); white-space: nowrap; border: 1px solid var(--blue); border-radius: 999px; padding: 0 7px; }
+  #spkask .skip { min-height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent;
+    color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 600; }
+  #spkask .skip:hover { color: var(--text); border-color: var(--muted); }
+  #spkask .quote { margin: 3px 0 7px; color: var(--text); font-style: italic; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  #spkask .quote .qt { font-style: normal; color: var(--muted); font-size: 12px; margin-right: 5px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- the single alert slot ---------- */
+  #alert { display: none; margin: 0 8px 6px; padding: 6px 6px 6px 10px; border-radius: 8px; font-size: 13px;
+    align-items: center; gap: 8px; flex: none; font-weight: 600; }
+  #alert.show { display: flex; }
+  #alert.crit { background: var(--crit); color: #fff; }
+  #alert.warn { background: var(--orange-bg); color: var(--orange); border: 1px solid var(--orange); }
+  #alert.info { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue); }
+  #alert.ok { background: var(--green-bg); color: var(--green); font-weight: 500; }
+  #alert.wait { background: var(--panel); color: var(--orange); border: 1px dashed var(--orange); font-weight: 500; }
+  #alert .msg { flex: 1; min-width: 0; }
+  #alert .msg small { display: block; font-weight: 400; opacity: .92; font-size: 12px; }
+  #alert button { border: 1px solid currentColor; background: transparent; border-radius: 6px; padding: 4px 9px;
+    font-size: 12px; cursor: pointer; white-space: nowrap; font-weight: 600; min-height: 28px; }
+  #alert.crit button { background: #fff; color: var(--crit); border-color: #fff; }
+  #alert button.x { border: 0; padding: 4px 6px; opacity: .8; }
+  #alert.ok button[data-act="go"] { background: var(--green); color: #fff; border-color: var(--green); font-weight: 700; padding: 6px 16px; }
+
+  /* ---------- dock: agenda / now-next / pinned ---------- */
+  #dock { flex: 0 1 auto; min-height: 0; max-height: 46%; overflow-y: auto; margin: 0 8px; display: flex; flex-direction: column; gap: 6px; }
+  #dock:empty { display: none; }
+  #agenda { display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px;
+    font-size: 13px; -webkit-user-select: none; user-select: none; flex: none; }
+  #agenda.has { display: block; }
+  #dock:has(#nowbox.has) #agenda { display: none; }   /* presentation: Now / Next replaces the agenda */
+  #agenda .head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  #agenda .lab { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #agnext { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #agnext b { font-weight: 600; }
+  #segs { display: flex; gap: 3px; margin-top: 5px; }
+  #segs i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); display: block; }
+  #segs i.done { background: var(--green); } #segs i.cur { background: var(--blue); }
+  #aggist { display: none; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  #agenda:not(.collapsed) #aggist:not(:empty) { display: block; }
+  #aglist { list-style: none; margin: 4px 0 0; padding: 0; display: none; gap: 2px; }
+  #agenda:not(.collapsed) #aglist { display: grid; }
+  #aglist li { display: flex; gap: 6px; padding: 1px 0; }
+  #aglist li::before { content: "\25CB"; color: var(--muted); width: 12px; flex: none; }
+  #aglist li.done { color: var(--muted); text-decoration: line-through; }
+  #aglist li.done::before { content: "\2713"; color: var(--green); text-decoration: none; }
+  #aglist li.cur { font-weight: 600; } #aglist li.cur::before { content: "\25CF"; color: var(--blue); }
+  .chev { color: var(--muted); transition: transform .15s; flex: none; }
+  #agenda:not(.collapsed) .chev { transform: rotate(180deg); }
+
+  #nowbox { display: none; background: var(--blue-bg); border-radius: 10px; padding: 7px 10px; font-size: .86em; flex: none; }
+  #nowbox.has { display: block; }
+  #nowbox .now { font-weight: 700; }
+  #nowbox ul { margin: 2px 0 0; padding-left: 1.2em; }
+  #nowbox .nxt { color: var(--muted); margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); }
+
+  #pinbox { display: none; flex-direction: column; gap: 6px; }
+  #pinbox.has { display: flex; }
+
+  /* ---------- fact results (instant, from the ask field) ---------- */
+  #fres { display: none; margin: 0 8px 6px; background: var(--panel); border: 1px solid var(--orange); border-radius: 10px;
+    padding: 3px 10px; font-size: 14px; flex: 0 1 auto; min-height: 0; max-height: 40%; overflow-y: auto; }
+  #fres.has { display: block; }
+  #fres .fr { padding: 5px 0; border-bottom: 1px solid var(--line); }
+  #fres .fr:last-of-type { border-bottom: 0; }
+  #fres .fid { color: var(--orange); font-weight: 700; margin-right: 6px; }
+  #fres .fsrc { color: var(--muted); font-size: 12px; }
+  #fres .hint { color: var(--muted); font-size: 12px; padding: 3px 0 2px; border-top: 1px solid var(--line); }
+
+  /* ---------- local "working on it" pill after HELP NOW ---------- */
+  #working { display: none; margin: 6px 8px 0; padding: 5px 10px; border-radius: 999px; background: var(--red-bg);
+    color: var(--red); border: 1px solid var(--red); font-size: 13px; font-weight: 700; flex: none; align-self: flex-start; }
+  #working.show { display: block; }
+
+  /* ---------- tips list ---------- */
+  #list { flex: 1; overflow-y: auto; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+  #empty { color: var(--muted); text-align: center; margin-top: 18px; font-size: 14px; }
+  .tip { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 10px;
+    padding: 7px 10px 5px; flex: none; }
+  .tip.red { border-left-color: var(--red); } .tip.orange { border-left-color: var(--orange); }
+  .tip.info { border-left-color: var(--green); }
+  .tip.fact { border-left-color: var(--orange); }
+  .tip.card { border-left-style: double; border-left-width: 6px; }
+  .tip .q { font-size: 12px; color: var(--muted); letter-spacing: .02em; margin-bottom: 2px; }
+  .gist { font-weight: 700; line-height: 1.3; }
+  .phrase { margin-top: 3px; }
+  .phrase::before { content: "\201C"; color: var(--muted); } .phrase::after { content: "\201D"; color: var(--muted); }
+  .items { margin: 4px 0 0; padding-left: 1.3em; font-size: .92em; }
+  .more { display: none; font-size: 12px; color: var(--blue); cursor: pointer; background: none; border: 0; padding: 2px 0; }
+  .foot { display: flex; align-items: flex-end; gap: 6px; margin-top: 4px; min-height: 26px; }
+  .meta { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 7px; align-items: center; }
+  .meta .note { font-style: italic; }
+  .lag { font-variant-numeric: tabular-nums; } .lag.slow { color: var(--orange); font-weight: 600; }
+  .latetag { font-size: 10px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--orange); color: var(--orange); font-weight: 600; }
+  .fb { display: flex; gap: 2px; flex: none; }
+  .fb button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid transparent; background: transparent;
+    color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 13px; }
+  .fb button svg { width: 14px; height: 14px; }
+  .fb button:hover { border-color: var(--line); background: var(--panel2); color: var(--text); }
+  .fb button.on { color: #fff; }
+  .fb .yes.on { background: var(--green); } .fb .part.on { background: var(--orange); } .fb .no.on { background: var(--red); }
+  .fb .pin.on { background: var(--blue); }
+  /* the newest card is the big one; older cards are smaller and calmer by colour, not by opacity */
+  .tip.latest { box-shadow: 0 0 0 1px var(--line), 0 2px 8px rgba(0, 0, 0, .08); }
+  .tip:not(.latest):not(.pinned) { background: var(--panel2); font-size: .86em; }
+  .tip:not(.latest):not(.pinned) .phrase { color: var(--muted); }
+  .tip:not(.latest):not(.pinned) .fb { opacity: .45; transition: opacity .12s; }
+  .tip:not(.latest):not(.pinned):hover .fb, .tip .fb:has(.on) { opacity: 1; }
+  .tip.dismissed .gist, .tip.dismissed .phrase { text-decoration: line-through; text-decoration-color: var(--muted); }
+  .tip.ask, .tip.ask:not(.latest):not(.pinned) { background: transparent; border-style: dashed; border-left-style: solid; border-left-color: var(--muted); }
+  /* "❓ question heard": a slim grey line, replaced when the next tip arrives */
+  .qline { border-left: 3px solid var(--muted); padding: 1px 8px; font-size: 13px; color: var(--muted);
+    display: flex; gap: 8px; flex: none; }
+  .qline .qtext { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qline .qt { font-size: 12px; flex: none; }
+  /* 🆘 items: strong red */
+  .tip.sos, .tip.sos:not(.latest):not(.pinned) { background: var(--red-bg); border-color: var(--red); border-left-width: 6px; }
+  .tip.sos .gist { color: var(--red); }
+  /* pinned (in the dock): compact, list folded behind "N points" */
+  .tip.pinned { background: var(--panel); }
+  .tip.pinned .more { display: inline; }
+  .tip.pinned .items { display: none; } .tip.pinned.open .items { display: block; }
+  .why { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; }
+  .why .rc { border: 1px solid var(--line); background: transparent; border-radius: 999px; font-size: 12px; padding: 3px 9px; cursor: pointer; }
+  .why .rc.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+  .why input { flex-basis: 100%; font-size: 12px; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--bg); color: inherit; }
+  .why .sent { color: var(--green); }
+
+  /* ---------- bottom: quick asks, one field, the two big call buttons ---------- */
+  #chips { display: flex; gap: 5px; padding: 0 8px 6px; flex: none; overflow-x: auto; scrollbar-width: none; }
+  #chips::-webkit-scrollbar { display: none; }
+  #chips button { white-space: nowrap; border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+    font-size: 12px; padding: 4px 10px; cursor: pointer; }
+  #chips button:hover { border-color: var(--blue); color: var(--blue); }
+  #ask { display: flex; gap: 6px; padding: 0 8px 8px; flex: none; align-items: stretch; }
+  .field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 0 3px 0 9px; min-height: 40px; }
+  .field:focus-within { border-color: var(--blue); }
+  .field > svg { width: 15px; height: 15px; color: var(--muted); flex: none; }
+  #q { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: 14px; padding: 8px 0; }
+  #send { width: 32px; height: 32px; border: 0; border-radius: 8px; background: var(--blue); color: #fff; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0; }
+  #send svg { width: 15px; height: 15px; }
+  .act { min-height: 40px; min-width: 44px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 700;
+    padding: 0 10px; white-space: nowrap; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+  /* Pause is a mode: a small icon in the top bar next to mute. HELP NOW is the one action: a red button with text. */
+  #pause svg { width: 15px; height: 15px; }
+  #pause.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+  #pause:focus-visible, #sos:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  #sos { background: var(--red); border: 0; color: #fff; padding: 0 14px; height: 40px; font-size: 13px; letter-spacing: .04em; }
+  #sos:hover { filter: brightness(1.1); }
+  #sos kbd { font: 600 10px/1 -apple-system, sans-serif; opacity: .8; margin-left: 2px; letter-spacing: 0; }
+  #sos:active, #pause:active { transform: translateY(1px); }
+
+  /* short window (e.g. 420x280): chips hide until the field has focus, alerts lose the second line */
+  @media (max-height: 330px) {
+    #chips { display: none; }
+    body:has(#q:focus) #chips { display: flex; }
+    #alert .msg small { display: none; }
+    #segs { display: none; }
+    #dock { max-height: 38%; }
+    #pinbox .tip { padding: 3px 6px 3px 10px; font-size: .86em; display: flex; align-items: center; gap: 6px; }
+    #pinbox .tip .phrase, #pinbox .tip .items, #pinbox .tip .more, #pinbox .tip .meta, #pinbox .tip .q { display: none; }
+    #pinbox .tip .foot { margin-top: 0; min-height: 0; }
+    #pinbox .tip .gist { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    body:has(#alert.show:not(.ok):not(.wait)) #agenda { display: none; }
+    /* the speaker card stays usable but compact: one-line quote, the dock gives way while it is open */
+    #spkask { padding: 5px 6px 6px 8px; max-height: 58%; }
+    #spkask .quote { -webkit-line-clamp: 1; margin-bottom: 5px; }
+    #spkask .nrow { margin-top: 5px; }
+    body:has(#spkask.show) #dock { display: none; }
+    #spkline { padding-bottom: 3px; }
+  }
+
+  /* ---------- the ⚙ menu ---------- */
+  #scrim { position: absolute; inset: 44px 0 0 0; background: var(--scrim); display: none; z-index: 4; }
+  #menu { position: absolute; top: 44px; right: 8px; left: 8px; max-height: calc(100% - 52px); overflow-y: auto; z-index: 5;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+    font-size: 13px; display: none; }
+  body.menu #menu, body.menu #scrim { display: block; }
+  .sec { padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .sec:last-child { border-bottom: 0; }
+  .sec h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+  .rowf { display: grid; grid-template-columns: 92px 1fr minmax(0, auto); align-items: center; gap: 8px; min-height: 32px; }
+  .rowf > span:first-child { color: var(--muted); }
+  .rowf select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 7px;
+    font-size: 13px; padding: 4px 6px; }
+  .pill { font-size: 12px; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .pill.wait { color: var(--orange); } .pill.ok { color: var(--green); } .pill.warn { color: var(--red); }
+  .hintline { color: var(--muted); font-size: 12px; margin: 0 0 4px 100px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; justify-self: start; }
+  .seg button { border: 0; background: transparent; padding: 5px 9px; font-size: 12px; cursor: pointer; border-right: 1px solid var(--line); }
+  .seg button:last-child { border-right: 0; }
+  .seg button.on { background: var(--text); color: var(--panel); }
+  .slider { display: flex; align-items: center; gap: 8px; }
+  .slider input { flex: 1; accent-color: var(--blue); min-width: 0; }
+  .slider .a1 { font-size: 12px; } .slider .a2 { font-size: 17px; font-weight: 600; }
+  #sizeval { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; width: 34px; text-align: right; }
+  .switch { width: 38px; height: 22px; border-radius: 999px; background: var(--line); border: 0; position: relative; cursor: pointer; padding: 0; justify-self: start; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transition: left .15s; }
+  .switch.on { background: var(--green); } .switch.on::after { left: 19px; }
+  .switch.na { opacity: .45; }
+  .ctxline { display: flex; align-items: center; gap: 8px; }
+  .togline { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; min-height: 32px; margin-top: 4px; }
+  .togline .t { cursor: pointer; } .togline .t small { display: block; color: var(--muted); font-size: 12px; }
+  #uilang button { padding: 5px 10px; }
+  .ctxline .t { flex: 1; } .ctxline .t small { display: block; color: var(--muted); font-size: 12px; }
+  .btn { border: 1px solid var(--line); background: var(--bg); border-radius: 7px; padding: 6px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  #status { font-size: 12px; color: var(--text); line-height: 1.5; }
+  #status.deaf { color: #fff; background: var(--crit); border-radius: 4px; padding: 0 6px; font-weight: 600; }
+  #diag { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before { content: "\25B8  "; } details[open] summary::before { content: "\25BE  "; }
+  #helpbox { font-size: 12px; line-height: 1.45; margin-top: 6px; }
+  #helpbox h5 { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  #helpbox h5:first-child { margin-top: 0; }
+  #helpbox dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 10px; margin: 0; }
+  #helpbox dt { font-weight: 600; white-space: nowrap; } #helpbox dd { margin: 0; color: var(--muted); }
+
+  /* ---------- presentation split view: slide cards (left) + the usual tips stream (right) ---------- */
+  #main { display: flex; flex-direction: column; position: relative; flex: 1 1 0; min-width: 0; height: 100%; overflow: hidden; }
+  #deckpane { display: none; }
+  body.split { flex-direction: row; }
+  body.split #deckpane { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; height: 100%; position: relative;
+    border-right: 1px solid var(--line); }
+  #dkbtn { display: none; }
+  body.dkready #dkbtn { display: inline-flex; }
+  body.split #dkbtn { background: var(--blue-bg); border-color: var(--blue); }
+  #dkswap { display: none; font-size: 17px; }
+  body.split #dkswap { display: inline-flex; }
+  body.split.swap #dkswap { background: var(--blue-bg); border-color: var(--blue); }
+  body.split.swap #deckpane { order: 2; border-right: 0; border-left: 1px solid var(--line); }
+  #dk-top { flex: none; padding: 8px 10px 6px 12px; display: flex; flex-direction: column; gap: 6px;
+    border-bottom: 1px solid var(--line); -webkit-user-select: none; user-select: none; }
+  .dk-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+  .dk-num { font-weight: 700; font-variant-numeric: tabular-nums; background: var(--text); color: var(--bg);
+    border-radius: 6px; padding: 1px 8px; font-size: 14px; flex: none; }
+  .dk-ttl { font-weight: 600; font-size: 14px; flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #dk-rem { font-size: 26px; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+  #dk-rem.warn { color: var(--orange); } #dk-rem.neg { color: var(--red); }
+  .dk-b { height: 28px; min-width: 28px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--panel); font-size: 12px; cursor: pointer; flex: none; }
+  .dk-b:hover { border-color: var(--muted); }
+  .dk-b:focus-visible, #dk-mode:focus-visible, #dk-min:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .dk-b[aria-pressed="true"] { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+  .dk-b.pri { background: var(--blue); border-color: var(--blue); color: var(--bg); font-weight: 600; }
+  #dk-mode, #dk-min { height: 28px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; padding: 0 6px; }
+  #dk-min { width: 50px; font-variant-numeric: tabular-nums; }
+  .dk-lab { font-size: 12px; color: var(--muted); }
+  #dk-clock { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #dk-pace { font-size: 12px; color: var(--muted); }
+  #dk-pace:empty { display: none; }
+  .dk-chip { padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; font-weight: 600; white-space: nowrap; }
+  .dk-chip.ok { color: var(--green); } .dk-chip.warn { color: var(--orange); } .dk-chip.bad { color: var(--red); }
+  #dk-track { position: relative; display: flex; gap: 2px; height: 8px; }
+  .dk-seg { height: 100%; background: var(--line); border-radius: 2px; min-width: 2px; }
+  .dk-seg.o { background: repeating-linear-gradient(135deg, var(--line) 0 3px, transparent 3px 6px); }
+  .dk-seg.done { background: var(--blue); opacity: .4; }
+  .dk-seg.cur { background: var(--blue); opacity: 1; }
+  .dk-seg.o.done, .dk-seg.o.cur { background: var(--orange); }
+  #dk-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); pointer-events: none; }
+  #dk-cards { flex: 1 1 0; min-height: 0; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
+  .dk-card { scroll-snap-align: start; scroll-snap-stop: always; height: 100%; overflow-y: auto; padding: 12px 16px 18px;
+    border-bottom: 1px dashed var(--line); }
+  .dk-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .dk-head h2 { font-size: 17px; line-height: 1.25; margin: 0; flex: 1 1 140px; min-width: 0; }
+  .dk-card.cur .dk-num { background: var(--blue); color: var(--bg); }
+  .dk-who { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px;
+    border-radius: 5px; border: 1px solid var(--line); color: var(--muted); flex: none; }
+  .dk-who.me { color: var(--blue); border-color: var(--blue); }
+  .dk-who.other { color: var(--orange); border-color: var(--orange); }
+  .dk-txt p.nums, #nowbox .nums { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; margin: 4px 0 6px; }
+  .dk-bud { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  .dk-go { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .dk-txt p { font-size: calc(var(--size) * 1.12); line-height: 1.45; margin: 0 0 .6em; }
+  .dk-txt p.s { opacity: .55; }
+  .dk-txt p.s::before { content: attr(data-l); display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; border: 1px solid var(--muted); color: var(--muted); border-radius: 4px; padding: 0 5px; margin-right: 8px; vertical-align: middle; }
+  .dk-txt p.h { font-size: 13px; line-height: 1.4; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; }
+  .dk-txt p.c { color: var(--orange); }
+  #dk-cards.comp p.s { display: none; }
+  .dk-nx { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  #dk-wrap { display: none; position: absolute; left: 8px; right: 8px; bottom: 8px; max-height: 70%; overflow: auto; z-index: 7;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 10px 12px; font-size: 13px; }
+  #dk-wrap.on { display: block; }
+  #dk-wrap table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; margin-top: 6px; }
+  #dk-wrap th, #dk-wrap td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  #dk-wrap td.r, #dk-wrap th.r { text-align: right; }
+  #dk-wrap td.bad { color: var(--red); } #dk-wrap td.ok { color: var(--green); }
+  #dk-wrap td.t { white-space: normal; }
+</style>
+</head>
+<body>
+<div id="deckpane" aria-label="Slides">
+  <div id="dk-top">
+    <div class="dk-row">
+      <span class="dk-num" id="dk-num">-</span>
+      <span class="dk-ttl" id="dk-ttl"></span>
+      <span id="dk-rem">0:00</span>
+    </div>
+    <div class="dk-row">
+      <button class="dk-b pri" id="dk-start" type="button"></button>
+      <button class="dk-b" id="dk-prev" type="button">◀</button>
+      <button class="dk-b" id="dk-next" type="button">▶</button>
+      <button class="dk-b" id="dk-auto" type="button" aria-pressed="true"></button>
+      <button class="dk-b" id="dk-comp" type="button" aria-pressed="false"></button>
+      <button class="dk-b" id="dk-snd" type="button" aria-pressed="true"></button>
+      <button class="dk-b" id="dk-reset" type="button"></button>
+      <button class="dk-b" id="dk-swap" type="button" aria-pressed="false">⇄</button>
+      <select id="dk-mode"><option value="mine"></option><option value="all"></option></select>
+      <input id="dk-min" type="number" min="1" max="180" step="1"><span class="dk-lab" id="dk-minlab"></span>
+      <span id="dk-clock"></span>
+    </div>
+    <div class="dk-row" id="dk-pace"></div>
+    <div id="dk-track"></div>
+  </div>
+  <div id="dk-cards"></div>
+  <div id="dk-wrap"></div>
+</div>
+<div id="main">
+<header id="bar">
+  <span id="dot" data-i18n-title="dot_wait" title="Waiting for the recording..."></span>
+  <span id="title" data-i18n="title_default">Live Tips</span>
+  <span id="elapsed"></span>
+  <span id="spacer"></span>
+  <span id="pausedpill" role="button" tabindex="0" data-i18n="paused_pill" data-i18n-title="paused_pill_tt">Tips paused</span>
+  <span id="meter" data-i18n-title="meter_tt"></span>
+  <button id="pause" class="ib" type="button" aria-pressed="false"></button>
+  <button id="pause" class="ib" type="button" aria-pressed="false"></button>
+  <button id="mute" class="ib" data-i18n-title="mute_tt">🎙</button>
+  <button id="gear" class="ib" data-i18n-title="gear_tt" data-i18n-aria="menu_aria">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</header>
+
+<div id="spkline" aria-live="polite">
+  <button id="spkchip" type="button" aria-haspopup="dialog" aria-expanded="false"><span>🗣</span><span class="nm"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+  <div id="spkpop" role="dialog" data-i18n-aria="spkpop_aria"></div>
+</div>
+
+<div id="alert" role="status" aria-live="polite"></div>
+
+<div id="dock">
+  <div id="agenda" class="collapsed">
+    <div class="head" data-i18n-title="agenda_tt">
+      <span class="lab"><span data-i18n="agenda">Agenda</span> <span id="agcount"></span></span>
+      <span id="agnext"></span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div id="segs"></div>
+    <div id="aggist"></div>
+    <ul id="aglist"></ul>
+  </div>
+  <div id="nowbox"></div>
+  <div id="pinbox"></div>
+</div>
+
+<div id="fres"></div>
+<div id="working"></div>
+<div id="spkask" role="dialog" data-i18n-aria="ask_title"></div>
+<div id="list"><div id="empty" data-i18n="empty">Tips will appear here.</div></div>
+
+<div id="chips">
+  <button data-q="suggest a reply" data-i18n="chip_reply" data-i18n-title="chip_reply_tt">Suggest reply</button>
+  <button data-q="what to ask now" data-i18n="chip_ask" data-i18n-title="chip_ask_tt">What to ask now</button>
+  <button data-q="catch me up" data-i18n="chip_catch" data-i18n-title="chip_catch_tt">Catch me up</button>
+  <button data-q="what was decided" data-i18n="chip_decided" data-i18n-title="chip_decided_tt">Decided so far</button>
+</div>
+<form id="ask" autocomplete="off">
+  <label class="field">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="q" data-i18n-ph="q_ph" data-i18n-title="q_tt">
+    <button id="send" type="submit" data-i18n-title="send_tt" data-i18n-aria="send_tt">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+  </label>
+  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt"><span data-i18n="sos_label">HELP</span><kbd>⌃⌥H</kbd></button>
+</form>
+
+<div id="scrim"></div>
+<div id="menu" role="dialog" data-i18n-aria="menu_aria">
+  <div class="sec" id="setup">
+    <h4 data-i18n="sec_call">Call</h4>
+    <div class="rowf"><span data-i18n="l_type">Type</span>
+      <select id="s_type" data-i18n-title="s_type_tt">
+        <option value="auto" data-i18n="o_standard">Standard</option><option value="presentation" data-i18n="o_presentation">Presentation (my talk)</option>
+        <option value="interview" data-i18n="o_interview">Interview</option></select>
+      <span class="pill" id="p_call_type"></span></div>
+    <div class="rowf" id="l_role" style="display:none"><span data-i18n="l_role">My role</span>
+      <select id="s_role"><option value="" data-i18n="o_notset">not set</option><option value="observer" data-i18n="o_observer">Observer</option>
+        <option value="coach" data-i18n="o_coach">Coach (me)</option><option value="interviewer" data-i18n="o_interviewer">Interviewer (me)</option></select>
+      <span class="pill" id="p_hiring_role"></span></div>
+    <div class="rowf"><span data-i18n="l_aud">Audience</span>
+      <select id="s_aud" data-i18n-title="s_aud_tt">
+        <option value="auto" data-i18n="o_auto">Auto</option><option value="team" data-i18n="o_team">Team</option>
+        <option value="client" data-i18n="o_client">Client</option></select>
+      <span class="pill" id="p_audience"></span></div>
+    <div class="rowf"><span data-i18n="l_lang">Language</span>
+      <select id="s_lang" data-i18n-title="s_lang_tt"><option value="uk" data-i18n="o_uk">Ukrainian</option><option value="en" data-i18n="o_en">English</option>
+        <option value="mix" data-i18n="o_mix">Mixed</option></select>
+      <span class="pill" id="p_call_lang"></span></div>
+    <div class="rowf"><span data-i18n="l_mic">Mic</span>
+      <select id="s_mic" data-i18n-title="s_mic_tt"><option value="default" data-i18n="o_default">System default</option><option value="builtin" data-i18n="o_builtin">Mac built-in</option></select>
+      <span class="pill" id="p_mic_device"></span></div>
+    <div class="rowf"><span data-i18n="l_proactive">Proactive tips</span>
+      <button id="proactive" class="switch" type="button" role="switch" aria-checked="false" data-i18n-title="proactive_tt" data-i18n-aria="l_proactive"></button>
+      <span class="pill" id="p_proactive"></span></div>
+    <div class="rowf" id="l_cmt" style="display:none"><span data-i18n="l_cmt">Comment rate</span>
+      <select id="cmt" data-i18n-title="cmt_tt">
+        <option value="20" data-i18n="o_every" data-n="20">every 20 s</option><option value="45" data-i18n="o_every" data-n="45">every 45 s</option>
+        <option value="90" data-i18n="o_every" data-n="90">every 90 s</option><option value="0" data-i18n="o_off">off</option></select>
+      <span class="pill" id="p_comment_rate_seconds"></span></div>
+  </div>
+  <div class="sec">
+    <h4 data-i18n="sec_display">Display</h4>
+    <div class="rowf"><span data-i18n="l_uilang">Interface</span>
+      <div class="seg" id="uilang" data-i18n-title="uilang_tt"><button type="button" data-v="en">English</button><button type="button" data-v="uk">Українська</button></div>
+      <span></span></div>
+    <div class="rowf"><span data-i18n="l_size">Text size</span>
+      <div class="slider"><span class="a1">A</span><input id="size" type="range" min="12" max="30" step="1" value="18" data-i18n-title="l_size" data-i18n-aria="l_size"><span class="a2">A</span></div>
+      <span id="sizeval">18</span></div>
+    <div class="hintline" data-i18n="size_hint">Also Cmd + and Cmd -</div>
+    <div class="rowf"><span data-i18n="l_opacity">Opacity</span>
+      <div class="seg" id="fade" data-i18n-title="fade_tt"><button type="button" data-v="1">100</button><button type="button" data-v="0.94" class="on">94</button><button type="button" data-v="0.8">80</button><button type="button" data-v="0.65">65</button></div>
+      <span></span></div>
+    <div class="rowf"><span data-i18n="l_ontop">Always on top</span>
+      <button id="pin" class="switch on" type="button" role="switch" aria-checked="true" data-i18n-title="pin_tt" data-i18n-aria="l_ontop"></button><span></span></div>
+    <div class="rowf"><span data-i18n="l_semantic">Local AI</span>
+      <button id="semantic" class="switch on" type="button" role="switch" aria-checked="true" data-i18n-title="semantic_tt" data-i18n-aria="l_semantic"></button>
+      <span class="pill" id="p_semantic"></span></div>
+    <div class="togline">
+      <button id="stealth" class="switch on" type="button" role="switch" aria-checked="true" data-i18n-title="stealth_tt" data-i18n-aria="l_stealth"></button>
+      <label for="stealth" class="t" data-i18n-title="stealth_tt"><span data-i18n="l_stealth">Hide from screen sharing and screenshots</span><small data-i18n="stealth_sub">On: a screen share and screenshots skip this window</small></label>
+    </div>
+  </div>
+  <div class="sec">
+    <h4 data-i18n="sec_context">Context</h4>
+    <div class="ctxline">
+      <div class="t"><span id="brief"></span><small id="briefsub"></small></div>
+      <button id="refresh" class="btn" type="button" data-i18n="refresh" data-i18n-title="refresh_tt">Refresh</button>
+    </div>
+  </div>
+  <div class="sec">
+    <h4 data-i18n="sec_diag">Diagnostics</h4>
+    <div id="status" data-i18n="dot_wait">Waiting for the recording...</div>
+    <div id="diag"></div>
+  </div>
+  <div class="sec">
+    <details id="help"><summary data-i18n="help_sum">Help: what every element means</summary>
+      <div id="helpbox"></div>
+    </details>
+  </div>
+</div>
+</div><!-- #main -->
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var list = $('list');
+  var empty = $('empty');
+  var native = window.webkit && window.webkit.messageHandlers;
+  function send(name, value) { try { native[name].postMessage(value); } catch (e) {} }
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function hms() { return new Date().toTimeString().slice(0, 8); }
+
+  // ---------- interface language (v37): every UI string goes through t(key) ----------
+  // Messages to the skill stay canonical English whatever the UI language; tip content is shown as-is.
+  var I18N = {
+    en: {
+      dot_wait: 'Waiting for the recording...',
+      title_default: 'Live Tips',
+      paused_pill: 'Tips paused',
+      paused_pill_tt: 'Tips are paused: Claude keeps recording and listening, but shows nothing new. Click to resume tips',
+      meter_tt: 'Your share of talk time. Adds your monologue timer after 0:30, orange after 1:30',
+      meter_you: 'You {p}%',
+      mute_tt: 'Mute: stop transcribing your microphone. Press it when you are muted in the meeting (cafe, music, people around), press again when you unmute.',
+      gear_tt: 'Settings: call, display, context, diagnostics, help',
+      menu_aria: 'Settings',
+      spkchip_tt: 'Now speaking (voice match, never certain). Click to rename this speaker, move this line to someone else, or merge two speakers',
+      spkpop_aria: 'Speaker',
+      agenda: 'Agenda',
+      agenda_tt: 'Click to unfold or fold',
+      ag_now: 'Now:',
+      ag_all: 'All covered',
+      empty: 'Tips will appear here.',
+      chip_reply: 'Suggest reply',
+      chip_reply_tt: 'A ready answer or comment on what is being discussed right now, even if nobody asked you yet',
+      chip_ask: 'What to ask now',
+      chip_ask_tt: '1-2 questions worth asking right now',
+      chip_catch: 'Catch me up',
+      chip_catch_tt: 'What was said in the last ~5 minutes, in 3-5 lines',
+      chip_decided: 'Decided so far',
+      chip_decided_tt: 'Decisions and action items so far, with owners',
+      q_ph: 'Fact or question',
+      q_tt: 'Typing shows matching facts at once (no AI). Enter sends the text to Claude. Esc clears.',
+      send_tt: 'Ask Claude',
+      mute_aria: 'Mute my microphone',
+      unmute_aria: 'Unmute my microphone',
+      pause_tt: 'Pause tips (Control-Option-P, works from any app): Claude keeps recording and listening, but shows nothing until you press play. HELP NOW still works.',
+      play_tt: 'Resume tips (Control-Option-P)',
+      pause_aria: 'Pause tips',
+      play_aria: 'Resume tips',
+      pause_unconf_on: '⚠ Tips still paused: the recorder did not confirm',
+      pause_unconf_off: '⚠ Tips still on: the recorder did not confirm',
+      sos_aria: 'HELP NOW',
+      sos_label: 'HELP',
+      sos_label: 'HELP',
+      sos_tt: "HELP NOW (Control-Option-H, works from any app): the best facts for what is being said, at once, then Claude's answer",
+      work_on: '🆘 Working on it... {n} s',
+      work_late: '🆘 No answer yet ({n} s). Is Claude listening?',
+      sec_call: 'Call',
+      l_type: 'Type',
+      s_type_tt: 'Standard: a usual meeting; talk vs discussion is detected by itself. Presentation and Interview need a special prep. Who is on the other side (team or client) is set in Audience.',
+      o_standard: 'Standard',
+      o_auto: 'Auto',
+      o_presentation: 'Presentation (my talk)',
+      o_interview: 'Interview',
+      l_role: 'My role',
+      o_notset: 'not set',
+      o_observer: 'Observer',
+      o_coach: 'Coach (me)',
+      o_interviewer: 'Interviewer (me)',
+      l_aud: 'Audience',
+      s_aud_tt: 'Who is on the other side. Sets default language, strictness and tone.',
+      o_team: 'Team',
+      o_client: 'Client',
+      o_boss: 'Boss (as client)',
+      l_lang: 'Language',
+      s_lang_tt: 'The language spoken in the call (for speech recognition). The interface language is in Display.',
+      o_uk: 'Ukrainian',
+      o_en: 'English',
+      o_mix: 'Mixed',
+      l_mic: 'Mic',
+      s_mic_tt: 'Which microphone records you',
+      o_default: 'System default',
+      o_builtin: 'Mac built-in',
+      l_proactive: 'Proactive tips',
+      proactive_tt: 'Off: only answers to questions, live facts, owner/date, your turn, red flags. On: also initiative and comment ideas.',
+      l_cmt: 'Comment rate',
+      cmt_tt: 'How often the window suggests what you can add when others finish a thought',
+      o_every: 'every {n} s',
+      o_off: 'off',
+      v_on: 'on',
+      v_off: 'off',
+      secs: '{n} s',
+      sec_display: 'Display',
+      l_uilang: 'Interface',
+      uilang_tt: 'Language of the window: buttons, menu, help. Claude also writes the short tip headlines in it. Your call language is set in Call',
+      l_size: 'Text size',
+      size_hint: 'Also Cmd + and Cmd -',
+      l_opacity: 'Opacity',
+      fade_tt: 'Window transparency',
+      l_ontop: 'Always on top',
+      l_semantic: 'Local AI',
+      semantic_tt: 'On: a local model on this Mac finds facts and cards by meaning and helps HELP NOW. Off: keywords only, no local model.',
+      semantic_off_tt: 'Off: keywords only, no local model. Click to turn on.',
+      semantic_na_tt: 'Local AI unavailable: {r}. Keywords still work.',
+      lab_semantic: 'Local AI',
+      d_semantic: 'Local AI: {v}',
+      sem_on: 'on', sem_off: 'off', sem_loading: 'starting', sem_na: 'unavailable',
+      pin_tt: 'Keep on top of other windows',
+      l_stealth: 'Hide from screen sharing and screenshots',
+      stealth_sub: 'This call only. The default for new calls is in Settings > General',
+      stealth_tt: 'On (default): colleagues do not see this window when you share your screen, and screenshots skip it. Off: the window shows in a screen share and you can take screenshots of it.',
+      sec_context: 'Context',
+      brief_none: 'Brief: not loaded yet',
+      brief_from: 'Brief from {t}',
+      brief_sub: 'Meetings, threads and documents of the project.',
+      brief_updating: 'Updating since {t}, 1-3 min, the recording goes on',
+      refresh: 'Refresh',
+      refresh_tt: "Refresh context: re-read the project's meetings, threads and documents and update the brief. Takes 1-3 min, the recording goes on.",
+      refresh_ask: 'refresh context',
+      refresh_note: 'updating the brief, 1-3 min, the recording goes on',
+      sec_diag: 'Diagnostics',
+      help_sum: 'Help: what every element means',
+      // alerts
+      al_deaf: 'Tips engine is not responding ({n} s)',
+      al_deaf_sub: 'Live Tips restarts it by itself. If it stays, end the call and start it again',
+      al_copy: 'Copy "continue"',
+      al_copied: 'Copied',
+      al_mic_streak: 'Mic still not recording after {n} restarts',
+      al_mic: 'Your mic is not recording',
+      al_mic_sub_mac: 'Restarting it. Check the macOS mic permission',
+      al_mic_sub: 'Restarting it. Or switch to the Mac mic now',
+      al_use_mac: 'Use Mac mic',
+      al_auto: 'Mic switched to the Mac mic',
+      al_auto_sub: 'The headset mic stopped recording',
+      al_back: 'Back to headset',
+      al_standby: 'Ready. Waiting for the call',
+      al_standby_sub: 'Starts by itself when the other side speaks, or press Start',
+      al_go: 'Start',
+      al_going: 'Starting…',
+      al_silent: 'Cannot hear the other side',
+      al_silent_sub: 'No system audio for a while. Check the meeting app output',
+      al_lag: 'Transcript {n} s behind',
+      al_lag_sub: 'Speech recognition is slow, tips come later',
+      al_hide: 'Hide',
+      // settings feedback
+      lab_call_type: 'Meeting type',
+      lab_hiring_role: 'My role',
+      lab_audience: 'Audience',
+      lab_call_lang: 'Language',
+      lab_mic_device: 'Mic',
+      lab_comment_rate_seconds: 'Comment hints',
+      lab_proactive: 'Proactive tips',
+      set_sending: 'sending...',
+      set_sent: '{k} = {v}: sent, waiting for confirmation...',
+      set_ok: '✓ {k} = {v}: {how}',
+      how_claude: 'Claude applied',
+      how_rec: 'applied by the recorder',
+      set_fail_rec: 'the recorder did not confirm',
+      set_fail_claude: 'Claude has not confirmed yet (busy or not listening)',
+      set_fail: 'not confirmed',
+      set_recv_pill: 'received, Claude is applying...',
+      set_recv: '{k} = {v}: received, waiting for Claude to apply it...',
+      // cards
+      you: 'You',
+      ask_sent_note: 'sent, the answer will appear here',
+      ask_find_note: 'searching the project sources',
+      n_points: '{n} points',
+      pin_card_tt: 'Pin this card to the top',
+      yes_tt: 'Useful, I used it',
+      part_tt: 'Partly useful: say what was off',
+      no_tt: 'Not useful here',
+      late: 'late',
+      late_tt: 'You had already started answering. Still useful if the topic is open.',
+      r_late: 'Late',
+      r_off_topic: 'Off topic',
+      r_wrong_fact: 'Wrong fact',
+      r_too_long: 'Too long',
+      r_not_now: 'Not now',
+      why_ph: 'Comment (optional): e.g. part A useful, part B off. Enter to send',
+      why_sent: '✓ sent',
+      fr_none: 'Nothing in the fact book.',
+      fr_hint: 'Enter asks Claude · Esc clears',
+      now_now: 'Now:',
+      now_next: 'Next:',
+      // status and diagnostics
+      st_loading_model: 'Loading the model...',
+      st_recording: 'Recording',
+      st_stopping: 'Stopping...',
+      st_stopped: 'Recording finished',
+      st_error: 'Recording error',
+      st_lines: '{n} lines',
+      st_silent: 'cannot hear the other side',
+      st_muted: 'mic muted',
+      st_mic_streak: '⚠ MIC STILL NOT RECORDING after {n} restarts: ⚙ Mic -> Mac built-in, or reconnect the headset',
+      st_mic_stall: '⚠ YOUR MIC IS NOT RECORDING, restarting it',
+      st_tips_lag: 'tips ~{n} s behind',
+      st_asr_lag: 'transcript {n} s behind',
+      st_deaf: '⚠ Tips engine is not responding ({n} s)',
+      d_mic: 'mic {v}',
+      d_restarts: 'mic restarts {n}',
+      d_streak: ', streak {n}',
+      d_auto: 'mic auto switched to Mac',
+      d_other: 'other side {v}',
+      d_listener: 'listener {n} s ago',
+      d_lag: 'transcript lag {n} s',
+      d_queue: 'queue {n}',
+      d_audience: 'audience {v}',
+      d_mode: 'mode {v}',
+      d_last: 'last line {v}',
+      d_seq: 'seq {n}',
+      d_errors: 'errors: {v}',
+      d_paused: 'tips paused',
+      d_tips_on: 'tips on',
+      d_speakers: 'Speakers: {v}',
+      d_rev: ', rev {n}',
+      sp_on: 'on',
+      sp_off: 'off',
+      sp_loading: 'loading',
+      // speakers
+      spk_label: 'Speaker {n}',
+      spk_named: '✓ {a} = {b}',
+      spk_merged: '✓ {a} merged with {b}',
+      spk_moved: '✓ Line {t} moved to {b}',
+      ask_title: 'Who is speaking?',
+      ask_secs_tt: 'Speech heard from this voice so far',
+      ask_more: '+{n} more',
+      ask_more_tt: 'More new voices wait to be named after this one',
+      ask_skip: 'Skip',
+      ask_skip_tt: 'Skip: do not ask about this speaker again in this call. Lines stay as {a}',
+      ask_sugg_tt: '{n}: voice match {p}%',
+      ask_sugg_merge: '. Already {a} in this call: picking it merges the two',
+      ask_known_tt: '{n}: a known name (this call, your team or voice library), no voice match',
+      ask_known_merge_tt: '{n}: already a speaker in this call. Picking it merges the two',
+      ask_ph: 'Type a name, Enter',
+      ask_in_tt: 'Type the name of this speaker and press Enter. A name already used in this call merges the two. Esc clears.',
+      ask_ok: 'OK',
+      ask_ok_tt: 'Save this name for all lines of {a}',
+      pop_line: 'line at {t}',
+      pop_close: 'Close (Esc)',
+      pop_rename: 'Rename this speaker',
+      pop_rename_ph: 'Name for {a}',
+      pop_rename_tt: 'New name for all lines of this speaker. Enter saves. A name already used in this call merges the two.',
+      pop_save: 'Save',
+      pop_save_tt: 'Save the name for all lines of this speaker',
+      pop_fix: 'This line ({t}) was someone else',
+      pop_fix_btn_tt: 'Move only the line at {t} to {a}',
+      pop_fix_ph: 'Or a new name',
+      pop_fix_tt: 'Move only this line to a new speaker with this name. Enter moves it.',
+      pop_move: 'Move',
+      pop_move_tt: 'Move only this line to a new speaker with this name',
+      pop_same: 'Same person as',
+      pop_merge_tt: '{a} and {b} are the same person: merge them',
+      pop_none: 'No other speakers in this call yet',
+      help_html:
+        '<h5>Top bar</h5><dl>' +
+        '<dt>Red pulse</dt><dd>Recording. Orange = a mic problem, red ring = Claude is not listening.</dd>' +
+        '<dt>16:42</dt><dd>Time since the recording started.</dd>' +
+        '<dt>You 38% · 1:20</dt><dd>Your share of talk time and your current monologue (orange after 1:30).</dd>' +
+        '<dt>Tips paused</dt><dd>Shown while tips are paused. Click it to resume.</dd>' +
+        '<dt>🎙 Mute</dt><dd>Stop transcribing your mic while you are muted in the meeting.</dd>' +
+        '<dt>⚙</dt><dd>This menu: call setup, display, context, diagnostics, help.</dd>' +
+        '<dt>🗣 Name</dt><dd>Who on the other side is speaking now (by voice, never certain). Long names are cut, hover for the full one. Click it to rename the speaker, say this line was someone else, or merge two speakers.</dd>' +
+        '</dl><h5>Speakers</h5><dl>' +
+        '<dt>Who is speaking?</dt><dd>A new voice talked for a few seconds. Pick a name (a dot = voice match: green strong, orange fair), type one and press Enter, or Skip. Picking a name already used in this call merges the two. Names are never set by themselves.</dd>' +
+        '</dl><h5>Strip under the bar</h5><dl>' +
+        '<dt>One alert</dt><dd>Only the most important problem, with a one-click fix: Claude not listening, mic not recording (Use Mac mic), mic switched (Back to headset), other side silent, transcript behind, setting confirmed.</dd>' +
+        '<dt>Tips engine not responding</dt><dd>Live Tips restarts it by itself; if it stays, end the call and start again.</dd>' +
+        '</dl><h5>Bottom</h5><dl>' +
+        '<dt>HELP (red button, ⌃⌥H)</dt><dd>Stuck right now: the best facts for what is being said appear at once, then Claude\'s answer.</dd>' +
+        '<dt>⏸ / ▶ (top bar, ⌃⌥P)</dt><dd>Pause tips: Claude keeps recording and listening but shows nothing new (the top bar says "Tips paused"). HELP NOW and your typed questions still work. ▶ resumes; held items then appear.</dd>' +
+        '<dt>Field</dt><dd>Type a word (logs, pricing, a person, a ticket key): matching facts show at once, no AI. Enter sends the text to Claude. Start with "find:" to make Claude search the sources.</dd>' +
+        '<dt>Suggest reply</dt><dd>A ready answer or comment on the current topic.</dd>' +
+        '<dt>What to ask now</dt><dd>1-2 questions for the open points.</dd>' +
+        '<dt>Catch me up</dt><dd>The last ~5 minutes in 3-5 lines.</dd>' +
+        '<dt>Decided so far</dt><dd>Decisions and action items with owners and dates.</dd>' +
+        '</dl><h5>Cards</h5><dl>' +
+        '<dt>Colour stripe</dt><dd>Red = act now, orange = worth saying, green = info. A double stripe is an instant ⚡ card from the recorder.</dd>' +
+        '<dt>❓ line</dt><dd>A question from the other side was heard; the answer replaces it.</dd>' +
+        '<dt>🆘 red card</dt><dd>HELP NOW result.</dd>' +
+        '<dt>+18s</dt><dd>How long after the phrase the tip appeared. Orange when over 20 s.</dd>' +
+        '<dt>late</dt><dd>Came after you had started answering. Use it if the topic is still open.</dd>' +
+        '<dt>📌</dt><dd>Pin the card to the top. Unpin returns it to its place.</dd>' +
+        '<dt>✓ ~ ✕</dt><dd>Used it, partly useful, not useful. After ~ or ✕ pick a reason (Late, Off topic, Wrong fact, Too long, Not now) and add a short comment if you like. Enter sends. One ✕ never mutes a topic by itself.</dd>' +
+        '<dt>📌 Fact</dt><dd>When the other side asks "how long / how much / when / status" about something in the fact book, the fact shows by itself in 1-2 s.</dd>' +
+        '<dt>Agenda</dt><dd>Progress bar and the current point. Click to see all: ✓ covered, ○ not yet.</dd>' +
+        '<dt>Now / Next</dt><dd>Presentation: the window follows what you say through your outline.</dd>' +
+        '</dl><h5>Call setup</h5><dl>' +
+        '<dt>Type: Standard</dt><dd>Default. The window detects when you present (you talk most) and when it is a discussion.</dd>' +
+        '<dt>Presentation</dt><dd>Your talk with an outline: Now / Next on top, short points, no interrupting tips.</dd>' +
+        '<dt>Interview</dt><dd>Pick your role: Observer (strong answer contents), Coach: you are the one being asked; your own prepared stories, numbers and facts at hand, and the parts of a question you have not answered yet. Interviewer (follow-ups and gaps).</dd>' +
+        '<dt>Audience</dt><dd>Auto, Team or Client. Client: stricter, restricted internal numbers stay hidden, the culture profile is used. The language is set separately.</dd>' +
+        '<dt>Language</dt><dd>What is spoken. Switches at once, nothing is lost.</dd>' +
+        '<dt>Mic</dt><dd>System default (headset or Mac) or Mac built-in, even with AirPods on. Switches in about a second.</dd>' +
+        '<dt>Proactive tips</dt><dd>Off (default): answers, live facts, owner/date, your turn, red flags only. On: also ideas to add, at the Comment rate.</dd>' +
+        '</dl><h5>Display</h5><dl>' +
+        '<dt>Interface</dt><dd>English or Ukrainian for the window. Claude also writes the short tip headlines in it. Tip texts stay as Claude wrote them.</dd>' +
+        '<dt>Hide from sharing</dt><dd>On (default): a screen share and screenshots skip this window. Turn it off to show the window to colleagues or to take a screenshot.</dd>' +
+        '</dl><h5>Diagnostics</h5><dl>' +
+        '<dt>tips ~N s behind</dt><dd>Median delay of the last tips. "transcript N s behind": speech recognition is slow.</dd>' +
+        '<dt>Recording · N lines</dt><dd>All good.</dd>' +
+        '<dt>Speakers: on / off</dt><dd>Voice recognition of who speaks on the other side. Off (with the reason) when the voice model is not installed: everything else works, all other voices are one label.</dd>' +
+        '</dl>'
+    },
+    uk: {
+      dot_wait: 'Чекаю на запис...',
+      title_default: 'Live Tips',
+      paused_pill: 'На паузі',
+      paused_pill_tt: 'Підказки на паузі: Claude і далі записує та слухає, але нічого нового не показує. Натисни, щоб відновити',
+      meter_tt: 'Твоя частка часу розмови. Після 0:30 додається таймер твого монологу, після 1:30 він стає помаранчевим',
+      meter_you: 'Ти {p}%',
+      mute_tt: 'Вимкнути мікрофон: я перестаю розпізнавати твій мікрофон. Натискай, коли вимикаєш звук у зустрічі (кафе, музика, люди поруч), і ще раз, коли вмикаєш.',
+      gear_tt: 'Налаштування: дзвінок, вигляд, контекст, діагностика, пояснення',
+      menu_aria: 'Налаштування',
+      spkchip_tt: 'Зараз говорить (за голосом, не напевно). Натисни, щоб перейменувати, віддати цю репліку іншій людині або об\'єднати двох співрозмовників',
+      spkpop_aria: 'Співрозмовник',
+      agenda: 'План',
+      agenda_tt: 'Натисни, щоб розгорнути або згорнути',
+      ag_now: 'Зараз:',
+      ag_all: 'Усе обговорили',
+      empty: 'Тут з\'являтимуться підказки.',
+      chip_reply: 'Що відповісти',
+      chip_reply_tt: 'Готова відповідь або коментар до того, що обговорюють зараз, навіть якщо тебе ще не питали',
+      chip_ask: 'Що спитати',
+      chip_ask_tt: '1-2 питання, які варто поставити саме зараз',
+      chip_catch: 'Що я пропустив',
+      chip_catch_tt: 'Про що говорили останні ~5 хвилин, у 3-5 рядках',
+      chip_decided: 'Що вирішили',
+      chip_decided_tt: 'Рішення і доручення на цей момент, з відповідальними',
+      q_ph: 'Факт або питання',
+      q_tt: 'Поки друкуєш, одразу видно схожі факти (без ШІ). Enter надсилає текст Claude. Esc очищає.',
+      send_tt: 'Запитати Claude',
+      mute_aria: 'Вимкнути мій мікрофон',
+      unmute_aria: 'Увімкнути мій мікрофон',
+      pause_tt: 'Пауза підказок (Control-Option-P, з будь-якого застосунку): Claude і далі записує та слухає, але нічого не показує, доки не натиснеш «Продовжити». ДОПОМОЖИ працює і на паузі.',
+      play_tt: 'Відновити підказки (Control-Option-P)',
+      pause_aria: 'Поставити підказки на паузу',
+      play_aria: 'Відновити підказки',
+      pause_unconf_on: '⚠ Підказки досі на паузі: програма запису не підтвердила',
+      pause_unconf_off: '⚠ Підказки досі увімкнені: програма запису не підтвердила',
+      sos_aria: 'ДОПОМОЖИ',
+      sos_label: 'ДОПОМОЖИ',
+      sos_label: 'ДОПОМОЖИ',
+      sos_tt: 'ДОПОМОЖИ (Control-Option-H, з будь-якого застосунку): одразу найкращі факти до того, що зараз говорять, а потім відповідь Claude',
+      work_on: '🆘 Шукаю... {n} с',
+      work_late: '🆘 Відповіді ще немає ({n} с). Claude слухає?',
+      sec_call: 'Дзвінок',
+      l_type: 'Тип',
+      s_type_tt: 'Звичайна: звичайна зустріч, виступ чи обговорення визначаються самі. Для презентації та співбесіди потрібна окрема підготовка. Хто з того боку (команда чи клієнт) задається окремо.',
+      o_auto: 'Авто',
+      o_standard: 'Звичайна',
+      o_presentation: 'Презентація (мій виступ)',
+      o_interview: 'Співбесіда',
+      l_role: 'Моя роль',
+      o_notset: 'не вибрано',
+      o_observer: 'Спостерігач',
+      o_coach: 'Коуч (я)',
+      o_interviewer: 'Проводжу співбесіду (я)',
+      l_aud: 'Хто з того боку',
+      s_aud_tt: 'Хто з того боку. Від цього залежать мова за замовчуванням, суворість і тон.',
+      o_team: 'Команда',
+      o_client: 'Клієнт',
+      o_boss: 'Керівник (як клієнт)',
+      l_lang: 'Мова дзвінка',
+      s_lang_tt: 'Якою мовою говорять у дзвінку (для розпізнавання мовлення). Мова вікна задається у розділі «Вигляд».',
+      o_uk: 'Українська',
+      o_en: 'Англійська',
+      o_mix: 'Змішана',
+      l_mic: 'Мікрофон',
+      s_mic_tt: 'Який мікрофон тебе записує',
+      o_default: 'Системний',
+      o_builtin: 'Вбудований у Mac',
+      l_proactive: 'Ініціативні підказки',
+      proactive_tt: 'Вимкнено: лише відповіді на питання, факти до теми, відповідальний і дата, твоя черга, тривожні сигнали. Увімкнено: ще й ідеї, що можна додати.',
+      l_cmt: 'Частота ідей',
+      cmt_tt: 'Як часто вікно підказує, що можна додати, коли інші закінчують думку',
+      o_every: 'кожні {n} с',
+      o_off: 'вимкнено',
+      v_on: 'увімкнено',
+      v_off: 'вимкнено',
+      secs: '{n} с',
+      sec_display: 'Вигляд',
+      l_uilang: 'Мова вікна',
+      uilang_tt: 'Мова вікна: кнопки, меню, пояснення. Цією ж мовою Claude пише короткі заголовки підказок. Мову самого дзвінка задають у розділі «Дзвінок»',
+      l_size: 'Розмір тексту',
+      size_hint: 'Також Cmd + і Cmd -',
+      l_opacity: 'Непрозорість',
+      fade_tt: 'Прозорість вікна',
+      l_ontop: 'Поверх інших вікон',
+      l_semantic: 'Локальний ШІ',
+      semantic_tt: 'Увімкнено: локальна модель на цьому Маку знаходить факти й картки за змістом і допомагає кнопці HELP NOW. Вимкнено: лише ключові слова, без локальної моделі.',
+      semantic_off_tt: 'Вимкнено: лише ключові слова, без локальної моделі. Натисни, щоб увімкнути.',
+      semantic_na_tt: 'Локальний ШІ недоступний: {r}. Ключові слова працюють.',
+      lab_semantic: 'Локальний ШІ',
+      d_semantic: 'Локальний ШІ: {v}',
+      sem_on: 'увімкнено', sem_off: 'вимкнено', sem_loading: 'запускається', sem_na: 'недоступний',
+      pin_tt: 'Тримати вікно поверх інших',
+      l_stealth: 'Ховати від показу екрана і знімків екрана',
+      stealth_sub: 'Лише для цього дзвінка. Типове значення для нових дзвінків у Settings > General',
+      stealth_tt: 'Увімкнено (за замовчуванням): колеги не бачать це вікно, коли ти показуєш екран, і знімки екрана його пропускають. Вимкнено: вікно видно під час показу екрана, і його можна зняти на знімок.',
+      sec_context: 'Контекст',
+      brief_none: 'Довідка: ще не завантажена',
+      brief_from: 'Довідка від {t}',
+      brief_sub: 'Зустрічі, обговорення і документи проєкту.',
+      brief_updating: 'Оновлюю з {t}, 1-3 хв, запис триває',
+      refresh: 'Оновити',
+      refresh_tt: 'Оновити контекст: заново прочитати зустрічі, обговорення і документи проєкту та оновити довідку. Займає 1-3 хв, запис триває.',
+      refresh_ask: 'оновити контекст',
+      refresh_note: 'оновлюю довідку, 1-3 хв, запис триває',
+      sec_diag: 'Діагностика',
+      help_sum: 'Пояснення: що означає кожен елемент',
+      al_deaf: 'Рушій підказок не відповідає ({n} с)',
+      al_deaf_sub: 'Live Tips перезапускає його сам. Якщо не минає, заверши дзвінок і почни знову',
+      al_copy: 'Скопіювати "continue"',
+      al_copied: 'Скопійовано',
+      al_mic_streak: 'Мікрофон досі не записує після {n} перезапусків',
+      al_mic: 'Твій мікрофон не записує',
+      al_mic_sub_mac: 'Перезапускаю. Перевір дозвіл на мікрофон у macOS',
+      al_mic_sub: 'Перезапускаю. Або перемкнися на мікрофон Mac просто зараз',
+      al_use_mac: 'Мікрофон Mac',
+      al_auto: 'Перемкнув на мікрофон Mac',
+      al_auto_sub: 'Мікрофон гарнітури перестав записувати',
+      al_back: 'Назад на гарнітуру',
+      al_standby: 'Готово. Чекаю на дзвінок',
+      al_standby_sub: 'Почнеться сам, коли заговорить інша сторона, або натисни Start',
+      al_go: 'Start',
+      al_going: 'Починаю…',
+      al_silent: 'Не чую співрозмовників',
+      al_silent_sub: 'Уже якийсь час немає звуку з комп\'ютера. Перевір вихід звуку в програмі зустрічі',
+      al_lag: 'Розшифровка відстає на {n} с',
+      al_lag_sub: 'Мовлення розпізнається повільно, підказки прийдуть пізніше',
+      al_hide: 'Сховати',
+      lab_call_type: 'Тип зустрічі',
+      lab_hiring_role: 'Моя роль',
+      lab_audience: 'Хто з того боку',
+      lab_call_lang: 'Мова дзвінка',
+      lab_mic_device: 'Мікрофон',
+      lab_comment_rate_seconds: 'Ідеї для коментарів',
+      lab_proactive: 'Ініціативні підказки',
+      set_sending: 'надсилаю...',
+      set_sent: '{k} = {v}: надіслано, чекаю підтвердження...',
+      set_ok: '✓ {k} = {v}: {how}',
+      how_claude: 'Claude застосував',
+      how_rec: 'застосувала програма запису',
+      set_fail_rec: 'програма запису не підтвердила',
+      set_fail_claude: 'Claude ще не підтвердив (зайнятий або не слухає)',
+      set_fail: 'не підтверджено',
+      set_recv_pill: 'отримано, Claude застосовує...',
+      set_recv: '{k} = {v}: отримано, чекаю, поки Claude застосує...',
+      you: 'Ти',
+      ask_sent_note: 'надіслано, відповідь з\'явиться тут',
+      ask_find_note: 'шукаю в джерелах проєкту',
+      n_points: 'пунктів: {n}',
+      pin_card_tt: 'Закріпити картку вгорі',
+      yes_tt: 'Корисно, я цим скористався',
+      part_tt: 'Частково корисно: скажи, що не так',
+      no_tt: 'Тут не допомогло',
+      late: 'запізно',
+      late_tt: 'Ти вже почав відповідати. Знадобиться, якщо тема ще відкрита.',
+      r_late: 'Запізно',
+      r_off_topic: 'Не в тему',
+      r_wrong_fact: 'Хибний факт',
+      r_too_long: 'Задовго',
+      r_not_now: 'Не зараз',
+      why_ph: 'Коментар (необов\'язково): напр., частина А корисна, Б ні. Enter надсилає',
+      why_sent: '✓ надіслано',
+      fr_none: 'У книзі фактів нічого немає.',
+      fr_hint: 'Enter питає Claude · Esc очищає',
+      now_now: 'Зараз:',
+      now_next: 'Далі:',
+      st_loading_model: 'Завантажую модель...',
+      st_recording: 'Запис',
+      st_stopping: 'Зупиняю...',
+      st_stopped: 'Запис завершено',
+      st_error: 'Помилка запису',
+      st_lines: 'рядків: {n}',
+      st_silent: 'не чую співрозмовників',
+      st_muted: 'мікрофон вимкнено',
+      st_mic_streak: '⚠ МІКРОФОН ДОСІ НЕ ЗАПИСУЄ після {n} перезапусків: ⚙ Мікрофон -> Вбудований у Mac, або перепідключи гарнітуру',
+      st_mic_stall: '⚠ ТВІЙ МІКРОФОН НЕ ЗАПИСУЄ, перезапускаю',
+      st_tips_lag: 'підказки відстають на ~{n} с',
+      st_asr_lag: 'розшифровка відстає на {n} с',
+      st_deaf: '⚠ Рушій підказок не відповідає ({n} с)',
+      d_mic: 'мікрофон {v}',
+      d_restarts: 'перезапусків мікрофона {n}',
+      d_streak: ', поспіль {n}',
+      d_auto: 'мікрофон сам перемкнувся на Mac',
+      d_other: 'звук співрозмовників {v}',
+      d_listener: 'Claude читав {n} с тому',
+      d_lag: 'затримка розшифровки {n} с',
+      d_queue: 'черга {n}',
+      d_audience: 'хто з того боку: {v}',
+      d_mode: 'режим {v}',
+      d_last: 'останній рядок {v}',
+      d_seq: 'лічильник {n}',
+      d_errors: 'помилки: {v}',
+      d_paused: 'підказки на паузі',
+      d_tips_on: 'підказки увімкнено',
+      d_speakers: 'Голоси: {v}',
+      d_rev: ', версія {n}',
+      sp_on: 'увімкнено',
+      sp_off: 'вимкнено',
+      sp_loading: 'завантажую',
+      spk_label: 'Співрозмовник {n}',
+      spk_named: '✓ {a} = {b}',
+      spk_merged: '✓ {a} і {b}: об\'єднано',
+      spk_moved: '✓ Репліку о {t} віддано: {b}',
+      ask_title: 'Хто говорить?',
+      ask_secs_tt: 'Скільки цей голос уже говорив',
+      ask_more: 'ще {n}',
+      ask_more_tt: 'Після цього ще кілька нових голосів чекають на ім\'я',
+      ask_skip: 'Пропустити',
+      ask_skip_tt: 'Пропустити: більше не питати про цього співрозмовника в цьому дзвінку. Репліки лишаться як «{a}»',
+      ask_sugg_tt: '{n}: збіг голосу {p}%',
+      ask_sugg_merge: '. Уже є в цьому дзвінку як «{a}»: вибір об\'єднає їх',
+      ask_known_tt: '{n}: знайоме ім\'я (з цього дзвінка, твоєї команди або бібліотеки голосів), без збігу голосу',
+      ask_known_merge_tt: '{n}: уже є в цьому дзвінку. Вибір об\'єднає їх',
+      ask_ph: 'Введи ім\'я, Enter',
+      ask_in_tt: 'Введи ім\'я цього співрозмовника і натисни Enter. Ім\'я, яке вже є в цьому дзвінку, об\'єднає їх. Esc очищає.',
+      ask_ok: 'OK',
+      ask_ok_tt: 'Зберегти це ім\'я для всіх реплік: {a}',
+      pop_line: 'репліка о {t}',
+      pop_close: 'Закрити (Esc)',
+      pop_rename: 'Перейменувати',
+      pop_rename_ph: 'Ім\'я для: {a}',
+      pop_rename_tt: 'Нове ім\'я для всіх реплік цієї людини. Enter зберігає. Ім\'я, яке вже є в цьому дзвінку, об\'єднає їх.',
+      pop_save: 'Зберегти',
+      pop_save_tt: 'Зберегти ім\'я для всіх реплік цієї людини',
+      pop_fix: 'Цю репліку ({t}) сказав хтось інший',
+      pop_fix_btn_tt: 'Віддати лише репліку о {t}: {a}',
+      pop_fix_ph: 'Або нове ім\'я',
+      pop_fix_tt: 'Віддати лише цю репліку новій людині з цим ім\'ям. Enter переносить.',
+      pop_move: 'Віддати',
+      pop_move_tt: 'Віддати лише цю репліку новій людині з цим ім\'ям',
+      pop_same: 'Це та сама людина, що й',
+      pop_merge_tt: '{a} і {b} - одна людина: об\'єднати',
+      pop_none: 'Інших співрозмовників у цьому дзвінку ще немає',
+      help_html:
+        '<h5>Верхня смуга</h5><dl>' +
+        '<dt>Червоний пульс</dt><dd>Іде запис. Помаранчевий = проблема з мікрофоном, червоне кільце = Claude не слухає.</dd>' +
+        '<dt>16:42</dt><dd>Скільки триває запис.</dd>' +
+        '<dt>Ти 38% · 1:20</dt><dd>Твоя частка часу розмови і поточний монолог (помаранчевий після 1:30).</dd>' +
+        '<dt>На паузі</dt><dd>Видно, поки підказки на паузі. Натисни, щоб відновити.</dd>' +
+        '<dt>🎙 Мікрофон</dt><dd>Перестати розпізнавати твій мікрофон, поки в зустрічі в тебе вимкнено звук.</dd>' +
+        '<dt>⚙</dt><dd>Це меню: дзвінок, вигляд, контекст, діагностика, пояснення.</dd>' +
+        '<dt>🗣 Ім\'я</dt><dd>Хто з того боку говорить зараз (за голосом, не напевно). Довгі імена обрізано, повне видно при наведенні. Натисни, щоб перейменувати, віддати цю репліку іншій людині або об\'єднати двох співрозмовників.</dd>' +
+        '</dl><h5>Співрозмовники</h5><dl>' +
+        '<dt>Хто говорить?</dt><dd>Новий голос говорив кілька секунд. Вибери ім\'я (крапка = збіг голосу: зелена сильний, помаранчева середній), введи своє і натисни Enter або «Пропустити». Ім\'я, яке вже є в цьому дзвінку, об\'єднає двох. Імена ніколи не ставляться самі.</dd>' +
+        '</dl><h5>Смуга під верхньою</h5><dl>' +
+        '<dt>Одне попередження</dt><dd>Лише найважливіша проблема з виправленням в один клік: Claude не слухає, мікрофон не записує («Мікрофон Mac»), мікрофон перемкнувся («Назад на гарнітуру»), не чути співрозмовників, розшифровка відстає, налаштування підтверджено.</dd>' +
+        '<dt>Рушій підказок не відповідає</dt><dd>Live Tips перезапускає його сам; якщо не минає, заверши дзвінок і почни знову.</dd>' +
+        '</dl><h5>Унизу</h5><dl>' +
+        '<dt>ДОПОМОЖИ (червона кнопка, ⌃⌥H)</dt><dd>Застряг просто зараз: одразу з\'являються найкращі факти до того, що говорять, а потім відповідь Claude.</dd>' +
+        '<dt>⏸ / ▶ (верхня смуга, ⌃⌥P)</dt><dd>Пауза підказок: Claude і далі записує та слухає, але нічого нового не показує (угорі напис «На паузі»). ДОПОМОЖИ і твої питання працюють. ▶ відновлює, і тоді з\'являється все, що чекало.</dd>' +
+        '<dt>Поле</dt><dd>Введи слово (логи, ціни, людина, номер задачі): схожі факти видно одразу, без ШІ. Enter надсилає текст Claude. Почни з "find:", щоб Claude пошукав у джерелах.</dd>' +
+        '<dt>Що відповісти</dt><dd>Готова відповідь або коментар до поточної теми.</dd>' +
+        '<dt>Що спитати</dt><dd>1-2 питання щодо відкритих моментів.</dd>' +
+        '<dt>Що я пропустив</dt><dd>Останні ~5 хвилин у 3-5 рядках.</dd>' +
+        '<dt>Що вирішили</dt><dd>Рішення і доручення з відповідальними та датами.</dd>' +
+        '</dl><h5>Картки</h5><dl>' +
+        '<dt>Кольорова смужка</dt><dd>Червона = дій зараз, помаранчева = варто сказати, зелена = до відома. Подвійна смужка = миттєва ⚡ картка від програми запису.</dd>' +
+        '<dt>Рядок ❓</dt><dd>Співрозмовники поставили питання; відповідь з\'явиться на його місці.</dd>' +
+        '<dt>🆘 червона картка</dt><dd>Результат ДОПОМОЖИ.</dd>' +
+        '<dt>+18s</dt><dd>Через скільки секунд після фрази з\'явилася підказка. Помаранчеве, якщо більше 20 с.</dd>' +
+        '<dt>запізно</dt><dd>Прийшла, коли ти вже почав відповідати. Знадобиться, якщо тема ще відкрита.</dd>' +
+        '<dt>📌</dt><dd>Закріпити картку вгорі. Відкріплена повертається на своє місце.</dd>' +
+        '<dt>✓ ~ ✕</dt><dd>Скористався, частково корисно, не допомогло. Після ~ або ✕ вибери причину (Запізно, Не в тему, Хибний факт, Задовго, Не зараз) і за бажання додай короткий коментар. Enter надсилає. Один ✕ сам по собі тему не вимикає.</dd>' +
+        '<dt>📌 Факт</dt><dd>Коли співрозмовники питають «скільки часу / скільки коштує / коли / який стан» про щось із книги фактів, факт з\'являється сам за 1-2 с.</dd>' +
+        '<dt>План</dt><dd>Смуга прогресу і поточний пункт. Натисни, щоб побачити все: ✓ обговорено, ○ ще ні.</dd>' +
+        '<dt>Зараз / Далі</dt><dd>Презентація: вікно стежить за тим, що ти кажеш, за твоїм планом виступу.</dd>' +
+        '</dl><h5>Налаштування дзвінка</h5><dl>' +
+        '<dt>Тип: Звичайна</dt><dd>За замовчуванням. Вікно саме бачить, коли ти виступаєш (говориш найбільше), а коли йде обговорення.</dd>' +
+        '<dt>Презентація</dt><dd>Твій виступ за планом: угорі «Зараз / Далі», короткі пункти, без підказок, що відволікають.</dd>' +
+        '<dt>Співбесіда</dt><dd>Вибери роль: Спостерігач (що має бути в сильній відповіді), Коуч: питають тебе; під рукою твої підготовлені історії, цифри й факти, а також частини питання, на які ти ще не відповів. Проводжу співбесіду (уточнювальні питання і прогалини).</dd>' +
+        '<dt>Хто з того боку</dt><dd>Авто, Команда або Клієнт. Клієнт: суворіші правила, внутрішні цифри приховані, використовується культурний профіль. Мова задається окремо.</dd>' +
+        '<dt>Мова дзвінка</dt><dd>Якою мовою говорять. Перемикається одразу, нічого не губиться.</dd>' +
+        '<dt>Мікрофон</dt><dd>Системний (гарнітура або Mac) або вбудований у Mac, навіть з AirPods. Перемикається приблизно за секунду.</dd>' +
+        '<dt>Ініціативні підказки</dt><dd>Вимкнено (за замовчуванням): лише відповіді, факти до теми, відповідальний і дата, твоя черга, тривожні сигнали. Увімкнено: ще й ідеї, що можна додати, з вибраною частотою.</dd>' +
+        '</dl><h5>Вигляд</h5><dl>' +
+        '<dt>Мова вікна</dt><dd>Англійська або українська. Цією ж мовою Claude пише короткі заголовки підказок. Самі підказки показано так, як їх написав Claude.</dd>' +
+        '<dt>Ховати від показу</dt><dd>Увімкнено (за замовчуванням): показ екрана і знімки екрана це вікно пропускають. Вимкни, щоб показати вікно колегам або зробити знімок.</dd>' +
+        '</dl><h5>Діагностика</h5><dl>' +
+        '<dt>підказки відстають на ~N с</dt><dd>Середня затримка останніх підказок. «Розшифровка відстає на N с»: мовлення розпізнається повільно.</dd>' +
+        '<dt>Запис · рядків: N</dt><dd>Усе гаразд.</dd>' +
+        '<dt>Голоси: увімкнено / вимкнено</dt><dd>Розпізнавання за голосом, хто говорить з того боку. Вимкнено (з причиною), якщо модель голосів не встановлена: усе інше працює, усі інші голоси під однією позначкою.</dd>' +
+        '</dl>'
+    }
+  };
+  window.prompterI18n = I18N;   // read-only use by the headless test
+  var uiLang = load('ui_lang') === 'uk' ? 'uk' : 'en';
+  // t('key', {n: 3}) -> the string in the current UI language with {n} filled in (English as a fallback).
+  function t(key, p) {
+    var s = I18N[uiLang][key];
+    if (s == null) s = I18N.en[key];
+    if (s == null) return key;
+    if (p) s = s.replace(/\{(\w+)\}/g, function (m, k) { return p[k] != null ? String(p[k]) : m; });
+    return s;
+  }
+  // Static markup: data-i18n (text), data-i18n-title, data-i18n-ph (placeholder), data-i18n-aria;
+  // data-n / data-t fill {n} / {t}. Also used for the buttons inside rendered cards.
+  function applyStatic(rootEl) {
+    var r = rootEl || document;
+    [].forEach.call(r.querySelectorAll('[data-i18n],[data-i18n-title],[data-i18n-ph],[data-i18n-aria]'), function (el) {
+      var p = { n: el.getAttribute('data-n'), t: el.getAttribute('data-t') }, k;
+      if ((k = el.getAttribute('data-i18n'))) el.textContent = t(k, p);
+      if ((k = el.getAttribute('data-i18n-title'))) el.title = t(k, p);
+      if ((k = el.getAttribute('data-i18n-ph'))) el.placeholder = t(k, p);
+      if ((k = el.getAttribute('data-i18n-aria'))) el.setAttribute('aria-label', t(k, p));
+    });
+    if (!rootEl) {
+      document.documentElement.lang = uiLang;
+      var hb = document.getElementById('helpbox'); if (hb) hb.innerHTML = t('help_html');
+    }
+  }
+  function i18nSpan(key, p) {
+    return '<span data-i18n="' + key + '"' + (p && p.n != null ? ' data-n="' + esc(p.n) + '"' : '') + '>' + esc(t(key, p)) + '</span>';
+  }
+  applyStatic();
+
+  // ---------- display: font size (slider + Cmd+ / Cmd-), opacity, always on top ----------
+  var SIZE_DEF = 18, sizeIn = $('size'), sizeVal = $('sizeval');
+  var size = parseFloat(load('font_size')) || SIZE_DEF;
+  function applySize() {
+    size = Math.max(12, Math.min(30, Math.round(size)));
+    document.documentElement.style.setProperty('--size', size + 'px');
+    sizeIn.value = String(size); sizeVal.textContent = String(size);
+  }
+  applySize();
+  sizeIn.oninput = function () { size = +sizeIn.value; applySize(); store('font_size', size); };
+  document.addEventListener('keydown', function (e) {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+    if (e.key === '=' || e.key === '+') size += 1;
+    else if (e.key === '-' || e.key === '_') size -= 1;
+    else if (e.key === '0') size = SIZE_DEF;
+    else return;
+    e.preventDefault(); applySize(); store('font_size', size);
+  });
+
+  // Opacity (2026-10-22): with a window that can be see-through (window.LT_GLASS, set by the native
+  // window) only the backgrounds fade; text stays fully opaque with a halo in the background colour,
+  // so it is readable at 65-80 %. An older window fades as a whole, as before.
+  var fadeBtns = $('fade').querySelectorAll('button'), fadeV = 0.94;
+  function applyFade(v) {
+    fadeV = v;
+    var root = document.documentElement;
+    if (!window.LT_GLASS) { send('opacity', v); document.body.classList.toggle('halo', v < 0.9); return; }
+    send('opacity', 1);
+    root.style.removeProperty('--bg'); root.style.removeProperty('--panel'); root.style.removeProperty('--panel2');
+    var cs = getComputedStyle(root);
+    var bg = cs.getPropertyValue('--bg').trim(), pa = cs.getPropertyValue('--panel').trim(), p2 = cs.getPropertyValue('--panel2').trim();
+    root.style.setProperty('--halo', bg);
+    if (v < 1) {
+      var pct = Math.round(v * 100);
+      root.style.setProperty('--bg', 'color-mix(in srgb, ' + bg + ' ' + pct + '%, transparent)');
+      root.style.setProperty('--panel', 'color-mix(in srgb, ' + pa + ' ' + Math.min(100, pct + 6) + '%, transparent)');
+      root.style.setProperty('--panel2', 'color-mix(in srgb, ' + p2 + ' ' + Math.min(100, pct + 6) + '%, transparent)');
+    }
+    document.body.classList.toggle('halo', v < 0.9);
+  }
+  [].forEach.call(fadeBtns, function (b) {
+    b.onclick = function () {
+      [].forEach.call(fadeBtns, function (x) { x.classList.toggle('on', x === b); });
+      applyFade(parseFloat(b.getAttribute('data-v')));
+    };
+  });
+  window.enableGlass = function () { window.LT_GLASS = true; applyFade(fadeV); };
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyFade(fadeV); }); } catch (e) {}
+
+  var pinned = true, pinBtn = $('pin');
+  pinBtn.onclick = function () {
+    pinned = !pinned; pinBtn.classList.toggle('on', pinned); pinBtn.setAttribute('aria-checked', String(pinned));
+    send('pin', pinned);
+  };
+
+  // Hide from screen sharing and screenshots (window-local; an older window app ignores the message).
+  var stealth = load('stealth') !== '0', stBtn = $('stealth');
+  function applyStealth() { stBtn.classList.toggle('on', stealth); stBtn.setAttribute('aria-checked', String(stealth)); }
+  applyStealth();
+  send('stealth', stealth);
+  stBtn.onclick = function () {
+    stealth = !stealth; store('stealth', stealth ? '1' : '0'); applyStealth(); send('stealth', stealth);
+  };
+
+  // Interface language: re-render everything in place, no reload. The skill hears it as ui_lang.
+  var langBtns = $('uilang').querySelectorAll('button');
+  function markLang() { [].forEach.call(langBtns, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === uiLang); }); }
+  markLang();
+  [].forEach.call(langBtns, function (b) {
+    b.onclick = function () {
+      var v = b.getAttribute('data-v'); if (v === uiLang) return;
+      setLang(v); send('setting', { key: 'ui_lang', value: uiLang });
+    };
+  });
+  function setLang(l) {
+    uiLang = l === 'uk' ? 'uk' : 'en'; store('ui_lang', uiLang);
+    applyStatic(); markLang();
+    applyPause(); alertKey = ''; renderAlert(); renderBrief(); tickWorking();
+    if (semBtn) applySemantic();
+    if (lastAgenda) renderAgenda(lastAgenda);
+    renderNow(); searchFacts();
+    renderAsk(true);
+    if (popSid) renderPop(false); else renderChip();
+    if (S && Object.keys(S).length) window.setStatus(S);
+  }
+  window.setUiLang = setLang;   // for tests and the native side
+
+  // ---------- mute ----------
+  var muted = false, muteBtn = $('mute');
+  function applyMute() {
+    muteBtn.classList.toggle('muted', muted);
+    muteBtn.textContent = muted ? '🔇' : '🎙';
+    muteBtn.setAttribute('aria-pressed', String(muted));
+    muteBtn.setAttribute('aria-label', muted ? t('unmute_aria') : t('mute_aria'));
+  }
+  var muteClick = 0;
+  muteBtn.onclick = function () { muted = !muted; muteClick = Date.now(); applyMute(); send('mute', muted); };
+
+  // ---------- the ⚙ menu ----------
+  var gear = $('gear');
+  function setMenu(on) { document.body.classList.toggle('menu', on); gear.classList.toggle('open', on); }
+  gear.onclick = function () { setMenu(!document.body.classList.contains('menu')); };
+  $('scrim').onclick = function () { setMenu(false); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && document.body.classList.contains('menu')) setMenu(false);
+  });
+  window.showSetup = function (on) { setMenu(on !== false); };
+
+  // ---------- the single alert slot ----------
+  // Priority: Claude not listening > mic not recording > mic auto switched > other side silent >
+  // transcript behind > setting feedback (sent / confirmed / not confirmed).
+  var alertEl = $('alert'), S = {}, setMsg = null, setTimer = null, silentSince = null, dismissed = {}, alertKey = '';
+  function alertCandidates() {
+    var out = [], rec = S.state === 'recording';
+    if (S.state === 'standby')
+      out.push({ id: 'standby', cls: 'ok', text: t('al_standby'), sub: t('al_standby_sub'), act: 'go', actText: t('al_go') });
+    if (rec && S.system_audio === 'ok') themHeard = true;
+    if (rec && S.listener_age_s != null && S.listener_age_s > 75)
+      out.push({ id: 'deaf', cls: 'crit', text: t('al_deaf', { n: S.listener_age_s }),
+                 sub: t('al_deaf_sub') });   // Live Tips app: no Cowork chat to write "continue" in
+    var streak = +S.mic_stall_streak || 0;
+    if (rec && S.mic !== 'muted' && (S.mic === 'stalled' || streak >= 3)) {
+      var onMac = S.mic_device === 'builtin';
+      out.push({ id: 'mic', cls: streak >= 3 ? 'crit' : 'warn',
+                 text: streak >= 3 ? t('al_mic_streak', { n: streak }) : t('al_mic'),
+                 sub: onMac ? t('al_mic_sub_mac') : t('al_mic_sub'),
+                 act: onMac ? null : 'mic_builtin', actText: t('al_use_mac') });
+    }
+    if (S.mic_auto_switched && S.mic_device !== 'default' && !dismissed.auto)
+      out.push({ id: 'auto', cls: 'info', text: t('al_auto'), sub: t('al_auto_sub'),
+                 act: 'mic_default', actText: t('al_back'), close: true });
+    if (rec && themHeard && S.system_audio === 'silent' && silentSince && Date.now() - silentSince > 15000 && !dismissed.silent)
+      out.push({ id: 'silent', cls: 'warn', text: t('al_silent'), sub: t('al_silent_sub'), close: true });
+    if (rec && S.asr_lag_s != null && S.asr_lag_s > 4)
+      out.push({ id: 'lag', cls: 'warn', text: t('al_lag', { n: S.asr_lag_s }), sub: t('al_lag_sub') });
+    if (setMsg) out.push({ id: 'set', cls: setMsg.cls, text: setMsg.text });
+    return out;
+  }
+  var themHeard = false;   // "cannot hear the other side" only after they were heard once (not before the call)
+  function renderAlert() {
+    var a = alertCandidates()[0];
+    var key = a ? [a.id, a.cls, a.text, a.sub, a.act].join('|') : '';
+    if (key === alertKey) return;
+    alertKey = key;
+    if (!a) { alertEl.className = ''; alertEl.innerHTML = ''; alertEl.removeAttribute('data-id'); return; }
+    alertEl.className = 'show ' + a.cls;
+    alertEl.setAttribute('data-id', a.id);
+    alertEl.innerHTML = '<span class="msg">' + esc(a.text) + (a.sub ? '<small>' + esc(a.sub) + '</small>' : '') + '</span>' +
+      (a.act ? '<button type="button" data-act="' + a.act + '">' + esc(a.actText) + '</button>' : '') +
+      (a.close ? '<button type="button" class="x" data-act="close" data-id="' + a.id + '" title="' + esc(t('al_hide')) + '">✕</button>' : '');
+  }
+  alertEl.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var act = b.getAttribute('data-act');
+    if (act === 'copy') { copyText('continue'); b.textContent = t('al_copied'); }
+    else if (act === 'go') { send('setting', { key: 'go', value: true }); b.textContent = t('al_going'); b.disabled = true; }
+    else if (act === 'mic_builtin') setMic('builtin');
+    else if (act === 'mic_default') { dismissed.auto = true; setMic('default'); }
+    else if (act === 'close') { dismissed[b.getAttribute('data-id')] = true; }
+    renderAlert();
+  });
+  function copyText(str) {
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(str).catch(fallback); return; } } catch (e) {}
+    fallback();
+    function fallback() {
+      var ta = document.createElement('textarea'); ta.value = str; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      ta.remove();
+    }
+  }
+  setInterval(renderAlert, 1000);
+
+  // ---------- settings with feedback ----------
+  // Language and mic are applied by the recorder itself and confirmed through the status. Type,
+  // role, audience, proactive and comment rate need Claude: confirmed when Claude writes an "ack"
+  // item (or flagged as not confirmed after a timeout).
+  function lab(k) { return t('lab_' + k); }
+  var RECORDER_FINAL = { call_lang: 1, mic_device: 1, semantic: 1 },
+      RECORDER_ECHO = { call_lang: 1, mic_device: 1, call_type: 1, hiring_role: 1, audience: 1, proactive: 1, semantic: 1 };
+  var pend = {};
+  function toast(text, cls, keep) {
+    setMsg = { cls: cls, text: text };
+    clearTimeout(setTimer);
+    if (!keep) setTimer = setTimeout(function () { setMsg = null; renderAlert(); }, cls === 'ok' ? 4000 : 8000);
+    renderAlert();
+  }
+  function setPill(key, cls, text) {
+    var el = $('p_' + key);
+    if (!el) return;
+    el.className = 'pill ' + cls; el.textContent = text; el.title = text;
+    clearTimeout(el._t);
+    if (cls === 'ok') el._t = setTimeout(function () { el.textContent = ''; el.className = 'pill'; }, 8000);
+  }
+  function settingChanged(key, shown) {
+    pend[key] = { value: String(shown), at: Date.now(), rec: false, done: false };
+    setPill(key, 'wait', t('set_sending'));
+    toast(t('set_sent', { k: lab(key), v: shown }), 'wait', true);
+  }
+  function settingDone(key, how) {
+    var p = pend[key]; if (!p || p.done) return;
+    p.done = true;
+    setPill(key, 'ok', '✓ ' + how);
+    toast(t('set_ok', { k: lab(key), v: p.value, how: how }), 'ok');
+  }
+  function sendSetting(key, raw, shown) {
+    send('setting', { key: key, value: raw });
+    settingChanged(key, shown);
+    pend[key].raw = raw;
+  }
+  setInterval(function () {
+    Object.keys(pend).forEach(function (k) {
+      var p = pend[k]; if (p.done || p.failed) return;
+      var limit = RECORDER_FINAL[k] ? 15000 : 30000;
+      if (Date.now() - p.at > limit) {
+        p.failed = true;
+        var why = RECORDER_FINAL[k] ? t('set_fail_rec') : (p.rec ? t('set_fail_claude') : t('set_fail'));
+        setPill(k, 'warn', '⚠ ' + why);
+        toast('⚠ ' + lab(k) + ' = ' + p.value + ': ' + why, 'warn');
+      }
+    });
+  }, 1000);
+  window.ackSetting = function (key, value) {
+    var p = pend[key];
+    if (value != null) value = normVal(key, value);
+    if (p && (value == null || String(value) === p.value || p.failed || !p.done)) {
+      p.failed = false; settingDone(key, t('how_claude'));
+    }
+  };
+
+  var sType = $('s_type'), sRole = $('s_role'), lRole = $('l_role'), sAud = $('s_aud'),
+      sLang = $('s_lang'), sMic = $('s_mic'), prBtn = $('proactive'), lCmt = $('l_cmt'), cmtSel = $('cmt');
+  function txt(sel) { return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : sel.value; }
+  function showRole() { lRole.style.display = sType.value === 'interview' ? '' : 'none'; }
+  sType.onchange = function () { showRole(); sendSetting('call_type', sType.value, txt(sType)); };
+  sRole.onchange = function () { sendSetting('hiring_role', sRole.value, txt(sRole)); };
+  sAud.onchange = function () { sendSetting('audience', sAud.value, txt(sAud)); };
+  sLang.onchange = function () { sendSetting('call_lang', sLang.value, txt(sLang)); };
+  sMic.onchange = function () { sendSetting('mic_device', sMic.value, txt(sMic)); };
+  function setMic(v) { sMic.value = v; sMic.onchange(); }
+
+  var proactive = false;
+  function applyProactive() {
+    prBtn.classList.toggle('on', proactive); prBtn.setAttribute('aria-checked', String(proactive));
+    lCmt.style.display = proactive ? '' : 'none';
+  }
+  applyProactive();
+  prBtn.onclick = function () {
+    proactive = !proactive; applyProactive();
+    sendSetting('proactive', proactive ? 'on' : 'off', proactive ? t('v_on') : t('v_off'));
+  };
+
+  // Local AI switch: the recorder applies it at once and echoes `semantic_switch`;
+  // `semantic` in the status is what really runs (on / off / loading), with `semantic_reason`.
+  var semBtn = $('semantic'), semOn = true, semState = null;
+  function applySemantic() {
+    semBtn.classList.toggle('on', semOn); semBtn.setAttribute('aria-checked', String(semOn));
+    var na = semOn && semState && semState.state === 'off';
+    semBtn.classList.toggle('na', !!na);
+    semBtn.title = !semOn ? t('semantic_off_tt') :
+      (na ? t('semantic_na_tt', { r: semState.reason || t('sem_na') }) : t('semantic_tt'));
+  }
+  applySemantic();
+  semBtn.onclick = function () {
+    semOn = !semOn; applySemantic();
+    sendSetting('semantic', semOn ? 'on' : 'off', semOn ? t('v_on') : t('v_off'));
+  };
+
+  // Comment hint frequency (only matters with proactive tips on): @@SET comment_rate_seconds=N (0 = off).
+  var rates = [20, 45, 90, 0], rate0 = parseInt(load('cmt'), 10);
+  if (rates.indexOf(rate0) < 0) rate0 = 45;
+  cmtSel.value = String(rate0);
+  cmtSel.onchange = function () {
+    var v = parseInt(cmtSel.value, 10); store('cmt', v);
+    sendSetting('comment_rate_seconds', v, v ? t('secs', { n: v }) : t('o_off'));
+  };
+  if (rate0 !== 45) send('setting', { key: 'comment_rate_seconds', value: rate0 });
+
+  // Normalise values the recorder reports, legacy meeting types included.
+  function normVal(k, v) {
+    if (v == null) return v;
+    if (k === 'proactive' || k === 'semantic') return (v === true || v === 'on' || v === 'true' || v === 1) ? 'on' : 'off';
+    if (k === 'call_type') {
+      v = String(v);
+      if (v === 'hiring' || v === 'interview') return 'interview';
+      if (v === 'presentation') return 'presentation';
+      return 'auto';
+    }
+    if (k === 'hiring_role') { v = String(v); return v === 'candidate' ? 'coach' : v; }   // legacy role name
+    return String(v);
+  }
+  // Keep the menu in line with what the recorder really uses, but never fight a pending change
+  // or a select the user is working with.
+  function busy(k, el) { var p = pend[k]; return (p && !p.done && !p.failed) || document.activeElement === el; }
+  // Mic menu from the inputs the Mac sees now (status.mic_inputs, from audiocap --list-inputs).
+  // Without the list (older recorder) the two fixed options stay.
+  var micSig = '';
+  function syncMicOptions(s) {
+    var list = Array.isArray(s.mic_inputs) ? s.mic_inputs : [];
+    if (!list.length) return;
+    var cur = s.mic_device || sMic.value;
+    var sig = JSON.stringify(list.map(function (d) { return [d.uid, d.name, d.def ? 1 : 0, d['default'] ? 1 : 0, d.builtin ? 1 : 0]; })) +
+      '|' + cur + '|' + t('o_default') + '|' + t('o_builtin');
+    if (sig === micSig || document.activeElement === sMic) return;
+    micSig = sig;
+    var def = list.filter(function (d) { return d['default']; })[0];
+    function opt(v, label) { var o = document.createElement('option'); o.value = v; o.textContent = label; sMic.appendChild(o); }
+    sMic.innerHTML = '';
+    opt('default', t('o_default') + (def ? ' (' + def.name + ')' : ''));
+    opt('builtin', t('o_builtin'));
+    list.forEach(function (d) { if (!d.builtin) opt('uid:' + d.uid, d.name); });
+    if (cur && !Array.prototype.some.call(sMic.options, function (o) { return o.value === cur; }))
+      opt(cur, cur.indexOf('uid:') === 0 ? '\u26a0 ' + cur.slice(4) : cur);
+    sMic.value = cur;
+  }
+  function syncSetup(s) {
+    syncMicOptions(s);
+    if (s.mic_device && !busy('mic_device', sMic)) sMic.value = s.mic_device;
+    if (!busy('call_lang', sLang)) {
+      if (s.call_lang) sLang.value = s.call_lang;
+      else if (s.me_lang) sLang.value = s.me_lang === 'en' ? 'en' : 'uk';
+    }
+    if (s.call_type != null && !busy('call_type', sType)) { sType.value = normVal('call_type', s.call_type); showRole(); }
+    if (s.hiring_role != null && !busy('hiring_role', sRole)) sRole.value = normVal('hiring_role', s.hiring_role);
+    if (!busy('audience', sAud)) {
+      if (s.audience) sAud.value = s.audience;
+      else if (s.call_type === 'client') sAud.value = 'client';      // legacy "client meeting"
+    }
+    if (s.proactive != null && !busy('proactive', prBtn)) { proactive = normVal('proactive', s.proactive) === 'on'; applyProactive(); }
+    if (s.semantic != null) semState = { state: String(s.semantic), reason: s.semantic_reason || '' };
+    if (s.semantic_switch != null && !busy('semantic', semBtn)) semOn = normVal('semantic', s.semantic_switch) === 'on';
+    applySemantic();
+  }
+
+  // ---------- context ----------
+  var briefEl = $('brief'), briefSub = $('briefsub'), briefAt = null, refreshAt = 0;
+  function hhmm(v) {
+    var m = String(v || '').match(/(\d{1,2}):(\d{2})/);
+    return m ? (m[1].length === 1 ? '0' : '') + m[1] + ':' + m[2] : null;
+  }
+  var refreshHm = null;
+  function renderBrief() {
+    briefEl.textContent = briefAt ? t('brief_from', { t: briefAt }) : t('brief_none');
+    briefSub.textContent = refreshAt ? t('brief_updating', { t: refreshHm }) : t('brief_sub');
+  }
+  renderBrief();
+  function setBrief(v, fromRefresh) {
+    var hm = hhmm(v); if (!hm) return;
+    briefAt = hm;
+    if (fromRefresh) refreshAt = 0;
+    renderBrief();
+  }
+  $('refresh').onclick = function () {
+    send('ask', 'refresh context');       // canonical English for the skill
+    refreshAt = Date.now(); refreshHm = hms().slice(0, 5);
+    renderBrief();
+    render({ kind: 'ask', level: 'info', youKey: 'refresh_ask', noteKey: 'refresh_note', t: hms() });
+  };
+
+  // ---------- cards ----------
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function inline(s) {
+    return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|\s)_(.+?)_(?=\s|$)/g, '$1<i>$2</i>');
+  }
+  var ICON = {
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 4 3v2H6v-2l4-3z"/><path d="M12 15v6"/></svg>',
+    yes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
+    part: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 13c2-3 4-3 6-1.5s4 1.5 6-1.5 3-1 4 0"/></svg>',
+    no: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+  };
+  var SOS_RE = /^\s*\u{1F198}/u;
+  var seqNo = 0;
+  function dropQuestions() {
+    var qs = list.querySelectorAll('.qline');
+    for (var i = 0; i < qs.length; i++) qs[i].remove();
+  }
+  function byUid(uid) { return uid ? list.querySelector('[data-uid="' + String(uid).replace(/"/g, '') + '"]') || $('pinbox').querySelector('[data-uid="' + String(uid).replace(/"/g, '') + '"]') : null; }
+  function render(it) {
+    if (empty) { empty.remove(); empty = null; }
+    var kind = it.kind || 'tip';
+    // Streamed tips: the engine sends the gist first (partial) and the full tip with the same uid;
+    // "retract" removes a gist whose tip was dropped. The card keeps its place and pin.
+    if (kind === 'retract') { var gone = byUid(it.uid); if (gone) gone.remove(); return; }
+    var oldEl = byUid(it.uid);
+    // A "question heard" line lives until the next tip, answer or question replaces it.
+    if (kind !== 'ask') dropQuestions();
+    if (working && kind !== 'ask' && kind !== 'question' && !/^\s*\u{1F198}\s*Asking Claude/u.test(it.gist || '')) hideWorking();
+    var el = document.createElement('div');
+    el.dataset.seq = String(++seqNo);   // arrival order: an unpinned card goes back to its own place
+    if (kind === 'question') {
+      el.className = 'qline question';
+      el.innerHTML = '<span class="qtext">' + inline(it.gist || '❓') + '</span>' + (it.t ? '<span class="qt">' + esc(it.t) + '</span>' : '');
+      list.insertBefore(el, list.firstChild);
+      list.scrollTop = 0;
+      return;
+    }
+    el.className = 'tip ' + (it.level || 'info') + ' ' + kind + (it.late ? ' late' : '') + (SOS_RE.test(it.gist || '') ? ' sos' : '') + (it.partial ? ' partial' : '');
+    if (it.uid) el.dataset.uid = String(it.uid);
+    var html = '';
+    var lag = lagOf(it);
+    if (it.q) html += '<div class="q">' + i18nSpan('you') + ': ' + inline(it.q) + '</div>';
+    // Local echoes of what you sent: "You: <text>" with the label in the UI language.
+    if (it.you != null || it.youKey) html += '<div class="gist">' + i18nSpan('you') + ': ' + (it.youKey ? i18nSpan(it.youKey) : inline(it.you)) + '</div>';
+    else if (it.gist) html += '<div class="gist">' + inline(it.gist) + '</div>';
+    if (it.phrase) html += '<div class="phrase">' + inline(it.phrase) + '</div>';
+    if (it.items && it.items.length) {
+      html += '<button class="more" type="button" data-i18n="n_points" data-n="' + it.items.length + '">' + esc(t('n_points', { n: it.items.length })) + '</button>';
+      var tag = it.ordered === false ? 'ul' : 'ol';
+      html += '<' + tag + ' class="items">';
+      it.items.forEach(function (x) { html += '<li>' + inline(typeof x === 'string' ? x : (x && x.text) || '') + '</li>'; });
+      html += '</' + tag + '>';
+    }
+    var meta = '';
+    if (it.t) meta += '<span class="time">' + (kind === 'card' ? '⚡ ' : '') + esc(it.t) + '</span>';
+    if (lag != null) meta += '<span class="lag' + (lag > 20 ? ' slow' : '') + '">+' + lag + 's</span>';
+    if (it.late) meta += '<span class="latetag" data-i18n="late" data-i18n-title="late_tt" title="' + esc(t('late_tt')) + '">' + esc(t('late')) + '</span>';
+    if (it.noteKey) meta += '<span class="note" data-i18n="' + it.noteKey + '">' + esc(t(it.noteKey)) + '</span>';
+    else if (it.note) meta += '<span class="note">' + inline(it.note) + '</span>';
+    var rateable = kind === 'tip' || kind === 'card' || kind === 'answer' || kind === 'fact';
+    // Speech, brief checklist, status and wrap-up are not rated, but can be pinned (2026-10-21).
+    var pinnable = rateable || kind === 'speech' || kind === 'checklist' || kind === 'status' || kind === 'wrapup';
+    var fb = '';
+    function fbBtn(cls, key, icon) { return '<button class="' + cls + '" type="button" data-i18n-title="' + key + '" data-i18n-aria="' + key + '" title="' + esc(t(key)) + '" aria-label="' + esc(t(key)) + '">' + icon + '</button>'; }
+    if (pinnable) fb += fbBtn('pin', 'pin_card_tt', ICON.pin);
+    if (rateable) fb += fbBtn('yes', 'yes_tt', ICON.yes) + fbBtn('part', 'part_tt', ICON.part) + fbBtn('no', 'no_tt', ICON.no);
+    html += '<div class="foot"><div class="meta">' + meta + '</div>' + (fb ? '<div class="fb">' + fb + '</div>' : '') + '</div>';
+    el.innerHTML = html;
+    var more = el.querySelector('.more');
+    if (more) more.onclick = function () { el.classList.toggle('open'); };
+    if (rateable) {
+      var key = (it.card || '') + '|' + (it.t || '') + '|' + String(it.gist || '').slice(0, 60);
+      el.querySelector('.fb .yes').onclick = function () { rate(el, this, 'used', key); el.classList.remove('dismissed'); closeWhy(el); };
+      el.querySelector('.fb .part').onclick = function () { rate(el, this, 'partly', key); el.classList.remove('dismissed'); openWhy(el, 'partly', key); };
+      el.querySelector('.fb .no').onclick = function () { rate(el, this, 'not_useful', key); el.classList.add('dismissed'); openWhy(el, 'not_useful', key); };
+    }
+    var pb = el.querySelector('.fb .pin');
+    if (pb) pb.onclick = function () {
+      var box = $('pinbox');
+      if (el.classList.toggle('pinned')) {
+        pb.classList.add('on'); box.appendChild(el); box.classList.add('has');
+      } else {
+        pb.classList.remove('on'); el.classList.remove('open');
+        // Back to its place by arrival order (the list is newest first), not to the top.
+        var seq = +el.dataset.seq, after = null;
+        for (var j = 0; j < list.children.length; j++) {
+          var c = list.children[j];
+          if (c.dataset && c.dataset.seq && +c.dataset.seq < seq) { after = c; break; }
+        }
+        list.insertBefore(el, after);
+        if (!box.children.length) box.classList.remove('has');
+      }
+    };
+    if (kind !== 'ask') {
+      var prev = document.querySelectorAll('.tip.latest');
+      for (var i = 0; i < prev.length; i++) prev[i].classList.remove('latest');
+      el.classList.add('latest');
+    }
+    if (kind === 'speech' || kind === 'checklist') setBrief(it.at || it.t, !!refreshAt);
+    if (oldEl) {
+      el.dataset.seq = oldEl.dataset.seq;
+      if (oldEl.classList.contains('pinned')) { el.classList.add('pinned'); var pb2 = el.querySelector('.fb .pin'); if (pb2) pb2.classList.add('on'); }
+      if (oldEl.classList.contains('latest')) el.classList.add('latest');
+      oldEl.replaceWith(el);
+      return;
+    }
+    list.insertBefore(el, list.firstChild);
+    list.scrollTop = 0;
+    while (list.children.length > 40) list.removeChild(list.lastChild);
+  }
+  // Tip latency: "src" = transcript time of the line that triggered the tip, "at" = when the tip
+  // landed in this window (read_delta / the recorder stamp it). Shown on the card and as a
+  // rolling median in the diagnostics.
+  function secs(hms) { var p = String(hms || '').split(':'); return p.length === 3 ? (+p[0]) * 3600 + (+p[1]) * 60 + (+p[2]) : null; }
+  var lags = [];
+  function lagOf(it) {
+    var a = secs(it.at), b = secs(it.src);
+    if (a == null || b == null) return null;
+    var d = a - b; if (d < -43200) d += 86400;
+    return d >= 0 && d < 3600 ? d : null;
+  }
+  function rate(el, btn, verdict, key) {
+    var btns = el.querySelectorAll('.fb .yes, .fb .part, .fb .no');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('on');
+    btn.classList.add('on');
+    send('setting', { key: 'tip_feedback', value: verdict + '|' + key });
+  }
+  // Why a tip was only partly useful or not useful: reason chips plus a short comment.
+  // Every change re-sends the whole verdict; the last one for a tip wins.
+  var REASONS = ['late', 'off_topic', 'wrong_fact', 'too_long', 'not_now'];   // codes sent to the skill stay English
+  function clean(str) { return String(str || '').replace(/[|\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300); }
+  function closeWhy(el) { var w = el.querySelector('.why'); if (w) w.remove(); }
+  function openWhy(el, verdict, key) {
+    closeWhy(el);
+    var w = document.createElement('div'); w.className = 'why';
+    w.innerHTML = REASONS.map(function (x) { return '<button class="rc" type="button" data-r="' + x + '" data-i18n="r_' + x + '">' + esc(t('r_' + x)) + '</button>'; }).join('') +
+      '<input type="text" data-i18n-ph="why_ph" placeholder="' + esc(t('why_ph')) + '">';
+    el.appendChild(w);
+    var inp = w.querySelector('input');
+    function push(done) {
+      var rs = [].map.call(w.querySelectorAll('.rc.on'), function (b) { return b.getAttribute('data-r'); });
+      send('setting', { key: 'tip_feedback', value: verdict + '|' + key + '|r=' + rs.join(',') + '|c=' + clean(inp.value) });
+      if (done) {
+        var note = clean(inp.value);
+        w.innerHTML = '<span class="sent">' + i18nSpan('why_sent') + (rs.length ? ': ' + rs.join(', ') : '') + (note ? ' · ' + esc(note) : '') + '</span>';
+      }
+    }
+    [].forEach.call(w.querySelectorAll('.rc'), function (b) {
+      b.onclick = function () { b.classList.toggle('on'); push(false); };
+    });
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); push(true); }
+      if (e.key === 'Escape') { push(true); }
+      e.stopPropagation();
+    });
+    inp.focus();
+  }
+
+  // ---------- agenda: one line with a progress bar, unfolds on click ----------
+  var agenda = $('agenda'), aglist = $('aglist'), agcount = $('agcount'), agnext = $('agnext'), segs = $('segs'), aggist = $('aggist');
+  if (load('agenda_open') === '1') agenda.classList.remove('collapsed');
+  agenda.querySelector('.head').onclick = function () {
+    agenda.classList.toggle('collapsed'); store('agenda_open', agenda.classList.contains('collapsed') ? '0' : '1');
+  };
+  var lastAgenda = null;
+  function renderAgenda(it) {
+    lastAgenda = it;
+    var items = it.items || [], done = 0, cur = -1, rows = [];
+    items.forEach(function (x, i) {
+      var text = typeof x === 'string' ? x : (x.text || '');
+      var isDone = typeof x === 'string' ? /^✓\s*/.test(x) : !!x.done;
+      rows.push({ text: text.replace(/^✓\s*/, ''), done: isDone, cur: typeof x === 'object' && !!x.cur });
+      if (isDone) done++;
+    });
+    rows.forEach(function (r, i) { if (cur < 0 && r.cur) cur = i; });
+    if (cur < 0) rows.forEach(function (r, i) { if (cur < 0 && !r.done) cur = i; });
+    aglist.innerHTML = ''; segs.innerHTML = '';
+    rows.forEach(function (r, i) {
+      var li = document.createElement('li');
+      li.textContent = r.text;
+      li.className = r.done ? 'done' : (i === cur ? 'cur' : '');
+      aglist.appendChild(li);
+      var seg = document.createElement('i'); seg.className = li.className; segs.appendChild(seg);
+    });
+    agcount.textContent = items.length ? done + '/' + items.length : '';
+    agnext.innerHTML = cur >= 0 ? esc(t('ag_now')) + ' <b>' + esc(rows[cur].text) + '</b>' : (items.length ? esc(t('ag_all')) : '');
+    aggist.textContent = it.gist || '';
+    agenda.title = it.gist || '';
+    agenda.classList.toggle('has', items.length > 0);
+  }
+
+  // ---------- quick asks, one field (facts while typing, Enter asks Claude), HELP NOW, pause ----------
+  var chips = document.querySelectorAll('#chips button');
+  for (var ci = 0; ci < chips.length; ci++) chips[ci].onclick = function () {
+    var q = this.getAttribute('data-q');
+    send('ask', q);                       // canonical English for the skill, whatever the UI language
+    render({ kind: 'ask', level: 'info', youKey: this.getAttribute('data-i18n'), t: hms(), noteKey: 'ask_sent_note' });
+  };
+  var working = null, workEl = $('working');
+  function hideWorking() { working = null; workEl.className = ''; workEl.textContent = ''; }
+  function tickWorking() {
+    if (!working) return;
+    var s = Math.round((Date.now() - working) / 1000);
+    workEl.textContent = s < 60 ? t('work_on', { n: s }) : t('work_late', { n: s });
+  }
+  setInterval(tickWorking, 1000);
+  $('sos').onclick = function () {
+    send('ask', 'sos');
+    working = Date.now(); workEl.className = 'show'; tickWorking();
+  };
+
+  // ---------- pause / play tips (v37) ----------
+  // Local state flips at once; the recorder echoes `tips_paused` in the status, so the state
+  // survives a window reopen. While a click waits for its echo the status does not flip it back.
+  var paused = false, pausePend = null, pauseBtn = $('pause');
+  function applyPause() {
+    document.body.classList.toggle('paused', paused);
+    pauseBtn.classList.toggle('on', paused);
+    pauseBtn.innerHTML = paused
+      ? '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+    pauseBtn.title = paused ? t('play_tt') : t('pause_tt');
+    pauseBtn.setAttribute('aria-label', paused ? t('play_aria') : t('pause_aria'));
+    pauseBtn.setAttribute('aria-pressed', String(paused));
+  }
+  applyPause();
+  pauseBtn.onclick = function () {
+    paused = !paused; pausePend = { v: paused, at: Date.now() };
+    applyPause();
+    send('setting', { key: 'tips_paused', value: paused ? 'on' : 'off' });
+  };
+  $('pausedpill').onclick = function () { if (paused) pauseBtn.onclick(); };
+  $('pausedpill').onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.onclick(); } };
+  // Clicking the two call buttons must not pull the focus out of the field while you type.
+  [pauseBtn, $('sos')].forEach(function (b) { b.addEventListener('mousedown', function (e) { e.preventDefault(); }); });
+  function onOff(v) { return v === true || v === 'on' || v === 'true' || v === 1; }
+  function syncPause(s) {
+    if (s.tips_paused == null) return;          // older recorder: keep the local state
+    var rv = onOff(s.tips_paused);
+    if (pausePend) {
+      if (rv === pausePend.v) pausePend = null;
+      else if (Date.now() - pausePend.at > 15000) {
+        pausePend = null;
+        toast(rv ? t('pause_unconf_on') : t('pause_unconf_off'), 'warn');
+      } else return;
+    }
+    if (rv !== paused) { paused = rv; applyPause(); }
+  }
+
+  // ---------- speakers (v37): "Who is speaking?" card and the "Now speaking" chip ----------
+  // The window only knows what it sees: sids from asks and speaker_now, names it sent or the
+  // recorder echoed. That is enough to turn "pick a name already used" into a merge.
+  // Names may be full "First Last" (up to 60 chars): buttons and the chip cut them with an ellipsis
+  // and carry the full name in the tooltip.
+  var spk = {}, spkMerged = {}, askQ = [], askSkipped = {}, spkNow = null, speakersState = null, popSid = null, popT = null;
+  var askBox = $('spkask'), spkLine = $('spkline'), spkChip = $('spkchip'), spkPop = $('spkpop');
+  var NAME_MAX = 60;
+  function rootSid(sid) { var n = 0; while (spkMerged[sid] && n++ < 10) sid = spkMerged[sid]; return sid; }
+  function spkName(sid) { var r = spk[rootSid(sid)]; return r && r.name ? r.name : null; }
+  function sidNum(sid) { return String(sid || '?').replace(/^S/i, ''); }
+  function spkLabel(sid) { return spkName(sid) || t('spk_label', { n: sidNum(sid) }); }
+  function rawLabel(sid) { return t('spk_label', { n: sidNum(sid) }); }
+  function noteSid(sid, name) { if (!sid) return; if (!spk[sid]) spk[sid] = { name: null }; if (name) spk[sid].name = cleanName(name); }
+  function cleanName(s) { return String(s || '').replace(/[|\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX); }
+  function sidOfName(name, except) {
+    var low = name.toLowerCase(), ex = except ? rootSid(except) : null;
+    for (var k in spk) if (rootSid(k) === k && k !== ex && spk[k].name && spk[k].name.toLowerCase() === low) return k;
+    return null;
+  }
+  function otherSids(sid) {
+    var r = rootSid(sid);
+    return Object.keys(spk).filter(function (k) { return rootSid(k) === k && k !== r; }).sort(function (a, b) {
+      return (parseInt(a.slice(1), 10) || 0) - (parseInt(b.slice(1), 10) || 0);
+    });
+  }
+  function spkSet(key, value) { send('setting', { key: key, value: value }); }
+  // Name a cluster; a name that already belongs to another speaker of this call means "same person".
+  function nameSpeaker(sid, raw) {
+    var name = cleanName(raw); if (!sid || !name) return false;
+    var other = sidOfName(name, sid);
+    if (other) {
+      spkSet('speaker_merge', sid + '|' + other); spkMerged[sid] = other;
+      toast(t('spk_merged', { a: rawLabel(sid), b: spkLabel(other) }), 'ok');
+    } else {
+      spkSet('speaker_name', sid + '|' + name); noteSid(sid, name);
+      toast(t('spk_named', { a: rawLabel(sid), b: name }), 'ok');
+    }
+    dropAsk(sid); renderChip();
+    return true;
+  }
+  function mergeSpeaker(sid, target) {
+    if (!sid || !target || rootSid(target) === rootSid(sid)) return;
+    spkSet('speaker_merge', sid + '|' + target); spkMerged[sid] = target;
+    toast(t('spk_merged', { a: rawLabel(sid), b: spkLabel(target) }), 'ok');
+    dropAsk(sid); renderChip();
+  }
+  function fixLine(at, target) {      // target: a sid, or {name}
+    if (!at) return;
+    if (typeof target === 'string') { spkSet('speaker_fix', at + '|' + target); toast(t('spk_moved', { t: at, b: spkLabel(target) }), 'ok'); return; }
+    var name = cleanName(target.name); if (!name) return;
+    var other = sidOfName(name, null);
+    spkSet('speaker_fix', at + '|' + (other ? other : 'name:' + name));
+    toast(t('spk_moved', { t: at, b: name }), 'ok');
+  }
+  // A name button: the text is cut with an ellipsis, the tooltip carries the full name.
+  function nameBtn(attrs, title, inner) {
+    return '<button class="nb" type="button" ' + attrs + ' title="' + esc(title) + '">' + inner + '</button>';
+  }
+  function nameText(n) { return '<span class="nt">' + esc(n) + '</span>'; }
+
+  // "Who is speaking?" card: one at a time, the rest wait ("+N more").
+  function scoreCls(sc) { return sc >= 0.7 ? 'hi' : (sc >= 0.6 ? 'mid' : ''); }
+  function addAsk(it) {
+    if (!it.sid) return;
+    noteSid(it.sid);
+    if (askSkipped[it.sid] || spkMerged[it.sid] || spkName(it.sid)) return;
+    for (var i = 0; i < askQ.length; i++) if (askQ[i].sid === it.sid) { askQ[i] = it; renderAsk(); return; }
+    askQ.push(it); renderAsk();
+  }
+  function dropAsk(sid) {
+    var n = askQ.length;
+    askQ = askQ.filter(function (a) { return a.sid !== sid && !spkName(a.sid) && !spkMerged[a.sid]; });
+    if (askQ.length !== n) renderAsk();
+  }
+  function renderAsk(force) {
+    if (!askQ.length) { askBox.className = ''; askBox.innerHTML = ''; askBox._a = null; askBox.removeAttribute('data-sid'); return; }
+    var a = askQ[0], more = askQ.length - 1;
+    if (!force && askBox._a === a) {
+      var m = askBox.querySelector('.moreq');
+      if (m) m.textContent = t('ask_more', { n: more });
+      if (!!m === more > 0) return;
+    }
+    var inp = askBox.querySelector('input'), keep = null, hadFocus = false;
+    if (inp && askBox.getAttribute('data-sid') === a.sid) { keep = inp.value; hadFocus = document.activeElement === inp; }
+    var names = [], seen = {}, html = '';
+    (a.suggestions || []).forEach(function (s) {
+      var n = cleanName(s && s.name); if (!n || seen[n.toLowerCase()]) return; seen[n.toLowerCase()] = 1;
+      var sc = +s.score || 0, other = sidOfName(n, a.sid);
+      names.push(nameBtn('data-name="' + esc(n) + '"',
+        t('ask_sugg_tt', { n: n, p: Math.round(sc * 100) }) + (other ? t('ask_sugg_merge', { a: spkLabel(other) }) : ''),
+        '<i class="sc ' + scoreCls(sc) + '"></i>' + nameText(n)));
+    });
+    (a.known || []).forEach(function (k) {
+      var n = cleanName(k); if (!n || seen[n.toLowerCase()]) return; seen[n.toLowerCase()] = 1;
+      var other = sidOfName(n, a.sid);
+      names.push(nameBtn('data-name="' + esc(n) + '"', t(other ? 'ask_known_merge_tt' : 'ask_known_tt', { n: n }), nameText(n)));
+    });
+    var label = rawLabel(a.sid);
+    html += '<div class="h"><b>' + esc(t('ask_title')) + '</b><span class="sid">' + esc(label) + '</span>' +
+      (a.seconds ? '<span class="sid secs" title="' + esc(t('ask_secs_tt')) + '">· ' + esc(t('secs', { n: Math.round(a.seconds) })) + '</span>' : '') +
+      '<span class="grow"></span>' +
+      (more > 0 ? '<span class="moreq" title="' + esc(t('ask_more_tt')) + '">' + esc(t('ask_more', { n: more })) + '</span>' : '') +
+      '<button class="skip" type="button" data-act="skip" title="' + esc(t('ask_skip_tt', { a: label })) + '">' + esc(t('ask_skip')) + '</button></div>';
+    if (a.quote) html += '<div class="quote" title="' + esc(a.quote) + '">' + (a.t ? '<span class="qt">' + esc(a.t) + '</span>' : '') + esc(a.quote) + '</div>';
+    if (names.length) html += '<div class="names">' + names.join('') + '</div>';
+    html += '<div class="nrow"><input type="text" maxlength="' + NAME_MAX + '" placeholder="' + esc(t('ask_ph')) + '" title="' + esc(t('ask_in_tt')) + '">' +
+      '<button class="go" type="button" data-act="name" title="' + esc(t('ask_ok_tt', { a: label })) + '">' + esc(t('ask_ok')) + '</button></div>';
+    if (askBox._a !== a) { askShown = Date.now(); askMini = false; }
+    askBox.innerHTML = html; askBox._a = a; askBox.setAttribute('data-sid', a.sid); askBox.className = askMini ? 'show mini' : 'show';
+    var ni = askBox.querySelector('input');
+    if (keep != null) { ni.value = keep; if (hadFocus) ni.focus(); }
+  }
+  // After 20 s without an answer the card folds to its title line so it does not cover the tips;
+  // a click on it opens it again for another 20 s.
+  var askShown = 0, askMini = false;
+  setInterval(function () {
+    if (askMini || !askQ.length || !askShown || Date.now() - askShown < 20000) return;
+    if (askBox.contains(document.activeElement)) { askShown = Date.now(); return; }
+    askMini = true; askBox.classList.add('mini');
+  }, 2000);
+  askBox.addEventListener('click', function (e) {
+    if (askMini) { askMini = false; askShown = Date.now(); askBox.classList.remove('mini'); if (!e.target.closest('button')) return; }
+    var a = askQ[0]; if (!a) return;
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.hasAttribute('data-name')) { nameSpeaker(a.sid, b.getAttribute('data-name')); return; }
+    var act = b.getAttribute('data-act');
+    if (act === 'skip') { askSkipped[a.sid] = 1; spkSet('speaker_skip', a.sid); askQ.shift(); renderAsk(); }
+    else if (act === 'name') { var v = askBox.querySelector('input').value; if (cleanName(v)) nameSpeaker(a.sid, v); else askBox.querySelector('input').focus(); }
+  });
+  askBox.addEventListener('keydown', function (e) {
+    if (e.target.tagName !== 'INPUT') return;
+    if (e.key === 'Enter') { e.preventDefault(); var a = askQ[0]; if (a && cleanName(e.target.value)) nameSpeaker(a.sid, e.target.value); }
+    else if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); }
+    e.stopPropagation();
+  });
+
+  // "Now speaking" chip under the top bar; frozen while its popover is open.
+  function renderChip() {
+    var open = spkPop.classList.contains('show');
+    var show = open || (speakersState !== 'off' && !!(spkNow && spkNow.sid));
+    spkLine.classList.toggle('show', show);
+    if (!show || open) return;
+    var nm = spkName(spkNow.sid), shown = nm || spkLabel(spkNow.sid);
+    spkChip.querySelector('.nm').textContent = shown;
+    spkChip.title = shown + '\n' + t('spkchip_tt');
+    spkChip.setAttribute('aria-label', shown);
+    spkChip.classList.toggle('unnamed', !nm);
+  }
+  function closePop() {
+    spkPop.className = ''; spkPop.innerHTML = ''; popSid = null; popT = null;
+    spkChip.classList.remove('open'); spkChip.setAttribute('aria-expanded', 'false');
+    renderChip();
+  }
+  function namesHtml(sids, act, titleFn) {
+    if (!sids.length) return '<div class="none">' + esc(t('pop_none')) + '</div>';
+    return '<div class="names">' + sids.map(function (k) {
+      return nameBtn('data-a="' + act + '" data-sid="' + esc(k) + '"', titleFn(k), nameText(spkLabel(k)));
+    }).join('') + '</div>';
+  }
+  function renderPop(focusInput) {
+    var label = spkLabel(popSid), cur = spkName(popSid) || '', others = otherSids(popSid), at = popT;
+    var html = '<div class="ph"><b title="' + esc(label) + '">🗣 ' + esc(label) + '</b>' + (at ? '<small>' + esc(t('pop_line', { t: at })) + '</small>' : '') +
+      '<button class="xb" type="button" data-a="close" title="' + esc(t('pop_close')) + '" aria-label="' + esc(t('pop_close')) + '">✕</button></div>';
+    html += '<h6>' + esc(t('pop_rename')) + '</h6><div class="nrow"><input type="text" data-f="rename" maxlength="' + NAME_MAX + '" value="' + esc(cur) +
+      '" placeholder="' + esc(t('pop_rename_ph', { a: label })) + '" title="' + esc(t('pop_rename_tt')) + '">' +
+      '<button class="go" type="button" data-a="rename" title="' + esc(t('pop_save_tt')) + '">' + esc(t('pop_save')) + '</button></div>';
+    if (at) {
+      html += '<h6>' + esc(t('pop_fix', { t: at })) + '</h6>' +
+        namesHtml(others, 'fix', function (k) { return t('pop_fix_btn_tt', { t: at, a: spkLabel(k) }); }) +
+        '<div class="nrow"><input type="text" data-f="fix" maxlength="' + NAME_MAX + '" placeholder="' + esc(t('pop_fix_ph')) + '" title="' + esc(t('pop_fix_tt')) + '">' +
+        '<button class="go" type="button" data-a="fixnew" title="' + esc(t('pop_move_tt')) + '">' + esc(t('pop_move')) + '</button></div>';
+    }
+    html += '<h6>' + esc(t('pop_same')) + '</h6>' +
+      namesHtml(others, 'merge', function (k) { return t('pop_merge_tt', { a: label, b: spkLabel(k) }); });
+    spkPop.innerHTML = html; spkPop.className = 'show';
+    if (focusInput) spkPop.querySelector('input').focus();
+  }
+  function openPop(byKeyboard) {
+    if (!spkNow || !spkNow.sid) return;
+    popSid = rootSid(spkNow.sid); popT = spkNow.t || null;
+    renderPop(byKeyboard);
+    spkChip.classList.add('open'); spkChip.setAttribute('aria-expanded', 'true');
+  }
+  spkChip.onclick = function (e) { if (spkPop.classList.contains('show')) closePop(); else openPop(e.detail === 0); };
+  function popAct(act, b) {
+    var sid = popSid, at = popT;
+    if (act === 'close') { closePop(); return; }
+    if (act === 'rename') { var v = spkPop.querySelector('input[data-f="rename"]').value; if (!cleanName(v) || cleanName(v) === spkName(sid)) { closePop(); return; } nameSpeaker(sid, v); }
+    else if (act === 'fix') fixLine(at, b.getAttribute('data-sid'));
+    else if (act === 'fixnew') { var n = spkPop.querySelector('input[data-f="fix"]').value; if (!cleanName(n)) return; fixLine(at, { name: n }); }
+    else if (act === 'merge') mergeSpeaker(sid, b.getAttribute('data-sid'));
+    closePop();
+  }
+  spkPop.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-a]'); if (b) popAct(b.getAttribute('data-a'), b);
+  });
+  spkPop.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closePop(); spkChip.focus(); }
+    else if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); popAct(e.target.getAttribute('data-f') === 'fix' ? 'fixnew' : 'rename'); }
+    e.stopPropagation();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && spkPop.classList.contains('show')) closePop();
+  });
+  document.addEventListener('mousedown', function (e) {
+    if (spkPop.classList.contains('show') && !spkLine.contains(e.target)) closePop();
+  });
+  function syncSpeakers(s) {
+    if (s.speakers != null) speakersState = String(s.speakers);
+    var now = s.speaker_now && typeof s.speaker_now === 'object' && s.speaker_now.sid ? s.speaker_now : null;
+    if (now) { noteSid(now.sid, now.name); if (now.name) dropAsk(now.sid); }
+    spkNow = now;
+    renderChip();
+  }
+
+  // Fact book: instant local search (same word matching as the recorder), no AI involved.
+  var STOP = {};
+  ('the and for that this with you your are was were have has will would could should can about from what when where which into there their they them then than just also only very ' +
+   'але або щоб тому коли якщо тобто типу просто також треба можна буде було були який яка яке які цей цього цьому ця це ці там тут вже ще дуже').split(' ').forEach(function (w) { STOP[w] = 1; });
+  function toks(str) { return (String(str || '').toLowerCase().match(/[\p{L}\p{N}'’]{2,}/gu) || []).filter(function (w) { return !STOP[w]; }); }
+  function tm(a, b) {
+    if (a === b) return true;
+    if (b.indexOf(a) === 0 && a.length >= 2) return true;          // typing a prefix finds the word
+    var n = 0, m = Math.min(a.length, b.length);
+    if (m < 4) return false;
+    while (n < m && a[n] === b[n]) n++;
+    return n >= 3 && n >= m - 1;
+  }
+  var facts = [], fidx = [], outline = [], posCur = null, posNext = null;
+  function indexFacts() {
+    fidx = facts.map(function (f) {
+      return { f: f, t: toks([f.id, f.title, (f.keywords || []).join(' '), f.text].join(' ')) };
+    });
+  }
+  var input = $('q'), fres = $('fres');
+  function searchFacts() {
+    var raw = input.value.replace(/^\s*find:\s*/i, '');
+    var q = toks(raw);
+    if (!q.length || !fidx.length) { fres.className = ''; fres.innerHTML = ''; return; }
+    var hits = [];
+    fidx.forEach(function (x) {
+      var sc = 0;
+      q.forEach(function (w) { if (x.t.some(function (y) { return tm(w, y); })) sc++; });
+      if (sc === q.length || (q.length > 2 && sc >= q.length - 1)) hits.push({ sc: sc, f: x.f });
+    });
+    hits.sort(function (a, b) { return b.sc - a.sc; });
+    fres.innerHTML = (hits.length ? hits.slice(0, 6).map(function (h) {
+      var f = h.f;
+      return '<div class="fr"><span class="fid">' + esc(f.id || '') + '</span><b>' + inline(f.title || '') + '</b> ' +
+        inline(f.text || '') + (f.source ? ' <span class="fsrc">' + esc(f.source) + '</span>' : '') + '</div>';
+    }).join('') : '<div class="fr">' + esc(t('fr_none')) + '</div>') + '<div class="hint">' + esc(t('fr_hint')) + '</div>';
+    fres.className = 'has';
+  }
+  input.addEventListener('input', searchFacts);
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { input.value = ''; searchFacts(); e.stopPropagation(); }
+  });
+  $('ask').onsubmit = function (e) {
+    e.preventDefault();
+    var text = input.value.trim();
+    if (!text) return;
+    send('ask', text);
+    var find = /^find:\s*/i.test(text);
+    render({ kind: 'ask', level: 'info', you: text, t: hms(), noteKey: find ? 'ask_find_note' : 'ask_sent_note' });
+    input.value = '';
+    searchFacts();
+  };
+
+  // Presentation tracker: the recorder follows your words through the outline.
+  var nowbox = $('nowbox');
+  function secById(id) { for (var i = 0; i < outline.length; i++) if (outline[i].id === id) return outline[i]; return null; }
+  function pts(sec) { return (sec.points || []).slice(0, 4).map(function (p) { return '<li>' + inline(p) + '</li>'; }).join(''); }
+  function nums(sec) { return sec.numbers && sec.numbers.length ? '<div class="nums">' + sec.numbers.map(esc).join('  ·  ') + '</div>' : ''; }
+  function renderNow() {
+    if (!outline.length) { nowbox.className = ''; nowbox.innerHTML = ''; return; }
+    var c = secById(posCur), n = secById(posNext) || (posCur == null ? outline[0] : null);
+    var html = '';
+    if (c) html += '<div class="now">' + esc(t('now_now')) + ' ' + inline(c.title) + '</div>' + nums(c) + '<ul>' + pts(c) + '</ul>';
+    if (n) html += '<div class="nxt">' + esc(t('now_next')) + ' <b>' + inline(n.title) + '</b>' + nums(n) + '<ul>' + pts(n) + '</ul></div>';
+    nowbox.innerHTML = html; nowbox.className = html ? 'has' : '';
+  }
+  window.addItems = function (items) {
+    (items || []).forEach(function (it) {
+      if (!it) return;
+      if (it.kind === 'agenda') { renderAgenda(it); return; }
+      if (it.kind === 'facts') { facts = it.facts || []; indexFacts(); searchFacts(); return; }
+      if (it.kind === 'outline') { outline = it.sections || []; renderNow(); return; }
+      if (it.kind === 'outline_pos') { posCur = it.cur; posNext = it.next; renderNow(); return; }
+      if (it.kind === 'tip' || it.kind === 'card' || it.kind === 'answer') {
+        var l = lagOf(it); if (l != null) { lags.push(l); lags = lags.slice(-5); }
+      }
+      if (it.kind === 'ack') { window.ackSetting(it.key, it.value); return; }
+      if (it.kind === 'speaker_ask') { addAsk(it); return; }
+      render(it);
+    });
+  };
+
+  // ---------- status ----------
+  var dot = $('dot'), statusEl = $('status'), diagEl = $('diag'), titleEl = $('title'), elapsedEl = $('elapsed');
+  var startedMs = null, endedMs = null;
+  function fmtDur(s) {
+    s = Math.max(0, Math.floor(s)); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (x < 10 ? '0' : '') + x;
+  }
+  function tickElapsed() {
+    if (startedMs == null || isNaN(startedMs)) { elapsedEl.textContent = ''; return; }
+    elapsedEl.textContent = fmtDur(((endedMs || Date.now()) - startedMs) / 1000);
+  }
+  setInterval(tickElapsed, 1000);
+  window.setStatus = function (s) {
+    s = s || {};
+    S = s;
+    var st = s.state || '';
+    var text = { loading_model: 1, recording: 1, stopping: 1, stopped: 1, error: 1 }[st] ? t('st_' + st) : (st || t('dot_wait'));
+    if (st === 'recording' && s.lines != null) text += ' · ' + t('st_lines', { n: s.lines });
+    if (s.system_audio === 'silent') text += ' · ' + t('st_silent');
+    if (s.mic === 'muted') text += ' · ' + t('st_muted');
+    if (s.mic === 'stalled') text += ' · ' + (s.mic_stall_streak >= 3 ? t('st_mic_streak', { n: s.mic_stall_streak }) : t('st_mic_stall'));
+    if (lags.length) {
+      var sl = lags.slice().sort(function (a, b) { return a - b; }), med = sl[Math.floor(sl.length / 2)];
+      text += ' · ' + t('st_tips_lag', { n: med });
+    }
+    if (s.asr_lag_s != null && s.asr_lag_s > 4) text += ' · ' + t('st_asr_lag', { n: s.asr_lag_s });
+    var meter = $('meter'), mtext = '';
+    if (st === 'recording' && s.talk_me_pct != null) mtext = t('meter_you', { p: s.talk_me_pct });
+    if (st === 'recording' && s.monologue_s >= 30) {
+      var m = Math.floor(s.monologue_s / 60), sec = s.monologue_s % 60;
+      mtext += (mtext ? ' · ' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+    }
+    meter.textContent = mtext;
+    meter.classList.toggle('long', s.monologue_s >= 90);
+    // Follow the recorder (e.g. a new call starts unmuted), but not right after a click.
+    if (st === 'recording' && Date.now() - muteClick > 5000 && (s.mic === 'muted') !== muted) {
+      muted = s.mic === 'muted'; applyMute();
+    }
+    if (s.title) { text = s.title + ' · ' + text; titleEl.textContent = s.title; titleEl.title = s.title; }
+    if (s.started_at) startedMs = Date.parse(s.started_at);
+    if (st === 'recording') endedMs = null;
+    else if ((st === 'stopping' || st === 'stopped') && !endedMs) endedMs = Date.now();
+    tickElapsed();
+    syncSetup(s);
+    syncPause(s);
+    syncSpeakers(s);
+    // Echo from the recorder: language and mic are final; the others then wait for Claude's ack.
+    Object.keys(RECORDER_ECHO).forEach(function (k) {
+      var p = pend[k], sv = k === 'semantic' ? s.semantic_switch : s[k];
+      if (p && !p.rec && !p.done && sv != null && normVal(k, sv) === normVal(k, p.raw != null ? p.raw : p.value)) {
+        p.rec = true; p.failed = false;
+        if (RECORDER_FINAL[k]) settingDone(k, t('how_rec'));
+        else { setPill(k, 'wait', t('set_recv_pill'));
+               toast(t('set_recv', { k: lab(k), v: p.value }), 'wait', true); }
+      }
+    });
+    if (s.setup_open && !window._setupShown) { window._setupShown = true; window.showSetup(true); }
+    var bt = s.brief_at || s.context_at;
+    if (bt) setBrief(bt, false);
+    // The skill touches state/listener on every poll. A long gap means its chat turn ended
+    // and nobody reads the call: tell the PM how to revive it (a window question cannot).
+    var deaf = st === 'recording' && s.listener_age_s != null && s.listener_age_s > 75;
+    if (deaf) text = t('st_deaf', { n: s.listener_age_s });
+    statusEl.textContent = text;
+    statusEl.classList.toggle('deaf', deaf);
+    var d = [];
+    if (s.mic) d.push(t('d_mic', { v: s.mic + (s.mic_device ? ' (' + s.mic_device + ')' : '') }));
+    if (s.mic_stall_restarts) d.push(t('d_restarts', { n: s.mic_stall_restarts }) + (s.mic_stall_streak ? t('d_streak', { n: s.mic_stall_streak }) : ''));
+    if (s.mic_auto_switched) d.push(t('d_auto'));
+    if (s.system_audio) d.push(t('d_other', { v: s.system_audio }));
+    if (s.listener_age_s != null) d.push(t('d_listener', { n: s.listener_age_s }));
+    if (s.asr_lag_s != null) d.push(t('d_lag', { n: s.asr_lag_s }));
+    if (s.queue) d.push(t('d_queue', { n: s.queue }));
+    if (s.audience) d.push(t('d_audience', { v: s.audience }));
+    if (s.mode) d.push(t('d_mode', { v: s.mode }));
+    if (s.last_line_at) d.push(t('d_last', { v: s.last_line_at }));
+    if (s.tips_paused != null) d.push(onOff(s.tips_paused) ? t('d_paused') : t('d_tips_on'));
+    if (s.speakers != null) {
+      var sv = String(s.speakers), svt = { on: 1, off: 1, loading: 1 }[sv] ? t('sp_' + sv) : sv;
+      d.push(t('d_speakers', { v: svt + (s.speakers_reason ? ' (' + s.speakers_reason + ')' : '') }) +
+             (s.speakers_rev != null ? t('d_rev', { n: s.speakers_rev }) : ''));
+    }
+    if (s.semantic != null) {
+      var smv = String(s.semantic), smt = !onOff(s.semantic_switch == null ? 'on' : s.semantic_switch) ? t('sem_off') :
+        ({ on: 1, loading: 1 }[smv] ? t('sem_' + smv) : t('sem_na'));
+      d.push(t('d_semantic', { v: smt + (s.semantic_reason && smv === 'off' ? ' (' + s.semantic_reason + ')' : '') }));
+    }
+    if (s.seq != null) d.push(t('d_seq', { n: s.seq }));
+    if (s.errors && s.errors.length) d.push(t('d_errors', { v: s.errors.join('; ') }));
+    diagEl.textContent = d.join(' · ');
+    // Top bar dot: recording pulse, orange on a mic problem, red ring when Claude is deaf.
+    dot.className = deaf ? 'dead' : (st === 'recording' ? (s.mic === 'stalled' ? 'warn' : 'rec') : (st === 'stopped' ? 'ok' : ''));
+    dot.title = text;
+    if (s.system_audio === 'silent') { if (!silentSince) silentSince = Date.now(); }
+    else { silentSince = null; dismissed.silent = false; }
+    if (!s.mic_auto_switched) dismissed.auto = false;
+    renderAlert();
+  };
+
+  send('setting', { key: 'ui_lang', value: uiLang });   // once on load: the skill writes tip headlines in it
+  send('ready', true);
+})();
+</script>
+<script>
+// ---------- Presentation split view (v38) ----------
+// The skill writes <stem>.slides.json; the recorder pushes it as {"kind":"slides"}. When the meeting
+// type is Presentation and slides exist, the window goes twice as wide (native "split" message):
+// slide cards with the full speech on the left, the usual tips stream on the right.
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var native = window.webkit && window.webkit.messageHandlers;
+  function send(name, value) { try { native[name].postMessage(value); } catch (e) {} }
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  var L = {
+    uk: { start: 'Старт', pause: 'Пауза', cont: 'Продовжити', auto: 'Авто', comp: 'Стиснути', snd: 'Звук', reset: 'Скинути',
+      mine: 'Мої слайди', all: 'Усі слайди', min: 'хв', left: 'лишилось', of: 'з', me: 'твоє', shared: 'спільне', other: 'говорить',
+      onSlide: 'У презентації: слайд', silent: 'Ти мовчиш.', next: 'Далі', last: 'Це останній слайд.', skip: 'можна пропустити',
+      ontrack: 'за графіком', ahead: 'уперед', back: 'назад', behind: 'відстаєш', early: 'випереджаєш', wpm: 'сл/хв',
+      slow: 'повільно', ok: 'норм', fast: 'швидко', squeeze: 'стисни', timeout: 'час слайда вийшов',
+      done: 'Прогін завершено', total: 'Загалом', limit: 'при ліміті', over: 'перебір', spare: 'запас', close: 'Закрити',
+      slide: 'Слайд', title: 'Назва', plan: 'План', fact: 'Факт', diff: 'Різниця',
+      autoTt: 'Картки гортаються самі за розкладом, з сигналом', compTt: 'Сховати абзаци «можна пропустити»', btnTt: 'Картки слайдів (split view)', swap: 'Поміняти місцями слайди і підказки' },
+    en: { start: 'Start', pause: 'Pause', cont: 'Resume', auto: 'Auto', comp: 'Trim', snd: 'Sound', reset: 'Reset',
+      mine: 'My slides', all: 'All slides', min: 'min', left: 'left', of: 'of', me: 'yours', shared: 'shared', other: 'speaks',
+      onSlide: 'On screen: slide', silent: 'You stay quiet.', next: 'Next', last: 'This is the last slide.', skip: 'can skip',
+      ontrack: 'on schedule', ahead: 'ahead', back: 'back', behind: 'behind', early: 'ahead', wpm: 'wpm',
+      slow: 'slow', ok: 'ok', fast: 'fast', squeeze: 'trim', timeout: 'slide time is up',
+      done: 'Run finished', total: 'Total', limit: 'with a limit of', over: 'over', spare: 'spare', close: 'Close',
+      slide: 'Slide', title: 'Title', plan: 'Plan', fact: 'Actual', diff: 'Diff',
+      autoTt: 'Cards turn by the schedule, with a beep', compTt: 'Hide the "can skip" paragraphs', btnTt: 'Slide cards (split view)', swap: 'Swap the slides and tips sides' }
+  };
+  function lang() { return document.documentElement.lang === 'uk' ? 'uk' : 'en'; }
+  function t(k) { return L[lang()][k] || L.en[k] || k; }
+
+  var data = null, S = [], cs = [], ce = [], total = 0, cards = [];
+  var mode = load('deck_mode') === 'all' ? 'all' : 'mine', T = 0;
+  var auto = load('deck_auto') !== '0', sound = load('deck_sound') !== '0', compress = false;
+  var running = false, elapsed = 0, offset = 0, idx = 0, last = 0, enter = {}, warned = {}, finished = false, entryLag = 0;
+  var actx = null, progScroll = false, pt = null, st = null;
+  var presenting = false, userHidden = false, isSplit = false, curLang = lang(), swap = load('deck_swap') === '1';
+
+  function fmt(x) { var n = x < 0; x = Math.abs(Math.round(x)); var m = Math.floor(x / 60), r = x % 60; return (n ? '-' : '') + m + ':' + (r < 10 ? '0' : '') + r; }
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function incl(d) { return mode === 'all' || d.who !== 'other'; }
+  function words(d) { var n = 0; (d.body || []).forEach(function (b) { if (b.k === 'p' || (b.k === 's' && !compress)) n += String(b.t).split(/\s+/).filter(Boolean).length; }); return n; }
+  function defMin() {
+    if (mode === 'all' && data.total_min) return Math.round(data.total_min);
+    var s = 0; data.slides.forEach(function (d) { if (incl(d)) s += d.sec || 60; });
+    return Math.max(1, Math.round(s / 60));
+  }
+
+  // ---------- bar button: show / hide the cards ----------
+  var dkbtn = el('button', 'ib', '📑'); dkbtn.id = 'dkbtn'; dkbtn.type = 'button';
+  var gear = $('gear'); if (gear && gear.parentNode) gear.parentNode.insertBefore(dkbtn, gear);
+  dkbtn.onclick = function () { userHidden = isSplit; applySplit(); };
+  // Swap sides button in the top bar (visible in split view): slides left/right, tips the other side.
+  var swbtn = el('button', 'ib', '⇄'); swbtn.id = 'dkswap'; swbtn.type = 'button';
+  if (gear && gear.parentNode) gear.parentNode.insertBefore(swbtn, dkbtn);
+  function toggleSwap() { swap = !swap; store('deck_swap', swap ? '1' : '0'); document.body.classList.toggle('swap', swap); labels(); }
+  swbtn.onclick = function () { toggleSwap(); };
+
+  function wantSplit() { return presenting && S.length > 0 && !userHidden; }
+  function applySplit() {
+    document.body.classList.toggle('dkready', presenting && S.length > 0);
+    document.body.classList.toggle('swap', swap);
+    var on = wantSplit();
+    if (on === isSplit) return;
+    isSplit = on;
+    document.body.classList.toggle('split', on);
+    // The window grows on the slides side, so the tips stream stays where the PM put it.
+    send('split', { on: on, grow: swap ? 'right' : 'left' });
+    if (on) setTimeout(function () { showCard(idx); }, 350);
+  }
+
+  function labels() {
+    $('dk-start').textContent = running ? t('pause') : (elapsed > 0 ? t('cont') : t('start'));
+    $('dk-auto').textContent = t('auto'); $('dk-auto').title = t('autoTt');
+    $('dk-comp').textContent = t('comp'); $('dk-comp').title = t('compTt');
+    $('dk-snd').textContent = '🔔'; $('dk-snd').title = t('snd'); $('dk-reset').textContent = '↺'; $('dk-reset').title = t('reset');
+    $('dk-mode').options[0].textContent = t('mine'); $('dk-mode').options[1].textContent = t('all');
+    $('dk-minlab').textContent = t('min'); dkbtn.title = t('btnTt');
+    $('dk-swap').title = t('swap'); $('dk-swap').setAttribute('aria-pressed', String(swap)); swbtn.title = t('swap');
+    $('dk-auto').setAttribute('aria-pressed', String(auto));
+    $('dk-snd').setAttribute('aria-pressed', String(sound));
+    $('dk-comp').setAttribute('aria-pressed', String(compress));
+  }
+
+  function build() {
+    if (!data) return;
+    var base = data.slides.filter(incl);
+    if (!T) T = parseInt(load('deck_min_' + mode) || '0', 10) || defMin();
+    var sum = base.reduce(function (a, d) { return a + (d.sec || 60); }, 0) || 1, k = T * 60 / sum, acc = 0;
+    S = base.map(function (d) { var o = {}; for (var x in d) o[x] = d[x]; o.b = (d.sec || 60) * k; return o; });
+    cs = []; ce = []; S.forEach(function (d) { cs.push(acc); acc += d.b; ce.push(acc); }); total = acc;
+    var tr = $('dk-track'); tr.innerHTML = '';
+    S.forEach(function (d) { var e = el('div', 'dk-seg' + (d.who === 'other' ? ' o' : '')); e.style.flex = String(d.b); e.title = d.n + '. ' + d.title + ' (' + fmt(d.b) + ')'; tr.appendChild(e); });
+    var m = el('div'); m.id = 'dk-mark'; tr.appendChild(m);
+    var box = $('dk-cards'); box.innerHTML = ''; cards = [];
+    S.forEach(function (d, i) {
+      var a = el('section', 'dk-card'), hd = el('div', 'dk-head');
+      hd.appendChild(el('span', 'dk-num', String(d.n)));
+      hd.appendChild(el('span', 'dk-who ' + d.who, d.who === 'other' ? (t('other') + (d.speaker ? ': ' + d.speaker : '')) : t(d.who)));
+      hd.appendChild(el('h2', null, d.title));
+      hd.appendChild(el('span', 'dk-bud', fmt(d.b)));
+      a.appendChild(hd);
+      a.appendChild(el('div', 'dk-go', (d.who === 'other' ? t('silent') + ' ' : '') + t('onSlide') + ' ' + d.n + '.'));
+      var tx = el('div', 'dk-txt');
+      if (d.numbers && d.numbers.length) tx.appendChild(el('p', 'nums', d.numbers.join('  ·  ')));
+      (d.body || []).forEach(function (b) { var p = el('p', b.k === 'p' ? '' : b.k, b.t); if (b.k === 's') p.setAttribute('data-l', t('skip')); tx.appendChild(p); });
+      a.appendChild(tx);
+      var nx = S[i + 1];
+      a.appendChild(el('div', 'dk-nx', nx ? t('next') + ': ' + nx.n + '. ' + nx.title + ' (' + fmt(nx.b) + ')' : t('last')));
+      box.appendChild(a); cards.push(a);
+    });
+    $('dk-min').value = T; $('dk-mode').value = mode;
+    if (idx > S.length - 1) idx = Math.max(0, S.length - 1);
+    labels();
+  }
+
+  function slideAt(v) { for (var i = 0; i < S.length; i++) if (v < ce[i]) return i; return S.length - 1; }
+  function beep(kind) {
+    if (!sound) return;
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      var f = kind === 'warn' ? [520] : [660, 880], t0 = actx.currentTime;
+      f.forEach(function (fr, i) {
+        var o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = fr; o.type = 'sine';
+        g.gain.setValueAtTime(0.0001, t0 + i * 0.16); g.gain.exponentialRampToValueAtTime(0.16, t0 + i * 0.16 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.16 + 0.14);
+        o.connect(g); g.connect(actx.destination); o.start(t0 + i * 0.16); o.stop(t0 + i * 0.16 + 0.16);
+      });
+    } catch (e) {}
+  }
+  function showCard(i) {
+    var box = $('dk-cards'); if (!box.clientHeight) return;
+    progScroll = true; box.scrollTop = i * box.clientHeight;
+    clearTimeout(pt); pt = setTimeout(function () { progScroll = false; }, 250);
+  }
+  function setCur(i, withBeep, fromScroll) {
+    if (!S.length) return;
+    idx = i;
+    if (!(i in enter)) enter[i] = elapsed;
+    entryLag = elapsed + offset - cs[i];
+    if (withBeep) beep('go');
+    var segs = $('dk-track').children;
+    for (var j = 0; j < S.length; j++) {
+      segs[j].className = 'dk-seg' + (S[j].who === 'other' ? ' o' : '') + (j < i ? ' done' : j === i ? ' cur' : '');
+      cards[j].classList.toggle('cur', j === i);
+    }
+    if (!fromScroll) showCard(i);
+    render();
+  }
+  function jump(i, fromScroll) {
+    if (!S.length) return;
+    i = Math.max(0, Math.min(S.length - 1, i));
+    if (auto) offset = cs[i] - elapsed;
+    setCur(i, false, fromScroll);
+  }
+  function nextS() {
+    if (!running && !finished && elapsed === 0 && idx === 0) { startStop(); return; }
+    if (idx >= S.length - 1) { finish(); return; }
+    jump(idx + 1);
+  }
+  function startStop() {
+    if (finished || !S.length) return;
+    running = !running; last = performance.now();
+    if (running) { beep('go'); if (!(idx in enter)) enter[idx] = elapsed; }
+    labels();
+  }
+  function reset() {
+    running = false; elapsed = 0; offset = 0; idx = 0; enter = {}; warned = {}; finished = false; entryLag = 0;
+    $('dk-wrap').classList.remove('on'); labels();
+    setCur(0, false, false);
+  }
+  function finish() {
+    running = false; finished = true; labels();
+    var w = $('dk-wrap'); w.innerHTML = '';
+    var hd = el('div', 'dk-row'); hd.appendChild(el('b', null, t('done'))); hd.lastChild.style.flex = '1';
+    var cl = el('button', 'dk-b', t('close')); cl.type = 'button'; cl.onclick = function () { w.classList.remove('on'); }; hd.appendChild(cl);
+    w.appendChild(hd);
+    var dd = elapsed - T * 60;
+    w.appendChild(el('div', 'dk-lab', t('total') + ' ' + fmt(elapsed) + ' ' + t('limit') + ' ' + fmt(T * 60) + ' (' + (dd > 0 ? t('over') : t('spare')) + ' ' + fmt(Math.abs(dd)) + ')'));
+    var tb = el('table'), th = el('tr');
+    [t('slide'), t('title'), t('plan'), t('fact'), t('diff')].forEach(function (h, i) { th.appendChild(el('th', i > 1 ? 'r' : null, h)); });
+    tb.appendChild(th);
+    var keys = Object.keys(enter).map(Number).sort(function (a, b) { return a - b; });
+    keys.forEach(function (i, j) {
+      var end = j + 1 < keys.length ? enter[keys[j + 1]] : elapsed, act = end - enter[i], d = act - S[i].b, tr = el('tr');
+      tr.appendChild(el('td', null, String(S[i].n))); tr.appendChild(el('td', 't', S[i].title));
+      tr.appendChild(el('td', 'r', fmt(S[i].b))); tr.appendChild(el('td', 'r', fmt(act)));
+      tr.appendChild(el('td', 'r ' + (d > 8 ? 'bad' : d < -8 ? 'ok' : ''), (d > 0 ? '+' : '') + fmt(d)));
+      tb.appendChild(tr);
+    });
+    w.appendChild(tb); w.classList.add('on');
+    render();
+  }
+
+  function render() {
+    if (!S.length) return;
+    var d = S[idx], v = elapsed + offset, rem = ce[idx] - v;
+    $('dk-num').textContent = d.n; $('dk-ttl').textContent = d.title; $('dk-ttl').title = d.title;
+    var r = $('dk-rem'); r.textContent = fmt(rem); r.className = rem < 0 ? 'neg' : rem < 10 ? 'warn' : '';
+    $('dk-clock').textContent = fmt(elapsed) + ' ' + t('of') + ' ' + fmt(T * 60);
+    $('dk-mark').style.left = Math.min(100, Math.max(0, v / total * 100)) + '%';
+    var pc = $('dk-pace'); pc.innerHTML = '';
+    function chip(cls, txt) { pc.appendChild(el('span', 'dk-chip ' + cls, txt)); }
+    if (!running && elapsed === 0) return;
+    if (Math.abs(offset) > 8) chip(offset > 0 ? 'ok' : 'warn', (offset > 0 ? t('ahead') : t('back')) + ' ' + fmt(Math.abs(offset)));
+    else if (!auto && Math.abs(entryLag) > 8) chip(entryLag > 0 ? 'bad' : 'ok', (entryLag > 0 ? t('behind') : t('early')) + ' ' + fmt(Math.abs(entryLag)));
+    else chip('ok', t('ontrack'));
+    if (d.who !== 'other') {
+      var wn = words(d);
+      if (rem > 5 && wn > 0) {
+        var wpm = Math.round(wn / (rem / 60));
+        chip(wpm > 150 ? 'bad' : (wpm > 135 || wpm < 95) ? 'warn' : 'ok',
+          wpm + ' ' + t('wpm') + ' ' + (wpm > 150 ? t('squeeze') : wpm > 135 ? t('fast') : wpm < 95 ? t('slow') : t('ok')));
+      } else if (rem <= 5 && wn > 0) chip('bad', t('timeout'));
+    }
+  }
+
+  function tick() {
+    var sel = $('s_type'), p = !!(sel && sel.value === 'presentation');
+    if (p !== presenting) { presenting = p; if (!p) userHidden = false; applySplit(); }
+    if (lang() !== curLang) { curLang = lang(); if (data) { build(); setCur(idx, false, false); } }
+    if (!S.length) return;
+    if (running) {
+      var n = performance.now(); elapsed += (n - last) / 1000; last = n;
+      var v = elapsed + offset;
+      if (v >= total && auto) { finish(); return; }
+      if (auto) { var ni = slideAt(v); if (ni !== idx) setCur(ni, true, false); }
+      var rem = ce[idx] - v;
+      if (rem <= 10 && rem > 0 && !warned[idx]) { warned[idx] = 1; beep('warn'); }
+    }
+    render();
+  }
+
+  function loadSlides(it) {
+    if (!it || !it.slides || !it.slides.length) return;
+    var keep = running || elapsed > 0;
+    data = { title: it.title || '', total_min: it.total_min || 0, slides: it.slides };
+    T = 0; build();
+    if (keep) setCur(Math.min(idx, S.length - 1), false, false); else reset();
+    applySplit();
+  }
+
+  // The recorder's items reach the page through window.addItems; take ours, pass the rest on.
+  var orig = window.addItems;
+  window.addItems = function (items) {
+    var rest = [];
+    (items || []).forEach(function (it) { if (it && it.kind === 'slides') loadSlides(it); else rest.push(it); });
+    if (rest.length && orig) orig(rest);
+  };
+
+  $('dk-start').onclick = function () { startStop(); render(); };
+  $('dk-next').onclick = nextS;
+  $('dk-prev').onclick = function () { jump(idx - 1); };
+  $('dk-reset').onclick = reset;
+  $('dk-swap').onclick = function () { toggleSwap(); };
+  $('dk-auto').onclick = function () { auto = !auto; store('deck_auto', auto ? '1' : '0'); offset = auto ? cs[idx] - elapsed : 0; labels(); render(); };
+  $('dk-comp').onclick = function () { compress = !compress; $('dk-cards').classList.toggle('comp', compress); labels(); };
+  $('dk-snd').onclick = function () { sound = !sound; store('deck_sound', sound ? '1' : '0'); labels(); };
+  $('dk-mode').onchange = function () { mode = this.value; store('deck_mode', mode); T = 0; build(); reset(); };
+  $('dk-min').onchange = function () {
+    var x = parseInt(this.value, 10); if (!x || x < 1) x = 1; if (x > 180) x = 180;
+    T = x; store('deck_min_' + mode, String(x)); build(); reset();
+  };
+  $('dk-cards').addEventListener('scroll', function () {
+    if (progScroll) return;
+    clearTimeout(st);
+    st = setTimeout(function () {
+      var box = $('dk-cards'); if (!box.clientHeight) return;
+      var i = Math.round(box.scrollTop / box.clientHeight);
+      if (i !== idx && i >= 0 && i < S.length) jump(i, true);
+    }, 120);
+  });
+  window.addEventListener('resize', function () { if (isSplit) showCard(idx); });
+  labels();
+  setInterval(tick, 250);
+})();
+</script>
+</body>
+</html>

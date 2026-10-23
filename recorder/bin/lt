@@ -33,6 +33,11 @@ re-enacting a page of prose. Runs inside device_bash (Linux VM) or on the Mac it
                             reachable Ollama it asks the running recorder, else falls back to a plain
                             text search (and says so)
 
+  lt digest <project_root> [--days 7] [--max-chars 6000] [--json] [--me-label Я] [--pm-names a,b]
+                            compact digest of the project's recent calls (live/), newest first:
+                            questions to the PM with the PM's answer, promises and dates the PM
+                            said, what the PM typed, action items; oldest dropped past --max-chars
+
 Global options (any position):
   --mac-root <work_root>    the Mac folder that is mounted here as $HOME/mnt/<basename>:
                             $HOME/mnt/<basename(work_root)>/x <-> <work_root>/x
@@ -1008,9 +1013,185 @@ def cmd_search(args):
     print_hits(S, hits, f"text search in {root}: {len(hits)} hits", as_json, note=note)
 
 
+# ---------------------------------------------------------------- digest of recent calls
+CALL_MD = re.compile(r"^(\d{4}-\d{2}-\d{2})-(\d{4})-([^.]+)\.md$")
+Q_CUE = re.compile(r"(^|\W)(what|how|when|why|who|where|which|can|could|do|does|did|are|is|will|would|should|any|"
+                   r"чи|що|як|коли|чому|навіщо|хто|де|скільки|який|яка|яке|які|можеш|можете|можна|"
+                   r"что|когда|почему|кто|сколько|можешь)(\W|$)", re.I)
+YOU = re.compile(r"(^|\W)(you|your|ти|тобі|тебе|твій|твоя|твоє|ви|вам|вас|ваш|ваша|ваше|ты|тебя|вы|вас)(\W|$)", re.I)
+PROMISE = re.compile(
+    r"(^|\W)(i will|i'll|we will|we'll|i am going to|i'm going to|will send|"
+    r"я зроблю|зроблю|надішлю|відправлю|скину|підготую|перевірю|напишу|передам|поставлю|зробимо|надішлемо|"
+    r"сделаю|отправлю|пришлю|"
+    r"today|tomorrow|tonight|next week|this week|end of (the )?(day|week)|eod|deadline|monday|tuesday|wednesday|"
+    r"thursday|friday|сьогодні|завтра|післязавтра|наступного тижня|цього тижня|до кінця (дня|тижня|місяця)|понеділ|вівтор|середу|середа|"
+    r"четвер|п'ятниц|п’ятниц|субот|неділ|january|february|march|april|may|june|july|august|september|october|"
+    r"november|december|січн|лют|берез|квіт|травн|черв|лип|серп|верес|жовт|листопад|груд)(\W|$)", re.I)
+WINDOW_CMD = re.compile(r"^\s*(suggest a reply|мене чути|погнали|ще раз підсвіти|підсвіти|airpods)", re.I)
+DATEISH = re.compile(r"\b\d{1,2}[./]\d{1,2}\b|\b\d{1,2}:\d{2}\b")
+
+
+def digest_files(live, days, today=None):
+    from datetime import date, timedelta
+    today = today or date.today()
+    since = (today - timedelta(days=max(0, int(days)))).isoformat()
+    calls = []
+    try:
+        names = os.listdir(live)
+    except OSError:
+        return []
+    for n in names:
+        m = CALL_MD.match(n)
+        if not m or n.startswith("prep-") or m.group(3).endswith("-transcript") or "-transcript-" in m.group(3):
+            continue
+        if m.group(1) < since:
+            continue
+        calls.append((m.group(1), m.group(2), os.path.join(live, n)))
+    calls.sort(reverse=True)
+    return calls
+
+
+def _trim(s, n):
+    s = re.sub(r"\s+", " ", str(s or "")).strip()
+    return s if len(s) <= n else s[: n - 3].rstrip() + "..."
+
+
+def digest_call(path, me_label="Я", pm_names=(), cap=8):
+    s = stem(path)
+    title = re.sub(r"^\d{4}-\d{2}-\d{2}-\d{4}-", "", os.path.basename(s)).replace("-", " ")
+    try:
+        if os.path.exists(s + ".named.md"):
+            lines = open(s + ".named.md", encoding="utf-8", errors="replace").read().splitlines()
+        else:
+            lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
+            sp = read_json_dict(s + ".speakers.json")
+            if sp.get("clusters"):
+                lines = apply_speakers(lines, sp, me_label)
+    except Exception:  # noqa: BLE001
+        lines = []
+    for ln in lines[:5]:
+        if ln.startswith("# ") and ":" in ln:
+            title = ln.split(":", 1)[1].strip() or title
+            break
+    rows = []
+    for ln in lines:
+        m = LINE.match(ln)
+        if not m:
+            continue
+        txt = m.group(4).strip()
+        if not txt or any(p.search(txt) for p in ARTEFACT):
+            continue
+        who = re.sub(r"\s*\[S\d+\]$", "", m.group(2)).strip()
+        rows.append((m.group(1), who, who == me_label, txt))
+    names = [x.lower() for x in pm_names if x]
+    questions, promises, seen = [], [], set()
+    for i, (t, who, mine, txt) in enumerate(rows):
+        low = txt.lower()
+        if not mine and len(questions) < cap:
+            named = any(x in low for x in names)
+            if ("?" in txt or Q_CUE.search(txt)) and (named or YOU.search(txt)) and ("?" in txt or named):
+                key = low[:80]
+                if key not in seen:
+                    seen.add(key)
+                    ans = ""
+                    for t2, _w, mine2, txt2 in rows[i + 1: i + 6]:
+                        if mine2 and len(txt2.split()) >= 4:
+                            ans = _trim(txt2, 200)
+                            break
+                    questions.append({"t": t, "who": who, "q": _trim(txt, 220), "answer": ans})
+        elif mine and len(promises) < cap and (PROMISE.search(txt) or DATEISH.search(txt)):
+            promises.append({"t": t, "text": _trim(txt, 200)})
+    typed = []
+    for r in jsonl(s + ".inbox.jsonl"):
+        if r.get("kind") in ("setting", "settings") or not isinstance(r.get("text"), str) or not r["text"].strip():
+            continue
+        if len(r["text"].split()) < 4 or WINDOW_CMD.search(r["text"]):
+            continue
+        typed.append({"t": r.get("t") or "", "kind": r.get("kind") or "note", "text": _trim(r["text"], 200)})
+    typed = typed[:cap]
+    st = read_json_dict(s + ".state.json")
+    items = []
+    ai = st.get("action_items") if isinstance(st.get("action_items"), list) else []
+    for a in ai[: cap + 2]:
+        if isinstance(a, dict):
+            txt = " ".join(x for x in (str(a.get("who") or "").strip() + ":" if a.get("who") else "",
+                                       str(a.get("what") or a.get("text") or "").strip(),
+                                       "(" + str(a.get("when")).strip() + ")" if a.get("when") else "") if x)
+        else:
+            txt = str(a)
+        if txt.strip():
+            items.append(_trim(txt, 200))
+    return {"stem": os.path.basename(s), "date": "", "title": title, "questions": questions,
+            "promises": promises, "typed": typed, "action_items": items}
+
+
+def digest_text(c):
+    out_ = [f"## {c['date']} {c['title']} ({c['stem']})"]
+    for q in c["questions"]:
+        out_.append(f"- Q [{q['t']}] {q['who']}: {q['q']}")
+        if q["answer"]:
+            out_.append(f"  PM answered: {q['answer']}")
+    for p in c["promises"]:
+        out_.append(f"- PM said/promised [{p['t']}]: {p['text']}")
+    for x in c["typed"]:
+        out_.append(f"- PM typed ({x['kind']}): {x['text']}")
+    for a in c["action_items"]:
+        out_.append(f"- Action item: {a}")
+    if len(out_) == 1:
+        out_.append("- (nothing extracted)")
+    return "\n".join(out_)
+
+
+def cmd_digest(args):
+    if not args or args[0].startswith("--"):
+        print("usage: lt digest <project_root> [--days 7] [--max-chars 6000] [--json] [--me-label Я] [--pm-names a,b]")
+        sys.exit(2)
+    args = list(args)
+    as_json = "--json" in args
+    if as_json:
+        args.remove("--json")
+    try:
+        days = int(opt(args, "--days", 7))
+        max_chars = int(opt(args, "--max-chars", 6000))
+    except ValueError:
+        raise LtError("--days and --max-chars take whole numbers")
+    me_label = opt(args, "--me-label", "Я")
+    pm_names = [x.strip() for x in (opt(args, "--pm-names") or os.environ.get("LT_PM_NAMES") or "").split(",") if x.strip()]
+    root = local(args[0])
+    live = os.path.join(root, "live")
+    calls, total, blocks, dropped, broken = [], 120, [], 0, 0  # 120: the header line
+    for d, hm, path in digest_files(live, days):
+        try:
+            c = digest_call(path, me_label, pm_names)
+        except Exception:  # noqa: BLE001
+            broken += 1
+            continue
+        c["date"] = f"{d} {hm[:2]}:{hm[2:]}"
+        txt = digest_text(c)
+        if total + len(txt) + 2 > max_chars:
+            if not blocks:
+                txt = txt[: max(0, max_chars - total - 3)] + "..."
+                c["truncated"] = True
+            else:
+                dropped += 1
+                continue
+        total += len(txt) + 2
+        blocks.append(txt)
+        calls.append(c)
+    if as_json:
+        out({"root": root, "days": days, "calls": calls, "chars": total, "dropped_oldest": dropped, "broken": broken})
+        return
+    head = f"RECENT CALLS of {os.path.basename(root.rstrip('/'))}, last {days} days, newest first: {len(calls)} calls"
+    if dropped:
+        head += f" ({dropped} older dropped by --max-chars)"
+    print(head if blocks else head + "\n(no calls in the window)")
+    if blocks:
+        print("\n\n".join(blocks))
+
+
 CMDS = {"start": cmd_start, "status": cmd_status, "stop": cmd_stop, "prep-check": cmd_prep_check,
         "state": cmd_state, "wrapup-data": cmd_wrapup_data, "speakers": cmd_speakers,
-        "index": cmd_index, "search": cmd_search}
+        "index": cmd_index, "search": cmd_search, "digest": cmd_digest}
 
 
 def global_opts(argv):

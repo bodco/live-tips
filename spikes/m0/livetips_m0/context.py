@@ -4,7 +4,8 @@ From what the PM typed at the start (a few lines: what the call is about, what t
 and the project folder, builds a text block for the cached prompt prefix:
   - the PM's context as typed,
   - the project's Current State from the local Notion mirror (_notion/current-state.md),
-  - the best snippets of the project index for the context (lt search, local embeddings).
+  - the best snippets of the project index for the context (lt search, local embeddings),
+  - a digest of the project's recent calls (lt digest): questions, answers, promises, typed notes.
 Nothing here leaves the Mac except as part of the prompt for a project with API access.
 """
 import json
@@ -34,6 +35,25 @@ def index_snippets(lt_cmd: List[str], project_root: Path, query: str, k: int = 8
         return []
 
 
+def recent_calls(lt_cmd: List[str], project_root: Path, days: int = 7, max_chars: int = 3000,
+                 timeout: float = 10.0) -> str:
+    """`lt digest`: what was asked, answered, promised and typed on this project's recent calls.
+    Empty on any problem (no lt, error exit, timeout, no calls): the call starts without it."""
+    if not lt_cmd:
+        return ""
+    try:
+        r = subprocess.run(lt_cmd + ["digest", str(project_root), "--days", str(days), "--max-chars", str(max_chars)],
+                           capture_output=True, text=True, timeout=timeout)
+        if r.returncode != 0:
+            return ""
+        out = (r.stdout or "").strip()
+        if not out or "(no calls in the window)" in out or out.startswith("ERROR"):
+            return ""
+        return out[: max_chars + 200]
+    except Exception:
+        return ""
+
+
 def build(context: str, project_root: Optional[str], lt_cmd: Optional[List[str]] = None) -> str:
     parts = []
     if context.strip():
@@ -52,4 +72,8 @@ def build(context: str, project_root: Optional[str], lt_cmd: Optional[List[str]]
                 text = (h.get("preview") or h.get("text") or "").replace("\n", " ")[:400]
                 lines.append("- [{}{}] {}".format(src, ", " + date if date else "", text))
             parts.append("LOCAL MATERIALS FOUND FOR THE CONTEXT (project index):\n" + "\n".join(lines))
+        digest = recent_calls(lt_cmd or [], root)
+        if digest:
+            parts.append("RECENT CALLS (digest; what the PM already said, answered or promised on this project's "
+                         "last calls; newer than the Notion state when they disagree):\n" + digest)
     return "\n\n".join(parts)

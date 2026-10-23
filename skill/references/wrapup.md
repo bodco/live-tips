@@ -37,6 +37,16 @@ Notion: {посилання на сторінку з Step 5}
 Далі: звіт по мітингу, change-request, risk-register?
 ```
 
+**Tip quality (optional, never blocks the wrap-up).** If the Live Tips app is installed
+(`<tool_root>/state/sidecar-config.json` exists and its engine folder holds `livetips_m0`), or the
+user asks, run the same blind judge for the skill's tips: from the engine folder,
+`python -m livetips_m0.judge --config <tool_root>/state/sidecar-config.json --md "<transcript>" --quick`
+(Sonnet, at most 25 tips, about $0.10; the key comes from the environment, never print it).
+It writes `<stem>.judge/judge.summary.json` next to the transcript; if the app already rated
+the call, just read that file. Add one line to the wrap-up: `Оцінка підказок (суддя): skill
+{mean}/5 ({n}), app {mean}/5 ({n}); найгірше: ...` (the `worst` reasons). Without the app,
+skip the judge and keep the counts from `lt wrapup-data` in the "Підказки" line.
+
 The Data Completeness line follows `projects/SKILL.md` (OK / EMPTY / STALE / SKIPPED /
 FAILED). Do not run the next skills without the user's command. If the call went to a
 different subject than the checklist, say so in one line instead of listing every checklist

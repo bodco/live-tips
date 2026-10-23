@@ -173,6 +173,7 @@
   #nowbox.has { display: block; }
   #nowbox .now { font-weight: 700; }
   #nowbox ul { margin: 2px 0 0; padding-left: 1.2em; }
+  #nowbox .tline { font-variant-numeric: tabular-nums; color: var(--muted); margin-top: 2px; }
   #nowbox .nxt { color: var(--muted); margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); }
 
   #pinbox { display: none; flex-direction: column; gap: 6px; }
@@ -2077,11 +2078,14 @@
   function secById(id) { for (var i = 0; i < outline.length; i++) if (outline[i].id === id) return outline[i]; return null; }
   function pts(sec) { return (sec.points || []).slice(0, 4).map(function (p) { return '<li>' + inline(p) + '</li>'; }).join(''); }
   function nums(sec) { return sec.numbers && sec.numbers.length ? '<div class="nums">' + sec.numbers.map(esc).join('  ·  ') + '</div>' : ''; }
+  var timeLine = '';
   function renderNow() {
     if (!outline.length) { nowbox.className = ''; nowbox.innerHTML = ''; return; }
     var c = secById(posCur), n = secById(posNext) || (posCur == null ? outline[0] : null);
     var html = '';
     if (c) html += '<div class="now">' + esc(t('now_now')) + ' ' + inline(c.title) + '</div>' + nums(c) + '<ul>' + pts(c) + '</ul>';
+    var st = $('s_type');   // 2026-10-23: one time line under Now, presentation only
+    if (c && timeLine && st && st.value === 'presentation') html += '<div class="tline">' + esc(timeLine) + '</div>';
     if (n) html += '<div class="nxt">' + esc(t('now_next')) + ' <b>' + inline(n.title) + '</b>' + nums(n) + '<ul>' + pts(n) + '</ul></div>';
     nowbox.innerHTML = html; nowbox.className = html ? 'has' : '';
   }
@@ -2092,6 +2096,7 @@
       if (it.kind === 'facts') { facts = it.facts || []; indexFacts(); searchFacts(); return; }
       if (it.kind === 'outline') { outline = it.sections || []; renderNow(); return; }
       if (it.kind === 'outline_pos') { posCur = it.cur; posNext = it.next; renderNow(); return; }
+      if (it.kind === 'timeline') { timeLine = it.text || ''; renderNow(); return; }
       if (it.kind === 'tip' || it.kind === 'card' || it.kind === 'answer') {
         var l = lagOf(it); if (l != null) { lags.push(l); lags = lags.slice(-5); }
       }

@@ -151,7 +151,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             : recording ? "● Recording" + (st.project.map { ": \($0)" } ?? "") : "Not recording"
         statusLines[1].title = String(format: "Lines %d · tips %d · this call $%.2f of $%.0f", st.lines, st.tips, st.callSpentUSD, cfg.budget.callHardUSD)
         statusLines[1].isHidden = !recording
-        statusLines[2].isHidden = true
+        let judge = cfg.judgeAfterCall ? CallEngine.shared.judgeResult : ""
+        statusLines[2].title = CallEngine.shared.judgeRunning != nil ? "Rating the last call's tips..." : judge
+        statusLines[2].isHidden = recording || (judge.isEmpty && CallEngine.shared.judgeRunning == nil)
         statusLines[3].title = String(format: "This month: $%.2f of $%.0f", month, cfg.budget.monthlyHardUSD)
         micItem.isHidden = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         item?.button?.image = NSImage(systemSymbolName: recording ? "record.circle.fill" : "text.bubble", accessibilityDescription: "Live Tips")

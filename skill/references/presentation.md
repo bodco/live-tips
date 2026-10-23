@@ -9,7 +9,10 @@ object `{"sections": [...]}` with 5-15 sections in speaking order:
 `numbers` (optional, up to 6) are the figures the PM says in this section; the window shows
 them in one bold line on the Now card (and on the slide card from `slides.json`).
 `title` max 6 words, 2-4 `points` of max 8 words in the call language (what to say, not a
-script), 4-10 `keywords` the PM will actually say in that section. The recorder follows the
+script), 4-10 `keywords` the PM will actually say in that section. Only `keywords` are matched
+(not title or points), so pick words unique to the section: a keyword shared by many sections
+counts little. Add `"slides": [12, 16]` (or end the title with "12-16") to tie the section to
+`slides.json`, and `"who": "other"` for a colleague's section (or let all its slides be `other`). The recorder follows the
 PM's mic lines through the sections and the window pins **Now** (the current section with
 its points) and **Next** (the next one), see "Presentation mode".
 
@@ -22,7 +25,11 @@ part, not to interrupt.
    section titles only); the Now / Next box carries the details.
 2. **Tracking is local.** The recorder follows the PM's mic lines through the sections and
    writes `kind: outline_pos` (`cur`, `next`) into the tips file; the window pins Now and
-   Next. Read the position with `grep '"outline_pos"' "<tips_file>" | tail -1` in the same
+   Next. Since 2026-10-23 the tracker is plan-aware: the current and next section are
+   preferred, a far jump needs a clearly stronger match, going back needs two matches in a
+   row, the planned time per slide is a weak hint, and a colleague's sections (`who: other`)
+   are followed from the other side's lines, the PM's sections from the mic only.
+   Read the position with `grep '"outline_pos"' "<tips_file>" | tail -1` in the same
    device_bash call as a poll, when needed.
 3. **Look-ahead in pauses.** When the position moves to section N, rewrite section N+1
    (and N+2 if time allows) in `outline.json`, read-modify-write, keeping `id` and
@@ -42,12 +49,15 @@ part, not to interrupt.
 7. **One time line, about the PM's own slides only.** The time check (2/3 and 5 minutes before
    the end) is ONE pinned line "⏱ {N} хв лишилось, {K} слайдів: пропусти {які}" that is
    updated in place, never five red cards, never advice about a colleague's slides while the
-   colleague speaks.
+   colleague speaks. The recorder writes it itself every 60 s when `slides.json` has `sec`
+   budgets (`kind: timeline`, "⏱ 12:30 з 40:00 · відстаєте 3 хв", shown under Now).
 8. **Numbers on the slides.** `slides.json` carries, per slide, the numbers the PM will say
    (`"numbers": ["840 680 UAH", "63 h"]`) and the 1-2 questions this slide usually raises with
-   the answer (`"qa": [{"q": "...", "a": "..."}]`); the window shows the numbers in Now, and
-   the Q&A entries go into the fact book so a question after the talk gets a local 📌 answer
-   within 2 s. The PM garbled a number from his own slide and skipped the hours figure on the
+   the answer (`"qa": [{"q": "...", "a": "...", "keywords": ["...", "..."]}]`, the answer with
+   its number, 3-5 keywords the asker will say). The prep writes both for every PM slide. The
+   window shows the numbers in Now; when the other side asks ("?" or a question word) and 2
+   keywords match (or 1 of 6+ letters), the recorder shows a local 🟠 "❓ {q}" card with the
+   answer at once (each entry at most once per 2 min). The PM garbled a number from his own slide and skipped the hours figure on the
    real call: the slide text alone does not help, the numbers must be on the Now card.
 9. **Rehearsal results go back into the files.** After a rehearsal wrap-up ("+3.5 min",
    "slide 38 not reached", a decision not to ask for decisions today) rewrite `slides.json`
@@ -57,3 +67,6 @@ part, not to interrupt.
    moves to a slide whose `who` is `me` after a colleague's block, pin the PM's entry
    sentence as a 🔴 card BEFORE the handoff (the colleague's last slide), not on hearing
    the name: the handoff cues were never said as scripted and ASR wrote the name as "Body".
+   The recorder does this itself: when the tracker reaches the colleague's section that ends
+   right before a `me` slide, it shows once a 🔴 "🎤 Твій вихід: слайд {n} {title}" card with
+   the first read-aloud line of that slide.

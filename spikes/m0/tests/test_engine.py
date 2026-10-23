@@ -219,3 +219,157 @@ def test_invented_numbers_are_dropped(tmp_path):
     assert obj["items"] == ["14 fixes shipped"] and obj["_dropped_items"] == 1 and "_unseen_number_in_phrase" not in obj
     obj = eng.validate_facts({"gist": "x", "items": [], "phrase": "The estimate is 37 hours."}, ln)
     assert obj.get("_unseen_number_in_phrase") is True
+
+
+# ---------- meeting concept in code (2026-10-23) ----------
+def _meeting_engine(tmp_path, resp, **extra):
+    from livetips_m0.replay import build_engine
+    cfg = dict(CFG, budget=dict(CFG["budget"], ledger=str(tmp_path / "s.json")), **extra)
+    clock = {"t": 36000.0}
+    eng, _ = build_engine(cfg, FIX / "demo-call.md", tmp_path / "o", lambda: clock["t"], FakeProvider(resp, 0.0, 0.0))
+    return eng, clock
+
+
+def _feed(eng, clock, raw, n, at):
+    from livetips_m0.transcript import parse_line
+    clock["t"] = at
+    eng.on_line(parse_line(raw, n, "Me"))
+    end = time.monotonic() + 5
+    while time.monotonic() < end and any(not f.done() for f in eng.futures):
+        time.sleep(0.01)
+
+
+def _out(tmp_path):
+    def rd(name):
+        p = tmp_path / "o" / ("demo-call.app." + name + ".jsonl")
+        return [json.loads(l) for l in p.read_text().splitlines()] if p.exists() else []
+    return rd("tips"), rd("timing")
+
+
+def _no_tip_classify(model, user):
+    return json.dumps({"need_tip": False, "level": "none", "trigger": "none", "topic": "x"})
+
+
+def test_observer_question_tip_is_orange_rate_exempt_and_nothing_after(tmp_path):
+    n = {"i": 0}
+
+    def resp(model, user):
+        if "ROLE classify" in user:
+            return _no_tip_classify(model, user)
+        n["i"] += 1
+        if "role observer: the other side asked" in user:
+            return json.dumps({"gist": "🟠 Question {}".format(n["i"]), "level": "red", "topic": "question {}".format(n["i"]),
+                               "phrase": "A strong answer names the tool, the role and the result."})
+        return json.dumps({"gist": "🟠 Add fact", "level": "orange", "topic": "fact"})
+    eng, clock = _meeting_engine(tmp_path, resp)
+    assert eng.set_meeting({"call_type": "interview", "hiring_role": "observer"})     # window menu change
+    _feed(eng, clock, "[10:00:00] Other [S1] (en): How do you design API tests?", 1, 36001)
+    _feed(eng, clock, "[10:00:05] Other [S1] (en): And what about flaky tests?", 2, 36006)
+    _feed(eng, clock, "[10:00:10] Other [S1] (en): How do you report bugs?", 3, 36011)
+    _feed(eng, clock, "[10:00:15] Other [S2] (en): I usually start with the contract and then add negative cases, by Friday.", 4, 36016)
+    _feed(eng, clock, "[10:00:20] Other [S1] (en): Alex, do you have questions?", 5, 36021)
+    tips, timing = _out(tmp_path)
+    full = [t for t in tips if not t.get("partial") and t.get("kind") == "tip"]
+    assert [t["level"] for t in full] == ["orange", "orange"]               # forced orange, 2 per minute
+    assert any(s.get("outcome") == "diet_meeting_rate" and s["src"] == "10:00:10" for s in timing)
+    assert not any(s["src"] in ("10:00:15", "10:00:20") and s.get("route") for s in timing)   # nothing after the answer
+    assert all("role observer: the other side asked" in c["user"] for c in eng.provider.inner.calls if "ROLE tip" in c["user"])
+
+
+def test_observer_blocks_model_tips_without_meeting_route(tmp_path):
+    eng, clock = _meeting_engine(tmp_path, responder, call_type="interview", hiring_role="observer")
+    assert eng.meeting_block({"gist": "🟠 Add fact", "level": "orange", "topic": "x"}, "add_fact", {}) == "role_observer"
+    assert eng.meeting_block({"gist": "🟠 Q", "level": "orange", "topic": "x"}, "direct_question", {"meeting": "observer_question"}) is None
+
+
+def test_interviewer_one_clarify_per_long_answer_without_rate(tmp_path):
+    def resp(model, user):
+        if "ROLE classify" in user:
+            return _no_tip_classify(model, user)
+        if "role interviewer: the candidate just gave" in user:
+            return json.dumps({"gist": "🟠 Уточни: own role " + str(len(user)), "level": "orange", "topic": "clarify " + str(len(user)),
+                               "phrase": "What exactly was your part?"})
+        return json.dumps({"skip": True, "reason": "x"})
+    eng, clock = _meeting_engine(tmp_path, resp, call_type="interview", hiring_role="interviewer")
+    long_a = " ".join(["we built the service together with the team and it worked well"] * 2)    # 24 words
+    _feed(eng, clock, "[10:00:00] Me (en): Can you describe your last project?", 1, 36001)
+    _feed(eng, clock, "[10:00:05] Other (en): " + long_a, 2, 36006)
+    _feed(eng, clock, "[10:00:15] Other (en): " + long_a, 3, 36016)          # 48 words: clarify
+    _feed(eng, clock, "[10:00:25] Other (en): " + long_a, 4, 36026)          # same answer: no second one
+    _feed(eng, clock, "[10:00:30] Me (en): How did you test it?", 5, 36031)
+    _feed(eng, clock, "[10:00:35] Other (en): " + long_a + " " + long_a, 6, 36036)   # 10 s later, no rate limit
+    tips, timing = _out(tmp_path)
+    full = [t for t in tips if not t.get("partial") and t.get("kind") == "tip"]
+    assert [t["src"] for t in full] == ["10:00:15", "10:00:35"]
+    assert all(t["gist"].startswith("🟠 Уточни") for t in full)
+
+
+def test_coach_question_red_and_money_without_numbers(tmp_path):
+    def resp(model, user):
+        if "ROLE classify" in user:
+            return _no_tip_classify(model, user)
+        if "money, dates or scope" in user:
+            return json.dumps({"gist": "🔴 Без цифр зараз", "level": "orange", "topic": "salary",
+                               "phrase": "I would like to understand the scope first."})
+        if "role coach: the PM is being asked" in user:
+            return json.dumps({"gist": "🔴 Hard project story", "level": "orange", "topic": "hard project"})
+        return json.dumps({"skip": True, "reason": "x"})
+    eng, clock = _meeting_engine(tmp_path, resp, call_type="interview", hiring_role="coach")
+    _feed(eng, clock, "[10:00:00] Other (en): What salary do you expect", 1, 36001)
+    _feed(eng, clock, "[10:00:05] Other (en): Tell me about a hard project?", 2, 36006)
+    _feed(eng, clock, "[10:00:10] Other (uk): Яка ваша дата старту і ставка?", 3, 36011)
+    tips, timing = _out(tmp_path)
+    full = [t for t in tips if not t.get("partial") and t.get("kind") == "tip"]
+    assert {t["src"]: t["level"] for t in full} == {"10:00:00": "red", "10:00:05": "red"}   # 3rd: red_repeat of the money gist
+    assert next(s for s in timing if s["src"] == "10:00:10")["meeting"] == "coach_money"
+    from livetips_m0.transcript import parse_line
+    ln = parse_line("[10:00:20] Other (uk): Ми цінуємо командну роботу.", 9, "Me")
+    assert eng.meeting_hint(ln, eng.detector.detect(ln), 36021) is None
+
+
+def test_team_audience_drops_info_and_caps_tips_per_hour(tmp_path):
+    eng, clock = _meeting_engine(tmp_path, responder, audience="team")
+    assert eng._diet({"gist": "🟢 x", "level": "info", "topic": "x"}, 40000) == "team_info"
+    for i in range(12):
+        eng.tips.append({"uid": "u%d" % i, "level": "orange", "topic": "t%d" % i, "_at": 38000 + i})
+    assert eng._diet({"gist": "🟠 y", "level": "orange", "topic": "new topic"}, 40000) == "team_hour_cap"
+    assert eng._diet({"gist": "🔴 z", "level": "red", "topic": "red one"}, 40000) is None
+    assert eng._diet({"gist": "🟠 y", "level": "orange", "topic": "new topic"}, 38000 + 3700) is None   # an hour later
+    eng.set_meeting({"audience": "client"})
+    assert eng._diet({"gist": "🟢 x", "level": "info", "topic": "info topic"}, 40000) is None
+
+
+def test_client_header_restricted_numbers_line_and_meeting_switch(tmp_path):
+    eng, clock = _meeting_engine(tmp_path, responder)
+    head = lambda: eng.prompt.blocks[1]["text"].split("BRIEF:")[0]
+    assert "never stated" not in head() and "role observer" not in head()            # default unchanged
+    eng.set_meeting({"audience": "client"})
+    assert "restricted internal facts may shape a tip, but numbers from them are never stated" in head()
+    eng.set_meeting({"call_type": "interview", "hiring_role": "observer"})
+    assert "role observer" in head()
+    eng.set_meeting({"call_type": "auto"})                  # hiring_role stays in meta; the note must go
+    assert "role observer" not in head()
+    from livetips_m0.transcript import parse_line
+    ln = parse_line("[10:00:00] Other (en): How do you design API tests?", 1, "Me")
+    assert eng.meeting_hint(ln, eng.detector.detect(ln), 36001) is None
+
+
+def test_presentation_blocks_pacing_and_routes_qa_question(tmp_path):
+    from livetips_m0.transcript import parse_line
+    eng, clock = _meeting_engine(tmp_path, responder, call_type="presentation")
+    pacing = {"gist": "🟠 5 minutes left, skip slides", "level": "orange", "topic": "time"}
+    assert eng.meeting_block(pacing, "add_fact", {}) == "presentation_timing"
+    assert eng.meeting_block({"gist": "🟠 Price 120", "level": "orange", "topic": "price"}, "add_fact", {}) is None
+    for i in range(10):                                      # the PM presents for 100 s
+        eng.history.append(parse_line("[10:0{}:{}0] Me (en): {}".format(i // 6, i % 6, "slide text " * 20), i + 1, "Me"))
+    q = parse_line("[10:01:45] Other (en): How does the pricing work?", 20, "Me")
+    assert eng.meeting_hint(q, eng.detector.detect(q), 36105) is None                # still presenting
+    for i, t in enumerate(["10:02:00", "10:02:15", "10:02:30", "10:02:45"]):
+        eng.history.append(parse_line("[{}] Other (en): {}".format(t, "a long audience remark " * 8), 30 + i, "Me"))
+    q2 = parse_line("[10:02:50] Other (en): How does the pricing work?", 40, "Me")
+    eng.history.append(q2)
+    mh = eng.meeting_hint(q2, eng.detector.detect(q2), 36170)
+    assert mh and mh["kind"] == "presentation_qa" and mh["trigger"] == "direct_question"
+    eng.set_meeting({"call_type": "auto"})
+    assert eng.meeting_block(pacing, "add_fact", {}) is None
+    assert eng.meeting_hint(q2, eng.detector.detect(q2), 36170) is None

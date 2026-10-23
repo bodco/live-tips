@@ -409,6 +409,11 @@ struct SettingsView: View {
                 ModelPicker(title: "After the call", selection: $model.config.models.analysis, choices: model.modelChoices).help("Summary and analysis. Not time-critical. Recommended: Opus.")
                 Toggle("Second request when Claude is slow", isOn: $model.config.hedgeEnabled)
                     .help("If Claude shows no answer after 2 s (classify) or 3 s (tip), or fails at once, the same request is sent again and the first good answer wins. Faster tips on busy hours; costs a little more (both requests are billed and counted in the limits).")
+                Toggle("Rate tips after each call (blind judge, about $0.10)", isOn: $model.config.judgeAfterCall)
+                    .help("After the call Claude Sonnet scores up to 25 tips of the app and of the skill from the transcript, in the background. Results: <call>.judge/judge.summary.json next to the transcript.")
+                if !CallEngine.shared.judgeResult.isEmpty {
+                    Text(CallEngine.shared.judgeResult).font(.caption).foregroundStyle(.secondary)
+                }
             } header: { Text("Models") } footer: {
                 Text(model.config.knownModels.isEmpty ? "Test the Claude key to load the models your key can use." : "Models your key can use.")
                     .font(.caption).foregroundStyle(.secondary)

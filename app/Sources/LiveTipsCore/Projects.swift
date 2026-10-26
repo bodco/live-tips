@@ -38,6 +38,10 @@ public struct ProjectRegistry: Codable, Equatable {
     public var lastUsed: String = ""        // "project:<slug>" or "workspace:<name>"
     /// When each target was last used for a call (target -> ISO 8601), for "Last call" in Start call.
     public var lastUsedAt: [String: String] = [:]
+    /// Folders the PM excluded from the folder scan (absolute paths).
+    public var excluded: [String] = []
+    /// Workspace folders added by hand outside the work folder.
+    public var extraWorkspaces: [String] = []
     public init() {}
 
     public init(from decoder: Decoder) throws {
@@ -46,6 +50,20 @@ public struct ProjectRegistry: Codable, Equatable {
         workspaces = (try? c.decode([Workspace].self, forKey: .workspaces)) ?? []
         lastUsed = (try? c.decode(String.self, forKey: .lastUsed)) ?? ""
         lastUsedAt = (try? c.decode([String: String].self, forKey: .lastUsedAt)) ?? [:]
+        excluded = (try? c.decode([String].self, forKey: .excluded)) ?? []
+        extraWorkspaces = (try? c.decode([String].self, forKey: .extraWorkspaces)) ?? []
+    }
+
+    /// 2026-10-26 (owner): projects without Notion or Control Tower configs. Folder projects are added;
+    /// a project already known (same folder) keeps everything it has (config, people, switches).
+    public mutating func merge(folders: [Project]) {
+        for p in folders where !projects.contains(where: { $0.root == p.root }) {
+            var q = p
+            var n = 2
+            while projects.contains(where: { $0.slug == q.slug }) { q.slug = p.slug + "-\(n)"; n += 1 }
+            projects.append(q)
+        }
+        projects.sort { $0.name.lowercased() < $1.name.lowercased() }
     }
 
     public static func load(from url: URL) -> ProjectRegistry {

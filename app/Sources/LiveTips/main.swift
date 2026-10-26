@@ -126,6 +126,7 @@ func prompterArgs(_ args: [String]) -> PrompterArgs {
         case "--control": a.control = it.next() ?? ""
         case "--title": a.title = it.next() ?? a.title
         case "--prompter-demo": a.demo = true
+        case "--prompter-demo-presentation": a.demo = true; a.demoPresentation = true
         default: break
         }
     }
@@ -136,12 +137,19 @@ func prompterArgs(_ args: [String]) -> PrompterArgs {
         let tmp = NSTemporaryDirectory()
         a.tips = tmp + "livetips-app-demo.tips.jsonl"
         a.inbox = tmp + "livetips-app-demo.inbox.jsonl"
-        a.title = "Live Tips (app, demo)"
-        let demo = [
-            #"{"t":"10:30:05","kind":"checklist","level":"info","gist":"Meeting checklist","items":["Release status","New client request","Decision on the date"]}"#,
-            #"{"t":"10:31:40","src":"10:31:36","kind":"tip","level":"red","gist":"🔴 New requirement. Do not agree now.","phrase":"Good idea. I will write it down. We will check it and come back to you.","engine":"app"}"#,
-            #"{"t":"10:33:12","src":"10:33:08","kind":"tip","level":"orange","gist":"🟠 Fix the owner and the date","phrase":"So, Alex checks the export by Friday. Is that right?","engine":"app"}"#,
+        a.title = a.demoPresentation ? "Demo Live Tips: presentation" : "Demo Live Tips"
+        // 2026-10-26: every element of the current window, so a change can be checked without a call.
+        var demo = [
+            #"{"t":"10:30:00","kind":"speech","uid":"speech","level":"info","gist":"🟢 Your speech: since Monday","phrase":"Two projects, short: the export is on dev, the pilot starts Monday.","items":["Export: on dev, production Tuesday","Pilot: 5 users from Monday","Blocker: test accounts from the client","Ask: confirm the pilot list today"],"engine":"app"}"#,
+            #"{"t":"10:31:10","kind":"situation","topic":"export release plan","owner":"Dana","mine":true,"floor":"Dana","asks":[{"t":"10:31:05","who":"Dana","what":"send the test account list","type":"request"}],"actions":[{"what":"send the test account list","due":"today","from":"Dana"},{"what":"confirm the pilot users","due":"Friday","from":"PM"}],"decisions":["export goes to production on Tuesday"],"speech_done":[0]}"#,
+            #"{"t":"10:31:40","src":"10:31:36","kind":"tip","level":"red","gist":"🎯 Dana asks: when is the export live?","phrase":"It is on dev now; production on Tuesday after the review.","items":["Review: Monday 15:00"],"note":"brief, 24.10","engine":"app"}"#,
+            #"{"t":"10:33:12","src":"10:33:08","kind":"tip","level":"orange","gist":"🟠 Room question: who tests the pilot?","phrase":"Our QA covers the first week, then the client team.","engine":"app"}"#,
+            #"{"t":"10:34:00","kind":"answer","level":"info","q":"find: pilot users","gist":"🔎 Pilot: 5 users, list from the client","items":["Kick-off notes 21.10: 5 users, names by Friday"],"note":"Sources: kickoff-notes.md","engine":"app"}"#,
+            #"{"t":"10:40:00","kind":"wrapup","uid":"call-picture","level":"info","gist":"📋 Call summary","items":["Decision: export goes to production on Tuesday","On me: send the test account list (today)","Not said from the speech: Blocker: test accounts from the client"],"note":"from the call picture, unchecked","engine":"app"}"#,
         ]
+        if a.demoPresentation {
+            demo.insert(#"{"t":"10:29:00","kind":"slides","title":"Pilot plan","total_min":6,"slides":[{"n":1,"title":"Why a pilot","sec":90,"who":"me","body":[{"k":"p","t":"Five users for two weeks show whether the export saves the team an hour a day."},{"k":"s","t":"Skip if short on time: the history of the request."}]},{"n":2,"title":"Plan and dates","sec":120,"who":"me","body":[{"k":"p","t":"Monday kick-off, daily check-ins, results on the 14th."}]},{"n":3,"title":"What we need from you","sec":90,"who":"me","body":[{"k":"p","t":"The list of five users and test accounts by Friday."}]}]}"#, at: 0)
+        }
         try? (demo.joined(separator: "\n") + "\n").write(toFile: a.tips, atomically: true, encoding: .utf8)
         try? "".write(toFile: a.inbox, atomically: true, encoding: .utf8)
     }

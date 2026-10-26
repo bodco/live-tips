@@ -124,6 +124,7 @@ final class PrepRunner: ObservableObject {
         var languages: [String]
         var context: String
         var workspaceRoot: String
+        var folders: [String] = []          // "Add folder" in Start call: read these first, they may be outside the project
     }
 
     func cancel() {
@@ -153,8 +154,12 @@ final class PrepRunner: ObservableObject {
         var notion = [(r.root as NSString).appendingPathComponent("_notion")]
         if !r.workspaceRoot.isEmpty { notion.append((r.workspaceRoot as NSString).appendingPathComponent("_notion")) }
         let prompt = """
-        Prepare Live Tips for a call ahead of time (a "prep ahead" of the live-tips skill). Work ONLY with local files: \
-        no Notion, Jira, web or MCP tools, no recording, no subagents. The Notion data is already mirrored locally.
+        Prepare Live Tips for a call ahead of time (a "prep ahead" of the live-tips skill). Work with local files: \
+        no Notion or Jira APIs, no MCP tools, no recording, no subagents (the Notion data is already mirrored locally). \
+        The only web access: links written in the call context below (public pages: a client's site, a shared Google \
+        Doc, a public Notion page). Read them with WebFetch; for a Google Doc use \
+        https://docs.google.com/document/d/<id>/export?format=txt, for a Google Sheet .../export?format=csv. A page \
+        that needs a sign-in or shows nothing useful: say so in the brief's sources line and go on. No other web search.
 
         Call: "\(r.title)", \(h.string(from: r.date)). Project: \(r.projectName) (slug \(r.slug)). Project folder: \(r.root). \
         Project config: \(r.config.isEmpty ? "none" : r.config). Audience: \(r.audience). Meeting type: \(r.callType)\
@@ -162,6 +167,7 @@ final class PrepRunner: ObservableObject {
 
         The PM's call context (what matters, the folders and documents to read first):
         \(r.context.isEmpty ? "(none)" : r.context)
+        \(r.folders.isEmpty ? "" : "Folders the PM added (look through them first; read fully the files the context names): " + r.folders.joined(separator: "; "))
 
         Read first: \(skill)/SKILL.md (the Start checklist, steps 5-6, and "prep ahead"), then \
         \(refs.map { skill + "/references/" + $0 }.joined(separator: ", ")). Follow their content rules and file formats \
@@ -186,11 +192,12 @@ final class PrepRunner: ObservableObject {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
         let py = c.engine.python
-        let allowed = ["Read", "Grep", "Glob", "Write", "Edit", "Bash(\(py):*)", "Bash(\"\(py)\":*)", "Bash(python3:*)", "Bash(textutil:*)",
+        let allowed = ["Read", "Grep", "Glob", "Write", "Edit", "WebFetch", "Bash(\(py):*)", "Bash(\"\(py)\":*)", "Bash(python3:*)", "Bash(textutil:*)",
                        "Bash(ls:*)", "Bash(find:*)", "Bash(head:*)", "Bash(wc:*)"]
         p.arguments = ["-p", prompt, "--model", model, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
                        "--allowedTools", allowed.joined(separator: ","),
                        "--add-dir", skill, "--add-dir", live] + (r.workspaceRoot.isEmpty ? [] : ["--add-dir", r.workspaceRoot])
+                       + r.folders.flatMap { ["--add-dir", $0] }
         p.currentDirectoryURL = URL(fileURLWithPath: r.root)
         var env = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -287,6 +294,8 @@ final class PrepRunner: ObservableObject {
                 case "Read":
                     if path.hasPrefix(skill) { set(max(progress, 0.08), "Reading the instructions", file) }
                     else { filesRead += 1; sources(file) }
+                case "WebFetch":
+                    filesRead += 1; sources("web: " + String(((input["url"] as? String) ?? "").prefix(60)))
                 case "Grep", "Glob":
                     sources("search: " + String(((input["pattern"] as? String) ?? "").prefix(40)))
                 default:

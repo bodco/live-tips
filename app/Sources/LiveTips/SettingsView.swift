@@ -256,7 +256,76 @@ final class SettingsModel: ObservableObject {
 
     func rescanWorkspaces() {
         guard !config.workRoot.isEmpty else { return }
-        registry.workspaces = WorkspaceScanner.scan(workRoot: config.workRoot, projects: registry.projects)
+        registry.workspaces = WorkspaceScanner.scan(workRoot: config.workRoot, projects: registry.projects,
+                                                    extra: registry.extraWorkspaces, excluded: registry.excluded)
+    }
+
+    // ---- folder projects (2026-10-26: Notion and configs are optional)
+    func scanFolders() {
+        guard !config.workRoot.isEmpty else { note = "Set the work folder in General first."; return }
+        let before = registry.projects.count
+        let r = WorkspaceScanner.scanFolders(workRoot: config.workRoot, extra: registry.extraWorkspaces, excluded: registry.excluded)
+        registry.merge(folders: r.projects)
+        rescanWorkspaces()
+        note = "\(r.workspaces.count) workspace(s), \(registry.projects.count - before) new project(s)"
+        IndexService.shared.configure(projects: registry.projects, appRoot: CallEngine.shared.appRoot,
+                                      python: config.engine.python, enabled: config.localAI.enabled)
+    }
+
+    var folderCandidates: [(dir: String, projects: Int)] {
+        guard !config.workRoot.isEmpty else { return [] }
+        return WorkspaceScanner.candidates(workRoot: config.workRoot, known: registry.extraWorkspaces, excluded: registry.excluded)
+    }
+
+    func workspaceHasNotion(_ w: Workspace) -> Bool {
+        var dir = w.root
+        if (dir as NSString).lastPathComponent.lowercased().hasSuffix(" general") { dir = (dir as NSString).deletingLastPathComponent }
+        return FileManager.default.fileExists(atPath: (dir as NSString).appendingPathComponent("_notion/workspace.md"))
+    }
+
+    func addWorkspace(_ dir: String) {
+        if !registry.extraWorkspaces.contains(dir) { registry.extraWorkspaces.append(dir) }
+        registry.excluded.removeAll { $0 == dir }
+        scanFolders()
+    }
+
+    func ignoreFolder(_ dir: String) {
+        if !registry.excluded.contains(dir) { registry.excluded.append(dir) }
+    }
+
+    func addWorkspaceFolder() {
+        guard let dir = chooseFolder("Choose a workspace folder: its subfolders become projects") else { return }
+        addWorkspace(dir)
+    }
+
+    func addProjectFolder() {
+        guard let dir = chooseFolder("Choose a project folder") else { return }
+        registry.excluded.removeAll { $0 == dir }
+        var p = Project(name: (dir as NSString).lastPathComponent, slug: WorkspaceScanner.slug((dir as NSString).lastPathComponent), root: dir)
+        p.workspace = ((dir as NSString).deletingLastPathComponent as NSString).lastPathComponent
+        registry.merge(folders: [p])
+        rescanWorkspaces()
+        note = "Added \(p.name)"
+    }
+
+    /// Takes a workspace out of Live Tips: its folder is ignored by scans and its projects leave the list.
+    /// Nothing on disk changes; Add > Workspace folder brings it back.
+    func removeWorkspace(_ w: Workspace) {
+        var dir = w.root
+        if (dir as NSString).lastPathComponent.lowercased().hasSuffix(" general") { dir = (dir as NSString).deletingLastPathComponent }
+        registry.extraWorkspaces.removeAll { $0 == dir }
+        if !registry.excluded.contains(dir) { registry.excluded.append(dir) }
+        registry.projects.removeAll { !$0.root.isEmpty && ($0.root + "/").hasPrefix(dir + "/") }
+        rescanWorkspaces()
+        note = "Removed \(w.name) from Live Tips (the folder is untouched)"
+    }
+
+    func excludeProject(_ slug: String) {
+        if let p = registry.projects.first(where: { $0.slug == slug }), !p.root.isEmpty, !registry.excluded.contains(p.root) {
+            registry.excluded.append(p.root)
+        }
+        removeProject(slug)
+        rescanWorkspaces()
     }
 
     struct ReadyItem { let title: String; let ok: Bool; let action: String; let tab: String? }
@@ -398,17 +467,59 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var runner = PrepRunner.shared
 
+    struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
+    static let panes: [Pane] = [
+        Pane(id: "general", title: "General", symbol: "gearshape", subtitle: "Your name on calls, folders, Notion and how the app behaves."),
+        Pane(id: "keys", title: "Keys", symbol: "key", subtitle: "The Claude API key and the Notion token, kept in the macOS Keychain."),
+        Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Workspaces and projects from your work folder. Ticked projects are offered in Start call."),
+        Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
+        Pane(id: "how", title: "How it works", symbol: "point.3.connected.trianglepath.dotted", subtitle: "What happens before, during and after a call."),
+        Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
+    ]
+
+    // 2026-10-26 (owner): the welcome tour's look: a sidebar of icon tiles, a header per pane, soft cards.
     var body: some View {
-        TabView(selection: $model.tab) {
-            general.tag("general").tabItem { Label("General", systemImage: "gearshape") }
-            keys.tag("keys").tabItem { Label("Keys", systemImage: "key") }
-            projects.tag("projects").tabItem { Label("Projects", systemImage: "folder") }
-            ai.tag("ai").tabItem { Label("AI", systemImage: "cpu") }
-            HowItWorksView().tag("how").tabItem { Label("How it works", systemImage: "point.3.connected.trianglepath.dotted") }
-            AboutView(model: model).tag("about").tabItem { Label("About", systemImage: "info.circle") }
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Self.panes) { p in
+                    Button { model.tab = p.id } label: {
+                        HStack(spacing: 10) {
+                            IconTile(symbol: p.symbol, size: 26)
+                            Text(p.title)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .contentShape(Rectangle())
+                        .background(RoundedRectangle(cornerRadius: 8).fill(model.tab == p.id ? Color.accentColor.opacity(0.2) : .clear))
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
+            .padding(10)
+            .frame(width: 200)
+            .background(Color.secondary.opacity(0.05))
+            Divider()
+            VStack(spacing: 0) {
+                let p = Self.panes.first { $0.id == model.tab } ?? Self.panes[0]
+                WindowHeader(symbol: p.symbol, title: p.title, subtitle: p.subtitle)
+                    .padding(.horizontal, 28).padding(.top, 20).padding(.bottom, 2)
+                pane.scrollContentBackground(.hidden)
+            }
         }
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minWidth: 900, minHeight: 600)
         .onChange(of: model.tab) { SettingsWindow.window?.title = SettingsWindow.title(for: model.tab) }
+    }
+
+    @ViewBuilder var pane: some View {
+        switch model.tab {
+        case "keys": keys
+        case "projects": projects
+        case "ai": ai
+        case "how": HowItWorksView()
+        case "about": AboutView(model: model)
+        default: general
+        }
     }
 
     var keys: some View {
@@ -451,7 +562,7 @@ struct SettingsView: View {
                 .help("Sonnet reads the files and pulls out the facts well and fast; Opus is a little better on a hard call but slower and uses the plan's limit several times faster.")
             } header: { Text("Preparation (Prepare now in Start call)") } footer: {
                 Text(PrepRunner.claudePath == nil ? "Claude Code is not installed on this Mac: Start call offers the Cowork request instead."
-                     : "Claude Code builds the brief, facts and cards from local files only: the project folder, the local Notion mirror and earlier calls.")
+                     : "Claude Code builds the brief, facts and cards from local files (the project folder, the local Notion mirror, earlier calls) and the public web links in Call context.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .onAppear { runner.refreshAuth() }
@@ -570,71 +681,116 @@ struct SettingsView: View {
 
     var projects: some View {
         Form {
-            if model.registry.projects.isEmpty {
-                ContentUnavailableView {
-                    Label("No projects yet", systemImage: "folder.badge.plus")
-                } description: {
-                    Text("Live Tips reads projects from your Control Tower configs (projects/<slug>.md): name, folder, team and client people. Import the folder once; re-import any time to pick up changes.")
-                } actions: {
-                    Button("Import from Control Tower…") { model.importProjects() }
+            Section {
+                Text("Ticked projects are active and offered in Start call. ⋯ next to a workspace removes it; right-click a project to remove it. Live Tips works with plain folders: \(model.config.workRoot.isEmpty ? "<work folder>" : model.config.workRoot)/<Workspace>/<Project>. Each project folder gets a live/ folder for its calls; a \u{201C}<Workspace> General\u{201D} folder holds calls about the whole workspace. A Control Tower config and a Notion mirror are optional: they add the people, the Notion pages and the project's current state.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Scan work folder") { model.scanFolders() }
+                        .disabled(model.config.workRoot.isEmpty)
+                        .help("Adds the project folders of your workspaces. Folders that only look like workspaces are listed below to add or ignore; nothing else is added by itself.")
+                    Menu("Add") {
+                        Button("Project folder…") { model.addProjectFolder() }
+                        Button("Workspace folder…") { model.addWorkspaceFolder() }
+                        Divider()
+                        Button("Import Control Tower configs…") { model.importProjects() }
+                    }
+                    .fixedSize()
+                    Spacer()
+                    Button("Reindex all") { IndexService.shared.reindexAll() }
+                        .help("Rebuild the search index of every project with Index on (in the background, paused during calls).")
                 }
-            } else {
+                if model.config.workRoot.isEmpty {
+                    Text("Set the work folder in General first.").font(.caption).foregroundStyle(.orange)
+                }
+                if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.secondary) }
+            }
+            let cands = model.folderCandidates
+            if !cands.isEmpty {
                 Section {
-                    ForEach($model.registry.projects, id: \.slug) { $p in
-                        HStack(alignment: .center) {
-                            Image(systemName: "folder").foregroundStyle(.secondary)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(p.name)
-                                Text(p.root.isEmpty ? "No folder in the config" : p.root).font(.caption).foregroundStyle(.secondary)
+                    ForEach(cands, id: \.dir) { c in
+                        HStack {
+                            Image(systemName: "folder.badge.questionmark").foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text((c.dir as NSString).lastPathComponent)
+                                Text("\(c.projects) folder\(c.projects == 1 ? "" : "s") inside").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Toggle("Claude", isOn: $p.apiAllowed).toggleStyle(.checkbox)
-                                .help("Send this project's call text to the Claude API. Off: local layer only.")
-                            Toggle("Index", isOn: $p.index.enabled).toggleStyle(.checkbox)
-                                .help("Search the project folder for HELP NOW and questions. The index updates by itself a minute after files change, never during a call. \(IndexService.shared.results[p.root] ?? "")")
-                        }
-                        .contextMenu {
-                            Button("Reindex now") { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
-                            Button("Remove from Live Tips", role: .destructive) { model.removeProject(p.slug) }
+                            Button("Add as workspace") { model.addWorkspace(c.dir) }
+                            Button("Ignore") { model.ignoreFolder(c.dir) }
                         }
                     }
-                } header: {
-                    HStack {
-                        Text("Projects")
-                        Spacer()
-                        Button("Reindex all") { IndexService.shared.reindexAll() }
-                            .help("Rebuild the search index of every project with Index on (incremental, in the background, paused during calls). Log: <app folder>/logs/index.log")
-                        Button("Re-import…") { model.importProjects() }
-                    }
-                } footer: {
-                    Text("Projects come from your Control Tower configs. Re-import updates names, folders and people; your switches stay. To add a project, add its config and re-import. To remove one, right-click it (or archive it in its config). \(model.note)")
-                        .font(.caption).foregroundStyle(.secondary)
+                } header: { Text("Found in your work folder") } footer: {
+                    Text("A workspace's subfolders become its projects. Ignore keeps a folder out of every scan.").font(.caption).foregroundStyle(.secondary)
                 }
+            }
+            ForEach(model.registry.workspaces, id: \.name) { w in
                 Section {
-                    if model.registry.workspaces.isEmpty {
-                        Text("No workspaces found. Set the work folder in General.").font(.caption).foregroundStyle(.secondary)
-                    }
-                    ForEach(model.registry.workspaces, id: \.name) { w in
-                        HStack {
-                            Image(systemName: "square.stack.3d.up").foregroundStyle(.secondary)
-                            Text(w.name)
-                            Spacer()
-                            Text(w.projects.joined(separator: ", ")).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
+                    let members = model.registry.projects.filter { w.projects.contains($0.slug) }
+                    if members.isEmpty { Text("No projects yet: Scan work folder.").font(.caption).foregroundStyle(.secondary) }
+                    ForEach(members, id: \.slug) { p in projectRow(p.slug) }
                 } header: {
-                    HStack {
-                        Text("Workspaces")
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.stack.3d.up")
+                        Text(w.name)
+                        if model.workspaceHasNotion(w) { Text("Notion").font(.caption2).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15))) }
                         Spacer()
-                        Button("Rescan") { model.rescanWorkspaces() }
+                        Text("calls: " + (w.root as NSString).lastPathComponent).font(.caption).foregroundStyle(.secondary)
+                        Menu {
+                            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: w.root)]) }
+                            Button("Remove workspace from Live Tips", role: .destructive) { model.removeWorkspace(w) }
+                        } label: { Image(systemName: "ellipsis.circle") }
+                        .menuStyle(.borderlessButton).fixedSize()
                     }
-                } footer: {
-                    Text("A workspace is a folder in your work folder with a Notion mirror (_notion/workspace.md), for general calls about several projects.")
-                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            let inWs = Set(model.registry.workspaces.flatMap(\.projects))
+            let others = model.registry.projects.filter { !inWs.contains($0.slug) }
+            if !others.isEmpty {
+                Section {
+                    ForEach(others, id: \.slug) { p in projectRow(p.slug) }
+                } header: { Text(model.registry.workspaces.isEmpty ? "Projects" : "Other projects") }
+            }
+            if model.registry.projects.isEmpty && model.registry.workspaces.isEmpty && cands.isEmpty {
+                Section {
+                    Text("No projects yet. Scan the work folder, or add a project folder. Any folder works; Notion is not needed.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
         }
         .formStyle(.grouped)
+    }
+
+    @ViewBuilder func projectRow(_ slug: String) -> some View {
+        if let i = model.registry.projects.firstIndex(where: { $0.slug == slug }) {
+            let p = model.registry.projects[i]
+            HStack(alignment: .center) {
+                Toggle("", isOn: Binding(get: { model.registry.projects[i].status != "archived" },
+                                         set: { model.registry.projects[i].status = $0 ? "active" : "archived" }))
+                    .toggleStyle(.checkbox).labelsHidden()
+                    .help("Active: offered in Start call. Untick a project that is over; its folder and calls stay.")
+                Image(systemName: "folder").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(p.name).foregroundStyle(p.status == "archived" ? .secondary : .primary)
+                        if !p.config.isEmpty {
+                            Text("config").font(.caption2).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15)))
+                                .help("People, Notion pages and settings come from " + p.config)
+                        }
+                    }
+                    Text(p.root.isEmpty ? "No folder" : p.root).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+                Spacer()
+                Toggle("Claude", isOn: $model.registry.projects[i].apiAllowed).toggleStyle(.checkbox)
+                    .help("Send this project's call text to the Claude API. Off: local layer only.")
+                Toggle("Index", isOn: $model.registry.projects[i].index.enabled).toggleStyle(.checkbox)
+                    .help("Search the project folder for questions and the folder search. Updates by itself a minute after files change, never during a call. \(IndexService.shared.results[p.root] ?? "")")
+            }
+            .contextMenu {
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }.disabled(p.root.isEmpty)
+                Button("Reindex now") { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
+                Button("Remove from Live Tips", role: .destructive) { model.excludeProject(p.slug) }
+            }
+        }
     }
 
     var general: some View {
@@ -701,12 +857,40 @@ struct SettingsView: View {
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
                 Toggle("Write the call summary to Notion", isOn: $model.config.notionWriteSummary)
                     .help("After the call: updates the meeting's Notion page (or creates one) in your Meetings database. The Cowork skill can do it instead.")
+                if model.config.notionWriteSummary {
+                    NotionDestinationView()
+                    Text("Projects with a Control Tower config write to their own Meetings database; the one chosen here is for every other project.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             } header: { Text("Behaviour") } footer: {
                 HStack {
                     Text("Settings save automatically and survive updates: options in Application Support/LiveTips, keys in the Keychain.")
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.config]) }.buttonStyle(.link)
                 }
                 .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Toggle(isOn: $model.config.consentSay) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Play an audio consent message")
+                        Text("When a recording starts, macOS speaks the message through your speakers, so the others hear it through your microphone.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Toggle(isOn: $model.config.consentChat) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Copy a consent message for the meeting chat")
+                        Text("When a recording starts, the message is copied and a notification reminds you to paste it into the chat (Command-V).")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if model.config.consentSay || model.config.consentChat {
+                    TextField("English", text: $model.config.consentTextEN, axis: .vertical).lineLimit(2...4)
+                    TextField("Українська", text: $model.config.consentTextUK, axis: .vertical).lineLimit(2...4)
+                }
+            } header: { Text("Recording consent") } footer: {
+                Text("Off by default. The message follows the call's language. Check the rules of your company and your clients' countries: in some places everyone must agree to a recording.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 LabeledContent("HELP NOW") { Text("⌃⌥H  Control-Option-H").font(.callout.monospaced()) }
@@ -881,7 +1065,7 @@ final class SettingsWindow {
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
             w.title = title(for: tab)
-            w.setContentSize(NSSize(width: 820, height: 560))
+            w.setContentSize(NSSize(width: 960, height: 660))
             w.isReleasedWhenClosed = false
             window = w
         }

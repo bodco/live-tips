@@ -76,15 +76,34 @@ def header_info(md: Path) -> dict:
     except ValueError:
         t0 = dt.datetime.fromtimestamp(md.stat().st_ctime).astimezone()
     tz = os.environ.get("LT_TIMEZONE") or "Europe/Kiev"
-    return {"title": title, "start": t0, "tz": "Europe/Kiev" if tz in ("Europe/Kyiv", "Europe/Uzhgorod") else tz}
+    # 2026-10-26 (owner): the page is written in the call's language ("- Мови: Я = en, дозволені = en").
+    langs = next((l.split("=")[-1].strip() for l in head if l.startswith("- Мови:") or l.startswith("- Languages:")), "uk")
+    lang = "en" if langs.split("+")[0].strip() == "en" else "uk"
+    return {"title": title, "start": t0, "tz": "Europe/Kiev" if tz in ("Europe/Kyiv", "Europe/Uzhgorod") else tz, "lang": lang}
+
+
+TXT = {
+    "uk": {"actions": "Action items", "decisions": "Рішення", "commit": "Зобов'язання з нашого боку",
+           "new": "Нові вимоги (кандидати на зміну обсягу)", "open": "Відкриті питання", "risks": "Ризики",
+           "tips": "Підказки: показано {shown}, карток {cards}, фактів {facts}, запізнілих {late}; затримка медіана {med} с, макс {mx} с",
+           "prep": "Підготовка: ", "prep_yes": "використана", "prep_no": "не було",
+           "tr": "Транскрипт: {n} рядків, мови {langs}, локальний файл {f}", "summary": "Підсумок", "transcript": "Транскрипт",
+           "append": "Live Tips: підсумок ({hhmm})", "tr_app": "Транскрипт (Live Tips)", "write": "Ukrainian"},
+    "en": {"actions": "Action items", "decisions": "Decisions", "commit": "Our commitments",
+           "new": "New requests (possible scope changes)", "open": "Open questions", "risks": "Risks",
+           "tips": "Tips: shown {shown}, cards {cards}, facts {facts}, late {late}; delay median {med} s, max {mx} s",
+           "prep": "Preparation: ", "prep_yes": "used", "prep_no": "none",
+           "tr": "Transcript: {n} lines, languages {langs}, local file {f}", "summary": "Summary", "transcript": "Transcript",
+           "append": "Live Tips: summary ({hhmm})", "tr_app": "Transcript (Live Tips)", "write": "English"},
+}
 
 
 # ---------------------------------------------------------------- wrap-up by Claude
 SYSTEM = """You write the wrap-up of a work call for a project manager (PM), from the call transcript.
 Lines are "[time] Speaker (lang): text"; "Я" is the PM. The transcript is machine speech recognition: names and
 technical words can be garbled, and speaker labels can be wrong; never invent facts that are not said.
-Write in Ukrainian (internal notes), plain and short, no long dashes. Return ONLY one JSON object:
-{"name": "2-6 word meeting name in the language of the call, about what was actually discussed",
+Write in {LANG}, plain and short, no long dashes. Return ONLY one JSON object:
+{"name": "2-6 words in {LANG}: what was actually discussed (the meeting's own name is added in front of it)",
  "summary": "1-2 sentences",
  "action_items": [{"who": "...", "what": "...", "when": "... or empty"}],
  "decisions": ["..."], "commitments": ["what we (the PM's side) promised, with dates"],
@@ -93,15 +112,23 @@ Write in Ukrainian (internal notes), plain and short, no long dashes. Return ONL
 Empty lists are fine. Do not repeat the same item in two lists."""
 
 
-def claude_wrapup(transcript: str, brief: str, model: str) -> dict:
+def claude_wrapup(transcript: str, brief: str, model: str, lang: str = "uk") -> dict:
     key = os.environ.get("CLAUDE_API", "")
     user = (f"PREP BRIEF (may be empty):\n{brief[:6000]}\n\n" if brief else "") + f"TRANSCRIPT:\n{transcript[:120000]}"
     r = http("POST", ANTHROPIC, {"x-api-key": key, "anthropic-version": "2023-06-01"},
-             {"model": model, "max_tokens": 2500, "system": SYSTEM,
+             {"model": model, "max_tokens": 2500, "system": SYSTEM.replace("{LANG}", TXT[lang]["write"]),
               "messages": [{"role": "user", "content": user}]}, timeout=180)
     text = "".join(b.get("text", "") for b in r.get("content", []) if b.get("type") == "text")
     i, j = text.find("{"), text.rfind("}")
-    return json.loads(text[i:j + 1])
+    out = json.loads(text[i:j + 1])
+    u = r.get("usage") or {}
+    try:   # 2026-10-26 (owner): the menu shows what the last call cost, the wrap-up included
+        from .cost import cost_usd
+        out["_cost"] = cost_usd(model, u.get("input_tokens", 0), u.get("cache_creation_input_tokens", 0), 0,
+                                u.get("cache_read_input_tokens", 0), u.get("output_tokens", 0))
+    except Exception:  # noqa: BLE001
+        out["_cost"] = None
+    return out
 
 
 # ---------------------------------------------------------------- blocks
@@ -127,13 +154,14 @@ def todo(s: str) -> dict:
     return {"type": "to_do", "to_do": {"rich_text": rt(s), "checked": False}}
 
 
-def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool) -> list:
+def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "uk") -> list:
+    T = TXT[lang]
     b = []
-    sections = [("Action items", [f"{a.get('who', '').strip()}: {a.get('what', '').strip()}" + (f" ({a['when']})" if a.get("when") else "")
+    sections = [(T["actions"], [f"{a.get('who', '').strip()}: {a.get('what', '').strip()}" + (f" ({a['when']})" if a.get("when") else "")
                                   for a in w.get("action_items", [])], todo),
-                ("Рішення", w.get("decisions", []), bullet), ("Зобов'язання з нашого боку", w.get("commitments", []), bullet),
-                ("Нові вимоги (кандидати на зміну обсягу)", w.get("new_requests", []), bullet),
-                ("Відкриті питання", w.get("open_questions", []), bullet), ("Ризики", w.get("risks", []), bullet)]
+                (T["decisions"], w.get("decisions", []), bullet), (T["commit"], w.get("commitments", []), bullet),
+                (T["new"], w.get("new_requests", []), bullet),
+                (T["open"], w.get("open_questions", []), bullet), (T["risks"], w.get("risks", []), bullet)]
     for title, items, kind in sections:
         items = [i for i in items if str(i).strip(" :")]
         if items:
@@ -142,10 +170,10 @@ def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool) -> list:
     tips = stats.get("tips", {})
     tr = stats.get("transcript", {})
     b.append(h(3, "Live Tips"))
-    b.append(bullet(f"Підказки: показано {tips.get('shown', 0)}, карток {tips.get('cards_fired', 0)}, фактів {tips.get('facts_shown', 0)}, "
-                    f"запізнілих {tips.get('late', 0)}; затримка медіана {tips.get('delay_median_s', '?')} с, макс {tips.get('delay_max_s', '?')} с"))
-    b.append(bullet("Підготовка з Cowork: " + ("використана" if prep_used else "не було")))
-    b.append(bullet(f"Транскрипт: {tr.get('lines_real', '?')} рядків, мови {', '.join((tr.get('langs') or {}).keys())}, локальний файл {md.name}"))
+    b.append(bullet(T["tips"].format(shown=tips.get('shown', 0), cards=tips.get('cards_fired', 0), facts=tips.get('facts_shown', 0),
+                                     late=tips.get('late', 0), med=tips.get('delay_median_s', '?'), mx=tips.get('delay_max_s', '?'))))
+    b.append(bullet(T["prep"] + (T["prep_yes"] if prep_used else T["prep_no"])))
+    b.append(bullet(T["tr"].format(n=tr.get('lines_real', '?'), langs=", ".join((tr.get('langs') or {}).keys()), f=md.name)))
     return b
 
 
@@ -165,17 +193,37 @@ def file_block(upload_id: str, name: str) -> dict:
     return {"type": "file", "file": {"type": "file_upload", "file_upload": {"id": upload_id}, "name": name}}
 
 
-def find_page(ds: str, start: dt.datetime) -> dict | None:
+def schema(ds: str) -> dict:
+    """2026-10-26: any Meetings database works. The title property, a date property ("Date" first), a text
+    property for the summary ("Summary" first) and Project/Workspace (relation or select) are found by type;
+    what is missing is skipped instead of failing."""
+    props = notion("GET", f"/data_sources/{ds}").get("properties", {})
+    by = lambda t: [n for n, v in props.items() if v.get("type") == t]  # noqa: E731
+    pick = lambda t, pref: (pref if (props.get(pref) or {}).get("type") == t else (by(t) or [None])[0])  # noqa: E731
+    out = {"title": (by("title") or ["Name"])[0], "date": pick("date", "Date"), "summary": None,
+           "project": None, "workspace": None}
+    if (props.get("Summary") or {}).get("type") == "rich_text":
+        out["summary"] = "Summary"
+    for key, name in (("project", "Project"), ("workspace", "Workspace")):
+        t = (props.get(name) or {}).get("type")
+        if t in ("relation", "select", "rich_text"):
+            out[key] = (name, t)
+    return out
+
+
+def find_page(ds: str, start: dt.datetime, date_prop: str | None = "Date") -> dict | None:
+    if not date_prop:
+        return None
     lo, hi = (start - dt.timedelta(minutes=20)).isoformat(), (start + dt.timedelta(minutes=20)).isoformat()
     r = notion("POST", f"/data_sources/{ds}/query", {"filter": {"and": [
-        {"property": "Date", "date": {"on_or_after": lo}}, {"property": "Date", "date": {"on_or_before": hi}}]},
+        {"property": date_prop, "date": {"on_or_after": lo}}, {"property": date_prop, "date": {"on_or_before": hi}}]},
         "page_size": 10})
     pages = r.get("results", [])
     if not pages:
         return None
 
     def gap(p):
-        s = ((p.get("properties", {}).get("Date") or {}).get("date") or {}).get("start")
+        s = ((p.get("properties", {}).get(date_prop) or {}).get("date") or {}).get("start")
         try:
             return abs((dt.datetime.fromisoformat(s.replace("Z", "+00:00")) - start).total_seconds())
         except Exception:  # noqa: BLE001
@@ -191,19 +239,25 @@ def append(page_id: str, blocks: list) -> None:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--md", required=True, type=Path)
-    ap.add_argument("--project-config", required=True, type=Path)
+    ap.add_argument("--project-config", type=Path, default=None, help="Control Tower config (meetings_db, page ids)")
+    ap.add_argument("--meetings-db", default="", help="data source id of the Meetings database (used without a config)")
+    ap.add_argument("--project-name", default="", help="written to a Project select or text property")
     ap.add_argument("--lt", nargs=2, required=True)
     ap.add_argument("--model", default="claude-sonnet-5-5")
+    ap.add_argument("--when", default="", help="ISO date and time of the meeting set in Start call (title date)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--find-only", action="store_true", help="only look up this meeting's page in Notion")
     a = ap.parse_args(argv)
-    res = {"ok": False, "url": None, "created": False, "error": None}
+    res = {"ok": False, "url": None, "created": False, "error": None, "cost_usd": None}
     try:
-        ids = config_ids(a.project_config)
+        ids = config_ids(a.project_config) if a.project_config and a.project_config.exists() else {}
+        if not ids.get("meetings_db") and a.meetings_db:
+            ids["meetings_db"] = a.meetings_db.replace("collection://", "").strip()
         if not ids.get("meetings_db"):
-            raise RuntimeError(f"no meetings_db in {a.project_config.name}")
+            raise RuntimeError("no Meetings database: choose one in Settings > General > Notion")
+        sc = schema(ids["meetings_db"])
         if a.find_only:
-            p = find_page(ids["meetings_db"], header_info(a.md)["start"])
+            p = find_page(ids["meetings_db"], header_info(a.md)["start"], sc["date"])
             print(json.dumps({"ok": True, "found": bool(p), "url": p and p.get("url")}))
             return 0
         out = subprocess.run(list(a.lt) + ["wrapup-data", str(a.md)], capture_output=True, text=True, timeout=120).stdout
@@ -215,8 +269,14 @@ def main(argv=None) -> int:
         brief_f = Path(str(a.md)[:-3] + ".brief.md")
         brief = brief_f.read_text(encoding="utf-8") if brief_f.exists() else ""
         info = header_info(a.md)
-        w = claude_wrapup(plain, brief, a.model)
-        blocks = wrapup_blocks(w, stats, a.md, bool(brief))
+        if a.when:   # 2026-10-26 (owner): the title's date is the meeting time set in the app, not the recording start
+            try:
+                info["start"] = dt.datetime.fromisoformat(a.when.replace("Z", "+00:00")).astimezone()
+            except ValueError:
+                pass
+        lang = info.get("lang", "uk")
+        w = claude_wrapup(plain, brief, a.model, lang)
+        blocks = wrapup_blocks(w, stats, a.md, bool(brief), lang)
         fname = a.md.stem + "-transcript.md"
         if a.dry_run:
             print(json.dumps({"ok": True, "dry_run": True, "name": w.get("name"), "summary": w.get("summary"),
@@ -224,34 +284,54 @@ def main(argv=None) -> int:
             return 0
         up = upload_md(fname, plain)
         hhmm = dt.datetime.now().strftime("%H:%M")
-        page = find_page(ids["meetings_db"], info["start"])
+        res["cost_usd"] = w.get("_cost")
+        if w.get("_cost"):   # into the same monthly ledger as the tips
+            try:
+                from .cost import BudgetGuard
+                BudgetGuard(os.environ.get("LT_LEDGER", "~/.livetips/spend.json"), 1e9, 1e9, 1e9).add(float(w["_cost"]))
+            except Exception:  # noqa: BLE001
+                pass
+        page = find_page(ids["meetings_db"], info["start"], sc["date"])
+
+        def links(existing: dict) -> dict:
+            """Project and Workspace: a relation from the config's page ids, or the project's name as a select or text."""
+            upd = {}
+            for key, idkey, val in (("project", "project_page_id", a.project_name), ("workspace", "workspace_page_id", "")):
+                if not sc[key]:
+                    continue
+                name, t = sc[key]
+                if (existing.get(name) or {}).get(t):
+                    continue
+                if t == "relation" and ids.get(idkey):
+                    upd[name] = {"relation": [{"id": ids[idkey]}]}
+                elif t == "select" and val:
+                    upd[name] = {"select": {"name": val[:100]}}
+                elif t == "rich_text" and val:
+                    upd[name] = {"rich_text": rt(val)}
+            return upd
         if page:
             props = page.get("properties", {})
-            upd = {}
-            if ids.get("project_page_id") and not (props.get("Project") or {}).get("relation"):
-                upd["Project"] = {"relation": [{"id": ids["project_page_id"]}]}
-            if ids.get("workspace_page_id") and not (props.get("Workspace") or {}).get("relation"):
-                upd["Workspace"] = {"relation": [{"id": ids["workspace_page_id"]}]}
+            upd = links(props)
             if upd:
                 notion("PATCH", f"/pages/{page['id']}", {"properties": upd})
-            append(page["id"], [h(2, f"Live Tips: підсумок і роздуми ({hhmm})"), para(w.get("summary", ""))] + blocks
-                   + [h(3, "Транскрипт (Live Tips)"), file_block(up, fname)])
+            append(page["id"], [h(2, TXT[lang]["append"].format(hhmm=hhmm)), para(w.get("summary", ""))] + blocks
+                   + [h(3, TXT[lang]["tr_app"]), file_block(up, fname)])
             res.update(ok=True, url=page.get("url"))
         else:
             start = info["start"]
-            props = {"Meeting Name": {"title": rt((w.get("name") or info["title"]) + " ") + [
-                        {"type": "mention", "mention": {"type": "date", "date": {"start": start.isoformat(timespec="minutes"),
-                                                                                  "time_zone": None}}}]},
-                     "Date": {"date": {"start": start.isoformat(timespec="seconds")}},
-                     "Summary": {"rich_text": rt(w.get("summary", ""))}}
-            props["Meeting Name"]["title"][-1]["mention"]["date"].pop("time_zone")
-            if ids.get("project_page_id"):
-                props["Project"] = {"relation": [{"id": ids["project_page_id"]}]}
-            if ids.get("workspace_page_id"):
-                props["Workspace"] = {"relation": [{"id": ids["workspace_page_id"]}]}
+            # 2026-10-26 (owner): the page title starts with the meeting's name, then what it was about.
+            topic = (w.get("name") or "").strip()
+            name = info["title"] if not topic or topic.lower() in info["title"].lower() else info["title"] + ": " + topic
+            props = {sc["title"]: {"title": rt(name + " ") + [
+                        {"type": "mention", "mention": {"type": "date", "date": {"start": start.isoformat(timespec="minutes")}}}]}}
+            if sc["date"]:
+                props[sc["date"]] = {"date": {"start": start.isoformat(timespec="seconds")}}
+            if sc["summary"]:
+                props[sc["summary"]] = {"rich_text": rt(w.get("summary", ""))}
+            props.update(links({}))
             p = notion("POST", "/pages", {"parent": {"type": "data_source_id", "data_source_id": ids["meetings_db"]},
                                           "properties": props,
-                                          "children": [h(2, "Підсумок")] + blocks + [h(2, "Транскрипт"), file_block(up, fname)]})
+                                          "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"]), file_block(up, fname)]})
             res.update(ok=True, url=p.get("url"), created=True)
     except Exception as e:  # noqa: BLE001
         res["error"] = f"{type(e).__name__}: {e}"[:600]

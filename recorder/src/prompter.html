@@ -413,6 +413,13 @@
   #dk-wrap td.r, #dk-wrap th.r { text-align: right; }
   #dk-wrap td.bad { color: var(--red); } #dk-wrap td.ok { color: var(--green); }
   #dk-wrap td.t { white-space: normal; }
+  /* call picture (v49, 2026-10-26): one status line from a kind "situation" item */
+  #sitline { display: none; padding: 3px 12px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; border-bottom: 1px solid var(--line); }
+  #sitline.show { display: block; }
+  #sitline .mine { color: var(--blue); font-weight: 600; }
+  #sitline .turn { color: var(--red); font-weight: 700; }
+  .items li.said { text-decoration: line-through; opacity: .55; }
 </style>
 </head>
 <body>
@@ -463,6 +470,7 @@
 </div>
 
 <div id="alert" role="status" aria-live="polite"></div>
+<div id="sitline" aria-live="polite"></div>
 
 <div id="dock">
   <div id="agenda" class="collapsed">
@@ -758,6 +766,7 @@
       fr_hint: 'Enter asks Claude · Esc clears',
       now_now: 'Now:',
       now_next: 'Next:',
+      sit_turn: 'Your turn', sit_listen: 'Topic:', sit_mine: 'yours', sit_not: 'not yours',
       // status and diagnostics
       st_loading_model: 'Loading the model...',
       st_recording: 'Recording',
@@ -1042,6 +1051,7 @@
       fr_hint: 'Enter питає Claude · Esc очищає',
       now_now: 'Зараз:',
       now_next: 'Далі:',
+      sit_turn: 'Ваша черга', sit_listen: 'Тема:', sit_mine: 'ваша', sit_not: 'не ваша',
       st_loading_model: 'Завантажую модель...',
       st_recording: 'Запис',
       st_stopping: 'Зупиняю...',
@@ -2088,9 +2098,25 @@
     if (n) html += '<div class="nxt">' + esc(t('now_next')) + ' <b>' + inline(n.title) + '</b>' + nums(n) + '<ul>' + pts(n) + '</ul></div>';
     nowbox.innerHTML = html; nowbox.className = html ? 'has' : '';
   }
+  // Call picture (v49): topic, whose it is, "your turn"; speech points said are struck through.
+  function renderSituation(s) {
+    var line = $('sitline'); if (!line) return;
+    var turn = (s.asks || []).some(function (a) { return a.type === 'update'; }), parts = [];
+    if (turn) parts.push('<span class="turn">' + esc(t('sit_turn')) + '</span>');
+    if (s.topic) parts.push(esc(t('sit_listen')) + ' ' + esc(s.topic) + (s.owner ? ' · ' + esc(s.owner) : ''));
+    if (s.topic) parts.push(s.mine ? '<span class="mine">' + esc(t('sit_mine')) + '</span>' : esc(t('sit_not')));
+    line.innerHTML = parts.join(' · '); line.className = parts.length ? 'show' : ''; line.title = line.textContent;
+    var sp = byUid('speech');
+    if (sp) {
+      var lis = sp.querySelectorAll('.items li'), done = {};
+      (s.speech_done || []).forEach(function (i) { done[i] = 1; });
+      for (var i = 0; i < lis.length; i++) lis[i].classList.toggle('said', !!done[i]);
+    }
+  }
   window.addItems = function (items) {
     (items || []).forEach(function (it) {
       if (!it) return;
+      if (it.kind === 'situation') { renderSituation(it); return; }
       if (it.kind === 'agenda') { renderAgenda(it); return; }
       if (it.kind === 'facts') { facts = it.facts || []; indexFacts(); searchFacts(); return; }
       if (it.kind === 'outline') { outline = it.sections || []; renderNow(); return; }

@@ -33,6 +33,23 @@ final class CallEngine {
     /// 2026-10-23: a visible confirmation that the call ended and the transcript is saved (menu, tips window).
     var lastCallSummary = ""
     var lastLines = 0
+    var liveSpent = 0.0, liveTips = 0
+    /// 2026-10-26 (owner): what the last call cost, for the menu: the tips engine during the call plus the
+    /// Notion wrap-up after it (state/last-call.json, survives a restart).
+    var lastCallPath: String { (appRoot as NSString).appendingPathComponent("state/last-call.json") }
+    var lastCall: [String: Any] {
+        get { ((try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: lastCallPath)))) as? [String: Any]) ?? [:] }
+        set { if let d = try? JSONSerialization.data(withJSONObject: newValue) { try? d.write(to: URL(fileURLWithPath: lastCallPath)) } }
+    }
+    var lastCallLine: String {
+        let d = lastCall
+        guard let tips = d["tips_usd"] as? Double else { return "" }
+        let notes = d["notes_usd"] as? Double ?? 0
+        var line = String(format: "Last call: $%.2f", tips + notes)
+        if notes > 0 { line += String(format: " (tips $%.2f, Notion notes $%.2f)", tips, notes) }
+        if let n = d["tips"] as? Int { line += " · \(n) tip\(n == 1 ? "" : "s")" }
+        return line
+    }
     static let callEnded = Notification.Name("LiveTipsCallEnded")
 
     func problems() -> [String] {
@@ -114,18 +131,26 @@ final class CallEngine {
         recorder = p
         IndexService.shared.pause()        // the indexer waits while Whisper and the tips engine run
         self.onReady = onReady
+        liveSpent = 0; liveTips = 0
         poll?.invalidate()
         var sidecarStarted = false
+        var consentDone = false
         poll = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
             guard let self = self else { t.invalidate(); return }
             let st = EngineStatus.load(path: self.statusPath)
             if let f = st.file { self.lastFile = f }
             if st.lines > 0 { self.lastLines = st.lines }
+            if st.callSpentUSD > self.liveSpent { self.liveSpent = st.callSpentUSD }
+            if st.tips > self.liveTips { self.liveTips = st.tips }
             if !sidecarStarted, let file = st.file, ["recording", "loading_model", "standby"].contains(st.state) {
                 sidecarStarted = true
                 self.adoptPrep(file: file)
                 self.onReady?(st)
                 if apiAllowed { self.startSidecar(file: file, status: st) }
+            }
+            if !consentDone, st.state == "recording" {
+                consentDone = true
+                self.consent()
             }
             // The tips engine must live as long as the recording: restart it if it ended (it reads on from now).
             if sidecarStarted, apiAllowed, st.state == "recording", let file = st.file,
@@ -142,6 +167,8 @@ final class CallEngine {
                 IndexService.shared.resume()
                 let f = DateFormatter(); f.dateFormat = "HH:mm"
                 let saved = (st.file ?? self.lastFile).map { FileManager.default.fileExists(atPath: $0) } ?? false
+                self.lastCall = ["tips_usd": self.liveSpent, "tips": self.liveTips, "lines": self.lastLines,
+                                 "at": ISO8601DateFormatter().string(from: Date())]
                 self.lastCallSummary = saved
                     ? "✓ Call ended \(f.string(from: Date())) · transcript saved (\(self.lastLines) lines)"
                     : "⚠ Call ended \(f.string(from: Date())) · no transcript file found"
@@ -254,15 +281,20 @@ final class CallEngine {
         guard let key = store.get(.claudeAPIKey), let notionToken = store.get(.notionToken) else {
             notionResult = "Notion: add the Notion token in Settings > Keys"; notify(notionResult); return
         }
-        guard !projectConfig.isEmpty, FileManager.default.fileExists(atPath: projectConfig) else {
-            notionResult = "Notion: this call has no project config, nothing written"; return
+        let hasConfig = !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig)
+        guard hasConfig || !c.notionMeetingsDB.isEmpty else {
+            notionResult = "Notion: choose where meeting pages go in Settings > General > Notion"; notify(notionResult); return
         }
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
-        p.arguments = ["-m", "livetips_m0.wrapup_notion", "--md", file, "--project-config", projectConfig,
+        let projectName = ((callRequest["project_dir"] as? String).map { ($0 as NSString).lastPathComponent }) ?? ""
+        p.arguments = ["-m", "livetips_m0.wrapup_notion", "--md", file,
                        "--lt", c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt"),
-                       "--model", c.models.tip]
+                       "--model", c.models.tip, "--project-name", projectName]
+            + (hasConfig ? ["--project-config", projectConfig] : [])
+            + (c.notionMeetingsDB.isEmpty ? [] : ["--meetings-db", c.notionMeetingsDB])
+            + ((callRequest["scheduled_at"] as? String).map { ["--when", $0] } ?? [])   // the date and time set in Start call
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = ProcessInfo.processInfo.environment
         env["CLAUDE_API"] = key
@@ -281,6 +313,7 @@ final class CallEngine {
             let d = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] ?? [:]
             DispatchQueue.main.async {
                 guard let self = self else { return }
+                if let c = d["cost_usd"] as? Double, c > 0 { var lc = self.lastCall; lc["notes_usd"] = c; self.lastCall = lc }
                 if (d["ok"] as? Bool) == true, let url = d["url"] as? String {
                     self.notionResult = url
                     self.notify(((d["created"] as? Bool) == true ? "Meeting page created in Notion" : "Wrap-up added to the meeting page in Notion"), url: url)
@@ -334,10 +367,10 @@ final class CallEngine {
                     parts.append(String(format: "%@ %.1f/5 (%d tips)", eng, m, n))
                 }
             }
-            let line = parts.isEmpty ? "Last call: no tips rated" : "Last call: " + parts.joined(separator: ", ")
+            let line = parts.isEmpty ? "Tips rated: none" : "Tips rated: " + parts.joined(separator: ", ")
             DispatchQueue.main.async { self?.judgeResult = line; self?.judgeRunning = nil }
         }
-        do { try p.run(); judgeRunning = p } catch { judgeResult = "Last call: judge could not start" }
+        do { try p.run(); judgeRunning = p } catch { judgeResult = "Tips rated: the check could not start" }
     }
 
     func notify(_ text: String, url: String? = nil) {
@@ -386,6 +419,30 @@ final class CallEngine {
                 self.runJudge(file: file)
             }
             onDone(file, saved)
+        }
+    }
+
+    /// Consent when the recording starts (Settings > General > Recording consent; both off by default).
+    func consent() {
+        let c = config
+        guard c.consentSay || c.consentChat else { return }
+        let uk = ((callRequest["me_lang"] as? String) ?? "uk") == "uk"
+        let text = uk ? c.consentTextUK : c.consentTextEN
+        guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        if c.consentChat {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            notify("Consent message copied: paste it into the meeting chat (Command-V)")
+        }
+        if c.consentSay {
+            DispatchQueue.global().async {
+                func say(_ args: [String]) -> Int32 {
+                    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/say"); p.arguments = args
+                    p.standardError = FileHandle.nullDevice
+                    do { try p.run(); p.waitUntilExit(); return p.terminationStatus } catch { return -1 }
+                }
+                if !(uk && say(["-v", "Lesya", text]) == 0) { _ = say([text]) }
+            }
         }
     }
 

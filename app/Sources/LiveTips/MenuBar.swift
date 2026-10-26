@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var pauseItem = NSMenuItem()
     var helpItem = NSMenuItem()
     var tipsItem = NSMenuItem()
+    var demoItem = NSMenuItem()
+    var demoPresItem = NSMenuItem()
     var notionItem = NSMenuItem()
     var lastStatus = EngineStatus()
 
@@ -34,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         // The main action first; the status lines below it (review P2).
         startItem = add(menu, "Start call…", #selector(startCall), "n")
-        tipsItem = add(menu, "Open tips window", #selector(showTips), "t")
+        tipsItem = add(menu, "Open tips window", #selector(showTips), "")
         pauseItem = add(menu, "Pause or resume tips", #selector(togglePause), "p")
         pauseItem.keyEquivalentModifierMask = [.control, .option]      // shown in the menu: the global shortcut
         helpItem = add(menu, "HELP NOW", #selector(helpNow), "h")
@@ -47,8 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         micItem = add(menu, "Allow microphone…", #selector(requestMic), "")
         menu.addItem(.separator())
         add(menu, "Settings…", #selector(openSettings), ",")
-        add(menu, "Setup…", #selector(openSetup), "")
+        add(menu, "Setup", #selector(openSetup), "")
+        add(menu, "Welcome tour", #selector(openOnboarding), "")
         add(menu, "About Live Tips", #selector(openAbout), "")
+        // For checking the window without a call: shown only with Option held while the menu opens.
+        demoItem = add(menu, "Demo Live Tips", #selector(showDemo), "")
+        demoPresItem = add(menu, "Demo Live Tips: presentation", #selector(showDemoPresentation), "")
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Live Tips", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         it.menu = menu
@@ -59,11 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateCoreIfNeeded()
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
-        if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
-        if !UserDefaults.standard.bool(forKey: "onboarded") {
+        // 2026-10-26: new users get the onboarding (permissions, folders, Claude, install, Notion optional).
+        if !UserDefaults.standard.bool(forKey: "onboardingDone") && !UserDefaults.standard.bool(forKey: "onboarded") {
             UserDefaults.standard.set(true, forKey: "onboarded")
-            openSettings()
-        }
+            MainActor.assumeIsolated { OnboardingWindow.show() }
+        } else if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
     }
 
     /// After an app update the recorder core in the app folder is refreshed from the app by itself
@@ -130,7 +136,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.mainMenu = main
     }
 
-    func menuWillOpen(_ menu: NSMenu) { refresh() }
+    func menuWillOpen(_ menu: NSMenu) {
+        refresh()
+        let dev = NSEvent.modifierFlags.contains(.option)
+        demoItem.isHidden = !dev
+        demoPresItem.isHidden = !dev
+    }
 
     func refresh() {
         let cfg = config
@@ -145,7 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         endItem.isHidden = !recording
         pauseItem.isHidden = st.state != "recording"
         helpItem.isHidden = st.state != "recording"
-        tipsItem.title = recording ? "Open tips window" : "Preview tips window"
+        tipsItem.isHidden = !recording
         notionItem.isHidden = recording || CallEngine.shared.lastFile == nil
         notionItem.toolTip = CallEngine.shared.notionResult
         statusLines[0].title = st.state == "standby" ? "○ Waiting for the call" + (st.project.map { ": \($0)" } ?? "")
@@ -156,9 +167,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         statusLines[1].title = String(format: "Lines %d · tips %d · this call $%.2f of $%.0f", st.lines, st.tips, st.callSpentUSD, cfg.budget.callHardUSD)
         statusLines[1].isHidden = !recording
+        // 2026-10-26 (owner): the last call's cost; the tip rating only when that developer check is on.
         let judge = cfg.judgeAfterCall ? CallEngine.shared.judgeResult : ""
-        statusLines[2].title = CallEngine.shared.judgeRunning != nil ? "Rating the last call's tips..." : judge
-        statusLines[2].isHidden = recording || (judge.isEmpty && CallEngine.shared.judgeRunning == nil)
+        let cost = CallEngine.shared.lastCallLine
+        statusLines[2].title = [cost, CallEngine.shared.judgeRunning != nil && cfg.judgeAfterCall ? "rating the tips…" : judge]
+            .filter { !$0.isEmpty }.joined(separator: " · ")
+        statusLines[2].isHidden = recording || statusLines[2].title.isEmpty
         statusLines[3].title = String(format: "This month: $%.2f of $%.0f", month, cfg.budget.monthlyHardUSD)
         micItem.isHidden = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         item?.button?.image = NSImage(systemSymbolName: recording ? "record.circle.fill" : "text.bubble", accessibilityDescription: "Live Tips")
@@ -175,6 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         CallEngine.shared.writeToNotion(file: f)
     }
     @objc func openSetup() { MainActor.assumeIsolated { SetupWindow.show() } }
+    @objc func openOnboarding() { MainActor.assumeIsolated { OnboardingWindow.show() } }
     @objc func openSettings() { MainActor.assumeIsolated { SettingsWindow.show() } }
     @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
     @objc func openSettingsTab() { MainActor.assumeIsolated { SettingsWindow.show() } }
@@ -239,12 +254,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                     control: (CallEngine.shared.appRoot as NSString).appendingPathComponent("control")))
             return
         }
-        if tips == nil {
-            MainActor.assumeIsolated {
-                let c = PrompterController(args: prompterArgs(["LiveTips", "--prompter-demo"]))
-                c.show()
-                tips = c
-            }
+    }
+
+    @objc func showDemo() { openDemo("--prompter-demo") }
+    @objc func showDemoPresentation() { openDemo("--prompter-demo-presentation") }
+    func openDemo(_ flag: String) {
+        MainActor.assumeIsolated {
+            tips?.window?.close()
+            let c = PrompterController(args: prompterArgs(["LiveTips", flag]))
+            c.show()
+            tips = c
         }
     }
 
@@ -290,8 +309,20 @@ final class StartCallModel: ObservableObject {
     @Published var language = "uk"
     @Published var note = ""
     /// 2026-10-26 (owner): a template instead of an empty field; empty lines of it are not sent.
-    static let contextTemplate = "Мета: \nУчасники: \nВідкриті питання: \nДе дивитись (документи, тікети): "
+    static let contextTemplate = "Мета: \nУчасники: \nВідкриті питання: \nДе дивитись (документи, посилання): "
     @Published var context = StartCallModel.contextTemplate
+    /// 2026-10-27 (owner): "Add folder" like in Cowork; the context then names only files or links.
+    @Published var folders: [String] = []
+
+    func addFolders() {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true; p.canChooseFiles = false; p.allowsMultipleSelection = true
+        p.message = "Folders to look through for this call"
+        p.prompt = "Add"
+        if let r = root { p.directoryURL = URL(fileURLWithPath: r) }
+        guard p.runModal() == .OK else { return }
+        for u in p.urls where !folders.contains(u.path) { folders.append(u.path) }
+    }
     /// When the call is: today, the next full hour (17:00). Goes into the Cowork request and the call request.
     @Published var callDate = StartCallModel.nextFullHour()
 
@@ -314,6 +345,7 @@ final class StartCallModel: ObservableObject {
             }
             out.append(t)
         }
+        if !folders.isEmpty { out.append("Папки: " + folders.joined(separator: "; ")) }
         return out.joined(separator: "\n")
     }
 
@@ -467,7 +499,7 @@ final class StartCallModel: ObservableObject {
                                   slug: project?.slug ?? workspace?.name.lowercased() ?? "", root: root,
                                   config: project?.config ?? "", audience: audience, callType: callType, hiringRole: hiringRole,
                                   languages: language.split(separator: "+").map(String.init), context: cleanContext,
-                                  workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""))
+                                  workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""), folders: folders)
     }
 
     /// Phrase to paste into Cowork to make a prep for this call.
@@ -567,124 +599,236 @@ struct StartCallView: View {
     @State private var copied = false
 
     @AppStorage("startCallAdvanced") private var advanced = false
+    @State private var picking = false
+    @State private var search = ""
 
+    // 2026-10-26 (owner): the main window before a call, not a settings form: one hero card with the
+    // project, the title and the time, the context, the preparation, then one big Start button.
     var body: some View {
         VStack(spacing: 0) {
-            Form {
-                Section {
-                    Picker("Project", selection: $model.target) {
-                        Text("Choose…").tag("")
-                        if !model.registry.workspaces.isEmpty {
-                            Section("Workspaces") {
-                                ForEach(model.registry.workspaces, id: \.name) { w in
-                                    Label(w.name, systemImage: "square.stack.3d.up").tag("workspace:" + w.name)
+            ScrollView {
+                VStack(spacing: 16) {
+                    VStack(spacing: 8) {
+                        IconTile(symbol: "text.bubble", size: 52)
+                        Text("Start a call").font(.title.weight(.semibold))
+                    }
+                    .padding(.top, 4)
+                    hero
+                    HStack(spacing: 12) {
+                        pill("person.2") {
+                            Picker("", selection: $model.audience) {
+                                Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client")
+                            }
+                            .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        }
+                        .help("Who is on the other side of the call. Auto: detected from who speaks. Team: internal call, no corrections of your facts. Client: stricter, internal numbers are never shown, the client's culture profile is used.")
+                        pill("globe") {
+                            Picker("", selection: Binding(get: { model.language }, set: { model.language = $0; model.languageTouched = true })) {
+                                Text("Ukrainian").tag("uk"); Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
+                            }
+                            .labelsHidden().fixedSize()
+                        }
+                        .help("Language of the call: what may be spoken; transcription is restricted to these.")
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("What matters on this call", systemImage: "text.alignleft").font(.callout.weight(.medium))
+                        TextEditor(text: $model.context)
+                            .font(.callout)
+                            .scrollContentBackground(.hidden)
+                            .padding(6)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.07)))
+                            .frame(height: 96)
+                        folderChips
+                        Text("Names after \u{201C}Учасники:\u{201D} or \u{201C}Participants:\u{201D} are the speakers offered on the call. Added folders are looked through for the preparation; name single files or links in the text. Empty lines are not sent.")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .ltCard(padding: 14)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Preparation", systemImage: "doc.badge.clock").font(.callout.weight(.medium))
+                        prepStatus
+                        if !model.prepList.isEmpty {
+                            Picker("Use", selection: Binding(get: { model.chosenPrep ?? "" },
+                                                             set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
+                                Text("Automatic (match by call title)").tag("")
+                                ForEach(model.prepList, id: \.file) { p in
+                                    Text("\(p.heading) · \(p.made.formatted(date: .abbreviated, time: .shortened))").tag(p.file)
                                 }
                             }
                         }
-                        Section("Projects") {
-                            ForEach(model.registry.projects.filter { $0.status != "archived" }, id: \.slug) { p in
-                                Label(p.name, systemImage: "folder").tag("project:" + p.slug)
+                        prepActions
+                    }
+                    .ltCard(padding: 14)
+                    DisclosureGroup(isExpanded: $advanced) {
+                        Form {
+                            Picker("Meeting type", selection: $model.callType) {
+                                Text("Regular").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
                             }
+                            .help("Regular: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview work best with a preparation.")
+                            if model.callType == "interview" {
+                                Picker("Your role", selection: $model.hiringRole) {
+                                    Text("Observer").tag("observer"); Text("Interviewer").tag("interviewer"); Text("Coach (I am interviewed)").tag("coach")
+                                }
+                                .help("Observer: you watch someone interview a candidate; tips show each question and what a strong answer has. Interviewer: you ask; tips give the next question and follow-ups. Coach: you are the one being interviewed; tips give a structure and an opening sentence for your answer.")
+                            }
+                            Picker("Tip model", selection: $model.tipModel) {
+                                Text("Default (\(prettyModel(AppConfig.load(from: AppPaths.config).models.tip)))").tag("")
+                                ForEach(model.tipModelChoices, id: \.self) { id in Text(prettyModel(id) + "  " + id).tag(id) }
+                            }
+                            .help("For this call only. Settings > AI sets the default.")
+                            Picker("Microphone", selection: $model.micDevice) {
+                                Text("System default" + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
+                                Text("Mac built-in microphone").tag("builtin")
+                                ForEach(model.micInputs.filter { !$0.builtin }, id: \.uid) { d in
+                                    Text(d.name).tag("uid:" + d.uid)
+                                }
+                                if model.micDevice.hasPrefix("uid:") && !model.micInputs.contains(where: { "uid:" + $0.uid == model.micDevice }) {
+                                    Text("Not connected: " + String(model.micDevice.dropFirst(4))).tag(model.micDevice)
+                                }
+                            }
+                            .help("Your voice. System default follows macOS (AirPods, a headset or the Mac). Can be changed during the call in the tips window.")
+                            Picker("Start recording", selection: $model.standby) {
+                                Text("When the other side speaks").tag(true)
+                                Text("Right away").tag(false)
+                            }
+                            .help("When the other side speaks: the window opens now and waits; recording starts when the other side speaks for a few seconds, or when you press the green Start.")
+                            Toggle("Don't save new voices (webinar, strangers)", isOn: $model.publicCall)
+                                .help("Speakers can still be named during the call, but no voice prints are saved. On other calls your team's voices are remembered for every project and the client's for this project only.")
                         }
+                        .formStyle(.columns)
+                        .padding(.top, 8)
+                    } label: {
+                        Label("More options", systemImage: "slider.horizontal.3").font(.callout.weight(.medium))
                     }
-                    .help("Recordings and notes go to this folder. A workspace is for general calls about several projects.")
-                    .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false }
-                    TextField("Title", text: $model.title, prompt: Text("e.g. Weekly sync with the client"))
-                        .onChange(of: model.title) { model.scanPrep(); copied = false }
-                    DatePicker("Date and time", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute])
-                        .help("When the call is. Goes into the preparation request.")
-                        .onChange(of: model.callDate) { copied = false }
-                    if let r = model.root {
-                        Text(model.details).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
-                            .help(r + "\n" + model.details)
-                    }
+                    .ltCard(padding: 14)
                 }
-                Section {
-                    TextEditor(text: $model.context)
-                        .font(.callout)
-                        .scrollContentBackground(.hidden)
-                        .frame(height: 84)
-                } header: {
-                    Text("Call context")
-                } footer: {
-                    Text("Empty lines are not sent. Names after \u{201C}Учасники:\u{201D} or \u{201C}Participants:\u{201D} are the speakers offered on the call.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Section {
-                    prepStatus
-                    if !model.prepList.isEmpty {
-                        Picker("Use preparation", selection: Binding(get: { model.chosenPrep ?? "" },
-                                                                      set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
-                            Text("Automatic (match by call title)").tag("")
-                            ForEach(model.prepList, id: \.file) { p in
-                                Text("\(p.heading) · \(p.made.formatted(date: .abbreviated, time: .shortened))").tag(p.file)
-                            }
-                        }
-                    }
-                    prepActions
-                } header: { Text("Preparation") }
-                Section {
-                    Picker("Audience", selection: $model.audience) {
-                        Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client")
-                    }
-                    .pickerStyle(.segmented)
-                    .help("Who is on the other side. Auto: detected from who speaks. Team: internal call, no corrections of your facts. Client: stricter, internal numbers are never shown, the client's culture profile is used.")
-                    Picker("Languages", selection: Binding(get: { model.language }, set: { model.language = $0; model.languageTouched = true })) {
-                        Text("Ukrainian").tag("uk"); Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
-                    }
-                    .help("What may be spoken on the call; transcription is restricted to these.")
-                    DisclosureGroup("Advanced", isExpanded: $advanced) {
-                        Picker("Meeting type", selection: $model.callType) {
-                            Text("Regular").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
-                        }
-                        .help("Regular: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview work best with a preparation.")
-                        if model.callType == "interview" {
-                            Picker("Your role", selection: $model.hiringRole) {
-                                Text("Observer").tag("observer"); Text("Interviewer").tag("interviewer"); Text("Coach (I am interviewed)").tag("coach")
-                            }
-                            .help("Observer: you watch someone interview a candidate; tips show each question and what a strong answer has. Interviewer: you ask; tips give the next question and follow-ups. Coach: you are the one being interviewed; tips give a structure and an opening sentence for your answer.")
-                        }
-                        Picker("Tip model", selection: $model.tipModel) {
-                            Text("Default (\(prettyModel(AppConfig.load(from: AppPaths.config).models.tip)))").tag("")
-                            ForEach(model.tipModelChoices, id: \.self) { id in Text(prettyModel(id) + "  " + id).tag(id) }
-                        }
-                        .help("For this call only. Settings > AI sets the default.")
-                        Picker("Microphone", selection: $model.micDevice) {
-                            Text("System default" + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
-                            Text("Mac built-in microphone").tag("builtin")
-                            ForEach(model.micInputs.filter { !$0.builtin }, id: \.uid) { d in
-                                Text(d.name).tag("uid:" + d.uid)
-                            }
-                            if model.micDevice.hasPrefix("uid:") && !model.micInputs.contains(where: { "uid:" + $0.uid == model.micDevice }) {
-                                Text("Not connected: " + String(model.micDevice.dropFirst(4))).tag(model.micDevice)
-                            }
-                        }
-                        .help("Your voice. System default follows macOS (AirPods, a headset or the Mac). Can be changed during the call in the tips window.")
-                        Picker("Start recording", selection: $model.standby) {
-                            Text("When the other side speaks").tag(true)
-                            Text("Right away").tag(false)
-                        }
-                        .help("When the other side speaks: the window opens now and waits; recording starts when the other side speaks for a few seconds, or when you press the green Start.")
-                        Toggle("Don't save new voices (webinar, strangers)", isOn: $model.publicCall)
-                            .help("Speakers can still be named during the call, but no voice prints are saved. On other calls your team's voices are remembered for every project and the client's for this project only.")
-                    }
-                }
+                .padding(.horizontal, 28).padding(.vertical, 18)
             }
-            .formStyle(.grouped)
-            Divider()
-            // UI review 26.10: the main action never scrolls out of sight.
-            HStack {
-                Text(model.note).font(.caption).foregroundStyle(.orange).lineLimit(2)
-                Spacer()
-                Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
-                Button("Start") { onStart() }.keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
+            VStack(spacing: 8) {
+                if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.orange).lineLimit(2) }
+                LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") { onStart() }
+                    .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
+                Button("Cancel", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .keyboardShortcut(.cancelAction)
             }
-            .padding(.horizontal, 20).padding(.vertical, 12)
+            .padding(.top, 10).padding(.bottom, 16)
         }
-        .frame(width: 540, height: 720)
+        .frame(width: 580, height: 800)
+        .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false }
         .onAppear { model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in if !PrepRunner.shared.useAPI { PrepRunner.shared.refreshAuth() } }
+    }
+
+    /// The project, the call's title and its time: what the call is.
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button { search = ""; picking = true } label: {
+                HStack(spacing: 12) {
+                    IconTile(symbol: model.workspace != nil ? "square.stack.3d.up" : "folder", size: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.project?.name ?? model.workspace?.name ?? "Choose a project")
+                            .font(.headline).foregroundStyle(model.target.isEmpty ? .secondary : .primary)
+                        Text(model.workspace != nil ? "Workspace: a general call about several projects"
+                             : (model.project.map { $0.workspace.isEmpty ? "Project" : "Project in " + $0.workspace } ?? "Recordings and notes go to its folder"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down").foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $picking, arrowEdge: .bottom) { projectPicker }
+            Divider()
+            TextField("", text: $model.title, prompt: Text("Title, e.g. Weekly sync"))
+                .textFieldStyle(.plain).font(.title3)
+                .onChange(of: model.title) { model.scanPrep(); copied = false }
+            HStack(spacing: 8) {
+                Image(systemName: "calendar").foregroundStyle(.secondary)
+                DatePicker("", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute])
+                    .labelsHidden().fixedSize()
+                    .onChange(of: model.callDate) { copied = false }
+                Spacer()
+            }
+            .help("When the call is: goes into the preparation and the Notion page title.")
+            if let r = model.root {
+                Text(model.details).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                    .help(r + "\n" + model.details)
+            }
+        }
+        .ltCard(padding: 16)
+    }
+
+    /// Folders added for this call, as removable chips, and the Add folder button.
+    private var folderChips: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Button { model.addFolders() } label: { Label("Add folder", systemImage: "folder.badge.plus") }
+                .controlSize(.small).disabled(model.target.isEmpty)
+            if !model.folders.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(model.folders, id: \.self) { f in
+                            HStack(spacing: 4) {
+                                Image(systemName: "folder").font(.caption)
+                                Text((f as NSString).lastPathComponent).font(.caption).lineLimit(1)
+                                Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(.caption2) }
+                                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                            .help(f)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var projectPicker: some View {
+        let q = search.lowercased()
+        let ws = model.registry.workspaces.filter { q.isEmpty || $0.name.lowercased().contains(q) }
+        let ps = model.registry.projects.filter { $0.status != "archived" && (q.isEmpty || $0.name.lowercased().contains(q)) }
+        return VStack(alignment: .leading, spacing: 6) {
+            TextField("", text: $search, prompt: Text("Find a project")).textFieldStyle(.roundedBorder)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    if !ps.isEmpty { Text("Projects").font(.caption).foregroundStyle(.secondary).padding(.top, 4) }
+                    ForEach(ps, id: \.slug) { p in pickRow("folder", p.name, p.workspace, "project:" + p.slug) }
+                    if !ws.isEmpty { Text("Workspaces").font(.caption).foregroundStyle(.secondary).padding(.top, 6) }
+                    ForEach(ws, id: \.name) { w in pickRow("square.stack.3d.up", w.name, "general calls", "workspace:" + w.name) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(12)
+        .frame(width: 340, height: 360)
+    }
+
+    private func pickRow(_ symbol: String, _ name: String, _ sub: String, _ tag: String) -> some View {
+        Button { model.target = tag; picking = false } label: {
+            HStack(spacing: 10) {
+                IconTile(symbol: symbol, size: 26)
+                Text(name)
+                if !sub.isEmpty { Text(sub).font(.caption).foregroundStyle(.secondary) }
+                Spacer()
+                if model.target == tag { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
+            }
+            .padding(.horizontal, 6).padding(.vertical, 4)
+            .contentShape(Rectangle())
+            .background(RoundedRectangle(cornerRadius: 6).fill(model.target == tag ? Color.accentColor.opacity(0.15) : .clear))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func pill<C: View>(_ symbol: String, @ViewBuilder _ content: () -> C) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol).foregroundStyle(.secondary)
+            content()
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: LT.radius).fill(LT.cardFill))
     }
 
     /// One line: found, being written, for another call, or none.
@@ -737,9 +881,9 @@ struct StartCallView: View {
                     model.note = runner.start(r) ?? ""
                 }
                 .disabled(model.target.isEmpty || PrepRunner.claudePath == nil || (!runner.useAPI && runner.loggedIn == false))
-                .help("Claude Code builds the preparation here from local files: the documents named in Call context, the project folder, the local Notion mirror and earlier calls. No Notion, Jira or web. A few minutes; you can close this window.")
+                .help("Claude Code builds the preparation here from local files: the documents named in Call context, the project folder, the local Notion mirror, earlier calls and public web links you put in Call context. A few minutes; you can close this window.")
                 Menu("More") {
-                    Button(copied ? "Copied" : "Copy request for Cowork (with Notion and Jira)") {
+                    Button(copied ? "Copied" : "Copy request for Cowork") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(model.prepPhrase, forType: .string)
                         copied = true

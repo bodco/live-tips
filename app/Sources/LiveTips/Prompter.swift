@@ -14,6 +14,7 @@ struct PrompterArgs {
     var control = ""
     var title = "Live Tips (app)"
     var demo = false
+    var demoPresentation = false
 }
 
 /// Reads only the lines appended to a file since the previous call.
@@ -202,6 +203,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pageReady = true
         web.evaluateJavaScript("window.enableGlass && window.enableGlass()", completionHandler: nil)
+        if args.demoPresentation {   // the demo of the presentation mode: type Presentation opens the slide cards
+            web.evaluateJavaScript("(function(){var s=document.getElementById('s_type'); if(s){s.value='presentation'; s.dispatchEvent(new Event('change'));}})()", completionHandler: nil)
+        }
         let queued = pending
         pending.removeAll()
         for js in queued { web.evaluateJavaScript(js, completionHandler: nil) }

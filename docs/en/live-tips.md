@@ -1044,7 +1044,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Download:**
-[LiveTips-0.5.4-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.4/LiveTips-0.5.4-beta.dmg)
+[LiveTips-0.5.5-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.5/LiveTips-0.5.5-beta.dmg)
 
 What it does:
 
@@ -1275,3 +1275,50 @@ address", `references/sweep.md`, `references/presentation.md`).
    the app was restarted during it, and then writes the Notion page as usual.
 33. **Two people, one initial.** When two participants share a short form ("Anna K."), both keep their
    full names; voices are merged into a short name only when exactly one full name leads to it.
+34. **Projects without Notion.** Settings > Projects works with plain folders: <work folder>/<Workspace>/<Project>.
+   "Scan work folder" adds the project folders of your workspaces (a folder with a Notion mirror is a
+   workspace by itself; other folders that look like workspaces are listed with Add or Ignore). "Add"
+   takes any project or workspace folder, also outside the work folder. A Control Tower config and a
+   Notion mirror are optional extras: people, Notion pages, the current state.
+35. **Welcome tour.** A new install opens a short onboarding: permissions (microphone, system audio),
+   the work folder and its workspaces, your name on calls, the Claude key, the local install and Notion
+   (optional). The menu has "Welcome tour" to run it again.
+36. **Notion page.** The meeting page title starts with the meeting's name ("Weekly sync: export
+   plan"); the title and the summary are written in the call's language.
+37. **Links in Call context.** "Prepare now" also reads public web pages you list under "Де дивитись":
+   a client's site, a Google Doc or Sheet shared with anyone (read through its text export), a public
+   Notion page (often only partly, Notion renders with scripts). Pages behind a sign-in are skipped and
+   named in the brief's sources.
+38. **Demo window.** Hold Option while opening the menu: "Demo Live Tips" and "Demo Live Tips:
+   presentation" show every element of the window with sample data, for checking the window without a call.
+39. **Recording consent.** Settings > General > Recording consent, both off by default: "Play an audio
+   consent message" speaks a short notice when recording starts (in the call's language), "Copy a consent message
+   for the meeting chat" puts it on the clipboard with a reminder to paste it into the call chat. Both texts are
+   editable (English and Ukrainian). Recording without consent may be illegal where you or the others are.
+40. **Notion page date.** The date in the meeting page title is the "Date and time" set in Start call,
+   not the moment the recording started.
+41. **The skill shows the call picture.** The live-tips skill (v49) writes the same call picture as the app:
+   a status line with the topic, whose topic it is and "Your turn", and speech points struck through once said.
+   Red only when you are addressed, the same answer at most once in 10 minutes, tips in the call's language.
+42. **Notion without Control Tower.** Settings > General > Notion (and the welcome tour) walk through it:
+   create an internal integration at notion.so/profile/integrations, paste its secret, share a page with it
+   (••• > Connections), then pick where meeting pages go. "Use" on a database adds the missing Date, Summary
+   and Project properties; "Create Meetings here" on a page creates the database. Any database works: the
+   title, date and summary properties are found by type, missing ones are skipped. A project with a Control
+   Tower config keeps writing to its own Meetings database.
+43. **Active projects.** A tick next to each project (in the welcome tour and in Settings > Projects): only
+   active projects are offered in Start call. ⋯ next to a workspace removes it from Live Tips; nothing on
+   disk changes.
+44. **What the last call cost.** The menu shows "Last call: $0.26 (tips $0.21, Notion notes $0.05) · 5 tips".
+   The Notion write-up counts toward the monthly limit too. The tip rating (a developer check, about $0.10
+   a call) is off for new installs.
+45. **Permissions.** The welcome tour reads the System Audio Recording permission from macOS: a button
+   while it is missing, a tick once it is granted; the button asks right away instead of on the first call.
+46. **One look.** Start call, Settings (now with a sidebar), Setup and the tips window share the welcome
+   tour's design: an icon and a title on top, soft rounded cards, one big blue button for the main action.
+   Setup has one "Install all" button that installs every missing part in order.
+47. **Start call.** The window before a call: the project (a list with search, active projects only), the
+   title and the time in one card, Who and Language as two small controls (their names on hover), "What
+   matters on this call", Preparation, More options, one big Start call button. "Add folder" adds one or
+   more folders for this call (also outside the project); Prepare now looks through them, and the text
+   names only single documents or links.

@@ -50,15 +50,26 @@ public struct AppConfig: Codable, Equatable {
     public var stealthDefault = true
     public var showInDock = true
     public var notionWriteSummary = false
+    /// 2026-10-26: where meeting pages go when the project has no Control Tower config (a data source id
+    /// chosen or created in Settings or the welcome tour) and its name for the UI.
+    public var notionMeetingsDB = ""
+    public var notionMeetingsName = ""
     /// Speaker identification on the other side's audio (local voice prints, as in the skill).
     public var speakersEnabled = true
     /// M2: a second request when Claude is slow to start answering (the first good answer wins).
     public var hedgeEnabled = true
     /// After each call: the blind judge rates the tips in the background (Sonnet, at most 25 tips, about $0.10).
-    public var judgeAfterCall = true
+    public var judgeAfterCall = false     // 2026-10-26: off for new installs (a developer check, about $0.10 a call)
     /// 2026-10-23: tips for a question to anyone on the call (not only to you) when the brief or the
     /// project state holds an answer you could give or add.
     public var answerAny = true
+    /// 2026-10-26 (owner): consent when a recording starts, both off by default. Say: macOS speaks the
+    /// message through the speakers so the others hear it via the microphone. Chat: the message is copied
+    /// for the meeting chat (paste it with Command-V).
+    public var consentSay = false
+    public var consentChat = false
+    public var consentTextEN = "Hi all, a note-taking assistant on my computer transcribes this call for my notes. Tell me if you would rather I turn it off."
+    public var consentTextUK = "Привіт усім, помічник на моєму комп'ютері транскрибує цей дзвінок для моїх нотаток. Скажіть, якщо краще його вимкнути."
     /// The work folder connected to Cowork: project folders and the Notion mirror (_notion/) live here.
     public var workRoot = ""
     /// Advanced override; empty = <workRoot>/Tools/LiveTips (or Application Support without a work folder).
@@ -79,10 +90,16 @@ public struct AppConfig: Codable, Equatable {
         stealthDefault = (try? c.decode(Bool.self, forKey: .stealthDefault)) ?? d.stealthDefault
         showInDock = (try? c.decode(Bool.self, forKey: .showInDock)) ?? d.showInDock
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
+        notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB
+        notionMeetingsName = (try? c.decode(String.self, forKey: .notionMeetingsName)) ?? d.notionMeetingsName
         speakersEnabled = (try? c.decode(Bool.self, forKey: .speakersEnabled)) ?? d.speakersEnabled
         hedgeEnabled = (try? c.decode(Bool.self, forKey: .hedgeEnabled)) ?? d.hedgeEnabled
         judgeAfterCall = (try? c.decode(Bool.self, forKey: .judgeAfterCall)) ?? d.judgeAfterCall
         answerAny = (try? c.decode(Bool.self, forKey: .answerAny)) ?? d.answerAny
+        consentSay = (try? c.decode(Bool.self, forKey: .consentSay)) ?? d.consentSay
+        consentChat = (try? c.decode(Bool.self, forKey: .consentChat)) ?? d.consentChat
+        consentTextEN = (try? c.decode(String.self, forKey: .consentTextEN)) ?? d.consentTextEN
+        consentTextUK = (try? c.decode(String.self, forKey: .consentTextUK)) ?? d.consentTextUK
         workRoot = (try? c.decode(String.self, forKey: .workRoot)) ?? d.workRoot
         appRoot = (try? c.decode(String.self, forKey: .appRoot)) ?? d.appRoot
         knownModels = (try? c.decode([String].self, forKey: .knownModels)) ?? d.knownModels

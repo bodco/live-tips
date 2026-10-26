@@ -5,26 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Live Tips</title>
 <style>
-  /* ---------- tokens: light by default, dark follows the system (or data-theme) ---------- */
+  /* ---------- tokens: light by default, dark follows the system (or data-theme) ----------
+     2026-10-26 (owner): the palette of the app's windows (welcome tour, Start call, Settings). */
   :root {
-    --bg: #f4f5f7; --panel: #ffffff; --panel2: #eef0f3; --text: #14161b; --muted: #5b6270;
-    --line: #dde1e7; --red: #d23434; --orange: #a35500; --blue: #2c6bd6; --green: #1d8656;
+    --bg: #f2f3f7; --panel: #ffffff; --panel2: #eceef3; --text: #14161b; --muted: #5b6270;
+    --line: #e2e5ec; --red: #d23434; --orange: #a35500; --blue: #2f6fe4; --green: #1d8656;
     --red-bg: #fdecec; --orange-bg: #fff3e3; --blue-bg: #eaf1fd; --green-bg: #e8f6ef;
     --crit: #c62828; --scrim: rgba(20, 22, 27, .28); --shadow: 0 12px 40px rgba(20, 22, 27, .18);
     --size: 18px;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #121418; --panel: #1b1e25; --panel2: #171a20; --text: #eef0f4; --muted: #a3aab6;
-      --line: #2a2e37; --red: #ff6b6b; --orange: #ffad4d; --blue: #6cb2ff; --green: #55cf95;
-      --red-bg: #3a1c1f; --orange-bg: #33260f; --blue-bg: #16263d; --green-bg: #143024;
+      --bg: #1f2130; --panel: #2a2c3c; --panel2: #252736; --text: #eceef5; --muted: #a2a7b8;
+      --line: #353849; --red: #ff6b6b; --orange: #ffad4d; --blue: #5b9bff; --green: #55cf95;
+      --red-bg: #3d2028; --orange-bg: #382a17; --blue-bg: #1f2d4d; --green-bg: #183329;
       --scrim: rgba(0, 0, 0, .45); --shadow: 0 12px 40px rgba(0, 0, 0, .55);
     }
   }
   :root[data-theme="dark"] {
-    --bg: #121418; --panel: #1b1e25; --panel2: #171a20; --text: #eef0f4; --muted: #a3aab6;
-    --line: #2a2e37; --red: #ff6b6b; --orange: #ffad4d; --blue: #6cb2ff; --green: #55cf95;
-    --red-bg: #3a1c1f; --orange-bg: #33260f; --blue-bg: #16263d; --green-bg: #143024;
+    --bg: #1f2130; --panel: #2a2c3c; --panel2: #252736; --text: #eceef5; --muted: #a2a7b8;
+    --line: #353849; --red: #ff6b6b; --orange: #ffad4d; --blue: #5b9bff; --green: #55cf95;
+    --red-bg: #3d2028; --orange-bg: #382a17; --blue-bg: #1f2d4d; --green-bg: #183329;
     --scrim: rgba(0, 0, 0, .45); --shadow: 0 12px 40px rgba(0, 0, 0, .55);
   }
   * { box-sizing: border-box; }
@@ -198,7 +199,7 @@
   /* ---------- tips list ---------- */
   #list { flex: 1; overflow-y: auto; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
   #empty { color: var(--muted); text-align: center; margin-top: 18px; font-size: 14px; }
-  .tip { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 10px;
+  .tip { background: var(--panel); border: 1px solid transparent; border-left: 4px solid var(--blue); border-radius: 10px;
     padding: 7px 10px 5px; flex: none; }
   .tip.red { border-left-color: var(--red); } .tip.orange { border-left-color: var(--orange); }
   .tip.info { border-left-color: var(--green); }

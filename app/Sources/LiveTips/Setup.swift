@@ -24,7 +24,7 @@ final class SetupModel: ObservableObject {
         Step(id: "tips", title: "Tips engine modules", why: "Claude API client, rules reader, and ONNX Runtime for the local AI model.", optional: false),
         Step(id: "whisper", title: "Whisper model (about 1.6 GB)", why: "The speech model itself, downloaded once from Hugging Face.", optional: false),
         Step(id: "localai", title: "Local AI model bge-m3 (about 590 MB)", why: "Finds facts and project files by meaning, for HELP NOW and the fact cards.", optional: false),
-        Step(id: "voices", title: "Speaker identification (optional)", why: "Tells the other side's voices apart (S1, S2…). Voice prints stay on this Mac.", optional: true),
+        Step(id: "voices", title: "Speaker identification", why: "Tells the voices apart and remembers who is who. Voice prints stay on this Mac.", optional: false),
     ]
     @Published var log: [String] = []
     @Published var busy = false
@@ -118,54 +118,60 @@ final class SetupModel: ObservableObject {
 struct SetupView: View {
     @ObservedObject var model: SetupModel
 
+    @State private var showLog = false
+
+    // 2026-10-26 (owner): the welcome tour's look: header, one soft card, one big button.
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Set up Live Tips").font(.title2.bold())
-            Text("Live Tips runs speech recognition and a small AI model on this Mac. This installs what is missing into the app folder; nothing needs an administrator password. Steps with a green tick are already in place.")
-                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        VStack(spacing: 14) {
+            WindowHeader(symbol: "arrow.down.circle", title: "Speech recognition and local AI",
+                         subtitle: "Live Tips runs speech recognition and a small AI model on this Mac. Install all puts every missing part in place, one after another, into the app folder; nothing needs an administrator password.")
             VStack(spacing: 0) {
                 ForEach(model.steps) { s in
                     HStack(alignment: .top, spacing: 10) {
                         icon(s.state).frame(width: 18)
                         VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text(s.title).font(.body.weight(.medium))
-                                if !s.detail.isEmpty { Text(s.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                            }
+                            Text(s.title)
                             Text(s.why).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Text(s.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     .padding(.vertical, 6)
-                    Divider()
                 }
             }
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 1) {
-                        ForEach(Array(model.log.enumerated()), id: \.offset) { i, l in
-                            Text(l).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).id(i)
-                        }
-                    }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
+            .ltCard()
+            DisclosureGroup("Details", isExpanded: $showLog) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 1) {
+                            ForEach(Array(model.log.enumerated()), id: \.offset) { i, l in
+                                Text(l).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).id(i)
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
+                    }
+                    .frame(height: 110)
+                    .background(RoundedRectangle(cornerRadius: LT.radius).fill(LT.cardFill))
+                    .onChange(of: model.log.count) { proxy.scrollTo(model.log.count - 1) }
                 }
-                .frame(height: 110)
-                .background(Color(nsColor: .textBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .onChange(of: model.log.count) { proxy.scrollTo(model.log.count - 1) }
             }
-            HStack {
-                Button("Check again") { Task { await model.checkAll() } }.disabled(model.busy)
-                Spacer()
-                if model.busy { ProgressView().controlSize(.small) }
-                Button(model.allRequiredOK ? "Install speaker identification" : "Install missing") {
-                    Task { await model.installMissing(includeOptional: model.allRequiredOK) }
+            .font(.callout).foregroundStyle(.secondary)
+            if !showLog, let last = model.log.last {
+                Text(last).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Spacer(minLength: 0)
+            VStack(spacing: 8) {
+                LTPrimaryButton(title: model.allRequiredOK ? "Everything is installed" : (model.busy ? "Installing…" : "Install all"),
+                                symbol: model.allRequiredOK ? "checkmark" : (model.busy ? nil : "arrow.down")) {
+                    Task { await model.installMissing(includeOptional: true) }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.busy || (model.allRequiredOK && model.steps.last?.state == .ok))
+                .disabled(model.busy || model.allRequiredOK)
+                Button("Check again") { Task { await model.checkAll() } }.buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .disabled(model.busy)
             }
         }
-        .padding(20)
-        .frame(width: 620)
+        .padding(.horizontal, 28).padding(.vertical, 22)
+        .frame(width: 640, height: 640)
         .task { await model.checkAll() }
     }
 

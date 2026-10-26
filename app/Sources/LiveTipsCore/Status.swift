@@ -111,17 +111,79 @@ public struct Workspace: Codable, Equatable {
 }
 
 public enum WorkspaceScanner {
-    public static func scan(workRoot: String, projects: [Project]) -> [Workspace] {
+    /// Folders in the work folder that are tools, not workspaces.
+    public static let skipNames: Set<String> = ["tools", "skills", "secrets", "scheduled", "control tower", "applications",
+                                                "archive", "archived", "downloads", "claude outputs"]
+
+    /// 2026-10-26 (owner): the work folder is the model, Notion is optional.
+    ///   <work folder>/<Workspace>/<Project>/...  (a "<Workspace> General" folder holds the workspace's own calls)
+    /// A workspace is a folder with a Notion mirror marker (_notion/workspace.md) or with project folders
+    /// inside; a project is a folder inside a workspace (not hidden, not "_...", not live/, not "* General").
+    /// Returns the workspaces and the folder projects (name and folder only; a config adds the rest).
+    public static func scanFolders(workRoot: String, extra: [String] = [], excluded: [String] = []) -> (workspaces: [String], projects: [Project]) {
+        let fm = FileManager.default
         let root = (workRoot as NSString).expandingTildeInPath
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: root) else { return [] }
-        var out: [Workspace] = []
-        for n in names.sorted() where !n.hasPrefix(".") && !n.hasPrefix("_") {
+        var wsDirs: [String] = []
+        for n in ((try? fm.contentsOfDirectory(atPath: root)) ?? []).sorted() where !n.hasPrefix(".") && !n.hasPrefix("_") {
             let dir = (root as NSString).appendingPathComponent(n)
-            guard FileManager.default.fileExists(atPath: (dir as NSString).appendingPathComponent("_notion/workspace.md")) else { continue }
-            let members = projects.filter { !$0.root.isEmpty && ($0.root + "/").hasPrefix(dir + "/") }.map { $0.slug }
-            out.append(Workspace(name: n, root: callFolder(dir), projects: members))
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: dir, isDirectory: &isDir), isDir.boolValue, !excluded.contains(dir) else { continue }
+            let marked = fm.fileExists(atPath: (dir as NSString).appendingPathComponent("_notion/workspace.md"))
+            if marked || extra.contains(dir) { wsDirs.append(dir) }
         }
-        return out
+        for e in extra where fm.fileExists(atPath: e) && !wsDirs.contains(e) { wsDirs.append(e) }
+        var projects: [Project] = []
+        for w in wsDirs {
+            for d in projectDirs(w, excluded: excluded) {
+                var p = Project(name: (d as NSString).lastPathComponent, slug: slug((d as NSString).lastPathComponent), root: d)
+                p.workspace = (w as NSString).lastPathComponent
+                projects.append(p)
+            }
+        }
+        return (wsDirs, projects)
+    }
+
+    /// Folders in the work folder that look like workspaces (project folders inside) but are not added
+    /// yet: Settings > Projects offers them with Add / Ignore, nothing is added by itself.
+    public static func candidates(workRoot: String, known: [String], excluded: [String]) -> [(dir: String, projects: Int)] {
+        let fm = FileManager.default
+        let root = (workRoot as NSString).expandingTildeInPath
+        return ((try? fm.contentsOfDirectory(atPath: root)) ?? []).sorted().compactMap { n in
+            let dir = (root as NSString).appendingPathComponent(n)
+            var isDir: ObjCBool = false
+            guard !n.hasPrefix("."), !n.hasPrefix("_"), !skipNames.contains(n.lowercased()), !known.contains(dir), !excluded.contains(dir),
+                  fm.fileExists(atPath: dir, isDirectory: &isDir), isDir.boolValue,
+                  !fm.fileExists(atPath: (dir as NSString).appendingPathComponent("_notion/workspace.md")) else { return nil }
+            let k = projectDirs(dir, excluded: excluded).count
+            return k > 0 ? (dir, k) : nil
+        }
+    }
+
+    static func projectDirs(_ ws: String, excluded: [String]) -> [String] {
+        let fm = FileManager.default
+        return ((try? fm.contentsOfDirectory(atPath: ws)) ?? []).sorted().compactMap { n in
+            let low = n.lowercased()
+            guard !n.hasPrefix("."), !n.hasPrefix("_"), low != "live", !low.hasSuffix(" general") else { return nil }
+            let d = (ws as NSString).appendingPathComponent(n)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: d, isDirectory: &isDir), isDir.boolValue, !excluded.contains(d) else { return nil }
+            return d
+        }
+    }
+
+    public static func slug(_ s: String) -> String {
+        let cleaned = s.replacingOccurrences(of: "[^\\p{L}\\p{N}\\s_-]", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces).lowercased()
+        let out = cleaned.replacingOccurrences(of: "[\\s_]+", with: "-", options: .regularExpression)
+        return out.isEmpty ? "project" : out
+    }
+
+    public static func scan(workRoot: String, projects: [Project], extra: [String] = [], excluded: [String] = []) -> [Workspace] {
+        let found = scanFolders(workRoot: workRoot, extra: extra, excluded: excluded).workspaces
+        return found.map { dir in
+            let members = projects.filter { !$0.root.isEmpty && ($0.root + "/").hasPrefix(dir + "/") }.map { $0.slug }
+            return Workspace(name: (dir as NSString).lastPathComponent, root: callFolder(dir), projects: members)
+        }
     }
 
     /// Where calls about the whole workspace live. The Cowork skill keeps them in "<Workspace> General"

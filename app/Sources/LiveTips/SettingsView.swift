@@ -120,7 +120,28 @@ final class SettingsModel: ObservableObject {
     static func scopeLabel(_ s: String) -> String {
         if s == "team" { return "Team, all projects" }
         if s.hasPrefix("project:") { return "Client of " + String(s.dropFirst(8)) }
+        if s.hasPrefix("workspace:") { return "Workspace " + String(s.dropFirst(10)) + ", all its projects" }
         return "All projects (saved before scopes)"
+    }
+
+    /// 2026-10-26 (owner): where a voice is suggested: the team (every project), one project, or a whole workspace.
+    var voiceScopes: [(tag: String, label: String)] {
+        var out: [(String, String)] = [("team", "Team, all projects")]
+        for w in registry.workspaces { out.append(("workspace:" + w.name, "Workspace " + w.name + ", all its projects")) }
+        for w in registry.workspaces { out.append(("project:" + w.name.lowercased(), "Calls of workspace " + w.name + " only")) }
+        for p in registry.projects where p.status != "archived" { out.append(("project:" + p.slug, "Project " + p.name)) }
+        return out
+    }
+
+    func setVoiceScope(_ name: String, _ scope: String) {
+        guard !CallEngine.shared.isRunning, let d = try? Data(contentsOf: URL(fileURLWithPath: voicesPath)),
+              var o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              var people = o["people"] as? [String: Any], var p = people[name] as? [String: Any] else { return }
+        p["scope"] = scope
+        people[name] = p
+        o["people"] = people
+        if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
+        loadVoices()
     }
 
     /// The folder with the imported project configs (projects/<slug>.md) feeds the mirror's layout.
@@ -375,6 +396,7 @@ struct FolderRow: View {
 
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
+    @ObservedObject var runner = PrepRunner.shared
 
     var body: some View {
         TabView(selection: $model.tab) {
@@ -382,6 +404,7 @@ struct SettingsView: View {
             keys.tag("keys").tabItem { Label("Keys", systemImage: "key") }
             projects.tag("projects").tabItem { Label("Projects", systemImage: "folder") }
             ai.tag("ai").tabItem { Label("AI", systemImage: "cpu") }
+            HowItWorksView().tag("how").tabItem { Label("How it works", systemImage: "point.3.connected.trianglepath.dotted") }
             AboutView(model: model).tag("about").tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(minWidth: 760, minHeight: 520)
@@ -403,10 +426,41 @@ struct SettingsView: View {
 
     var ai: some View {
         Form {
+            // UI review 26.10: how "Prepare now" runs lives here, Start call keeps one button.
+            Section {
+                Picker("Run with", selection: $runner.useAPI) {
+                    Text("Claude account").tag(false); Text("API key").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .help("Claude account: Claude Code's own sign-in, uses your Claude plan. API key: the key in Keys, billed like the tips; use it when the plan's limit is reached.")
+                if !runner.useAPI {
+                    HStack(spacing: 8) {
+                        Image(systemName: runner.loggedIn == true ? "checkmark.circle.fill" : (runner.loggedIn == false ? "exclamationmark.triangle.fill" : "circle.dotted"))
+                            .foregroundStyle(runner.loggedIn == true ? Color.green : (runner.loggedIn == false ? Color.orange : Color.secondary))
+                        Text(runner.loggedIn == true ? "Claude Code signed in" + (runner.authInfo.isEmpty ? "" : " (\(runner.authInfo))")
+                             : runner.loggedIn == false ? "Claude Code is not signed in" : "Checking the Claude Code sign-in…")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if runner.loggedIn == false { Button("Log in…") { runner.openLogin() } }
+                        Button("Check") { runner.refreshAuth() }
+                    }
+                }
+                Picker("Model", selection: $runner.model) {
+                    ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
+                }
+                .help("Sonnet reads the files and pulls out the facts well and fast; Opus is a little better on a hard call but slower and uses the plan's limit several times faster.")
+            } header: { Text("Preparation (Prepare now in Start call)") } footer: {
+                Text(PrepRunner.claudePath == nil ? "Claude Code is not installed on this Mac: Start call offers the Cowork request instead."
+                     : "Claude Code builds the brief, facts and cards from local files only: the project folder, the local Notion mirror and earlier calls.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .onAppear { runner.refreshAuth() }
             Section {
                 ModelPicker(title: "Classify", selection: $model.config.models.classify, choices: model.modelChoices).help("Decides if a tip is needed. Runs often: fast and cheap. Recommended: Haiku.")
                 ModelPicker(title: "Tip", selection: $model.config.models.tip, choices: model.modelChoices).help("Writes the tip you see. Recommended: Sonnet. Opus is too slow for live tips.")
                 ModelPicker(title: "After the call", selection: $model.config.models.analysis, choices: model.modelChoices).help("Summary and analysis. Not time-critical. Recommended: Opus.")
+                Toggle("Answer questions to anyone, not only to me", isOn: $model.config.answerAny)
+                    .help("A question asked to anyone on the call gets a tip when your brief, facts or the project's Current State hold an answer you could give or add. Off: only questions to you by name.")
                 Toggle("Second request when Claude is slow", isOn: $model.config.hedgeEnabled)
                     .help("If Claude shows no answer after 2 s (classify) or 3 s (tip), or fails at once, the same request is sent again and the first good answer wins. Faster tips on busy hours; costs a little more (both requests are billed and counted in the limits).")
                 Toggle("Rate tips after each call (blind judge, about $0.10)", isOn: $model.config.judgeAfterCall)
@@ -489,7 +543,17 @@ struct SettingsView: View {
                         HStack {
                             Text(v.name)
                             Spacer()
-                            Text(SettingsModel.scopeLabel(v.scope) + " · \(v.calls) call\(v.calls == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
+                            Menu(SettingsModel.scopeLabel(v.scope)) {
+                                ForEach(model.voiceScopes, id: \.tag) { sc in
+                                    Button { model.setVoiceScope(v.name, sc.tag) } label: {
+                                        if sc.tag == v.scope { Label(sc.label, systemImage: "checkmark") } else { Text(sc.label) }
+                                    }
+                                }
+                            }
+                            .menuStyle(.borderlessButton).fixedSize().font(.caption)
+                            .disabled(CallEngine.shared.isRunning)
+                            .help("Where this voice is suggested and recognised: the team (every project), a whole workspace, or one project. Not during a call.")
+                            Text("\(v.calls) call\(v.calls == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
                             Button("Forget") { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
                                 .help("Removes this person's voice prints from the Mac. Not during a call.")
                         }
@@ -497,7 +561,7 @@ struct SettingsView: View {
                 }
                 .onAppear { model.loadVoices() }
             } header: { Text("Speakers") } footer: {
-                Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. Names are never set by themselves. Your team (the team table of a project config) is remembered for every project, a client for that project only, and nothing is saved on a call marked Public in Start call. Voice prints stay in <app folder>/voices on this Mac.")
+                Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. A voice named on a meeting series is named by itself on the next call of that series when it matches well (Clear speakers in the window forgets it). Your team (the team table of a project config) is remembered for every project, a client for that project only; the menu next to each person moves them to the team, a whole workspace or another project. Nothing is saved on a call marked Public in Start call. Voice prints stay in <app folder>/voices on this Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -678,6 +742,80 @@ struct SettingsView: View {
     }
 }
 
+/// 2026-10-26 (owner): what runs on the Mac, what goes to Claude and when, and what to expect.
+struct HowItWorksView: View {
+    var body: some View {
+        Form {
+            Section {
+                VStack(spacing: 6) {
+                    HStack(spacing: 6) {
+                        box("Your mic + call audio", "captured on the Mac", .gray)
+                        arrow
+                        box("Whisper", "speech to text on the Mac", .gray)
+                        arrow
+                        box("Transcript", "with speaker names", .gray)
+                    }
+                    Image(systemName: "arrow.down").foregroundStyle(.secondary)
+                    HStack(alignment: .top, spacing: 10) {
+                        box("On the Mac, 1-2 s", "keyword rules, prepared facts and cards; Local AI matches them by meaning", .green)
+                        box("Claude, about 5 s", "classifies new lines, writes tips, answers asks and HELP NOW, searches the project folder", .blue)
+                    }
+                    Image(systemName: "arrow.down").foregroundStyle(.secondary)
+                    box("Tips window", "facts, tips, answers, transcript; nothing is sent to anyone", .orange)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+            } header: { Text("The flow") }
+
+            Section {
+                row("waveform", "Recording", "Your microphone and the call's system audio. Audio never leaves the Mac; the text transcript is written to the project's live folder.")
+                row("text.bubble", "Transcription", "Whisper (large-v3-turbo) runs on the Mac in the languages chosen in Start call. Ukrainian only is the default; add English when the call mixes languages.")
+                row("person.2.wave.2", "Speakers", "A small voice model on the Mac tells voices apart. You name a voice once in the window; the name is remembered for the next calls of the same meeting series (project + title) and filled in by itself when the voice matches well. \"Clear speakers\" in the window forgets them.")
+                row("cpu", "Local AI (optional)", "bge-m3, an embedding model on the Mac, not a chat model. It finds prepared facts and cards by meaning, builds the search index of each project folder (updated after files change, paused during calls) and helps HELP NOW. It never writes tips by itself.")
+            } header: { Text("On your Mac") }
+
+            Section {
+                row("doc.text.magnifyingglass", "What Claude gets", "Only for projects with Claude tips on: the Cowork preparation (brief, facts, cards, outline), the call context you typed, the project's Current State from the Notion mirror, passages from the project folder found for that context, a digest of recent calls, and the last minutes of the transcript with speaker names. This context is cached for an hour, so each tip costs little.")
+                row("bolt", "When Claude is called", "A direct question or request to you, a date, an owner or a number goes straight to a tip; other new lines are checked by a fast model (Haiku) and turned into a tip only when they need one. Your asks in the window, HELP NOW and the folder search always go to Claude.")
+                row("list.bullet.rectangle", "Call picture", "Every ~10 s a fast model (Haiku) updates the picture of the call: the topic and whose it is, open questions and requests to you, what you took on, decisions, and which speech points you said. The window shows it as the status line, the On me panel and the speech card; an open question to you that no tip covered gets one red tip.")
+                row("folder", "Folder search", "The folder button: Claude turns your question into a few searches, reads the best passages from the project's files (by meaning with Local AI on, by words otherwise) and answers with the file names, in 10-30 s.")
+                row("checkmark.seal", "After the call", "A wrap-up goes to the meeting's page in Notion (when the Notion token is set) and a quality check of the tips runs in the background.")
+                row("dollarsign.circle", "Limits", "The call and monthly budgets in Settings > AI stop Claude when reached; the Mac part keeps working.")
+            } header: { Text("Claude (cloud)") }
+
+            Section {
+                row("checkmark.circle", "Count on", "Instant prepared facts; a tip within seconds after a direct question; answers to what you type; the transcript and speaker names saved in the project folder; nothing sent to the client or posted anywhere by itself.")
+                row("exclamationmark.triangle", "Do not count on", "Names, numbers and terms heard right every time (check them); similar voices always told apart; short replies tagged; Claude seeing your screen, chats or files outside the project folder; information newer than the last Notion mirror or index update; numbers Claude was not given. A project with Claude off gets only the Mac part.")
+            } header: { Text("What to expect") }
+        }
+        .formStyle(.grouped)
+    }
+
+    var arrow: some View { Image(systemName: "arrow.right").foregroundStyle(.secondary) }
+
+    func box(_ title: String, _ sub: String, _ color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(title).font(.callout).bold()
+            Text(sub).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(color.opacity(0.4)))
+    }
+
+    func row(_ icon: String, _ title: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon).frame(width: 20).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).bold()
+                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
 struct AboutView: View {
     @ObservedObject var model: SettingsModel
 
@@ -734,7 +872,7 @@ final class SettingsWindow {
     static let model = SettingsModel()
 
     static func title(for tab: String) -> String {
-        ["general": "General", "keys": "Keys", "projects": "Projects", "ai": "AI", "about": "About Live Tips"][tab] ?? "Settings"
+        ["general": "General", "keys": "Keys", "projects": "Projects", "ai": "AI", "how": "How Live Tips works", "about": "About Live Tips"][tab] ?? "Settings"
     }
 
     static func show(tab: String = "general") {

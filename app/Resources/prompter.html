@@ -34,7 +34,8 @@
   button, select, input { font-family: inherit; color: inherit; }
   /* see-through window: a halo keeps every letter readable over whatever is behind */
   body.halo { --halo-c: var(--halo, var(--bg)); text-shadow: 0 0 1px var(--halo-c), 0 0 2px var(--halo-c), 0 0 4px var(--halo-c), 0 0 8px var(--halo-c); }
-  body.halo .tip, body.halo #alert, body.halo #agenda { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  /* glass-2026-10-23: no blur behind cards (it hid what is behind the window); the top bar stays solid */
+  body.halo #bar { background: var(--bar-bg, var(--bg)); }
 
   /* ---------- top bar: state + mute + menu ---------- */
   #bar { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; font-size: 13px; flex: none;
@@ -81,7 +82,7 @@
   #spkpop .ph b { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #spkpop .ph small { flex: none; }
   #spkpop .ph small { color: var(--muted); font-weight: 400; }
-  #spkpop h6 { margin: 8px 0 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+  #spkpop h6 { margin: 8px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
   #spkpop .none { color: var(--muted); font-style: italic; }
 
   /* shared: name buttons and the name input row (speaker card and popover) */
@@ -213,7 +214,7 @@
   .meta { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 7px; align-items: center; }
   .meta .note { font-style: italic; }
   .lag { font-variant-numeric: tabular-nums; } .lag.slow { color: var(--orange); font-weight: 600; }
-  .latetag { font-size: 10px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--orange); color: var(--orange); font-weight: 600; }
+  .latetag { font-size: 11px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--orange); color: var(--orange); font-weight: 600; }
   .fb { display: flex; gap: 2px; flex: none; }
   .fb button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid transparent; background: transparent;
     color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 13px; }
@@ -250,7 +251,9 @@
   .why .sent { color: var(--green); }
 
   /* ---------- bottom: quick asks, one field, the two big call buttons ---------- */
-  #chips { display: flex; gap: 5px; padding: 0 8px 6px; flex: none; overflow-x: auto; scrollbar-width: none; }
+  #chips { display: none; gap: 5px; padding: 0 8px 6px; flex: none; overflow-x: auto; scrollbar-width: none; }
+  /* UI review 26.10: quick asks show while the ask field is in use, the stream keeps the height */
+  body:has(#q:focus) #chips, #chips:hover, #chips:focus-within { display: flex; }
   #chips::-webkit-scrollbar { display: none; }
   #chips button { white-space: nowrap; border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
     font-size: 12px; padding: 4px 10px; cursor: pointer; }
@@ -345,6 +348,61 @@
   /* ---------- presentation split view: slide cards (left) + the usual tips stream (right) ---------- */
   #main { display: flex; flex-direction: column; position: relative; flex: 1 1 0; min-width: 0; height: 100%; overflow: hidden; }
   #deckpane { display: none; }
+  /* ---------- call picture (2026-10-26): status line, "On me" panel, speech points said ---------- */
+  #sitline { display: none; padding: 3px 12px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; border-bottom: 1px solid var(--line); }
+  #sitline.show { display: block; }
+  #sitline .mine { color: var(--blue); font-weight: 600; }
+  #sitline .turn { color: var(--red); font-weight: 700; }
+  #onme { display: none; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 6px 10px; font-size: 12.5px; }
+  #onme.has { display: block; }
+  #onme .head { cursor: pointer; font-weight: 600; display: flex; gap: 6px; align-items: center; -webkit-user-select: none; user-select: none; }
+  #onme .head .n { color: var(--muted); font-weight: 400; }
+  #onme ul { margin: 6px 0 0; padding: 0 0 0 2px; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  #onme.collapsed ul { display: none; }
+  #onme li .who { color: var(--muted); font-size: 12px; }
+  #onme li.ask { color: var(--red); }
+  #onme li.new { animation: onmeflash 1.6s ease-out; }
+  @keyframes onmeflash { from { background: var(--blue-bg); } to { background: transparent; } }
+  .tip.speech .items li.said { color: var(--muted); text-decoration: line-through; }
+  .tip.speech.turn { border-color: var(--red); box-shadow: 0 0 0 2px var(--red-bg); }
+  /* ---------- transcript split view (2026-10-26): the live transcript next to the tips ---------- */
+  #trpane { display: none; }
+  body.trsplit { flex-direction: row; }
+  body.trsplit #deckpane { display: none; }
+  body.trsplit #trpane { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; height: 100%;
+    border-right: 1px solid var(--line); background: var(--bg); }
+  body.trsplit #trbtn { background: var(--blue-bg); border-color: var(--blue); }
+  #tr-top { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 10px 6px 12px;
+    border-bottom: 1px solid var(--line); -webkit-user-select: none; user-select: none; }
+  #tr-top .grow { flex: 1 1 0; }
+  #tr-n { color: var(--muted); font-size: 12px; }
+  #tr-list { flex: 1 1 0; overflow-y: auto; padding: 6px 12px 12px; font-size: 13px; line-height: 1.45; }
+  .trl { padding: 2px 0; }
+  .trl .tt { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 6px; }
+  .trl .who { font-weight: 600; margin-right: 5px; }
+  .trl.me .who { color: var(--blue); }
+  .trl .who.un { color: var(--muted); }
+  .trl.mark { color: var(--muted); font-style: italic; text-align: center; font-size: 12px; padding: 6px 0; }
+  .tr-empty { color: var(--muted); padding: 12px 0; }
+  body.trsplit #trpane { position: relative; }
+  .trl button.who { border: 0; background: transparent; padding: 0 2px; font: inherit; font-weight: 600; color: inherit;
+    cursor: pointer; border-radius: 4px; }
+  .trl button.who:hover { background: var(--blue-bg); }
+  .trl button.who.un { color: var(--muted); }
+  #trmenu { display: none; position: absolute; z-index: 30; left: 12px; right: 12px; max-width: 360px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 8px 10px; font-size: 12px; }
+  #trmenu.show { display: block; }
+  #trmenu h6 { margin: 6px 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  #trmenu .names { display: flex; flex-wrap: wrap; gap: 4px; }
+  #trmenu .nb { border: 1px solid var(--line); background: var(--panel2); border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 12px; }
+  #trmenu .nb:hover { border-color: var(--blue); }
+  #trmenu .nrow { display: flex; gap: 4px; margin-top: 4px; }
+  #trmenu input { flex: 1 1 0; min-width: 0; font-size: 12px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
+  #trmenu .q { color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #findbtn { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 4px; display: inline-flex; align-items: center; }
+  #findbtn:hover { color: var(--blue); }
+  #findbtn svg { width: 17px; height: 17px; }
   body.split { flex-direction: row; }
   body.split #deckpane { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; height: 100%; position: relative;
     border-right: 1px solid var(--line); }
@@ -443,6 +501,15 @@
   <div id="dk-cards"></div>
   <div id="dk-wrap"></div>
 </div>
+<div id="trpane" aria-label="Transcript">
+  <div id="tr-top">
+    <b data-i18n="tr_title">Transcript</b><span id="tr-n"></span><span class="grow"></span>
+    <button id="tr-clear" class="dk-b" type="button" data-i18n="spk_clear" data-i18n-title="spk_clear_tt">Clear speakers</button>
+    <button id="tr-follow" class="dk-b" type="button" aria-pressed="true" data-i18n="tr_follow" data-i18n-title="tr_follow_tt">Follow</button>
+  </div>
+  <div id="tr-list"></div>
+  <div id="trmenu" role="dialog"></div>
+</div>
 <div id="main">
 <header id="bar">
   <span id="dot" data-i18n-title="dot_wait" title="Waiting for the recording..."></span>
@@ -452,8 +519,10 @@
   <span id="pausedpill" role="button" tabindex="0" data-i18n="paused_pill" data-i18n-title="paused_pill_tt">Tips paused</span>
   <span id="meter" data-i18n-title="meter_tt"></span>
   <button id="pause" class="ib" type="button" aria-pressed="false"></button>
-  <button id="pause" class="ib" type="button" aria-pressed="false"></button>
   <button id="mute" class="ib" data-i18n-title="mute_tt">🎙</button>
+  <button id="trbtn" class="ib" type="button" aria-pressed="false" data-i18n-title="tr_btn_tt" data-i18n-aria="tr_btn_tt" title="Transcript">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>
+  </button>
   <button id="gear" class="ib" data-i18n-title="gear_tt" data-i18n-aria="menu_aria">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
@@ -464,6 +533,7 @@
   <div id="spkpop" role="dialog" data-i18n-aria="spkpop_aria"></div>
 </div>
 
+<div id="sitline" aria-live="polite"></div>
 <div id="alert" role="status" aria-live="polite"></div>
 
 <div id="dock">
@@ -477,6 +547,7 @@
     <div id="aggist"></div>
     <ul id="aglist"></ul>
   </div>
+  <div id="onme" class="collapsed"><div class="head"></div><ul></ul></div>
   <div id="nowbox"></div>
   <div id="pinbox"></div>
 </div>
@@ -496,6 +567,9 @@
   <label class="field">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
     <input id="q" data-i18n-ph="q_ph" data-i18n-title="q_tt">
+    <button id="findbtn" type="button" data-i18n-title="find_tt" data-i18n-aria="find_tt" title="Search the project folder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v3"/><path d="M3 7v10a2 2 0 0 0 2 2h6"/><circle cx="17" cy="16" r="3"/><path d="M21.5 20.5l-2.3-2.3"/></svg>
+    </button>
     <button id="send" type="submit" data-i18n-title="send_tt" data-i18n-aria="send_tt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
@@ -742,7 +816,7 @@
       // cards
       you: 'You',
       ask_sent_note: 'sent, the answer will appear here',
-      ask_find_note: 'searching the project sources',
+      ask_find_note: 'Claude is searching the project folder, 10-30 s',
       n_points: '{n} points',
       pin_card_tt: 'Pin this card to the top',
       yes_tt: 'Useful, I used it',
@@ -814,6 +888,26 @@
       ask_in_tt: 'Type the name of this speaker and press Enter. A name already used in this call merges the two. Esc clears.',
       ask_ok: 'OK',
       ask_ok_tt: 'Save this name for all lines of {a}',
+      tr_btn_tt: 'Transcript',
+      sit_mine: 'yours', sit_not: 'not yours', sit_turn: '🔴 Your turn: the speech is open', sit_listen: '👂',
+      onme: 'On me', onme_tt: 'What you were asked or took on during this call (open questions first). Click to fold',
+      tr_who_tt: 'Wrong speaker? Click to give this line to someone else or rename the speaker',
+      tr_move: 'This line is',
+      tr_other_ph: 'Someone else: type a name, Enter',
+      tr_rename: 'Rename {a} in every line',
+      tr_rename_ph: 'New name, Enter',
+      tr_title: 'Transcript',
+      tr_n: '{n} lines',
+      tr_follow: 'Follow',
+      tr_follow_tt: 'Keep the newest line in view. Scroll up to read back; Follow brings you to the end again',
+      tr_empty: 'The transcript appears here as people speak.',
+      spk_clear: 'Clear speakers',
+      spk_clear_tt: 'Remove every speaker name of this call and forget the names remembered for this meeting series. The voices are asked again',
+      spk_clear_confirm: 'Click again to clear',
+      spk_cleared: 'Speaker names cleared for this meeting',
+      spk_auto: '✓ {a}: known voice of this meeting series',
+      find_tt: 'Search the project folder: Claude looks through the project files (notes, transcripts, specs, exports) and answers in 10-30 s',
+      find_ph: 'Type what to look for, then click the folder',
       pop_line: 'line at {t}',
       pop_close: 'Close (Esc)',
       pop_rename: 'Rename this speaker',
@@ -847,7 +941,7 @@
         '</dl><h5>Bottom</h5><dl>' +
         '<dt>HELP (red button, ⌃⌥H)</dt><dd>Stuck right now: the best facts for what is being said appear at once, then Claude\'s answer.</dd>' +
         '<dt>⏸ / ▶ (top bar, ⌃⌥P)</dt><dd>Pause tips: Claude keeps recording and listening but shows nothing new (the top bar says "Tips paused"). HELP NOW and your typed questions still work. ▶ resumes; held items then appear.</dd>' +
-        '<dt>Field</dt><dd>Type a word (logs, pricing, a person, a ticket key): matching facts show at once, no AI. Enter sends the text to Claude. Start with "find:" to make Claude search the sources.</dd>' +
+        '<dt>Field</dt><dd>Type a word (logs, pricing, a person, a ticket key): matching facts show at once, no AI. Enter sends the text to Claude. The folder button (or "find:" at the start) makes Claude search the project folder first.</dd>' +
         '<dt>Suggest reply</dt><dd>A ready answer or comment on the current topic.</dd>' +
         '<dt>What to ask now</dt><dd>1-2 questions for the open points.</dd>' +
         '<dt>Catch me up</dt><dd>The last ~5 minutes in 3-5 lines.</dd>' +
@@ -1027,7 +1121,7 @@
       set_recv: '{k} = {v}: отримано, чекаю, поки Claude застосує...',
       you: 'Ти',
       ask_sent_note: 'надіслано, відповідь з\'явиться тут',
-      ask_find_note: 'шукаю в джерелах проєкту',
+      ask_find_note: 'Claude шукає в папці проєкту, 10-30 с',
       n_points: 'пунктів: {n}',
       pin_card_tt: 'Закріпити картку вгорі',
       yes_tt: 'Корисно, я цим скористався',
@@ -1097,6 +1191,26 @@
       ask_in_tt: 'Введи ім\'я цього співрозмовника і натисни Enter. Ім\'я, яке вже є в цьому дзвінку, об\'єднає їх. Esc очищає.',
       ask_ok: 'OK',
       ask_ok_tt: 'Зберегти це ім\'я для всіх реплік: {a}',
+      tr_btn_tt: 'Транскрипт',
+      sit_mine: 'твоє', sit_not: 'не твоє', sit_turn: '🔴 Твоя черга: спіч відкрито', sit_listen: '👂',
+      onme: 'На мені', onme_tt: 'Що тобі доручили або про що спитали на цьому дзвінку (відкриті питання першими). Клік згортає',
+      tr_who_tt: 'Не той спікер? Клікни, щоб віддати репліку іншому або перейменувати спікера',
+      tr_move: 'Цю репліку сказав',
+      tr_other_ph: 'Хтось інший: введи імʼя, Enter',
+      tr_rename: 'Перейменувати {a} в усіх репліках',
+      tr_rename_ph: 'Нове імʼя, Enter',
+      tr_title: 'Транскрипт',
+      tr_n: '{n} реплік',
+      tr_follow: 'Стежити',
+      tr_follow_tt: 'Тримати останню репліку на екрані. Прокрути вгору, щоб перечитати; «Стежити» поверне в кінець',
+      tr_empty: 'Транскрипт з\'явиться тут, щойно хтось заговорить.',
+      spk_clear: 'Очистити спікерів',
+      spk_clear_tt: 'Прибрати всі імена спікерів цього дзвінка і забути імена, запамʼятані для цієї серії мітингів. Голоси буде спитано знову',
+      spk_clear_confirm: 'Ще раз, щоб очистити',
+      spk_cleared: 'Імена спікерів для цього мітингу очищено',
+      spk_auto: '✓ {a}: знайомий голос цієї серії мітингів',
+      find_tt: 'Пошук у папці проєкту: Claude перегляне файли проєкту (нотатки, транскрипти, специфікації, експорти) і відповість за 10-30 с',
+      find_ph: 'Введи, що шукати, і натисни на папку',
       pop_line: 'репліка о {t}',
       pop_close: 'Закрити (Esc)',
       pop_rename: 'Перейменувати',
@@ -1130,7 +1244,7 @@
         '</dl><h5>Унизу</h5><dl>' +
         '<dt>ДОПОМОЖИ (червона кнопка, ⌃⌥H)</dt><dd>Застряг просто зараз: одразу з\'являються найкращі факти до того, що говорять, а потім відповідь Claude.</dd>' +
         '<dt>⏸ / ▶ (верхня смуга, ⌃⌥P)</dt><dd>Пауза підказок: Claude і далі записує та слухає, але нічого нового не показує (угорі напис «На паузі»). ДОПОМОЖИ і твої питання працюють. ▶ відновлює, і тоді з\'являється все, що чекало.</dd>' +
-        '<dt>Поле</dt><dd>Введи слово (логи, ціни, людина, номер задачі): схожі факти видно одразу, без ШІ. Enter надсилає текст Claude. Почни з "find:", щоб Claude пошукав у джерелах.</dd>' +
+        '<dt>Поле</dt><dd>Введи слово (логи, ціни, людина, номер задачі): схожі факти видно одразу, без ШІ. Enter надсилає текст Claude. Кнопка з папкою (або "find:" на початку) змушує Claude спершу пошукати в папці проєкту.</dd>' +
         '<dt>Що відповісти</dt><dd>Готова відповідь або коментар до поточної теми.</dd>' +
         '<dt>Що спитати</dt><dd>1-2 питання щодо відкритих моментів.</dd>' +
         '<dt>Що я пропустив</dt><dd>Останні ~5 хвилин у 3-5 рядках.</dd>' +
@@ -1227,11 +1341,14 @@
     var cs = getComputedStyle(root);
     var bg = cs.getPropertyValue('--bg').trim(), pa = cs.getPropertyValue('--panel').trim(), p2 = cs.getPropertyValue('--panel2').trim();
     root.style.setProperty('--halo', bg);
+    root.style.setProperty('--bar-bg', bg);
     if (v < 1) {
-      var pct = Math.round(v * 100);
-      root.style.setProperty('--bg', 'color-mix(in srgb, ' + bg + ' ' + pct + '%, transparent)');
-      root.style.setProperty('--panel', 'color-mix(in srgb, ' + pa + ' ' + Math.min(100, pct + 6) + '%, transparent)');
-      root.style.setProperty('--panel2', 'color-mix(in srgb, ' + p2 + ' ' + Math.min(100, pct + 6) + '%, transparent)');
+      // The window background and the cards add up: the background fades much more than the slider
+      // value, the cards follow it, so at 64% about a third of what is behind shows through a card.
+      var pct = Math.round(v * 100), back = Math.round(Math.max(0, (v - 0.4)) * 100 / 0.6 * 0.35);
+      root.style.setProperty('--bg', 'color-mix(in srgb, ' + bg + ' ' + back + '%, transparent)');
+      root.style.setProperty('--panel', 'color-mix(in srgb, ' + pa + ' ' + pct + '%, transparent)');
+      root.style.setProperty('--panel2', 'color-mix(in srgb, ' + p2 + ' ' + Math.max(0, pct - 6) + '%, transparent)');
     }
     document.body.classList.toggle('halo', v < 0.9);
   }
@@ -1979,6 +2096,7 @@
     }
     html += '<h6>' + esc(t('pop_same')) + '</h6>' +
       namesHtml(others, 'merge', function (k) { return t('pop_merge_tt', { a: label, b: spkLabel(k) }); });
+    html += '<div class="nrow"><button class="skip" type="button" data-a="clearall" title="' + esc(t('spk_clear_tt')) + '">' + esc(t('spk_clear')) + '</button></div>';
     spkPop.innerHTML = html; spkPop.className = 'show';
     if (focusInput) spkPop.querySelector('input').focus();
   }
@@ -2019,6 +2137,173 @@
     spkNow = now;
     renderChip();
   }
+
+  // ---------- speakers.json from the app (2026-10-26): names set by the recorder (auto) reach the window ----------
+  window.setSpeakers = function (d) {
+    if (!d || typeof d !== 'object') return;
+    var cl = d.clusters || {};
+    for (var sid in cl) {
+      if (!spk[sid]) spk[sid] = { name: null };
+      spk[sid].name = cl[sid] && cl[sid].name ? cleanName(cl[sid].name) : null;
+      if (spk[sid].name) dropAsk(sid);
+    }
+    var mg = d.merged || {};
+    for (var a in mg) spkMerged[a] = mg[a];
+    trOver = d.overrides || {};
+    renderChip(); trRender();
+  };
+
+  // ---------- call picture from the engine (2026-10-26) ----------
+  var sit = null, cardSeen = {}, onmeKnown = {};
+  function cardPasses(it) {
+    var key = String(it.card || it.id || it.gist || '').toLowerCase().slice(0, 80), now = Date.now();
+    if (cardSeen[key] && now - cardSeen[key] < 10 * 60 * 1000) return false;      // the same card twice in 10 min
+    if (sit && sit.mine === false && it.level !== 'red') return false;               // someone else's topic: stay quiet
+    cardSeen[key] = now;
+    return true;
+  }
+  function renderSituation(s) {
+    var wasTurn = !!(sit && (sit.asks || []).some(function (a) { return a.type === 'update'; }));
+    sit = s;
+    var line = $('sitline'), turn = (s.asks || []).some(function (a) { return a.type === 'update'; });
+    var parts = [];
+    if (turn) parts.push('<span class="turn">' + esc(t('sit_turn')) + '</span>');
+    if (s.topic) parts.push(esc(t('sit_listen')) + ' ' + esc(s.topic) + (s.owner ? ' · ' + esc(s.owner) : ''));
+    if (s.topic) parts.push(s.mine ? '<span class="mine">' + esc(t('sit_mine')) + '</span>' : esc(t('sit_not')));
+    line.innerHTML = parts.join(' · '); line.className = parts.length ? 'show' : '';
+    line.title = line.textContent;
+    // "On me": open asks to the PM first, then what the PM took on.
+    var box = $('onme'), ul = box.querySelector('ul'), rows = [];
+    (s.asks || []).filter(function (a) { return a.type !== 'update'; }).forEach(function (a) {
+      rows.push({ k: 'a:' + (a.what || ''), cls: 'ask', html: '🔴 ' + esc(a.what || '') + (a.who ? ' <span class="who">· ' + esc(a.who) + '</span>' : '') });
+    });
+    (s.actions || []).forEach(function (a) {
+      rows.push({ k: 'm:' + (a.what || ''), cls: 'act', html: '📋 ' + esc(a.what || '') + (a.due ? ' <span class="who">· ' + esc(a.due) + '</span>' : '') +
+        (a.from && a.from !== 'PM' ? ' <span class="who">· ' + esc(a.from) + '</span>' : '') });
+    });
+    ul.innerHTML = rows.map(function (r) { var isNew = !onmeKnown[r.k]; onmeKnown[r.k] = 1;
+      return '<li class="' + r.cls + (isNew ? ' new' : '') + '">' + r.html + '</li>'; }).join('');
+    box.querySelector('.head').innerHTML = '📋 ' + esc(t('onme')) + ' <span class="n">' + rows.length + '</span>';
+    box.querySelector('.head').title = t('onme_tt');
+    box.classList.toggle('has', rows.length > 0);
+    // The speech: points already said are struck through; "your turn" opens it on top.
+    var sp = byUidAny('speech');
+    if (sp) {
+      var lis = sp.querySelectorAll('.items li'), done = {};
+      (s.speech_done || []).forEach(function (i) { done[i] = 1; });
+      for (var i = 0; i < lis.length; i++) lis[i].classList.toggle('said', !!done[i]);
+      sp.classList.toggle('turn', turn);
+      // Opened and pinned once when the turn starts; an unpin by hand is respected (QA 26.10).
+      if (turn && !wasTurn) { sp.classList.add('open'); var pb = sp.querySelector('.fb .pin'); if (pb && !sp.classList.contains('pinned')) pb.click(); }
+    }
+  }
+  function byUidAny(uid) { return document.querySelector('[data-uid="' + uid + '"]'); }
+  (function () { var h = $('onme').querySelector('.head'); h.addEventListener('click', function () { $('onme').classList.toggle('collapsed'); }); })();
+  $('onme').classList.remove('collapsed');
+
+  // ---------- transcript split view (2026-10-26) ----------
+  var trSeq = 0, trLines = [], trOpen = false, trFollow = true, trOver = {}, trMe = null;
+  var trList = $('tr-list'), trBtn = $('trbtn'), trFol = $('tr-follow');
+  var TR_RX = /^\[(\d\d:\d\d:\d\d)\] (.+?)(?: \[(S\d+)\])? \(([\w+-]+)\): (.*)$/;
+  function trWho(x) {
+    var o = trOver[x.t], sid = o || x.sid;
+    if (o && String(o).indexOf('name:') === 0) return { n: String(o).slice(5) };
+    if (sid) { var nm = spkName(sid); return { n: nm || spkLabel(sid), un: !nm }; }
+    return { n: x.who };
+  }
+  function trRow(x) {
+    if (x.mark) return '<div class="trl mark">' + esc(x.mark) + '</div>';
+    var w = trWho(x);
+    var who = (x.sid || trOver[x.t])
+      ? '<button type="button" class="who' + (w.un ? ' un' : '') + '" data-i="' + (x.i != null ? x.i : '') + '" data-t="' + esc(x.t) + '" title="' + esc(t('tr_who_tt')) + '">' + esc(w.n) + ':</button>'
+      : '<span class="who' + (w.un ? ' un' : '') + '">' + esc(w.n) + ':</span>';
+    return '<div class="trl' + (x.me ? ' me' : '') + '"><span class="tt">' + esc(x.t) + '</span>' + who + esc(x.text) + '</div>';
+  }
+  function trRender() {
+    if (!trOpen) return;
+    var top = trList.scrollTop;
+    trList.innerHTML = trLines.length ? trLines.slice(-800).map(trRow).join('') : '<div class="tr-empty">' + esc(t('tr_empty')) + '</div>';
+    $('tr-n').textContent = trLines.length ? t('tr_n', { n: trLines.length }) : '';
+    if (trFollow) trList.scrollTop = trList.scrollHeight; else trList.scrollTop = top;
+  }
+  function setFollow(on) { trFollow = on; trFol.setAttribute('aria-pressed', String(on)); if (on) trList.scrollTop = trList.scrollHeight; }
+  trList.addEventListener('scroll', function () {
+    var atEnd = trList.scrollHeight - trList.scrollTop - trList.clientHeight < 30;
+    if (atEnd !== trFollow) setFollow(atEnd);
+  });
+  trFol.onclick = function () { setFollow(true); };
+  window.addTranscript = function (lines) {
+    (lines || []).forEach(function (l) {
+      var m;
+      if ((m = /^- (?:Канали|Channels): (.+?) = /.exec(l))) { trMe = m[1]; return; }
+      if ((m = /^--- (.+) ---$/.exec(l))) { trLines.push({ mark: m[1] }); return; }
+      m = TR_RX.exec(l); if (!m) return;
+      trLines.push({ i: ++trSeq, t: m[1], who: m[2], sid: m[3] || null, text: m[5], me: !m[3] && !!trMe && m[2] === trMe });
+    });
+    if (trLines.length > 3000) trLines = trLines.slice(-3000);
+    trRender();
+  };
+  function setTr(on) {
+    trOpen = on; document.body.classList.toggle('trsplit', on); trBtn.setAttribute('aria-pressed', String(on));
+    send('transcript', on);
+    if (on) { trFollow = true; trRender(); }
+  }
+  trBtn.onclick = function () { setTr(!trOpen); };
+  // Reassign a line from the transcript (2026-10-26): click the speaker of a line.
+  var knownNames = [], trMenu = $('trmenu'), trMenuT = null;
+  function trLineAt(tm) { for (var i = trLines.length - 1; i >= 0; i--) if (trLines[i].t === tm) return trLines[i]; return null; }
+  function closeTrMenu() { trMenu.className = ''; trMenu.innerHTML = ''; trMenuT = null; }
+  function openTrMenu(btn) {
+    var bi = +btn.getAttribute('data-i'), x = null;     // by line number: two lines in one second stay apart (QA)
+    for (var k = trLines.length - 1; k >= 0; k--) if (trLines[k].i === bi) { x = trLines[k]; break; }
+    if (!x) x = trLineAt(btn.getAttribute('data-t'));
+    if (!x) return;
+    trMenuT = x.t;
+    var o = trOver[x.t], cur = o && String(o).indexOf('name:') !== 0 ? rootSid(o) : (x.sid ? rootSid(x.sid) : null);
+    var sids = Object.keys(spk).filter(function (k) { return rootSid(k) === k && k !== cur; }).sort(function (a, b) {
+      return (parseInt(a.slice(1), 10) || 0) - (parseInt(b.slice(1), 10) || 0); });
+    var used = {}; sids.forEach(function (k) { var n = spkName(k); if (n) used[n.toLowerCase()] = 1; });
+    if (cur && spkName(cur)) used[spkName(cur).toLowerCase()] = 1;
+    var html = '<div class="q">' + esc(x.t) + ' · ' + esc(x.text) + '</div><h6>' + esc(t('tr_move')) + '</h6><div class="names">' +
+      sids.map(function (k) { return '<button class="nb" type="button" data-sid="' + esc(k) + '">' + esc(spkLabel(k)) + '</button>'; }).join('') +
+      knownNames.filter(function (n) { return !used[n.toLowerCase()]; }).map(function (n) {
+        return '<button class="nb" type="button" data-name="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') +
+      '</div><div class="nrow"><input type="text" data-f="other" maxlength="' + NAME_MAX + '" placeholder="' + esc(t('tr_other_ph')) + '"></div>';
+    if (cur) html += '<h6>' + esc(t('tr_rename', { a: spkLabel(cur) })) + '</h6><div class="nrow"><input type="text" data-f="rename" data-sid="' + esc(cur) +
+      '" maxlength="' + NAME_MAX + '" value="' + esc(spkName(cur) || '') + '" placeholder="' + esc(t('tr_rename_ph')) + '"></div>';
+    trMenu.innerHTML = html; trMenu.className = 'show';
+    var r = btn.getBoundingClientRect(), pr = $('trpane').getBoundingClientRect();
+    trMenu.style.top = Math.min(r.bottom - pr.top + 4, pr.height - trMenu.offsetHeight - 8) + 'px';
+  }
+  trList.addEventListener('click', function (e) { var b = e.target.closest('button.who'); if (b) { e.stopPropagation(); openTrMenu(b); } });
+  trMenu.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !trMenuT) return;
+    if (b.hasAttribute('data-sid')) { fixLine(trMenuT, b.getAttribute('data-sid')); trOver[trMenuT] = b.getAttribute('data-sid'); }
+    else if (b.hasAttribute('data-name')) { var n = b.getAttribute('data-name'), o = sidOfName(n, null); fixLine(trMenuT, o || { name: n }); trOver[trMenuT] = o || 'name:' + n; }
+    closeTrMenu(); trRender();
+  });
+  trMenu.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeTrMenu(); e.stopPropagation(); return; }
+    if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+    e.preventDefault(); e.stopPropagation();
+    var v = cleanName(e.target.value); if (!v || !trMenuT) return;
+    if (e.target.getAttribute('data-f') === 'rename') nameSpeaker(e.target.getAttribute('data-sid'), v);
+    else { var o = sidOfName(v, null); fixLine(trMenuT, o || { name: v }); trOver[trMenuT] = o || 'name:' + v; }
+    closeTrMenu(); trRender();
+  });
+  document.addEventListener('mousedown', function (e) { if (trMenu.classList.contains('show') && !trMenu.contains(e.target) && !e.target.closest('button.who')) closeTrMenu(); });
+  // "Clear speakers": two clicks within 4 s (no modal dialogs in the tips window).
+  var clrArm = 0;
+  function clrLabels() { [$('tr-clear')].concat([].slice.call(document.querySelectorAll('[data-a="clearall"]'))).forEach(function (b) { if (b) b.textContent = t('spk_clear'); }); }
+  function clearSpeakers(btn) {
+    if (Date.now() - clrArm < 4000) { clrArm = 0; spkSet('speakers_clear', true); clrLabels(); return; }
+    clrLabels(); clrArm = Date.now(); btn.textContent = t('spk_clear_confirm');
+    setTimeout(function () { if (clrArm && Date.now() - clrArm >= 4000) { clrArm = 0; clrLabels(); } }, 4100);
+  }
+  $('tr-clear').onclick = function () { clearSpeakers(this); };
+  spkPop.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-a="clearall"]'); if (b) { e.stopPropagation(); clearSpeakers(b); }
+  }, true);
 
   // Fact book: instant local search (same word matching as the recorder), no AI involved.
   var STOP = {};
@@ -2072,6 +2357,15 @@
     input.value = '';
     searchFacts();
   };
+  // Folder button: Claude searches the project folder first (lt search), then answers (2026-10-26).
+  $('findbtn').onclick = function () {
+    var text = input.value.trim().replace(/^find:\s*/i, '');
+    if (!text) { input.placeholder = t('find_ph'); input.focus(); return; }
+    send('ask', 'find: ' + text);
+    render({ kind: 'ask', level: 'info', you: '🔎 ' + text, t: hms(), noteKey: 'ask_find_note' });
+    input.value = '';
+    searchFacts();
+  };
 
   // Presentation tracker: the recorder follows your words through the outline.
   var nowbox = $('nowbox');
@@ -2101,7 +2395,16 @@
         var l = lagOf(it); if (l != null) { lags.push(l); lags = lags.slice(-5); }
       }
       if (it.kind === 'ack') { window.ackSetting(it.key, it.value); return; }
-      if (it.kind === 'speaker_ask') { addAsk(it); return; }
+      if (it.kind === 'situation') { renderSituation(it); return; }
+      // 2026-10-26 review: heard-question lines and unasked fact cards were never used; facts stay in the field search.
+      if (it.kind === 'question') return;
+      if (it.kind === 'fact' && !it.q) return;
+      if (it.kind === 'card' && !cardPasses(it)) return;
+      if (it.kind === 'speaker_ask') { (it.known || []).forEach(function (n) { n = cleanName(n); if (n && knownNames.indexOf(n) < 0) knownNames.push(n); }); addAsk(it); return; }
+      if (it.kind === 'speaker_auto') { noteSid(it.sid, it.name); dropAsk(it.sid); renderChip(); trRender();
+        toast(t('spk_auto', { a: it.name }), 'ok'); return; }
+      if (it.kind === 'speakers_cleared') { for (var k in spk) spk[k].name = null; askQ = []; askSkipped = {};
+        renderAsk(); renderChip(); trRender(); toast(t('spk_cleared'), 'ok'); return; }
       render(it);
     });
   };

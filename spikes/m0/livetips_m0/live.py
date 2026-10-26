@@ -71,6 +71,10 @@ def handle_inbox(eng, raw: str) -> None:
     low = text.lower()
     if low == "sos":
         eng.on_request("sos")
+    elif low.startswith("find:"):
+        q = text[5:].strip()
+        if q:
+            eng.on_request("find", q)
     elif low in ("off topic", "refresh context"):
         return
     else:
@@ -80,6 +84,12 @@ def handle_inbox(eng, raw: str) -> None:
 def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, poll_s: float = 0.15,
         from_start: bool = False, provider=None, max_s: float = None, inbox: Path = None, state_dir: Path = None):
     out.mkdir(parents=True, exist_ok=True)
+    # The app starts the engine while the recorder waits for the call (standby): the transcript file
+    # appears with the first line. 2026-10-23: the engine crashed here and was restarted by the app.
+    waited = 0.0
+    while not md.exists() and waited < 3 * 3600:
+        time.sleep(0.5)
+        waited += 0.5
     eng, stem = build_engine(cfg, md, out, now_sod, provider)
     (out / (stem + ".app.run.json")).write_text(json.dumps({
         "md": md.name, "mode": "live", "variant": cfg.get("variant"), "models": cfg["models"],
@@ -159,6 +169,10 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
             break
         time.sleep(poll_s)
     eng.drain(60)
+    try:
+        eng.final_wrapup()
+    except Exception as e:  # noqa: BLE001
+        print("wrapup:", repr(e), flush=True)
     span = (last_written - first_written) if first_written and last_written else 0
     (out / (stem + ".app.summary.json")).write_text(json.dumps(
         {"lines": n, "call_span_s": round(span, 1), "tips": len(eng.tips),

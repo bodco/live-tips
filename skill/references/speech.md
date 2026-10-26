@@ -66,8 +66,9 @@ planned questions in order. For a hiring interview: see "Hiring interview mode" 
 the role's prep item.
 
 **Refresh.** The PM can ask "онови спіч" in the chat or the window at any time (or the window
-button): regenerate from fresh data and emit again. After each other participant's report in
-a round, when the PM's turn is near, re-emit "Your turn" (see Triggers).
+button): regenerate from fresh data and emit again. Never predict the PM's turn: no
+"your turn is near", "pause, you can start" or "your turn" from the order of a round. The PM starts
+on their own; the speech card is already on screen (PM sync review 2026-10-23).
 
 **If the PM opens the meeting** (the PM hosts it, the user says so, or the first 30 s of the
 call are silent on the other side): right after the speech post the "Your turn" tip

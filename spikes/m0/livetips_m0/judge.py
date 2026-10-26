@@ -200,7 +200,7 @@ def main(argv=None, provider=None):
         outp.write_text("")               # a rerun replaces the old scores
     extra = {"extra_body": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}}}
     if a.quick:
-        extra = {"extra_body": {"thinking": {"type": "disabled"}}}
+        extra = {"extra_body": {"thinking": {"type": "between_tools"}}}   # Sonnet 5.5 refuses "disabled" (400)
     recs = []
     for it in items:
         hint = "gist: {}\nphrase: {}\nitems: {}".format(it["gist"], it["phrase"], "; ".join(str(x) for x in it["items"]))

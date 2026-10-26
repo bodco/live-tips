@@ -92,7 +92,8 @@ DEFAULTS = {
     "speaker_new_min_s": 1.5,   # only segments this long may open a new cluster (shorter ones are too noisy)
     "speaker_automerge": 0.6,   # two clusters whose centroids are this close are the same person
     "speaker_suggest": 0.5,     # library people with cosine >= this are offered as suggestions
-    "speaker_prompt_s": 8.0,    # s of speech of an unnamed cluster before the window asks "Who is speaking?"
+    "speaker_auto": 0.72,       # 2026-10-26: a voice this close to a name used on this meeting series is named by itself
+    "speaker_prompt_s": 15.0,   # 2026-10-26 (was 8: short exclamations were asked about); s of speech of an unnamed cluster before the window asks "Who is speaking?"
     "speaker_min_s": 1.0,       # s of speech a segment needs to get an embedding
     "speaker_inherit_s": 1.5,   # a segment without a usable embedding keeps the previous speaker within this gap
     "speaker_wait_s": 0,        # v37.1: never wait for the voice embedding; a late tag arrives via speakers.json
@@ -2350,7 +2351,7 @@ def _round_emb(v) -> list:
 class VoiceLibrary:
     """<tool root>/voices/voices.json: {"people": {"Name": {"embeddings": [[...]], "updated": iso,
     "calls": n, "scope": "team" | "project:<slug>"}}}. Local only. Used for suggestions; a name is
-    never assigned automatically.
+    assigned automatically only for a name used on the same meeting series (Rosters, speaker_auto).
 
     Scopes (owner decision D3, 2026-10-22): the team is global (suggested on every call), a client is
     remembered for its project only (suggested on that project's calls), and on a public call
@@ -2360,19 +2361,21 @@ class VoiceLibrary:
 
     MAX = 20
 
-    def __init__(self, path: Path, project: str = "", team_names=(), remember: bool = True):
+    def __init__(self, path: Path, project: str = "", team_names=(), remember: bool = True, workspace: str = ""):
         self.path = path
         self.people: dict[str, dict] = {}
         self.cents: dict[str, np.ndarray] = {}
         self.broken = False
         self.project = _s(project)
-        self.team = {re.sub(r"\s+", " ", _s(n)).strip().lower() for n in (team_names or []) if _s(n).strip()}
+        self.workspace = _s(workspace).strip().casefold()     # 2026-10-26: "workspace:<name>" scope
+        self.team = {short_name(n).lower() for n in (team_names or []) if _s(n).strip()}
         self.remember = remember
         self.load()
 
     def visible(self, name: str) -> bool:
         sc = (self.people.get(name) or {}).get("scope")
-        return not sc or sc == "team" or (bool(self.project) and sc == "project:" + self.project)
+        return (not sc or sc == "team" or (bool(self.project) and sc == "project:" + self.project)
+                or (bool(self.workspace) and sc.casefold() == "workspace:" + self.workspace))
 
     def scope_for(self, name: str) -> str:
         if name.strip().lower() in self.team or not self.project:
@@ -2401,7 +2404,32 @@ class VoiceLibrary:
                 self.people[str(name)] = {"embeddings": embs, "updated": p.get("updated"), "calls": calls}
                 if p.get("scope"):
                     self.people[str(name)]["scope"] = str(p["scope"])
+        self._merge_short()
         self._cents()
+
+    def _merge_short(self) -> None:
+        """2026-10-26: older full names join their short form ("Ed Stone" -> "Ed S."), but only when exactly
+        one full name leads to that short form; two different people stay apart (QA). Scope: an explicit
+        "team" wins, otherwise the first explicit project or workspace scope (never "no scope")."""
+        groups: dict[str, list[str]] = {}
+        for name in list(self.people):
+            groups.setdefault(short_name(name).casefold(), []).append(name)
+        for sk, names in groups.items():
+            fulls = {n.casefold() for n in names if short_name(n).casefold() != n.casefold()}
+            if len(names) < 2 and not fulls or len(fulls) > 1:
+                continue
+            key = short_name(names[0])
+            embs, calls, scopes, upd = [], 0, [], None
+            for n in names:
+                p = self.people.pop(n)
+                embs += p["embeddings"]
+                calls = max(calls, int(p.get("calls") or 0))
+                if p.get("scope"):
+                    scopes.append(p["scope"])
+                upd = max(filter(None, [upd, p.get("updated")]), default=None)
+            self.people[key] = {"embeddings": prune_embeddings(embs, self.MAX), "updated": upd, "calls": calls}
+            if scopes:
+                self.people[key]["scope"] = "team" if "team" in scopes else scopes[0]
 
     def _cents(self) -> None:
         self.cents = {}
@@ -2450,7 +2478,9 @@ class VoiceLibrary:
             if name in desired and scope != "team" and self.scope_for(name) == "team":
                 scope = "team"            # named from the team roster: the team is global
             elif name in desired and scope.startswith("project:") and self.project and scope != "project:" + self.project:
-                scope = "team"            # the same person on two projects' calls: suggest everywhere
+                # The same person on two projects' calls: inside one workspace they become the workspace's
+                # (QA 26.10: a workspace call promoted a client to the whole team), otherwise everyone's.
+                scope = ("workspace:" + self.workspace) if self.workspace else "team"
             self.people[name] = {"embeddings": prune_embeddings(new, self.MAX), "updated": stamp, "calls": calls,
                                  "scope": scope}
         self._cents()
@@ -2468,7 +2498,65 @@ class VoiceLibrary:
         os.replace(tmp, self.path)
 
 
+class Rosters:
+    """2026-10-26 (owner): who was named on the previous calls of the same meeting series, so the PM does
+    not name the same people every time. <tool root>/voices/rosters.json: {"<project>|<title slug>":
+    {"names": [...], "updated": iso}}. A voice matching one of these names (speaker_auto) is named by
+    itself; any other voice is still asked. "Clear speakers" in the window forgets the series."""
+
+    MAX = 15
+
+    def __init__(self, path: Path, key: str):
+        self.path, self.key = path, key
+        try:
+            d = json.loads(path.read_text(encoding="utf-8"))
+            self.data = d if isinstance(d, dict) else {}
+        except Exception:  # noqa: BLE001
+            self.data = {}
+
+    def names(self) -> list[str]:
+        e = self.data.get(self.key) if self.key else None
+        return [short_name(n) for n in (e or {}).get("names") or [] if _s(n).strip()]
+
+    def remember(self, names: list[str]) -> None:
+        if not self.key:
+            return
+        out = []
+        for n in list(names) + self.names():
+            if n and n.casefold() not in {x.casefold() for x in out}:
+                out.append(n)
+        self.data[self.key] = {"names": out[: self.MAX], "updated": dt.datetime.now().astimezone().isoformat(timespec="seconds")}
+        self._write()
+
+    def forget(self) -> None:
+        if self.key and self.data.pop(self.key, None) is not None:
+            self._write()
+
+    def _write(self) -> None:
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_name(self.path.name + f".{os.getpid()}.tmp")
+            tmp.write_text(json.dumps(self.data, ensure_ascii=False, indent=1), encoding="utf-8")
+            os.replace(tmp, self.path)
+        except OSError as e:
+            log(f"speakers: cannot write {self.path.name} ({e!r})")
+
+
 NAME_MAX = 80
+
+
+def short_name(name: str) -> str:
+    """2026-10-26 (owner): speakers are shown as first name + initial: "Bohdan Neymet" -> "Bohdan N.".
+    One word, or a name that already ends with an initial ("Bohdan N."), stays as it is."""
+    n = re.sub(r"\s+", " ", _s(name)).strip()
+    # QA 26.10: "Ed Stone (PO)" -> "Ed S.", "Dr. Ed Stone" -> "Ed S."
+    n = re.sub(r"\s*[(\[][^)\]]*[)\]]", "", n).strip()
+    n = re.sub(r"^(dr|mr|mrs|ms|prof|пан|пані)\.?\s+", "", n, flags=re.I).strip()
+    parts = n.split(" ")
+    if len(parts) < 2 or re.fullmatch(r"\w\.?", parts[-1]):
+        return n
+    last = parts[-1].strip("()\"'")
+    return f"{parts[0]} {last[:1].upper()}." if last else parts[0]
 
 
 def clean_name(name, what: str = "name") -> str | None:
@@ -2489,18 +2577,33 @@ def clean_people(people) -> list[str]:
     separated by commas / new lines). Cleaned, deduplicated case-insensitively, order kept."""
     if isinstance(people, str):
         people = re.split(r"[,\n;]", people)
-    out, seen = [], set()
+    full = []
     for p in people if isinstance(people, (list, tuple)) else []:
         n = clean_name(p, "people entry") if _s(p) else None
-        if n and n.casefold() not in seen:
-            seen.add(n.casefold())
-            out.append(n)
+        if n and n.casefold() not in {x.casefold() for x in full}:
+            full.append(n)
+    # Short form "First L.", unless two different people share it (QA 26.10: Anna Kovalenko / Anna Kravets).
+    by_short: dict[str, set] = {}
+    for n in full:
+        if " " in n and not re.fullmatch(r".*\s\w\.?", n):
+            by_short.setdefault(short_name(n).casefold(), set()).add(n.casefold())
+    out, seen = [], set()
+    for n in full:
+        sn = short_name(n)
+        name = n if len(by_short.get(sn.casefold(), ())) > 1 else sn
+        if name.casefold() not in seen:
+            seen.add(name.casefold())
+            out.append(name)
     return out
 
 
 def normalize_person(name: str, people: list[str]) -> str:
     """A typed name matching a `people` entry case-insensitively, or by a first name that only
-    one entry has, becomes that full name. Anything else is kept as typed."""
+    one entry has, becomes that entry. Anything else is kept as typed. Always "First L." (short_name)."""
+    for p in people:                      # a full name kept full because two people share its short form
+        if p.casefold() == name.casefold():
+            return p
+    name = short_name(name)
     low = name.casefold()
     for p in people:
         if p.casefold() == low:
@@ -2566,6 +2669,11 @@ class SpeakerTracker:
         self.last_end = 0.0
         self.lib_added: dict[str, list] = {}
         self.people: list[str] = clean_people(cfg.get("people") or [])
+        # 2026-10-26 (owner): participants typed in Start call ("Учасники: ..."): the only names offered.
+        self.participants: list[str] = clean_people(cfg.get("participants") or [])
+        self.people = clean_people(self.participants + self.people)
+        self.rosters: Rosters | None = None
+        self.auto: set[str] = set()           # sids named by the series roster (not by the PM)
 
     def _f(self, key: str) -> float:
         try:
@@ -2594,7 +2702,11 @@ class SpeakerTracker:
         embs = [m["emb"] for m in c["members"] if m["emb"] is not None]
         c["centroid"] = unit(np.mean(embs, axis=0)) if embs else None
         if self.lib is not None and not c["name"]:
-            c["suggestions"] = self.lib.suggest(c["centroid"], self._f("speaker_suggest"))
+            c["suggestions"] = self.lib.suggest(c["centroid"], self._f("speaker_suggest"), limit=12)
+            if self.participants:
+                allowed = {p.casefold() for p in self.participants}
+                c["suggestions"] = [x for x in c["suggestions"] if x["name"].casefold() in allowed]
+            c["suggestions"] = c["suggestions"][:3]
         elif c["name"]:
             c["suggestions"] = []
 
@@ -2739,6 +2851,17 @@ class SpeakerTracker:
         this call, then names already used in this call (to merge), then frequent library names."""
         used = {c["name"].casefold() for c in self.clusters.values() if c["name"]}
         out, seen = [], set()
+        if self.participants:
+            # Only the participants of this call (and names already given in it); anyone else is typed.
+            for p in self.participants:
+                if p.casefold() not in used and p.casefold() not in seen:
+                    seen.add(p.casefold())
+                    out.append(p)
+            for c in sorted(self.clusters.values(), key=lambda c: -c["seconds"]):
+                if c["name"] and c["name"].casefold() not in seen:
+                    seen.add(c["name"].casefold())
+                    out.append(c["name"])
+            return out[:max(n, len(self.participants))]
 
         def add(x):
             if x and x.casefold() not in seen:
@@ -2763,12 +2886,60 @@ class SpeakerTracker:
             return
         if c["seconds"] < self._f("speaker_prompt_s"):
             return
+        if self._auto_name(sid):
+            return
         self.asked.add(sid)
         if self.ask_open or self.paused:
             if sid not in self.ask_queue:
                 self.ask_queue.append(sid)
             return
         self._open_ask(sid)
+
+    def _auto_name(self, sid: str) -> bool:
+        """Name a voice by itself when its best library match is a name used on this meeting series
+        (Rosters) with cosine >= speaker_auto, clearly ahead of the next match, and not used yet in this call."""
+        if self.rosters is None:
+            return False
+        roster = {n.casefold() for n in self.rosters.names()}
+        sug = self.clusters[sid].get("suggestions") or []
+        if not roster or not sug:
+            return False
+        top = sug[0]
+        name = _s(top.get("name"))
+        second = float(sug[1]["score"]) if len(sug) > 1 else 0.0
+        if self.participants and name.casefold() not in {p.casefold() for p in self.participants}:
+            return False
+        if (name.casefold() not in roster or float(top.get("score") or 0) < self._f("speaker_auto")
+                or float(top["score"]) - second < 0.05 or self.by_name(name, exclude=sid)):
+            return False
+        self.clusters[sid]["name"] = name
+        self.auto.add(sid)
+        self._recompute(sid)
+        self.rev += 1
+        self._lib_sync()
+        self._save()
+        self.emit({"kind": "speaker_auto", "sid": sid, "name": name, "score": top["score"], "at": hhmmss(now())})
+        log(f"speakers: {sid} named {name} by the meeting series roster ({top['score']})")
+        return True
+
+    def clear_names(self) -> bool:
+        """'Clear speakers' in the window: every name of this call is removed (lines go back to Speaker N),
+        the series roster is forgotten and the voices are asked again."""
+        for c in self.clusters.values():
+            c["name"] = None
+        for sid in list(self.clusters):
+            self._recompute(sid)
+        self.overrides = {t: v for t, v in self.overrides.items() if not str(v).startswith("name:")}
+        self.skipped.clear()
+        self.asked.clear()
+        self.auto.clear()
+        self.ask_open, self.ask_queue = None, []
+        if self.rosters is not None:
+            self.rosters.forget()
+        self.emit({"kind": "speakers_cleared", "at": hhmmss(now())})   # before the new asks: the window resets first
+        for sid in sorted(self.clusters, key=lambda s: -self.clusters[s]["seconds"]):
+            self._maybe_ask(sid)
+        return True
 
     def _open_ask(self, sid: str) -> None:
         c = self.clusters[sid]
@@ -2835,6 +3006,8 @@ class SpeakerTracker:
             elif key == "speaker_fix":
                 t, _, target = v.partition("|")
                 changed = self._fix(t.strip(), target.strip())
+            elif key == "speakers_clear":
+                changed = self.clear_names()
             elif key == "speaker_skip":
                 sid = self.resolve(v.strip())
                 if sid in self.clusters:
@@ -2847,6 +3020,10 @@ class SpeakerTracker:
                 self.rev += 1
                 self._lib_sync()
                 self._save()
+                if key == "speaker_name" and self.rosters is not None and self.lib is not None and self.lib.remember:
+                    named = [c["name"] for c in self.clusters.values() if c["name"]]
+                    if named:
+                        self.rosters.remember(named)      # QA: kept even if the recorder dies before finalize
             return changed
 
     def _fix(self, t: str, target: str) -> bool:
@@ -2941,6 +3118,11 @@ class SpeakerTracker:
         with self.lock:
             self._lib_sync()
             self._save()
+            if self.rosters is not None and self.lib is not None and self.lib.remember:
+                named = [c["name"] for c in sorted(self.clusters.values(), key=lambda c: -c["seconds"])
+                         if c["name"] and c["seconds"] >= 5]
+                if named:
+                    self.rosters.remember(named)
             if not self.clusters and not self.overrides:
                 return None
             named = transcript.with_name(transcript.stem + ".named.md")
@@ -3291,9 +3473,13 @@ def main() -> int:
     if status["speakers"] == "loading":
         lib = VoiceLibrary(ROOT / str(cfg.get("voices_dir") or "voices") / "voices.json",
                            project=cfg.get("slug") or "", team_names=cfg.get("people_team") or [],
-                           remember=cfg.get("voices_remember", True) not in (False, "false", "off", "0", 0))
+                           remember=cfg.get("voices_remember", True) not in (False, "false", "off", "0", 0),
+                           workspace=cfg.get("workspace") or "")
         tracker = SpeakerTracker(cfg, out.with_name(out.stem + ".speakers.json"), lib,
                                  emit=lambda item: _append_json(tips_file, item))
+        series = slugify(re.sub(r"\.app$", "", _s(cfg.get("title")))) if _s(cfg.get("title")).strip() else ""
+        tracker.rosters = Rosters(lib.path.with_name("rosters.json"),
+                                  f"{cfg.get('slug') or ''}|{series}" if series else "")
 
         def load_speakers() -> None:
             emb, reason = load_embedder(cfg)

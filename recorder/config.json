@@ -11,7 +11,7 @@
   "speakers_enabled": true,
   "speaker_join": 0.45,
   "speaker_suggest": 0.5,
-  "speaker_prompt_s": 8,
+  "speaker_prompt_s": 15,
   "semantic_enabled": true,
   "ollama_url": "http://127.0.0.1:11434",
   "semantic_model": "bge-m3",

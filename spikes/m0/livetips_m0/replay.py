@@ -30,7 +30,10 @@ def call_meta_from_md(md: Path, cfg: dict) -> dict:
             "audience": cfg.get("audience", "auto"), "call_type": cfg.get("call_type", "auto"),
             "langs": cfg.get("langs", ["uk", "en"]), "me_label": cfg["me_label"], "them_label": cfg["them_label"],
             "name_aliases": cfg.get("name_aliases", []), "tips_lang": cfg.get("tips_lang", "uk"),
-            "hiring_role": cfg.get("hiring_role", "") if cfg.get("call_type") == "interview" else ""}
+            "hiring_role": cfg.get("hiring_role", "") if cfg.get("call_type") == "interview" else "",
+            "answer_any": cfg.get("answer_any", True), "turn_tips": cfg.get("turn_tips", False),
+            "proactive": cfg.get("proactive", False), "pm_projects": cfg.get("pm_projects", []),
+            "participants": cfg.get("participants", [])}
     return meta
 
 
@@ -54,8 +57,16 @@ def build_engine(cfg, md: Path, out: Path, clock, provider=None):
     budget = BudgetGuard(b.get("ledger", "~/.livetips/spend.json"), b.get("call_soft_usd", 2.0),
                          b.get("call_hard_usd", 5.0), b.get("monthly_hard_usd", 100.0))
     cfg.setdefault("speakers_file", str(base) + ".speakers.json")
-    return Engine(cfg=cfg, rules=rules, provider=provider, prompt=prompt, out_dir=out, stem=stem,
-                  clock=clock, budget=budget), stem
+    eng = Engine(cfg=cfg, rules=rules, provider=provider, prompt=prompt, out_dir=out, stem=stem,
+                 clock=clock, budget=budget)
+    if cfg.get("speech_card", True):
+        eng.speech_card(_brief_text(base))
+    return eng, stem
+
+
+def _brief_text(base: Path) -> str:
+    p = Path(str(base) + ".brief.md")
+    return p.read_text(encoding="utf-8", errors="replace") if p.exists() else ""
 
 
 def replay(cfg: dict, md: Path, out: Path, minutes=None, start_min=0.0, speed=1.0, provider=None, verbose=True):

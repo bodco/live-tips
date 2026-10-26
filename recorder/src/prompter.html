@@ -34,7 +34,8 @@
   button, select, input { font-family: inherit; color: inherit; }
   /* see-through window: a halo keeps every letter readable over whatever is behind */
   body.halo { --halo-c: var(--halo, var(--bg)); text-shadow: 0 0 1px var(--halo-c), 0 0 2px var(--halo-c), 0 0 4px var(--halo-c), 0 0 8px var(--halo-c); }
-  body.halo .tip, body.halo #alert, body.halo #agenda { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  /* glass-2026-10-23: no blur behind cards (it hid what is behind the window); the top bar stays solid */
+  body.halo #bar { background: var(--bar-bg, var(--bg)); }
 
   /* ---------- top bar: state + mute + menu ---------- */
   #bar { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; font-size: 13px; flex: none;
@@ -1222,11 +1223,14 @@
     var cs = getComputedStyle(root);
     var bg = cs.getPropertyValue('--bg').trim(), pa = cs.getPropertyValue('--panel').trim(), p2 = cs.getPropertyValue('--panel2').trim();
     root.style.setProperty('--halo', bg);
+    root.style.setProperty('--bar-bg', bg);
     if (v < 1) {
-      var pct = Math.round(v * 100);
-      root.style.setProperty('--bg', 'color-mix(in srgb, ' + bg + ' ' + pct + '%, transparent)');
-      root.style.setProperty('--panel', 'color-mix(in srgb, ' + pa + ' ' + Math.min(100, pct + 6) + '%, transparent)');
-      root.style.setProperty('--panel2', 'color-mix(in srgb, ' + p2 + ' ' + Math.min(100, pct + 6) + '%, transparent)');
+      // The window background and the cards add up: the background fades much more than the slider
+      // value, the cards follow it, so at 64% about a third of what is behind shows through a card.
+      var pct = Math.round(v * 100), back = Math.round(Math.max(0, (v - 0.4)) * 100 / 0.6 * 0.35);
+      root.style.setProperty('--bg', 'color-mix(in srgb, ' + bg + ' ' + back + '%, transparent)');
+      root.style.setProperty('--panel', 'color-mix(in srgb, ' + pa + ' ' + pct + '%, transparent)');
+      root.style.setProperty('--panel2', 'color-mix(in srgb, ' + p2 + ' ' + Math.max(0, pct - 6) + '%, transparent)');
     }
     document.body.classList.toggle('halo', v < 0.9);
   }
@@ -2097,6 +2101,8 @@
       }
       if (it.kind === 'ack') { window.ackSetting(it.key, it.value); return; }
       if (it.kind === 'speaker_ask') { addAsk(it); return; }
+      if (it.kind === 'speaker_auto') { noteSid(it.sid, it.name); dropAsk(it.sid); renderChip(); toast('✓ ' + it.name, 'ok'); return; }
+      if (it.kind === 'speakers_cleared') { for (var k in spk) spk[k].name = null; askQ = []; askSkipped = {}; renderAsk(); renderChip(); return; }
       render(it);
     });
   };

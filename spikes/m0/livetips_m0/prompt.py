@@ -29,7 +29,7 @@ Triggers (level, id, when, what to give):
 
 Context discipline (most common failures, check every time):
 - Read the whole transcript you get. If the fact, owner or date was already said aloud by anyone, or the PM already answered, return skip.
-- "your_turn" only when the PM is addressed by name AND asked for an update or opinion now. If someone else is giving the update, skip. A name said in the third person ("as Alex said", "Alex will check") is not an address. A turn already tipped stays tipped until the PM has spoken.
+{address_rule}
 - Classify says need_tip only when the tip would carry something concrete from the brief, fact book, cards or transcript; with no brief and no facts, only red triggers (a direct question, the PM's turn, a new request, a commitment) need a tip.
 - Never answer a question with a fact that is not in the brief, fact book, cards or transcript. No fact = skip.
 - The phrase uses the language the PM speaks with these people on this call (look at the PM's own lines).
@@ -42,9 +42,19 @@ Tip diet: one gist line plus at most one phrase or up to {fact_lines} fact lines
 Output formats are given in the task at the end of each request.
 """
 
+ADDRESS_STRICT = """- "your_turn" only when the PM is addressed by name AND asked for an update or opinion now. If someone else is giving the update, skip. A name said in the third person ("as Alex said", "Alex will check") is not an address. A turn already tipped stays tipped until the PM has spoken."""
+
+# 2026-10-23 PM sync review: the PM may be expected to answer or add to a question asked to anyone.
+ADDRESS_ANY = """- Questions to anyone count: when anyone on the call asks a question (to the PM, to another person or to the room) and the brief, the fact book, the cards or the project current state hold a concrete answer, give it. Who was addressed does not matter. Skip when nothing concrete answers it, it was already answered aloud, or the question is about someone else's project and the brief holds nothing specific on it.
+- Never a tip about whose turn it is ("your turn", "your turn soon", "pause, you can start"), even with the speech in it: the PM decides when to speak and already has the speech card. When the PM is asked for an update by name, give only what is new versus the speech card (an answer to the exact question), or skip."""
+
+
+CLASSIFY_ANY = "A question to anyone counts when the context holds a concrete answer: the PM could give it. Who was addressed does not matter. A mention without a question is not a reason for a tip."
+CLASSIFY_STRICT = "A name in the third person is not an address."
+
 CLASSIFY_TASK = """ROLE classify. Do NOT write a tip. Only decide if the PM needs a tip right now for the newest line(s).
 Return JSON only: {"need_tip": true|false, "level": "red|orange|none", "trigger": "<trigger id or none>", "topic": "<2-4 words>"}.
-need_tip is true only for a trigger in the table AND when the fact book, brief or cards hold something concrete to give, or the PM is asked directly. A name in the third person is not an address. If the question was already answered in the transcript, false."""
+need_tip is true only for a trigger in the table AND when the fact book, brief or cards hold something concrete to give, or the PM is asked directly. {address} If the question was already answered in the transcript, false."""
 
 TIP_TASK = """ROLE tip. Event: {event}. Write the tip for the newest line(s), or skip with {{"skip": true, "reason": "..."}}.
 Before writing, decide what is NEW: a fact, number, owner, date or sentence that nobody has said aloud yet and that is not in tips_given. If nothing is new, or the PM already answered the question, skip. Skip is the normal outcome; a shown tip is the exception.
@@ -52,7 +62,7 @@ Facts marked unverified, "(verify)", "to confirm" or similar are never stated as
 Tip format (JSON, keys in this order, gist first):
 {{"gist": "<emoji + what is happening, max {gist_words} words, in the tips language>", "level": "red|orange|info", "topic": "<2-5 words>", "new": "<what in this tip was not said aloud yet, max 8 words>", "phrase": "<ready sentence the PM can say now, in the answer language; English: simple, max {phrase_words} words>", "items": ["<fact with number>"], "note": "<source, date>", "trigger": "<trigger id>", "fact_ids": ["<ids from the fact book used>"]}}
 Emoji: red = 🔴 (direct question: 🎯), orange = 🟠, info = 🟢.
-Tips language: {tips_lang}. Answer language: the language the PM is expected to speak right now.
+Tips language: {tips_lang}. Answer language (phrase and items): the language the PM is expected to speak right now; on a call in one language only ({langs}) always that language, never English templates.
 Return JSON only, gist first."""
 
 
@@ -69,6 +79,12 @@ def disabled_triggers(meta: Optional[dict]) -> set:
             off.add("your_turn")             # the PM asks or watches; nobody waits for the PM's update
     if meta.get("audience") == "team":
         off.add("pm_factual_error")          # the PM thinks aloud with the team: no corrections
+    if not meta.get("turn_tips", False):
+        off.add("your_turn")                 # 2026-10-23: the PM starts talking on their own, not on a tip
+    if not meta.get("proactive", False):
+        # 2026-10-26 review: "Зафіксуй" / "Можеш додати" during other people's talk were noise (as in the
+        # skill, proactive.md is off by default). Owners and dates go to the "On me" panel instead.
+        off |= {"add_fact", "fix_owner_date"}
     return off
 
 
@@ -80,7 +96,8 @@ def render_rules(rules, tips_lang: str = "", meta: Optional[dict] = None) -> str
     return RULES_TEMPLATE.format(
         version=rules.version, priorities=" > ".join(rules.priorities["order"]), triggers=trig,
         fact_lines=d["limits"]["fact_lines_max"], fact_words=d["limits"]["fact_words_max"],
-        live_topic=d["live_topic_window_s"])
+        live_topic=d["live_topic_window_s"],
+        address_rule=ADDRESS_ANY if (meta or {}).get("answer_any", True) else ADDRESS_STRICT)
 
 
 def _read(p: Optional[Path], limit: int) -> str:
@@ -131,7 +148,7 @@ AUDIENCE_NOTES = {
     "client": "Client call: restricted internal facts may shape a tip, but numbers from them are never stated.",
     "boss": "Client rules (the PM's manager acts as the client): restricted internal facts may shape a tip, "
             "but numbers from them are never stated.",
-    "team": "Team call: no corrections of the PM, no info tips; at most a few tips per hour.",
+    "team": "Team call: no corrections of the PM.",
 }
 
 TYPE_NOTES = {
@@ -145,7 +162,7 @@ class PromptBuilder:
         self.rules = rules
         lim = rules.diet["limits"]
         self.fmt = {"tips_lang": call_meta.get("tips_lang", "uk"), "gist_words": lim["gist_words_max"],
-                    "phrase_words": lim["phrase_words_max_en"]}
+                    "phrase_words": lim["phrase_words_max_en"], "langs": "+".join(call_meta.get("langs", [])) or "uk"}
         self.meta = dict(call_meta)
         self._brief = _read(brief_path, 40000) or "(no brief)"
         self._extra = extra_context
@@ -177,16 +194,24 @@ class PromptBuilder:
             return False
         self.meta = call_meta = new
         role = "coach" if call_meta.get("hiring_role") == "candidate" else call_meta.get("hiring_role")
-        header = "Call: {title}. Project: {project}. Audience: {audience}. Type: {call_type}. Languages: {langs}. " \
+        import datetime as _dt
+        today = _dt.date.today()
+        header = "Today: {today}. Call: {title}. Project: {project}. Audience: {audience}. Type: {call_type}. Languages: {langs}. " \
                  "The PM's lines are labelled \"{me_label}\"; everyone else \"{them_label}\" (a speaker tag like [S2] may follow). " \
                  "The PM is addressed as: {aliases}.{role}{aud}{typ}".format(
                      role=(" " + ROLE_NOTES[role]) if call_meta.get("call_type") == "interview" and role in ROLE_NOTES else "",
                      aud=(" " + AUDIENCE_NOTES[call_meta.get("audience")]) if call_meta.get("audience") in AUDIENCE_NOTES else "",
                      typ=(" " + TYPE_NOTES[call_meta.get("call_type")]) if call_meta.get("call_type") in TYPE_NOTES else "",
+                     today=today.strftime("%A %Y-%m-%d"),
                      title=call_meta.get("title", ""), project=call_meta.get("project", ""),
                      audience=call_meta.get("audience", "auto"), call_type=call_meta.get("call_type", "auto"),
                      langs=", ".join(call_meta.get("langs", [])), me_label=call_meta.get("me_label", ""),
                      them_label=call_meta.get("them_label", ""), aliases=", ".join(call_meta.get("name_aliases", [])))
+        if call_meta.get("pm_projects"):
+            header += " The PM's own projects: {}. Updates about other projects belong to other people.".format(
+                ", ".join(call_meta["pm_projects"]))
+        if call_meta.get("participants"):
+            header += " Participants: {}. Never address anyone else.".format(", ".join(call_meta["participants"]))
         facts = self.blocks[2] if len(self.blocks) > 2 else {
             "text": "FACT BOOK AND CARDS:\n" + (facts_block(*self._facts) or "(none)"), "cache": True}
         if len(self.blocks) <= 2:
@@ -200,7 +225,10 @@ class PromptBuilder:
         return True
 
     def user(self, role: str, event: str, tail_lines: List[str], state: dict, earlier_lines: List[str] = ()) -> str:
-        task = CLASSIFY_TASK if role == "classify" else TIP_TASK.format(event=event, **self.fmt)
+        if role == "classify":
+            task = CLASSIFY_TASK.replace("{address}", CLASSIFY_ANY if self.meta.get("answer_any", True) else CLASSIFY_STRICT)
+        else:
+            task = TIP_TASK.format(event=event, **self.fmt)
         st = json.dumps(state, ensure_ascii=False)
         earlier = "EARLIER IN THE CALL (older lines, for what was already said):\n{}\n\n".format("\n".join(earlier_lines)) if earlier_lines else ""
         return "STATE: {}\n\n{}LIVE TRANSCRIPT (last 90 s, newest last):\n{}\n\n{}".format(st, earlier, "\n".join(tail_lines), task)

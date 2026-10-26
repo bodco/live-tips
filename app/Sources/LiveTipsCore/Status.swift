@@ -66,9 +66,14 @@ public struct EngineStatus {
     public var tips = 0
     public var callSpentUSD = 0.0
     public var project: String?
+    public var slug: String?
     public var file: String?
     public var tipsFile: String?
     public var inboxFile: String?
+    /// Recorder errors (audio helper exits) and the audio state, to warn when nothing is recorded.
+    public var errors: [String] = []
+    public var mic: String?
+    public var systemAudio: String?
 
     public static func load(path: String) -> EngineStatus {
         var s = EngineStatus()
@@ -80,9 +85,13 @@ public struct EngineStatus {
         s.tips = (o["tips"] as? Int) ?? 0
         s.callSpentUSD = (o["spent_usd"] as? Double) ?? 0
         s.project = (o["project"] as? String) ?? (o["slug"] as? String) ?? (o["title"] as? String)
+        s.slug = o["slug"] as? String
         s.file = o["file"] as? String
         s.tipsFile = o["tips_file"] as? String
         s.inboxFile = o["inbox_file"] as? String
+        s.errors = (o["errors"] as? [String]) ?? []
+        s.mic = o["mic"] as? String
+        s.systemAudio = o["system_audio"] as? String
         // model-tips engine numbers (state/llm.json next to status.json)
         let llm = ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent("llm.json")
         if let d2 = FileManager.default.contents(atPath: llm), let o2 = try? JSONSerialization.jsonObject(with: d2) as? [String: Any] {
@@ -110,8 +119,25 @@ public enum WorkspaceScanner {
             let dir = (root as NSString).appendingPathComponent(n)
             guard FileManager.default.fileExists(atPath: (dir as NSString).appendingPathComponent("_notion/workspace.md")) else { continue }
             let members = projects.filter { !$0.root.isEmpty && ($0.root + "/").hasPrefix(dir + "/") }.map { $0.slug }
-            out.append(Workspace(name: n, root: dir, projects: members))
+            out.append(Workspace(name: n, root: callFolder(dir), projects: members))
         }
         return out
+    }
+
+    /// Where calls about the whole workspace live. The Cowork skill keeps them in "<Workspace> General"
+    /// (settings.workspaces.<key>.project_root); the app uses the same folder, so the prep, the calls and
+    /// the local index are shared (2026-10-23: the app looked in <Workspace>/live and saw no prep).
+    /// A <Workspace>/live link to another folder wins; then a "* General" subfolder; else the workspace folder.
+    public static func callFolder(_ dir: String) -> String {
+        let fm = FileManager.default
+        let live = (dir as NSString).appendingPathComponent("live")
+        if let dest = try? fm.destinationOfSymbolicLink(atPath: live) {
+            let abs = dest.hasPrefix("/") ? dest : (dir as NSString).appendingPathComponent(dest)
+            return ((abs as NSString).standardizingPath as NSString).deletingLastPathComponent
+        }
+        if fm.fileExists(atPath: live) { return dir }
+        let subs = ((try? fm.contentsOfDirectory(atPath: dir)) ?? []).filter { $0.lowercased().hasSuffix(" general") }
+        if subs.count == 1 { return (dir as NSString).appendingPathComponent(subs[0]) }
+        return dir
     }
 }

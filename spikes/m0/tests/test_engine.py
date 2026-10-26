@@ -8,6 +8,8 @@ from livetips_m0.replay import replay
 CFG = {"variant": "test", "models": {"classify": "fake-haiku", "tip": "fake-sonnet"}, "cache_ttl": "1h",
        "me_label": "Me", "them_label": "Other", "name_aliases": ["Alex"], "langs": ["en"], "tips_lang": "en",
        "active_rate_seconds": 45, "periodic_classify_s": 999,
+       # The original routing (questions to the PM by name, turn tips); the 2026-10-23 defaults are tested below.
+       "answer_any": False, "turn_tips": True, "speech_card": False, "situation": False, "proactive": True, "red_burst_s": 0, "phrase_repeat_min": 1.1,
        "budget": {"ledger": "", "call_soft_usd": 1, "call_hard_usd": 2, "monthly_hard_usd": 100}}
 
 
@@ -187,8 +189,10 @@ def test_interview_switches_off_project_triggers():
     off = disabled_triggers({"call_type": "interview", "hiring_role": "observer"})
     assert {"new_requirement", "pm_commitment", "your_turn"} <= off
     assert "pm_factual_error" in disabled_triggers({"audience": "team"})
-    assert disabled_triggers({"audience": "client"}) == set()
-    txt = render_rules(Rules(), meta={"call_type": "interview", "hiring_role": "coach"})
+    assert disabled_triggers({"audience": "client", "turn_tips": True, "proactive": True}) == set()
+    assert {"add_fact", "fix_owner_date"} <= disabled_triggers({"audience": "client", "turn_tips": True})
+    assert disabled_triggers({"audience": "client"}) == {"your_turn", "add_fact", "fix_owner_date"}   # defaults: no turn tips, no proactive
+    txt = render_rules(Rules(), meta={"call_type": "interview", "hiring_role": "coach", "turn_tips": True})
     assert "new_requirement" not in txt and "your_turn" in txt
 
 
@@ -373,3 +377,157 @@ def test_presentation_blocks_pacing_and_routes_qa_question(tmp_path):
     eng.set_meeting({"call_type": "auto"})
     assert eng.meeting_block(pacing, "add_fact", {}) is None
     assert eng.meeting_hint(q2, eng.detector.detect(q2), 36170) is None
+
+
+
+def test_answer_any_routes_a_question_to_someone_else(tmp_path):
+    """2026-10-23 PM sync: a question to another person may be one the PM answers or adds to."""
+    from livetips_m0.engine import Engine
+    from livetips_m0.prompt import PromptBuilder, ADDRESS_ANY
+    from livetips_m0.rules import Rules
+    from livetips_m0.providers import FakeProvider
+    from livetips_m0.transcript import Line
+    rules = Rules()
+    cfg = dict(CFG, answer_any=True, turn_tips=False, budget=dict(CFG["budget"], ledger=str(tmp_path / "s.json")))
+    meta = {"title": "t", "answer_any": True, "name_aliases": ["Alex"], "langs": ["en"]}
+    pb = PromptBuilder(rules, meta)
+    assert ADDRESS_ANY.split(":")[0] in pb.blocks[0]["text"]
+    assert "Who was addressed does not matter" in pb.user("classify", "", [], {})
+    eng = Engine(cfg=cfg, rules=rules, provider=FakeProvider(responder, 0.01, 0.02), prompt=pb,
+                 out_dir=tmp_path, stem="c", clock=lambda: 36000.0)
+    seen = []
+    eng._submit_tip = lambda line, trig, span, level_hint=None: seen.append("tip:" + str(span.get("route")))
+    eng._submit_classify = lambda line, span: seen.append("classify:" + str(span.get("route")))
+    eng.on_line(Line(1, "10:00:00", "them", "Other", None, "en", "Maria, when does the release go to production?"))
+    # 2026-10-26: a question to someone else goes to classify first (no parallel Sonnet call), still answered.
+    assert seen == ["classify:classify"]
+
+
+def test_speech_card_from_brief(tmp_path):
+    from livetips_m0.engine import Engine
+    from livetips_m0.prompt import PromptBuilder
+    from livetips_m0.rules import Rules
+    from livetips_m0.providers import FakeProvider
+    cfg = dict(CFG, budget=dict(CFG["budget"], ledger=str(tmp_path / "s.json")))
+    eng = Engine(cfg=cfg, rules=Rules(), provider=FakeProvider(responder, 0.01, 0.02), prompt=PromptBuilder(Rules(), {"title": "t"}),
+                 out_dir=tmp_path, stem="c", clock=lambda: 36000.0)
+    brief = ('# Live Brief\n\n## 6. My speech\n**🟢 Your speech: since Monday**\n"Short: release on Tuesday."\n'
+             '1. Release on Tuesday\n2. Two open bugs\n\n## 7. Insight Bank\nx\n')
+    item = eng.speech_card(brief)
+    assert item["kind"] == "speech" and item["gist"].startswith("🟢") and "Release on Tuesday" in item["items"][0]
+    assert eng.speech_card(brief) is None                     # a restarted engine does not show it twice
+    assert eng.meeting_block({"gist": "🎯 Статус", "phrase": "Short: release on Tuesday."}, "direct_question", {}) == "speech_repeat"
+    eng2 = Engine(cfg=cfg, rules=Rules(), provider=FakeProvider(responder, 0.01, 0.02), prompt=PromptBuilder(Rules(), {"title": "t"}),
+                  out_dir=tmp_path / "b", stem="c", clock=lambda: 36000.0)
+    js = '{"kind": "speech", "gist": "🟢 Your speech", "phrase": "Short.", "items": ["a", "b"]}'
+    assert eng2.speech_card("# B\n\n## speech.json\n" + js + "\n")["items"] == ["a", "b"]
+
+
+def test_workspace_current_states(tmp_path):
+    from livetips_m0.context import build
+    ws = tmp_path / "Acme"
+    for name in ("Alpha", "Beta"):
+        (ws / name / "_notion").mkdir(parents=True)
+        (ws / name / "_notion" / "current-state.md").write_text("# " + name + " state\nrelease Tuesday")
+    (ws / "Acme General").mkdir()
+    for root in (ws, ws / "Acme General"):
+        out = build("", str(root))
+        assert "Alpha state" in out and "Beta state" in out
+
+
+
+def test_turn_tips_are_blocked_by_default(tmp_path):
+    from livetips_m0.engine import Engine
+    from livetips_m0.prompt import PromptBuilder
+    from livetips_m0.rules import Rules
+    from livetips_m0.providers import FakeProvider
+    cfg = dict(CFG, turn_tips=False, budget=dict(CFG["budget"], ledger=str(tmp_path / "s.json")))
+    eng = Engine(cfg=cfg, rules=Rules(), provider=FakeProvider(responder, 0.01, 0.02),
+                 prompt=PromptBuilder(Rules(), {"title": "t"}), out_dir=tmp_path, stem="c", clock=lambda: 36000.0)
+    assert eng.meeting_block({"gist": "🎯 Твоя черга: апдейт"}, "direct_question", {}) == "turn_tip"
+    assert eng.meeting_block({"gist": "🟠 Пауза: можеш почати свій апдейт"}, "none", {}) == "turn_tip"
+    assert eng.meeting_block({"gist": "🎯 Maria asks how the presentation went"}, "direct_question", {}) is None
+
+
+def test_find_searches_the_project_folder_and_answers_with_sources(tmp_path, monkeypatch):
+    # 2026-10-26: the folder button in the window: queries from the fast model, lt search, passages to the tip.
+    from livetips_m0 import context
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "estimate.md").write_text("# Estimate\n\nPhase 2 pricing: 420 hours, Reports first, owner Dana.\n")
+    calls = []
+
+    def fake_snippets(lt, root, query, k=8, timeout=25.0):
+        calls.append(query)
+        return [{"path": str(proj / "estimate.md"), "rel": "estimate.md", "date": "2026-10-20", "score": 0.8,
+                 "preview": "Phase 2 pricing: 420 hours"}]
+    monkeypatch.setattr(context, "index_snippets", fake_snippets)
+
+    def resp(model, user):
+        if "Question:" in user:
+            return '{"queries": ["phase 2 pricing", "оцінка фаза 2"]}'
+        assert "PASSAGES FROM THE PROJECT FOLDER" in user and "420 hours" in user
+        return '{"gist": "Phase 2: 420 h", "level": "info", "topic": "pricing", "items": ["Reports first"]}'
+    eng, clock = _meeting_engine(tmp_path, resp, project_root=str(proj), lt_cmd=["lt"])
+    eng.on_request("find", "pricing for phase 2")
+    end = time.monotonic() + 5
+    while time.monotonic() < end and any(not f.done() for f in eng.futures):
+        time.sleep(0.01)
+    tips, timing = _out(tmp_path)
+    ans = [t for t in tips if t.get("kind") == "answer"]
+    assert ans and ans[-1]["gist"] == "🔎 Phase 2: 420 h"
+    assert ans[-1]["sources"] == ["estimate.md"] and ans[-1]["q"] == "find: pricing for phase 2"
+    assert calls[0] == "pricing for phase 2" and len(calls) == 3
+    assert timing[-1]["find_snippets"] == 1
+
+
+
+def test_situation_tracker_state_on_me_and_ask_tip(tmp_path):
+    # 2026-10-26: a running picture of the call; an open request to the PM in the third person gets one red tip.
+    def resp(model, user):
+        if "PREVIOUS STATE" in user:
+            return ('{"topic": "audit log retention", "owner": "Dana", "mine": true, "floor": "Dana", '
+                    '"asks": [{"id": "a1", "t": "10:00:05", "who": "Dana", "what": "ask the client about log retention", "type": "request"}], '
+                    '"actions": [{"id": "m1", "what": "ask the client about log retention", "due": "Friday", "from": "Dana"}], '
+                    '"decisions": ["keep logs 90 days"], "speech_done": [0]}')
+        if "Open request to the PM" in user:
+            return '{"gist": "🎯 Retention: ask at the stand-up", "level": "red", "topic": "retention", "phrase": "I will ask them on Friday."}'
+        return '{"need_tip": false, "level": "none", "trigger": "none", "topic": "x"}'
+    eng, clock = _meeting_engine(tmp_path, resp, situation=True, proactive=False)
+    eng.speech_items = ["Audit log is on dev", "Next: retention"]
+    _feed(eng, clock, "[10:00:05] Other (en): Alex will ask the client about log retention.", 1, 36005.0)
+    tips, timing = _out(tmp_path)
+    sit = [t for t in tips if t.get("kind") == "situation"]
+    assert sit and sit[-1]["actions"][0]["due"] == "Friday" and sit[-1]["speech_done"] == []   # the PM did not speak
+    red = [t for t in tips if t.get("kind") == "tip" and t.get("level") == "red" and not t.get("partial")]
+    assert len(red) == 1 and "Retention" in red[0]["gist"]
+
+
+def test_speech_show_and_rewrite_in_place(tmp_path):
+    def resp(model, user):
+        if "asks about the speech" in user:
+            return '{"gist": "🟢 Твій спіч", "phrase": "Short update.", "items": ["A", "B", "Resource call on 23.10"], "note": "added the resource call"}'
+        return '{"skip": true, "reason": "x"}'
+    eng, clock = _meeting_engine(tmp_path, resp, situation=False)
+    eng._emit_speech({"gist": "🟢 Твій спіч", "phrase": "Short update.", "items": ["A", "B"]})
+    eng.on_request("ask", "де мій спіч?")
+    eng.on_request("ask", "додай у спіч resource management call")
+    end = time.monotonic() + 5
+    while time.monotonic() < end and any(not f.done() for f in eng.futures):
+        time.sleep(0.01)
+    tips, _ = _out(tmp_path)
+    sp = [t for t in tips if t.get("kind") == "speech"]
+    assert len(sp) == 3 and all(t["uid"] == "speech" for t in sp)
+    assert "Resource call on 23.10" in sp[-1]["items"] and eng.speech_items[-1] == "Resource call on 23.10"
+
+
+def test_final_wrapup_and_red_only_for_the_pm(tmp_path):
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: '{"skip": true, "reason": "x"}', situation=False, phrase_repeat_min=0.42)
+    eng.speech_items = ["A", "B"]
+    eng.situation = {"decisions": ["keep logs 90 days"], "actions": [{"what": "ask the client", "due": "Friday"}],
+                     "asks": [{"what": "send the demo", "who": "Dana", "type": "request"}], "speech_done": [0]}
+    out = eng.final_wrapup()
+    assert out["kind"] == "wrapup" and any("90 days" in i for i in out["items"]) and any(i.endswith("B") for i in out["items"])
+    # the same phrase in other words is noise at any level
+    eng.tips.append({"phrase": "We can only speak to the gateway logs today", "_at": 36000.0, "level": "red", "gist": "x"})
+    assert eng._diet({"level": "red", "gist": "y", "phrase": "We can only speak to the gateway logs here"}, 36010.0) == "phrase_repeat"

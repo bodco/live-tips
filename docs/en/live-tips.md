@@ -1044,7 +1044,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Download:**
-[LiveTips-0.5.2-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.2/LiveTips-0.5.2-beta.dmg)
+[LiveTips-0.5.4-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.4/LiveTips-0.5.4-beta.dmg)
 
 What it does:
 
@@ -1128,7 +1128,9 @@ meeting, the app adds its section to that page instead of creating a second one.
 You can run both on one call, for a fair comparison or as a backup. The app records with its
 own recorder in its own app folder and names its files `<call>.app.*`
 (`2026-10-22-1500-team-daily.app.md`), so the two never share a transcript, control or state
-files. Both run Whisper, so expect about twice the CPU and memory. Compare afterwards:
+files. Both run Whisper and the local embeddings, so expect about twice the CPU and memory and
+a slower Mac for the first minutes, while both update the local index (a workspace folder shared
+with the skill is indexed once; the second copy waits for the lock). Compare afterwards:
 
 ```bash
 python -m livetips_m0.report <app folder>/runs/<call>.app --calls-root <project folder>/live
@@ -1198,3 +1200,78 @@ address", `references/sweep.md`, `references/presentation.md`).
 11. **Rated after every call.** With Settings > AI > "Rate tips after each call" on (default), the
    app runs a quick blind judge (Sonnet, up to 25 tips of the app and the skill, about $0.10) and
    shows "Last call: app 3.4/5, skill 2.9/5" in the menu; details in `<call>.judge/`.
+12. **The speech first.** When the prep has the PM's speech ("Your speech" in the brief), the app
+   shows it as the first card the moment the engine starts, without a model call, as the skill does.
+13. **Questions to anyone (0.5.3).** A question asked to anyone on the call gets a tip when the
+   brief, the facts, the cards or the project's Current State hold an answer the PM could give or
+   add: on a team sync the PM is often expected to answer a question put to someone else. Settings >
+   AI > "Answer questions to anyone, not only to me" (on by default); off restores the old rule
+   (only questions to the PM by name). No tip ever predicts the PM's turn ("your turn", "pause, you
+   can start"): the PM starts on their own.
+14. **Current State of the workspace.** A call started on a workspace (a PM sync about several
+   projects) reads the Current State pages of the member projects (`_notion/current-state.md`).
+   The workspace's calls live in the same folder as the skill's: `<Workspace>/<Workspace> General`
+   when it exists, or the folder a `<Workspace>/live` link points to.
+15. **Call ended, visibly.** After End call the button turns into "Ended ✓", the window gets a
+   closing card with the transcript file and its line count, and the menu shows "✓ Call ended
+   HH:MM · transcript saved (N lines)". Close the window only after that.
+16. **No audio, said aloud.** Before each call the app checks that the recorder's audio helper
+   starts and reinstalls it once if macOS blocks it (after an update a binary overwritten in place
+   is killed at launch). If the helper still fails during a call, the window shows a red "not
+   recording" card within 30 s and the menu says so: end the call and start again.
+17. **Preparation by hand (0.5.4).** Start call shows "Preparation": the newest Cowork prep made
+   for this call title (the file name or the title in the brief heading). "Use preparation" lists
+   every prep of the project's live folder from the last 14 days, so a prep saved under another name
+   can be picked by hand.
+18. **Ukrainian only by default.** Languages in Start call: Ukrainian (default), Ukrainian + English,
+   English, English + Spanish. A project whose client language is English starts with English.
+19. **Search the project folder.** The folder button in the ask field (or "find:" at the start):
+   Claude turns the question into a few searches, reads the best passages from the project's files
+   (by meaning with Local AI on, by words otherwise) and answers with the file names in 10-30 s.
+20. **Transcript next to the tips.** The lines button in the top bar opens the live transcript in a
+   split pane (the window grows like it does for slide cards), with speaker names and "Follow".
+21. **Speakers: short names and memory.** Names are shown as first name + initial ("Alex M."). The
+   names used on a meeting series (project + call title) are remembered; on the next call of the
+   series a voice that matches one of them well is named by itself. "Clear speakers" (in the
+   transcript pane and the speaker popover, two clicks) removes the names of this call and forgets
+   the series.
+22. **How it works.** Settings > How it works: what runs on the Mac, what Claude gets and when, and
+   what to expect.
+23. **Start call layout.** Project, Title, Date and time (today, the next full hour; it goes into
+   the Cowork request), then the folder and team line. Call context starts as a template (goal,
+   participants, open questions, where to look); empty template lines are not sent. Names after
+   "Учасники:" / "Participants:" are the only names the speaker cards offer; anyone else is typed.
+24. **Fix a speaker from the transcript.** Click the speaker of a line in the transcript pane: give
+   the line to another speaker or a typed name, or rename that speaker in every line.
+25. **Voice library scopes.** Settings > AI > Voice library: the menu next to each person moves the
+   voice to the team (every project), a whole workspace (all its projects) or one project.
+26. **The call picture (0.5.4, after the 26.10 review).** A fast model keeps a running picture of the
+   call every ~10 s: the topic and whose it is, open questions and requests to you (also "Alex will
+   check" said in the third person), what you took on, decisions, and which speech points you already
+   said. The window shows it as a status line ("👂 topic · who · yours / not yours"), an "On me" panel
+   (open asks in red, your actions with dates), and the speech card with said points struck through;
+   when you are asked for your update the speech opens on top ("Your turn"). A new open ask to you that
+   no tip covered gets one red tip.
+27. **Less noise.** Heard-question lines and unasked fact cards are no longer shown in the stream (facts
+   stay in the field search); a prepared card shows once in 10 minutes and not on someone else's topic;
+   "Fix it / You can add" tips during other people's talk are off by default (`proactive`); "Who is
+   speaking?" waits for 15 s of speech. Questions to anyone still get a tip when the context answers them.
+28. **Asks remember.** The ask field keeps the earlier asks of the call, so "more detail" builds on the
+   last answer. "Where is my speech?" shows the speech; "add X to the speech" rewrites the speech card
+   in place.
+29. **Red is for you only.** A red tip means you were addressed (by name or "you"), a new request,
+   your own commitment, or an open question to you; an answer to a question asked to the room comes in
+   orange. The same answer in other words within 10 minutes is not shown again.
+30. **Call summary in the window.** When the call ends, the window gets one card from the call picture:
+   decisions, what is on you, unanswered questions and speech points you never said (no model call; the
+   Notion page is written as before). An ask nobody answered for 6 minutes leaves the "On me" panel.
+31. **Start call, tidier.** Cancel and Start stay at the bottom; Project, Title, Date and time, Call
+   context, Preparation, Audience and Languages are visible, the rest is under "Advanced". How "Prepare
+   now" runs (Claude account or API key, sign-in, model) moved to Settings > AI > Preparation; Start call
+   shows one button, its progress (stages from Claude Code's own events: instructions, sources with a
+   file count, brief, cards, facts, check) and the cost when it is done. A prep made in the morning for
+   an evening call counts as fresh: its age runs from the call time in its name.
+32. **End call always ends.** End call reads the recorder's own state, so it stops the call even after
+   the app was restarted during it, and then writes the Notion page as usual.
+33. **Two people, one initial.** When two participants share a short form ("Anna K."), both keep their
+   full names; voices are merged into a short name only when exactly one full name leads to it.

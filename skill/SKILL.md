@@ -219,8 +219,9 @@ Whisper language or prompt; restart with the right one and tell the PM what was 
 
 | Level | Trigger | Tip |
 |---|---|---|
-| 🔴 | **Your turn**: `{them_label}` addresses the PM by any of `settings.user.name_aliases` (any grammatical form or misspelling) with a request for an update or opinion, or a round of updates reaches the PM | opening sentence + the speech theses not used yet, in order (format in `speech.md`); one topic asked = that topic only. Immediate |
+| 🔴 | **Your turn**: `{them_label}` addresses the PM by any of `settings.user.name_aliases` (any grammatical form or misspelling) with a request for an update or opinion (never predicted from the order of a round) | opening sentence + the speech theses not used yet, in order (format in `speech.md`); one topic asked = that topic only. Immediate |
 | 🔴 | A direct question to the PM | gist "🎯 {тема}" + the answer as a ready phrase + up to 2 facts with sources, from the brief, cards, fact book |
+| 🟠 | A question to anyone else on the call (or to the room) that the brief, the cards, the fact book or Current State answer | gist "🎯 {тема}" + the fact the PM could give or add, with its source. Who was asked does not matter: the PM may be expected to answer or add. No fact = silence |
 | 🔴 | `{them_label}` asks for something new ("could you also", "can we add", a change of scope or behaviour) | "Нова вимога. Не погоджуй зараз." + "Good idea. I will write it down. We will check it and come back to you." |
 | 🔴 | `{me_label}` commits a date or an estimate | "Оцінку дає виконавець. Не називай цифру." + a phrase that defers |
 | 🔴 | A statement contradicts a Decision or a red line of the brief | "Суперечить рішенню {дата}" + the decision in a few words |
@@ -257,7 +258,7 @@ Whisper language or prompt; restart with the right one and tell the PM what was 
   A tip's topic must match the last two other-side lines, not the last 60 s.
 - **A name is not an address.** Of 77 lines with the PM's name only 12 addressed the PM. "Як
   Петро казав", "Петра треба спитати", "Mike is on vacation", "Mike will check" are
-  third person: no "Your turn", no direct question tip. "Your turn" needs the vocative or
+  third person: no "Your turn", no direct question tip. (A question asked to someone else still gets the 🟠 fact tip above when the context answers it.) "Your turn" needs the vocative or
   the bare alias plus a request or a question in the same line, and nobody else holding the
   floor (a co-presenter who was just handed the word is not the PM's turn).
 - **Volume cap on team calls**: at most 12 model tips per hour and no `info` level unless the

@@ -56,6 +56,9 @@ public struct AppConfig: Codable, Equatable {
     public var hedgeEnabled = true
     /// After each call: the blind judge rates the tips in the background (Sonnet, at most 25 tips, about $0.10).
     public var judgeAfterCall = true
+    /// 2026-10-23: tips for a question to anyone on the call (not only to you) when the brief or the
+    /// project state holds an answer you could give or add.
+    public var answerAny = true
     /// The work folder connected to Cowork: project folders and the Notion mirror (_notion/) live here.
     public var workRoot = ""
     /// Advanced override; empty = <workRoot>/Tools/LiveTips (or Application Support without a work folder).
@@ -79,6 +82,7 @@ public struct AppConfig: Codable, Equatable {
         speakersEnabled = (try? c.decode(Bool.self, forKey: .speakersEnabled)) ?? d.speakersEnabled
         hedgeEnabled = (try? c.decode(Bool.self, forKey: .hedgeEnabled)) ?? d.hedgeEnabled
         judgeAfterCall = (try? c.decode(Bool.self, forKey: .judgeAfterCall)) ?? d.judgeAfterCall
+        answerAny = (try? c.decode(Bool.self, forKey: .answerAny)) ?? d.answerAny
         workRoot = (try? c.decode(String.self, forKey: .workRoot)) ?? d.workRoot
         appRoot = (try? c.decode(String.self, forKey: .appRoot)) ?? d.appRoot
         knownModels = (try? c.decode([String].self, forKey: .knownModels)) ?? d.knownModels

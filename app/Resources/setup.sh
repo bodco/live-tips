@@ -42,7 +42,13 @@ case "$MODE:$STEP" in
     else echo "MISSING not installed yet"; fi ;;
   install:core)
     mkdir -p "$APPROOT/src" "$APPROOT/bin" "$APPROOT/control" "$APPROOT/state" "$APPROOT/voices" "$APPROOT/runs"
-    cp -f "$BUNDLE/core/src/"* "$APPROOT/src/" && cp -f "$BUNDLE/core/bin/"* "$APPROOT/bin/" || exit 1
+    cp -f "$BUNDLE/core/src/"* "$APPROOT/src/" || exit 1
+    # Binaries are replaced by a new file (copy, then rename), never overwritten in place: macOS keeps the
+    # code signature of a running or recently run binary per file, and an in-place copy gets it killed at
+    # launch (SIGKILL, "exited with -9"; 2026-10-23: a whole call recorded nothing).
+    for f in "$BUNDLE/core/bin/"*; do
+      n="$(basename "$f")"; cp -f "$f" "$APPROOT/bin/.$n.new" && mv -f "$APPROOT/bin/.$n.new" "$APPROOT/bin/$n" || exit 1
+    done
     [ -f "$APPROOT/config.json" ] || cp "$BUNDLE/core/config.json" "$APPROOT/config.json"
     xattr -dr com.apple.quarantine "$APPROOT/bin" "$APPROOT/src" 2>/dev/null
     chmod +x "$APPROOT/bin/"*

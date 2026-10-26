@@ -4,6 +4,7 @@
 
 import AppKit
 import WebKit
+import LiveTipsCore
 
 struct PrompterArgs {
     var tips = ""
@@ -88,13 +89,20 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     var isSplit = false              // presentation split view: slide cards on one side, tips on the other
     var baseWidth: CGFloat = 0       // window width before the split, restored when it ends
     var grewRight = false            // the side the window grew to (the slides side)
+    var deckWide = false             // the page wants the slide cards next to the tips
+    var trWide = false               // 2026-10-26: the transcript pane is open next to the tips
+    var deckGrowRight = false
+    var transcript: TailReader?      // the call's transcript (.md), pushed to the transcript pane
+    var transcriptPath = ""
+    var speakersMtime: Date?
+    var ticker: Timer?               // stopped when the window closes (QA: closed windows kept reading files)
 
     init(args: PrompterArgs) { self.args = args }
 
     func show() {
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript"] { uc.add(self, name: name) }
         let cfg = WKWebViewConfiguration()
         cfg.userContentController = uc
 
@@ -119,6 +127,17 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         _ = window.setFrameAutosaveName("LiveTipsAppPrompter")   // remembers position and size
         addEndCallButton()
 
+        // 2026-10-23: the title bar (close, minimise, End call) stays solid at any opacity setting.
+        if let tb = window.standardWindowButton(.closeButton)?.superview {
+            tb.wantsLayer = true
+            window.effectiveAppearance.performAsCurrentDrawingAppearance {
+                tb.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            }
+        }
+        NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in
+            MainActor.assumeIsolated { self?.showCallEnded(n.userInfo ?? [:]) }
+        }
+
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
         web.navigationDelegate = self
         web.setValue(false, forKey: "drawsBackground")   // the page's own background can be see-through
@@ -131,7 +150,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         NSApp.activate(ignoringOtherApps: true)
 
         if !args.tips.isEmpty { tips = TailReader(path: args.tips) }
-        Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(tick),
+        ticker = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(tick),
                              userInfo: nil, repeats: true)
     }
 
@@ -148,6 +167,26 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             push("window.setStatus(" + s + ")")
             if let d = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] {
                 startButton?.isHidden = (d["state"] as? String) != "standby"
+                if let f = d["file"] as? String, !f.isEmpty, f != transcriptPath {
+                    transcriptPath = f
+                    transcript = TailReader(path: f)
+                    speakersMtime = nil
+                }
+            }
+        }
+        // The live transcript and the speaker names (speakers.json) for the transcript pane.
+        if let tr = transcript {
+            let lines = tr.newLines()
+            if !lines.isEmpty, let d = try? JSONSerialization.data(withJSONObject: lines), let js = String(data: d, encoding: .utf8) {
+                push("window.addTranscript && window.addTranscript(" + js + ")")
+            }
+        }
+        if ticks % 4 == 2, !transcriptPath.isEmpty {
+            let sp = (transcriptPath.hasSuffix(".md") ? String(transcriptPath.dropLast(3)) : transcriptPath) + ".speakers.json"
+            if let m = (try? FileManager.default.attributesOfItem(atPath: sp))?[.modificationDate] as? Date, m != speakersMtime,
+               let s = try? String(contentsOfFile: sp, encoding: .utf8), isJSONObject(s) {
+                speakersMtime = m
+                push("window.setSpeakers && window.setSpeakers(" + s + ")")
             }
         }
     }
@@ -206,10 +245,17 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             // towards the cards, so the tips stream stays where the PM put it.
             // Body: Bool (grow left), or {"on": Bool, "grow": "left" | "right"} after the PM swapped the sides.
             if let d = message.body as? [String: Any] {
-                setSplit((d["on"] as? Bool) ?? false, growRight: (d["grow"] as? String) == "right", animate: true)
+                deckWide = (d["on"] as? Bool) ?? false
+                deckGrowRight = (d["grow"] as? String) == "right"
             } else {
-                setSplit((message.body as? Bool) ?? false, growRight: false, animate: true)
+                deckWide = (message.body as? Bool) ?? false
+                deckGrowRight = false
             }
+            setSplit(deckWide || trWide, growRight: deckGrowRight, animate: true)
+        case "transcript":
+            // The transcript pane opens next to the tips: the window grows the same way as for slide cards.
+            trWide = (message.body as? Bool) ?? false
+            setSplit(deckWide || trWide, growRight: deckGrowRight, animate: true)
         case "setting":
             // {"key": ..., "value": ...} -> the skill reads it from the inbox as @@SET key=value
             guard let d = message.body as? [String: Any], let key = d["key"] as? String,
@@ -243,7 +289,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     }
 
     /// Back to the normal width before the frame is saved, so the next call does not open twice as wide.
-    func windowWillClose(_ notification: Notification) { setSplit(false, animate: false) }
+    func windowWillClose(_ notification: Notification) {
+        deckWide = false; trWide = false; setSplit(false, animate: false)
+        ticker?.invalidate(); ticker = nil
+    }
 
     /// "End call" in the window's title bar: stops the recording; the transcript and tips stay in the project folder.
     var endButton: NSButton?
@@ -288,12 +337,49 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     }
 
     @objc func endCallClicked() {
-        guard CallEngine.shared.isRunning else { window.close(); return }
+        // 2026-10-26: End call did nothing on a live call. The app had lost track of the recorder
+        // process, and a modal alert can open behind this floating window. Now: the recorder's own
+        // status decides, and the question is a sheet on this window.
+        let st = EngineStatus.load(path: CallEngine.shared.statusPath)
+        let live = CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(st.state)
+        guard live else { window.close(); return }
         let a = NSAlert()
         a.messageText = "End the call?"
-        a.informativeText = "Recording stops; the transcript and tips stay in the project folder."
+        a.informativeText = "Recording stops; the transcript and tips stay in the project folder, and the summary goes to Notion."
         a.addButton(withTitle: "End call")
         a.addButton(withTitle: "Cancel")
-        if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop() }
+        a.beginSheetModal(for: window) { [weak self] resp in
+            guard resp == .alertFirstButtonReturn else { return }
+            MainActor.assumeIsolated {
+                let owned = CallEngine.shared.isRunning
+                CallEngine.shared.stop()
+                self?.endButton?.title = "Ending..."
+                self?.endButton?.isEnabled = false
+                if !owned {
+                    CallEngine.shared.finishOrphan { file, saved in
+                        self?.showCallEnded(["saved": saved, "file": file, "lines": EngineStatus.load(path: CallEngine.shared.statusPath).lines])
+                    }
+                }
+            }
+        }
+    }
+
+    /// The recorder has stopped: the button says so and the window gets a closing card with the file
+    /// (2026-10-23: "I was afraid to close the app before it finished the call").
+    func showCallEnded(_ info: [AnyHashable: Any]) {
+        let saved = info["saved"] as? Bool ?? false
+        endButton?.title = saved ? "Ended ✓" : "Ended"
+        endButton?.bezelColor = saved ? .systemGreen : .systemOrange
+        endButton?.isEnabled = true            // a click now closes the window
+        endButton?.sizeToFit()
+        let file = ((info["file"] as? String ?? "") as NSString).lastPathComponent
+        let lines = info["lines"] as? Int ?? 0
+        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
+        let item: [String: Any] = ["kind": "wrapup", "level": "info", "t": f.string(from: Date()), "at": f.string(from: Date()),
+                                   "gist": saved ? "✅ Call ended, transcript saved" : "⚠ Call ended, transcript file not found",
+                                   "items": saved ? ["\(lines) lines: \(file)", "You can close this window."] : ["Check the project's live folder."]]
+        if let d = try? JSONSerialization.data(withJSONObject: [item]), let js = String(data: d, encoding: .utf8) {
+            push("window.addItems && window.addItems(\(js))")
+        }
     }
 }

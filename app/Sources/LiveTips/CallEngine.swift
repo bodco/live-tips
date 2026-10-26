@@ -30,6 +30,10 @@ final class CallEngine {
     var judgeResultPath: String { (appRoot as NSString).appendingPathComponent("state/last-judge.txt") }
     var sidecarRestarts = 0
     var projectRoot = ""
+    /// 2026-10-23: a visible confirmation that the call ended and the transcript is saved (menu, tips window).
+    var lastCallSummary = ""
+    var lastLines = 0
+    static let callEnded = Notification.Name("LiveTipsCallEnded")
 
     func problems() -> [String] {
         let c = config
@@ -42,10 +46,44 @@ final class CallEngine {
         return p
     }
 
+    /// The recorder's audio helper (bin/audiocap) must start. 2026-10-23: after an update the helper was
+    /// killed by macOS at every launch (signature cached for the old file) and a call recorded nothing.
+    /// A quick probe; on a kill the core is copied again (as a new file) and probed once more.
+    func ensureAudioHelper() -> String? {
+        let bin = (appRoot as NSString).appendingPathComponent("bin/audiocap")
+        guard FileManager.default.isExecutableFile(atPath: bin) else { return nil }
+        func probe() -> Bool {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: bin)
+            p.arguments = ["--help"]
+            p.standardOutput = FileHandle.nullDevice
+            p.standardError = FileHandle.nullDevice
+            do { try p.run() } catch { return false }
+            let deadline = Date().addingTimeInterval(4)
+            while p.isRunning && Date() < deadline { usleep(50_000) }
+            if p.isRunning { p.terminate(); return true }
+            return !(p.terminationReason == .uncaughtSignal)
+        }
+        if probe() { return nil }
+        if let res = Bundle.main.resourcePath {
+            let s = Process()
+            s.executableURL = URL(fileURLWithPath: "/bin/bash")
+            s.arguments = [(res as NSString).appendingPathComponent("setup.sh"), "install", "core"]
+            var env = ProcessInfo.processInfo.environment
+            env["APPROOT"] = appRoot
+            env["BUNDLE"] = res
+            s.environment = env
+            try? s.run()
+            s.waitUntilExit()
+        }
+        return probe() ? nil : "The audio helper is blocked by macOS (killed at launch). Open Settings > About and run Setup again, or reinstall Live Tips."
+    }
+
     /// Starts recording. `request` goes to control/start.json (project_dir, title, slug, langs, call_type, audience).
     func start(request: [String: Any], apiAllowed: Bool, onReady: @escaping (EngineStatus) -> Void) -> String? {
         if isRunning { return "A call is already running" }
         if let first = problems().first { return first }
+        if let err = ensureAudioHelper() { return err }
         LocalAIService.shared.apply()                       // core config: semantic on/off, engine URL
         if config.localAI.enabled { _ = LocalAIService.shared.waitReady(timeout: 6) }
         callContext = (request["context"] as? String) ?? ""
@@ -82,6 +120,7 @@ final class CallEngine {
             guard let self = self else { t.invalidate(); return }
             let st = EngineStatus.load(path: self.statusPath)
             if let f = st.file { self.lastFile = f }
+            if st.lines > 0 { self.lastLines = st.lines }
             if !sidecarStarted, let file = st.file, ["recording", "loading_model", "standby"].contains(st.state) {
                 sidecarStarted = true
                 self.adoptPrep(file: file)
@@ -96,8 +135,19 @@ final class CallEngine {
             }
             if !(self.recorder?.isRunning ?? false) {
                 t.invalidate()
-                self.sidecar?.terminate()
+                // The tips engine ends by itself a few seconds after the recorder and writes the call summary
+                // card; it is stopped only if it hangs (P2 26.10).
+                let sc = self.sidecar
+                DispatchQueue.main.asyncAfter(deadline: .now() + 25) { if sc?.isRunning == true { sc?.terminate() } }
                 IndexService.shared.resume()
+                let f = DateFormatter(); f.dateFormat = "HH:mm"
+                let saved = (st.file ?? self.lastFile).map { FileManager.default.fileExists(atPath: $0) } ?? false
+                self.lastCallSummary = saved
+                    ? "✓ Call ended \(f.string(from: Date())) · transcript saved (\(self.lastLines) lines)"
+                    : "⚠ Call ended \(f.string(from: Date())) · no transcript file found"
+                NotificationCenter.default.post(name: CallEngine.callEnded, object: nil,
+                                                userInfo: ["summary": self.lastCallSummary, "saved": saved,
+                                                           "file": (st.file ?? self.lastFile) ?? "", "lines": self.lastLines])
                 if let file = st.file ?? self.lastFile, apiAllowed {
                     self.writeToNotion(file: file)
                     self.runJudge(file: file)          // background, optional: never blocks the UI or the call
@@ -112,9 +162,23 @@ final class CallEngine {
         let c = config
         let lt = (appRoot as NSString).appendingPathComponent("bin/lt")
         guard FileManager.default.fileExists(atPath: lt) else { return }
+        // A prep chosen by hand in the Start call window: copy its files next to this call's transcript,
+        // and do not let the automatic pick add files of another prep (QA 26.10).
+        var auto = true
+        if let chosen = callRequest["prep_file"] as? String, !chosen.isEmpty, chosen.hasSuffix(".brief.md") {
+            auto = false
+            let base = String(chosen.dropLast(".brief.md".count))
+            let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
+            for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json"] {
+                let dst = stem + ext
+                if FileManager.default.fileExists(atPath: base + ext), !FileManager.default.fileExists(atPath: dst) {
+                    try? FileManager.default.copyItem(atPath: base + ext, toPath: dst)
+                }
+            }
+        }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.python)
-        p.arguments = [lt, "prep-check", file, "--adopt-prep"]
+        p.arguments = [lt, "prep-check", file] + (auto ? ["--adopt-prep"] : [])
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/prep.log"))
         p.standardOutput = log
         p.standardError = log
@@ -133,7 +197,7 @@ final class CallEngine {
         var sc: [String: Any] = [
             "variant": "app", "provider": "anthropic", "api_key_env": "CLAUDE_API",
             "models": ["classify": c.models.classify, "tip": c.models.tip], "cache_ttl": "1h", "direct_route": true,
-            "periodic_classify_s": 20, "max_parallel_calls": 4, "max_tokens": ["classify": 60, "tip": 300],
+            "periodic_classify_s": 20, "max_parallel_calls": 4, "max_tokens": ["classify": 60, "tip": 700],
             "request_extra": ["classify": ["thinking": ["type": "disabled"]], "tip": ["thinking": ["type": "between_tools"]]],
             "me_label": core["me_label"] ?? "Me", "them_label": core["them_label"] ?? "Other",
             "name_aliases": c.nameAliases, "langs": core["langs"] ?? ["en"], "tips_lang": (c.uiLanguage == "uk" || (core["me_lang"] as? String) == "uk") ? "uk" : "en",
@@ -145,8 +209,15 @@ final class CallEngine {
         for k in ["call_type", "audience", "hiring_role"] { if let v = callRequest[k] as? String, !v.isEmpty { sc[k] = v } }
         if let m = callRequest["tip_model"] as? String, !m.isEmpty { sc["models"] = ["classify": c.models.classify, "tip": m] }
         sc["hedge"] = ["enabled": c.hedgeEnabled]
+        sc["answer_any"] = c.answerAny
+        // 2026-10-26: the running call picture needs who the PM is on this call.
+        for k in ["participants", "pm_projects"] { if let v = callRequest[k] as? [String], !v.isEmpty { sc[k] = v } }
+        sc["situation"] = true
+        sc["proactive"] = false
         sc["project_root"] = projectRoot
-        if c.localAI.enabled { sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")] }
+        // lt search: by meaning with Local AI on, plain text search otherwise (2026-10-26: "Search the project" works either way).
+        sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")]
+        sc["local_ai"] = c.localAI.enabled
         if let d = try? JSONSerialization.data(withJSONObject: sc, options: [.prettyPrinted]) {
             try? d.write(to: URL(fileURLWithPath: cfgPath), options: .atomic)
         }
@@ -279,7 +350,47 @@ final class CallEngine {
         if a.runModal() == .alertFirstButtonReturn, let u = url, let link = URL(string: u) { NSWorkspace.shared.open(link) }
     }
 
+    /// 2026-10-26: the app was restarted during a call (an update), so it no longer owns the recorder.
+    /// After End call, wait for the recorder to stop, then do what a normal end does: the Notion page
+    /// (project config looked up by the call's slug) and the tips rating.
+    func finishOrphan(onDone: @escaping (String, Bool) -> Void) {
+        var waited = 0
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
+            guard let self = self else { t.invalidate(); return }
+            waited += 1
+            let st = EngineStatus.load(path: self.statusPath)
+            guard st.state == "stopped" || waited > 60 else { return }
+            t.invalidate()
+            if st.state != "stopped" {
+                // QA 26.10: the recorder died without writing "stopped": mark it, or the menu shows a call forever.
+                if let d = FileManager.default.contents(atPath: self.statusPath),
+                   var o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
+                    let pid = (o["pid"] as? Int) ?? 0
+                    if pid <= 0 || kill(pid_t(pid), 0) != 0 {
+                        o["state"] = "stopped"
+                        if let out = try? JSONSerialization.data(withJSONObject: o, options: [.prettyPrinted]) {
+                            try? out.write(to: URL(fileURLWithPath: self.statusPath), options: .atomic)
+                        }
+                    }
+                }
+            }
+            let file = st.file ?? self.lastFile ?? ""
+            let saved = !file.isEmpty && FileManager.default.fileExists(atPath: file)
+            if self.projectConfig.isEmpty, let slug = st.slug {
+                let reg = ProjectRegistry.load(from: AppPaths.projects)
+                self.projectConfig = reg.projects.first { $0.slug == slug }?.config ?? ""
+            }
+            let api = ProjectRegistry.load(from: AppPaths.projects).projects.first { $0.slug == st.slug }?.apiAllowed ?? true
+            if saved && api {
+                self.writeToNotion(file: file)
+                self.runJudge(file: file)
+            }
+            onDone(file, saved)
+        }
+    }
+
     func stop() {
+        lastCallSummary = ""
         let control = (appRoot as NSString).appendingPathComponent("control")
         FileManager.default.createFile(atPath: (control as NSString).appendingPathComponent("stop"), contents: Data())
     }

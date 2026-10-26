@@ -165,6 +165,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         window.delegate = self
         window.isReleasedWhenClosed = false
         _ = window.setFrameAutosaveName("LiveTipsPrompter")   // remembers position and size
+        // 2026-10-23: the title bar (close, minimise, buttons) stays solid at any opacity setting.
+        if let tb = window.standardWindowButton(.closeButton)?.superview {
+            tb.wantsLayer = true
+            window.effectiveAppearance.performAsCurrentDrawingAppearance {
+                tb.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            }
+        }
 
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
         web.navigationDelegate = self

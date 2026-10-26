@@ -21,6 +21,32 @@ def current_state(project_root: Path, limit: int = 6000) -> str:
     return ""
 
 
+def workspace_states(root: Path, limit_each: int = 5000, max_projects: int = 5) -> List[str]:
+    """A workspace call (a PM sync about several projects): the root has no Current State of its own,
+    so the member projects' pages are used (folders next to it or below it with _notion/current-state.md).
+    A "<Workspace> General" folder is the workspace's own folder: its parent holds the projects."""
+    bases = [root]
+    try:
+        if root.name.lower().endswith(" general"):
+            bases.append(root.parent)
+        if root.is_symlink() or (root / "live").is_symlink():
+            bases.append(root.resolve().parent)
+    except OSError:
+        pass
+    out, seen = [], set()
+    for base in bases:
+        try:
+            subs = sorted(d for d in base.iterdir() if d.is_dir() and not d.name.startswith((".", "_")))
+        except OSError:
+            continue
+        for d in subs:
+            p = d / "_notion" / "current-state.md"
+            if p.exists() and p.resolve() not in seen and len(out) < max_projects:
+                seen.add(p.resolve())
+                out.append("[{}]\n{}".format(d.name, p.read_text(encoding="utf-8", errors="replace")[:limit_each]))
+    return out
+
+
 def index_snippets(lt_cmd: List[str], project_root: Path, query: str, k: int = 8, timeout: float = 25.0) -> List[dict]:
     if not lt_cmd or not query.strip():
         return []
@@ -63,6 +89,11 @@ def build(context: str, project_root: Optional[str], lt_cmd: Optional[List[str]]
         cs = current_state(root)
         if cs:
             parts.append("PROJECT CURRENT STATE (local Notion mirror):\n" + cs)
+        else:
+            ws = workspace_states(root)
+            if ws:
+                parts.append("CURRENT STATE OF THE WORKSPACE PROJECTS (local Notion mirror; a call about "
+                             "several projects):\n" + "\n\n".join(ws))
         hits = index_snippets(lt_cmd or [], root, context) if context.strip() else []
         if hits:
             lines = []

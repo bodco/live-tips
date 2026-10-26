@@ -25,7 +25,7 @@
         "speaker_ask",
         "question",
         "outline",
-        "outline_pos",
+        "outline_pos", "situation",
         "facts",
         "state",
         "retract"

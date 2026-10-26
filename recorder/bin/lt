@@ -394,6 +394,17 @@ def prep_core(path, ext):
     return DATE_PREFIX.sub("", re.sub(r"^prep-", "", name))
 
 
+def prep_heading(path, ext):
+    """Call title written in the brief heading ("# Live Brief: <title> (prep, ...)"), '' if none."""
+    try:
+        brief = str(path)[: -len(ext)] + ".brief.md"
+        first = open(brief, encoding="utf-8").readline()
+    except OSError:
+        return ""
+    m = re.match(r"#\s*Live Brief(?:\s*\(prep\))?\s*:\s*(.+?)(?:\s*\((?:prep|[^)]*\d{4}-\d\d-\d\d)[^)]*\))?\s*$", first)
+    return m.group(1).strip() if m else ""
+
+
 def title_match(a, b):
     """Equal or one contains the other, ignoring spaces and hyphens: "Weekly Standup" matches
     prep-...-acme-weekly-stand-up (Cowork may split a word or prefix the project)."""
@@ -478,12 +489,26 @@ def adopt_prep(s):
     title = call_title_slug(s)
     adopted = {}
     exts = (".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json")
-    fresh = {ext: [p for p in live.glob("prep-*" + ext) if time.time() - p.stat().st_mtime < 3 * 3600]
-             for ext in exts}
+    def is_fresh(p):
+        """Made in the last 3 h, or (QA 26.10) made earlier for a call whose time in the name is near:
+        prep-YYYY-MM-DD-HHMM-... from 3 h before now to 12 h ahead."""
+        if time.time() - p.stat().st_mtime < 3 * 3600:
+            return True
+        m = re.match(r"prep-(\d{4}-\d\d-\d\d-\d{4})", p.name)
+        if m:
+            try:
+                when = time.mktime(time.strptime(m.group(1), "%Y-%m-%d-%H%M"))
+                return -3 * 3600 < when - time.time() < 12 * 3600 and time.time() - p.stat().st_mtime < 24 * 3600
+            except ValueError:
+                return False
+        return False
+    fresh = {ext: [p for p in live.glob("prep-*" + ext) if is_fresh(p)] for ext in exts}
     for ext in exts:
         if os.path.exists(s + ext):
             continue
-        cands = [p for p in fresh[ext] if title_match(prep_core(str(p), ext), title)]
+        cands = [p for p in fresh[ext]
+                 if title_match(prep_core(str(p), ext), title)
+                 or (prep_heading(p, ext) and title_match(prep_heading(p, ext), title))]
         if not cands:
             continue
         src = max(cands, key=lambda p: p.stat().st_mtime)

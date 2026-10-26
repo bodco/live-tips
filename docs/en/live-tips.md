@@ -1044,7 +1044,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Download:**
-[LiveTips-0.5.5-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.5/LiveTips-0.5.5-beta.dmg)
+[LiveTips-0.5.6-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.6/LiveTips-0.5.6-beta.dmg)
 
 What it does:
 
@@ -1285,7 +1285,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    (optional). The menu has "Welcome tour" to run it again.
 36. **Notion page.** The meeting page title starts with the meeting's name ("Weekly sync: export
    plan"); the title and the summary are written in the call's language.
-37. **Links in Call context.** "Prepare now" also reads public web pages you list under "Де дивитись":
+37. **Links in Call context.** "Prepare now" also reads public web pages you list under "Where to look":
    a client's site, a Google Doc or Sheet shared with anyone (read through its text export), a public
    Notion page (often only partly, Notion renders with scripts). Pages behind a sign-in are skipped and
    named in the brief's sources.
@@ -1320,5 +1320,8 @@ address", `references/sweep.md`, `references/presentation.md`).
 47. **Start call.** The window before a call: the project (a list with search, active projects only), the
    title and the time in one card, Who and Language as two small controls (their names on hover), "What
    matters on this call", Preparation, More options, one big Start call button. "Add folder" adds one or
-   more folders for this call (also outside the project); Prepare now looks through them, and the text
-   names only single documents or links.
+   more folders for this call (also outside the project); the project folder is always included and shown
+   first with a lock; Prepare now looks through them, and the text names only document names or links.
+   The context template follows the interface language (Goal, Participants, Open questions, Where to
+   look in English; Мета, Учасники, Відкриті питання, Де дивитись in Ukrainian). The scroll area keeps
+   rounded edges and the same gap above the button while scrolling.

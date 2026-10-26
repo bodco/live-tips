@@ -1051,7 +1051,7 @@ Meeting Notes через API не записуються: специфікаці
 Код і деталі: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Завантажити:**
-[LiveTips-0.5.5-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.5/LiveTips-0.5.5-beta.dmg)
+[LiveTips-0.5.6-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.6/LiveTips-0.5.6-beta.dmg)
 
 Що він робить:
 
@@ -1330,5 +1330,8 @@ address", `references/sweep.md`, `references/presentation.md`).
 47. **Start call.** Вікно перед дзвінком: проєкт (список з пошуком, лише активні), назва і час в одній
    картці, Who і Language як два маленькі перемикачі (назви при наведенні), "What matters on this call",
    Preparation, More options, одна велика кнопка Start call. "Add folder" додає одну чи кілька папок для
-   цього дзвінка (і поза проєктом); Prepare now переглядає їх, а в тексті лишаються тільки окремі документи
-   чи посилання.
+   цього дзвінка (і поза проєктом); папка проєкту включена завжди і показана першою із замком; Prepare now
+   переглядає їх, а в тексті лишаються тільки назви документів чи посилання. Шаблон контексту йде за мовою
+   інтерфейсу (Goal, Participants, Open questions, Where to look англійською; Мета, Учасники, Відкриті
+   питання, Де дивитись українською). Область прокрутки тримає заокруглені краї і той самий відступ над
+   кнопкою під час прокрутки.

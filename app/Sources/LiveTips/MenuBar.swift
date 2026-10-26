@@ -309,8 +309,18 @@ final class StartCallModel: ObservableObject {
     @Published var language = "uk"
     @Published var note = ""
     /// 2026-10-26 (owner): a template instead of an empty field; empty lines of it are not sent.
-    static let contextTemplate = "Мета: \nУчасники: \nВідкриті питання: \nДе дивитись (документи, посилання): "
+    /// 2026-10-27 (owner): the template follows the interface language; no Ukrainian words in an English UI.
+    static let templates = ["en": "Goal: \nParticipants: \nOpen questions: \nWhere to look (document names, links): ",
+                            "uk": "Мета: \nУчасники: \nВідкриті питання: \nДе дивитись (назви документів, посилання): "]
+    static var uiLang: String { AppConfig.load(from: AppPaths.config).uiLanguage == "uk" ? "uk" : "en" }
+    static var contextTemplate: String { templates[uiLang]! }
+    static let allTemplates = templates.values.joined(separator: "\n") + "\nДе дивитись (документи, посилання): \nДе дивитись (папки, документи, посилання): "
     @Published var context = StartCallModel.contextTemplate
+    /// An untouched template in the other language (or an older one) is replaced by this language's.
+    func refreshTemplate() {
+        let t = context.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty || StartCallModel.allTemplates.contains(t) { context = StartCallModel.contextTemplate }
+    }
     /// 2026-10-27 (owner): "Add folder" like in Cowork; the context then names only files or links.
     @Published var folders: [String] = []
 
@@ -341,11 +351,11 @@ final class StartCallModel: ObservableObject {
             if isHeader(t) {
                 // An empty template line goes; a header with its list on the next lines stays (QA 26.10).
                 let next = lines[(i + 1)...].first { !$0.isEmpty }
-                if next == nil || isHeader(next!) || StartCallModel.contextTemplate.contains(next!) { continue }
+                if next == nil || isHeader(next!) || StartCallModel.allTemplates.contains(next!) { continue }
             }
             out.append(t)
         }
-        if !folders.isEmpty { out.append("Папки: " + folders.joined(separator: "; ")) }
+        if !folders.isEmpty { out.append((StartCallModel.uiLang == "uk" ? "Папки: " : "Folders: ") + folders.joined(separator: "; ")) }
         return out.joined(separator: "\n")
     }
 
@@ -639,7 +649,7 @@ struct StartCallView: View {
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.07)))
                             .frame(height: 96)
                         folderChips
-                        Text("Names after \u{201C}Учасники:\u{201D} or \u{201C}Participants:\u{201D} are the speakers offered on the call. Added folders are looked through for the preparation; name single files or links in the text. Empty lines are not sent.")
+                        Text("Names after \u{201C}\(StartCallModel.uiLang == "uk" ? "Учасники:" : "Participants:")\u{201D} are the speakers offered on the call. Empty lines are not sent.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     .ltCard(padding: 14)
@@ -701,8 +711,10 @@ struct StartCallView: View {
                     }
                     .ltCard(padding: 14)
                 }
-                .padding(.horizontal, 28).padding(.vertical, 18)
             }
+            // 2026-10-27 (owner): mid-scroll the cut edge is rounded like a card, with the same gap above the button.
+            .clipShape(RoundedRectangle(cornerRadius: LT.radius))
+            .padding(.horizontal, 28).padding(.top, 14)
             VStack(spacing: 8) {
                 if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.orange).lineLimit(2) }
                 LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") { onStart() }
@@ -710,9 +722,10 @@ struct StartCallView: View {
                 Button("Cancel", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
                     .keyboardShortcut(.cancelAction)
             }
-            .padding(.top, 10).padding(.bottom, 16)
+            .padding(.top, 16).padding(.bottom, 16)
         }
         .frame(width: 580, height: 800)
+        .onAppear { model.refreshTemplate() }
         .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false }
         .onAppear { model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
@@ -761,12 +774,23 @@ struct StartCallView: View {
 
     /// Folders added for this call, as removable chips, and the Add folder button.
     private var folderChips: some View {
+        VStack(alignment: .leading, spacing: 6) {
+        Text("Folders to search: the project folder is always included; add other folders where the documents for this call are.")
+            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         HStack(alignment: .top, spacing: 6) {
             Button { model.addFolders() } label: { Label("Add folder", systemImage: "folder.badge.plus") }
                 .controlSize(.small).disabled(model.target.isEmpty)
-            if !model.folders.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
+                        if let r = model.root {
+                            HStack(spacing: 4) {
+                                Image(systemName: "lock.fill").font(.caption2)
+                                Text((r as NSString).lastPathComponent).font(.caption).lineLimit(1)
+                            }
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Capsule().fill(Color.secondary.opacity(0.18)))
+                            .help("Included: " + r + "\nThe preparation and earlier calls of this project are found here.")
+                        }
                         ForEach(model.folders, id: \.self) { f in
                             HStack(spacing: 4) {
                                 Image(systemName: "folder").font(.caption)
@@ -779,8 +803,8 @@ struct StartCallView: View {
                             .help(f)
                         }
                     }
-                }
             }
+        }
         }
     }
 

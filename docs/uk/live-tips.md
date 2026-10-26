@@ -1051,7 +1051,7 @@ Meeting Notes через API не записуються: специфікаці
 Код і деталі: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Завантажити:**
-[LiveTips-0.5.6-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.6/LiveTips-0.5.6-beta.dmg)
+[LiveTips-0.5.7-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.7/LiveTips-0.5.7-beta.dmg)
 
 Що він робить:
 
@@ -1335,3 +1335,12 @@ address", `references/sweep.md`, `references/presentation.md`).
    інтерфейсу (Goal, Participants, Open questions, Where to look англійською; Мета, Учасники, Відкриті
    питання, Де дивитись українською). Область прокрутки тримає заокруглені краї і той самий відступ над
    кнопкою під час прокрутки.
+48. **Start call, закріплений верх (0.5.7).** Шапка, проєкт, назва, час і три компактні перемикачі (хто,
+   тип зустрічі, мова; назви при наведенні) стоять на місці; контекст, підготовка і More options прокручуються
+   під ними. Назва обовʼязкова: Start call з порожньою назвою обводить її червоним і ставить туди курсор. Під
+   контекстом: Add folder з папками-плашками, один рядок "Project folder included", потім примітка про
+   Participants. Prepare now читає всю папку проєкту (у її підпапці live/ лежать дзвінки й підготовки), тому
+   плашка із замком показує папку проєкту.
+49. **Settings > Projects (0.5.7).** ⋯ біля проєкту: Show in Finder, Use Claude for tips, Search this folder
+   (обидва увімкнені за замовчуванням), Reindex now, Remove project from Live Tips. Пояснення переїхало в
+   кнопку (i). Проєкт, імпортований двічі (та сама папка зі скісною рискою в кінці і без), обʼєднується.

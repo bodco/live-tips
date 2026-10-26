@@ -466,12 +466,13 @@ struct FolderRow: View {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var runner = PrepRunner.shared
+    @State private var showProjectsInfo = false
 
     struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
     static let panes: [Pane] = [
         Pane(id: "general", title: "General", symbol: "gearshape", subtitle: "Your name on calls, folders, Notion and how the app behaves."),
         Pane(id: "keys", title: "Keys", symbol: "key", subtitle: "The Claude API key and the Notion token, kept in the macOS Keychain."),
-        Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Workspaces and projects from your work folder. Ticked projects are offered in Start call."),
+        Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
         Pane(id: "how", title: "How it works", symbol: "point.3.connected.trianglepath.dotted", subtitle: "What happens before, during and after a call."),
         Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
@@ -682,8 +683,6 @@ struct SettingsView: View {
     var projects: some View {
         Form {
             Section {
-                Text("Ticked projects are active and offered in Start call. ⋯ next to a workspace removes it; right-click a project to remove it. Live Tips works with plain folders: \(model.config.workRoot.isEmpty ? "<work folder>" : model.config.workRoot)/<Workspace>/<Project>. Each project folder gets a live/ folder for its calls; a \u{201C}<Workspace> General\u{201D} folder holds calls about the whole workspace. A Control Tower config and a Notion mirror are optional: they add the people, the Notion pages and the project's current state.")
-                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Button("Scan work folder") { model.scanFolders() }
                         .disabled(model.config.workRoot.isEmpty)
@@ -695,6 +694,9 @@ struct SettingsView: View {
                         Button("Import Control Tower configs…") { model.importProjects() }
                     }
                     .fixedSize()
+                    Button { showProjectsInfo.toggle() } label: { Image(systemName: "info.circle") }
+                        .buttonStyle(.borderless)
+                        .popover(isPresented: $showProjectsInfo, arrowEdge: .bottom) { projectsInfo }
                     Spacer()
                     Button("Reindex all") { IndexService.shared.reindexAll() }
                         .help("Rebuild the search index of every project with Index on (in the background, paused during calls).")
@@ -739,7 +741,7 @@ struct SettingsView: View {
                             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: w.root)]) }
                             Button("Remove workspace from Live Tips", role: .destructive) { model.removeWorkspace(w) }
                         } label: { Image(systemName: "ellipsis.circle") }
-                        .menuStyle(.borderlessButton).fixedSize()
+                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     }
                 }
             }
@@ -758,6 +760,35 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// 2026-10-27 (owner): plain words instead of the long text on top of the tab.
+    var projectsInfo: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("How projects work").font(.headline)
+            Text("Each project is a folder on your Mac: work folder > workspace > project. Calls, preparations and notes are saved in the project folder.")
+            Text("Tick a project to see it in Start call. Untick a project that is over; nothing is deleted.")
+            Text("⋯ removes a project or a whole workspace from Live Tips. The folders stay on your Mac; Scan work folder or Add brings them back.")
+            Text("A Control Tower config or a Notion copy are optional: they add the team, Notion pages and the project's current state.")
+        }
+        .font(.callout).fixedSize(horizontal: false, vertical: true)
+        .padding(16).frame(width: 380)
+    }
+
+    func projectMenu(_ i: Int) -> some View {
+        let p = model.registry.projects[i]
+        return Menu {
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }.disabled(p.root.isEmpty)
+            Divider()
+            // Both on by default; kept here for a project whose call text must not leave the Mac.
+            Toggle("Use Claude for tips", isOn: $model.registry.projects[i].apiAllowed)
+            Toggle("Search this folder", isOn: $model.registry.projects[i].index.enabled)
+            Button("Reindex now") { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
+            Divider()
+            Button("Remove project from Live Tips", role: .destructive) { model.excludeProject(p.slug) }
+        } label: { Image(systemName: "ellipsis.circle") }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .help("Show in Finder, remove from Live Tips")
     }
 
     @ViewBuilder func projectRow(_ slug: String) -> some View {
@@ -780,10 +811,7 @@ struct SettingsView: View {
                     Text(p.root.isEmpty ? "No folder" : p.root).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer()
-                Toggle("Claude", isOn: $model.registry.projects[i].apiAllowed).toggleStyle(.checkbox)
-                    .help("Send this project's call text to the Claude API. Off: local layer only.")
-                Toggle("Index", isOn: $model.registry.projects[i].index.enabled).toggleStyle(.checkbox)
-                    .help("Search the project folder for questions and the folder search. Updates by itself a minute after files change, never during a call. \(IndexService.shared.results[p.root] ?? "")")
+                projectMenu(i)
             }
             .contextMenu {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }.disabled(p.root.isEmpty)

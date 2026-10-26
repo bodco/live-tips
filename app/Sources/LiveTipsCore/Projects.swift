@@ -57,7 +57,8 @@ public struct ProjectRegistry: Codable, Equatable {
     /// 2026-10-26 (owner): projects without Notion or Control Tower configs. Folder projects are added;
     /// a project already known (same folder) keeps everything it has (config, people, switches).
     public mutating func merge(folders: [Project]) {
-        for p in folders where !projects.contains(where: { $0.root == p.root }) {
+        dedupe()
+        for p in folders where !projects.contains(where: { Self.norm($0.root) == Self.norm(p.root) }) {
             var q = p
             var n = 2
             while projects.contains(where: { $0.slug == q.slug }) { q.slug = p.slug + "-\(n)"; n += 1 }
@@ -66,10 +67,35 @@ public struct ProjectRegistry: Codable, Equatable {
         projects.sort { $0.name.lowercased() < $1.name.lowercased() }
     }
 
+    public static func norm(_ path: String) -> String {
+        var p = (path as NSString).expandingTildeInPath
+        while p.count > 1 && p.hasSuffix("/") { p.removeLast() }
+        return p
+    }
+
+    /// 2026-10-27: one project per folder. A config import wrote ".../Project/" and a folder scan
+    /// ".../Project": the same folder twice. The entry with a config wins; it stays active if either was.
+    public mutating func dedupe() {
+        var out: [Project] = []
+        for p in projects {
+            let key = Self.norm(p.root)
+            if !key.isEmpty, let i = out.firstIndex(where: { Self.norm($0.root) == key }) {
+                var keep = out[i].config.isEmpty && !p.config.isEmpty ? p : out[i]
+                if out[i].status != "archived" || p.status != "archived" { keep.status = "active" }
+                keep.root = key
+                out[i] = keep
+            } else {
+                out.append(p)
+            }
+        }
+        projects = out
+    }
+
     public static func load(from url: URL) -> ProjectRegistry {
-        guard let d = try? Data(contentsOf: url), let r = try? JSONDecoder().decode(ProjectRegistry.self, from: d) else {
+        guard let d = try? Data(contentsOf: url), var r = try? JSONDecoder().decode(ProjectRegistry.self, from: d) else {
             return ProjectRegistry()
         }
+        r.dedupe()
         return r
     }
 

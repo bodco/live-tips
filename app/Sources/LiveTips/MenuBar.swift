@@ -610,36 +610,52 @@ struct StartCallView: View {
 
     @AppStorage("startCallAdvanced") private var advanced = false
     @State private var picking = false
+    @State private var titleMissing = false
+    @FocusState private var titleFocus: Bool
     @State private var search = ""
 
     // 2026-10-26 (owner): the main window before a call, not a settings form: one hero card with the
     // project, the title and the time, the context, the preparation, then one big Start button.
+    // 2026-10-27 (owner): what the call is stays in place (header, project, title, time, who, type,
+    // language); the context, the preparation and more options scroll under it.
     var body: some View {
         VStack(spacing: 0) {
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    IconTile(symbol: "text.bubble", size: 40)
+                    Text("Start a call").font(.title2.weight(.semibold))
+                    Spacer()
+                }
+                hero
+                HStack(spacing: 10) {
+                    pill("person.2") {
+                        Picker("", selection: $model.audience) {
+                            Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client")
+                        }
+                        .labelsHidden()
+                    }
+                    .help("Who is on the other side of the call. Auto: detected from who speaks. Team: internal call, no corrections of your facts. Client: stricter, internal numbers are never shown, the client's culture profile is used.")
+                    pill("rectangle.3.group") {
+                        Picker("", selection: $model.callType) {
+                            Text("Regular").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
+                        }
+                        .labelsHidden()
+                    }
+                    .help("Meeting type. Regular: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview work best with a preparation.")
+                    pill("globe") {
+                        Picker("", selection: Binding(get: { model.language }, set: { model.language = $0; model.languageTouched = true })) {
+                            Text("Ukrainian").tag("uk"); Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
+                        }
+                        .labelsHidden()
+                    }
+                    .help("Language of the call: what may be spoken; transcription is restricted to these.")
+                }
+            }
+            .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 14)
+            .background(Color.secondary.opacity(0.04))
+            .overlay(alignment: .bottom) { Divider() }
             ScrollView {
                 VStack(spacing: 16) {
-                    VStack(spacing: 8) {
-                        IconTile(symbol: "text.bubble", size: 52)
-                        Text("Start a call").font(.title.weight(.semibold))
-                    }
-                    .padding(.top, 4)
-                    hero
-                    HStack(spacing: 12) {
-                        pill("person.2") {
-                            Picker("", selection: $model.audience) {
-                                Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client")
-                            }
-                            .pickerStyle(.segmented).labelsHidden().fixedSize()
-                        }
-                        .help("Who is on the other side of the call. Auto: detected from who speaks. Team: internal call, no corrections of your facts. Client: stricter, internal numbers are never shown, the client's culture profile is used.")
-                        pill("globe") {
-                            Picker("", selection: Binding(get: { model.language }, set: { model.language = $0; model.languageTouched = true })) {
-                                Text("Ukrainian").tag("uk"); Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
-                            }
-                            .labelsHidden().fixedSize()
-                        }
-                        .help("Language of the call: what may be spoken; transcription is restricted to these.")
-                    }
                     VStack(alignment: .leading, spacing: 8) {
                         Label("What matters on this call", systemImage: "text.alignleft").font(.callout.weight(.medium))
                         TextEditor(text: $model.context)
@@ -649,6 +665,8 @@ struct StartCallView: View {
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.07)))
                             .frame(height: 96)
                         folderChips
+                        Text("Project folder included. Add folders with this call's documents.")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         Text("Names after \u{201C}\(StartCallModel.uiLang == "uk" ? "Учасники:" : "Participants:")\u{201D} are the speakers offered on the call. Empty lines are not sent.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
@@ -670,10 +688,6 @@ struct StartCallView: View {
                     .ltCard(padding: 14)
                     DisclosureGroup(isExpanded: $advanced) {
                         Form {
-                            Picker("Meeting type", selection: $model.callType) {
-                                Text("Regular").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
-                            }
-                            .help("Regular: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview work best with a preparation.")
                             if model.callType == "interview" {
                                 Picker("Your role", selection: $model.hiringRole) {
                                     Text("Observer").tag("observer"); Text("Interviewer").tag("interviewer"); Text("Coach (I am interviewed)").tag("coach")
@@ -714,10 +728,13 @@ struct StartCallView: View {
             }
             // 2026-10-27 (owner): mid-scroll the cut edge is rounded like a card, with the same gap above the button.
             .clipShape(RoundedRectangle(cornerRadius: LT.radius))
-            .padding(.horizontal, 28).padding(.top, 14)
+            .padding(.horizontal, 28).padding(.top, 16)
             VStack(spacing: 8) {
                 if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.orange).lineLimit(2) }
-                LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") { onStart() }
+                LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") {
+                    if model.title.trimmingCharacters(in: .whitespaces).isEmpty { titleMissing = true; titleFocus = true; return }
+                    onStart()
+                }
                     .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
                 Button("Cancel", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
                     .keyboardShortcut(.cancelAction)
@@ -755,7 +772,14 @@ struct StartCallView: View {
             Divider()
             TextField("", text: $model.title, prompt: Text("Title, e.g. Weekly sync"))
                 .textFieldStyle(.plain).font(.title3)
-                .onChange(of: model.title) { model.scanPrep(); copied = false }
+                .focused($titleFocus)
+                .padding(.vertical, 4).padding(.horizontal, 6)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.red, lineWidth: titleMissing ? 1.5 : 0))
+                .onChange(of: model.title) { model.scanPrep(); copied = false; if !model.title.isEmpty { titleMissing = false } }
+            if titleMissing {
+                Text("A title is needed: it names the notes, the preparation and the Notion page.")
+                    .font(.caption).foregroundStyle(.red)
+            }
             HStack(spacing: 8) {
                 Image(systemName: "calendar").foregroundStyle(.secondary)
                 DatePicker("", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute])
@@ -775,9 +799,7 @@ struct StartCallView: View {
     /// Folders added for this call, as removable chips, and the Add folder button.
     private var folderChips: some View {
         VStack(alignment: .leading, spacing: 6) {
-        Text("Folders to search: the project folder is always included; add other folders where the documents for this call are.")
-            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .center, spacing: 6) {
             Button { model.addFolders() } label: { Label("Add folder", systemImage: "folder.badge.plus") }
                 .controlSize(.small).disabled(model.target.isEmpty)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -845,12 +867,11 @@ struct StartCallView: View {
     }
 
     private func pill<C: View>(_ symbol: String, @ViewBuilder _ content: () -> C) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 6) {
             Image(systemName: symbol).foregroundStyle(.secondary)
             content()
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
+        .padding(.horizontal, 10).padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: LT.radius).fill(LT.cardFill))
     }

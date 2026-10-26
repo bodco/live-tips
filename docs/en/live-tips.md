@@ -1044,7 +1044,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Download:**
-[LiveTips-0.5.6-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.6/LiveTips-0.5.6-beta.dmg)
+[LiveTips-0.5.7-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.7/LiveTips-0.5.7-beta.dmg)
 
 What it does:
 
@@ -1325,3 +1325,12 @@ address", `references/sweep.md`, `references/presentation.md`).
    The context template follows the interface language (Goal, Participants, Open questions, Where to
    look in English; Мета, Учасники, Відкриті питання, Де дивитись in Ukrainian). The scroll area keeps
    rounded edges and the same gap above the button while scrolling.
+48. **Start call, fixed top (0.5.7).** The header, the project, the title, the time and three compact
+   controls (who, meeting type, language; their names on hover) stay in place; the context, the preparation
+   and More options scroll under them. The title is required: Start call with an empty title outlines it in
+   red and puts the cursor there. Under the context: Add folder with the folders as chips, one line "Project
+   folder included", then the Participants note. Prepare now reads the whole project folder (its live/
+   subfolder holds the calls and the preparations), so the lock chip shows the project folder.
+49. **Settings > Projects (0.5.7).** ⋯ next to a project: Show in Finder, Use Claude for tips, Search this
+   folder (both on by default), Reindex now, Remove project from Live Tips. The explanation moved into the
+   (i) button. A project imported twice (the same folder with and without a trailing slash) is merged.

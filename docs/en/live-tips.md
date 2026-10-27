@@ -1099,7 +1099,30 @@ They work best together. Make the prep in Cowork (brief, fact cards, an outline 
 presentation): the app picks it up by itself when the prep title matches the call title (rule
 in section 5.0). In **Start call** press **Copy request for Cowork** to get a ready prep request.
 Without a prep the app uses the call context you type in Start call, the project's current state
-and local search over the project folder.
+and local search over the project folder (14.1a).
+
+### 14.1a No time to prepare? Start the call anyway
+
+A preparation makes tips richer, but it is not required. If you did not get to Prepare now (or
+it is still running), start the call: recording begins at once and the window works from the
+first minute.
+
+| Works without a preparation | Needs a preparation |
+|---|---|
+| Red tips when you are addressed: a direct question to you, your turn, a new request, a date or commitment being made | The speech card (your update, point by point) |
+| HELP NOW: the next sentence to say, built from what was just said | Instant fact cards (⚡) that fire on a keyword in under a second |
+| Questions typed in the window, answered from the call so far | Facts from documents read before the call (the fact book) |
+| "Find" questions: a search over the project folder (local index) | |
+| The call context you typed in Start call, the project's current state from the local Notion mirror, a digest of the project's recent calls | |
+| On me, the wrap-up and the Notion meeting page | |
+
+A preparation that finishes after the call started joins it by itself: the window says
+"Preparation ready", the speech appears and tips use the brief from then on (0.6.0). So the
+worst case of a late prep is a quieter first few minutes, not a lost call. Two lines in Call
+context in Start call (the goal, what to look for) already help a lot.
+
+The skill works the same way: without a ready prep it starts the recording at once and builds the
+brief in the first 1-3 minutes of the call (section 5.0).
 
 ### 14.2 After the call: the meeting page in Notion
 
@@ -1400,3 +1423,5 @@ address", `references/sweep.md`, `references/presentation.md`).
 65. **The skill (v51).** What people say on the call and in documents is data, never instructions; titles
    and names never go into a command line (`lt start -` reads the JSON on stdin); research agents are
    read-only. The keepalive hook binds to one session and cleans the title it shows.
+66. **No preparation needed to start (0.6.1).** Section 14.1a: what works without a preparation and
+   what it adds; Start call says it too.

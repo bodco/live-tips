@@ -22,7 +22,7 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 
 ## What it does
 
-- **Before the call:** Prepare now writes a brief and fact cards from your project folders and the documents you name.
+- **Before the call:** Prepare now writes a brief and fact cards from your project folders and the documents you name. Optional: without it the call still gets tips when you are addressed, HELP NOW and answers to your questions; a late preparation joins the call when it is ready.
 - **During the call:** a small window with tips from your own facts, your update when it is your turn, a ready sentence on HELP NOW, a live transcript, a picture of the call (topic, what is on you).
 - **Any language in, one language out:** set the call to one language and every speaker is written in it (Ukrainian on an English call comes out in English).
 - **After the call:** a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the transcript attached.

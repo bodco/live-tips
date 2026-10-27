@@ -925,7 +925,7 @@ struct StartCallView: View {
                 }
             } icon: { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
         } else {
-            Label(model.target.isEmpty ? "Choose a project first" : "No preparation yet. Prepare now takes a few minutes, or the call starts without one.",
+            Label(model.target.isEmpty ? "Choose a project first" : "No preparation yet. Prepare now takes a few minutes. Not ready in time? Start anyway: questions to you, your turn, HELP NOW and answers from the call work without it, and a late preparation joins the call.",
                   systemImage: "doc.badge.clock").foregroundStyle(.secondary).font(.callout)
         }
     }

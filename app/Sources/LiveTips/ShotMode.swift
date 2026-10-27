@@ -167,9 +167,32 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
             if let w = HomeWindow.window { w.setContentSize(NSSize(width: 820, height: 1080)) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
-                if let w = HomeWindow.window { capture(w, "home-\(theme)"); w.close(); HomeWindow.window = nil }
-                next()
+                if let w = HomeWindow.window { capture(w, "home-\(theme)"); w.setContentSize(NSSize(width: 1200, height: 800)) }
+                // The wide Home (the week next to the calls): the first picture on the site.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [self] in
+                    if let w = HomeWindow.window { capture(w, "home-wide-\(theme)"); w.close(); HomeWindow.window = nil }
+                    prepare(theme, evs[1])
+                }
             }
+        }
+    }
+
+    /// Prepare from Home: the form that asks for the project and what matters on the call.
+    func prepare(_ theme: String, _ e: CalendarService.CalEvent) {
+        let m = StartCallModel()
+        m.applyEvent(e)
+        m.target = "project:orbit-saas-launch"
+        let f = DateFormatter(); f.dateFormat = "d MMM"
+        m.appliedFrom = "Set up like the last \u{201C}\(e.title)\u{201D} call (\(f.string(from: Date().addingTimeInterval(-7 * 86400)))): correct what changed."
+        m.context = "Goal: agree the pilot plan and the export release date.\nParticipants: Emily Clark, David Kim\nOpen questions: who tests the pilot, the test accounts.\nWhere to look: kickoff notes, export spec."
+        let w = NSWindow(contentViewController: NSHostingController(rootView: PrepareSheet(model: m, onPrepare: {}, onCancel: {}, onMore: {})))
+        w.title = "Prepare"
+        w.isReleasedWhenClosed = false
+        w.center(); w.makeKeyAndOrderFront(nil)
+        keep.append(w)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
+            capture(w, "prepare-\(theme)"); w.close()
+            next()
         }
     }
 

@@ -35,7 +35,7 @@ struct WeekStats: View {
                 Text(weekStart.formatted(.dateTime.day().month()) + " - " + now.formatted(.dateTime.day().month())).font(.caption).foregroundStyle(.secondary)
                 Spacer()
             }
-            HStack(spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
                 tile("Calls", "\(this.count)", delta(Double(this.count), Double(last.count), fmt: { "\(Int($0))" }))
                 tile("On calls", hm(mins), delta(mins, lastMins, fmt: hm))
                 tile("Claude", String(format: "$%.2f", spend), lastSpend > 0 ? "last week " + String(format: "$%.2f", lastSpend) : "from 0.6.8 on")
@@ -51,15 +51,20 @@ struct WeekStats: View {
                 .chartLegend(position: .bottom, alignment: .leading)
                 .frame(height: 150)
             }
-            HStack(spacing: 16) {
-                if let l = longest, (l.minutes ?? 0) > 0 { fact("Longest", "\(l.title), \(hm(l.minutes ?? 0))") }
-                if let b = busiest, b.value > 0 { fact("Busiest day", "\(b.key), \(hm(b.value))") }
-                if !this.isEmpty { fact("Average call", hm(mins / Double(this.count)) + (spend > 0 ? String(format: ", $%.2f", spend / Double(this.count)) : "")) }
+            ViewThatFits(in: .horizontal) {
+              HStack(spacing: 16) { facts(longest, busiest, this, mins, spend) }
+              VStack(alignment: .leading, spacing: 4) { facts(longest, busiest, this, mins, spend) }
             }
             .font(.caption)
         }
         .ltCard(padding: 14)
         .onAppear { history.fillDetails() }
+    }
+
+    @ViewBuilder private func facts(_ longest: CallHistory.Record?, _ busiest: (key: String, value: Double)?, _ this: [CallHistory.Record], _ mins: Double, _ spend: Double) -> some View {
+        if let l = longest, (l.minutes ?? 0) > 0 { fact("Longest", "\(l.title), \(hm(l.minutes ?? 0))") }
+        if let b = busiest, b.value > 0 { fact("Busiest day", "\(b.key), \(hm(b.value))") }
+        if !this.isEmpty { fact("Average call", hm(mins / Double(this.count)) + (spend > 0 ? String(format: ", $%.2f", spend / Double(this.count)) : "")) }
     }
 
     private func hm(_ m: Double) -> String {

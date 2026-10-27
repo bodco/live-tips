@@ -520,6 +520,7 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var runner = PrepRunner.shared
     @State private var showProjectsInfo = false
+    @AppStorage("homeShowStats") private var showStats = true      // Home: this week's numbers (2026-10-27)
 
     struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
     static let panes: [Pane] = [
@@ -977,6 +978,13 @@ struct SettingsView: View {
                 }
                 Toggle("Hide the tips window from screen sharing and screenshots", isOn: $model.config.stealthDefault)
                     .help("Default for new calls. The tips window menu changes it for one call only.")
+                Toggle(isOn: $showStats) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show this week's numbers on Home")
+                        Text("Calls, time on calls, Claude spend, the chart and the monthly spend. Turn off to show Home to colleagues without your numbers.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 Toggle("Show Live Tips in the Dock", isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
             } header: { Text("Behaviour") } footer: {

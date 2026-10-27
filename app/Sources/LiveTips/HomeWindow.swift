@@ -39,6 +39,8 @@ struct HomeView: View {
     @State private var note = ""
     @State private var pickCalendars = false
     @State private var prepSheet: StartCallModel?
+    /// 2026-10-27 (owner): Settings > General: the week's numbers, the chart and the spend can be hidden (a demo to colleagues).
+    @AppStorage("homeShowStats") private var showStats = true
 
     private var live: Bool { CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(status.state) }
 
@@ -46,15 +48,26 @@ struct HomeView: View {
         VStack(spacing: 0) {
             header.padding(.horizontal, 28).padding(.top, 18).padding(.bottom, 14)
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    if live { liveCard }
-                    if !note.isEmpty { Text(note).font(.callout).foregroundStyle(.orange) }
-                    aheadSection
-                    WeekStats()
-                    recentSection
+            // 2026-10-27 (owner): a wide window puts the week next to the calls; a narrow one stacks them.
+            GeometryReader { geo in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if live { liveCard }
+                        if !note.isEmpty { Text(note).font(.callout).foregroundStyle(.orange) }
+                        if geo.size.width >= 1060 {
+                            HStack(alignment: .top, spacing: 18) {
+                                VStack(alignment: .leading, spacing: 18) { aheadSection; recentSection }
+                                    .frame(maxWidth: .infinity)
+                                if showStats { WeekStats().frame(width: 360) }
+                            }
+                        } else {
+                            aheadSection
+                            if showStats { WeekStats() }
+                            recentSection
+                        }
+                    }
+                    .padding(.horizontal, 28).padding(.vertical, 18)
                 }
-                .padding(.horizontal, 28).padding(.vertical, 18)
             }
             Divider()
             footer.padding(.horizontal, 28).padding(.vertical, 10)
@@ -324,9 +337,9 @@ struct HomeView: View {
         let calCount = demo ? 3 : cal.calendars.filter { !cal.excluded.contains($0.calendarIdentifier) }.count
         return HStack(spacing: 14) {
             chip(hasKey ? "key.fill" : "key", hasKey ? "Claude API key set" : "No Claude API key", hasKey ? .secondary : .orange) { SettingsWindow.show(tab: "keys") }
-            chip("dollarsign.circle", String(format: "Month $%.2f / $%.0f", month, cfg.budget.monthlyHardUSD), month >= cfg.budget.monthlyHardUSD * 0.9 ? .orange : .secondary) { SettingsWindow.show(tab: "ai") }
+            if showStats { chip("dollarsign.circle", String(format: "Month $%.2f / $%.0f", month, cfg.budget.monthlyHardUSD), month >= cfg.budget.monthlyHardUSD * 0.9 ? .orange : .secondary) { SettingsWindow.show(tab: "ai") }
             Link("Balance in Anthropic Console", destination: URL(string: "https://console.anthropic.com/settings/billing")!).font(.caption)
-                .help("Anthropic does not let an API key read the balance; it is shown in the Console.")
+                .help("Anthropic does not let an API key read the balance; it is shown in the Console.") }
             if !mirror.isEmpty { chip("doc.text", mirror == "ok" ? "Notion mirror fresh" : "Notion mirror \(mirror)", mirror == "ok" ? .secondary : .orange) { SettingsWindow.show(tab: "notion") } }
             chip("cpu", cfg.localAI.enabled ? "Local AI on" : "Local AI off", .secondary) { SettingsWindow.show(tab: "ai") }
             chip("calendar", cal.access == .granted ? "\(calCount) calendars" : "Calendars off", cal.access == .granted ? .secondary : .orange) { SettingsWindow.show(tab: "calendars") }

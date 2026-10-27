@@ -1,153 +1,50 @@
-# LiveTips.app (beta)
+# Live Tips
 
-Native macOS companion for the `live-tips` skill: records the call locally, transcribes it on
-the Mac and asks a model for tips on events instead of polling. Status: **beta 0.5.8**, a
-downloadable app (see Install below); the M0 spike that measured the approach is kept further down.
+**A quiet co-pilot on your calls.** [Українською](README.uk.md) · [Site](https://tower.bodco.pm/live-tips/)
 
-The skill and the app are both supported and behave the same way. Behaviour lives in one
-place, [`rules/`](rules/), which both read.
+Live Tips listens to your call on your Mac and speaks up only when a fact or a phrase is needed:
+a question to you, your turn, a new request, a date you are about to promise. Audio is transcribed
+on the Mac and never leaves it; only text goes to Claude. After the call the summary, decisions and
+action items land in Notion, and the transcript stays in your project folder.
 
-## Layout
+Beta, built by one project manager for his own calls.
+
+## Two ways to run it
+
+| | The app | The skill |
+|---|---|---|
+| What | A native macOS menu bar app | A Claude Cowork skill |
+| You need | Apple Silicon Mac, macOS 14.4+, a Claude API key | Claude Cowork with a computer linked, the recorder from this repo |
+| Tips come from | Claude API, called on events | Claude in your Cowork chat |
+| Download | [LiveTips.dmg](https://github.com/bodco/live-tips/releases/latest/download/LiveTips.dmg) | [live-tips.skill](https://github.com/bodco/live-tips/releases/latest/download/live-tips.skill) |
+
+Both share the same rules (`rules/`) and the same recorder, so tips behave the same way.
+
+## What it does
+
+- **Before the call:** Prepare now writes a brief and fact cards from your project folders and the documents you name.
+- **During the call:** a small window with tips from your own facts, your update when it is your turn, a ready sentence on HELP NOW, a live transcript, a picture of the call (topic, what is on you).
+- **Any language in, one language out:** set the call to one language and every speaker is written in it (Ukrainian on an English call comes out in English).
+- **After the call:** a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the transcript attached.
+
+How it compares with Fireflies, Fathom and Notion AI Meeting Notes: [tower.bodco.pm/live-tips/compare](https://tower.bodco.pm/live-tips/compare/).
+
+## Repository
 
 | Path | What |
 |---|---|
-| `rules/` | shared rules: triggers and cue words, tip diet, priorities, call concept, ASR filters, JSON schemas, UI strings (en, uk) |
-| `rules/generated/` | sections of the skill's `SKILL.md` generated from `rules/` (do not edit by hand) |
-| `spikes/m0/` | M0 spike: event-driven model calls on top of live-transcriber files, real-time replay of recorded calls, latency and cost report |
-| `tools/gen_skill_section.py` | regenerates the skill sections; `--check` fails when they are stale, `--compare SKILL.md` fails on drift |
-| `tools/check_anonymized.py` | fails on user paths, keys, IDs, long dashes and terms from a private deny list |
-| `Fixtures/` | synthetic demo call used by the tests |
+| `app/` | The macOS app (Swift) |
+| `recorder/` | The recorder: audio capture, local Whisper transcription, speakers, the tips window |
+| `skill/` | The Cowork skill: `SKILL.md`, `references/`, `settings.yaml` |
+| `spikes/m0/` | The tips engine (Python) and its tests |
+| `rules/` | Shared rules for the app and the skill |
+| `notion-mirror/` | Optional local copy of Notion pages for facts and search |
+| `keepalive/` | Optional Cowork plugin that keeps the skill listening during a call |
+| `docs/` | The full guide: [English](docs/en/live-tips.md), [українською](docs/uk/live-tips.md) |
+| `DEVELOPMENT.md` | Layout, build and the measurements behind the design |
 
-## Install (beta)
+Live Tips works on its own. With [PM Control Tower](https://github.com/bodco/pm-control-tower) it also reads your project configs (people, Notion pages, the current state).
 
-1. Download the dmg from the release page:
-   [LiveTips-0.5.8-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.8/LiveTips-0.5.8-beta.dmg).
-   Open it and drag **Live Tips** into Applications.
-2. **First open: right-click > Open**, then confirm. The beta is not notarized by Apple yet, so a
-   plain double-click is blocked the first time. After that it opens normally.
-3. The **Setup** window checks what is there and installs the rest: the Python modules, the speech
-   model and the local AI model. Each step gets a tick when it is done. In total it is about
-   2.5 GB, and nothing needs an administrator password.
-4. Add your Claude API key in Settings > Keys (it is stored in Keychain) and check the spending limits in Settings > AI.
+History: Live Tips grew inside PM Control Tower; releases up to 0.5.8 are [there](https://github.com/bodco/pm-control-tower/releases). This repository keeps that history.
 
-Requirements: macOS 14.4 or newer on Apple silicon, Python 3.10 or newer (Setup checks it and
-says what to do when it is missing). Expect rough edges: this is a beta.
-
-## Using Live Tips: start a call
-
-1. Menu bar icon (or the Dock icon) > **Start call…**
-2. **Project**: recordings, notes and the prep live in this project's folder. A workspace is for general calls about several projects.
-3. **Title**: a short name of the call, e.g. "Weekly sync". It also links the call to its prep (see below), so keep the same title you gave the prep.
-4. **Call context** (optional, strongly recommended): what the call is about and where to look, e.g. "pricing for phase 2, see the estimate and last week's notes". Before the call starts Claude gets this text, the project's current state (`_notion/current-state.md`) and the project files that local search finds for it.
-5. **Audience**, **Meeting type**, **Microphone**, **Languages**, then **Start**.
-
-### Prep made in Cowork
-
-A prep is a brief, fact cards and, for a presentation, an outline and slides that Claude builds in Cowork from your project files, Notion and the tracker 10-30 minutes before the call. Tips are much better with it.
-
-- **How to make one:** in Start call press **Copy request for Cowork** and paste it into Cowork in the same project. The request already names the call title, time and your context.
-- **Where it lands:** `<project folder>/live/prep-<date>-<HHMM>-<title>.brief.md`, `.cards.json`, `.facts.json` (plus `.outline.json` and `.slides.json` for a presentation).
-- **Which prep is used:** on Start the app takes `prep-*` files younger than 3 hours from that folder. Only a prep whose name matches the call title is used ("Weekly Sync" matches `...-weekly-sync`); a prep made for another call is never used, so its brief and internal facts cannot leak into the wrong meeting. Each file kind is taken separately, so a prep without slides still gives the brief and the facts.
-- **How to check before Start:** the **Prep** block says "Prep found: <title>" in green when a prep matches the title. When the only fresh prep is for another call, it says so in orange and that prep is not used. In every state there is a button that copies the Cowork request for this call (title, time, project, call context), so the next prep can be made while an older one is still in the folder. The block rechecks the folder every 5 seconds and when the project or the title changes.
-- **Without a prep:** the call still works. Claude uses the call context, the project's current state and local search, and the local layer (fact cards, the "❓" question cards, HELP NOW) runs as usual.
-
-### Standby: open the window before the call
-
-**Recording starts: When the call begins** (in Start call) opens the tips window early, while you
-wait for the others. Nothing is recorded and there are no microphone warnings yet. Recording
-starts by itself when the other side has been speaking for about 5 seconds, or at once when you
-press the green **Start** in the window. The red **End call** ends the call. The Cowork skill has
-the same standby.
-
-### Presentation: split view
-
-With meeting type **Presentation** and a prep that has slides (`<stem>.slides.json`), the tips
-window splits into 2 halves: slide cards with the full text of your speech, and the usual tips
-stream.
-
-- Cards scroll one slide at a time (snap); move with the arrows, the ◀ ▶ buttons or the wheel.
-- A timer with a limit in minutes scales the time of each slide to fit. **Auto** turns the slides
-  on schedule with a short signal and warns 10 s before the end of a slide. The pace line shows
-  your words per minute.
-- **Trim** hides the paragraphs marked as safe to skip. **My slides / All slides** switches between
-  your part and the whole deck.
-- Paragraph kinds: read aloud, may skip, a hint (not to be read), a colleague's line right before
-  your part.
-- At the end a table compares the plan with the actual time of every slide.
-- 📑 hides or shows the cards, ⇄ swaps the 2 sides (remembered). The window grows towards the
-  cards, so the tips stream stays where you put it.
-
-### See-through window
-
-In the tips window, ⚙ > Display > **Opacity** fades only the window background. The text stays fully opaque and
-gets a soft halo in the background colour, so it stays readable over whatever is behind the
-window, even at low opacity.
-
-### FAQ
-
-- **Do I need Cowork open during the call?** No. Live Tips calls the Claude API itself with your key from Keychain. Cowork is only needed for the prep and for the wrap-up you ask for later.
-- **Can I change the microphone during the call?** Yes, in the tips window (Mic menu). "System default" follows macOS; choosing a device keeps it even if macOS switches.
-- **What is Local AI?** A small model on this Mac (built-in bge-m3, or your Ollama) that matches facts and cards by meaning and powers HELP NOW and project search. Settings > AI explains the engines and how to add another one.
-- **Which "❓" cards are shown?** Only for a line that names you and asks something, a line with a work word (estimate, deadline, status, price, release…), or a question about time or amount ("when…?", "how much…?"). Rule: `rules/triggers.yaml` > `question_card`.
-- **What does it cost?** Usually $0.10 to $1.20 per hour of a call; the menu shows this call and this month against the limits from Settings.
-- **Does it write to Notion?** Yes, if Settings > General > "Write the call summary to Notion" is on and the Notion token in Keys can see the project's Meetings DB. After the call it appends a "Live Tips" section (wrap-up and the transcript file) to this meeting's page, found by `Date` within 20 min of the start, or creates the page. Menu bar > "Send last call to Notion" does it later. Details: docs, section 14.2.
-- **Can the app and the Cowork skill record the same call?** Yes. The app writes only `<call>.app.*` files with its own recorder, so nothing is shared; expect about twice the CPU. `livetips_m0.report` and `livetips_m0.judge` compare the two afterwards (docs, section 14.3).
-- **Speakers?** As in the skill: the "Who is speaking?" card offers the project's people, names you give appear in tips and in the Notion summary and are remembered in `<app folder>/voices`. On or off: Settings > AI > Speakers.
-- **Interviews?** Start call > Meeting type Interview > Your role: Observer (someone else interviews a candidate), Interviewer (you ask) or Coach (you are the one being interviewed). Tips follow the role, as in the skill.
-- **A different model for one call?** Start call > Tip model. Settings > AI sets the default.
-- **What if Claude is slow?** With "Second request when Claude is slow" on (Settings > AI), a request with no answer after 2 s (classify) or 3 s (tip), or one that fails at once, is sent again and the first good answer wins. Both are billed and counted in the limits.
-- **Whose voices are remembered?** Your team's for every project, a client's for that project only, nobody's on a call marked Public call in Start call. Settings > AI > Speakers lists the library; Forget removes a person.
-- **Notion mirror?** Settings > General > Notion mirror > Set up sync copies `tools/notion-mirror` to `<work>/Tools/notion-mirror`, finds your Control Tower databases with the Notion token and runs it every 2 hours outside calls. A mirror you already run yourself is left alone.
-- **Shortcuts?** Control-Option-H is HELP NOW and Control-Option-P pauses tips, also while the meeting app has the focus. They are shown in the menu bar menu, on the HELP button and in Settings > General > Shortcuts.
-- **Where are the files?** Transcript, tips and wrap-up data: `<project folder>/live/`. App logs: `<app folder>/logs/`.
-
-## How tips are decided (0.5.1)
-
-Local signals route a line (vocative name + request, second-person question, new request, the PM's commitment go straight to the tip model; a name in the third person never counts). The gist is shown first and the full tip replaces it. Before showing, the engine checks the tip is still open (the PM has not answered, the numbers were not said) and that every number exists in the brief, facts, cards or transcript. Presentation: keyword facts and question cards only on explicit questions. Details: docs, section 14.5.
-
-## M0 spike
-
-Measures whether direct, event-driven model calls reach the target: from the end of the
-question to the tip on screen, median 5 s or less, p90 8 s or less.
-
-```
-cd spikes/m0
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest -q tests
-cp config.example.json my.json        # set model ids, labels, name aliases, secrets file
-.venv/bin/python -m livetips_m0.replay --config my.json --md /path/to/<stem>.md --out runs/r1
-.venv/bin/python -m livetips_m0.report runs/r1 --calls-root /path/to/live
-```
-
-The replay feeds each transcript line at the moment the recorder wrote it (from
-`<stem>.md.timing.jsonl`), so the real ASR lag is included. Keep `--speed 1` for latency numbers.
-Outputs go to the run folder only: `<stem>.app.tips.jsonl`, `.app.llm.jsonl` (role, model,
-tokens, cache reads and writes, cost, timings), `.app.timing.jsonl` (spans per event).
-
-### Pipeline
-
-1. Local cue detection on each final line (no model): name of the PM, question, second person,
-   new requirement, commitment by the PM, frustration. Cue words are in `rules/triggers.yaml`.
-2. Strong signals go straight to the `tip` role. Weaker ones go to `classify` (fast model) first.
-3. The `tip` role streams JSON with `gist` first; the time the gist is complete is logged.
-4. The diet runs in code: rate limit for non-red tips, no non-red tip while the PM speaks,
-   one tip per topic. Invalid model output is never shown.
-5. Prompt caching: rules, call header with brief, and the fact book are three cached system
-   blocks; the transcript tail is the only volatile part.
-
-### Providers
-
-`livetips_m0/providers.py` keeps the model behind a small interface: Claude API (streaming,
-prompt caching), any OpenAI-compatible server (for a local model; not measured yet), and a fake
-provider for tests.
-
-### Spending limit
-
-`budget` in the config: a soft and a hard limit per call and a hard monthly cap kept in a small
-local ledger. At the hard limit model tips stop and only the local layer runs.
-
-## Privacy
-
-Audio and voice prints never leave the Mac. Only text goes to the model API. Keys are read at
-runtime (Keychain in the app, an environment variable or a secrets file in the spike) and are
-never printed or logged.
+MIT License.

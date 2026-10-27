@@ -1,6 +1,6 @@
 # live-transcriber
 
-[English](README.md) · Повний опис: [docs/uk/17-live-tips.md](../../docs/uk/17-live-tips.md)
+[English](README.md) · Повний опис: [docs/uk/live-tips.md](../docs/uk/live-tips.md)
 
 Локальна транскрипція дзвінків для скіла `live-tips`. Пише мікрофон і системний звук двома
 каналами, розпізнає кожну фразу на Маку через Whisper large-v3-turbo (MLX) і дописує рядки в
@@ -16,7 +16,7 @@
 ## Встановлення (Apple Silicon, macOS 14.2+, Python 3.10+)
 
 ```
-cp -R tools/live-transcriber ~/work/Tools/
+cp -R recorder ~/work/Tools/live-transcriber
 bash ~/work/Tools/live-transcriber/install.sh
 ```
 

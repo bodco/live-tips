@@ -104,8 +104,9 @@ workspace page, outside the DB, with no properties (verified 2026-10-14). After 
 source, then set the properties. Relation values (`Project`, `Workspace`) are given as page
 IDs copied exactly from the config; never retype an ID by hand from memory, copy it.
 
-1. **Name.** Generate a short meaningful meeting name in the language of the call from what
-   was actually discussed (2-6 words, e.g. "Fraud Engine scope sync"), not "Meeting".
+1. **Name.** The title starts with the meeting's own name (the call title given at the start),
+   then a colon and 2-6 words on what was actually discussed, all in the language of the call
+   (e.g. "Weekly sync: export scope"); never "Meeting". Same rule as the Live Tips app (0.5.5+).
    Property `Meeting Name` (the title property of the Meetings DB; check the schema).
    Title = `<name> @<start date-time>`, where the date-time is a Notion date mention. Create the
    page with the plain `<name>`, then set the title with `notion-update-page` `update_properties`
@@ -115,7 +116,7 @@ IDs copied exactly from the config; never retype an ID by hand from memory, copy
    read "<mention-date start=..."). Verify with `notion-query-data-sources` mode `rows`: the title
    must hold `<date start=...` with no backslash before `<`; if it is escaped, set it again.
 2. **Properties.**
-   - `Date`: start date-time of the meeting = `started_at` from `status.json` (it already
+   - `Date`: start date-time of the meeting = the time the PM gave for the call (if any), else `started_at` from `status.json` (it already
      carries the Mac's offset, e.g. `2026-10-10T23:48:02+03:00`), with
      `date:Date:is_datetime = 1`; no end.
    - `<zone>` for the title mention: `timezone` from `status.json` (the Mac clock; it may say

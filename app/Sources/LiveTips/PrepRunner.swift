@@ -107,7 +107,7 @@ final class PrepRunner: ObservableObject {
         let w = (workRoot as NSString).expandingTildeInPath
         var c: [String] = []
         if let d = UserDefaults.standard.string(forKey: "prepSkillDir"), !d.isEmpty { c.append((d as NSString).expandingTildeInPath) }
-        c += [home + "/.claude/skills/live-tips", w + "/Skills/src/live-tips", w + "/Control Tower/plugin/skills/live-tips"]
+        c += [home + "/.claude/skills/live-tips", w + "/Skills/src/live-tips", w + "/live-tips/skill", w + "/Control Tower/plugin/skills/live-tips"]
         return c.first { FileManager.default.fileExists(atPath: ($0 as NSString).appendingPathComponent("SKILL.md")) }
     }
 
@@ -242,7 +242,7 @@ final class PrepRunner: ObservableObject {
                 if ok {
                     self.progress = 1; self.stage = "Done"
                     // QA 26.10: the call may have started while the prep was written: pick up the rest now.
-                    if CallEngine.shared.isRunning, let f = CallEngine.shared.lastFile { CallEngine.shared.adoptPrep(file: f) }
+                    if CallEngine.shared.isRunning, let f = CallEngine.shared.lastFile { CallEngine.shared.adoptLatePrep(base: base, file: f) }
                 }
                 self.running = false
                 self.process = nil

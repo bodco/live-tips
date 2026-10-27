@@ -96,6 +96,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     var transcript: TailReader?      // the call's transcript (.md), pushed to the transcript pane
     var transcriptPath = ""
     var speakersMtime: Date?
+    var lastPrep = ""
     var ticker: Timer?               // stopped when the window closes (QA: closed windows kept reading files)
 
     init(args: PrompterArgs) { self.args = args }
@@ -174,6 +175,23 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                     speakersMtime = nil
                 }
             }
+        }
+        // 2026-10-27 (owner): the preparation's progress in the ⚙ panel's Context block.
+        if ticks % 4 == 2 {
+            let js: String = MainActor.assumeIsolated {
+                let r = PrepRunner.shared
+                var d: [String: Any] = ["state": "none"]
+                if r.running {
+                    d = ["state": "running", "stage": r.stage, "detail": r.detail, "progress": r.progress]
+                } else if !transcriptPath.isEmpty, FileManager.default.fileExists(atPath: String(transcriptPath.dropLast(3)) + ".brief.md") {
+                    d = ["state": "ready"]
+                } else if r.result.lowercased().contains("fail") {
+                    d = ["state": "failed", "stage": r.result]
+                }
+                let data = (try? JSONSerialization.data(withJSONObject: d)) ?? Data("{}".utf8)
+                return String(data: data, encoding: .utf8) ?? "{}"
+            }
+            if js != lastPrep { lastPrep = js; push("window.setPrep && window.setPrep(" + js + ")") }
         }
         // The live transcript and the speaker names (speakers.json) for the transcript pane.
         if let tr = transcript {

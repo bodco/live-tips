@@ -1,6 +1,6 @@
 # live-transcriber
 
-[Українською](README.uk.md) · Full guide: [docs/en/17-live-tips.md](../../docs/en/17-live-tips.md)
+[Українською](README.uk.md) · Full guide: [docs/en/live-tips.md](../docs/en/live-tips.md)
 
 Local call transcription for the `live-tips` skill. Records the microphone and the system
 audio as two channels, transcribes every phrase on the Mac with Whisper large-v3-turbo (MLX)
@@ -16,7 +16,7 @@ Nothing goes to the network except the one-time model download.
 ## Install (Apple Silicon, macOS 14.2+, Python 3.10+)
 
 ```
-cp -R tools/live-transcriber ~/work/Tools/
+cp -R recorder ~/work/Tools/live-transcriber
 bash ~/work/Tools/live-transcriber/install.sh
 ```
 

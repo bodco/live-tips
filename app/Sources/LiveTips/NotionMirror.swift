@@ -1,7 +1,7 @@
 import Foundation
 import LiveTipsCore
 
-/// Runs tools/notion-mirror for the user (M1): "Set up sync" in Settings > General copies the script
+/// Runs notion-mirror/ for the user (M1): "Set up sync" in Settings > General copies the script
 /// from the app to <work>/Tools/notion-mirror, writes its config, finds the Control Tower databases
 /// with the Notion token from the Keychain (--discover) and starts the first full run. After that the
 /// app runs it every 2 hours, never during a call. A mirror the user already runs with their own

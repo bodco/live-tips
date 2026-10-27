@@ -75,7 +75,9 @@ def handle_inbox(eng, raw: str) -> None:
         q = text[5:].strip()
         if q:
             eng.on_request("find", q)
-    elif low in ("off topic", "refresh context"):
+    elif low == "refresh context":
+        eng.reload_prep()             # the window's Refresh or the app after a late preparation
+    elif low == "off topic":
         return
     else:
         eng.on_request("ask", text)

@@ -8,23 +8,23 @@
   /* ---------- tokens: light by default, dark follows the system (or data-theme) ---------- */
   :root {
     --bg: #f4f5f7; --panel: #ffffff; --panel2: #eef0f3; --text: #14161b; --muted: #5b6270;
-    --line: #dde1e7; --red: #d23434; --orange: #a35500; --blue: #2c6bd6; --green: #1d8656;
+    --line: #e2e5ec; --red: #d23434; --orange: #a35500; --blue: #2f6fe4; --green: #1d8656;
     --red-bg: #fdecec; --orange-bg: #fff3e3; --blue-bg: #eaf1fd; --green-bg: #e8f6ef;
     --crit: #c62828; --scrim: rgba(20, 22, 27, .28); --shadow: 0 12px 40px rgba(20, 22, 27, .18);
-    --size: 18px;
+    --size: 18px; --blue-soft: rgba(47, 111, 228, .12);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #121418; --panel: #1b1e25; --panel2: #171a20; --text: #eef0f4; --muted: #a3aab6;
-      --line: #2a2e37; --red: #ff6b6b; --orange: #ffad4d; --blue: #6cb2ff; --green: #55cf95;
-      --red-bg: #3a1c1f; --orange-bg: #33260f; --blue-bg: #16263d; --green-bg: #143024;
+      --bg: #1f2130; --panel: #2a2c3c; --panel2: #252736; --text: #eceef5; --muted: #a2a7b8;
+      --line: #353849; --red: #ff6b6b; --orange: #ffad4d; --blue: #5b9bff; --green: #55cf95;
+      --red-bg: #3d2028; --orange-bg: #382a17; --blue-bg: #1f2d4d; --green-bg: #183329; --blue-soft: rgba(91, 155, 255, .16);
       --scrim: rgba(0, 0, 0, .45); --shadow: 0 12px 40px rgba(0, 0, 0, .55);
     }
   }
   :root[data-theme="dark"] {
-    --bg: #121418; --panel: #1b1e25; --panel2: #171a20; --text: #eef0f4; --muted: #a3aab6;
-    --line: #2a2e37; --red: #ff6b6b; --orange: #ffad4d; --blue: #6cb2ff; --green: #55cf95;
-    --red-bg: #3a1c1f; --orange-bg: #33260f; --blue-bg: #16263d; --green-bg: #143024;
+    --bg: #1f2130; --panel: #2a2c3c; --panel2: #252736; --text: #eceef5; --muted: #a2a7b8;
+    --line: #353849; --red: #ff6b6b; --orange: #ffad4d; --blue: #5b9bff; --green: #55cf95;
+    --red-bg: #3d2028; --orange-bg: #382a17; --blue-bg: #1f2d4d; --green-bg: #183329; --blue-soft: rgba(91, 155, 255, .16);
     --scrim: rgba(0, 0, 0, .45); --shadow: 0 12px 40px rgba(0, 0, 0, .55);
   }
   * { box-sizing: border-box; }
@@ -420,6 +420,52 @@
   #sitline .mine { color: var(--blue); font-weight: 600; }
   #sitline .turn { color: var(--red); font-weight: 700; }
   .items li.said { text-decoration: line-through; opacity: .55; }
+  /* ---------- 2026-10-27 design pass (owner): the same look as Start call and the welcome tour ----------
+     Everything you can click has the accent tint; static text stays gray. Cards and controls: no hard
+     outlines, soft fills, radius 10. */
+  .ib { border: 0; border-radius: 10px; background: var(--blue-soft); color: var(--blue); }
+  .ib:hover { filter: brightness(1.12); border: 0; }
+  #mute.muted { background: var(--red); color: #fff; }
+  #pause.on { background: var(--orange); color: #fff; }
+  #gear.open { background: var(--blue); color: #fff; border: 0; }
+  #trbtn[aria-pressed="true"] { background: var(--blue); color: #fff; }
+  .field { border: 0; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+  .field:focus-within { box-shadow: inset 0 0 0 2px var(--blue); }
+  #send { border-radius: 9px; }
+  #sos { border-radius: 10px; height: auto; min-height: 36px; }
+  #chips button { border: 0; background: var(--blue-soft); color: var(--blue); }
+  #chips button:hover { filter: brightness(1.12); color: var(--blue); }
+  #pausedpill { border: 0; background: var(--orange-bg); }
+  .btn, .dk-b, #alert button { border: 0; background: var(--blue-soft); color: var(--blue); border-radius: 8px; }
+  #alert button { background: rgba(255, 255, 255, .18); color: inherit; }
+  .tip .fb button:hover { background: var(--blue-soft); color: var(--blue); }
+
+  /* the ⚙ panel: cards like Start call */
+  #menu { background: var(--bg); border: 0; border-radius: 14px; padding: 4px 0 8px; }
+  .sec { background: var(--panel); border: 0; border-radius: 10px; margin: 8px 10px 0; padding: 10px 12px; }
+  .sec h4 { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .rowf { grid-template-columns: 112px 1fr minmax(0, auto); }
+  .rowf select { -webkit-appearance: none; appearance: none; border: 0; border-radius: 8px; background-color: var(--blue-soft);
+    color: var(--text); padding: 6px 28px 6px 10px; min-height: 30px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%235b9bff' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 10l5-5 5 5M7 14l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 9px center; }
+  .rowf select:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .seg { border: 0; background: var(--blue-soft); border-radius: 9px; padding: 2px; gap: 2px; }
+  .seg button { border: 0; border-radius: 7px; color: var(--blue); }
+  .seg button.on { background: var(--blue); color: #fff; }
+  .switch.on { background: var(--blue); }
+  .pill { border: 0; }
+
+  /* 2026-10-27 (owner): more air in the ⚙ panel; the preparation progress in Context */
+  .sec { padding: 14px 14px 12px; margin: 10px 12px 0; }
+  .sec h4 { margin-bottom: 12px; }
+  .rowf { min-height: 38px; gap: 12px; margin-bottom: 6px; }
+  .rowf:last-child { margin-bottom: 0; }
+  .hintline { margin: -2px 0 8px; }
+  .ctxline + .ctxline { margin-top: 10px; }
+  #prepbar { height: 4px; border-radius: 2px; background: var(--blue-soft); margin-top: 6px; overflow: hidden; }
+  #prepbar i { display: block; height: 100%; width: 0; background: var(--blue); transition: width .4s; }
+  #mute svg { width: 16px; height: 16px; }
 </style>
 </head>
 <body>
@@ -458,7 +504,7 @@
   <span id="pausedpill" role="button" tabindex="0" data-i18n="paused_pill" data-i18n-title="paused_pill_tt">Tips paused</span>
   <span id="meter" data-i18n-title="meter_tt"></span>
   <button id="pause" class="ib" type="button" aria-pressed="false"></button>
-  <button id="mute" class="ib" data-i18n-title="mute_tt">🎙</button>
+  <button id="mute" class="ib" data-i18n-title="mute_tt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
   <button id="gear" class="ib" data-i18n-title="gear_tt" data-i18n-aria="menu_aria">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
@@ -506,7 +552,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
   </label>
-  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt"><span data-i18n="sos_label">HELP</span><kbd>⌃⌥H</kbd></button>
+  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt"><span data-i18n="sos_label">HELP</span></button>
 </form>
 
 <div id="scrim"></div>
@@ -1292,10 +1338,11 @@
   window.setUiLang = setLang;   // for tests and the native side
 
   // ---------- mute ----------
+  var MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>', MIC_OFF_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V6a3 3 0 0 0-5.7-1.3"/><path d="M5 11a7 7 0 0 0 11.4 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>';
   var muted = false, muteBtn = $('mute');
   function applyMute() {
     muteBtn.classList.toggle('muted', muted);
-    muteBtn.textContent = muted ? '🔇' : '🎙';
+    muteBtn.innerHTML = muted ? MIC_OFF_SVG : MIC_SVG;
     muteBtn.setAttribute('aria-pressed', String(muted));
     muteBtn.setAttribute('aria-label', muted ? t('unmute_aria') : t('mute_aria'));
   }

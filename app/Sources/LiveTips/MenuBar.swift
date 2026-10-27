@@ -144,6 +144,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func refresh() {
+        // Custom shortcuts (Settings > General > Shortcuts) shown in the menu.
+        for (item, act) in [(helpItem, HotKeys.Action.help), (pauseItem, HotKeys.Action.pause)] {
+            let c = HotKeys.shared.combo(act)
+            item.keyEquivalent = c.char.lowercased(); item.keyEquivalentModifierMask = c.menuMask
+        }
         let cfg = config
         IndexService.shared.configure(projects: ProjectRegistry.load(from: AppPaths.projects).projects, appRoot: appRoot,
                                       python: cfg.engine.python, enabled: cfg.localAI.enabled)

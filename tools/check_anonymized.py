@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail if the public tools/live-tips-app tree contains personal data.
+"""Fail if the public live-tips repository contains personal data.
 
 Forbidden: absolute user paths, API keys and tokens, and any word listed in a private deny
 list (one term per line). The deny list lives outside the repository; pass it with
@@ -13,19 +13,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 GENERIC = [
-    (r"/Users/[A-Za-z0-9._-]+", "absolute macOS user path"),
+    (r"/Users/(?!you\b|me\b|example\b)[A-Za-z0-9._-]+", "absolute macOS user path"),
     (r"sk-ant-[A-Za-z0-9_-]{8,}", "Anthropic key"),
     (r"ntn_[A-Za-z0-9]{20,}|secret_[A-Za-z0-9]{30,}", "Notion token"),
     (r"[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}", "UUID (Notion or other ID)"),
     (chr(0x2014), "long dash"),
 ]
 SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", "runs", "venv", ".venv"}
+SKIP_FILES = {"LICENSE"}          # the copyright line names the author on purpose
+# Made-up IDs in self-tests (all one digit, or 0-9a-f in order) are not real IDs.
+FAKE_ID = re.compile(r"^(?:([0-9a-f])\1*|(?:0123456789abcdef)+)$")
 TEXT_EXT = {".py", ".md", ".json", ".yaml", ".yml", ".txt", ".sh", ".swift", ".html", ".toml", ".cfg", ""}
 
 
 def files(root: Path):
     for p in root.rglob("*"):
-        if p.is_file() and not (set(p.parts) & SKIP_DIRS) and p.suffix in TEXT_EXT:
+        if p.is_file() and not (set(p.parts) & SKIP_DIRS) and p.suffix in TEXT_EXT and p.name not in SKIP_FILES:
             yield p
 
 
@@ -44,7 +47,11 @@ def main(argv=None) -> int:
     for f in files(a.root):
         for n, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             for rx, why in pats:
-                if rx.search(line):
+                m = rx.search(line)
+                if m and why.startswith("UUID") and all(FAKE_ID.match(x.replace("-", "")[:32]) or len(set(x.replace("-", ""))) <= 1
+                                                         for x in rx.findall(line)):
+                    continue
+                if m:
                     print("{}:{}: {}".format(f.relative_to(a.root), n, why))
                     bad += 1
     print("anonymization: {} finding(s)".format(bad))

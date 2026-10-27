@@ -220,6 +220,8 @@ class Engine:
             self.history.append(line)
         if hasattr(self.prompt, "refresh_facts") and line.line_id % 5 == 0 and self.prompt.refresh_facts():
             self.out_timing.write({"line_id": line.line_id, "src": line.t, "outcome": "facts_reloaded"})
+        if line.line_id % 5 == 0:
+            self.reload_prep()
         sig = self.detector.detect(line)
         span = {"line_id": line.line_id, "src": line.t, "speaker": line.speaker, "seg_end": line.seg_end,
                 "written": line.written, "available_at": now, "signals": sig.tags,
@@ -796,6 +798,26 @@ class Engine:
         return self._presenting
 
     # ---------- the PM's speech from the brief, at the start ----------
+    def reload_prep(self) -> bool:
+        """A preparation that landed after the start: reload the brief and the facts, show the speech
+        and a short notice in the window (2026-10-27, owner)."""
+        if not hasattr(self.prompt, "refresh_brief"):
+            return False
+        try:
+            changed = self.prompt.refresh_brief()
+        except Exception:  # noqa: BLE001
+            return False
+        if not changed:
+            return False
+        if hasattr(self.prompt, "refresh_facts"):
+            self.prompt.refresh_facts()
+        t = s_to_hms(self.clock())
+        self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "notice", "level": "info", "t": t, "at": t,
+                             "gist": "Preparation ready: the brief, the facts and the cards are loaded"})
+        if self.speech_item is None and self.cfg.get("speech_card", True):
+            self.speech_card(self.prompt._brief)
+        return True
+
     def speech_card(self, brief_text: str) -> Optional[dict]:
         """The skill shows "Твій спіч" from the brief as the first card (no model call). The brief carries
         it as a ready item under "## speech.json"; without one, the "спіч / speech" section is used."""

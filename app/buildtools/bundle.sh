@@ -18,7 +18,7 @@ ICONSET="$(mktemp -d)/AppIcon.iconset"; mkdir -p "$ICONSET"
 xcrun swift "$HERE/buildtools/make_icon.swift" "$ICONSET" >/dev/null && iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" || echo "icon: skipped"
 # Self-contained beta (2026-10-22): the recorder core and the tips engine travel inside the app;
 # the Setup window copies the core into the app folder and installs Python modules and models.
-LT="$HERE/../../live-transcriber"
+LT="$HERE/../recorder"
 CORE="$APP/Contents/Resources/core"; mkdir -p "$CORE/src" "$CORE/bin"
 cp "$LT/src/transcriber.py" "$LT/src/semantic.py" "$CORE/src/"
 cp "$LT/bin/lt" "$LT/bin/read_delta.py" "$CORE/bin/"
@@ -33,7 +33,7 @@ rsync -a --exclude __pycache__ "$HERE/../spikes/m0/livetips_m0" "$ENG/spikes/m0/
 cp "$HERE/Resources/setup.sh" "$APP/Contents/Resources/setup.sh"
 # Notion mirror (Settings > General > Set up sync copies it into <work>/Tools/notion-mirror)
 mkdir -p "$APP/Contents/Resources/notion-mirror"
-cp "$HERE/../../notion-mirror/"{mirror.py,run.sh,install.sh,README.md,README.uk.md,mirror.config.example.json} "$APP/Contents/Resources/notion-mirror/"
+cp "$HERE/../notion-mirror/"{mirror.py,run.sh,install.sh,README.md,README.uk.md,mirror.config.example.json} "$APP/Contents/Resources/notion-mirror/"
 mkdir -p "$APP/Contents/Helpers"
 xcrun swiftc -O -o "$APP/Contents/Helpers/audiocap" "$HERE/Helpers/audiocap.swift"
 codesign --force --sign "$IDENT" --identifier "$BUNDLE_ID.audiocap" "$APP/Contents/Helpers/audiocap"

@@ -506,6 +506,17 @@
   .seg button.on { background: var(--blue); color: #fff; }
   .switch.on { background: var(--blue); }
   .pill { border: 0; }
+
+  /* 2026-10-27 (owner): more air in the ⚙ panel; the preparation progress in Context */
+  .sec { padding: 14px 14px 12px; margin: 10px 12px 0; }
+  .sec h4 { margin-bottom: 12px; }
+  .rowf { min-height: 38px; gap: 12px; margin-bottom: 6px; }
+  .rowf:last-child { margin-bottom: 0; }
+  .hintline { margin: -2px 0 8px; }
+  .ctxline + .ctxline { margin-top: 10px; }
+  #prepbar { height: 4px; border-radius: 2px; background: var(--blue-soft); margin-top: 6px; overflow: hidden; }
+  #prepbar i { display: block; height: 100%; width: 0; background: var(--blue); transition: width .4s; }
+  #mute svg { width: 16px; height: 16px; }
 </style>
 </head>
 <body>
@@ -553,7 +564,7 @@
   <span id="pausedpill" role="button" tabindex="0" data-i18n="paused_pill" data-i18n-title="paused_pill_tt">Tips paused</span>
   <span id="meter" data-i18n-title="meter_tt"></span>
   <button id="pause" class="ib" type="button" aria-pressed="false"></button>
-  <button id="mute" class="ib" data-i18n-title="mute_tt">🎙</button>
+  <button id="mute" class="ib" data-i18n-title="mute_tt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
   <button id="trbtn" class="ib" type="button" aria-pressed="false" data-i18n-title="tr_btn_tt" data-i18n-aria="tr_btn_tt" title="Transcript">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>
   </button>
@@ -605,7 +616,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
   </label>
-  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt"><span data-i18n="sos_label">HELP</span><kbd>⌃⌥H</kbd></button>
+  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt"><span data-i18n="sos_label">HELP</span></button>
 </form>
 
 <div id="scrim"></div>
@@ -669,6 +680,10 @@
     <div class="ctxline">
       <div class="t"><span id="brief"></span><small id="briefsub"></small></div>
       <button id="refresh" class="btn" type="button" data-i18n="refresh" data-i18n-title="refresh_tt">Refresh</button>
+    </div>
+    <div class="ctxline" id="prepline" style="display:none">
+      <div class="t"><span id="preptitle"></span><small id="prepsub"></small>
+        <div id="prepbar"><i></i></div></div>
     </div>
   </div>
   <div class="sec">
@@ -794,6 +809,7 @@
       stealth_sub: 'This call only. The default for new calls is in Settings > General',
       stealth_tt: 'On (default): colleagues do not see this window when you share your screen, and screenshots skip it. Off: the window shows in a screen share and you can take screenshots of it.',
       sec_context: 'Context',
+      prep_running: 'Preparation: being written', prep_ready: 'Preparation: ready and loaded', prep_failed: 'Preparation: failed', prep_none: 'Preparation: none for this call', prep_ready_toast: 'Preparation ready: the speech, facts and cards are loaded',
       brief_none: 'Brief: not loaded yet',
       brief_from: 'Brief from {t}',
       brief_sub: 'Meetings, threads and documents of the project.',
@@ -1102,6 +1118,7 @@
       stealth_sub: 'Лише для цього дзвінка. Типове значення для нових дзвінків у Settings > General',
       stealth_tt: 'Увімкнено (за замовчуванням): колеги не бачать це вікно, коли ти показуєш екран, і знімки екрана його пропускають. Вимкнено: вікно видно під час показу екрана, і його можна зняти на знімок.',
       sec_context: 'Контекст',
+      prep_running: 'Підготовка: пишеться', prep_ready: 'Підготовка: готова і завантажена', prep_failed: 'Підготовка: не вдалася', prep_none: 'Підготовка: для цього дзвінка немає', prep_ready_toast: 'Підготовка готова: спіч, факти і картки завантажено',
       brief_none: 'Довідка: ще не завантажена',
       brief_from: 'Довідка від {t}',
       brief_sub: 'Зустрічі, обговорення і документи проєкту.',
@@ -1431,10 +1448,11 @@
   window.setUiLang = setLang;   // for tests and the native side
 
   // ---------- mute ----------
+  var MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>', MIC_OFF_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V6a3 3 0 0 0-5.7-1.3"/><path d="M5 11a7 7 0 0 0 11.4 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>';
   var muted = false, muteBtn = $('mute');
   function applyMute() {
     muteBtn.classList.toggle('muted', muted);
-    muteBtn.textContent = muted ? '🔇' : '🎙';
+    muteBtn.innerHTML = muted ? MIC_OFF_SVG : MIC_SVG;
     muteBtn.setAttribute('aria-pressed', String(muted));
     muteBtn.setAttribute('aria-label', muted ? t('unmute_aria') : t('mute_aria'));
   }
@@ -2405,9 +2423,20 @@
     if (n) html += '<div class="nxt">' + esc(t('now_next')) + ' <b>' + inline(n.title) + '</b>' + nums(n) + '<ul>' + pts(n) + '</ul></div>';
     nowbox.innerHTML = html; nowbox.className = html ? 'has' : '';
   }
+  // 2026-10-27 (owner): a preparation that finishes during the call (from the app or the engine).
+  window.setPrep = function (p) {
+    var row = $('prepline'); if (!row || !p) return;
+    row.style.display = '';
+    var st = p.state || 'none';
+    $('preptitle').textContent = t('prep_' + (st === 'running' ? 'running' : st === 'ready' ? 'ready' : st === 'failed' ? 'failed' : 'none'));
+    $('prepsub').textContent = [p.stage, p.detail].filter(Boolean).join(' · ');
+    var bar = $('prepbar'); bar.style.display = st === 'running' ? '' : 'none';
+    bar.firstChild.style.width = Math.round((p.progress || 0) * 100) + '%';
+  };
   window.addItems = function (items) {
     (items || []).forEach(function (it) {
       if (!it) return;
+      if (it.kind === 'notice') { toast(t('prep_ready_toast'), 'ok'); window.setPrep({ state: 'ready' }); return; }
       if (it.kind === 'agenda') { renderAgenda(it); return; }
       if (it.kind === 'facts') { facts = it.facts || []; indexFacts(); searchFacts(); return; }
       if (it.kind === 'outline') { outline = it.sections || []; renderNow(); return; }

@@ -165,6 +165,8 @@ class PromptBuilder:
                     "phrase_words": lim["phrase_words_max_en"], "langs": "+".join(call_meta.get("langs", [])) or "uk"}
         self.meta = dict(call_meta)
         self._brief = _read(brief_path, 40000) or "(no brief)"
+        self._brief_path = brief_path
+        self._brief_key = (brief_path.stat().st_mtime if brief_path and Path(brief_path).exists() else None)
         self._extra = extra_context
         self._facts = (facts_path, cards_path)
         self.blocks = []
@@ -183,6 +185,23 @@ class PromptBuilder:
             return False
         self._facts_key = key
         self.blocks[2] = {"text": "FACT BOOK AND CARDS:\n" + (facts_block(fp, cp) or "(none)"), "cache": True}
+        return True
+
+    def refresh_brief(self) -> bool:
+        """2026-10-27 (owner): a preparation that finishes after the call started is picked up mid-call.
+        Reloads the brief when its file appears or changes; returns True when it did."""
+        bp = self._brief_path
+        if not bp or not Path(bp).exists():
+            return False
+        key = Path(bp).stat().st_mtime
+        if key == self._brief_key:
+            return False
+        text = _read(bp, 40000)
+        if not text:
+            return False
+        self._brief_key, self._brief = key, text
+        self.blocks = []
+        self.set_meeting({})          # rebuilds the blocks with the new brief (a new cache prefix)
         return True
 
     def set_meeting(self, change: dict) -> bool:

@@ -2558,8 +2558,8 @@ NAME_MAX = 80
 
 
 def short_name(name: str) -> str:
-    """2026-10-26 (owner): speakers are shown as first name + initial: "Bohdan Neymet" -> "Bohdan N.".
-    One word, or a name that already ends with an initial ("Bohdan N."), stays as it is."""
+    """2026-10-26 (owner): speakers are shown as first name + initial: "Mike Johnson" -> "Mike J.".
+    One word, or a name that already ends with an initial ("Mike J."), stays as it is."""
     n = re.sub(r"\s+", " ", _s(name)).strip()
     # QA 26.10: "Ed Stone (PO)" -> "Ed S.", "Dr. Ed Stone" -> "Ed S."
     n = re.sub(r"\s*[(\[][^)\]]*[)\]]", "", n).strip()

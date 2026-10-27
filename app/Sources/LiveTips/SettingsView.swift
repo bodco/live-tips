@@ -921,10 +921,10 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
-                LabeledContent("HELP NOW") { Text("⌃⌥H  Control-Option-H").font(.callout.monospaced()) }
-                LabeledContent("Pause or resume tips") { Text("⌃⌥P  Control-Option-P").font(.callout.monospaced()) }
+                ShortcutRow(action: .help)
+                ShortcutRow(action: .pause)
             } header: { Text("Shortcuts") } footer: {
-                Text("They work from any app during a call, also while the meeting app has the focus. Also in the menu bar menu and on the tips window buttons.")
+                Text("They work from any app during a call, also while the meeting app has the focus. Change: press the new keys with Control, Option or Command (Esc cancels). Pause stops the transcript and the tips for both sides.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
@@ -1056,7 +1056,7 @@ struct AboutView: View {
                 check(model.mirrorHealth == "ok", "Notion mirror is fresh", "General")
                 check(model.config.localAI.enabled, "Local AI on", "AI")
             } header: { Text("Ready for a call") } footer: {
-                Text("Before a call: click Live Tips in the Dock or the menu bar > Start call, choose the project or workspace, Start. The tips window opens under your camera. During the call: Control-Option-H is HELP NOW, Control-Option-P pauses tips.")
+                Text("Before a call: click Live Tips in the Dock or the menu bar > Start call, choose the project or workspace, Start. The tips window opens under your camera. During the call: \(HotKeys.shared.combo(.help).display) is HELP NOW, \(HotKeys.shared.combo(.pause).display) pauses (Settings > General > Shortcuts).")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

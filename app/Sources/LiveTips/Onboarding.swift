@@ -186,7 +186,7 @@ struct OnboardingView: View {
         case .claude: return "Tips, answers and the call picture come from Claude with your own API key, about $0.3-0.8 per call. Without a key Live Tips still records, transcribes and shows prepared facts."
         case .install: return "Speech recognition and a small local AI model run on this Mac (about 2.5 GB, no administrator password)."
         case .notion: return "After each call Live Tips adds a page to a Notion database: a short summary, decisions, action items, open questions and the transcript. Without Notion the same notes stay in the project folder."
-        case .done: return "Before a call: Live Tips in the menu bar > Start call, pick the project, Start. During the call: Control-Option-H is HELP NOW, Control-Option-P pauses tips."
+        case .done: return "Before a call: Live Tips in the menu bar > Start call, pick the project, Start. During the call: \(HotKeys.shared.combo(.help).display) is HELP NOW, \(HotKeys.shared.combo(.pause).display) pauses. Change them in Settings > General > Shortcuts."
         }
     }
 

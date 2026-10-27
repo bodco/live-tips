@@ -1,6 +1,6 @@
-# 17. Live tips: a co-pilot on the call
+# Live Tips: a co-pilot on the call
 
-[Українською](../uk/17-live-tips.md) · [Back to contents](README.md)
+[Українською](../uk/live-tips.md) · [Back to the README](../../README.md)
 
 Live tips listens to a call together with the PM and posts tips in the Cowork chat. Audio is
 transcribed locally on the Mac and never leaves it. The skill reads the transcript line by
@@ -86,8 +86,8 @@ Why it is built this way:
 
 ## 2. Components
 
-The code is in [`tools/live-transcriber/`](../../tools/live-transcriber/), the skill in
-[`plugin/skills/live-tips/`](../../plugin/skills/live-tips/).
+The code is in [`recorder/`](../../recorder/), the skill in
+[`skill/`](../../skill/).
 
 | File | Role |
 |---|---|
@@ -104,9 +104,9 @@ The code is in [`tools/live-transcriber/`](../../tools/live-transcriber/), the s
 | `src/semantic.py` | Optional semantic layer: embeddings through a local Ollama (`bge-m3`), the per-project index, search by meaning |
 | `src/prompter.swift`, `src/prompter.html` | The tips window (layout in "The tips window"); shows `*.tips.jsonl`, writes questions and settings to `*.inbox.jsonl`. Built into `bin/prompter` |
 | `launchd/live-transcriber.plist.template` | LaunchAgent template (`WatchPaths` on `control/`) |
-| `plugin/skills/live-tips/SKILL.md` | The skill core: invariants, priority order, the start checklist, the poll loop, the `@@` table, stop |
-| `plugin/skills/live-tips/references/*.md` | Modules the core reads on demand (list in "How the skill is built") |
-| `plugin/skills/live-tips/settings.yaml` | Everything personal: labels, paths, languages, tip rules, time zone |
+| `skill/SKILL.md` | The skill core: invariants, priority order, the start checklist, the poll loop, the `@@` table, stop |
+| `skill/references/*.md` | Modules the core reads on demand (list in "How the skill is built") |
+| `skill/settings.yaml` | Everything personal: labels, paths, languages, tip rules, time zone |
 
 Runtime folders (not in git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `control/`,
 `models/` (the voice model), `voices/` (your local voice library: never put it in a repository).
@@ -214,7 +214,7 @@ action items), `<title>.polls.jsonl` (every poll), `<title>.tips.jsonl` and
   (section 5, "Local semantic layer").
 - Claude desktop (Cowork) with a connected folder that holds the tool and the project
   folders (`~/work` for the author).
-- The `pm-control-tower` plugin with a project config in `projects/<slug>.md`. The skill
+- Optional: the [PM Control Tower](https://github.com/bodco/pm-control-tower) plugin with a project config in `projects/<slug>.md`. The skill
   takes the team, meetings, `Local Paths` and Notion IDs (`meetings_db`, `project_page_id`,
   `workspace_page_id`) from there.
 - The Notion connector in Cowork (for the Live Brief and the Meetings DB page). Without it
@@ -224,11 +224,11 @@ action items), `<title>.polls.jsonl` (every poll), `<title>.tips.jsonl` and
 
 ## 4. Installing from scratch
 
-1. **Put the tool on the Mac.** Copy `tools/live-transcriber/` from this repository to
+1. **Put the tool on the Mac.** Copy `recorder/` from this repository to
    `~/work/Tools/live-transcriber` (another path is fine, then change it in `settings.yaml`):
    ```
    mkdir -p ~/work/Tools
-   cp -R "<repo clone>/tools/live-transcriber" ~/work/Tools/
+   cp -R "<repo clone>/recorder" ~/work/Tools/
    ```
 2. **LaunchAgent name.** Default `com.pm-control-tower.live-transcriber`. For your own
    prefix change `launchd_label` in `config.json` before installing.
@@ -258,11 +258,13 @@ action items), `<title>.polls.jsonl` (every poll), `<title>.tips.jsonl` and
    Later runs only re-embed new or changed files. Details: section 5, "Local semantic layer".
 4c. **Updating from an older version.** Re-run `install.sh`: it rebuilds `audiocap` and the
    tips window (`bin/prompter`). The stealth switch and the new window need that rebuild.
-5. **The skill.** The `pm-control-tower` plugin (1.8.0+) contains `live-tips` as a core
-   `SKILL.md`, the `references/` modules and `settings.yaml`; upload all of them together. Fill
-   in `plugin/skills/live-tips/settings.yaml`: `paths.work_root`, `paths.tool_root`, labels,
+5. **The skill.** Download `live-tips.skill` from the [latest release](https://github.com/bodco/live-tips/releases/latest)
+   (or zip the `skill/` folder): a core `SKILL.md`, the `references/` modules and `settings.yaml`;
+   add it in Cowork under Skills. It works on its own; the PM Control Tower plugin and its project
+   configs are optional extras (people, Notion pages, the current state). Fill
+   in `skill/settings.yaml`: `paths.work_root`, `paths.tool_root`, labels,
    languages, `user.name_aliases`, `user.timezone`. Plugin setup substitutes `~~home-folder` for you.
-5a. **Keepalive plugin (recommended).** Install `tools/live-tips-keepalive` as a Cowork
+5a. **Keepalive plugin (recommended).** Install `keepalive` as a Cowork
    plugin (zip the folder into `live-tips-keepalive.plugin`). While a call is recorded, its
    Stop hook does not let Claude end its turn, so the tips loop cannot fall silent by itself.
    It fails open: no marker, an expired marker (2.5 h) or 400 blocks and it does nothing.
@@ -686,7 +688,7 @@ admin history take?" finds the fact "Admin audit logs: 16 h".
   a separate thread with a short timeout: transcription and tips never wait for it.
 - **The project index.** `lt index "<project folder>"` embeds the project's text files
   (`.md`, `.txt`, `.csv`, small `.json`), including the local Notion mirror (`_notion/`, made by
-  [`tools/notion-mirror`](../../tools/notion-mirror/README.md)),
+  [`notion-mirror`](../../notion-mirror/README.md)),
   into `<project>/.livetips-index/`. It is incremental (only new or changed files) and
   during a call the recorder indexes fresh files in the background, only while transcription
   is idle. Skipped: `.git`, `repos/`, archives, binaries, files over 2 MB, call artefacts
@@ -887,7 +889,7 @@ account, not a separate file on the Mac. To change it, edit the file in the skil
 upload the skill again (a zip with the `live-tips/` folder holding `SKILL.md`, the
 `references/` folder and `settings.yaml`; a zip without `references/` gives a skill that
 says a module is missing) in Claude settings, Skills section. The template in this
-repository is `plugin/skills/live-tips/settings.yaml`.
+repository is `skill/settings.yaml`.
 
 Fine recognition parameters (`vad_mode`, `end_silence`, `max_segment`, echo window,
 `lang_bias`, `gap_resync`) are in
@@ -959,9 +961,9 @@ layers are tuned there too: `speakers_enabled`, `speaker_join` (0.45), `speaker_
 ## 12. Checklist for a colleague
 
 1. Apple Silicon Mac, macOS 14.2+, Python 3.10+, Xcode CLT.
-2. `tools/live-transcriber` → `~/work/Tools/live-transcriber`, `bash install.sh`, both
+2. `recorder` → `~/work/Tools/live-transcriber`, `bash install.sh`, both
    permissions for Terminal, both peaks above zero in `install.log`.
-3. `pm-control-tower` plugin 1.8.0+ (the skill with its `references/` folder),
+3. The `live-tips` skill from the release (with its `references/` folder),
    `live-tips/settings.yaml` filled in, including `user.name_aliases`.
 3a. Optional: `bin/install-voices.sh` for speaker names; Ollama with `ollama pull bge-m3` and
    `lt index "<project folder>"` for the semantic layer.
@@ -1033,7 +1035,7 @@ Licences change; the links above are the authority, this table is a snapshot of 
   are new and optional; stealth depends on the meeting app honouring the macOS window flag, so
   check it in your app before a sensitive call.
 - Something wrong or missing: open an issue in the
-  [repository](https://github.com/bodco/pm-control-tower/issues) with the log lines (never with
+  [repository](https://github.com/bodco/live-tips/issues) with the log lines (never with
   transcripts or client data).
 
 ---
@@ -1041,10 +1043,10 @@ Licences change; the links above are the authority, this table is a snapshot of 
 ## 14. Live Tips app (beta)
 
 A native macOS menu bar app that runs the same live-tips loop without a Cowork chat. Code and
-details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
+details: [`./`](../../DEVELOPMENT.md).
 
 **Download:**
-[LiveTips-0.5.8-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.8/LiveTips-0.5.8-beta.dmg)
+[LiveTips.dmg](https://github.com/bodco/live-tips/releases/latest/download/LiveTips.dmg)
 
 What it does:
 
@@ -1067,7 +1069,7 @@ What it does:
   the one being interviewed, as in the skill), the tip model for this call only, and a line
   that confirms the project (people, Claude on or off, the last call, the Notion mirror);
 - the Notion mirror without a terminal: Settings > General > Notion mirror > **Set up sync**
-  (details in [`tools/notion-mirror`](../../tools/notion-mirror/README.md)).
+  (details in [`notion-mirror`](../../notion-mirror/README.md)).
 
 **It is a beta.**
 
@@ -1354,4 +1356,20 @@ address", `references/sweep.md`, `references/presentation.md`).
    recording when a call app takes the microphone; the summary in Google Docs or Drive, or as a document in
    the project folder, for users without Notion. Until then each call starts by hand from the menu bar.
 54. **Comparison.** How Live Tips stands next to Fireflies, Fathom and Notion AI Meeting Notes (transcript,
-   help during the call, summary, prices as of 27 October 2026): https://tower.bodco.pm/compare/
+   help during the call, summary, prices as of 27 October 2026): https://tower.bodco.pm/live-tips/compare/
+55. **Its own repository (0.6.0).** Live Tips moved out of PM Control Tower into
+   github.com/bodco/live-tips with its history: the app (`app/`), the recorder (`recorder/`), the skill
+   (`skill/`), the engine (`spikes/m0/`) and this guide. Downloads: `LiveTips.dmg` and `live-tips.skill`
+   from the latest release.
+56. **A preparation that is late (0.6.0).** Start the call while Prepare now is still writing: the
+   preparation finishes in the background, its files join the call, the window shows "Preparation ready"
+   and the speech appears, and tips use the brief from then on. The ⚙ panel's Context block shows the
+   preparation: being written (stage and progress), ready and loaded, failed or none.
+57. **Your own shortcuts (0.6.0).** Settings > General > Shortcuts: Change, press the new keys (with
+   Control, Option or Command; Esc cancels), Reset. The HELP button no longer shows the keys; the menu shows
+   the current ones.
+58. **Tips window (0.6.0).** The microphone button is an icon like the others; the ⚙ panel has more space
+   between rows and blocks.
+59. **The skill (v50).** The same window changes (design, microphone icon, Pause stops the transcript) and
+   the same Notion title as the app: the meeting's name, then the topic, in the call's language, with the
+   date the PM gave for the call.

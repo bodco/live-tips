@@ -1,6 +1,6 @@
-# 17. Live tips: асистент на дзвінку
+# Live tips: асистент на дзвінку
 
-[English](../en/17-live-tips.md) · [До змісту](README.md)
+[English](../en/live-tips.md) · [До змісту](../../README.md)
 
 Live tips - це блок, який слухає дзвінок разом з ПМом і підказує в чаті Cowork. Аудіо
 розпізнається локально на Маку, назовні нічого не йде. Скіл читає транскрипт рядок за рядком
@@ -82,8 +82,8 @@ Live tips - це блок, який слухає дзвінок разом з П
 
 ## 2. Компоненти
 
-Код лежить у [`tools/live-transcriber/`](../../tools/live-transcriber/), скіл у
-[`plugin/skills/live-tips/`](../../plugin/skills/live-tips/).
+Код лежить у [`recorder/`](../../recorder/), скіл у
+[`skill/`](../../skill/).
 
 | Файл | Роль |
 |---|---|
@@ -100,9 +100,9 @@ Live tips - це блок, який слухає дзвінок разом з П
 | `src/semantic.py` | Необов'язковий смисловий шар: вектори через локальну Ollama (`bge-m3`), індекс проєкту, пошук за змістом |
 | `src/prompter.swift`, `src/prompter.html` | Вікно-суфлер (будова в розділі "Вікно-суфлер"); показує `*.tips.jsonl`, пише питання й налаштування в `*.inbox.jsonl`. Збирається в `bin/prompter` |
 | `launchd/live-transcriber.plist.template` | Шаблон LaunchAgent (`WatchPaths` на `control/`) |
-| `plugin/skills/live-tips/SKILL.md` | Ядро скіла: незмінні правила, порядок пріоритетів, чекліст старту, цикл опитування, таблиця рядків `@@`, стоп |
-| `plugin/skills/live-tips/references/*.md` | Модулі, які ядро читає за потреби (перелік у "Як побудований скіл") |
-| `plugin/skills/live-tips/settings.yaml` | Усе особисте: мітки, шляхи, мови, правила підказок, часова зона |
+| `skill/SKILL.md` | Ядро скіла: незмінні правила, порядок пріоритетів, чекліст старту, цикл опитування, таблиця рядків `@@`, стоп |
+| `skill/references/*.md` | Модулі, які ядро читає за потреби (перелік у "Як побудований скіл") |
+| `skill/settings.yaml` | Усе особисте: мітки, шляхи, мови, правила підказок, часова зона |
 
 Runtime-папки (не в git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `control/`,
 `models/` (модель голосів), `voices/` (твоя локальна бібліотека голосів: ніколи не клади її в
@@ -212,7 +212,7 @@ Runtime-папки (не в git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `
   (розділ 5, "Локальний смисловий шар").
 - Claude desktop (Cowork) з підключеною папкою, у якій лежать інструмент і папки проєктів
   (у автора `~/work`).
-- Плагін `pm-control-tower` з конфігом проєкту в `projects/<slug>.md`. Скіл бере звідти
+- Необовʼязково: плагін [PM Control Tower](https://github.com/bodco/pm-control-tower) з конфігом проєкту в `projects/<slug>.md`. Скіл бере звідти
   команду, мітинги, `Local Paths` і Notion ID (`meetings_db`, `project_page_id`,
   `workspace_page_id`).
 - Конектор Notion у Cowork (для Live Brief і сторінки в Meetings DB). Без нього підказки
@@ -222,11 +222,11 @@ Runtime-папки (не в git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `
 
 ## 4. Встановлення з нуля
 
-1. **Покласти інструмент на Мак.** Скопіюй `tools/live-transcriber/` з цього репозиторію в
+1. **Покласти інструмент на Мак.** Скопіюй `recorder/` з цього репозиторію в
    `~/work/Tools/live-transcriber` (шлях можна інший, тоді виправ його в `settings.yaml`):
    ```
    mkdir -p ~/work/Tools
-   cp -R "<клон репозиторію>/tools/live-transcriber" ~/work/Tools/
+   cp -R "<клон репозиторію>/recorder" ~/work/Tools/
    ```
 2. **Назва LaunchAgent.** За замовчуванням `com.pm-control-tower.live-transcriber`. Якщо
    хочеш свій префікс, зміни `launchd_label` у `config.json` до встановлення.
@@ -258,12 +258,12 @@ Runtime-папки (не в git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `
 4c. **Оновлення зі старішої версії.** Перезапусти `install.sh`: він перезбирає `audiocap` і
    вікно-суфлер (`bin/prompter`). Перемикач невидимості і нове вікно потребують цієї
    перезбірки.
-5. **Скіл.** Плагін `pm-control-tower` (від 1.8.0) містить `live-tips` як ядро `SKILL.md`,
+5. **Скіл.** Завантаж `live-tips.skill` з [останнього релізу](https://github.com/bodco/live-tips/releases/latest) (або заархівуй папку `skill/`); він працює сам, плагін PM Control Tower і конфіги проєктів не обовʼязкові. Скіл містить ядро `SKILL.md`,
    модулі `references/` і `settings.yaml`; завантажуй їх разом. Заповни
-   `plugin/skills/live-tips/settings.yaml`: `paths.work_root`, `paths.tool_root`, мітки,
+   `skill/settings.yaml`: `paths.work_root`, `paths.tool_root`, мітки,
    мови, `user.name_aliases`, `user.timezone`. При налаштуванні плагіна `~~home-folder`
    підставиться сам.
-5a. **Плагін-запобіжник (рекомендовано).** Встанови `tools/live-tips-keepalive` як плагін
+5a. **Плагін-запобіжник (рекомендовано).** Встанови `keepalive` як плагін
    Cowork (запакуй теку в `live-tips-keepalive.plugin`). Поки йде запис, його Stop-хук не
    дає Claude завершити хід, тож цикл підказок не замовкне сам. Якщо щось не так, хук нічого
    не блокує: немає позначки, позначка протухла (2,5 год) або 400 блокувань. Скіл ставить
@@ -685,7 +685,7 @@ live tips до <дзвінок>". Скіл у субагенті читає вс
   окремому потоці з коротким тайм-аутом: розпізнавання і підказки на нього ніколи не чекають.
 - **Індекс проєкту.** `lt index "<папка проєкту>"` переводить у вектори текстові файли
   проєкту (`.md`, `.txt`, `.csv`, невеликі `.json`), разом з локальною копією Notion
-  (`_notion/`, її робить [`tools/notion-mirror`](../../tools/notion-mirror/README.uk.md)), у `<проєкт>/.livetips-index/`. Він дописується поступово (лише нові чи
+  (`_notion/`, її робить [`notion-mirror`](../../notion-mirror/README.uk.md)), у `<проєкт>/.livetips-index/`. Він дописується поступово (лише нові чи
   змінені файли), а під час дзвінка записувач індексує свіжі файли у фоні, лише коли
   розпізнавання простоює. Пропускаються: `.git`, `repos/`, архіви, бінарні файли, файли понад
   2 МБ, робочі файли дзвінків (індексуються лише транскрипти) і все, що схоже на секрети
@@ -891,7 +891,7 @@ Meeting Notes через API не записуються: специфікаці
 заново (zip з папкою `live-tips/`, де лежать `SKILL.md`, папка `references/` і
 `settings.yaml`; zip без `references/` дасть скіл, який повідомлятиме, що модуля бракує) у
 налаштуваннях Claude, розділ Skills. У репозиторії шаблон лежить у
-`plugin/skills/live-tips/settings.yaml`.
+`skill/settings.yaml`.
 
 Тонкі параметри розпізнавання (`vad_mode`, `end_silence`, `max_segment`, вікно відлуння,
 `lang_bias`, `gap_resync`)
@@ -965,9 +965,9 @@ Meeting Notes через API не записуються: специфікаці
 ## 12. Чекліст для колеги
 
 1. Мак на Apple Silicon, macOS 14.2+, Python 3.10+, Xcode CLT.
-2. `tools/live-transcriber` → `~/work/Tools/live-transcriber`, `bash install.sh`, обидва
+2. `recorder` → `~/work/Tools/live-transcriber`, `bash install.sh`, обидва
    дозволи для Terminal, у `install.log` обидва піки більші за нуль.
-3. Плагін `pm-control-tower` 1.8.0+ (скіл разом з папкою `references/`), заповнений
+3. Скіл `live-tips` з релізу (разом з папкою `references/`), заповнений
    `live-tips/settings.yaml`, зокрема `user.name_aliases`.
 3a. Необов'язково: `bin/install-voices.sh` для імен спікерів; Ollama з `ollama pull bge-m3` і
    `lt index "<папка проєкту>"` для смислового шару.
@@ -1040,7 +1040,7 @@ Meeting Notes через API не записуються: специфікаці
   застосунок для дзвінків прапорець вікна macOS, тож перевір його у своєму застосунку перед
   чутливим дзвінком.
 - Щось не так чи бракує: відкрий issue в
-  [репозиторії](https://github.com/bodco/pm-control-tower/issues) з рядками логів (ніколи з
+  [репозиторії](https://github.com/bodco/live-tips/issues) з рядками логів (ніколи з
   транскриптами чи даними клієнтів).
 
 ---
@@ -1048,10 +1048,10 @@ Meeting Notes через API не записуються: специфікаці
 ## 14. Застосунок Live Tips (бета)
 
 Нативний застосунок macOS у рядку меню, що крутить той самий цикл live tips без чату Cowork.
-Код і деталі: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
+Код і деталі: [`./`](../../DEVELOPMENT.md).
 
 **Завантажити:**
-[LiveTips-0.5.8-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.8/LiveTips-0.5.8-beta.dmg)
+[LiveTips.dmg](https://github.com/bodco/live-tips/releases/latest/download/LiveTips.dmg)
 
 Що він робить:
 
@@ -1074,7 +1074,7 @@ Meeting Notes через API не записуються: специфікаці
   проходиш ти, як у скілі), модель підказок лише на цей дзвінок і рядок, що підтверджує проєкт
   (люди, Claude увімкнено чи ні, останній дзвінок, дзеркало Notion);
 - дзеркало Notion без термінала: Settings > General > Notion mirror > **Set up sync**
-  (деталі в [`tools/notion-mirror`](../../tools/notion-mirror/README.uk.md)).
+  (деталі в [`notion-mirror`](../../notion-mirror/README.uk.md)).
 
 **Це бета.**
 
@@ -1363,4 +1363,18 @@ address", `references/sweep.md`, `references/presentation.md`).
    запис, коли застосунок дзвінка бере мікрофон; підсумок у Google Docs чи Drive або документом у папці
    проєкту для тих, хто без Notion. Поки що кожен дзвінок починаєш вручну з рядка меню.
 54. **Порівняння.** Як Live Tips виглядає поруч з Fireflies, Fathom і Notion AI Meeting Notes (транскрипт,
-   допомога під час дзвінка, підсумок, ціни на 27 жовтня 2026): https://tower.bodco.pm/uk/compare/
+   допомога під час дзвінка, підсумок, ціни на 27 жовтня 2026): https://tower.bodco.pm/uk/live-tips/compare/
+55. **Власний репозиторій (0.6.0).** Live Tips переїхав з PM Control Tower у github.com/bodco/live-tips
+   разом з історією: застосунок (`app/`), записувач (`recorder/`), скіл (`skill/`), рушій (`spikes/m0/`) і цей
+   посібник. Завантаження: `LiveTips.dmg` і `live-tips.skill` з останнього релізу.
+56. **Підготовка, що запізнюється (0.6.0).** Починай дзвінок, поки Prepare now ще пише: підготовка
+   завершується у фоні, її файли приєднуються до дзвінка, вікно показує "Підготовка готова", зʼявляється спіч,
+   і далі підказки враховують бриф. Блок Context у панелі ⚙ показує підготовку: пишеться (етап і прогрес),
+   готова і завантажена, не вдалася або немає.
+57. **Свої гарячі клавіші (0.6.0).** Settings > General > Shortcuts: Change, натисни нові клавіші (з
+   Control, Option або Command; Esc скасовує), Reset. Кнопка HELP більше не показує клавіші; меню показує
+   поточні.
+58. **Вікно підказок (0.6.0).** Кнопка мікрофона тепер іконка, як інші; у панелі ⚙ більше простору між
+   рядками і блоками.
+59. **Скіл (v50).** Ті самі зміни вікна (дизайн, іконка мікрофона, пауза зупиняє транскрипт) і та сама назва
+   в Notion, що в застосунку: назва зустрічі, потім тема, мовою дзвінка, з датою, яку PM дав для дзвінка.

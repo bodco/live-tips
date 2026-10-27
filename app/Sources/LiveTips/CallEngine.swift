@@ -185,10 +185,30 @@ final class CallEngine {
     }
 
     /// Picks up a prep made ahead in Cowork (prep-<time>-<title>.brief.md, cards.json, facts.json).
+    /// 2026-10-27 (owner): the call started before the preparation was done. Its files replace what the
+    /// call had (an older automatic pick or nothing); the recorder and the tips engine reload them by
+    /// themselves within seconds, show the speech and a "Preparation ready" notice.
+    func adoptLatePrep(base: String, file: String) {
+        let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
+        let fm = FileManager.default
+        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json"] where fm.fileExists(atPath: base + ext) {
+            let tmp = stem + ext + ".tmp"
+            try? fm.removeItem(atPath: tmp)
+            if (try? fm.copyItem(atPath: base + ext, toPath: tmp)) != nil {
+                _ = try? fm.replaceItemAt(URL(fileURLWithPath: stem + ext), withItemAt: URL(fileURLWithPath: tmp))
+                if fm.fileExists(atPath: tmp) { try? fm.moveItem(atPath: tmp, toPath: stem + ext) }
+            }
+        }
+        notify("Preparation ready: loaded into the call")
+    }
+
     func adoptPrep(file: String) {
         let c = config
         let lt = (appRoot as NSString).appendingPathComponent("bin/lt")
         guard FileManager.default.fileExists(atPath: lt) else { return }
+        // A preparation still being written: wait for it (adoptLatePrep) instead of picking an older one.
+        let chosenNow = (callRequest["prep_file"] as? String).map { !$0.isEmpty } ?? false
+        if !chosenNow, MainActor.assumeIsolated({ PrepRunner.shared.running }) { return }
         // A prep chosen by hand in the Start call window: copy its files next to this call's transcript,
         // and do not let the automatic pick add files of another prep (QA 26.10).
         var auto = true

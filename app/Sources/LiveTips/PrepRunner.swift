@@ -15,6 +15,9 @@ final class PrepRunner: ObservableObject {
     @Published var startedAt: Date?
     @Published var result = ""            // last outcome, one line
     @Published var target = ""            // the prep base name being written
+    /// 2026-10-27 (owner, Up next): the call this preparation is for (StartCallModel.id). It joins a live call
+    /// only when that call has the same id, so a preparation for an upcoming call never lands in the live one.
+    @Published var callID: UUID?
     /// 2026-10-26: objective progress from Claude Code's own event stream (stream-json): which files it
     /// reads and writes. Stages: instructions, sources, brief, cards, facts, check, done.
     @Published var progress: Double = 0
@@ -126,6 +129,13 @@ final class PrepRunner: ObservableObject {
         var workspaceRoot: String
         var folders: [String] = []          // "Add folder" in Start call: read these first, they may be outside the project
         var useProjectFolder = true         // 2026-10-27 (owner): off = never read the project folder, only write the prep into live/
+        var callID: UUID? = nil             // 2026-10-27 (owner, Up next): which call it is for
+    }
+
+    /// A preparation joins the live call only when it was made for that very call (Up next, 2026-10-27).
+    nonisolated static func joinsLiveCall(prepFor: UUID?, liveCall: UUID?) -> Bool {
+        guard let a = prepFor, let b = liveCall else { return prepFor == nil && liveCall == nil }
+        return a == b
     }
 
     func cancel() {
@@ -135,6 +145,7 @@ final class PrepRunner: ObservableObject {
         lineBuf = Data()
         running = false
         result = "Stopped"
+        UpNext.shared.prepFinished(id: callID, base: nil, ok: false, stopped: true)
     }
 
     /// Starts the prep. Returns an error line, or nil when it started.
@@ -254,13 +265,17 @@ final class PrepRunner: ObservableObject {
             Task { @MainActor in
                 guard let self = self, self.process === proc else { return }
                 (proc.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
+                let forID = self.callID
                 if ok {
                     self.progress = 1; self.stage = "Done"
                     // QA 26.10: the call may have started while the prep was written: pick up the rest now.
-                    if CallEngine.shared.isRunning, let f = CallEngine.shared.lastFile { CallEngine.shared.adoptLatePrep(base: base, file: f) }
+                    // 2026-10-27 (Up next): only into the call it was made for.
+                    if Self.joinsLiveCall(prepFor: forID, liveCall: CallEngine.shared.currentCallID),
+                       CallEngine.shared.isRunning, let f = CallEngine.shared.lastFile { CallEngine.shared.adoptLatePrep(base: base, file: f) }
                 }
                 self.running = false
                 self.process = nil
+                UpNext.shared.prepFinished(id: forID, base: base, ok: ok)
                 let mins = Int((Date().timeIntervalSince(self.startedAt ?? Date())) / 60)
                 let tail = (try? String(contentsOfFile: (logs as NSString).appendingPathComponent("prep-claude.log"), encoding: .utf8))
                     .map { String($0.suffix(600)) } ?? ""
@@ -280,6 +295,7 @@ final class PrepRunner: ObservableObject {
         running = true
         startedAt = Date()
         target = (base as NSString).lastPathComponent
+        callID = r.callID
         result = ""
         progress = 0.02; stage = "Starting Claude Code"; detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil
         return nil

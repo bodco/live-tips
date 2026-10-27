@@ -15,6 +15,8 @@ final class CallEngine {
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
     var statusPath: String { (appRoot as NSString).appendingPathComponent("state/status.json") }
     var isRunning: Bool { recorder?.isRunning ?? false }
+    /// 2026-10-27 (Up next): the id of the call being recorded (StartCallModel.id); preparations join only it.
+    var currentCallID: UUID?
     var callContext = ""
     var callRequest: [String: Any] = [:]
     var projectConfig = ""          // projects/<slug>.md of this call (Meetings DB and page IDs for Notion)
@@ -237,7 +239,7 @@ final class CallEngine {
         guard FileManager.default.fileExists(atPath: lt) else { return }
         // A preparation still being written: wait for it (adoptLatePrep) instead of picking an older one.
         let chosenNow = (callRequest["prep_file"] as? String).map { !$0.isEmpty } ?? false
-        if !chosenNow, MainActor.assumeIsolated({ PrepRunner.shared.running }) { return }
+        if !chosenNow, MainActor.assumeIsolated({ PrepRunner.shared.running && PrepRunner.joinsLiveCall(prepFor: PrepRunner.shared.callID, liveCall: currentCallID) }) { return }
         // A prep chosen by hand in the Start call window: copy its files next to this call's transcript,
         // and do not let the automatic pick add files of another prep (QA 26.10).
         var auto = true

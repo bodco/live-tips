@@ -104,7 +104,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func show() {
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript", "pref", "rename"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript", "pref", "rename", "upnext"] { uc.add(self, name: name) }
         // The remembered window settings, before the page's own script runs.
         let prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
         if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
@@ -168,7 +168,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             if !lines.isEmpty { push("window.addItems([" + lines.joined(separator: ",") + "])") }
         }
         ticks += 1
-        if ticks % 4 == 0, !args.status.isEmpty,
+        // 2026-10-27 (owner): the status every 0.5 s (was 2 s), so the dot turns red as soon as the recording runs.
+        if !args.status.isEmpty,
            let s = try? String(contentsOfFile: args.status, encoding: .utf8),
            s != lastStatus, isJSONObject(s) {
             lastStatus = s
@@ -187,17 +188,21 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             let js: String = MainActor.assumeIsolated {
                 let r = PrepRunner.shared
                 var d: [String: Any] = ["state": "none"]
-                if r.running {
+                // Up next (2026-10-27): only the preparation of this call; an upcoming call's shows in Up next.
+                let mine = PrepRunner.joinsLiveCall(prepFor: r.callID, liveCall: CallEngine.shared.currentCallID)
+                if r.running && mine {
                     d = ["state": "running", "stage": r.stage, "detail": r.detail, "progress": r.progress]
                 } else if !transcriptPath.isEmpty, FileManager.default.fileExists(atPath: String(transcriptPath.dropLast(3)) + ".brief.md") {
                     d = ["state": "ready"]
-                } else if r.result.lowercased().contains("fail") {
+                } else if mine, r.result.lowercased().contains("fail") {
                     d = ["state": "failed", "stage": r.result]
                 }
                 let data = (try? JSONSerialization.data(withJSONObject: d)) ?? Data("{}".utf8)
                 return String(data: data, encoding: .utf8) ?? "{}"
             }
             if js != lastPrep { lastPrep = js; push("window.setPrep && window.setPrep(" + js + ")") }
+            let un: String = MainActor.assumeIsolated { UpNext.shared.json() }
+            if un != lastUpNext { lastUpNext = un; push("window.setUpNext && window.setUpNext(" + un + ")") }
         }
         // The live transcript and the speaker names (speakers.json) for the transcript pane.
         if let tr = transcript {
@@ -296,6 +301,27 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             // The transcript pane opens next to the tips: the window grows the same way as for slide cards.
             trWide = (message.body as? Bool) ?? false
             setSplit(deckWide || trWide, growRight: deckGrowRight, animate: true)
+        case "upnext":
+            // 2026-10-27 (owner, Up next): {"a": "plan" | "edit" | "switch" | "remove" | "prep", "id": ...}
+            guard let d = message.body as? [String: Any], let act = d["a"] as? String else { return }
+            MainActor.assumeIsolated {
+                guard let app = NSApp.delegate as? AppDelegate else { return }
+                let m = (d["id"] as? String).flatMap { UpNext.shared.item($0) }
+                switch act {
+                case "plan": StartCallWindow.show(delegate: app)
+                case "edit": if let m = m { StartCallWindow.show(delegate: app, prepared: m) }
+                case "switch": if let m = m { app.confirmSwitch(to: m, on: window) }
+                case "prep": if let m = m, let e = UpNext.shared.prepare(m) { push("window.toastMsg && window.toastMsg(" + jsString(e) + ")") }
+                case "remove":
+                    guard let m = m else { return }
+                    let a = NSAlert()
+                    a.messageText = "Remove \u{201C}\(m.effectiveTitle)\u{201D} from Up next?"
+                    a.informativeText = "Its preparation files stay in the project's live folder."
+                    a.addButton(withTitle: "Remove"); a.addButton(withTitle: "Cancel")
+                    a.beginSheetModal(for: window) { r in if r == .alertFirstButtonReturn { MainActor.assumeIsolated { UpNext.shared.remove(m) } } }
+                default: break
+                }
+            }
         case "rename":
             // 2026-10-27 (owner): rename the call while it runs (a title typed in a hurry).
             guard let v = (message.body as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty else { return }
@@ -350,11 +376,13 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     var endButton: NSButton?
     var callEnded = false
     var startButton: NSButton?
+    var lastUpNext = ""
 
     @objc func startClicked() {
         guard !args.control.isEmpty else { return }
         FileManager.default.createFile(atPath: (args.control as NSString).appendingPathComponent("go"), contents: Data())
         startButton?.isHidden = true
+        push("window.setStarting && window.setStarting()")     // blue dot until the recorder says it records
     }
     /// 2026-10-27 (owner): the call buttons in the same style as the rest of the app: a soft pill,
     /// blue to start, red to end, both say "call".
@@ -402,8 +430,28 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     }
 
     @objc func newCallClicked() {
-        window.close()
-        (NSApp.delegate as? AppDelegate)?.startCall()
+        MainActor.assumeIsolated {
+            guard let app = NSApp.delegate as? AppDelegate else { return }
+            if CallEngine.shared.isRunning { window.close(); return }    // the next call is already starting (Up next switch)
+            if let n = UpNext.shared.first {
+                if let e = app.launch(n) { app.notifySwitchFailed(e, n) }
+            } else {
+                window.close()
+                app.startCall()
+            }
+        }
+    }
+
+    /// Up next switch: the call is being ended by the app, not by this window's button.
+    func markEnding() {
+        if let b = endButton { restylePill(b, "Ending...", color: .systemRed); b.isEnabled = false }
+        push("window.setEnding && window.setEnding()")
+    }
+
+    func jsString(_ s: String) -> String {
+        let d = (try? JSONSerialization.data(withJSONObject: [s])) ?? Data("[\"\"]".utf8)
+        let a = String(data: d, encoding: .utf8) ?? "[\"\"]"
+        return String(a.dropFirst().dropLast())
     }
 
     @objc func endCallClicked() {
@@ -417,8 +465,15 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         a.messageText = "End the call?"
         a.informativeText = "Recording stops; the transcript and tips stay in the project folder, and the summary goes to Notion."
         a.addButton(withTitle: "End call")
+        // 2026-10-27 (Up next): the next planned call can start right after this one.
+        let next: StartCallModel? = MainActor.assumeIsolated { UpNext.shared.first }
+        if let n = next { a.addButton(withTitle: "End and start \u{201C}\(MainActor.assumeIsolated { n.effectiveTitle })\u{201D}") }
         a.addButton(withTitle: "Cancel")
         a.beginSheetModal(for: window) { [weak self] resp in
+            if let n = next, resp == .alertSecondButtonReturn {
+                MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.performSwitch(to: n) }
+                return
+            }
             guard resp == .alertFirstButtonReturn else { return }
             MainActor.assumeIsolated {
                 let owned = CallEngine.shared.isRunning
@@ -444,16 +499,19 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             b.toolTip = "Close this window"
         }
         // 2026-10-27 (owner): start the next call from here: closes this window and opens Start call.
+        // With a call in Up next the pill starts it at once ("Start next"; the old call has ended already).
         if let g = startButton {
             callEnded = true
-            restylePill(g, "New call", color: .controlAccentColor)
+            let next: StartCallModel? = MainActor.assumeIsolated { UpNext.shared.first }
+            let label = next == nil ? "New call" : "Start next"
+            restylePill(g, label, color: .controlAccentColor)
             let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-            g.attributedTitle = NSAttributedString(string: "New call", attributes: [.foregroundColor: NSColor.white, .font: font])
+            g.attributedTitle = NSAttributedString(string: label, attributes: [.foregroundColor: NSColor.white, .font: font])
             g.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
             if let b = endButton { g.frame.origin.x = max(0, b.frame.minX - 6 - g.frame.width) }
             g.action = #selector(newCallClicked)
             g.target = self
-            g.toolTip = "Close this window and open Start call"
+            g.toolTip = next.map { n in "Start \u{201C}" + MainActor.assumeIsolated { n.effectiveTitle } + "\u{201D} now (Up next)" } ?? "Close this window and open Start call"
             g.isHidden = false
         }
         let file = ((info["file"] as? String ?? "") as NSString).lastPathComponent

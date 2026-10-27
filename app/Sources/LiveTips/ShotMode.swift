@@ -27,6 +27,8 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             try? fm.createDirectory(atPath: d, withIntermediateDirectories: true)
         }
         setenv("LT_SUPPORT_DIR", sup, 1)
+        try? fm.removeItem(atPath: sup + "/upnext.json")          // Up next starts empty on every run
+        try? fm.removeItem(atPath: app + "/state/status.json")
         let cfg: [String: Any] = ["workRoot": work, "appRoot": app, "uiLanguage": "en", "speakersEnabled": true]
         write(cfg, sup + "/config.json")
         var reg = ProjectRegistry()
@@ -61,6 +63,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         for theme in ["dark", "light"] {
             steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
             steps.append { [unowned self] in self.startCall(theme) }
+            steps.append { [unowned self] in self.planCall(theme) }
             for tab in ["general", "notion", "ai", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
             steps.append { [unowned self] in self.tips(theme, presentation: false) }
             steps.append { [unowned self] in self.tips(theme, presentation: true) }
@@ -93,6 +96,33 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         StartCallWindow.show(delegate: AppDelegate(), prepared: m)
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
             if let w = StartCallWindow.window { capture(w, "start-call-\(theme)"); w.close() }
+            next()
+        }
+    }
+
+    /// Up next (2026-10-27): Start call during a live call plans an upcoming call. The live call is faked by a
+    /// status file in the demo folder; the planned call then stays in Up next, so the tips window shows it.
+    lazy var planned: StartCallModel = {
+        let m = StartCallModel()
+        m.target = "project:internal-delivery-playbook"
+        m.language = "en"
+        m.title = "Team retro"
+        m.callDate = StartCallModel.nextFullHour()
+        m.context = "Goal: agree two process changes for the next sprint.\nParticipants: Mike Johnson, Sarah Lee.\nOpen questions: release checklist owner."
+        return m
+    }()
+
+    func planCall(_ theme: String) {
+        let st = (CallEngine.shared.statusPath as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: st, withIntermediateDirectories: true)
+        let started = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-14 * 60))
+        Self.write(["state": "recording", "title": "Orbit weekly with the client", "started_at": started, "pid": Int(getpid())], CallEngine.shared.statusPath)
+        CallEngine.shared.callRequest["title"] = "Orbit weekly with the client"
+        StartCallWindow.show(delegate: AppDelegate(), prepared: planned)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
+            if let w = StartCallWindow.window { capture(w, "plan-call-\(theme)"); w.close() }
+            UpNext.shared.save(planned)
+            try? FileManager.default.removeItem(atPath: CallEngine.shared.statusPath)
             next()
         }
     }

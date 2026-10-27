@@ -1133,6 +1133,41 @@ context in Start call (the goal, what to look for) already help a lot.
 The skill works the same way: without a ready prep it starts the recording at once and builds the
 brief in the first 1-3 minutes of the call (section 5.0).
 
+### 14.1b Back-to-back calls: Up next
+
+A call is running and the next one starts right after it. The app lets you set up and prepare
+the next calls during the current one and switch with one question. There is no limit on how many
+calls you plan; only one call records at a time.
+
+| Where | What |
+|---|---|
+| Menu bar during a call | **Plan an upcoming call...** opens Start call in plan mode; **Up next (N)** lists the planned calls |
+| Start call in plan mode | A red "Recording: <current call> mm:ss" line on top. **Add to Up next** (keeps the call), **Prepare** (writes its preparation now), **End current call and start this...** (switch), **Close** |
+| Start call without a live call | **Start call** as before; **Save for later** puts the call in Up next |
+| Tips window, ⚙ > Up next | Every planned call with its time and preparation state: Edit, Prepare, Switch..., × (remove); **Plan an upcoming call...** |
+| Tips window, dock | The next call: "Next: <title> · 14:30 · preparing 42%" and **Switch...** |
+| End call | **End call**, **End and start "<next call>"**, Cancel |
+| After a call ended | The green pill says **Start next** and starts the first call of Up next at once (no question: nothing is live) |
+
+**Switch.** One question: "End "A" and start "B"?", with what happens to B's preparation. On yes the
+current call ends the usual way (transcript saved, the Notion summary and the tips rating run in the
+background with A's settings), and B starts as soon as the recorder has stopped, usually in a few
+seconds. If the recorder does not stop in 45 s, the app says so and B stays in Up next.
+
+**Preparations.** Claude Code writes one preparation at a time; the others wait in line ("preparation
+in line") and start by themselves. Each preparation belongs to its call (an id), so it joins only
+that call: a preparation for B that finishes while A records is kept for B, and one still running at the
+switch joins B when ready. A finished preparation is used by name when its call starts.
+
+**Kept across restarts.** Up next is saved in `upnext.json` in the app folder (Application
+Support/LiveTips). Removing a call from Up next stops or unqueues its preparation; files already
+written stay in the project's `live/` folder.
+
+**The status dot** next to the call's name: grey = waiting for the call (standby) or paused (tips and
+transcript); blue, pulsing = starting (after Start, while the model loads) or stopping; red, blinking =
+recording; orange = recording, but the microphone has a problem; green = stopped, transcript saved. The
+window reads the recorder's status every 0.5 s.
+
 ### 14.2 After the call: the meeting page in Notion
 
 With **Settings > General > Write the call summary to Notion** on, the app writes the wrap-up
@@ -1454,3 +1489,6 @@ address", `references/sweep.md`, `references/presentation.md`).
    button closes the window and opens Start call.
 72. **Privacy policy and terms of use (0.6.4).** Settings > About > Your data gives the short version and links to
    the full [privacy policy](https://tower.bodco.pm/live-tips/privacy/) and [terms](https://tower.bodco.pm/live-tips/terms/).
+73. **Up next (0.6.5).** Plan and prepare any number of upcoming calls during a call and switch with one
+   question (section 14.1b); a preparation joins only its own call.
+74. **Status dot (0.6.5).** Grey waiting or paused, blue starting or stopping, red recording, green stopped.

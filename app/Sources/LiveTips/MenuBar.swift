@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var demoItem = NSMenuItem()
     var demoPresItem = NSMenuItem()
     var notionItem = NSMenuItem()
+    var upNextItem = NSMenuItem()
     var lastStatus = EngineStatus()
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
@@ -36,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         // The main action first; the status lines below it (review P2).
         startItem = add(menu, "Start call…", #selector(startCall), "n")
+        upNextItem = NSMenuItem(title: "Up next", action: nil, keyEquivalent: "")
+        upNextItem.isHidden = true
+        menu.addItem(upNextItem)
         tipsItem = add(menu, "Open tips window", #selector(showTips), "")
         pauseItem = add(menu, "Pause or resume tips", #selector(togglePause), "p")
         pauseItem.keyEquivalentModifierMask = [.control, .option]      // shown in the menu: the global shortcut
@@ -63,6 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
         NotionMirrorService.shared.startSchedule()
         updateCoreIfNeeded()
+        // Up next (2026-10-27): the switch goes on when the old call's recorder has stopped.
+        NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.finishSwitch() }
+        }
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         // 2026-10-26: new users get the onboarding (permissions, folders, Claude, install, Notion optional).
@@ -158,7 +166,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let recording = ["recording", "loading_model", "standby"].contains(st.state)
         lastStatus = st
         warnIfNoAudio(st)
-        startItem.isHidden = recording
+        // 2026-10-27 (Up next): during a call the same item plans an upcoming call.
+        startItem.title = recording ? "Plan an upcoming call…" : "Start call…"
+        MainActor.assumeIsolated { rebuildUpNextMenu() }
         endItem.isHidden = !recording
         pauseItem.isHidden = st.state != "recording"
         helpItem.isHidden = st.state != "recording"
@@ -309,6 +319,11 @@ struct CallFiles {
 
 @MainActor
 final class StartCallModel: ObservableObject {
+    /// 2026-10-27 (owner, Up next): every call set up here has an id; its preparation is tied to it.
+    var id = UUID()
+    /// The base path of this call's finished preparation (<root>/live/prep-...), set when it is ready.
+    @Published var prepBase: String?
+    @Published var prepFailed = false
     @Published var target = ""          // "project:<slug>" | "workspace:<name>"
     @Published var title = ""
     @Published var audience = "auto"
@@ -521,7 +536,7 @@ final class StartCallModel: ObservableObject {
                                   config: project?.config ?? "", audience: audience, callType: callType, hiringRole: hiringRole,
                                   languages: language.split(separator: "+").map(String.init), context: cleanContext,
                                   workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""), folders: folders,
-                                  useProjectFolder: useProjectFolder)
+                                  useProjectFolder: useProjectFolder, callID: id)
     }
 
     /// Phrase to paste into Cowork to make a prep for this call.
@@ -618,8 +633,16 @@ final class StartCallModel: ObservableObject {
 struct StartCallView: View {
     @ObservedObject var model: StartCallModel
     @ObservedObject var runner = PrepRunner.shared
+    @ObservedObject var upnext = UpNext.shared
+    /// 2026-10-27 (owner, Up next): a call is being recorded; this window sets up an upcoming one.
+    var live = false
+    var liveTitle = ""
+    var liveSince: Date?
     var onStart: () -> Void
     var onCancel: () -> Void
+    var onSave: () -> Void = {}
+    var onSwitch: () -> Void = {}
+    var onRemove: () -> Void = {}
     @State private var copied = false
 
     @AppStorage("startCallAdvanced") private var advanced = false
@@ -635,10 +658,17 @@ struct StartCallView: View {
         VStack(spacing: 0) {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    IconTile(symbol: "text.bubble", size: 40)
-                    Text("Start a call").font(.title2.weight(.semibold))
+                    IconTile(symbol: live ? "calendar.badge.plus" : "text.bubble", size: 40)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(live ? "Plan an upcoming call" : saved ? "Upcoming call" : "Start a call").font(.title2.weight(.semibold))
+                        if live || saved {
+                            Text("Set it up and prepare it now; it starts only when you switch to it.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                     Spacer()
                 }
+                if live { liveBanner }
                 hero
                 HStack(spacing: 10) {
                     ChoicePill(symbol: "person.2", label: ["auto": "Auto", "team": "Team", "client": "Client"][model.audience] ?? "Auto",
@@ -751,12 +781,32 @@ struct StartCallView: View {
             .padding(.horizontal, 28).padding(.top, 16)
             VStack(spacing: 8) {
                 if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.orange).lineLimit(2) }
-                LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") {
-                    onStart()
+                if live {
+                    // 2026-10-27 (owner, Up next): during a call the main action keeps this call for later;
+                    // switching is a separate, confirmed step.
+                    LTPrimaryButton(title: saved ? "Save" : "Add to Up next", symbol: "calendar.badge.plus") { onSave() }
+                        .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
+                    HStack(spacing: 18) {
+                        Button("End current call and start this…", action: onSwitch).buttonStyle(.borderless)
+                            .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
+                        if saved { Button("Remove", action: onRemove).buttonStyle(.borderless).foregroundStyle(.secondary) }
+                        Button("Close", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
+                            .keyboardShortcut(.cancelAction)
+                    }
+                } else {
+                    LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") {
+                        onStart()
+                    }
+                        .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
+                    HStack(spacing: 18) {
+                        Button(saved ? "Save" : "Save for later", action: onSave).buttonStyle(.borderless)
+                            .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
+                            .help("Keep this call in Up next: set it up and prepare it now, start it later.")
+                        if saved { Button("Remove", action: onRemove).buttonStyle(.borderless).foregroundStyle(.secondary) }
+                        Button("Cancel", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
+                            .keyboardShortcut(.cancelAction)
+                    }
                 }
-                    .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
-                Button("Cancel", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
-                    .keyboardShortcut(.cancelAction)
             }
             .padding(.top, 16).padding(.bottom, 16)
         }
@@ -766,6 +816,21 @@ struct StartCallView: View {
         .onAppear { model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in if !PrepRunner.shared.useAPI { PrepRunner.shared.refreshAuth() } }
+    }
+
+    var saved: Bool { upnext.contains(model) }
+
+    /// The call being recorded, so it is clear this window does not start a call by itself.
+    private var liveBanner: some View {
+        HStack(spacing: 8) {
+            Circle().fill(Color.red).frame(width: 8, height: 8)
+            Text("Recording: \(liveTitle)").font(.callout.weight(.medium)).lineLimit(1)
+            if let d = liveSince { Text(d, style: .timer).font(.callout.monospacedDigit()).foregroundStyle(.secondary) }
+            Spacer()
+            Button("Show tips") { (NSApp.delegate as? AppDelegate)?.showTips() }.buttonStyle(.borderless)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: LT.radius).fill(Color.red.opacity(0.10)))
     }
 
     /// The project, the call's title and its time: what the call is.
@@ -907,8 +972,10 @@ struct StartCallView: View {
 
     /// One line: found, being written, for another call, or none.
     @ViewBuilder private var prepStatus: some View {
-        if runner.running, let p = model.prep, p.file.hasPrefix(runner.target) {
+        if runner.running, runner.callID == model.id {
             Label("Being written: \(runner.stage.lowercased())…", systemImage: "hourglass").foregroundStyle(.secondary)
+        } else if upnext.prepState(model) == .queued {
+            Label("Waiting in line: starts when the preparation in progress is done.", systemImage: "clock").foregroundStyle(.secondary)
         } else if let p = model.prep, p.matches {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
@@ -934,7 +1001,7 @@ struct StartCallView: View {
 
     /// Prepare now (Claude Code) with its progress; how it runs is set in Settings > AI > Preparation.
     @ViewBuilder private var prepActions: some View {
-        if runner.running {
+        if runner.running && runner.callID == model.id {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
@@ -950,12 +1017,14 @@ struct StartCallView: View {
             }
         } else {
             HStack(spacing: 10) {
-                Button { 
-                    guard let r = model.prepRequest() else { model.note = "Choose a project first."; return }
-                    model.note = runner.start(r) ?? ""
-                } label: { Label("Prepare now", systemImage: "sparkles") }
+                Button {
+                    // 2026-10-27 (Up next): one preparation runs at a time; the others wait in line.
+                    model.note = upnext.prepare(model) ?? ""
+                    if live && !saved && model.note.isEmpty { onSave() }   // a call being prepared is kept in Up next
+                } label: { Label(runner.running ? "Prepare (after the current one)" : "Prepare now", systemImage: "sparkles") }
                 .buttonStyle(LTSoftButtonStyle())
-                .disabled(model.target.isEmpty || PrepRunner.claudePath == nil || (!runner.useAPI && runner.loggedIn == false))
+                .disabled(model.target.isEmpty || PrepRunner.claudePath == nil || (!runner.useAPI && runner.loggedIn == false)
+                          || upnext.prepState(model) == .queued)
                 .help("Claude Code builds the preparation here from local files: the documents named in the context, the folders above, the local Notion mirror, earlier calls and public web links in the context. A few minutes; you can close this window.")
                 Menu {
                     Button(copied ? "Copied" : "Copy request for Cowork") {
@@ -967,6 +1036,15 @@ struct StartCallView: View {
                 } label: { Text("More") }
                 .menuStyle(.borderlessButton).tint(.accentColor).fixedSize().disabled(model.target.isEmpty)
                 Spacer()
+            }
+            if upnext.prepState(model) == .queued {
+                HStack {
+                    Text("In line after: \(runner.target)").font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Button("Take out of line") { upnext.unqueue(model) }.controlSize(.small)
+                }
+            } else if runner.running {
+                Text("Another call is being prepared (\(runner.stage.lowercased())); this one starts after it.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if PrepRunner.claudePath == nil {
                 Text("Claude Code is not installed: use More > Copy request for Cowork.").font(.caption).foregroundStyle(.secondary)
@@ -1000,28 +1078,181 @@ struct StartCallView: View {
 @MainActor
 final class StartCallWindow {
     static var window: NSWindow?
+    static var model: StartCallModel?
 
+    /// 2026-10-27 (owner, Up next): while a call is live this window plans an upcoming call: Add to Up next,
+    /// Prepare, or End current call and start this (confirmed). Without a live call it starts a call as before,
+    /// and Save for later keeps the call in Up next.
     static func show(delegate: AppDelegate, prepared: StartCallModel? = nil) {
         let model = prepared ?? StartCallModel()
-        let view = StartCallView(model: model, onStart: {
-            guard let req = model.requestJSON() else { return }
-            let err = CallEngine.shared.start(request: req, apiAllowed: model.project?.apiAllowed ?? true) { st in
-                delegate.openTips(for: CallFiles(tips: st.tipsFile ?? "", inbox: st.inboxFile ?? "",
-                                                 status: CallEngine.shared.statusPath,
-                                                 control: (CallEngine.shared.appRoot as NSString).appendingPathComponent("control")))
-            }
-            if let err = err { model.note = err } else { window?.close() }
-        }, onCancel: { window?.close() })
+        Self.model = model
+        let live = delegate.callIsLive
+        let liveTitle = CallEngine.shared.renamed ?? (CallEngine.shared.callRequest["title"] as? String) ?? "the current call"
+        let since = EngineStatus.load(path: CallEngine.shared.statusPath).startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+        let view = StartCallView(model: model, live: live, liveTitle: liveTitle, liveSince: since, onStart: {
+            if let err = delegate.launch(model) { model.note = err } else { window?.close() }
+        }, onCancel: {
+            // A call with a preparation running or waiting is kept, so the preparation is not lost.
+            if live, !UpNext.shared.contains(model), [.running, .queued].contains(UpNext.shared.prepState(model)) { UpNext.shared.save(model) }
+            window?.close()
+        }, onSave: {
+            guard !model.target.isEmpty else { return }
+            UpNext.shared.save(model)
+            model.note = ""
+            window?.close()
+        }, onSwitch: {
+            UpNext.shared.save(model)
+            delegate.confirmSwitch(to: model, on: window)
+        }, onRemove: {
+            UpNext.shared.remove(model)
+            window?.close()
+        })
         let host = NSHostingController(rootView: view)
         let w = window ?? NSWindow(contentViewController: host)
         w.contentViewController = host
         w.styleMask.insert(.resizable)
         w.setContentSize(NSSize(width: 540, height: 720))
-        w.title = "Start call"
+        w.title = live ? "Plan an upcoming call" : "Start call"
         w.isReleasedWhenClosed = false
         window = w
         w.center()
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+// MARK: - Up next: start, switch (2026-10-27, owner)
+
+extension AppDelegate {
+    /// A call is being recorded or waits for the other side (also a call the app lost track of).
+    var callIsLive: Bool {
+        CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(EngineStatus.load(path: CallEngine.shared.statusPath).state)
+    }
+
+    /// Starts a call set up in Start call or kept in Up next. Its finished preparation is used by name; one still
+    /// being written joins the call when done. Returns an error line, or nil.
+    @MainActor
+    func launch(_ model: StartCallModel) -> String? {
+        if model.chosenPrep == nil, let b = model.prepBase, let root = model.root {
+            let name = (b as NSString).lastPathComponent + ".brief.md"
+            if FileManager.default.fileExists(atPath: ((root as NSString).appendingPathComponent("live") as NSString).appendingPathComponent(name)) {
+                model.chosenPrep = name
+            }
+        }
+        guard let req = model.requestJSON() else { return model.note.isEmpty ? "This call cannot start yet." : model.note }
+        let before = CallEngine.shared.currentCallID
+        CallEngine.shared.currentCallID = model.id
+        let err = CallEngine.shared.start(request: req, apiAllowed: model.project?.apiAllowed ?? true) { [weak self] st in
+            self?.openTips(for: CallFiles(tips: st.tipsFile ?? "", inbox: st.inboxFile ?? "",
+                                          status: CallEngine.shared.statusPath,
+                                          control: (CallEngine.shared.appRoot as NSString).appendingPathComponent("control")))
+        }
+        if err != nil { CallEngine.shared.currentCallID = before; return err }
+        UpNext.shared.remove(model, keepPrep: true)
+        return nil
+    }
+
+    /// "End current call and start this…": one question, then the switch.
+    @MainActor
+    func confirmSwitch(to model: StartCallModel, on window: NSWindow?) {
+        guard callIsLive else {
+            if let e = launch(model) { model.note = e } else { StartCallWindow.window?.close() }
+            return
+        }
+        let cur = CallEngine.shared.renamed ?? (CallEngine.shared.callRequest["title"] as? String) ?? "the current call"
+        let next = model.effectiveTitle
+        let a = NSAlert()
+        a.messageText = "End \u{201C}\(cur)\u{201D} and start \u{201C}\(next)\u{201D}?"
+        var info = "Recording stops now. The transcript is saved and the Notion summary is written in the background. "
+        info += model.standby ? "\(next) opens right away and records when the other side speaks or you press Start." : "\(next) starts recording right away."
+        switch UpNext.shared.prepState(model) {
+        case .running: info += "\n\nIts preparation is \(Int(PrepRunner.shared.progress * 100))% done; it goes on and joins the call when ready."
+        case .queued: info += "\n\nIts preparation is waiting in line; it joins the call when ready."
+        case .failed: info += "\n\nIts preparation failed; the call starts without it."
+        case .none: info += "\n\nNo preparation: questions to you, HELP NOW and answers from the call still work."
+        case .ready: break
+        }
+        a.informativeText = info
+        a.addButton(withTitle: "End and start")
+        a.addButton(withTitle: "Cancel")
+        let go: () -> Void = { [weak self] in self?.performSwitch(to: model) }
+        if let w = window, w.isVisible {
+            a.beginSheetModal(for: w) { r in if r == .alertFirstButtonReturn { MainActor.assumeIsolated { go() } } }
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            if a.runModal() == .alertFirstButtonReturn { go() }
+        }
+    }
+
+    /// Ends the live call properly and starts `model` as soon as the recorder has stopped.
+    @MainActor
+    func performSwitch(to model: StartCallModel) {
+        StartCallWindow.window?.close()
+        guard callIsLive else { if let e = launch(model) { notifySwitchFailed(e, model) }; return }
+        UpNext.shared.switchingTo = model
+        let owned = CallEngine.shared.isRunning
+        CallEngine.shared.stop()
+        tips?.markEnding()
+        if !owned {
+            CallEngine.shared.finishOrphan { [weak self] _, _ in MainActor.assumeIsolated { self?.finishSwitch() } }
+        }
+        // The recorder normally stops in a few seconds; if it does not, say so instead of waiting forever.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 45) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let m = UpNext.shared.switchingTo, m === model else { return }
+                UpNext.shared.switchingTo = nil
+                self?.notifySwitchFailed("The current call did not stop in 45 s. End it in the tips window, then start \u{201C}\(model.effectiveTitle)\u{201D} from Up next.", model)
+            }
+        }
+    }
+
+    /// Called when the recorder of the old call has stopped (CallEngine.callEnded or the orphan finish).
+    @MainActor
+    func finishSwitch() {
+        guard let m = UpNext.shared.switchingTo else { return }
+        UpNext.shared.switchingTo = nil
+        // A moment for the old call's wrap-up (Notion summary, rating) to read that call's settings first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self = self else { return }
+                if let e = self.launch(m) { self.notifySwitchFailed(e, m) }
+            }
+        }
+    }
+
+    @MainActor
+    func notifySwitchFailed(_ text: String, _ model: StartCallModel) {
+        UpNext.shared.save(model)
+        let a = NSAlert()
+        a.messageText = "\u{201C}\(model.effectiveTitle)\u{201D} did not start"
+        a.informativeText = text + "\n\nIt stays in Up next."
+        a.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        a.runModal()
+    }
+
+    /// The menu's Up next submenu: each call opens for editing, switching or starting.
+    @MainActor
+    func rebuildUpNextMenu() {
+        let items = UpNext.shared.items
+        upNextItem.isHidden = items.isEmpty
+        upNextItem.title = "Up next (\(items.count))"
+        let m = NSMenu()
+        let f = DateFormatter(); f.dateFormat = "d MMM HH:mm"
+        for c in items {
+            let st = UpNext.shared.prepState(c)
+            let mark = ["ready": " · prepared", "running": " · preparing", "queued": " · in line", "failed": " · preparation failed"][st.rawValue] ?? ""
+            let it = NSMenuItem(title: "\(c.effectiveTitle) · \(f.string(from: c.callDate))\(mark)", action: #selector(openUpNext(_:)), keyEquivalent: "")
+            it.target = self
+            it.representedObject = c.id.uuidString
+            m.addItem(it)
+        }
+        upNextItem.submenu = m
+    }
+
+    @objc func openUpNext(_ sender: NSMenuItem) {
+        MainActor.assumeIsolated {
+            if let id = sender.representedObject as? String, let c = UpNext.shared.item(id) { StartCallWindow.show(delegate: self, prepared: c) }
+        }
     }
 }

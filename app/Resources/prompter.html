@@ -43,6 +43,24 @@
     -webkit-user-select: none; user-select: none; }
   #dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
   #dot.rec { background: var(--red); animation: pulse 1.6s infinite; }
+  /* 2026-10-27 (owner): blue while the recording starts or stops; grey = waiting or paused; green = stopped, saved */
+  #dot.go { background: var(--blue); animation: pulse .7s infinite; }
+  /* Up next (2026-10-27): the next planned call in the dock, all of them in the ⚙ panel */
+  #upnext { display: none; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  #upnext.has { display: flex; }
+  #upnext .upt { flex: 1; min-width: 0; text-align: left; border: 1px dashed var(--line); background: transparent; color: var(--muted);
+    border-radius: 8px; padding: 4px 8px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; }
+  #upnext .upt:hover { border-color: var(--blue); color: var(--blue); }
+  #upnext b { color: var(--text); font-weight: 600; }
+  #upnext .ps.ready { color: var(--green); } #upnext .ps.failed { color: var(--orange); }
+  .uprow { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .uprow:first-child { border-top: 0; }
+  .uprow .t { flex: 1; min-width: 0; } .uprow .t small { display: block; color: var(--muted); font-size: 12px; }
+  .uprow .upb { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .uprow .btn { padding: 4px 8px; }
+  .upbar { height: 3px; border-radius: 2px; background: var(--blue-soft); margin-top: 4px; overflow: hidden; }
+  .upbar i { display: block; height: 100%; background: var(--blue); }
+  #upplan { margin-top: 8px; }
   #dot.ok { background: var(--green); }
   #dot.warn { background: var(--orange); }
   #dot.dead { background: var(--red); box-shadow: 0 0 0 3px var(--red-bg); }
@@ -629,6 +647,7 @@
   <div id="onme" class="collapsed"><div class="head"></div><ul></ul></div>
   <div id="nowbox"></div>
   <div id="pinbox"></div>
+  <div id="upnext"></div>
 </div>
 
 <div id="fres"></div>
@@ -687,6 +706,12 @@
         <option value="20" data-i18n="o_every" data-n="20">every 20 s</option><option value="45" data-i18n="o_every" data-n="45">every 45 s</option>
         <option value="90" data-i18n="o_every" data-n="90">every 90 s</option><option value="0" data-i18n="o_off">off</option></select>
       <span class="pill" id="p_comment_rate_seconds"></span></div>
+  </div>
+  <div class="sec" id="upsec">
+    <h4 data-i18n="sec_upnext">Up next</h4>
+    <div id="uplist"></div>
+    <button id="upplan" class="btn" type="button" data-i18n="up_plan">Plan an upcoming call…</button>
+    <div class="hintline" data-i18n="up_hint">Set up and prepare the next calls while this one runs. Switch ends this call (transcript and Notion summary are saved) and starts the chosen one.</div>
   </div>
   <div class="sec">
     <h4 data-i18n="sec_display">Display</h4>
@@ -758,6 +783,13 @@
   var I18N = {
     en: {
       dot_wait: 'Waiting for the recording...',
+      dot_go: 'Starting the recording...', dot_end: 'Stopping the recording...', dot_rec: 'Recording',
+      dot_paused: 'Paused: nothing is transcribed', dot_ok: 'Stopped, the transcript is saved', dot_warn: 'Recording, but the microphone has a problem',
+      sec_upnext: 'Up next', up_plan: 'Plan an upcoming call…', up_label: 'Next:', up_switch: 'Switch…',
+      up_hint: 'Set up and prepare the next calls while this one runs. Switch ends this call (transcript and Notion summary are saved) and starts the chosen one.',
+      up_empty: 'No upcoming calls.', up_edit: 'Edit', up_prep: 'Prepare', up_remove_tt: 'Remove from Up next',
+      up_prep_none: 'no preparation', up_prep_queued: 'preparation in line', up_prep_running: 'preparing {p}%',
+      up_prep_ready: 'prepared ✓', up_prep_failed: 'preparation failed',
       title_default: 'Live Tips',
       paused_pill: 'Paused',
       paused_pill_tt: 'Paused: nothing is transcribed and no tips are shown (a side talk, a break). Click to resume',
@@ -1071,6 +1103,13 @@
     },
     uk: {
       dot_wait: 'Чекаю на запис...',
+      dot_go: 'Запускаю запис...', dot_end: 'Зупиняю запис...', dot_rec: 'Йде запис',
+      dot_paused: 'Пауза: нічого не транскрибується', dot_ok: 'Зупинено, транскрипт збережено', dot_warn: 'Йде запис, але з мікрофоном проблема',
+      sec_upnext: 'Далі', up_plan: 'Запланувати наступний дзвінок…', up_label: 'Далі:', up_switch: 'Перейти…',
+      up_hint: 'Налаштуй і підготуй наступні дзвінки, поки йде цей. Перехід завершує цей дзвінок (транскрипт і підсумок у Notion зберігаються) і запускає обраний.',
+      up_empty: 'Наступних дзвінків немає.', up_edit: 'Змінити', up_prep: 'Підготувати', up_remove_tt: 'Прибрати з черги',
+      up_prep_none: 'без підготовки', up_prep_queued: 'підготовка в черзі', up_prep_running: 'готую {p}%',
+      up_prep_ready: 'підготовлено ✓', up_prep_failed: 'підготовка не вдалась',
       title_default: 'Live Tips',
       paused_pill: 'На паузі',
       paused_pill_tt: 'Пауза: текст не записується і підказок немає (розмова не для дзвінка, перерва). Натисни, щоб продовжити',
@@ -1573,7 +1612,7 @@
     var b = e.target.closest('button'); if (!b) return;
     var act = b.getAttribute('data-act');
     if (act === 'copy') { copyText('continue'); b.textContent = t('al_copied'); }
-    else if (act === 'go') { send('setting', { key: 'go', value: true }); b.textContent = t('al_going'); b.disabled = true; }
+    else if (act === 'go') { send('setting', { key: 'go', value: true }); b.textContent = t('al_going'); b.disabled = true; window.setStarting(); }
     else if (act === 'mic_builtin') setMic('builtin');
     else if (act === 'mic_default') { dismissed.auto = true; setMic('default'); }
     else if (act === 'close') { dismissed[b.getAttribute('data-id')] = true; }
@@ -2631,6 +2670,43 @@
     elapsedEl.textContent = fmtDur(((endedMs || Date.now()) - startedMs) / 1000);
   }
   setInterval(tickElapsed, 1000);
+  var startingAt = 0, endingAt = 0;
+  var DOT_CLS = { dead: 'dead', warn: 'warn', paused: '', rec: 'rec', go: 'go', end: 'go', ok: 'ok', wait: '' };
+  function setDot(k) { dot.className = DOT_CLS[k] || ''; dot.title = t(k === 'dead' ? 'dot_warn' : 'dot_' + k); }
+  // The green Start was pressed (window button or the standby card): blue until the recorder reports "recording".
+  window.setStarting = function () { startingAt = Date.now(); setDot('go'); };
+  window.setEnding = function () { endingAt = Date.now(); setDot('end'); };
+  window.toastMsg = function (m) { toast(m, 'warn'); };
+  // ---------- Up next (2026-10-27, owner) ----------
+  var UP = [];
+  function upPrep(u) { return u.prep === 'running' ? t('up_prep_running', { p: Math.round((u.progress || 0) * 100) }) : t('up_prep_' + (u.prep || 'none')); }
+  function upBtn(a, id, label, tt) { return '<button type="button" class="btn" data-up="' + a + '" data-id="' + esc(id) + '"' + (tt ? ' title="' + esc(tt) + '"' : '') + '>' + esc(label) + '</button>'; }
+  function renderUp() {
+    var chip = $('upnext'), list = $('uplist');
+    if (!chip || !list) return;
+    if (!UP.length) { chip.className = ''; chip.innerHTML = ''; }
+    else {
+      var u = UP[0];
+      chip.className = 'has';
+      chip.innerHTML = '<button type="button" class="upt" data-up="edit" data-id="' + esc(u.id) + '" title="' + esc(u.project) + '">' +
+        esc(t('up_label')) + ' <b>' + esc(u.title) + '</b> · ' + esc(u.when) + ' · <span class="ps ' + esc(u.prep) + '">' + esc(upPrep(u)) + '</span>' +
+        (UP.length > 1 ? ' · +' + (UP.length - 1) : '') + '</button>' +
+        '<button type="button" class="dk-b" data-up="switch" data-id="' + esc(u.id) + '">' + esc(t('up_switch')) + '</button>';
+    }
+    list.innerHTML = UP.length ? UP.map(function (u) {
+      return '<div class="uprow"><div class="t"><b>' + esc(u.title) + '</b><small>' + esc(u.project + ' · ' + u.when + ' · ' + upPrep(u)) + '</small>' +
+        (u.prep === 'running' ? '<div class="upbar"><i style="width:' + Math.round((u.progress || 0) * 100) + '%"></i></div>' : '') + '</div>' +
+        '<div class="upb">' + upBtn('edit', u.id, t('up_edit')) + ((u.prep === 'none' || u.prep === 'failed') ? upBtn('prep', u.id, t('up_prep')) : '') +
+        upBtn('switch', u.id, t('up_switch')) + upBtn('remove', u.id, '×', t('up_remove_tt')) + '</div></div>';
+    }).join('') : '<div class="hintline">' + esc(t('up_empty')) + '</div>';
+  }
+  window.setUpNext = function (list) { UP = list || []; renderUp(); };
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('[data-up]');
+    if (!b) return;
+    send('upnext', { a: b.getAttribute('data-up'), id: b.getAttribute('data-id') || '' });
+  });
+  (function () { var p = $('upplan'); if (p) p.addEventListener('click', function () { send('upnext', { a: 'plan' }); }); })();
   window.setStatus = function (s) {
     s = s || {};
     S = s;
@@ -2711,7 +2787,14 @@
     if (s.errors && s.errors.length) d.push(t('d_errors', { v: s.errors.join('; ') }));
     diagEl.textContent = d.join(' · ');
     // Top bar dot: recording pulse, orange on a mic problem, red ring when Claude is deaf.
-    dot.className = deaf ? 'dead' : (st === 'recording' ? (s.mic === 'stalled' ? 'warn' : 'rec') : (st === 'stopped' ? 'ok' : ''));
+    // 2026-10-27 (owner): grey = waiting or paused, blue = starting or stopping, red = recording, green = stopped.
+    if (st === 'recording' || st === 'stopped') startingAt = 0;
+    if (st === 'stopped') endingAt = 0;
+    var dk = deaf ? 'dead'
+      : st === 'recording' ? (s.mic === 'stalled' ? 'warn' : (paused ? 'paused' : 'rec'))
+      : (st === 'loading_model' || st === 'stopping' || endingAt || (st === 'standby' && startingAt && Date.now() - startingAt < 20000)) ? (st === 'stopping' || endingAt ? 'end' : 'go')
+      : st === 'stopped' ? 'ok' : 'wait';
+    setDot(dk);
     dot.title = text;
     if (s.system_audio === 'silent') { if (!silentSince) silentSince = Date.now(); }
     else { silentSince = null; dismissed.silent = false; }

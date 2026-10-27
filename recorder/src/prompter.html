@@ -466,6 +466,22 @@
   #prepbar { height: 4px; border-radius: 2px; background: var(--blue-soft); margin-top: 6px; overflow: hidden; }
   #prepbar i { display: block; height: 100%; width: 0; background: var(--blue); transition: width .4s; }
   #mute svg { width: 16px; height: 16px; }
+
+  /* 2026-10-27 (owner): line icons instead of emoji; On me reads left to right */
+  .ic { width: 1em; height: 1em; vertical-align: -0.15em; flex: none; }
+  #helpbox dt .ic { color: var(--blue); }
+  #onme ul { text-align: left; align-items: stretch; }
+  #onme li { display: flex; gap: 6px; align-items: baseline; text-align: left; }
+  #onme li .ic { color: var(--blue); position: relative; top: 2px; }
+  #onme li.ask .ic { color: var(--red); }
+  #spkchip .spkic { display: inline-flex; color: var(--blue); }
+
+  /* call buttons and Help in the app's style */
+  #sos { background: var(--red-bg); color: var(--red); letter-spacing: 0; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; }
+  #sos:hover { background: var(--red); color: #fff; filter: none; }
+  #sos .sosic { display: inline-flex; }
+  #title { cursor: text; border-radius: 6px; padding: 1px 4px; }
+  #title.editing { outline: 2px solid var(--blue); background: var(--panel); }
 </style>
 </head>
 <body>
@@ -511,7 +527,7 @@
 </header>
 
 <div id="spkline" aria-live="polite">
-  <button id="spkchip" type="button" aria-haspopup="dialog" aria-expanded="false"><span>🗣</span><span class="nm"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+  <button id="spkchip" type="button" aria-haspopup="dialog" aria-expanded="false"><span class="spkic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M17 7a4 4 0 0 1 0 6M19.5 4.5a7.5 7.5 0 0 1 0 11"/></svg></span><span class="nm"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
   <div id="spkpop" role="dialog" data-i18n-aria="spkpop_aria"></div>
 </div>
 
@@ -552,7 +568,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
   </label>
-  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt"><span data-i18n="sos_label">HELP</span></button>
+  <button id="sos" class="act" type="button" data-i18n-aria="sos_aria" data-i18n-title="sos_tt"><span class="sosic"></span><span data-i18n="sos_label">Help</span></button>
 </form>
 
 <div id="scrim"></div>
@@ -574,7 +590,7 @@
         <option value="client" data-i18n="o_client">Client</option></select>
       <span class="pill" id="p_audience"></span></div>
     <div class="rowf"><span data-i18n="l_lang">Language</span>
-      <select id="s_lang" data-i18n-title="s_lang_tt"><option value="uk" data-i18n="o_uk">Ukrainian</option><option value="en" data-i18n="o_en">English</option>
+      <select id="s_lang" data-i18n-title="s_lang_tt"><option value="en" data-i18n="o_en">English</option><option value="uk" data-i18n="o_uk">Ukrainian</option>
         <option value="mix" data-i18n="o_mix">Mixed</option></select>
       <span class="pill" id="p_call_lang"></span></div>
     <div class="rowf"><span data-i18n="l_mic">Mic</span>
@@ -583,6 +599,7 @@
     <div class="rowf"><span data-i18n="l_proactive">Proactive tips</span>
       <button id="proactive" class="switch" type="button" role="switch" aria-checked="false" data-i18n-title="proactive_tt" data-i18n-aria="l_proactive"></button>
       <span class="pill" id="p_proactive"></span></div>
+    <div class="hintline" data-i18n="proactive_hint"></div>
     <div class="rowf" id="l_cmt" style="display:none"><span data-i18n="l_cmt">Comment rate</span>
       <select id="cmt" data-i18n-title="cmt_tt">
         <option value="20" data-i18n="o_every" data-n="20">every 20 s</option><option value="45" data-i18n="o_every" data-n="45">every 45 s</option>
@@ -637,8 +654,17 @@
   var empty = $('empty');
   var native = window.webkit && window.webkit.messageHandlers;
   function send(name, value) { try { native[name].postMessage(value); } catch (e) {} }
-  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  var ICONS = {"mic": "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"3\" width=\"6\" height=\"11\" rx=\"3\"/><path d=\"M5 11a7 7 0 0 0 14 0M12 18v3\"/></svg>", "speaker": "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"9\" cy=\"8\" r=\"3.5\"/><path d=\"M3 20a6 6 0 0 1 12 0M17 7a4 4 0 0 1 0 6M19.5 4.5a7.5 7.5 0 0 1 0 11\"/></svg>", "help": "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\"/><path d=\"M5.6 5.6l3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9\"/></svg>", "pause": "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 5v14M15 5v14\"/></svg>", "pin": "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 17v4M8 3h8l-1 6 3 4H6l3-4z\"/></svg>", "list": "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01\"/></svg>", "check": "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"4\"/><path d=\"M8.5 12.5l2.5 2.5 4.5-5\"/></svg>", "ask": "<svg class=\"ic\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5M12 17h.01\"/></svg>"};
+  (function () { var e = document.querySelector('#sos .sosic'); if (e) e.innerHTML = ICONS.help; })();
+  function iconize(h) { return String(h).replace(/🎙/g, ICONS.mic).replace(/🗣/g, ICONS.speaker).replace(/🆘/g, ICONS.help).replace(/⏸ \/ ▶/g, ICONS.pause).replace(/📌/g, ICONS.pin); }
+  function store(k, v) {
+    try { localStorage.setItem(k, v); } catch (e) {}
+    try { window.LT_PREFS = window.LT_PREFS || {}; window.LT_PREFS[k] = String(v); window.webkit.messageHandlers.pref.postMessage({ k: k, v: String(v) }); } catch (e) {}
+  }
+  function load(k) {
+    if (window.LT_PREFS && Object.prototype.hasOwnProperty.call(window.LT_PREFS, k)) return window.LT_PREFS[k];
+    try { return localStorage.getItem(k); } catch (e) { return null; }
+  }
   function hms() { return new Date().toTimeString().slice(0, 8); }
 
   // ---------- interface language (v37): every UI string goes through t(key) ----------
@@ -681,7 +707,8 @@
       pause_unconf_on: '⚠ Tips still paused: the recorder did not confirm',
       pause_unconf_off: '⚠ Tips still on: the recorder did not confirm',
       sos_aria: 'HELP NOW',
-      sos_label: 'HELP',
+      sos_label: 'Help',
+      rename_tt: 'Double-click to rename the call',
       sos_tt: "HELP NOW (Control-Option-H, works from any app): the best facts for what is being said, at once, then Claude's answer",
       work_on: '🆘 Working on it... {n} s',
       work_late: '🆘 No answer yet ({n} s). Is Claude listening?',
@@ -712,6 +739,7 @@
       o_default: 'System default',
       o_builtin: 'Mac built-in',
       l_proactive: 'Proactive tips',
+      proactive_hint: 'Ideas you could add: a missing owner or date, a fact worth mentioning. Off by default so only what you need comes up; answers, your turn and red flags always come.',
       proactive_tt: 'Off: only answers to questions, live facts, owner/date, your turn, red flags. On: also initiative and comment ideas.',
       l_cmt: 'Comment rate',
       cmt_tt: 'How often the window suggests what you can add when others finish a thought',
@@ -740,8 +768,8 @@
       stealth_sub: 'This call only. The default for new calls is in Settings > General',
       stealth_tt: 'On (default): colleagues do not see this window when you share your screen, and screenshots skip it. Off: the window shows in a screen share and you can take screenshots of it.',
       sec_context: 'Context',
-      brief_none: 'Brief: not loaded yet',
-      brief_from: 'Brief from {t}',
+      brief_none: 'Preparation: not loaded yet',
+      brief_from: 'Preparation from {t}',
       brief_sub: 'Meetings, threads and documents of the project.',
       brief_updating: 'Updating since {t}, 1-3 min, the recording goes on',
       refresh: 'Refresh',
@@ -969,7 +997,8 @@
       pause_unconf_on: '⚠ Підказки досі на паузі: програма запису не підтвердила',
       pause_unconf_off: '⚠ Підказки досі увімкнені: програма запису не підтвердила',
       sos_aria: 'ДОПОМОЖИ',
-      sos_label: 'ДОПОМОЖИ',
+      sos_label: 'Допоможи',
+      rename_tt: 'Двічі клікни, щоб перейменувати дзвінок',
       sos_tt: 'ДОПОМОЖИ (Control-Option-H, з будь-якого застосунку): одразу найкращі факти до того, що зараз говорять, а потім відповідь Claude',
       work_on: '🆘 Шукаю... {n} с',
       work_late: '🆘 Відповіді ще немає ({n} с). Claude слухає?',
@@ -1000,6 +1029,7 @@
       o_default: 'Системний',
       o_builtin: 'Вбудований у Mac',
       l_proactive: 'Ініціативні підказки',
+      proactive_hint: 'Ідеї, що можна додати: відповідальний чи дата, яких бракує, факт, який варто згадати. За замовчуванням вимкнено, щоб зʼявлялося лише потрібне; відповіді, твоя черга і тривожні сигнали приходять завжди.',
       proactive_tt: 'Вимкнено: лише відповіді на питання, факти до теми, відповідальний і дата, твоя черга, тривожні сигнали. Увімкнено: ще й ідеї, що можна додати.',
       l_cmt: 'Частота ідей',
       cmt_tt: 'Як часто вікно підказує, що можна додати, коли інші закінчують думку',
@@ -1028,8 +1058,8 @@
       stealth_sub: 'Лише для цього дзвінка. Типове значення для нових дзвінків у Settings > General',
       stealth_tt: 'Увімкнено (за замовчуванням): колеги не бачать це вікно, коли ти показуєш екран, і знімки екрана його пропускають. Вимкнено: вікно видно під час показу екрана, і його можна зняти на знімок.',
       sec_context: 'Контекст',
-      brief_none: 'Довідка: ще не завантажена',
-      brief_from: 'Довідка від {t}',
+      brief_none: 'Підготовка: ще не завантажена',
+      brief_from: 'Підготовка від {t}',
       brief_sub: 'Зустрічі, обговорення і документи проєкту.',
       brief_updating: 'Оновлюю з {t}, 1-3 хв, запис триває',
       refresh: 'Оновити',
@@ -1239,7 +1269,7 @@
     });
     if (!rootEl) {
       document.documentElement.lang = uiLang;
-      var hb = document.getElementById('helpbox'); if (hb) hb.innerHTML = t('help_html');
+      var hb = document.getElementById('helpbox'); if (hb) hb.innerHTML = iconize(t('help_html'));
     }
   }
   function i18nSpan(key, p) {
@@ -1293,9 +1323,14 @@
   [].forEach.call(fadeBtns, function (b) {
     b.onclick = function () {
       [].forEach.call(fadeBtns, function (x) { x.classList.toggle('on', x === b); });
-      applyFade(parseFloat(b.getAttribute('data-v')));
+      applyFade(parseFloat(b.getAttribute('data-v'))); store('fade', b.getAttribute('data-v'));
     };
   });
+  (function () {                                   // the opacity chosen last time
+    var f0 = load('fade'); if (!f0) return;
+    fadeV = parseFloat(f0) || fadeV;
+    [].forEach.call(fadeBtns, function (x) { x.classList.toggle('on', x.getAttribute('data-v') === f0); });
+  })();
   window.enableGlass = function () { window.LT_GLASS = true; applyFade(fadeV); };
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyFade(fadeV); }); } catch (e) {}
 
@@ -1487,18 +1522,27 @@
   sType.onchange = function () { showRole(); sendSetting('call_type', sType.value, txt(sType)); };
   sRole.onchange = function () { sendSetting('hiring_role', sRole.value, txt(sRole)); };
   sAud.onchange = function () { sendSetting('audience', sAud.value, txt(sAud)); };
+  // 2026-10-27 (owner): English and Ukrainian on top, then every language the speech model knows
+  // (type the first letters to jump). Several languages at once: Start call.
+  (function () {
+    var all = [["af", "Afrikaans"], ["sq", "Albanian"], ["am", "Amharic"], ["ar", "Arabic"], ["hy", "Armenian"], ["as", "Assamese"], ["az", "Azerbaijani"], ["ba", "Bashkir"], ["eu", "Basque"], ["be", "Belarusian"], ["bn", "Bengali"], ["bs", "Bosnian"], ["br", "Breton"], ["bg", "Bulgarian"], ["my", "Burmese"], ["yue", "Cantonese"], ["ca", "Catalan"], ["zh", "Chinese"], ["hr", "Croatian"], ["cs", "Czech"], ["da", "Danish"], ["nl", "Dutch"], ["en", "English"], ["et", "Estonian"], ["fo", "Faroese"], ["fi", "Finnish"], ["fr", "French"], ["gl", "Galician"], ["ka", "Georgian"], ["de", "German"], ["el", "Greek"], ["gu", "Gujarati"], ["ht", "Haitian Creole"], ["ha", "Hausa"], ["haw", "Hawaiian"], ["he", "Hebrew"], ["hi", "Hindi"], ["hu", "Hungarian"], ["is", "Icelandic"], ["id", "Indonesian"], ["it", "Italian"], ["ja", "Japanese"], ["jw", "Javanese"], ["kn", "Kannada"], ["kk", "Kazakh"], ["km", "Khmer"], ["ko", "Korean"], ["lo", "Lao"], ["la", "Latin"], ["lv", "Latvian"], ["ln", "Lingala"], ["lt", "Lithuanian"], ["lb", "Luxembourgish"], ["mk", "Macedonian"], ["mg", "Malagasy"], ["ms", "Malay"], ["ml", "Malayalam"], ["mt", "Maltese"], ["mi", "Maori"], ["mr", "Marathi"], ["mn", "Mongolian"], ["ne", "Nepali"], ["no", "Norwegian"], ["nn", "Norwegian Nynorsk"], ["oc", "Occitan"], ["ps", "Pashto"], ["fa", "Persian"], ["pl", "Polish"], ["pt", "Portuguese"], ["pa", "Punjabi"], ["ro", "Romanian"], ["ru", "Russian"], ["sa", "Sanskrit"], ["sr", "Serbian"], ["sn", "Shona"], ["sd", "Sindhi"], ["si", "Sinhala"], ["sk", "Slovak"], ["sl", "Slovenian"], ["so", "Somali"], ["es", "Spanish"], ["su", "Sundanese"], ["sw", "Swahili"], ["sv", "Swedish"], ["tl", "Tagalog"], ["tg", "Tajik"], ["ta", "Tamil"], ["tt", "Tatar"], ["te", "Telugu"], ["th", "Thai"], ["bo", "Tibetan"], ["tr", "Turkish"], ["tk", "Turkmen"], ["uk", "Ukrainian"], ["ur", "Urdu"], ["uz", "Uzbek"], ["vi", "Vietnamese"], ["cy", "Welsh"], ["yi", "Yiddish"], ["yo", "Yoruba"]];
+    var g = document.createElement('optgroup');     g.label = 'All languages';
+    all.forEach(function (l) { if (l[0] === 'en' || l[0] === 'uk') return; var o = document.createElement('option'); o.value = l[0]; o.textContent = l[1]; g.appendChild(o); });
+    sLang.appendChild(g);
+  })();
   sLang.onchange = function () { sendSetting('call_lang', sLang.value, txt(sLang)); };
   sMic.onchange = function () { sendSetting('mic_device', sMic.value, txt(sMic)); };
   function setMic(v) { sMic.value = v; sMic.onchange(); }
 
-  var proactive = false;
+  var proactive = load('proactive') === '1';      // 2026-10-27 (owner): remembered for the next calls
   function applyProactive() {
     prBtn.classList.toggle('on', proactive); prBtn.setAttribute('aria-checked', String(proactive));
     lCmt.style.display = proactive ? '' : 'none';
   }
   applyProactive();
+  if (proactive) setTimeout(function () { sendSetting('proactive', 'on', t('v_on')); }, 1500);   // carry the choice into this call
   prBtn.onclick = function () {
-    proactive = !proactive; applyProactive();
+    proactive = !proactive; applyProactive(); store('proactive', proactive ? '1' : '0');
     sendSetting('proactive', proactive ? 'on' : 'off', proactive ? t('v_on') : t('v_off'));
   };
 
@@ -1569,7 +1613,12 @@
     syncMicOptions(s);
     if (s.mic_device && !busy('mic_device', sMic)) sMic.value = s.mic_device;
     if (!busy('call_lang', sLang)) {
-      if (s.call_lang) sLang.value = s.call_lang;
+      var want = s.call_lang || (Array.isArray(s.langs) && s.langs.length > 1 ? s.langs.join('+') : '');
+      if (want && ![].some.call(sLang.options, function (o) { return o.value === want; })) {
+        var o = document.createElement('option'); o.value = want; o.textContent = want.split('+').map(function (c) { var f = [].filter.call(sLang.options, function (x) { return x.value === c; })[0]; return f ? f.textContent : c; }).join(' + ');
+        sLang.insertBefore(o, sLang.options[2] || null);
+      }
+      if (want) sLang.value = want;
       else if (s.me_lang) sLang.value = s.me_lang === 'en' ? 'en' : 'uk';
     }
     if (s.call_type != null && !busy('call_type', sType)) { sType.value = normVal('call_type', s.call_type); showRole(); }
@@ -2022,7 +2071,7 @@
   }
   function renderPop(focusInput) {
     var label = spkLabel(popSid), cur = spkName(popSid) || '', others = otherSids(popSid), at = popT;
-    var html = '<div class="ph"><b title="' + esc(label) + '">🗣 ' + esc(label) + '</b>' + (at ? '<small>' + esc(t('pop_line', { t: at })) + '</small>' : '') +
+    var html = '<div class="ph"><b title="' + esc(label) + '">' + ICONS.speaker + ' ' + esc(label) + '</b>' + (at ? '<small>' + esc(t('pop_line', { t: at })) + '</small>' : '') +
       '<button class="xb" type="button" data-a="close" title="' + esc(t('pop_close')) + '" aria-label="' + esc(t('pop_close')) + '">✕</button></div>';
     html += '<h6>' + esc(t('pop_rename')) + '</h6><div class="nrow"><input type="text" data-f="rename" maxlength="' + NAME_MAX + '" value="' + esc(cur) +
       '" placeholder="' + esc(t('pop_rename_ph', { a: label })) + '" title="' + esc(t('pop_rename_tt')) + '">' +
@@ -2182,6 +2231,26 @@
 
   // ---------- status ----------
   var dot = $('dot'), statusEl = $('status'), diagEl = $('diag'), titleEl = $('title'), elapsedEl = $('elapsed');
+  // 2026-10-27 (owner): rename the call while it runs: double-click the title, Enter saves, Esc cancels.
+  var renamedTitle = load('renamed_' + (document.title || '')) || '';
+  renamedTitle = '';
+  titleEl.ondblclick = function () {
+    var before = titleEl.textContent;
+    titleEl.contentEditable = 'true'; titleEl.classList.add('editing'); titleEl.focus();
+    var r = document.createRange(); r.selectNodeContents(titleEl); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    function done(save) {
+      titleEl.contentEditable = 'false'; titleEl.classList.remove('editing');
+      var v = titleEl.textContent.replace(/\s+/g, ' ').trim();
+      if (save && v && v !== before) {
+        renamedTitle = v;
+        send('setting', { key: 'title', value: v });   // the skill reads @@SET title=...
+        toast(v, 'ok');
+      } else { titleEl.textContent = before; }
+      titleEl.onkeydown = null; titleEl.onblur = null;
+    }
+    titleEl.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); done(true); } if (e.key === 'Escape') done(false); };
+    titleEl.onblur = function () { done(true); };
+  };
   var startedMs = null, endedMs = null;
   function fmtDur(s) {
     s = Math.max(0, Math.floor(s)); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
@@ -2218,7 +2287,8 @@
     if (st === 'recording' && Date.now() - muteClick > 5000 && (s.mic === 'muted') !== muted) {
       muted = s.mic === 'muted'; applyMute();
     }
-    if (s.title) { text = s.title + ' · ' + text; titleEl.textContent = s.title; titleEl.title = s.title; }
+    var ttl = renamedTitle || s.title;
+    if (ttl) { text = ttl + ' · ' + text; if (!titleEl.isContentEditable) titleEl.textContent = ttl; titleEl.title = t('rename_tt'); }
     if (s.started_at) startedMs = Date.parse(s.started_at);
     if (st === 'recording') endedMs = null;
     else if ((st === 'stopping' || st === 'stopped') && !endedMs) endedMs = Date.now();
@@ -2292,8 +2362,14 @@
   var $ = function (id) { return document.getElementById(id); };
   var native = window.webkit && window.webkit.messageHandlers;
   function send(name, value) { try { native[name].postMessage(value); } catch (e) {} }
-  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function store(k, v) {
+    try { localStorage.setItem(k, v); } catch (e) {}
+    try { window.LT_PREFS = window.LT_PREFS || {}; window.LT_PREFS[k] = String(v); window.webkit.messageHandlers.pref.postMessage({ k: k, v: String(v) }); } catch (e) {}
+  }
+  function load(k) {
+    if (window.LT_PREFS && Object.prototype.hasOwnProperty.call(window.LT_PREFS, k)) return window.LT_PREFS[k];
+    try { return localStorage.getItem(k); } catch (e) { return null; }
+  }
 
   var L = {
     uk: { start: 'Старт', pause: 'Пауза', cont: 'Продовжити', auto: 'Авто', comp: 'Стиснути', snd: 'Звук', reset: 'Скинути',

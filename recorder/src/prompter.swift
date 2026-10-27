@@ -142,7 +142,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         installHotKeys()
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "pref"] { uc.add(self, name: name) }
+        // 2026-10-27: window settings (opacity, proactive, ...) live in UserDefaults; localStorage of a
+        // file:// page is not reliable in WebKit. The page reads them before its own script runs.
+        let prefs = (UserDefaults.standard.dictionary(forKey: "prompterPrefs") as? [String: String]) ?? [:]
+        if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
+            uc.addUserScript(WKUserScript(source: "window.LT_PREFS = \(js);", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
         let cfg = WKWebViewConfiguration()
         cfg.userContentController = uc
 
@@ -300,6 +306,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
             } else {
                 try? FileManager.default.removeItem(atPath: path)
             }
+        case "pref":
+            guard let d = message.body as? [String: Any], let k = d["k"] as? String, k.count < 64 else { return }
+            var prefs = (UserDefaults.standard.dictionary(forKey: "prompterPrefs") as? [String: String]) ?? [:]
+            prefs[k] = String(describing: d["v"] ?? "").prefix(200).description
+            UserDefaults.standard.set(prefs, forKey: "prompterPrefs")
         case "setting":
             // {"key": ..., "value": ...} -> the skill reads it from the inbox as @@SET key=value
             guard let d = message.body as? [String: Any], let key = d["key"] as? String,

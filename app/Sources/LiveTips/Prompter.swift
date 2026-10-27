@@ -106,7 +106,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let uc = WKUserContentController()
         for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript", "pref", "rename", "upnext"] { uc.add(self, name: name) }
         // The remembered window settings, before the page's own script runs.
-        let prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
+        var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
+        // 2026-10-27 (owner): one interface language for the whole app: the window follows Settings > General.
+        prefs["ui_lang"] = MainActor.assumeIsolated { AppConfig.load(from: AppPaths.config).uiLanguage == "uk" ? "uk" : "en" }
         if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
             uc.addUserScript(WKUserScript(source: "window.LT_PREFS = " + js + ";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -334,6 +336,13 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
             prefs[k] = d["v"] as? String ?? ""
             UserDefaults.standard.set(prefs, forKey: "prompterPrefs")
+            if k == "ui_lang", let v = d["v"] as? String, ["en", "uk"].contains(v) {
+                // The window's Interface switch is the app's interface language too (Settings > General).
+                MainActor.assumeIsolated {
+                    SettingsWindow.model.config.uiLanguage = v
+                    SettingsWindow.model.saveConfig()
+                }
+            }
         case "setting":
             // {"key": ..., "value": ...} -> the skill reads it from the inbox as @@SET key=value
             guard let d = message.body as? [String: Any], let key = d["key"] as? String,

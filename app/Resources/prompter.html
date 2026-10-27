@@ -793,6 +793,7 @@
       dot_wait: 'Waiting for the recording...',
       dot_go: 'Starting the recording...', dot_end: 'Stopping the recording...', dot_rec: 'Recording',
       dot_paused: 'Paused: nothing is transcribed', dot_ok: 'Stopped, the transcript is saved', dot_warn: 'Recording, but the microphone has a problem',
+      who_me: 'me', who_them: 'the other side',
       sec_upnext: 'Up next', up_plan: 'Plan an upcoming call…', up_label: 'Next:', up_switch: 'Switch…',
       up_hint: 'Set up and prepare the next calls while this one runs. Switch ends this call (transcript and Notion summary are saved) and starts the chosen one.',
       up_empty: 'No upcoming calls.', up_edit: 'Edit', up_prep: 'Prepare', up_remove_tt: 'Remove from Up next',
@@ -1115,6 +1116,7 @@
       dot_wait: 'Чекаю на запис...',
       dot_go: 'Запускаю запис...', dot_end: 'Зупиняю запис...', dot_rec: 'Йде запис',
       dot_paused: 'Пауза: нічого не транскрибується', dot_ok: 'Зупинено, транскрипт збережено', dot_warn: 'Йде запис, але з мікрофоном проблема',
+      who_me: 'я', who_them: 'співрозмовник',
       sec_upnext: 'Далі', up_plan: 'Запланувати наступний дзвінок…', up_label: 'Далі:', up_switch: 'Перейти…',
       up_hint: 'Налаштуй і підготуй наступні дзвінки, поки йде цей. Перехід завершує цей дзвінок (транскрипт і підсумок у Notion зберігаються) і запускає обраний.',
       up_empty: 'Наступних дзвінків немає.', up_edit: 'Змінити', up_prep: 'Підготувати', up_remove_tt: 'Прибрати з черги',
@@ -2375,13 +2377,32 @@
     cardSeen[key] = now;
     return true;
   }
+  // 2026-10-27 (owner): transcript channel labels ("Я", "Співрозмовник", "Me", "Other") shown in the window language.
+  // Service lines written by an older recorder in Ukrainian, shown in English when the window is English.
+  var TR_MARKS = [[/^дзвінок почався/, 'call started'], [/^мікрофон вимкнено/, 'microphone muted'], [/^мікрофон увімкнено/, 'microphone on'],
+    [/^мікрофон завис, перезапускаю/, 'microphone froze, restarting it'], [/^мікрофон: перемкнув на мікрофон Мака/, "microphone: switched to the Mac's microphone"],
+    [/^мікрофон відновився після (\d+) перезапуск\(ів\)/, 'microphone back after $1 restart(s)'], [/^мікрофон: Мак/, "microphone: the Mac's"],
+    [/^мікрофон: за замовчуванням/, 'microphone: system default'], [/^мікрофон: /, 'microphone: '], [/^мова: /, 'language: '],
+    [/^пауза: запис тексту і підказки зупинено/, 'paused: transcript and tips stopped'], [/^продовжено після паузи/, 'resumed after the pause'],
+    [/^кінець запису/, 'end of recording']];
+  function trMark(x) {
+    if (uiLang !== 'en') return x;
+    for (var i = 0; i < TR_MARKS.length; i++) if (TR_MARKS[i][0].test(x)) return x.replace(TR_MARKS[i][0], TR_MARKS[i][1]);
+    return x;
+  }
+  function dispWho(w) {
+    var k = String(w || '').trim().toLowerCase();
+    if (k === 'я' || k === 'me' || k === 'pm') return t('who_me');
+    if (k === 'співрозмовник' || k === 'other' || k === 'the other side' || k === 'інша сторона') return t('who_them');
+    return w;
+  }
   function renderSituation(s) {
     var wasTurn = !!(sit && (sit.asks || []).some(function (a) { return a.type === 'update'; }));
     sit = s;
     var line = $('sitline'), turn = (s.asks || []).some(function (a) { return a.type === 'update'; });
     var parts = [];
     if (turn) parts.push('<span class="turn">' + esc(t('sit_turn')) + '</span>');
-    if (s.topic) parts.push(esc(t('sit_listen')) + ' ' + esc(s.topic) + (s.owner ? ' · ' + esc(s.owner) : ''));
+    if (s.topic) parts.push(esc(t('sit_listen')) + ' ' + esc(s.topic) + (s.owner ? ' · ' + esc(dispWho(s.owner)) : ''));
     if (s.topic) parts.push(s.mine ? '<span class="mine">' + esc(t('sit_mine')) + '</span>' : esc(t('sit_not')));
     line.innerHTML = parts.join(' · '); line.className = parts.length ? 'show' : '';
     line.title = line.textContent;
@@ -2452,7 +2473,7 @@
       var m;
       if ((m = /^- (?:Канали|Channels): (.+?) = .*?, (.+?) = /.exec(l))) { trMe = m[1]; trThem = m[2]; return; }
       if ((m = /^- (?:Канали|Channels): (.+?) = /.exec(l))) { trMe = m[1]; return; }
-      if ((m = /^--- (.+) ---$/.exec(l))) { trLines.push({ mark: m[1] }); return; }
+      if ((m = /^--- (.+) ---$/.exec(l))) { trLines.push({ mark: trMark(m[1]) }); return; }
       m = TR_RX.exec(l); if (!m) return;
       trLines.push({ i: ++trSeq, t: m[1], who: m[2], sid: m[3] || null, text: m[5], me: !m[3] && !!trMe && m[2] === trMe });
     });

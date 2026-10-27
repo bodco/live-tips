@@ -1152,6 +1152,16 @@ def handoff_slide(sec: dict, slides: list[dict]) -> dict | None:
     return None
 
 
+# 2026-10-27 (owner): the window language everywhere. The app sends "ui_lang" in the start request; service
+# lines in the transcript, the header and the recorder's own window items follow it. Without it (the skill),
+# Ukrainian as before. Speaker labels and the transcript format do not change (tools parse them).
+UI = {"lang": "uk"}
+
+
+def L(uk: str, en: str) -> str:
+    return en if UI["lang"] == "en" else uk
+
+
 def fmt_mmss(sec: float) -> str:
     sec = max(0, int(sec))
     return f"{sec // 60}:{sec % 60:02d}"
@@ -1160,13 +1170,15 @@ def fmt_mmss(sec: float) -> str:
 def timeline_text(t_plan: float, total: float, span: tuple[int, int] | None) -> str:
     """"⏱ 12:30 з 40:00 · відстаєте 3 хв" (behind the planned end of the current section),
     "випереджаєте" (before its planned start), else "за планом"."""
-    tail = "за планом"
+    tail = L("за планом", "on plan")
     if span:
         if t_plan > span[1] + 30:
-            tail = f"відстаєте {max(1, round((t_plan - span[1]) / 60))} хв"
+            n = max(1, round((t_plan - span[1]) / 60))
+            tail = L(f"відстаєте {n} хв", f"{n} min behind")
         elif t_plan < span[0] - 30:
-            tail = f"випереджаєте {max(1, round((span[0] - t_plan) / 60))} хв"
-    return f"⏱ {fmt_mmss(t_plan)} з {fmt_mmss(total)} · {tail}"
+            n = max(1, round((span[0] - t_plan) / 60))
+            tail = L(f"випереджаєте {n} хв", f"{n} min ahead")
+    return f"⏱ {fmt_mmss(t_plan)} {L('з', 'of')} {fmt_mmss(total)} · {tail}"
 
 
 QA_CUE = re.compile(r"\?|питан|вопрос|question|чому|почему|why|what|how|як\b|що\b|чи\b", re.I)
@@ -1289,7 +1301,7 @@ class Outline:
             self.handoffs_done.add(nxt.get("n"))
             first = next((b["t"] for b in nxt.get("body", []) if b.get("k") == "p"), "")
             _append_json(self.tips, {"t": hhmmss(t), "src": hhmmss(t), "at": hhmmss(now()), "kind": "card",
-                                     "level": "red", "gist": f"🎤 Твій вихід: слайд {nxt.get('n')} {nxt.get('title', '')}",
+                                     "level": "red", "gist": L("🎤 Твій вихід: слайд", "🎤 Your turn: slide") + f" {nxt.get('n')} {nxt.get('title', '')}",
                                      "phrase": first, "card": f"handoff-{nxt.get('n')}"})
 
     def check(self, line: "Line", paused: bool = False) -> None:
@@ -3600,7 +3612,17 @@ def main() -> int:
         log(status["errors"][0])
         return 1
 
-    header = (f"# Live transcript: {title}\n\n"
+    UI["lang"] = "en" if str(cfg.get("ui_lang") or "").lower().startswith("en") else "uk"
+    if UI["lang"] == "en":
+        header = (f"# Live transcript: {title}\n\n"
+                  f"- Project: {cfg.get('slug') or Path(cfg['project_dir']).name}\n"
+                  f"- Start: {dt.datetime.fromtimestamp(started):%Y-%m-%d %H:%M:%S}\n"
+                  f"- Languages: {cfg['me_label']} = {'+'.join(cfg['me_langs']) or cfg['me_lang']}, allowed = {'+'.join(cfg['langs'])}\n"
+                  f"- Model: {cfg['model']}\n"
+                  f"- Channels: {cfg['me_label']} = microphone, {cfg['them_label']} = system audio\n"
+                  f"- Microphone: {'the Mac built-in microphone' if cfg['mic_device'] == 'builtin' else 'system default input (headset or Mac)'}\n\n")
+    else:
+      header = (f"# Live transcript: {title}\n\n"
               f"- Проєкт: {cfg.get('slug') or Path(cfg['project_dir']).name}\n"
               f"- Початок: {dt.datetime.fromtimestamp(started):%Y-%m-%d %H:%M:%S}\n"
               f"- Мови: {cfg['me_label']} = {'+'.join(cfg['me_langs']) or cfg['me_lang']}, дозволені = {'+'.join(cfg['langs'])}\n"
@@ -3802,7 +3824,7 @@ def main() -> int:
             return
         standby["on"] = False
         status.update(state="recording", standby=False)
-        writer.marker("дзвінок почався")
+        writer.marker(L("дзвінок почався", "call started"))
         log(f"standby -> recording: {why}")
         # The speech that started the call (last 20 s) is transcribed, not lost.
         for sg in standby["buf"]:
@@ -3918,7 +3940,7 @@ def main() -> int:
                 newp = cfg.get("prompt_" + val) or (None if val == "en" else cfg.get("prompt"))
                 pcell[0] = newp
                 pwords[0] = set(re.findall(r"\w+", (newp or "").lower()))
-                writer.marker(f"мова: {'+'.join(langs)}")
+                writer.marker(L("мова: ", "language: ") + '+'.join(langs))
                 log(f"languages switched in the tips window: me={me} allowed={'+'.join(langs)}")
             elif key == "mic_device" and (val in ("default", "builtin") or (val.startswith("uid:") and len(val) > 4)):
                 caps[0].switch_device(val)
@@ -3926,9 +3948,9 @@ def main() -> int:
                 status["mic_device"] = val
                 if val.startswith("uid:"):
                     nm = next((i.get("name") for i in MIC_INPUTS[0] if "uid:" + str(i.get("uid")) == val), val[4:])
-                    writer.marker("мікрофон: " + str(nm))
+                    writer.marker(L("мікрофон: ", "microphone: ") + str(nm))
                 else:
-                    writer.marker("мікрофон: " + ("Мак" if val == "builtin" else "за замовчуванням"))
+                    writer.marker(L("мікрофон: ", "microphone: ") + (L("Мак", "the Mac's") if val == "builtin" else L("за замовчуванням", "system default")))
             elif key == "call_type":
                 # Shown back in the window; the skill reads it as @@SET. Legacy values are mapped.
                 ct, au = normalize_meeting(val, status.get("audience"))
@@ -3955,7 +3977,7 @@ def main() -> int:
                 if on != segs["them"].paused:
                     for sg in segs.values():
                         sg.set_paused(on)
-                    writer.marker("пауза: запис тексту і підказки зупинено" if on else "продовжено після паузи")
+                    writer.marker(L("пауза: запис тексту і підказки зупинено", "paused: transcript and tips stopped") if on else L("продовжено після паузи", "resumed after the pause"))
                 log("tips and transcript paused in the window" if on else "tips and transcript resumed")
                 changed = True
             elif key == "semantic":
@@ -4157,22 +4179,22 @@ def main() -> int:
         if action == "restart":
             # One transcript marker per stall episode (not one per restart).
             if mic_cap.stall_streak == 0:
-                writer.marker("мікрофон завис, перезапускаю")
+                writer.marker(L("мікрофон завис, перезапускаю", "microphone froze, restarting it"))
             why = "no audio" if mic_silent_s > float(cfg.get("mic_stall_s", 12)) else "digital silence (all zeros)"
             mic_cap.restart_stalled(max(mic_silent_s, mic_zero_s), why)
         elif action == "switch_builtin":
             mic_cap.auto_switch_builtin(max(mic_silent_s, mic_zero_s))
             cfg["mic_device"] = "builtin"
             status.update(mic_device="builtin", mic_auto_switched=True)
-            writer.marker("мікрофон: перемкнув на мікрофон Мака")
+            writer.marker(L("мікрофон: перемкнув на мікрофон Мака", "microphone: switched to the Mac's microphone"))
         elif action == "recovered":
-            writer.marker(f"мікрофон відновився після {mic_cap.stall_streak} перезапуск(ів)")
+            writer.marker(L(f"мікрофон відновився після {mic_cap.stall_streak} перезапуск(ів)", f"microphone back after {mic_cap.stall_streak} restart(s)"))
             log(f"audiocap mic recovered after {mic_cap.stall_streak} stall restart(s)")
             mic_cap.stall_streak = 0
         muted = mute_file.exists()
         if muted != segs["me"].muted:
             segs["me"].set_muted(muted)
-            writer.marker("мікрофон вимкнено" if muted else "мікрофон увімкнено")
+            writer.marker(L("мікрофон вимкнено", "microphone muted") if muted else L("мікрофон увімкнено", "microphone on"))
             log("mic muted in the tips window" if muted else "mic unmuted")
         reopen = CONTROL / "prompter"
         if reopen.exists():
@@ -4228,7 +4250,7 @@ def main() -> int:
     deadline = now() + 60
     while segq.unfinished_tasks and now() < deadline:
         time.sleep(0.3)
-    writer.close(f"\n--- кінець запису {hhmmss(now())} ---\n")
+    writer.close(f"\n--- {L('кінець запису', 'end of recording')} {hhmmss(now())} ---\n")
     if spk["worker"] is not None:
         spk["worker"].stop()
     if sem_live is not None:

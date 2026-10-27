@@ -1531,3 +1531,6 @@ address", `references/sweep.md`, `references/presentation.md`).
    Settings > Calendars; the call is picked from chips around now, overlaps included.
 77. **Regular meetings remembered (0.6.6).** A call of a series starts from the setup of its last call.
 78. **💡 Proactive tips in the top bar (0.6.6)** and a clearer button order.
+79. **One interface language (0.6.7).** Settings > General > Interface language and the tips window switch are one
+   setting. Gists, the call picture, service lines in the transcript (call started, microphone muted...) and the
+   transcript header follow it; a phrase to say stays in the call's language, the Notion page in the call's language.

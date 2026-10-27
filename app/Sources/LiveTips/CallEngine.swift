@@ -148,6 +148,7 @@ final class CallEngine {
         var req = request
         req["prompter"] = false            // Live Tips shows its own window
         req["stem_suffix"] = ".app"        // own files (<stem>.app.*): the skill can record the same call
+        req["ui_lang"] = config.uiLanguage == "uk" ? "uk" : "en"   // service lines in the transcript follow the window language
         guard let d = try? JSONSerialization.data(withJSONObject: req, options: [.prettyPrinted, .sortedKeys]) else { return "Bad request" }
         try? d.write(to: URL(fileURLWithPath: (control as NSString).appendingPathComponent("start.json")), options: .atomic)
 
@@ -278,7 +279,7 @@ final class CallEngine {
             "periodic_classify_s": 20, "max_parallel_calls": 4, "max_tokens": ["classify": 60, "tip": 700],
             "request_extra": ["classify": ["thinking": ["type": "disabled"]], "tip": ["thinking": ["type": "between_tools"]]],
             "me_label": core["me_label"] ?? "Me", "them_label": core["them_label"] ?? "Other",
-            "name_aliases": c.nameAliases, "langs": core["langs"] ?? ["en"], "tips_lang": (c.uiLanguage == "uk" || (core["me_lang"] as? String) == "uk") ? "uk" : "en",
+            "name_aliases": c.nameAliases, "langs": core["langs"] ?? ["en"], "tips_lang": c.uiLanguage == "uk" ? "uk" : "en",      // 2026-10-27 (owner): the window language, always
             "budget": ["ledger": SpendLedger.defaultPath, "call_soft_usd": c.budget.callSoftUSD,
                        "call_hard_usd": c.budget.callHardUSD, "monthly_hard_usd": c.budget.monthlyHardUSD]]
         // Call context: the PM's note, the project's current state and local files found for it (lt search).

@@ -37,16 +37,16 @@ PACING = re.compile(r"(time left|minutes? left|min left|pace|pacing|behind sched
 OBSERVER_EVENT = ("Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = "
                   "the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not "
                   "apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = "
-                  "'для порівняння, не для озвучення'. Never analyse the PM. trigger direct_question.")
+                  "'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.")
 INTERVIEWER_EVENT = ("Interview, role interviewer: the candidate just gave a long answer to the PM's question. If the answer "
-                     "is vague (no numbers, no own role, no result) give ONE orange tip: gist starting with '🟠 Уточни: ', "
+                     "is vague (no numbers, no own role, no result) give ONE orange tip: gist starting with '🟠 ' and 'Clarify: ' in the tips language, "
                      "phrase = the follow-up question the PM can ask now. Never suggest answers for the candidate. If the "
                      "answer is concrete, skip. trigger add_fact.")
 COACH_QUESTION_EVENT = ("Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, "
                         "phrase = a ready opening sentence, items = situation, action, result with a number, only from the "
                         "brief, the fact book or the cards. trigger direct_question.")
 COACH_MONEY_EVENT = ("Interview, role coach: the other side asks about money, dates or scope (price, rate, salary, start date, "
-                     "notice period, budget). Give ONE red tip: gist like '🔴 Без цифр зараз', phrase = a calm sentence that "
+                     "notice period, budget). Give ONE red tip: gist like '🔴 No numbers now' in the tips language, phrase = a calm sentence that "
                      "defers the number (for example 'I would like to understand the scope first and come back with a "
                      "number'), never a number. trigger direct_question.")
 QA_EVENT = ("Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the "
@@ -121,7 +121,7 @@ class JsonlWriter:
 # decisions, which speech points were said. The window shows it as a status line and an "On me" panel.
 SITUATION_SYS = """You keep the running state of a video call for a project manager (the PM). The PM's lines are labelled "{me}"; the PM is addressed as: {aliases}. The PM's own projects: {projects}. Participants: {people}. Today: {today}.
 Return JSON only, no prose:
-{{"topic": "<what is discussed now, max 6 words, in {lang}>", "owner": "<who leads this topic: a name, PM, or empty>", "mine": true|false, "floor": "<who speaks now: a name or PM>",
+{{"topic": "<what is discussed now, max 6 words, in {lang}>", "owner": "<who leads this topic: a name, PM, or empty; never a transcript channel label>", "mine": true|false, "floor": "<who speaks now: a name or PM>",
  "asks": [{{"id": "a1", "t": "<HH:MM:SS of the line>", "who": "<name>", "what": "<what the PM is asked, max 12 words, in {lang}>", "type": "question|request|update"}}],
  "actions": [{{"id": "m1", "what": "<what the PM must do, max 12 words, in {lang}>", "due": "<day or date, or empty>", "from": "<who asked, or PM>"}}],
  "decisions": ["<a decision made on this call, max 14 words, in {lang}>"],
@@ -818,6 +818,10 @@ class Engine:
             self.speech_card(self.prompt._brief)
         return True
 
+    def _ui_uk(self) -> bool:
+        """2026-10-27 (owner): labels and gists follow the window language (tips_lang); a phrase to say follows the call."""
+        return (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
+
     def speech_card(self, brief_text: str) -> Optional[dict]:
         """The skill shows "Твій спіч" from the brief as the first card (no model call). The brief carries
         it as a ready item under "## speech.json"; without one, the "спіч / speech" section is used."""
@@ -852,14 +856,14 @@ class Engine:
             if not m:
                 return None
             body = [l.strip() for l in m.group(1).splitlines() if l.strip() and not l.startswith("#")]
-            gist = next((l.strip("* ") for l in body if l.startswith("**")), "🟢 Твій спіч")
+            gist = next((l.strip("* ") for l in body if l.startswith("**")), ("🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech"))
             phrase = next((l.strip('"“” ') for l in body if l.startswith('"') or l.startswith("“")), "")
             items = [l.lstrip("-* ") for l in body if not l.startswith("**") and not l.startswith('"') and not l.startswith("“")]
             item = {"gist": gist, "phrase": phrase, "items": items[:12]}
         now = self.clock()
         out = {"schema_version": 1, "engine": "app", "uid": "speech", "t": s_to_hms(now), "src": s_to_hms(now), "kind": "speech",
-               "level": "info", "gist": item.get("gist") or "🟢 Твій спіч", "phrase": item.get("phrase", ""),
-               "items": [str(x) for x in (item.get("items") or [])][:14], "note": item.get("note", "бриф"),
+               "level": "info", "gist": item.get("gist") or ("🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech"), "phrase": item.get("phrase", ""),
+               "items": [str(x) for x in (item.get("items") or [])][:14], "note": item.get("note", "бриф" if self._ui_uk() else "brief"),
                "at": s_to_hms(now)}
         out = {k: v for k, v in out.items() if v not in ("", [], None)}
         self.speech_phrase = out.get("phrase", "")
@@ -999,7 +1003,7 @@ class Engine:
     def _emit_speech(self, obj: dict, note: str = "") -> dict:
         now = self.clock()
         out = {"schema_version": 1, "engine": "app", "uid": "speech", "t": s_to_hms(now), "src": s_to_hms(now),
-               "kind": "speech", "level": "info", "gist": obj.get("gist") or "🟢 Твій спіч", "phrase": obj.get("phrase", ""),
+               "kind": "speech", "level": "info", "gist": obj.get("gist") or ("🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech"), "phrase": obj.get("phrase", ""),
                "items": [str(x) for x in (obj.get("items") or [])][:14], "note": note or obj.get("note", ""), "at": s_to_hms(now)}
         out = {k: v for k, v in out.items() if v not in ("", [], None)}
         changed = list(out.get("items") or []) != self.speech_items

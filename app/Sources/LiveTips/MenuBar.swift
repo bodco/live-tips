@@ -242,8 +242,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if noAudioSince == nil { noAudioSince = Date() }
         guard Date().timeIntervalSince(noAudioSince!) > 30, noAudioWarned != st.file else { return }
         noAudioWarned = st.file
-        let item: [String: Any] = ["kind": "tip", "level": "red", "gist": "⚠ Запис не йде: аудіо не захоплюється",
-                                   "items": ["Заверши дзвінок і почни знову: Live Tips перевірить аудіо-помічник перед стартом."],
+        let uk = config.uiLanguage == "uk"
+        let item: [String: Any] = ["kind": "tip", "level": "red", "gist": uk ? "⚠ Запис не йде: аудіо не захоплюється" : "⚠ Not recording: no audio is captured",
+                                   "items": [uk ? "Заверши дзвінок і почни знову: Live Tips перевірить аудіо-помічник перед стартом."
+                                                : "End the call and start again: Live Tips checks the audio helper before the start."],
                                    "t": DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)]
         if let d = try? JSONSerialization.data(withJSONObject: [item]), let js = String(data: d, encoding: .utf8) {
             if tips == nil { showTips() }

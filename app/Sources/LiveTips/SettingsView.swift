@@ -1129,11 +1129,21 @@ struct AboutView: View {
                 }
                 Text("A quiet co-pilot for video calls. Live Tips transcribes the call on your Mac and shows a small window with the right fact or a ready phrase when you need it: a direct question to you, a new request, a date or an owner to fix. Prepared facts and cards appear instantly; Claude tips arrive in about 5 seconds. Audio never leaves your Mac.")
                 HStack(spacing: 16) {
-                    Link("Website", destination: URL(string: "https://tower.bodco.pm")!)
-                    Link("GitHub", destination: URL(string: "https://github.com/bodco/pm-control-tower")!)
-                    Link("Notion template", destination: URL(string: "https://bodco.notion.site/pm-control-tower")!)
+                    Link("Website", destination: URL(string: "https://tower.bodco.pm/live-tips/")!)
+                    Link("GitHub", destination: URL(string: "https://github.com/bodco/live-tips")!)
+                    Link("PM Control Tower", destination: URL(string: "https://tower.bodco.pm")!)
                 }
             }
+            // 2026-10-27 (owner): privacy policy and terms of use, published on the website.
+            Section {
+                Text("Audio stays on this Mac. Transcripts, voice prints, settings and logs stay in your folders and the Keychain. Text goes only to the AI provider and Notion you set up, with your own keys. Nothing is sent to the author: no analytics, no tracking. Tell the people on your calls that you transcribe them and get consent where it is required.")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 16) {
+                    Link("Privacy policy", destination: URL(string: "https://tower.bodco.pm/live-tips/privacy/")!)
+                    Link("Terms of use", destination: URL(string: "https://tower.bodco.pm/live-tips/terms/")!)
+                    Link("MIT licence", destination: URL(string: "https://github.com/bodco/live-tips/blob/main/LICENSE")!)
+                }
+            } header: { Text("Your data") }
             Section {
                 check(isOK(.claudeAPIKey), "Claude API key works", "Keys")
                 check(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, "Microphone allowed", "asked on the first call")

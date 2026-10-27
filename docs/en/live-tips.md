@@ -939,6 +939,9 @@ layers are tuned there too: `speakers_enabled`, `speaker_join` (0.45), `speaker_
 
 ## 11. Privacy and etiquette
 
+The full texts: [privacy policy](https://tower.bodco.pm/live-tips/privacy/) and [terms of use](https://tower.bodco.pm/live-tips/terms/)
+(also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). Nothing is sent to the author: no analytics, no tracking.
+
 - Audio is not stored: recognised phrases are appended to the `.md` immediately, audio
   buffers live only in memory.
 - Transcripts live in the project folder (`<project>/live/`). Do not add them to public
@@ -1449,3 +1452,5 @@ address", `references/sweep.md`, `references/presentation.md`).
    transcript file itself stays in the project's `live/` folder.
 71. **New call from the tips window (0.6.3).** When a call ends, "Ended ✓" keeps its shape and a "New call"
    button closes the window and opens Start call.
+72. **Privacy policy and terms of use (0.6.4).** Settings > About > Your data gives the short version and links to
+   the full [privacy policy](https://tower.bodco.pm/live-tips/privacy/) and [terms](https://tower.bodco.pm/live-tips/terms/).

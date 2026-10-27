@@ -47,4 +47,4 @@ Live Tips працює сам. З [PM Control Tower](https://github.com/bodco/pm
 
 Історія: Live Tips виріс усередині PM Control Tower; релізи до 0.5.8 [там](https://github.com/bodco/pm-control-tower/releases). Цей репозиторій зберігає ту історію.
 
-Ліцензія MIT.
+Ліцензія MIT. [Політика конфіденційності](PRIVACY.uk.md) і [умови використання](TERMS.uk.md): аудіо лишається на вашому Маку, автору нічого не надсилається.

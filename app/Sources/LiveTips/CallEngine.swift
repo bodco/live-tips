@@ -294,6 +294,11 @@ final class CallEngine {
         // lt search: by meaning with Local AI on, plain text search otherwise (2026-10-26: "Search the project" works either way).
         sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")]
         sc["local_ai"] = c.localAI.enabled
+        // 2026-10-27 (owner): a question with no ready answer starts a read-only Claude Code search of the project folder.
+        sc["deep_lookup"] = true
+        if let cl = PrepRunner.claudePath { sc["claude_cli"] = cl }
+        let extra = ((callRequest["workspace_root"] as? String).flatMap { $0.isEmpty ? nil : [$0] } ?? []) + ((callRequest["folders"] as? [String]) ?? [])
+        if !extra.isEmpty { sc["extra_dirs"] = extra }
         if let d = try? JSONSerialization.data(withJSONObject: sc, options: [.prettyPrinted]) {
             try? d.write(to: URL(fileURLWithPath: cfgPath), options: .atomic)
         }

@@ -95,7 +95,7 @@ final class PrepRunner: ObservableObject {
     }
 
     /// The `claude` command line tool (Claude Code).
-    static var claudePath: String? {
+    nonisolated static var claudePath: String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return [home + "/.local/bin/claude", home + "/.claude/local/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
             .first { FileManager.default.isExecutableFile(atPath: $0) }

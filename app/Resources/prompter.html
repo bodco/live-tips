@@ -380,7 +380,13 @@
   #tr-n { color: var(--muted); font-size: 12px; }
   #tr-list { flex: 1 1 0; overflow-y: auto; padding: 6px 12px 12px; font-size: 13px; line-height: 1.45; }
   .trl { padding: 2px 0; }
-  .trl .tt { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 6px; }
+  .trl .tt { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 6px;
+    background: none; border: 0; padding: 0 2px; border-radius: 4px; font-family: inherit; cursor: pointer; }
+  .trl .tt .x { display: none; margin-left: 3px; color: var(--red); font-weight: 700; }
+  .trl:hover .tt .x { display: inline; }
+  .trl .tt.armed { background: var(--red); color: #fff; }
+  .trl .tt.armed .x { display: inline; color: #fff; }
+  .trl .who { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
   .trl .who { font-weight: 600; margin-right: 5px; }
   .trl.me .who { color: var(--blue); }
   .trl .who.un { color: var(--muted); }
@@ -479,7 +485,7 @@
   #mute.muted { background: var(--red); color: #fff; }
   #pause.on { background: var(--orange); color: #fff; }
   #gear.open { background: var(--blue); color: #fff; border: 0; }
-  #trbtn[aria-pressed="true"] { background: var(--blue); color: #fff; }
+  #trbtn[aria-pressed="true"] { background: var(--blue-bg); color: var(--blue); box-shadow: inset 0 0 0 1.5px var(--blue); }
   .field { border: 0; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
   .field:focus-within { box-shadow: inset 0 0 0 2px var(--blue); }
   #send { border-radius: 9px; }
@@ -967,6 +973,7 @@
       onme: 'On me', onme_tt: 'On you from this call: questions to you not answered yet, then what you took on in your own words or were asked by name. Other people\'s tasks are not here. Click to fold',
       tr_who_tt: 'Wrong speaker? Click to give this line to someone else or rename the speaker',
       tr_move: 'This line is',
+      tr_del_tt: 'Delete this line from the transcript (click twice)', tr_del_confirm: 'Click again to delete', tr_deleted: 'Line {t} deleted from the transcript',
       tr_other_ph: 'Someone else: type a name, Enter',
       tr_rename: 'Rename {a} in every line',
       tr_rename_ph: 'New name, Enter',
@@ -1272,6 +1279,7 @@
       onme: 'На мені', onme_tt: 'Що на тобі з цього дзвінка: питання до тебе, на які ще немає відповіді, далі те, що ти взяв на себе своїми словами або що тобі доручили на імʼя. Чужих задач тут немає. Клік згортає',
       tr_who_tt: 'Не той спікер? Клікни, щоб віддати репліку іншому або перейменувати спікера',
       tr_move: 'Цю репліку сказав',
+      tr_del_tt: 'Видалити репліку з транскрипту (два кліки)', tr_del_confirm: 'Клікни ще раз, щоб видалити', tr_deleted: 'Репліку {t} видалено з транскрипту',
       tr_other_ph: 'Хтось інший: введи імʼя, Enter',
       tr_rename: 'Перейменувати {a} в усіх репліках',
       tr_rename_ph: 'Нове імʼя, Enter',
@@ -2298,28 +2306,30 @@
   $('onme').classList.remove('collapsed');
 
   // ---------- transcript split view (2026-10-26) ----------
-  var trSeq = 0, trLines = [], trOpen = false, trFollow = true, trOver = {}, trMe = null;
+  var trSeq = 0, trLines = [], trOpen = false, trFollow = true, trOver = {}, trMe = null, trWhoName = {}, trThem = null;
   var trList = $('tr-list'), trBtn = $('trbtn'), trFol = $('tr-follow');
   var TR_RX = /^\[(\d\d:\d\d:\d\d)\] (.+?)(?: \[(S\d+)\])? \(([\w+-]+)\): (.*)$/;
   function trWho(x) {
     var o = trOver[x.t], sid = o || x.sid;
     if (o && String(o).indexOf('name:') === 0) return { n: String(o).slice(5) };
     if (sid) { var nm = spkName(sid); return { n: nm || spkLabel(sid), un: !nm }; }
+    if (trWhoName[x.i]) return { n: trWhoName[x.i] };
     return { n: x.who };
   }
   function trRow(x) {
     if (x.mark) return '<div class="trl mark">' + esc(x.mark) + '</div>';
     var w = trWho(x);
-    var who = (x.sid || trOver[x.t])
-      ? '<button type="button" class="who' + (w.un ? ' un' : '') + '" data-i="' + (x.i != null ? x.i : '') + '" data-t="' + esc(x.t) + '" title="' + esc(t('tr_who_tt')) + '">' + esc(w.n) + ':</button>'
-      : '<span class="who' + (w.un ? ' un' : '') + '">' + esc(w.n) + ':</span>';
-    return '<div class="trl' + (x.me ? ' me' : '') + '"><span class="tt">' + esc(x.t) + '</span>' + who + esc(x.text) + '</div>';
+    // 2026-10-27 (owner): every line can be given to another speaker ("Me" and the other side too) and deleted.
+    var who = '<button type="button" class="who' + (w.un ? ' un' : '') + '" data-i="' + (x.i != null ? x.i : '') + '" data-t="' + esc(x.t) + '" title="' + esc(t('tr_who_tt')) + '">' + esc(w.n) + ':</button>';
+    if (x.del) return '';
+    var isMe = trWhoName[x.i] ? trWhoName[x.i] === trMe : x.me;
+    return '<div class="trl' + (isMe ? ' me' : '') + '"><button type="button" class="tt" data-del="' + (x.i != null ? x.i : '') + '" title="' + esc(t('tr_del_tt')) + '">' + esc(x.t) + '<span class="x">×</span></button>' + who + esc(x.text) + '</div>';
   }
   function trRender() {
     if (!trOpen) return;
     var top = trList.scrollTop;
     trList.innerHTML = trLines.length ? trLines.slice(-800).map(trRow).join('') : '<div class="tr-empty">' + esc(t('tr_empty')) + '</div>';
-    $('tr-n').textContent = trLines.length ? t('tr_n', { n: trLines.length }) : '';
+    $('tr-n').textContent = trLines.length ? t('tr_n', { n: trLines.filter(function (x) { return !x.del && !x.mark; }).length }) : '';
     if (trFollow) trList.scrollTop = trList.scrollHeight; else trList.scrollTop = top;
   }
   function setFollow(on) { trFollow = on; trFol.setAttribute('aria-pressed', String(on)); if (on) trList.scrollTop = trList.scrollHeight; }
@@ -2331,6 +2341,7 @@
   window.addTranscript = function (lines) {
     (lines || []).forEach(function (l) {
       var m;
+      if ((m = /^- (?:Канали|Channels): (.+?) = .*?, (.+?) = /.exec(l))) { trMe = m[1]; trThem = m[2]; return; }
       if ((m = /^- (?:Канали|Channels): (.+?) = /.exec(l))) { trMe = m[1]; return; }
       if ((m = /^--- (.+) ---$/.exec(l))) { trLines.push({ mark: m[1] }); return; }
       m = TR_RX.exec(l); if (!m) return;
@@ -2346,7 +2357,12 @@
   }
   trBtn.onclick = function () { setTr(!trOpen); };
   // Reassign a line from the transcript (2026-10-26): click the speaker of a line.
-  var knownNames = [], trMenu = $('trmenu'), trMenuT = null;
+  var knownNames = [], trMenu = $('trmenu'), trMenuT = null, trMenuX = null;
+  function lineWho(x, name) {      // works with or without speaker identification: applied to the file after the stop
+    if (!x || !name) return;
+    trWhoName[x.i] = name;
+    spkSet('line_who', x.t + '|' + String(x.text || '').slice(0, 40).replace(/\|/g, ' ') + '|' + name);
+  }
   function trLineAt(tm) { for (var i = trLines.length - 1; i >= 0; i--) if (trLines[i].t === tm) return trLines[i]; return null; }
   function closeTrMenu() { trMenu.className = ''; trMenu.innerHTML = ''; trMenuT = null; }
   function openTrMenu(btn) {
@@ -2354,7 +2370,7 @@
     for (var k = trLines.length - 1; k >= 0; k--) if (trLines[k].i === bi) { x = trLines[k]; break; }
     if (!x) x = trLineAt(btn.getAttribute('data-t'));
     if (!x) return;
-    trMenuT = x.t;
+    trMenuT = x.t; trMenuX = x;
     var o = trOver[x.t], cur = o && String(o).indexOf('name:') !== 0 ? rootSid(o) : (x.sid ? rootSid(x.sid) : null);
     var sids = Object.keys(spk).filter(function (k) { return rootSid(k) === k && k !== cur; }).sort(function (a, b) {
       return (parseInt(a.slice(1), 10) || 0) - (parseInt(b.slice(1), 10) || 0); });
@@ -2362,7 +2378,7 @@
     if (cur && spkName(cur)) used[spkName(cur).toLowerCase()] = 1;
     var html = '<div class="q">' + esc(x.t) + ' · ' + esc(x.text) + '</div><h6>' + esc(t('tr_move')) + '</h6><div class="names">' +
       sids.map(function (k) { return '<button class="nb" type="button" data-sid="' + esc(k) + '">' + esc(spkLabel(k)) + '</button>'; }).join('') +
-      knownNames.filter(function (n) { return !used[n.toLowerCase()]; }).map(function (n) {
+      [trMe, trThem].concat(knownNames).filter(function (n, i, a) { return n && a.indexOf(n) === i && !used[n.toLowerCase()] && n !== trWho(x).n; }).map(function (n) {
         return '<button class="nb" type="button" data-name="' + esc(n) + '">' + esc(n) + '</button>'; }).join('') +
       '</div><div class="nrow"><input type="text" data-f="other" maxlength="' + NAME_MAX + '" placeholder="' + esc(t('tr_other_ph')) + '"></div>';
     if (cur) html += '<h6>' + esc(t('tr_rename', { a: spkLabel(cur) })) + '</h6><div class="nrow"><input type="text" data-f="rename" data-sid="' + esc(cur) +
@@ -2371,11 +2387,31 @@
     var r = btn.getBoundingClientRect(), pr = $('trpane').getBoundingClientRect();
     trMenu.style.top = Math.min(r.bottom - pr.top + 4, pr.height - trMenu.offsetHeight - 8) + 'px';
   }
-  trList.addEventListener('click', function (e) { var b = e.target.closest('button.who'); if (b) { e.stopPropagation(); openTrMenu(b); } });
+  trList.addEventListener('click', function (e) {
+    var d = e.target.closest('button.tt');
+    if (d) {
+      e.stopPropagation();
+      var di = +d.getAttribute('data-del'), x = null;
+      for (var k = trLines.length - 1; k >= 0; k--) if (trLines[k].i === di) { x = trLines[k]; break; }
+      if (!x) return;
+      if (!d.classList.contains('armed')) {          // first click arms, a second within 3 s deletes
+        d.classList.add('armed'); d.title = t('tr_del_confirm');
+        setTimeout(function () { d.classList.remove('armed'); d.title = t('tr_del_tt'); }, 3000);
+        return;
+      }
+      x.del = true;
+      spkSet('line_delete', x.t + '|' + String(x.text || '').slice(0, 40).replace(/\|/g, ' '));
+      toast(t('tr_deleted', { t: x.t }), 'ok'); trRender();
+      return;
+    }
+    var b = e.target.closest('button.who'); if (b) { e.stopPropagation(); openTrMenu(b); }
+  });
   trMenu.addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b || !trMenuT) return;
-    if (b.hasAttribute('data-sid')) { fixLine(trMenuT, b.getAttribute('data-sid')); trOver[trMenuT] = b.getAttribute('data-sid'); }
-    else if (b.hasAttribute('data-name')) { var n = b.getAttribute('data-name'), o = sidOfName(n, null); fixLine(trMenuT, o || { name: n }); trOver[trMenuT] = o || 'name:' + n; }
+    if (b.hasAttribute('data-sid')) { var sd = b.getAttribute('data-sid'); fixLine(trMenuT, sd); trOver[trMenuT] = sd; lineWho(trMenuX, spkName(sd) || spkLabel(sd)); }
+    else if (b.hasAttribute('data-name')) { var n = b.getAttribute('data-name'), o = sidOfName(n, null);
+      if (n === trMe || n === trThem) { trOver[trMenuT] = 'name:' + n; lineWho(trMenuX, n); }
+      else { fixLine(trMenuT, o || { name: n }); trOver[trMenuT] = o || 'name:' + n; lineWho(trMenuX, n); } }
     closeTrMenu(); trRender();
   });
   trMenu.addEventListener('keydown', function (e) {
@@ -2384,7 +2420,7 @@
     e.preventDefault(); e.stopPropagation();
     var v = cleanName(e.target.value); if (!v || !trMenuT) return;
     if (e.target.getAttribute('data-f') === 'rename') nameSpeaker(e.target.getAttribute('data-sid'), v);
-    else { var o = sidOfName(v, null); fixLine(trMenuT, o || { name: v }); trOver[trMenuT] = o || 'name:' + v; }
+    else { var o = sidOfName(v, null); fixLine(trMenuT, o || { name: v }); trOver[trMenuT] = o || 'name:' + v; lineWho(trMenuX, v); }
     closeTrMenu(); trRender();
   });
   document.addEventListener('mousedown', function (e) { if (trMenu.classList.contains('show') && !trMenu.contains(e.target) && !e.target.closest('button.who')) closeTrMenu(); });

@@ -2634,6 +2634,40 @@ def speaker_display(sid: str | None, name: str | None) -> str | None:
     return f"Speaker {m.group(1)}" if m else None
 
 
+LINE_EDITS: dict = {"del": set(), "who": {}}
+
+
+def apply_line_edits(path: Path) -> int:
+    """After the stop: drop the lines deleted in the window and rename the speaker of reassigned lines.
+    A line is matched by its time and the first words of its text."""
+    if not LINE_EDITS["del"] and not LINE_EDITS["who"]:
+        return 0
+    text = path.read_text(encoding="utf-8")
+    out, n = [], 0
+    for ln in text.splitlines(keepends=True):
+        m = TAGGED_LINE.match(ln) or PLAIN_LINE.match(ln)
+        if m:
+            body = ln[m.end():].strip()
+            key = None
+            for k in list(LINE_EDITS["del"]) + list(LINE_EDITS["who"].keys()):
+                if k[0] == m.group(1) and body.startswith(k[1].strip()[:30]):
+                    key = k
+                    break
+            if key in LINE_EDITS["del"]:
+                n += 1
+                continue
+            if key in LINE_EDITS["who"]:
+                lang = m.group(4) if m.re is TAGGED_LINE else m.group(3)
+                ln = f"[{m.group(1)}] {LINE_EDITS['who'][key]} ({lang}): " + ln[m.end():]
+                n += 1
+        out.append(ln)
+    if n:
+        tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+        tmp.write_text("".join(out), encoding="utf-8")
+        os.replace(tmp, path)
+    return n
+
+
 def apply_speaker_names(text: str, them_label: str, label_for) -> str:
     """Replace `{them_label} [S2]` (and untagged system lines with an override) by the display
     name from label_for(line_time, sid) -> str | None. Other lines stay as they are."""
@@ -2646,7 +2680,7 @@ def apply_speaker_names(text: str, them_label: str, label_for) -> str:
                 ln = f"[{m.group(1)}] {lab} ({m.group(4)}): " + ln[m.end():]
         else:
             m = PLAIN_LINE.match(ln)
-            if m and m.group(2) == them_label:
+            if m:      # 2026-10-27: an override also renames an untagged line of either channel
                 lab = label_for(m.group(1), None)
                 if lab:
                     ln = f"[{m.group(1)}] {lab} ({m.group(3)}): " + ln[m.end():]
@@ -3779,6 +3813,21 @@ def main() -> int:
                     sos_now()
                 continue
             key, val = d.get("key"), d.get("value")
+            if key in ("line_delete", "line_undelete", "line_who"):
+                # 2026-10-27 (owner): delete a line or give it to another speaker from the transcript pane.
+                # "HH:MM:SS|first words" (delete) or "HH:MM:SS|first words|Name" (who); applied after the stop,
+                # so readers that follow the file by offset are never disturbed during the call.
+                parts = _s(val).split("|")
+                if len(parts) >= 2 and re.fullmatch(r"\d\d:\d\d:\d\d", parts[0]):
+                    k = (parts[0], parts[1][:40])
+                    if key == "line_delete":
+                        LINE_EDITS["del"].add(k)
+                    elif key == "line_undelete":
+                        LINE_EDITS["del"].discard(k)
+                    elif len(parts) >= 3 and parts[-1].strip():
+                        LINE_EDITS["who"][k] = parts[-1].strip()[:60]
+                    log(f"transcript edit: {key} at {parts[0]}")
+                continue
             if key == "go":
                 go_live("Start pressed in the window")
                 continue
@@ -4115,6 +4164,12 @@ def main() -> int:
             sem_live.summary(out, tips_file)
         except Exception as e:  # noqa: BLE001
             log(f"semantic: summary failed ({e!r})")
+    try:
+        n_edits = apply_line_edits(out)
+        if n_edits:
+            log(f"transcript edits applied: {n_edits}")
+    except Exception as e:  # noqa: BLE001
+        log(f"transcript edits failed ({e!r})")
     if tracker is not None and spk["ready"]:
         try:
             named = tracker.finalize(out, cfg["them_label"])

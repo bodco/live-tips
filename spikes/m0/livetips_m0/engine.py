@@ -974,6 +974,8 @@ class Engine:
         obj = first_json(c.text) if not c.error else None
         if not obj or obj.get("skip"):
             obj = {"gist": "Nothing found in the project folder" if not c.error else "Search failed: " + c.error[:80]}
+        if not snips or not obj or obj.get("skip") or "Nothing found" in str(obj.get("gist", "")):
+            self._start_deep(text, "ask")
         note = obj.get("note") or ""
         if srcs and not note:
             note = "Sources: " + ", ".join(srcs[:4])
@@ -1049,20 +1051,38 @@ class Engine:
         if kind == "sos":
             event = ("HELP NOW pressed: the PM is speaking and cannot type. Give ONE red tip now: gist starting with "
                      "'🆘 ', the next sentence the PM can say right now (answer to the open question, a fact with its number, "
-                     "or a bridge such as 'Let me give you the exact number after the call.'), up to 2 fact lines. Never skip.")
+                     "or a bridge such as 'Let me give you the exact number after the call.'), up to 2 fact lines. Never skip. Add \"answered\": false when no concrete fact answers the open question (a deeper search then starts by itself).")
         else:
             hist = ""
             if self.ask_log:
                 hist = " Earlier asks in this call (the PM may refer to them, e.g. 'more detail', 'and the other one'): " + \
                        " | ".join("Q: {} A: {}".format(x["q"], x["a"]) for x in self.ask_log[-5:]) + "."
             event = "The PM typed a question in the tips window: " + text + "." + hist + " Answer it like a short chat reply (gist = the answer in a few words, items = details when asked for detail). Everything in the brief counts (the PM's speech, open questions, blocks), as do the fact book, the cards, the project current state, the call situation and the transcript. Never answer 'no answer' to a follow-up of an earlier answer: build on it. Skip only if nothing in the context answers it, then say so in the gist."
+            # 2026-10-27 (owner): without a preparation the brief is empty; the project folder still holds the answer.
+            snips = self._project_snippets(text, budget_chars=9000)
+            if snips:
+                event += ("\n\nPASSAGES FROM THE PROJECT FOLDER (search for this question; newest facts win):\n" +
+                          "\n\n".join("[{}{}]\n{}".format(x["src"], ", " + x["date"] if x["date"] else "", x["text"]) for x in snips))
+            event += (" Add \"answered\": true when the context really answers it, false otherwise. Never skip a typed "
+                      "question: when the answer is not here, gist says what is known nearest, phrase is a sentence the PM "
+                      "can say right now (an honest bridge such as checking and coming back with a date), and a deeper "
+                      "search of the project folder starts by itself.")
         span["tip_start"] = self.clock()
         c = self._call("tip", line, event)
         done = self.clock()
         obj = first_json(c.text) if not c.error else None
+        unanswered = (not obj) or bool(obj.get("skip")) or obj.get("answered") is False
         if not obj or obj.get("skip"):
-            gist = "🆘 Nothing concrete found" if kind == "sos" else "No answer in the brief or the call so far"
-            obj = {"gist": gist, "level": "info", "topic": kind}
+            uk = (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
+            gist = ("🆘 " if kind == "sos" else "") + ("Готової відповіді немає, шукаю в папці проєкту" if uk else
+                                                     "No ready answer, searching the project folder")
+            phrase = ("Дайте мені хвилину, я перевірю і скажу точно." if uk else "Give me a minute, I will check and tell you exactly.")
+            obj = {"gist": gist, "phrase": phrase, "level": "info", "topic": kind}
+        if unanswered and kind in ("ask", "sos"):
+            self._start_deep(text or (line.text if line else ""), kind)
+            obj["note"] = (obj.get("note") + " · " if obj.get("note") else "") + (
+                "шукаю глибше в папці проєкту, ~1 хв" if (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
+                else "searching the project folder, about 1 min")
         item = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": span["src"],
                 "kind": "tip" if kind == "sos" else "answer", "level": "red" if kind == "sos" else obj.get("level", "info"),
                 "gist": obj.get("gist", ""), "phrase": obj.get("phrase", ""), "items": obj.get("items", []),
@@ -1076,6 +1096,50 @@ class Engine:
         self.out_tips.write(item)
         span.update({"outcome": "emitted", "emit_at": done, "tip_ms": c.ms(c.t_done), "error": c.error})
         self.out_timing.write(span)
+
+    # ---------- deep lookup with Claude Code (2026-10-27) ----------
+    def _start_deep(self, question: str, kind: str) -> None:
+        if not self.cfg.get("deep_lookup", True) or not question.strip():
+            return
+        with self.lock:
+            running = getattr(self, "deep_running", 0)
+            done = getattr(self, "deep_count", 0)
+            if running >= 2 or done >= int(self.cfg.get("deep_max_per_call", 12)):
+                return
+            self.deep_running = running + 1
+            self.deep_count = done + 1
+            tail = ["{}: {}".format(h.speaker, h.text) for h in list(self.history)[-8:]]
+        threading.Thread(target=self._run_deep, args=(question, kind, tail), daemon=True).start()
+
+    def _run_deep(self, question: str, kind: str, tail: List[str]) -> None:
+        from . import deep
+        uk = (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
+        t0 = self.clock()
+        try:
+            res = deep.lookup(self.cfg, question, tail, "Ukrainian" if uk else "English")
+        finally:
+            with self.lock:
+                self.deep_running = max(0, getattr(self, "deep_running", 1) - 1)
+        if self.budget and res.get("cost_usd"):
+            self.budget.add(float(res["cost_usd"]))
+        done = self.clock()
+        self.out_llm.write({"at": s_to_hms(done), "role": "deep_lookup", "q": question[:200], "secs": round(done - t0, 1),
+                            "answered": res.get("answered"), "error": res.get("error"), "cost_usd": res.get("cost_usd")})
+        if res.get("error"):
+            gist = ("🔎 Пошук у папці не вдався: " if uk else "🔎 The folder search failed: ") + str(res["error"])[:90]
+            item = {"gist": gist, "level": "info"}
+        else:
+            item = {"gist": "🔎 " + str(res.get("gist", "")).lstrip("🔎 "), "phrase": res.get("phrase", ""),
+                    "items": [str(x) for x in (res.get("items") or [])][:4], "level": "info",
+                    "note": ("Джерела: " if uk else "Sources: ") + ", ".join(res.get("sources") or []) if res.get("sources") else ""}
+        out = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": s_to_hms(t0), "kind": "answer",
+               "q": question, "at": s_to_hms(done), **item}
+        out = {k: v for k, v in out.items() if v not in ("", [], None)}
+        if kind == "ask":
+            self.ask_log.append({"q": question, "a": (str(out.get("gist", "")) + " " + str(out.get("phrase", "")))[:200]})
+        with self.lock:
+            self.tips.append(out)
+        self.out_tips.write(out)
 
     # ---------- situation tracker (2026-10-26) ----------
     def _maybe_situation(self, line: Line, sig, now: float) -> None:
@@ -1192,6 +1256,10 @@ class Engine:
                              "already answered.".format(a.get("type", "question"), a.get("who", "someone"), a.get("what", "")),
                     "force_level": "red"}
             self._submit_tip(line, "direct_question", span)
+            # 2026-10-27 (owner): with no preparation, a question to the PM also starts a search of the project
+            # folder at once, so the answer may be there before the PM has to ask for it.
+            if a.get("type") == "question" and (getattr(self.prompt, "_brief", "") or "(no brief)").strip() == "(no brief)":
+                self._start_deep(a.get("what", ""), "ask")
 
     def final_wrapup(self) -> Optional[dict]:
         """P2 (26.10): at the end, the window gets what the call picture holds: decisions, what is on the PM,

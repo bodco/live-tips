@@ -589,7 +589,9 @@ final class StartCallModel: ObservableObject {
                 "workspace": workspace?.name ?? registry.workspaces.first { w in w.projects.contains(project?.slug ?? "\u{0}") }?.name ?? "",
                 "scheduled_at": ISO8601DateFormatter().string(from: callDate), "mic_device": micDevice, "standby": standby,
                 "project_config": project?.config ?? "", "people": people, "people_team": peopleTeam,
-                "voices_remember": !publicCall, "prep_file": chosenPrepPath ?? ""]
+                "voices_remember": !publicCall, "prep_file": chosenPrepPath ?? "",
+                "folders": folders,
+                "workspace_root": { let ws = workspace ?? registry.workspaces.first { w in w.projects.contains(project?.slug ?? "\u{0}") }; return (ws?.root == root) ? "" : (ws?.root ?? "") }()]
     }
 
     var tipModelChoices: [String] {

@@ -350,6 +350,7 @@ class Segmenter:
         self.peak_window: list[float] = []
         self.lost = 0.0               # s of audio that never arrived (device restarts etc.)
         self.muted = False            # PM pressed mute in the tips window: mic audio is ignored
+        self.paused = False           # 2026-10-27: Pause in the tips window stops the transcript too (both sides)
         self.last_feed: float | None = None   # wall time of the last chunk from audiocap (also while muted)
         self.voiced = 0               # speech frames in the open segment
         self.noise_dropped = 0        # segments dropped as noise (low share of speech or too quiet)
@@ -371,6 +372,17 @@ class Segmenter:
             self.unmuted_at = now()
         self.muted = on
 
+    def set_paused(self, on: bool) -> None:
+        """Pause in the tips window: nothing is transcribed (a side talk while the client is away).
+        What was said before the click is kept; the clock keeps running."""
+        if on and not self.paused:
+            if self.in_speech:
+                self._close()
+            self.samples += len(self.pending)
+            self.pending = np.zeros(0, dtype=np.float32)
+            self.pre = []
+        self.paused = on
+
     def feed(self, chunk: np.ndarray) -> None:
         t = now()
         self.last_feed = t
@@ -389,7 +401,7 @@ class Segmenter:
                     self._close()
                 self.t0 += gap
                 self.lost += gap
-        if self.muted:
+        if self.muted or self.paused:
             # Muted in the tips window (the PM is muted in the meeting): music and people around
             # are not transcribed as the PM. The clock keeps running.
             self.samples += len(chunk)
@@ -3791,7 +3803,12 @@ def main() -> int:
                 status["tips_paused"] = "on" if on else "off"
                 if tracker is not None:
                     tracker.set_paused(on)
-                log("tips paused in the window" if on else "tips resumed")
+                # 2026-10-27 (owner): Pause stops the transcript too, for both sides, until Resume.
+                if on != segs["them"].paused:
+                    for sg in segs.values():
+                        sg.set_paused(on)
+                    writer.marker("пауза: запис тексту і підказки зупинено" if on else "продовжено після паузи")
+                log("tips and transcript paused in the window" if on else "tips and transcript resumed")
                 changed = True
             elif key == "semantic":
                 # Window switch "Local AI (Ollama)": off stops every embedding call and the indexing at once.

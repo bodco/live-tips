@@ -12,20 +12,20 @@
     --line: #e2e5ec; --red: #d23434; --orange: #a35500; --blue: #2f6fe4; --green: #1d8656;
     --red-bg: #fdecec; --orange-bg: #fff3e3; --blue-bg: #eaf1fd; --green-bg: #e8f6ef;
     --crit: #c62828; --scrim: rgba(20, 22, 27, .28); --shadow: 0 12px 40px rgba(20, 22, 27, .18);
-    --size: 18px;
+    --size: 18px; --blue-soft: rgba(47, 111, 228, .12);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #1f2130; --panel: #2a2c3c; --panel2: #252736; --text: #eceef5; --muted: #a2a7b8;
       --line: #353849; --red: #ff6b6b; --orange: #ffad4d; --blue: #5b9bff; --green: #55cf95;
-      --red-bg: #3d2028; --orange-bg: #382a17; --blue-bg: #1f2d4d; --green-bg: #183329;
+      --red-bg: #3d2028; --orange-bg: #382a17; --blue-bg: #1f2d4d; --green-bg: #183329; --blue-soft: rgba(91, 155, 255, .16);
       --scrim: rgba(0, 0, 0, .45); --shadow: 0 12px 40px rgba(0, 0, 0, .55);
     }
   }
   :root[data-theme="dark"] {
     --bg: #1f2130; --panel: #2a2c3c; --panel2: #252736; --text: #eceef5; --muted: #a2a7b8;
     --line: #353849; --red: #ff6b6b; --orange: #ffad4d; --blue: #5b9bff; --green: #55cf95;
-    --red-bg: #3d2028; --orange-bg: #382a17; --blue-bg: #1f2d4d; --green-bg: #183329;
+    --red-bg: #3d2028; --orange-bg: #382a17; --blue-bg: #1f2d4d; --green-bg: #183329; --blue-soft: rgba(91, 155, 255, .16);
     --scrim: rgba(0, 0, 0, .45); --shadow: 0 12px 40px rgba(0, 0, 0, .55);
   }
   * { box-sizing: border-box; }
@@ -401,9 +401,6 @@
   #trmenu .nrow { display: flex; gap: 4px; margin-top: 4px; }
   #trmenu input { flex: 1 1 0; min-width: 0; font-size: 12px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
   #trmenu .q { color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #findbtn { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 4px; display: inline-flex; align-items: center; }
-  #findbtn:hover { color: var(--blue); }
-  #findbtn svg { width: 17px; height: 17px; }
   body.split { flex-direction: row; }
   body.split #deckpane { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; height: 100%; position: relative;
     border-right: 1px solid var(--line); }
@@ -473,6 +470,42 @@
   #dk-wrap td.r, #dk-wrap th.r { text-align: right; }
   #dk-wrap td.bad { color: var(--red); } #dk-wrap td.ok { color: var(--green); }
   #dk-wrap td.t { white-space: normal; }
+
+  /* ---------- 2026-10-27 design pass (owner): the same look as Start call and the welcome tour ----------
+     Everything you can click has the accent tint; static text stays gray. Cards and controls: no hard
+     outlines, soft fills, radius 10. */
+  .ib { border: 0; border-radius: 10px; background: var(--blue-soft); color: var(--blue); }
+  .ib:hover { filter: brightness(1.12); border: 0; }
+  #mute.muted { background: var(--red); color: #fff; }
+  #pause.on { background: var(--orange); color: #fff; }
+  #gear.open { background: var(--blue); color: #fff; border: 0; }
+  #trbtn[aria-pressed="true"] { background: var(--blue); color: #fff; }
+  .field { border: 0; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+  .field:focus-within { box-shadow: inset 0 0 0 2px var(--blue); }
+  #send { border-radius: 9px; }
+  #sos { border-radius: 10px; height: auto; min-height: 36px; }
+  #chips button { border: 0; background: var(--blue-soft); color: var(--blue); }
+  #chips button:hover { filter: brightness(1.12); color: var(--blue); }
+  #pausedpill { border: 0; background: var(--orange-bg); }
+  .btn, .dk-b, #alert button { border: 0; background: var(--blue-soft); color: var(--blue); border-radius: 8px; }
+  #alert button { background: rgba(255, 255, 255, .18); color: inherit; }
+  .tip .fb button:hover { background: var(--blue-soft); color: var(--blue); }
+
+  /* the ⚙ panel: cards like Start call */
+  #menu { background: var(--bg); border: 0; border-radius: 14px; padding: 4px 0 8px; }
+  .sec { background: var(--panel); border: 0; border-radius: 10px; margin: 8px 10px 0; padding: 10px 12px; }
+  .sec h4 { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .rowf { grid-template-columns: 112px 1fr minmax(0, auto); }
+  .rowf select { -webkit-appearance: none; appearance: none; border: 0; border-radius: 8px; background-color: var(--blue-soft);
+    color: var(--text); padding: 6px 28px 6px 10px; min-height: 30px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%235b9bff' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 10l5-5 5 5M7 14l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 9px center; }
+  .rowf select:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .seg { border: 0; background: var(--blue-soft); border-radius: 9px; padding: 2px; gap: 2px; }
+  .seg button { border: 0; border-radius: 7px; color: var(--blue); }
+  .seg button.on { background: var(--blue); color: #fff; }
+  .switch.on { background: var(--blue); }
+  .pill { border: 0; }
 </style>
 </head>
 <body>
@@ -568,9 +601,6 @@
   <label class="field">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
     <input id="q" data-i18n-ph="q_ph" data-i18n-title="q_tt">
-    <button id="findbtn" type="button" data-i18n-title="find_tt" data-i18n-aria="find_tt" title="Search the project folder">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v3"/><path d="M3 7v10a2 2 0 0 0 2 2h6"/><circle cx="17" cy="16" r="3"/><path d="M21.5 20.5l-2.3-2.3"/></svg>
-    </button>
     <button id="send" type="submit" data-i18n-title="send_tt" data-i18n-aria="send_tt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </button>
@@ -670,8 +700,8 @@
     en: {
       dot_wait: 'Waiting for the recording...',
       title_default: 'Live Tips',
-      paused_pill: 'Tips paused',
-      paused_pill_tt: 'Tips are paused: Claude keeps recording and listening, but shows nothing new. Click to resume tips',
+      paused_pill: 'Paused',
+      paused_pill_tt: 'Paused: nothing is transcribed and no tips are shown (a side talk, a break). Click to resume',
       meter_tt: 'Your share of talk time. Adds your monologue timer after 0:30, orange after 1:30',
       meter_you: 'You {p}%',
       mute_tt: 'Mute: stop transcribing your microphone. Press it when you are muted in the meeting (cafe, music, people around), press again when you unmute.',
@@ -697,7 +727,7 @@
       send_tt: 'Ask Claude',
       mute_aria: 'Mute my microphone',
       unmute_aria: 'Unmute my microphone',
-      pause_tt: 'Pause tips (Control-Option-P, works from any app): Claude keeps recording and listening, but shows nothing until you press play. HELP NOW still works.',
+      pause_tt: 'Pause (Control-Option-P, works from any app): stops the transcript and the tips for both sides, for a side talk or a break. Press again to continue.',
       play_tt: 'Resume tips (Control-Option-P)',
       pause_aria: 'Pause tips',
       play_aria: 'Resume tips',
@@ -712,9 +742,9 @@
       sec_call: 'Call',
       l_type: 'Type',
       s_type_tt: 'Standard: a usual meeting; talk vs discussion is detected by itself. Presentation and Interview need a special prep. Who is on the other side (team or client) is set in Audience.',
-      o_standard: 'Standard',
+      o_standard: 'Regular',
       o_auto: 'Auto',
-      o_presentation: 'Presentation (my talk)',
+      o_presentation: 'Presentation',
       o_interview: 'Interview',
       l_role: 'My role',
       o_notset: 'not set',
@@ -942,7 +972,7 @@
         '</dl><h5>Bottom</h5><dl>' +
         '<dt>HELP (red button, ⌃⌥H)</dt><dd>Stuck right now: the best facts for what is being said appear at once, then Claude\'s answer.</dd>' +
         '<dt>⏸ / ▶ (top bar, ⌃⌥P)</dt><dd>Pause tips: Claude keeps recording and listening but shows nothing new (the top bar says "Tips paused"). HELP NOW and your typed questions still work. ▶ resumes; held items then appear.</dd>' +
-        '<dt>Field</dt><dd>Type a word (logs, pricing, a person, a ticket key): matching facts show at once, no AI. Enter sends the text to Claude. The folder button (or "find:" at the start) makes Claude search the project folder first.</dd>' +
+        '<dt>Field</dt><dd>Type a word (logs, pricing, a person, a ticket key): matching facts show at once, no AI. Enter sends the text to Claude. A question about files or documents ("find…", "in the spec…") makes Claude search the project folder first.</dd>' +
         '<dt>Suggest reply</dt><dd>A ready answer or comment on the current topic.</dd>' +
         '<dt>What to ask now</dt><dd>1-2 questions for the open points.</dd>' +
         '<dt>Catch me up</dt><dd>The last ~5 minutes in 3-5 lines.</dd>' +
@@ -979,7 +1009,7 @@
       dot_wait: 'Чекаю на запис...',
       title_default: 'Live Tips',
       paused_pill: 'На паузі',
-      paused_pill_tt: 'Підказки на паузі: Claude і далі записує та слухає, але нічого нового не показує. Натисни, щоб відновити',
+      paused_pill_tt: 'Пауза: текст не записується і підказок немає (розмова не для дзвінка, перерва). Натисни, щоб продовжити',
       meter_tt: 'Твоя частка часу розмови. Після 0:30 додається таймер твого монологу, після 1:30 він стає помаранчевим',
       meter_you: 'Ти {p}%',
       mute_tt: 'Вимкнути мікрофон: я перестаю розпізнавати твій мікрофон. Натискай, коли вимикаєш звук у зустрічі (кафе, музика, люди поруч), і ще раз, коли вмикаєш.',
@@ -1005,7 +1035,7 @@
       send_tt: 'Запитати Claude',
       mute_aria: 'Вимкнути мій мікрофон',
       unmute_aria: 'Увімкнути мій мікрофон',
-      pause_tt: 'Пауза підказок (Control-Option-P, з будь-якого застосунку): Claude і далі записує та слухає, але нічого не показує, доки не натиснеш «Продовжити». ДОПОМОЖИ працює і на паузі.',
+      pause_tt: 'Пауза (Control-Option-P, з будь-якого застосунку): зупиняє запис тексту і підказки для обох сторін, на розмову не для дзвінка чи перерву. Натисни ще раз, щоб продовжити.',
       play_tt: 'Відновити підказки (Control-Option-P)',
       pause_aria: 'Поставити підказки на паузу',
       play_aria: 'Відновити підказки',
@@ -1022,7 +1052,7 @@
       s_type_tt: 'Звичайна: звичайна зустріч, виступ чи обговорення визначаються самі. Для презентації та співбесіди потрібна окрема підготовка. Хто з того боку (команда чи клієнт) задається окремо.',
       o_auto: 'Авто',
       o_standard: 'Звичайна',
-      o_presentation: 'Презентація (мій виступ)',
+      o_presentation: 'Презентація',
       o_interview: 'Співбесіда',
       l_role: 'Моя роль',
       o_notset: 'не вибрано',
@@ -1245,7 +1275,7 @@
         '</dl><h5>Унизу</h5><dl>' +
         '<dt>ДОПОМОЖИ (червона кнопка, ⌃⌥H)</dt><dd>Застряг просто зараз: одразу з\'являються найкращі факти до того, що говорять, а потім відповідь Claude.</dd>' +
         '<dt>⏸ / ▶ (верхня смуга, ⌃⌥P)</dt><dd>Пауза підказок: Claude і далі записує та слухає, але нічого нового не показує (угорі напис «На паузі»). ДОПОМОЖИ і твої питання працюють. ▶ відновлює, і тоді з\'являється все, що чекало.</dd>' +
-        '<dt>Поле</dt><dd>Введи слово (логи, ціни, людина, номер задачі): схожі факти видно одразу, без ШІ. Enter надсилає текст Claude. Кнопка з папкою (або "find:" на початку) змушує Claude спершу пошукати в папці проєкту.</dd>' +
+        '<dt>Поле</dt><dd>Введи слово (логи, ціни, людина, номер задачі): схожі факти видно одразу, без ШІ. Enter надсилає текст Claude. Питання про файли чи документи ("знайди…", "у специфікації…") змушує Claude спершу пошукати в папці проєкту.</dd>' +
         '<dt>Що відповісти</dt><dd>Готова відповідь або коментар до поточної теми.</dd>' +
         '<dt>Що спитати</dt><dd>1-2 питання щодо відкритих моментів.</dd>' +
         '<dt>Що я пропустив</dt><dd>Останні ~5 хвилин у 3-5 рядках.</dd>' +
@@ -2355,15 +2385,6 @@
     send('ask', text);
     var find = /^find:\s*/i.test(text);
     render({ kind: 'ask', level: 'info', you: text, t: hms(), noteKey: find ? 'ask_find_note' : 'ask_sent_note' });
-    input.value = '';
-    searchFacts();
-  };
-  // Folder button: Claude searches the project folder first (lt search), then answers (2026-10-26).
-  $('findbtn').onclick = function () {
-    var text = input.value.trim().replace(/^find:\s*/i, '');
-    if (!text) { input.placeholder = t('find_ph'); input.focus(); return; }
-    send('ask', 'find: ' + text);
-    render({ kind: 'ask', level: 'info', you: '🔎 ' + text, t: hms(), noteKey: 'ask_find_note' });
     input.value = '';
     searchFacts();
   };

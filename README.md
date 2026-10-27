@@ -1,7 +1,7 @@
 # LiveTips.app (beta)
 
 Native macOS companion for the `live-tips` skill: records the call locally, transcribes it on
-the Mac and asks a model for tips on events instead of polling. Status: **beta 0.5.7**, a
+the Mac and asks a model for tips on events instead of polling. Status: **beta 0.5.8**, a
 downloadable app (see Install below); the M0 spike that measured the approach is kept further down.
 
 The skill and the app are both supported and behave the same way. Behaviour lives in one
@@ -21,7 +21,7 @@ place, [`rules/`](rules/), which both read.
 ## Install (beta)
 
 1. Download the dmg from the release page:
-   [LiveTips-0.5.7-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.7/LiveTips-0.5.7-beta.dmg).
+   [LiveTips-0.5.8-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.8/LiveTips-0.5.8-beta.dmg).
    Open it and drag **Live Tips** into Applications.
 2. **First open: right-click > Open**, then confirm. The beta is not notarized by Apple yet, so a
    plain double-click is blocked the first time. After that it opens normally.

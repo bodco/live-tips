@@ -1044,7 +1044,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`tools/live-tips-app/`](../../tools/live-tips-app/README.md).
 
 **Download:**
-[LiveTips-0.5.7-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.7/LiveTips-0.5.7-beta.dmg)
+[LiveTips-0.5.8-beta.dmg](https://github.com/bodco/pm-control-tower/releases/download/live-tips-app-v0.5.8/LiveTips-0.5.8-beta.dmg)
 
 What it does:
 
@@ -1334,3 +1334,24 @@ address", `references/sweep.md`, `references/presentation.md`).
 49. **Settings > Projects (0.5.7).** ⋯ next to a project: Show in Finder, Use Claude for tips, Search this
    folder (both on by default), Reindex now, Remove project from Live Tips. The explanation moved into the
    (i) button. A project imported twice (the same folder with and without a trailing slash) is merged.
+50. **Start call, 0.5.8.** The title is optional again but looks like an input (a pencil, a frame that turns
+   blue when you type). Who, meeting type and language are three equal controls; everything clickable has
+   the accent tint. The project folder chip can be switched off (×): Prepare now then reads only the added
+   folders and the named documents and writes its files into live/ without reading anything else there.
+   The Preparation card: the model and account on the right of its title, "Use" and its menu on one line,
+   Prepare now and More as tinted buttons.
+51. **Tips window, 0.5.8.** Pause now stops the transcript too, for both sides (a side talk while the
+   client is away); the transcript gets "paused" and "resumed" marks. The buttons, the field, the chips and
+   the ⚙ panel use the same design as Start call (soft cards, tinted controls). The folder button in the
+   question field is gone: a question about files or documents ("find…", "in the spec…") searches the
+   project folder by itself.
+52. **One language in the transcript.** With one call language set, every speaker is written in it: Ukrainian
+   speech on an English call comes out in English, Russian on a Ukrainian call in Ukrainian. Whisper is
+   forced to that language, so other languages are translated as they are decoded. It keeps the meaning;
+   names and numbers deserve a glance. With two languages (Ukrainian + English) each speaker stays in the
+   language spoken. This is a real difference from note takers that write a foreign language in Latin letters.
+53. **Planned, not built yet.** A Google Calendar link (title, time, people for Start call); a prompt to start
+   recording when a call app takes the microphone; the summary in Google Docs or Drive, or as a document in
+   the project folder, for users without Notion. Until then each call starts by hand from the menu bar.
+54. **Comparison.** How Live Tips stands next to Fireflies, Fathom and Notion AI Meeting Notes (transcript,
+   help during the call, summary, prices as of 27 October 2026): https://tower.bodco.pm/compare/

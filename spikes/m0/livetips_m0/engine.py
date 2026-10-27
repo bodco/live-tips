@@ -1010,11 +1010,17 @@ class Engine:
         self.ask_log.append({"q": text, "a": "speech updated: " + str(obj.get("note", ""))[:120]})
         return True
 
+    FIND_ASK = re.compile(r"\b(знайди|пошукай|шукай|де лежить|в якому файлі|у файлі|в папці|у папці|файл\w*|документ\w*|специфікац\w*|"
+                          r"find|search|look up|which file|in the files?|in the folder|docs?|documents?|spec\w*)\b", re.I)
+
     def _run_request(self, kind: str, text: str, line: Line, span: dict) -> None:
         if kind == "ask" and (self.SPEECH_ASK.search(text) or (self.speech_item and self.SPEECH_SHOW.search(text))):
             span["tip_start"] = self.clock()
             if self._run_speech_request(text, line, span):
                 return
+        # 2026-10-27 (owner): no separate folder button; a question about files or "find/search" goes to the folder search.
+        if kind == "ask" and self.FIND_ASK.search(text):
+            kind = "find"
         if kind == "find":
             self._run_find(text, line, span)
             return

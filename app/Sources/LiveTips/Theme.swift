@@ -94,3 +94,18 @@ struct LTPrimaryButton: View {
         .controlSize(.large)
     }
 }
+
+/// A secondary action: accent text on a soft accent fill (2026-10-27, owner: clickable things get color).
+struct LTSoftButtonStyle: ButtonStyle {
+    var small = false
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(small ? .callout : .body)
+            .padding(.horizontal, small ? 10 : 12).padding(.vertical, small ? 4 : 6)
+            .foregroundStyle(enabled ? Color.accentColor : Color.secondary)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(configuration.isPressed ? 0.25 : (enabled ? 0.15 : 0.06))))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+    }
+}

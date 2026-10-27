@@ -125,6 +125,7 @@ final class PrepRunner: ObservableObject {
         var context: String
         var workspaceRoot: String
         var folders: [String] = []          // "Add folder" in Start call: read these first, they may be outside the project
+        var useProjectFolder = true         // 2026-10-27 (owner): off = never read the project folder, only write the prep into live/
     }
 
     func cancel() {
@@ -174,11 +175,18 @@ final class PrepRunner: ObservableObject {
         exactly; skip every part that needs Notion, Jira, the Agent tool, device_bash, polling or a recording \
         (all paths here are local Mac paths).
 
+        \(r.useProjectFolder ? """
         Sources, in this order: the folders and documents named in the call context (read them fully; .docx with \
         `textutil -convert txt -stdout <file>`), the project config, the Current State and other rows of the local \
         Notion mirror (\(notion.joined(separator: ", "))), the recent calls in \(live) (transcripts *.md and their \
         *.tips.jsonl, newest first; `"\(c.engine.python)" "\(lt)" digest "\(r.root)" --days 14` gives a digest), then other \
         project files found with Grep and Glob. Newer facts win; say in the brief which sources were used and what is old.
+        """ : """
+        The PM EXCLUDED the project folder for this call: do not read, list or search anything in \(r.root) or the \
+        Notion mirror, and not the earlier calls in \(live); only write the files below into \(live). Sources: only \
+        the folders the PM added, the documents and links named in the call context and the project config. Say in the \
+        brief that the project folder was excluded on purpose.
+        """)
 
         Write exactly these files and nothing else:
         - \(base).brief.md, first line: "# Live Brief: \(r.title) (prep, \(h.string(from: r.date)))"
@@ -198,7 +206,7 @@ final class PrepRunner: ObservableObject {
                        "--allowedTools", allowed.joined(separator: ","),
                        "--add-dir", skill, "--add-dir", live] + (r.workspaceRoot.isEmpty ? [] : ["--add-dir", r.workspaceRoot])
                        + r.folders.flatMap { ["--add-dir", $0] }
-        p.currentDirectoryURL = URL(fileURLWithPath: r.root)
+        p.currentDirectoryURL = URL(fileURLWithPath: r.useProjectFolder ? r.root : live)
         var env = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         env["PATH"] = [home + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", env["PATH"] ?? ""].joined(separator: ":")

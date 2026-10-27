@@ -323,6 +323,7 @@ final class StartCallModel: ObservableObject {
     }
     /// 2026-10-27 (owner): "Add folder" like in Cowork; the context then names only files or links.
     @Published var folders: [String] = []
+    @Published var useProjectFolder = true     // 2026-10-27 (owner): the project folder can be left out of the preparation
 
     func addFolders() {
         let p = NSOpenPanel()
@@ -509,7 +510,8 @@ final class StartCallModel: ObservableObject {
                                   slug: project?.slug ?? workspace?.name.lowercased() ?? "", root: root,
                                   config: project?.config ?? "", audience: audience, callType: callType, hiringRole: hiringRole,
                                   languages: language.split(separator: "+").map(String.init), context: cleanContext,
-                                  workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""), folders: folders)
+                                  workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""), folders: folders,
+                                  useProjectFolder: useProjectFolder)
     }
 
     /// Phrase to paste into Cowork to make a prep for this call.
@@ -610,7 +612,6 @@ struct StartCallView: View {
 
     @AppStorage("startCallAdvanced") private var advanced = false
     @State private var picking = false
-    @State private var titleMissing = false
     @FocusState private var titleFocus: Bool
     @State private var search = ""
 
@@ -665,22 +666,31 @@ struct StartCallView: View {
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.07)))
                             .frame(height: 96)
                         folderChips
-                        Text("Project folder included. Add folders with this call's documents.")
+                        Text(model.useProjectFolder ? "The project folder is included; add folders with this call's documents." : "The project folder is left out; only the added folders are read.")
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         Text("Names after \u{201C}\(StartCallModel.uiLang == "uk" ? "Учасники:" : "Participants:")\u{201D} are the speakers offered on the call. Empty lines are not sent.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                     .ltCard(padding: 14)
                     VStack(alignment: .leading, spacing: 10) {
-                        Label("Preparation", systemImage: "doc.badge.clock").font(.callout.weight(.medium))
+                        HStack {
+                            Label("Preparation", systemImage: "doc.badge.clock").font(.callout.weight(.medium))
+                            Spacer()
+                            Text(runner.useAPI ? "\(runner.model.capitalized) · API key" : "\(runner.model.capitalized) · Claude account")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         prepStatus
                         if !model.prepList.isEmpty {
-                            Picker("Use", selection: Binding(get: { model.chosenPrep ?? "" },
-                                                             set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
-                                Text("Automatic (match by call title)").tag("")
-                                ForEach(model.prepList, id: \.file) { p in
-                                    Text("\(p.heading) · \(p.made.formatted(date: .abbreviated, time: .shortened))").tag(p.file)
+                            HStack(spacing: 8) {
+                                Text("Use").foregroundStyle(.secondary)
+                                Picker("", selection: Binding(get: { model.chosenPrep ?? "" },
+                                                              set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
+                                    Text("Automatic (match by call title)").tag("")
+                                    ForEach(model.prepList, id: \.file) { p in
+                                        Text("\(p.heading) · \(p.made.formatted(date: .abbreviated, time: .shortened))").tag(p.file)
+                                    }
                                 }
+                                .labelsHidden().frame(maxWidth: .infinity)
                             }
                         }
                         prepActions
@@ -732,7 +742,6 @@ struct StartCallView: View {
             VStack(spacing: 8) {
                 if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.orange).lineLimit(2) }
                 LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") {
-                    if model.title.trimmingCharacters(in: .whitespaces).isEmpty { titleMissing = true; titleFocus = true; return }
                     onStart()
                 }
                     .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
@@ -763,23 +772,25 @@ struct StartCallView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Image(systemName: "chevron.up.chevron.down").foregroundStyle(.secondary)
+                    Image(systemName: "chevron.up.chevron.down").foregroundStyle(Color.accentColor)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .popover(isPresented: $picking, arrowEdge: .bottom) { projectPicker }
-            Divider()
-            TextField("", text: $model.title, prompt: Text("Title, e.g. Weekly sync"))
-                .textFieldStyle(.plain).font(.title3)
-                .focused($titleFocus)
-                .padding(.vertical, 4).padding(.horizontal, 6)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.red, lineWidth: titleMissing ? 1.5 : 0))
-                .onChange(of: model.title) { model.scanPrep(); copied = false; if !model.title.isEmpty { titleMissing = false } }
-            if titleMissing {
-                Text("A title is needed: it names the notes, the preparation and the Notion page.")
-                    .font(.caption).foregroundStyle(.red)
+            // 2026-10-27 (owner): optional, but clearly the place to type the call's name.
+            HStack(spacing: 8) {
+                Image(systemName: "pencil").foregroundStyle(Color.accentColor)
+                TextField("", text: $model.title, prompt: Text("Call title, e.g. Weekly sync"))
+                    .textFieldStyle(.plain).font(.title3)
+                    .focused($titleFocus)
+                    .onChange(of: model.title) { model.scanPrep(); copied = false }
             }
+            .padding(.vertical, 8).padding(.horizontal, 10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.10)))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(titleFocus ? Color.accentColor : Color.secondary.opacity(0.25),
+                                                                lineWidth: titleFocus ? 2 : 1))
+            .onTapGesture { titleFocus = true }
             HStack(spacing: 8) {
                 Image(systemName: "calendar").foregroundStyle(.secondary)
                 DatePicker("", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute])
@@ -801,17 +812,24 @@ struct StartCallView: View {
         VStack(alignment: .leading, spacing: 6) {
         HStack(alignment: .center, spacing: 6) {
             Button { model.addFolders() } label: { Label("Add folder", systemImage: "folder.badge.plus") }
-                .controlSize(.small).disabled(model.target.isEmpty)
+                .buttonStyle(LTSoftButtonStyle(small: true)).disabled(model.target.isEmpty)
             ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         if let r = model.root {
                             HStack(spacing: 4) {
-                                Image(systemName: "lock.fill").font(.caption2)
+                                Image(systemName: "folder").font(.caption)
                                 Text((r as NSString).lastPathComponent).font(.caption).lineLimit(1)
+                                    .strikethrough(!model.useProjectFolder)
+                                Button { model.useProjectFolder.toggle() } label: {
+                                    Image(systemName: model.useProjectFolder ? "xmark" : "plus").font(.caption2)
+                                }
+                                .buttonStyle(.plain)
                             }
+                            .foregroundStyle(model.useProjectFolder ? Color.accentColor : .secondary)
                             .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(Color.secondary.opacity(0.18)))
-                            .help("Included: " + r + "\nThe preparation and earlier calls of this project are found here.")
+                            .background(Capsule().fill(model.useProjectFolder ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12)))
+                            .help(model.useProjectFolder ? "The project folder: " + r + "\nIts files and earlier calls are read for the preparation. × leaves it out for this call."
+                                                          : "Left out: the preparation will not read this folder (only the new files are written into its live folder). + brings it back.")
                         }
                         ForEach(model.folders, id: \.self) { f in
                             HStack(spacing: 4) {
@@ -866,14 +884,15 @@ struct StartCallView: View {
         .buttonStyle(.plain)
     }
 
+    // 2026-10-27 (owner): three equal controls, tinted because they are clickable.
     private func pill<C: View>(_ symbol: String, @ViewBuilder _ content: () -> C) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: symbol).foregroundStyle(.secondary)
-            content()
+            Image(systemName: symbol).foregroundStyle(Color.accentColor).frame(width: 18)
+            content().frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: LT.radius).fill(LT.cardFill))
+        .background(RoundedRectangle(cornerRadius: LT.radius).fill(Color.accentColor.opacity(0.10)))
     }
 
     /// One line: found, being written, for another call, or none.
@@ -920,25 +939,24 @@ struct StartCallView: View {
                 Button("Stop") { runner.cancel() }.controlSize(.small)
             }
         } else {
-            HStack(spacing: 8) {
-                Button("Prepare now") {
+            HStack(spacing: 10) {
+                Button { 
                     guard let r = model.prepRequest() else { model.note = "Choose a project first."; return }
                     model.note = runner.start(r) ?? ""
-                }
+                } label: { Label("Prepare now", systemImage: "sparkles") }
+                .buttonStyle(LTSoftButtonStyle())
                 .disabled(model.target.isEmpty || PrepRunner.claudePath == nil || (!runner.useAPI && runner.loggedIn == false))
-                .help("Claude Code builds the preparation here from local files: the documents named in Call context, the project folder, the local Notion mirror, earlier calls and public web links you put in Call context. A few minutes; you can close this window.")
-                Menu("More") {
+                .help("Claude Code builds the preparation here from local files: the documents named in the context, the folders above, the local Notion mirror, earlier calls and public web links in the context. A few minutes; you can close this window.")
+                Menu {
                     Button(copied ? "Copied" : "Copy request for Cowork") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(model.prepPhrase, forType: .string)
                         copied = true
                     }
                     Button("Preparation settings…") { SettingsWindow.show(tab: "ai") }
-                }
-                .menuStyle(.borderlessButton).fixedSize().disabled(model.target.isEmpty)
+                } label: { Text("More") }
+                .menuStyle(.borderlessButton).tint(.accentColor).fixedSize().disabled(model.target.isEmpty)
                 Spacer()
-                Text(runner.useAPI ? "\(runner.model.capitalized) · API key" : "\(runner.model.capitalized) · Claude account")
-                    .font(.caption).foregroundStyle(.secondary)
             }
             if PrepRunner.claudePath == nil {
                 Text("Claude Code is not installed: use More > Copy request for Cowork.").font(.caption).foregroundStyle(.secondary)

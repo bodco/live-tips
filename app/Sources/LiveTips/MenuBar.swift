@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 CallHistory.shared.recordEnd(file: file, title: ce.renamed ?? (ce.callRequest["title"] as? String) ?? "Call",
                                              project: self?.lastStatus.project ?? (root as NSString).lastPathComponent,
                                              lines: n.userInfo?["lines"] as? Int ?? 0, cost: ce.lastCall["tips_usd"] as? Double)
+                SpendDays.add(ce.lastCall["tips_usd"] as? Double ?? 0)
                 self?.finishSwitch()
             }
         }

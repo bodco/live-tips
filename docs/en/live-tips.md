@@ -1176,7 +1176,8 @@ window reads the recorder's status every 0.5 s.
 |---|---|
 | Top | Start call (Plan an upcoming call during a call), Plan a call |
 | Live call | Title, timer, lines, tips, cost; Show tips, End call |
-| Ahead | The calls from the ticked calendars (from 3 h ago to 36 h ahead, declined ones left out) and the Up next calls, by time. Each: time, "in progress" or "in 5 min", repeat mark, project, account and calendar, preparation state, "Same time as ..." when calls overlap. Prepare (sets the call up like the last one of its series and writes the preparation; does not start it), Set up..., Start (Switch... during a call), × (hides the event here; the calendar is not changed) |
+| Ahead | The calls from the ticked calendars (from 3 h ago to 36 h ahead, declined ones left out) and the Up next calls, by time. Each: time, "in progress" or "in 5 min", repeat mark, project, account and calendar, preparation state, "Same time as ..." when calls overlap. Prepare (asks first: the project or workspace and "What matters on this call", filled from the last call of the series; then writes the preparation; does not start the call), Set up..., Start (Switch... during a call), × (hides the event here; the calendar is not changed) |
+| This week | Calls, time on calls, Claude spend (counted by day from 0.6.8 on) and how many calls were prepared, each against last week; minutes per day by project; the longest call, the busiest day, the average call |
 | Recent calls | The last 40 calls (the app's and the skill's transcripts of the last 45 days): Notion, Transcript, Show in Finder, × (hides it from the list; files stay) |
 | Bottom | Claude API key, this month's spend against the limit, a link to the balance in the Anthropic Console (an API key cannot read it), Notion copy, local AI, calendars |
 
@@ -1534,3 +1535,6 @@ address", `references/sweep.md`, `references/presentation.md`).
 79. **One interface language (0.6.7).** Settings > General > Interface language and the tips window switch are one
    setting. Gists, the call picture, service lines in the transcript (call started, microphone muted...) and the
    transcript header follow it; a phrase to say stays in the call's language, the Notion page in the call's language.
+80. **Prepare asks first (0.6.8).** Prepare in Home opens a short form: the project or workspace (no default for a
+   new meeting) and "What matters on this call"; More settings opens the full Start call.
+81. **This week on Home (0.6.8).** Calls, time on calls, Claude spend, prepared calls, minutes per day by project.

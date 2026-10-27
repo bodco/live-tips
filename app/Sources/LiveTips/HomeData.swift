@@ -85,6 +85,8 @@ extension StartCallModel {
             let t = (ev.title + " " + ev.calendar).lowercased()
             if let p = registry.projects.filter({ $0.status != "archived" }).first(where: { t.contains($0.name.lowercased()) || t.contains($0.slug.lowercased()) }) {
                 target = "project:" + p.slug
+            } else {
+                target = ""          // owner: never the last used project by default; Prepare asks
             }
             applyProjectDefaults()
         }
@@ -131,6 +133,8 @@ final class CallHistory: ObservableObject {
         var notionURL: String?
         var costUSD: Double?
         var hidden = false
+        var minutes: Double?       // from the first to the last line of the transcript
+        var prepared: Bool?        // a preparation (<stem>.brief.md) was there
     }
 
     @Published private(set) var records: [Record] = []
@@ -162,6 +166,46 @@ final class CallHistory: ObservableObject {
 
     func setNotion(file: String, url: String) {
         if records.contains(where: { $0.file == file }) { update(file) { $0.notionURL = url } }
+    }
+
+    func addCost(file: String, _ usd: Double) {
+        guard usd > 0, records.contains(where: { $0.file == file }) else { return }
+        update(file) { $0.costUSD = ($0.costUSD ?? 0) + usd }
+    }
+
+    /// Length and preparation of each call, read once from its files (in the background).
+    func fillDetails() {
+        let todo = records.filter { $0.minutes == nil || $0.prepared == nil }.map(\.file)
+        guard !todo.isEmpty else { return }
+        DispatchQueue.global(qos: .utility).async {
+            var found: [String: (Double, Bool)] = [:]
+            for f in todo { found[f] = (Self.duration(of: f), Self.wasPrepared(f)) }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    for (f, v) in found { if let i = self.records.firstIndex(where: { $0.file == f }) { self.records[i].minutes = v.0; self.records[i].prepared = v.1 } }
+                    self.persist()
+                }
+            }
+        }
+    }
+
+    nonisolated static func duration(of file: String) -> Double {
+        guard let text = try? String(contentsOfFile: file, encoding: .utf8) else { return 0 }
+        let re = try? NSRegularExpression(pattern: "^\\[(\\d\\d):(\\d\\d):(\\d\\d)\\]", options: .anchorsMatchLines)
+        let ns = text as NSString
+        let ms = re?.matches(in: text, range: NSRange(location: 0, length: ns.length)) ?? []
+        func secs(_ m: NSTextCheckingResult) -> Int {
+            (1...3).map { Int(ns.substring(with: m.range(at: $0))) ?? 0 }.enumerated().reduce(0) { $0 + $1.element * [3600, 60, 1][$1.offset] }
+        }
+        guard let a = ms.first, let b = ms.last else { return 0 }
+        var d = secs(b) - secs(a)
+        if d < 0 { d += 86400 }
+        return Double(d) / 60
+    }
+
+    nonisolated static func wasPrepared(_ file: String) -> Bool {
+        let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
+        return FileManager.default.fileExists(atPath: stem + ".brief.md")
     }
 
     private func update(_ file: String, _ change: (inout Record) -> Void) {
@@ -217,3 +261,28 @@ final class CallHistory: ObservableObject {
         if added { persist() }
     }
 }
+
+/// 2026-10-27 (owner): Claude spend by day for Home's week (the shared ledger keeps months only). Counted from
+/// 0.6.8 on: the tips of each call, the Notion summary and preparations paid with the API key.
+enum SpendDays {
+    static var path: URL { AppPaths.support.appendingPathComponent("spend-days.json") }
+    static func load() -> [String: Double] {
+        guard let d = try? Data(contentsOf: path), let m = try? JSONDecoder().decode([String: Double].self, from: d) else { return [:] }
+        return m
+    }
+    static func key(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: d) }
+    static func add(_ usd: Double, on day: Date = Date()) {
+        guard usd > 0 else { return }
+        var m = load()
+        m[key(day), default: 0] += usd
+        if let d = try? JSONEncoder().encode(m) { try? d.write(to: path, options: .atomic) }
+    }
+    static func total(from: Date, to: Date) -> Double {
+        let m = load()
+        var sum = 0.0, d = Calendar.current.startOfDay(for: from)
+        while d < to { sum += m[key(d)] ?? 0; d = Calendar.current.date(byAdding: .day, value: 1, to: d) ?? to }
+        return sum
+    }
+}
+
+extension StartCallModel: Identifiable {}

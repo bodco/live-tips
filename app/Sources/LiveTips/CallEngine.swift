@@ -371,7 +371,11 @@ final class CallEngine {
             let d = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] ?? [:]
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                if let c = d["cost_usd"] as? Double, c > 0 { var lc = self.lastCall; lc["notes_usd"] = c; self.lastCall = lc }
+                if let c = d["cost_usd"] as? Double, c > 0 {
+                    var lc = self.lastCall; lc["notes_usd"] = c; self.lastCall = lc
+                    SpendDays.add(c)
+                    MainActor.assumeIsolated { CallHistory.shared.addCost(file: file, c) }
+                }
                 if (d["ok"] as? Bool) == true, let url = d["url"] as? String {
                     self.notionResult = url
                     MainActor.assumeIsolated { CallHistory.shared.setNotion(file: file, url: url) }

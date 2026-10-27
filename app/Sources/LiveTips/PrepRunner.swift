@@ -266,6 +266,7 @@ final class PrepRunner: ObservableObject {
                 guard let self = self, self.process === proc else { return }
                 (proc.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
                 let forID = self.callID
+                if self.useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
                 if ok {
                     self.progress = 1; self.stage = "Done"
                     // QA 26.10: the call may have started while the prep was written: pick up the rest now.

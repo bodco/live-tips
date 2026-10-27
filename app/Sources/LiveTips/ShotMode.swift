@@ -32,13 +32,21 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         try? fm.removeItem(atPath: sup + "/history.json")
         // Recent calls for Home: demo transcripts of the last days.
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-        for (days, hm, slug, title, dir) in [(0, "1000", "orbit-weekly-with-the-client", "Orbit weekly with the client", orbit),
-                                             (1, "1530", "release-checklist-review", "Release checklist review", play),
-                                             (2, "1100", "orbit-pilot-planning", "Orbit pilot planning", orbit)] {
+        for (days, hm, slug, title, dir, len) in [(0, "1000", "orbit-weekly-with-the-client", "Orbit weekly with the client", orbit, 42),
+                                                  (1, "1530", "release-checklist-review", "Release checklist review", play, 25),
+                                                  (2, "1100", "orbit-pilot-planning", "Orbit pilot planning", orbit, 55),
+                                                  (2, "1600", "team-sync", "Team sync", play, 18),
+                                                  (3, "0930", "orbit-kickoff", "Orbit kickoff", orbit, 64)] {
             let d = df.string(from: Date().addingTimeInterval(-Double(days) * 86400 - 3600))
             let f = "\(dir)/live/\(d)-\(hm)-\(slug).app.md"
-            try? "# Live Transcript: \(title)\n\n- Project: demo\n".write(toFile: f, atomically: true, encoding: .utf8)
+            let h = Int(hm.prefix(2)) ?? 10, m = Int(hm.suffix(2)) ?? 0
+            let endM = h * 60 + m + len
+            let body = "# Live Transcript: \(title)\n\n- Project: demo\n\n" + String(format: "[%02d:%02d:05] Me (en): Hello.\n[%02d:%02d:10] Other (en): Thanks, bye.\n", h, m, endM / 60, endM % 60)
+            try? body.write(toFile: f, atomically: true, encoding: .utf8)
+            if days != 2 { try? "# Live Brief: demo\n".write(toFile: String(f.dropLast(3)) + ".brief.md", atomically: true, encoding: .utf8) }
         }
+        let k = DateFormatter(); k.dateFormat = "yyyy-MM-dd"
+        write([k.string(from: Date()): 0.62, k.string(from: Date().addingTimeInterval(-86400)): 0.41, k.string(from: Date().addingTimeInterval(-2 * 86400)): 0.95], sup + "/spend-days.json")
         let cfg: [String: Any] = ["workRoot": work, "appRoot": app, "uiLanguage": "en", "speakersEnabled": true]
         write(cfg, sup + "/config.json")
         var reg = ProjectRegistry()
@@ -157,7 +165,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         if let r = CallHistory.shared.visible.first { CallHistory.shared.setNotion(file: r.file, url: "https://www.notion.so/demo") }
         HomeWindow.show(delegate: AppDelegate())
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
-            if let w = HomeWindow.window { w.setContentSize(NSSize(width: 820, height: 760)) }
+            if let w = HomeWindow.window { w.setContentSize(NSSize(width: 820, height: 1080)) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
                 if let w = HomeWindow.window { capture(w, "home-\(theme)"); w.close(); HomeWindow.window = nil }
                 next()

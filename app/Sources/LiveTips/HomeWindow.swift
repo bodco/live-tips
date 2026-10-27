@@ -38,6 +38,7 @@ struct HomeView: View {
     @State private var status = EngineStatus()
     @State private var note = ""
     @State private var pickCalendars = false
+    @State private var prepSheet: StartCallModel?
 
     private var live: Bool { CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(status.state) }
 
@@ -50,6 +51,7 @@ struct HomeView: View {
                     if live { liveCard }
                     if !note.isEmpty { Text(note).font(.callout).foregroundStyle(.orange) }
                     aheadSection
+                    WeekStats()
                     recentSection
                 }
                 .padding(.horizontal, 28).padding(.vertical, 18)
@@ -59,6 +61,16 @@ struct HomeView: View {
         }
         .frame(minWidth: 640, minHeight: 560)
         .onAppear { tick(); cal.refresh(); history.scan() }
+        .sheet(item: $prepSheet) { m in
+            PrepareSheet(model: m, onPrepare: {
+                upnext.save(m)
+                note = upnext.prepare(m) ?? ""
+                prepSheet = nil
+            }, onCancel: { prepSheet = nil }, onMore: {
+                prepSheet = nil
+                StartCallWindow.show(delegate: app, prepared: m)
+            })
+        }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in tick() }
     }
 
@@ -233,11 +245,9 @@ struct HomeView: View {
         return m
     }
 
+    /// Asks first: the project or workspace and what matters on this call (PrepareSheet).
     private func prepare(_ r: Ahead) {
-        let m = model(for: r)
-        guard !m.target.isEmpty else { StartCallWindow.show(delegate: app, prepared: m); return }
-        upnext.save(m)
-        note = upnext.prepare(m) ?? ""
+        prepSheet = model(for: r)
     }
 
     private func start(_ r: Ahead) {

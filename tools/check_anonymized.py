@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 GENERIC = [
-    (r"/Users/(?!you\b|me\b|example\b)[A-Za-z0-9._-]+", "absolute macOS user path"),
+    (r"/Users/(?!you\b|me\b|example\b|Shared\b)[A-Za-z0-9._-]+", "absolute macOS user path"),
     (r"sk-ant-[A-Za-z0-9_-]{8,}", "Anthropic key"),
     (r"ntn_[A-Za-z0-9]{20,}|secret_[A-Za-z0-9]{30,}", "Notion token"),
     (r"(?<![0-9a-f])[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}(?![0-9a-f])", "UUID (Notion or other ID)"),

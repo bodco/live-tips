@@ -2384,10 +2384,37 @@ class VoiceLibrary:
         self.remember = remember
         self.load()
 
+    # 2026-10-27 (owner): two separate things per person. "side": team (ours) or client (the other side);
+    # "where": the calls the voice is suggested on, "all" or any number of "project:<slug>" and
+    # "workspace:<name>". Older entries keep working: their "scope" is read as side + where.
+    @staticmethod
+    def side_of(p: dict) -> str:
+        if p.get("side") in ("team", "client"):
+            return p["side"]
+        sc = p.get("scope") or ""
+        return "team" if sc == "team" else ("client" if sc else "")
+
+    @staticmethod
+    def where_of(p: dict) -> list:
+        w = p.get("where")
+        if isinstance(w, list) and w:
+            return [str(x) for x in w]
+        sc = p.get("scope") or ""
+        return ["all"] if (not sc or sc == "team") else [sc]
+
+    @staticmethod
+    def legacy_scope(side: str, where: list) -> str:
+        if "all" in where:
+            return "team" if side == "team" else ""
+        return where[0] if where else ""
+
     def visible(self, name: str) -> bool:
-        sc = (self.people.get(name) or {}).get("scope")
-        return (not sc or sc == "team" or (bool(self.project) and sc == "project:" + self.project)
-                or (bool(self.workspace) and sc.casefold() == "workspace:" + self.workspace))
+        w = [x.casefold() for x in self.where_of(self.people.get(name) or {})]
+        return ("all" in w or (bool(self.project) and ("project:" + self.project).casefold() in w)
+                or (bool(self.workspace) and ("workspace:" + self.workspace) in w))
+
+    def side(self, name: str) -> str:
+        return self.side_of(self.people.get(name) or {})
 
     def scope_for(self, name: str) -> str:
         if name.strip().lower() in self.team or not self.project:
@@ -2416,6 +2443,10 @@ class VoiceLibrary:
                 self.people[str(name)] = {"embeddings": embs, "updated": p.get("updated"), "calls": calls}
                 if p.get("scope"):
                     self.people[str(name)]["scope"] = str(p["scope"])
+                if p.get("side") in ("team", "client"):
+                    self.people[str(name)]["side"] = p["side"]
+                if isinstance(p.get("where"), list) and p["where"]:
+                    self.people[str(name)]["where"] = [str(x) for x in p["where"]]
         self._merge_short()
         self._cents()
 
@@ -2432,8 +2463,12 @@ class VoiceLibrary:
                 continue
             key = short_name(names[0])
             embs, calls, scopes, upd = [], 0, [], None
+            sides, wheres = [], []
             for n in names:
                 p = self.people.pop(n)
+                if self.side_of(p):
+                    sides.append(self.side_of(p))
+                wheres += [x for x in self.where_of(p) if x not in wheres]
                 embs += p["embeddings"]
                 calls = max(calls, int(p.get("calls") or 0))
                 if p.get("scope"):
@@ -2442,6 +2477,10 @@ class VoiceLibrary:
             self.people[key] = {"embeddings": prune_embeddings(embs, self.MAX), "updated": upd, "calls": calls}
             if scopes:
                 self.people[key]["scope"] = "team" if "team" in scopes else scopes[0]
+            if sides:
+                self.people[key]["side"] = "team" if "team" in sides else sides[0]
+            if wheres:
+                self.people[key]["where"] = ["all"] if "all" in wheres else wheres
 
     def _cents(self) -> None:
         self.cents = {}
@@ -2469,7 +2508,7 @@ class VoiceLibrary:
         return [k for k, _ in sorted(self.people.items(), key=lambda kv: (-int(kv[1].get("calls") or 0), kv[0]))
                 if self.visible(k)][:n]
 
-    def apply_call(self, prev: dict, desired: dict) -> None:
+    def apply_call(self, prev: dict, desired: dict, sides: dict | None = None) -> None:
         """Replace this call's earlier contribution (prev: name -> embeddings) with `desired`.
         A rename moves the call's embeddings from the old name to the new one."""
         stamp = dt.datetime.now().astimezone().isoformat(timespec="seconds")
@@ -2486,15 +2525,15 @@ class VoiceLibrary:
             if not new:
                 self.people.pop(name, None)
                 continue
-            scope = p.get("scope") or self.scope_for(name)
-            if name in desired and scope != "team" and self.scope_for(name) == "team":
-                scope = "team"            # named from the team roster: the team is global
-            elif name in desired and scope.startswith("project:") and self.project and scope != "project:" + self.project:
-                # The same person on two projects' calls: inside one workspace they become the workspace's
-                # (QA 26.10: a workspace call promoted a client to the whole team), otherwise everyone's.
-                scope = ("workspace:" + self.workspace) if self.workspace else "team"
+            known = name in self.people
+            side = (sides or {}).get(name) or self.side_of(p) or ("team" if self.scope_for(name) == "team" else "client")
+            where = self.where_of(p) if known else (["all"] if (side == "team" or not self.project) else ["project:" + self.project])
+            if name in desired and known and self.project and not self.visible(name):
+                # 2026-10-27 (owner): the same person on another project's call: that project is added,
+                # nobody is promoted to "all projects" by themselves any more.
+                where = where + ["project:" + self.project]
             self.people[name] = {"embeddings": prune_embeddings(new, self.MAX), "updated": stamp, "calls": calls,
-                                 "scope": scope}
+                                 "side": side, "where": where, "scope": self.legacy_scope(side, where)}
         self._cents()
 
     def save(self) -> None:
@@ -2739,7 +2778,7 @@ class SpeakerTracker:
         sid = f"S{self.next_n}"
         self.next_n += 1
         self.clusters[sid] = {"name": name, "members": [], "centroid": None, "seconds": 0.0,
-                              "first": None, "quotes": [], "suggestions": []}
+                              "first": None, "quotes": [], "suggestions": [], "side": None}
         self.rev += 1
         return sid
 
@@ -2892,6 +2931,30 @@ class SpeakerTracker:
             text = "…" + (cut.split(" ", 1)[1] if " " in cut[:30] else cut)
         return t, text
 
+    def _roster_side(self, name: str) -> str:
+        team = {short_name(x).casefold() for x in (self.cfg.get("people_team") or []) if _s(x).strip()}
+        return "team" if short_name(name).casefold() in team else ""
+
+    def _roster(self) -> list[dict]:
+        """2026-10-27 (owner): the people to pick from on this call, with their side: this call's participants
+        and the project's people (start.json), then the voice library visible on this project; no duplicates."""
+        out, seen = [], set()
+
+        def add(name, side):
+            k = short_name(name).casefold() if name else ""
+            if k and k not in seen:
+                seen.add(k)
+                out.append({"name": name, "side": side or None})
+        for c in self.clusters.values():
+            if c["name"]:
+                add(c["name"], c.get("side") or (self.lib.side(c["name"]) if self.lib is not None else "") or self._roster_side(c["name"]))
+        for x in list(self.participants or []) + list(self.people or []):
+            add(x, (self.lib.side(x) if self.lib is not None and x in self.lib.people else "") or self._roster_side(x))
+        if self.lib is not None:
+            for name in self.lib.frequent(40):
+                add(name, self.lib.side(name))
+        return out[:60]
+
     def known_names(self, n: int = 8) -> list[str]:
         """Names offered on a "Who is speaking?" card: `people` from start.json not yet named in
         this call, then names already used in this call (to merge), then frequent library names."""
@@ -3027,7 +3090,13 @@ class SpeakerTracker:
         v = _s(value)
         with self.lock:
             changed = False
-            if key == "speaker_name":
+            if key == "speaker_side":                   # "S2|team" or "S2|client" (2026-10-27)
+                sid, _, side = v.partition("|")
+                sid = self.resolve(sid.strip())
+                if sid in self.clusters and side.strip() in ("team", "client"):
+                    self.clusters[sid]["side"] = side.strip()
+                    changed = True
+            elif key == "speaker_name":
                 sid, sep, raw = v.partition("|")          # split on the first "|" only
                 sid = self.resolve(sid.strip())
                 if sid not in self.clusters or not sep:
@@ -3121,10 +3190,12 @@ class SpeakerTracker:
             good = [m for m in c["members"] if m["emb"] is not None and m["dur"] >= self._f("speaker_new_min_s")]
             good = good or [m for m in c["members"] if m["emb"] is not None]
             desired.setdefault(c["name"], []).extend(_round_emb(m["emb"]) for m in good[-10:])
-        if desired == self.lib_added:
+        sides = {c["name"]: c.get("side") for c in self.clusters.values() if c["name"] and c.get("side")}
+        if desired == self.lib_added and sides == getattr(self, "lib_sides", {}):
             return
         try:
-            self.lib.apply_call(self.lib_added, desired)
+            self.lib.apply_call(self.lib_added, desired, sides)
+            self.lib_sides = sides
             self.lib.save()
             self.lib_added = desired
         except Exception as e:  # noqa: BLE001
@@ -3137,9 +3208,12 @@ class SpeakerTracker:
             for sid in sorted(self.clusters, key=lambda s: int(s[1:])):
                 c = self.clusters[sid]
                 t, q = self._quote(c) if c["quotes"] else (None, "")
+                side = c.get("side") or (self.lib.side(c["name"]) if (self.lib is not None and c["name"]) else "") or \
+                    (self._roster_side(c["name"]) if c["name"] else "")
                 cl[sid] = {"name": c["name"], "seconds": round(c["seconds"], 1), "first": c["first"],
-                           "last_quote": {"t": t, "text": q} if t else None, "suggestions": list(c["suggestions"])}
-            return {"clusters": cl, "overrides": dict(self.overrides), "merged": dict(self.merged),
+                           "last_quote": {"t": t, "text": q} if t else None, "suggestions": list(c["suggestions"]),
+                           "side": side or None}
+            return {"clusters": cl, "roster": self._roster(), "overrides": dict(self.overrides), "merged": dict(self.merged),
                     "skipped": sorted(self.skipped), "rev": self.rev, "updated": hhmmss(now())}
 
     def _save(self) -> None:
@@ -3899,7 +3973,7 @@ def main() -> int:
             elif key == "tip_feedback":
                 if sem_live is not None:
                     sem_live.note_feedback(val)
-            elif key in ("speaker_name", "speaker_merge", "speaker_fix", "speaker_skip"):
+            elif key in ("speaker_name", "speaker_merge", "speaker_fix", "speaker_skip", "speaker_side"):
                 if tracker is not None and tracker.apply_setting(key, val):
                     log(f"speakers: {key}={val}")
                     changed = True

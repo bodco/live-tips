@@ -1144,7 +1144,7 @@ menu bar: **Send last call to Notion**.
    counts).
 3. Found: it appends a **Live Tips** section to that page. Not found: it creates a new page with
    the project and workspace relations and a real date mention in the title, like the skill.
-4. The transcript is attached to the page as `<call>-transcript.md`.
+4. The transcript goes into a child page of the meeting page ("Transcript (Live Tips) · <call>"), one line per paragraph; the file stays in the project's `live/` folder.
 
 What it needs:
 
@@ -1438,3 +1438,14 @@ address", `references/sweep.md`, `references/presentation.md`).
    included (click the name), and deleted (hover the time, click twice). The edits are applied to the
    transcript file after the call, so the Notion page and the wrap-up use them. The transcript button
    is readable in the light theme.
+69. **Speakers with a side (0.6.3).** Each person in the voice library has a side, Team (ours) or Client,
+   and the calls they are suggested on: all projects, whole workspaces or several projects (Settings >
+   AI > Voice library, two menus). A person heard on another project's call gets that project added
+   instead of being moved to "all projects". The transcript tab shows who has spoken so far: name each
+   voice (pick from this call's people, the project's people and the library, or type a new name) and
+   set Team or Client; it is saved with the voice.
+70. **Transcript in Notion as a page (0.6.3).** The meeting page gets a child page with the whole
+   transcript (one line per paragraph, time and speaker in bold) instead of an attached .md file. The
+   transcript file itself stays in the project's `live/` folder.
+71. **New call from the tips window (0.6.3).** When a call ends, "Ended ✓" keeps its shape and a "New call"
+   button closes the window and opens Start call.

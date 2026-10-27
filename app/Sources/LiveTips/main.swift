@@ -157,6 +157,14 @@ func prompterArgs(_ args: [String]) -> PrompterArgs {
 }
 
 let args = CommandLine.arguments
+if let i = args.firstIndex(of: "--shots") {
+    ShotMode.prepareDemo()
+    let app = NSApplication.shared
+    let d = MainActor.assumeIsolated { ShotMode(out: URL(fileURLWithPath: i + 1 < args.count ? args[i + 1] : NSTemporaryDirectory() + "livetips-shots")) }
+    app.delegate = d
+    app.setActivationPolicy(.regular)
+    app.run()
+}
 if args.contains("--prompter") || args.contains("--prompter-demo") {
     let app = NSApplication.shared
     let d = PrompterAppDelegate(pargs: prompterArgs(args))

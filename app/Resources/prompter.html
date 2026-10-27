@@ -378,6 +378,17 @@
     border-bottom: 1px solid var(--line); -webkit-user-select: none; user-select: none; }
   #tr-top .grow { flex: 1 1 0; }
   #tr-n { color: var(--muted); font-size: 12px; }
+  #tr-spk { border-bottom: 1px solid var(--line); padding: 4px 12px 6px; font-size: 12.5px; }
+  #tr-spk summary { cursor: pointer; color: var(--muted); padding: 4px 0; }
+  #tr-spk-n { color: var(--muted); }
+  .sprow { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+  .sprow .sl { width: 74px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  .sprow input { flex: 1 1 auto; min-width: 0; font: inherit; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: inherit; }
+  .sprow .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; flex: none; }
+  .sprow .seg button { font: inherit; font-size: 11.5px; border: 0; padding: 3px 8px; background: none; color: var(--muted); cursor: pointer; }
+  .sprow .seg button.on { background: var(--blue-bg); color: var(--blue); font-weight: 600; }
+  .sprow .seg button.on.cl { background: var(--orange-bg, rgba(255,149,0,.15)); color: var(--orange, #c76a00); }
+  #tr-spk .hint { color: var(--muted); padding: 2px 0 4px; }
   #tr-list { flex: 1 1 0; overflow-y: auto; padding: 6px 12px 12px; font-size: 13px; line-height: 1.45; }
   .trl { padding: 2px 0; }
   .trl .tt { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 6px;
@@ -574,6 +585,7 @@
     <button id="tr-clear" class="dk-b" type="button" data-i18n="spk_clear" data-i18n-title="spk_clear_tt">Clear speakers</button>
     <button id="tr-follow" class="dk-b" type="button" aria-pressed="true" data-i18n="tr_follow" data-i18n-title="tr_follow_tt">Follow</button>
   </div>
+  <details id="tr-spk" open><summary><span data-i18n="spk_sum">Speakers</span> <span id="tr-spk-n"></span></summary><div id="tr-spk-list"></div><datalist id="tr-roster"></datalist></details>
   <div id="tr-list"></div>
   <div id="trmenu" role="dialog"></div>
 </div>
@@ -973,6 +985,8 @@
       onme: 'On me', onme_tt: 'On you from this call: questions to you not answered yet, then what you took on in your own words or were asked by name. Other people\'s tasks are not here. Click to fold',
       tr_who_tt: 'Wrong speaker? Click to give this line to someone else or rename the speaker',
       tr_move: 'This line is',
+      spk_sum: 'Speakers', spk_who_ph: 'Who is it? Pick or type a name', side_team: 'Team', side_client: 'Client',
+      spk_none: 'No other voices yet (speaker identification: Settings > AI).',
       tr_del_tt: 'Delete this line from the transcript (click twice)', tr_del_confirm: 'Click again to delete', tr_deleted: 'Line {t} deleted from the transcript',
       tr_other_ph: 'Someone else: type a name, Enter',
       tr_rename: 'Rename {a} in every line',
@@ -1279,6 +1293,8 @@
       onme: 'На мені', onme_tt: 'Що на тобі з цього дзвінка: питання до тебе, на які ще немає відповіді, далі те, що ти взяв на себе своїми словами або що тобі доручили на імʼя. Чужих задач тут немає. Клік згортає',
       tr_who_tt: 'Не той спікер? Клікни, щоб віддати репліку іншому або перейменувати спікера',
       tr_move: 'Цю репліку сказав',
+      spk_sum: 'Спікери', spk_who_ph: 'Хто це? Обери або впиши імʼя', side_team: 'Команда', side_client: 'Клієнт',
+      spk_none: 'Інших голосів ще немає (розпізнавання спікерів: Settings > AI).',
       tr_del_tt: 'Видалити репліку з транскрипту (два кліки)', tr_del_confirm: 'Клікни ще раз, щоб видалити', tr_deleted: 'Репліку {t} видалено з транскрипту',
       tr_other_ph: 'Хтось інший: введи імʼя, Enter',
       tr_rename: 'Перейменувати {a} в усіх репліках',
@@ -2246,16 +2262,55 @@
   window.setSpeakers = function (d) {
     if (!d || typeof d !== 'object') return;
     var cl = d.clusters || {};
+    spkRoster = Array.isArray(d.roster) ? d.roster : spkRoster;
     for (var sid in cl) {
       if (!spk[sid]) spk[sid] = { name: null };
       spk[sid].name = cl[sid] && cl[sid].name ? cleanName(cl[sid].name) : null;
+      spk[sid].side = cl[sid] && cl[sid].side ? cl[sid].side : (spk[sid].sidePending || null);
+      spk[sid].seconds = cl[sid] && cl[sid].seconds || 0;
       if (spk[sid].name) dropAsk(sid);
     }
     var mg = d.merged || {};
     for (var a in mg) spkMerged[a] = mg[a];
     trOver = d.overrides || {};
-    renderChip(); trRender();
+    renderChip(); trRender(); renderSpkSummary();
   };
+  // 2026-10-27 (owner): who has spoken so far, who they are and which side, editable from the transcript tab.
+  var spkRoster = [];
+  function renderSpkSummary() {
+    var box = $('tr-spk-list'); if (!box) return;
+    var sids = Object.keys(spk).filter(function (k) { return rootSid(k) === k && (spk[k].seconds || 0) > 0; })
+      .sort(function (a, b) { return (parseInt(a.slice(1), 10) || 0) - (parseInt(b.slice(1), 10) || 0); });
+    $('tr-spk-n').textContent = sids.length ? '(' + sids.length + ')' : '';
+    $('tr-roster').innerHTML = spkRoster.map(function (p) {
+      return '<option value="' + esc(p.name) + '">' + esc(p.side === 'team' ? t('side_team') : p.side === 'client' ? t('side_client') : '') + '</option>'; }).join('');
+    var act = document.activeElement, keep = act && act.closest && act.closest('#tr-spk-list') ? act.getAttribute('data-sid') : null;
+    if (keep) return;                      // do not redraw under the PM's typing
+    box.innerHTML = sids.length ? sids.map(function (k) {
+      var sd = spk[k].side || '';
+      return '<div class="sprow" data-sid="' + esc(k) + '"><span class="sl">' + esc(t('spk_label', { n: sidNum(k) })) + '</span>' +
+        '<input type="text" list="tr-roster" data-sid="' + esc(k) + '" maxlength="' + NAME_MAX + '" value="' + esc(spk[k].name || '') + '" placeholder="' + esc(t('spk_who_ph')) + '">' +
+        '<span class="seg"><button type="button" data-side="team" class="' + (sd === 'team' ? 'on' : '') + '">' + esc(t('side_team')) + '</button>' +
+        '<button type="button" data-side="client" class="' + (sd === 'client' ? 'on cl' : '') + '">' + esc(t('side_client')) + '</button></span></div>';
+    }).join('') : '<div class="hint">' + esc(t('spk_none')) + '</div>';
+  }
+  $('tr-spk-list').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-side]'); if (!b) return;
+    var k = b.closest('.sprow').getAttribute('data-sid'), side = b.getAttribute('data-side');
+    spk[k].side = side; spk[k].sidePending = side;
+    spkSet('speaker_side', k + '|' + side); renderSpkSummary();
+  });
+  $('tr-spk-list').addEventListener('change', function (e) {
+    var inp = e.target; if (inp.tagName !== 'INPUT') return;
+    var k = inp.getAttribute('data-sid'), v = cleanName(inp.value);
+    if (v && v !== spk[k].name) {
+      nameSpeaker(k, v);
+      var r = spkRoster.filter(function (p) { return p.name.toLowerCase() === v.toLowerCase(); })[0];
+      if (r && r.side && !spk[k].side) { spk[k].side = r.side; spkSet('speaker_side', k + '|' + r.side); }
+    }
+    inp.blur(); setTimeout(renderSpkSummary, 50);
+  });
+  $('tr-spk-list').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.target.dispatchEvent(new Event('change', { bubbles: true })); });
 
   // ---------- call picture from the engine (2026-10-26) ----------
   var sit = null, cardSeen = {}, onmeKnown = {};
@@ -2282,7 +2337,7 @@
       rows.push({ k: 'a:' + (a.what || ''), cls: 'ask', html: ICONS.ask + ' ' + esc(a.what || '') + (a.who ? ' <span class="who">· ' + esc(a.who) + '</span>' : '') });
     });
     (s.actions || []).forEach(function (a) {
-      rows.push({ k: 'm:' + (a.what || ''), cls: 'act', html: ICONS.check + ' ' + esc(a.what || '') + (a.due ? ' <span class="who">· ' + esc(a.due) + '</span>' : '') +
+      rows.push({ k: 'm:' + (a.what || ''), cls: 'mine', html: ICONS.check + ' ' + esc(a.what || '') + (a.due ? ' <span class="who">· ' + esc(a.due) + '</span>' : '') +
         (a.from && a.from !== 'PM' ? ' <span class="who">· ' + esc(a.from) + '</span>' : '') });
     });
     ul.innerHTML = rows.map(function (r) { var isNew = !onmeKnown[r.k]; onmeKnown[r.k] = 1;

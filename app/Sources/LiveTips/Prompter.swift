@@ -174,7 +174,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             lastStatus = s
             push("window.setStatus(" + s + ")")
             if let d = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] {
-                startButton?.isHidden = (d["state"] as? String) != "standby"
+                if !callEnded { startButton?.isHidden = (d["state"] as? String) != "standby" }
                 if let f = d["file"] as? String, !f.isEmpty, f != transcriptPath {
                     transcriptPath = f
                     transcript = TailReader(path: f)
@@ -348,6 +348,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     /// "End call" in the window's title bar: stops the recording; the transcript and tips stay in the project folder.
     var endButton: NSButton?
+    var callEnded = false
     var startButton: NSButton?
 
     @objc func startClicked() {
@@ -368,6 +369,15 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let size = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
         b.frame = NSRect(x: 0, y: 0, width: ceil(size.width) + 24, height: 22)
         return b
+    }
+
+    func restylePill(_ b: NSButton, _ title: String, color: NSColor) {
+        let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        b.attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: color, .font: font])
+        b.layer?.backgroundColor = color.withAlphaComponent(0.18).cgColor
+        let w = ceil((title as NSString).size(withAttributes: [.font: font]).width) + 24
+        let right = b.frame.maxX
+        b.frame = NSRect(x: max(0, right - w), y: b.frame.origin.y, width: w, height: 22)
     }
 
     func addEndCallButton() {
@@ -391,6 +401,11 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         endButton = b
     }
 
+    @objc func newCallClicked() {
+        window.close()
+        (NSApp.delegate as? AppDelegate)?.startCall()
+    }
+
     @objc func endCallClicked() {
         // 2026-10-26: End call did nothing on a live call. The app had lost track of the recorder
         // process, and a modal alert can open behind this floating window. Now: the recorder's own
@@ -408,7 +423,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             MainActor.assumeIsolated {
                 let owned = CallEngine.shared.isRunning
                 CallEngine.shared.stop()
-                self?.endButton?.title = "Ending..."
+                if let b = self?.endButton { self?.restylePill(b, "Ending...", color: .systemRed) }
                 self?.endButton?.isEnabled = false
                 if !owned {
                     CallEngine.shared.finishOrphan { file, saved in
@@ -423,10 +438,24 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     /// (2026-10-23: "I was afraid to close the app before it finished the call").
     func showCallEnded(_ info: [AnyHashable: Any]) {
         let saved = info["saved"] as? Bool ?? false
-        endButton?.title = saved ? "Ended ✓" : "Ended"
-        endButton?.bezelColor = saved ? .systemGreen : .systemOrange
-        endButton?.isEnabled = true            // a click now closes the window
-        endButton?.sizeToFit()
+        if let b = endButton {                  // 2026-10-27: same pill style, green when saved (sizeToFit broke the shape)
+            restylePill(b, saved ? "Ended ✓" : "Ended", color: saved ? .systemGreen : .systemOrange)
+            b.isEnabled = true                  // a click now closes the window
+            b.toolTip = "Close this window"
+        }
+        // 2026-10-27 (owner): start the next call from here: closes this window and opens Start call.
+        if let g = startButton {
+            callEnded = true
+            restylePill(g, "New call", color: .controlAccentColor)
+            let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+            g.attributedTitle = NSAttributedString(string: "New call", attributes: [.foregroundColor: NSColor.white, .font: font])
+            g.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+            if let b = endButton { g.frame.origin.x = max(0, b.frame.minX - 6 - g.frame.width) }
+            g.action = #selector(newCallClicked)
+            g.target = self
+            g.toolTip = "Close this window and open Start call"
+            g.isHidden = false
+        }
         let file = ((info["file"] as? String ?? "") as NSString).lastPathComponent
         let lines = info["lines"] as? Int ?? 0
         let f = DateFormatter(); f.dateFormat = "HH:mm:ss"

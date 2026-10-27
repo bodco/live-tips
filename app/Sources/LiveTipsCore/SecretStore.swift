@@ -13,6 +13,8 @@ public struct SecretStore {
     public init(service: String) { self.service = service }
 
     public func get(_ key: Key) -> String? {
+        // Screenshot mode (demo data) never touches the Keychain: no prompt, and no real key on a picture.
+        if ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"] != nil { return nil }
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                 kSecAttrAccount as String: key.rawValue, kSecReturnData as String: true,
                                 kSecMatchLimit as String: kSecMatchLimitOne]
@@ -23,6 +25,7 @@ public struct SecretStore {
 
     @discardableResult
     public func set(_ key: Key, _ value: String) -> Bool {
+        if ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"] != nil { return false }
         let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                    kSecAttrAccount as String: key.rawValue]
         let data = Data(value.utf8)

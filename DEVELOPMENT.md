@@ -153,3 +153,18 @@ local ledger. At the hard limit model tips stop and only the local layer runs.
 Audio and voice prints never leave the Mac. Only text goes to the model API. Keys are read at
 runtime (Keychain in the app, an environment variable or a secrets file in the spike) and are
 never printed or logged.
+
+## Screenshots for the website
+
+The pictures on the Live Tips pages are made by the app itself, on demo data:
+
+```bash
+"/Applications/Live Tips.app/Contents/MacOS/LiveTips" --shots ~/Desktop/livetips-shots
+```
+
+It writes the demo projects (Orbit SaaS Launch, Internal Delivery Playbook in the Northwind Studio
+workspace) and demo voices to `/Users/Shared/LiveTipsDemo`, never reads your own projects or the
+Keychain, opens Start call, Settings (General, Notion, AI, Projects), the tips window and the
+presentation mode, and saves each as `<name>-dark.png` and `<name>-light.png` at 2x. Convert them to
+WebP and put them in the website's `public/live-tips/shots/`. Run it again after every visible change
+in the app, so the site always shows the current windows.

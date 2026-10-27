@@ -179,6 +179,45 @@ def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "
 
 
 # ---------------------------------------------------------------- Notion
+LINE_RX = re.compile(r"^\[(\d\d:\d\d:\d\d)\] (.+?) \(([\w+-]+)\): (.*)$")
+
+
+def transcript_blocks(text: str) -> list:
+    """The transcript as Notion blocks (2026-10-27, owner: a page, not a file): one paragraph per line with
+    the time and the speaker in bold, headings and markers kept."""
+    out = []
+    for raw in text.splitlines():
+        ln = raw.strip()
+        if not ln:
+            continue
+        m = LINE_RX.match(ln)
+        if m:
+            who = m.group(1) + " " + m.group(2) + ": "
+            out.append({"type": "paragraph", "paragraph": {"rich_text": [
+                {"type": "text", "text": {"content": who}, "annotations": {"bold": True}}] + rt(m.group(4))}})
+        elif ln.startswith("# "):
+            out.append(h(2, ln[2:]))
+        elif ln.startswith("## "):
+            out.append(h(3, ln[3:]))
+        elif ln.startswith("---") and ln.endswith("---"):
+            out.append({"type": "paragraph", "paragraph": {"rich_text": [
+                {"type": "text", "text": {"content": ln.strip("- ")}, "annotations": {"italic": True, "color": "gray"}}]}})
+        else:
+            out.append(para(ln))
+    return out
+
+
+def transcript_page(parent_id: str, title: str, text: str) -> dict:
+    """A child page under the meeting page holding the whole transcript."""
+    blocks = transcript_blocks(text)
+    p = notion("POST", "/pages", {"parent": {"type": "page_id", "page_id": parent_id},
+                                  "properties": {"title": {"title": rt(title)}},
+                                  "icon": {"type": "emoji", "emoji": "📝"},
+                                  "children": blocks[:90]})
+    append(p["id"], blocks[90:])
+    return p
+
+
 def upload_md(name: str, text: str) -> str:
     fu = notion("POST", "/file_uploads", {"filename": name, "content_type": "text/markdown"})
     boundary = "----lt" + uuid.uuid4().hex
@@ -291,7 +330,6 @@ def main(argv=None) -> int:
             print(json.dumps({"ok": True, "dry_run": True, "name": w.get("name"), "summary": w.get("summary"),
                               "blocks": len(blocks), "ids": ids}, ensure_ascii=False))
             return 0
-        up = upload_md(fname, plain)
         hhmm = dt.datetime.now().strftime("%H:%M")
         res["cost_usd"] = w.get("_cost")
         if w.get("_cost"):   # into the same monthly ledger as the tips
@@ -324,7 +362,8 @@ def main(argv=None) -> int:
             if upd:
                 notion("PATCH", f"/pages/{page['id']}", {"properties": upd})
             append(page["id"], [h(2, TXT[lang]["append"].format(hhmm=hhmm)), para(w.get("summary", ""))] + blocks
-                   + [h(3, TXT[lang]["tr_app"]), file_block(up, fname)])
+                   + [h(3, TXT[lang]["tr_app"])])
+            transcript_page(page["id"], TXT[lang]["tr_app"] + " · " + info["title"], plain)
             res.update(ok=True, url=page.get("url"))
         else:
             start = info["start"]
@@ -340,7 +379,8 @@ def main(argv=None) -> int:
             props.update(links({}))
             p = notion("POST", "/pages", {"parent": {"type": "data_source_id", "data_source_id": ids["meetings_db"]},
                                           "properties": props,
-                                          "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"]), file_block(up, fname)]})
+                                          "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])]})
+            transcript_page(p["id"], TXT[lang]["transcript"] + " · " + name, plain)
             res.update(ok=True, url=p.get("url"), created=True)
     except Exception as e:  # noqa: BLE001
         res["error"] = f"{type(e).__name__}: {e}"[:600]

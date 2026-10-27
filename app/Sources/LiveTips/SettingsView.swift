@@ -5,7 +5,9 @@ import SwiftUI
 
 enum AppPaths {
     static var support: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("LiveTips")
+        // Screenshot mode (--shots) runs on demo data in its own folder, never on the PM's projects.
+        if let d = ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"], !d.isEmpty { return URL(fileURLWithPath: d) }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("LiveTips")
     }
     static var config: URL { support.appendingPathComponent("config.json") }
     static var projects: URL { support.appendingPathComponent("projects.json") }
@@ -95,7 +97,18 @@ final class SettingsModel: ObservableObject {
     @Published var mirrorNote = ""
 
     // Voice library (<app folder>/voices/voices.json): team voices for every project, clients per project (D3).
-    struct Voice: Identifiable { let name: String; let scope: String; let calls: Int; var id: String { name } }
+    /// 2026-10-27 (owner): side (our team or the client's) and where (all projects, workspaces, projects) are separate.
+    struct Voice: Identifiable { let name: String; let side: String; let wherer: [String]; let calls: Int; var id: String { name } }
+    static func side(of p: [String: Any]) -> String {
+        if let s = p["side"] as? String, s == "team" || s == "client" { return s }
+        let sc = (p["scope"] as? String) ?? ""
+        return sc == "team" ? "team" : (sc.isEmpty ? "" : "client")
+    }
+    static func whereOf(_ p: [String: Any]) -> [String] {
+        if let w = p["where"] as? [String], !w.isEmpty { return w }
+        let sc = (p["scope"] as? String) ?? ""
+        return (sc.isEmpty || sc == "team") ? ["all"] : [sc]
+    }
     @Published var voices: [Voice] = []
     var voicesPath: String { (CallEngine.shared.appRoot as NSString).appendingPathComponent("voices/voices.json") }
     func loadVoices() {
@@ -104,8 +117,8 @@ final class SettingsModel: ObservableObject {
               let people = o["people"] as? [String: Any] else { voices = []; return }
         voices = people.compactMap { k, v in
             guard let p = v as? [String: Any] else { return nil }
-            return Voice(name: k, scope: (p["scope"] as? String) ?? "", calls: (p["calls"] as? Int) ?? 0)
-        }.sorted { ($0.scope, $0.name) < ($1.scope, $1.name) }
+            return Voice(name: k, side: Self.side(of: p), wherer: Self.whereOf(p), calls: (p["calls"] as? Int) ?? 0)
+        }.sorted { ($0.side == "team" ? 0 : 1, $0.name) < ($1.side == "team" ? 0 : 1, $1.name) }
     }
     /// Removes one person's voice prints (not during a call: the recorder writes the file then).
     func forgetVoice(_ name: String) {
@@ -116,6 +129,46 @@ final class SettingsModel: ObservableObject {
         o["people"] = people
         if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
         loadVoices()
+    }
+    static func whereLabel(_ w: [String]) -> String {
+        if w.contains("all") { return "All projects" }
+        let parts = w.map { x -> String in
+            if x.hasPrefix("project:") { return String(x.dropFirst(8)) }
+            if x.hasPrefix("workspace:") { return "workspace " + String(x.dropFirst(10)) }
+            return x
+        }
+        return parts.isEmpty ? "Nowhere" : parts.joined(separator: ", ")
+    }
+    var voiceWheres: [(tag: String, label: String)] {
+        var out: [(String, String)] = [("all", "All projects")]
+        for w in registry.workspaces { out.append(("workspace:" + w.name, "Workspace " + w.name + " (all its projects)")) }
+        for p in registry.projects where p.status != "archived" { out.append(("project:" + p.slug, "Project " + p.name)) }
+        return out
+    }
+    private func editVoice(_ name: String, _ change: (inout [String: Any]) -> Void) {
+        guard !CallEngine.shared.isRunning, let d = try? Data(contentsOf: URL(fileURLWithPath: voicesPath)),
+              var o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              var people = o["people"] as? [String: Any], var p = people[name] as? [String: Any] else { return }
+        change(&p)
+        let side = Self.side(of: p), wh = Self.whereOf(p)
+        p["scope"] = wh.contains("all") ? (side == "team" ? "team" : "") : (wh.first ?? "")     // older recorders
+        people[name] = p
+        o["people"] = people
+        if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
+        loadVoices()
+    }
+    func setVoiceSide(_ name: String, _ side: String) { editVoice(name) { $0["side"] = side } }
+    func toggleVoiceWhere(_ name: String, _ tag: String) {
+        editVoice(name) { p in
+            var w = Self.whereOf(p)
+            if tag == "all" { w = w.contains("all") ? [] : ["all"] }
+            else {
+                w.removeAll { $0 == "all" }
+                if let i = w.firstIndex(of: tag) { w.remove(at: i) } else { w.append(tag) }
+            }
+            p["where"] = w.isEmpty ? ["all"] : w
+            if p["side"] == nil { p["side"] = Self.side(of: p).isEmpty ? "client" : Self.side(of: p) }
+        }
     }
     static func scopeLabel(_ s: String) -> String {
         if s == "team" { return "Team, all projects" }
@@ -657,16 +710,24 @@ struct SettingsView: View {
                         HStack {
                             Text(v.name)
                             Spacer()
-                            Menu(SettingsModel.scopeLabel(v.scope)) {
-                                ForEach(model.voiceScopes, id: \.tag) { sc in
-                                    Button { model.setVoiceScope(v.name, sc.tag) } label: {
-                                        if sc.tag == v.scope { Label(sc.label, systemImage: "checkmark") } else { Text(sc.label) }
+                            Menu(v.side == "team" ? "Team" : (v.side == "client" ? "Client" : "Side?")) {
+                                Button { model.setVoiceSide(v.name, "team") } label: { v.side == "team" ? Label("Team (ours)", systemImage: "checkmark") : Label("Team (ours)", systemImage: "person.2") }
+                                Button { model.setVoiceSide(v.name, "client") } label: { v.side == "client" ? Label("Client side", systemImage: "checkmark") : Label("Client side", systemImage: "building.2") }
+                            }
+                            .menuStyle(.borderlessButton).fixedSize().font(.caption)
+                            .foregroundStyle(v.side == "team" ? Color.accentColor : .primary)
+                            .disabled(CallEngine.shared.isRunning)
+                            .help("Which side this person is on: our team or the client's. Not during a call.")
+                            Menu(SettingsModel.whereLabel(v.wherer)) {
+                                ForEach(model.voiceWheres, id: \.tag) { sc in
+                                    Button { model.toggleVoiceWhere(v.name, sc.tag) } label: {
+                                        if v.wherer.contains(sc.tag) { Label(sc.label, systemImage: "checkmark") } else { Text(sc.label) }
                                     }
                                 }
                             }
                             .menuStyle(.borderlessButton).fixedSize().font(.caption)
                             .disabled(CallEngine.shared.isRunning)
-                            .help("Where this voice is suggested and recognised: the team (every project), a whole workspace, or one project. Not during a call.")
+                            .help("The calls this voice is suggested and recognised on: all projects, whole workspaces, or any number of projects (tick several). Not during a call.")
                             Text("\(v.calls) call\(v.calls == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
                             Button("Forget") { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
                                 .help("Removes this person's voice prints from the Mac. Not during a call.")
@@ -675,7 +736,7 @@ struct SettingsView: View {
                 }
                 .onAppear { model.loadVoices() }
             } header: { Text("Speakers") } footer: {
-                Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. A voice named on a meeting series is named by itself on the next call of that series when it matches well (Clear speakers in the window forgets it). Your team (the team table of a project config) is remembered for every project, a client for that project only; the menu next to each person moves them to the team, a whole workspace or another project. Nothing is saved on a call marked Public in Start call. Voice prints stay in <app folder>/voices on this Mac.")
+                Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. A voice named on a meeting series is named by itself on the next call of that series when it matches well (Clear speakers in the window forgets it). Each person has a side (Team, ours, or Client) and the calls they are suggested on: all projects, whole workspaces or several projects. The team table of a project config is Team on all projects; anyone else starts as Client of the call's project, and a person heard on another project's call gets that project added. Nothing is saved on a call marked Public in Start call. Voice prints stay in <app folder>/voices on this Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

@@ -1,0 +1,168 @@
+import AppKit
+import SwiftUI
+import WebKit
+import LiveTipsCore
+
+/// `LiveTips --shots <folder>`: renders the app's windows on demo data into PNG files for the website
+/// (2026-10-27, owner: the site shows the real app, and the pictures are refreshed as the app changes).
+/// Demo projects, people and voices only (Orbit SaaS Launch, Northwind Studio, Mike, Emily, ...): the
+/// PM's own projects are never loaded, because the support folder is replaced before anything reads it.
+/// Each window is drawn into a bitmap by AppKit itself (no screen recording permission is needed);
+/// the tips window's web content comes from WKWebView.takeSnapshot and is laid over the frame.
+@MainActor
+final class ShotMode: NSObject, NSApplicationDelegate {
+    let out: URL
+    var steps: [() -> Void] = []
+    var keep: [AnyObject] = []
+    init(out: URL) { self.out = out }
+
+    nonisolated static let demoRoot = "/Users/Shared/LiveTipsDemo"
+
+    /// Writes the demo support folder and points the app at it. Called before the app starts.
+    nonisolated static func prepareDemo() {
+        let fm = FileManager.default
+        let sup = demoRoot + "/support", work = demoRoot + "/work", app = demoRoot + "/app"
+        let orbit = work + "/Northwind Studio/Orbit SaaS Launch", play = work + "/Northwind Studio/Internal Delivery Playbook"
+        for d in [sup, orbit + "/live", play + "/live", app + "/voices", work + "/Northwind Studio"] {
+            try? fm.createDirectory(atPath: d, withIntermediateDirectories: true)
+        }
+        setenv("LT_SUPPORT_DIR", sup, 1)
+        let cfg: [String: Any] = ["workRoot": work, "appRoot": app, "uiLanguage": "en", "speakersEnabled": true]
+        write(cfg, sup + "/config.json")
+        var reg = ProjectRegistry()
+        var o = Project(name: "Orbit SaaS Launch", slug: "orbit-saas-launch", root: orbit)
+        o.workspace = "Northwind Studio"
+        o.people = [.init(name: "Mike Johnson", role: "PM", side: "team"), .init(name: "Sarah Lee", role: "Tech lead", side: "team"),
+                    .init(name: "Emily Clark", role: "Product owner", side: "client"), .init(name: "David Kim", role: "CTO", side: "client")]
+        var pb = Project(name: "Internal Delivery Playbook", slug: "internal-delivery-playbook", root: play)
+        pb.workspace = "Northwind Studio"
+        pb.people = [.init(name: "Mike Johnson", role: "PM", side: "team")]
+        reg.projects = [o, pb]
+        reg.workspaces = [Workspace(name: "Northwind Studio", root: work + "/Northwind Studio", projects: [o.slug, pb.slug])]
+        reg.lastUsed = "project:orbit-saas-launch"
+        if let d = try? JSONEncoder().encode(reg) { try? d.write(to: URL(fileURLWithPath: sup + "/projects.json")) }
+        let emb = Array(repeating: 0.1, count: 16)
+        func voice(_ side: String, _ wh: [String], _ calls: Int) -> [String: Any] {
+            ["embeddings": [emb], "calls": calls, "side": side, "where": wh, "updated": "2026-10-27T10:00:00+02:00"]
+        }
+        write(["people": ["Mike J.": voice("team", ["all"], 12), "Sarah L.": voice("team", ["all"], 9),
+                          "Emily C.": voice("client", ["project:orbit-saas-launch"], 6),
+                          "David K.": voice("client", ["project:orbit-saas-launch", "project:internal-delivery-playbook"], 3)]],
+              app + "/voices/voices.json")
+    }
+
+    nonisolated static func write(_ o: Any, _ path: String) {
+        if let d = try? JSONSerialization.data(withJSONObject: o, options: [.prettyPrinted]) { try? d.write(to: URL(fileURLWithPath: path)) }
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        log("launched")
+        for theme in ["dark", "light"] {
+            steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
+            steps.append { [unowned self] in self.startCall(theme) }
+            for tab in ["general", "notion", "ai", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
+            steps.append { [unowned self] in self.tips(theme, presentation: false) }
+            steps.append { [unowned self] in self.tips(theme, presentation: true) }
+        }
+        steps.append { exit(0) }
+        next()
+    }
+
+    func log(_ m: String) {
+        let f = out.appendingPathComponent("shots.log")
+        let line = "\(Date()) \(m)\n"
+        if let h = try? FileHandle(forWritingTo: f) { h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); try? h.close() }
+        else { try? line.write(to: f, atomically: true, encoding: .utf8) }
+    }
+
+    func next(after: Double = 0.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + after) { [weak self] in
+            guard let self = self, !self.steps.isEmpty else { return }
+            self.log("step, \(self.steps.count) left")
+            self.steps.removeFirst()()
+        }
+    }
+
+    func startCall(_ theme: String) {
+        let m = StartCallModel()
+        m.target = "project:orbit-saas-launch"
+        m.language = "en"
+        m.title = "Orbit weekly with the client"
+        m.context = "Goal: agree the pilot plan and the export release date.\nParticipants: Emily Clark, David Kim.\nOpen questions: who tests the pilot, the test accounts.\nWhere to look: kickoff notes, export spec."
+        StartCallWindow.show(delegate: AppDelegate(), prepared: m)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
+            if let w = StartCallWindow.window { capture(w, "start-call-\(theme)"); w.close() }
+            next()
+        }
+    }
+
+    func settings(_ tab: String, _ theme: String) {
+        SettingsWindow.show(tab: tab)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
+            if let w = SettingsWindow.window { capture(w, "settings-\(tab)-\(theme)") }
+            if tab == "projects" { SettingsWindow.window?.close() }
+            next()
+        }
+    }
+
+    func tips(_ theme: String, presentation: Bool) {
+        var pa = prompterArgs(["LiveTips", presentation ? "--prompter-demo-presentation" : "--prompter-demo"])
+        pa.title = "Live Tips: Orbit SaaS Launch"
+        let c = PrompterController(args: pa)
+        c.show()
+        keep.append(c)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [self] in
+            if !presentation {   // the transcript pane with named speakers, as during a call
+                c.web.evaluateJavaScript("""
+                  try { document.getElementById('trbtn').click();
+                  window.setSpeakers({clusters:{S1:{name:'Emily C.',seconds:40,side:'client'},S2:{name:'David K.',seconds:22,side:'client'}},
+                    roster:[{name:'Emily C.',side:'client'},{name:'David K.',side:'client'},{name:'Sarah L.',side:'team'}]});
+                  window.addTranscript(['- Channels: Me = microphone, Other = system audio',
+                    '[10:31:02] Emily C. [S1] (en): When is the export live for our users?',
+                    '[10:31:09] Me (en): It is on dev now, production on Tuesday after the review.',
+                    '[10:31:20] David K. [S2] (en): And who tests the pilot?',
+                    '[10:31:26] Me (en): Our QA covers the first week, then your team.']); } catch (e) {}
+                """, completionHandler: nil)
+            }
+            // The same size in both themes, so the dark and light pictures match on the site.
+            c.window.setContentSize(presentation ? NSSize(width: 1040, height: 560) : NSSize(width: 1040, height: 640))
+            if !presentation { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { c.window.setContentSize(NSSize(width: 1040, height: 640)) } }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [self] in
+                capture(c.window, presentation ? "tips-presentation-\(theme)" : "tips-\(theme)", web: c.web) { [self] in
+                    c.window.close()
+                    next()
+                }
+            }
+        }
+    }
+
+    func capture(_ w: NSWindow, _ name: String, web: WKWebView? = nil, done: (() -> Void)? = nil) {
+        guard let frame = w.contentView?.superview, let base = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { done?(); return }
+        // Always 2x (sharp on retina screens), whatever the scale of the screen the window is on.
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(frame.bounds.width * 2), pixelsHigh: Int(frame.bounds.height * 2),
+                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                   colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) ?? base
+        rep.size = frame.bounds.size
+        frame.cacheDisplay(in: frame.bounds, to: rep)
+        func save() {
+            if let png = rep.representation(using: .png, properties: [:]) { try? png.write(to: out.appendingPathComponent(name + ".png")) }
+            log("saved " + name)
+            done?()
+        }
+        guard let web = web else { save(); return }
+        web.takeSnapshot(with: nil) { img, _ in
+            MainActor.assumeIsolated {
+                if let img = img, let ctx = NSGraphicsContext(bitmapImageRep: rep) {
+                    var r = web.convert(web.bounds, to: frame)
+                    if frame.isFlipped { r.origin.y = frame.bounds.height - r.maxY }
+                    NSGraphicsContext.saveGraphicsState()
+                    NSGraphicsContext.current = ctx
+                    img.draw(in: r)
+                    NSGraphicsContext.restoreGraphicsState()
+                }
+                save()
+            }
+        }
+    }
+}

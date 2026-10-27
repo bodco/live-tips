@@ -85,9 +85,9 @@ other text): `## Live Tips: підсумок і роздуми ({HH:MM})` with t
 hiring analysis) plus what Notion AI cannot give: tips that mattered, answers worth
 revisiting, contradictions with decisions and the tracker, risks, open questions, next
 steps with owners, the tip statistics. Never edit, move or delete existing blocks, the
-title or the `Summary`. Transcript: if the page already has a Notion AI transcript, do not
-add ours (name the local file in the section); if it has none, add our cleaned transcript
-in a toggle "Транскрипт (Live Tips)". Properties: set `Project`, `Workspace` and `Date`
+title or the `Summary`. Transcript: ALWAYS add our cleaned transcript as a child page of the
+page (see "Transcript page" below), even when the page has a Notion AI transcript, and never ask
+about it. Properties: set `Project`, `Workspace` and `Date`
 only if they are empty, never overwrite. If the page is outside the Meetings DB, leave it
 where it is and say so in the final message. A second run for the same meeting (the
 section already exists) appends `## Live Tips: доповнення ({HH:MM})` instead of a duplicate.
@@ -130,7 +130,7 @@ IDs copied exactly from the config; never retype an ID by hand from memory, copy
    - `Meeting type`: only if the meeting type from Step 0 exactly matches an existing option;
      otherwise leave it empty (never create options).
    - `Summary`: 1-2 sentence summary (internal language).
-3. **Body.** An AI Meeting Notes block with the transcript, then the wrap-up:
+3. **Body.** (Since 2026-10-27 the transcript is a child page, see "Transcript page" below; the embedded `<notes>` lines in this template are no longer written, keep only the wrap-up and a section `## Транскрипт` holding the child page.) Wrap-up:
    ```
    <meeting-notes>
    	<name>
@@ -148,21 +148,24 @@ IDs copied exactly from the config; never retype an ID by hand from memory, copy
    (short repeats of the Whisper prompt's opening such as "Дзвінок команди ..." with a garbled
    ending) and say so in one line with the COUNT from its numbers: "відкинуто {N} з {M} рядків
    як артефакти". Never count by eye: a
-   transcript with 20+ real lines always goes into the page, even if many lines were
-   artefacts. Skipping the transcript is allowed only when fewer than 20 real lines remain.
+   transcript with 20+ real lines always gets its page (below), even if many lines
+   were artefacts. Skipping it is allowed only when fewer than 20 real lines remain.
    **Notion API limit (verified 2026-10-11):** the `<transcript>` and `<summary>` sections of
    a meeting-notes block cannot be written through the API (the spec says writing
    `<transcript>` errors), and Notion AI summary generation cannot be triggered through the
    API. So the transcript goes into the `<notes>` section of the block, and the summary is
    written by this skill (Summary property + "Підсумок" section). The PM can still press
    Notion AI in the block manually.
-   Long transcripts: if the content is rejected as too large, create the page with the first
-   ~300 lines, then append the rest in chunks with `update_content` (old_str = the current
-   last line of the notes, new_str = that line + the next chunk, same indentation). If the
-   transcript is too large to retype reasonably (more than ~150 useful lines), write the
-   wrap-up only, name the local transcript file, and offer to add the transcript on request.
-4. **Verify** with a fetch: parent is the Meetings DB, properties set, title has the date mention, wrap-up present (and line count in notes equals the transcript line
-   count when the transcript was added). Put the page link into the wrap-up.
+   **Transcript page (always, no questions; the PM's standing order, changed 2026-10-27 from a file
+   to a page).** After the wrap-up is written, create a child page under the meeting page with
+   `notion-create-pages` (parent = the meeting page id, title `Транскрипт (Live Tips) · <meeting
+   name>` in the call's language, icon 📝) whose content is the cleaned transcript as markdown: take
+   `clean_file`, keep the Notion escapes, one line per paragraph with the time and the speaker in
+   bold (`**[12:30:11] Mike:** text`). No line limit: when the content is too large for one call,
+   create the page with the first ~300 lines and append the rest in chunks with `update_content`.
+   No file attachment. The section `## Транскрипт` of the meeting page holds only that child page.
+   If the write fails, say so in one line and name the local file; do not ask the PM what to do.
+4. **Verify** with a fetch: parent is the Meetings DB, properties set, title has the date mention, wrap-up present, and the transcript file block is on the page. Put the page link into the wrap-up.
 5. Client-facing rule does not apply: the Meetings DB is internal. Restricted 🔒 content may
    go into the "Підсумок" section.
 

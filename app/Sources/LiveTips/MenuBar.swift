@@ -1001,8 +1001,8 @@ struct StartCallView: View {
 final class StartCallWindow {
     static var window: NSWindow?
 
-    static func show(delegate: AppDelegate) {
-        let model = StartCallModel()
+    static func show(delegate: AppDelegate, prepared: StartCallModel? = nil) {
+        let model = prepared ?? StartCallModel()
         let view = StartCallView(model: model, onStart: {
             guard let req = model.requestJSON() else { return }
             let err = CallEngine.shared.start(request: req, apiAllowed: model.project?.apiAllowed ?? true) { st in

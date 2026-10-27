@@ -373,6 +373,7 @@ final class CallEngine {
                 if let c = d["cost_usd"] as? Double, c > 0 { var lc = self.lastCall; lc["notes_usd"] = c; self.lastCall = lc }
                 if (d["ok"] as? Bool) == true, let url = d["url"] as? String {
                     self.notionResult = url
+                    MainActor.assumeIsolated { CallHistory.shared.setNotion(file: file, url: url) }
                     self.notify(((d["created"] as? Bool) == true ? "Meeting page created in Notion" : "Wrap-up added to the meeting page in Notion"), url: url)
                 } else {
                     self.notionResult = "Notion: " + ((d["error"] as? String) ?? "failed, see logs/notion.log")

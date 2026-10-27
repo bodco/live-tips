@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         // The main action first; the status lines below it (review P2).
+        add(menu, "Home", #selector(openHome), "0")
         startItem = add(menu, "Start call…", #selector(startCall), "n")
         upNextItem = NSMenuItem(title: "Up next", action: nil, keyEquivalent: "")
         upNextItem.isHidden = true
@@ -68,8 +69,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NotionMirrorService.shared.startSchedule()
         updateCoreIfNeeded()
         // Up next (2026-10-27): the switch goes on when the old call's recorder has stopped.
-        NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.finishSwitch() }
+        NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in
+            MainActor.assumeIsolated {
+                // Home's Recent calls (2026-10-27): recorded before a switch starts the next call.
+                let ce = CallEngine.shared
+                let file = n.userInfo?["file"] as? String ?? ""
+                let root = ce.callRequest["project_dir"] as? String ?? ""
+                CallHistory.shared.recordEnd(file: file, title: ce.renamed ?? (ce.callRequest["title"] as? String) ?? "Call",
+                                             project: self?.lastStatus.project ?? (root as NSString).lastPathComponent,
+                                             lines: n.userInfo?["lines"] as? Int ?? 0, cost: ce.lastCall["tips_usd"] as? Double)
+                self?.finishSwitch()
+            }
         }
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
@@ -78,6 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             UserDefaults.standard.set(true, forKey: "onboarded")
             MainActor.assumeIsolated { OnboardingWindow.show() }
         } else if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
+        else if !callIsLive { openHome() }       // 2026-10-27 (owner): Home is the app's main window
+        MainActor.assumeIsolated { _ = CalendarService.shared }
     }
 
     /// After an app update the recorder core in the app folder is refreshed from the app by itself
@@ -102,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Dock icon: a call in progress (also while waiting for the other side) opens its tips window.
-        if !flag { if CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(lastStatus.state) { showTips() } else { startCall() } }
+        if !flag { if CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(lastStatus.state) { showTips() } else { openHome() } }
         return true
     }
 
@@ -200,6 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
+    @objc func openHome() { MainActor.assumeIsolated { HomeWindow.show(delegate: self) } }
     @objc func sendToNotion() {
         guard let f = CallEngine.shared.lastFile, !CallEngine.shared.isRunning else { return }
         CallEngine.shared.writeToNotion(file: f)
@@ -324,6 +337,10 @@ final class StartCallModel: ObservableObject {
     /// The base path of this call's finished preparation (<root>/live/prep-...), set when it is ready.
     @Published var prepBase: String?
     @Published var prepFailed = false
+    /// 2026-10-27 (owner, calendars): the calendar event this call is, its series, and where the settings came from.
+    @Published var calEventID: String?
+    var seriesKey: String?
+    @Published var appliedFrom: String?
     @Published var target = ""          // "project:<slug>" | "workspace:<name>"
     @Published var title = ""
     @Published var audience = "auto"
@@ -636,6 +653,7 @@ struct StartCallView: View {
     @ObservedObject var upnext = UpNext.shared
     /// 2026-10-27 (owner, Up next): a call is being recorded; this window sets up an upcoming one.
     var live = false
+    var planOnly = false            // Plan a call from Home: plan mode without a live call
     var liveTitle = ""
     var liveSince: Date?
     var onStart: () -> Void
@@ -658,10 +676,10 @@ struct StartCallView: View {
         VStack(spacing: 0) {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    IconTile(symbol: live ? "calendar.badge.plus" : "text.bubble", size: 40)
+                    IconTile(symbol: live || planOnly ? "calendar.badge.plus" : "text.bubble", size: 40)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(live ? "Plan an upcoming call" : saved ? "Upcoming call" : "Start a call").font(.title2.weight(.semibold))
-                        if live || saved {
+                        Text(live || planOnly ? "Plan an upcoming call" : saved ? "Upcoming call" : "Start a call").font(.title2.weight(.semibold))
+                        if live || saved || planOnly {
                             Text("Set it up and prepare it now; it starts only when you switch to it.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -669,6 +687,7 @@ struct StartCallView: View {
                     Spacer()
                 }
                 if live { liveBanner }
+                calendarStrip
                 hero
                 HStack(spacing: 10) {
                     ChoicePill(symbol: "person.2", label: ["auto": "Auto", "team": "Team", "client": "Client"][model.audience] ?? "Auto",
@@ -781,13 +800,13 @@ struct StartCallView: View {
             .padding(.horizontal, 28).padding(.top, 16)
             VStack(spacing: 8) {
                 if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.orange).lineLimit(2) }
-                if live {
+                if live || planOnly {
                     // 2026-10-27 (owner, Up next): during a call the main action keeps this call for later;
                     // switching is a separate, confirmed step.
                     LTPrimaryButton(title: saved ? "Save" : "Add to Up next", symbol: "calendar.badge.plus") { onSave() }
                         .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
                     HStack(spacing: 18) {
-                        Button("End current call and start this…", action: onSwitch).buttonStyle(.borderless)
+                        Button(live ? "End current call and start this…" : "Start now", action: live ? onSwitch : onStart).buttonStyle(.borderless)
                             .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
                         if saved { Button("Remove", action: onRemove).buttonStyle(.borderless).foregroundStyle(.secondary) }
                         Button("Close", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
@@ -819,6 +838,60 @@ struct StartCallView: View {
     }
 
     var saved: Bool { upnext.contains(model) }
+
+    /// 2026-10-27 (owner, calendars): the calls around now, from every calendar on this Mac. Two or three at the
+    /// same time are normal (one in the calendar he skips, another he joins): the PM picks the one he goes to.
+    @ObservedObject private var cal = CalendarService.shared
+    static func eventHelp(_ e: CalendarService.CalEvent) -> String {
+        var t: String = e.title + "\n" + e.account + " · " + e.calendar
+        if !e.attendees.isEmpty { t += "\n" + e.attendees.joined(separator: ", ") }
+        t += "\nClick to set up this call from the event"
+        if e.recurring { t += " (and like its last call)" }
+        return t
+    }
+    @ViewBuilder private var calendarStrip: some View {
+        let evs = cal.aroundNow()
+        if cal.access == .granted, !evs.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar").foregroundStyle(.secondary)
+                        ForEach(evs) { e in
+                            let on = model.calEventID == e.id
+                            Button { model.applyEvent(e); copied = false } label: {
+                                HStack(spacing: 5) {
+                                    Circle().fill(Color(nsColor: e.color)).frame(width: 7, height: 7)
+                                    Text(e.timeRange).monospacedDigit().foregroundStyle(.secondary)
+                                    Text(e.title).lineLimit(1)
+                                    let rel: String = e.relative()
+                                    if !rel.isEmpty && !rel.hasPrefix("ended") { Text(rel).foregroundStyle(rel == "in progress" ? Color.red : Color.secondary) }
+                                    if e.recurring { Image(systemName: "repeat").foregroundStyle(.secondary) }
+                                }
+                                .font(.caption)
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(Capsule().fill(on ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.10)))
+                                .overlay(Capsule().stroke(on ? Color.accentColor : .clear))
+                            }
+                            .buttonStyle(.plain)
+                            .help(Self.eventHelp(e))
+                        }
+                    }
+                }
+                if let a = model.appliedFrom {
+                    Label(a, systemImage: "arrow.uturn.backward.circle").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        } else if cal.access == .unknown {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar").foregroundStyle(.secondary)
+                Text("Pick the call from your calendars").font(.caption).foregroundStyle(.secondary)
+                Button("Connect calendars") { cal.connect() }.buttonStyle(.link).font(.caption)
+                Spacer()
+            }
+        } else if let a = model.appliedFrom {
+            Label(a, systemImage: "arrow.uturn.backward.circle").font(.caption).foregroundStyle(.secondary)
+        }
+    }
 
     /// The call being recorded, so it is clear this window does not start a call by itself.
     private var liveBanner: some View {
@@ -866,6 +939,13 @@ struct StartCallView: View {
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(titleFocus ? Color.accentColor : Color.secondary.opacity(0.25),
                                                                 lineWidth: titleFocus ? 2 : 1))
             .onTapGesture { titleFocus = true }
+            if let e = model.rememberedForTitle {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.uturn.backward.circle").foregroundStyle(Color.accentColor)
+                    Text("A call named \u{201C}\(e.title)\u{201D} was set up before.").font(.caption).foregroundStyle(.secondary)
+                    Button("Use its settings") { model.apply(e); model.scanPrep() }.buttonStyle(.link).font(.caption)
+                }
+            }
             HStack(spacing: 8) {
                 Image(systemName: "calendar").foregroundStyle(.secondary)
                 DatePicker("", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute])
@@ -1083,13 +1163,13 @@ final class StartCallWindow {
     /// 2026-10-27 (owner, Up next): while a call is live this window plans an upcoming call: Add to Up next,
     /// Prepare, or End current call and start this (confirmed). Without a live call it starts a call as before,
     /// and Save for later keeps the call in Up next.
-    static func show(delegate: AppDelegate, prepared: StartCallModel? = nil) {
+    static func show(delegate: AppDelegate, prepared: StartCallModel? = nil, planOnly: Bool = false) {
         let model = prepared ?? StartCallModel()
         Self.model = model
         let live = delegate.callIsLive
         let liveTitle = CallEngine.shared.renamed ?? (CallEngine.shared.callRequest["title"] as? String) ?? "the current call"
         let since = EngineStatus.load(path: CallEngine.shared.statusPath).startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
-        let view = StartCallView(model: model, live: live, liveTitle: liveTitle, liveSince: since, onStart: {
+        let view = StartCallView(model: model, live: live, planOnly: planOnly && !live, liveTitle: liveTitle, liveSince: since, onStart: {
             if let err = delegate.launch(model) { model.note = err } else { window?.close() }
         }, onCancel: {
             // A call with a preparation running or waiting is kept, so the preparation is not lost.
@@ -1112,7 +1192,7 @@ final class StartCallWindow {
         w.contentViewController = host
         w.styleMask.insert(.resizable)
         w.setContentSize(NSSize(width: 540, height: 720))
-        w.title = live ? "Plan an upcoming call" : "Start call"
+        w.title = live || planOnly ? "Plan an upcoming call" : "Start call"
         w.isReleasedWhenClosed = false
         window = w
         w.center()
@@ -1149,6 +1229,7 @@ extension AppDelegate {
         }
         if err != nil { CallEngine.shared.currentCallID = before; return err }
         UpNext.shared.remove(model, keepPrep: true)
+        SeriesMemory.shared.remember(model)          // the next call of this series starts from these settings
         return nil
     }
 

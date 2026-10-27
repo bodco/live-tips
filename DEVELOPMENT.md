@@ -164,7 +164,7 @@ The pictures on the Live Tips pages are made by the app itself, on demo data:
 
 It writes the demo projects (Orbit SaaS Launch, Internal Delivery Playbook in the Northwind Studio
 workspace) and demo voices to `/Users/Shared/LiveTipsDemo`, never reads your own projects or the
-Keychain, opens Start call, Start call in plan mode during a (faked) live call (`plan-call`), Settings (General, Notion, AI, Projects), the tips window and the
+Keychain, opens Start call, Start call in plan mode during a (faked) live call (`plan-call`), Home on demo calendars and demo transcripts (`home`), Settings (General, Notion, AI, Projects), the tips window and the
 presentation mode, and saves each as `<name>-dark.png` and `<name>-light.png` at 2x. Convert them to
 WebP and put them in the website's `public/live-tips/shots/`. Run it again after every visible change
 in the app, so the site always shows the current windows.

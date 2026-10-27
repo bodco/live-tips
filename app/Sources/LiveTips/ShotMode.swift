@@ -29,6 +29,16 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         setenv("LT_SUPPORT_DIR", sup, 1)
         try? fm.removeItem(atPath: sup + "/upnext.json")          // Up next starts empty on every run
         try? fm.removeItem(atPath: app + "/state/status.json")
+        try? fm.removeItem(atPath: sup + "/history.json")
+        // Recent calls for Home: demo transcripts of the last days.
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        for (days, hm, slug, title, dir) in [(0, "1000", "orbit-weekly-with-the-client", "Orbit weekly with the client", orbit),
+                                             (1, "1530", "release-checklist-review", "Release checklist review", play),
+                                             (2, "1100", "orbit-pilot-planning", "Orbit pilot planning", orbit)] {
+            let d = df.string(from: Date().addingTimeInterval(-Double(days) * 86400 - 3600))
+            let f = "\(dir)/live/\(d)-\(hm)-\(slug).app.md"
+            try? "# Live Transcript: \(title)\n\n- Project: demo\n".write(toFile: f, atomically: true, encoding: .utf8)
+        }
         let cfg: [String: Any] = ["workRoot": work, "appRoot": app, "uiLanguage": "en", "speakersEnabled": true]
         write(cfg, sup + "/config.json")
         var reg = ProjectRegistry()
@@ -64,6 +74,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
             steps.append { [unowned self] in self.startCall(theme) }
             steps.append { [unowned self] in self.planCall(theme) }
+            steps.append { [unowned self] in self.home(theme) }
             for tab in ["general", "notion", "ai", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
             steps.append { [unowned self] in self.tips(theme, presentation: false) }
             steps.append { [unowned self] in self.tips(theme, presentation: true) }
@@ -124,6 +135,33 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             UpNext.shared.save(planned)
             try? FileManager.default.removeItem(atPath: CallEngine.shared.statusPath)
             next()
+        }
+    }
+
+    /// Home on demo calendars: two calls at the same time (one skipped, one joined), Up next, recent calls.
+    func home(_ theme: String) {
+        let now = Date()
+        let hour = StartCallModel.nextFullHour()
+        func ev(_ id: String, _ t: String, _ s: Date, _ mins: Double, _ acc: String, _ cal: String, _ c: NSColor, _ rec: Bool, _ who: [String]) -> CalendarService.CalEvent {
+            .init(id: id, seriesKey: rec ? "cal:" + id : "title:" + StartCallModel.slugify(t), title: t, start: s, end: s.addingTimeInterval(mins * 60),
+                  calendar: cal, account: acc, color: c, attendees: who, link: nil, recurring: rec)
+        }
+        let evs = [ev("e1", "Northwind all-hands", now.addingTimeInterval(-10 * 60), 40, "mike@northwind.example", "Northwind", .systemPurple, true, []),
+                   ev("e2", "Orbit weekly with the client", now.addingTimeInterval(5 * 60), 30, "mike.johnson@gmail.example", "Work", .systemBlue, true, ["Emily Clark", "David Kim"]),
+                   ev("e3", "Team retro", hour, 45, "mike@northwind.example", "Northwind", .systemPurple, false, ["Sarah Lee"]),
+                   ev("e4", "Orbit pilot review", Calendar.current.date(byAdding: .day, value: 1, to: hour) ?? hour, 30, "mike.johnson@gmail.example", "Work", .systemBlue, true, ["Emily Clark"])]
+        CalendarService.shared.useDemo(evs)
+        planned.calEventID = "e3"
+        UpNext.shared.save(planned)
+        CallHistory.shared.scan()
+        if let r = CallHistory.shared.visible.first { CallHistory.shared.setNotion(file: r.file, url: "https://www.notion.so/demo") }
+        HomeWindow.show(delegate: AppDelegate())
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
+            if let w = HomeWindow.window { w.setContentSize(NSSize(width: 820, height: 760)) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
+                if let w = HomeWindow.window { capture(w, "home-\(theme)"); w.close(); HomeWindow.window = nil }
+                next()
+            }
         }
     }
 

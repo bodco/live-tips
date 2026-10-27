@@ -1168,6 +1168,40 @@ transcript); blue, pulsing = starting (after Start, while the model loads) or st
 recording; orange = recording, but the microphone has a problem; green = stopped, transcript saved. The
 window reads the recorder's status every 0.5 s.
 
+### 14.1c Home, calendars and regular meetings
+
+**Home** is the app's main window (it opens with the app and from the Dock; menu bar > Home, Command-0):
+
+| Part | What |
+|---|---|
+| Top | Start call (Plan an upcoming call during a call), Plan a call |
+| Live call | Title, timer, lines, tips, cost; Show tips, End call |
+| Ahead | The calls from the ticked calendars (from 3 h ago to 36 h ahead, declined ones left out) and the Up next calls, by time. Each: time, "in progress" or "in 5 min", repeat mark, project, account and calendar, preparation state, "Same time as ..." when calls overlap. Prepare (sets the call up like the last one of its series and writes the preparation; does not start it), Set up..., Start (Switch... during a call), × (hides the event here; the calendar is not changed) |
+| Recent calls | The last 40 calls (the app's and the skill's transcripts of the last 45 days): Notion, Transcript, Show in Finder, × (hides it from the list; files stay) |
+| Bottom | Claude API key, this month's spend against the limit, a link to the balance in the Anthropic Console (an API key cannot read it), Notion copy, local AI, calendars |
+
+**Calendars (Settings > Calendars).** Live Tips reads calendars through macOS (EventKit), so several Google
+and Microsoft accounts work at once and nothing has to be installed:
+1. System Settings > Internet Accounts > Add Account: Google, or Microsoft Exchange (work) / Outlook.com
+   (personal); keep Calendars on. Repeat for every account.
+2. Settings > Calendars > Connect calendars (macOS asks once).
+3. Tick the calendars with your calls (All / None per account); the rest never shows.
+Read only: Live Tips never changes an event. A company that blocks Mail and Calendar on Macs blocks this too.
+An optional reminder before calendar calls is off by default (your calendar already reminds you).
+
+**Picking the call.** Start call shows the calls around now as chips (in progress, just ended, the next 3 h),
+overlapping ones included: you click the one you are actually going to. The click fills the title, the
+time, the participants ("Participants:" line) and, for a regular meeting, everything else from its last call.
+
+**Regular meetings.** When a call starts, its setup is remembered (`series.json` in the app folder): project,
+audience, type, languages, the "What matters on this call" text, folders, role and tip model, by the calendar
+series and by the title. The next call of the series starts from it ("Set up like the last ... call"), and
+a typed title that was used before offers "Use its settings". Settings > Calendars > Forget all clears it.
+
+**Proactive tips in the top bar.** 💡 switches proactive tips on and off during the call. The top bar order:
+the status dot, the title, the timer; 💡 proactive, ⏸ pause (tips and transcript), 🎙 mic; transcript, ⚙.
+End call stays apart in the title bar and always asks.
+
 ### 14.2 After the call: the meeting page in Notion
 
 With **Settings > General > Write the call summary to Notion** on, the app writes the wrap-up
@@ -1492,3 +1526,8 @@ address", `references/sweep.md`, `references/presentation.md`).
 73. **Up next (0.6.5).** Plan and prepare any number of upcoming calls during a call and switch with one
    question (section 14.1b); a preparation joins only its own call.
 74. **Status dot (0.6.5).** Grey waiting or paused, blue starting or stopping, red recording, green stopped.
+75. **Home (0.6.6).** The app's main window: live call, calls ahead, recent calls, state (section 14.1c).
+76. **Calendars through macOS (0.6.6).** Several Google and Microsoft accounts, the relevant calendars ticked in
+   Settings > Calendars; the call is picked from chips around now, overlaps included.
+77. **Regular meetings remembered (0.6.6).** A call of a series starts from the setup of its last call.
+78. **💡 Proactive tips in the top bar (0.6.6)** and a clearer button order.

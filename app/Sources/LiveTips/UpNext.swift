@@ -118,6 +118,7 @@ final class UpNext: ObservableObject {
         var publicCall: Bool; var hiringRole: String; var tipModel: String; var language: String
         var context: String; var folders: [String]; var useProjectFolder: Bool; var callDate: Date
         var chosenPrep: String?; var prepBase: String?; var prepFailed: Bool
+        var calEventID: String?; var seriesKey: String?
     }
 
     private func persist() {
@@ -125,7 +126,8 @@ final class UpNext: ObservableObject {
             Saved(id: m.id.uuidString, target: m.target, title: m.title, audience: m.audience, callType: m.callType,
                   publicCall: m.publicCall, hiringRole: m.hiringRole, tipModel: m.tipModel, language: m.language,
                   context: m.context, folders: m.folders, useProjectFolder: m.useProjectFolder, callDate: m.callDate,
-                  chosenPrep: m.chosenPrep, prepBase: m.prepBase, prepFailed: m.prepFailed)
+                  chosenPrep: m.chosenPrep, prepBase: m.prepBase, prepFailed: m.prepFailed,
+                  calEventID: m.calEventID, seriesKey: m.seriesKey)
         }
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; enc.outputFormatting = [.prettyPrinted]
         if let d = try? enc.encode(list) {
@@ -144,7 +146,7 @@ final class UpNext: ObservableObject {
             m.publicCall = s.publicCall; m.hiringRole = s.hiringRole; m.tipModel = s.tipModel
             m.language = s.language; m.languageTouched = true; m.context = s.context; m.folders = s.folders
             m.useProjectFolder = s.useProjectFolder; m.callDate = s.callDate; m.chosenPrep = s.chosenPrep
-            m.prepBase = s.prepBase; m.prepFailed = s.prepFailed
+            m.prepBase = s.prepBase; m.prepFailed = s.prepFailed; m.calEventID = s.calEventID; m.seriesKey = s.seriesKey
             return m
         }
     }

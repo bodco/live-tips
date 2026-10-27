@@ -50,6 +50,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleShortVersionString</key><string>$VER</string>
 <key>CFBundleVersion</key><string>$BUILD</string>
 <key>LSMinimumSystemVersion</key><string>14.4</string>
+<key>NSCalendarsFullAccessUsageDescription</key><string>Live Tips lists your calls from the calendars on this Mac so you can pick the one to prepare and start. Read only.</string>
+<key>NSCalendarsUsageDescription</key><string>Live Tips lists your calls from the calendars on this Mac so you can pick the one to prepare and start. Read only.</string>
 <key>NSMicrophoneUsageDescription</key><string>LiveTips transcribes your side of the call locally on this Mac.</string>
 <key>NSAudioCaptureUsageDescription</key><string>LiveTips transcribes the other side of the call locally on this Mac.</string>
 </dict></plist>

@@ -89,6 +89,7 @@ struct OnboardingView: View {
     @ObservedObject var m: OnboardingModel
     @ObservedObject var settings: SettingsModel
     @ObservedObject var setup: SetupModel
+    @ObservedObject var cal = CalendarService.shared
     var close: () -> Void
 
     init(m: OnboardingModel, close: @escaping () -> Void) {
@@ -210,6 +211,12 @@ struct OnboardingView: View {
                               button: m.sysAudio == false ? "Open Settings" : "Allow audio access",
                               note: m.sysAudio == false ? "Turn on Live Tips under Privacy & Security > Screen & System Audio Recording." : "") {
                     m.askSystemAudio()
+                }
+                // 2026-10-27 (owner): optional; the calls from the calendars appear in Home and Start call.
+                permissionRow("calendar", "Your calls from the calendars (optional)", ok: cal.access == .granted,
+                              button: cal.access == .denied ? "Open Settings" : "Connect calendars",
+                              note: "Google and Microsoft accounts added in System Settings > Internet Accounts. Settings > Calendars later.") {
+                    cal.connect()
                 }
             }
         case .folder:

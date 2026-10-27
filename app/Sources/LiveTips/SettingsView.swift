@@ -526,6 +526,7 @@ struct SettingsView: View {
         Pane(id: "general", title: "General", symbol: "gearshape", subtitle: "Your name on calls, folders, Notion and how the app behaves."),
         Pane(id: "keys", title: "Keys", symbol: "key", subtitle: "The Claude API key and the Notion token, kept in the macOS Keychain."),
         Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
+        Pane(id: "calendars", title: "Calendars", symbol: "calendar", subtitle: "Your Google, Microsoft and iCloud calendars: pick the calls to prepare and start."),
         Pane(id: "notion", title: "Notion", symbol: "doc.text", subtitle: "Meeting pages after each call and the optional local copy of Notion."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
         Pane(id: "how", title: "How it works", symbol: "point.3.connected.trianglepath.dotted", subtitle: "What happens before, during and after a call."),
@@ -572,6 +573,7 @@ struct SettingsView: View {
         case "projects": projects
         case "ai": ai
         case "notion": notion
+        case "calendars": CalendarsPane()
         case "how": HowItWorksView()
         case "about": AboutView(model: model)
         default: general
@@ -1181,7 +1183,7 @@ final class SettingsWindow {
     static let model = SettingsModel()
 
     static func title(for tab: String) -> String {
-        ["general": "General", "keys": "Keys", "projects": "Projects", "ai": "AI", "notion": "Notion", "how": "How Live Tips works", "about": "About Live Tips"][tab] ?? "Settings"
+        ["general": "General", "calendars": "Calendars", "keys": "Keys", "projects": "Projects", "ai": "AI", "notion": "Notion", "how": "How Live Tips works", "about": "About Live Tips"][tab] ?? "Settings"
     }
 
     static func show(tab: String = "general") {

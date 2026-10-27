@@ -291,6 +291,9 @@
   /* Pause is a mode: a small icon in the top bar next to mute. HELP NOW is the one action: a red button with text. */
   #pause svg { width: 15px; height: 15px; }
   #pause.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+  #pro.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .bsep { width: 1px; height: 20px; background: var(--line); margin: 0 2px; flex: none; }
+  @media (max-width: 400px) { #bar { gap: 5px; } #bar .ib { width: 28px; height: 28px; } .bsep { display: none; } }
   #pause:focus-visible, #sos:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
   #sos { background: var(--red); border: 0; color: #fff; padding: 0 14px; height: 40px; font-size: 13px; letter-spacing: .04em; }
   #sos:hover { filter: brightness(1.1); }
@@ -615,8 +618,13 @@
   <span id="spacer"></span>
   <span id="pausedpill" role="button" tabindex="0" data-i18n="paused_pill" data-i18n-title="paused_pill_tt">Tips paused</span>
   <span id="meter" data-i18n-title="meter_tt"></span>
+  <!-- 2026-10-27 (owner): what the tips do (proactive, pause), your mic, then the view (transcript, ⚙). End call stays in the title bar, apart. -->
+  <button id="pro" class="ib" type="button" aria-pressed="false" data-i18n-title="pro_tt_off" data-i18n-aria="l_proactive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg>
+  </button>
   <button id="pause" class="ib" type="button" aria-pressed="false"></button>
   <button id="mute" class="ib" data-i18n-title="mute_tt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+  <span class="bsep" aria-hidden="true"></span>
   <button id="trbtn" class="ib" type="button" aria-pressed="false" data-i18n-title="tr_btn_tt" data-i18n-aria="tr_btn_tt" title="Transcript">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>
   </button>
@@ -857,6 +865,8 @@
       o_default: 'System default',
       o_builtin: 'Mac built-in',
       l_proactive: 'Proactive tips',
+      pro_tt_off: 'Proactive tips are off: only answers, your turn, owners, dates and red flags. Click to also get ideas to add.',
+      pro_tt_on: 'Proactive tips are on: also ideas to add (a missing owner or date, a fact worth mentioning). Click to turn off.',
       proactive_hint: 'Ideas you could add: a missing owner or date, a fact worth mentioning. Off by default so only what you need comes up; answers, your turn and red flags always come.',
       proactive_tt: 'Off: only answers to questions, live facts, owner/date, your turn, red flags. On: also initiative and comment ideas.',
       l_cmt: 'Comment rate',
@@ -1177,6 +1187,8 @@
       o_default: 'Системний',
       o_builtin: 'Вбудований у Mac',
       l_proactive: 'Ініціативні підказки',
+      pro_tt_off: 'Ініціативні підказки вимкнено: лише відповіді, твоя черга, відповідальні, дати і тривожні сигнали. Клік, щоб отримувати ще й ідеї.',
+      pro_tt_on: 'Ініціативні підказки увімкнено: ще й ідеї, що додати (відповідальний чи дата, яких бракує, факт до теми). Клік, щоб вимкнути.',
       proactive_hint: 'Ідеї, що можна додати: відповідальний чи дата, яких бракує, факт, який варто згадати. За замовчуванням вимкнено, щоб зʼявлялося лише потрібне; відповіді, твоя черга і тривожні сигнали приходять завжди.',
       proactive_tt: 'Вимкнено: лише відповіді на питання, факти до теми, відповідальний і дата, твоя черга, тривожні сигнали. Увімкнено: ще й ідеї, що можна додати.',
       l_cmt: 'Частота ідей',
@@ -1708,9 +1720,12 @@
   var proactive = load('proactive') === '1';      // 2026-10-27 (owner): remembered for the next calls
   function applyProactive() {
     prBtn.classList.toggle('on', proactive); prBtn.setAttribute('aria-checked', String(proactive));
+    var pb = $('pro');      // 2026-10-27 (owner): the same switch in the top bar, to change it during the call
+    if (pb) { pb.classList.toggle('on', proactive); pb.setAttribute('aria-pressed', String(proactive)); pb.title = t(proactive ? 'pro_tt_on' : 'pro_tt_off'); }
     lCmt.style.display = proactive ? '' : 'none';
   }
   applyProactive();
+  (function () { var pb = $('pro'); if (pb) pb.addEventListener('click', function () { prBtn.onclick(); }); })();
   if (proactive) setTimeout(function () { sendSetting('proactive', 'on', t('v_on')); }, 1500);   // carry the choice into this call
   prBtn.onclick = function () {
     proactive = !proactive; applyProactive(); store('proactive', proactive ? '1' : '0');

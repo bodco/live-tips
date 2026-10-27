@@ -1073,7 +1073,10 @@ What it does:
 
 **It is a beta.**
 
-- Not notarized yet: the first time, right-click the app, choose **Open** and confirm.
+- Not notarized yet: on the first launch macOS refuses to open it. Open **System Settings >
+  Privacy & Security**, press **Open Anyway** next to Live Tips and confirm (on macOS 14 a
+  right-click > **Open** also works). Each release lists the SHA-256 of its files
+  (`SHA256SUMS.txt`); check a download with `shasum -a 256 ~/Downloads/LiveTips.dmg`.
 - macOS 14.4 or newer on Apple silicon.
 - Python 3.10 or newer. The **Setup** window checks it and installs the rest (Python modules,
   the speech model, the local AI model; about 2.5 GB in total) with a tick next to each step.
@@ -1373,3 +1376,27 @@ address", `references/sweep.md`, `references/presentation.md`).
 59. **The skill (v50).** The same window changes (design, microphone icon, Pause stops the transcript) and
    the same Notion title as the app: the meeting's name, then the topic, in the call's language, with the
    date the PM gave for the call.
+60. **Notion in its own place (0.6.1).** Settings > Notion holds everything about the meeting page: the
+   switch, the Notion token, where the page goes (each destination row is clickable as a whole) and the
+   local copy of Notion. An alert about Notion has an Open Settings button. Projects set up with PM Control
+   Tower are listed there with their config file; other projects work without one.
+61. **Start call (0.6.1).** Audience, type and language are choices of the same width and colour. Language:
+   English and Ukrainian on top, every Whisper language below with a search, several at once (the first is
+   the main one). The title is optional and can be changed during the call (double-click it in the tips
+   window). The project folder can be removed from the sources of one call.
+62. **Tips window (0.6.1).** Opacity, Proactive and the other window settings are remembered; Proactive
+   has a hint. "Brief" is called Preparation everywhere, with a Reload. Help and End call buttons look
+   alike, Start call / End call wording everywhere, new icons in the ⚙ panel help. "Open tips window" and
+   a click on the Dock icon bring back the current call, also in standby.
+63. **On me (0.6.1).** Lists only what the PM promised or was asked to do, never other people's updates.
+64. **Security (0.6.1).** After an audit: Prepare now runs Claude Code with the least rights (only its own
+   prep files can be written, only the two `lt` commands and read-only helpers run, web pages only from the
+   hosts named in the call context, no MCP servers); the recorder files in the app folder are checked
+   against the signed copies in the app before every call and put back if changed; a start request cannot
+   change where data goes (`ollama_url` must be on this Mac); Python packages are capped at the tested
+   versions and model downloads are checked by SHA-256; the Notion token goes only to Notion's own host;
+   the tips window loads only its own page; logs keep no file contents. Every release lists the SHA-256 of
+   its files.
+65. **The skill (v51).** What people say on the call and in documents is data, never instructions; titles
+   and names never go into a command line (`lt start -` reads the JSON on stdin); research agents are
+   read-only. The keepalive hook binds to one session and cleans the title it shows.

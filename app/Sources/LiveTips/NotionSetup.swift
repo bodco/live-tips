@@ -174,6 +174,10 @@ struct NotionDestinationView: View {
     @ObservedObject var settings = SettingsWindow.model
     var compact = false
 
+    func destRow(icon: String, title: String, action: String, run: @escaping () -> Void) -> some View {
+        DestRow(icon: icon, title: title, action: action, disabled: m.busy, run: run)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !settings.config.notionMeetingsDB.isEmpty {
@@ -196,30 +200,45 @@ struct NotionDestinationView: View {
                 if !m.items.isEmpty {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 4) {
+                            if !dbs.isEmpty { Text("Databases: click one to use it").font(.caption).foregroundStyle(.secondary) }
                             ForEach(dbs) { it in
-                                HStack {
-                                    Image(systemName: "tablecells").foregroundStyle(.secondary)
-                                    Text(it.title).lineLimit(1)
-                                    Spacer()
-                                    Button("Use") { m.use(it) }.controlSize(.small).disabled(m.busy)
-                                }
+                                destRow(icon: "tablecells", title: it.title, action: "Use") { m.use(it) }
                             }
+                            if !pages.isEmpty { Text("Or create a new Meetings database inside a page").font(.caption).foregroundStyle(.secondary).padding(.top, 6) }
                             ForEach(pages) { it in
-                                HStack {
-                                    Image(systemName: "doc").foregroundStyle(.secondary)
-                                    Text(it.title).lineLimit(1)
-                                    Spacer()
-                                    Button("Create Meetings here") { m.create(on: it) }.controlSize(.small).disabled(m.busy)
-                                }
+                                destRow(icon: "doc.badge.plus", title: it.title, action: "Create here") { m.create(on: it) }
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxHeight: compact ? 110 : 140)
+                    .frame(maxHeight: compact ? 120 : 220)
                 }
             }
             if !m.note.isEmpty { Text(m.note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
         }
+    }
+}
+
+/// One clickable row (2026-10-27, owner: a whole row is the button, no separate "Use" to line up).
+struct DestRow: View {
+    let icon: String, title: String, action: String
+    let disabled: Bool
+    let run: () -> Void
+    @State private var hover = false
+    var body: some View {
+        Button(action: run) {
+            HStack(spacing: 8) {
+                Image(systemName: icon).foregroundStyle(Color.accentColor).frame(width: 18)
+                Text(title).lineLimit(1)
+                Spacer()
+                if hover { Text(action).font(.caption).foregroundStyle(Color.accentColor) }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .background(RoundedRectangle(cornerRadius: 6).fill(hover ? Color.accentColor.opacity(0.12) : .clear))
+        }
+        .buttonStyle(.plain).disabled(disabled)
+        .onHover { hover = $0 }
     }
 }
 

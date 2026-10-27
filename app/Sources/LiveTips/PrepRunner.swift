@@ -200,10 +200,23 @@ final class PrepRunner: ObservableObject {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
         let py = c.engine.python
-        let allowed = ["Read", "Grep", "Glob", "Write", "Edit", "WebFetch", "Bash(\(py):*)", "Bash(\"\(py)\":*)", "Bash(python3:*)", "Bash(textutil:*)",
-                       "Bash(ls:*)", "Bash(find:*)", "Bash(head:*)", "Bash(wc:*)"]
-        p.arguments = ["-p", prompt, "--model", model, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
+        // Security (audit 2026-10-27): least privilege. Only the two lt commands, read-only shell helpers, the
+        // textutil conversion, WebFetch only to the hosts named in the PM's context, and writes only to this
+        // prep's own files. "default" permission mode: anything else is denied in -p mode (no prompt to accept).
+        let ltq = "\"\(py)\" \"\(lt)\""
+        var allowed = ["Read", "Grep", "Glob",
+                       "Write(/\(base).*)", "Edit(/\(base).*)",
+                       "Bash(\(ltq) prep-check:*)", "Bash(\(ltq) digest:*)",
+                       "Bash(\(py) \(lt) prep-check:*)", "Bash(\(py) \(lt) digest:*)",
+                       "Bash(textutil -convert txt -stdout:*)", "Bash(ls:*)", "Bash(head:*)", "Bash(wc:*)"]
+        allowed += Self.webHosts(in: r.context).map { "WebFetch(domain:\($0))" }
+        let denied = (py.hasPrefix("/") ? ["Bash(python3:*)", "Bash(python:*)"] : []) + ["Bash(curl:*)", "Bash(wget:*)", "Bash(sh:*)", "Bash(bash:*)", "Bash(zsh:*)", "Bash(osascript:*)",
+                      "Bash(find:*)", "Bash(rm:*)", "Bash(open:*)", "WebSearch", "Task", "NotebookEdit",
+                      "Edit(/\(skill)/**)", "Write(/\(skill)/**)"]
+        p.arguments = ["-p", prompt, "--model", model, "--output-format", "stream-json", "--verbose", "--permission-mode", "default",
                        "--allowedTools", allowed.joined(separator: ","),
+                       "--disallowedTools", denied.joined(separator: ","),
+                       "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}",
                        "--add-dir", skill, "--add-dir", live] + (r.workspaceRoot.isEmpty ? [] : ["--add-dir", r.workspaceRoot])
                        + r.folders.flatMap { ["--add-dir", $0] }
         p.currentDirectoryURL = URL(fileURLWithPath: r.useProjectFolder ? r.root : live)
@@ -222,7 +235,9 @@ final class PrepRunner: ObservableObject {
         p.environment = env
         let logs = (appRoot as NSString).appendingPathComponent("logs")
         try? FileManager.default.createDirectory(atPath: logs, withIntermediateDirectories: true)
-        let log = FileHandle.forAppending(path: (logs as NSString).appendingPathComponent("prep-claude.log"))
+        let logPath = (logs as NSString).appendingPathComponent("prep-claude.log")
+        let log = FileHandle.forAppending(path: logPath)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: logPath)
         log?.write(("\n==== \(Date()) \(r.title) -> \(base)\n").data(using: .utf8)!)
         let out = Pipe()
         p.standardOutput = out
@@ -230,7 +245,7 @@ final class PrepRunner: ObservableObject {
         out.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
             if d.isEmpty { return }
-            log?.write(d)
+            Self.logSafe(d, to: log)
             Task { @MainActor in self?.consume(d, skill: skill, base: base) }
         }
         p.terminationHandler = { [weak self] proc in
@@ -268,6 +283,26 @@ final class PrepRunner: ObservableObject {
         result = ""
         progress = 0.02; stage = "Starting Claude Code"; detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil
         return nil
+    }
+
+    /// Hosts of the http(s) links the PM wrote in the call context, plus docs.google.com for Google Docs exports.
+    nonisolated static func webHosts(in text: String) -> [String] {
+        var hosts: Set<String> = []
+        let det = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        det?.enumerateMatches(in: text, range: NSRange(text.startIndex..., in: text)) { m, _, _ in
+            if let u = m?.url, let sc = u.scheme?.lowercased(), sc == "https" || sc == "http", let h = u.host?.lowercased(),
+               h.range(of: "^[a-z0-9.-]+$", options: .regularExpression) != nil { hosts.insert(h) }
+        }
+        if hosts.contains(where: { $0.hasSuffix("google.com") }) { hosts.insert("docs.google.com") }
+        return hosts.sorted()
+    }
+
+    /// The log keeps what explains a failure (system, result and error lines), never tool results with file contents.
+    nonisolated static func logSafe(_ d: Data, to log: FileHandle?) {
+        guard let log = log, let s = String(data: d, encoding: .utf8) else { return }
+        for ln in s.split(separator: "\n") where ln.contains("\"type\":\"result\"") || ln.contains("\"type\":\"system\"") || ln.contains("\"error\"") {
+            log.write((String(ln.prefix(4000)) + "\n").data(using: .utf8)!)
+        }
     }
 
     /// Reads Claude Code's stream-json events and turns tool calls into stages (no guessing from time).

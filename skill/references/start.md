@@ -122,7 +122,9 @@ prep check, state, wrap-up numbers). Call it inside device_bash as `python3 <too
    turns it into Ukrainian gibberish. For an English call write an English prompt. Also
    give `prompt_en` and `prompt_uk` in `start.json`: when the window switches the language
    the recorder swaps to the matching prompt (or drops it for `en` if none).
-3. Start: `python3 <tool_root>/bin/lt start '<json>'` with this JSON (one device_bash call):
+3. Start (one device_bash call; the JSON goes on stdin, so a title like "Client's weekly" cannot
+   break the command): `python3 <tool_root>/bin/lt start - <<'LT_JSON_7f3a'`, then the JSON on one
+   line, then `LT_JSON_7f3a` on its own line. The JSON:
    `{"project_dir": "<Mac path of project_root>", "title": "...", "slug": "...", "me_lang": "...", "me_langs": "xx+yy", "langs": "xx+yy+zz", "me_label": "...", "them_label": "...", "prompt": "...", "prompter": true, "mic_device": "default", "setup": true, "call_type": "auto|presentation|interview", "audience": "auto|team|client|boss", "proactive": "off|on", "hiring_role": "observer|coach|interviewer", "people": ["First Last", "..."], "people_team": ["First Last", "..."], "voices_remember": true}`
    (`people_team` = the names from the config's team table only: their voices are remembered for
    every project; other names are remembered for this project only. `voices_remember: false` on a
@@ -153,6 +155,11 @@ prep check, state, wrap-up numbers). Call it inside device_bash as `python3 <too
    one line and the fix it names.
 5. **Keepalive marker.** Right after `recording`, write the marker with the cloud `Bash`
    tool (this session's own environment, NOT device_bash):
-   `mkdir -p ~/.live-tips && python3 -c 'import json,time; json.dump({"until": time.time()+60*(<tips.hard_cap_minutes>+30), "title": "<title>", "state_file": "<state file path>", "max_blocks": 400}, open("'$HOME'/.live-tips/keepalive.json","w"))'`.
+   one call; the values travel as JSON on stdin, never inside the command:
+```
+mkdir -p ~/.live-tips && python3 -c 'import json,os,sys,time; m=json.load(sys.stdin); m["until"]=time.time()+60*m.pop("minutes"); m["max_blocks"]=400; json.dump(m,open(os.path.expanduser("~/.live-tips/keepalive.json"),"w"))' <<'LT_JSON_7f3a'
+{"minutes": <tips.hard_cap_minutes + 30>, "title": "<title, JSON-escaped>", "state_file": "<state file path>"}
+LT_JSON_7f3a
+```
    If the session has no `Bash` tool, skip it.
 6. One `SendUserMessage` (NOT a final answer, see LOOP DISCIPLINE): `Запис іде: {file name}. Мови: я {me_langs or me_lang}, дозволені {langs}. Мікрофон: {навушники або системний за замовчуванням | мікрофон Мака}.` With the tips window on, add `Підказки у вікні-суфлері.` Do NOT wait for the brief: go to Step 2 right away, and keep the loop alive.

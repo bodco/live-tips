@@ -93,7 +93,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { if lastStatus.state == "recording" { showTips() } else { startCall() } }   // Dock icon
+        // Dock icon: a call in progress (also while waiting for the other side) opens its tips window.
+        if !flag { if CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(lastStatus.state) { showTips() } else { startCall() } }
         return true
     }
 
@@ -254,8 +255,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func requestMic() { AVCaptureDevice.requestAccess(for: .audio) { _ in } }
 
     @objc func showTips() {
-        if lastStatus.state == "recording", let t = lastStatus.tipsFile {
-            openTips(for: CallFiles(tips: t, inbox: lastStatus.inboxFile ?? "", status: CallEngine.shared.statusPath,
+        // 2026-10-27 (owner): reopens a closed tips window for the call in progress, also in standby.
+        let st = EngineStatus.load(path: CallEngine.shared.statusPath)
+        lastStatus = st
+        if ["recording", "standby", "loading_model"].contains(st.state) || CallEngine.shared.isRunning,
+           let t = CallEngine.shared.appTipsFile ?? st.tipsFile {
+            openTips(for: CallFiles(tips: t, inbox: st.inboxFile ?? "", status: CallEngine.shared.statusPath,
                                     control: (CallEngine.shared.appRoot as NSString).appendingPathComponent("control")))
             return
         }
@@ -634,27 +639,25 @@ struct StartCallView: View {
                 }
                 hero
                 HStack(spacing: 10) {
-                    pill("person.2") {
-                        Picker("", selection: $model.audience) {
-                            Text("Auto").tag("auto"); Text("Team").tag("team"); Text("Client").tag("client")
-                        }
-                        .labelsHidden()
+                    ChoicePill(symbol: "person.2", label: ["auto": "Auto", "team": "Team", "client": "Client"][model.audience] ?? "Auto",
+                               help: "Who is on the other side of the call") { close in
+                        OptionList(options: [("auto", "Auto", "Detected from who speaks."),
+                                             ("team", "Team", "An internal call: no corrections of your facts."),
+                                             ("client", "Client", "Stricter: internal numbers are never shown, the client's culture profile is used.")],
+                                   selection: $model.audience, close: close)
                     }
-                    .help("Who is on the other side of the call. Auto: detected from who speaks. Team: internal call, no corrections of your facts. Client: stricter, internal numbers are never shown, the client's culture profile is used.")
-                    pill("rectangle.3.group") {
-                        Picker("", selection: $model.callType) {
-                            Text("Regular").tag("auto"); Text("Presentation").tag("presentation"); Text("Interview").tag("interview")
-                        }
-                        .labelsHidden()
+                    ChoicePill(symbol: "rectangle.3.group", label: ["auto": "Regular", "presentation": "Presentation", "interview": "Interview"][model.callType] ?? "Regular",
+                               help: "Meeting type") { close in
+                        OptionList(options: [("auto", "Regular", "A usual meeting; talk and discussion are told apart by themselves."),
+                                             ("presentation", "Presentation", "Your talk with an outline; best with a preparation."),
+                                             ("interview", "Interview", "A hiring interview; choose your role in More options.")],
+                                   selection: $model.callType, close: close)
                     }
-                    .help("Meeting type. Regular: a usual meeting; talk vs discussion is detected by itself. Presentation (your talk with an outline) and Interview work best with a preparation.")
-                    pill("globe") {
-                        Picker("", selection: Binding(get: { model.language }, set: { model.language = $0; model.languageTouched = true })) {
-                            Text("Ukrainian").tag("uk"); Text("Ukrainian + English").tag("uk+en"); Text("English").tag("en"); Text("English + Spanish").tag("en+es")
-                        }
-                        .labelsHidden()
+                    ChoicePill(symbol: "globe", label: Languages.label(model.language.split(separator: "+").map(String.init)),
+                               help: "Languages spoken on the call") { _ in
+                        LanguagePicker(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
+                                                      set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
                     }
-                    .help("Language of the call: what may be spoken; transcription is restricted to these.")
                 }
             }
             .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 14)

@@ -3332,6 +3332,18 @@ def listener_age() -> int | None:
         return None
 
 
+REQUEST_BLOCKED = {"ollama_url", "index_extra", "semantic_model", "python"}
+
+
+def _local_url(u: str) -> bool:
+    """Embeddings carry call text: only a server on this Mac is accepted."""
+    try:
+        from urllib.parse import urlsplit
+        return urlsplit(u).hostname in ("127.0.0.1", "localhost", "::1")
+    except ValueError:
+        return False
+
+
 def load_request(args) -> dict:
     cfg = dict(DEFAULTS)
     user_cfg = ROOT / "config.json"
@@ -3352,7 +3364,16 @@ def load_request(args) -> dict:
     for key in ("langs", "me_langs"):
         if isinstance(req.get(key), str):
             req[key] = [l.strip() for l in req[key].replace("+", ",").split(",") if l.strip()]
-    cfg.update({k: v for k, v in req.items() if v not in (None, "")})
+    # Security (audit 2026-10-27): a start request (written by the skill, the app or anyone who can write
+    # control/) may set call settings, not where data is sent or which folders are read: those stay in config.json.
+    blocked = {k for k in req if k in REQUEST_BLOCKED or k.endswith("_url")}
+    if blocked:
+        print(f"start request: ignored {sorted(blocked)} (set them in config.json)", file=sys.stderr)
+    cfg.update({k: v for k, v in req.items() if v not in (None, "") and k not in blocked})
+    if not _local_url(str(cfg.get("ollama_url") or "")):
+        print("ollama_url is not on this Mac: the semantic layer stays off", file=sys.stderr)
+        cfg["ollama_url"] = DEFAULTS["ollama_url"]
+        cfg["semantic_enabled"] = False
     raw_md = str(cfg.get("mic_device") or "default").strip()
     md = raw_md.lower().replace(" ", "_")
     if raw_md.startswith("uid:") and len(raw_md) > 4:
@@ -3761,6 +3782,10 @@ def main() -> int:
             if key == "go":
                 go_live("Start pressed in the window")
                 continue
+            if key == "call_lang" and isinstance(val, str) and val not in LANG_SETS and re.fullmatch(r"[a-z]{2,3}(\+[a-z]{2,3}){0,4}", val):
+                # 2026-10-27: any Whisper language or a set of them ("es", "de+en"); the first is the main one.
+                codes = val.split("+")
+                LANG_SETS[val] = (codes[0], list(codes), list(codes))
             if key == "call_lang" and val in LANG_SETS:
                 me, me_langs, langs = LANG_SETS[val]
                 cfg.update(me_lang=me, me_langs=me_langs, langs=langs)

@@ -194,10 +194,11 @@ def cmd_start(args):
     args = [a for a in args if a != "--dry-run"]
     wait = float(opt(args, "--wait", 60))
     if not args:
-        print("usage: lt start '<json>' [--dry-run] [--wait 60]")
+        print("usage: lt start - [--dry-run] [--wait 60]   (the JSON on stdin; or lt start '<json>')")
         sys.exit(2)
     try:
-        req = json.loads(args[0])
+        # "-": the JSON comes on stdin (a quoted heredoc), so titles and names never pass through the shell.
+        req = json.loads(sys.stdin.read() if args[0] == "-" else args[0])
     except json.JSONDecodeError as e:
         raise LtError(f"start: the argument is not valid JSON ({e})")
     if not isinstance(req, dict):

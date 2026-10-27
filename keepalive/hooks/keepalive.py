@@ -11,6 +11,7 @@ The skill removes the marker after the wrap-up and the Meetings DB page.
 """
 import json
 import os
+import re
 import sys
 import time
 
@@ -22,9 +23,10 @@ def allow():
 
 
 try:
-    sys.stdin.read()            # hook input (session id, stop_hook_active); not needed
+    inp = json.loads(sys.stdin.read() or "{}")   # hook input: session_id, stop_hook_active
 except Exception:  # noqa: BLE001
-    pass
+    inp = {}
+sid = str(inp.get("session_id") or "")
 
 try:
     with open(MARKER, encoding="utf-8") as f:
@@ -35,6 +37,14 @@ except Exception:  # noqa: BLE001
 
 if time.time() > until:
     allow()
+
+# Security (audit 2026-10-27): the marker belongs to one session. The first session that is held binds it
+# (the skill may also write session_id itself); every other session in the same HOME stops normally.
+owner = str(m.get("session_id") or "")
+if owner and sid and owner != sid:
+    allow()
+if not owner and sid:
+    m["session_id"] = sid
 
 blocks = int(m.get("blocks", 0)) + 1
 if blocks > int(m.get("max_blocks", 400)):
@@ -48,8 +58,15 @@ try:
 except OSError:
     pass
 
-title = m.get("title") or "the call"
-state = m.get("state_file") or "the .state.json next to the transcript"
+def clean(v, n):
+    """Only plain characters reach Claude: the reason is hook feedback, so no quotes, brackets or newlines."""
+    return re.sub(r"[^\w .,:/~()-]", "", str(v or ""), flags=re.UNICODE)[:n].strip()
+
+
+title = clean(m.get("title"), 80) or "the call"
+state = clean(m.get("state_file"), 200)
+if not state.endswith(".state.json"):
+    state = "the .state.json next to the transcript"
 reason = (
     f"live-tips: the call \"{title}\" is still being recorded. Do NOT end the turn. "
     f"Send anything for the PM with SendUserMessage, then make the next read_delta poll "

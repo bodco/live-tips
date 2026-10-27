@@ -473,6 +473,7 @@ struct SettingsView: View {
         Pane(id: "general", title: "General", symbol: "gearshape", subtitle: "Your name on calls, folders, Notion and how the app behaves."),
         Pane(id: "keys", title: "Keys", symbol: "key", subtitle: "The Claude API key and the Notion token, kept in the macOS Keychain."),
         Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
+        Pane(id: "notion", title: "Notion", symbol: "doc.text", subtitle: "Meeting pages after each call and the optional local copy of Notion."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
         Pane(id: "how", title: "How it works", symbol: "point.3.connected.trianglepath.dotted", subtitle: "What happens before, during and after a call."),
         Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
@@ -517,6 +518,7 @@ struct SettingsView: View {
         case "keys": keys
         case "projects": projects
         case "ai": ai
+        case "notion": notion
         case "how": HowItWorksView()
         case "about": AboutView(model: model)
         default: general
@@ -527,7 +529,7 @@ struct SettingsView: View {
         Form {
             Section {
                 KeyRow(title: "Claude API key", hint: "From console.anthropic.com > API keys. Used for tips during the call and the summary after it.", key: .claudeAPIKey, model: model)
-                KeyRow(title: "Notion token", hint: "Internal integration token (notion.so/my-integrations). Optional: fresh changes and the call summary in Notion.", key: .notionToken, model: model)
+                KeyRow(title: "Notion token", hint: "Optional. Set it up in Settings > Notion.", key: .notionToken, model: model)
             } footer: {
                 Text("Paste with ⌘V and press Return. Each key is checked with one request. Keys live only in the macOS Keychain and survive app updates.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -769,7 +771,7 @@ struct SettingsView: View {
             Text("Each project is a folder on your Mac: work folder > workspace > project. Calls, preparations and notes are saved in the project folder.")
             Text("Tick a project to see it in Start call. Untick a project that is over; nothing is deleted.")
             Text("⋯ removes a project or a whole workspace from Live Tips. The folders stay on your Mac; Scan work folder or Add brings them back.")
-            Text("A Control Tower config or a Notion copy are optional: they add the team, Notion pages and the project's current state.")
+            Text("Optional extras come from PM Control Tower (a separate free framework): a project file projects/<project>.md with the team, the Notion pages and the Meetings database. You get it when you set a project up there; then Add > Import Control Tower configs. Without it everything still works from the folders.")
         }
         .font(.callout).fixedSize(horizontal: false, vertical: true)
         .padding(16).frame(width: 380)
@@ -821,29 +823,29 @@ struct SettingsView: View {
         }
     }
 
-    var general: some View {
+    // 2026-10-27 (owner): everything about Notion in one place (it was hidden under General > Behaviour).
+    var notion: some View {
         Form {
-            if !model.readyItems.allSatisfy(\.ok) {
+            Section {
+                Toggle("Write a meeting page after each call", isOn: $model.config.notionWriteSummary)
+                KeyRow(title: "Notion token", hint: "An internal integration secret (ntn_…) from notion.so/profile/integrations. Then open the Notion page where meeting notes should live, ••• > Connections, add your integration.", key: .notionToken, model: model)
+                NotionDestinationView()
+            } header: { Text("Meeting pages") } footer: {
+                Text("After the call: a short summary, decisions, action items, open questions and the transcript, in the call's language. Missed one? Live Tips menu > Send last call to Notion.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            let withConfig = model.registry.projects.filter { !$0.config.isEmpty }
+            if !withConfig.isEmpty {
                 Section {
-                    ForEach(model.readyItems, id: \.title) { it in
-                        HStack {
-                            Image(systemName: it.ok ? "checkmark.circle.fill" : "circle").foregroundStyle(it.ok ? Color.green : Color.secondary)
-                            Text(it.title)
-                            Spacer()
-                            if !it.ok, let tab = it.tab { Button(it.action) { model.tab = tab } }
-                            else if !it.ok, it.action == "Import…" { Button(it.action) { model.importProjects() } }
-                            else if !it.ok { Text(it.action).font(.caption).foregroundStyle(.secondary) }
-                        }
+                    ForEach(withConfig, id: \.slug) { p in
+                        LabeledContent(p.name) { Text("its own Meetings database").foregroundStyle(.secondary) }
                     }
-                } header: { Text("Get ready for the first call") } footer: {
-                    Text("This list disappears when everything is set. The same list is in About.").font(.caption).foregroundStyle(.secondary)
+                } header: { Text("Projects set up with PM Control Tower") } footer: {
+                    Text("These projects have a PM Control Tower project file (projects/<project>.md) that names their Meetings database, so their pages go there. Every other project uses the database above. Without PM Control Tower this list is empty and nothing here applies.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
             Section {
-                FolderRow(title: "Work folder",
-                          hint: "The folder you connected to Cowork, where your project folders live. Live Tips keeps its files in <work folder>/Tools/LiveTips (the skill sees them) and reads the Notion mirror from <work folder>/_notion.",
-                          path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder("Choose your work folder") })
-                    .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
                 LabeledContent {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -867,6 +869,37 @@ struct SettingsView: View {
                 } label: {
                     Text("Notion mirror").help("A read-only copy of your Notion as .md files, refreshed by a background job every 2 hours. Live Tips reads it for facts and search; anything newer comes from the Notion API.")
                 }
+            } header: { Text("Local copy of Notion (optional)") } footer: {
+                Text("A read-only copy of your PM Control Tower Notion as files, for facts and search during calls. Needed only with PM Control Tower.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    var general: some View {
+        Form {
+            if !model.readyItems.allSatisfy(\.ok) {
+                Section {
+                    ForEach(model.readyItems, id: \.title) { it in
+                        HStack {
+                            Image(systemName: it.ok ? "checkmark.circle.fill" : "circle").foregroundStyle(it.ok ? Color.green : Color.secondary)
+                            Text(it.title)
+                            Spacer()
+                            if !it.ok, let tab = it.tab { Button(it.action) { model.tab = tab } }
+                            else if !it.ok, it.action == "Import…" { Button(it.action) { model.importProjects() } }
+                            else if !it.ok { Text(it.action).font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
+                } header: { Text("Get ready for the first call") } footer: {
+                    Text("This list disappears when everything is set. The same list is in About.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                FolderRow(title: "Work folder",
+                          hint: "The folder you connected to Cowork, where your project folders live. Live Tips keeps its files in <work folder>/Tools/LiveTips (the skill sees them) and reads the Notion mirror from <work folder>/_notion.",
+                          path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder("Choose your work folder") })
+                    .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
                 LabeledContent("Your name on calls") {
                     TextField("", text: $model.aliasesText, prompt: Text("e.g. Alex, Alexander, Sasha"))
                         .onSubmit { model.saveAliases() }
@@ -883,13 +916,6 @@ struct SettingsView: View {
                     .help("Default for new calls. The tips window menu changes it for one call only.")
                 Toggle("Show Live Tips in the Dock", isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
-                Toggle("Write the call summary to Notion", isOn: $model.config.notionWriteSummary)
-                    .help("After the call: updates the meeting's Notion page (or creates one) in your Meetings database. The Cowork skill can do it instead.")
-                if model.config.notionWriteSummary {
-                    NotionDestinationView()
-                    Text("Projects with a Control Tower config write to their own Meetings database; the one chosen here is for every other project.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
             } header: { Text("Behaviour") } footer: {
                 HStack {
                     Text("Settings save automatically and survive updates: options in Application Support/LiveTips, keys in the Keychain.")
@@ -1084,7 +1110,7 @@ final class SettingsWindow {
     static let model = SettingsModel()
 
     static func title(for tab: String) -> String {
-        ["general": "General", "keys": "Keys", "projects": "Projects", "ai": "AI", "how": "How Live Tips works", "about": "About Live Tips"][tab] ?? "Settings"
+        ["general": "General", "keys": "Keys", "projects": "Projects", "ai": "AI", "notion": "Notion", "how": "How Live Tips works", "about": "About Live Tips"][tab] ?? "Settings"
     }
 
     static func show(tab: String = "general") {

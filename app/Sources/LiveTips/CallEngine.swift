@@ -34,6 +34,7 @@ final class CallEngine {
     var lastCallSummary = ""
     var lastLines = 0
     var liveSpent = 0.0, liveTips = 0
+    var renamed: String?          // a new title given during the call (tips window)
     /// 2026-10-26 (owner): what the last call cost, for the menu: the tips engine during the call plus the
     /// Notion wrap-up after it (state/last-call.json, survives a restart).
     var lastCallPath: String { (appRoot as NSString).appendingPathComponent("state/last-call.json") }
@@ -61,6 +62,33 @@ final class CallEngine {
         }
         if c.engine.python.isEmpty || !fm.isExecutableFile(atPath: c.engine.python) { p.append("Recorder Python not set") }
         return p
+    }
+
+    /// Security (audit 2026-10-27): the recorder runs from the app folder, which any process of this user can
+    /// write, and it inherits the app's microphone and screen-audio permissions. Before every call the core
+    /// files are compared with the signed copies inside Live Tips.app; a changed file is put back.
+    func verifyCore() {
+        guard let core = Bundle.main.resourceURL?.appendingPathComponent("core").path else { return }
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: (core as NSString).appendingPathComponent("VERSION")) else { return }   // dev build
+        var restored: [String] = []
+        for rel in ["src/transcriber.py", "src/semantic.py", "bin/lt", "bin/read_delta.py", "bin/audiocap"] {
+            let src = (core as NSString).appendingPathComponent(rel), dst = (appRoot as NSString).appendingPathComponent(rel)
+            guard let a = fm.contents(atPath: src) else { continue }
+            if fm.contents(atPath: dst) == a { continue }
+            let tmp = (dst as NSString).deletingLastPathComponent + "/." + (rel as NSString).lastPathComponent + ".new"
+            try? fm.removeItem(atPath: tmp)
+            do {
+                try fm.copyItem(atPath: src, toPath: tmp)
+                _ = try fm.replaceItemAt(URL(fileURLWithPath: dst), withItemAt: URL(fileURLWithPath: tmp))
+                try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dst)
+                restored.append(rel)
+            } catch { try? fm.removeItem(atPath: tmp) }
+        }
+        if !restored.isEmpty {
+            let logs = (appRoot as NSString).appendingPathComponent("logs/recorder.log")
+            FileHandle.forAppending(path: logs)?.write("\n\(Date()) core files changed outside the app, restored: \(restored.joined(separator: ", "))\n".data(using: .utf8)!)
+        }
     }
 
     /// The recorder's audio helper (bin/audiocap) must start. 2026-10-23: after an update the helper was
@@ -100,6 +128,7 @@ final class CallEngine {
     func start(request: [String: Any], apiAllowed: Bool, onReady: @escaping (EngineStatus) -> Void) -> String? {
         if isRunning { return "A call is already running" }
         if let first = problems().first { return first }
+        verifyCore()
         if let err = ensureAudioHelper() { return err }
         LocalAIService.shared.apply()                       // core config: semantic on/off, engine URL
         if config.localAI.enabled { _ = LocalAIService.shared.waitReady(timeout: 6) }
@@ -131,7 +160,7 @@ final class CallEngine {
         recorder = p
         IndexService.shared.pause()        // the indexer waits while Whisper and the tips engine run
         self.onReady = onReady
-        liveSpent = 0; liveTips = 0
+        liveSpent = 0; liveTips = 0; renamed = nil
         poll?.invalidate()
         var sidecarStarted = false
         var consentDone = false
@@ -260,7 +289,7 @@ final class CallEngine {
         // 2026-10-26: the running call picture needs who the PM is on this call.
         for k in ["participants", "pm_projects"] { if let v = callRequest[k] as? [String], !v.isEmpty { sc[k] = v } }
         sc["situation"] = true
-        sc["proactive"] = false
+        sc["proactive"] = ((UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:])["proactive"] as? String) == "1"   // remembered in the tips window
         sc["project_root"] = projectRoot
         // lt search: by meaning with Local AI on, plain text search otherwise (2026-10-26: "Search the project" works either way).
         sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")]
@@ -299,11 +328,11 @@ final class CallEngine {
         guard c.notionWriteSummary else { return }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         guard let key = store.get(.claudeAPIKey), let notionToken = store.get(.notionToken) else {
-            notionResult = "Notion: add the Notion token in Settings > Keys"; notify(notionResult); return
+            notionResult = "Notion: add the Notion token in Settings > Notion"; notify(notionResult, settingsTab: "notion"); return
         }
         let hasConfig = !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig)
         guard hasConfig || !c.notionMeetingsDB.isEmpty else {
-            notionResult = "Notion: choose where meeting pages go in Settings > General > Notion"; notify(notionResult); return
+            notionResult = "Notion: choose where meeting pages go (Settings > Notion). Then use Send last call to Notion in the menu."; notify(notionResult, settingsTab: "notion"); return
         }
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
         let p = Process()
@@ -314,6 +343,7 @@ final class CallEngine {
                        "--model", c.models.tip, "--project-name", projectName]
             + (hasConfig ? ["--project-config", projectConfig] : [])
             + (c.notionMeetingsDB.isEmpty ? [] : ["--meetings-db", c.notionMeetingsDB])
+            + (renamed.map { ["--title", $0] } ?? [])
             + ((callRequest["scheduled_at"] as? String).map { ["--when", $0] } ?? [])   // the date and time set in Start call
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = ProcessInfo.processInfo.environment
@@ -393,14 +423,16 @@ final class CallEngine {
         do { try p.run(); judgeRunning = p } catch { judgeResult = "Tips rated: the check could not start" }
     }
 
-    func notify(_ text: String, url: String? = nil) {
+    func notify(_ text: String, url: String? = nil, settingsTab: String? = nil) {
         let a = NSAlert()
         a.messageText = "Live Tips"
         a.informativeText = text
-        a.addButton(withTitle: url == nil ? "OK" : "Open in Notion")
-        if url != nil { a.addButton(withTitle: "Close") }
+        a.addButton(withTitle: url != nil ? "Open in Notion" : (settingsTab != nil ? "Open Settings" : "OK"))
+        if url != nil || settingsTab != nil { a.addButton(withTitle: "Later") }
         NSApp.activate(ignoringOtherApps: true)
-        if a.runModal() == .alertFirstButtonReturn, let u = url, let link = URL(string: u) { NSWorkspace.shared.open(link) }
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        if let u = url, let link = URL(string: u) { NSWorkspace.shared.open(link) }
+        if let tab = settingsTab { MainActor.assumeIsolated { SettingsWindow.show(tab: tab) } }
     }
 
     /// 2026-10-26: the app was restarted during a call (an update), so it no longer owns the recorder.

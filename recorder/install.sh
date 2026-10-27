@@ -96,17 +96,21 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST" || fail "launchctl bootstrap"
 echo "LaunchAgent loaded"
 
 # 7. Permissions test (prompts appear for Terminal)
+umask 077
+LT_TMP="$(mktemp -d)"; trap 'rm -rf "$LT_TMP"' EXIT
+export LT_TMP
 echo "--- permissions test: 5 c мікрофона і 5 c системного звуку"
 echo "Якщо macOS спитає дозвіл на мікрофон або запис системного звуку для Terminal, дозволь."
-"$ROOT/bin/audiocap" --source mic --seconds 5 > /tmp/lt-mic.raw 2>>"$ROOT/logs/audiocap-mic.log"
-echo "mic bytes: $(stat -f %z /tmp/lt-mic.raw)"
+"$ROOT/bin/audiocap" --source mic --seconds 5 > "$LT_TMP/lt-mic.raw" 2>>"$ROOT/logs/audiocap-mic.log"
+echo "mic bytes: $(stat -f %z "$LT_TMP/lt-mic.raw")"
 echo "Увімкни будь-який звук (YouTube) на 5 с..."
-"$ROOT/bin/audiocap" --source system --seconds 6 > /tmp/lt-sys.raw 2>>"$ROOT/logs/audiocap-system.log"
-echo "system bytes: $(stat -f %z /tmp/lt-sys.raw)"
+"$ROOT/bin/audiocap" --source system --seconds 6 > "$LT_TMP/lt-sys.raw" 2>>"$ROOT/logs/audiocap-system.log"
+echo "system bytes: $(stat -f %z "$LT_TMP/lt-sys.raw")"
 "$ROOT/.venv/bin/python" - <<'PYEOF'
+import os
 import numpy as np
 for name in ("mic", "sys"):
-    a = np.fromfile(f"/tmp/lt-{name}.raw", dtype=np.float32)
+    a = np.fromfile(f"{os.environ['LT_TMP']}/lt-{name}.raw", dtype=np.float32)
     print(f"{name}: {len(a)/16000:.1f} s, peak {float(np.abs(a).max()) if len(a) else 0:.4f}")
 PYEOF
 tail -n 3 "$ROOT/logs/audiocap-mic.log" "$ROOT/logs/audiocap-system.log"

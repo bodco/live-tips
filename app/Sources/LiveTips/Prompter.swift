@@ -104,7 +104,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func show() {
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript", "pref", "rename"] { uc.add(self, name: name) }
+        // The remembered window settings, before the page's own script runs.
+        let prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
+        if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
+            uc.addUserScript(WKUserScript(source: "window.LT_PREFS = " + js + ";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
         let cfg = WKWebViewConfiguration()
         cfg.userContentController = uc
 
@@ -146,6 +151,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         web.autoresizingMask = [.width, .height]
         window.contentView = web
         let url = URL(fileURLWithPath: args.html)
+        pageURL = url
         web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
 
         window.makeKeyAndOrderFront(nil)
@@ -218,6 +224,18 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         }
     }
 
+    /// Security (audit 2026-10-27): the window shows only its own page. https links open in the browser,
+    /// everything else (other files, javascript:, data:, custom schemes) is refused.
+    var pageURL: URL?
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
+        guard let u = action.request.url else { decisionHandler(.cancel); return }
+        if u.isFileURL, let page = pageURL, u.standardizedFileURL.path == page.standardizedFileURL.path { decisionHandler(.allow); return }
+        if u.absoluteString == "about:blank" { decisionHandler(.allow); return }
+        if u.scheme?.lowercased() == "https", action.navigationType == .linkActivated { NSWorkspace.shared.open(u) }
+        decisionHandler(.cancel)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pageReady = true
         web.evaluateJavaScript("window.enableGlass && window.enableGlass()", completionHandler: nil)
@@ -278,6 +296,18 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             // The transcript pane opens next to the tips: the window grows the same way as for slide cards.
             trWide = (message.body as? Bool) ?? false
             setSplit(deckWide || trWide, growRight: deckGrowRight, animate: true)
+        case "rename":
+            // 2026-10-27 (owner): rename the call while it runs (a title typed in a hurry).
+            guard let v = (message.body as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty else { return }
+            MainActor.assumeIsolated { CallEngine.shared.callRequest["title"] = v; CallEngine.shared.renamed = v }
+            window.title = "Live Tips: " + v
+            if !args.inbox.isEmpty { appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": "title", "value": v]), to: args.inbox) }
+        case "pref":
+            // Window settings remembered across calls (opacity, text size, proactive, language...).
+            guard let d = message.body as? [String: Any], let k = d["k"] as? String else { return }
+            var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
+            prefs[k] = d["v"] as? String ?? ""
+            UserDefaults.standard.set(prefs, forKey: "prompterPrefs")
         case "setting":
             // {"key": ..., "value": ...} -> the skill reads it from the inbox as @@SET key=value
             guard let d = message.body as? [String: Any], let key = d["key"] as? String,
@@ -325,24 +355,27 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         FileManager.default.createFile(atPath: (args.control as NSString).appendingPathComponent("go"), contents: Data())
         startButton?.isHidden = true
     }
+    /// 2026-10-27 (owner): the call buttons in the same style as the rest of the app: a soft pill,
+    /// blue to start, red to end, both say "call".
+    func pillButton(_ title: String, color: NSColor, filled: Bool, action: Selector) -> NSButton {
+        let b = NSButton(title: title, target: self, action: action)
+        b.isBordered = false
+        b.wantsLayer = true
+        b.layer?.cornerRadius = 9
+        b.layer?.backgroundColor = (filled ? color : color.withAlphaComponent(0.18)).cgColor
+        b.attributedTitle = NSAttributedString(string: title, attributes: [
+            .foregroundColor: filled ? NSColor.white : color, .font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
+        let size = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
+        b.frame = NSRect(x: 0, y: 0, width: ceil(size.width) + 24, height: 22)
+        return b
+    }
+
     func addEndCallButton() {
-        let b = NSButton(title: "End call", target: self, action: #selector(endCallClicked))
-        b.bezelStyle = .rounded
-        b.controlSize = .small
-        b.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        b.bezelColor = .systemRed
-        b.contentTintColor = .white
+        let b = pillButton("End call", color: .systemRed, filled: false, action: #selector(endCallClicked))
         b.toolTip = "Stop recording this call"
-        b.sizeToFit()
-        // Green Start while the window waits for the call (standby); it starts by itself when the other side speaks.
-        let g = NSButton(title: "Start", target: self, action: #selector(startClicked))
-        g.bezelStyle = .rounded
-        g.controlSize = .small
-        g.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
-        g.bezelColor = .systemGreen
-        g.contentTintColor = .white
+        // Start call while the window waits for the call (standby); it also starts by itself when the other side speaks.
+        let g = pillButton("Start call", color: .controlAccentColor, filled: true, action: #selector(startClicked))
         g.toolTip = "Start recording now (otherwise it starts when the other side speaks)"
-        g.sizeToFit()
         g.isHidden = true
         let w = g.frame.width + b.frame.width + 18
         let holder = NSView(frame: NSRect(x: 0, y: 0, width: w, height: 28))

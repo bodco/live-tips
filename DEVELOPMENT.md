@@ -23,8 +23,10 @@ place, [`rules/`](rules/), which both read.
 1. Download the dmg from the release page:
    [LiveTips.dmg](https://github.com/bodco/live-tips/releases/latest/download/LiveTips.dmg).
    Open it and drag **Live Tips** into Applications.
-2. **First open: right-click > Open**, then confirm. The beta is not notarized by Apple yet, so a
-   plain double-click is blocked the first time. After that it opens normally.
+2. **First open:** the beta is not notarized by Apple yet, so macOS blocks the first launch. Open
+   **System Settings > Privacy & Security** and press **Open Anyway** (on macOS 14 a right-click >
+   **Open** also works). After that it opens normally. Check the download first against
+   `SHA256SUMS.txt` in the release: `shasum -a 256 ~/Downloads/LiveTips.dmg`.
 3. The **Setup** window checks what is there and installs the rest: the Python modules, the speech
    model and the local AI model. Each step gets a tick when it is done. In total it is about
    2.5 GB, and nothing needs an administrator password.

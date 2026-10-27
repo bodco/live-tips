@@ -1243,7 +1243,7 @@
     }
   }
   function i18nSpan(key, p) {
-    return '<span data-i18n="' + key + '"' + (p && p.n != null ? ' data-n="' + esc(p.n) + '"' : '') + '>' + esc(t(key, p)) + '</span>';
+    return '<span data-i18n="' + esc(key) + '"' + (p && p.n != null ? ' data-n="' + esc(p.n) + '"' : '') + '>' + esc(t(key, p)) + '</span>';
   }
   applyStatic();
 
@@ -1668,13 +1668,13 @@
     if (it.t) meta += '<span class="time">' + (kind === 'card' ? '⚡ ' : '') + esc(it.t) + '</span>';
     if (lag != null) meta += '<span class="lag' + (lag > 20 ? ' slow' : '') + '">+' + lag + 's</span>';
     if (it.late) meta += '<span class="latetag" data-i18n="late" data-i18n-title="late_tt" title="' + esc(t('late_tt')) + '">' + esc(t('late')) + '</span>';
-    if (it.noteKey) meta += '<span class="note" data-i18n="' + it.noteKey + '">' + esc(t(it.noteKey)) + '</span>';
+    if (it.noteKey) meta += '<span class="note" data-i18n="' + esc(it.noteKey) + '">' + esc(t(it.noteKey)) + '</span>';
     else if (it.note) meta += '<span class="note">' + inline(it.note) + '</span>';
     var rateable = kind === 'tip' || kind === 'card' || kind === 'answer' || kind === 'fact';
     // Speech, brief checklist, status and wrap-up are not rated, but can be pinned (2026-10-21).
     var pinnable = rateable || kind === 'speech' || kind === 'checklist' || kind === 'status' || kind === 'wrapup';
     var fb = '';
-    function fbBtn(cls, key, icon) { return '<button class="' + cls + '" type="button" data-i18n-title="' + key + '" data-i18n-aria="' + key + '" title="' + esc(t(key)) + '" aria-label="' + esc(t(key)) + '">' + icon + '</button>'; }
+    function fbBtn(cls, key, icon) { return '<button class="' + cls + '" type="button" data-i18n-title="' + esc(key) + '" data-i18n-aria="' + esc(key) + '" title="' + esc(t(key)) + '" aria-label="' + esc(t(key)) + '">' + icon + '</button>'; }
     if (pinnable) fb += fbBtn('pin', 'pin_card_tt', ICON.pin);
     if (rateable) fb += fbBtn('yes', 'yes_tt', ICON.yes) + fbBtn('part', 'part_tt', ICON.part) + fbBtn('no', 'no_tt', ICON.no);
     html += '<div class="foot"><div class="meta">' + meta + '</div>' + (fb ? '<div class="fb">' + fb + '</div>' : '') + '</div>';

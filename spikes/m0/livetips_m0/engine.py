@@ -129,7 +129,7 @@ Return JSON only, no prose:
 Rules:
 - mine = the topic is about the PM's projects or work, or the PM is asked or assigned something in it. Someone else's update about their own project is not mine.
 - asks = OPEN questions or requests TO THE PM: by name, by "you" after the PM spoke, or about the PM's projects; also a request said in the third person ("Alex will check"). type update = the PM is asked for their status or given the floor for their update (also by a nickname or short form of the PM's name, "давай", "твоя черга", "over to you", or the host moving to the PM's projects). Remove an ask once the PM answered it or did it. Questions to other people, and questions the PM asked others, are not asks.
-- actions = everything the PM took on or was given on this call (keep them all until the call ends, update the due date when it changes). Not other people's tasks.
+- actions = only what the PM personally took on in the PM's own lines ("{me}": "I will...", "я зроблю...") or what someone explicitly assigned to the PM by name or "you" in reply to the PM (keep them until the call ends, update the due date when it changes). NEVER an item from someone else's update about their own work, even in the first person ("I will prepare the report for Brian" said by another speaker is THEIR task), never a task for another named person, never a general to-do of the team. When unsure who owns it, leave it out.
 - decisions = only decisions actually agreed aloud, keep them all.
 - speech_done = only points the PM said aloud in the PM's own lines ("{me}"); nobody else's update counts. Empty until the PM gives the update.
 - Keep the ids of items you keep; new items get new ids. Never invent: only what was said."""

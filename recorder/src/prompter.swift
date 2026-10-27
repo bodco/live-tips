@@ -179,6 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         web.autoresizingMask = [.width, .height]
         window.contentView = web
         let url = URL(fileURLWithPath: args.html)
+        pageURL = url
         web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
 
         window.makeKeyAndOrderFront(nil)
@@ -236,6 +237,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         } else {
             pending.append(js)
         }
+    }
+
+    /// Security (audit 2026-10-27): only the window's own page loads; https links open in the browser.
+    var pageURL: URL?
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let u = action.request.url else { decisionHandler(.cancel); return }
+        if u.isFileURL, let page = pageURL, u.standardizedFileURL.path == page.standardizedFileURL.path { decisionHandler(.allow); return }
+        if u.absoluteString == "about:blank" { decisionHandler(.allow); return }
+        if u.scheme?.lowercased() == "https", action.navigationType == .linkActivated { NSWorkspace.shared.open(u) }
+        decisionHandler(.cancel)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

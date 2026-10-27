@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -184,7 +185,12 @@ def upload_md(name: str, text: str) -> str:
     body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\n"
             f"Content-Type: text/markdown\r\n\r\n").encode() + text.encode("utf-8") + f"\r\n--{boundary}--\r\n".encode()
     tok = os.environ.get("NOTION_TOKEN", "")
-    http("POST", fu["upload_url"], {"Authorization": f"Bearer {tok}", "Notion-Version": NOTION_VERSION},
+    url = str(fu.get("upload_url", ""))
+    # Security (audit 2026-10-27): the token goes only to Notion's own API host, never to a URL from a response.
+    host = urllib.parse.urlsplit(url)
+    if host.scheme != "https" or not (host.hostname == "api.notion.com" or (host.hostname or "").endswith(".notion.com")):
+        raise RuntimeError("Notion returned an unexpected upload address; not sending the token there")
+    http("POST", url, {"Authorization": f"Bearer {tok}", "Notion-Version": NOTION_VERSION},
          raw=body, ctype=f"multipart/form-data; boundary={boundary}")
     return fu["id"]
 
@@ -242,6 +248,7 @@ def main(argv=None) -> int:
     ap.add_argument("--project-config", type=Path, default=None, help="Control Tower config (meetings_db, page ids)")
     ap.add_argument("--meetings-db", default="", help="data source id of the Meetings database (used without a config)")
     ap.add_argument("--project-name", default="", help="written to a Project select or text property")
+    ap.add_argument("--title", default="", help="the call's name when it was renamed during the call")
     ap.add_argument("--lt", nargs=2, required=True)
     ap.add_argument("--model", default="claude-sonnet-5-5")
     ap.add_argument("--when", default="", help="ISO date and time of the meeting set in Start call (title date)")
@@ -269,6 +276,8 @@ def main(argv=None) -> int:
         brief_f = Path(str(a.md)[:-3] + ".brief.md")
         brief = brief_f.read_text(encoding="utf-8") if brief_f.exists() else ""
         info = header_info(a.md)
+        if a.title.strip():
+            info["title"] = a.title.strip()
         if a.when:   # 2026-10-26 (owner): the title's date is the meeting time set in the app, not the recording start
             try:
                 info["start"] = dt.datetime.fromisoformat(a.when.replace("Z", "+00:00")).astimezone()

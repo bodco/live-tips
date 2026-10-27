@@ -22,6 +22,9 @@ find_python() {
   return 1
 }
 vimport() { [ -x "$VPY" ] && "$VPY" -c "$1" >/dev/null 2>&1; }
+# Security (audit 2026-10-27): packages are capped at the versions Live Tips was tested with (a new, possibly
+# hijacked release is never picked up), and every downloaded model file is checked against its SHA-256.
+sha_ok() { [ "$(shasum -a 256 "$1" | cut -d' ' -f1)" = "$2" ]; }
 pip_in() { "$VPY" -m pip install --progress-bar off "$@" 2>&1 | grep -E "^(Collecting|Installing|Successfully|ERROR)" ; return "${PIPESTATUS[0]}"; }
 
 case "$MODE:$STEP" in
@@ -64,12 +67,12 @@ case "$MODE:$STEP" in
   check:recorder)
     if vimport "import mlx_whisper, numpy"; then echo "OK mlx-whisper $("$VPY" -c 'import importlib.metadata as m;print(m.version("mlx-whisper"))' 2>/dev/null)"; else echo "MISSING"; fi ;;
   install:recorder)
-    pip_in mlx-whisper numpy && { pip_in webrtcvad-wheels || echo "webrtcvad not available: a simpler speech detector is used"; } ;;
+    pip_in "mlx-whisper>=0.4,<=0.4.3" "numpy>=1.26,<=2.5.4" && { pip_in "webrtcvad-wheels<=2.0.14.post1" || echo "webrtcvad not available: a simpler speech detector is used"; } ;;
 
   check:tips)
     if vimport "import anthropic, yaml, jsonschema, onnxruntime, tokenizers"; then echo "OK"; else echo "MISSING"; fi ;;
   install:tips)
-    pip_in "anthropic>=0.70" "pyyaml>=6" "jsonschema>=4.20" onnxruntime tokenizers ;;
+    pip_in "anthropic>=0.70,<=2.1.0" "pyyaml>=6,<=6.0.3" "jsonschema>=4.20,<=4.26.0" "onnxruntime>=1.17,<=1.31.0" "tokenizers>=0.15,<=0.23.3" ;;
 
   check:whisper)
     d="$HOME/.cache/huggingface/hub/models--${WHISPER_MODEL//\//--}"
@@ -88,20 +91,29 @@ PY
     if [ -s "$m/model_quantized.onnx" ] && [ -s "$m/tokenizer.json" ]; then echo "OK bge-m3 int8"; else echo "MISSING about 590 MB"; fi ;;
   install:localai)
     m="$APPROOT/models/bge-m3-int8"; mkdir -p "$m"; base="https://huggingface.co/Xenova/bge-m3/resolve/main"
-    for f in tokenizer.json config.json onnx/model_quantized.onnx; do
-      out="$m/$(basename "$f")"; [ -s "$out" ] && { echo "have $(basename "$f")"; continue; }
+    for fh in tokenizer.json:6710678b12670bc442b99edc952c4d996ae309a7020c1fa0096dd245c2faf790 \
+              config.json:734a79bf12d388c1467a4e3ab625f45de7f6906cffcfb93a1eca1787504bed95 \
+              onnx/model_quantized.onnx:0826f8c1ab9edf1801db86c61919d4d108e8bfc0b809ec823ad366882ff0b77d; do
+      f="${fh%%:*}"; h="${fh##*:}"
+      out="$m/$(basename "$f")"; [ -s "$out" ] && sha_ok "$out" "$h" && { echo "have $(basename "$f")"; continue; }
       echo "Downloading $(basename "$f")..."
       curl -fL --retry 3 --connect-timeout 20 -o "$out.part" "$base/$f" 2>&1 | tr '\r' '\n' | grep -E "[0-9]+ +[0-9.]+[MG]" | tail -1
-      [ -s "$out.part" ] && mv "$out.part" "$out" || { echo "download failed: $f"; exit 1; }
+      [ -s "$out.part" ] || { echo "download failed: $f"; exit 1; }
+      sha_ok "$out.part" "$h" || { rm -f "$out.part"; echo "checksum mismatch for $f: refused (the file on the server changed)"; exit 1; }
+      mv "$out.part" "$out"
     done
     echo "Local AI model ready" ;;
 
   check:voices)
     if vimport "import sherpa_onnx" && [ -s "$APPROOT/models/wespeaker_en_voxceleb_resnet34_LM.onnx" ]; then echo "OK"; else echo "MISSING optional"; fi ;;
   install:voices)
-    pip_in sherpa-onnx || exit 1
-    n=wespeaker_en_voxceleb_resnet34_LM.onnx; out="$APPROOT/models/$n"
-    [ -s "$out" ] || curl -fsSL --retry 3 -o "$out" "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/$n" || exit 1
+    pip_in "sherpa-onnx>=1.10,<=1.13.8" || exit 1
+    n=wespeaker_en_voxceleb_resnet34_LM.onnx; out="$APPROOT/models/$n"; h=ce2c5db3fb2c438f1d58de35577c951bc27ea0d41ef74968de4a480a1a59e39b
+    if ! { [ -s "$out" ] && sha_ok "$out" "$h"; }; then
+      curl -fsSL --retry 3 -o "$out.part" "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/$n" || exit 1
+      sha_ok "$out.part" "$h" || { rm -f "$out.part"; echo "checksum mismatch for $n: refused"; exit 1; }
+      mv "$out.part" "$out"
+    fi
     echo "Speaker identification ready" ;;
 
   *) echo "usage: setup.sh check|install python|core|venv|recorder|tips|whisper|localai|voices"; exit 2 ;;

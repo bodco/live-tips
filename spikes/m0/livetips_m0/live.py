@@ -62,6 +62,15 @@ def handle_inbox(eng, raw: str) -> None:
         key, value = d.get("key"), d.get("value")
         if key == "tips_paused":
             eng.paused = str(value).lower() in ("on", "true", "1")
+        elif key == "proactive":          # 2026-10-27: the window switch now really changes the engine
+            eng.proactive = str(value).lower() in ("on", "true", "1")
+            eng.cfg["proactive"] = eng.proactive
+        elif key == "title" and str(value or "").strip():   # renamed during the call
+            eng.cfg["title"] = str(value).strip()[:120]
+            try:
+                eng.prompt.set_meeting({"title": eng.cfg["title"]})
+            except Exception:  # noqa: BLE001
+                pass
         if key in ACK_KEYS:
             eng.out_tips.write({"kind": "ack", "key": key, "value": value, "t": time.strftime("%H:%M:%S")})
         return

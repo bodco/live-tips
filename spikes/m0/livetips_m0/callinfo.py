@@ -19,33 +19,30 @@ def tips_files(md: Path) -> List[Path]:
     return [p for p in out if p.exists()]
 
 
-def last_item(md: Path, kind: str) -> Optional[dict]:
-    last = None
-    for p in tips_files(md):
-        for ln in p.read_text(encoding="utf-8", errors="replace").splitlines():
-            if '"' + kind + '"' not in ln:
-                continue
-            try:
-                o = json.loads(ln)
-            except ValueError:
-                continue
-            if o.get("kind") == kind:
-                last = o
-    return last
-
-
 def items_of_kind(md: Path, kind: str) -> List[dict]:
+    """Every item of one kind in the call's tips files, in file order (the app's first, then the skill's)."""
     out = []
     for p in tips_files(md):
         for ln in p.read_text(encoding="utf-8", errors="replace").splitlines():
-            if '"' + kind + '"' in ln:
-                try:
-                    o = json.loads(ln)
-                except ValueError:
-                    continue
-                if o.get("kind") == kind:
-                    out.append(o)
+            o = _item(ln, kind)
+            if o is not None:
+                out.append(o)
     return out
+
+
+def _item(ln: str, kind: str) -> Optional[dict]:
+    if '"' + kind + '"' not in ln:
+        return None
+    try:
+        o = json.loads(ln)
+    except ValueError:
+        return None
+    return o if o.get("kind") == kind else None
+
+
+def last_item(md: Path, kind: str) -> Optional[dict]:
+    items = items_of_kind(md, kind)
+    return items[-1] if items else None
 
 
 def header(md: Path) -> dict:

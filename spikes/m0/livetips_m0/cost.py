@@ -51,15 +51,18 @@ class BudgetGuard:
     def _month(self):
         return time.strftime("%Y-%m")
 
-    def month_spent(self) -> float:
+    def _ledger(self) -> dict:
         try:
-            return float(json.loads(self.ledger.read_text()).get(self._month(), 0.0))
+            return json.loads(self.ledger.read_text())
         except (OSError, ValueError):
-            return 0.0
+            return {}
+
+    def month_spent(self) -> float:
+        return float(self._ledger().get(self._month(), 0.0))
 
     def add(self, usd: float) -> None:
         self.call_spent += usd or 0.0
-        try:
+        try:                                   # an unreadable ledger stops here rather than being overwritten
             data = json.loads(self.ledger.read_text()) if self.ledger.exists() else {}
         except ValueError:
             data = {}

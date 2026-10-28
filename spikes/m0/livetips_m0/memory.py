@@ -10,7 +10,7 @@ Prints JSON {"ok", "answer", "quote", "file", "t", "title", "date", "found"}.
 import argparse
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from . import callinfo
 from .context import index_snippets
@@ -62,47 +62,66 @@ def word_passages(root: Path, q: str, k: int = 8, window: int = 6) -> List[dict]
 def index_passages(root: Path, q: str, lt: List[str], k: int = 8) -> List[dict]:
     out = []
     for h in index_snippets(lt, root, q, k=k * 2, timeout=25.0):
-        p = Path(str(h.get("path") or ""))
-        if not p.is_absolute():
-            p = root / p
-        if p.parent.name != "live" or not CALL_MD.match(p.name):
+        p = call_file(root, h.get("path"))
+        if p is None:
             continue                                             # transcripts only
         prev = str(h.get("preview") or h.get("text") or "")
-        t = ""
-        for l in callinfo.lines(p, 400000):
-            if l["text"] and l["text"][:40] in prev:
-                t = l["t"]
-                break
-        out.append({"file": p, "t": t, "text": prev[:1500]})
+        out.append({"file": p, "t": moment(p, lambda text: bool(text) and text[:40] in prev), "text": prev[:1500]})
         if len(out) >= k:
             break
     return out
 
 
-def ask(root: Path, q: str, lt=None, model: str = "claude-haiku-5-5", lang: str = "uk", provider=None) -> dict:
+def call_file(root: Path, path) -> Optional[Path]:
+    """The index hit's file when it is a call transcript in <project>/live/, else None."""
+    p = Path(str(path or ""))
+    if not p.is_absolute():
+        p = root / p
+    return p if p.parent.name == "live" and CALL_MD.match(p.name) else None
+
+
+def moment(md: Path, match, default: str = "") -> str:
+    """The time of the first transcript line whose text matches."""
+    return next((l["t"] for l in callinfo.lines(md, 400000) if match(l["text"])), default)
+
+
+def gather(root: Path, q: str, lt=None) -> List[dict]:
+    """Index passages first, word matches fill in up to 8."""
     ps = index_passages(root, q, lt or []) if lt else []
     seen = {(str(p["file"]), p["t"]) for p in ps}
     for p in word_passages(root, q):
         if (str(p["file"]), p["t"]) not in seen and len(ps) < 8:
             ps.append(p)
-    if not ps:
-        return {"ok": True, "found": False, "answer": "", "quote": "", "file": "", "t": "", "title": "", "date": ""}
-    user = "QUESTION: " + q + "\n\n" + "\n\n".join(
+    return ps
+
+
+def passages_prompt(q: str, ps: List[dict]) -> str:
+    return "QUESTION: " + q + "\n\n" + "\n\n".join(
         "PASSAGE {} (call \"{}\", {}):\n{}".format(i, callinfo.header(p["file"])["title"], p["file"].name[:10], p["text"])
         for i, p in enumerate(ps))
-    obj, usd = ask_json(SYSTEM.format(LANG="Ukrainian" if lang == "uk" else "English"), user, model, 600, provider)
-    obj = obj or {}
+
+
+def best_passage(ps: List[dict], obj: dict) -> dict:
     try:
-        best = ps[int(obj.get("passage", 0))]
+        return ps[int(obj.get("passage", 0))]
     except (TypeError, ValueError, IndexError):
-        best = ps[0]
+        return ps[0]
+
+
+NOT_FOUND = {"ok": True, "found": False, "answer": "", "quote": "", "file": "", "t": "", "title": "", "date": ""}
+
+
+def ask(root: Path, q: str, lt=None, model: str = "claude-haiku-5-5", lang: str = "uk", provider=None) -> dict:
+    ps = gather(root, q, lt)
+    if not ps:
+        return dict(NOT_FOUND)
+    obj, usd = ask_json(SYSTEM.format(LANG="Ukrainian" if lang == "uk" else "English"), passages_prompt(q, ps), model, 600, provider)
+    obj = obj or {}
+    best = best_passage(ps, obj)
     quote = str(obj.get("quote") or "")
     t = best["t"]
     if quote:                                                    # the moment of the quote, when it is a real line
-        for l in callinfo.lines(best["file"], 400000):
-            if quote[:30].lower() in l["text"].lower():
-                t = l["t"]
-                break
+        t = moment(best["file"], lambda text: quote[:30].lower() in text.lower(), t)
     return {"ok": True, "found": bool(obj.get("found", True)), "answer": str(obj.get("answer") or "").replace(chr(0x2014), "-"),
             "quote": quote, "file": str(best["file"]), "t": t, "title": callinfo.header(best["file"])["title"],
             "date": best["file"].name[:10], "cost_usd": usd}

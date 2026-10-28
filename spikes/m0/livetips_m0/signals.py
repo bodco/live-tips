@@ -33,16 +33,21 @@ class Signals:
     @property
     def route(self):
         """'direct' (straight to tip), 'classify', or None."""
-        if self.new_requirement or self.commitment:
-            return "direct"
-        if self.name_vocative and not self.third_person and (self.question or self.update_request):
-            return "direct"
-        if self.question and self.second_person and not self.third_person:
+        if self.direct:
             return "direct"
         # A name alone is often a mention while someone else speaks (judged as false "your turn").
         if self.name_mention or self.question or self.frustration or self.update_request:
             return "classify"
         return None
+
+    @property
+    def direct(self) -> bool:
+        """A new requirement, the PM's own commitment, or a question or update request addressed to the PM."""
+        if self.new_requirement or self.commitment:
+            return True
+        if self.third_person:
+            return False
+        return bool((self.name_vocative and (self.question or self.update_request)) or (self.question and self.second_person))
 
     @property
     def trigger_hint(self):
@@ -81,30 +86,38 @@ class Detector:
         words = _words(line.text)
         s = Signals()
         if line.speaker == "them":
-            s.question = "?" in line.text or (bool(words) and self._any(" ".join(words[:2]), words[:2], self.q))
-            s.second_person = self._any(text_l, words, self.you)
-            s.name_mention = any(w.startswith(a[:max(4, len(a) - 2)]) for a in self.aliases for w in words)
-            s.name_vocative = any(w == a or w == a + "е" for a in self.aliases for w in words)
-            if s.name_mention:
-                # Review 2026-10-23: of 77 lines with the PM's name only 12 addressed the PM; the rest
-                # were third person ("Mike already told us") or inflected forms ("Петра", "Петром").
-                inflected = any(w != a and w.startswith(a) and len(w) - len(a) in (1, 2, 3) and not w.endswith("е")
-                                for a in self.aliases for w in words)
-                before, after = "", ""
-                for a in self.aliases:
-                    i = text_l.find(a)
-                    if i >= 0:
-                        before = text_l[max(0, i - 12):i]
-                        after = text_l[i + len(a):i + len(a) + 16].lstrip("еаиуом")   # inflection tail
-                        break
-                after_3p = any(after.lstrip().startswith(t) for t in self.after3)
-                s.third_person = (inflected and not s.name_vocative) or after_3p \
-                    or any(before.endswith(t) or before.rstrip().endswith(t.strip()) for t in self.third)
-            s.update_request = self._any(text_l, words, self.upd)
-            s.new_requirement = self._any(text_l, words, self.req)
-            s.frustration = self._any(text_l, words, self.frus)
+            self._theirs(s, line.text, text_l, words)
         else:
             has_number = bool(re.search(r"\d", line.text)) or self._any(text_l, words, ["один", "два", "три", "пʼять", "one", "two", "three", "five"])
             s.commitment = has_number and self._any(text_l, words, self.units)
         s.tags = [k for k, v in vars(s).items() if v is True]
         return s
+
+    def _theirs(self, s: Signals, text: str, text_l: str, words: List[str]) -> None:
+        s.question = "?" in text or (bool(words) and self._any(" ".join(words[:2]), words[:2], self.q))
+        s.second_person = self._any(text_l, words, self.you)
+        s.name_mention = any(w.startswith(a[:max(4, len(a) - 2)]) for a in self.aliases for w in words)
+        s.name_vocative = any(w == a or w == a + "е" for a in self.aliases for w in words)
+        if s.name_mention:
+            s.third_person = self._third_person(text_l, words, s.name_vocative)
+        s.update_request = self._any(text_l, words, self.upd)
+        s.new_requirement = self._any(text_l, words, self.req)
+        s.frustration = self._any(text_l, words, self.frus)
+
+    def _third_person(self, text_l: str, words: List[str], vocative: bool) -> bool:
+        """Review 2026-10-23: of 77 lines with the PM's name only 12 addressed the PM; the rest
+        were third person ("Mike already told us") or inflected forms ("Петра", "Петром")."""
+        inflected = any(w != a and w.startswith(a) and len(w) - len(a) in (1, 2, 3) and not w.endswith("е")
+                        for a in self.aliases for w in words)
+        before, after = self._around_name(text_l)
+        after_3p = any(after.lstrip().startswith(t) for t in self.after3)
+        return (inflected and not vocative) or after_3p \
+            or any(before.endswith(t) or before.rstrip().endswith(t.strip()) for t in self.third)
+
+    def _around_name(self, text_l: str):
+        """12 characters before the first alias found and 16 after it (without the inflection tail)."""
+        for a in self.aliases:
+            i = text_l.find(a)
+            if i >= 0:
+                return text_l[max(0, i - 12):i], text_l[i + len(a):i + len(a) + 16].lstrip("еаиуом")
+        return "", ""

@@ -109,23 +109,30 @@ def _read(p: Optional[Path], limit: int) -> str:
 def facts_block(facts_path: Optional[Path], cards_path: Optional[Path], limit: int = 30000) -> str:
     out = []
     for p, kind in ((facts_path, "fact"), (cards_path, "card")):
-        if not p or not p.exists():
-            continue
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-        except ValueError:
-            continue
-        items = data if isinstance(data, list) else data.get(kind + "s", data.get("items", []))
-        for it in items if isinstance(items, list) else []:
-            if not isinstance(it, dict):
-                continue
-            fid = it.get("id", "")
-            text = it.get("text") or it.get("phrase") or ""
-            title = it.get("title") or it.get("gist") or ""
-            src = it.get("source") or it.get("note") or ""
-            out.append("- [{}:{}] {} | {} | {}".format(kind, fid, title, text, src))
-    s = "\n".join(out)
-    return s[:limit]
+        out += fact_lines(_json_file(p), kind)
+    return "\n".join(out)[:limit]
+
+
+def _json_file(p: Optional[Path]):
+    if not p or not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+
+
+def fact_lines(data, kind: str) -> List[str]:
+    """"- [fact:<id>] title | text | source" lines from a fact book or a card file (a list or {facts|cards|items: [...]})."""
+    if data is None:
+        return []
+    items = data if isinstance(data, list) else data.get(kind + "s", data.get("items", []))
+    out = []
+    for it in items if isinstance(items, list) else []:
+        if isinstance(it, dict):
+            out.append("- [{}:{}] {} | {} | {}".format(kind, it.get("id", ""), it.get("title") or it.get("gist") or "",
+                                                      it.get("text") or it.get("phrase") or "", it.get("source") or it.get("note") or ""))
+    return out
 
 
 # Interview roles, same meaning as the skill's references/hiring.md (hiring_role).
@@ -157,6 +164,42 @@ TYPE_NOTES = {
 }
 
 
+def files_key(*paths) -> tuple:
+    """Paths with their modification times: a change of any file changes the key."""
+    return tuple((str(p), p.stat().st_mtime if p and p.exists() else None) for p in paths)
+
+
+def meeting_notes(meta: dict) -> str:
+    """The interview role, audience and call type notes that apply to this call."""
+    role = "coach" if meta.get("hiring_role") == "candidate" else meta.get("hiring_role")
+    notes = [ROLE_NOTES[role]] if meta.get("call_type") == "interview" and role in ROLE_NOTES else []
+    notes += [AUDIENCE_NOTES[meta["audience"]]] if meta.get("audience") in AUDIENCE_NOTES else []
+    notes += [TYPE_NOTES[meta["call_type"]]] if meta.get("call_type") in TYPE_NOTES else []
+    return "".join(" " + n for n in notes)
+
+
+def people_notes(meta: dict) -> str:
+    out = ""
+    if meta.get("pm_projects"):
+        out += " The PM's own projects: {}. Updates about other projects belong to other people.".format(
+            ", ".join(meta["pm_projects"]))
+    if meta.get("participants"):
+        out += " Participants: {}. Never address anyone else.".format(", ".join(meta["participants"]))
+    return out
+
+
+def call_header(meta: dict, today) -> str:
+    """The call's header line for the prompt: date, call, audience, type, languages, labels and meeting notes."""
+    return "Today: {today}. Call: {title}. Project: {project}. Audience: {audience}. Type: {call_type}. Languages: {langs}. " \
+           "The PM's lines are labelled \"{me_label}\"; everyone else \"{them_label}\" (a speaker tag like [S2] may follow). " \
+           "The PM is addressed as: {aliases}.{notes}".format(
+               notes=meeting_notes(meta), today=today.strftime("%A %Y-%m-%d"),
+               title=meta.get("title", ""), project=meta.get("project", ""),
+               audience=meta.get("audience", "auto"), call_type=meta.get("call_type", "auto"),
+               langs=", ".join(meta.get("langs", [])), me_label=meta.get("me_label", ""),
+               them_label=meta.get("them_label", ""), aliases=", ".join(meta.get("name_aliases", []))) + people_notes(meta)
+
+
 class PromptBuilder:
     def __init__(self, rules, call_meta: dict, brief_path=None, facts_path=None, cards_path=None, extra_context: str = ""):
         self.rules = rules
@@ -180,7 +223,7 @@ class PromptBuilder:
         """The prep can land after the start (lt prep-check adopts it): reload the fact book and the
         cards when their files change (review 2026-10-23: the real presentation ran with no facts)."""
         fp, cp = self._facts
-        key = tuple((str(p), p.stat().st_mtime if p and p.exists() else None) for p in (fp, cp))
+        key = files_key(fp, cp)
         if key == getattr(self, "_facts_key", None):
             return False
         self._facts_key = key
@@ -212,30 +255,12 @@ class PromptBuilder:
         if self.blocks and new == self.meta:
             return False
         self.meta = call_meta = new
-        role = "coach" if call_meta.get("hiring_role") == "candidate" else call_meta.get("hiring_role")
         import datetime as _dt
-        today = _dt.date.today()
-        header = "Today: {today}. Call: {title}. Project: {project}. Audience: {audience}. Type: {call_type}. Languages: {langs}. " \
-                 "The PM's lines are labelled \"{me_label}\"; everyone else \"{them_label}\" (a speaker tag like [S2] may follow). " \
-                 "The PM is addressed as: {aliases}.{role}{aud}{typ}".format(
-                     role=(" " + ROLE_NOTES[role]) if call_meta.get("call_type") == "interview" and role in ROLE_NOTES else "",
-                     aud=(" " + AUDIENCE_NOTES[call_meta.get("audience")]) if call_meta.get("audience") in AUDIENCE_NOTES else "",
-                     typ=(" " + TYPE_NOTES[call_meta.get("call_type")]) if call_meta.get("call_type") in TYPE_NOTES else "",
-                     today=today.strftime("%A %Y-%m-%d"),
-                     title=call_meta.get("title", ""), project=call_meta.get("project", ""),
-                     audience=call_meta.get("audience", "auto"), call_type=call_meta.get("call_type", "auto"),
-                     langs=", ".join(call_meta.get("langs", [])), me_label=call_meta.get("me_label", ""),
-                     them_label=call_meta.get("them_label", ""), aliases=", ".join(call_meta.get("name_aliases", [])))
-        if call_meta.get("pm_projects"):
-            header += " The PM's own projects: {}. Updates about other projects belong to other people.".format(
-                ", ".join(call_meta["pm_projects"]))
-        if call_meta.get("participants"):
-            header += " Participants: {}. Never address anyone else.".format(", ".join(call_meta["participants"]))
+        header = call_header(call_meta, _dt.date.today())
         facts = self.blocks[2] if len(self.blocks) > 2 else {
             "text": "FACT BOOK AND CARDS:\n" + (facts_block(*self._facts) or "(none)"), "cache": True}
         if len(self.blocks) <= 2:
-            fp, cp = self._facts
-            self._facts_key = tuple((str(p), p.stat().st_mtime if p and p.exists() else None) for p in (fp, cp))
+            self._facts_key = files_key(*self._facts)
         self.blocks = [
             {"text": render_rules(self.rules, meta=call_meta), "cache": True},
             {"text": header + "\n\nBRIEF:\n" + self._brief + ("\n\n" + self._extra if self._extra else ""), "cache": True},

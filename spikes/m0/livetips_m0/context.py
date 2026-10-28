@@ -25,6 +25,17 @@ def workspace_states(root: Path, limit_each: int = 5000, max_projects: int = 5) 
     """A workspace call (a PM sync about several projects): the root has no Current State of its own,
     so the member projects' pages are used (folders next to it or below it with _notion/current-state.md).
     A "<Workspace> General" folder is the workspace's own folder: its parent holds the projects."""
+    out, seen = [], set()
+    for base in workspace_bases(root):
+        for d in project_dirs(base):
+            p = d / "_notion" / "current-state.md"
+            if p.exists() and p.resolve() not in seen and len(out) < max_projects:
+                seen.add(p.resolve())
+                out.append("[{}]\n{}".format(d.name, p.read_text(encoding="utf-8", errors="replace")[:limit_each]))
+    return out
+
+
+def workspace_bases(root: Path) -> List[Path]:
     bases = [root]
     try:
         if root.name.lower().endswith(" general"):
@@ -33,18 +44,14 @@ def workspace_states(root: Path, limit_each: int = 5000, max_projects: int = 5) 
             bases.append(root.resolve().parent)
     except OSError:
         pass
-    out, seen = [], set()
-    for base in bases:
-        try:
-            subs = sorted(d for d in base.iterdir() if d.is_dir() and not d.name.startswith((".", "_")))
-        except OSError:
-            continue
-        for d in subs:
-            p = d / "_notion" / "current-state.md"
-            if p.exists() and p.resolve() not in seen and len(out) < max_projects:
-                seen.add(p.resolve())
-                out.append("[{}]\n{}".format(d.name, p.read_text(encoding="utf-8", errors="replace")[:limit_each]))
-    return out
+    return bases
+
+
+def project_dirs(base: Path) -> List[Path]:
+    try:
+        return sorted(d for d in base.iterdir() if d.is_dir() and not d.name.startswith((".", "_")))
+    except OSError:
+        return []
 
 
 def index_snippets(lt_cmd: List[str], project_root: Path, query: str, k: int = 8, timeout: float = 25.0) -> List[dict]:
@@ -86,25 +93,33 @@ def build(context: str, project_root: Optional[str], lt_cmd: Optional[List[str]]
         parts.append("CALL CONTEXT FROM THE PM (what this call is about and what to look for):\n" + context.strip())
     if project_root:
         root = Path(project_root)
-        cs = current_state(root)
-        if cs:
-            parts.append("PROJECT CURRENT STATE (local Notion mirror):\n" + cs)
-        else:
-            ws = workspace_states(root)
-            if ws:
-                parts.append("CURRENT STATE OF THE WORKSPACE PROJECTS (local Notion mirror; a call about "
-                             "several projects):\n" + "\n\n".join(ws))
-        hits = index_snippets(lt_cmd or [], root, context) if context.strip() else []
-        if hits:
-            lines = []
-            for h in hits[:8]:
-                src = h.get("rel") or h.get("path") or ""
-                date = h.get("date") or h.get("last_edited") or ""
-                text = (h.get("preview") or h.get("text") or "").replace("\n", " ")[:400]
-                lines.append("- [{}{}] {}".format(src, ", " + date if date else "", text))
-            parts.append("LOCAL MATERIALS FOUND FOR THE CONTEXT (project index):\n" + "\n".join(lines))
+        parts.append(state_part(root))
+        parts.append(hits_part(index_snippets(lt_cmd or [], root, context) if context.strip() else []))
         digest = recent_calls(lt_cmd or [], root)
         if digest:
             parts.append("RECENT CALLS (digest; what the PM already said, answered or promised on this project's "
                          "last calls; newer than the Notion state when they disagree):\n" + digest)
-    return "\n\n".join(parts)
+    return "\n\n".join(x for x in parts if x)
+
+
+def state_part(root: Path) -> str:
+    cs = current_state(root)
+    if cs:
+        return "PROJECT CURRENT STATE (local Notion mirror):\n" + cs
+    ws = workspace_states(root)
+    if ws:
+        return ("CURRENT STATE OF THE WORKSPACE PROJECTS (local Notion mirror; a call about "
+                "several projects):\n" + "\n\n".join(ws))
+    return ""
+
+
+def hits_part(hits: List[dict]) -> str:
+    if not hits:
+        return ""
+    lines = []
+    for h in hits[:8]:
+        src = h.get("rel") or h.get("path") or ""
+        date = h.get("date") or h.get("last_edited") or ""
+        text = (h.get("preview") or h.get("text") or "").replace("\n", " ")[:400]
+        lines.append("- [{}{}] {}".format(src, ", " + date if date else "", text))
+    return "LOCAL MATERIALS FOUND FOR THE CONTEXT (project index):\n" + "\n".join(lines)

@@ -32,7 +32,7 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 - **Any language in, one language out:** set the call to one language and every speaker is written in it (Ukrainian on an English call comes out in English).
 - **After the call:** a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page.
 
-How it compares with Fireflies, Fathom and Notion AI Meeting Notes: [tower.bodco.pm/pacenote/compare](https://tower.bodco.pm/pacenote/compare/).
+How it compares with Fireflies and Fathom (price, recording, live help, preparation, summary, CRM, data): [Pacenote vs Fireflies vs Fathom](https://tower.bodco.pm/pacenote/compare/).
 
 ## For teams (design)
 

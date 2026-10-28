@@ -147,26 +147,7 @@ def discover(cfg):
     config. Several matches for one name (for example the public template and a working copy both
     shared with the integration): the most recently edited one wins, and all are listed."""
     api = Notion(get_token(cfg), cfg.get("notion_version", "2025-09-03"), cfg.get("markdown_version"), 0.34)
-    found, cursor = {}, None
-    while True:
-        body = {"filter": {"property": "object", "value": "data_source"}, "page_size": 100}
-        if cursor:
-            body["start_cursor"] = cursor
-        r = api.req("POST", "/search", body)
-        for ds in r.get("results", []):
-            name = re.sub(r"[^\w ]", "", rich(ds.get("title") or [])).strip().lower()
-            for key, names in DB_NAMES.items():
-                if name in names:
-                    found.setdefault(key, []).append((ds.get("last_edited_time") or "", ds["id"], name))
-        if not r.get("has_more"):
-            break
-        cursor = r.get("next_cursor")
-    out = {}
-    for key, hits in found.items():
-        hits.sort(reverse=True)
-        out[key] = hits[0][1]
-        if len(hits) > 1:
-            print("note: %d data sources named %r, using the most recently edited one" % (len(hits), hits[0][2]))
+    out = pick_latest(visible_sources(api))
     if "projects" not in out:
         raise SystemExit("No Projects database visible to this integration: share the Control Tower page with it")
     cfg["projects_ds"] = out.pop("projects")
@@ -177,6 +158,33 @@ def discover(cfg):
     if missing:
         print("not found (not shared with the integration?): " + ", ".join(missing))
     return 0
+
+
+def visible_sources(api):
+    """config key -> [(last_edited, id, name)] for every data source whose title is a Control Tower name."""
+    found, cursor = {}, None
+    while True:
+        body = {"filter": {"property": "object", "value": "data_source"}, "page_size": 100}
+        if cursor:
+            body["start_cursor"] = cursor
+        r = api.req("POST", "/search", body)
+        for ds in r.get("results", []):
+            name = re.sub(r"[^\w ]", "", rich(ds.get("title") or [])).strip().lower()
+            for key in (k for k, names in DB_NAMES.items() if name in names):
+                found.setdefault(key, []).append((ds.get("last_edited_time") or "", ds["id"], name))
+        if not r.get("has_more"):
+            return found
+        cursor = r.get("next_cursor")
+
+
+def pick_latest(found):
+    out = {}
+    for key, hits in found.items():
+        hits.sort(reverse=True)
+        out[key] = hits[0][1]
+        if len(hits) > 1:
+            print("note: %d data sources named %r, using the most recently edited one" % (len(hits), hits[0][2]))
+    return out
 
 
 def atomic_write(path, text):
@@ -204,30 +212,29 @@ class Notion:
             pass
 
     def req(self, method, path, body=None, version=None):
-        url = API + path
         data = json.dumps(body).encode() if body is not None else None
         for attempt in range(6):
             time.sleep(self.pause)
-            r = urllib.request.Request(url, data=data, method=method)
-            r.add_header("Authorization", "Bearer " + self.token)
-            r.add_header("Notion-Version", version or self.version)
-            r.add_header("Content-Type", "application/json")
             try:
                 self.calls += 1
-                with urllib.request.urlopen(r, timeout=60, context=self.ctx) as resp:
+                with urllib.request.urlopen(self.request(method, path, data, version), timeout=60, context=self.ctx) as resp:
                     return json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
-                if e.code == 429 or e.code >= 500:
-                    wait = float(e.headers.get("Retry-After") or (2 ** attempt))
-                    time.sleep(min(wait, 60))
-                    continue
-                detail = e.read().decode("utf-8", "replace")[:300]
-                raise NotionError(e.code, detail)
+                if not (e.code == 429 or e.code >= 500):
+                    raise NotionError(e.code, e.read().decode("utf-8", "replace")[:300])
+                time.sleep(min(float(e.headers.get("Retry-After") or (2 ** attempt)), 60))
             except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
                 if attempt == 5:
                     raise NotionError(0, str(e))
                 time.sleep(2 ** attempt)
         raise NotionError(0, "retries exhausted")
+
+    def request(self, method, path, data, version):
+        r = urllib.request.Request(API + path, data=data, method=method)
+        r.add_header("Authorization", "Bearer " + self.token)
+        r.add_header("Notion-Version", version or self.version)
+        r.add_header("Content-Type", "application/json")
+        return r
 
     def query_all(self, ds_id, since=None):
         body = {"page_size": 100}

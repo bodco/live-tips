@@ -13,7 +13,6 @@ import json
 import os
 import shutil
 import subprocess
-from pathlib import Path
 from typing import List, Optional
 
 SYSTEM = """You help a project manager during a live call. Find the answer to the PM's question in the
@@ -49,7 +48,18 @@ def lookup(cfg: dict, question: str, transcript_tail: List[str], lang: str, time
     claude = claude_path(cfg)
     if not claude:
         return {"error": "Claude Code (the claude command) is not installed"}
-    dirs = [d for d in (cfg.get("extra_dirs") or []) if isinstance(d, str) and os.path.isdir(d)]
+    try:
+        r = subprocess.run(deep_args(cfg, claude, question, transcript_tail, lang), cwd=root, env=deep_env(cfg, os.environ),
+                           capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return {"error": "the search took too long"}
+    except OSError as e:
+        return {"error": "could not start Claude Code: " + str(e)[:80]}
+    return read_result(r.stdout, r.returncode)
+
+
+def deep_args(cfg: dict, claude: str, question: str, transcript_tail: List[str], lang: str) -> List[str]:
+    """Read-only Claude Code: Read, Grep and Glob over the folders; the call lines go in as data."""
     prompt = ("Question from the PM: " + question.strip()[:600] + "\n\n<transcript_data>\n" +
               "\n".join(x[:400] for x in transcript_tail[-8:]) + "\n</transcript_data>")
     args = [claude, "-p", prompt, "--model", cfg.get("deep_model") or "sonnet", "--output-format", "json",
@@ -57,27 +67,29 @@ def lookup(cfg: dict, question: str, transcript_tail: List[str], lang: str, time
             "--permission-mode", "default", "--allowedTools", "Read,Grep,Glob",
             "--disallowedTools", "Bash,Write,Edit,NotebookEdit,WebFetch,WebSearch,Task",
             "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--max-turns", str(cfg.get("deep_max_turns", 14))]
-    for d in dirs:
-        args += ["--add-dir", d]
-    env = dict(os.environ)
-    key = os.environ.get(cfg.get("api_key_env", "CLAUDE_API"), "")
+    for d in cfg.get("extra_dirs") or []:
+        if isinstance(d, str) and os.path.isdir(d):
+            args += ["--add-dir", d]
+    return args
+
+
+def deep_env(cfg: dict, environ) -> dict:
+    env = dict(environ)
+    key = environ.get(cfg.get("api_key_env", "CLAUDE_API"), "")
     if key:
         env["ANTHROPIC_API_KEY"] = key          # billed like the tips; never written or logged
     env["PATH"] = ":".join([os.path.expanduser("~/.local/bin"), "/opt/homebrew/bin", "/usr/local/bin", env.get("PATH", "")])
+    return env
+
+
+def read_result(stdout: str, returncode: int) -> dict:
     try:
-        r = subprocess.run(args, cwd=root, env=env, capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return {"error": "the search took too long"}
-    except OSError as e:
-        return {"error": "could not start Claude Code: " + str(e)[:80]}
-    try:
-        out = json.loads(r.stdout or "{}")
+        out = json.loads(stdout or "{}")
     except json.JSONDecodeError:
-        return {"error": "Claude Code gave no result (exit {})".format(r.returncode)}
+        return {"error": "Claude Code gave no result (exit {})".format(returncode)}
     cost = out.get("total_cost_usd") or 0.0
-    text = out.get("result") or ""
     from .engine import first_json
-    obj = first_json(text) or {}
+    obj = first_json(out.get("result") or "") or {}
     if not obj:
         return {"error": "no answer from the search", "cost_usd": cost}
     obj["cost_usd"] = cost

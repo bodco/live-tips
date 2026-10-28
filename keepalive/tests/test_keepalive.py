@@ -46,3 +46,32 @@ def test_gives_up_after_max_blocks(tmp_path):
     assert hook(tmp_path, "{}", m)[1] == ""
     code, out, saved = hook(tmp_path, "{}", {"until": time.time() + 600})
     assert "the call" in json.loads(out)["reason"] and saved["blocks"] == 1
+
+
+def load_hook():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("keepalive_hook", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_in_process(tmp_path, capsys):
+    k = load_hook()
+    marker = tmp_path / "keepalive.json"
+    assert k.main("{}", str(marker), now=0) == 0 and capsys.readouterr().out == ""
+    marker.write_text(json.dumps({"until": 100, "title": "T", "max_blocks": 2}))
+    assert k.main('{"session_id": "a"}', str(marker), now=50) == 0
+    d = json.loads(capsys.readouterr().out)
+    assert d["decision"] == "block" and json.loads(marker.read_text()) == {"until": 100, "title": "T", "max_blocks": 2,
+                                                                             "session_id": "a", "blocks": 1}
+    k.main('{"session_id": "a"}', str(marker), now=100)
+    assert json.loads(marker.read_text())["blocks"] == 2 and capsys.readouterr().out
+    k.main('{"session_id": "a"}', str(marker), now=60)
+    assert capsys.readouterr().out == "" and json.loads(marker.read_text())["blocks"] == 2
+    assert k.main("", str(marker), now=101) == 0 and capsys.readouterr().out == ""
+    assert k.read_input("[") == {} and k.load_marker(str(tmp_path / "none")) == (None, None)
+    assert k.hold({"session_id": "x"}, 10, "", 5) == {"session_id": "x", "blocks": 1}
+    k.save({"a": 1}, str(tmp_path / "missing" / "m.json"))                   # an unwritable path is ignored
+    assert k.clean('a"b<c>\nd', 3) == "abc" and k.clean(None, 5) == ""
+    assert "the .state.json next to the transcript" in k.reason({}, "M") and "the call" in k.reason({}, "M")

@@ -9,3 +9,7 @@ models/
 *.named.md
 *.jsonl
 !Fixtures/*.jsonl
+# quality gates (ub-mode: crapper, dryer, mutator)
+.metrics/
+target/
+.coverage

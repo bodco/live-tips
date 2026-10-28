@@ -19,8 +19,8 @@ GENERIC = [
     (r"(?<![0-9a-f])[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}(?![0-9a-f])", "UUID (Notion or other ID)"),
     (chr(0x2014), "long dash"),
 ]
-SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", "runs", "venv", ".venv"}
-SKIP_FILES = {"LICENSE"}          # the copyright line names the author on purpose
+SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", "runs", "venv", ".venv", ".metrics", "target"}   # + quality-gate output (ub-mode)
+SKIP_FILES = {"LICENSE", ".coverage"}          # the copyright line names the author on purpose
 # Made-up IDs in self-tests (all one digit, or 0-9a-f in order) are not real IDs.
 FAKE_ID = re.compile(r"^(?:([0-9a-f])\1*|(?:0123456789abcdef)+)$")
 TEXT_EXT = {".py", ".md", ".json", ".yaml", ".yml", ".txt", ".sh", ".swift", ".html", ".toml", ".cfg", ""}

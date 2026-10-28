@@ -215,3 +215,27 @@ Keychain, opens Start call, Start call in plan mode during a (faked) live call (
 presentation mode, and saves each as `<name>-dark.png` and `<name>-light.png` at 2x. Convert them to
 WebP and put them in the website's `public/live-tips/shots/`. Run it again after every visible change
 in the app, so the site always shows the current windows.
+
+## Quality gates (ub-mode)
+
+Since 0.8.3 the code is held to [ub-mode](https://github.com/unclebob/ub-mode): every function under CRAP 10
+([crapper](https://github.com/unclebob/crapper)), no duplicated structure scoring 0.8 or more
+([dryer](https://github.com/unclebob/dryer)), and mutation testing of each changed file
+([mutator](https://github.com/unclebob/mutator)). The tools need Python 3.11+. Run them from the folder you
+analyze; their output goes to `.metrics/` (ignored by git):
+
+```bash
+cd spikes/m0
+~/work/Tools/crapper/crapper --coverage-command 'python -m coverage run -m pytest -q tests && python -m coverage lcov -o target/coverage/python/lcov.info'
+~/work/Tools/dryer/dryer --threshold 0.8
+~/work/Tools/mutator/mutator --use-existing-coverage --test-command 'python -m pytest -q -x tests/test_routing.py' livetips_m0/routing.py
+```
+
+The tools cover Python and TypeScript. The Swift app and the tips window's JavaScript are not covered by
+them; they keep their own checks (`CoreChecks`, `app/WebTests`).
+
+Baseline on 2026-10-28, worst first, is the work list: the tips engine (`spikes/m0`) has 299 functions, 100
+of them at CRAP 10 or more (the largest: `Engine._run_situation`, `Engine._run_tip`, `live.run`); the recorder
+(`recorder/src`) has 267 functions, 50 with complexity 10 or more (`transcriber.main` is the largest) and one
+duplicate pair; `routing.py` is done. Each change brings the functions it touches under the gate.
+

@@ -3,6 +3,15 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.3
+
+- **Cheaper tips on the API key:** the earlier minutes of the call are now read from Claude's prompt cache
+  instead of being paid in full on every request (about 8% less per call in an A/B replay of a recorded call).
+- **Fix:** after the rename the app could keep pointing at the removed "Live Tips.app" for its tips engine; the
+  engine now follows the app at every launch.
+- **Engine quality (ub-mode):** the AI routing module is split into small tested pieces (every function under
+  CRAP 10, 94% of mutants killed); a missing key or a missing Claude Code now shows up in Settings > AI.
+
 ## 0.8.2
 
 - **Settings > AI is the one place for Claude.** Access once for the whole app: your Claude account (Claude

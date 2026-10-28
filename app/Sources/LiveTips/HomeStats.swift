@@ -18,8 +18,7 @@ struct WeekStats: View {
 
     private struct Bar: Identifiable { var id: String { "\(date.timeIntervalSince1970)" + project }; var date: Date; var project: String; var minutes: Double }
 
-    static let periods: [(String, String)] = [("today", "Today"), ("week", "This week"), ("lastweek", "Last week"),
-                                               ("month", "This month"), ("30", "Last 30 days"), ("custom", "Dates…")]
+    static var periods: [(String, String)] { ["today", "week", "lastweek", "month", "30", "custom"].map { ($0, L("stats.period." + $0)) } }
 
     /// [start, end) of the chosen period.
     private func range(_ now: Date = Date()) -> (Date, Date) {
@@ -84,13 +83,13 @@ struct WeekStats: View {
         return VStack(alignment: .leading, spacing: 10) {
             // 2026-10-28: one line when there is room, the pickers under the title in a narrow column.
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { Text("Insights").font(.headline).fixedSize(); Spacer(); pickers(sc) }
-                VStack(alignment: .leading, spacing: 6) { Text("Insights").font(.headline); HStack(spacing: 8) { pickers(sc) } }
+                HStack(spacing: 8) { Text(L("stats.title")).font(.headline).fixedSize(); Spacer(); pickers(sc) }
+                VStack(alignment: .leading, spacing: 6) { Text(L("stats.title")).font(.headline); HStack(spacing: 8) { pickers(sc) } }
             }
             if period == "custom" && day == nil {
                 HStack(spacing: 6) {
-                    DatePicker("From", selection: $from, displayedComponents: .date).fixedSize()
-                    DatePicker("to", selection: $to, displayedComponents: .date).fixedSize()
+                    DatePicker(L("stats.from"), selection: $from, displayedComponents: .date).fixedSize()
+                    DatePicker(L("stats.to"), selection: $to, displayedComponents: .date).fixedSize()
                 }
                 .font(PN.Font.caption)
             }
@@ -102,10 +101,10 @@ struct WeekStats: View {
                 }
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: compact ? 120 : 150), spacing: 10)], spacing: 10) {
-                tile("Calls", "\(this.count)", delta(Double(this.count), Double(prev.count), fmt: { "\(Int($0))" }))
-                tile("On calls", hm(mins), delta(mins, prevMins, fmt: hm))
-                tile("Claude", String(format: "$%.2f", spend), prevSpend > 0 ? String(format: "before $%.2f", prevSpend) : (scope.isEmpty ? "counted from 0.6.8" : "calls with a cost"))
-                tile("Prepared", this.isEmpty ? "-" : "\(prepared) of \(this.count)", this.isEmpty ? "" : "\(Int((Double(prepared) / Double(max(1, this.count)) * 100).rounded()))%")
+                // Pacenote 0.8 (F3): no dollars here, they live in Settings > AI.
+                tile(L("stats.calls"), "\(this.count)", delta(Double(this.count), Double(prev.count), fmt: { "\(Int($0))" }))
+                tile(L("stats.onCalls"), hm(mins), delta(mins, prevMins, fmt: hm))
+                tile(L("stats.prepared"), this.isEmpty ? "-" : L("home.week.preparedOf", ["x": "\(prepared)", "y": "\(this.count)"]), this.isEmpty ? "" : "\(Int((Double(prepared) / Double(max(1, this.count)) * 100).rounded()))%")
             }
             if !bars.isEmpty {
                 Chart(bars) { b in
@@ -132,9 +131,9 @@ struct WeekStats: View {
                     }
                 }
                 .frame(height: compact ? 96 : 160)
-                .help("Click a day to see it; click it again to go back.")
+                .help(L("stats.clickDay"))
             } else {
-                Text("No calls in this period.").font(.callout).foregroundStyle(PN.C.text3)
+                Text(L("stats.empty")).font(.callout).foregroundStyle(PN.C.text3)
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) { facts(longest, busiest, this, mins, spend) }
@@ -159,7 +158,7 @@ struct WeekStats: View {
                         }
                     }
                     .padding(.top, 4)
-                } label: { Text("Calls in this selection (\(this.count))").font(PN.Font.caption.weight(.semibold)) }
+                } label: { Text(L("stats.selection", ["n": "\(this.count)"])).font(PN.Font.caption.weight(.semibold)) }
             }
         }
         .ltCard(padding: 14)
@@ -168,9 +167,9 @@ struct WeekStats: View {
 
     @ViewBuilder private func facts(_ longest: CallHistory.Record?, _ busiest: (key: Date, value: Double)?, _ this: [CallHistory.Record], _ mins: Double, _ spend: Double) -> some View {
         let wd = Self.dayFmt
-        if let l = longest, (l.minutes ?? 0) > 0 { fact("Longest", "\(l.title), \(hm(l.minutes ?? 0))") }
-        if day == nil, let b = busiest, b.value > 0 { fact("Busiest day", "\(wd.string(from: b.key)), \(hm(b.value))") }
-        if !this.isEmpty { fact("Average call", hm(mins / Double(this.count)) + (spend > 0 ? String(format: ", $%.2f", spend / Double(this.count)) : "")) }
+        if let l = longest, (l.minutes ?? 0) > 0 { fact(L("stats.longest"), "\(l.title), \(hm(l.minutes ?? 0))") }
+        if day == nil, let b = busiest, b.value > 0 { fact(L("stats.busiest"), "\(wd.string(from: b.key)), \(hm(b.value))") }
+        if !this.isEmpty { fact(L("stats.average"), hm(mins / Double(this.count))) }
     }
 
     @ViewBuilder private func pickers(_ sc: (projects: [String], workspaces: [String])) -> some View {
@@ -179,24 +178,21 @@ struct WeekStats: View {
         }
         .labelsHidden().fixedSize()
         Picker("", selection: $scope) {
-            Text("All projects").tag("")
-            if !sc.workspaces.isEmpty { Section("Workspaces") { ForEach(sc.workspaces, id: \.self) { Text($0).tag("w:" + $0) } } }
-            Section("Projects") { ForEach(sc.projects, id: \.self) { Text($0).tag("p:" + $0) } }
+            Text(L("stats.allProjects")).tag("")
+            if !sc.workspaces.isEmpty { Section(L("stats.workspaces")) { ForEach(sc.workspaces, id: \.self) { Text($0).tag("w:" + $0) } } }
+            Section(L("stats.projects")) { ForEach(sc.projects, id: \.self) { Text($0).tag("p:" + $0) } }
         }
         .labelsHidden().fixedSize()
     }
 
     static let dayFmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "EEE d MMM"; return f }()
 
-    private func hm(_ m: Double) -> String {
-        let t = Int(m.rounded())
-        return t >= 60 ? "\(t / 60) h \(t % 60) min" : "\(t) min"
-    }
+    private func hm(_ m: Double) -> String { HomeView.hm(m) }
 
     private func delta(_ a: Double, _ b: Double, fmt: (Double) -> String) -> String {
-        guard b > 0 else { return a > 0 ? "none before" : "" }
+        guard b > 0 else { return a > 0 ? L("stats.noneBefore") : "" }
         let d = a - b
-        return (d >= 0 ? "+" : "-") + fmt(abs(d)) + " vs before"
+        return L("stats.vsBefore", ["d": (d >= 0 ? "+" : "-") + fmt(abs(d))])
     }
 
     private func tile(_ label: String, _ value: String, _ sub: String) -> some View {

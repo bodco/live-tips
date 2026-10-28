@@ -44,6 +44,14 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             let body = "# Live Transcript: \(title)\n\n- Project: demo\n\n" + String(format: "[%02d:%02d:05] Me (en): Hello.\n[%02d:%02d:10] Other (en): Thanks, bye.\n", h, m, endM / 60, endM % 60)
             try? body.write(toFile: f, atomically: true, encoding: .utf8)
             if days != 2 { try? "# Live Brief: demo\n".write(toFile: String(f.dropLast(3)) + ".brief.md", atomically: true, encoding: .utf8) }
+            // Pacenote 0.8 (F3): the call picture at the end of the call, for Home's Recent and On you.
+            let sit: [String: Any] = ["kind": "situation", "t": "10:40:00",
+                                      "decisions": days == 0 ? ["Export goes to production on Tuesday", "Pilot starts Monday with 5 users"] : ["Release checklist approved"],
+                                      "actions": days == 0 ? [["what": "Send the test account list", "due": "today", "from": "Emily"]] : days == 1 ? [["what": "Share the release notes draft", "due": "Friday", "from": "PM"]] : [],
+                                      "asks": days == 0 ? [["who": "David", "what": "Who tests the pilot after week one?", "type": "question"]] : []]
+            if let d = try? JSONSerialization.data(withJSONObject: sit), let s = String(data: d, encoding: .utf8) {
+                try? (s + "\n").write(toFile: f + ".tips.jsonl", atomically: true, encoding: .utf8)
+            }
         }
         let k = DateFormatter(); k.dateFormat = "yyyy-MM-dd"
         write([k.string(from: Date()): 0.62, k.string(from: Date().addingTimeInterval(-86400)): 0.41, k.string(from: Date().addingTimeInterval(-2 * 86400)): 0.95], sup + "/spend-days.json")

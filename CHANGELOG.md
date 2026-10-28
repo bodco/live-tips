@@ -3,6 +3,23 @@
 Pacenote (formerly Live Tips). Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.3 (F3: Home)
+
+- **Home answers "what is next and am I ready":** Today with the day's calls and time on calls, Plan a call and
+  Start call on top. Up next is one big card: the call (or the live one with its timer and Show tips), the project,
+  people and platform, then **Are you ready?**: the brief (ready and when, preparing, or Prepare), what is still on
+  you from the last call of the series, questions left open last time, overlaps with another call (Skip hides it on
+  Home only). One verdict: Ready, Mostly with what is left, or Not prepared. Then Start tips for this call and Edit setup.
+- **Later:** the rest of today and the next day, one row each: time, call, project and people, one badge and one
+  action; Set up, Start now, Show in Calendar and Hide in the row's menu.
+- **Right column:** On you (what you took on in the last two weeks, from the call picture; a tick hides it here
+  until the commitments register in F5), This week (calls, time on calls, prepared X of Y and a Monday to Friday
+  chart, no dollars; Details opens the full statistics), Recent (call, date, "2 decisions · 1 on you · 1 open
+  question"; a click opens the Notion page or the transcript, the rest in the context menu).
+- **Status line:** Claude, Notion and calendars with a dot, red only when something is wrong; spending appears only
+  as a warning near the monthly limit. Dollars are left to Settings > AI (also gone from the statistics).
+- Home and the statistics in English and Ukrainian.
+
 ## 0.8.2 (F2: tips window)
 
 - **New tips window** (Concept A "Focus"): one card answers "what do I say now" (hero), older cards one line each

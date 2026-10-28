@@ -3,6 +3,22 @@
 Pacenote (formerly Live Tips). Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.1 (F1: foundation)
+
+- **Design tokens** (`PacenoteTheme.swift`, the same values as the web `tokens.css`): colors for text, accent,
+  status and recording, radii, spacing, type sizes.
+- **Three button styles only:** primary (one per window, Return), secondary, tertiary for actions in rows.
+  The capsule buttons, the soft blue buttons and link-style main actions are gone; disabled buttons dim.
+- **Contrast and size:** no text under 12 pt (the 10 pt captions are 12 pt now), captions in the darker grey
+  from the tokens, status colors from the tokens instead of system red, green and orange.
+- **Menu bar panel** instead of the system menu: the next call with its readiness, Start tips, Open brief or
+  Prepare, two more calls, Open Home and Start a call, this month's spend and the last call; during a call the
+  call card with Show tips, Pause and End call (asks first), Help now and this call's cost. Settings in the
+  header, Setup, Welcome tour and About under Help and About, the demo windows with Option. Closes on Esc and
+  on a click outside.
+- **Home ⌘0 and Start a call ⌘N** are also in the app menu.
+- **Screenshots:** the panel between calls and during a call.
+
 ## 0.8.0 (F0: rebrand)
 
 - **New name: Pacenote**, "Your co-driver on calls" / "Ваш штурман на дзвінках". The bundle identifier,

@@ -7,23 +7,11 @@ import Combine
 /// Menu bar item and the main app delegate: live status, spending against limits, Start call,
 /// tips window, settings. The Dock icon is on by default so the app is visible even when the
 /// menu bar is full.
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     var item: NSStatusItem?
     var tips: PrompterController?
     var timer: Timer?
-    let statusLines = [NSMenuItem(), NSMenuItem(), NSMenuItem(), NSMenuItem()]
-    var micItem = NSMenuItem()
-    var startItem = NSMenuItem()
-    var endItem = NSMenuItem()
-    var pauseItem = NSMenuItem()
-    var helpItem = NSMenuItem()
-    var tipsItem = NSMenuItem()
-    var demoItem = NSMenuItem()
-    var demoPresItem = NSMenuItem()
-    var notionItem = NSMenuItem()
-    var upNextItem = NSMenuItem()
-    var homeItem = NSMenuItem(), settingsItem = NSMenuItem(), setupItem = NSMenuItem(), tourItem = NSMenuItem()
-    var aboutItem = NSMenuItem(), quitItem = NSMenuItem()
+    var panel: MenuBarPanelController?      // Pacenote 0.8 (F1): the menu bar panel instead of an NSMenu
     var menuLang = L10n.lang
     var clock: Timer?               // the elapsed time next to the menu bar icon while recording
     var lastStatus = EngineStatus()
@@ -38,38 +26,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         it.button?.image = Brand.menuBarImage(recording: false)     // Pacenote 0.8: the brand template
         it.button?.imagePosition = .imageLeft
         it.button?.toolTip = L("menubar.tooltip")
-        let menu = NSMenu()
-        menu.delegate = self
-        // The main action first; the status lines below it (review P2).
-        homeItem = add(menu, L("menubar.home"), #selector(openHome), "0")
-        startItem = add(menu, L("menubar.startCall"), #selector(startCall), "n")
-        upNextItem = NSMenuItem(title: "Up next", action: nil, keyEquivalent: "")
-        upNextItem.isHidden = true
-        menu.addItem(upNextItem)
-        tipsItem = add(menu, L("menubar.showTips"), #selector(showTips), "")
-        pauseItem = add(menu, L("menubar.pause"), #selector(togglePause), "p")
-        pauseItem.keyEquivalentModifierMask = [.control, .option]      // shown in the menu: the global shortcut
-        helpItem = add(menu, L("menubar.helpNow"), #selector(helpNow), "h")
-        helpItem.keyEquivalentModifierMask = [.control, .option]
-        endItem = add(menu, L("menubar.endCall"), #selector(endCall), "")
-        menu.addItem(.separator())
-        for l in statusLines { l.isEnabled = false; menu.addItem(l) }
-        menu.addItem(.separator())
-        notionItem = add(menu, L("menubar.sendNotion"), #selector(sendToNotion), "")
-        micItem = add(menu, L("menubar.allowMic"), #selector(requestMic), "")
-        menu.addItem(.separator())
-        settingsItem = add(menu, L("menubar.settings"), #selector(openSettings), ",")
-        setupItem = add(menu, L("menubar.setup"), #selector(openSetup), "")
-        tourItem = add(menu, L("menubar.welcomeTour"), #selector(openOnboarding), "")
-        aboutItem = add(menu, L("menubar.about"), #selector(openAbout), "")
-        // For checking the window without a call: shown only with Option held while the menu opens.
-        demoItem = add(menu, L("menubar.demo"), #selector(showDemo), "")
-        demoPresItem = add(menu, L("menubar.demoPresentation"), #selector(showDemoPresentation), "")
-        menu.addItem(.separator())
-        quitItem = NSMenuItem(title: L("menubar.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        menu.addItem(quitItem)
-        it.menu = menu
+        it.button?.target = self
+        it.button?.action = #selector(statusItemClicked(_:))
+        it.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        it.button?.setAccessibilityLabel(L("app.name"))
         item = it
+        MainActor.assumeIsolated { panel = MenuBarPanelController(app: self, button: it.button) }
         refresh()
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
         NotionMirrorService.shared.startSchedule()
@@ -142,6 +104,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         appMenu.addItem(withTitle: L("menubar.about"), action: #selector(openAbout), keyEquivalent: "").target = self
         appMenu.addItem(withTitle: L("menubar.settings"), action: #selector(openSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
+        // Pacenote 0.8 (F1): Home and Start a call are app commands too, not only rows of the menu bar panel.
+        appMenu.addItem(withTitle: L("menubar.home"), action: #selector(openHome), keyEquivalent: "0").target = self
+        appMenu.addItem(withTitle: L("menubar.startCall"), action: #selector(startCall), keyEquivalent: "n").target = self
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: L("menubar.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         let editItem = NSMenuItem()
@@ -164,63 +130,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.mainMenu = main
     }
 
-    func menuWillOpen(_ menu: NSMenu) {
+    @objc func statusItemClicked(_ sender: Any?) {
         refresh()
-        let dev = NSEvent.modifierFlags.contains(.option)
-        demoItem.isHidden = !dev
-        demoPresItem.isHidden = !dev
+        MainActor.assumeIsolated { panel?.toggle() }
     }
 
     func refresh() {
-        // Custom shortcuts (Settings > General > Shortcuts) shown in the menu.
-        for (item, act) in [(helpItem, HotKeys.Action.help), (pauseItem, HotKeys.Action.pause)] {
-            let c = HotKeys.shared.combo(act)
-            item.keyEquivalent = c.char.lowercased(); item.keyEquivalentModifierMask = c.menuMask
-        }
         let cfg = config
         IndexService.shared.configure(projects: ProjectRegistry.load(from: AppPaths.projects).projects, appRoot: appRoot,
                                       python: cfg.engine.python, enabled: cfg.localAI.enabled)
         let st = EngineStatus.load(path: (appRoot as NSString).appendingPathComponent("state/status.json"))
         let month = SpendLedger.monthSpent()
-        let recording = ["recording", "loading_model", "standby"].contains(st.state)
         lastStatus = st
         warnIfNoAudio(st)
-        // 2026-10-27 (Up next): during a call the same item plans an upcoming call.
-        relabelMenu()
-        startItem.title = recording ? L("menubar.planCall") : L("menubar.startCall")
-        MainActor.assumeIsolated { rebuildUpNextMenu() }
-        endItem.isHidden = !recording
-        pauseItem.isHidden = st.state != "recording"
-        helpItem.isHidden = st.state != "recording"
-        tipsItem.isHidden = !recording
-        notionItem.isHidden = recording || CallEngine.shared.lastFile == nil
-        notionItem.toolTip = CallEngine.shared.notionResult
-        let elapsed = Self.elapsed(st)
-        statusLines[0].title = st.state == "standby" ? L("menubar.status.waiting") + (st.project.map { ": \($0)" } ?? "")
-            : recording ? L("menubar.status.recording", ["elapsed": elapsed]) + (st.project.map { " · \($0)" } ?? "")
-            : (CallEngine.shared.lastCallSummary.isEmpty ? L("menubar.status.notRecording") : CallEngine.shared.lastCallSummary)
-        if noAudioWarned != nil, noAudioWarned == st.file, st.lines == 0, ["recording", "standby"].contains(st.state) {
-            statusLines[0].title = L("menubar.status.audioFailing")
-        }
-        statusLines[1].title = L("menubar.status.callLine", ["lines": "\(st.lines)", "tips": "\(st.tips)",
-                                                              "cost": String(format: "%.2f", st.callSpentUSD), "cap": String(format: "%.0f", cfg.budget.callHardUSD)])
-        statusLines[1].isHidden = !recording
-        // 2026-10-26 (owner): the last call's cost; the tip rating only when that developer check is on.
-        let judge = cfg.judgeAfterCall ? CallEngine.shared.judgeResult : ""
-        let cost = CallEngine.shared.lastCallLine
-        statusLines[2].title = [cost, CallEngine.shared.judgeRunning != nil && cfg.judgeAfterCall ? "rating the tips…" : judge]
-            .filter { !$0.isEmpty }.joined(separator: " · ")
-        statusLines[2].isHidden = recording || statusLines[2].title.isEmpty
-        statusLines[2].toolTip = CallEngine.shared.lastCallDetail
-        statusLines[3].title = L("menubar.thisMonth", ["spent": String(format: "%.2f", month), "cap": String(format: "%.0f", cfg.budget.monthlyHardUSD)])
-        micItem.isHidden = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        if menuLang != L10n.lang { menuLang = L10n.lang; installMainMenu() }     // the app menu follows the language
+        MainActor.assumeIsolated { fillPanel(st, month: month, cfg: cfg) }
         item?.button?.image = Brand.menuBarImage(recording: st.state == "recording")
         setClock(st.state == "recording")
-        if st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9 {
-            item?.button?.contentTintColor = .systemOrange
-        } else {
-            item?.button?.contentTintColor = recording ? .systemRed : nil
+        // Orange near a spending limit; no red tint while recording: the filled dot and the clock say it.
+        item?.button?.contentTintColor = (st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9) ? .systemOrange : nil
+    }
+
+    /// The menu bar panel's data (Pacenote 0.8, F1).
+    @MainActor func fillPanel(_ st: EngineStatus, month: Double, cfg: AppConfig) {
+        guard let m = panel?.model else { return }
+        let ce = CallEngine.shared
+        m.isRecording = st.state == "recording"
+        m.isLive = ce.isRunning || ["recording", "standby", "loading_model"].contains(st.state)
+        m.elapsed = Self.elapsed(st)
+        let failing = noAudioWarned != nil && noAudioWarned == st.file && st.lines == 0 && ["recording", "standby"].contains(st.state)
+        m.warning = failing
+        m.statusLine = st.state == "standby" ? L("menubar.status.waiting") : ""
+        m.liveTitle = ce.renamed ?? (ce.callRequest["title"] as? String) ?? st.project ?? L("app.name")
+        let callLine = st.state == "recording"
+            ? L("menubar.status.callLine", ["lines": "\(st.lines)", "tips": "\(st.tips)",
+                                            "cost": String(format: "%.2f", st.callSpentUSD), "cap": String(format: "%.0f", cfg.budget.callHardUSD)])
+            : ""
+        m.liveLine = failing ? L("menubar.status.audioFailing") : [st.project ?? "", callLine].filter { !$0.isEmpty }.joined(separator: " · ")
+        let calls = AheadCall.list().map { a -> MenuBarModel.Call in
+            let target = a.model.map { $0.target.isEmpty ? "" : $0.targetName } ?? ""
+            let note = [target, a.event?.timeRange ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+            return MenuBarModel.Call(id: a.id, title: a.title, startsAt: a.start,
+                                     state: a.model.map { UpNext.shared.prepState($0) } ?? .none, note: note, ahead: a)
         }
+        m.next = calls.first
+        m.later = Array(calls.dropFirst().prefix(2))
+        m.monthSpend = month
+        m.monthCap = cfg.budget.monthlyHardUSD
+        // 2026-10-26 (owner): the last call's cost; the tip rating only when that developer check is on.
+        let judge = cfg.judgeAfterCall ? (ce.judgeRunning != nil ? "rating the tips…" : ce.judgeResult) : ""
+        m.lastCallLine = [ce.lastCallLine, judge].filter { !$0.isEmpty }.joined(separator: " · ")
+        m.lastCallDetail = ce.lastCallDetail
+        m.thisCallSpend = st.callSpentUSD
+        m.canSendNotion = !m.isLive && ce.lastFile != nil
+        m.notionResult = ce.notionResult
+        m.micMissing = AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
+        m.helpKey = HotKeys.shared.combo(.help).display
+        m.pauseKey = HotKeys.shared.combo(.pause).display
+        panel?.place()
     }
 
     @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
@@ -1352,49 +1319,11 @@ extension AppDelegate {
         NSApp.activate(ignoringOtherApps: true)
         a.runModal()
     }
-
-    /// The menu's Up next submenu: each call opens for editing, switching or starting.
-    @MainActor
-    func rebuildUpNextMenu() {
-        let items = UpNext.shared.visible
-        upNextItem.isHidden = items.isEmpty
-        upNextItem.title = L("menubar.upNextCount", ["n": "\(items.count)"])
-        let m = NSMenu()
-        let f = DateFormatter(); f.dateFormat = "d MMM HH:mm"
-        for c in items {
-            let st = UpNext.shared.prepState(c)
-            let mark = ["ready", "running", "queued", "failed"].contains(st.rawValue) ? " · " + L("menubar.upNext." + st.rawValue) : ""
-            let it = NSMenuItem(title: "\(c.effectiveTitle) · \(f.string(from: c.callDate))\(mark)", action: #selector(openUpNext(_:)), keyEquivalent: "")
-            it.target = self
-            it.representedObject = c.id.uuidString
-            m.addItem(it)
-        }
-        upNextItem.submenu = m
-    }
-
-    @objc func openUpNext(_ sender: NSMenuItem) {
-        MainActor.assumeIsolated {
-            if let id = sender.representedObject as? String, let c = UpNext.shared.item(id) { StartCallWindow.show(delegate: self, prepared: c) }
-        }
-    }
 }
 
-// MARK: - Pacenote 0.8 (F0): menu language and the recording clock
+// MARK: - Pacenote 0.8: the recording clock
 
 extension AppDelegate {
-    /// The menu follows the interface language (Settings > General) without a restart.
-    func relabelMenu() {
-        guard menuLang != L10n.lang else { return }
-        menuLang = L10n.lang
-        homeItem.title = L("menubar.home"); tipsItem.title = L("menubar.showTips"); pauseItem.title = L("menubar.pause")
-        helpItem.title = L("menubar.helpNow"); endItem.title = L("menubar.endCall"); notionItem.title = L("menubar.sendNotion")
-        micItem.title = L("menubar.allowMic"); settingsItem.title = L("menubar.settings"); setupItem.title = L("menubar.setup")
-        tourItem.title = L("menubar.welcomeTour"); aboutItem.title = L("menubar.about"); quitItem.title = L("menubar.quit")
-        demoItem.title = L("menubar.demo"); demoPresItem.title = L("menubar.demoPresentation")
-        item?.button?.toolTip = L("menubar.tooltip")
-        installMainMenu()
-    }
-
     /// Time since the recording started, "32:14" or "1:02:05".
     static func elapsed(_ st: EngineStatus) -> String {
         guard let s = st.startedAt, let d = ISO8601DateFormatter().date(from: s) else { return "00:00" }
@@ -1418,6 +1347,7 @@ extension AppDelegate {
     }
 
     func tickClock() {
+        MainActor.assumeIsolated { panel?.model.elapsed = Self.elapsed(lastStatus) }
         guard let b = item?.button else { return }
         b.attributedTitle = NSAttributedString(string: " " + Self.elapsed(lastStatus),
                                                attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])

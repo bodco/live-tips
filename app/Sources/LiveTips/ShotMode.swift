@@ -87,6 +87,8 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             steps.append { [unowned self] in self.startCall(theme) }
             steps.append { [unowned self] in self.planCall(theme) }
             steps.append { [unowned self] in self.home(theme) }
+            steps.append { [unowned self] in self.menuPanel(theme, live: false) }
+            steps.append { [unowned self] in self.menuPanel(theme, live: true) }
             for tab in ["general", "calendars", "keys", "notion", "ai", "how", "about", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
             steps.append { [unowned self] in self.tips(theme, presentation: false) }
             steps.append { [unowned self] in self.tips(theme, presentation: true) }
@@ -267,6 +269,37 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
             if let w = PrepDocWindow.windows[path] { capture(w, "prep-doc-\(theme)"); w.close(); PrepDocWindow.windows[path] = nil }
             try? FileManager.default.removeItem(atPath: path)
+            next()
+        }
+    }
+
+    /// The menu bar panel (Pacenote 0.8, F1) on demo data: between calls and during one.
+    func menuPanel(_ theme: String, live: Bool) {
+        let app = AppDelegate()
+        let c = MenuBarPanelController(app: app, button: nil)
+        let m = c.model
+        func call(_ title: String, _ inMin: Double, _ st: UpNext.PrepState) -> MenuBarModel.Call {
+            let d = Date().addingTimeInterval(inMin * 60)
+            return MenuBarModel.Call(id: title, title: title, startsAt: d, state: st, note: "Orbit SaaS Launch",
+                                     ahead: AheadCall(id: title, event: nil, model: nil, start: d))
+        }
+        m.isLive = live
+        m.isRecording = live
+        m.elapsed = "32:14"
+        m.liveTitle = "Orbit weekly with the client"
+        m.liveLine = "Orbit SaaS Launch · " + L("menubar.status.callLine", ["lines": "42", "tips": "3", "cost": "0.21", "cap": "2"])
+        m.next = call("Orbit weekly with the client", 8, .none)
+        m.later = [call("Team retro", 125, .ready), call("Release checklist review", 245, .running)]
+        m.monthSpend = 12.40
+        m.monthCap = 100
+        m.lastCallLine = L("menubar.lastCall", ["cost": "0.47", "n": "6"])
+        m.thisCallSpend = 0.21
+        keep.append(c); keep.append(app)
+        guard let w = c.windowForShots() else { next(); return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
+            c.place()
+            capture(w, live ? "menubar-panel-live-\(theme)" : "menubar-panel-\(theme)")
+            w.orderOut(nil)
             next()
         }
     }

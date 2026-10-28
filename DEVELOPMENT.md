@@ -18,6 +18,35 @@ place, [`rules/`](rules/), which both read.
 | `tools/check_anonymized.py` | fails on user paths, keys, IDs, long dashes and terms from a private deny list |
 | `Fixtures/` | synthetic demo call used by the tests |
 
+## Names
+
+Pacenote is the product name since 0.8. Before that the product was called Live Tips, and the name is still
+inside the code on purpose: renaming it would reset macOS permissions, move the users' files and break the skill.
+
+| What says "live tips" | What it is | Why it stays |
+|---|---|---|
+| `live-tips` skill (`skill/`) | the Cowork skill that runs the same loop in a chat; Pacenote's other half | skill names are what people type and what other skills call |
+| `LiveTips.app`, the `LiveTips` executable, `io.github.example.livetips` | the app's file, binary and bundle id | macOS ties the microphone and screen recording permissions to them |
+| `LiveTipsCore`, `Sources/LiveTips/` | Swift module and folder names | internal only |
+| `~/Library/Application Support/LiveTips`, `<work>/Tools/LiveTips`, `Library/Logs/LiveTips`, `.livetips-index/` | where settings, the recorder core, logs and the local search index live | moving them would lose the users' data; the skill reads the same folders |
+| `livetips_m0` (Python), the prompts ("You are Live Tips, ...") | the tips engine and its model prompts | a prompt change is a behaviour change: it goes through `rules/`, not through a rename |
+| `window.LiveTips`, the `liveTips` message handler | the bridge between Swift and the tips window | internal API name |
+| `live-transcriber`, `recorder/` | the recorder the skill uses and the app copies | not changed without the owner |
+| headings "Live Tips: ..." in older Notion pages | written before 0.8 | the app and the skill still recognise them |
+
+Everything a person sees says Pacenote: the app name, the menu bar, windows, notifications, Notion pages and the site.
+
+## The tips window (0.8)
+
+`app/Resources/tips/`: `index.html`, `tokens.css` (the design tokens, the same values as `PacenoteTheme.swift`),
+`tips.css`, `tips.js` (the window: hero card, Earlier, agenda, On me, transcript, brief, presentation, compact mode)
+and `feed.js`. The recorder and the tips engine still write the item stream the skill's window reads
+(`<stem>.app.tips.jsonl`), and the app still pushes it with `addItems`, `setStatus`, `addTranscript`, `setSpeakers`,
+`setPrepDoc`, `setPrep`, `setUpNext`. `feed.js` turns that into the window's state (`LiveTips.setState`); it has no
+DOM and is tested with `node app/WebTests/feed.test.js`. The window answers on one WebKit handler, `liveTips`,
+with `{"action": ...}` (`PrompterController.handleAction`). Open `index.html` in a browser to see it on demo data:
+`?state=ready`, `?state=empty`, `?theme=dark`, `?lang=uk`, `?mode=compact`, `?mode=presentation`, `?left=4`.
+
 ## Install (beta)
 
 1. Download the dmg from the release page:

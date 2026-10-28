@@ -10,9 +10,10 @@ cd "$HERE" && swift build -c release --scratch-path "$SCRATCH"
 APP="${LIVETIPS_APP_OUT:-$SCRATCH}/LiveTips.app"
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$SCRATCH/release/LiveTips" "$APP/Contents/MacOS/LiveTips"
-# Shared tips window (same file as the skill's live-transcriber; parity).
-PROMPTER_HTML="${LIVETIPS_PROMPTER_HTML:-$HERE/Resources/prompter.html}"
-cp "$PROMPTER_HTML" "$APP/Contents/Resources/prompter.html"
+# The tips window (Pacenote 0.8, F2): Resources/tips (index.html, tokens.css, tips.css, feed.js, tips.js).
+# The skill's live-transcriber keeps its own window (recorder/src/prompter.html).
+mkdir -p "$APP/Contents/Resources/tips"
+cp "$HERE/Resources/tips/"{index.html,tokens.css,tips.css,feed.js,tips.js} "$APP/Contents/Resources/tips/"
 # Interface strings (en, uk) and the macOS names and permission texts per language (Pacenote 0.8)
 mkdir -p "$APP/Contents/Resources/i18n"
 cp "$HERE/Resources/i18n/"*.json "$APP/Contents/Resources/i18n/"

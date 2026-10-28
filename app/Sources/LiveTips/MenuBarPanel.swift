@@ -74,6 +74,7 @@ final class MenuBarModel: ObservableObject {
     @Published var showDev = false
     @Published var helpKey = "⌃⌥H"
     @Published var pauseKey = "⌃⌥P"
+    @Published var compactKey = "⌃⌥T"
     weak var app: AppDelegate?
     var close: () -> Void = {}
 
@@ -96,6 +97,7 @@ struct MenuBarPanel: View {
             if model.isLive {
                 if model.isRecording {
                     row(L("menubar.helpNow"), model.helpKey) { $0.helpNow() }
+                    row(L("menubar.compact"), model.compactKey) { $0.toggleCompact() }
                     row(L("menubar.pause"), model.pauseKey) { $0.togglePause() }
                 }
                 row(L("menubar.planCall"), "⌘N") { $0.startCall() }.keyboardShortcut("n")

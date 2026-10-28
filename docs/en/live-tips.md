@@ -17,7 +17,7 @@ Live tips is in **beta**, and it is mostly glue around other people's open-sourc
 goes into the Meetings DB: into the meeting's existing page (for example the one Notion AI
 Meeting Notes created) or into a new one when there is none.
 
-There is also the **Pacenote app (beta, formerly the Live Tips app)**: a native macOS menu bar app that runs the same loop
+There is also the **Pacenote app (beta)**: a native macOS menu bar app that runs the same loop
 without a Cowork chat, with your own Claude API key. It reads the same rules and shows the same
 tips window. See [section 14](#14-live-tips-app-beta).
 
@@ -1043,7 +1043,7 @@ Licences change; the links above are the authority, this table is a snapshot of 
 
 ---
 
-## 14. Pacenote app (beta, formerly Live Tips)
+## 14. Pacenote app (beta)
 
 A native macOS menu bar app that runs the same live-tips loop without a Cowork chat. Code and
 details: [`./`](../../DEVELOPMENT.md).

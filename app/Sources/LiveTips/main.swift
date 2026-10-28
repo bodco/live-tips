@@ -130,7 +130,7 @@ func prompterArgs(_ args: [String]) -> PrompterArgs {
         default: break
         }
     }
-    if a.html.isEmpty, let res = Bundle.main.resourceURL?.appendingPathComponent("prompter.html").path {
+    if a.html.isEmpty, let res = Bundle.main.resourceURL?.appendingPathComponent("tips/index.html").path {   // Pacenote 0.8
         a.html = res
     }
     if a.demo {

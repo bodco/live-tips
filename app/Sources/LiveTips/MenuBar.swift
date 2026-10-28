@@ -50,7 +50,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.finishSwitch()
             }
         }
-        HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() })
+        HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() },
+                               mute: { [weak self] in self?.toggleMute() }, compact: { [weak self] in self?.toggleCompact() })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         // 2026-10-26: new users get the onboarding (permissions, folders, Claude, install, Notion optional).
         if !UserDefaults.standard.bool(forKey: "onboardingDone") && !UserDefaults.standard.bool(forKey: "onboarded") {
@@ -187,6 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.micMissing = AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
         m.helpKey = HotKeys.shared.combo(.help).display
         m.pauseKey = HotKeys.shared.combo(.pause).display
+        m.compactKey = HotKeys.shared.combo(.compact).display
         panel?.place()
     }
 
@@ -202,9 +204,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
     @objc func openSettingsTab() { MainActor.assumeIsolated { SettingsWindow.show() } }
 
-    /// Same as the buttons in the tips window (the window owns the pause state and HELP NOW).
-    @objc func togglePause() { pushTips("document.getElementById('pause').click()") }
-    @objc func helpNow() { pushTips("document.getElementById('sos').click()") }
+    /// Same as the tips window's own controls (the window owns the pause and mic state). Pacenote 0.8 (F2).
+    @objc func togglePause() { pushTips("window.LiveTips && LiveTips.togglePause()") }
+    @objc func helpNow() { pushTips("window.LiveTips && LiveTips.help()") }
+    @objc func toggleMute() { pushTips("window.LiveTips && LiveTips.toggleMute()") }
+    @objc func toggleCompact() {
+        guard lastStatus.state == "recording" || lastStatus.state == "standby" else { return }
+        if tips == nil { showTips() }
+        MainActor.assumeIsolated { tips?.toggleCompact() }
+    }
     func pushTips(_ js: String) {
         guard lastStatus.state == "recording" else { return }
         if tips == nil { showTips() }
@@ -294,7 +302,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             a.inbox = call.inbox
             a.status = call.status
             a.control = call.control
-            a.html = Bundle.main.resourceURL?.appendingPathComponent("prompter.html").path ?? ""
+            a.html = Bundle.main.resourceURL?.appendingPathComponent("tips/index.html").path ?? ""
             // Pacenote 0.8: the window is titled with the call, the brand sits in the title bar.
             let ce = CallEngine.shared
             a.title = ce.renamed ?? (ce.callRequest["title"] as? String) ?? lastStatus.project ?? L("app.name")

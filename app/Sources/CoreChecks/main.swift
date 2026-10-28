@@ -171,7 +171,16 @@ func interfaceStrings() {
     }
 }
 
+func versions() {
+    expect(AppVersion.number(in: "v0.8.1") == "0.8.1", "tag v0.8.1")
+    expect(AppVersion.number(in: "pacenote-0.10.0-beta") == "0.10.0", "tag with a name")
+    expect(AppVersion.isNewer("0.10.0", than: "0.9.9"), "0.10 > 0.9.9")
+    expect(!AppVersion.isNewer("0.8", than: "0.8.0"), "0.8 == 0.8.0")
+    expect(!AppVersion.isNewer("v0.8.0", than: "0.8.1"), "older tag")
+}
+
 interfaceStrings()
+versions()
 frameRoundTripAcrossChunks()
 frameResyncAfterGarbage()
 watchdogStartGraceThenStallTerminateKillRestart()

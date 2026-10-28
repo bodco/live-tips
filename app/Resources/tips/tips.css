@@ -1,0 +1,170 @@
+/* Pacenote, tips window, Concept A "Focus". Requires tokens.css. App copy of design/pacenote-0.8/tips-window (F2). */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:color-mix(in srgb,var(--bg) calc(var(--fade,1)*100%),transparent);color:var(--text);font:14px/1.4 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+.app{height:100vh;display:flex;container-type:inline-size;container-name:app}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.pane{display:none}
+
+/* ---------- Header ---------- */
+.bar{height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 16px}
+.rec{width:8px;height:8px;border-radius:50%;background:var(--rec);flex:none}
+.rec.paused{background:var(--text-3)}
+.timer{font-weight:600;font-variant-numeric:tabular-nums}
+.status{font-size:13px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spacer{flex:1}
+.onme{display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:0;border-radius:var(--radius-s);background:var(--k-onme-soft);color:var(--k-onme);font-size:13px;font-weight:600;white-space:nowrap}
+.onme .n{background:var(--k-onme);color:var(--bg);border-radius:9px;padding:0 6px;font-size:12px;line-height:18px}
+.onme[hidden]{display:none}
+.icon-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:0;border-radius:var(--radius-s);background:transparent;color:var(--text-2)}
+.icon-btn:hover{background:var(--surface-2)}
+
+/* ---------- Agenda ---------- */
+.agenda{flex:none;padding:0 16px 14px;display:flex;flex-direction:column;gap:8px}
+.agenda[hidden]{display:none}
+.segs{display:flex;gap:4px}
+.seg{flex:1;height:4px;border-radius:2px;background:var(--surface-2);border:0;padding:0;cursor:pointer}
+.seg:focus-visible{outline:2px solid var(--accent-fill);outline-offset:2px}
+.seg.done{background:var(--k-turn)}
+.seg.now{background:var(--accent-fill)}
+.agenda .cap{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--text-3)}
+.agenda .cap b{font-weight:400;color:var(--text)}
+.agenda .cap span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Hero ---------- */
+.hero{flex:none;margin:0 12px;background:var(--surface);border-radius:var(--radius-l);padding:18px 18px 10px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-card);animation:in .18s ease-out}
+.hero[hidden]{display:none}
+@keyframes in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.kind{font-size:var(--fs-label);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.k-answer{color:var(--k-answer)} .k-turn{color:var(--k-turn)} .k-onme{color:var(--k-onme)} .k-docs{color:var(--k-docs)} .k-neutral{color:var(--k-neutral)}
+.hero .head{display:flex;align-items:center;gap:8px}
+.meta{font-size:12px;color:var(--text-3)}
+.hero .q{font-size:15px;color:var(--text-2)}
+.hero .say{font-size:var(--fs-hero);line-height:1.32;font-weight:600;letter-spacing:-.01em;text-wrap:pretty}
+.hero .src{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-3)}
+.hero .acts{display:flex;gap:2px;margin-left:-8px}
+.ghost{background:transparent;border:0;color:var(--text-3);font-size:13px;padding:6px 8px;border-radius:var(--radius-s)}
+.ghost:hover{background:var(--surface-2);color:var(--text)}
+.hero.finish{box-shadow:0 0 0 1px color-mix(in srgb,var(--k-onme) 45%,transparent) inset}
+
+/* ---------- Earlier ---------- */
+.earlier{flex:1;min-height:0;overflow-y:auto;margin-top:16px;display:flex;flex-direction:column}
+.earlier .h{display:flex;justify-content:space-between;padding:0 16px 8px;font-size:12px;color:var(--text-3)}
+.earlier .h b{font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.row{position:relative;display:flex;align-items:flex-start;gap:12px;padding:11px 16px;border-top:1px solid var(--separator);background:transparent;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%}
+.row:hover{background:color-mix(in srgb,var(--surface) 60%,transparent)}
+.row .kind{width:78px;flex:none;padding-top:2px}
+.row .t{flex:1;min-width:0;font-size:14px;color:var(--text)}
+.row .m{flex:none;font-size:12px;color:var(--text-3);padding-top:2px}
+.row.done{opacity:.6}
+.row .hover-acts{display:none;gap:2px;position:absolute;right:10px;top:6px;background:var(--bg);border-radius:var(--radius-s)}
+.row:hover .hover-acts{display:flex}
+.row:hover .m{visibility:hidden}
+
+/* ---------- Footer ---------- */
+.next{flex:none;margin:0 12px 10px;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-m);background:color-mix(in srgb,var(--surface) 50%,transparent);border:1px solid var(--separator)}
+.next[hidden]{display:none}
+.next .t{flex:1;font-size:13px;color:var(--text-2)}
+.warn{color:var(--k-onme)}
+.link{background:transparent;border:0;color:var(--accent);font-size:13px;font-weight:600;padding:4px 6px}
+.ask{flex:none;display:flex;gap:8px;padding:10px 12px 12px}
+.ask label{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:var(--radius-m);background:var(--surface);border:1px solid var(--border)}
+.ask input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);font:inherit}
+.help{height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:var(--radius-m);border:0;background:var(--accent-fill);color:#fff;font-weight:600;white-space:nowrap}
+.help .k{font-size:12px;font-weight:500;opacity:.85}
+
+/* ---------- Side pane (wide) and sheet (narrow) ---------- */
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;border-radius:8px;background:var(--surface-2);margin:12px 16px}
+.tab{border:0;border-radius:6px;padding:5px 0;font-size:13px;background:transparent;color:var(--text-2);white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.panebody{flex:1;min-height:0;overflow-y:auto;padding:0 16px 16px;display:flex;flex-direction:column;gap:14px}
+.tl{display:flex;gap:10px;line-height:1.45}
+.tl .who{flex:none;width:72px;font-weight:600;background:transparent;border:0;padding:0;text-align:left}
+.who.client{color:var(--k-docs)} .who.team{color:var(--k-answer)} .who.unknown{color:var(--text-3);text-decoration:underline dotted}
+.newvoice{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-m);background:var(--accent-soft)}
+.newvoice .t{flex:1;font-size:13px}
+.onme-item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--separator)}
+.onme-item input{margin-top:3px}
+.brief h3{font-size:13px;margin:8px 0 4px}
+.brief p,.brief li{font-size:14px;color:var(--text-2)}
+.panefoot{flex:none;padding:10px 16px 14px;display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);border-top:1px solid var(--separator)}
+
+.sheet{position:fixed;inset:48px 8px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-l);box-shadow:0 20px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;z-index:20}
+.sheet[hidden]{display:none}
+.sheet .close{position:absolute;top:10px;right:10px}
+
+.menu{position:fixed;top:44px;right:10px;min-width:240px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-m);box-shadow:0 12px 30px rgba(0,0,0,.25);padding:6px;z-index:30;display:flex;flex-direction:column}
+.menu[hidden]{display:none}
+.menu button{display:flex;justify-content:space-between;gap:16px;border:0;background:transparent;padding:7px 10px;border-radius:6px;text-align:left;font-size:13px}
+.menu button:hover{background:var(--accent-fill);color:#fff}
+.menu .sep{height:1px;background:var(--separator);margin:4px 6px}
+.menu kbd{font:inherit;opacity:.6}
+
+.popover{position:fixed;z-index:40;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-m);box-shadow:0 12px 30px rgba(0,0,0,.25);padding:12px;display:flex;flex-direction:column;gap:10px;width:260px}
+.popover[hidden]{display:none}
+.popover input[type=text]{height:30px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 8px;font:inherit}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:2px;border-radius:8px;background:var(--surface-2)}
+.seg2 button{border:0;border-radius:6px;padding:4px 0;background:transparent;font-size:13px}
+.seg2 button[aria-pressed="true"]{background:var(--surface);font-weight:600}
+
+/* ---------- Presentation ---------- */
+.present{flex:none;margin:0 12px;background:var(--surface);border-radius:var(--radius-l);padding:18px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-card)}
+.present[hidden]{display:none}
+.present .top{display:flex;justify-content:space-between;align-items:baseline}
+.present .clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums}
+.present .over{color:var(--danger-text)}
+.present .step{font-size:20px;font-weight:600}
+.present .say{font-size:16px;line-height:1.45;color:var(--text-2)}
+.present .nx{font-size:13px;color:var(--text-3)}
+.present .ctl{display:flex;gap:8px}
+.btn2{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);font-size:13px}
+.btn1{height:32px;padding:0 14px;border-radius:7px;border:0;background:var(--accent-fill);color:#fff;font-size:13px;font-weight:600}
+
+/* ---------- Compact "glance" mode ---------- */
+.app.compact .agenda,.app.compact .earlier,.app.compact .next,.app.compact .ask,.app.compact .pane{display:none!important}
+.app.compact .hero{margin:0 8px 8px;padding:12px 14px;gap:6px}
+.app.compact .hero .q,.app.compact .hero .src,.app.compact .hero .acts{display:none}
+.app.compact .hero .say{font-size:19px}
+
+/* ---------- Wide: side pane ---------- */
+@container app (min-width: 760px){
+  .pane{display:flex;flex-direction:column;width:min(40%,420px);flex:none;background:var(--surface);border-left:1px solid var(--separator)}
+  .hero .say{font-size:var(--fs-hero-wide)}
+  .hero,.present{margin:0 16px}
+  .row{padding:11px 20px}
+  .agenda{padding:0 20px 14px}
+}
+/* Very narrow: hide status word, keep timer */
+@container app (max-width: 400px){
+  .status{display:none}
+  .row .kind{width:70px}
+  .help .k{display:none}
+}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---------- Empty states: ready (before start) and listening (no tips yet) ---------- */
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:0 32px;text-align:center}
+.empty[hidden]{display:none}
+.empty .mark{width:44px;height:auto;color:var(--text)}
+.empty .ring{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px color-mix(in srgb,var(--brand) 25%,transparent),0 0 0 14px color-mix(in srgb,var(--brand) 7%,transparent);animation:breathe 3.2s ease-in-out infinite}
+@keyframes breathe{50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--brand) 35%,transparent),0 0 0 20px color-mix(in srgb,var(--brand) 4%,transparent)}}
+@media (prefers-reduced-motion: reduce){.empty .ring{animation:none}}
+.empty .t1{font-size:19px;font-weight:600;margin-top:6px}
+.empty .t2{font-size:14px;line-height:1.5;color:var(--text-2);max-width:300px}
+.empty .ctl{display:flex;gap:8px;margin-top:12px}
+.empty .foot{font-size:12px;color:var(--text-3);margin-top:18px}
+.rec.ready{background:transparent;box-shadow:inset 0 0 0 1.5px var(--text-3)}
+
+/* ---------- App additions (F2) ---------- */
+.status.warn{color:var(--k-onme);font-weight:600}
+.struck{text-decoration:line-through;color:var(--text-3)}
+.hero .say[contenteditable="true"]{outline:2px solid var(--accent-fill);outline-offset:4px;border-radius:4px}
+.hero .acts .btn1{margin-left:8px}
+.briefedit{flex:1;min-height:240px;width:100%;resize:vertical;border:1px solid var(--border);border-radius:var(--radius-m);background:var(--surface);color:var(--text);font:13px/1.5 var(--font-mono);padding:10px}
+.panebody .ctl{display:flex;gap:8px}
+.empty .ctl .btn1,.empty .ctl .btn2{height:36px}
+.toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);max-width:calc(100% - 32px);background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-m);box-shadow:0 12px 30px rgba(0,0,0,.2);padding:8px 14px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+.toast.show{opacity:1}
+.toast.warn{color:var(--k-onme)}
+@media (prefers-reduced-motion: reduce){.hero{animation:none}.toast{transition:none}}

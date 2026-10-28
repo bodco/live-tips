@@ -157,7 +157,8 @@ final class UpNext: ObservableObject {
             let when = Calendar.current.isDateInToday(m.callDate) ? f.string(from: m.callDate) : d.string(from: m.callDate)
             return ["id": m.id.uuidString, "title": m.effectiveTitle, "project": m.targetName, "when": when,
                     "prep": st.rawValue, "progress": st == .running ? runner.progress : 0,
-                    "stage": st == .running ? runner.stage : ""]
+                    "stage": st == .running ? runner.stage : "",
+                    "starts_in_min": m.callDate.timeIntervalSinceNow / 60]      // Pacenote 0.8: "Team retro in 8 min" 
         }
         let data = (try? JSONSerialization.data(withJSONObject: list)) ?? Data("[]".utf8)
         return String(data: data, encoding: .utf8) ?? "[]"

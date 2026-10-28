@@ -36,13 +36,26 @@ final class HotKeys: @unchecked Sendable {
         }
     }
 
-    enum Action: UInt32, CaseIterable { case help = 1, pause = 2
-        var title: String { self == .help ? "HELP NOW" : "Pause or resume" }
-        var defaultCombo: Combo {
-            self == .help ? Combo(key: UInt32(kVK_ANSI_H), mods: UInt32(controlKey | optionKey), char: "h")
-                          : Combo(key: UInt32(kVK_ANSI_P), mods: UInt32(controlKey | optionKey), char: "p")
+    // Pacenote 0.8 (F2): Control-Option-M turns the microphone off or on, Control-Option-T the compact tips window.
+    enum Action: UInt32, CaseIterable { case help = 1, pause = 2, mute = 3, compact = 4
+        var title: String {
+            switch self {
+            case .help: return L("menubar.helpNow")
+            case .pause: return L("menubar.pause")
+            case .mute: return L("hotkey.mute")
+            case .compact: return L("menubar.compact")
+            }
         }
-        var prefix: String { self == .help ? "hk.help" : "hk.pause" }
+        var defaultCombo: Combo {
+            let mods = UInt32(controlKey | optionKey)
+            switch self {
+            case .help: return Combo(key: UInt32(kVK_ANSI_H), mods: mods, char: "h")
+            case .pause: return Combo(key: UInt32(kVK_ANSI_P), mods: mods, char: "p")
+            case .mute: return Combo(key: UInt32(kVK_ANSI_M), mods: mods, char: "m")
+            case .compact: return Combo(key: UInt32(kVK_ANSI_T), mods: mods, char: "t")
+            }
+        }
+        var prefix: String { ["hk.help", "hk.pause", "hk.mute", "hk.compact"][Int(rawValue) - 1] }
     }
 
     func combo(_ a: Action) -> Combo {
@@ -62,9 +75,10 @@ final class HotKeys: @unchecked Sendable {
         register(a)
     }
 
-    func install(help: @escaping () -> Void, pause: @escaping () -> Void) {
+    func install(help: @escaping () -> Void, pause: @escaping () -> Void,
+                 mute: @escaping () -> Void = {}, compact: @escaping () -> Void = {}) {
         guard handler == nil else { return }
-        actions = [Action.help.rawValue: help, Action.pause.rawValue: pause]
+        actions = [Action.help.rawValue: help, Action.pause.rawValue: pause, Action.mute.rawValue: mute, Action.compact.rawValue: compact]
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
             var id = EventHotKeyID()

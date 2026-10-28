@@ -92,9 +92,14 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             for tab in ["general", "calendars", "keys", "notion", "ai", "how", "about", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
             steps.append { [unowned self] in self.tips(theme, presentation: false) }
             steps.append { [unowned self] in self.tips(theme, presentation: true) }
+            steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "tips-380", size: NSSize(width: 380, height: 620)) }
+            steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "tips-560", size: NSSize(width: 560, height: 620)) }
+            steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setStatus({state:'standby',title:'Orbit weekly with the client'});", name: "tips-ready", size: NSSize(width: 560, height: 620)) }
             if ProcessInfo.processInfo.environment["LT_SHOTS_ALL"] == "1" {
-                steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('prbtn').click();", name: "tips-prep-pane") }
-                steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('gear').click();", name: "tips-menu") }
+                steps.append { [unowned self] in self.tipsExtra(theme, js: "LiveTips.openTab('brief');", name: "tips-brief") }
+                steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('moreBtn').click();", name: "tips-menu", size: NSSize(width: 560, height: 620)) }
+                steps.append { [unowned self] in self.tipsExtra(theme, js: "LiveTips.setMode('compact');", name: "tips-compact", size: NSSize(width: 560, height: 150)) }
+                steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setStatus({state:'recording',title:'Orbit weekly with the client',started_at:new Date(Date.now()-55*60000).toISOString(),minutes_left:4});", name: "tips-finish", size: NSSize(width: 560, height: 620)) }
                 steps.append { [unowned self] in self.prepDoc(theme) }
                 for st in OnboardingModel.Step.allCases where st != .splash { steps.append { [unowned self] in self.onboarding(st, theme) } }
             }
@@ -218,8 +223,8 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// The tips window in a given state (Preparation pane, ⚙ menu), for a design review.
-    func tipsExtra(_ theme: String, js: String, name: String) {
+    /// The tips window in a given state and size (Pacenote 0.8: 380, 560, 1000 px, ready, compact, menu, brief).
+    func tipsExtra(_ theme: String, js: String, name: String, size: NSSize = NSSize(width: 1040, height: 680)) {
         var pa = prompterArgs(["LiveTips", "--prompter-demo"])
         pa.title = "Orbit weekly with the client"
         let c = PrompterController(args: pa)
@@ -229,7 +234,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             c.web.evaluateJavaScript("""
               try { window.setPrepDoc && window.setPrepDoc({text: \(Self.demoBriefJS), at: '09:40'}); \(js) } catch (e) {}
             """, completionHandler: nil)
-            c.window.setContentSize(NSSize(width: 1040, height: 680))
+            c.window.setContentSize(size)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
                 capture(c.window, "\(name)-\(theme)", web: c.web) { [self] in c.window.close(); next() }
             }
@@ -334,7 +339,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [self] in
             if !presentation {   // the transcript pane with named speakers, as during a call
                 c.web.evaluateJavaScript("""
-                  try { document.getElementById('trbtn').click();
+                  try { LiveTips.openTab('transcript');
                   window.setSpeakers({clusters:{S1:{name:'Emily C.',seconds:40,side:'client'},S2:{name:'David K.',seconds:22,side:'client'}},
                     roster:[{name:'Emily C.',side:'client'},{name:'David K.',side:'client'},{name:'Sarah L.',side:'team'}]});
                   window.addTranscript(['- Channels: Me = microphone, Other = system audio',

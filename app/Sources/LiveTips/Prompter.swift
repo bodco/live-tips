@@ -1,8 +1,10 @@
-// The tips window of LiveTips.app: the same prompter.html as the skill's live-transcriber
-// (shared UI, parity), hosted in a WKWebView. Ported from live-transcriber src/prompter.swift;
-// the message bridge (ask, pin, opacity, ready, mute, setting, stealth) is unchanged.
+// The tips window of Pacenote, hosted in a WKWebView. Pacenote 0.8 (F2): the page is Resources/tips/
+// (Concept A "Focus"); the skill's live-transcriber keeps its own prompter.html. The item stream, the status,
+// the transcript and the speakers go to the page as before (feed.js turns them into the window's state);
+// the page answers on one handler, "liveTips", with {"action": ...} (handleAction below).
 
 import AppKit
+import SwiftUI
 import WebKit
 import LiveTipsCore
 
@@ -101,17 +103,20 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     var stem: String { transcriptPath.hasSuffix(".md") ? String(transcriptPath.dropLast(3)) : transcriptPath }
     var lastPrep = ""
     var ticker: Timer?               // stopped when the window closes (QA: closed windows kept reading files)
+    var compactFrame: NSRect?        // the full window's frame while the compact strip is shown
 
     init(args: PrompterArgs) { self.args = args }
 
     func show() {
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript", "pref", "rename", "upnext", "cardedit", "prepdoc"] { uc.add(self, name: name) }
+        uc.add(self, name: "liveTips")
         // The remembered window settings, before the page's own script runs.
         var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
         // 2026-10-27 (owner): one interface language for the whole app: the window follows Settings > General.
         prefs["ui_lang"] = MainActor.assumeIsolated { AppConfig.load(from: AppPaths.config).uiLanguage == "uk" ? "uk" : "en" }
+        prefs["keys"] = ["help": HotKeys.shared.combo(.help).display, "pause": HotKeys.shared.combo(.pause).display,
+                         "mute": HotKeys.shared.combo(.mute).display, "compact": HotKeys.shared.combo(.compact).display]
         if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
             uc.addUserScript(WKUserScript(source: "window.LT_PREFS = " + js + ";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -124,7 +129,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         window = NSWindow(contentRect: rect,
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
-        window.title = args.title
+        window.title = args.title                   // the call's name; the brand symbol sits next to it
         window.titlebarAppearsTransparent = true   // the title bar blends with the page background
         window.level = Self.onTop ? .floating : .normal      // 2026-10-28: "Always on top" is remembered
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -152,6 +157,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
         web.navigationDelegate = self
+        if let z = prefs["zoom"] as? Double, z > 0 { web.pageZoom = CGFloat(z) }      // Cmd + and Cmd -, remembered
         web.setValue(false, forKey: "drawsBackground")   // the page's own background can be see-through
         web.autoresizingMask = [.width, .height]
         window.contentView = web
@@ -174,15 +180,15 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         }
         ticks += 1
         // 2026-10-27 (owner): the status every 0.5 s (was 2 s), so the dot turns red as soon as the recording runs.
+        // Pacenote 0.8: the minutes left (the calendar event's end) ride along for the "N min left" card.
         if !args.status.isEmpty,
-           let s = try? String(contentsOfFile: args.status, encoding: .utf8),
-           s != lastStatus, isJSONObject(s) {
-            lastStatus = s
-            push("window.setStatus(" + s + ")")
-            if let d = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] {
-                if !callEnded, let g = startButton, g.isHidden != ((d["state"] as? String) != "standby") {
-                    g.isHidden = (d["state"] as? String) != "standby"; layoutTitleButtons()
-                }
+           let raw = try? String(contentsOfFile: args.status, encoding: .utf8), isJSONObject(raw),
+           var d = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any] {
+            if let left = Self.minutesLeft() { d["minutes_left"] = left }
+            let s = (try? JSONSerialization.data(withJSONObject: d, options: [.sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? raw
+            if s != lastStatus {
+                lastStatus = s
+                push("window.setStatus(" + s + ")")
                 if let f = d["file"] as? String, !f.isEmpty, f != transcriptPath {
                     transcriptPath = f
                     transcript = TailReader(path: f)
@@ -262,10 +268,14 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pageReady = true
-        web.evaluateJavaScript("window.setPinned && window.setPinned(\(Self.onTop))", completionHandler: nil)
-        web.evaluateJavaScript("window.enableGlass && window.enableGlass()", completionHandler: nil)
-        if args.demoPresentation {   // the demo of the presentation mode: type Presentation opens the slide cards
-            web.evaluateJavaScript("(function(){var s=document.getElementById('s_type'); if(s){s.value='presentation'; s.dispatchEvent(new Event('change'));}})()", completionHandler: nil)
+        if let o = (UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:])["opacity"] as? Double {
+            web.evaluateJavaScript("window.LiveTips && LiveTips.setOpacity(\(o))", completionHandler: nil)
+        }
+        if args.demo {   // the demo window: a call in progress (or a presentation) without a recorder
+            let f = ISO8601DateFormatter()
+            let st: [String: Any] = ["state": "recording", "title": args.title, "started_at": f.string(from: Date().addingTimeInterval(-32 * 60 - 14)),
+                                     "call_type": args.demoPresentation ? "presentation" : "auto", "system_audio": "ok", "mic": "on", "minutes_left": 13]
+            web.evaluateJavaScript("window.setStatus && window.setStatus(" + jsonLine(st) + ")", completionHandler: nil)
         }
         let queued = pending
         pending.removeAll()
@@ -274,6 +284,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
+        if message.name == "liveTips", let d = message.body as? [String: Any] { handleAction(d) }
+    }
+
+    /// The window's requests by their pre-0.8 names (the inbox, the corrections log, the files), shared by handleAction.
+    func handle(_ name: String, _ body: Any) {
+        let message = (name: name, body: body)
         switch message.name {
         case "ask":
             guard let text = message.body as? String,
@@ -381,6 +397,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 if !tp.isEmpty { CallHistory.shared.rename(file: tp, title: v) }     // Home and insights at once
             }
             window.title = v                 // Pacenote 0.8: the call's name, no product prefix
+            push("window.LiveTips && LiveTips.rename(" + jsString(v) + ")")
             if !args.inbox.isEmpty { appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": "title", "value": v]), to: args.inbox) }
         case "pref":
             // Window settings remembered across calls (opacity, text size, proactive, language...).
@@ -534,22 +551,16 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     @objc func pinClicked() { setOnTop(!Self.onTop) }
 
     func addEndCallButton() {
-        let b = pillButton("End call", color: .systemRed, filled: false, action: #selector(endCallClicked))
-        b.toolTip = "Stop recording this call"
+        let b = pillButton(L("menubar.endCall"), color: .systemRed, filled: false, action: #selector(endCallClicked))
+        b.toolTip = L("tips.endCall.tooltip")
         // Start call while the window waits for the call (standby); it also starts by itself when the other side speaks.
         let g = pillButton("Start call", color: .controlAccentColor, filled: true, action: #selector(startClicked))
         g.toolTip = "Start recording now (otherwise it starts when the other side speaks)"
         g.isHidden = true
-        let pin = NSButton(image: NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Always on top") ?? NSImage(), target: self, action: #selector(pinClicked))
-        pin.isBordered = false
-        pin.frame = NSRect(x: 0, y: 0, width: 22, height: 22)
-        pinButton = pin
-        styleOnTop()
-        let w = pin.frame.width + g.frame.width + b.frame.width + 26
+        // Pacenote 0.8 (F2): no pin in the title bar (Always on top is in Call settings); the brand symbol on the left.
+        let w = g.frame.width + b.frame.width + 20
         let holder = NSView(frame: NSRect(x: 0, y: 0, width: w, height: 28))
-        pin.frame.origin = NSPoint(x: 2, y: 3)
-        holder.addSubview(pin)
-        g.frame.origin = NSPoint(x: pin.frame.maxX + 6, y: (28 - g.frame.height) / 2)
+        g.frame.origin = NSPoint(x: 4, y: (28 - g.frame.height) / 2)
         b.frame.origin = NSPoint(x: g.frame.maxX + 6, y: (28 - b.frame.height) / 2)
         holder.addSubview(g)
         holder.addSubview(b)
@@ -561,6 +572,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         endButton = b
         titleHolder = holder
         layoutTitleButtons()
+        let mark = NSHostingView(rootView: PacenoteSymbol(height: 14).padding(.horizontal, 6))
+        mark.frame = NSRect(x: 0, y: 0, width: 26, height: 28)
+        let lead = NSTitlebarAccessoryViewController()
+        lead.view = mark
+        lead.layoutAttribute = .leading
+        window.addTitlebarAccessoryViewController(lead)
     }
 
     /// The live call's title and project folder name (the corrections log keys).
@@ -667,5 +684,134 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         if let d = try? JSONSerialization.data(withJSONObject: [item]), let js = String(data: d, encoding: .utf8) {
             push("window.addItems && window.addItems(\(js))")
         }
+    }
+}
+
+// MARK: - Pacenote 0.8 (F2): the new window's actions, compact mode, zoom, Call settings
+
+extension PrompterController {
+    /// One handler for the page: {"action": ..., ...} (REDESIGN-SPEC 3.10). Old behaviour is reused through handle(_:_:).
+    func handleAction(_ d: [String: Any]) {
+        let act = d["action"] as? String ?? ""
+        switch act {
+        case "ask":
+            if let t = d["text"] as? String { handle("ask", t) }
+        case "help":
+            handle("ask", "sos")                                   // HELP NOW, as before
+        case "shorter":
+            // No engine change: a typed ask the tips engine answers as usual (the card says "Shorter").
+            guard let say = d["say"] as? String, !say.isEmpty else { return }
+            handle("ask", "shorter: one sentence I can say now, same facts: " + say)
+        case "said":
+            sendSetting("tip_feedback", "used|" + (d["key"] as? String ?? ""))
+        case "edit":
+            var c = d
+            c["action"] = "edit"
+            c["key"] = d["id"] ?? ""
+            handle("cardedit", c)
+        case "onme-toggle":
+            let done = d["done"] as? Bool ?? false
+            handle("cardedit", ["action": done ? "onme_done" : "onme_open", "kind": "onme", "key": d["id"] ?? "",
+                                "after": ["text": d["text"] as? String ?? ""]] as [String: Any])
+        case "agenda":
+            handle("cardedit", ["action": "agenda", "kind": "agenda", "key": d["id"] ?? "",
+                                "after": ["text": d["title"] as? String ?? "", "state": d["state"] as? String ?? ""]] as [String: Any])
+        case "name-speaker":
+            let sid = d["speakerId"] as? String ?? "", name = d["name"] as? String ?? "", side = d["side"] as? String ?? ""
+            guard sid.range(of: "^S[0-9]+$", options: .regularExpression) != nil, !name.isEmpty else { return }
+            sendSetting("speaker_name", sid + "|" + name)
+            if !side.isEmpty { sendSetting("speaker_side", sid + "|" + side) }
+        case "setting":
+            if let k = d["key"] as? String { handle("setting", ["key": k, "value": d["value"] ?? NSNull()] as [String: Any]) }
+        case "mute":
+            handle("mute", d["on"] as? Bool ?? false)
+        case "compact":
+            setCompact(d["on"] as? Bool ?? false)
+        case "zoom":
+            zoom(d["step"] as? Int ?? 0)
+        case "start":
+            startClicked()
+        case "prepdoc":
+            if let t = d["text"] as? String { handle("prepdoc", t) }
+        case "prepare-next":
+            handle("upnext", ["a": "prep", "id": d["id"] as? String ?? ""])
+        case "open-next":
+            MainActor.assumeIsolated {
+                if let id = d["id"] as? String, let m = UpNext.shared.item(id), let p = PrepDocWindow.path(for: m) {
+                    PrepDocWindow.show(path: p, title: m.effectiveTitle)
+                }
+            }
+        case "menu":
+            switch d["item"] as? String ?? "" {
+            case "clear-speakers": sendSetting("speakers_clear", true)
+            case "settings": MainActor.assumeIsolated { CallSettingsWindow.show(for: self) }
+            case "switch-call":
+                MainActor.assumeIsolated {
+                    guard let app = NSApp.delegate as? AppDelegate else { return }
+                    if let n = UpNext.shared.first { app.confirmSwitch(to: n, on: window) } else { StartCallWindow.show(delegate: app, planOnly: true) }
+                }
+            default: break
+            }
+        default:
+            break                                                  // pin, hide, present, ready: the window keeps them itself
+        }
+    }
+
+    func sendSetting(_ key: String, _ value: Any) { handle("setting", ["key": key, "value": value] as [String: Any]) }
+
+    /// Minutes until the end of the call's calendar event (nil without an event).
+    static func minutesLeft() -> Int? {
+        MainActor.assumeIsolated {
+            guard let id = CallEngine.shared.liveEventID, let e = CalendarService.shared.event(id) else { return nil }
+            return Int((e.end.timeIntervalSinceNow / 60).rounded(.up))
+        }
+    }
+
+    // Compact mode (REDESIGN-SPEC 3.8): a strip about 560 x 150 at the top of the same place, always on top,
+    // still hidden from screen sharing. Control-Option-T or the window menu; the same again goes back.
+    var isCompact: Bool { compactFrame != nil }
+    func setCompact(_ on: Bool) {
+        guard let w = window else { return }
+        if on, compactFrame == nil {
+            compactFrame = w.frame
+            var f = w.frame
+            let size = NSSize(width: 560, height: 150)
+            f.origin.y = f.maxY - size.height
+            f.size = size
+            w.minSize = NSSize(width: 360, height: 90)
+            w.setFrame(f, display: true, animate: true)
+            w.level = .floating
+        } else if !on, let f = compactFrame {
+            compactFrame = nil
+            w.minSize = NSSize(width: 300, height: 140)
+            w.setFrame(f, display: true, animate: true)
+            w.level = Self.onTop ? .floating : .normal
+        }
+        push("window.LiveTips && LiveTips.setMode('" + (on ? "compact" : "normal") + "')")
+    }
+    func toggleCompact() { setCompact(!isCompact) }
+
+    /// Cmd + / Cmd - / Cmd 0 in the window: the page zoom, remembered for the next calls.
+    func zoom(_ step: Int) {
+        let z = step == 0 ? 1.0 : min(1.6, max(0.8, Double(web.pageZoom) + Double(step) * 0.1))
+        web.pageZoom = CGFloat(z)
+        var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
+        prefs["zoom"] = z
+        UserDefaults.standard.set(prefs, forKey: "prompterPrefs")
+    }
+
+    /// Display settings from Call settings: the background opacity (text stays solid) and screen-share hiding.
+    func setOpacity(_ v: Double) {
+        var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
+        prefs["opacity"] = v
+        UserDefaults.standard.set(prefs, forKey: "prompterPrefs")
+        push("window.LiveTips && LiveTips.setOpacity(\(v))")
+    }
+    var hiddenFromSharing: Bool {
+        get { window.sharingType == NSWindow.SharingType.none }
+        set { window.sharingType = newValue ? .none : .readOnly }
+    }
+    func setLanguage(_ l: String) {
+        push("window.LiveTips && LiveTips.setLang('" + (l == "uk" ? "uk" : "en") + "')")
     }
 }

@@ -2,15 +2,15 @@
 
 **Your co-driver on calls.** [Українською](README.uk.md) · [Site](https://tower.bodco.pm/pacenote/)
 
-Pacenote (formerly Live Tips) prepares a short brief before the call, gives quiet, precise tips during it, and writes
+Pacenote prepares a short brief before the call, gives quiet, precise tips during it, and writes
 the notes after. You keep the wheel. It listens to your call on your Mac and speaks up only when a fact or a phrase is needed:
 a question to you, your turn, a new request, a date you are about to promise. Audio is transcribed
 on the Mac and never leaves it; only text goes to Claude. After the call the summary, decisions and
 action items land in Notion, and the transcript stays in your project folder.
 
 Beta, built by one project manager for his own calls. The new name changes what you see; the repository,
-the `live-tips` skill, the `LiveTips.app` file, folders and settings keep the old name, so calls, folders and
-permissions carry over.
+the `live-tips` skill, the `LiveTips.app` file, folders and settings keep their names, so calls, folders and
+permissions carry over. What "live tips" means inside the code: [DEVELOPMENT.md](DEVELOPMENT.md#names).
 
 ## Two ways to run it
 

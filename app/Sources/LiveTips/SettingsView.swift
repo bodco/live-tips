@@ -1027,6 +1027,8 @@ struct SettingsView: View {
             Section {
                 ShortcutRow(action: .help)
                 ShortcutRow(action: .pause)
+                ShortcutRow(action: .mute)
+                ShortcutRow(action: .compact)
             } header: { Text("Shortcuts") } footer: {
                 Text("They work from any app during a call, also while the meeting app has the focus. Change: press the new keys with Control, Option or Command (Esc cancels). Pause stops the transcript and the tips for both sides.")
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -1134,6 +1136,30 @@ struct HowItWorksView: View {
 
 struct AboutView: View {
     @ObservedObject var model: SettingsModel
+    @State private var checking = false
+    @State private var updateNote = ""
+    @State private var updateURL: URL?
+
+    /// Pacenote 0.8 (owner, Q6): the latest release from the GitHub API, compared with this build.
+    func checkUpdates() async {
+        checking = true; updateURL = nil; updateNote = L("common.checking")
+        defer { checking = false }
+        var r = URLRequest(url: URL(string: "https://api.github.com/repos/bodco/live-tips/releases/latest")!)
+        r.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        r.timeoutInterval = 10
+        guard let res = try? await URLSession.shared.data(for: r), (res.1 as? HTTPURLResponse)?.statusCode == 200,
+              let o = (try? JSONSerialization.jsonObject(with: res.0)) as? [String: Any],
+              let tag = o["tag_name"] as? String, let latest = AppVersion.number(in: tag) else {
+            updateNote = L("settings.about.checkFailed"); return
+        }
+        let mine = info["CFBundleShortVersionString"] as? String ?? "0"
+        if AppVersion.isNewer(latest, than: mine) {
+            updateNote = L("settings.about.newVersion", ["version": latest])
+            updateURL = URL(string: o["html_url"] as? String ?? "") ?? URL(string: "https://github.com/bodco/live-tips/releases/latest")
+        } else {
+            updateNote = L("settings.about.upToDate", ["version": mine])
+        }
+    }
 
     var info: [String: Any] { Bundle.main.infoDictionary ?? [:] }
     var versionLine: String {
@@ -1155,9 +1181,15 @@ struct AboutView: View {
                         Text(versionLine).font(PN.Font.caption).foregroundStyle(PN.C.text3).textSelection(.enabled)
                     }
                     Spacer()
-                    // No updater in the app: the releases page opens in the browser, nothing is checked in the background.
-                    Button(L("settings.about.checkUpdates")) { NSWorkspace.shared.open(URL(string: "https://github.com/bodco/live-tips/releases/latest")!) }
-                        .buttonStyle(.pnSecondary)
+                    // Asks GitHub for the latest release only when pressed; nothing is checked in the background.
+                    Button(L("settings.about.checkUpdates")) { Task { await checkUpdates() } }
+                        .buttonStyle(.pnSecondary).disabled(checking)
+                }
+                if !updateNote.isEmpty {
+                    HStack {
+                        Text(updateNote).font(.callout).foregroundStyle(updateURL != nil ? PN.C.accent : PN.C.text3)
+                        if let u = updateURL { Button(L("settings.about.download")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary) }
+                    }
                 }
                 Text(L("app.description")).fixedSize(horizontal: false, vertical: true)
                 Text(L("settings.about.formerly")).font(.callout).foregroundStyle(PN.C.text3)

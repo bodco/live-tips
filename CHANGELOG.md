@@ -3,6 +3,28 @@
 Pacenote (formerly Live Tips). Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.2 (F2: tips window)
+
+- **New tips window** (Concept A "Focus"): one card answers "what do I say now" (hero), older cards one line each
+  under Earlier, the agenda as a bar on top, On me, the next call when it is 10 minutes away, Ask and Help. Wide
+  windows show Transcript, On me and Brief on the right; narrow ones open them as a sheet. Light and dark, English
+  and Ukrainian, no emoji, no colored stripes.
+- **The call summary is no longer a card in the middle of the call:** it feeds the "N min left" card 5 minutes
+  before the calendar end (not raised agenda items and a recap to say aloud) and the summary after the call.
+- **Cards:** Said it (moves it to Earlier as Answered), Shorter (asks Claude for one sentence), Pin, Edit, Hide.
+  A click on an Earlier line makes it the hero; Esc goes back.
+- **Speakers inline:** a "New voice" banner over the transcript, a click on any name opens Name + Client/Team.
+  "Forget speaker names" is in the menu, the transcript follows the latest line by itself.
+- **Window menu:** Pause, Mic off, Compact mode, Presentation mode, Transcript, Brief, Forget speaker names, Switch to
+  next call, Call settings. Call settings is a native window: call type and role, audience, language, microphone,
+  proactive tips, the call's name, background opacity, always on top, hiding from screen sharing, interface language.
+  Text size with Cmd + and Cmd -.
+- **Compact mode** (Control-Option-T): a strip with the timer and the hero's phrase, on top, still hidden from screen
+  sharing. Control-Option-M turns the mic off or on. Both can be changed in Settings > General > Shortcuts.
+- **Title bar:** the Pacenote symbol and the call's name, End call; no pin.
+- **Check for updates** asks GitHub for the latest release and offers the download.
+- The old window (`app/Resources/prompter.html`) is removed from the app; the skill's live-transcriber keeps its own.
+
 ## 0.8.1 (F1: foundation)
 
 - **Design tokens** (`PacenoteTheme.swift`, the same values as the web `tokens.css`): colors for text, accent,

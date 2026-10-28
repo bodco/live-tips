@@ -53,6 +53,75 @@ class Tail:
 ACK_KEYS = {"call_type", "hiring_role", "audience", "comment_rate_seconds", "proactive", "ui_lang", "tips_paused"}
 
 
+def _on(value) -> bool:
+    return str(value).lower() in ("on", "true", "1")
+
+
+def _paused(eng, value) -> None:
+    eng.paused = _on(value)
+
+
+def _proactive(eng, value) -> None:
+    eng.proactive = _on(value)        # 2026-10-27: the window switch now really changes the engine
+    eng.cfg["proactive"] = eng.proactive
+
+
+def _set_meeting(eng, change: dict) -> None:
+    try:
+        eng.prompt.set_meeting(change)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _title(eng, value) -> None:
+    if str(value or "").strip():      # renamed during the call
+        eng.cfg["title"] = str(value).strip()[:120]
+        _set_meeting(eng, {"title": eng.cfg["title"]})
+
+
+def _call_lang(eng, value) -> None:
+    v = str(value or "")              # Pacenote 0.8: the call's languages changed in Call settings
+    if v:
+        _set_meeting(eng, {"langs": ["uk", "en"] if v == "mix" else [c for c in v.split("+") if c]})
+
+
+def _onme(eng, value) -> None:
+    text, _, st = str(value or "").rpartition("|")   # "<action text>|done" or "|open": a tick in the window's On me
+    if text.strip():
+        eng.onme_ticked[norm_text(text)] = st == "done"
+
+
+SETTINGS = {
+    "tips_paused": _paused,
+    "proactive": _proactive,
+    "title": _title,
+    "call_lang": _call_lang,
+    "agenda_state": lambda eng, v: eng.set_agenda_state(str(v or "")),        # an agenda item's state set in the window
+    "onme_state": _onme,
+    "commitment_closed": lambda eng, v: eng.commitment_closed(str(v or "")),  # the app wrote the register
+}
+
+
+def handle_setting(eng, key, value) -> None:
+    if key in SETTINGS:
+        SETTINGS[key](eng, value)
+    if key in ACK_KEYS:
+        eng.out_tips.write({"kind": "ack", "key": key, "value": value, "t": time.strftime("%H:%M:%S")})
+
+
+def handle_request(eng, text: str) -> None:
+    low = text.lower()
+    if low == "sos":
+        eng.on_request("sos")
+    elif low.startswith("find:"):
+        if text[5:].strip():
+            eng.on_request("find", text[5:].strip())
+    elif low == "refresh context":
+        eng.reload_prep()             # the window's Refresh or the app after a late preparation
+    elif low != "off topic":
+        eng.on_request("ask", text)
+
+
 def handle_inbox(eng, raw: str) -> None:
     """Questions, HELP NOW and settings from the tips window (the skill gets the same via read_delta)."""
     try:
@@ -60,141 +129,143 @@ def handle_inbox(eng, raw: str) -> None:
     except ValueError:
         return
     if d.get("kind") == "setting":
-        key, value = d.get("key"), d.get("value")
-        if key == "tips_paused":
-            eng.paused = str(value).lower() in ("on", "true", "1")
-        elif key == "proactive":          # 2026-10-27: the window switch now really changes the engine
-            eng.proactive = str(value).lower() in ("on", "true", "1")
-            eng.cfg["proactive"] = eng.proactive
-        elif key == "title" and str(value or "").strip():   # renamed during the call
-            eng.cfg["title"] = str(value).strip()[:120]
-            try:
-                eng.prompt.set_meeting({"title": eng.cfg["title"]})
-            except Exception:  # noqa: BLE001
-                pass
-        elif key == "call_lang" and str(value or ""):   # Pacenote 0.8: the call's languages changed in Call settings
-            v = str(value)
-            codes = ["uk", "en"] if v == "mix" else [c for c in v.split("+") if c]
-            try:
-                eng.prompt.set_meeting({"langs": codes})
-            except Exception:  # noqa: BLE001
-                pass
-        elif key == "agenda_state":       # Pacenote 0.8: the PM set an agenda item's state in the window
-            eng.set_agenda_state(str(value or ""))
-        elif key == "onme_state":         # "<action text>|done" or "|open": a tick in the window's On me
-            text, _, st = str(value or "").rpartition("|")
-            if text.strip():
-                eng.onme_ticked[norm_text(text)] = st == "done"
-        elif key == "commitment_closed":  # the PM closed an open commitment in the window (the app wrote the register)
-            eng.commitment_closed(str(value or ""))
-        if key in ACK_KEYS:
-            eng.out_tips.write({"kind": "ack", "key": key, "value": value, "t": time.strftime("%H:%M:%S")})
+        handle_setting(eng, d.get("key"), d.get("value"))
         return
     text = (d.get("text") or "").strip()
-    if not text:
-        return
-    low = text.lower()
-    if low == "sos":
-        eng.on_request("sos")
-    elif low.startswith("find:"):
-        q = text[5:].strip()
-        if q:
-            eng.on_request("find", q)
-    elif low == "refresh context":
-        eng.reload_prep()             # the window's Refresh or the app after a late preparation
-    elif low == "off topic":
-        return
-    else:
-        eng.on_request("ask", text)
+    if text:
+        handle_request(eng, text)
+
+
+def wait_for(path: Path, limit_s: float = 3 * 3600, step: float = 0.5) -> None:
+    """The app starts the engine while the recorder waits for the call (standby): the transcript file
+    appears with the first line. 2026-10-23: the engine crashed here and was restarted by the app."""
+    waited = 0.0
+    while not path.exists() and waited < limit_s:
+        time.sleep(step)
+        waited += step
+
+
+def skip_existing(*tails) -> None:
+    for t in tails:
+        if t and t.path.exists():
+            t.pos = t.path.stat().st_size
+
+
+class LiveRun:
+    """One live call: the tails it reads, the lines waiting for their timing, what it has seen."""
+
+    def __init__(self, cfg, eng, md: Path, inbox: Path = None, from_start: bool = False):
+        self.cfg, self.eng = cfg, eng
+        self.t_md, self.t_tm = Tail(md), Tail(Path(str(md) + ".timing.jsonl"))
+        self.t_in = Tail(inbox) if inbox else None
+        skip_existing(self.t_in)                     # only requests made after the engine attached
+        if not from_start:                           # join a running call: skip what is already there
+            skip_existing(self.t_md, self.t_tm)
+        self.timing, self.pending, self.n = {}, [], 0
+        self.last_new = self.t0 = time.monotonic()
+        self.last_touch = 0.0
+        self.first_written = self.last_written = None
+
+    def step(self) -> None:
+        self.read_timing()
+        self.read_lines()
+        self.feed_ready()
+        if self.t_in:
+            for raw in self.t_in.read():
+                handle_inbox(self.eng, raw)
+
+    def read_timing(self) -> None:
+        for raw in self.t_tm.read():
+            try:
+                r = json.loads(raw)
+                self.timing.setdefault((r.get("t"), r.get("ch")), []).append(r)
+            except ValueError:
+                pass
+
+    def read_lines(self) -> None:
+        for raw in self.t_md.read():
+            ln = parse_line(raw, self.n, self.cfg["me_label"])
+            if ln:
+                self.n += 1
+                self.pending.append((ln, time.monotonic()))
+                self.last_new = time.monotonic()
+
+    def feed_ready(self) -> None:
+        keep = []
+        for ln, seen in self.pending:
+            recs = self.timing.get((ln.t, ln.speaker))
+            if recs or time.monotonic() - seen > 1.0:    # timing usually follows within ms; never wait > 1 s
+                self.feed(ln, recs.pop(0) if recs else None)
+            else:
+                keep.append((ln, seen))
+        self.pending = keep
+
+    def feed(self, ln, rec) -> None:
+        if rec:
+            ln.seg_end = hms_to_s(rec["seg_end"]) if rec.get("seg_end") else None
+            ln.written = hms_to_s(rec["written"]) if rec.get("written") else now_sod()
+        else:
+            ln.written = now_sod()
+        self.eng.on_line(ln)
+        self.first_written = self.first_written or ln.written
+        self.last_written = ln.written
+
+    def touch_state(self, state_dir: Path) -> None:
+        if not state_dir or time.monotonic() - self.last_touch <= 5:
+            return
+        self.last_touch = time.monotonic()
+        eng = self.eng
+        try:
+            (state_dir / "listener").touch()      # the window shows "not listening" without it
+            (state_dir / "llm.json").write_text(json.dumps({
+                "spent_usd": round(eng.budget.call_spent, 4) if eng.budget else 0, "tips": len(eng.tips),
+                "budget": eng.budget.state() if eng.budget else "ok", "updated": time.strftime("%H:%M:%S")}))
+        except OSError:
+            pass
+
+    def follow_status(self, status: Path) -> bool:
+        """The meeting concept changed in the window's menu: the engine follows it. True: the recorder stopped."""
+        if not (status and status.exists()):
+            return False
+        try:
+            st = json.loads(status.read_text())
+            ch = {k: st.get(k) for k in ("call_type", "audience", "hiring_role") if st.get(k)}
+            if ch and self.eng.set_meeting(ch):
+                print("meeting:", ch, flush=True)
+        except (OSError, ValueError):
+            pass
+        try:
+            return json.loads(status.read_text()).get("state") == "stopped" and time.monotonic() - self.last_new > 5
+        except ValueError:
+            return False
+
+    def timed_out(self, idle_min: float, max_s: float) -> bool:
+        if idle_min and time.monotonic() - self.last_new > idle_min * 60:     # 0 = never (app mode)
+            return True
+        return bool(max_s and time.monotonic() - self.t0 > max_s)
+
+    def summary(self) -> dict:
+        span = (self.last_written - self.first_written) if self.first_written and self.last_written else 0
+        eng = self.eng
+        return {"lines": self.n, "call_span_s": round(span, 1), "tips": len(eng.tips),
+                "spent_usd": round(eng.budget.call_spent, 4) if eng.budget else None}
 
 
 def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, poll_s: float = 0.15,
         from_start: bool = False, provider=None, max_s: float = None, inbox: Path = None, state_dir: Path = None):
     out.mkdir(parents=True, exist_ok=True)
-    # The app starts the engine while the recorder waits for the call (standby): the transcript file
-    # appears with the first line. 2026-10-23: the engine crashed here and was restarted by the app.
-    waited = 0.0
-    while not md.exists() and waited < 3 * 3600:
-        time.sleep(0.5)
-        waited += 0.5
+    wait_for(md)
     if cfg.get("variant") == "app":           # Pacenote 0.8: the register next to the transcript
         cfg.setdefault("register_dir", str(md.parent))
     eng, stem = build_engine(cfg, md, out, now_sod, provider)
     (out / (stem + ".app.run.json")).write_text(json.dumps({
         "md": md.name, "mode": "live", "variant": cfg.get("variant"), "models": cfg["models"],
         "cache_ttl": cfg.get("cache_ttl"), "started": time.strftime("%Y-%m-%d %H:%M:%S")}, ensure_ascii=False, indent=1))
-    t_md, t_tm = Tail(md), Tail(Path(str(md) + ".timing.jsonl"))
-    t_in = Tail(inbox) if inbox else None
-    if t_in and t_in.path.exists():
-        t_in.pos = t_in.path.stat().st_size      # only requests made after the engine attached
-    last_touch = 0.0
-    if not from_start:                   # join a running call: skip what is already there
-        for t in (t_md, t_tm):
-            if t.path.exists():
-                t.pos = t.path.stat().st_size
-    timing = {}
-    pending = []
-    n = 0
-    last_new = time.monotonic()
-    t0 = time.monotonic()
-    first_written = last_written = None
+    lr = LiveRun(cfg, eng, md, inbox, from_start)
     while True:
-        for raw in t_tm.read():
-            try:
-                r = json.loads(raw)
-                timing.setdefault((r.get("t"), r.get("ch")), []).append(r)
-            except ValueError:
-                pass
-        for raw in t_md.read():
-            ln = parse_line(raw, n, cfg["me_label"])
-            if ln:
-                n += 1
-                pending.append((ln, time.monotonic()))
-                last_new = time.monotonic()
-        keep = []
-        for ln, seen in pending:
-            recs = timing.get((ln.t, ln.speaker))
-            if recs or time.monotonic() - seen > 1.0:    # timing usually follows within ms; never wait > 1 s
-                if recs:
-                    rec = recs.pop(0)
-                    ln.seg_end = hms_to_s(rec["seg_end"]) if rec.get("seg_end") else None
-                    ln.written = hms_to_s(rec["written"]) if rec.get("written") else now_sod()
-                else:
-                    ln.written = now_sod()
-                eng.on_line(ln)
-                first_written = first_written or ln.written
-                last_written = ln.written
-            else:
-                keep.append((ln, seen))
-        pending = keep
-        if t_in:
-            for raw in t_in.read():
-                handle_inbox(eng, raw)
-        if state_dir and time.monotonic() - last_touch > 5:
-            last_touch = time.monotonic()
-            try:
-                (state_dir / "listener").touch()      # the window shows "not listening" without it
-                (state_dir / "llm.json").write_text(json.dumps({
-                    "spent_usd": round(eng.budget.call_spent, 4) if eng.budget else 0, "tips": len(eng.tips),
-                    "budget": eng.budget.state() if eng.budget else "ok", "updated": time.strftime("%H:%M:%S")}))
-            except OSError:
-                pass
-        if status and status.exists():
-            try:   # the meeting concept changed in the window's menu: the engine follows it
-                st = json.loads(status.read_text())
-                ch = {k: st.get(k) for k in ("call_type", "audience", "hiring_role") if st.get(k)}
-                if ch and eng.set_meeting(ch):
-                    print("meeting:", ch, flush=True)
-            except (OSError, ValueError):
-                pass
-            try:
-                if json.loads(status.read_text()).get("state") == "stopped" and time.monotonic() - last_new > 5:
-                    break
-            except ValueError:
-                pass
-        if idle_min and time.monotonic() - last_new > idle_min * 60:     # 0 = never (app mode)
-            break
-        if max_s and time.monotonic() - t0 > max_s:
+        lr.step()
+        lr.touch_state(state_dir)
+        if lr.follow_status(status) or lr.timed_out(idle_min, max_s):
             break
         time.sleep(poll_s)
     eng.drain(60)
@@ -202,10 +273,7 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
         eng.final_wrapup()
     except Exception as e:  # noqa: BLE001
         print("wrapup:", repr(e), flush=True)
-    span = (last_written - first_written) if first_written and last_written else 0
-    (out / (stem + ".app.summary.json")).write_text(json.dumps(
-        {"lines": n, "call_span_s": round(span, 1), "tips": len(eng.tips),
-         "spent_usd": round(eng.budget.call_spent, 4) if eng.budget else None}, indent=1))
+    (out / (stem + ".app.summary.json")).write_text(json.dumps(lr.summary(), indent=1))
     return eng
 
 

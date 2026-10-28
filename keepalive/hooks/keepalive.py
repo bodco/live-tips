@@ -37,20 +37,24 @@ def load_marker(path):
 
 def hold(m, until, sid, now):
     """The marker to save when this stop is blocked; None lets the turn end."""
-    if m is None or now > until:
+    if m is None or now > until or not bind_session(m, sid):
         return None
-    # Security (audit 2026-10-27): the marker belongs to one session. The first session that is held binds it
-    # (the skill may also write session_id itself); every other session in the same HOME stops normally.
-    owner = str(m.get("session_id") or "")
-    if owner and sid and owner != sid:
-        return None
-    if not owner and sid:
-        m["session_id"] = sid
     blocks = int(m.get("blocks", 0)) + 1
     if blocks > int(m.get("max_blocks", 400)):
         return None
     m["blocks"] = blocks
     return m
+
+
+def bind_session(m, sid):
+    """Security (audit 2026-10-27): the marker belongs to one session. The first session that is held binds it
+    (the skill may also write session_id itself); every other session in the same HOME stops normally."""
+    owner = str(m.get("session_id") or "")
+    if owner and sid and owner != sid:
+        return False
+    if not owner and sid:
+        m["session_id"] = sid
+    return True
 
 
 def save(m, path):

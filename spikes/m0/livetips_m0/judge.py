@@ -186,6 +186,33 @@ def quick_sample(items):
     return sample_even(ap_, n_app) + sample_even(sk_, QUICK_MAX - n_app)
 
 
+def items_to_judge(a, stem: str, lines) -> list:
+    """The shown tips of both engines inside the call, sampled for --quick, in a fixed shuffled order."""
+    app_path, skill_path = tips_paths(a, stem)
+    skill = [] if (a.app_only or same_file(app_path, skill_path)) else tips_of(skill_path, "skill")
+    app = tips_of(app_path, "app", skip_engine="skill") if app_path else []
+    items = in_call(skill + app, lines)
+    if a.quick:
+        items = quick_sample(items)
+    random.Random(7).shuffle(items)
+    return items
+
+
+def judge_all(prov, model, system, lines, items, extra, out: Path) -> list:
+    """Scores every item; judge.jsonl gets each one as it comes (a rerun replaces the old scores)."""
+    out.mkdir(parents=True, exist_ok=True)
+    outp = out / "judge.jsonl"
+    if outp.exists():
+        outp.write_text("")
+    recs = []
+    for it in items:
+        rec = judge_one(prov, model, system, lines, it, extra)
+        recs.append(rec)
+        with outp.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return recs
+
+
 def judge_extra(quick: bool) -> dict:
     if quick:
         return {"extra_body": {"thinking": {"type": "between_tools"}}}   # Sonnet 5.5 refuses "disabled" (400)
@@ -222,27 +249,11 @@ def main(argv=None, provider=None):
     lines = load_call(a.md, cfg.get("me_label", "Me"))
     stem = a.md.name[:-3] if a.md.name.endswith(".md") else a.md.stem
     out = a.out or (a.md.parent / (stem + ".judge"))
-    app_path, skill_path = tips_paths(a, stem)
-    skill = [] if (a.app_only or same_file(app_path, skill_path)) else tips_of(skill_path, "skill")
-    app = tips_of(app_path, "app", skip_engine="skill") if app_path else []
-    items = in_call(skill + app, lines)
-    if a.quick:
-        items = quick_sample(items)
-    random.Random(7).shuffle(items)
+    items = items_to_judge(a, stem, lines)
     call_type = resolve_call_type(a, cfg)
     system = system_prompt(call_type, load_slides(a.slides), a.role or str(cfg.get("hiring_role") or ""))
     prov = provider or make_provider(cfg, lambda n: load_secret(n, cfg.get("secrets_file")), job="after")   # 0.8.2: the "After the call" route
-    out.mkdir(parents=True, exist_ok=True)
-    outp = out / "judge.jsonl"
-    if outp.exists():
-        outp.write_text("")               # a rerun replaces the old scores
-    extra = judge_extra(a.quick)
-    recs = []
-    for it in items:
-        rec = judge_one(prov, model, system, lines, it, extra)
-        recs.append(rec)
-        with outp.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    recs = judge_all(prov, model, system, lines, items, judge_extra(a.quick), out)
     summary = summarize(recs)
     summary["meta"] = {"model": model, "quick": a.quick, "call_type": call_type, "judged": len(recs)}
     (out / "judge.summary.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False))

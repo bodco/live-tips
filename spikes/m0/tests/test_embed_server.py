@@ -75,3 +75,48 @@ def test_embed_orders_short_texts_first_in_batches():
     assert [b[0] for b in batches] == [" ", "x" * 16] and len(batches[0]) == E.BATCH
     assert out[:, 0].tolist() == [float(n) for n in range(20, 0, -1)] + [1.0]
     assert E.Engine.embed(eng, []).shape == (0, 1024)
+
+
+def test_engine_with_fake_runtime(tmp_path, monkeypatch):
+    import sys
+    import types
+    calls = {}
+
+    class Sess:
+        def __init__(self, path, so, providers):
+            calls["init"] = (path, so.intra_op_num_threads, providers)
+
+        def get_inputs(self):
+            return [types.SimpleNamespace(name=n) for n in ("input_ids", "attention_mask", "token_type_ids")]
+
+        def run(self, _, feed):
+            calls["feed"] = sorted(feed)
+            n = feed["input_ids"].shape[0]
+            return [np.ones((n, 3, 4), dtype=np.float32) * 2]
+
+    class Tok:
+        @staticmethod
+        def from_file(p):
+            calls["tok"] = p
+            return Tok()
+
+        def enable_truncation(self, max_length):
+            pass
+
+        def enable_padding(self):
+            pass
+
+        def encode_batch(self, texts):
+            return [types.SimpleNamespace(ids=[1, 2], attention_mask=[1, 1]) for _ in texts]
+    ort = types.SimpleNamespace(SessionOptions=lambda: types.SimpleNamespace(intra_op_num_threads=0, graph_optimization_level=None),
+                                GraphOptimizationLevel=types.SimpleNamespace(ORT_ENABLE_ALL=99), InferenceSession=Sess)
+    monkeypatch.setitem(sys.modules, "onnxruntime", ort)
+    monkeypatch.setitem(sys.modules, "tokenizers", types.SimpleNamespace(Tokenizer=Tok))
+    with pytest.raises(SystemExit):
+        E.Engine(tmp_path)
+    (tmp_path / "model_quantized.onnx").write_text("")
+    eng = E.Engine(tmp_path, threads=2)
+    assert calls["init"][1] == 2 and calls["init"][2] == ["CPUExecutionProvider"]
+    v = eng.embed(["a", "bb"])
+    assert calls["feed"] == ["attention_mask", "input_ids", "token_type_ids"]
+    assert v.shape == (2, 4) and abs(float(np.linalg.norm(v[0])) - 1.0) < 1e-6

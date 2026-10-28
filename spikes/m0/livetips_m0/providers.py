@@ -261,9 +261,11 @@ class HedgedProvider(Provider):
         after = self.after_s.get(model, self.default_after)
         self.stats["calls"] += 1
         args = dict(model=model, system=system, user=user, max_tokens=max_tokens, cache_ttl=cache_ttl, extra=extra)
-        if not after or after <= 0:
+        if not (after and after > 0):
             return self.inner.complete(on_text=on_text, **args)
-        race = _Race(self.inner, args, on_text)
+        return self._race(_Race(self.inner, args, on_text), after)
+
+    def _race(self, race: "_Race", after: float) -> Completion:
         race.launch("primary")
         early, pending, hedged = race.first(after)
         if early is not None:
@@ -276,7 +278,6 @@ class HedgedProvider(Provider):
         if pending and self.on_extra:
             race.bill_later(pending, self.on_extra)
         return winner or last
-
 
     def _tag(self, winner: Completion, tag: str) -> None:
         winner.hedge = tag

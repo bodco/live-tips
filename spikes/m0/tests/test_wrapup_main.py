@@ -129,3 +129,40 @@ def test_action_line_and_pacenote_blocks(tmp_path):
     assert W.action_line({}) == ": "
     b = W.pacenote_blocks({}, tmp_path / "x.md", False, W.TXT["en"])
     assert b[0]["type"] == "heading_3" and "Preparation: none" in b[2]["bulleted_list_item"]["rich_text"][0]["text"]["content"]
+
+
+def test_http_retries_then_fails(monkeypatch):
+    import io
+    import urllib.error
+    waits, tries = [], []
+
+    def urlopen(req, timeout):
+        tries.append(req.get_method())
+        if len(tries) == 1:
+            raise urllib.error.HTTPError(req.full_url, 429, "busy", {}, io.BytesIO(b"slow down"))
+        if len(tries) == 2:
+            class R:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *a):
+                    return False
+
+                def read(self):
+                    return b'{"ok": 1}'
+            return R()
+        raise urllib.error.HTTPError(req.full_url, 400, "bad", {}, io.BytesIO(b"nope"))
+    monkeypatch.setattr(W.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(W.time, "sleep", waits.append)
+    assert W.http("POST", "https://api.notion.com/v1/pages?x=1", {"A": "b"}, {"k": 1}) == {"ok": 1} and waits == [2]
+    with pytest.raises(RuntimeError) as e:
+        W.http("GET", "https://api.notion.com/v1/pages?x=1", {})
+    assert str(e.value) == "GET https://api.notion.com/v1/pages -> 400: nope"
+
+
+def test_notion_sends_the_token_header(monkeypatch):
+    seen = {}
+    monkeypatch.setenv("NOTION_TOKEN", "tok")
+    monkeypatch.setattr(W, "http", lambda m, url, headers, body=None: seen.update(m=m, url=url, h=headers) or {})
+    W.notion("GET", "/users/me")
+    assert seen["url"] == W.NOTION + "/users/me" and seen["h"]["Authorization"] == "Bearer tok"

@@ -942,7 +942,7 @@ Meeting Notes через API не записуються: специфікаці
 
 ## 11. Приватність і етикет
 
-Повні тексти: [політика конфіденційності](https://tower.bodco.pm/uk/live-tips/privacy/) і [умови використання](https://tower.bodco.pm/uk/live-tips/terms/)
+Повні тексти: [політика конфіденційності](https://tower.bodco.pm/uk/pacenote/privacy/) і [умови використання](https://tower.bodco.pm/uk/pacenote/terms/)
 (також [PRIVACY.uk.md](../../PRIVACY.uk.md) і [TERMS.uk.md](../../TERMS.uk.md)). Автору нічого не надсилається: без аналітики і трекінгу.
 
 - Аудіо не зберігається: розпізнані фрази одразу дописуються в `.md`, аудіобуфери живуть
@@ -1467,7 +1467,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    запис, коли застосунок дзвінка бере мікрофон; підсумок у Google Docs чи Drive або документом у папці
    проєкту для тих, хто без Notion. Поки що кожен дзвінок починаєш вручну з рядка меню.
 54. **Порівняння.** Як Live Tips виглядає поруч з Fireflies, Fathom і Notion AI Meeting Notes (транскрипт,
-   допомога під час дзвінка, підсумок, ціни на 27 жовтня 2026): https://tower.bodco.pm/uk/live-tips/compare/
+   допомога під час дзвінка, підсумок, ціни на 27 жовтня 2026): https://tower.bodco.pm/uk/pacenote/compare/
 55. **Власний репозиторій (0.6.0).** Live Tips переїхав з PM Control Tower у github.com/bodco/live-tips
    разом з історією: застосунок (`app/`), записувач (`recorder/`), скіл (`skill/`), рушій (`spikes/m0/`) і цей
    посібник. Завантаження: `LiveTips.dmg` і `live-tips.skill` з останнього релізу.
@@ -1527,7 +1527,7 @@ address", `references/sweep.md`, `references/presentation.md`).
 71. **Новий дзвінок з вікна підказок (0.6.3).** Коли дзвінок закінчився, "Ended ✓" має правильну форму, а
    кнопка "New call" закриває вікно і відкриває Start call.
 72. **Політика конфіденційності і умови використання (0.6.4).** Settings > About > Your data дає коротку версію і
-   посилання на повні [політику](https://tower.bodco.pm/uk/live-tips/privacy/) і [умови](https://tower.bodco.pm/uk/live-tips/terms/).
+   посилання на повні [політику](https://tower.bodco.pm/uk/pacenote/privacy/) і [умови](https://tower.bodco.pm/uk/pacenote/terms/).
 73. **Далі (0.6.5).** Плануй і готуй скільки завгодно наступних дзвінків під час дзвінка і переходь на них після
    одного питання (розділ 14.1b); підготовка приєднується лише до свого дзвінка.
 74. **Крапка статусу (0.6.5).** Сіра чекає або пауза, синя запуск чи зупинка, червона запис, зелена зупинено.

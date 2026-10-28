@@ -1,6 +1,6 @@
 # Умови використання Pacenote
 
-Оновлено 27 жовтня 2026. Повний текст на сайті: **[tower.bodco.pm/uk/live-tips/terms/](https://tower.bodco.pm/uk/live-tips/terms/)** ([English](TERMS.md)).
+Оновлено 27 жовтня 2026. Повний текст на сайті: **[tower.bodco.pm/uk/pacenote/terms/](https://tower.bodco.pm/uk/pacenote/terms/)** ([English](TERMS.md)).
 
 Коротко:
 

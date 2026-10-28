@@ -1,6 +1,6 @@
 # Pacenote terms of use
 
-Updated 27 October 2026. The full text is on the website: **[tower.bodco.pm/live-tips/terms/](https://tower.bodco.pm/live-tips/terms/)** ([українською](TERMS.uk.md)).
+Updated 27 October 2026. The full text is on the website: **[tower.bodco.pm/pacenote/terms/](https://tower.bodco.pm/pacenote/terms/)** ([українською](TERMS.uk.md)).
 
 In short:
 

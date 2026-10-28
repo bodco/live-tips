@@ -1,6 +1,6 @@
 # Pacenote
 
-**Ваш штурман на дзвінках.** [English](README.md) · [Сайт](https://tower.bodco.pm/uk/live-tips/)
+**Ваш штурман на дзвінках.** [English](README.md) · [Сайт](https://tower.bodco.pm/uk/pacenote/)
 
 Pacenote (раніше Live Tips) готує короткий бриф перед дзвінком, дає тихі й точні підказки під час нього і пише
 нотатки після. Кермо у ваших руках. Він слухає дзвінок на твоєму Маку і озивається лише тоді, коли потрібен факт або фраза:
@@ -32,7 +32,7 @@ Pacenote (раніше Live Tips) готує короткий бриф пере�
 - **Будь-яка мова на вході, одна в транскрипті:** задай дзвінку одну мову, і кожного спікера записано нею (українська на англійському дзвінку виходить англійською).
 - **Після дзвінка:** сторінка в Notion мовою дзвінка (підсумок, рішення, наші зобовʼязання, нові запити, відкриті питання, ризики, action items) з повним транскриптом як дочірньою сторінкою.
 
-Порівняння з Fireflies, Fathom і Notion AI Meeting Notes: [tower.bodco.pm/uk/live-tips/compare](https://tower.bodco.pm/uk/live-tips/compare/).
+Порівняння з Fireflies, Fathom і Notion AI Meeting Notes: [tower.bodco.pm/uk/pacenote/compare](https://tower.bodco.pm/uk/pacenote/compare/).
 
 ## Репозиторій
 

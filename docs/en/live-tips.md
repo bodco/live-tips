@@ -939,7 +939,7 @@ layers are tuned there too: `speakers_enabled`, `speaker_join` (0.45), `speaker_
 
 ## 11. Privacy and etiquette
 
-The full texts: [privacy policy](https://tower.bodco.pm/live-tips/privacy/) and [terms of use](https://tower.bodco.pm/live-tips/terms/)
+The full texts: [privacy policy](https://tower.bodco.pm/pacenote/privacy/) and [terms of use](https://tower.bodco.pm/pacenote/terms/)
 (also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). Nothing is sent to the author: no analytics, no tracking.
 
 - Audio is not stored: recognised phrases are appended to the `.md` immediately, audio
@@ -1461,7 +1461,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    recording when a call app takes the microphone; the summary in Google Docs or Drive, or as a document in
    the project folder, for users without Notion. Until then each call starts by hand from the menu bar.
 54. **Comparison.** How Live Tips stands next to Fireflies, Fathom and Notion AI Meeting Notes (transcript,
-   help during the call, summary, prices as of 27 October 2026): https://tower.bodco.pm/live-tips/compare/
+   help during the call, summary, prices as of 27 October 2026): https://tower.bodco.pm/pacenote/compare/
 55. **Its own repository (0.6.0).** Live Tips moved out of PM Control Tower into
    github.com/bodco/live-tips with its history: the app (`app/`), the recorder (`recorder/`), the skill
    (`skill/`), the engine (`spikes/m0/`) and this guide. Downloads: `LiveTips.dmg` and `live-tips.skill`
@@ -1523,7 +1523,7 @@ address", `references/sweep.md`, `references/presentation.md`).
 71. **New call from the tips window (0.6.3).** When a call ends, "Ended ✓" keeps its shape and a "New call"
    button closes the window and opens Start call.
 72. **Privacy policy and terms of use (0.6.4).** Settings > About > Your data gives the short version and links to
-   the full [privacy policy](https://tower.bodco.pm/live-tips/privacy/) and [terms](https://tower.bodco.pm/live-tips/terms/).
+   the full [privacy policy](https://tower.bodco.pm/pacenote/privacy/) and [terms](https://tower.bodco.pm/pacenote/terms/).
 73. **Up next (0.6.5).** Plan and prepare any number of upcoming calls during a call and switch with one
    question (section 14.1b); a preparation joins only its own call.
 74. **Status dot (0.6.5).** Grey waiting or paused, blue starting or stopping, red recording, green stopped.

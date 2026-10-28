@@ -1,6 +1,6 @@
 # Pacenote
 
-**Your co-driver on calls.** [Українською](README.uk.md) · [Site](https://tower.bodco.pm/live-tips/)
+**Your co-driver on calls.** [Українською](README.uk.md) · [Site](https://tower.bodco.pm/pacenote/)
 
 Pacenote (formerly Live Tips) prepares a short brief before the call, gives quiet, precise tips during it, and writes
 the notes after. You keep the wheel. It listens to your call on your Mac and speaks up only when a fact or a phrase is needed:
@@ -32,7 +32,7 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 - **Any language in, one language out:** set the call to one language and every speaker is written in it (Ukrainian on an English call comes out in English).
 - **After the call:** a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page.
 
-How it compares with Fireflies, Fathom and Notion AI Meeting Notes: [tower.bodco.pm/live-tips/compare](https://tower.bodco.pm/live-tips/compare/).
+How it compares with Fireflies, Fathom and Notion AI Meeting Notes: [tower.bodco.pm/pacenote/compare](https://tower.bodco.pm/pacenote/compare/).
 
 ## Repository
 

@@ -1162,7 +1162,7 @@ struct AboutView: View {
                 Text(L("app.description")).fixedSize(horizontal: false, vertical: true)
                 Text(L("settings.about.formerly")).font(.callout).foregroundStyle(PN.C.text3)
                 HStack(spacing: 16) {
-                    Link(L("settings.about.website"), destination: URL(string: "https://tower.bodco.pm/live-tips/")!)
+                    Link(L("settings.about.website"), destination: URL(string: "https://tower.bodco.pm/pacenote/")!)
                     Link("GitHub", destination: URL(string: "https://github.com/bodco/live-tips")!)
                     Link("PM Control Tower", destination: URL(string: "https://tower.bodco.pm")!)
                 }
@@ -1172,8 +1172,8 @@ struct AboutView: View {
                 Text(L("settings.about.dataBody"))
                     .font(.callout).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 16) {
-                    Link(L("settings.about.privacy"), destination: URL(string: "https://tower.bodco.pm/live-tips/privacy/")!)
-                    Link(L("settings.about.terms"), destination: URL(string: "https://tower.bodco.pm/live-tips/terms/")!)
+                    Link(L("settings.about.privacy"), destination: URL(string: "https://tower.bodco.pm/pacenote/privacy/")!)
+                    Link(L("settings.about.terms"), destination: URL(string: "https://tower.bodco.pm/pacenote/terms/")!)
                     Link(L("settings.about.license"), destination: URL(string: "https://github.com/bodco/live-tips/blob/main/LICENSE")!)
                 }
             } header: { Text(L("settings.about.yourData")) }

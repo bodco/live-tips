@@ -83,9 +83,15 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             steps.append { [unowned self] in self.startCall(theme) }
             steps.append { [unowned self] in self.planCall(theme) }
             steps.append { [unowned self] in self.home(theme) }
-            for tab in ["general", "notion", "ai", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
+            for tab in ["general", "calendars", "keys", "notion", "ai", "how", "about", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
             steps.append { [unowned self] in self.tips(theme, presentation: false) }
             steps.append { [unowned self] in self.tips(theme, presentation: true) }
+            if ProcessInfo.processInfo.environment["LT_SHOTS_ALL"] == "1" {
+                steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('prbtn').click();", name: "tips-prep-pane") }
+                steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('gear').click();", name: "tips-menu") }
+                steps.append { [unowned self] in self.prepDoc(theme) }
+                for st in OnboardingModel.Step.allCases { steps.append { [unowned self] in self.onboarding(st, theme) } }
+            }
         }
         steps.append { exit(0) }
         next()
@@ -201,6 +207,72 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
             if let w = SettingsWindow.window { capture(w, "settings-\(tab)-\(theme)") }
             if tab == "projects" { SettingsWindow.window?.close() }
+            next()
+        }
+    }
+
+    /// The tips window in a given state (Preparation pane, ⚙ menu), for a design review.
+    func tipsExtra(_ theme: String, js: String, name: String) {
+        var pa = prompterArgs(["LiveTips", "--prompter-demo"])
+        pa.title = "Live Tips: Orbit SaaS Launch"
+        let c = PrompterController(args: pa)
+        c.show()
+        keep.append(c)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [self] in
+            c.web.evaluateJavaScript("""
+              try { window.setPrepDoc && window.setPrepDoc({text: \(Self.demoBriefJS), at: '09:40'}); \(js) } catch (e) {}
+            """, completionHandler: nil)
+            c.window.setContentSize(NSSize(width: 1040, height: 680))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
+                capture(c.window, "\(name)-\(theme)", web: c.web) { [self] in c.window.close(); next() }
+            }
+        }
+    }
+
+    static let demoBrief = """
+    # Live Brief: Orbit weekly with the client (prep, today 11:00)
+
+    **Goal:** agree the pilot plan and the export release date.
+
+    ## Previous meetings
+    - **Last week:** export scope agreed; Emily asked for test accounts (open). David asked who tests the pilot (partly answered).
+    - **Action items:** Mike - send the test account list (not done); Sarah - export on dev (done).
+
+    ## Checklist
+    - [ ] Confirm the export release date (Tuesday after the review)
+    - [ ] Who tests the pilot: our QA the first week, then their team
+    - [ ] Send the test account list today
+
+    ## Risks
+    - Pilot slips if the test accounts are late.
+
+    Sources: kickoff notes, export spec, 2 previous calls, 4 corrections.
+    """
+    static var demoBriefJS: String {
+        let d = (try? JSONSerialization.data(withJSONObject: [demoBrief])) ?? Data("[\"\"]".utf8)
+        let s = String(data: d, encoding: .utf8) ?? "[\"\"]"
+        return String(s.dropFirst().dropLast())
+    }
+
+    /// Read prep: the preparation document window before the call.
+    func prepDoc(_ theme: String) {
+        let path = out.appendingPathComponent("demo-prep.brief.md").path
+        try? Self.demoBrief.write(toFile: path, atomically: true, encoding: .utf8)
+        PrepDocWindow.show(path: path, title: "Orbit weekly with the client")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
+            if let w = PrepDocWindow.windows[path] { capture(w, "prep-doc-\(theme)"); w.close(); PrepDocWindow.windows[path] = nil }
+            try? FileManager.default.removeItem(atPath: path)
+            next()
+        }
+    }
+
+    /// First run: every onboarding step.
+    func onboarding(_ st: OnboardingModel.Step, _ theme: String) {
+        OnboardingWindow.show()
+        OnboardingWindow.model.step = st
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
+            if let w = OnboardingWindow.window { capture(w, "onboarding-\(st.rawValue)-\(st)-\(theme)") }
+            if st == OnboardingModel.Step.allCases.last { OnboardingWindow.window?.close() }
             next()
         }
     }

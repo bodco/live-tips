@@ -427,6 +427,76 @@ def pacing_tip(obj: dict, trigger: str) -> bool:
     return trigger == "timer_checkpoint" or obj.get("trigger") == "timer_checkpoint" or bool(PACING.search(text))
 
 
+def deep_item(res: dict, uk: bool) -> dict:
+    """The card fields of a deep folder lookup result (or of its failure)."""
+    if res.get("error"):
+        return {"gist": ("🔎 Пошук у папці не вдався: " if uk else "🔎 The folder search failed: ") + str(res["error"])[:90],
+                "level": "info"}
+    note = ("Джерела: " if uk else "Sources: ") + ", ".join(res["sources"]) if res.get("sources") else ""
+    return {"gist": "🔎 " + str(res.get("gist", "")).lstrip("🔎 "), "phrase": res.get("phrase", ""),
+            "items": [str(x) for x in (res.get("items") or [])][:4], "level": "info", "note": note}
+
+
+def numbers_seen(text: str, corpus: str) -> bool:
+    """Every number of two or more characters in the text also appears in the (lower-case) corpus."""
+    for n in re.findall(r"\d[\d.,]*\d|\d", text or ""):
+        n = n.rstrip(".,")
+        if n and len(n) > 1 and n not in corpus:
+            return False
+    return True
+
+
+def check_numbers(obj: dict, corpus: str) -> dict:
+    items = [i for i in (obj.get("items") or []) if numbers_seen(i, corpus)]
+    dropped = len(obj.get("items") or []) - len(items)
+    obj["items"] = items
+    if dropped:
+        obj["_dropped_items"] = dropped
+    if obj.get("phrase") and not numbers_seen(obj["phrase"], corpus):
+        obj["_unseen_number_in_phrase"] = True
+    return obj
+
+
+def situation_due(since: Optional[float], interval: float, strong: bool) -> bool:
+    """Time for a new call picture: the first one, every interval, or 3 s after a strong line."""
+    return since is None or since >= interval or (strong and since >= 3)
+
+
+def commitment_card(c: dict, t: str, uk: bool) -> dict:
+    mine = (c.get("owner") or "me") == "me"
+    who = ("На мені" if mine else "На них") if uk else ("On me" if mine else "On them")
+    return {"schema_version": 1, "engine": "app", "kind": "commitment_done", "level": "info", "t": t, "at": t,
+            "src": t, "id": c["id"], "text": c.get("text", ""), "owner": c.get("owner") or "me",
+            "gist": who + " · " + ("Зроблено? " if uk else "Done? ") + c.get("text", "")}
+
+
+def speech_out(item: dict, now: float, default_gist: str, note: str) -> dict:
+    """The speech card as the window shows it."""
+    out = {"schema_version": 1, "engine": "app", "uid": "speech", "t": s_to_hms(now), "src": s_to_hms(now), "kind": "speech",
+           "level": "info", "gist": item.get("gist") or default_gist, "phrase": item.get("phrase", ""),
+           "items": [str(x) for x in (item.get("items") or [])][:14], "note": note, "at": s_to_hms(now)}
+    return {k: v for k, v in out.items() if v not in ("", [], None)}
+
+
+def add_queries(qs: List[str], obj: Optional[dict]) -> None:
+    """New, non-empty queries from the model, case-insensitively unique."""
+    for q in (obj or {}).get("queries") or []:
+        if isinstance(q, str) and q.strip() and q.strip().lower() not in [x.lower() for x in qs]:
+            qs.append(q.strip())
+
+
+def pm_share(lines: List[Line]) -> float:
+    me = sum(len(h.text) for h in lines if h.speaker == "me")
+    return me / (sum(len(h.text) for h in lines) or 1)
+
+
+def pm_leads(share: float, was: bool, presentation: bool) -> bool:
+    """Hysteresis: in at 65% (55% in a presentation), out below 55%."""
+    if was:
+        return share >= 0.55
+    return share > (0.55 if presentation else 0.65)
+
+
 def asks_the_pm(sig) -> bool:
     """A question to the PM by name or "you", not about a third person."""
     return bool((sig.name_vocative or (sig.question and sig.second_person)) and not sig.third_person)
@@ -688,22 +758,7 @@ class Engine:
         corpus = self.prompt.corpus()
         with self.lock:
             corpus += " " + " ".join(h.text for h in self.history[-400:])
-        corpus = corpus.lower()
-
-        def ok(text: str) -> bool:
-            for n in re.findall(r"\d[\d.,]*\d|\d", text or ""):
-                n = n.rstrip(".,")
-                if n and len(n) > 1 and n not in corpus:
-                    return False
-            return True
-        items = [i for i in (obj.get("items") or []) if ok(i)]
-        dropped = len(obj.get("items") or []) - len(items)
-        obj["items"] = items
-        if dropped:
-            obj["_dropped_items"] = dropped
-        if obj.get("phrase") and not ok(obj["phrase"]):
-            obj["_unseen_number_in_phrase"] = True
-        return obj
+        return check_numbers(obj, corpus.lower())
 
     def _budget_stops(self) -> bool:
         """The app's own API limit is reached and this call has no way around the key."""
@@ -764,35 +819,45 @@ class Engine:
             span["classify_ms"] = c.ms(c.t_done)
             obj = first_json(c.text) if not c.error else None
             if c.error or obj is None or list(self.cls_validator.iter_errors(obj)):
-                span["outcome"] = "classify_error" if c.error else "classify_invalid"
-                span["error"] = c.error
-                if span.get("gate") is not None:
-                    g = span.pop("gate"); g["need_tip"] = None; g["event"].set()   # no verdict: the tip decides
-                self.out_timing.write(span)
-            elif span.get("gate") is not None:
-                gate = span.pop("gate")
-                gate["need_tip"] = bool(obj.get("need_tip"))
-                gate["obj"] = obj
-                gate["event"].set()
-                span["classify"] = obj
-                span["outcome"] = "classify_for_parallel"
-                self.out_timing.write(span)
-            elif obj.get("need_tip"):
-                span["classify"] = obj
-                self._submit_tip(line, obj.get("trigger", "none"), span, level_hint=obj.get("level"))
+                self._classify_failed(span, c)
             else:
-                span["classify"] = obj
-                span["outcome"] = "no_tip"
-                self.out_timing.write(span)
+                self._classified(line, span, obj)
         finally:
-            with self.lock:
-                nxt = self.classify_pending
-                self.classify_pending = None
-                self.classify_busy = False
-            if nxt is not None:
-                self._submit_classify(nxt, {"line_id": nxt.line_id, "src": nxt.t, "speaker": nxt.speaker,
-                                            "seg_end": nxt.seg_end, "written": nxt.written,
-                                            "available_at": self.clock(), "route": "classify_pending"})
+            self._classify_next()
+
+    def _classify_failed(self, span: dict, c) -> None:
+        span["outcome"] = "classify_error" if c.error else "classify_invalid"
+        span["error"] = c.error
+        if span.get("gate") is not None:
+            g = span.pop("gate")
+            g["need_tip"] = None                # no verdict: the tip decides
+            g["event"].set()
+        self.out_timing.write(span)
+
+    def _classified(self, line: Line, span: dict, obj: dict) -> None:
+        span["classify"] = obj
+        if span.get("gate") is not None:
+            gate = span.pop("gate")
+            gate["need_tip"] = bool(obj.get("need_tip"))
+            gate["obj"] = obj
+            gate["event"].set()
+            span["outcome"] = "classify_for_parallel"
+        elif obj.get("need_tip"):
+            self._submit_tip(line, obj.get("trigger", "none"), span, level_hint=obj.get("level"))
+            return
+        else:
+            span["outcome"] = "no_tip"
+        self.out_timing.write(span)
+
+    def _classify_next(self) -> None:
+        with self.lock:
+            nxt = self.classify_pending
+            self.classify_pending = None
+            self.classify_busy = False
+        if nxt is not None:
+            self._submit_classify(nxt, {"line_id": nxt.line_id, "src": nxt.t, "speaker": nxt.speaker,
+                                        "seg_end": nxt.seg_end, "written": nxt.written,
+                                        "available_at": self.clock(), "route": "classify_pending"})
 
     def _submit_tip(self, line: Line, trigger: str, span: dict, level_hint: Optional[str] = None) -> None:
         with self.lock:
@@ -1134,12 +1199,8 @@ class Engine:
             recent = [h for h in self.history if h.t_s >= now - 120 - 30]
         if not recent or recent[-1].t_s - recent[0].t_s < 100:
             return False
-        me = sum(len(h.text) for h in recent if h.speaker == "me")
-        tot = sum(len(h.text) for h in recent) or 1
-        share = me / tot
         was = getattr(self, "_presenting", False)
-        enter = 0.55 if meta.get("call_type") == "presentation" else 0.65
-        self._presenting = share >= 0.55 if was else share > enter
+        self._presenting = pm_leads(pm_share(recent), was, meta.get("call_type") == "presentation")
         return self._presenting
 
     # ---------- the PM's speech from the brief, at the start ----------
@@ -1179,12 +1240,7 @@ class Engine:
         item = speech_from_brief(brief_text, default)
         if not item:
             return None
-        now = self.clock()
-        out = {"schema_version": 1, "engine": "app", "uid": "speech", "t": s_to_hms(now), "src": s_to_hms(now), "kind": "speech",
-               "level": "info", "gist": item.get("gist") or default, "phrase": item.get("phrase", ""),
-               "items": [str(x) for x in (item.get("items") or [])][:14], "note": item.get("note", "бриф" if self._ui_uk() else "brief"),
-               "at": s_to_hms(now)}
-        out = {k: v for k, v in out.items() if v not in ("", [], None)}
+        out = speech_out(item, self.clock(), default, item.get("note", "бриф" if self._ui_uk() else "brief"))
         self._remember_speech(out)
         self.out_tips.write(out)
         return out
@@ -1228,14 +1284,10 @@ class Engine:
     def _find_queries(self, text: str) -> List[str]:
         qs = [text]
         try:
-            c = self.provider.complete(model=self.models["classify"], system=[{"text": self.FIND_QUERIES}],
-                                       user="Question: " + text, max_tokens=150, cache_ttl=None,
-                                       extra=(self.cfg.get("request_extra") or {}).get("classify"))
-            self._bill(c)
-            obj = first_json(c.text) if not c.error else None
-            for q in (obj or {}).get("queries") or []:
-                if isinstance(q, str) and q.strip() and q.strip().lower() not in [x.lower() for x in qs]:
-                    qs.append(q.strip())
+            c = self._bill(self.provider.complete(model=self.models["classify"], system=[{"text": self.FIND_QUERIES}],
+                                                  user="Question: " + text, max_tokens=150, cache_ttl=None,
+                                                  extra=(self.cfg.get("request_extra") or {}).get("classify")))
+            add_queries(qs, first_json(c.text) if not c.error else None)
         except Exception:  # noqa: BLE001  (the question itself is still searched)
             pass
         return qs[:5]
@@ -1294,13 +1346,9 @@ class Engine:
     SPEECH_SHOW = re.compile(r"^\W*(де|покажи|show|where|дай|відкрий|open)\b.{0,40}(спіч|speech|мій апдейт|my update)", re.I)
 
     def _emit_speech(self, obj: dict, note: str = "") -> dict:
-        now = self.clock()
-        out = {"schema_version": 1, "engine": "app", "uid": "speech", "t": s_to_hms(now), "src": s_to_hms(now),
-               "kind": "speech", "level": "info", "gist": obj.get("gist") or ("🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech"), "phrase": obj.get("phrase", ""),
-               "items": [str(x) for x in (obj.get("items") or [])][:14], "note": note or obj.get("note", ""), "at": s_to_hms(now)}
-        out = {k: v for k, v in out.items() if v not in ("", [], None)}
+        out = speech_out(obj, self.clock(), "🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech", note or obj.get("note", ""))
         changed = list(out.get("items") or []) != self.speech_items
-        self.speech_item, self.speech_items, self.speech_phrase = out, list(out.get("items") or []), out.get("phrase", "")
+        self._remember_speech(out)
         if changed and self.situation:
             with self.lock:
                 self.situation["speech_done"] = []      # numbers of the old points mean nothing now (QA 26.10)
@@ -1352,7 +1400,7 @@ class Engine:
         obj = self._request_answer(c, kind, text, line)
         item = request_item(obj, kind, text, span["src"], done)
         if kind == "ask":
-            self.ask_log.append({"q": text, "a": (str(obj.get("gist", "")) + " " + str(obj.get("phrase", "")))[:200]})
+            self._log_ask(text, obj)
         with self.lock:
             self.tips.append(item)
         self.out_tips.write(item)
@@ -1401,7 +1449,7 @@ class Engine:
 
     def _run_deep(self, question: str, kind: str, tail: List[str]) -> None:
         from . import deep
-        uk = (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
+        uk = self._ui_uk()
         t0 = self.clock()
         try:
             res = deep.lookup(self.cfg, question, tail, "Ukrainian" if uk else "English")
@@ -1413,21 +1461,18 @@ class Engine:
         done = self.clock()
         self.out_llm.write({"at": s_to_hms(done), "role": "deep_lookup", "q": question[:200], "secs": round(done - t0, 1),
                             "answered": res.get("answered"), "error": res.get("error"), "cost_usd": res.get("cost_usd")})
-        if res.get("error"):
-            gist = ("🔎 Пошук у папці не вдався: " if uk else "🔎 The folder search failed: ") + str(res["error"])[:90]
-            item = {"gist": gist, "level": "info"}
-        else:
-            item = {"gist": "🔎 " + str(res.get("gist", "")).lstrip("🔎 "), "phrase": res.get("phrase", ""),
-                    "items": [str(x) for x in (res.get("items") or [])][:4], "level": "info",
-                    "note": ("Джерела: " if uk else "Sources: ") + ", ".join(res.get("sources") or []) if res.get("sources") else ""}
         out = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": s_to_hms(t0), "kind": "answer",
-               "q": question, "at": s_to_hms(done), **item}
+               "q": question, "at": s_to_hms(done), **deep_item(res, uk)}
         out = {k: v for k, v in out.items() if v not in ("", [], None)}
         if kind == "ask":
-            self.ask_log.append({"q": question, "a": (str(out.get("gist", "")) + " " + str(out.get("phrase", "")))[:200]})
+            self._log_ask(question, out)
         with self.lock:
             self.tips.append(out)
         self.out_tips.write(out)
+
+    def _log_ask(self, question: str, answer: dict) -> None:
+        """Earlier asks go into the next ask's prompt ("more detail", "and the other one")."""
+        self.ask_log.append({"q": question, "a": (str(answer.get("gist", "")) + " " + str(answer.get("phrase", "")))[:200]})
 
     # ---------- situation tracker (2026-10-26) ----------
     def _maybe_situation(self, line: Line, sig, now: float) -> None:
@@ -1435,8 +1480,7 @@ class Engine:
             return
         strong = line.speaker == "them" and (sig.name_vocative or sig.name_mention or bool(SITUATION_STRONG.search(line.text)))
         since = None if self.sit_last_at is None else now - self.sit_last_at
-        due = since is None or since >= self.sit_interval
-        if not (due or (strong and since >= 3)):
+        if not situation_due(since, self.sit_interval, strong):
             return
         with self.lock:
             if self.sit_busy:
@@ -1548,6 +1592,7 @@ class Engine:
                 return None
         return None if self.stale(line, "direct_question") else line
 
+    # ---------- agenda and commitments register (Pacenote 0.8, F5) ----------
     def _situation_extra_rules(self) -> str:
         ag, cm = getattr(self.rules, "agenda", {}) or {}, getattr(self.rules, "commitments", {}) or {}
         keys = ['"theirs": [{"who": "<name>", "what": "<what they promised, max 12 words, in the call\'s language>", "due": "<day or date, or empty>", "t": "<HH:MM:SS>"}]']
@@ -1638,13 +1683,7 @@ class Engine:
             if not c or c["id"] in self.commit_proposed:
                 continue
             self.commit_proposed.add(c["id"])
-            t = s_to_hms(self.clock())
-            uk = self._ui_uk()
-            mine = (c.get("owner") or "me") == "me"
-            self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "commitment_done", "level": "info", "t": t, "at": t,
-                                 "src": t, "id": c["id"], "text": c.get("text", ""), "owner": c.get("owner") or "me",
-                                 "gist": (("На мені" if mine else "На них") if uk else ("On me" if mine else "On them")) +
-                                         " · " + ("Зроблено? " if uk else "Done? ") + c.get("text", "")})
+            self.out_tips.write(commitment_card(c, s_to_hms(self.clock()), self._ui_uk()))
 
     def _risk_cards(self, sit: dict) -> None:
         """A new risk: one quiet card in Earlier (rules/risks.yaml > during_call), never red."""

@@ -179,3 +179,51 @@ def test_pacing_tip():
     assert pacing_tip({"gist": "5 minutes left"}, "x")
     assert pacing_tip({"gist": "g"}, "timer_checkpoint") and pacing_tip({"gist": "g", "trigger": "timer_checkpoint"}, "x")
     assert not pacing_tip({"gist": "5 minutes left", "level": "red"}, "x") and not pacing_tip({"gist": "hello"}, "x")
+
+
+def test_deep_item():
+    from livetips_m0.engine import deep_item
+    assert deep_item({"error": "timeout"}, False) == {"gist": "🔎 The folder search failed: timeout", "level": "info"}
+    it = deep_item({"gist": "🔎 42", "items": [1, 2, 3, 4, 5], "sources": ["a.md", "b.md"]}, False)
+    assert it["gist"] == "🔎 42" and it["items"] == ["1", "2", "3", "4"] and it["note"] == "Sources: a.md, b.md"
+    assert deep_item({"gist": "x"}, True)["note"] == "" and deep_item({"gist": "x", "sources": ["s"]}, True)["note"].endswith("s")
+
+
+def test_numbers_check():
+    from livetips_m0.engine import check_numbers, numbers_seen
+    assert numbers_seen("42 users, 7 days", "we have 42 users") and not numbers_seen("43 users", "42 users")
+    assert numbers_seen("", "") and numbers_seen("1.5.", "1.5")
+    obj = check_numbers({"items": ["42 users", "99 bugs"], "phrase": "77 days"}, "42 users")
+    assert obj["items"] == ["42 users"] and obj["_dropped_items"] == 1 and obj["_unseen_number_in_phrase"]
+    assert check_numbers({"items": [], "phrase": "ok"}, "") == {"items": [], "phrase": "ok"}
+
+
+def test_situation_due():
+    from livetips_m0.engine import situation_due
+    assert situation_due(None, 10, False) and situation_due(10, 10, False) and situation_due(3, 10, True)
+    assert not situation_due(9.9, 10, False) and not situation_due(2.9, 10, True)
+
+
+def test_commitment_and_speech_cards():
+    from livetips_m0.engine import commitment_card, speech_out
+    c = commitment_card({"id": "c1", "text": "send deck", "owner": "Ann"}, "00:01:00", False)
+    assert c["gist"] == "On them · Done? send deck" and c["owner"] == "Ann"
+    assert commitment_card({"id": "c2", "text": "x"}, "t", True)["gist"].startswith("На мені")
+    s = speech_out({"items": list(range(20))}, 5.0, "D", "")
+    assert s["gist"] == "D" and len(s["items"]) == 14 and "note" not in s and s["uid"] == "speech"
+
+
+def test_add_queries():
+    from livetips_m0.engine import add_queries
+    qs = ["Pilot"]
+    add_queries(qs, {"queries": ["pilot", " start date ", "", 3, "Start date"]})
+    assert qs == ["Pilot", "start date"]
+    add_queries(qs, None)
+    assert qs == ["Pilot", "start date"]
+
+
+def test_pm_share_and_leads():
+    from livetips_m0.engine import pm_leads, pm_share
+    assert pm_share([_l(1, "me", "aaa"), _l(2, "them", "a")]) == 0.75 and pm_share([]) == 0
+    assert pm_leads(0.66, False, False) and not pm_leads(0.65, False, False)
+    assert pm_leads(0.56, False, True) and pm_leads(0.55, True, False) and not pm_leads(0.54, True, True)

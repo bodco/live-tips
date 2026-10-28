@@ -150,9 +150,8 @@ def context_windows(lines, end: float, span: float, bucket: float, tail_s: float
     `tail_s` seconds and at most `tail_s + bucket`. Lines are in time order and have `t_s`."""
     cut = ((end - tail_s) // bucket) * bucket if bucket else end - tail_s
     lines = [l for l in lines if l.t_s <= end]
-    earlier = [l for l in lines if cut - span < l.t_s <= cut] if span and cut > 0 else []
-    tail = [l for l in lines if l.t_s > cut] if earlier else [l for l in lines if l.t_s > cut or cut <= 0]
-    return earlier, tail
+    earlier = [l for l in lines if cut - span < l.t_s <= cut]
+    return earlier, [l for l in lines if l.t_s > cut]
 
 
 class Engine:

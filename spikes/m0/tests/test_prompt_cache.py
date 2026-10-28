@@ -93,3 +93,9 @@ def test_anthropic_request_marks_the_earlier_block_for_the_cache():
     assert content[0] == {"type": "text", "text": "EARLIER", "cache_control": {"type": "ephemeral", "ttl": "5m"}}
     assert content[1] == {"type": "text", "text": "NOW"}
     assert sink["system"][0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
+
+
+def test_without_an_earlier_window_only_the_live_tail_is_sent():
+    lines = [L(t) for t in range(0, 1200, 10)]
+    earlier, tail = context_windows(lines, end=845, span=0, bucket=0)
+    assert earlier == [] and [l.t_s for l in tail][0] == 760 and tail[-1].t_s == 840

@@ -69,19 +69,22 @@ def tips_of(path: Path, engine: str, skip_engine: str = None):
     retracted = {r.get("uid") for r in recs if r.get("kind") == "retract" and r.get("uid")}
     res = []
     for t in recs:
-        if t.get("kind") not in ("tip", "fact", "answer") or t.get("q") or t.get("partial") or "src" not in t or "at" not in t:
-            continue
-        if t.get("uid") and t.get("uid") in retracted:
-            continue
-        if skip_engine and t.get("engine") == skip_engine:
-            continue
-        try:
-            res.append({"engine": engine, "src_s": hms_to_s(t["src"][:8]), "at_s": hms_to_s(t["at"][:8]),
-                        "gist": t.get("gist", ""), "phrase": t.get("phrase", ""), "items": t.get("items", []),
-                        "level": t.get("level")})
-        except Exception:
-            continue
+        if shown_tip(t, retracted, skip_engine):
+            try:
+                res.append({"engine": engine, "src_s": hms_to_s(t["src"][:8]), "at_s": hms_to_s(t["at"][:8]),
+                            "gist": t.get("gist", ""), "phrase": t.get("phrase", ""), "items": t.get("items", []),
+                            "level": t.get("level")})
+            except Exception:
+                continue
     return res
+
+
+def shown_tip(t: dict, retracted: set, skip_engine: str = None) -> bool:
+    if t.get("kind") not in ("tip", "fact", "answer") or t.get("q") or t.get("partial") or "src" not in t or "at" not in t:
+        return False
+    if t.get("uid") and t.get("uid") in retracted:
+        return False
+    return not (skip_engine and t.get("engine") == skip_engine)
 
 
 def load_slides(path):
@@ -137,18 +140,61 @@ def sample_even(items, n):
 
 
 def summarize(recs):
-    summary = {}
-    for eng in ("skill", "app"):
-        rs = [r for r in recs if r["engine"] == eng and isinstance(r.get("score"), (int, float))]
-        sc = [r["score"] for r in rs]
-        good = [s for s in sc if s >= 4]
-        worst = sorted(rs, key=lambda r: r["score"])[:3]
-        summary[eng] = {"n": len(sc), "mean": round(sum(sc) / len(sc), 2) if sc else None, "p50": pct(sc, .5),
-                        "share_4plus": round(len(good) / len(sc), 2) if sc else None,
-                        "timely": round(sum(1 for r in rs if r.get("timely")) / len(sc), 2) if sc else None,
-                        "worst": ["{} ({}): {}".format(r["score"], (r.get("gist") or "")[:40], r.get("reason") or "")
-                                  for r in worst if r["score"] <= 3]}
-    return summary
+    return {eng: engine_summary([r for r in recs if r["engine"] == eng and isinstance(r.get("score"), (int, float))])
+            for eng in ("skill", "app")}
+
+
+def engine_summary(rs):
+    sc = [r["score"] for r in rs]
+    if not sc:
+        return {"n": 0, "mean": None, "p50": pct(sc, .5), "share_4plus": None, "timely": None, "worst": []}
+    worst = sorted(rs, key=lambda r: r["score"])[:3]
+    return {"n": len(sc), "mean": round(sum(sc) / len(sc), 2), "p50": pct(sc, .5),
+            "share_4plus": round(len([s for s in sc if s >= 4]) / len(sc), 2),
+            "timely": round(sum(1 for r in rs if r.get("timely")) / len(sc), 2),
+            "worst": ["{} ({}): {}".format(r["score"], (r.get("gist") or "")[:40], r.get("reason") or "")
+                      for r in worst if r["score"] <= 3]}
+
+
+def tips_paths(a, stem: str):
+    """(the app's tips file or None, the skill's tips file)."""
+    app_path = a.app_tips or (a.run / (stem + ".app.tips.jsonl") if a.run else None)
+    skill_path = a.md.parent / (stem + ".tips.jsonl")
+    if stem.endswith(".app"):              # the app's own recording: the skill's tips of the same call, if any
+        alt = a.md.parent / (stem[:-4] + ".tips.jsonl")
+        if alt.exists():
+            skill_path = alt
+    return app_path, skill_path
+
+
+def same_file(a, b) -> bool:
+    return a is not None and b.exists() and a.exists() and b.resolve() == a.resolve()
+
+
+def in_call(items, lines):
+    """Tips whose trigger lies within the call (one minute of slack on each side)."""
+    ws = [l.written for l in lines if l.written] or [l.t_s for l in lines]
+    if not ws:
+        return items
+    t0, t1 = min(ws), max(ws)
+    return [t for t in items if t0 - 60 <= t["src_s"] <= t1 + 60]
+
+
+def quick_sample(items):
+    ap_, sk_ = [t for t in items if t["engine"] == "app"], [t for t in items if t["engine"] == "skill"]
+    n_app = min(len(ap_), max(QUICK_MAX - len(sk_), (QUICK_MAX + 1) // 2))   # half each, the rest to whoever has more
+    return sample_even(ap_, n_app) + sample_even(sk_, QUICK_MAX - n_app)
+
+
+def judge_one(prov, model, system, lines, it, extra) -> dict:
+    hint = "gist: {}\nphrase: {}\nitems: {}".format(it["gist"], it["phrase"], "; ".join(str(x) for x in it["items"]))
+    user = "TRANSCRIPT (trigger line marked; hint shown at {}):\n{}\n\nHINT:\n{}".format(
+        _hms(it["at_s"]), window(lines, it["src_s"], it["at_s"]), hint)
+    c = prov.complete(model=model, system=[{"text": system, "cache": True}], user=user, max_tokens=400,
+                      cache_ttl="5m", extra=extra)
+    obj = first_json(c.text) or {}
+    return dict(it, score=obj.get("score"), timely=obj.get("timely"), concrete=obj.get("concrete"),
+                reason=obj.get("reason"), error=c.error)
 
 
 def main(argv=None, provider=None):
@@ -170,26 +216,12 @@ def main(argv=None, provider=None):
     lines = load_call(a.md, cfg.get("me_label", "Me"))
     stem = a.md.name[:-3] if a.md.name.endswith(".md") else a.md.stem
     out = a.out or (a.md.parent / (stem + ".judge"))
-    app_path = a.app_tips or (a.run / (stem + ".app.tips.jsonl") if a.run else None)
-    skill_path = a.md.parent / (stem + ".tips.jsonl")
-    if stem.endswith(".app"):              # the app's own recording: the skill's tips of the same call, if any
-        alt = a.md.parent / (stem[:-4] + ".tips.jsonl")
-        if alt.exists():
-            skill_path = alt
-    same = app_path is not None and skill_path.exists() and app_path.exists() and \
-        skill_path.resolve() == app_path.resolve()
-    skill = [] if (a.app_only or same) else tips_of(skill_path, "skill")
+    app_path, skill_path = tips_paths(a, stem)
+    skill = [] if (a.app_only or same_file(app_path, skill_path)) else tips_of(skill_path, "skill")
     app = tips_of(app_path, "app", skip_engine="skill") if app_path else []
-    ws = [l.written for l in lines if l.written] or [l.t_s for l in lines]
-    if ws:
-        t0, t1 = min(ws), max(ws)
-        items = [t for t in skill + app if t0 - 60 <= t["src_s"] <= t1 + 60]
-    else:
-        items = skill + app
+    items = in_call(skill + app, lines)
     if a.quick:
-        ap_, sk_ = [t for t in items if t["engine"] == "app"], [t for t in items if t["engine"] == "skill"]
-        n_app = min(len(ap_), max(QUICK_MAX - len(sk_), (QUICK_MAX + 1) // 2))   # half each, the rest to whoever has more
-        items = sample_even(ap_, n_app) + sample_even(sk_, QUICK_MAX - n_app)
+        items = quick_sample(items)
     random.Random(7).shuffle(items)
     call_type = resolve_call_type(a, cfg)
     system = system_prompt(call_type, load_slides(a.slides), a.role or str(cfg.get("hiring_role") or ""))
@@ -203,14 +235,7 @@ def main(argv=None, provider=None):
         extra = {"extra_body": {"thinking": {"type": "between_tools"}}}   # Sonnet 5.5 refuses "disabled" (400)
     recs = []
     for it in items:
-        hint = "gist: {}\nphrase: {}\nitems: {}".format(it["gist"], it["phrase"], "; ".join(str(x) for x in it["items"]))
-        user = "TRANSCRIPT (trigger line marked; hint shown at {}):\n{}\n\nHINT:\n{}".format(
-            _hms(it["at_s"]), window(lines, it["src_s"], it["at_s"]), hint)
-        c = prov.complete(model=model, system=[{"text": system, "cache": True}], user=user, max_tokens=400,
-                          cache_ttl="5m", extra=extra)
-        obj = first_json(c.text) or {}
-        rec = dict(it, score=obj.get("score"), timely=obj.get("timely"), concrete=obj.get("concrete"),
-                   reason=obj.get("reason"), error=c.error)
+        rec = judge_one(prov, model, system, lines, it, extra)
         recs.append(rec)
         with outp.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")

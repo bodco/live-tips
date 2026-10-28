@@ -133,3 +133,80 @@ def test_context_parts(tmp_path):
     assert "WORKSPACE PROJECTS" in part and "[Alpha]" in part and "[Beta]" in part and "_hidden" not in part
     assert context.state_part(tmp_path / "Alpha").startswith("PROJECT CURRENT STATE")
     assert context.project_dirs(tmp_path / "none") == [] and context.state_part(tmp_path / "none") == ""
+
+
+def test_commitments_cli_and_fold(tmp_path, capsys):
+    from livetips_m0 import commitments as R
+    folder = tmp_path / "live"
+    ev = R.record_call(folder, call="2026-10-01-1000-weekly.md", project="p", title="Weekly",
+                       actions=[{"what": "Send   the deck", "id": "a1"}, {"what": "Book the room"}, {"what": " "}],
+                       theirs=[{"who": "Ann", "what": "Review the spec"}, {"who": "PM", "what": "x"}, {"who": "", "what": "y"}],
+                       ticked={"a1": True})
+    assert [e["op"] for e in ev] == ["add", "done", "add", "add"] and ev[0]["text"] == "Send the deck"
+    again = R.record_call(folder, call="2026-10-01-1000-weekly.md", project="p", title="Weekly",
+                          actions=[{"what": "send the deck"}], theirs=[], ticked={})
+    assert again == []                                    # a similar item of the same call is not added twice
+    assert R.main(["list", str(folder)]) == 0
+    open_ = [json.loads(l) for l in capsys.readouterr().out.splitlines()]
+    assert [i["text"] for i in open_] == ["Book the room", "Review the spec"]
+    R.main(["list", str(folder), "--all"])
+    assert len(capsys.readouterr().out.splitlines()) == 3
+    cid = open_[0]["id"]
+    assert R.main(["drop", str(folder), cid]) == 0
+    assert json.loads(capsys.readouterr().out)["op"] == "drop"
+    R.main(["reopen", str(folder), cid])
+    R.main(["done", str(folder), cid])
+    capsys.readouterr()
+    items = {i["id"]: i for i in R.load(folder)}
+    assert items[cid]["status"] == "done" and items[cid]["done_source"] == "manual"
+    import pytest
+    with pytest.raises(SystemExit):
+        R.main(["done", str(folder)])
+    (folder / R.FILE).open("a").write("bad\n{\"op\": \"done\"}\n" + json.dumps({"op": "done", "id": "nope"}) + "\n")
+    assert len(R.load(folder)) == 3
+
+
+def test_fold_aliases_a_duplicate_add():
+    from livetips_m0.commitments import fold
+    ev = [{"op": "add", "id": "a", "text": "send the deck", "call": "c.md"},
+          {"op": "add", "id": "a", "text": "again", "call": "c.md"},
+          {"op": "add", "id": "b", "text": "send the deck today", "call": "c.app.md"},
+          {"op": "done", "id": "b", "at": "t", "source": "said"},
+          {"op": "add", "id": "c", "text": "other", "call": "d.md", "owner": "Ann"}]
+    items = fold(ev)
+    assert [i["id"] for i in items] == ["a", "c"] and items[0]["status"] == "done" and items[0]["done_source"] == "said"
+
+
+def test_replay_helpers():
+    from types import SimpleNamespace as S
+    from livetips_m0.replay import select_lines, set_path
+    lines = [S(t_s=100.0, dur=None, written=None, seg_end=None), S(t_s=0.0, dur=2.0, written=None, seg_end=None),
+             S(t_s=50.0, dur=None, written=300.0, seg_end=None)]
+    sel, t0 = select_lines(lines, minutes=2, start_min=0)
+    assert t0 == 3.0 and [l.written for l in sel] == [3.0, 104.0]
+    assert select_lines([]) == (None, None)
+    cfg = {"a": 1}
+    set_path(cfg, 'b.c="5m"')
+    set_path(cfg, "a=2")
+    assert cfg == {"a": 2, "b": {"c": "5m"}}
+
+
+def test_judge_helpers(tmp_path):
+    from types import SimpleNamespace as S
+    from livetips_m0.judge import engine_summary, in_call, quick_sample, same_file, shown_tip
+    assert shown_tip({"kind": "tip", "src": "s", "at": "a"}, set())
+    assert not shown_tip({"kind": "tip", "src": "s", "at": "a", "uid": "u"}, {"u"})
+    assert not shown_tip({"kind": "tip", "src": "s", "at": "a", "engine": "skill"}, set(), "skill")
+    assert not shown_tip({"kind": "retract"}, set()) and not shown_tip({"kind": "tip", "src": "s", "at": "a", "partial": True}, set())
+    f = tmp_path / "t.jsonl"
+    f.write_text("")
+    assert same_file(f, f) and not same_file(None, f) and not same_file(f, tmp_path / "x")
+    lines = [S(written=100.0, t_s=0), S(written=None, t_s=0), S(written=200.0, t_s=0)]
+    items = [{"src_s": 30}, {"src_s": 50}, {"src_s": 260}, {"src_s": 261}]
+    assert in_call(items, lines) == [{"src_s": 50}, {"src_s": 260}] and in_call(items, []) == items
+    many = [{"engine": "app", "at_s": i} for i in range(40)] + [{"engine": "skill", "at_s": i} for i in range(5)]
+    q = quick_sample(many)
+    assert len(q) == 25 and sum(1 for t in q if t["engine"] == "skill") == 5
+    assert engine_summary([])["n"] == 0
+    s = engine_summary([{"score": 5, "timely": True}, {"score": 2, "gist": "g", "reason": "r"}])
+    assert s["mean"] == 3.5 and s["share_4plus"] == 0.5 and s["timely"] == 0.5 and s["worst"] == ["2 (g): r"]

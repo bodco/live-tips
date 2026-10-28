@@ -73,18 +73,35 @@ def _brief_text(base: Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace") if p.exists() else ""
 
 
-def replay(cfg: dict, md: Path, out: Path, minutes=None, start_min=0.0, speed=1.0, provider=None, verbose=True):
-    lines = load_call(md, cfg["me_label"])
-    for ln in lines:                       # older calls without timing: estimate availability
+def select_lines(lines, minutes=None, start_min=0.0):
+    """(the lines to replay sorted by when they were written, the replay start), or (None, None) for no lines.
+    Older calls without timing get an estimated availability."""
+    for ln in lines:
         if ln.written is None:
             ln.seg_end = ln.t_s + (ln.dur or 3.0)
             ln.written = ln.seg_end + 1.0
     lines.sort(key=lambda x: x.written)
     if not lines:
-        raise SystemExit("no transcript lines in " + str(md))
+        return None, None
     t0 = lines[0].written + start_min * 60
     t_end = t0 + minutes * 60 if minutes else float("inf")
-    sel = [ln for ln in lines if t0 <= ln.written <= t_end]
+    return [ln for ln in lines if t0 <= ln.written <= t_end], t0
+
+
+def set_path(cfg: dict, kv: str) -> None:
+    """--set a.b=<json>: override one config value."""
+    k, v = kv.split("=", 1)
+    cur = cfg
+    parts = k.split(".")
+    for p in parts[:-1]:
+        cur = cur.setdefault(p, {})
+    cur[parts[-1]] = json.loads(v)
+
+
+def replay(cfg: dict, md: Path, out: Path, minutes=None, start_min=0.0, speed=1.0, provider=None, verbose=True):
+    sel, t0 = select_lines(load_call(md, cfg["me_label"]), minutes, start_min)
+    if sel is None:
+        raise SystemExit("no transcript lines in " + str(md))
     mono0 = time.monotonic()
 
     def clock():
@@ -123,12 +140,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     cfg = json.loads(Path(a.config).read_text(encoding="utf-8"))
     for kv in a.set:
-        k, v = kv.split("=", 1)
-        cur = cfg
-        parts = k.split(".")
-        for p in parts[:-1]:
-            cur = cur.setdefault(p, {})
-        cur[parts[-1]] = json.loads(v)
+        set_path(cfg, kv)
     replay(cfg, a.md, a.out, a.minutes, a.start_min, a.speed)
     return 0
 

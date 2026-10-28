@@ -79,6 +79,36 @@ def read_events(folder) -> List[dict]:
     return out
 
 
+def same_slot(item: dict, call: str, owner: str, text: str) -> bool:
+    """The same call, the same owner and a similar text (rules/commitments.yaml > duplicates)."""
+    return (call_key(item.get("call")) == call_key(call) and (item.get("owner") or "me").lower() == (owner or "me").lower()
+            and similar(item["text"], text))
+
+
+ITEM_KEYS = ("id", "text", "owner", "project", "series", "call", "t", "created", "due", "by")
+NOT_DONE = dict(done_at="", done_source="", done_call="")
+
+
+def _apply(it: dict, op: str, e: dict) -> None:
+    if op == "done":
+        it.update(status="done", done_at=e.get("at", ""), done_source=e.get("source", "manual"), done_call=e.get("call", ""))
+    elif op == "reopen":
+        it.update(status="open", **NOT_DONE)
+    elif op == "drop":
+        it["status"] = "dropped"
+
+
+def _add(items: Dict[str, dict], alias: Dict[str, str], e: dict) -> None:
+    cid = e.get("id")
+    if cid in items or cid in alias:
+        return
+    twin = next((i for i in items.values() if i["status"] == "open" and same_slot(i, e.get("call"), e.get("owner"), e.get("text", ""))), None)
+    if twin:
+        alias[cid] = twin["id"]
+        return
+    items[cid] = dict({k: e.get(k, "") for k in ITEM_KEYS}, status="open", **NOT_DONE)
+
+
 def fold(events: List[dict]) -> List[dict]:
     """Items in the order they were added, with status open|done|dropped. A duplicate add (same call, similar
     text, rules/commitments.yaml > duplicates) points at the first item; later events on it apply to the first."""
@@ -87,26 +117,9 @@ def fold(events: List[dict]) -> List[dict]:
     for e in events:
         op, cid = e.get("op"), e.get("id")
         if op == "add":
-            if cid in items or cid in alias:
-                continue
-            twin = next((i for i in items.values() if i["status"] == "open" and call_key(i.get("call")) == call_key(e.get("call"))
-                         and (i.get("owner") or "me").lower() == (e.get("owner") or "me").lower() and similar(i["text"], e.get("text", ""))), None)
-            if twin:
-                alias[cid] = twin["id"]
-                continue
-            it = {k: e.get(k, "") for k in ("id", "text", "owner", "project", "series", "call", "t", "created", "due", "by")}
-            it.update(status="open", done_at="", done_source="", done_call="")
-            items[cid] = it
-            continue
-        it = items.get(alias.get(cid, cid))
-        if not it:
-            continue
-        if op == "done":
-            it.update(status="done", done_at=e.get("at", ""), done_source=e.get("source", "manual"), done_call=e.get("call", ""))
-        elif op == "reopen":
-            it.update(status="open", done_at="", done_source="", done_call="")
-        elif op == "drop":
-            it["status"] = "dropped"
+            _add(items, alias, e)
+        elif items.get(alias.get(cid, cid)):
+            _apply(items[alias.get(cid, cid)], op, e)
     return list(items.values())
 
 
@@ -135,40 +148,49 @@ def _neg(s: str) -> str:
     return "".join(chr(0x10FFFF - ord(c)) for c in s)
 
 
+class _CallRecord:
+    """The add (and done) events of one call's commitments, skipping what the register already holds."""
+
+    def __init__(self, have: List[dict], call: str, project: str, series: str, created: str, by: str):
+        self.have, self.call, self.project, self.series, self.created, self.by = have, call, project, series, created, by
+        self.events: List[dict] = []
+
+    def add(self, text, owner: str, due, t, done: bool) -> None:
+        text = re.sub(r"\s+", " ", str(text or "")).strip()[:120]
+        if not text:
+            return
+        cid = make_id(self.call, owner, text)
+        if any(i["id"] == cid or same_slot(i, self.call, owner, text) for i in self.have):
+            return
+        name = Path(self.call).name
+        e = {"op": "add", "id": cid, "text": text, "owner": owner, "project": self.project, "series": self.series,
+             "call": name, "t": t or "", "created": self.created, "due": str(due or "")[:40], "by": self.by}
+        self.events.append(e)
+        self.have.append(dict(e, status="open"))
+        if done:
+            self.events.append({"op": "done", "id": cid, "at": self.created, "source": "manual", "call": name})
+
+
+def promiser(a: dict) -> str:
+    """Who made a promise to the PM's side; empty for the PM or nobody."""
+    who = str(a.get("who") or "").strip()[:40]
+    return who if who and who.lower() not in ("pm", "me") else ""
+
+
 def record_call(folder, *, call: str, project: str, title: str, actions: List[dict], theirs: List[dict],
                 ticked: Optional[Dict[str, bool]] = None, by: str = "app") -> List[dict]:
     """End of a call (rules/commitments.yaml > write_when): the PM's actions (owner me) and promises to the PM's
     side (owner = name). `ticked` = the window's On me ticks, by action id. Returns the events written."""
     ticked = ticked or {}       # by action id or by norm_text(what)
-    have = load(folder)
-    ser = series_key(project, title)
-    created = now_iso()
-    events = []
-
-    def add(text, owner, due, t, done):
-        text = re.sub(r"\s+", " ", str(text or "")).strip()[:120]
-        if not text:
-            return
-        cid = make_id(call, owner, text)
-        if any(i["id"] == cid or (call_key(i.get("call")) == call_key(call) and (i.get("owner") or "me").lower() == owner.lower()
-                                  and similar(i["text"], text)) for i in have):
-            return
-        e = {"op": "add", "id": cid, "text": text, "owner": owner, "project": project, "series": ser,
-             "call": Path(call).name, "t": t or "", "created": created, "due": str(due or "")[:40], "by": by}
-        events.append(e)
-        have.append(dict(e, status="open"))
-        if done:
-            events.append({"op": "done", "id": cid, "at": created, "source": "manual", "call": Path(call).name})
-
+    rec = _CallRecord(load(folder), call, project, series_key(project, title), now_iso(), by)
     for a in actions or []:
-        add(a.get("what"), "me", a.get("due"), a.get("t"),
-            bool(ticked.get(str(a.get("id") or "")) or ticked.get(norm_text(a.get("what") or ""))))
+        rec.add(a.get("what"), "me", a.get("due"), a.get("t"),
+                bool(ticked.get(str(a.get("id") or "")) or ticked.get(norm_text(a.get("what") or ""))))
     for a in theirs or []:
-        who = str(a.get("who") or "").strip()[:40]
-        if who and who.lower() not in ("pm", "me"):
-            add(a.get("what"), who, a.get("due"), a.get("t"), False)
-    append(folder, events)
-    return events
+        if promiser(a):
+            rec.add(a.get("what"), promiser(a), a.get("due"), a.get("t"), False)
+    append(folder, rec.events)
+    return rec.events
 
 
 def mark(folder, cid: str, op: str = "done", source: str = "manual", call: str = "") -> dict:

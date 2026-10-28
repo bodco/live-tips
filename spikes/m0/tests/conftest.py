@@ -5,3 +5,4 @@ HERE = Path(__file__).absolute()   # not resolve(): mutation testing links the t
 sys.path.insert(0, str(HERE.parents[1]))          # spikes/m0
 APP = HERE.parents[3]                             # tools/live-tips-app
 FIX = APP / "Fixtures"
+sys.path.insert(0, str(HERE.parent))              # tests/ (golden_harness)

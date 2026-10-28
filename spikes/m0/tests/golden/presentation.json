@@ -1,0 +1,4927 @@
+{
+"llm": [
+{
+"at": "10:00:05",
+"error": null,
+"input": 100,
+"line_id": 0,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:00:15",
+"error": null,
+"input": 100,
+"line_id": 1,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts\"",
+"usd": null
+},
+{
+"at": "10:00:15",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 1,
+"model": "fake-sonnet",
+"output": 8,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"usd": null
+},
+{
+"at": "10:00:32",
+"error": null,
+"input": 100,
+"line_id": 3,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:00:32",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 3,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 25\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:00:42",
+"error": null,
+"input": 100,
+"line_id": 4,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:00:42",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 4,
+"model": "fake-haiku",
+"output": 26,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"red\", \"trigger\": \"direct_question\", \"topic\": \"topic 4\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:00:42",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 4,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 2\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:00:54",
+"error": null,
+"input": 100,
+"line_id": 5,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:00:54",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 5,
+"model": "fake-haiku",
+"output": 24,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": false, \"level\": \"info\", \"trigger\": \"none\", \"topic\": \"topic 4\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:00:54",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 5,
+"model": "fake-sonnet",
+"output": 8,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"usd": null
+},
+{
+"at": "10:01:08",
+"error": null,
+"input": 100,
+"line_id": 6,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:01:08",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 6,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 75\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:01:21",
+"error": null,
+"input": 100,
+"line_id": 7,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:01:21",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 7,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 93\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:01:33",
+"error": null,
+"input": 100,
+"line_id": 8,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:01:33",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 8,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 0\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:01:39",
+"error": null,
+"input": 100,
+"line_id": 9,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:01:39",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 9,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 37\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:01:53",
+"error": null,
+"input": 100,
+"line_id": 10,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:02:06",
+"error": null,
+"input": 100,
+"line_id": 11,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:02:18",
+"error": null,
+"input": 100,
+"line_id": 12,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:02:25",
+"error": null,
+"input": 100,
+"line_id": 13,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:02:25",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 13,
+"model": "fake-sonnet",
+"output": 8,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"usd": null
+},
+{
+"at": "10:02:36",
+"error": null,
+"input": 100,
+"line_id": 14,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:02:36",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 14,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 67\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:02:51",
+"error": null,
+"input": 100,
+"line_id": 16,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:03:03",
+"error": null,
+"input": 100,
+"line_id": 17,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:03:23",
+"error": null,
+"input": 100,
+"line_id": 19,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:03:23",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 19,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 70\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:03:34",
+"error": null,
+"input": 100,
+"line_id": 20,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:03:34",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 20,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 54\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:03:47",
+"error": null,
+"input": 100,
+"line_id": 21,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:03:47",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 21,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 15\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:03:56",
+"error": null,
+"input": 100,
+"line_id": 22,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:03:56",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 22,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 42\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:03:56",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 22,
+"model": "fake-sonnet",
+"output": 38,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 92\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:04:01",
+"error": null,
+"input": 100,
+"line_id": 23,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:04:01",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 23,
+"model": "fake-sonnet",
+"output": 3,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "not json at all",
+"usd": null
+},
+{
+"at": "10:04:19",
+"error": null,
+"input": 100,
+"line_id": 25,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:04:19",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 25,
+"model": "fake-haiku",
+"output": 25,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"orange\", \"trigger\": \"add_fact\", \"topic\": \"topic 2\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:04:19",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 25,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 90\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:04:33",
+"error": null,
+"input": 100,
+"line_id": 26,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:04:42",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 27,
+"model": "fake-sonnet",
+"output": 3,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "not json at all",
+"usd": null
+},
+{
+"at": "10:04:53",
+"error": null,
+"input": 100,
+"line_id": 28,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:04:59",
+"error": null,
+"input": 100,
+"line_id": 29,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:04:59",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 29,
+"model": "fake-haiku",
+"output": 25,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"info\", \"trigger\": \"your_turn\", \"topic\": \"topic 4\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:04:59",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 29,
+"model": "fake-sonnet",
+"output": 8,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"usd": null
+},
+{
+"at": "10:05:10",
+"error": null,
+"input": 100,
+"line_id": 30,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:05:20",
+"error": null,
+"input": 100,
+"line_id": 31,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:05:20",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 31,
+"model": "fake-haiku",
+"output": 25,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"orange\", \"trigger\": \"add_fact\", \"topic\": \"topic 3\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:05:20",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 31,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 52\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:05:32",
+"error": null,
+"input": 100,
+"line_id": 32,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:05:41",
+"error": null,
+"input": 100,
+"line_id": 33,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:05:41",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 33,
+"model": "fake-haiku",
+"output": 27,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"orange\", \"trigger\": \"new_requirement\", \"topic\": \"topic 0\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:05:41",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 33,
+"model": "fake-sonnet",
+"output": 3,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "not json at all",
+"usd": null
+},
+{
+"at": "10:05:54",
+"error": null,
+"input": 100,
+"line_id": 35,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:05:54",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 35,
+"model": "fake-haiku",
+"output": 26,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"red\", \"trigger\": \"pm_commitment\", \"topic\": \"topic 1\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:05:54",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 35,
+"model": "fake-sonnet",
+"output": 3,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "not json at all",
+"usd": null
+},
+{
+"at": "10:06:07",
+"error": null,
+"input": 100,
+"line_id": 36,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:06:20",
+"error": null,
+"input": 100,
+"line_id": 38,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:06:20",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 38,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 89\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:06:32",
+"error": null,
+"input": 100,
+"line_id": 39,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:06:46",
+"error": null,
+"input": 100,
+"line_id": 40,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:06:46",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 40,
+"model": "fake-haiku",
+"output": 26,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"red\", \"trigger\": \"pm_commitment\", \"topic\": \"topic 2\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:06:46",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 40,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 49\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:06:46",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 40,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 14\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"answered": null,
+"at": "10:06:46",
+"cost_usd": null,
+"error": "no project folder for this call",
+"q": "pilot users",
+"role": "deep_lookup",
+"secs": 0.0
+},
+{
+"at": "10:06:56",
+"error": null,
+"input": 100,
+"line_id": 41,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:06:56",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 41,
+"model": "fake-haiku",
+"output": 25,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"info\", \"trigger\": \"your_turn\", \"topic\": \"topic 0\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:06:56",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 41,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 52\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:07:11",
+"error": null,
+"input": 100,
+"line_id": 43,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts\"",
+"usd": null
+},
+{
+"at": "10:07:24",
+"error": null,
+"input": 100,
+"line_id": 44,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:07:37",
+"error": null,
+"input": 100,
+"line_id": 45,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:07:37",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 45,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 42\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:07:59",
+"error": null,
+"input": 100,
+"line_id": 47,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:08:07",
+"error": null,
+"input": 100,
+"line_id": 48,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts\"",
+"usd": null
+},
+{
+"at": "10:08:07",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 48,
+"model": "fake-haiku",
+"output": 27,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"orange\", \"trigger\": \"new_requirement\", \"topic\": \"topic 2\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:08:07",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 48,
+"model": "fake-sonnet",
+"output": 3,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "not json at all",
+"usd": null
+},
+{
+"at": "10:08:23",
+"error": null,
+"input": 100,
+"line_id": 50,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts\"",
+"usd": null
+},
+{
+"at": "10:08:23",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 50,
+"model": "fake-haiku",
+"output": 26,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"red\", \"trigger\": \"direct_question\", \"topic\": \"topic 2\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:08:23",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 50,
+"model": "fake-sonnet",
+"output": 8,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"usd": null
+},
+{
+"at": "10:08:37",
+"error": null,
+"input": 100,
+"line_id": 52,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:08:50",
+"error": null,
+"input": 100,
+"line_id": 54,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts\"",
+"usd": null
+},
+{
+"at": "10:08:54",
+"error": null,
+"input": 100,
+"line_id": 55,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts\"",
+"usd": null
+},
+{
+"at": "10:08:54",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 55,
+"model": "fake-haiku",
+"output": 25,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"info\", \"trigger\": \"your_turn\", \"topic\": \"topic 1\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:09:09",
+"error": null,
+"input": 100,
+"line_id": 57,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:09:09",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 57,
+"model": "fake-sonnet",
+"output": 8,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"usd": null
+},
+{
+"at": "10:09:22",
+"error": null,
+"input": 100,
+"line_id": 58,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:09:22",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 58,
+"model": "fake-sonnet",
+"output": 8,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"usd": null
+},
+{
+"at": "10:09:32",
+"error": null,
+"input": 100,
+"line_id": 59,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:09:44",
+"error": null,
+"input": 100,
+"line_id": 60,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts\"",
+"usd": null
+},
+{
+"at": "10:09:44",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 60,
+"model": "fake-sonnet",
+"output": 38,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 35\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:09:44",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 60,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 48\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:10:01",
+"error": null,
+"input": 100,
+"line_id": 62,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:10:17",
+"error": null,
+"input": 100,
+"line_id": 64,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:10:28",
+"error": null,
+"input": 100,
+"line_id": 65,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:10:28",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 65,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 89\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:10:42",
+"error": null,
+"input": 100,
+"line_id": 66,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:10:47",
+"error": null,
+"input": 100,
+"line_id": 67,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:10:47",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 67,
+"model": "fake-haiku",
+"output": 24,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": false, \"level\": \"info\", \"trigger\": \"none\", \"topic\": \"topic 0\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:10:47",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 67,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 78\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:10:54",
+"error": null,
+"input": 100,
+"line_id": 68,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:10:54",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 68,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 11\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:11:08",
+"error": null,
+"input": 100,
+"line_id": 69,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:11:18",
+"error": null,
+"input": 100,
+"line_id": 70,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:11:18",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 70,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 61\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:11:24",
+"error": null,
+"input": 100,
+"line_id": 71,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:11:24",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 71,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 84\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:11:37",
+"error": null,
+"input": 100,
+"line_id": 72,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts",
+"usd": null
+},
+{
+"at": "10:11:50",
+"error": null,
+"input": 100,
+"line_id": 73,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:11:50",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 73,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 49\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:12:02",
+"error": null,
+"input": 100,
+"line_id": 74,
+"model": "fake-haiku",
+"output": 84,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [{\"id\": \"a0\", \"t\": \"10:00:05\", \"who\": \"Dana\", \"what\": \"send the test accounts\"",
+"usd": null
+},
+{
+"at": "10:12:02",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 74,
+"model": "fake-sonnet",
+"output": 37,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 0\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:12:16",
+"error": null,
+"input": 100,
+"line_id": 75,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:12:26",
+"error": null,
+"input": 100,
+"line_id": 77,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:12:38",
+"error": null,
+"input": 100,
+"line_id": 78,
+"model": "fake-haiku",
+"output": 59,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": true, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", \"",
+"usd": null
+},
+{
+"at": "10:12:53",
+"error": null,
+"input": 100,
+"line_id": 80,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:13:08",
+"error": null,
+"input": 100,
+"line_id": 82,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:13:14",
+"error": null,
+"input": 100,
+"line_id": 83,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:13:14",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 83,
+"model": "fake-haiku",
+"output": 26,
+"role": "classify",
+"stop": null,
+"text": null,
+"text_head": "{\"need_tip\": true, \"level\": \"red\", \"trigger\": \"direct_question\", \"topic\": \"topic 4\", \"reason\": \"scripted\"}",
+"usd": null
+},
+{
+"at": "10:13:14",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 83,
+"model": "fake-sonnet",
+"output": 38,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 3\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:13:20",
+"error": null,
+"input": 100,
+"line_id": 84,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:13:20",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 84,
+"model": "fake-sonnet",
+"output": 38,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 90\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
+"at": "10:13:36",
+"error": null,
+"input": 100,
+"line_id": 86,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:13:36",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 86,
+"model": "fake-sonnet",
+"output": 36,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 36\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"usd": null
+},
+{
+"at": "10:13:44",
+"error": null,
+"input": 100,
+"line_id": 88,
+"model": "fake-haiku",
+"output": 60,
+"role": "situation",
+"text_head": "{\"topic\": \"release plan\", \"owner\": \"Dana\", \"mine\": false, \"floor\": \"Dana\", \"asks\": [], \"actions\": [{\"id\": \"m1\", \"what\": \"confirm pilot users\", \"due\": \"Friday\", ",
+"usd": null
+},
+{
+"at": "10:13:44",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"input": 100,
+"line_id": 88,
+"model": "fake-sonnet",
+"output": 38,
+"role": "tip",
+"stop": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 3\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+}
+],
+"requests": [
+{
+"model": "fake-haiku",
+"user_sha": "2be4b1a9bd0d"
+},
+{
+"model": "fake-haiku",
+"user_sha": "647d4cd47fa4"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "5eeb0f6ae568"
+},
+{
+"model": "fake-haiku",
+"user_sha": "a39c0db7ba73"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "7afb4d2ceacc"
+},
+{
+"model": "fake-haiku",
+"user_sha": "fa781f249819"
+},
+{
+"model": "fake-haiku",
+"user_sha": "52985ff58bd9"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "cb07a14efd03"
+},
+{
+"model": "fake-haiku",
+"user_sha": "894f82eb8a1e"
+},
+{
+"model": "fake-haiku",
+"user_sha": "7451fdd10391"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "497665176a79"
+},
+{
+"model": "fake-haiku",
+"user_sha": "8d33a5bdb939"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "910e002d621c"
+},
+{
+"model": "fake-haiku",
+"user_sha": "947dd5387ace"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "a9b33cad265a"
+},
+{
+"model": "fake-haiku",
+"user_sha": "feae340e1af4"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "b23aca1867c9"
+},
+{
+"model": "fake-haiku",
+"user_sha": "cfc05f958150"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "500cc6cc9f44"
+},
+{
+"model": "fake-haiku",
+"user_sha": "fa0f93ae06be"
+},
+{
+"model": "fake-haiku",
+"user_sha": "1d4bd41f7094"
+},
+{
+"model": "fake-haiku",
+"user_sha": "497a39345c9d"
+},
+{
+"model": "fake-haiku",
+"user_sha": "eb0702e4ce15"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "b759a04e1b35"
+},
+{
+"model": "fake-haiku",
+"user_sha": "da46302f2052"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "6dca798cda8f"
+},
+{
+"model": "fake-haiku",
+"user_sha": "4fc121d92618"
+},
+{
+"model": "fake-haiku",
+"user_sha": "8f0bf9c3600f"
+},
+{
+"model": "fake-haiku",
+"user_sha": "5e4e25901d73"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "ef73fe32353d"
+},
+{
+"model": "fake-haiku",
+"user_sha": "722ce984c2be"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "1130c235f428"
+},
+{
+"model": "fake-haiku",
+"user_sha": "b99157b65181"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "83b4cb3694dc"
+},
+{
+"model": "fake-haiku",
+"user_sha": "9bc846fbd112"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "876c22d37e62"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "4b62b6ab6e53"
+},
+{
+"model": "fake-haiku",
+"user_sha": "1394a8d9a64d"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "f47ccf816b41"
+},
+{
+"model": "fake-haiku",
+"user_sha": "b216eec972bc"
+},
+{
+"model": "fake-haiku",
+"user_sha": "5c132bda9085"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "5373f36f60b7"
+},
+{
+"model": "fake-haiku",
+"user_sha": "d20366beb1ad"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "0ae8a9e59567"
+},
+{
+"model": "fake-haiku",
+"user_sha": "9992b40fbc77"
+},
+{
+"model": "fake-haiku",
+"user_sha": "12c9b434a288"
+},
+{
+"model": "fake-haiku",
+"user_sha": "2c60264c3ab5"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "2cbf8bd3f094"
+},
+{
+"model": "fake-haiku",
+"user_sha": "f2e90592ca21"
+},
+{
+"model": "fake-haiku",
+"user_sha": "bf01fd5fb728"
+},
+{
+"model": "fake-haiku",
+"user_sha": "f82d41e674b4"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "4544d0f6b67c"
+},
+{
+"model": "fake-haiku",
+"user_sha": "53367b9bad61"
+},
+{
+"model": "fake-haiku",
+"user_sha": "4044e1d3c3ed"
+},
+{
+"model": "fake-haiku",
+"user_sha": "f47ea811e699"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "9dfcb2b56655"
+},
+{
+"model": "fake-haiku",
+"user_sha": "ec565e7f4465"
+},
+{
+"model": "fake-haiku",
+"user_sha": "f2e7a5dad7fd"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "6a270a23dda0"
+},
+{
+"model": "fake-haiku",
+"user_sha": "cf18458fc2fa"
+},
+{
+"model": "fake-haiku",
+"user_sha": "0ef0f0c34280"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "b4958fa2511c"
+},
+{
+"model": "fake-haiku",
+"user_sha": "6b7a367fa4d5"
+},
+{
+"model": "fake-haiku",
+"user_sha": "041b602b5af1"
+},
+{
+"model": "fake-haiku",
+"user_sha": "ee9c143a658c"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "6c57392e6b49"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "67a3b014aebd"
+},
+{
+"model": "fake-haiku",
+"user_sha": "1b4b9700a3bf"
+},
+{
+"model": "fake-haiku",
+"user_sha": "2c1d3dba5858"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "af8fcadf2064"
+},
+{
+"model": "fake-haiku",
+"user_sha": "54f5aca8c7fe"
+},
+{
+"model": "fake-haiku",
+"user_sha": "bfcfc63b25a2"
+},
+{
+"model": "fake-haiku",
+"user_sha": "22f8a954227c"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "93cdb2dba9ee"
+},
+{
+"model": "fake-haiku",
+"user_sha": "89b532d9fc45"
+},
+{
+"model": "fake-haiku",
+"user_sha": "0914d192a6a0"
+},
+{
+"model": "fake-haiku",
+"user_sha": "8741e8a59bb0"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "aea46c6d858c"
+},
+{
+"model": "fake-haiku",
+"user_sha": "87f1b1aa89b8"
+},
+{
+"model": "fake-haiku",
+"user_sha": "11b143017011"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "512c1edc1d3d"
+},
+{
+"model": "fake-haiku",
+"user_sha": "a62363d17fea"
+},
+{
+"model": "fake-haiku",
+"user_sha": "28b0499eaf19"
+},
+{
+"model": "fake-haiku",
+"user_sha": "a5f0704a879b"
+},
+{
+"model": "fake-haiku",
+"user_sha": "05e8aaeac994"
+},
+{
+"model": "fake-haiku",
+"user_sha": "a7372f8598a3"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "e983505bdc0d"
+},
+{
+"model": "fake-haiku",
+"user_sha": "96213759c3dd"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "742677b6ed43"
+},
+{
+"model": "fake-haiku",
+"user_sha": "7ead7e47e5ea"
+},
+{
+"model": "fake-haiku",
+"user_sha": "d9e2375a50bb"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "de84e0ef670b"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "63f3f07e86da"
+},
+{
+"model": "fake-haiku",
+"user_sha": "85888af2c5b6"
+},
+{
+"model": "fake-haiku",
+"user_sha": "fdb80bafc65b"
+},
+{
+"model": "fake-haiku",
+"user_sha": "f12712e7d66b"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "7f6d0c01b980"
+},
+{
+"model": "fake-haiku",
+"user_sha": "c71ba446ec82"
+},
+{
+"model": "fake-haiku",
+"user_sha": "4218267fdce1"
+},
+{
+"model": "fake-haiku",
+"user_sha": "c84b96c36426"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "06629bd28a25"
+},
+{
+"model": "fake-haiku",
+"user_sha": "2c75cc2183ce"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "5c2317e45c8c"
+},
+{
+"model": "fake-haiku",
+"user_sha": "96b0276b7b5f"
+},
+{
+"model": "fake-haiku",
+"user_sha": "910cb86527af"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "bf526041bf6e"
+},
+{
+"model": "fake-haiku",
+"user_sha": "0e73ad7e15a0"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "e82519c344ea"
+},
+{
+"model": "fake-haiku",
+"user_sha": "cf5d3e61cd06"
+},
+{
+"model": "fake-haiku",
+"user_sha": "5cb9cc732043"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "e44ffc0ad57d"
+},
+{
+"model": "fake-haiku",
+"user_sha": "65e29774b1e3"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "5c99abec2884"
+},
+{
+"model": "fake-haiku",
+"user_sha": "14cf6e1c630a"
+},
+{
+"model": "fake-haiku",
+"user_sha": "d928799ed131"
+},
+{
+"model": "fake-haiku",
+"user_sha": "4acabe2270e2"
+},
+{
+"model": "fake-haiku",
+"user_sha": "c4f97fdd52df"
+},
+{
+"model": "fake-haiku",
+"user_sha": "3f9b096f295f"
+},
+{
+"model": "fake-haiku",
+"user_sha": "14e6118fda78"
+},
+{
+"model": "fake-haiku",
+"user_sha": "77ba5e918e0e"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "3e814469e0c0"
+},
+{
+"model": "fake-haiku",
+"user_sha": "aaa80be593a7"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "0a7fb8978f4f"
+},
+{
+"model": "fake-haiku",
+"user_sha": "d9a9fb1ffc37"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "2a578e2049fe"
+},
+{
+"model": "fake-haiku",
+"user_sha": "23c2f5d1aa92"
+},
+{
+"model": "fake-sonnet",
+"user_sha": "10127995ae6b"
+}
+],
+"timing": [
+{
+"available_at": 36015.0,
+"line_id": 1,
+"outcome": "skip",
+"reason": "nothing",
+"route": "direct",
+"seg_end": 36014.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:00:11",
+"tip_done": 36015.0,
+"tip_start": 36015.0,
+"to_pm": true,
+"written": 36015.0
+},
+{
+"available_at": 36032.0,
+"gist": "Tip 25",
+"gist_at": 36032.0,
+"line_id": 3,
+"outcome": "diet_pm_speaking",
+"route": "direct",
+"seg_end": 36031.0,
+"signals": [
+"commitment"
+],
+"speaker": "me",
+"src": "10:00:28",
+"tip_done": 36032.0,
+"tip_start": 36032.0,
+"to_pm": false,
+"written": 36032.0
+},
+{
+"available_at": 36042.0,
+"classify": {
+"level": "red",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 4",
+"trigger": "direct_question"
+},
+"classify_done": 36042.0,
+"classify_start": 36042.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36042.0,
+"gist": "Tip 2",
+"gist_at": 36042.0,
+"level": "info",
+"line_id": 4,
+"outcome": "emitted",
+"route": "classify",
+"seg_end": 36041.0,
+"shown_at": 36042.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:00:38",
+"tip_done": 36042.0,
+"tip_start": 36042.0,
+"to_pm": false,
+"written": 36042.0
+},
+{
+"available_at": 36054.0,
+"classify_done": 36054.0,
+"classify_start": 36054.0,
+"error": null,
+"line_id": 5,
+"off": "your_turn",
+"outcome": "classify_invalid",
+"route": "parallel",
+"seg_end": 36053.0,
+"signals": [
+"question",
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:00:50",
+"to_pm": true,
+"written": 36054.0
+},
+{
+"available_at": 36054.0,
+"line_id": 5,
+"off": "your_turn",
+"outcome": "skip",
+"reason": "nothing",
+"route": "parallel",
+"seg_end": 36053.0,
+"signals": [
+"question",
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:00:50",
+"tip_done": 36054.0,
+"tip_start": 36054.0,
+"to_pm": true,
+"written": 36054.0
+},
+{
+"available_at": 36068.0,
+"emit_at": 36068.0,
+"error": null,
+"line_id": 6,
+"outcome": "emitted",
+"request": "ask",
+"src": "10:01:08",
+"tip_start": 36068.0
+},
+{
+"available_at": 36081.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 93",
+"gist_at": 36081.0,
+"line_id": 7,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36080.0,
+"signals": [
+"question",
+"second_person",
+"new_requirement"
+],
+"speaker": "them",
+"src": "10:01:17",
+"tip_done": 36081.0,
+"tip_start": 36081.0,
+"to_pm": true,
+"written": 36081.0
+},
+{
+"available_at": 36093.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36093.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 0",
+"gist_at": 36093.0,
+"level": "orange",
+"line_id": 8,
+"meeting": "presentation_qa",
+"outcome": "emitted",
+"route": "direct",
+"seg_end": 36092.0,
+"shown_at": 36093.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:01:29",
+"tip_done": 36093.0,
+"tip_start": 36093.0,
+"to_pm": false,
+"written": 36093.0
+},
+{
+"available_at": 36099.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 37",
+"gist_at": 36099.0,
+"line_id": 9,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36098.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:01:35",
+"tip_done": 36099.0,
+"tip_start": 36099.0,
+"to_pm": true,
+"written": 36099.0
+},
+{
+"available_at": 36145.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"line_id": 13,
+"meeting": "presentation_qa",
+"outcome": "skip",
+"reason": "nothing",
+"route": "direct",
+"seg_end": 36144.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:02:21",
+"tip_done": 36145.0,
+"tip_start": 36145.0,
+"to_pm": false,
+"written": 36145.0
+},
+{
+"available_at": 36156.0,
+"emit_at": 36156.0,
+"error": null,
+"line_id": 14,
+"outcome": "emitted",
+"request": "sos",
+"src": "10:02:36",
+"tip_start": 36156.0
+},
+{
+"available_at": 36203.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36203.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 70",
+"gist_at": 36203.0,
+"level": "orange",
+"line_id": 19,
+"meeting": "presentation_qa",
+"outcome": "emitted",
+"route": "direct",
+"seg_end": 36202.0,
+"shown_at": 36203.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:03:19",
+"tip_done": 36203.0,
+"tip_start": 36203.0,
+"to_pm": true,
+"written": 36203.0
+},
+{
+"available_at": 36214.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36214.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 54",
+"gist_at": 36214.0,
+"level": "red",
+"line_id": 20,
+"meeting": "presentation_qa",
+"outcome": "emitted",
+"route": "direct",
+"seg_end": 36213.0,
+"shown_at": 36214.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:03:30",
+"tip_done": 36214.0,
+"tip_start": 36214.0,
+"to_pm": true,
+"written": 36214.0
+},
+{
+"available_at": 36227.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 15",
+"gist_at": 36227.0,
+"line_id": 21,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36226.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:03:43",
+"tip_done": 36227.0,
+"tip_start": 36227.0,
+"to_pm": false,
+"written": 36227.0
+},
+{
+"available_at": 36236.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 42",
+"gist_at": 36236.0,
+"line_id": 22,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36235.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:03:52",
+"tip_done": 36236.0,
+"tip_start": 36236.0,
+"to_pm": false,
+"written": 36236.0
+},
+{
+"available_at": 36236.0,
+"emit_at": 36236.0,
+"error": null,
+"line_id": 22,
+"outcome": "emitted",
+"request": "ask",
+"src": "10:03:56",
+"tip_start": 36236.0
+},
+{
+"available_at": 36241.0,
+"error": null,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"line_id": 23,
+"meeting": "presentation_qa",
+"outcome": "tip_invalid",
+"route": "direct",
+"seg_end": 36240.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:03:57",
+"tip_done": 36241.0,
+"tip_start": 36241.0,
+"to_pm": false,
+"written": 36241.0
+},
+{
+"available_at": 36259.0,
+"classify": {
+"level": "orange",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 2",
+"trigger": "add_fact"
+},
+"classify_done": 36259.0,
+"classify_start": 36259.0,
+"line_id": 25,
+"off": "your_turn",
+"outcome": "classify_for_parallel",
+"route": "parallel",
+"seg_end": 36258.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:04:15",
+"to_pm": true,
+"written": 36259.0
+},
+{
+"available_at": 36259.0,
+"gist": "Tip 90",
+"gist_at": 36259.0,
+"line_id": 25,
+"off": "your_turn",
+"outcome": "diet_phrase_repeat",
+"route": "parallel",
+"seg_end": 36258.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:04:15",
+"tip_done": 36259.0,
+"tip_start": 36259.0,
+"to_pm": true,
+"written": 36259.0
+},
+{
+"available_at": 36282.0,
+"error": null,
+"line_id": 27,
+"outcome": "tip_invalid",
+"route": "direct",
+"seg_end": 36281.0,
+"signals": [
+"commitment"
+],
+"speaker": "me",
+"src": "10:04:38",
+"tip_done": 36282.0,
+"tip_start": 36282.0,
+"to_pm": false,
+"written": 36282.0
+},
+{
+"available_at": 36299.0,
+"classify_done": 36299.0,
+"classify_start": 36299.0,
+"error": null,
+"line_id": 29,
+"off": "your_turn",
+"outcome": "classify_invalid",
+"route": "parallel",
+"seg_end": 36298.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:04:55",
+"to_pm": true,
+"written": 36299.0
+},
+{
+"available_at": 36299.0,
+"line_id": 29,
+"off": "your_turn",
+"outcome": "skip",
+"reason": "nothing",
+"route": "parallel",
+"seg_end": 36298.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:04:55",
+"tip_done": 36299.0,
+"tip_start": 36299.0,
+"to_pm": true,
+"written": 36299.0
+},
+{
+"available_at": 36320.0,
+"classify": {
+"level": "orange",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 3",
+"trigger": "add_fact"
+},
+"classify_done": 36320.0,
+"classify_start": 36320.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36320.0,
+"gist": "Tip 52",
+"gist_at": 36320.0,
+"level": "orange",
+"line_id": 31,
+"outcome": "emitted",
+"route": "classify",
+"seg_end": 36319.0,
+"shown_at": 36320.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:05:16",
+"tip_done": 36320.0,
+"tip_start": 36320.0,
+"to_pm": false,
+"written": 36320.0
+},
+{
+"available_at": 36341.0,
+"classify": {
+"level": "orange",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 0",
+"trigger": "new_requirement"
+},
+"classify_done": 36341.0,
+"classify_start": 36341.0,
+"line_id": 33,
+"off": "your_turn",
+"outcome": "classify_for_parallel",
+"route": "parallel",
+"seg_end": 36340.0,
+"signals": [
+"question",
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:05:37",
+"to_pm": true,
+"written": 36341.0
+},
+{
+"available_at": 36341.0,
+"error": null,
+"line_id": 33,
+"off": "your_turn",
+"outcome": "tip_invalid",
+"route": "parallel",
+"seg_end": 36340.0,
+"signals": [
+"question",
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:05:37",
+"tip_done": 36341.0,
+"tip_start": 36341.0,
+"to_pm": true,
+"written": 36341.0
+},
+{
+"available_at": 36354.0,
+"classify": {
+"level": "red",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 1",
+"trigger": "pm_commitment"
+},
+"classify_done": 36354.0,
+"classify_start": 36354.0,
+"error": null,
+"line_id": 35,
+"outcome": "tip_invalid",
+"route": "classify",
+"seg_end": 36353.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:05:50",
+"tip_done": 36354.0,
+"tip_start": 36354.0,
+"to_pm": false,
+"written": 36354.0
+},
+{
+"available_at": 36380.0,
+"gist": "Tip 89",
+"gist_at": 36380.0,
+"line_id": 38,
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36379.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:06:16",
+"tip_done": 36380.0,
+"tip_start": 36380.0,
+"to_pm": true,
+"written": 36380.0
+},
+{
+"available_at": 36406.0,
+"classify": {
+"level": "red",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 2",
+"trigger": "pm_commitment"
+},
+"classify_done": 36406.0,
+"classify_start": 36406.0,
+"line_id": 40,
+"off": "your_turn",
+"outcome": "classify_for_parallel",
+"route": "parallel",
+"seg_end": 36405.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:06:42",
+"to_pm": true,
+"written": 36406.0
+},
+{
+"available_at": 36406.0,
+"gist": "Tip 49",
+"gist_at": 36406.0,
+"line_id": 40,
+"off": "your_turn",
+"outcome": "diet_phrase_repeat",
+"route": "parallel",
+"seg_end": 36405.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:06:42",
+"tip_done": 36406.0,
+"tip_start": 36406.0,
+"to_pm": true,
+"written": 36406.0
+},
+{
+"available_at": 36406.0,
+"emit_at": 36406.0,
+"error": null,
+"find_snippets": 0,
+"line_id": 40,
+"outcome": "emitted",
+"request": "find",
+"src": "10:06:46",
+"tip_start": 36406.0
+},
+{
+"available_at": 36416.0,
+"classify_done": 36416.0,
+"classify_start": 36416.0,
+"error": null,
+"line_id": 41,
+"off": "your_turn",
+"outcome": "classify_invalid",
+"route": "parallel",
+"seg_end": 36415.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:06:52",
+"to_pm": true,
+"written": 36416.0
+},
+{
+"available_at": 36416.0,
+"gist": "Tip 52",
+"gist_at": 36416.0,
+"line_id": 41,
+"off": "your_turn",
+"outcome": "diet_phrase_repeat",
+"route": "parallel",
+"seg_end": 36415.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:06:52",
+"tip_done": 36416.0,
+"tip_start": 36416.0,
+"to_pm": true,
+"written": 36416.0
+},
+{
+"available_at": 36457.0,
+"gist": "Tip 42",
+"gist_at": 36457.0,
+"line_id": 45,
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36456.0,
+"signals": [
+"commitment"
+],
+"speaker": "me",
+"src": "10:07:33",
+"tip_done": 36457.0,
+"tip_start": 36457.0,
+"to_pm": false,
+"written": 36457.0
+},
+{
+"available_at": 36487.0,
+"classify": {
+"level": "orange",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 2",
+"trigger": "new_requirement"
+},
+"classify_done": 36487.0,
+"classify_start": 36487.0,
+"error": null,
+"line_id": 48,
+"outcome": "tip_invalid",
+"route": "classify",
+"seg_end": 36486.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:08:03",
+"tip_done": 36487.0,
+"tip_start": 36487.0,
+"to_pm": false,
+"written": 36487.0
+},
+{
+"available_at": 36503.0,
+"classify": {
+"level": "red",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 2",
+"trigger": "direct_question"
+},
+"classify_done": 36503.0,
+"classify_start": 36503.0,
+"line_id": 50,
+"outcome": "skip",
+"reason": "nothing",
+"route": "classify",
+"seg_end": 36502.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:08:19",
+"tip_done": 36503.0,
+"tip_start": 36503.0,
+"to_pm": false,
+"written": 36503.0
+},
+{
+"available_at": 36534.0,
+"classify_done": 36534.0,
+"classify_start": 36534.0,
+"error": null,
+"line_id": 55,
+"outcome": "classify_invalid",
+"route": "classify",
+"seg_end": 36533.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:08:50",
+"to_pm": false,
+"written": 36534.0
+},
+{
+"available_at": 36549.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"line_id": 57,
+"meeting": "presentation_qa",
+"outcome": "skip",
+"reason": "nothing",
+"route": "direct",
+"seg_end": 36548.0,
+"signals": [
+"question",
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:09:05",
+"tip_done": 36549.0,
+"tip_start": 36549.0,
+"to_pm": true,
+"written": 36549.0
+},
+{
+"available_at": 36562.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"line_id": 58,
+"meeting": "presentation_qa",
+"outcome": "skip",
+"reason": "nothing",
+"route": "direct",
+"seg_end": 36561.0,
+"signals": [
+"question",
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:09:18",
+"tip_done": 36562.0,
+"tip_start": 36562.0,
+"to_pm": true,
+"written": 36562.0
+},
+{
+"available_at": 36584.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 35",
+"gist_at": 36584.0,
+"line_id": 60,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36583.0,
+"signals": [
+"question",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:09:40",
+"tip_done": 36584.0,
+"tip_start": 36584.0,
+"to_pm": true,
+"written": 36584.0
+},
+{
+"available_at": 36584.0,
+"emit_at": 36584.0,
+"error": null,
+"line_id": 60,
+"outcome": "emitted",
+"request": "ask",
+"src": "10:09:44",
+"tip_start": 36584.0
+},
+{
+"available_at": 36628.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36628.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 89",
+"gist_at": 36628.0,
+"level": "orange",
+"line_id": 65,
+"meeting": "presentation_qa",
+"outcome": "emitted",
+"route": "direct",
+"seg_end": 36627.0,
+"shown_at": 36628.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:10:24",
+"tip_done": 36628.0,
+"tip_start": 36628.0,
+"to_pm": false,
+"written": 36628.0
+},
+{
+"available_at": 36647.0,
+"classify_done": 36647.0,
+"classify_start": 36647.0,
+"error": null,
+"line_id": 67,
+"off": "your_turn",
+"outcome": "classify_invalid",
+"route": "parallel",
+"seg_end": 36646.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:10:43",
+"to_pm": true,
+"written": 36647.0
+},
+{
+"available_at": 36647.0,
+"gist": "Tip 78",
+"gist_at": 36647.0,
+"line_id": 67,
+"off": "your_turn",
+"outcome": "diet_phrase_repeat",
+"route": "parallel",
+"seg_end": 36646.0,
+"signals": [
+"second_person",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:10:43",
+"tip_done": 36647.0,
+"tip_start": 36647.0,
+"to_pm": true,
+"written": 36647.0
+},
+{
+"available_at": 36654.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36654.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 11",
+"gist_at": 36654.0,
+"level": "orange",
+"line_id": 68,
+"meeting": "presentation_qa",
+"outcome": "emitted",
+"route": "direct",
+"seg_end": 36653.0,
+"shown_at": 36654.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:10:50",
+"tip_done": 36654.0,
+"tip_start": 36654.0,
+"to_pm": false,
+"written": 36654.0
+},
+{
+"available_at": 36678.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 61",
+"gist_at": 36678.0,
+"line_id": 70,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36677.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:11:14",
+"tip_done": 36678.0,
+"tip_start": 36678.0,
+"to_pm": false,
+"written": 36678.0
+},
+{
+"available_at": 36684.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36684.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 84",
+"gist_at": 36684.0,
+"level": "red",
+"line_id": 71,
+"meeting": "presentation_qa",
+"outcome": "emitted",
+"route": "direct",
+"seg_end": 36683.0,
+"shown_at": 36684.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:11:20",
+"tip_done": 36684.0,
+"tip_start": 36684.0,
+"to_pm": true,
+"written": 36684.0
+},
+{
+"available_at": 36710.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 49",
+"gist_at": 36710.0,
+"line_id": 73,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36709.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:11:46",
+"tip_done": 36710.0,
+"tip_start": 36710.0,
+"to_pm": true,
+"written": 36710.0
+},
+{
+"available_at": 36722.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 0",
+"gist_at": 36722.0,
+"line_id": 74,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36721.0,
+"signals": [
+"question",
+"name_mention",
+"name_vocative",
+"update_request"
+],
+"speaker": "them",
+"src": "10:11:58",
+"tip_done": 36722.0,
+"tip_start": 36722.0,
+"to_pm": true,
+"written": 36722.0
+},
+{
+"available_at": 36794.0,
+"classify": {
+"level": "red",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 4",
+"trigger": "direct_question"
+},
+"classify_done": 36794.0,
+"classify_start": 36794.0,
+"gist": "Tip 3",
+"gist_at": 36794.0,
+"line_id": 83,
+"outcome": "diet_phrase_repeat",
+"route": "classify",
+"seg_end": 36793.0,
+"signals": [
+"question"
+],
+"speaker": "them",
+"src": "10:13:10",
+"tip_done": 36794.0,
+"tip_start": 36794.0,
+"to_pm": false,
+"written": 36794.0
+},
+{
+"available_at": 36800.0,
+"gist": "Tip 90",
+"gist_at": 36800.0,
+"line_id": 84,
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36799.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:13:16",
+"tip_done": 36800.0,
+"tip_start": 36800.0,
+"to_pm": true,
+"written": 36800.0
+},
+{
+"available_at": 36816.0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36816.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 36",
+"gist_at": 36816.0,
+"level": "red",
+"line_id": 86,
+"meeting": "presentation_qa",
+"outcome": "emitted",
+"route": "direct",
+"seg_end": 36815.0,
+"shown_at": 36816.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:13:32",
+"tip_done": 36816.0,
+"tip_start": 36816.0,
+"to_pm": true,
+"written": 36816.0
+},
+{
+"available_at": 36824.0,
+"event": "Presentation Q&A: someone in the audience asks a question after the talk. Answer it with one fact from the brief, the fact book or the cards, or skip. Never a timing or pacing tip. trigger direct_question.",
+"gist": "Tip 3",
+"gist_at": 36824.0,
+"line_id": 88,
+"meeting": "presentation_qa",
+"outcome": "diet_phrase_repeat",
+"route": "direct",
+"seg_end": 36823.0,
+"signals": [
+"question",
+"second_person"
+],
+"speaker": "them",
+"src": "10:13:40",
+"tip_done": 36824.0,
+"tip_start": 36824.0,
+"to_pm": true,
+"written": 36824.0
+}
+],
+"tips": [
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:00:05",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:00:05",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [
+{
+"id": "a0",
+"t": "10:00:05",
+"type": "request",
+"what": "send the test accounts",
+"who": "Dana"
+}
+],
+"at": "10:00:15",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:00:15",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:00:32",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:00:32",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:00:42",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:00:42",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:00:42",
+"engine": "app",
+"gist": "Tip 2",
+"kind": "tip",
+"level": "info",
+"partial": true,
+"schema_version": 1,
+"src": "10:00:38",
+"t": "10:00:42",
+"uid": "a4-42000"
+},
+{
+"at": "10:00:42",
+"engine": "app",
+"gist": "Tip 2",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "info",
+"phrase": "We ship it on Tuesday, 2 users.",
+"schema_version": 1,
+"src": "10:00:38",
+"t": "10:00:42",
+"topic": "topic 4",
+"trigger": "direct_question",
+"uid": "a4-42000"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:00:54",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:00:54",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [
+{
+"id": "a0",
+"t": "10:00:05",
+"type": "request",
+"what": "send the test accounts",
+"who": "Dana"
+}
+],
+"at": "10:01:08",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:01:08",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:01:08",
+"engine": "app",
+"gist": "Tip 75",
+"items": [
+"Review on Monday"
+],
+"kind": "answer",
+"level": "red",
+"phrase": "We ship it on Tuesday, 0 users.",
+"q": "When does the pilot start?",
+"schema_version": 1,
+"src": "10:01:08",
+"t": "10:01:08"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:01:21",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:01:21",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:01:33",
+"engine": "app",
+"gist": "Tip 0",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:01:29",
+"t": "10:01:33",
+"uid": "a8-93000"
+},
+{
+"at": "10:01:33",
+"engine": "app",
+"gist": "Tip 0",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 3 users.",
+"schema_version": 1,
+"src": "10:01:29",
+"t": "10:01:33",
+"topic": "topic 2",
+"trigger": "direct_question",
+"uid": "a8-93000"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:01:39",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:01:39",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:01:53",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:01:53",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:02:06",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:02:06",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:02:18",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:02:18",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:02:36",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:02:36",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:02:36",
+"engine": "app",
+"gist": "Tip 67",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"level": "red",
+"phrase": "We ship it on Tuesday, 5 users.",
+"schema_version": 1,
+"src": "10:02:36",
+"t": "10:02:36"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [
+{
+"id": "a0",
+"t": "10:00:05",
+"type": "request",
+"what": "send the test accounts",
+"who": "Dana"
+}
+],
+"at": "10:02:51",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:02:51",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:03:03",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:03:03",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:03:23",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:03:23",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:03:23",
+"engine": "app",
+"gist": "Tip 70",
+"kind": "tip",
+"level": "orange",
+"partial": true,
+"schema_version": 1,
+"src": "10:03:19",
+"t": "10:03:23",
+"uid": "a19-203000"
+},
+{
+"at": "10:03:23",
+"engine": "app",
+"gist": "Tip 70",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 4 users.",
+"schema_version": 1,
+"src": "10:03:19",
+"t": "10:03:23",
+"topic": "topic 3",
+"trigger": "direct_question",
+"uid": "a19-203000"
+},
+{
+"at": "10:03:34",
+"engine": "app",
+"gist": "Tip 54",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:03:30",
+"t": "10:03:34",
+"uid": "a20-214000"
+},
+{
+"at": "10:03:34",
+"engine": "app",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 54",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "red",
+"phrase": "We ship it on Tuesday, 3 users.",
+"schema_version": 1,
+"src": "10:03:30",
+"t": "10:03:34",
+"topic": "topic 2",
+"trigger": "direct_question",
+"uid": "a20-214000"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:03:56",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:03:56",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:03:56",
+"engine": "app",
+"gist": "Tip 92",
+"items": [
+"Review on Monday"
+],
+"kind": "answer",
+"level": "orange",
+"phrase": "We ship it on Tuesday, 4 users.",
+"q": "What did we promise on retention?",
+"schema_version": 1,
+"src": "10:03:56",
+"t": "10:03:56"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [
+{
+"id": "a0",
+"t": "10:00:05",
+"type": "request",
+"what": "send the test accounts",
+"who": "Dana"
+}
+],
+"at": "10:04:01",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:04:01",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:04:33",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:04:33",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:04:53",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:04:53",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:04:59",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:04:59",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [
+{
+"id": "a0",
+"t": "10:00:05",
+"type": "request",
+"what": "send the test accounts",
+"who": "Dana"
+}
+],
+"at": "10:05:20",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:05:20",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:05:20",
+"engine": "app",
+"gist": "Tip 52",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:05:16",
+"t": "10:05:20",
+"uid": "a31-320000"
+},
+{
+"at": "10:05:20",
+"engine": "app",
+"gist": "Tip 52",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 3 users.",
+"schema_version": 1,
+"src": "10:05:16",
+"t": "10:05:20",
+"topic": "topic 1",
+"trigger": "add_fact",
+"uid": "a31-320000"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:05:32",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:05:32",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [
+{
+"id": "a0",
+"t": "10:00:05",
+"type": "request",
+"what": "send the test accounts",
+"who": "Dana"
+}
+],
+"at": "10:05:54",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:05:54",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:06:07",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:06:07",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:06:46",
+"engine": "app",
+"gist": "🔎 Tip 14",
+"items": [
+"Review on Monday"
+],
+"kind": "answer",
+"level": "red",
+"phrase": "We ship it on Tuesday, 6 users.",
+"q": "find: pilot users",
+"schema_version": 1,
+"src": "10:06:46",
+"t": "10:06:46"
+},
+{
+"at": "10:06:46",
+"engine": "app",
+"gist": "🔎 The folder search failed: no project folder for this call",
+"kind": "answer",
+"level": "info",
+"q": "pilot users",
+"schema_version": 1,
+"src": "10:06:46",
+"t": "10:06:46"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:06:56",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [],
+"t": "10:06:56",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:07:11",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:07:11",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:07:24",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:07:24",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:07:37",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:07:37",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:07:59",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:07:59",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:08:07",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:08:07",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:08:37",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:08:37",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:08:50",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:08:50",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:09:09",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:09:09",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:09:44",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:09:44",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:09:44",
+"engine": "app",
+"gist": "Tip 48",
+"items": [
+"Review on Monday"
+],
+"kind": "answer",
+"level": "red",
+"phrase": "We ship it on Tuesday, 6 users.",
+"q": "What is the release date?",
+"schema_version": 1,
+"src": "10:09:44",
+"t": "10:09:44"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:10:17",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:10:17",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:10:28",
+"engine": "app",
+"gist": "Tip 89",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:10:24",
+"t": "10:10:28",
+"uid": "a65-628000"
+},
+{
+"at": "10:10:28",
+"engine": "app",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 89",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 3 users.",
+"schema_version": 1,
+"src": "10:10:24",
+"t": "10:10:28",
+"topic": "topic 4",
+"trigger": "direct_question",
+"uid": "a65-628000"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:10:42",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:10:42",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:10:47",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:10:47",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:10:54",
+"engine": "app",
+"gist": "Tip 11",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:10:50",
+"t": "10:10:54",
+"uid": "a68-654000"
+},
+{
+"at": "10:10:54",
+"engine": "app",
+"gist": "Tip 11",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 0 users.",
+"schema_version": 1,
+"src": "10:10:50",
+"t": "10:10:54",
+"topic": "topic 3",
+"trigger": "direct_question",
+"uid": "a68-654000"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:11:24",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:11:24",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:11:24",
+"engine": "app",
+"gist": "Tip 84",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:11:20",
+"t": "10:11:24",
+"uid": "a71-684000"
+},
+{
+"at": "10:11:24",
+"engine": "app",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 84",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "red",
+"phrase": "We ship it on Tuesday, 3 users.",
+"schema_version": 1,
+"src": "10:11:20",
+"t": "10:11:24",
+"topic": "topic 4",
+"trigger": "direct_question",
+"uid": "a71-684000"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:11:37",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:11:37",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:12:02",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": true,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:12:02",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"actions": [
+{
+"due": "Friday",
+"from": "PM",
+"id": "m1",
+"what": "confirm pilot users"
+}
+],
+"asks": [],
+"at": "10:12:53",
+"decisions": [
+"export goes live on Tuesday"
+],
+"engine": "app",
+"floor": "Dana",
+"kind": "situation",
+"mine": false,
+"owner": "Dana",
+"risks": [],
+"schema_version": 1,
+"speech_done": [
+0
+],
+"t": "10:12:53",
+"theirs": [],
+"topic": "release plan"
+},
+{
+"at": "10:13:36",
+"engine": "app",
+"gist": "Tip 36",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:13:32",
+"t": "10:13:36",
+"uid": "a86-816000"
+},
+{
+"at": "10:13:36",
+"engine": "app",
+"gist": "Tip 36",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "red",
+"phrase": "We ship it on Tuesday, 0 users.",
+"schema_version": 1,
+"src": "10:13:32",
+"t": "10:13:36",
+"topic": "topic 3",
+"trigger": "direct_question",
+"uid": "a86-816000"
+},
+{
+"at": "10:20:28",
+"engine": "app",
+"gist": "📋 Call summary",
+"items": [
+"Decision: export goes live on Tuesday",
+"On me: confirm pilot users (Friday)"
+],
+"kind": "wrapup",
+"level": "info",
+"note": "from the call picture, unchecked",
+"schema_version": 1,
+"src": "10:20:28",
+"t": "10:20:28",
+"uid": "call-picture"
+}
+]
+}

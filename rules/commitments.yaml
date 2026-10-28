@@ -1,0 +1,39 @@
+# Commitments register (Pacenote 0.8, idea 01). Shared by the skill and the app.
+# Both write the same file; neither ever sends anything outside the Mac.
+schema_version: 1
+file: "<call folder>/commitments.jsonl"     # the project's live/ folder, next to the transcripts
+format: >-
+  JSON lines, append only. Each line is an event; the register is the events folded by id.
+  Never rewrite or delete lines: a later event wins.
+events:
+  add: '{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill"}'
+  done: '{"v":1,"op":"done","id":"<id>","at":"<ISO time>","source":"manual|detected","call":"<transcript file name, when closed on a call>"}'
+  reopen: '{"v":1,"op":"reopen","id":"<id>","at":"<ISO time>"}'
+  drop: '{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}'
+id: "c-<first 10 hex characters of sha1 of: call file name without .app, owner, text in lower case>"
+series_key: "<project slug>|<call title in lower case, letters and digits only>"
+owner: >-
+  me = what the PM took on (the call picture's actions). A name = what someone else promised the PM or the
+  PM's team on this call ("on them"). General team to-dos and other people's updates about their own work are not commitments.
+duplicates: >-
+  The app and the skill may record the same call. An add whose call (without .app) is the same and whose text
+  shares at least 60% of its words with an open item is the same commitment: keep the first.
+write_when: >-
+  At the end of the call (state stopped), once: every action of the call picture (owner me) and every promise
+  made to the PM's side (owner = the person's name), with the due date when one was named. An item the PM ticked
+  in the window's On me is added and closed at once (done, source manual).
+open_on_call: >-
+  At the start, read the open items of this project (up to 15, this series first). Give them to the model
+  that keeps the call picture as OPEN COMMITMENTS with their ids.
+model_rule_theirs: >-
+  theirs = promises other people made to the PM or the PM's team on this call: who and what, with the due date
+  when named ("I will send the list by Friday" said by the client). Never the PM's own tasks, never a task
+  for a third person, never someone's update about their own work.
+model_rule_done: >-
+  done_commitments = ids of OPEN COMMITMENTS that someone said on this call are done, sent or finished
+  ("done", "sent", "зроблено", "надіслав"), about that same item.
+closing: >-
+  A detected close is only a proposal: the window shows a quiet card "Done? <item>" with Mark done;
+  only the PM's click closes it (done, source detected). Nothing closes by itself.
+export: Copy as text only. No tracker integration (no Jira in the app).
+order: overdue first, then items with a due date (soonest first), then the rest (newest first)

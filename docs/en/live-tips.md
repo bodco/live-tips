@@ -1203,6 +1203,31 @@ a typed title that was used before offers "Use its settings". Settings > Calenda
 the status dot, the title, the timer; 💡 proactive, ⏸ pause (tips and transcript), 🎙 mic; transcript, ⚙.
 End call stays apart in the title bar and always asks.
 
+### 14.1d Agenda, commitments, brief freshness and the call-start offer (0.8.5)
+
+The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/commitments.yaml` and
+`rules/freshness.json` (the skill keeps a generated copy in SKILL.md, "Agenda, commitments, brief freshness").
+
+- **Agenda as a contract.** The brief's checklist is the agenda. The model that keeps the call picture marks the
+  item being discussed and the ones already discussed; the window shows them as the agenda bar, and a click on a
+  segment sets the state by hand (your state wins). Five minutes before the end the "N min left" card lists what
+  was not raised. After the call the Notion page gets an "Agenda" section (discussed, raised, not raised), and the
+  items not raised go into "What matters" of the next call of the same series as "Not raised last time: ...".
+- **Commitments register.** What you took on and what others promised your side are written at the end of the
+  call to `<project>/live/commitments.jsonl` (one file per project, append only: nothing is ever rewritten).
+  Home > On you shows your open items from every call: overdue first, then those with a date, then the rest. The
+  tick closes an item; the context menu copies it, opens the call or drops what is not a commitment. Up next shows
+  what is still open in this series ("On you, still open", "Waiting on Dana: ..."). On a later call of the series,
+  when someone says an item is done, the tips window shows a quiet "Done?" card: only your Mark done closes it.
+  There is no tracker integration: Copy is the export.
+- **Brief freshness.** Home, Later and the call form compare when the brief was made with the files of the project
+  folder (and the folders added in the form): "Brief is 2 days old · 3 changes since". Refresh updates only the
+  sections the changed files touch and keeps your edits and the checklist. Nothing is refreshed by itself.
+- **Start tips when a call begins.** When Zoom, Microsoft Teams or a browser call (Google Meet: the microphone is in
+  use by another app) is on and the calendar has a call now (within 5 minutes of its start), Pacenote offers once,
+  as a notification and a banner on Home: "Start tips for Orbit weekly?" with the project of the series. It never
+  records by itself. Settings > Calendars > "Suggest starting tips when a call begins" (on by default).
+
 ### 14.2 After the call: the meeting page in Notion
 
 With **Settings > General > Write the call summary to Notion** on, the app writes the wrap-up

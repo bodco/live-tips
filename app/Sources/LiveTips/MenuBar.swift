@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refresh()
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
         NotionMirrorService.shared.startSchedule()
+        MainActor.assumeIsolated { AutoStart.shared.start() }      // Pacenote 0.8.5: offer to start tips when a call begins
         updateCoreIfNeeded()
         // Up next (2026-10-27): the switch goes on when the old call's recorder has stopped.
         NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in
@@ -547,7 +548,7 @@ final class StartCallModel: ObservableObject {
         return ((root as NSString).appendingPathComponent("live") as NSString).appendingPathComponent(c)
     }
 
-    var targetName: String { project?.name ?? workspace?.name ?? "the project" }
+    var targetName: String { project?.name ?? workspace?.name ?? L("call.theProject") }
 
     /// "Prepare now": the request for Claude Code (PrepRunner).
     func prepRequest() -> PrepRunner.Request? {

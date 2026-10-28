@@ -47,6 +47,16 @@ DOM and is tested with `node app/WebTests/feed.test.js`. The window answers on o
 with `{"action": ...}` (`PrompterController.handleAction`). Open `index.html` in a browser to see it on demo data:
 `?state=ready`, `?state=empty`, `?theme=dark`, `?lang=uk`, `?mode=compact`, `?mode=presentation`, `?left=4`.
 
+## Agenda, commitments, brief freshness (0.8.5)
+
+Rules: `rules/agenda.yaml`, `rules/commitments.yaml`, `rules/freshness.json`; `tools/gen_skill_section.py` renders them
+into `rules/generated/skill_register.md`, and the skill keeps that text in SKILL.md (`--compare` checks it). The
+engine adds the agenda and the open commitments to the call picture (`livetips_m0/agenda.py`,
+`livetips_m0/commitments.py`, Engine `_situation_extra_*`) and writes the register at the end of the call; the app
+reads and ticks it (`LiveTipsCore/Commitments.swift`, `Register.swift`), checks the brief (`Freshness.swift`), runs a
+Refresh (`PrepRunner`, `refreshBase`) and offers to start tips when a call begins (`AutoStart.swift`). The register is
+one append-only file per project, `<project>/live/commitments.jsonl`, so a project's data never mixes with another's.
+
 ## Install (beta)
 
 1. Download the dmg from the release page:

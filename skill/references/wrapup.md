@@ -52,6 +52,18 @@ FAILED). Do not run the next skills without the user's command. If the call went
 different subject than the checklist, say so in one line instead of listing every checklist
 item as missed.
 
+**Commitments register (Pacenote 0.8.5, rules in SKILL.md > "Agenda, commitments, brief freshness").**
+After the wrap-up message, append the call's items to `<project>/live/commitments.jsonl` with one
+device_bash `cat >>` (JSON lines exactly as in the rules, `"by":"skill"`): every action of the call
+picture with `"owner":"me"`, every promise made to the PM's side with the person's name as owner.
+Compute `id` with `python3 -c` (sha1 as the rules say) so the app's record of the same call is
+recognised as a duplicate. Commitments the call picture said are done (`done_commitments`) are only
+proposals: list them in the wrap-up as `Схоже, зроблено: {пункт}. Закрити?` and append a `done`
+event (`"source":"detected"`) only for the ones the PM confirms in the chat. Add one line to the
+wrap-up: `Реєстр обіцянок: додано {N} (на мені {n}, на них {m}), відкритих у проєкті {K}`.
+**Agenda.** The Notion page (Step 5) gets a section `### Агенда` (English call: `### Agenda`): each
+checklist item with `обговорено` / `піднято` / `не піднято` (the last agenda strip of the call).
+
 With the tips window on, ALWAYS also emit a short `kind: wrapup` item (missed on 2026-10-21): gist "Дзвінок завершено",
 up to 5 `items` (action items and open questions), `note` = the Notion page link once Step 5
 is done (one extra read call with `--wait 0` just to emit it).

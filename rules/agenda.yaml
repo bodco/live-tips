@@ -1,0 +1,24 @@
+# Agenda as a contract (Pacenote 0.8, idea 02). Shared by the skill and the app.
+schema_version: 1
+source: >-
+  The checklist lines of the call's brief (`- [ ] item` and `- [x] item`, in the order of the brief).
+  Hiring: the planned or likely questions; a stand-up the PM leads: the people to hear from.
+max_items: 8
+max_chars: 60
+states:
+  todo: not raised yet
+  now: being discussed now (at most one item)
+  done: discussed, decided or answered
+# Text for the model that keeps the call picture (the app's engine adds it to its prompt; the skill follows it).
+model_rule: >-
+  agenda_now = the number of the AGENDA item being discussed in the new lines, or -1 when none is.
+  agenda_done = numbers of AGENDA items that were discussed, decided or answered on this call (keep earlier ones).
+  An item counts only when its subject was really talked about, not when someone only names it in a list.
+emit: >-
+  One item `{"kind":"agenda","items":[{"text":"<item>","done":true|false,"cur":true|false}]}` each time
+  the state changes; it replaces the previous strip. The PM can change an item's state in the window
+  (`@@SET agenda_state=<index>|todo|now|done`, index from 0); the PM's state wins over the model's.
+wrapup: >-
+  The call summary gets an "Agenda" section: each item with Discussed, Raised or Not raised.
+  Items not raised go into the "What matters" text of the next call of the same series,
+  as one line "Not raised last time: <item>; <item>".

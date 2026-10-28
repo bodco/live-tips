@@ -49,9 +49,31 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                                       "decisions": days == 0 ? ["Export goes to production on Tuesday", "Pilot starts Monday with 5 users"] : ["Release checklist approved"],
                                       "actions": days == 0 ? [["what": "Send the test account list", "due": "today", "from": "Emily"]] : days == 1 ? [["what": "Share the release notes draft", "due": "Friday", "from": "PM"]] : [],
                                       "asks": days == 0 ? [["who": "David", "what": "Who tests the pilot after week one?", "type": "question"]] : []]
-            if let d = try? JSONSerialization.data(withJSONObject: sit), let s = String(data: d, encoding: .utf8) {
-                try? (s + "\n").write(toFile: f + ".tips.jsonl", atomically: true, encoding: .utf8)
+            // Pacenote 0.8.5: the last agenda strip of the call (one item not raised: carried into the next call of the series).
+            let agenda: [String: Any] = ["kind": "agenda", "final": true, "items": [["text": "Export release date", "done": true, "state": "done"],
+                                                                                 ["text": "Who tests the pilot", "done": true, "state": "done"],
+                                                                                 ["text": "Test accounts", "done": false, "state": "todo"]]]
+            if let d = try? JSONSerialization.data(withJSONObject: sit), let s = String(data: d, encoding: .utf8),
+               let d2 = try? JSONSerialization.data(withJSONObject: agenda), let s2 = String(data: d2, encoding: .utf8) {
+                try? (s + "\n" + (days == 0 ? s2 + "\n" : "")).write(toFile: f + ".tips.jsonl", atomically: true, encoding: .utf8)
             }
+        }
+        // Pacenote 0.8.5 (F5): the commitments register for Home's On you and the readiness checks (demo items only).
+        let iso = ISO8601DateFormatter()
+        let yesterday = df.string(from: Date().addingTimeInterval(-86400)), today = df.string(from: Date().addingTimeInterval(-3600))
+        let regItems: [(String, String, String, String, String, Double)] = [
+            ("Send the test account list", "me", yesterday, "orbit-saas-launch", "Orbit weekly with the client", 2),
+            ("Share the release notes draft", "me", "Friday", "internal-delivery-playbook", "Release checklist review", 1),
+            ("Book the pilot kick-off room", "me", "", "orbit-saas-launch", "Orbit pilot planning", 3),
+            ("Names of the 5 pilot users", "Emily Clark", "Friday", "orbit-saas-launch", "Orbit weekly with the client", 2)]
+        try? fm.removeItem(atPath: orbit + "/live/commitments.jsonl")
+        try? fm.removeItem(atPath: play + "/live/commitments.jsonl")
+        for (text, owner, due, proj, title, days) in regItems {
+            let folder = (proj == "orbit-saas-launch" ? orbit : play) + "/live"
+            let call = "\(today)-1000-" + title.lowercased().replacingOccurrences(of: " ", with: "-") + ".app.md"
+            CommitmentRegister.append(folder: folder, [["op": "add", "id": CommitmentRegister.makeID(call: call, owner: owner, text: text),
+                "text": text, "owner": owner, "project": proj, "series": CommitmentRegister.seriesKey(project: proj, title: title),
+                "call": call, "t": "10:20:00", "created": iso.string(from: Date().addingTimeInterval(-days * 86400)), "due": due, "by": "app"]])
         }
         let k = DateFormatter(); k.dateFormat = "yyyy-MM-dd"
         write([k.string(from: Date()): 0.62, k.string(from: Date().addingTimeInterval(-86400)): 0.41, k.string(from: Date().addingTimeInterval(-2 * 86400)): 0.95], sup + "/spend-days.json")

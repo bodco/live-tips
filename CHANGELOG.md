@@ -3,6 +3,22 @@
 Pacenote (formerly Live Tips). Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.5 (F5: agenda, commitments, brief freshness, call-start offer)
+
+- **Agenda as a contract:** the brief's checklist is the agenda; the call picture marks the item being discussed and
+  the ones done, a click on the agenda bar sets a state by hand. The Notion page gets an "Agenda" section, and items
+  not raised go into "What matters" of the next call of the series.
+- **Commitments register:** what you took on and what others promised your side, kept per project in
+  `live/commitments.jsonl` (append only), written by the app and the skill alike. Home > On you lists your open items
+  from every call (overdue first) with tick, Copy, Open the call and Not a commitment; Up next shows what is still
+  open in the series. A later call that says an item is done shows a quiet "Done?" card; only Mark done closes it.
+- **Brief freshness instead of overnight preparation:** "Brief is 2 days old · 3 changes since" on Home, Later and
+  in the call form, with Refresh: an update of only the sections the changed files touch. Never by itself.
+- **Start tips when a call begins:** with Zoom, Teams or a browser call on and a calendar call starting, a quiet
+  notification and a Home banner offer to start tips; nothing records by itself (Settings > Calendars).
+- Shared rules: `rules/agenda.yaml`, `rules/commitments.yaml`, `rules/freshness.json` (rules 0.2.0); the skill's
+  SKILL.md and references follow them.
+
 ## 0.8.4 (F4: forms, brief, onboarding, Settings)
 
 - **One call form for three jobs:** Start call, Prepare and Plan a call share one window (project, title, time

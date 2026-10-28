@@ -130,6 +130,10 @@ final class PrepRunner: ObservableObject {
         var folders: [String] = []          // "Add folder" in Start call: read these first, they may be outside the project
         var useProjectFolder = true         // 2026-10-27 (owner): off = never read the project folder, only write the prep into live/
         var callID: UUID? = nil             // 2026-10-27 (owner, Up next): which call it is for
+        // Pacenote 0.8.5 (rules/freshness.json > refresh): update an existing brief from the files changed since.
+        var refreshBase: String? = nil
+        var refreshOf: Date? = nil
+        var changed: [String] = []
     }
 
     /// A preparation joins the live call only when it was made for that very call (Up next, 2026-10-27).
@@ -144,7 +148,7 @@ final class PrepRunner: ObservableObject {
         process = nil
         lineBuf = Data()
         running = false
-        result = "Stopped"
+        result = L("prep.stopped")
         UpNext.shared.prepFinished(id: callID, base: nil, ok: false, stopped: true)
     }
 
@@ -160,12 +164,12 @@ final class PrepRunner: ObservableObject {
         try? FileManager.default.createDirectory(atPath: live, withIntermediateDirectories: true)
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmm"
         let h = DateFormatter(); h.dateFormat = "yyyy-MM-dd HH:mm"
-        let base = (live as NSString).appendingPathComponent("prep-\(f.string(from: r.date))-\(StartCallModel.slugify(r.title))")
+        let base = r.refreshBase ?? (live as NSString).appendingPathComponent("prep-\(f.string(from: r.date))-\(StartCallModel.slugify(r.title))")
         let refs = ["sweep.md", "speech.md"] + (r.callType == "presentation" ? ["presentation.md"] : [])
             + (r.callType == "interview" ? ["hiring.md"] : []) + (r.audience == "client" ? ["culture.md"] : [])
         var notion = [(r.root as NSString).appendingPathComponent("_notion")]
         if !r.workspaceRoot.isEmpty { notion.append((r.workspaceRoot as NSString).appendingPathComponent("_notion")) }
-        let prompt = """
+        let fullPrompt = """
         Prepare Live Tips for a call ahead of time (a "prep ahead" of the live-tips skill). Work with local files: \
         no Notion or Jira APIs, no MCP tools, no recording, no subagents (the Notion data is already mirrored locally). \
         The only web access: links written in the call context below (public pages: a client's site, a shared Google \
@@ -215,7 +219,24 @@ final class PrepRunner: ObservableObject {
         Then run `"\(c.engine.python)" "\(lt)" prep-check "\(base).md"` and fix the files until it prints verdict: OK.
         End with one line: the sources used.
         """
-        if useAPI && !hasAPIKey { return "No Claude API key in Settings > Keys" }
+        let refreshPrompt = """
+        Refresh an existing Live Tips preparation (the live-tips skill's sweep.md, section "Refresh"). Work with local \
+        files only: no Notion or Jira APIs, no MCP tools, no web, no subagents.
+
+        Call: "\(r.title)", \(h.string(from: r.date)). Project: \(r.projectName) (slug \(r.slug)). Project folder: \(r.root).
+        The brief: \(base).brief.md (the PM's original is \(base).brief.orig.md when it exists: lines that differ are the \
+        PM's edits and stay). Facts: \(base).facts.json, cards: \(base).cards.json.
+        Files changed since the brief was made (newest first; read only these, fully):
+        \(r.changed.isEmpty ? "(none: the brief is only old; check the project's Current State in the local Notion mirror \(notion.joined(separator: ", ")) and the newest call in \(live))" : r.changed.map { "- " + $0 }.joined(separator: "\n"))
+
+        Read first: \(skill)/SKILL.md (section "Agenda, commitments, brief freshness") and \(skill)/references/sweep.md \
+        (section "Refresh"). Rewrite only the sections of the brief these files change; keep the checklist order, every \
+        ticked item and the PM's lines. Update the facts and cards only for the same topics. Put one line at the top of the \
+        brief: "Updated <time>: <N> files, sections: ...". Then run `"\(c.engine.python)" "\(lt)" prep-check "\(base).md"` \
+        and fix the files until it prints verdict: OK. End with one line: what changed.
+        """
+        let prompt = r.refreshBase == nil ? fullPrompt : refreshPrompt
+        if useAPI && !hasAPIKey { return L("prep.err.noKey") }
         if !useAPI && loggedIn == false { return L("prep.err.notSigned") }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
@@ -277,7 +298,8 @@ final class PrepRunner: ObservableObject {
                 let forID = self.callID
                 if self.useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
                 if ok {
-                    self.progress = 1; self.stage = "Done"
+                    Freshness.writeSnapshot(base: base, refreshOf: r.refreshOf)      // rules/freshness.json > snapshot
+                    self.progress = 1; self.stage = L("prep.st.done")
                     // QA 26.10: the call may have started while the prep was written: pick up the rest now.
                     // 2026-10-27 (Up next): only into the call it was made for.
                     if Self.joinsLiveCall(prepFor: forID, liveCall: CallEngine.shared.currentCallID),
@@ -307,7 +329,7 @@ final class PrepRunner: ObservableObject {
         target = (base as NSString).lastPathComponent
         callID = r.callID
         result = ""
-        progress = 0.02; stage = "Starting Claude Code"; detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil
+        progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil
         return nil
     }
 

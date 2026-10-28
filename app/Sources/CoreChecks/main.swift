@@ -179,8 +179,40 @@ func versions() {
     expect(!AppVersion.isNewer("v0.8.0", than: "0.8.1"), "older tag")
 }
 
+/// Pacenote 0.8.5: the commitments register folds like livetips_m0/commitments.py (same ids, same duplicates).
+func commitmentsRegister() {
+    expect(CommitmentRegister.makeID(call: "/x/live/call-1.app.md", owner: "me", text: "Send the test account list") == "c-bb87a2a300", "id parity with Python")
+    expect(CommitmentRegister.seriesKey(project: "orbit", title: "Weekly Sync #2") == "orbit|weeklysync2")
+    let a = CommitmentRegister.makeID(call: "call-1.app.md", owner: "me", text: "Send the test account list")
+    let ev: [[String: Any]] = [
+        ["op": "add", "id": a, "text": "Send the test account list", "owner": "me", "call": "call-1.app.md", "created": "2026-10-20T10:00:00+03:00", "due": "Friday"],
+        ["op": "add", "id": "c-skill", "text": "send test account list", "owner": "me", "call": "call-1.md"],          // the skill's twin
+        ["op": "add", "id": "c-them", "text": "Share the export spec", "owner": "Dana", "call": "call-1.md", "created": "2026-10-20T10:00:00+03:00"],
+        ["op": "done", "id": "c-skill", "at": "2026-10-21T09:00:00+03:00", "source": "detected"],
+        ["op": "add", "id": "c-old", "text": "Book the room", "owner": "me", "call": "call-0.md", "created": "2026-10-01T10:00:00+03:00", "due": "3.10"],
+    ]
+    let items = CommitmentRegister.fold(ev)
+    expect(items.count == 3, "a duplicate add is folded")
+    expect(items.first { $0.id == a }?.status == "done" && items.first { $0.id == a }?.doneSource == "detected", "an event on the twin closes the first")
+    expect(items.first { $0.id == "c-them" }?.mine == false)
+    let now = ISO8601DateFormatter().date(from: "2026-10-22T12:00:00+03:00")!
+    let open = CommitmentRegister.sorted(items.filter { $0.status == "open" }, now: now)
+    expect(open.first?.id == "c-old" && CommitmentRegister.isOverdue(open[0], now: now), "overdue first")
+    let from = ISO8601DateFormatter().date(from: "2026-10-20T10:00:00+03:00")!       // a Tuesday
+    let fri = CommitmentRegister.dueDate("by Friday", from: from)!
+    expect(Calendar.current.component(.weekday, from: fri) == 6 && fri > from, "a weekday is the next one")
+    expect(CommitmentRegister.dueDate("до п'ятниці", from: from) == fri, "Ukrainian weekday")
+    expect(CommitmentRegister.dueDate("2026-11-03", from: from) != nil && CommitmentRegister.dueDate("soon", from: from) == nil)
+    let dir = NSTemporaryDirectory() + "pn-reg-\(getpid())"
+    CommitmentRegister.append(folder: dir, [["op": "add", "id": "c-1", "text": "One", "owner": "me", "call": "x.md"]])
+    CommitmentRegister.mark(folder: dir, id: "c-1", op: "done")
+    expect(CommitmentRegister.load(folder: dir).first?.status == "done", "append and mark")
+    try? FileManager.default.removeItem(atPath: dir)
+}
+
 interfaceStrings()
 versions()
+commitmentsRegister()
 frameRoundTripAcrossChunks()
 frameResyncAfterGarbage()
 watchdogStartGraceThenStallTerminateKillRestart()

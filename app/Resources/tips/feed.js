@@ -179,6 +179,21 @@
           return { id: 'a' + i, title: text, done, cur: typeof x === 'object' && x && !!x.cur };
         });
         return true;
+      case 'commitment_done': {
+        // Pacenote 0.8.5 (rules/commitments.yaml > closing): an open commitment was said to be done. A quiet card
+        // (never the hero); only the PM's Mark done closes it in the register.
+        if (!it.id) return false;
+        const id = 'k:' + it.id;
+        if (this.byId[id]) return false;
+        const mine = !it.owner || it.owner === 'me';
+        this.put({
+          id, kind: 'onme', quiet: true, who: mine ? '' : clean(it.owner), question: '', say: clean(it.text),
+          source: '', meta: '', unverified: false, items: [], at: hmsToMs(it.at || it.t, this.now()), state: 'active', pinned: false,
+          partial: false, late: false, card: '', t: it.t || '', commit: { id: String(it.id), text: clean(it.text), mine },
+          raw: { kind: 'commitment_done', gist: it.gist || '', phrase: '', items: [] }
+        });
+        return true;
+      }
       case 'checklist':
         if (!this.agendaEngine) this.agendaBrief = (it.items || []).map((x, i) => ({ id: 'b' + i, title: clean(itemText(x)), done: false, cur: false }));
         return true;
@@ -383,6 +398,8 @@
   };
   Feed.prototype.toggleOnMe = function (id, done) { this.onMeDone[id] = !!done; this.emit(); };
   Feed.prototype.setAgendaState = function (id, state) { this.agendaManual[id] = state; this.emit(); };
+  /** The PM pressed Mark done on a commitment card. */
+  Feed.prototype.commitDone = function (cardId) { const c = this.byId[cardId]; if (c) { c.state = 'done'; this.local[cardId] = Object.assign({}, this.local[cardId], { state: 'done' }); this.emit(); } };
 
   /** Prepared facts that match a typed question (shown at once, before Claude answers). */
   Feed.prototype.searchFacts = function (q) {

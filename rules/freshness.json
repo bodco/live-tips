@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "about": "Brief freshness (Pacenote 0.8, idea 03). Shared by the skill and the app. Nothing runs by itself: the PM presses Refresh.",
+  "prepared_at": "The time the preparation was made: prepared_at in <stem>.prep.json when it exists, otherwise the creation time of <stem>.brief.md (an edit by the PM does not make a brief fresh).",
+  "changes": "Files in the project folder (and the folders added in the call form) changed after prepared_at, except the paths below. Each file counts once.",
+  "ignore": ["live/", ".livetips-index/", ".git/", "node_modules/", ".DS_Store", "Tools/"],
+  "ignore_hidden": true,
+  "max_files_scanned": 4000,
+  "stale_after_hours": 24,
+  "stale_rule": "A brief is stale when at least one change happened since prepared_at, or it is older than stale_after_hours and the call is a different day.",
+  "label": "Brief is <age> old · <n> changes since",
+  "refresh": "Refresh = an incremental update: Claude gets the old brief and the list of changed files, reads only those, and rewrites only the sections they change. The checklist and the PM's edits stay. The facts and cards follow the same changes. It never starts by itself.",
+  "snapshot": "After a preparation or a refresh, write <stem>.prep.json: {\"prepared_at\": \"<ISO time>\", \"by\": \"app|skill\", \"refresh_of\": \"<ISO time of the previous one, or empty>\"}."
+}

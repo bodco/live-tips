@@ -713,9 +713,19 @@ extension PrompterController {
             let done = d["done"] as? Bool ?? false
             handle("cardedit", ["action": done ? "onme_done" : "onme_open", "kind": "onme", "key": d["id"] ?? "",
                                 "after": ["text": d["text"] as? String ?? ""]] as [String: Any])
+            // Pacenote 0.8.5: the engine adds a ticked action to the register already closed (rules/commitments.yaml).
+            if let id = d["id"] as? String, id.hasPrefix("m:"), let t = d["text"] as? String, !t.isEmpty { sendSetting("onme_state", t + "|" + (done ? "done" : "open")) }
         case "agenda":
             handle("cardedit", ["action": "agenda", "kind": "agenda", "key": d["id"] ?? "",
                                 "after": ["text": d["title"] as? String ?? "", "state": d["state"] as? String ?? ""]] as [String: Any])
+            // Pacenote 0.8.5 (rules/agenda.yaml > emit): the PM's state of an item wins over the model's.
+            if let id = d["id"] as? String, let st = d["state"] as? String { sendSetting("agenda_state", id + "|" + st) }
+        case "commitment-done":
+            // Pacenote 0.8.5: Mark done on a "Done?" card closes the open commitment in the register (source detected).
+            guard let id = d["id"] as? String, id.hasPrefix("c-") else { return }
+            let file = stem + ".md"
+            MainActor.assumeIsolated { Register.shared.markDone(id: id, callFile: file) }
+            sendSetting("commitment_closed", id)
         case "name-speaker":
             let sid = d["speakerId"] as? String ?? "", name = d["name"] as? String ?? "", side = d["side"] as? String ?? ""
             guard sid.range(of: "^S[0-9]+$", options: .regularExpression) != nil, !name.isEmpty else { return }

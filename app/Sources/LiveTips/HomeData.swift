@@ -74,6 +74,40 @@ extension StartCallModel {
         useProjectFolder = e.useProjectFolder; hiringRole = e.hiringRole; tipModel = e.tipModel; publicCall = e.publicCall
         let f = DateFormatter(); f.dateFormat = "d MMM"
         appliedFrom = L("call.appliedLast", ["title": e.title, "date": f.string(from: e.savedAt)])
+        carryNotRaised(title: e.title)
+    }
+
+    /// Pacenote 0.8.5 (rules/agenda.yaml > wrapup): agenda items not raised on the last call of this series go into
+    /// "What matters" as one line, so the next preparation and the tips pick them up. Same project only.
+    func carryNotRaised(title: String) {
+        let key = EditLog.seriesKey(title)
+        let names = Set([project?.name, project?.slug, workspace?.name, root.map { ($0 as NSString).lastPathComponent }].compactMap { $0 })
+        guard !names.isEmpty, let last = CallHistory.shared.visible.first(where: { $0.start < Date() && EditLog.seriesKey($0.title) == key && names.contains($0.project) }) else { return }
+        let left = Self.notRaised(transcript: last.file)
+        guard !left.isEmpty else { return }
+        let line = L("call.notRaisedLast", ["items": left.joined(separator: "; ")])
+        if context.contains(line) { return }
+        let prefix = L("call.notRaisedLast", ["items": ""])
+        let kept = context.split(separator: "\n", omittingEmptySubsequences: false).filter { !$0.hasPrefix(prefix) }.joined(separator: "\n")
+        context = (kept.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : kept.trimmingCharacters(in: .newlines) + "\n") + line
+    }
+
+    /// The items of the last agenda strip of a call that were never raised (state todo).
+    static func notRaised(transcript file: String) -> [String] {
+        let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
+        for p in [file + ".tips.jsonl", stem + ".tips.jsonl"] {
+            guard let s = try? String(contentsOfFile: p, encoding: .utf8) else { continue }
+            for ln in s.split(separator: "\n").reversed() where ln.contains("\"agenda\"") {
+                guard let o = (try? JSONSerialization.jsonObject(with: Data(ln.utf8))) as? [String: Any], (o["kind"] as? String) == "agenda",
+                      let items = o["items"] as? [Any] else { continue }
+                return items.compactMap { x -> String? in
+                    guard let d = x as? [String: Any], let t = d["text"] as? String, !t.isEmpty else { return nil }
+                    let st = (d["state"] as? String) ?? ((d["done"] as? Bool) == true ? "done" : (d["cur"] as? Bool) == true ? "now" : "todo")
+                    return st == "todo" ? t : nil
+                }
+            }
+        }
+        return []
     }
 
     /// A calendar event: its title, time and people; the project and the rest from the last call of the series

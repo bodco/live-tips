@@ -165,5 +165,23 @@ test('Up next: the next call with minutes and readiness', () => {
   assert.deepStrictEqual(get().next, { id: 'n1', title: 'Team retro', startsInMin: 8, prepared: false, preparing: false });
 });
 
+test('a commitment said to be done: one quiet On me card, Mark done closes it here', () => {
+  const { f, get } = make();
+  const it = { kind: 'commitment_done', id: 'c-1a2b3c', text: 'Send the test account list', owner: 'me', t: '10:30:00', gist: 'On me · Done? Send the test account list' };
+  f.addItems([it]); f.addItems([it]);
+  const cs = get().cards.filter((c) => c.commit);
+  assert.strictEqual(cs.length, 1);
+  assert.strictEqual(cs[0].quiet, true);
+  assert.strictEqual(cs[0].kind, 'onme');
+  assert.strictEqual(cs[0].commit.id, 'c-1a2b3c');
+  assert.strictEqual(cs[0].say, 'Send the test account list');
+  f.commitDone(cs[0].id);
+  assert.strictEqual(get().cards.find((c) => c.commit).state, 'done');
+  f.addItems([{ kind: 'commitment_done', id: 'c-9', text: 'Share the spec', owner: 'Dana', t: '10:31:00' }]);
+  const other = get().cards.find((c) => c.commit && c.commit.id === 'c-9');
+  assert.strictEqual(other.commit.mine, false);
+  assert.strictEqual(other.who, 'Dana');
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

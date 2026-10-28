@@ -267,6 +267,14 @@ struct CallSetupView: View {
                 Text(L("call.brief.queued")).font(PN.Font.body).foregroundStyle(PN.C.text2)
                 Spacer()
                 Button(L("call.brief.unqueue")) { upnext.unqueue(model) }.buttonStyle(.pnTertiary)
+            } else if model.prep?.matches == true, let fr = Freshness.check(model), fr.stale {
+                // Pacenote 0.8.5 (idea 03): an old brief says so and offers Refresh; it never refreshes by itself.
+                Image(systemName: "clock.arrow.circlepath").foregroundStyle(PN.C.onMe)
+                Text(fr.line).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1)
+                    .help(fr.changes.prefix(8).map { ($0 as NSString).lastPathComponent }.joined(separator: "\n"))
+                Spacer()
+                if let path = PrepDocWindow.path(for: model) { Button(L("common.open")) { PrepDocWindow.show(path: path, title: model.effectiveTitle) }.buttonStyle(.pnTertiary) }
+                if canPrepare { Button(L("fresh.refresh")) { refreshNow() }.buttonStyle(.pnTertiary) }
             } else if let p = model.prep, p.matches {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
                 Text(L("home.check.briefReady", ["at": p.made.formatted(date: Calendar.current.isDateInToday(p.made) ? .omitted : .abbreviated, time: .shortened)]))
@@ -287,6 +295,11 @@ struct CallSetupView: View {
         }
         .padding(12)
         .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+    }
+
+    private func refreshNow() {
+        model.note = upnext.refresh(model) ?? ""
+        if !saved && model.note.isEmpty { upnext.save(model) }
     }
 
     private var canPrepare: Bool {

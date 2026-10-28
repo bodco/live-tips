@@ -4,7 +4,7 @@ import LiveTipsCore
 
 // Pacenote 0.8 (F3): what Home knows about calls already held, from their own files. The tips engine writes the
 // call picture ("situation": decisions, what the PM took on, open questions to the PM) into the call's tips file;
-// its last line is the outcome of the call. Until the commitments register (F5, idea 01) these are read-only.
+// its last line is the outcome of the call (Recent's "2 decisions · 1 on you · 1 open question").
 
 struct CallOutcome: Equatable {
     var decisions: [String] = []
@@ -60,30 +60,4 @@ final class OutcomeCache {
     }
 }
 
-/// "On you" on Home: what the PM took on in recent calls, newest first. A tick hides an item here only; the
-/// commitments register (F5) will keep them for real.
-@MainActor
-enum OnYou {
-    struct Item: Identifiable, Hashable { var id: String; var text: String; var project: String; var when: Date; var file: String }
-
-    static var done: Set<String> {
-        get { Set(UserDefaults.standard.stringArray(forKey: "homeOnYouDone") ?? []) }
-        set { UserDefaults.standard.set(Array(newValue).suffix(400), forKey: "homeOnYouDone") }
-    }
-
-    static func items(project: String? = nil, days: Double = 14) -> [Item] {
-        let since = Date().addingTimeInterval(-days * 86400)
-        var seen = Set<String>(), out: [Item] = []
-        let closed = done
-        for r in CallHistory.shared.visible where r.start > since && (project == nil || r.project == project) {
-            for t in OutcomeCache.shared.outcome(r.file)?.onMe ?? [] {
-                let key = t.lowercased().trimmingCharacters(in: .whitespaces)
-                let id = r.file + "|" + key
-                guard !seen.contains(key), !closed.contains(id) else { continue }
-                seen.insert(key)
-                out.append(Item(id: id, text: t, project: r.project, when: r.start, file: r.file))
-            }
-        }
-        return out
-    }
-}
+// "On you" on Home reads the commitments register since Pacenote 0.8.5 (Register.swift, rules/commitments.yaml).

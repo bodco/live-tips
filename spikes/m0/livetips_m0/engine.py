@@ -13,6 +13,8 @@ from typing import Callable, Dict, List, Optional
 
 import jsonschema
 
+from . import agenda as agenda_mod
+from . import commitments as register
 from .cost import cost_usd
 from .prompt import disabled_triggers
 from .providers import HedgedProvider
@@ -209,6 +211,24 @@ class Engine:
         self.speech_items: List[str] = []
         self.speech_item: Optional[dict] = None
         self.ask_log: List[dict] = []
+        # Pacenote 0.8.5 (F5): the agenda as a contract and the commitments register (rules/agenda.yaml,
+        # rules/commitments.yaml). The register lives in the call's folder (<project>/live/commitments.jsonl).
+        self.agenda_items: List[tuple] = []
+        self.agenda_done: set = set()
+        self.agenda_now = -1
+        self.agenda_manual: Dict[int, str] = {}
+        self.agenda_sent: Optional[list] = None
+        self.register_dir = cfg.get("register_dir") or ""
+        self.open_commitments: List[dict] = []
+        self.commit_proposed: set = set()
+        self.onme_ticked: Dict[str, bool] = {}
+        if cfg.get("commitments", True) and self.register_dir:
+            try:
+                m = self.meta()
+                self.open_commitments = register.open_items(self.register_dir, register.series_key(m.get("project", ""), m.get("title", "")),
+                                                            int((getattr(rules, "commitments", None) or {}).get("open_limit", 15)))
+            except Exception:  # noqa: BLE001  (the register is a helper; tips go on without it)
+                self.open_commitments = []
         mt = cfg.setdefault("max_tokens", {})
         if isinstance(mt, dict) and mt.get("tip", 0) and mt["tip"] < 700:
             mt["tip"] = 700                   # 300 cut the two best tips of the PM sync (long Ukrainian phrase)
@@ -818,6 +838,7 @@ class Engine:
                                       "Preparation ready: the brief, the facts and the cards are loaded")})
         if self.speech_item is None and self.cfg.get("speech_card", True):
             self.speech_card(self.prompt._brief)
+        self.set_agenda_items(self.prompt._brief)
         return True
 
     def _ui_uk(self) -> bool:
@@ -1180,11 +1201,13 @@ class Engine:
                                           projects=", ".join(meta.get("pm_projects") or [meta.get("project", "")]) or "-",
                                           people=", ".join(meta.get("participants") or []) or "unknown",
                                           today=_dt.date.today().strftime("%A %Y-%m-%d"), lang=lang)
+            sysmsg += self._situation_extra_rules()
             fmt = lambda h: "[{}] {}: {}".format(h.t, self.speakers.who(h), h.text[:400])
             speech = "\n".join("{}. {}".format(i, x) for i, x in enumerate(self.speech_items)) or "(none)"
             user = "PREVIOUS STATE: {}\n\nPM SPEECH POINTS:\n{}\n\nEARLIER LINES (context):\n{}\n\nNEW LINES:\n{}".format(
                 json.dumps(self.situation or {}, ensure_ascii=False), speech, "\n".join(fmt(h) for h in ctx) or "-",
                 "\n".join(fmt(h) for h in new[-60:]))
+            user = self._situation_extra_input() + user
             extra = (self.cfg.get("request_extra") or {}).get("classify")
             c = self.provider.complete(model=self.models["classify"], system=[{"text": sysmsg}], user=user,
                                        max_tokens=self.cfg.get("situation_max_tokens", 900), cache_ttl=None, extra=extra)
@@ -1203,7 +1226,10 @@ class Engine:
                    "asks": [a for a in (obj.get("asks") or []) if isinstance(a, dict) and a.get("what")][:6],
                    "actions": [a for a in (obj.get("actions") or []) if isinstance(a, dict) and a.get("what")][:20],
                    "decisions": [str(d) for d in (obj.get("decisions") or []) if d][:20],
-                   "speech_done": [int(i) for i in (obj.get("speech_done") or []) if str(i).isdigit()]}
+                   "speech_done": [int(i) for i in (obj.get("speech_done") or []) if str(i).isdigit()],
+                   "theirs": [a for a in (obj.get("theirs") or []) if isinstance(a, dict) and a.get("what") and a.get("who")][:20]}
+            if not sit["theirs"] and (self.situation or {}).get("theirs"):
+                sit["theirs"] = self.situation["theirs"]          # promises made earlier stay until the end of the call
             # A speech point counts as said only when the PM really spoke in the new lines (review: a replay
             # struck the whole speech through during someone else's update).
             prev_done = set(self.situation.get("speech_done") or [])
@@ -1226,6 +1252,8 @@ class Engine:
                 now = self.clock()
                 self.out_tips.write(dict(sit, schema_version=1, engine="app", kind="situation", t=s_to_hms(now), at=s_to_hms(now)))
             self._asks_to_tips(sit, hist)
+            self._agenda_from_model(obj)
+            self._commitments_done(obj)
         except Exception as e:  # noqa: BLE001  (the state is a helper; tips go on without it)
             self.out_timing.write({"outcome": "situation_error", "error": repr(e)[:200]})
         finally:
@@ -1267,15 +1295,130 @@ class Engine:
             if a.get("type") == "question" and (getattr(self.prompt, "_brief", "") or "(no brief)").strip() == "(no brief)":
                 self._start_deep(a.get("what", ""), "ask")
 
+    # ---------- agenda and commitments register (Pacenote 0.8.5, F5) ----------
+    def _situation_extra_rules(self) -> str:
+        ag, cm = getattr(self.rules, "agenda", {}) or {}, getattr(self.rules, "commitments", {}) or {}
+        keys = ['"theirs": [{"who": "<name>", "what": "<what they promised, max 12 words, in the call\'s language>", "due": "<day or date, or empty>", "t": "<HH:MM:SS>"}]']
+        rules = ["- " + cm.get("model_rule_theirs", "theirs = promises other people made to the PM's side on this call.")]
+        if self.agenda_items:
+            keys += ['"agenda_now": <number or -1>', '"agenda_done": [<numbers>]']
+            rules.append("- " + ag.get("model_rule", "agenda_now = the AGENDA item discussed now; agenda_done = items discussed."))
+        if self.open_commitments:
+            keys.append('"done_commitments": ["<id>"]')
+            rules.append("- " + cm.get("model_rule_done", "done_commitments = ids of OPEN COMMITMENTS said to be done."))
+        return "\nAlso return these keys in the same JSON object: {}.\n{}".format(", ".join(keys), "\n".join(rules))
+
+    def _situation_extra_input(self) -> str:
+        parts = []
+        if self.agenda_items:
+            parts.append("AGENDA:\n" + "\n".join("{}. {}".format(i, t) for i, (t, _) in enumerate(self.agenda_items)))
+        left = [c for c in self.open_commitments if c["id"] not in self.commit_proposed]
+        if left:
+            parts.append("OPEN COMMITMENTS (from earlier calls; id | owner | what):\n" + "\n".join(
+                "{} | {} | {}{}".format(c["id"], c.get("owner") or "me", c.get("text", ""), " | due " + c["due"] if c.get("due") else "")
+                for c in left))
+        return "\n\n".join(parts) + ("\n\n" if parts else "")
+
+    def set_agenda_items(self, brief_text: str) -> None:
+        """The brief's checklist is the agenda (rules/agenda.yaml > source). A new brief starts the states again."""
+        ag = getattr(self.rules, "agenda", {}) or {}
+        items = agenda_mod.from_brief(brief_text, int(ag.get("max_items", 8)), int(ag.get("max_chars", 60)))
+        if [t for t, _ in items] == [t for t, _ in self.agenda_items]:
+            return
+        with self.lock:
+            self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual = items, set(), -1, {}
+        self._emit_agenda()
+
+    def agenda_strip(self) -> List[dict]:
+        st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual)
+        return [{"text": t, "done": s == "done", "cur": s == "now", "state": s} for (t, _), s in zip(self.agenda_items, st)]
+
+    def _emit_agenda(self, final: bool = False) -> None:
+        if not self.agenda_items:
+            return
+        strip = self.agenda_strip()
+        if strip == self.agenda_sent and not final:
+            return
+        self.agenda_sent = strip
+        t = s_to_hms(self.clock())
+        out = {"schema_version": 1, "engine": "app", "kind": "agenda", "t": t, "at": t,
+               "gist": "Агенда" if self._ui_uk() else "Agenda", "items": strip}
+        if final:
+            out["final"] = True
+        self.out_tips.write(out)
+
+    def _agenda_from_model(self, obj: dict) -> None:
+        if not self.agenda_items:
+            return
+        n = len(self.agenda_items)
+        done = {int(i) for i in (obj.get("agenda_done") or []) if str(i).lstrip("-").isdigit() and 0 <= int(i) < n}
+        try:
+            now = int(obj.get("agenda_now", -1))
+        except (TypeError, ValueError):
+            now = -1
+        with self.lock:
+            self.agenda_done |= done
+            self.agenda_now = now if 0 <= now < n and now not in self.agenda_done else -1
+        self._emit_agenda()
+
+    def set_agenda_state(self, value: str) -> None:
+        """@@SET agenda_state=<index>|todo|now|done from the window (the PM's state wins)."""
+        try:
+            idx, state = str(value).split("|", 1)
+            i = int(str(idx).lstrip("ab"))
+        except ValueError:
+            return
+        if state in ("todo", "now", "done") and 0 <= i < len(self.agenda_items):
+            with self.lock:
+                if state == "now":
+                    self.agenda_manual = {k: v for k, v in self.agenda_manual.items() if v != "now"}
+                self.agenda_manual[i] = state
+            self._emit_agenda()
+
+    def _commitments_done(self, obj: dict) -> None:
+        """An open commitment said to be done: a quiet card "Done? <item>"; only the PM's click closes it."""
+        ids = {c["id"]: c for c in self.open_commitments}
+        for cid in obj.get("done_commitments") or []:
+            c = ids.get(str(cid))
+            if not c or c["id"] in self.commit_proposed:
+                continue
+            self.commit_proposed.add(c["id"])
+            t = s_to_hms(self.clock())
+            uk = self._ui_uk()
+            mine = (c.get("owner") or "me") == "me"
+            self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "commitment_done", "level": "info", "t": t, "at": t,
+                                 "src": t, "id": c["id"], "text": c.get("text", ""), "owner": c.get("owner") or "me",
+                                 "gist": (("На мені" if mine else "На них") if uk else ("On me" if mine else "On them")) +
+                                         " · " + ("Зроблено? " if uk else "Done? ") + c.get("text", "")})
+
+    def commitment_closed(self, cid: str) -> None:
+        self.commit_proposed.add(str(cid))
+
+    def write_register(self) -> List[dict]:
+        if not (self.cfg.get("commitments", True) and self.register_dir and self.cfg.get("call_file")):
+            return []
+        sit = self.situation or {}
+        m = self.meta()
+        return register.record_call(self.register_dir, call=self.cfg["call_file"], project=m.get("project", ""),
+                                    title=self.cfg.get("title") or m.get("title", ""), actions=sit.get("actions") or [],
+                                    theirs=sit.get("theirs") or [], ticked=self.onme_ticked, by="app")
+
     def final_wrapup(self) -> Optional[dict]:
         """P2 (26.10): at the end, the window gets what the call picture holds: decisions, what is on the PM,
         open asks and the speech points never said. No model call."""
         sit = self.situation or {}
+        self._emit_agenda(final=True)
+        try:
+            self.write_register()
+        except Exception as e:  # noqa: BLE001
+            self.out_timing.write({"outcome": "register_error", "error": repr(e)[:200]})
         uk = (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
         L = (lambda u, e: u if uk else e)
         items = [L("Рішення: ", "Decision: ") + d for d in sit.get("decisions") or []]
         items += [L("На мені: ", "On me: ") + a.get("what", "") + (" (" + a["due"] + ")" if a.get("due") else "")
                   for a in sit.get("actions") or []]
+        items += [L("За ними: ", "On them: ") + a.get("who", "") + ": " + a.get("what", "") + (" (" + a["due"] + ")" if a.get("due") else "")
+                  for a in sit.get("theirs") or []]
         items += [L("Без відповіді: ", "Unanswered: ") + a.get("what", "") + (" · " + a["who"] if a.get("who") else "")
                   for a in sit.get("asks") or [] if a.get("type") != "update"]
         done = set(sit.get("speech_done") or [])

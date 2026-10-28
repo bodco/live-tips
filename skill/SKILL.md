@@ -159,6 +159,13 @@ lines (tips only for what is still relevant), back to the loop.
    short lines) and `Підкажу, коли буде що додати.`
 8. Load `workflow-authoring` once if research is on (`research.md`), and read `window.md` and
    (audience `client`) `culture.md` in quiet polls.
+9. **Register, agenda, freshness** (since Pacenote 0.8.5, rules in "Agenda, commitments, brief
+   freshness" below): read the open items of `<project>/live/commitments.jsonl` (this series first,
+   max 15) and keep them in state as `open_commitments`; emit the agenda strip from the brief's
+   checklist; for a prep picked up with `--adopt-prep`, count the project files changed since it
+   was made and, when there are any, add `Бриф від {час}, змін після нього: {N}. Оновити?` to the
+   sources line (refresh only on the PM's yes, `sweep.md` > Refresh). Done when the open items are
+   in state (or the file does not exist).
 
 A **prep ahead** ("підготуй live tips до {дзвінок}") runs steps 1, 5 and 6 without recording and
 saves `prep-<YYYY-MM-DD-HHMM>-<title>.*` files; `lt prep-check --adopt-prep` picks them up at the
@@ -260,6 +267,44 @@ said in the PM's own lines). When it changes, emit one item
 the window shows a status line, an "On me" panel and strikes the said theses through. A new open
 ask to the PM that no tip covered gets one 🔴 tip. At `stopped`, the wrap-up item starts with
 decisions, what is on the PM, unanswered asks and the speech theses never said.
+Since Pacenote 0.8.5 the picture also keeps the agenda (`agenda_now`, `agenda_done`), promises made to
+the PM's side (`theirs`: who, what, due) and `done_commitments` (open commitments from earlier calls said
+to be done), as the section below says; at `stopped` the actions and `theirs` go into the commitments register.
+
+### Agenda, commitments, brief freshness
+
+Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshness.json`; do not edit here.
+
+**Agenda.** Source: The checklist lines of the call's brief (`- [ ] item` and `- [x] item`, in the order of the brief). Hiring: the planned or likely questions; a stand-up the PM leads: the people to hear from. At most 8 items, ~60 characters each.
+- States: `todo` not raised yet; `now` being discussed now (at most one item); `done` discussed, decided or answered.
+- Call picture: agenda_now = the number of the AGENDA item being discussed in the new lines, or -1 when none is. agenda_done = numbers of AGENDA items that were discussed, decided or answered on this call (keep earlier ones). An item counts only when its subject was really talked about, not when someone only names it in a list.
+- Window: One item `{"kind":"agenda","items":[{"text":"<item>","done":true|false,"cur":true|false}]}` each time the state changes; it replaces the previous strip. The PM can change an item's state in the window (`@@SET agenda_state=<index>|todo|now|done`, index from 0); the PM's state wins over the model's.
+- After the call: The call summary gets an "Agenda" section: each item with Discussed, Raised or Not raised. Items not raised go into the "What matters" text of the next call of the same series, as one line "Not raised last time: <item>; <item>".
+
+**Commitments register.** File: `<call folder>/commitments.jsonl`. JSON lines, append only. Each line is an event; the register is the events folded by id. Never rewrite or delete lines: a later event wins.
+- `add`: `{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill"}`
+- `done`: `{"v":1,"op":"done","id":"<id>","at":"<ISO time>","source":"manual|detected","call":"<transcript file name, when closed on a call>"}`
+- `reopen`: `{"v":1,"op":"reopen","id":"<id>","at":"<ISO time>"}`
+- `drop`: `{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}`
+- id: `c-<first 10 hex characters of sha1 of: call file name without .app, owner, text in lower case>`; series: `<project slug>|<call title in lower case, letters and digits only>`.
+- Owner: me = what the PM took on (the call picture's actions). A name = what someone else promised the PM or the PM's team on this call ("on them"). General team to-dos and other people's updates about their own work are not commitments.
+- Duplicates: The app and the skill may record the same call. An add whose call (without .app) is the same and whose text shares at least 60% of its words with an open item is the same commitment: keep the first.
+- Write when: At the end of the call (state stopped), once: every action of the call picture (owner me) and every promise made to the PM's side (owner = the person's name), with the due date when one was named. An item the PM ticked in the window's On me is added and closed at once (done, source manual).
+- Open on call: At the start, read the open items of this project (up to 15, this series first). Give them to the model that keeps the call picture as OPEN COMMITMENTS with their ids.
+- Model rule theirs: theirs = promises other people made to the PM or the PM's team on this call: who and what, with the due date when named ("I will send the list by Friday" said by the client). Never the PM's own tasks, never a task for a third person, never someone's update about their own work.
+- Model rule done: done_commitments = ids of OPEN COMMITMENTS that someone said on this call are done, sent or finished ("done", "sent", "зроблено", "надіслав"), about that same item.
+- Closing: A detected close is only a proposal: the window shows a quiet card "Done? <item>" with Mark done; only the PM's click closes it (done, source detected). Nothing closes by itself.
+- Export: Copy as text only. No tracker integration (no Jira in the app).
+- Order: overdue first, then items with a due date (soonest first), then the rest (newest first)
+
+**Brief freshness.** Brief freshness (Pacenote 0.8, idea 03). Shared by the skill and the app. Nothing runs by itself: the PM presses Refresh.
+- Prepared at: The time the preparation was made: prepared_at in <stem>.prep.json when it exists, otherwise the creation time of <stem>.brief.md (an edit by the PM does not make a brief fresh).
+- Changes: Files in the project folder (and the folders added in the call form) changed after prepared_at, except the paths below. Each file counts once.
+- Stale rule: A brief is stale when at least one change happened since prepared_at, or it is older than stale_after_hours and the call is a different day.
+- Label: Brief is <age> old · <n> changes since
+- Refresh: Refresh = an incremental update: Claude gets the old brief and the list of changed files, reads only those, and rewrites only the sections they change. The checklist and the PM's edits stay. The facts and cards follow the same changes. It never starts by itself.
+- Snapshot: After a preparation or a refresh, write <stem>.prep.json: {"prepared_at": "<ISO time>", "by": "app|skill", "refresh_of": "<ISO time of the previous one, or empty>"}.
+- Ignored paths: `live/`, `.livetips-index/`, `.git/`, `node_modules/`, `.DS_Store`, `Tools/`; hidden files ignored: yes; stale after 24 h.
 
 ### Tip diet and rates (wins over any rule that allows more)
 
@@ -336,6 +381,8 @@ After `stopped`: one final poll (it may print `@@DUE wrapup`), then read `refere
 and do Step 4 (numbers from `lt wrapup-data`, the `kind: wrapup` item into the window is
 mandatory), Step 5 (Notion: the existing Notion AI page of this meeting first, a new page only
 if none; a page link the user gave wins) and Step 6 (lessons) without waiting for a command.
+Between Step 4 and Step 5: append the call's commitments to `<project>/live/commitments.jsonl`
+(`wrapup.md` > Commitments register); never before `stopped`.
 
 **Last action before the final text (always, also after a failure in Step 4 or 5):** read
 `blocks` from `~/.live-tips/keepalive.json` (missing = 0), add the line `Keepalive: хук

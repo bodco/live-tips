@@ -84,14 +84,14 @@ def header_info(md: Path) -> dict:
 
 
 TXT = {
-    "uk": {"actions": "Action items", "decisions": "Рішення", "commit": "Зобов'язання з нашого боку",
+    "uk": {"actions": "Action items", "decisions": "Рішення", "agenda": "Агенда", "commit": "Зобов'язання з нашого боку",
            "new": "Нові вимоги (кандидати на зміну обсягу)", "open": "Відкриті питання", "risks": "Ризики",
            "tips": "Підказки: показано {shown}, карток {cards}, фактів {facts}, запізнілих {late}; затримка медіана {med} с, макс {mx} с",
            "prep": "Підготовка: ", "prep_yes": "використана", "prep_no": "не було",
            "tr": "Транскрипт: {n} рядків, мови {langs}, локальний файл {f}", "summary": "Підсумок", "transcript": "Транскрипт",
            "append": "Pacenote: підсумок ({hhmm})", "tr_app": "Транскрипт (Pacenote)", "write": "Ukrainian",
            "footer": "Нотатки Pacenote · транскрибовано на пристрої"},
-    "en": {"actions": "Action items", "decisions": "Decisions", "commit": "Our commitments",
+    "en": {"actions": "Action items", "decisions": "Decisions", "agenda": "Agenda", "commit": "Our commitments",
            "new": "New requests (possible scope changes)", "open": "Open questions", "risks": "Risks",
            "tips": "Tips: shown {shown}, cards {cards}, facts {facts}, late {late}; delay median {med} s, max {mx} s",
            "prep": "Preparation: ", "prep_yes": "used", "prep_no": "none",
@@ -197,6 +197,13 @@ def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "
                 (T["decisions"], w.get("decisions", []), bullet), (T["commit"], w.get("commitments", []), bullet),
                 (T["new"], w.get("new_requests", []), bullet),
                 (T["open"], w.get("open_questions", []), bullet), (T["risks"], w.get("risks", []), bullet)]
+    # Pacenote 0.8.5 (rules/agenda.yaml > wrapup): each agenda item with Discussed, Raised or Not raised.
+    from .agenda import last_from_tips, status_label
+    stem = str(md)[:-3] if str(md).endswith(".md") else str(md)
+    strip = next((x for x in (last_from_tips(Path(p)) for p in (str(md) + ".tips.jsonl", stem + ".tips.jsonl")) if x), None)
+    if strip:
+        sections.insert(1, (T["agenda"], ["{}: {}".format(str(it.get("text", "")).strip(), status_label(it, lang == "uk"))
+                                          for it in strip if str(it.get("text", "")).strip()], bullet))
     for title, items, kind in sections:
         items = [i for i in items if str(i).strip(" :")]
         if items:

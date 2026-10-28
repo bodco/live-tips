@@ -185,6 +185,7 @@ struct CalendarsPane: View {
     @ObservedObject var cal = CalendarService.shared
     @State private var accountsOpen = false
     @State private var remembered = SeriesMemory.shared.count
+    @AppStorage(AutoStart.defaultsKey) private var autoSuggest = true
 
     var body: some View {
         Form {
@@ -228,8 +229,10 @@ struct CalendarsPane: View {
                         .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
                 Section {
+                    // Pacenote 0.8.5 (idea 08): a quiet offer to start tips when a meeting app is on at a calendar call.
+                    Toggle(L("auto.setting"), isOn: $autoSuggest).help(L("auto.settingHelp"))
                     Toggle(L("cal.remindMeBeforeCalendar"), isOn: $cal.remind)
-                    if cal.remind { Stepper("\(cal.remindMinutes) min before", value: $cal.remindMinutes, in: 1...15) }
+                    if cal.remind { Stepper(L("cal.minBefore", ["n": "\(cal.remindMinutes)"]), value: $cal.remindMinutes, in: 1...15) }
                     HStack {
                         Text(cal.hidden.isEmpty ? L("cal.noHidden") : L("cal.hiddenN", ["n": "\(cal.hidden.count)"]))
                         Spacer()

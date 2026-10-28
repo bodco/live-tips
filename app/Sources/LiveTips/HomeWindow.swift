@@ -63,11 +63,12 @@ struct HomeView: View {
     @ObservedObject var upnext = UpNext.shared
     @ObservedObject var history = CallHistory.shared
     @ObservedObject var runner = PrepRunner.shared
+    @ObservedObject var register = Register.shared        // Pacenote 0.8.5: the commitments register
+    @ObservedObject var auto = AutoStart.shared            // Pacenote 0.8.5: "Start tips for ...?" when a call begins
     @State private var now = Date()
     @State private var status = EngineStatus()
     @State private var note = ""
     @State private var pickCalendars = false
-    @State private var doneTick = 0               // redraw On you after a tick
     /// 2026-10-27 (owner): Settings > General can hide the week's numbers (a demo to colleagues).
     @AppStorage("homeShowStats") private var showStats = true
 
@@ -97,7 +98,7 @@ struct HomeView: View {
         }
         .background(PN.C.bg)
         .frame(minWidth: 680, minHeight: 560)
-        .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents() }
+        .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents(); register.importOnce() }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in upnext.adoptPreparedEvents() }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in tick() }
     }
@@ -161,6 +162,7 @@ struct HomeView: View {
     @ViewBuilder private var leftColumn: some View {
         let rows = ahead
         VStack(alignment: .leading, spacing: 20) {
+            if let e = auto.suggestion, !live { autoBanner(e) }
             finishSetup
             if !note.isEmpty { Text(note).font(PN.Font.body).foregroundStyle(PN.C.onMe) }
             // Up next: the call being recorded, or the nearest one; an event that began more than 5 minutes ago without
@@ -326,6 +328,24 @@ struct HomeView: View {
         return ""
     }
 
+    /// Pacenote 0.8.5 (idea 08): "Start tips for Orbit weekly?" when a meeting app is on at a calendar call.
+    private func autoBanner(_ e: CalendarService.CalEvent) -> some View {
+        let m = auto.model(for: e)
+        return HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "waveform").foregroundStyle(PN.C.accent).frame(width: 18).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L("auto.title", ["title": e.title])).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                Text(m.target.isEmpty ? L("auto.chooseProject") : L("auto.body", ["project": m.targetName]))
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
+            Spacer(minLength: 8)
+            Button(L("auto.notNow")) { auto.dismiss() }.buttonStyle(.pnTertiary)
+            Button(L("home.startTips")) { auto.accept() }.buttonStyle(.pnPrimary)
+        }
+        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+    }
+
     // MARK: readiness (REDESIGN-SPEC 4.2)
 
     private struct Check: Identifiable {
@@ -347,7 +367,12 @@ struct HomeView: View {
         var out: [Check] = []
         let m = r.model
         let st = m.map { upnext.prepState($0) } ?? .none
-        if let m = m, let p = PrepDocWindow.path(for: m) {
+        if let m = m, st != .running, let fr = Freshness.check(m), fr.stale {
+            // Pacenote 0.8.5 (idea 03): "Brief is 2 days old · 3 changes since" with Refresh, never by itself.
+            out.append(Check(id: "brief", ok: false, text: fr.line,
+                             sub: fr.changes.prefix(3).map { ($0 as NSString).lastPathComponent }.joined(separator: ", "),
+                             action: L("fresh.refresh"), run: { refresh(r) }))
+        } else if let m = m, let p = PrepDocWindow.path(for: m) {
             let at = ((try? FileManager.default.attributesOfItem(atPath: p))?[.modificationDate] as? Date).map {
                 let f = DateFormatter(); f.dateFormat = Calendar.current.isDateInToday($0) ? "HH:mm" : "d MMM HH:mm"; return f.string(from: $0)
             } ?? ""
@@ -359,13 +384,19 @@ struct HomeView: View {
             out.append(Check(id: "brief", ok: false, text: L("home.check.noBrief"), sub: st == .failed ? L("badge.failed") : "",
                              action: L("menubar.prepare"), run: { prepare(r) }))
         }
+        // Pacenote 0.8.5 (idea 01): what is still open from this series, from the commitments register.
+        let series = seriesCommitments(r)
+        let mine = series.filter { $0.mine }, theirs = series.filter { !$0.mine }
+        if let first = mine.first {
+            out.append(Check(id: "onyou", ok: false, text: L("home.check.onYou", ["text": first.text]),
+                             sub: mine.count > 1 ? L("home.check.more", ["n": "\(mine.count - 1)"]) : "",
+                             action: L("reg.markDone"), run: { register.mark(first) }))
+        }
+        if let t = theirs.first {
+            out.append(Check(id: "onthem", ok: nil, text: L("home.check.onThem", ["who": t.owner, "text": t.text]),
+                             sub: theirs.count > 1 ? L("home.check.more", ["n": "\(theirs.count - 1)"]) : ""))
+        }
         if let last = lastOfSeries(r), let o = OutcomeCache.shared.outcome(last.file) {
-            let closed = OnYou.done
-            let open = o.onMe.filter { !closed.contains(last.file + "|" + $0.lowercased().trimmingCharacters(in: .whitespaces)) }
-            if let first = open.first {
-                out.append(Check(id: "onyou", ok: false, text: L("home.check.onYou", ["text": first]),
-                                 sub: open.count > 1 ? L("home.check.more", ["n": "\(open.count - 1)"]) : ""))
-            }
             if !o.openQuestions.isEmpty {
                 out.append(Check(id: "questions", ok: nil, text: L(o.openQuestions.count == 1 ? "home.check.question" : "home.check.questions", ["n": "\(o.openQuestions.count)"]),
                                  sub: o.openQuestions.prefix(2).joined(separator: "; ")))
@@ -376,6 +407,27 @@ struct HomeView: View {
                              action: L("home.check.skip", ["title": e.title]), run: { cal.hidden.insert(e.id) }))
         }
         return out
+    }
+
+    /// Open items of this meeting series, only when its project is known (never mixed across projects).
+    private func seriesCommitments(_ r: Ahead) -> [Commitment] {
+        let key = EditLog.seriesKey(r.title)
+        var slug: String?
+        if let t = r.model?.target, !t.isEmpty {
+            slug = t.hasPrefix("project:") ? String(t.dropFirst(8)) : String(t.dropFirst(10)).lowercased()
+        } else if let last = lastOfSeries(r) {
+            let reg = ProjectRegistry.load(from: AppPaths.projects)
+            slug = reg.projects.first { $0.name == last.project || $0.slug == last.project || ($0.root as NSString).lastPathComponent == last.project }?.slug
+                ?? reg.workspaces.first { $0.name == last.project }?.name.lowercased()
+        }
+        guard let s = slug, !s.isEmpty else { return [] }
+        return register.open(mine: nil).filter { $0.project == s && $0.series.split(separator: "|", maxSplits: 1).last.map(String.init) == key }
+    }
+
+    private func refresh(_ r: Ahead) {
+        let m = model(for: r)
+        if r.model == nil { upnext.save(m) }
+        if let e = upnext.refresh(m) { note = e }
     }
 
     private func checkRow(_ c: Check) -> some View {
@@ -440,8 +492,13 @@ struct HomeView: View {
             } else {
                 switch st {
                 case .ready:
-                    PNBadge(text: L("badge.ready"), kind: .ready)
-                    if let m = m, let p = PrepDocWindow.path(for: m) { Button(L("common.open")) { PrepDocWindow.show(path: p, title: m.effectiveTitle) }.buttonStyle(.pnTertiary) }
+                    if let m = m, let fr = Freshness.check(m), fr.stale {
+                        PNBadge(text: fr.badge, kind: .stale).help(fr.line)
+                        Button(L("fresh.refresh")) { refresh(r) }.buttonStyle(.pnTertiary)
+                    } else {
+                        PNBadge(text: L("badge.ready"), kind: .ready)
+                        if let m = m, let p = PrepDocWindow.path(for: m) { Button(L("common.open")) { PrepDocWindow.show(path: p, title: m.effectiveTitle) }.buttonStyle(.pnTertiary) }
+                    }
                 case .running: PNBadge(text: L("badge.preparing"), kind: .stale)
                 case .queued: PNBadge(text: L("badge.queued"), kind: .stale)
                 case .failed:
@@ -509,8 +566,10 @@ struct HomeView: View {
         }
     }
 
+    /// REDESIGN-SPEC 4.4 + idea 01: the PM's open commitments from every call, overdue first. The tick closes the item
+    /// in the register; the context menu copies it, opens the call or drops what is not a commitment.
     private var onYouSection: some View {
-        let items = OnYou.items()
+        let items = register.open(mine: true)
         let df = DateFormatter(); df.dateFormat = "d MMM"
         df.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US")
         return VStack(alignment: .leading, spacing: 8) {
@@ -523,24 +582,35 @@ struct HomeView: View {
                 Text(L("home.onYou.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
             } else {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(items.prefix(6)) { it in
+                    ForEach(items.prefix(6)) { c in
+                        let overdue = CommitmentRegister.isOverdue(c)
+                        let when = c.createdDate.map { df.string(from: $0) } ?? ""
+                        let sub = [register.projectName(c), when.isEmpty ? "" : L("reg.promised", ["date": when]),
+                                   c.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": c.due]) : L("reg.due", ["due": c.due]))]
+                            .filter { !$0.isEmpty }.joined(separator: " · ")
                         HStack(alignment: .top, spacing: 8) {
-                            Toggle("", isOn: Binding(get: { false }, set: { _ in var d = OnYou.done; d.insert(it.id); OnYou.done = d; doneTick += 1 }))
+                            Toggle("", isOn: Binding(get: { false }, set: { _ in register.mark(c) }))
                                 .toggleStyle(.checkbox).labelsHidden()
-                                .accessibilityLabel(it.text)
+                                .accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(it.text).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
-                                Text(it.project + " · " + df.string(from: it.when)).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                                Text(c.text).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+                                Text(sub).font(PN.Font.caption).foregroundStyle(overdue ? PN.C.danger : PN.C.text3)
                             }
                         }
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
-                        .onTapGesture(count: 2) { NSWorkspace.shared.open(URL(fileURLWithPath: it.file)) }
+                        .onTapGesture(count: 2) { if let f = register.transcript(c) { NSWorkspace.shared.open(URL(fileURLWithPath: f)) } }
                         .help(L("home.onYou.help"))
+                        .contextMenu {
+                            Button(L("reg.copy")) { register.copyText(c) }
+                            if let f = register.transcript(c) { Button(L("reg.openCall")) { NSWorkspace.shared.open(URL(fileURLWithPath: f)) } }
+                            Divider()
+                            Button(L("reg.drop")) { register.mark(c, "drop") }
+                        }
                     }
                     if items.count > 6 { Text(L("home.check.more", ["n": "\(items.count - 6)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                 }
-                .id(doneTick)
+                .id(register.version)
             }
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading)

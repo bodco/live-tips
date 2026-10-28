@@ -14,6 +14,7 @@ import json
 import time
 from pathlib import Path
 
+from .commitments import norm_text
 from .replay import build_engine
 from .transcript import hms_to_s, parse_line
 
@@ -71,6 +72,14 @@ def handle_inbox(eng, raw: str) -> None:
                 eng.prompt.set_meeting({"title": eng.cfg["title"]})
             except Exception:  # noqa: BLE001
                 pass
+        elif key == "agenda_state":       # Pacenote 0.8.5: the PM set an agenda item's state in the window
+            eng.set_agenda_state(str(value or ""))
+        elif key == "onme_state":         # "<action text>|done" or "|open": a tick in the window's On me
+            text, _, st = str(value or "").rpartition("|")
+            if text.strip():
+                eng.onme_ticked[norm_text(text)] = st == "done"
+        elif key == "commitment_closed":  # the PM closed an open commitment in the window (the app wrote the register)
+            eng.commitment_closed(str(value or ""))
         if key in ACK_KEYS:
             eng.out_tips.write({"kind": "ack", "key": key, "value": value, "t": time.strftime("%H:%M:%S")})
         return
@@ -101,6 +110,8 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
     while not md.exists() and waited < 3 * 3600:
         time.sleep(0.5)
         waited += 0.5
+    if cfg.get("variant") == "app":           # Pacenote 0.8.5: the register next to the transcript
+        cfg.setdefault("register_dir", str(md.parent))
     eng, stem = build_engine(cfg, md, out, now_sod, provider)
     (out / (stem + ".app.run.json")).write_text(json.dumps({
         "md": md.name, "mode": "live", "variant": cfg.get("variant"), "models": cfg["models"],

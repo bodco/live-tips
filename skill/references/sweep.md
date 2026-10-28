@@ -297,3 +297,15 @@ PM investigated lately, with the numbers. A JSON list, 40-200 items:
   abbreviations" rule applies to tips.
 - If the tracker is not reachable, say so in the checklist line ("трекер недоступний,
   факти лише з Notion").
+
+## Refresh (Pacenote 0.8.5: brief freshness, rules in SKILL.md > "Agenda, commitments, brief freshness")
+
+Only when the PM asks ("онови бриф", Refresh in the app). Input: the existing `<stem>.brief.md` and the list of
+project files changed since `prepared_at` (newest first, max 30). Read only those files (and the brief), then
+rewrite only the sections of the brief they change, keep the checklist order, every `- [x]`, and every line the
+PM edited (`<stem>.brief.orig.md` shows the original: lines that differ are the PM's). Update `facts.json` and
+`cards.json` only for the same topics. End with a line `Оновлено {час}: {N} файлів, секції: ...` at the top of
+the brief, write `<stem>.prep.json` (`prepared_at` now, `refresh_of` the previous time) and run
+`lt prep-check` as after a full sweep. Never start a refresh by yourself, never on a schedule.
+
+After every full sweep too: write `<stem>.prep.json` with `prepared_at` = now and `"by": "skill"`.

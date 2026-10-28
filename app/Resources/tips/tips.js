@@ -32,6 +32,7 @@
         transcript: 'Transcript', brief: 'Brief', settings: 'Call settings…', switchCall: 'Switch to next call…', clearSpeakers: 'Forget speaker names' },
       recap: 'Recap:',
       present: { next: 'Next', prev: 'Back', start: 'Start', nextUp: (t, s) => `Next: ${t} (${s})`, canSkip: 'Can skip if short on time' },
+      doneQ: 'Done?', markDone: 'Mark done', onThem: 'On them', closed: 'Closed',
       noItems: 'Nothing on you yet', close: 'Close', noBriefYet: 'No brief for this call yet.',
       readyStatus: 'Ready', readyTitle: 'Ready when you are', startListening: 'Start listening', openBrief: 'Open brief',
       listeningTitle: 'Listening', listeningSub: (k) => `Tips show up here when they matter. Stuck? Press ${k}.`, onDevice: 'Audio stays on this Mac',
@@ -58,6 +59,7 @@
         compact: 'Компактний режим', full: 'Повне вікно', present: 'Режим презентації', stopPresent: 'Завершити презентацію',
         transcript: 'Транскрипт', brief: 'Бриф', settings: 'Налаштування дзвінка…', switchCall: 'Перейти до наступного дзвінка…', clearSpeakers: 'Забути імена спікерів' },
       recap: 'Підсумок:',
+      doneQ: 'Зроблено?', markDone: 'Позначити зробленим', onThem: 'На них', closed: 'Закрито',
       present: { next: 'Далі', prev: 'Назад', start: 'Почати', nextUp: (t, s) => `Далі: ${t} (${s})`, canSkip: 'Можна пропустити, якщо бракує часу' },
       noItems: 'Поки нічого на тобі', close: 'Закрити', noBriefYet: 'Брифу для цього дзвінка ще немає.',
       readyStatus: 'Готово', readyTitle: 'Можна починати', startListening: 'Почати слухати', openBrief: 'Відкрити бриф',
@@ -118,6 +120,7 @@
   // Hero order (spec 3.2): pinned, a fresh answer or your turn (90 s), N min left, the newest action, the newest active.
   function pickHero(list) {
     if (S.ui.heroOverride) { const o = list.find((c) => c.id === S.ui.heroOverride); if (o) return o; }
+    list = list.filter((c) => !c.quiet || c.pinned);   // quiet cards (a commitment said to be done) stay in Earlier
     const pinned = list.find((c) => c.pinned && c.state === 'active'); if (pinned) return pinned;
     const fresh = list.find((c) => c.state === 'active' && (c.kind === 'answer' || c.kind === 'turn') && Date.now() - c.at < 90000); if (fresh) return fresh;
     const fin = list.find((c) => c.kind === 'finish'); if (fin) return fin;
@@ -216,6 +219,7 @@
 
   function kindLabel(c) {
     if (c.kind === 'finish') return c.label;
+    if (c.commit && !c.commit.mine) return T().onThem;
     if (c.state === 'done' && (c.kind === 'answer' || c.kind === 'turn')) return T().kinds.answered;
     return T().kinds[c.kind] || T().kinds.neutral;
   }
@@ -231,10 +235,11 @@
     const editing = S.ui.editing === c.id;
     el.innerHTML = `
       <div class="head"><span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>${c.kind === 'finish' ? '' : `<span class="meta"${c.unverified ? ` title="${esc(t.unverified)}"` : ''}>${esc(meta)}</span>`}</div>
-      ${c.question ? `<div class="q">${esc(c.question)}</div>` : ''}
+      ${(c.commit ? t.doneQ : c.question) ? `<div class="q">${esc(c.commit ? t.doneQ : c.question)}</div>` : ''}
       ${c.say ? `<div class="say"${editing ? ' contenteditable="true" spellcheck="false"' : ''}>${esc(c.say)}</div>` : ''}
       ${c.source ? `<div class="src">${ICON.doc}<span>${esc(c.source)}</span></div>` : ''}
-      ${c.kind === 'finish' ? '' : editing ? `<div class="acts">
+      ${c.commit ? `<div class="acts">${c.state === 'done' ? `<span class="meta">${esc(t.closed)}</span>` : `<button class="btn1" type="button" data-act="commit-done" data-id="${esc(c.id)}">${esc(t.markDone)}</button>`}
+        <button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></div>` : c.kind === 'finish' ? '' : editing ? `<div class="acts">
         <button class="btn1" type="button" data-act="edit-save" data-id="${esc(c.id)}">${esc(t.save)}</button>
         <button class="ghost" type="button" data-act="edit-cancel">${esc(t.cancel)}</button></div>` : `<div class="acts">
         <button class="ghost" type="button" data-act="said" data-id="${esc(c.id)}">${esc(t.saidIt)}</button>
@@ -250,11 +255,12 @@
     const t = T(), el = $('earlier');
     if (!list.length) { el.innerHTML = ''; return; }
     el.innerHTML = `<div class="h"><b>${esc(t.earlier)}</b><span>${list.length}</span></div>` + list.map((c) => {
-      const text = c.state === 'done' && c.question ? `${c.question}${c.say ? ' · ' + c.say : ''}` : (c.say || c.question || '');
+      const text = c.commit ? `${t.doneQ} ${c.say}` : c.state === 'done' && c.question ? `${c.question}${c.say ? ' · ' + c.say : ''}` : (c.say || c.question || '');
       return `<div class="row ${c.state === 'done' ? 'done' : ''}" role="button" tabindex="0" data-act="promote" data-id="${esc(c.id)}">
         <span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>
         <span class="t">${esc(text)}</span>
         <span class="m">${esc(rel(c.at))}</span>
+        ${c.commit && c.state !== 'done' ? `<button class="ghost" type="button" data-act="commit-done" data-id="${esc(c.id)}">${esc(t.markDone)}</button>` : ''}
         <span class="hover-acts"><button class="ghost" type="button" data-act="pin" data-id="${esc(c.id)}">${esc(c.pinned ? t.unpin : t.pin)}</button><button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></span>
       </div>`;
     }).join('');
@@ -435,6 +441,12 @@
         break;
       }
       case 'promote': S.ui.heroOverride = id; break;
+      case 'commit-done': {
+        if (!card || !card.commit) return;
+        card.state = 'done'; if (feed) feed.commitDone(id);
+        post('commitment-done', { id: card.commit.id, text: card.commit.text });
+        e.stopPropagation(); break;
+      }
       case 'agenda': {
         const a = S.agenda.find((x) => x.id === id); if (!a) return;
         const nextState = a.state === 'todo' ? 'now' : a.state === 'now' ? 'done' : 'todo';
@@ -586,6 +598,7 @@
         { id: 'c5', kind: 'answer', who: 'Emily C.', question: 'Who tests the pilot?', say: 'Our QA covers the first week, then your team takes over.', source: 'Kick-off notes, 21 Oct: 5 pilot users, names by Friday', at: now - 10000, state: 'active', raw: {} },
         { id: 'c4', kind: 'turn', say: 'Pilot plan: 5 users, 2 weeks, starts Monday', at: now - 2 * min, state: 'active', raw: {} },
         { id: 'c3', kind: 'onme', say: 'Send the test account list today', at: now - 6 * min, state: 'active', raw: {} },
+        { id: 'k:c-demo', kind: 'onme', quiet: true, say: 'Share the pilot schedule with Emily', commit: { id: 'c-demo', text: 'Share the pilot schedule with Emily', mine: true }, at: now - 7 * min, state: 'active', raw: {} },
         { id: 'c2', kind: 'docs', say: 'Pilot: 5 users, list from the client', meta: 'You searched: pilot users', source: 'kickoff-notes.md', at: now - 8 * min, state: 'active', raw: {} },
         { id: 'c1', kind: 'answer', who: 'Emily C.', question: 'When is the export live?', say: 'Tuesday, after the review', at: now - 12 * min, state: 'done', raw: {} }
       ],

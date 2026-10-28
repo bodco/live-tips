@@ -9,7 +9,7 @@ import queue
 import threading
 import time
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, List, Optional
 
 
@@ -76,6 +76,68 @@ def gist_closed(buf: str) -> bool:
     return False
 
 
+def take_piece(c: "Completion", piece: str, on_text) -> None:
+    """One streamed piece of text: first-token and gist times, then the caller sees the buffer."""
+    if c.t_first_token is None:
+        c.t_first_token = time.monotonic()
+    c.text += piece
+    if c.t_gist is None and gist_closed(c.text):
+        c.t_gist = time.monotonic()
+    if on_text:
+        on_text(c.text)
+
+
+def failed(c: "Completion", e: Exception) -> None:
+    c.t_done = time.monotonic()
+    c.error = "{}: {}".format(type(e).__name__, str(e)[:200])
+
+
+def system_blocks(system: List[dict], cache_ttl: Optional[str]) -> List[dict]:
+    """Messages API system blocks; blocks marked "cache" get a breakpoint with the request's TTL."""
+    blocks = []
+    for b in system:
+        blk = {"type": "text", "text": b["text"]}
+        if b.get("cache") and cache_ttl:
+            blk["cache_control"] = {"type": "ephemeral", "ttl": cache_ttl}
+        blocks.append(blk)
+    return blocks
+
+
+def read_usage(c: "Completion", u, cache_ttl: Optional[str]) -> None:
+    """Token counts of a finished message; cache writes split by TTL (old SDKs report one total)."""
+    c.input_tokens = u.input_tokens or 0
+    c.output_tokens = u.output_tokens or 0
+    c.cache_read = getattr(u, "cache_read_input_tokens", 0) or 0
+    cc = getattr(u, "cache_creation", None)
+    if cc is not None:
+        c.cache_write_5m = getattr(cc, "ephemeral_5m_input_tokens", 0) or 0
+        c.cache_write_1h = getattr(cc, "ephemeral_1h_input_tokens", 0) or 0
+        return
+    w = getattr(u, "cache_creation_input_tokens", 0) or 0
+    if cache_ttl == "1h":
+        c.cache_write_1h = w
+    else:
+        c.cache_write_5m = w
+
+
+def sse_chunks(lines):
+    """JSON chunks of an OpenAI-style server-sent event stream."""
+    for raw in lines:
+        line = raw.decode("utf-8", "replace").strip()
+        if line.startswith("data:") and line != "data: [DONE]":
+            yield json.loads(line[5:])
+
+
+def take_chunk(c: "Completion", ch: dict, on_text) -> None:
+    for choice in ch.get("choices") or []:
+        piece = (choice.get("delta") or {}).get("content") or ""
+        if piece:
+            take_piece(c, piece, on_text)
+    if ch.get("usage"):
+        c.input_tokens = ch["usage"].get("prompt_tokens", 0)
+        c.output_tokens = ch["usage"].get("completion_tokens", 0)
+
+
 class Provider:
     name = "base"
 
@@ -100,47 +162,21 @@ class AnthropicProvider(Provider):
         self.client = anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=1, default_headers=headers)
 
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
-        blocks = []
-        for b in system:
-            blk = {"type": "text", "text": b["text"]}
-            if b.get("cache") and cache_ttl:
-                blk["cache_control"] = {"type": "ephemeral", "ttl": cache_ttl}
-            blocks.append(blk)
         c = Completion(model=model, t_start=time.monotonic())
         try:
             with self.client.messages.stream(
-                model=model, max_tokens=max_tokens, system=blocks,  # no temperature: deprecated on current models
+                model=model, max_tokens=max_tokens, system=system_blocks(system, cache_ttl),  # no temperature: deprecated
                 messages=[{"role": "user", "content": user_content(user)}], **(extra or {}),
             ) as stream:
                 for ev in stream:
                     if ev.type == "content_block_delta" and getattr(ev.delta, "type", "") == "text_delta":
-                        if c.t_first_token is None:
-                            c.t_first_token = time.monotonic()
-                        c.text += ev.delta.text
-                        if c.t_gist is None and gist_closed(c.text):
-                            c.t_gist = time.monotonic()
-                        if on_text:
-                            on_text(c.text)
+                        take_piece(c, ev.delta.text, on_text)
                 msg = stream.get_final_message()
             c.t_done = time.monotonic()
-            u = msg.usage
-            c.input_tokens = u.input_tokens or 0
-            c.cache_read = getattr(u, "cache_read_input_tokens", 0) or 0
-            cc = getattr(u, "cache_creation", None)
-            if cc is not None:
-                c.cache_write_5m = getattr(cc, "ephemeral_5m_input_tokens", 0) or 0
-                c.cache_write_1h = getattr(cc, "ephemeral_1h_input_tokens", 0) or 0
-            else:
-                w = getattr(u, "cache_creation_input_tokens", 0) or 0
-                if cache_ttl == "1h":
-                    c.cache_write_1h = w
-                else:
-                    c.cache_write_5m = w
-            c.output_tokens = u.output_tokens or 0
+            read_usage(c, msg.usage, cache_ttl)
             c.stop_reason = msg.stop_reason
         except Exception as e:  # network, rate limit, overload: the caller degrades to local only
-            c.t_done = time.monotonic()
-            c.error = "{}: {}".format(type(e).__name__, str(e)[:200])
+            failed(c, e)
         return c
 
 
@@ -156,41 +192,26 @@ class OpenAICompatProvider(Provider):
         self.timeout = timeout
 
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
+        c = Completion(model=model, t_start=time.monotonic())
+        try:
+            with urllib.request.urlopen(self._request(model, system, user, max_tokens), timeout=self.timeout) as r:
+                for ch in sse_chunks(r):
+                    take_chunk(c, ch, on_text)
+            c.t_done = time.monotonic()
+        except Exception as e:
+            failed(c, e)
+        return c
+
+    def _request(self, model, system, user, max_tokens) -> urllib.request.Request:
         body = {
             "model": model, "max_tokens": max_tokens, "temperature": 0, "stream": True,
             "stream_options": {"include_usage": True},
             "messages": [{"role": "system", "content": "\n\n".join(b["text"] for b in system)},
                          {"role": "user", "content": user_text(user)}],
         }
-        req = urllib.request.Request(self.base_url + "/v1/chat/completions", data=json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json",
-                                              **({"Authorization": "Bearer " + self.api_key} if self.api_key else {})})
-        c = Completion(model=model, t_start=time.monotonic())
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                for raw in r:
-                    line = raw.decode("utf-8", "replace").strip()
-                    if not line.startswith("data:") or line == "data: [DONE]":
-                        continue
-                    ch = json.loads(line[5:])
-                    for choice in ch.get("choices") or []:
-                        piece = (choice.get("delta") or {}).get("content") or ""
-                        if piece:
-                            if c.t_first_token is None:
-                                c.t_first_token = time.monotonic()
-                            c.text += piece
-                            if c.t_gist is None and gist_closed(c.text):
-                                c.t_gist = time.monotonic()
-                            if on_text:
-                                on_text(c.text)
-                    if ch.get("usage"):
-                        c.input_tokens = ch["usage"].get("prompt_tokens", 0)
-                        c.output_tokens = ch["usage"].get("completion_tokens", 0)
-            c.t_done = time.monotonic()
-        except Exception as e:
-            c.t_done = time.monotonic()
-            c.error = "{}: {}".format(type(e).__name__, str(e)[:200])
-        return c
+        return urllib.request.Request(self.base_url + "/v1/chat/completions", data=json.dumps(body).encode(),
+                                      headers={"Content-Type": "application/json",
+                                               **({"Authorization": "Bearer " + self.api_key} if self.api_key else {})})
 
 
 class FakeProvider(Provider):
@@ -239,74 +260,94 @@ class HedgedProvider(Provider):
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         after = self.after_s.get(model, self.default_after)
         self.stats["calls"] += 1
+        args = dict(model=model, system=system, user=user, max_tokens=max_tokens, cache_ttl=cache_ttl, extra=extra)
         if not after or after <= 0:
-            return self.inner.complete(model=model, system=system, user=user, max_tokens=max_tokens,
-                                       cache_ttl=cache_ttl, on_text=on_text, extra=extra)
-        results: "queue.Queue" = queue.Queue()
-        first_token = threading.Event()
-        owner = {"tag": None}
-        olock = threading.Lock()
-
-        def run(tag):
-            def seen(text):
-                first_token.set()
-                # Only the request that streamed first feeds the caller (a streamed gist on screen).
-                with olock:
-                    if owner["tag"] is None:
-                        owner["tag"] = tag
-                    mine = owner["tag"] == tag
-                if mine and on_text:
-                    on_text(text)
-            try:
-                c = self.inner.complete(model=model, system=system, user=user, max_tokens=max_tokens,
-                                        cache_ttl=cache_ttl, on_text=seen, extra=extra)
-            except Exception as e:  # noqa: BLE001  never leave the waiter hanging
-                c = Completion(model=model, t_start=time.monotonic(), t_done=time.monotonic(),
-                               error="{}: {}".format(type(e).__name__, str(e)[:200]))
-            if c.t_first_token is not None:
-                first_token.set()
-            results.put((tag, c))
-
-        def launch(tag):
-            threading.Thread(target=run, args=(tag,), daemon=True).start()
-
-        launch("primary")
-        pending, hedged = 1, False
-        try:
-            tag, c = results.get(timeout=after)
-            pending -= 1
-            if not c.error:
-                return c
-            launch("hedge")                     # failed fast: one more try right away
-            pending, hedged = 1, True
-        except queue.Empty:
-            if not first_token.is_set():
-                launch("hedge")
-                pending, hedged = 2, True
+            return self.inner.complete(on_text=on_text, **args)
+        race = _Race(self.inner, args, on_text)
+        race.launch("primary")
+        early, pending, hedged = race.first(after)
+        if early is not None:
+            return early
         if hedged:
             self.stats["hedged"] += 1
-        winner, last = None, None
+        winner, last, pending = race.wait(pending)
+        if winner is not None and hedged:
+            winner.hedge = race.winner_tag
+            if race.winner_tag == "hedge":
+                self.stats["hedge_won"] += 1
+        if pending and self.on_extra:
+            race.bill_later(pending, self.on_extra)
+        return winner or last
+
+
+class _Race:
+    """Up to two identical requests; only the one that streamed first feeds the caller's on_text."""
+
+    def __init__(self, inner: Provider, args: dict, on_text):
+        self.inner, self.args, self.on_text = inner, args, on_text
+        self.results: "queue.Queue" = queue.Queue()
+        self.first_token = threading.Event()
+        self.owner: Optional[str] = None
+        self.olock = threading.Lock()
+        self.winner_tag: Optional[str] = None
+
+    def seen(self, tag: str, text: str) -> None:
+        self.first_token.set()
+        with self.olock:            # only the request that streamed first feeds the caller (a gist on screen)
+            if self.owner is None:
+                self.owner = tag
+            mine = self.owner == tag
+        if mine and self.on_text:
+            self.on_text(text)
+
+    def run(self, tag: str) -> None:
+        try:
+            c = self.inner.complete(on_text=lambda text: self.seen(tag, text), **self.args)
+        except Exception as e:  # noqa: BLE001  never leave the waiter hanging
+            c = Completion(model=self.args["model"], t_start=time.monotonic(), t_done=time.monotonic(),
+                           error="{}: {}".format(type(e).__name__, str(e)[:200]))
+        if c.t_first_token is not None:
+            self.first_token.set()
+        self.results.put((tag, c))
+
+    def launch(self, tag: str) -> None:
+        threading.Thread(target=self.run, args=(tag,), daemon=True).start()
+
+    def first(self, after: float):
+        """(an early good answer, or None; requests still running; whether a hedge started)."""
+        try:
+            _, c = self.results.get(timeout=after)
+        except queue.Empty:
+            if self.first_token.is_set():
+                return None, 1, False
+            self.launch("hedge")
+            return None, 2, True
+        if not c.error:
+            return c, 0, False
+        self.launch("hedge")                     # failed fast: one more try right away
+        return None, 1, True
+
+    def wait(self, pending: int):
+        """The first good answer (or the last failure) and how many requests are still running."""
+        last = None
         while pending:
-            tag, c = results.get()
+            tag, c = self.results.get()
             pending -= 1
             if not c.error:
-                winner = c
-                if hedged:
-                    c.hedge = tag
-                    if tag == "hedge":
-                        self.stats["hedge_won"] += 1
-                break
+                self.winner_tag = tag
+                return c, last, pending
             last = c
-        if pending and self.on_extra:
-            def drain():
-                for _ in range(pending):
-                    _, rest = results.get()
-                    try:
-                        self.on_extra(rest)
-                    except Exception:  # noqa: BLE001
-                        pass
-            threading.Thread(target=drain, daemon=True).start()
-        return winner or last
+        return None, last, pending
+
+    def bill_later(self, pending: int, on_extra) -> None:
+        def drain():
+            for _ in range(pending):
+                _, rest = self.results.get()
+                try:
+                    on_extra(rest)
+                except Exception:  # noqa: BLE001
+                    pass
+        threading.Thread(target=drain, daemon=True).start()
 
 
 def make_provider(cfg: dict, secret_loader: Callable[[str], str], job: Optional[str] = None) -> Provider:

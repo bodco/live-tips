@@ -190,6 +190,10 @@ ASK_TAIL = (" Add \"answered\": true when the context really answers it, false o
                       "search of the project folder starts by itself.")
 
 
+def not_answered(obj: Optional[dict]) -> bool:
+    return (not obj) or bool(obj.get("skip")) or obj.get("answered") is False
+
+
 def no_ready_answer(kind: str, uk: bool) -> dict:
     gist = ("🆘 " if kind == "sos" else "") + ("Готової відповіді немає, шукаю в папці проєкту" if uk else
                                                    "No ready answer, searching the project folder")
@@ -1459,7 +1463,7 @@ class Engine:
     def _request_answer(self, c, kind: str, text: str, line: Line) -> dict:
         """The model's answer to an ask or HELP NOW; never empty: a bridge phrase and a deeper search when it has none."""
         obj = first_json(c.text) if not c.error else None
-        unanswered = (not obj) or bool(obj.get("skip")) or obj.get("answered") is False
+        unanswered = not_answered(obj)
         uk = self._ui_uk()
         if not obj or obj.get("skip"):
             obj = no_ready_answer(kind, uk)

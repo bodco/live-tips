@@ -243,3 +243,9 @@ def test_small_rules():
     assert not strong_line(_l(1, "me", "hi"), S(name_vocative=True, name_mention=True))
     lines = [_l(0, "me", "a"), _l(59, "me", "b")]
     assert not spans_enough([]) and not spans_enough(lines) and spans_enough(lines, 59)
+
+
+def test_not_answered():
+    from livetips_m0.engine import not_answered
+    assert not_answered(None) and not_answered({}) and not_answered({"skip": True}) and not_answered({"gist": "g", "answered": False})
+    assert not not_answered({"gist": "g"}) and not not_answered({"gist": "g", "answered": True})

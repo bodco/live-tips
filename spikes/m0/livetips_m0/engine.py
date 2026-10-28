@@ -229,14 +229,20 @@ def speech_cards(text: str) -> List[dict]:
 
 def speech_from_brief(brief_text: str, default_gist: str):
     """The ready "## speech.json" item of the brief, else one built from the speech section, else None."""
+    return speech_json(brief_text) or speech_section(brief_text, default_gist)
+
+
+def speech_json(brief_text: str):
     m = SPEECH_JSON.search(brief_text)
-    if m:
-        try:
-            item = json.loads(m.group(1))
-        except ValueError:
-            item = None
-        if item:
-            return item
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except ValueError:
+        return None
+
+
+def speech_section(brief_text: str, default_gist: str) -> Optional[dict]:
     m = SPEECH_SECTION.search(brief_text)
     if not m:
         return None
@@ -497,6 +503,30 @@ def pm_leads(share: float, was: bool, presentation: bool) -> bool:
     return share > (0.55 if presentation else 0.65)
 
 
+def with_deep_note(note: Optional[str], uk: bool) -> str:
+    return (note + " · " if note else "") + ("шукаю глибше в папці проєкту, ~1 хв" if uk else "searching the project folder, about 1 min")
+
+
+def repeats_speech(obj: dict, speech_phrase: str) -> bool:
+    return bool(speech_phrase and obj.get("phrase") and jaccard(obj["phrase"], speech_phrase) >= 0.45)
+
+
+def line_span(line: Line, sig, now: float) -> dict:
+    """The timing record of one transcript line, filled in as it goes through the engine."""
+    return {"line_id": line.line_id, "src": line.t, "speaker": line.speaker, "seg_end": line.seg_end,
+            "written": line.written, "available_at": now, "signals": sig.tags,
+            "to_pm": bool(sig.name_vocative or (sig.question and sig.second_person))}
+
+
+def strong_line(line: Line, sig) -> bool:
+    """The other side names the PM or says something that changes the picture of the call."""
+    return line.speaker == "them" and bool(sig.name_vocative or sig.name_mention or SITUATION_STRONG.search(line.text))
+
+
+def spans_enough(lines: List[Line], seconds: float = 100) -> bool:
+    return bool(lines) and lines[-1].t_s - lines[0].t_s >= seconds
+
+
 def asks_the_pm(sig) -> bool:
     """A question to the PM by name or "you", not about a third person."""
     return bool((sig.name_vocative or (sig.question and sig.second_person)) and not sig.third_person)
@@ -631,9 +661,7 @@ class Engine:
             self.history.append(line)
         self._every_fifth_line(line)
         sig = self.detector.detect(line)
-        span = {"line_id": line.line_id, "src": line.t, "speaker": line.speaker, "seg_end": line.seg_end,
-                "written": line.written, "available_at": now, "signals": sig.tags,
-                "to_pm": bool(sig.name_vocative or (sig.question and sig.second_person))}
+        span = line_span(line, sig, now)
         if self.paused or self._budget_stops():
             return
         self._maybe_situation(line, sig, now)
@@ -954,17 +982,9 @@ class Engine:
     def _judge_tip(self, run: "TipRun", c) -> Optional[str]:
         """None: the tip goes out. Otherwise the outcome that stopped it (span carries the details)."""
         span = run.span
-        obj = first_json(c.text) if not c.error else None
-        if c.error or obj is None:
-            span["error"] = c.error
-            return "tip_error" if c.error else "tip_invalid"
-        bad = self._schema_error(obj)
-        if bad:
-            span["error"] = bad
-            return "tip_invalid"
-        if obj.get("skip"):
-            span["reason"] = obj.get("reason")
-            return "skip"
+        obj, why = self._parse_tip(c, span)
+        if why:
+            return why
         if span.get("force_level"):
             obj["level"] = span["force_level"]
         run.obj = obj
@@ -974,6 +994,21 @@ class Engine:
                 span["gist"] = obj.get("gist")
                 return outcome
         return None
+
+    def _parse_tip(self, c, span: dict):
+        """(the tip, None) or (None, why it is not one): a failed call, bad JSON or schema, a skip."""
+        obj = first_json(c.text) if not c.error else None
+        if c.error or obj is None:
+            span["error"] = c.error
+            return None, "tip_error" if c.error else "tip_invalid"
+        bad = self._schema_error(obj)
+        if bad:
+            span["error"] = bad
+            return None, "tip_invalid"
+        if obj.get("skip"):
+            span["reason"] = obj.get("reason")
+            return None, "skip"
+        return obj, None
 
     def _schema_error(self, obj: dict) -> Optional[str]:
         errs = list(self.tip_validator.iter_errors(obj))
@@ -1179,8 +1214,7 @@ class Engine:
         meta = self.meta()
         if not meta.get("turn_tips", self.cfg.get("turn_tips", False)) and TURN_GIST.search(obj.get("gist", "") or ""):
             return "turn_tip"                 # 2026-10-23: the PM starts on their own, never on a "your turn" tip
-        sp = getattr(self, "speech_phrase", "")
-        if sp and obj.get("phrase") and jaccard(obj["phrase"], sp) >= 0.45:
+        if repeats_speech(obj, getattr(self, "speech_phrase", "")):
             return "speech_repeat"            # the speech card is already on screen
         if meeting_role(meta) == "observer" and not span.get("meeting"):
             return "role_observer"            # after the answer: nothing (no add_fact, no fix_owner_date)
@@ -1197,7 +1231,7 @@ class Engine:
             return False
         with self.lock:
             recent = [h for h in self.history if h.t_s >= now - 120 - 30]
-        if not recent or recent[-1].t_s - recent[0].t_s < 100:
+        if not spans_enough(recent):
             return False
         was = getattr(self, "_presenting", False)
         self._presenting = pm_leads(pm_share(recent), was, meta.get("call_type") == "presentation")
@@ -1383,7 +1417,7 @@ class Engine:
                           r"find|search|look up|which file|in the files?|in the folder|docs?|documents?|spec\w*)\b", re.I)
 
     def _run_request(self, kind: str, text: str, line: Line, span: dict) -> None:
-        if kind == "ask" and (self.SPEECH_ASK.search(text) or (self.speech_item and self.SPEECH_SHOW.search(text))):
+        if kind == "ask" and self._about_speech(text):
             span["tip_start"] = self.clock()
             if self._run_speech_request(text, line, span):
                 return
@@ -1407,6 +1441,9 @@ class Engine:
         span.update({"outcome": "emitted", "emit_at": done, "tip_ms": c.ms(c.t_done), "error": c.error})
         self.out_timing.write(span)
 
+    def _about_speech(self, text: str) -> bool:
+        return bool(self.SPEECH_ASK.search(text) or (self.speech_item and self.SPEECH_SHOW.search(text)))
+
     def _ask_event(self, text: str) -> str:
         hist = ""
         if self.ask_log:
@@ -1428,9 +1465,7 @@ class Engine:
             obj = no_ready_answer(kind, uk)
         if unanswered and kind in ("ask", "sos"):
             self._start_deep(text or (line.text if line else ""), kind)
-            obj["note"] = (obj.get("note") + " · " if obj.get("note") else "") + (
-                "шукаю глибше в папці проєкту, ~1 хв" if uk
-                else "searching the project folder, about 1 min")
+            obj["note"] = with_deep_note(obj.get("note"), uk)
         return obj
 
     # ---------- deep lookup with Claude Code (2026-10-27) ----------
@@ -1478,7 +1513,7 @@ class Engine:
     def _maybe_situation(self, line: Line, sig, now: float) -> None:
         if not self.sit_enabled:
             return
-        strong = line.speaker == "them" and (sig.name_vocative or sig.name_mention or bool(SITUATION_STRONG.search(line.text)))
+        strong = strong_line(line, sig)
         since = None if self.sit_last_at is None else now - self.sit_last_at
         if not situation_due(since, self.sit_interval, strong):
             return

@@ -227,3 +227,19 @@ def test_pm_share_and_leads():
     assert pm_share([_l(1, "me", "aaa"), _l(2, "them", "a")]) == 0.75 and pm_share([]) == 0
     assert pm_leads(0.66, False, False) and not pm_leads(0.65, False, False)
     assert pm_leads(0.56, False, True) and pm_leads(0.55, True, False) and not pm_leads(0.54, True, True)
+
+
+def test_small_rules():
+    from livetips_m0.engine import line_span, repeats_speech, spans_enough, speech_json, strong_line, with_deep_note
+    assert speech_json("## speech.json\n{\"a\": 1}\n") == {"a": 1} and speech_json("x") is None
+    assert with_deep_note("", False) == "searching the project folder, about 1 min"
+    assert with_deep_note("n", True).startswith("n · шукаю")
+    assert repeats_speech({"phrase": "we ship on friday"}, "we ship on friday") and not repeats_speech({"phrase": "x"}, "")
+    assert not repeats_speech({}, "we ship")
+    sig = S(tags=["q"], name_vocative=False, question=True, second_person=True, name_mention=False)
+    span = line_span(_l(2, "them", "x"), sig, 4.0)
+    assert span["to_pm"] is True and span["available_at"] == 4.0 and span["signals"] == ["q"]
+    assert strong_line(_l(1, "them", "hi"), S(name_vocative=True, name_mention=False))
+    assert not strong_line(_l(1, "me", "hi"), S(name_vocative=True, name_mention=True))
+    lines = [_l(0, "me", "a"), _l(59, "me", "b")]
+    assert not spans_enough([]) and not spans_enough(lines) and spans_enough(lines, 59)

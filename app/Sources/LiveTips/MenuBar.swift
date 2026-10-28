@@ -343,6 +343,7 @@ final class StartCallModel: ObservableObject {
     /// 2026-10-27 (owner, calendars): the calendar event this call is, its series, and where the settings came from.
     @Published var calEventID: String?
     var seriesKey: String?
+    var calendarKey: String?          // "<account>|<calendar>": the project last used for this calendar is suggested
     @Published var appliedFrom: String?
     @Published var target = ""          // "project:<slug>" | "workspace:<name>"
     @Published var title = ""
@@ -810,8 +811,8 @@ struct StartCallView: View {
                 if live || planOnly {
                     // 2026-10-27 (owner, Up next): during a call the main action keeps this call for later;
                     // switching is a separate, confirmed step.
-                    LTPrimaryButton(title: saved ? "Save" : "Add to Up next", symbol: "calendar.badge.plus") { onSave() }
-                        .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
+                    LTPrimaryButton(title: saved ? "Save" : "Add to Up next", symbol: "calendar.badge.plus") { if !needProject() { onSave() } }
+                        .keyboardShortcut(.defaultAction)
                     HStack(spacing: 18) {
                         Button(live ? "End current call and start this…" : "Start now", action: live ? onSwitch : onStart).buttonStyle(.borderless)
                             .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
@@ -820,10 +821,12 @@ struct StartCallView: View {
                             .keyboardShortcut(.cancelAction)
                     }
                 } else {
+                    // 2026-10-28 (owner): never a dead button: without a project it opens the project list and says why.
                     LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") {
+                        if needProject() { return }
                         onStart()
                     }
-                        .keyboardShortcut(.defaultAction).disabled(model.target.isEmpty)
+                        .keyboardShortcut(.defaultAction)
                     HStack(spacing: 18) {
                         Button(saved ? "Save" : "Save for later", action: onSave).buttonStyle(.borderless)
                             .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
@@ -838,13 +841,21 @@ struct StartCallView: View {
         }
         .frame(width: 580, height: 800)
         .onAppear { model.refreshTemplate() }
-        .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false }
+        .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false; if !model.target.isEmpty { model.note = "" } }
         .onAppear { model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in if !PrepRunner.shared.useAPI { PrepRunner.shared.refreshAuth() } }
     }
 
     var saved: Bool { upnext.contains(model) }
+
+    /// No project or workspace yet (a new calendar meeting has none by default): open the list and say so.
+    private func needProject() -> Bool {
+        guard model.target.isEmpty else { return false }
+        model.note = "Choose the project or workspace of this call first: its folder gets the transcript and the notes."
+        search = ""; picking = true
+        return true
+    }
 
     /// 2026-10-27 (owner, calendars): the calls around now, from every calendar on this Mac. Two or three at the
     /// same time are normal (one in the calendar he skips, another he joins): the PM picks the one he goes to.
@@ -921,7 +932,7 @@ struct StartCallView: View {
                     IconTile(symbol: model.workspace != nil ? "square.stack.3d.up" : "folder", size: 40)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(model.project?.name ?? model.workspace?.name ?? "Choose a project")
-                            .font(.headline).foregroundStyle(model.target.isEmpty ? .secondary : .primary)
+                            .font(.headline).foregroundStyle(model.target.isEmpty ? Color.orange : Color.primary)
                         Text(model.workspace != nil ? "Workspace: a general call about several projects"
                              : (model.project.map { $0.workspace.isEmpty ? "Project" : "Project in " + $0.workspace } ?? "Recordings and notes go to its folder"))
                             .font(.caption).foregroundStyle(.secondary)

@@ -38,6 +38,8 @@ final class SeriesMemory {
                       context: m.context, folders: m.folders, useProjectFolder: m.useProjectFolder, hiringRole: m.hiringRole,
                       tipModel: m.tipModel, publicCall: m.publicCall, savedAt: Date())
         for k in keys(for: m) { map[k] = e }
+        // The calendar remembers its project too: a new meeting in the same calendar starts with it (2026-10-28).
+        if let ck = m.calendarKey, !m.target.isEmpty { map["calendar:" + ck] = e }
         if map.count > 400 {       // keep the newest
             map = Dictionary(uniqueKeysWithValues: map.sorted { $0.value.savedAt > $1.value.savedAt }.prefix(400).map { ($0.key, $0.value) })
         }
@@ -51,6 +53,9 @@ final class SeriesMemory {
         map = [:]
         try? FileManager.default.removeItem(at: path)
     }
+
+    /// The project of the last call that came from this calendar.
+    func projectFor(calendarKey: String) -> String? { map["calendar:" + calendarKey]?.target }
 
     func lookup(seriesKey: String?, title: String) -> Entry? {
         if let s = seriesKey, let e = map[s] { return e }
@@ -76,6 +81,7 @@ extension StartCallModel {
     func applyEvent(_ ev: CalendarService.CalEvent) {
         calEventID = ev.id
         seriesKey = ev.seriesKey
+        calendarKey = ev.account + "|" + ev.calendar
         title = ev.title
         callDate = ev.start
         if let e = SeriesMemory.shared.lookup(seriesKey: ev.seriesKey, title: ev.title) {
@@ -85,8 +91,12 @@ extension StartCallModel {
             let t = (ev.title + " " + ev.calendar).lowercased()
             if let p = registry.projects.filter({ $0.status != "archived" }).first(where: { t.contains($0.name.lowercased()) || t.contains($0.slug.lowercased()) }) {
                 target = "project:" + p.slug
+            } else if let t = SeriesMemory.shared.projectFor(calendarKey: ev.account + "|" + ev.calendar),
+                      registry.projects.contains(where: { "project:" + $0.slug == t }) || registry.workspaces.contains(where: { "workspace:" + $0.name == t }) {
+                target = t           // the project last used with this calendar
+                appliedFrom = "Project from your last call in the \u{201C}\(ev.calendar)\u{201D} calendar: check it."
             } else {
-                target = ""          // owner: never the last used project by default; Prepare asks
+                target = ""          // owner: never the last used project by default; Start and Prepare ask
             }
             applyProjectDefaults()
         }

@@ -1554,3 +1554,5 @@ address", `references/sweep.md`, `references/presentation.md`).
    Read in Start call open the same document, editable; the corrected text is what the call uses.
 87. **Add folder or file (0.7.2).** Start call and the Prepare form add whole folders or single files (one document
    from Downloads without the rest). The preparation reads the added files fully and nothing else in their folders.
+88. **Start call never dead (0.7.3).** Without a project the Start button opens the project list and says why; a
+   new calendar meeting gets the project last used with its calendar.

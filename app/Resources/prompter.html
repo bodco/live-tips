@@ -130,8 +130,6 @@
   .tip.partial .gist::after { content: " …"; opacity: .6; }
   #spkask.mini { max-height: none; padding-top: 4px; padding-bottom: 4px; cursor: pointer; }
   #spkask.mini .quote, #spkask.mini .names, #spkask.mini .nrow { display: none; }
-  #spkask.mini { max-height: none; padding-top: 4px; padding-bottom: 4px; cursor: pointer; }
-  #spkask.mini .quote, #spkask.mini .names, #spkask.mini .nrow { display: none; }
   #spkask .h { display: flex; align-items: center; gap: 6px; min-width: 0; }
   #spkask .h b { font-size: 14px; white-space: nowrap; flex: none; }
   #spkask .h .sid { color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -139,9 +137,9 @@
   #spkask .moreq, #spkask .skip { flex: none; }
   #spkask .h .grow { flex: 1; }
   #spkask .moreq { font-size: 12px; color: var(--blue); white-space: nowrap; border: 1px solid var(--blue); border-radius: 999px; padding: 0 7px; }
-  #spkask .skip { min-height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent;
+  #spkask .skip, #spkpop .skip { min-height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent;
     color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 600; }
-  #spkask .skip:hover { color: var(--text); border-color: var(--muted); }
+  #spkask .skip:hover, #spkpop .skip:hover { color: var(--text); border-color: var(--muted); }
   #spkask .quote { margin: 3px 0 7px; color: var(--text); font-style: italic; display: -webkit-box; -webkit-line-clamp: 2;
     -webkit-box-orient: vertical; overflow: hidden; }
   #spkask .quote .qt { font-style: normal; color: var(--muted); font-size: 12px; margin-right: 5px; font-variant-numeric: tabular-nums; }
@@ -294,6 +292,11 @@
   #pro.on { background: var(--blue); border-color: var(--blue); color: #fff; }
   .bsep { width: 1px; height: 20px; background: var(--line); margin: 0 2px; flex: none; }
   @media (max-width: 400px) { #bar { gap: 5px; } #bar .ib { width: 28px; height: 28px; } .bsep { display: none; } }
+  /* QA 2026-10-28: the bar fits its column (narrow window or split view): ⚙ never leaves the window. */
+  #bar { container-type: inline-size; }
+  #title { flex: 1 1 auto; min-width: 40px; }
+  @container (max-width: 470px) { #meter, .bsep { display: none; } #bar .ib { width: 28px; height: 28px; } }
+  @container (max-width: 400px) { #elapsed { display: none; } }
   #pause:focus-visible, #sos:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
   #sos { background: var(--red); border: 0; color: #fff; padding: 0 14px; height: 40px; font-size: 13px; letter-spacing: .04em; }
   #sos:hover { filter: brightness(1.1); }
@@ -343,7 +346,7 @@
   .slider { display: flex; align-items: center; gap: 8px; }
   .slider input { flex: 1; accent-color: var(--blue); min-width: 0; }
   .slider .a1 { font-size: 12px; } .slider .a2 { font-size: 17px; font-weight: 600; }
-  #sizeval { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; width: 34px; text-align: right; }
+  #sizeval { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 22px; width: auto; text-align: right; }
   .switch { width: 38px; height: 22px; border-radius: 999px; background: var(--line); border: 0; position: relative; cursor: pointer; padding: 0; justify-self: start; }
   .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transition: left .15s; }
@@ -438,13 +441,26 @@
   #tr-spk summary { cursor: pointer; color: var(--muted); padding: 4px 0; }
   #tr-spk-n { color: var(--muted); }
   .sprow { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
-  .sprow .sl { width: 74px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  .sprow .sl { width: auto; min-width: 64px; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
   .sprow input { flex: 1 1 auto; min-width: 0; font: inherit; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: inherit; }
   .sprow .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; flex: none; }
   .sprow .seg button { font: inherit; font-size: 11.5px; border: 0; padding: 3px 8px; background: none; color: var(--muted); cursor: pointer; }
   .sprow .seg button.on { background: var(--blue-bg); color: var(--blue); font-weight: 600; }
   .sprow .seg button.on.cl { background: var(--orange-bg, rgba(255,149,0,.15)); color: var(--orange, #c76a00); }
   #tr-spk .hint { color: var(--muted); padding: 2px 0 4px; }
+  /* 2026-10-28 (owner): (i) next to each speaker shows what that voice said, to tell who it is. */
+  .sprow .si { flex: none; width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted);
+    font: italic 600 11px Georgia, 'Times New Roman', serif; display: inline-flex; align-items: center; justify-content: center; cursor: help; user-select: none; }
+  .sprow .si:hover, .sprow .si.open, .sprow .si:focus-visible { color: var(--blue); border-color: var(--blue); outline: none; }
+  #spkhint { display: none; position: fixed; z-index: 30; width: min(380px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto;
+    padding: 9px 11px 6px; border-radius: 10px; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    box-shadow: 0 8px 28px rgba(0,0,0,.22); font-size: 12.5px; line-height: 1.42; }
+  #spkhint.show { display: block; }
+  #spkhint h6 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; display: flex; gap: 6px; }
+  #spkhint h6 span:last-child { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  #spkhint .q { margin: 0 0 6px; }
+  #spkhint .q .qt { color: var(--muted); font-size: 11.5px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+  #spkhint .none { color: var(--muted); font-style: italic; margin-bottom: 4px; }
   #tr-list { flex: 1 1 0; overflow-y: auto; padding: 6px 12px 12px; font-size: 13px; line-height: 1.45; }
   .trl { padding: 2px 0; }
   .trl .tt { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 6px;
@@ -652,6 +668,7 @@
     <button id="tr-follow" class="dk-b" type="button" aria-pressed="true" data-i18n="tr_follow" data-i18n-title="tr_follow_tt">Follow</button>
   </div>
   <details id="tr-spk" open><summary><span data-i18n="spk_sum">Speakers</span> <span id="tr-spk-n"></span></summary><div id="tr-spk-list"></div><datalist id="tr-roster"></datalist></details>
+  <div id="spkhint" role="tooltip"></div>
   <div id="tr-list"></div>
   <div id="trmenu" role="dialog"></div>
 </div>
@@ -664,7 +681,7 @@
   <span id="pausedpill" role="button" tabindex="0" data-i18n="paused_pill" data-i18n-title="paused_pill_tt">Tips paused</span>
   <span id="meter" data-i18n-title="meter_tt"></span>
   <!-- 2026-10-27 (owner): what the tips do (proactive, pause), your mic, then the view (transcript, ⚙). End call stays in the title bar, apart. -->
-  <button id="pro" class="ib" type="button" aria-pressed="false" data-i18n-title="pro_tt_off" data-i18n-aria="l_proactive">
+  <button id="pro" class="ib" type="button" aria-pressed="false" data-i18n-aria="l_proactive">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg>
   </button>
   <button id="pause" class="ib" type="button" aria-pressed="false"></button>
@@ -847,7 +864,7 @@
       ce_edit_tt: 'Edit this card: text and points', ce_gist: 'Heading', ce_phrase: 'Phrase', ce_add: '+ Point', ce_save: 'Save', ce_cancel: 'Cancel',
       ce_remove: 'Remove card', ce_saved: 'Card corrected', ce_removed: 'Card removed for this call',
       om_add_ph: 'Add what is on you…', om_hide_tt: 'Not on me: remove', om_edit_tt: 'Double-click to correct',
-      sec_upnext: 'Up next', up_plan: 'Plan an upcoming call…', up_label: 'Next:', up_switch: 'Switch…',
+      sec_upnext: 'Up next', up_plan: 'Plan an upcoming call…', up_label: 'Next call:', up_switch: 'Switch…',
       up_hint: 'Set up and prepare the next calls while this one runs. Switch ends this call (transcript and Notion summary are saved) and starts the chosen one.',
       up_empty: 'No upcoming calls.', up_edit: 'Edit', up_prep: 'Prepare', up_remove_tt: 'Remove from Up next',
       up_prep_none: 'no preparation', up_prep_queued: 'preparation in line', up_prep_running: 'preparing {p}%',
@@ -1083,6 +1100,7 @@
       tr_move: 'This line is',
       spk_sum: 'Speakers', spk_who_ph: 'Who is it? Pick or type a name', side_team: 'Team', side_client: 'Client',
       spk_none: 'No other voices yet (speaker identification: Settings > AI).',
+      spk_said: 'What they said', spk_said_none: 'No phrases from this voice yet.', spk_said_tip: 'What this speaker said', spk_said_secs: '{t} of speech',
       tr_del_tt: 'Delete this line from the transcript (click twice)', tr_del_confirm: 'Click again to delete', tr_deleted: 'Line {t} deleted from the transcript',
       tr_other_ph: 'Someone else: type a name, Enter',
       tr_rename: 'Rename {a} in every line',
@@ -1123,6 +1141,12 @@
         '<dt>Tips paused</dt><dd>Shown while tips are paused. Click it to resume.</dd>' +
         '<dt>🎙 Mute</dt><dd>Stop transcribing your mic while you are muted in the meeting.</dd>' +
         '<dt>⚙</dt><dd>This menu: call setup, display, context, diagnostics, help.</dd>' +
+        '<dt>Pin (title bar)</dt><dd>Always on top: the window stays above other windows. Click to let them cover it; the ⚙ switch is the same setting.</dd>' +
+        '<dt>Lightbulb</dt><dd>Proactive tips on or off. Off: tips only when you ask (field, Help, quick buttons).</dd>' +
+        '<dt>Document button</dt><dd>The full preparation in a pane next to the tips. Edit corrects it; the tips engine uses the corrected version at once.</dd>' +
+        '<dt>Lines button</dt><dd>The transcript in a pane. Click a time twice to delete a line, click a name to give the line to someone else. In Speakers, (i) shows what that voice said, to tell who it is.</dd>' +
+        '<dt>✎ on a card, On me</dt><dd>Correct a card or remove it; double-click an On me line to correct it, × removes it, the field adds one. Every correction is logged and the next preparations learn from it.</dd>' +
+        '<dt>Next call</dt><dd>The call planned after this one, with its preparation. Switch ends this call properly and starts that one.</dd>' +
         '<dt>🗣 Name</dt><dd>Who on the other side is speaking now (by voice, never certain). Long names are cut, hover for the full one. Click it to rename the speaker, say this line was someone else, or merge two speakers.</dd>' +
         '</dl><h5>Speakers</h5><dl>' +
         '<dt>Who is speaking?</dt><dd>A new voice talked for a few seconds. Pick a name (a dot = voice match: green strong, orange fair), type one and press Enter, or Skip. Picking a name already used in this call merges the two. Names are never set by themselves.</dd>' +
@@ -1130,8 +1154,8 @@
         '<dt>One alert</dt><dd>Only the most important problem, with a one-click fix: Claude not listening, mic not recording (Use Mac mic), mic switched (Back to headset), other side silent, transcript behind, setting confirmed.</dd>' +
         '<dt>Tips engine not responding</dt><dd>Live Tips restarts it by itself; if it stays, end the call and start again.</dd>' +
         '</dl><h5>Bottom</h5><dl>' +
-        '<dt>HELP (red button, ⌃⌥H)</dt><dd>Stuck right now: the best facts for what is being said appear at once, then Claude\'s answer.</dd>' +
-        '<dt>⏸ / ▶ (top bar, ⌃⌥P)</dt><dd>Pause tips: Claude keeps recording and listening but shows nothing new (the top bar says "Tips paused"). HELP NOW and your typed questions still work. ▶ resumes; held items then appear.</dd>' +
+        '<dt>Help (⌃⌥H)</dt><dd>Stuck right now: the best facts for what is being said appear at once, then Claude\'s answer.</dd>' +
+        '<dt>⏸ / ▶ (top bar, ⌃⌥P)</dt><dd>Pause tips: Claude keeps recording and listening but shows nothing new (the top bar says "Tips paused"). Help and your typed questions still work. ▶ resumes; held items then appear.</dd>' +
         '<dt>Field</dt><dd>Type a word (logs, pricing, a person, a ticket key): matching facts show at once, no AI. Enter sends the text to Claude. A question about files or documents ("find…", "in the spec…") makes Claude search the project folder first.</dd>' +
         '<dt>Suggest reply</dt><dd>A ready answer or comment on the current topic.</dd>' +
         '<dt>What to ask now</dt><dd>1-2 questions for the open points.</dd>' +
@@ -1175,7 +1199,7 @@
       ce_edit_tt: 'Редагувати картку: текст і пункти', ce_gist: 'Заголовок', ce_phrase: 'Фраза', ce_add: '+ Пункт', ce_save: 'Зберегти', ce_cancel: 'Скасувати',
       ce_remove: 'Прибрати картку', ce_saved: 'Картку виправлено', ce_removed: 'Картку прибрано з цього дзвінка',
       om_add_ph: 'Додати, що на мені…', om_hide_tt: 'Не на мені: прибрати', om_edit_tt: 'Подвійний клік, щоб виправити',
-      sec_upnext: 'Далі', up_plan: 'Запланувати наступний дзвінок…', up_label: 'Далі:', up_switch: 'Перейти…',
+      sec_upnext: 'Наступні дзвінки', up_plan: 'Запланувати наступний дзвінок…', up_label: 'Наступний дзвінок:', up_switch: 'Перейти…',
       up_hint: 'Налаштуй і підготуй наступні дзвінки, поки йде цей. Перехід завершує цей дзвінок (транскрипт і підсумок у Notion зберігаються) і запускає обраний.',
       up_empty: 'Наступних дзвінків немає.', up_edit: 'Змінити', up_prep: 'Підготувати', up_remove_tt: 'Прибрати з черги',
       up_prep_none: 'без підготовки', up_prep_queued: 'підготовка в черзі', up_prep_running: 'готую {p}%',
@@ -1189,7 +1213,7 @@
       gear_tt: 'Налаштування: дзвінок, вигляд, контекст, діагностика, пояснення',
       menu_aria: 'Налаштування',
       spkchip_tt: 'Зараз говорить (за голосом, не напевно). Натисни, щоб перейменувати, віддати цю репліку іншій людині або об\'єднати двох співрозмовників',
-      spkpop_aria: 'Співрозмовник',
+      spkpop_aria: 'Спікер',
       agenda: 'План',
       agenda_tt: 'Натисни, щоб розгорнути або згорнути',
       ag_now: 'Зараз:',
@@ -1381,7 +1405,7 @@
       sp_on: 'увімкнено',
       sp_off: 'вимкнено',
       sp_loading: 'завантажую',
-      spk_label: 'Співрозмовник {n}',
+      spk_label: 'Спікер {n}',
       spk_named: '✓ {a} = {b}',
       spk_merged: '✓ {a} і {b}: об\'єднано',
       spk_moved: '✓ Репліку о {t} віддано: {b}',
@@ -1406,6 +1430,7 @@
       tr_move: 'Цю репліку сказав',
       spk_sum: 'Спікери', spk_who_ph: 'Хто це? Обери або впиши імʼя', side_team: 'Команда', side_client: 'Клієнт',
       spk_none: 'Інших голосів ще немає (розпізнавання спікерів: Settings > AI).',
+      spk_said: 'Що казав цей спікер', spk_said_none: 'Від цього голосу ще немає фраз.', spk_said_tip: 'Що казав цей спікер', spk_said_secs: '{t} мовлення',
       tr_del_tt: 'Видалити репліку з транскрипту (два кліки)', tr_del_confirm: 'Клікни ще раз, щоб видалити', tr_deleted: 'Репліку {t} видалено з транскрипту',
       tr_other_ph: 'Хтось інший: введи імʼя, Enter',
       tr_rename: 'Перейменувати {a} в усіх репліках',
@@ -1446,6 +1471,12 @@
         '<dt>На паузі</dt><dd>Видно, поки підказки на паузі. Натисни, щоб відновити.</dd>' +
         '<dt>🎙 Мікрофон</dt><dd>Перестати розпізнавати твій мікрофон, поки в зустрічі в тебе вимкнено звук.</dd>' +
         '<dt>⚙</dt><dd>Це меню: дзвінок, вигляд, контекст, діагностика, пояснення.</dd>' +
+        '<dt>Шпилька (у заголовку)</dt><dd>Поверх усіх вікон: вікно лишається над іншими. Клік дозволяє іншим вікнам його перекривати; перемикач у ⚙ це те саме налаштування.</dd>' +
+        '<dt>Лампочка</dt><dd>Проактивні підказки ввімкнено чи вимкнено. Вимкнено: підказки лише на запит (поле, Допоможи, швидкі кнопки).</dd>' +
+        '<dt>Кнопка документа</dt><dd>Уся підготовка в панелі поруч із підказками. Edit виправляє її, і рушій підказок одразу бере виправлену версію.</dd>' +
+        '<dt>Кнопка рядків</dt><dd>Транскрипт у панелі. Два кліки на час видаляють рядок, клік на імʼя віддає рядок іншому спікеру. У Спікерах (i) показує, що казав цей голос, щоб зрозуміти, хто це.</dd>' +
+        '<dt>✎ на картці, На мені</dt><dd>Виправ картку або прибери її; подвійний клік на рядку «На мені» виправляє його, × прибирає, поле додає. Кожна правка записується в лог, і наступні підготовки на ній вчаться.</dd>' +
+        '<dt>Наступний дзвінок</dt><dd>Дзвінок, запланований після цього, з підготовкою. «Перейти» коректно завершує цей дзвінок і запускає той.</dd>' +
         '<dt>🗣 Ім\'я</dt><dd>Хто з того боку говорить зараз (за голосом, не напевно). Довгі імена обрізано, повне видно при наведенні. Натисни, щоб перейменувати, віддати цю репліку іншій людині або об\'єднати двох співрозмовників.</dd>' +
         '</dl><h5>Співрозмовники</h5><dl>' +
         '<dt>Хто говорить?</dt><dd>Новий голос говорив кілька секунд. Вибери ім\'я (крапка = збіг голосу: зелена сильний, помаранчева середній), введи своє і натисни Enter або «Пропустити». Ім\'я, яке вже є в цьому дзвінку, об\'єднає двох. Імена ніколи не ставляться самі.</dd>' +
@@ -1453,7 +1484,7 @@
         '<dt>Одне попередження</dt><dd>Лише найважливіша проблема з виправленням в один клік: Claude не слухає, мікрофон не записує («Мікрофон Mac»), мікрофон перемкнувся («Назад на гарнітуру»), не чути співрозмовників, розшифровка відстає, налаштування підтверджено.</dd>' +
         '<dt>Рушій підказок не відповідає</dt><dd>Live Tips перезапускає його сам; якщо не минає, заверши дзвінок і почни знову.</dd>' +
         '</dl><h5>Унизу</h5><dl>' +
-        '<dt>ДОПОМОЖИ (червона кнопка, ⌃⌥H)</dt><dd>Застряг просто зараз: одразу з\'являються найкращі факти до того, що говорять, а потім відповідь Claude.</dd>' +
+        '<dt>Допоможи (⌃⌥H)</dt><dd>Застряг просто зараз: одразу з\'являються найкращі факти до того, що говорять, а потім відповідь Claude.</dd>' +
         '<dt>⏸ / ▶ (верхня смуга, ⌃⌥P)</dt><dd>Пауза підказок: Claude і далі записує та слухає, але нічого нового не показує (угорі напис «На паузі»). ДОПОМОЖИ і твої питання працюють. ▶ відновлює, і тоді з\'являється все, що чекало.</dd>' +
         '<dt>Поле</dt><dd>Введи слово (логи, ціни, людина, номер задачі): схожі факти видно одразу, без ШІ. Enter надсилає текст Claude. Питання про файли чи документи ("знайди…", "у специфікації…") змушує Claude спершу пошукати в папці проєкту.</dd>' +
         '<dt>Що відповісти</dt><dd>Готова відповідь або коментар до поточної теми.</dd>' +
@@ -1578,10 +1609,10 @@
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyFade(fadeV); }); } catch (e) {}
 
   var pinned = true, pinBtn = $('pin');
-  pinBtn.onclick = function () {
-    pinned = !pinned; pinBtn.classList.toggle('on', pinned); pinBtn.setAttribute('aria-checked', String(pinned));
-    send('pin', pinned);
-  };
+  function applyPinned() { pinBtn.classList.toggle('on', pinned); pinBtn.setAttribute('aria-checked', String(pinned)); }
+  pinBtn.onclick = function () { pinned = !pinned; applyPinned(); send('pin', pinned); };
+  // 2026-10-28 (owner): the app remembers "Always on top" and has a pin in the title bar; the switch follows it.
+  window.setPinned = function (on) { pinned = !!on; applyPinned(); };
 
   // Hide from screen sharing and screenshots (window-local; an older window app ignores the message).
   var stealth = load('stealth') !== '0', stBtn = $('stealth');
@@ -1612,6 +1643,7 @@
     renderAsk(true);
     if (popSid) renderPop(false); else renderChip();
     if (S && Object.keys(S).length) window.setStatus(S);
+    applyProactive(); applyMute(); renderUp(); if (sit) renderSituation(sit); renderSpkSummary(); trRender(); prRender();
   }
   window.setUiLang = setLang;   // for tests and the native side
 
@@ -1955,7 +1987,7 @@
       render(nu);
       toast(t('ce_saved'), 'ok');
     });
-    b(t('ce_cancel'), '', function () { box.remove(); el.classList.remove('editing'); });
+    b(t('ce_cancel'), '', function () { box.remove(); el.classList.remove('editing'); if (el._pending) { var pd = el._pending; el._pending = null; render(pd); } });
     b(t('ce_remove'), 'rm', function () {
       var k = editKey(it);
       EDITS[k] = { removed: true };
@@ -1986,6 +2018,7 @@
     // "retract" removes a gist whose tip was dropped. The card keeps its place and pin.
     if (kind === 'retract') { var gone = byUid(it.uid); if (gone) gone.remove(); return; }
     var oldEl = byUid(it.uid);
+    if (oldEl && oldEl.classList.contains('editing') && !it._edited) { oldEl._pending = it; return; }   // QA: the PM is editing it
     // A "question heard" line lives until the next tip, answer or question replaces it.
     if (kind !== 'ask') dropQuestions();
     if (working && kind !== 'ask' && kind !== 'question' && !/^\s*\u{1F198}\s*Asking Claude/u.test(it.gist || '')) hideWorking();
@@ -2056,7 +2089,7 @@
         if (!box.children.length) box.classList.remove('has');
       }
     };
-    if (kind !== 'ask') {
+    if (kind !== 'ask' && !oldEl) {                    // QA: an update or an edit does not make an older card the newest
       var prev = document.querySelectorAll('.tip.latest');
       for (var i = 0; i < prev.length; i++) prev[i].classList.remove('latest');
       el.classList.add('latest');
@@ -2457,15 +2490,67 @@
       return '<option value="' + esc(p.name) + '">' + esc(p.side === 'team' ? t('side_team') : p.side === 'client' ? t('side_client') : '') + '</option>'; }).join('');
     var act = document.activeElement, keep = act && act.closest && act.closest('#tr-spk-list') ? act.getAttribute('data-sid') : null;
     if (keep) return;                      // do not redraw under the PM's typing
+    if (hintSid && box.matches(':hover')) return;   // nor under the open (i) hint
     box.innerHTML = sids.length ? sids.map(function (k) {
       var sd = spk[k].side || '';
       return '<div class="sprow" data-sid="' + esc(k) + '"><span class="sl">' + esc(t('spk_label', { n: sidNum(k) })) + '</span>' +
+        '<span class="si" tabindex="0" data-sid="' + esc(k) + '" aria-label="' + esc(t('spk_said_tip')) + '">i</span>' +
         '<input type="text" list="tr-roster" data-sid="' + esc(k) + '" maxlength="' + NAME_MAX + '" value="' + esc(spk[k].name || '') + '" placeholder="' + esc(t('spk_who_ph')) + '">' +
         '<span class="seg"><button type="button" data-side="team" class="' + (sd === 'team' ? 'on' : '') + '">' + esc(t('side_team')) + '</button>' +
         '<button type="button" data-side="client" class="' + (sd === 'client' ? 'on cl' : '') + '">' + esc(t('side_client')) + '</button></span></div>';
     }).join('') : '<div class="hint">' + esc(t('spk_none')) + '</div>';
   }
+  // (i): the longest phrases of this voice (merged voices included), in call order.
+  var hintSid = null, hintPinned = false;
+  function spkQuotes(k) {
+    var said = trLines.filter(function (l) { return l.sid && !l.del && !l.mark && l.text && rootSid(l.sid) === k; });
+    var good = said.filter(function (l) { return l.text.trim().split(/\s+/).length >= 3; });
+    var pool = (good.length ? good : said).slice(-60);
+    return pool.slice().sort(function (a, b) { return b.text.length - a.text.length; }).slice(0, 6)
+      .sort(function (a, b) { return (a.i || 0) - (b.i || 0); });
+  }
+  function fmtSecs(n) { n = Math.round(n || 0); return Math.floor(n / 60) + ':' + ('0' + n % 60).slice(-2); }
+  function showSpkHint(el, pin) {
+    var k = el.getAttribute('data-sid'), h = $('spkhint'), q = spkQuotes(k);
+    hintSid = k; hintPinned = !!pin;
+    document.querySelectorAll('.sprow .si.open').forEach(function (x) { x.classList.remove('open'); });
+    el.classList.add('open');
+    var secs = spk[k] && spk[k].seconds ? t('spk_said_secs', { t: fmtSecs(spk[k].seconds) }) : '';
+    h.innerHTML = '<h6><span>' + esc(t('spk_said')) + '</span><span>' + esc(rawLabel(k)) + (secs ? ' \u00b7 ' + esc(secs) : '') + '</span></h6>' +
+      (q.length ? q.map(function (l) {
+        var txt = l.text.length > 220 ? l.text.slice(0, 217) + '...' : l.text;
+        return '<div class="q"><span class="qt">' + esc(l.t || '') + '</span>' + esc(txt) + '</div>';
+      }).join('') : '<div class="none">' + esc(t('spk_said_none')) + '</div>');
+    h.classList.add('show');
+    var r = el.getBoundingClientRect(), w = h.offsetWidth, ht = h.offsetHeight;
+    var left = Math.max(12, Math.min(r.left - 12, window.innerWidth - w - 12));
+    var top = r.bottom + 6;
+    if (top + ht > window.innerHeight - 8 && r.top - ht - 6 > 8) top = r.top - ht - 6;
+    h.style.left = left + 'px'; h.style.top = Math.max(8, top) + 'px';
+  }
+  function hideSpkHint() {
+    hintSid = null; hintPinned = false; $('spkhint').classList.remove('show');
+    document.querySelectorAll('.sprow .si.open').forEach(function (x) { x.classList.remove('open'); });
+  }
+  $('tr-spk-list').addEventListener('mouseover', function (e) {
+    var i = e.target.closest && e.target.closest('.si'); if (i && !hintPinned) showSpkHint(i, false);
+  });
+  $('tr-spk-list').addEventListener('mouseout', function (e) {
+    var i = e.target.closest && e.target.closest('.si'); if (i && !hintPinned && !(e.relatedTarget && i.contains(e.relatedTarget))) hideSpkHint();
+  });
+  $('tr-spk-list').addEventListener('focusin', function (e) { if (e.target.classList && e.target.classList.contains('si')) showSpkHint(e.target, false); });
+  $('tr-spk-list').addEventListener('focusout', function (e) { if (e.target.classList && e.target.classList.contains('si') && !hintPinned) hideSpkHint(); });
+  document.addEventListener('mousedown', function (e) {
+    if (hintPinned && !(e.target.closest && (e.target.closest('#spkhint') || e.target.closest('.sprow .si')))) hideSpkHint();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && hintSid) hideSpkHint(); });
+  $('tr-list').addEventListener('scroll', function () { if (hintSid && !hintPinned) hideSpkHint(); });
   $('tr-spk-list').addEventListener('click', function (e) {
+    var si = e.target.closest('.si');
+    if (si) {                                   // click pins it open (or closes it), to read at leisure
+      if (hintPinned && hintSid === si.getAttribute('data-sid')) hideSpkHint(); else showSpkHint(si, true);
+      return;
+    }
     var b = e.target.closest('button[data-side]'); if (!b) return;
     var k = b.closest('.sprow').getAttribute('data-sid'), side = b.getAttribute('data-side');
     spk[k].side = side; spk[k].sidePending = side;
@@ -2500,12 +2585,14 @@
       var k = li.getAttribute('data-k'), ot = li.querySelector('.ot'), old = ot.textContent;
       var inp = document.createElement('input'); inp.value = old; inp.style.flex = '1';
       ot.replaceWith(inp); inp.focus();
+      var finished = false;                             // QA: Enter or Esc, then the blur: one result only
       function done(save) {
+        if (finished) return; finished = true;
         var v = inp.value.trim();
         if (save && v && v !== old) { ONME.edit[k] = v; send('cardedit', { action: 'onme_edit', kind: 'onme', key: k, before: { text: old }, after: { text: v } }); }
         renderSituation(sit);
       }
-      inp.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); });
+      inp.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') { ev.preventDefault(); done(false); } });
       inp.addEventListener('blur', function () { done(true); });
     });
   })();
@@ -2554,8 +2641,12 @@
       var k = 'a:' + (a.what || ''); if (ONME.hide[k]) return;
       rows.push({ k: k, cls: 'ask', html: ICONS.ask + ' <span class="ot">' + esc(txt(k, a.what || '')) + '</span>' + (a.who ? ' <span class="who">· ' + esc(a.who) + '</span>' : '') });
     });
+    // QA: the same task as an ask and as an action is shown once (as the ask).
+    function norm(x) { return String(x || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); }
+    var askN = (s.asks || []).filter(function (a) { return a.type !== 'update'; }).map(function (a) { return norm(a.what); }).filter(Boolean);
     (s.actions || []).forEach(function (a) {
       var k = 'm:' + (a.what || ''); if (ONME.hide[k]) return;
+      var an = norm(a.what); if (an && askN.some(function (q) { return q === an || (an.length > 12 && (q.indexOf(an) >= 0 || an.indexOf(q) >= 0)); })) return;
       rows.push({ k: k, cls: 'mine', html: ICONS.check + ' <span class="ot">' + esc(txt(k, a.what || '')) + '</span>' + (a.due ? ' <span class="who">· ' + esc(a.due) + '</span>' : '') +
         (a.from && a.from !== 'PM' ? ' <span class="who">· ' + esc(a.from) + '</span>' : '') });
     });
@@ -2580,7 +2671,9 @@
     }
     box.querySelector('.head').innerHTML = ICONS.list + ' ' + esc(t('onme')) + ' <span class="n">' + rows.length + '</span>';
     box.querySelector('.head').title = t('onme_tt');
-    box.classList.toggle('has', rows.length > 0);
+    // QA: On me is always there during the call (the field adds the first item); empty, it stays folded.
+    box.classList.add('has');
+    if (!rows.length && !box.dataset.touched) box.classList.add('collapsed');
     // The speech: points already said are struck through; "your turn" opens it on top.
     var sp = byUidAny('speech');
     if (sp) {
@@ -2593,8 +2686,9 @@
     }
   }
   function byUidAny(uid) { return document.querySelector('[data-uid="' + uid + '"]'); }
-  (function () { var h = $('onme').querySelector('.head'); h.addEventListener('click', function () { $('onme').classList.toggle('collapsed'); }); })();
+  (function () { var h = $('onme').querySelector('.head'); h.addEventListener('click', function () { $('onme').dataset.touched = '1'; $('onme').classList.toggle('collapsed'); }); })();
   $('onme').classList.remove('collapsed');
+  try { renderSituation({}); } catch (e) {}            // QA: On me (and its add field) from the start
 
   // ---------- transcript split view (2026-10-26) ----------
   var trSeq = 0, trLines = [], trOpen = false, trFollow = true, trOver = {}, trMe = null, trWhoName = {}, trThem = null;
@@ -2605,8 +2699,9 @@
     if (o && String(o).indexOf('name:') === 0) return { n: String(o).slice(5) };
     if (sid) { var nm = spkName(sid); return { n: nm || spkLabel(sid), un: !nm }; }
     if (trWhoName[x.i]) return { n: trWhoName[x.i] };
-    return { n: x.who };
+    return { n: dispWho(x.who) };
   }
+  var armedI = null, armedAt = 0;                       // QA: the first click on a time survives a redraw
   function trRow(x) {
     if (x.mark) return '<div class="trl mark">' + esc(x.mark) + '</div>';
     var w = trWho(x);
@@ -2614,7 +2709,8 @@
     var who = '<button type="button" class="who' + (w.un ? ' un' : '') + '" data-i="' + (x.i != null ? x.i : '') + '" data-t="' + esc(x.t) + '" title="' + esc(t('tr_who_tt')) + '">' + esc(w.n) + ':</button>';
     if (x.del) return '';
     var isMe = trWhoName[x.i] ? trWhoName[x.i] === trMe : x.me;
-    return '<div class="trl' + (isMe ? ' me' : '') + '"><button type="button" class="tt" data-del="' + (x.i != null ? x.i : '') + '" title="' + esc(t('tr_del_tt')) + '">' + esc(x.t) + '<span class="x">×</span></button>' + who + esc(x.text) + '</div>';
+    var arm = armedI === x.i && Date.now() - armedAt < 3000;
+    return '<div class="trl' + (isMe ? ' me' : '') + '"><button type="button" class="tt' + (arm ? ' armed' : '') + '" data-del="' + (x.i != null ? x.i : '') + '" title="' + esc(t(arm ? 'tr_del_confirm' : 'tr_del_tt')) + '">' + esc(x.t) + '<span class="x">×</span></button>' + who + esc(x.text) + '</div>';
   }
   function trRender() {
     if (!trOpen) return;
@@ -2646,9 +2742,18 @@
     send('transcript', on);
     if (on) { trFollow = true; trRender(); }
   }
-  trBtn.onclick = function () { if (prOpen) setPr(false); setTr(!trOpen); };
+  trBtn.onclick = function () {
+    if (prOpen && !trOpen) {                            // QA: pane to pane, the window keeps its width
+      if (document.body.classList.contains('predit') && $('pr-edit').value !== prText) $('pr-save').onclick();
+      prOpen = false; document.body.classList.remove('prsplit', 'predit'); prepBtn.setAttribute('aria-pressed', 'false');
+      $('pr-save').style.display = 'none'; $('pr-editbtn').style.display = '';
+      trOpen = true; document.body.classList.add('trsplit'); trBtn.setAttribute('aria-pressed', 'true'); trFollow = true; trRender();
+      return;
+    }
+    setTr(!trOpen);
+  };
   // 2026-10-28 (owner): the full preparation in its own pane, like the transcript; editable.
-  var prOpen = false, prText = '', prBtn = $('prbtn');
+  var prOpen = false, prText = '', prepBtn = $('prbtn');      // not prBtn: that is the Proactive switch
   function mdTable(rows) {
     var h = '<table>';
     rows.forEach(function (r, i) {
@@ -2685,19 +2790,23 @@
     prRender();
   };
   function setPr(on) {
-    prOpen = on; document.body.classList.toggle('prsplit', on); prBtn.setAttribute('aria-pressed', String(on));
+    prOpen = on; document.body.classList.toggle('prsplit', on); prepBtn.setAttribute('aria-pressed', String(on));
     if (on && trOpen) { trOpen = false; document.body.classList.remove('trsplit'); trBtn.setAttribute('aria-pressed', 'false'); }
     send('transcript', on);
     if (!on) { document.body.classList.remove('predit'); $('pr-save').style.display = 'none'; $('pr-editbtn').style.display = ''; }
   }
-  prBtn.onclick = function () { setPr(!prOpen); };
-  $('pr-close').onclick = function () { setPr(false); };
+  prepBtn.onclick = function () { setPr(!prOpen); };
+  $('pr-close').onclick = function () {               // QA: closing while editing keeps the changes
+    if (document.body.classList.contains('predit') && $('pr-edit').value !== prText) { $('pr-save').onclick(); }
+    setPr(false);
+  };
   $('pr-editbtn').onclick = function () {
     $('pr-edit').value = prText; document.body.classList.add('predit');
     $('pr-editbtn').style.display = 'none'; $('pr-save').style.display = ''; $('pr-edit').focus();
   };
   $('pr-save').onclick = function () {
-    prText = $('pr-edit').value; send('prepdoc', prText);
+    var changed = $('pr-edit').value !== prText;
+    prText = $('pr-edit').value; if (changed) send('prepdoc', prText);
     document.body.classList.remove('predit'); $('pr-save').style.display = 'none'; $('pr-editbtn').style.display = '';
     prRender(); toast(t('pr_saved'), 'ok');
   };
@@ -2739,11 +2848,13 @@
       var di = +d.getAttribute('data-del'), x = null;
       for (var k = trLines.length - 1; k >= 0; k--) if (trLines[k].i === di) { x = trLines[k]; break; }
       if (!x) return;
-      if (!d.classList.contains('armed')) {          // first click arms, a second within 3 s deletes
+      if (!(armedI === di && Date.now() - armedAt < 3000)) {   // first click arms, a second within 3 s deletes
+        armedI = di; armedAt = Date.now();
         d.classList.add('armed'); d.title = t('tr_del_confirm');
-        setTimeout(function () { d.classList.remove('armed'); d.title = t('tr_del_tt'); }, 3000);
+        setTimeout(function () { if (armedI === di && Date.now() - armedAt >= 2900) { armedI = null; trRender(); } }, 3000);
         return;
       }
+      armedI = null;
       x.del = true;
       spkSet('line_delete', x.t + '|' + String(x.text || '').slice(0, 40).replace(/\|/g, ' '));
       toast(t('tr_deleted', { t: x.t }), 'ok'); trRender();
@@ -2892,8 +3003,7 @@
   // ---------- status ----------
   var dot = $('dot'), statusEl = $('status'), diagEl = $('diag'), titleEl = $('title'), elapsedEl = $('elapsed');
   // 2026-10-27 (owner): rename the call while it runs: double-click the title, Enter saves, Esc cancels.
-  var renamedTitle = load('renamed_' + (document.title || '')) || '';
-  renamedTitle = '';
+  var renamedTitle = '';
   titleEl.ondblclick = function () {
     var before = titleEl.textContent;
     titleEl.contentEditable = 'true'; titleEl.classList.add('editing'); titleEl.focus();
@@ -2939,13 +3049,13 @@
     else {
       var u = UP[0];
       chip.className = 'has';
-      chip.innerHTML = '<button type="button" class="upt" data-up="edit" data-id="' + esc(u.id) + '" title="' + esc(u.project) + '">' +
+      chip.innerHTML = '<button type="button" class="upt" data-up="edit" data-id="' + esc(u.id) + '" title="' + esc(u.project || '') + '">' +
         esc(t('up_label')) + ' <b>' + esc(u.title) + '</b> · ' + esc(u.when) + ' · <span class="ps ' + esc(u.prep) + '">' + esc(upPrep(u)) + '</span>' +
         (UP.length > 1 ? ' · +' + (UP.length - 1) : '') + '</button>' +
         '<button type="button" class="dk-b" data-up="switch" data-id="' + esc(u.id) + '">' + esc(t('up_switch')) + '</button>';
     }
     list.innerHTML = UP.length ? UP.map(function (u) {
-      return '<div class="uprow"><div class="t"><b>' + esc(u.title) + '</b><small>' + esc(u.project + ' · ' + u.when + ' · ' + upPrep(u)) + '</small>' +
+      return '<div class="uprow"><div class="t"><b>' + esc(u.title) + '</b><small>' + esc([u.project, u.when, upPrep(u)].filter(Boolean).join(' · ')) + '</small>' +
         (u.prep === 'running' ? '<div class="upbar"><i style="width:' + Math.round((u.progress || 0) * 100) + '%"></i></div>' : '') + '</div>' +
         '<div class="upb">' + upBtn('edit', u.id, t('up_edit')) + ((u.prep === 'none' || u.prep === 'failed') ? upBtn('prep', u.id, t('up_prep')) : '') +
         upBtn('switch', u.id, t('up_switch')) + upBtn('remove', u.id, '×', t('up_remove_tt')) + '</div></div>';

@@ -17,6 +17,8 @@ final class CallEngine {
     var isRunning: Bool { recorder?.isRunning ?? false }
     /// 2026-10-27 (Up next): the id of the call being recorded (StartCallModel.id); preparations join only it.
     var currentCallID: UUID?
+    /// 2026-10-28 (owner): the calendar event of the live call, so Up next and Home never show it twice.
+    var liveEventID: String?
     var callContext = ""
     var callRequest: [String: Any] = [:]
     var projectConfig = ""          // projects/<slug>.md of this call (Meetings DB and page IDs for Notion)

@@ -255,6 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func endCall() {
+        if let t = tips { MainActor.assumeIsolated { t.window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); t.endCallClicked() }; return }
         let a = NSAlert()
         a.messageText = "End the call?"
         a.informativeText = "Recording stops; the transcript and tips stay in the project folder."
@@ -625,7 +626,7 @@ final class StartCallModel: ObservableObject {
                 "slug": project?.slug ?? workspace?.name.lowercased() ?? "", "call_type": callType, "audience": audience,
                 "hiring_role": callType == "interview" ? hiringRole : "", "tip_model": tipModel,
                 "me_lang": langs.0, "langs": langs.1, "me_langs": language == "uk+en" ? ["uk", "en"] : [langs.0],
-                "context": cleanContext, "participants": participants, "pm_projects": pmProjects,
+                "context": cleanContext, "participants": participantsWithPrevious, "pm_projects": pmProjects,
                 "workspace": workspace?.name ?? registry.workspaces.first { w in w.projects.contains(project?.slug ?? "\u{0}") }?.name ?? "",
                 "scheduled_at": ISO8601DateFormatter().string(from: callDate), "mic_device": micDevice, "standby": standby,
                 "project_config": project?.config ?? "", "people": people, "people_team": peopleTeam,
@@ -1124,7 +1125,7 @@ struct StartCallView: View {
                 Button {
                     // 2026-10-27 (Up next): one preparation runs at a time; the others wait in line.
                     model.note = upnext.prepare(model) ?? ""
-                    if live && !saved && model.note.isEmpty { onSave() }   // a call being prepared is kept in Up next
+                    if !saved && model.note.isEmpty { upnext.save(model) }   // kept in Up next (tracked as prepared until the call); the window stays
                 } label: { Label(runner.running ? "Prepare (after the current one)" : "Prepare now", systemImage: "sparkles") }
                 .buttonStyle(LTSoftButtonStyle())
                 .disabled(model.target.isEmpty || PrepRunner.claudePath == nil || (!runner.useAPI && runner.loggedIn == false)
@@ -1215,7 +1216,7 @@ final class StartCallWindow {
         let w = window ?? NSWindow(contentViewController: host)
         w.contentViewController = host
         w.styleMask.insert(.resizable)
-        w.setContentSize(NSSize(width: 540, height: 720))
+        w.setContentSize(NSSize(width: 580, height: 800))
         w.title = live || planOnly ? "Plan an upcoming call" : "Start call"
         w.isReleasedWhenClosed = false
         window = w
@@ -1237,6 +1238,7 @@ extension AppDelegate {
     /// being written joins the call when done. Returns an error line, or nil.
     @MainActor
     func launch(_ model: StartCallModel) -> String? {
+        if model.chosenPrep == nil { model.adoptExistingPrep() }
         if model.chosenPrep == nil, let b = model.prepBase, let root = model.root {
             let name = (b as NSString).lastPathComponent + ".brief.md"
             if FileManager.default.fileExists(atPath: ((root as NSString).appendingPathComponent("live") as NSString).appendingPathComponent(name)) {
@@ -1253,6 +1255,8 @@ extension AppDelegate {
         }
         if err != nil { CallEngine.shared.currentCallID = before; return err }
         UpNext.shared.remove(model, keepPrep: true)
+        UpNext.shared.removeMatching(model)          // 2026-10-28: no second entry of the call just started
+        CallEngine.shared.liveEventID = model.calEventID
         SeriesMemory.shared.remember(model)          // the next call of this series starts from these settings
         return nil
     }
@@ -1339,7 +1343,7 @@ extension AppDelegate {
     /// The menu's Up next submenu: each call opens for editing, switching or starting.
     @MainActor
     func rebuildUpNextMenu() {
-        let items = UpNext.shared.items
+        let items = UpNext.shared.visible
         upNextItem.isHidden = items.isEmpty
         upNextItem.title = "Up next (\(items.count))"
         let m = NSMenu()

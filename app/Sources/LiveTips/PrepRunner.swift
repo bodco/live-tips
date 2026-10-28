@@ -201,6 +201,7 @@ final class PrepRunner: ObservableObject {
         """)
 
         \(Self.previousCallsBlock(live: live, title: r.title))
+        \(EditLog.promptBlock(title: r.title, project: (r.root as NSString).lastPathComponent))
         Previous meetings (2026-10-28, owner): read the previous calls of this meeting in depth, as the skill's sweep.md \
         step 3b says: what was discussed, every question and whether it was answered fully, partly or not, open items, \
         action items (owner, due, status checked against newer sources), promises, the other side's concerns. The brief \

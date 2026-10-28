@@ -126,7 +126,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                           backing: .buffered, defer: false)
         window.title = args.title
         window.titlebarAppearsTransparent = true   // the title bar blends with the page background
-        window.level = .floating
+        window.level = Self.onTop ? .floating : .normal      // 2026-10-28: "Always on top" is remembered
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.sharingType = .none          // ask macOS to keep the window out of screen capture
         window.isMovableByWindowBackground = true
@@ -180,7 +180,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             lastStatus = s
             push("window.setStatus(" + s + ")")
             if let d = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String: Any] {
-                if !callEnded { startButton?.isHidden = (d["state"] as? String) != "standby" }
+                if !callEnded, let g = startButton, g.isHidden != ((d["state"] as? String) != "standby") {
+                    g.isHidden = (d["state"] as? String) != "standby"; layoutTitleButtons()
+                }
                 if let f = d["file"] as? String, !f.isEmpty, f != transcriptPath {
                     transcriptPath = f
                     transcript = TailReader(path: f)
@@ -260,6 +262,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pageReady = true
+        web.evaluateJavaScript("window.setPinned && window.setPinned(\(Self.onTop))", completionHandler: nil)
         web.evaluateJavaScript("window.enableGlass && window.enableGlass()", completionHandler: nil)
         if args.demoPresentation {   // the demo of the presentation mode: type Presentation opens the slide cards
             web.evaluateJavaScript("(function(){var s=document.getElementById('s_type'); if(s){s.value='presentation'; s.dispatchEvent(new Event('change'));}})()", completionHandler: nil)
@@ -284,8 +287,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                            to: args.tips)
             }
         case "pin":
-            let on = (message.body as? Bool) ?? true
-            window.level = on ? .floating : .normal
+            setOnTop((message.body as? Bool) ?? true)
         case "stealth":
             // v37: the PM can switch stealth off to share or screenshot the window (default on).
             let on = (message.body as? Bool) ?? true
@@ -346,6 +348,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             guard let d = message.body as? [String: Any], !transcriptPath.isEmpty else { return }
             var rec = d; rec["at"] = nowHMS()
             appendLine(jsonLine(rec), to: stem + ".edits.jsonl")
+            let (ct, cp) = Self.callNames()
+            EditLog.add(kind: "card_" + ((d["action"] as? String) ?? "edit"), title: ct, project: cp, file: stem, fields: d)
             if let card = d["card"] as? String, !card.isEmpty { updatePreparedCard(card, d) }
             if !args.inbox.isEmpty {
                 let after = (d["after"] as? [String: Any]).flatMap { try? JSONSerialization.data(withJSONObject: $0) }.flatMap { String(data: $0, encoding: .utf8) } ?? ""
@@ -357,7 +361,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             guard let text = message.body as? String, !transcriptPath.isEmpty else { return }
             let bp = stem + ".brief.md", orig = stem + ".brief.orig.md"
             if FileManager.default.fileExists(atPath: bp), !FileManager.default.fileExists(atPath: orig) { try? FileManager.default.copyItem(atPath: bp, toPath: orig) }
+            let old = (try? String(contentsOfFile: bp, encoding: .utf8)) ?? ""
             try? text.write(toFile: bp, atomically: true, encoding: .utf8)
+            let (ct, cp) = Self.callNames()
+            EditLog.addBriefEdit(title: ct, project: cp, file: stem, before: old, after: text, when: "during the call")
             briefMtime = (try? FileManager.default.attributesOfItem(atPath: bp))?[.modificationDate] as? Date
             if !args.inbox.isEmpty {
                 appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": "brief_edited", "value": "on"]), to: args.inbox)
@@ -366,7 +373,13 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         case "rename":
             // 2026-10-27 (owner): rename the call while it runs (a title typed in a hurry).
             guard let v = (message.body as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty else { return }
-            MainActor.assumeIsolated { CallEngine.shared.callRequest["title"] = v; CallEngine.shared.renamed = v }
+            let (oldTitle, cp) = Self.callNames()
+            if oldTitle != v { EditLog.add(kind: "rename", title: v, project: cp, file: stem, fields: ["before": oldTitle, "after": v]) }
+            let tp = transcriptPath
+            MainActor.assumeIsolated {
+                CallEngine.shared.callRequest["title"] = v; CallEngine.shared.renamed = v
+                if !tp.isEmpty { CallHistory.shared.rename(file: tp, title: v) }     // Home and insights at once
+            }
             window.title = "Live Tips: " + v
             if !args.inbox.isEmpty { appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": "title", "value": v]), to: args.inbox) }
         case "pref":
@@ -388,6 +401,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                   !args.inbox.isEmpty else { return }
             appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": key, "value": d["value"] ?? NSNull()]),
                        to: args.inbox)
+            if key.hasPrefix("speaker_"), let v = d["value"] as? String {   // who is who: corrections too (EditLog)
+                let (ct, cp) = Self.callNames()
+                EditLog.add(kind: key, title: ct, project: cp, file: stem, fields: ["value": v])
+            }
         default:
             break
         }
@@ -449,6 +466,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         guard !args.control.isEmpty else { return }
         FileManager.default.createFile(atPath: (args.control as NSString).appendingPathComponent("go"), contents: Data())
         startButton?.isHidden = true
+        layoutTitleButtons()
         push("window.setStarting && window.setStarting()")     // blue dot until the recorder says it records
     }
     /// 2026-10-27 (owner): the call buttons in the same style as the rest of the app: a soft pill,
@@ -471,9 +489,49 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         b.attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: color, .font: font])
         b.layer?.backgroundColor = color.withAlphaComponent(0.18).cgColor
         let w = ceil((title as NSString).size(withAttributes: [.font: font]).width) + 24
-        let right = b.frame.maxX
-        b.frame = NSRect(x: max(0, right - w), y: b.frame.origin.y, width: w, height: 22)
+        b.frame.size = NSSize(width: w, height: 22)
+        layoutTitleButtons()
     }
+
+    /// 2026-10-28 (owner): pin, Start and End always 8 pt apart, whatever their labels ("Start next", "Ended ✓").
+    var titleHolder: NSView?
+    func layoutTitleButtons() {
+        guard let h = titleHolder else { return }
+        let views: [NSView] = [pinButton, startButton, endButton].compactMap { $0 }.filter { !$0.isHidden }
+        let gap: CGFloat = 8
+        let need = views.reduce(CGFloat(0)) { $0 + $1.frame.width } + gap * CGFloat(max(0, views.count - 1)) + 10
+        if abs(h.frame.width - need) > 0.5 { h.setFrameSize(NSSize(width: need, height: h.frame.height)) }
+        var x = h.frame.width - 4
+        for v in views.reversed() {
+            x -= v.frame.width
+            v.frame.origin = NSPoint(x: x, y: (h.frame.height - v.frame.height) / 2)
+            x -= gap
+        }
+    }
+
+    /// 2026-10-28 (owner): "Always on top" back in sight: a pin in the title bar, remembered across calls.
+    static var onTop: Bool {
+        get { UserDefaults.standard.object(forKey: "tipsOnTop") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "tipsOnTop") }
+    }
+    var pinButton: NSButton?
+
+    func setOnTop(_ on: Bool) {
+        Self.onTop = on
+        window.level = on ? .floating : .normal
+        styleOnTop()
+        push("window.setPinned && window.setPinned(\(on))")
+    }
+
+    func styleOnTop() {
+        guard let p = pinButton else { return }
+        let on = Self.onTop
+        p.image = NSImage(systemSymbolName: on ? "pin.fill" : "pin.slash", accessibilityDescription: "Always on top")
+        p.contentTintColor = on ? .controlAccentColor : .secondaryLabelColor
+        p.toolTip = on ? "Always on top: on (click to let other windows cover it)" : "Always on top: off (click to keep the window above other windows)"
+    }
+
+    @objc func pinClicked() { setOnTop(!Self.onTop) }
 
     func addEndCallButton() {
         let b = pillButton("End call", color: .systemRed, filled: false, action: #selector(endCallClicked))
@@ -482,9 +540,16 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let g = pillButton("Start call", color: .controlAccentColor, filled: true, action: #selector(startClicked))
         g.toolTip = "Start recording now (otherwise it starts when the other side speaks)"
         g.isHidden = true
-        let w = g.frame.width + b.frame.width + 18
+        let pin = NSButton(image: NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Always on top") ?? NSImage(), target: self, action: #selector(pinClicked))
+        pin.isBordered = false
+        pin.frame = NSRect(x: 0, y: 0, width: 22, height: 22)
+        pinButton = pin
+        styleOnTop()
+        let w = pin.frame.width + g.frame.width + b.frame.width + 26
         let holder = NSView(frame: NSRect(x: 0, y: 0, width: w, height: 28))
-        g.frame.origin = NSPoint(x: 4, y: (28 - g.frame.height) / 2)
+        pin.frame.origin = NSPoint(x: 2, y: 3)
+        holder.addSubview(pin)
+        g.frame.origin = NSPoint(x: pin.frame.maxX + 6, y: (28 - g.frame.height) / 2)
         b.frame.origin = NSPoint(x: g.frame.maxX + 6, y: (28 - b.frame.height) / 2)
         holder.addSubview(g)
         holder.addSubview(b)
@@ -494,6 +559,18 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         acc.layoutAttribute = .trailing
         window.addTitlebarAccessoryViewController(acc)
         endButton = b
+        titleHolder = holder
+        layoutTitleButtons()
+    }
+
+    /// The live call's title and project folder name (the corrections log keys).
+    static func callNames() -> (String, String) {
+        MainActor.assumeIsolated {
+            let ce = CallEngine.shared
+            let t = ce.renamed ?? (ce.callRequest["title"] as? String) ?? "Call"
+            let p = ((ce.callRequest["project_dir"] as? String) ?? ce.projectRoot) as NSString
+            return (t, p.lastPathComponent)
+        }
     }
 
     @objc func newCallClicked() {

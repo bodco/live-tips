@@ -119,7 +119,10 @@ final class CalendarService: ObservableObject {
             let names = (e.attendees ?? []).filter { !$0.isCurrentUser && $0.participantType != .room && $0.participantType != .resource }
                 .compactMap { a -> String? in
                     if let n = a.name, !n.isEmpty, !n.contains("@") { return n }
-                    return a.url.absoluteString.replacingOccurrences(of: "mailto:", with: "").components(separatedBy: "@").first
+                    // 2026-10-28: an attendee without a display name: "o.starodubtseva@..." -> "O. Starodubtseva".
+                    let local = a.url.absoluteString.replacingOccurrences(of: "mailto:", with: "").components(separatedBy: "@").first ?? ""
+                    let parts = local.split(whereSeparator: { ".-_".contains($0) }).map { $0.prefix(1).uppercased() + $0.dropFirst() }
+                    return parts.isEmpty ? nil : parts.enumerated().map { $0.offset < parts.count - 1 && $0.element.count == 1 ? $0.element + "." : $0.element }.joined(separator: " ")
                 }
             let text = [e.url?.absoluteString, e.location, e.notes].compactMap { $0 }.joined(separator: " ")
             out.append(CalEvent(id: (e.eventIdentifier ?? e.calendarItemIdentifier) + "@" + String(Int(e.startDate.timeIntervalSince1970)),

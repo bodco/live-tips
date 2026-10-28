@@ -992,6 +992,13 @@ struct SettingsView: View {
                     Text("Settings save automatically and survive updates: options in Application Support/LiveTips, keys in the Keychain.")
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.config]) }.buttonStyle(.link)
                 }
+                HStack {
+                    Text("Your corrections (cards, On me, preparations, titles) are logged in edits.jsonl; each new preparation learns from them.")
+                    Button("Show log") {
+                        if !FileManager.default.fileExists(atPath: EditLog.url.path) { FileManager.default.createFile(atPath: EditLog.url.path, contents: nil) }
+                        NSWorkspace.shared.activateFileViewerSelecting([EditLog.url])
+                    }.buttonStyle(.link)
+                }
                 .font(.caption).foregroundStyle(.secondary)
             }
             Section {

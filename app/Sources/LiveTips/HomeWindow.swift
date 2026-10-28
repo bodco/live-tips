@@ -75,7 +75,8 @@ struct HomeView: View {
             footer.padding(.horizontal, 28).padding(.vertical, 10)
         }
         .frame(minWidth: 640, minHeight: 560)
-        .onAppear { tick(); cal.refresh(); history.scan() }
+        .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents() }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in upnext.adoptPreparedEvents() }
         .sheet(item: $prepSheet) { m in
             PrepareSheet(model: m, onPrepare: {
                 upnext.save(m)
@@ -150,12 +151,16 @@ struct HomeView: View {
     private var ahead: [Ahead] {
         var rows: [Ahead] = []
         var used = Set<ObjectIdentifier>()
+        let ce = CallEngine.shared
+        let liveKey = ce.isRunning ? EditLog.seriesKey(ce.renamed ?? (ce.callRequest["title"] as? String) ?? "") : ""
         for e in cal.upcoming(now) {
-            let m = upnext.items.first { $0.calEventID == e.id }
+            // 2026-10-28 (owner): the call being recorded is shown once, as live, not again as ahead.
+            if ce.isRunning, e.id == ce.liveEventID || (!liveKey.isEmpty && EditLog.seriesKey(e.title) == liveKey && e.start <= now.addingTimeInterval(15 * 60)) { continue }
+            let m = upnext.visible.first { $0.calEventID == e.id }
             if let m = m { used.insert(ObjectIdentifier(m)) }
             rows.append(Ahead(id: e.id, event: e, model: m, start: e.start))
         }
-        for m in upnext.items where !used.contains(ObjectIdentifier(m)) {
+        for m in upnext.visible where !used.contains(ObjectIdentifier(m)) {
             rows.append(Ahead(id: m.id.uuidString, event: nil, model: m, start: m.callDate))
         }
         return rows.sorted { $0.start < $1.start }
@@ -260,7 +265,7 @@ struct HomeView: View {
     private func model(for r: Ahead) -> StartCallModel {
         if let m = r.model { return m }
         let m = StartCallModel()
-        if let e = r.event { m.applyEvent(e) }
+        if let e = r.event { m.applyEvent(e) }       // also adopts a preparation not used yet
         return m
     }
 

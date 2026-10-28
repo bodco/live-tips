@@ -72,7 +72,15 @@ struct PrepDocView: View {
     private func save() {
         let orig = path.replacingOccurrences(of: ".brief.md", with: ".brief.orig.md")
         if orig != path, !FileManager.default.fileExists(atPath: orig) { try? FileManager.default.copyItem(atPath: path, toPath: orig) }
+        let old = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
         try? text.write(toFile: path, atomically: true, encoding: .utf8)
+        // 2026-10-28 (owner): every correction is logged to learn from (EditLog).
+        var t = String(text.split(separator: "\n").first ?? "")
+        if let r = t.range(of: "Live Brief:") { t = String(t[r.upperBound...]) }
+        if let r = t.range(of: " (prep") { t = String(t[..<r.lowerBound]) }
+        t = t.trimmingCharacters(in: .whitespaces)
+        let project = (((path as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent as NSString).lastPathComponent
+        EditLog.addBriefEdit(title: t.isEmpty ? "Call" : t, project: project, file: path, before: old, after: text, when: "before the call")
         editing = false
         saved = "Saved " + Date().formatted(date: .omitted, time: .shortened)
     }

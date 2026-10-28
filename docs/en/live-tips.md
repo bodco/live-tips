@@ -1556,3 +1556,29 @@ address", `references/sweep.md`, `references/presentation.md`).
    from Downloads without the rest). The preparation reads the added files fully and nothing else in their folders.
 88. **Start call never dead (0.7.3).** Without a project the Start button opens the project list and says why; a
    new calendar meeting gets the project last used with its calendar.
+89. **Corrections log (0.7.4).** Every correction is logged in `Application Support/LiveTips/edits.jsonl`: cards and
+   On me lines edited, added or removed, the preparation edited (before the call or during it), speakers named, the
+   call renamed. Each new preparation reads the corrections of the same meeting, then of the project, and learns the
+   pattern (what you remove, rewrite, add, fix). Settings > General > Show log.
+90. **No duplicate meetings (0.7.4).** The call being recorded never shows as Next call, in Up next or in Home's calls
+   ahead; starting a call removes its other Up next entries (same calendar event, or the same title within 2 hours),
+   and a planned call already held is dropped.
+91. **Who said what (0.7.4).** In the transcript's Speakers list, (i) next to a voice shows its longest phrases and
+   talk time on hover (click keeps it open), so you can tell who it is before naming it.
+92. **Always on top (0.7.4).** A pin in the tips window's title bar keeps the window above other windows; the ⚙
+   switch is the same setting, remembered across calls. The title-bar buttons keep an even gap whatever their labels.
+93. **Speakers from earlier meetings (0.7.4).** For a regular meeting, Start call and Prepare also offer the people of
+   its last 3 calls; calendar attendees without a name get a readable one from their address.
+94. **QA pass (0.7.4).** The lightbulb only switches proactive tips (it no longer opens the preparation); the window
+   bar fits narrow and split layouts; switching panes no longer resizes the window twice; closing the preparation
+   while editing keeps the changes; a card being edited is not replaced by a streamed update and an edited card no
+   longer becomes the newest; On me shows from the start (empty and folded), a task that is both an ask and an action
+   shows once, Esc cancels an On me edit; deleting a transcript line works while new lines arrive; the interface
+   language switch redraws every part of the window; End call from the menu bar asks on the tips window and offers
+   End and start next; Prepare now while a call is live keeps the planning window open; Home counts a call right
+   after it ends.
+95. **Prepared until the call happens (0.7.4).** A preparation of a meeting made after its last call belongs to the
+   coming call: Home shows that call as prepared (Read prep) after closing Home or restarting the app, Start uses it,
+   and Prepare now keeps the call in Up next. Once the call is held, that preparation is old and is not offered again.
+96. **A rename sticks (0.7.4).** A title changed during the call is the call's title everywhere: Home, recent calls,
+   insights (longest call) and the history, also after a restart mid-call (read back from the call's inbox file).

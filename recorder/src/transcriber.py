@@ -2801,8 +2801,14 @@ class SpeakerTracker:
         if self.lib is not None and not c["name"]:
             c["suggestions"] = self.lib.suggest(c["centroid"], self._f("speaker_suggest"), limit=12)
             if self.participants:
+                # 2026-10-28 (owner): a library name matches a participant also loosely ("Olena S." for
+                # "O. Starodubtseva" from a calendar): the same first letter and the same surname initial.
                 allowed = {p.casefold() for p in self.participants}
-                c["suggestions"] = [x for x in c["suggestions"] if x["name"].casefold() in allowed]
+                def _sig(n: str) -> tuple[str, str] | None:
+                    t = [w for w in re.split(r"[\s.]+", n.strip()) if w]
+                    return (t[0][0].casefold(), t[-1][0].casefold()) if len(t) >= 2 else None
+                sigs = {_sig(p) for p in self.participants} - {None}
+                c["suggestions"] = [x for x in c["suggestions"] if x["name"].casefold() in allowed or _sig(x["name"]) in sigs]
             c["suggestions"] = c["suggestions"][:3]
         elif c["name"]:
             c["suggestions"] = []

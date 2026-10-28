@@ -75,6 +75,7 @@ struct WeekStats: View {
         let (rs, re) = range()
         let bars: [Bar] = Dictionary(grouping: recs.filter { $0.start >= rs && $0.start < re }, by: { "\(cal.startOfDay(for: $0.start).timeIntervalSince1970)|" + $0.project })
             .map { k, v in Bar(date: cal.startOfDay(for: v[0].start), project: v[0].project, minutes: v.reduce(0) { $0 + ($1.minutes ?? 0) }) }
+            .sorted { ($0.date, $0.project) < ($1.date, $1.project) }      // QA: the same stack order every day
         let longest = this.max { ($0.minutes ?? 0) < ($1.minutes ?? 0) }
         let busiest = Dictionary(grouping: this, by: { cal.startOfDay(for: $0.start) }).mapValues { $0.reduce(0) { $0 + ($1.minutes ?? 0) } }.max { $0.value < $1.value }
         let sc = scopes
@@ -104,7 +105,7 @@ struct WeekStats: View {
                 tile("Calls", "\(this.count)", delta(Double(this.count), Double(prev.count), fmt: { "\(Int($0))" }))
                 tile("On calls", hm(mins), delta(mins, prevMins, fmt: hm))
                 tile("Claude", String(format: "$%.2f", spend), prevSpend > 0 ? String(format: "before $%.2f", prevSpend) : (scope.isEmpty ? "counted from 0.6.8" : "calls with a cost"))
-                tile("Prepared", this.isEmpty ? "-" : "\(prepared) of \(this.count)", this.isEmpty ? "" : "\(Int(Double(prepared) / Double(max(1, this.count)) * 100))%")
+                tile("Prepared", this.isEmpty ? "-" : "\(prepared) of \(this.count)", this.isEmpty ? "" : "\(Int((Double(prepared) / Double(max(1, this.count)) * 100).rounded()))%")
             }
             if !bars.isEmpty {
                 Chart(bars) { b in

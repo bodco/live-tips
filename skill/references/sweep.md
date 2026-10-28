@@ -116,6 +116,15 @@ is older than 3 days -> say so in the sources line (item 4) as
    goes into the brief's Previous meetings list; only what is likely to come up on THIS call (its
    agenda, its people, a due date now) becomes a checklist line and a card. The PM removes or
    corrects cards in the tips window, so prefer fewer, surer cards.
+3c. **Learn from the PM's corrections (2026-10-28).** The app logs every correction the PM makes
+   (cards and On me lines edited, added or removed, the preparation edited before or during the call,
+   speakers named, the call renamed) in `~/Library/Application Support/LiveTips/edits.jsonl`, one JSON
+   object per line (`kind`, `title`, `series`, `project`, `before`/`after`, `removed`/`added` lines).
+   When the file is readable, take the newest 30 records of this meeting (`series` = the title without
+   spaces and punctuation, lowercased), then of this project. Learn the pattern before writing: what he
+   removes, do not write again; what he rewrites, use his wording and level of detail; what he adds,
+   cover it this time; names and facts he fixes, use the fixed ones. A correction that contradicts a
+   newer source loses. Say in the brief's sources line how many corrections were used.
 3a. **Topic documents rule (mandatory).** For EVERY item of the checklist and every topic
    expected on the call (the user's words, the prep report, the open threads), find the project
    documents that touch it, created or changed in the last 3 days (Project docs `DESIGN-`,

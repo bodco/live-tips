@@ -19,13 +19,62 @@ final class UpNext: ObservableObject {
 
     private var path: URL { AppPaths.support.appendingPathComponent("upnext.json") }
 
-    private init() { load() }
+    private init() { load(); pruneHeld() }
 
     // MARK: list
 
     func contains(_ m: StartCallModel) -> Bool { items.contains { $0 === m } }
     func item(_ id: String) -> StartCallModel? { items.first { $0.id.uuidString == id } }
-    var first: StartCallModel? { items.first }
+    /// 2026-10-28 (owner): "no duplicate meetings". The call being recorded is not shown as the next one.
+    var first: StartCallModel? { visible.first }
+    var visible: [StartCallModel] { items.filter { !isLive($0) } }
+
+    /// The same call as the live one: its own setup, the same calendar event, or the same title within 2 hours.
+    func isLive(_ m: StartCallModel) -> Bool {
+        let ce = CallEngine.shared
+        guard (NSApp.delegate as? AppDelegate)?.callIsLive ?? ce.isRunning else { return false }
+        if ce.currentCallID == m.id { return true }
+        if let a = m.calEventID, let b = ce.liveEventID { return a == b }      // both from the calendar: exact
+        let t = EditLog.seriesKey(ce.renamed ?? (ce.callRequest["title"] as? String) ?? "")
+        return !t.isEmpty && t == EditLog.seriesKey(m.effectiveTitle) && abs(m.callDate.timeIntervalSinceNow) < 2 * 3600
+    }
+
+    /// A call has started: every Up next entry for it goes (set up twice, from the calendar and from Up next).
+    func removeMatching(_ s: StartCallModel) {
+        let key = EditLog.seriesKey(s.effectiveTitle)
+        let before = items.count
+        items.removeAll { m in
+            m === s || m.id == s.id
+                || (m.calEventID != nil && m.calEventID == s.calEventID)
+                || (!key.isEmpty && EditLog.seriesKey(m.effectiveTitle) == key && abs(m.callDate.timeIntervalSince(Date())) < 2 * 3600)
+        }
+        if items.count != before { persist() }
+    }
+
+    /// Calendar calls of the next 36 hours with a preparation not used yet join Up next as prepared.
+    func adoptPreparedEvents() {
+        var changed = false
+        for e in CalendarService.shared.upcoming() where !items.contains(where: { $0.calEventID == e.id }) {
+            let m = StartCallModel()
+            m.applyEvent(e)
+            guard !m.target.isEmpty, m.prepBase != nil, !isLive(m) else { continue }
+            items.append(m); changed = true
+        }
+        for m in items where m.prepBase == nil { if m.adoptExistingPrep() { changed = true } }
+        if changed { items.sort { $0.callDate < $1.callDate }; persist() }
+    }
+
+    /// Calls already held (a transcript of the same meeting that day) are not "up next" any more.
+    func pruneHeld() {
+        let held = CallHistory.shared.records
+        let before = items.count
+        items.removeAll { m in
+            guard m.callDate < Date().addingTimeInterval(-30 * 60) else { return false }
+            let key = EditLog.seriesKey(m.effectiveTitle)
+            return held.contains { EditLog.seriesKey($0.title) == key && abs($0.start.timeIntervalSince(m.callDate)) < 3 * 3600 }
+        }
+        if items.count != before { persist() }
+    }
 
     /// Adds or updates a call; the list is ordered by the call time.
     func save(_ m: StartCallModel) {
@@ -100,7 +149,7 @@ final class UpNext: ObservableObject {
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let d = DateFormatter(); d.dateFormat = "d MMM HH:mm"
         let runner = PrepRunner.shared
-        let list: [[String: Any]] = items.map { m in
+        let list: [[String: Any]] = visible.map { m in
             let st = prepState(m)
             let when = Calendar.current.isDateInToday(m.callDate) ? f.string(from: m.callDate) : d.string(from: m.callDate)
             return ["id": m.id.uuidString, "title": m.effectiveTitle, "project": m.targetName, "when": when,

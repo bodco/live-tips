@@ -102,6 +102,35 @@ extension StartCallModel {
         }
         setParticipants(ev.attendees)
         scanPrep()
+        adoptExistingPrep()
+    }
+
+    /// 2026-10-28 (owner): "track whether the call happened after the preparation". A preparation of this meeting
+    /// (prep-<date>-<title>.brief.md in the project's live folder) made after its last held call is the coming call's
+    /// preparation: Home shows it as prepared and Start uses it. One made before the last call is old.
+    @discardableResult
+    func adoptExistingPrep() -> Bool {
+        if let b = prepBase, FileManager.default.fileExists(atPath: b + ".brief.md") { return true }
+        guard let root = root else { return false }
+        let live = (root as NSString).appendingPathComponent("live")
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: live) else { return false }
+        let slug = Self.slugify(effectiveTitle)
+        let key = EditLog.seriesKey(effectiveTitle)
+        let lastHeld = CallHistory.shared.records.filter { EditLog.seriesKey($0.title) == key && $0.start < Date() }.map(\.start).max()
+        var best: (String, Date)?
+        for n in names where n.hasPrefix("prep-") && n.hasSuffix("-" + slug + ".brief.md") {
+            let p = (live as NSString).appendingPathComponent(n)
+            let attrs = try? fm.attributesOfItem(atPath: p)
+            guard let made = (attrs?[.creationDate] as? Date) ?? (attrs?[.modificationDate] as? Date) else { continue }
+            if let h = lastHeld, made <= h { continue }                     // written before the last call: old
+            if lastHeld == nil, Date().timeIntervalSince(made) > 3 * 86400 { continue }
+            if best == nil || made > best!.1 { best = (p, made) }
+        }
+        guard let b = best else { return false }
+        prepBase = String(b.0.dropLast(".brief.md".count))
+        prepFailed = false
+        return true
     }
 
     /// Writes the calendar's people into the "Participants:" line (the speakers offered on the call).
@@ -109,13 +138,41 @@ extension StartCallModel {
         guard !names.isEmpty else { return }
         let header = StartCallModel.uiLang == "uk" ? "Учасники:" : "Participants:"
         var lines = context.components(separatedBy: "\n")
-        let line = header + " " + names.joined(separator: ", ")
+        // Merge (2026-10-28): the names already there (a regular meeting's last setup) stay; the calendar adds the rest.
+        var all = participants
+        for n in names where !all.contains(where: { $0.caseInsensitiveCompare(n) == .orderedSame }) { all.append(n) }
+        let line = header + " " + all.joined(separator: ", ")
         if let i = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces).range(of: "^(учасники|participants|attendees)\\s*:", options: [.regularExpression, .caseInsensitive]) != nil }) {
             lines[i] = line
         } else {
             lines.insert(line, at: min(1, lines.count))
         }
         context = lines.joined(separator: "\n")
+    }
+
+    /// 2026-10-28 (owner): a regular meeting offers the speakers named on its last 3 calls (their speakers.json),
+    /// next to the participants typed or taken from the calendar, so the voice library's names are offered again.
+    var participantsWithPrevious: [String] {
+        var out = participants
+        guard let root = root else { return out }
+        let live = (root as NSString).appendingPathComponent("live")
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: live) else { return out }
+        let want = Self.slugify(effectiveTitle).replacingOccurrences(of: "-", with: "")
+        var seen = 0
+        for n in names.sorted(by: >) where n.hasSuffix(".speakers.json") && n.range(of: "^\\d{4}-\\d\\d-\\d\\d-\\d{4}-", options: .regularExpression) != nil {
+            let core = String(n.dropFirst(16)).replacingOccurrences(of: ".app.speakers.json", with: "").replacingOccurrences(of: ".speakers.json", with: "").replacingOccurrences(of: "-", with: "")
+            guard !want.isEmpty, core == want else { continue }
+            guard let d = fm.contents(atPath: (live as NSString).appendingPathComponent(n)),
+                  let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { continue }
+            var found: [String] = ((o["roster"] as? [[String: Any]]) ?? []).compactMap { $0["name"] as? String }
+            found += ((o["clusters"] as? [String: [String: Any]]) ?? [:]).values.compactMap { $0["name"] as? String }
+            for f in found where !f.isEmpty && !out.contains(where: { $0.caseInsensitiveCompare(f) == .orderedSame }) { out.append(f) }
+            seen += 1
+            if seen == 3 { break }
+        }
+        let me = Set(AppConfig.load(from: AppPaths.config).nameAliases.map { $0.lowercased() })
+        return out.filter { !me.contains($0.lowercased()) }
     }
 
     /// Before typing everything again: a remembered call with the same title (no calendar needed).
@@ -172,6 +229,34 @@ final class CallHistory: ObservableObject {
             records.append(Record(file: file, title: title, project: project, start: start, end: Date(), lines: lines, costUSD: cost))
             persist()
         }
+        fillDetails()            // QA: Home's numbers count the call just ended
+    }
+
+    /// 2026-10-28 (owner): a call renamed during the call keeps the new name everywhere (Home, insights, history).
+    /// The tips window writes the rename to <stem>.inbox.jsonl, so it survives a restart or an app update mid-call.
+    nonisolated static func renamedTitle(_ file: String) -> String? {
+        let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
+        guard let s = try? String(contentsOfFile: stem + ".inbox.jsonl", encoding: .utf8) else { return nil }
+        var t: String?
+        for ln in s.split(separator: "\n") where ln.contains("\"title\"") {
+            if let o = (try? JSONSerialization.jsonObject(with: Data(ln.utf8))) as? [String: Any],
+               (o["key"] as? String) == "title", let v = (o["value"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty { t = v }
+        }
+        return t
+    }
+
+    func rename(file: String, title: String) {
+        if records.contains(where: { $0.file == file }) { update(file) { $0.title = title } }
+    }
+
+    /// Renames found in the calls' inbox files (calls of the last 60 days).
+    func applyRenames() {
+        var changed = false
+        let since = Date().addingTimeInterval(-60 * 86400)
+        for i in records.indices where records[i].start > since {
+            if let t = Self.renamedTitle(records[i].file), t != records[i].title { records[i].title = t; changed = true }
+        }
+        if changed { persist() }
     }
 
     func setNotion(file: String, url: String) {
@@ -269,6 +354,7 @@ final class CallHistory: ObservableObject {
             }
         }
         if added { persist() }
+        applyRenames()
     }
 }
 

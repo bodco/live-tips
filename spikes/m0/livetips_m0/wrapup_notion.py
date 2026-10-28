@@ -45,11 +45,16 @@ def http(method: str, url: str, headers: dict, body=None, timeout=60, raw: bytes
                 return json.loads(t) if t else {}
         except urllib.error.HTTPError as e:
             msg = e.read().decode("utf-8", "replace")[:400]
-            if e.code in (429, 502, 503, 529) and attempt < 3:
-                time.sleep(2 + attempt * 3)
-                continue
-            raise RuntimeError(f"{method} {url.split('?')[0]} -> {e.code}: {msg}") from None
+            if not retry_later(e.code, attempt):
+                raise RuntimeError(f"{method} {url.split('?')[0]} -> {e.code}: {msg}") from None
 
+
+def retry_later(code: int, attempt: int) -> bool:
+    """Rate limits and overloads wait 2, 5, 8 s; three tries more at most."""
+    if code in (429, 502, 503, 529) and attempt < 3:
+        time.sleep(2 + attempt * 3)
+        return True
+    return False
 
 def notion(method, path, body=None):
     tok = os.environ.get("NOTION_TOKEN", "")
@@ -67,11 +72,15 @@ def config_ids(cfg_path: Path) -> dict:
     return out
 
 
+def _head_value(head, prefixes, default=""):
+    return next((l.split(":", 1)[1].strip() for l in head if l.startswith(prefixes)), default)
+
+
 def header_info(md: Path) -> dict:
     """Title, start and timezone from the transcript header and the recorder's state."""
     head = md.read_text(encoding="utf-8").splitlines()[:12]
     title = next((l[len("# Live transcript:"):].strip() for l in head if l.startswith("# Live transcript:")), md.stem)
-    start = next((l.split(":", 1)[1].strip() for l in head if l.startswith("- Початок:") or l.startswith("- Start:")), "")
+    start = _head_value(head, ("- Початок:", "- Start:"))
     try:
         t0 = dt.datetime.strptime(start, "%Y-%m-%d %H:%M:%S").astimezone()
     except ValueError:
@@ -115,6 +124,27 @@ Write in {LANG}, plain and short, no long dashes. Return ONLY one JSON object:
 Empty lists are fine. Do not repeat the same item in two lists."""
 
 
+def _correction(d: dict) -> str:
+    act, before, after = d.get("action", ""), d.get("before") or {}, d.get("after") or {}
+    if act == "onme_add":
+        return f"- On the PM (added by the PM): {after.get('text', '')}"
+    if act == "onme_remove":
+        return f"- NOT on the PM (removed by the PM): {before.get('text', '')}"
+    if act == "onme_edit":
+        return f"- Corrected by the PM: \"{before.get('text', '')}\" is really \"{after.get('text', '')}\""
+    if act == "remove":
+        return f"- Wrong or irrelevant (removed by the PM): {before.get('gist', '')}"
+    if act == "edit":
+        return edited_card(after)
+    return ""
+
+
+def edited_card(after: dict) -> str:
+    pts = "; ".join(after.get("items") or [])
+    return (f"- Corrected by the PM: {after.get('gist', '')}" + (f" ({after.get('phrase', '')})" if after.get("phrase") else "")
+            + (f": {pts}" if pts else ""))
+
+
 def pm_corrections(path: Path) -> str:
     """2026-10-28 (owner): cards and "On me" lines the PM corrected, removed or added in the tips window during the
     call (<stem>.edits.jsonl). They are true and win over the transcript and the call picture."""
@@ -123,21 +153,11 @@ def pm_corrections(path: Path) -> str:
     out = []
     for raw in path.read_text(encoding="utf-8").splitlines():
         try:
-            d = json.loads(raw)
+            line = _correction(json.loads(raw))
         except Exception:  # noqa: BLE001
             continue
-        act, before, after = d.get("action", ""), d.get("before") or {}, d.get("after") or {}
-        if act == "onme_add":
-            out.append(f"- On the PM (added by the PM): {after.get('text', '')}")
-        elif act == "onme_remove":
-            out.append(f"- NOT on the PM (removed by the PM): {before.get('text', '')}")
-        elif act == "onme_edit":
-            out.append(f"- Corrected by the PM: \"{before.get('text', '')}\" is really \"{after.get('text', '')}\"")
-        elif act == "remove":
-            out.append(f"- Wrong or irrelevant (removed by the PM): {before.get('gist', '')}")
-        elif act == "edit":
-            pts = "; ".join(after.get("items") or [])
-            out.append(f"- Corrected by the PM: {after.get('gist', '')}" + (f" ({after.get('phrase', '')})" if after.get("phrase") else "") + (f": {pts}" if pts else ""))
+        if line:
+            out.append(line)
     return ("\n\nCORRECTIONS BY THE PM DURING THE CALL (true; they win over the transcript):\n" + "\n".join(out[-60:])) if out else ""
 
 
@@ -193,32 +213,43 @@ def todo(s: str) -> dict:
 
 def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "uk") -> list:
     T = TXT[lang]
-    b = []
-    sections = [(T["actions"], [f"{a.get('who', '').strip()}: {a.get('what', '').strip()}" + (f" ({a['when']})" if a.get("when") else "")
-                                  for a in w.get("action_items", [])], todo),
+    sections = [(T["actions"], [action_line(a) for a in w.get("action_items", [])], todo),
                 (T["decisions"], w.get("decisions", []), bullet), (T["commit"], w.get("commitments", []), bullet),
                 (T["new"], w.get("new_requests", []), bullet),
                 (T["open"], w.get("open_questions", []), bullet), (T["risks"], w.get("risks", []), bullet)]
-    # Pacenote 0.8 (rules/agenda.yaml > wrapup): each agenda item with Discussed, Raised or Not raised.
-    from .agenda import last_from_tips, status_label
-    stem = str(md)[:-3] if str(md).endswith(".md") else str(md)
-    strip = next((x for x in (last_from_tips(Path(p)) for p in (str(md) + ".tips.jsonl", stem + ".tips.jsonl")) if x), None)
-    if strip:
-        sections.insert(1, (T["agenda"], ["{}: {}".format(str(it.get("text", "")).strip(), status_label(it, lang == "uk"))
-                                          for it in strip if str(it.get("text", "")).strip()], bullet))
+    agenda = agenda_lines(md, lang)
+    if agenda:
+        sections.insert(1, (T["agenda"], agenda, bullet))
+    b = []
     for title, items, kind in sections:
         items = [i for i in items if str(i).strip(" :")]
         if items:
             b.append(h(3, title))
             b += [kind(str(i)) for i in items]
+    return b + pacenote_blocks(stats, md, prep_used, T)
+
+
+def action_line(a: dict) -> str:
+    return f"{a.get('who', '').strip()}: {a.get('what', '').strip()}" + (f" ({a['when']})" if a.get("when") else "")
+
+
+def agenda_lines(md: Path, lang: str) -> list:
+    """Pacenote 0.8 (rules/agenda.yaml > wrapup): each agenda item with Discussed, Raised or Not raised."""
+    from .agenda import last_from_tips, status_label
+    stem = str(md)[:-3] if str(md).endswith(".md") else str(md)
+    strip = next((x for x in (last_from_tips(Path(p)) for p in (str(md) + ".tips.jsonl", stem + ".tips.jsonl")) if x), None)
+    return ["{}: {}".format(str(it.get("text", "")).strip(), status_label(it, lang == "uk"))
+            for it in strip or [] if str(it.get("text", "")).strip()]
+
+
+def pacenote_blocks(stats: dict, md: Path, prep_used: bool, T: dict) -> list:
     tips = stats.get("tips", {})
     tr = stats.get("transcript", {})
-    b.append(h(3, "Pacenote"))
-    b.append(bullet(T["tips"].format(shown=tips.get('shown', 0), cards=tips.get('cards_fired', 0), facts=tips.get('facts_shown', 0),
-                                     late=tips.get('late', 0), med=tips.get('delay_median_s', '?'), mx=tips.get('delay_max_s', '?'))))
-    b.append(bullet(T["prep"] + (T["prep_yes"] if prep_used else T["prep_no"])))
-    b.append(bullet(T["tr"].format(n=tr.get('lines_real', '?'), langs=", ".join((tr.get('langs') or {}).keys()), f=md.name)))
-    return b
+    return [h(3, "Pacenote"),
+            bullet(T["tips"].format(shown=tips.get('shown', 0), cards=tips.get('cards_fired', 0), facts=tips.get('facts_shown', 0),
+                                    late=tips.get('late', 0), med=tips.get('delay_median_s', '?'), mx=tips.get('delay_max_s', '?'))),
+            bullet(T["prep"] + (T["prep_yes"] if prep_used else T["prep_no"])),
+            bullet(T["tr"].format(n=tr.get('lines_real', '?'), langs=", ".join((tr.get('langs') or {}).keys()), f=md.name))]
 
 
 # ---------------------------------------------------------------- Notion
@@ -324,7 +355,7 @@ def append(page_id: str, blocks: list) -> None:
         notion("PATCH", f"/blocks/{page_id}/children", {"children": blocks[i:i + 90]})
 
 
-def main(argv=None) -> int:
+def parse_args(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--md", required=True, type=Path)
     ap.add_argument("--project-config", type=Path, default=None, help="Control Tower config (meetings_db, page ids)")
@@ -336,104 +367,159 @@ def main(argv=None) -> int:
     ap.add_argument("--when", default="", help="ISO date and time of the meeting set in Start call (title date)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--find-only", action="store_true", help="only look up this meeting's page in Notion")
-    a = ap.parse_args(argv)
+    return ap.parse_args(argv)
+
+
+def meeting_ids(a) -> dict:
+    ids = config_ids(a.project_config) if a.project_config and a.project_config.exists() else {}
+    if not ids.get("meetings_db") and a.meetings_db:
+        ids["meetings_db"] = a.meetings_db.replace("collection://", "").strip()
+    if not ids.get("meetings_db"):
+        raise RuntimeError("no Meetings database: choose one in Settings > General > Notion")
+    return ids
+
+
+def call_material(a):
+    """(lt wrapup-data numbers, the clean transcript as plain text, the brief with the PM's corrections first)."""
+    out = subprocess.run(list(a.lt) + ["wrapup-data", str(a.md)], capture_output=True, text=True, timeout=120).stdout
+    stats = json.loads(out[out.find("{"):])
+    clean = Path(stats["transcript"]["clean_file"]).read_text(encoding="utf-8")
+    plain = re.sub(r"\\([][<>*_#])", r"\1", clean)
+    if stats["transcript"].get("lines_real", 0) < 5:
+        raise RuntimeError("fewer than 5 transcript lines: nothing to write")
+    brief_f = Path(str(a.md)[:-3] + ".brief.md")
+    brief = brief_f.read_text(encoding="utf-8") if brief_f.exists() else ""
+    brief = (pm_corrections(Path(str(a.md)[:-3] + ".edits.jsonl")).strip() + "\n\n" + brief).strip()
+    return stats, plain, brief
+
+
+def call_info(a) -> dict:
+    info = header_info(a.md)
+    if a.title.strip():
+        info["title"] = a.title.strip()
+    if a.when:   # 2026-10-26 (owner): the title's date is the meeting time set in the app, not the recording start
+        try:
+            info["start"] = dt.datetime.fromisoformat(a.when.replace("Z", "+00:00")).astimezone()
+        except ValueError:
+            pass
+    return info
+
+
+def charge(cost) -> None:
+    """The wrap-up goes into the same monthly ledger as the tips."""
+    if not cost:
+        return
+    try:
+        from .cost import BudgetGuard
+        BudgetGuard(os.environ.get("LT_LEDGER", "~/.livetips/spend.json"), 1e9, 1e9, 1e9).add(float(cost))
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def link_props(sc: dict, ids: dict, existing: dict, project_name: str) -> dict:
+    """Project and Workspace: a relation from the config's page ids, or the project's name as a select or text."""
+    upd = {}
+    for key, idkey, val in (("project", "project_page_id", project_name), ("workspace", "workspace_page_id", "")):
+        if not sc[key]:
+            continue
+        name, t = sc[key]
+        if not (existing.get(name) or {}).get(t):
+            upd.update(link_value(name, t, ids.get(idkey), val))
+    return upd
+
+
+def link_value(name: str, t: str, page_id, val: str) -> dict:
+    if t == "relation" and page_id:
+        return {name: {"relation": [{"id": page_id}]}}
+    if t == "select" and val:
+        return {name: {"select": {"name": val[:100]}}}
+    if t == "rich_text" and val:
+        return {name: {"rich_text": rt(val)}}
+    return {}
+
+
+def page_name(title: str, topic: str) -> str:
+    """2026-10-26 (owner): the page title starts with the meeting's name, then what it was about."""
+    topic = (topic or "").strip()
+    return title if not topic or topic.lower() in title.lower() else title + ": " + topic
+
+
+def new_page_props(sc: dict, name: str, start: dt.datetime, summary: str) -> dict:
+    props = {sc["title"]: {"title": rt(name + " ") + [
+        {"type": "mention", "mention": {"type": "date", "date": {"start": start.isoformat(timespec="minutes")}}}]}}
+    if sc["date"]:
+        props[sc["date"]] = {"date": {"start": start.isoformat(timespec="seconds")}}
+    if sc["summary"]:
+        props[sc["summary"]] = {"rich_text": rt(summary)}
+    return props
+
+
+def add_footer(page_id: str, lang: str) -> None:
+    try:
+        append(page_id, footer_blocks(lang))   # the footer never fails the wrap-up
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def write_to_page(page: dict, sc, ids, a, w, blocks, plain, info, lang) -> dict:
+    """Append a Pacenote section to the meeting's existing page."""
+    upd = link_props(sc, ids, page.get("properties", {}), a.project_name)
+    if upd:
+        notion("PATCH", f"/pages/{page['id']}", {"properties": upd})
+    hhmm = dt.datetime.now().strftime("%H:%M")
+    append(page["id"], [h(2, TXT[lang]["append"].format(hhmm=hhmm)), para(w.get("summary", ""))] + blocks
+           + [h(3, TXT[lang]["tr_app"])])
+    transcript_page(page["id"], TXT[lang]["tr_app"] + " · " + info["title"], plain)
+    add_footer(page["id"], lang)
+    return {"ok": True, "url": page.get("url")}
+
+
+def create_page(sc, ids, a, w, blocks, plain, info, lang) -> dict:
+    """A new page in the Meetings database."""
+    name = page_name(info["title"], w.get("name"))
+    props = new_page_props(sc, name, info["start"], w.get("summary", ""))
+    props.update(link_props(sc, ids, {}, a.project_name))
+    p = notion("POST", "/pages", {"parent": {"type": "data_source_id", "data_source_id": ids["meetings_db"]},
+                                  "properties": props,
+                                  "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])]})
+    transcript_page(p["id"], TXT[lang]["transcript"] + " · " + name, plain)
+    add_footer(p["id"], lang)
+    return {"ok": True, "url": p.get("url"), "created": True}
+
+
+def run(a, res: dict) -> int:
+    ids = meeting_ids(a)
+    sc = schema(ids["meetings_db"])
+    if a.find_only:
+        p = find_page(ids["meetings_db"], header_info(a.md)["start"], sc["date"])
+        print(json.dumps({"ok": True, "found": bool(p), "url": p and p.get("url")}))
+        return 0
+    stats, plain, brief = call_material(a)
+    info = call_info(a)
+    lang = info.get("lang", "uk")
+    w = claude_wrapup(plain, brief, a.model, lang)
+    blocks = wrapup_blocks(w, stats, a.md, bool(brief), lang)
+    if a.dry_run:
+        print(json.dumps({"ok": True, "dry_run": True, "name": w.get("name"), "summary": w.get("summary"),
+                          "blocks": len(blocks), "ids": ids}, ensure_ascii=False))
+        return 0
+    res["cost_usd"] = w.get("_cost")
+    charge(w.get("_cost"))
+    page = find_page(ids["meetings_db"], info["start"], sc["date"])
+    if page:
+        res.update(write_to_page(page, sc, ids, a, w, blocks, plain, info, lang))
+    else:
+        res.update(create_page(sc, ids, a, w, blocks, plain, info, lang))
+    return None
+
+
+def main(argv=None) -> int:
+    a = parse_args(argv)
     res = {"ok": False, "url": None, "created": False, "error": None, "cost_usd": None}
     try:
-        ids = config_ids(a.project_config) if a.project_config and a.project_config.exists() else {}
-        if not ids.get("meetings_db") and a.meetings_db:
-            ids["meetings_db"] = a.meetings_db.replace("collection://", "").strip()
-        if not ids.get("meetings_db"):
-            raise RuntimeError("no Meetings database: choose one in Settings > General > Notion")
-        sc = schema(ids["meetings_db"])
-        if a.find_only:
-            p = find_page(ids["meetings_db"], header_info(a.md)["start"], sc["date"])
-            print(json.dumps({"ok": True, "found": bool(p), "url": p and p.get("url")}))
-            return 0
-        out = subprocess.run(list(a.lt) + ["wrapup-data", str(a.md)], capture_output=True, text=True, timeout=120).stdout
-        stats = json.loads(out[out.find("{"):])
-        clean = Path(stats["transcript"]["clean_file"]).read_text(encoding="utf-8")
-        plain = re.sub(r"\\([][<>*_#])", r"\1", clean)
-        if stats["transcript"].get("lines_real", 0) < 5:
-            raise RuntimeError("fewer than 5 transcript lines: nothing to write")
-        brief_f = Path(str(a.md)[:-3] + ".brief.md")
-        brief = brief_f.read_text(encoding="utf-8") if brief_f.exists() else ""
-        brief = (pm_corrections(Path(str(a.md)[:-3] + ".edits.jsonl")).strip() + "\n\n" + brief).strip()
-        info = header_info(a.md)
-        if a.title.strip():
-            info["title"] = a.title.strip()
-        if a.when:   # 2026-10-26 (owner): the title's date is the meeting time set in the app, not the recording start
-            try:
-                info["start"] = dt.datetime.fromisoformat(a.when.replace("Z", "+00:00")).astimezone()
-            except ValueError:
-                pass
-        lang = info.get("lang", "uk")
-        w = claude_wrapup(plain, brief, a.model, lang)
-        blocks = wrapup_blocks(w, stats, a.md, bool(brief), lang)
-        fname = a.md.stem + "-transcript.md"
-        if a.dry_run:
-            print(json.dumps({"ok": True, "dry_run": True, "name": w.get("name"), "summary": w.get("summary"),
-                              "blocks": len(blocks), "ids": ids}, ensure_ascii=False))
-            return 0
-        hhmm = dt.datetime.now().strftime("%H:%M")
-        res["cost_usd"] = w.get("_cost")
-        if w.get("_cost"):   # into the same monthly ledger as the tips
-            try:
-                from .cost import BudgetGuard
-                BudgetGuard(os.environ.get("LT_LEDGER", "~/.livetips/spend.json"), 1e9, 1e9, 1e9).add(float(w["_cost"]))
-            except Exception:  # noqa: BLE001
-                pass
-        page = find_page(ids["meetings_db"], info["start"], sc["date"])
-
-        def links(existing: dict) -> dict:
-            """Project and Workspace: a relation from the config's page ids, or the project's name as a select or text."""
-            upd = {}
-            for key, idkey, val in (("project", "project_page_id", a.project_name), ("workspace", "workspace_page_id", "")):
-                if not sc[key]:
-                    continue
-                name, t = sc[key]
-                if (existing.get(name) or {}).get(t):
-                    continue
-                if t == "relation" and ids.get(idkey):
-                    upd[name] = {"relation": [{"id": ids[idkey]}]}
-                elif t == "select" and val:
-                    upd[name] = {"select": {"name": val[:100]}}
-                elif t == "rich_text" and val:
-                    upd[name] = {"rich_text": rt(val)}
-            return upd
-        if page:
-            props = page.get("properties", {})
-            upd = links(props)
-            if upd:
-                notion("PATCH", f"/pages/{page['id']}", {"properties": upd})
-            append(page["id"], [h(2, TXT[lang]["append"].format(hhmm=hhmm)), para(w.get("summary", ""))] + blocks
-                   + [h(3, TXT[lang]["tr_app"])])
-            transcript_page(page["id"], TXT[lang]["tr_app"] + " · " + info["title"], plain)
-            try:
-                append(page["id"], footer_blocks(lang))   # the footer never fails the wrap-up
-            except Exception:
-                pass
-            res.update(ok=True, url=page.get("url"))
-        else:
-            start = info["start"]
-            # 2026-10-26 (owner): the page title starts with the meeting's name, then what it was about.
-            topic = (w.get("name") or "").strip()
-            name = info["title"] if not topic or topic.lower() in info["title"].lower() else info["title"] + ": " + topic
-            props = {sc["title"]: {"title": rt(name + " ") + [
-                        {"type": "mention", "mention": {"type": "date", "date": {"start": start.isoformat(timespec="minutes")}}}]}}
-            if sc["date"]:
-                props[sc["date"]] = {"date": {"start": start.isoformat(timespec="seconds")}}
-            if sc["summary"]:
-                props[sc["summary"]] = {"rich_text": rt(w.get("summary", ""))}
-            props.update(links({}))
-            p = notion("POST", "/pages", {"parent": {"type": "data_source_id", "data_source_id": ids["meetings_db"]},
-                                          "properties": props,
-                                          "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])]})
-            transcript_page(p["id"], TXT[lang]["transcript"] + " · " + name, plain)
-            try:
-                append(p["id"], footer_blocks(lang))   # the footer never fails the wrap-up
-            except Exception:
-                pass
-            res.update(ok=True, url=p.get("url"), created=True)
+        done = run(a, res)
+        if done is not None:
+            return done
     except Exception as e:  # noqa: BLE001
         res["error"] = f"{type(e).__name__}: {e}"[:600]
     print(json.dumps(res, ensure_ascii=False))

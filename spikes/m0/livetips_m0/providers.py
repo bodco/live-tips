@@ -37,6 +37,25 @@ class Completion:
         return None if t is None else round((t - self.t_start) * 1000)
 
 
+def user_text(user) -> str:
+    """The request as one text. 0.8.3: `user` is a string or a list of blocks {"text", "cache"?}; providers
+    without prompt caching read the blocks in order."""
+    return user if isinstance(user, str) else "".join(b["text"] for b in user)
+
+
+def user_content(user):
+    """The Messages API content of the request: blocks with "cache" ("5m" or "1h") get a cache breakpoint."""
+    if isinstance(user, str):
+        return user
+    out = []
+    for b in user:
+        blk = {"type": "text", "text": b["text"]}
+        if b.get("cache"):
+            blk["cache_control"] = {"type": "ephemeral", "ttl": b["cache"]}
+        out.append(blk)
+    return out
+
+
 def gist_closed(buf: str) -> bool:
     """True once the JSON value of "gist" is complete in a streaming buffer."""
     i = buf.find('"gist"')
@@ -90,7 +109,7 @@ class AnthropicProvider(Provider):
         try:
             with self.client.messages.stream(
                 model=model, max_tokens=max_tokens, system=blocks,  # no temperature: deprecated on current models
-                messages=[{"role": "user", "content": user}], **(extra or {}),
+                messages=[{"role": "user", "content": user_content(user)}], **(extra or {}),
             ) as stream:
                 for ev in stream:
                     if ev.type == "content_block_delta" and getattr(ev.delta, "type", "") == "text_delta":
@@ -140,7 +159,7 @@ class OpenAICompatProvider(Provider):
             "model": model, "max_tokens": max_tokens, "temperature": 0, "stream": True,
             "stream_options": {"include_usage": True},
             "messages": [{"role": "system", "content": "\n\n".join(b["text"] for b in system)},
-                         {"role": "user", "content": user}],
+                         {"role": "user", "content": user_text(user)}],
         }
         req = urllib.request.Request(self.base_url + "/v1/chat/completions", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json",
@@ -185,6 +204,7 @@ class FakeProvider(Provider):
 
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         c = Completion(model=model, t_start=time.monotonic())
+        user = user_text(user)
         self.calls.append({"model": model, "user": user})
         time.sleep(self.ttft)
         c.t_first_token = time.monotonic()

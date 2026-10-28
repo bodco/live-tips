@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
-from .providers import AnthropicProvider, Completion, Provider, gist_closed
+from .providers import AnthropicProvider, Completion, Provider, gist_closed, user_text
 
 ROUTES = ("api", "code")
 JOBS = ("prep", "tips", "after")
@@ -170,7 +170,7 @@ class ClaudeCodeProvider(Provider):
             timer = threading.Timer(self.timeout, p.kill)
             timer.start()
             try:
-                p.stdin.write(user)
+                p.stdin.write(user_text(user))
                 p.stdin.close()
                 result = None
                 for line in p.stdout:

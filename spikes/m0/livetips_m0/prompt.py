@@ -4,7 +4,7 @@ Order of system blocks (each ends with a cache breakpoint, max 4):
   1. rules (from rules/, identical for every call of this rules version)
   2. call header and brief (stable for the call)
   3. fact book and cards (append-only during the call; new facts go to the tail until rebuild)
-The user message is the volatile tail: event, state, last ~90 s of transcript, the role task.
+The user message: the earlier lines of the call as a cached block (0.8.3), then the volatile part: state, the live transcript, the role task.
 """
 import json
 from pathlib import Path
@@ -249,5 +249,10 @@ class PromptBuilder:
         else:
             task = TIP_TASK.format(event=event, **self.fmt)
         st = json.dumps(state, ensure_ascii=False)
-        earlier = "EARLIER IN THE CALL (older lines, for what was already said):\n{}\n\n".format("\n".join(earlier_lines)) if earlier_lines else ""
-        return "STATE: {}\n\n{}LIVE TRANSCRIPT (last 90 s, newest last):\n{}\n\n{}".format(st, earlier, "\n".join(tail_lines), task)
+        now = "STATE: {}\n\nLIVE TRANSCRIPT (the last minutes, newest last):\n{}\n\n{}".format(st, "\n".join(tail_lines), task)
+        if not earlier_lines:
+            return now
+        # 0.8.3 (prompt caching): the earlier lines change only every 2 minutes, so they come first and are
+        # read from the cache; the state, the live lines and the task change on every request and come after.
+        earlier = "EARLIER IN THE CALL (older lines, for what was already said):\n{}\n\n".format("\n".join(earlier_lines))
+        return [{"text": earlier, "cache": "5m"}, {"text": now}]

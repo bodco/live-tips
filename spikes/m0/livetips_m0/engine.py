@@ -142,6 +142,19 @@ SITUATION_STRONG = re.compile(r"(\?|\b(you|your|ти|тобі|тебе|твій|
 TURN_GIST = re.compile(r"(твоя черга|твій черг|черга .{0,12}тебе|можеш почати|your turn|you can start|over to you)", re.I)
 
 
+def context_windows(lines, end: float, span: float, bucket: float, tail_s: float = 90):
+    """Split the call so far into the earlier lines and the live tail (0.8.3, prompt caching).
+
+    The border between them moves in fixed `bucket` steps, not with every new line, so every request inside
+    one bucket starts with the same earlier lines and reads them from the cache. The tail is at least
+    `tail_s` seconds and at most `tail_s + bucket`. Lines are in time order and have `t_s`."""
+    cut = ((end - tail_s) // bucket) * bucket if bucket else end - tail_s
+    lines = [l for l in lines if l.t_s <= end]
+    earlier = [l for l in lines if cut - span < l.t_s <= cut] if span and cut > 0 else []
+    tail = [l for l in lines if l.t_s > cut] if earlier else [l for l in lines if l.t_s > cut or cut <= 0]
+    return earlier, tail
+
+
 class Engine:
     def __init__(self, *, cfg: dict, rules, provider, prompt, out_dir: Path, stem: str,
                  clock: Callable[[], float], budget=None):
@@ -304,29 +317,19 @@ class Engine:
             self._submit_classify(line, span)
 
     # ---------- model roles ----------
-    def _earlier(self, line: Line) -> List[str]:
-        """Lines older than the live tail, up to `context_earlier_s` back (default 8 min)."""
-        span = self.cfg.get("context_earlier_s", 240)
-        if not span:
-            return []
+    def _windows(self, line: Line):
+        """The earlier lines (up to `context_earlier_s` back, cut at `context_bucket_s` steps) and the live tail."""
         with self.lock:
             hist = [h for h in self.history if h.line_id <= line.line_id]
-        end = line.t_s
-        out = []
-        for h in hist:
-            if 90 < end - h.t_s <= 90 + span:
-                out.append("[{}] {}: {}".format(h.t, self.speakers.who(h), h.text[:300]))
-        return out[-80:]
+        return context_windows(hist, line.t_s, self.cfg.get("context_earlier_s", 240), self.cfg.get("context_bucket_s", 120))
+
+    def _earlier(self, line: Line) -> List[str]:
+        earlier, _ = self._windows(line)
+        return ["[{}] {}: {}".format(h.t, self.speakers.who(h), h.text[:300]) for h in earlier][-80:]
 
     def _tail(self, line: Line) -> List[str]:
-        with self.lock:
-            hist = [h for h in self.history if h.line_id <= line.line_id]
-        end = line.t_s
-        out = []
-        for h in hist:
-            if end - h.t_s <= 90:
-                out.append("[{}] {}: {}".format(h.t, self.speakers.who(h), h.text))
-        return out[-40:]
+        _, tail = self._windows(line)
+        return ["[{}] {}: {}".format(h.t, self.speakers.who(h), h.text) for h in tail][-60:]
 
     def _state(self) -> dict:
         """tips_given carries the numbers already shown (review 2026-10-23: "63 h" was shown three times

@@ -41,6 +41,7 @@ struct HomeView: View {
     @State private var prepSheet: StartCallModel?
     /// 2026-10-27 (owner): Settings > General: the week's numbers, the chart and the spend can be hidden (a demo to colleagues).
     @AppStorage("homeShowStats") private var showStats = true
+    @State private var showAllRecent = false
 
     private var live: Bool { CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(status.state) }
 
@@ -58,11 +59,12 @@ struct HomeView: View {
                             HStack(alignment: .top, spacing: 18) {
                                 VStack(alignment: .leading, spacing: 18) { aheadSection; recentSection }
                                     .frame(maxWidth: .infinity)
-                                if showStats { WeekStats().frame(width: 360) }
+                                if showStats { WeekStats().frame(width: 400) }
                             }
                         } else {
+                            // 2026-10-28 (owner): narrow: the insights on top, lower than in a wide window, then the calls.
+                            if showStats { WeekStats(compact: true) }
                             aheadSection
-                            if showStats { WeekStats() }
                             recentSection
                         }
                     }
@@ -283,8 +285,13 @@ struct HomeView: View {
 
     private var recentSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recent calls").font(.headline)
-            let rs = history.visible
+            let all = history.visible
+            HStack {
+                Text("Recent calls").font(.headline)
+                Spacer()
+                if all.count > 8 { Button(showAllRecent ? "Show fewer" : "Show all \(all.count)") { showAllRecent.toggle() }.buttonStyle(.link) }
+            }
+            let rs = showAllRecent ? all : Array(all.prefix(8))
             if rs.isEmpty {
                 Text("Calls you record appear here with their transcript and Notion page.").font(.callout).foregroundStyle(.secondary).ltCard(padding: 14)
             } else {

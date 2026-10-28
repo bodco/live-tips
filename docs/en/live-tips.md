@@ -1174,10 +1174,10 @@ window reads the recorder's status every 0.5 s.
 
 | Part | What |
 |---|---|
-| Top | Start call (Plan an upcoming call during a call), Plan a call. A wide window puts This week next to the calls |
+| Top | Start call (Plan an upcoming call during a call), Plan a call. Insights stand on top (lower in a narrow window); a wide window puts them next to the calls |
 | Live call | Title, timer, lines, tips, cost; Show tips, End call |
 | Ahead | The calls from the ticked calendars (from 3 h ago to 36 h ahead, declined ones left out) and the Up next calls, by time. Each: time, "in progress" or "in 5 min", repeat mark, project, account and calendar, preparation state, "Same time as ..." when calls overlap. Prepare (asks first: the project or workspace and "What matters on this call", filled from the last call of the series; then writes the preparation; does not start the call), Set up..., Start (Switch... during a call), × (hides the event here; the calendar is not changed) |
-| This week | Calls, time on calls, Claude spend (counted by day from 0.6.8 on) and how many calls were prepared, each against last week; minutes per day by project; the longest call, the busiest day, the average call. Settings > General > "Show this week's numbers on Home" hides it and the monthly spend (for a demo) |
+| Insights | A period (today, this week, last week, this month, last 30 days or your own dates) and a project or workspace; click a day in the chart to see that day. Calls, time on calls, Claude spend (counted by day from 0.6.8 on; for one project, the cost of its calls) and how many calls were prepared, each against the period before; the calls of the selection (double-click opens the transcript); minutes per day by project; the longest call, the busiest day, the average call. Settings > General > "Show this week's numbers on Home" hides it and the monthly spend (for a demo) |
 | Recent calls | The last 40 calls (the app's and the skill's transcripts of the last 45 days): Notion, Transcript, Show in Finder, × (hides it from the list; files stay) |
 | Bottom | Claude API key, this month's spend against the limit, a link to the balance in the Anthropic Console (an API key cannot read it), Notion copy, local AI, calendars |
 
@@ -1540,3 +1540,8 @@ address", `references/sweep.md`, `references/presentation.md`).
 81. **This week on Home (0.6.8).** Calls, time on calls, Claude spend, prepared calls, minutes per day by project.
 82. **Numbers off for a demo (0.6.9).** Settings > General hides this week's numbers, the chart and the monthly
    spend on Home; a wide Home shows the week next to the calls.
+83. **Interactive insights (0.7.0).** Period, project or workspace, a click on a day; the calls of the selection;
+   on top in a narrow Home, next to the calls in a wide one. Recent calls show 8, Show all for the rest.
+84. **Deeper preparation (0.7.0, skill v54).** Prepare reads the last 3 calls of the same meeting in full (the app
+   names their transcripts) and the brief (up to ~2500 words) has a "Previous meetings" section: what was discussed,
+   questions and whether they were answered, open items, action items with owner, due and status, promises.

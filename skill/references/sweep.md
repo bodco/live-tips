@@ -104,6 +104,16 @@ is older than 3 days -> say so in the sources line (item 4) as
    names one (titles of pages changed in the last 7 days, then the relevant ones).
    The same full list is used by a prep ahead ("підготуй live tips до ...", "підготуйся до
    дзвінка"): a prep is never lighter than the sweep.
+3b. **Previous meetings, read in depth (mandatory, 2026-10-28).** Find the last 3 meetings of this
+   series (the same title or calendar series; else the last 3 of this type with these people): their
+   transcripts in `live/` (`<stem>.md`, or `<stem>.named.md` when present; never only the tips) and
+   their Meetings DB pages (summary, decisions, action items). Read the transcripts in full, not only
+   the summaries. For each meeting extract: what was discussed (topics, 1-2 lines each, with numbers
+   and names); every question asked to us or by us and whether it was answered fully, partly or not
+   at all (the answer and who gave it); open items (raised, not closed); action items (owner, due date,
+   done / not done / unknown, checked against newer sources: the tracker, threads, later meetings);
+   promises we made; what the other side was unhappy about or kept pushing. A question or an action
+   item that stayed open is a topic of this call: put it on the checklist and make a card for it.
 3a. **Topic documents rule (mandatory).** For EVERY item of the checklist and every topic
    expected on the call (the user's words, the prep report, the open threads), find the project
    documents that touch it, created or changed in the last 3 days (Project docs `DESIGN-`,
@@ -148,10 +158,14 @@ State first"), everything scoped to this project (relation `Project` =
 For a topic call on a subject outside the standard sources (an incident, a contract), build
 the brief around the subject the user named, not around the stand-up agenda.
 
-Compress into the **Live Brief**, max ~1500 words, saved next to the transcript as
+Compress into the **Live Brief**, max ~2500 words (detailed: the PM reads it before the call), saved next to the transcript as
 `<transcript name>.brief.md`:
 
 1. Checklist: what this meeting must cover + "Decisions to obtain".
+1a. **Previous meetings** (from 3b, required): per meeting its date and 3-6 lines of what was
+   discussed; then one combined list: open questions (who asked, answered partly or not, what is
+   missing), action items (owner, due, status), promises in flight, the other side's concerns. With
+   no previous meetings say so in one line.
 2. Topic map: topic -> keywords (in every language of `langs`) and Jira keys -> 1-line status.
 3. Commitments in flight: who promised what by when.
 4. Red lines: decided items not to reopen, out-of-scope areas, decision rights.

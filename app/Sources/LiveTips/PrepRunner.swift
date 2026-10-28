@@ -199,6 +199,13 @@ final class PrepRunner: ObservableObject {
         brief that the project folder was excluded on purpose.
         """)
 
+        \(Self.previousCallsBlock(live: live, title: r.title))
+        Previous meetings (2026-10-28, owner): read the previous calls of this meeting in depth, as the skill's sweep.md \
+        step 3b says: what was discussed, every question and whether it was answered fully, partly or not, open items, \
+        action items (owner, due, status checked against newer sources), promises, the other side's concerns. The brief \
+        is detailed (up to ~2500 words) and has the "Previous meetings" section (sweep.md, item 1a); every open question \
+        or action item becomes a checklist line and a card.
+
         Write exactly these files and nothing else:
         - \(base).brief.md, first line: "# Live Brief: \(r.title) (prep, \(h.string(from: r.date)))"
         - \(base).cards.json
@@ -300,6 +307,25 @@ final class PrepRunner: ObservableObject {
         result = ""
         progress = 0.02; stage = "Starting Claude Code"; detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil
         return nil
+    }
+
+    /// The transcripts of the last 3 calls of the same meeting (same title) in the project's live folder, newest first.
+    static func previousCallsBlock(live: String, title: String) -> String {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: live) else { return "" }
+        let want = StartCallModel.slugify(title).replacingOccurrences(of: "-", with: "")
+        var picked: [String] = []
+        for n in names.sorted(by: >) where n.range(of: "^\\d{4}-\\d\\d-\\d\\d-\\d{4}-[^.]+(\\.app)?\\.md$", options: .regularExpression) != nil {
+            let core = String(n.dropFirst(16)).replacingOccurrences(of: ".app.md", with: "").replacingOccurrences(of: ".md", with: "").replacingOccurrences(of: "-", with: "")
+            guard !want.isEmpty, core == want || (min(core.count, want.count) >= 4 && (core.contains(want) || want.contains(core))) else { continue }
+            let stem = String(n.prefix(16 + max(0, n.count - 16 - (n.hasSuffix(".app.md") ? 7 : 3))))
+            if picked.contains(where: { ($0 as NSString).lastPathComponent.hasPrefix(stem) }) { continue }   // app and skill copies of one call
+            let named = (live as NSString).appendingPathComponent(String(n.dropLast(3)) + ".named.md")
+            picked.append(fm.fileExists(atPath: named) ? named : (live as NSString).appendingPathComponent(n))
+            if picked.count == 3 { break }
+        }
+        guard !picked.isEmpty else { return "Previous calls of this meeting: none found by title in \(live); use the Meetings rows of the Notion copy and the digest." }
+        return "Previous calls of this meeting (read each fully, newest first): " + picked.joined(separator: "; ")
     }
 
     /// Hosts of the http(s) links the PM wrote in the call context, plus docs.google.com for Google Docs exports.

@@ -41,7 +41,7 @@ def default_state_path() -> str:
         "~/Library/Application Support/LiveTips/state/ai-routes.json")
 
 
-def find_claude_cli(hint: str = "") -> Optional[str]:
+def find_claude_cli(hint: Optional[str] = None) -> Optional[str]:
     """The `claude` command line tool (Claude Code), where its installers put it."""
     home = os.path.expanduser("~")
     for p in [hint, os.environ.get("LT_CLAUDE_CLI", ""), home + "/.local/bin/claude", home + "/.claude/local/claude",
@@ -60,25 +60,23 @@ def cc_model(model: str) -> str:
     return model or "sonnet"
 
 
+# Why a route is out, by the words of its error. (route or None for both, reason, words); first match wins.
+OUT_REASONS = [
+    (None, "no_key", ("no api key",)),
+    (None, "missing", ("noroute", "not installed")),
+    (None, "credit", ("credit balance", "billing", "insufficient")),
+    ("api", "auth", ("authentication", "x-api-key", "permissiondenied")),
+    ("code", "limit", ("limit",)),            # "usage limit reached", "5-hour limit", "weekly limit"
+    ("code", "auth", ("login", "logged in", "oauth", "authentication", "invalid api key")),
+]
+
+
 def out_reason(route: str, err: Optional[str]) -> Optional[str]:
     """Why a route is out (worth switching), or None for a passing error (timeout, overload: hedging helps)."""
-    if not err:
-        return None
-    e = err.lower()
-    if "noroute" in e or "not installed" in e:
-        return "missing"
-    if "no api key" in e:
-        return "no_key"
-    if "credit balance" in e or "billing" in e or "insufficient" in e:
-        return "credit"
-    if route == "api":
-        if "authentication" in e or "x-api-key" in e or "permissiondenied" in e:
-            return "auth"
-        return None
-    if "limit" in e:                      # "usage limit reached", "5-hour limit", "weekly limit"
-        return "limit"
-    if "login" in e or "logged in" in e or "oauth" in e or "authentication" in e or "invalid api key" in e:
-        return "auth"
+    e = (err or "").lower()
+    for only, reason, words in OUT_REASONS:
+        if e and only in (None, route) and any(w in e for w in words):
+            return reason
     return None
 
 
@@ -100,7 +98,7 @@ class RouteState:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp{}".format(os.getpid()))
-            tmp.write_text(json.dumps(d, indent=1), encoding="utf-8")
+            tmp.write_text(json.dumps(d), encoding="utf-8")
             os.replace(tmp, self.path)
         except Exception:  # noqa: BLE001  the state is a hint, never a reason to fail a job
             pass
@@ -109,7 +107,8 @@ class RouteState:
         return bool((self.read().get(route) or {}).get("down"))
 
     def due(self, route: str, every_s: float) -> bool:
-        return time.time() - float((self.read().get(route) or {}).get("checked") or 0) >= every_s
+        checked = (self.read().get(route) or {}).get("checked")
+        return checked is None or time.time() - float(checked) >= every_s
 
     def mark_down(self, route: str, reason: str) -> None:
         with self.lock:
@@ -136,6 +135,76 @@ class RouteState:
             self._write(d)
 
 
+HIDDEN_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_API", "ANTHROPIC_CUSTOM_HEADERS")
+
+
+def cc_args(cli: str, alias: str, system_file: str) -> list:
+    """`claude -p` with no tools, no settings, no MCP servers and no saved session, streaming its events."""
+    return [cli, "-p", "--model", alias, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+            "--system-prompt-file", system_file, "--tools", "", "--setting-sources", "", "--strict-mcp-config",
+            "--no-session-persistence"]
+
+
+def cc_env(environ) -> dict:
+    """The child's environment without any API key: Claude Code then uses the PM's own sign-in."""
+    return {k: v for k, v in environ.items() if k not in HIDDEN_ENV}
+
+
+def text_delta(ev: dict) -> Optional[str]:
+    """The text a stream event adds to the answer, or None for any other event."""
+    e = ev.get("event") or {} if ev.get("type") == "stream_event" else {}
+    d = e.get("delta") or {} if e.get("type") == "content_block_delta" else {}
+    return d.get("text", "") if d.get("type") == "text_delta" else None
+
+
+def cc_event(c: Completion, line: str, on_text=None) -> Optional[dict]:
+    """Applies one stream-json line to the completion; returns the final "result" event when this is it."""
+    try:
+        ev = json.loads(line)
+    except ValueError:
+        return None
+    if ev.get("type") == "result":
+        return ev
+    piece = text_delta(ev)
+    if piece is None:
+        return None
+    if c.t_first_token is None:
+        c.t_first_token = time.monotonic()
+    c.text += piece
+    if c.t_gist is None and gist_closed(c.text):
+        c.t_gist = time.monotonic()
+    if on_text:
+        on_text(c.text)
+    return None
+
+
+def cc_finish(c: Completion, result: Optional[dict], returncode: int, stderr: str) -> Completion:
+    """Usage and errors from the final event (or from the exit code when there was none)."""
+    c.t_done = time.monotonic()
+    if result:
+        _cc_usage(c, result)
+        c.error = _cc_result_error(result)
+    elif returncode != 0 or not c.text:
+        c.error = "ClaudeCode: exit {} {}".format(returncode, (stderr or "").strip()[-200:])
+    return c
+
+
+def _cc_usage(c: Completion, result: dict) -> None:
+    u = result.get("usage") or {}
+    c.input_tokens = u.get("input_tokens") or 0
+    c.cache_read = u.get("cache_read_input_tokens") or 0
+    c.output_tokens = u.get("output_tokens") or 0
+    c.equiv_usd = result.get("total_cost_usd")
+    if not c.text and isinstance(result.get("result"), str):
+        c.text = result["result"]
+
+
+def _cc_result_error(result: dict) -> Optional[str]:
+    if result.get("is_error") or result.get("subtype") not in (None, "success"):
+        return "ClaudeCode: " + str(result.get("result") or result.get("subtype"))[:200]
+    return None
+
+
 class ClaudeCodeProvider(Provider):
     """One completion through Claude Code (`claude -p`) on the PM's Claude account.
 
@@ -155,70 +224,34 @@ class ClaudeCodeProvider(Provider):
         alias = cc_model(model)
         c = Completion(model="claude-code/" + alias, t_start=time.monotonic())
         c.route = "code"
-        sp = None
+        fd, sp = tempfile.mkstemp(prefix="sys-", suffix=".txt", dir=self.cwd)
         try:
-            fd, sp = tempfile.mkstemp(prefix="sys-", suffix=".txt", dir=self.cwd)
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write("\n\n".join(b["text"] for b in system) or "Answer briefly.")
-            args = [self.cli, "-p", "--model", alias, "--output-format", "stream-json", "--verbose",
-                    "--include-partial-messages", "--system-prompt-file", sp, "--tools", "", "--setting-sources", "",
-                    "--strict-mcp-config", "--no-session-persistence"]
-            env = {k: v for k, v in os.environ.items()
-                   if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_API", "ANTHROPIC_CUSTOM_HEADERS")}
-            p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                 text=True, cwd=self.cwd, env=env)
-            timer = threading.Timer(self.timeout, p.kill)
-            timer.start()
-            try:
-                p.stdin.write(user_text(user))
-                p.stdin.close()
-                result = None
-                for line in p.stdout:
-                    try:
-                        ev = json.loads(line)
-                    except ValueError:
-                        continue
-                    t = ev.get("type")
-                    if t == "stream_event":
-                        e = ev.get("event") or {}
-                        d = e.get("delta") or {}
-                        if e.get("type") == "content_block_delta" and d.get("type") == "text_delta":
-                            if c.t_first_token is None:
-                                c.t_first_token = time.monotonic()
-                            c.text += d.get("text", "")
-                            if c.t_gist is None and gist_closed(c.text):
-                                c.t_gist = time.monotonic()
-                            if on_text:
-                                on_text(c.text)
-                    elif t == "result":
-                        result = ev
-                err = p.stderr.read()
-                p.wait()
-            finally:
-                timer.cancel()
-            c.t_done = time.monotonic()
-            if result:
-                u = result.get("usage") or {}
-                c.input_tokens = u.get("input_tokens", 0) or 0
-                c.cache_read = u.get("cache_read_input_tokens", 0) or 0
-                c.output_tokens = u.get("output_tokens", 0) or 0
-                c.equiv_usd = result.get("total_cost_usd")
-                if not c.text and isinstance(result.get("result"), str):
-                    c.text = result["result"]
-                if result.get("is_error") or result.get("subtype") not in (None, "success"):
-                    c.error = "ClaudeCode: " + str(result.get("result") or result.get("subtype"))[:200]
-            elif p.returncode != 0 or not c.text:
-                c.error = "ClaudeCode: exit {} {}".format(p.returncode, (err or "").strip()[-200:])
-        except Exception as e:  # noqa: BLE001
+            return self._run(c, cc_args(self.cli, alias, sp), user_text(user), on_text)
+        except Exception as e:  # noqa: BLE001  a missing tool or a broken pipe is an error of this request
             c.t_done = time.monotonic()
             c.error = "ClaudeCode: {}: {}".format(type(e).__name__, str(e)[:200])
+            return c
         finally:
-            if sp:
-                try:
-                    os.remove(sp)
-                except OSError:
-                    pass
-        return c
+            os.remove(sp)
+
+    def _run(self, c: Completion, args: list, prompt: str, on_text) -> Completion:
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             text=True, cwd=self.cwd, env=cc_env(os.environ))
+        timer = threading.Timer(self.timeout, p.kill)
+        timer.start()
+        try:
+            p.stdin.write(prompt)
+            p.stdin.close()
+            result = None
+            for line in p.stdout:
+                result = cc_event(c, line, on_text) or result
+            err = p.stderr.read()
+            p.wait()
+        finally:
+            timer.cancel()
+        return cc_finish(c, result, p.returncode, err)
 
 
 class RoutedProvider(Provider):
@@ -256,25 +289,32 @@ class RoutedProvider(Provider):
         return self.preferred == "code" or self.auto
 
     def pick(self) -> str:
-        p = self.preferred
-        if not self.auto:
+        """The chosen route while it answers; with auto-switch the other one while it is out."""
+        p, o = self.preferred, other(self.preferred)
+        if not self.auto or self._ready(p) or self._recheck(p):
             return p
-        o = other(p)
-        if self.usable(p) and not self.state.is_down(p):
-            return p
-        if self.usable(p) and self.state.due(p, self.probe_every):
-            if self.background:
-                self._probe_async(p)
-            elif self.probe(p):
-                return p
-        if self.usable(o) and not self.state.is_down(o):
+        if self._ready(o):
             return o
         return p if self.usable(p) else o
+
+    def _ready(self, route: str) -> bool:
+        return self.usable(route) and not self.state.is_down(route)
+
+    def _recheck(self, route: str) -> bool:
+        """An out route due for a check: in the background during a call (this request goes the other way),
+        before the job otherwise (it goes back right away when it answers)."""
+        if not (self.usable(route) and self.state.due(route, self.probe_every)):
+            return False
+        if self.background:
+            self._probe_async(route)
+            return False
+        return self.probe(route)
 
     def probe(self, route: str) -> bool:
         """A one-word request on the route: it answers, so the job may go back to it."""
         leg = self.legs.get(route)
         if leg is None:
+            self.state.mark_down(route, "no_key" if route == "api" else "missing")
             return False
         self.state.touch(route)
         c = leg.complete(model=PING_MODEL[route], system=[{"text": "Reply with OK."}], user="OK?", max_tokens=5,
@@ -335,73 +375,59 @@ class RoutedProvider(Provider):
         return c
 
 
-def _env_api_leg(timeout: float) -> Optional[Provider]:
-    key = os.environ.get("CLAUDE_API", "")
-    if not key:
-        return None
-    return AnthropicProvider(key, timeout=timeout, workspace_id=os.environ.get("CLAUDE_WORKSPACE", ""))
+CODE_TIMEOUT = {True: 60.0, False: 300.0}    # during the call / any other job
+
+
+def make_legs(key: str, workspace: str, cli: Optional[str], api_timeout: float, code_timeout: float) -> dict:
+    """The two ways to Claude; a way that cannot be used (no key, no Claude Code) is None."""
+    return {"api": AnthropicProvider(key, timeout=api_timeout, workspace_id=workspace) if key else None,
+            "code": ClaudeCodeProvider(cli, timeout=code_timeout) if cli else None}
+
+
+def _secret(loader: Callable[[str], str], name: str) -> str:
+    try:
+        return loader(name) if name else ""
+    except KeyError:
+        return ""
 
 
 def provider_from_env(job: Optional[str] = None, timeout: float = 120.0) -> Provider:
     """For a one-off job started by the app: LT_AI_ROUTE (api | code), LT_AI_AUTO (1 | 0), LT_AI_STATE,
-    LT_CLAUDE_CLI; the key in CLAUDE_API. Without LT_AI_ROUTE: the API key as before 0.8.2."""
-    job = job or os.environ.get("LT_AI_JOB", "after")
-    route = os.environ.get("LT_AI_ROUTE", "")
-    if not route:
-        return _env_api_leg(timeout) or RoutedProvider(job, "api", {"api": None, "code": None}, auto=False)
-    cli = find_claude_cli()
-    legs = {"api": _env_api_leg(timeout), "code": ClaudeCodeProvider(cli, timeout=max(timeout, 300.0)) if cli else None}
-    return RoutedProvider(job, route, legs, auto=os.environ.get("LT_AI_AUTO", "1") == "1", state=RouteState())
+    LT_CLAUDE_CLI; the key in CLAUDE_API. Without LT_AI_ROUTE: the API key only, as before 0.8.2."""
+    env = os.environ
+    route = env.get("LT_AI_ROUTE", "")
+    cli = find_claude_cli() if route else None
+    legs = make_legs(env.get("CLAUDE_API", ""), env.get("CLAUDE_WORKSPACE", ""), cli, timeout, max(timeout, 300.0))
+    return RoutedProvider(job or env.get("LT_AI_JOB", "after"), route, legs,
+                          auto=bool(route) and env.get("LT_AI_AUTO", "1") == "1", state=RouteState())
 
 
 def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optional[str] = None) -> Provider:
     """For the tips engine and the judge: cfg["ai"] = {"routes": {job: route}, "auto": bool, "state": path,
-    "claude_cli": path}, written by the app into sidecar-config.json."""
+    "claude_cli": path}, written by the app into sidecar-config.json. LT_AI_ROUTE wins (a one-off run)."""
     ai = cfg.get("ai") or {}
     job = job or ai.get("job", "tips")
-    route = os.environ.get("LT_AI_ROUTE") or (ai.get("routes") or {}).get(job) or "api"   # the env wins (a one-off run)
-    try:
-        key = secret_loader(cfg.get("api_key_env", "CLAUDE_API"))
-    except KeyError:
-        key = ""
-    ws = cfg.get("workspace_id", "")
-    if not ws and cfg.get("workspace_id_env"):
-        try:
-            ws = secret_loader(cfg["workspace_id_env"])
-        except KeyError:
-            ws = ""
-    cli = find_claude_cli(ai.get("claude_cli") or cfg.get("claude_cli") or "")
-    timeout = 60.0 if job == "tips" else 300.0
-    legs = {"api": AnthropicProvider(key, workspace_id=ws) if key else None,
-            "code": ClaudeCodeProvider(cli, timeout=timeout) if cli else None}
+    route = os.environ.get("LT_AI_ROUTE") or (ai.get("routes") or {}).get(job)
+    key = _secret(secret_loader, cfg.get("api_key_env", "CLAUDE_API"))
+    ws = cfg.get("workspace_id") or _secret(secret_loader, cfg.get("workspace_id_env", ""))
+    legs = make_legs(key, ws, find_claude_cli(ai.get("claude_cli") or cfg.get("claude_cli")), 30.0, CODE_TIMEOUT[job == "tips"])
     return RoutedProvider(job, route, legs, auto=bool(ai.get("auto", True)), state=RouteState(ai.get("state")),
                           background=(job == "tips"))
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Pacenote AI routes: check a route, show or change the shared state")
+    """`ping --route api|code`: a one-word request on that way, its state updated (Settings > AI > Check now).
+    `status`: the shared state."""
+    ap = argparse.ArgumentParser(description="Pacenote AI routes: check a way to Claude, show the shared state")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    pg = sub.add_parser("ping")
-    pg.add_argument("--route", choices=ROUTES, required=True)
+    sub.add_parser("ping").add_argument("--route", choices=ROUTES, required=True)
     sub.add_parser("status")
-    mk = sub.add_parser("mark")
-    mk.add_argument("--route", choices=ROUTES, required=True)
-    mk.add_argument("--down", default="")
-    mk.add_argument("--up", action="store_true")
     a = ap.parse_args(argv)
     st = RouteState()
-    if a.cmd == "status":
-        print(json.dumps(st.read()))
-        return 0
-    if a.cmd == "mark":
-        st.mark_up(a.route) if a.up else st.mark_down(a.route, a.down or "error")
-        print(json.dumps({"ok": True}))
-        return 0
-    cli = find_claude_cli()
-    legs = {"api": _env_api_leg(30.0), "code": ClaudeCodeProvider(cli, timeout=60.0) if cli else None}
-    rp = RoutedProvider("ping", a.route, legs, auto=False, state=st)
-    ok = rp.probe(a.route)
-    print(json.dumps({"ok": ok, "route": a.route, "state": st.read().get(a.route) or {}}))
+    if a.cmd == "ping":
+        legs = make_legs(os.environ.get("CLAUDE_API", ""), os.environ.get("CLAUDE_WORKSPACE", ""), find_claude_cli(), 30.0, 60.0)
+        RoutedProvider("ping", a.route, legs, auto=False, state=st).probe(a.route)
+    print(json.dumps(st.read()))
     return 0
 
 

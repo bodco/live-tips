@@ -740,6 +740,303 @@ def load_json(path, default):
         return default
 
 
+def run_mode(state, args, started, cfg):
+    """(full, only_transcripts, since): a full run without state, on --full or when the last full run is too old."""
+    only_tr = "--transcripts" in args
+    if only_tr:
+        return False, True, None
+    full = "--full" in args or not state.get("last_run")
+    if not full and state.get("last_full"):
+        last_full = datetime.strptime(state["last_full"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+        full = started - last_full > timedelta(days=cfg.get("full_every_days", 7))
+    if full:
+        return True, False, None
+    since = iso(datetime.strptime(state["last_run"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+                - timedelta(minutes=15))
+    return False, False, since
+
+
+def mode_name(full, only_tr):
+    return "full" if full else ("transcripts" if only_tr else "incremental")
+
+
+def linked_databases(cfg, schema):
+    """The configured databases plus the Workspaces and Inbox data sources the Projects schema links to."""
+    dbs = dict(cfg["databases"])
+    for name, p in (schema.get("properties") or {}).items():
+        ds = p.get("relation", {}).get("data_source_id") if p.get("type") == "relation" else None
+        if not ds:
+            continue
+        if name == cfg["relation_workspace"]:
+            dbs.setdefault("_workspaces", ds)
+        if name.strip().lower().endswith("inbox"):
+            dbs.setdefault("inbox", ds)
+    return dbs
+
+
+def current_state_id(project):
+    cs = (project.get("properties") or {}).get("Current State")
+    return norm_id(cs.get("url")) if cs and cs.get("type") == "url" and cs.get("url") else None
+
+
+def mirror_parts(path):
+    """(the folder holding _notion, the path inside _notion) or None."""
+    parts = path.split(os.sep + MIRROR_DIR + os.sep, 1)
+    return parts if len(parts) == 2 else None
+
+
+def index_text(layout, projects, workspaces):
+    index = ["# Notion mirror index", "", "<!-- %s -->" % GENERATED_NOTE, "",
+             "| Workspace | Project | Folder |", "|---|---|---|"]
+    ws_title = {norm_id(w["id"]): title_of(w) for w in workspaces}
+    for p in sorted(projects, key=lambda x: title_of(x).lower()):
+        pid = norm_id(p["id"])
+        index.append("| %s | %s | `%s` |" % (ws_title.get(layout.proj_ws.get(pid), "-"), title_of(p),
+                                              layout.proj_folder[pid]))
+    return "\n".join(index) + "\n"
+
+
+class MirrorRun:
+    """One run of the mirror: Notion is read, files under _notion/ and the state are written."""
+
+    def __init__(self, cfg, args, status_path):
+        self.cfg, self.status_path = cfg, status_path
+        self.state = load_json(STATE_PATH, {"pages": {}, "last_run": None, "last_full": None})
+        self.started = now_utc()
+        self.full, self.only_tr, self.since = run_mode(self.state, args, self.started, cfg)
+        self.tr_dbs = set(cfg.get("transcript_dbs", ["meetings"]))
+        self.errors = []
+        self.path_owner = {v["path"]: k for k, v in self.state["pages"].items() if v.get("path")}
+        self.written = 0
+
+    def error(self, msg, logged):
+        self.errors.append(msg)
+        log("  ERROR " + logged)
+
+    def run(self):
+        cfg = self.cfg
+        log("start %s run%s" % ("FULL" if self.full else ("TRANSCRIPTS backfill" if self.only_tr else "incremental"),
+                               "" if (self.full or self.only_tr) else " since " + self.since))
+        self.api = Notion(get_token(cfg), cfg.get("notion_version", "2025-09-03"), cfg.get("markdown_version"),
+                          cfg.get("pause_seconds", 0.34))
+        # 1. Workspaces and Projects (always full, they are small).
+        dbs = linked_databases(cfg, self.api.data_source(cfg["projects_ds"]))
+        self.projects = self.api.query_all(cfg["projects_ds"])
+        self.workspaces = self.api.query_all(dbs["_workspaces"]) if dbs.get("_workspaces") else []
+        self.layout = Layout(cfg, self.workspaces, self.projects)
+        self.titles = {k: v.get("title", "") for k, v in self.state["pages"].items()}
+        for p in self.projects + self.workspaces:
+            self.titles[norm_id(p["id"])] = title_of(p)
+        self.users = self.load_users()
+        self.rs = Resolver(self.titles, self.users, self.state.setdefault("titles_extra", {}), self.lookup_title,
+                           cfg.get("max_page_lookups", 200))
+        rows, seen = self.collect_rows(dbs)          # 2. changed rows per database
+        self.write_projects()                        # 3. projects, current state, workspaces
+        self.write_rows(rows)                        # 4. database rows
+        archived = self.archive_missing(seen) if self.full else 0     # 5. pages gone from their database
+        swept, orphans = self.housekeeping() if self.full else ([], [])
+        return self.finish(archived, swept, orphans)  # 6. index and status
+
+    def load_users(self):
+        """People: one paginated GET /users per run, cached in state for mentions and people props."""
+        users = self.state.setdefault("users", {})
+        try:
+            for u in self.api.users_all():
+                if u.get("id") and u.get("name"):
+                    users[norm_id(u["id"])] = u["name"]
+            log("  users: %d cached" % len(users))
+        except NotionError as e:
+            log("  WARN users list unavailable (HTTP %s), using %d cached" % (e.code, len(users)))
+        return users
+
+    def lookup_title(self, pid):
+        try:
+            return title_of(self.api.page(pid))
+        except NotionError:
+            return None
+
+    def collect_rows(self, dbs):
+        rows, seen = [], {}
+        for key, ds in sorted(dbs.items()):
+            if key.startswith("_") or (self.only_tr and key not in self.tr_dbs):
+                continue
+            try:
+                res = self.api.query_all(ds, self.since)
+            except NotionError as e:
+                self.error("%s: %s" % (key, e), "query %s: %s" % (key, e))
+                continue
+            seen[key] = set()
+            for r in res:
+                if r.get("in_trash") or r.get("archived"):
+                    continue
+                rid = norm_id(r["id"])
+                seen[key].add(rid)
+                self.titles[rid] = title_of(r)
+                rows.append((key, r))
+            log("  %s: %d changed" % (key, len(res)))
+        return rows, seen
+
+    def page_text(self, page, key, children, head_extra):
+        """(the rendered file, whether a transcript was asked for, its state)."""
+        pid = norm_id(page["id"])
+        tr_req = key in self.tr_dbs
+        md, trunc = self.api.markdown(pid, transcript=tr_req)
+        tstate = transcript_state(md) if tr_req else None
+        if tstate:
+            head_extra = list(head_extra or []) + ["transcript: %s" % tstate]
+            if tstate == "omitted":
+                log("  WARN transcript still omitted for %s" % pid[:8])
+        extra = self.child_pages(md) if children else []
+        return render(page, key, self.rs, md, trunc, extra, head_extra), tr_req, tstate
+
+    def child_pages(self, md):
+        extra = []
+        for url, ctitle in PAGE_RE.findall(md or ""):
+            cid = norm_id(url)
+            if cid:
+                cmd, _ = self.api.markdown(cid)
+                extra.append((ctitle, cmd))
+                self.titles[cid] = ctitle
+        return extra
+
+    def write_page(self, page, key, base, fname, children=True, head_extra=None):
+        pid = norm_id(page["id"])
+        try:
+            text, tr_req, tstate = self.page_text(page, key, children, head_extra)
+        except NotionError as e:
+            return self.error("%s %s: %s" % (key, pid[:8], e), "page %s: %s" % (pid[:8], e))
+        path = os.path.join(base, MIRROR_DIR, fname)
+        owner = self.path_owner.get(path)
+        if owner and owner != pid:
+            return self.error("%s %s: path collision with %s" % (key, pid[:8], owner[:8]), "path collision %s" % path)
+        try:
+            self.save_file(pid, path, base, text)
+        except OSError as e:
+            return self.error("%s %s: write failed: %s" % (key, pid[:8], e), "write %s: %s" % (path, e))
+        self.state["pages"][pid] = {"path": path, "db": key, "title": title_of(page),
+                                    "last_edited": page.get("last_edited_time")}
+        if tr_req and tstate != "omitted":
+            self.state["pages"][pid]["tr"] = True  # transcript fetched (or the meeting has none)
+        self.path_owner[path] = pid
+        self.written += 1
+        if self.written % 100 == 0:
+            atomic_write(STATE_PATH, json.dumps(self.state, ensure_ascii=False, indent=1))
+
+    def save_file(self, pid, path, base, text):
+        old = self.state["pages"].get(pid, {}).get("path")
+        if old and old != path and os.path.exists(old):
+            os.remove(old)  # page moved (renamed or re-linked); the new copy replaces it
+        atomic_write(path, text)
+        gi = os.path.join(base, MIRROR_DIR, ".gitignore")
+        if not os.path.exists(gi):
+            atomic_write(gi, "*\n")
+
+    def unchanged(self, page, expected_path=None, key=None):
+        # RISK-6: a full run also skips pages whose last_edited and path did not change;
+        # the archive step below works from the query results, not from re-reading pages.
+        st = self.state["pages"].get(norm_id(page["id"]))
+        if not st or st.get("last_edited") != page.get("last_edited_time"):
+            return False
+        if not os.path.exists(st.get("path", "")):
+            return False
+        if expected_path and st.get("path") != expected_path:
+            return False
+        return not (key in self.tr_dbs and not st.get("tr"))  # written before transcripts were mirrored
+
+    def write_if_changed(self, page, key, base, fname, **kw):
+        if not self.unchanged(page, os.path.join(base, MIRROR_DIR, fname), kw.pop("check_key", None)):
+            self.write_page(page, key, base, fname, **kw)
+
+    def write_projects(self):
+        layout = self.layout
+        for p in self.projects:
+            base = layout.proj_folder[norm_id(p["id"])]
+            self.write_if_changed(p, "project", base, "project.md", children=False)
+            self.write_current_state(p, base)
+        for w in self.workspaces:
+            self.write_if_changed(w, "workspace", layout.ws_folder[norm_id(w["id"])], "workspace.md", children=False)
+
+    def write_current_state(self, p, base):
+        cs_id = current_state_id(p)
+        if not cs_id:
+            return
+        try:
+            csp = self.api.page(cs_id)
+            self.write_if_changed(csp, "current_state", base, "current-state.md", children=False,
+                                  head_extra=["mirror_last_run: %s" % iso(self.started)])
+        except NotionError as e:
+            self.errors.append("current_state %s: %s" % (title_of(p), e))
+
+    def write_rows(self, rows):
+        children_for = self.cfg.get("child_pages_for", ["reports", "knowledge"])
+        for key, r in rows:
+            self.write_if_changed(r, key, self.layout.base_for(r, self.cfg), row_filename(key, r, self.cfg),
+                                  check_key=key, children=(key in children_for))
+
+    def archive_missing(self, seen):
+        """Full run: archive pages that disappeared from their database."""
+        archived = 0
+        for pid, st in list(self.state["pages"].items()):
+            key = st.get("db")
+            if key in seen and pid not in seen[key] and os.path.exists(st.get("path", "")):
+                parts = mirror_parts(st["path"])
+                if parts:
+                    move_file(st["path"], os.path.join(parts[0], MIRROR_DIR, "_archived", parts[1]), touch=True)
+                    archived += 1
+                del self.state["pages"][pid]
+        return archived
+
+    def housekeeping(self):
+        """Full run: _archived retention, then orphan check (files no state entry points to)."""
+        roots, swept, orphans = self.layout.roots(), [], []
+        try:
+            swept = sweep_archived(roots, self.cfg["work_root"], self.cfg.get("archived_retention_days", 30),
+                                   datetime.now().strftime("%Y-%m-%d"))
+            if swept:
+                log("  _archived retention: %d files moved to _to_delete" % len(swept))
+        except OSError as e:
+            self.errors.append("archived retention: %s" % e)
+        try:
+            orphans = archive_orphans(roots, [v.get("path") for v in self.state["pages"].values()])
+            for o in orphans:
+                log("  orphan archived: %s" % o)
+        except OSError as e:
+            self.errors.append("orphan check: %s" % e)
+        return swept, orphans
+
+    def finish(self, archived, swept, orphans):
+        state, errors = self.state, self.errors
+        if not self.only_tr:  # a transcripts backfill covers one database only: keep the incremental window
+            state["last_run"] = iso(self.started)
+        if self.full:
+            state["last_full"] = iso(self.started)
+        state["last_errors"] = errors[:50]
+        atomic_write(STATE_PATH, json.dumps(state, ensure_ascii=False, indent=1))
+        atomic_write(os.path.join(self.cfg["work_root"], MIRROR_DIR, "INDEX.md"),
+                     index_text(self.layout, self.projects, self.workspaces))
+        atomic_write(self.status_path, self.status_text(archived, swept, orphans))
+        log("done: %s, pages %d, calls %d, errors %d" % ("full" if self.full else "incremental",
+                                                         len(state["pages"]), self.api.calls, len(errors)))
+        return 0 if not errors else 2
+
+    def status_text(self, archived, swept, orphans):
+        errors, started = self.errors, self.started
+        status = ["# Notion mirror status", "",
+                  "- result: %s" % ("OK" if not errors else "PARTIAL (%d errors)" % len(errors)),
+                  "- last_run_utc: %s" % iso(started),
+                  "- last_run_local: %s" % started.astimezone().isoformat(timespec="seconds"),
+                  "- mode: %s" % mode_name(self.full, self.only_tr),
+                  "- duration_s: %d" % (now_utc() - started).total_seconds(),
+                  "- pages_in_mirror: %d" % len(self.state["pages"]),
+                  "- archived_this_run: %d" % archived,
+                  "- orphans_archived: %d" % len(orphans),
+                  "- moved_to_delete: %d" % len(swept),
+                  "- users_cached: %d" % len(self.users),
+                  "- page_title_lookups: %d" % self.rs.lookups,
+                  "- api_calls: %d" % self.api.calls]
+        return "\n".join(status + ["- error: %s" % e for e in errors[:20]]) + "\n"
+
+
 def main():
     args = sys.argv[1:]
     if "--selftest" in args:
@@ -754,257 +1051,13 @@ def main():
     if "--status" in args:
         print(open(status_path, encoding="utf-8").read() if os.path.exists(status_path) else "no status yet")
         return 0
-
     lock = open(LOCK_PATH, "w")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         log("another run is in progress, exit")
         return 0
-
-    state = load_json(STATE_PATH, {"pages": {}, "last_run": None, "last_full": None})
-    started = now_utc()
-    only_tr = "--transcripts" in args
-    tr_dbs = set(cfg.get("transcript_dbs", ["meetings"]))
-    full = "--full" in args or not state.get("last_run")
-    if only_tr:
-        full = False
-    if not full and not only_tr and state.get("last_full"):
-        last_full = datetime.strptime(state["last_full"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-        if started - last_full > timedelta(days=cfg.get("full_every_days", 7)):
-            full = True
-    since = None
-    if not full and not only_tr:
-        since = iso(datetime.strptime(state["last_run"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-                    - timedelta(minutes=15))
-    log("start %s run%s" % ("FULL" if full else ("TRANSCRIPTS backfill" if only_tr else "incremental"),
-                           "" if (full or only_tr) else " since " + since))
-
-    token = get_token(cfg)
-    api = Notion(token, cfg.get("notion_version", "2025-09-03"), cfg.get("markdown_version"),
-                 cfg.get("pause_seconds", 0.34))
-    errors = []
-
-    # 1. Workspaces and Projects (always full, they are small).
-    proj_ds = cfg["projects_ds"]
-    schema = api.data_source(proj_ds)
-    dbs = dict(cfg["databases"])
-    for name, p in (schema.get("properties") or {}).items():
-        if p.get("type") == "relation":
-            ds = p["relation"].get("data_source_id")
-            if name == cfg["relation_workspace"] and ds:
-                dbs.setdefault("_workspaces", ds)
-            if name.strip().lower().endswith("inbox") and ds:
-                dbs.setdefault("inbox", ds)
-    projects = api.query_all(proj_ds)
-    workspaces = api.query_all(dbs["_workspaces"]) if dbs.get("_workspaces") else []
-    layout = Layout(cfg, workspaces, projects)
-
-    titles = {k: v.get("title", "") for k, v in state["pages"].items()}
-    for p in projects + workspaces:
-        titles[norm_id(p["id"])] = title_of(p)
-
-    # People: one paginated GET /users per run, cached in state for mentions and people props.
-    users = state.setdefault("users", {})
-    try:
-        for u in api.users_all():
-            if u.get("id") and u.get("name"):
-                users[norm_id(u["id"])] = u["name"]
-        log("  users: %d cached" % len(users))
-    except NotionError as e:
-        log("  WARN users list unavailable (HTTP %s), using %d cached" % (e.code, len(users)))
-
-    def lookup_title(pid):
-        try:
-            return title_of(api.page(pid))
-        except NotionError:
-            return None
-
-    rs = Resolver(titles, users, state.setdefault("titles_extra", {}), lookup_title,
-                  cfg.get("max_page_lookups", 200))
-
-    # 2. Collect changed rows per database.
-    rows, seen = [], {}
-    for key, ds in sorted(dbs.items()):
-        if key.startswith("_") or (only_tr and key not in tr_dbs):
-            continue
-        try:
-            res = api.query_all(ds, since)
-        except NotionError as e:
-            errors.append("%s: %s" % (key, e))
-            log("  ERROR query %s: %s" % (key, e))
-            continue
-        seen[key] = set()
-        for r in res:
-            if r.get("in_trash") or r.get("archived"):
-                continue
-            rid = norm_id(r["id"])
-            seen[key].add(rid)
-            titles[rid] = title_of(r)
-            rows.append((key, r))
-        log("  %s: %d changed" % (key, len(res)))
-
-    def write_page(page, key, base, fname, children=True, head_extra=None):
-        pid = norm_id(page["id"])
-        try:
-            tr_req = key in tr_dbs
-            md, trunc = api.markdown(pid, transcript=tr_req)
-            tstate = transcript_state(md) if tr_req else None
-            if tstate:
-                head_extra = list(head_extra or []) + ["transcript: %s" % tstate]
-                if tstate == "omitted":
-                    log("  WARN transcript still omitted for %s" % pid[:8])
-            extra = []
-            if children:
-                for url, ctitle in PAGE_RE.findall(md or ""):
-                    cid = norm_id(url)
-                    if cid:
-                        cmd, _ = api.markdown(cid)
-                        extra.append((ctitle, cmd))
-                        titles[cid] = ctitle
-            text = render(page, key, rs, md, trunc, extra, head_extra)
-        except NotionError as e:
-            errors.append("%s %s: %s" % (key, pid[:8], e))
-            log("  ERROR page %s: %s" % (pid[:8], e))
-            return
-        path = os.path.join(base, MIRROR_DIR, fname)
-        owner = path_owner.get(path)
-        if owner and owner != pid:
-            errors.append("%s %s: path collision with %s" % (key, pid[:8], owner[:8]))
-            log("  ERROR path collision %s" % path)
-            return
-        old = state["pages"].get(pid, {}).get("path")
-        try:
-            if old and old != path and os.path.exists(old):
-                os.remove(old)  # page moved (renamed or re-linked); the new copy replaces it
-            atomic_write(path, text)
-            gi = os.path.join(base, MIRROR_DIR, ".gitignore")
-            if not os.path.exists(gi):
-                atomic_write(gi, "*\n")
-        except OSError as e:
-            errors.append("%s %s: write failed: %s" % (key, pid[:8], e))
-            log("  ERROR write %s: %s" % (path, e))
-            return
-        state["pages"][pid] = {"path": path, "db": key, "title": title_of(page),
-                               "last_edited": page.get("last_edited_time")}
-        if tr_req and tstate != "omitted":
-            state["pages"][pid]["tr"] = True  # transcript fetched (or the meeting has none)
-        path_owner[path] = pid
-        written[0] += 1
-        if written[0] % 100 == 0:
-            atomic_write(STATE_PATH, json.dumps(state, ensure_ascii=False, indent=1))
-
-    path_owner = {v["path"]: k for k, v in state["pages"].items() if v.get("path")}
-    written = [0]
-
-    def unchanged(page, expected_path=None, key=None):
-        # RISK-6: a full run also skips pages whose last_edited and path did not change;
-        # the archive step below works from the query results, not from re-reading pages.
-        pid = norm_id(page["id"])
-        st = state["pages"].get(pid)
-        if not st or st.get("last_edited") != page.get("last_edited_time"):
-            return False
-        if not os.path.exists(st.get("path", "")):
-            return False
-        if expected_path and st.get("path") != expected_path:
-            return False
-        if key in tr_dbs and not st.get("tr"):
-            return False  # written before transcripts were mirrored (or the transcript was omitted)
-        return True
-
-    # 3. Projects, Current State, Workspaces.
-    for p in projects:
-        pid = norm_id(p["id"])
-        base = layout.proj_folder[pid]
-        if not unchanged(p, os.path.join(base, MIRROR_DIR, "project.md")):
-            write_page(p, "project", base, "project.md", children=False)
-        cs = (p.get("properties") or {}).get("Current State")
-        cs_id = norm_id(cs.get("url")) if cs and cs.get("type") == "url" and cs.get("url") else None
-        if cs_id:
-            try:
-                csp = api.page(cs_id)
-                if not unchanged(csp, os.path.join(base, MIRROR_DIR, "current-state.md")):
-                    write_page(csp, "current_state", base, "current-state.md", children=False,
-                               head_extra=["mirror_last_run: %s" % iso(started)])
-            except NotionError as e:
-                errors.append("current_state %s: %s" % (title_of(p), e))
-    for w in workspaces:
-        wid = norm_id(w["id"])
-        if not unchanged(w, os.path.join(layout.ws_folder[wid], MIRROR_DIR, "workspace.md")):
-            write_page(w, "workspace", layout.ws_folder[wid], "workspace.md", children=False)
-
-    # 4. Database rows.
-    for key, r in rows:
-        base = layout.base_for(r, cfg)
-        fname = row_filename(key, r, cfg)
-        if unchanged(r, os.path.join(base, MIRROR_DIR, fname), key):
-            continue
-        write_page(r, key, base, fname, children=(key in cfg.get("child_pages_for", ["reports", "knowledge"])))
-
-    # 5. Full run: archive pages that disappeared from their database.
-    archived = 0
-    if full:
-        for pid, st in list(state["pages"].items()):
-            key = st.get("db")
-            if key in seen and pid not in seen[key] and os.path.exists(st.get("path", "")):
-                src = st["path"]
-                parts = src.split(os.sep + MIRROR_DIR + os.sep, 1)
-                if len(parts) == 2:
-                    move_file(src, os.path.join(parts[0], MIRROR_DIR, "_archived", parts[1]), touch=True)
-                    archived += 1
-                del state["pages"][pid]
-
-    # 5b. Full run: _archived retention, then orphan check (files no state entry points to).
-    swept, orphans = [], []
-    if full:
-        roots = layout.roots()
-        try:
-            swept = sweep_archived(roots, cfg["work_root"], cfg.get("archived_retention_days", 30),
-                                   datetime.now().strftime("%Y-%m-%d"))
-            if swept:
-                log("  _archived retention: %d files moved to _to_delete" % len(swept))
-        except OSError as e:
-            errors.append("archived retention: %s" % e)
-        try:
-            orphans = archive_orphans(roots, [v.get("path") for v in state["pages"].values()])
-            for o in orphans:
-                log("  orphan archived: %s" % o)
-        except OSError as e:
-            errors.append("orphan check: %s" % e)
-
-    # 6. Index and status.
-    if not only_tr:  # a transcripts backfill covers one database only: keep the incremental window
-        state["last_run"] = iso(started)
-    if full:
-        state["last_full"] = iso(started)
-    state["last_errors"] = errors[:50]
-    atomic_write(STATE_PATH, json.dumps(state, ensure_ascii=False, indent=1))
-    index = ["# Notion mirror index", "", "<!-- %s -->" % GENERATED_NOTE, "",
-             "| Workspace | Project | Folder |", "|---|---|---|"]
-    ws_title = {norm_id(w["id"]): title_of(w) for w in workspaces}
-    for p in sorted(projects, key=lambda x: title_of(x).lower()):
-        pid = norm_id(p["id"])
-        index.append("| %s | %s | `%s` |" % (ws_title.get(layout.proj_ws.get(pid), "-"), title_of(p),
-                                              layout.proj_folder[pid]))
-    atomic_write(os.path.join(cfg["work_root"], MIRROR_DIR, "INDEX.md"), "\n".join(index) + "\n")
-    status = ["# Notion mirror status", "",
-              "- result: %s" % ("OK" if not errors else "PARTIAL (%d errors)" % len(errors)),
-              "- last_run_utc: %s" % iso(started),
-              "- last_run_local: %s" % started.astimezone().isoformat(timespec="seconds"),
-              "- mode: %s" % ("full" if full else ("transcripts" if only_tr else "incremental")),
-              "- duration_s: %d" % (now_utc() - started).total_seconds(),
-              "- pages_in_mirror: %d" % len(state["pages"]),
-              "- archived_this_run: %d" % archived,
-              "- orphans_archived: %d" % len(orphans),
-              "- moved_to_delete: %d" % len(swept),
-              "- users_cached: %d" % len(users),
-              "- page_title_lookups: %d" % rs.lookups,
-              "- api_calls: %d" % api.calls]
-    status += ["- error: %s" % e for e in errors[:20]]
-    atomic_write(status_path, "\n".join(status) + "\n")
-    log("done: %s, pages %d, calls %d, errors %d" % ("full" if full else "incremental",
-                                                     len(state["pages"]), api.calls, len(errors)))
-    return 0 if not errors else 2
+    return MirrorRun(cfg, args, status_path).run()
 
 
 # ---------------------------------------------------------------- self-test

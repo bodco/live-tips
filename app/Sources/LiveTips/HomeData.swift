@@ -108,6 +108,23 @@ extension StartCallModel {
     /// 2026-10-28 (owner): "track whether the call happened after the preparation". A preparation of this meeting
     /// (prep-<date>-<title>.brief.md in the project's live folder) made after its last held call is the coming call's
     /// preparation: Home shows it as prepared and Start uses it. One made before the last call is old.
+    /// 2026-10-28 (owner): a preparation belongs to ONE occurrence of a regular meeting: the one it was made for
+    /// (the date in its name, within 3 hours), or else the next occurrence only. Tomorrow's call of the same
+    /// series is not "prepared" by today's preparation.
+    func prepFits(_ base: String) -> Bool {
+        let n = (base as NSString).lastPathComponent
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmm"; f.locale = Locale(identifier: "en_US_POSIX")
+        guard n.hasPrefix("prep-"), n.count > 20, let pd = f.date(from: String(n.dropFirst(5).prefix(15))) else { return true }
+        if abs(pd.timeIntervalSince(callDate)) < 3 * 3600 { return true }
+        if pd > callDate { return false }
+        let key = EditLog.seriesKey(effectiveTitle)
+        let earlier = CalendarService.shared.upcoming().contains { e in
+            e.id != calEventID && e.start < callDate.addingTimeInterval(-3600)
+                && ((seriesKey != nil && e.seriesKey == seriesKey) || EditLog.seriesKey(e.title) == key)
+        }
+        return !earlier
+    }
+
     @discardableResult
     func adoptExistingPrep() -> Bool {
         if let b = prepBase, FileManager.default.fileExists(atPath: b + ".brief.md") { return true }
@@ -124,6 +141,7 @@ extension StartCallModel {
             let attrs = try? fm.attributesOfItem(atPath: p)
             guard let made = (attrs?[.creationDate] as? Date) ?? (attrs?[.modificationDate] as? Date) else { continue }
             if let h = lastHeld, made <= h { continue }                     // written before the last call: old
+            guard prepFits(String(p.dropLast(".brief.md".count))) else { continue }   // made for another occurrence
             if lastHeld == nil, Date().timeIntervalSince(made) > 3 * 86400 { continue }
             if best == nil || made > best!.1 { best = (p, made) }
         }

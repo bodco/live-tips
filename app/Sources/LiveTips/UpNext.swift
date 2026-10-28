@@ -54,6 +54,9 @@ final class UpNext: ObservableObject {
     /// Calendar calls of the next 36 hours with a preparation not used yet join Up next as prepared.
     func adoptPreparedEvents() {
         var changed = false
+        // 0.7.4 gave a regular meeting's preparation to every occurrence; it belongs to one (prepFits).
+        let wrong = items.filter { m in m.calEventID != nil && m.prepBase.map { !m.prepFits($0) } == true }
+        if !wrong.isEmpty { items.removeAll { m in wrong.contains { $0 === m } }; changed = true }
         for e in CalendarService.shared.upcoming() where !items.contains(where: { $0.calEventID == e.id }) {
             let m = StartCallModel()
             m.applyEvent(e)

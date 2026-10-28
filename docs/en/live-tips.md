@@ -1582,3 +1582,6 @@ address", `references/sweep.md`, `references/presentation.md`).
    and Prepare now keeps the call in Up next. Once the call is held, that preparation is old and is not offered again.
 96. **A rename sticks (0.7.4).** A title changed during the call is the call's title everywhere: Home, recent calls,
    insights (longest call) and the history, also after a restart mid-call (read back from the call's inbox file).
+97. **One preparation, one occurrence (0.7.5).** A regular meeting's preparation belongs to the occurrence it was made
+   for (the date in its name), or else only to the next one: tomorrow's call of the same series is not shown as
+   prepared by today's preparation.

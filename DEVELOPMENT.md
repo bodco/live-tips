@@ -239,3 +239,13 @@ of them at CRAP 10 or more (the largest: `Engine._run_situation`, `Engine._run_t
 (`recorder/src`) has 267 functions, 50 with complexity 10 or more (`transcriber.main` is the largest) and one
 duplicate pair; `routing.py` is done. Each change brings the functions it touches under the gate.
 
+Status on 2026-10-29 (0.8.4): every function of the shipped engine (`spikes/m0/livetips_m0`) is under CRAP 10;
+what is left over the gate are the developer bench scripts (`asr_bench`, `embed_bench`, `embed_equiv`,
+`semantic_eval`, `skill_baseline`, `report`), which the app never runs. dryer finds no duplicate
+pair at 0.8. The Notion mirror (`notion-mirror/`, the same file as `tools/notion-mirror` in pm-control-tower),
+`tools/` and `keepalive/` have tests of their own and are under the gate (the mirror's own `--selftest` is left
+as it is). The recorder (`recorder/`) is not changed without the owner, so its numbers stay as above.
+How the behaviour is pinned before a split: `tests/test_golden.py` replays a synthetic call through the engine in
+9 configurations and compares every output file; `notion-mirror/tests/test_mirror_golden.py` runs the mirror
+four times against a fake Notion and compares the written tree.
+

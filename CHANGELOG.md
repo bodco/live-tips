@@ -3,6 +3,17 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.4
+
+- **Engine quality (ub-mode), nothing changes on screen:** the tips engine, live mode, the AI providers, the
+  after-call jobs, the built-in embedding engine, the Notion mirror and the keepalive hook are split into small
+  tested functions. Every function of the shipped engine is under CRAP 10 (the developer bench tools excepted);
+  a replay of a synthetic call pins the tips, and a fake Notion pins the mirror, so the split could not change
+  what they do.
+- **Fixes:** a request to the built-in embedding engine whose body is not a JSON object gets an error reply
+  instead of a dropped connection; one malformed line in the PM's corrections no longer stops the after-call
+  summary.
+
 ## 0.8.3
 
 - **Cheaper tips on the API key:** the earlier minutes of the call are now read from Claude's prompt cache

@@ -42,6 +42,14 @@ def run(monkeypatch, *args):
     return mirror.main()
 
 
+HEX_ID = re.compile(r"[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}")
+
+
+def ids(text: str) -> str:
+    """Synthetic page ids as <id N>, so the snapshot holds no id-shaped strings."""
+    return HEX_ID.sub(lambda m: "<id %d>" % int(m.group(0).replace("-", ""), 16), text)
+
+
 def tree(root: Path, conf: Path):
     out = {}
     for base in (root, conf / "state"):
@@ -58,7 +66,7 @@ def tree(root: Path, conf: Path):
                     text = json.dumps(st, indent=1, sort_keys=True, ensure_ascii=False)
                 for rx, rep in VOLATILE:
                     text = rx.sub(rep, text)
-                out[str(p.relative_to(root.parent))] = text.replace(str(root.parent), "<tmp>")
+                out[ids(str(p.relative_to(root.parent)))] = ids(text.replace(str(root.parent), "<tmp>"))
     return out
 
 

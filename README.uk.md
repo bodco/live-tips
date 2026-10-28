@@ -34,6 +34,13 @@ Pacenote готує короткий бриф перед дзвінком, да�
 
 Порівняння з Fireflies, Fathom і Notion AI Meeting Notes: [tower.bodco.pm/uk/pacenote/compare](https://tower.bodco.pm/uk/pacenote/compare/).
 
+## Для команд (дизайн)
+
+Що, як знання про проєкти лежать в одному місці, кілька людей (PM, сейлзи) готуються кожен до своїх
+дзвінків, а всі підсумки збираються разом? Зараз це працює через Google Drive і Notion без сервера;
+командний сервер з користувачами, ролями і конекторами CRM (HubSpot і кастомна CRM) спроєктовано, але
+ще не збудовано: [docs/team](docs/team/README.uk.md).
+
 ## Репозиторій
 
 | Шлях | Що |
@@ -45,7 +52,7 @@ Pacenote готує короткий бриф перед дзвінком, да�
 | `rules/` | Спільні правила для застосунку і скіла |
 | `notion-mirror/` | Необовʼязкова локальна копія сторінок Notion для фактів і пошуку |
 | `keepalive/` | Необовʼязковий плагін Cowork, що тримає скіл на звʼязку під час дзвінка |
-| `docs/` | Повний посібник: [English](docs/en/live-tips.md), [українською](docs/uk/live-tips.md) |
+| `docs/` | Повний посібник: [English](docs/en/live-tips.md), [українською](docs/uk/live-tips.md); дизайн для команд у [`docs/team/`](docs/team/README.uk.md) |
 | `DEVELOPMENT.md` | Структура, збірка і виміри, на яких тримається дизайн |
 
 Pacenote працює сам. З [PM Control Tower](https://github.com/bodco/pm-control-tower) він ще читає конфіги проєктів (люди, сторінки Notion, поточний стан).

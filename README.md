@@ -34,6 +34,13 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 
 How it compares with Fireflies, Fathom and Notion AI Meeting Notes: [tower.bodco.pm/pacenote/compare](https://tower.bodco.pm/pacenote/compare/).
 
+## For teams (design)
+
+What if project knowledge lived in one place, several people (PMs, sales) each prepared for their own
+calls, and every summary landed in one place? Today that works with Google Drive and Notion and no
+server; a team server with users, roles and CRM connectors (HubSpot and a custom CRM) is designed but
+not built: [docs/team](docs/team/README.md).
+
 ## Repository
 
 | Path | What |
@@ -45,7 +52,7 @@ How it compares with Fireflies, Fathom and Notion AI Meeting Notes: [tower.bodco
 | `rules/` | Shared rules for the app and the skill |
 | `notion-mirror/` | Optional local copy of Notion pages for facts and search |
 | `keepalive/` | Optional Cowork plugin that keeps the skill listening during a call |
-| `docs/` | The full guide: [English](docs/en/live-tips.md), [українською](docs/uk/live-tips.md) |
+| `docs/` | The full guide: [English](docs/en/live-tips.md), [українською](docs/uk/live-tips.md); the team design in [`docs/team/`](docs/team/README.md) |
 | `DEVELOPMENT.md` | Layout, build and the measurements behind the design |
 
 Pacenote works on its own. With [PM Control Tower](https://github.com/bodco/pm-control-tower) it also reads your project configs (people, Notion pages, the current state).

@@ -79,6 +79,31 @@ def rss_bytes() -> int:
     return int(r if sys.platform == "darwin" else r * 1024)
 
 
+GET_ROUTES = {
+    "/api/version": lambda: {"version": VERSION},
+    "/api/tags": lambda: {"models": [{"name": MODEL_NAME + ":latest", "model": MODEL_NAME + ":latest"}]},
+    "/api/ps": lambda: {"models": [{"name": MODEL_NAME, "size": rss_bytes(), "size_vram": 0}]},
+}
+
+
+def post_reply(engine, path: str, body):
+    """(HTTP code, JSON reply) for an Ollama-style embedding request."""
+    if not isinstance(body, dict):
+        return 400, {"error": "bad json"}
+    model = str(body.get("model") or MODEL_NAME).split(":")[0]
+    if model != MODEL_NAME:
+        return 404, {"error": f"model \"{model}\" not found, the built-in engine has only {MODEL_NAME}"}
+    if path == "/api/embed":
+        inp = body.get("input")
+        texts = [inp] if isinstance(inp, str) else [str(t) for t in (inp or [])]
+        t0 = time.monotonic()
+        v = engine.embed(texts)
+        return 200, {"model": MODEL_NAME, "embeddings": v.tolist(), "total_duration": int((time.monotonic() - t0) * 1e9)}
+    if path == "/api/embeddings":
+        return 200, {"embedding": engine.embed([str(body.get("prompt") or "")])[0].tolist()}
+    return 404, {"error": "not found"}
+
+
 def make_handler(engine: Engine):
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):  # quiet: no request text in logs
@@ -93,34 +118,19 @@ def make_handler(engine: Engine):
             self.wfile.write(b)
 
         def do_GET(self):
-            if self.path == "/api/version":
-                return self._send(200, {"version": VERSION})
-            if self.path == "/api/tags":
-                return self._send(200, {"models": [{"name": MODEL_NAME + ":latest", "model": MODEL_NAME + ":latest"}]})
-            if self.path == "/api/ps":
-                return self._send(200, {"models": [{"name": MODEL_NAME, "size": rss_bytes(), "size_vram": 0}]})
-            return self._send(404, {"error": "not found"})
+            get = GET_ROUTES.get(self.path)
+            return self._send(200, get()) if get else self._send(404, {"error": "not found"})
 
         def do_POST(self):
+            code, obj = post_reply(engine, self.path, self._body())
+            return self._send(code, obj)
+
+        def _body(self):
             try:
                 n = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(n) or b"{}")
-            except Exception:
-                return self._send(400, {"error": "bad json"})
-            model = str(body.get("model") or MODEL_NAME).split(":")[0]
-            if model != MODEL_NAME:
-                return self._send(404, {"error": f"model \"{model}\" not found, the built-in engine has only {MODEL_NAME}"})
-            if self.path == "/api/embed":
-                inp = body.get("input")
-                texts = [inp] if isinstance(inp, str) else [str(t) for t in (inp or [])]
-                t0 = time.monotonic()
-                v = engine.embed(texts)
-                return self._send(200, {"model": MODEL_NAME, "embeddings": v.tolist(),
-                                        "total_duration": int((time.monotonic() - t0) * 1e9)})
-            if self.path == "/api/embeddings":
-                v = engine.embed([str(body.get("prompt") or "")])
-                return self._send(200, {"embedding": v[0].tolist()})
-            return self._send(404, {"error": "not found"})
+                return json.loads(self.rfile.read(n) or b"{}")
+            except Exception:  # noqa: BLE001
+                return None
     return H
 
 

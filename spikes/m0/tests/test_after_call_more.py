@@ -121,3 +121,32 @@ def test_upload_md_refuses_a_foreign_host(monkeypatch):
     monkeypatch.setattr(W, "notion", lambda m, path, body=None: {"id": "f1", "upload_url": "https://api.notion.com/v1/file_uploads/f1/send"})
     assert W.upload_md("t.md", "text") == "f1" and sent and sent[0][1].startswith("https://api.notion.com/")
     assert W.file_block("f1", "t.md")["file"]["file_upload"]["id"] == "f1"
+
+
+def test_cli_entry_points(tmp_path, monkeypatch, capsys):
+    from livetips_m0 import followup, memory
+    monkeypatch.setattr(rehearse, "questions", lambda base, lang, model: {"ok": True, "questions": ["Q1"]})
+    monkeypatch.setattr(rehearse, "score", lambda base, answers, lang, model: {"ok": True, "n": len(answers)})
+    ans = tmp_path / "a.json"
+    ans.write_text('[{"q": "Q1", "a": "A"}]')
+    assert rehearse.main(["questions", "--base", "b"]) == 0 and json.loads(capsys.readouterr().out)["questions"] == ["Q1"]
+    assert rehearse.main(["score", "--base", "b", "--answers", str(ans)]) == 0 and json.loads(capsys.readouterr().out)["n"] == 1
+    assert rehearse.main(["score", "--base", "b", "--answers", str(tmp_path / "none")]) == 1
+    assert json.loads(capsys.readouterr().out)["ok"] is False
+    monkeypatch.setattr(memory, "ask", lambda root, q, lt, model, lang: {"ok": True, "q": q, "lt": lt})
+    assert memory.main(["--root", str(tmp_path), "--q", "csv", "--lt", "py", "lt"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"ok": True, "q": "csv", "lt": ["py", "lt"]}
+    monkeypatch.setattr(memory, "ask", lambda *a: (_ for _ in ()).throw(RuntimeError("no index")))
+    assert memory.main(["--root", str(tmp_path), "--q", "csv"]) == 1 and "no index" in capsys.readouterr().out
+    monkeypatch.setattr(followup, "draft", lambda md, lang, model: {"subject": "S"})
+    assert followup.main(["--md", "x.md"]) == 0 and json.loads(capsys.readouterr().out) == {"subject": "S", "ok": True}
+
+
+def test_rehearsal_material_and_questions(tmp_path):
+    base = str(tmp_path / "call")
+    assert rehearse.material(base) == "(no preparation)"
+    (tmp_path / "call.brief.md").write_text("B")
+    (tmp_path / "call.slides.json").write_text("[]")
+    assert rehearse.material(base) == "BRIEF.MD:\nB\n\nSLIDES.JSON:\n[]"
+    out = rehearse.questions(base, "en", "m", Prov('{"questions": [{"q": "Why?"}, "How" , "", {"q": " "}]}'))
+    assert out["questions"] == ["Why?", "How"]

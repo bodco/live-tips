@@ -32,28 +32,41 @@ def files(root: Path):
             yield p
 
 
+def patterns(deny):
+    """The generic patterns plus one per term of the private deny list (when given)."""
+    pats = [(re.compile(p), why) for p, why in GENERIC]
+    if deny and Path(deny).exists():
+        for term in Path(deny).read_text(encoding="utf-8").splitlines():
+            term = term.strip()
+            if term and not term.startswith("#"):
+                pats.append((re.compile(r"(?i)(?<!\w)" + re.escape(term) + r"(?!\w)"), "deny list term"))
+    return pats
+
+
+def only_fake_ids(rx, line) -> bool:
+    """Every id-shaped string on the line is made up (one repeated digit, or 0-9a-f in order)."""
+    return all(FAKE_ID.match(x.replace("-", "")[:32]) or len(set(x.replace("-", ""))) <= 1 for x in rx.findall(line))
+
+
+def findings(path: Path, pats):
+    """(line number, reason) for each pattern found on each line."""
+    for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        for rx, why in pats:
+            if rx.search(line) and not (why.startswith("UUID") and only_fake_ids(rx, line)):
+                yield n, why
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--deny", default=os.environ.get("LIVETIPS_DENYLIST"))
     ap.add_argument("--root", type=Path, default=ROOT)
     a = ap.parse_args(argv)
-    pats = [(re.compile(p), why) for p, why in GENERIC]
-    if a.deny and Path(a.deny).exists():
-        for term in Path(a.deny).read_text(encoding="utf-8").splitlines():
-            term = term.strip()
-            if term and not term.startswith("#"):
-                pats.append((re.compile(r"(?i)(?<!\w)" + re.escape(term) + r"(?!\w)"), "deny list term"))
+    pats = patterns(a.deny)
     bad = 0
     for f in files(a.root):
-        for n, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-            for rx, why in pats:
-                m = rx.search(line)
-                if m and why.startswith("UUID") and all(FAKE_ID.match(x.replace("-", "")[:32]) or len(set(x.replace("-", ""))) <= 1
-                                                         for x in rx.findall(line)):
-                    continue
-                if m:
-                    print("{}:{}: {}".format(f.relative_to(a.root), n, why))
-                    bad += 1
+        for n, why in findings(f, pats):
+            print("{}:{}: {}".format(f.relative_to(a.root), n, why))
+            bad += 1
     print("anonymization: {} finding(s)".format(bad))
     return 1 if bad else 0
 

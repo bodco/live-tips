@@ -100,37 +100,52 @@ def extract_table(skill_md: str) -> str:
     return "\n".join(out) + "\n"
 
 
+def compare(path: Path, text: str, sections) -> int:
+    """1 when the Triggers table or a generated section in a SKILL.md differs from rules/."""
+    md = path.read_text(encoding="utf-8")
+    bad = 0
+    if extract_table(md) != text:
+        sys.stderr.write("DRIFT: the Triggers table in {} differs from rules/triggers.yaml\n".format(path))
+        bad = 1
+    for head, body in sections:
+        if head not in md or extract_section(md, head) != body:
+            sys.stderr.write("DRIFT: the section '{}' in {} differs from rules/\n".format(head, path))
+            bad = 1
+    if not bad:
+        print("OK: generated sections match rules/")
+    return bad
+
+
+def outputs(text, reg, after):
+    return ((OUT, text), (OUT_REG, reg), (OUT_AFTER, after))
+
+
+def check(files) -> int:
+    for out, t in files:
+        if not out.exists() or out.read_text(encoding="utf-8") != t:
+            sys.stderr.write("STALE: run tools/gen_skill_section.py\n")
+            return 1
+    print("OK: generated section is up to date")
+    return 0
+
+
+def write(files) -> int:
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    for out, t in files:
+        out.write_text(t, encoding="utf-8")
+        print("wrote", out.relative_to(ROOT))
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--compare", type=Path)
     a = ap.parse_args(argv)
-    text, reg, after = render(), render_register(), render_after()
+    text, reg, after = render(RULES), render_register(RULES), render_after(RULES)
     if a.compare:
-        md = a.compare.read_text(encoding="utf-8")
-        bad = 0
-        if extract_table(md) != text:
-            sys.stderr.write("DRIFT: the Triggers table in {} differs from rules/triggers.yaml\n".format(a.compare))
-            bad = 1
-        for head, body in ((REG_HEAD, reg), (AFTER_HEAD, after)):
-            if head not in md or extract_section(md, head) != body:
-                sys.stderr.write("DRIFT: the section '{}' in {} differs from rules/\n".format(head, a.compare))
-                bad = 1
-        if not bad:
-            print("OK: generated sections match rules/")
-        return bad
-    if a.check:
-        for out, t in ((OUT, text), (OUT_REG, reg), (OUT_AFTER, after)):
-            if not out.exists() or out.read_text(encoding="utf-8") != t:
-                sys.stderr.write("STALE: run tools/gen_skill_section.py\n")
-                return 1
-        print("OK: generated section is up to date")
-        return 0
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    for out, t in ((OUT, text), (OUT_REG, reg), (OUT_AFTER, after)):
-        out.write_text(t, encoding="utf-8")
-        print("wrote", out.relative_to(ROOT))
-    return 0
+        return compare(a.compare, text, ((REG_HEAD, reg), (AFTER_HEAD, after)))
+    return check(outputs(text, reg, after)) if a.check else write(outputs(text, reg, after))
 
 
 if __name__ == "__main__":

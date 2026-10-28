@@ -103,15 +103,19 @@ final class SetupModel: ObservableObject {
     }
 
     /// Points the app at what setup installed, unless the PM set other engines on purpose.
-    func applyEngineSettings() {
-        var c = config
-        let py = (appRoot as NSString).appendingPathComponent(".venv/bin/python")
-        let engineDir = ((Bundle.main.resourcePath ?? "") as NSString).appendingPathComponent("engine/spikes/m0")
-        var changed = false
-        if c.engine.python.isEmpty || !FileManager.default.isExecutableFile(atPath: c.engine.python) { c.engine.python = py; changed = true }
-        if c.engine.sidecarPython.isEmpty || !FileManager.default.isExecutableFile(atPath: c.engine.sidecarPython) { c.engine.sidecarPython = py; changed = true }
-        if c.engine.sidecarDir.isEmpty || !FileManager.default.fileExists(atPath: c.engine.sidecarDir) { c.engine.sidecarDir = engineDir; changed = true }
-        if changed { try? c.save(to: AppPaths.config) }
+    func applyEngineSettings() { Self.repairEnginePaths() }
+
+    /// The engine paths follow the app (also at every launch: a renamed or moved app must not leave the tips engine
+    /// pointing at a folder that is gone).
+    static func repairEnginePaths() {
+        var c = AppConfig.load(from: AppPaths.config)
+        let root = c.effectiveAppRoot(appSupport: AppPaths.support.path)
+        let fm = FileManager.default
+        guard let e = c.engine.resolved(defaultPython: (root as NSString).appendingPathComponent(".venv/bin/python"),
+                                        bundleEngine: ((Bundle.main.resourcePath ?? "") as NSString).appendingPathComponent("engine/spikes/m0"),
+                                        exists: { fm.fileExists(atPath: $0) }) else { return }
+        c.engine = e
+        try? c.save(to: AppPaths.config)
     }
 }
 

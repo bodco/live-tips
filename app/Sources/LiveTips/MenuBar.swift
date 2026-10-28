@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
         installMainMenu()
         NSApp.setActivationPolicy(config.showInDock ? .regular : .accessory)
         let it = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)

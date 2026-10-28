@@ -210,7 +210,22 @@ func commitmentsRegister() {
     try? FileManager.default.removeItem(atPath: dir)
 }
 
+func enginePathsFollowTheApp() {
+    // 0.8.3: after the rename the config still pointed at the removed "Live Tips.app"; the engine must follow the app.
+    var e = AppConfig.Engine()
+    e.python = "/v/bin/python"; e.sidecarPython = "/v/bin/python"; e.sidecarDir = "/Old.app/Contents/Resources/engine/spikes/m0"
+    let fixed = e.resolved(defaultPython: "/v/bin/python", bundleEngine: "/New.app/Contents/Resources/engine/spikes/m0",
+                           exists: { $0 == "/v/bin/python" || $0.hasPrefix("/New.app") })
+    expect(fixed?.sidecarDir == "/New.app/Contents/Resources/engine/spikes/m0", "a missing engine folder moves to the app's own")
+    expect(fixed?.python == "/v/bin/python", "a working python stays")
+    expect(e.resolved(defaultPython: "/v/bin/python", bundleEngine: "/Old.app/Contents/Resources/engine/spikes/m0",
+                      exists: { _ in true }) == nil, "nothing to change: nil")
+    var custom = AppConfig.Engine(); custom.python = "/mine/python"; custom.sidecarPython = "/mine/python"; custom.sidecarDir = "/mine/engine"
+    expect(custom.resolved(defaultPython: "/v/bin/python", bundleEngine: "/New.app/e", exists: { _ in true }) == nil, "the PM's own engine is kept")
+}
+
 interfaceStrings()
+enginePathsFollowTheApp()
 versions()
 commitmentsRegister()
 frameRoundTripAcrossChunks()

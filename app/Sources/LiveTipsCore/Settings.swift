@@ -59,6 +59,17 @@ public struct AppConfig: Codable, Equatable {
         public var sidecarPython = ""     // python with the model-tips engine (livetips_m0)
         public var sidecarDir = ""        // folder that contains livetips_m0/
         public init() {}
+
+        /// 0.8.3: the engine follows the app. An empty or vanished path (the app was renamed or moved) points at what
+        /// setup installed (`defaultPython`) and at the app's own engine (`bundleEngine`); a working path, the PM's own
+        /// choice included, stays. nil when nothing changes.
+        public func resolved(defaultPython: String, bundleEngine: String, exists: (String) -> Bool) -> Engine? {
+            var e = self
+            if e.python.isEmpty || !exists(e.python) { e.python = defaultPython }
+            if e.sidecarPython.isEmpty || !exists(e.sidecarPython) { e.sidecarPython = defaultPython }
+            if e.sidecarDir.isEmpty || !exists(e.sidecarDir) { e.sidecarDir = bundleEngine }
+            return e == self ? nil : e
+        }
     }
     public var engine = Engine()
     /// How people address the PM on calls (any form); the "your turn" trigger.

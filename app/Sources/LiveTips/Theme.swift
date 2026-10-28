@@ -4,7 +4,7 @@ import SwiftUI
 /// One look for every window (2026-10-26, owner: "the same design as the welcome tour"): an icon tile and a
 /// title on top, soft rounded cards without borders, one big blue capsule button for the main action.
 enum LT {
-    static let radius: CGFloat = 10
+    static let radius: CGFloat = PN.Radius.m
     static let cardFill = Color.secondary.opacity(0.08)
     static let tileFill = Color.secondary.opacity(0.12)
 }
@@ -44,7 +44,7 @@ struct WindowHeader: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.title2.weight(.semibold))
                     if !subtitle.isEmpty {
-                        Text(subtitle).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Text(subtitle).font(.callout).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 0)
@@ -54,7 +54,7 @@ struct WindowHeader: View {
                 IconTile(symbol: symbol, image: image)
                 Text(title).font(.title.weight(.semibold)).multilineTextAlignment(.center)
                 if !subtitle.isEmpty {
-                    Text(subtitle).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Text(subtitle).foregroundStyle(PN.C.text3).multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 520)
                 }
             }
@@ -74,38 +74,23 @@ extension View {
     func ltCard(padding: CGFloat = 12) -> some View { modifier(LTCard(padding: padding)) }
 }
 
-/// The main action of a window: blue, large, a capsule, with an arrow like Continue in the tour.
+/// The main action of a window (Pacenote 0.8, F1): the primary style from PacenoteTheme, bound to Return.
+/// One per window; everything else is .pnSecondary or .pnTertiary.
 struct LTPrimaryButton: View {
     var title: String
-    var symbol: String? = "arrow.right"
-    var minWidth: CGFloat = 220
+    var symbol: String? = nil
+    var minWidth: CGFloat = 0
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Text(title)
+            HStack(spacing: 6) {
                 if let s = symbol { Image(systemName: s) }
+                Text(title)
             }
             .frame(minWidth: minWidth)
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
-    }
-}
-
-/// A secondary action: accent text on a soft accent fill (2026-10-27, owner: clickable things get color).
-struct LTSoftButtonStyle: ButtonStyle {
-    var small = false
-    @Environment(\.isEnabled) private var enabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(small ? .callout : .body)
-            .padding(.horizontal, small ? 10 : 12).padding(.vertical, small ? 4 : 6)
-            .foregroundStyle(enabled ? Color.accentColor : Color.secondary)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(configuration.isPressed ? 0.25 : (enabled ? 0.15 : 0.06))))
-            .contentShape(RoundedRectangle(cornerRadius: 8))
+        .buttonStyle(.pnPrimary)
+        .keyboardShortcut(.defaultAction)
     }
 }

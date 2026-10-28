@@ -115,10 +115,10 @@ struct ShortcutRow: View {
                     .foregroundStyle(recording ? Color.accentColor : .primary)
                     .frame(minWidth: 90, alignment: .trailing)
                 Button(recording ? "Cancel" : "Change") { recording ? stop() : start() }
-                    .buttonStyle(LTSoftButtonStyle(small: true))
+                    .buttonStyle(.pnTertiary)
                 if combo != action.defaultCombo && !recording {
                     Button("Reset") { HotKeys.shared.set(action, nil); combo = HotKeys.shared.combo(action) }
-                        .buttonStyle(.borderless).foregroundStyle(.secondary)
+                        .buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
                 }
             }
         }

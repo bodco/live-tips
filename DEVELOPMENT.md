@@ -22,7 +22,7 @@ place, [`rules/`](rules/), which both read.
 
 1. Download the dmg from the release page:
    [LiveTips.dmg](https://github.com/bodco/live-tips/releases/latest/download/LiveTips.dmg).
-   Open it and drag **Live Tips** into Applications.
+   Open it and drag **Pacenote** into Applications.
 2. **First open:** the beta is not notarized by Apple yet, so macOS blocks the first launch. Open
    **System Settings > Privacy & Security** and press **Open Anyway** (on macOS 14 a right-click >
    **Open** also works). After that it opens normally. Check the download first against
@@ -35,7 +35,7 @@ place, [`rules/`](rules/), which both read.
 Requirements: macOS 14.4 or newer on Apple silicon, Python 3.10 or newer (Setup checks it and
 says what to do when it is missing). Expect rough edges: this is a beta.
 
-## Using Live Tips: start a call
+## Using Pacenote: start a call
 
 1. Menu bar icon (or the Dock icon) > **Start call…**
 2. **Project**: recordings, notes and the prep live in this project's folder. A workspace is for general calls about several projects.
@@ -87,7 +87,7 @@ window, even at low opacity.
 
 ### FAQ
 
-- **Do I need Cowork open during the call?** No. Live Tips calls the Claude API itself with your key from Keychain. Cowork is only needed for the prep and for the wrap-up you ask for later.
+- **Do I need Cowork open during the call?** No. Pacenote calls the Claude API itself with your key from Keychain. Cowork is only needed for the prep and for the wrap-up you ask for later.
 - **Can I change the microphone during the call?** Yes, in the tips window (Mic menu). "System default" follows macOS; choosing a device keeps it even if macOS switches.
 - **What is Local AI?** A small model on this Mac (built-in bge-m3, or your Ollama) that matches facts and cards by meaning and powers HELP NOW and project search. Settings > AI explains the engines and how to add another one.
 - **Which "❓" cards are shown?** Only for a line that names you and asks something, a line with a work word (estimate, deadline, status, price, release…), or a question about time or amount ("when…?", "how much…?"). Rule: `rules/triggers.yaml` > `question_card`.
@@ -156,7 +156,7 @@ never printed or logged.
 
 ## Screenshots for the website
 
-The pictures on the Live Tips pages are made by the app itself, on demo data:
+The pictures on the Pacenote pages are made by the app itself, on demo data:
 
 ```bash
 "/Applications/Live Tips.app/Contents/MacOS/LiveTips" --shots ~/Desktop/livetips-shots

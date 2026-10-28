@@ -78,8 +78,12 @@ final class ShotMode: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         log("launched")
+        // Pacenote 0.8: every screen in English and Ukrainian (files of the Ukrainian pass end in -uk).
+        for lang in ["en", "uk"] {
+        steps.append { [unowned self] in SettingsWindow.model.config.uiLanguage = lang; self.next(after: 0.3) }
         for theme in ["dark", "light"] {
             steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
+            steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
             steps.append { [unowned self] in self.planCall(theme) }
             steps.append { [unowned self] in self.home(theme) }
@@ -90,8 +94,9 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('prbtn').click();", name: "tips-prep-pane") }
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('gear').click();", name: "tips-menu") }
                 steps.append { [unowned self] in self.prepDoc(theme) }
-                for st in OnboardingModel.Step.allCases { steps.append { [unowned self] in self.onboarding(st, theme) } }
+                for st in OnboardingModel.Step.allCases where st != .splash { steps.append { [unowned self] in self.onboarding(st, theme) } }
             }
+        }
         }
         steps.append { exit(0) }
         next()
@@ -214,7 +219,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
     /// The tips window in a given state (Preparation pane, ⚙ menu), for a design review.
     func tipsExtra(_ theme: String, js: String, name: String) {
         var pa = prompterArgs(["LiveTips", "--prompter-demo"])
-        pa.title = "Live Tips: Orbit SaaS Launch"
+        pa.title = "Orbit weekly with the client"
         let c = PrompterController(args: pa)
         c.show()
         keep.append(c)
@@ -266,6 +271,16 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// First launch: the splash with the brand (Pacenote 0.8).
+    func splash(_ theme: String) {
+        OnboardingWindow.show()
+        OnboardingWindow.model.step = .splash
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
+            if let w = OnboardingWindow.window { capture(w, "onboarding-0-splash-\(theme)"); w.close() }
+            next()
+        }
+    }
+
     /// First run: every onboarding step.
     func onboarding(_ st: OnboardingModel.Step, _ theme: String) {
         OnboardingWindow.show()
@@ -279,7 +294,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
 
     func tips(_ theme: String, presentation: Bool) {
         var pa = prompterArgs(["LiveTips", presentation ? "--prompter-demo-presentation" : "--prompter-demo"])
-        pa.title = "Live Tips: Orbit SaaS Launch"
+        pa.title = "Orbit weekly with the client"
         let c = PrompterController(args: pa)
         c.show()
         keep.append(c)
@@ -317,8 +332,9 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         rep.size = frame.bounds.size
         frame.cacheDisplay(in: frame.bounds, to: rep)
         func save() {
-            if let png = rep.representation(using: .png, properties: [:]) { try? png.write(to: out.appendingPathComponent(name + ".png")) }
-            log("saved " + name)
+            let file = L10n.lang == "uk" ? name + "-uk" : name
+            if let png = rep.representation(using: .png, properties: [:]) { try? png.write(to: out.appendingPathComponent(file + ".png")) }
+            log("saved " + file)
             done?()
         }
         guard let web = web else { save(); return }

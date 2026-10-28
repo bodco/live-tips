@@ -37,7 +37,7 @@ Notion: {посилання на сторінку з Step 5}
 Далі: звіт по мітингу, change-request, risk-register?
 ```
 
-**Tip quality (optional, never blocks the wrap-up).** If the Live Tips app is installed
+**Tip quality (optional, never blocks the wrap-up).** If the Pacenote app (formerly Live Tips) is installed
 (`<tool_root>/state/sidecar-config.json` exists and its engine folder holds `livetips_m0`), or the
 user asks, run the same blind judge for the skill's tips: from the engine folder,
 `python -m livetips_m0.judge --config <tool_root>/state/sidecar-config.json --md "<transcript>" --quick`
@@ -81,7 +81,7 @@ create a new page only when there is none.
 
 **Writing into an existing page.** Fetch it first. Append ONE section at the very end with
 `insert_content`, whatever the body already holds (Notion AI summary, notes, transcript,
-other text): `## Live Tips: підсумок і роздуми ({HH:MM})` with the Step 4 wrap-up (or the
+other text): `## Pacenote: підсумок і роздуми ({HH:MM})` with the Step 4 wrap-up (or the
 hiring analysis) plus what Notion AI cannot give: tips that mattered, answers worth
 revisiting, contradictions with decisions and the tracker, risks, open questions, next
 steps with owners, the tip statistics. Never edit, move or delete existing blocks, the
@@ -90,7 +90,8 @@ page (see "Transcript page" below), even when the page has a Notion AI transcrip
 about it. Properties: set `Project`, `Workspace` and `Date`
 only if they are empty, never overwrite. If the page is outside the Meetings DB, leave it
 where it is and say so in the final message. A second run for the same meeting (the
-section already exists) appends `## Live Tips: доповнення ({HH:MM})` instead of a duplicate.
+section already exists, under `## Pacenote: ...` or the older `## Live Tips: ...` heading) appends
+`## Pacenote: доповнення ({HH:MM})` instead of a duplicate.
 
 **Creating a new page** (no existing page found) in the project's Meetings DB
 (`{config.notion.meetings_db}`, fetch the data source first for exact property names), as
@@ -106,7 +107,7 @@ IDs copied exactly from the config; never retype an ID by hand from memory, copy
 
 1. **Name.** The title starts with the meeting's own name (the call title given at the start),
    then a colon and 2-6 words on what was actually discussed, all in the language of the call
-   (e.g. "Weekly sync: export scope"); never "Meeting". Same rule as the Live Tips app (0.5.5+).
+   (e.g. "Weekly sync: export scope"); never "Meeting". Same rule as the Pacenote app (0.5.5+).
    Property `Meeting Name` (the title property of the Meetings DB; check the schema).
    Title = `<name> @<start date-time>`, where the date-time is a Notion date mention. Create the
    page with the plain `<name>`, then set the title with `notion-update-page` `update_properties`
@@ -158,13 +159,17 @@ IDs copied exactly from the config; never retype an ID by hand from memory, copy
    Notion AI in the block manually.
    **Transcript page (always, no questions; the PM's standing order, changed 2026-10-27 from a file
    to a page).** After the wrap-up is written, create a child page under the meeting page with
-   `notion-create-pages` (parent = the meeting page id, title `Транскрипт (Live Tips) · <meeting
+   `notion-create-pages` (parent = the meeting page id, title `Транскрипт (Pacenote) · <meeting
    name>` in the call's language, icon 📝) whose content is the cleaned transcript as markdown: take
    `clean_file`, keep the Notion escapes, one line per paragraph with the time and the speaker in
    bold (`**[12:30:11] Mike:** text`). No line limit: when the content is too large for one call,
    create the page with the first ~300 lines and append the rest in chunks with `update_content`.
    No file attachment. The section `## Транскрипт` of the meeting page holds only that child page.
    If the write fails, say so in one line and name the local file; do not ask the PM what to do.
+   **Footer (Pacenote 0.8, same as the app).** The last blocks of the page, after the transcript page:
+   a divider and one gray paragraph in the page's language, `Notes by Pacenote · transcribed on device`
+   (Ukrainian: `Нотатки Pacenote · транскрибовано на пристрої`). Add it once; a second run leaves it.
+   The page title never carries a product prefix.
 4. **Verify** with a fetch: parent is the Meetings DB, properties set, title has the date mention, wrap-up present, and the transcript file block is on the page. Put the page link into the wrap-up.
 5. Client-facing rule does not apply: the Meetings DB is internal. Restricted 🔒 content may
    go into the "Підсумок" section.

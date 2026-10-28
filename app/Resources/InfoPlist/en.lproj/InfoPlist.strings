@@ -1,0 +1,7 @@
+/* Pacenote 0.8: names and permission texts shown by macOS (English). */
+"CFBundleName" = "Pacenote";
+"CFBundleDisplayName" = "Pacenote";
+"NSMicrophoneUsageDescription" = "Pacenote transcribes your voice on this Mac. Audio never leaves it.";
+"NSAudioCaptureUsageDescription" = "Pacenote transcribes the other side of the call on this Mac.";
+"NSCalendarsFullAccessUsageDescription" = "Pacenote reads your calendars to suggest and prepare the right call. It never changes them.";
+"NSCalendarsUsageDescription" = "Pacenote reads your calendars to suggest and prepare the right call. It never changes them.";

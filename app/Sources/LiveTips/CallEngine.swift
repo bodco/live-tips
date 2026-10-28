@@ -50,10 +50,13 @@ final class CallEngine {
         let d = lastCall
         guard let tips = d["tips_usd"] as? Double else { return "" }
         let notes = d["notes_usd"] as? Double ?? 0
-        var line = String(format: "Last call: $%.2f", tips + notes)
-        if notes > 0 { line += String(format: " (tips $%.2f, Notion notes $%.2f)", tips, notes) }
-        if let n = d["tips"] as? Int { line += " · \(n) tip\(n == 1 ? "" : "s")" }
-        return line
+        return L("menubar.lastCall", ["cost": String(format: "%.2f", tips + notes), "n": "\((d["tips"] as? Int) ?? 0)"])
+    }
+    /// The split of the last call's cost, shown as the menu line's tooltip.
+    var lastCallDetail: String? {
+        let d = lastCall
+        guard let tips = d["tips_usd"] as? Double, let notes = d["notes_usd"] as? Double, notes > 0 else { return nil }
+        return L("menubar.lastCall.detail", ["tips": String(format: "%.2f", tips), "notes": String(format: "%.2f", notes)])
     }
     static let callEnded = Notification.Name("LiveTipsCallEnded")
 
@@ -125,7 +128,7 @@ final class CallEngine {
             try? s.run()
             s.waitUntilExit()
         }
-        return probe() ? nil : "The audio helper is blocked by macOS (killed at launch). Open Settings > About and run Setup again, or reinstall Live Tips."
+        return probe() ? nil : "The audio helper is blocked by macOS (killed at launch). Open Settings > About and run Setup again, or reinstall Pacenote."
     }
 
     /// Starts recording. `request` goes to control/start.json (project_dir, title, slug, langs, call_type, audience).
@@ -445,10 +448,10 @@ final class CallEngine {
 
     func notify(_ text: String, url: String? = nil, settingsTab: String? = nil) {
         let a = NSAlert()
-        a.messageText = "Live Tips"
+        a.messageText = L("notification.title")
         a.informativeText = text
-        a.addButton(withTitle: url != nil ? "Open in Notion" : (settingsTab != nil ? "Open Settings" : "OK"))
-        if url != nil || settingsTab != nil { a.addButton(withTitle: "Later") }
+        a.addButton(withTitle: url != nil ? L("common.openInNotion") : (settingsTab != nil ? L("common.openSettings") : L("common.ok")))
+        if url != nil || settingsTab != nil { a.addButton(withTitle: L("common.later")) }
         NSApp.activate(ignoringOtherApps: true)
         guard a.runModal() == .alertFirstButtonReturn else { return }
         if let u = url, let link = URL(string: u) { NSWorkspace.shared.open(link) }

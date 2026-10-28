@@ -21,5 +21,5 @@ Notes, ask for the Notion meeting page link and read the transcript from Notion 
 
 Everything else (speech, brief, triggers, tip diet and rates, wrap-up) is the same, except Step 5: the
 Notion meeting page already holds the real transcript, so do not create a second page; write
-the "Підсумок (Live Tips)" section into it. Only offer to set its `Project`, `Workspace` and
+the "Підсумок (Pacenote)" section (older pages: "Підсумок (Live Tips)") into it. Only offer to set its `Project`, `Workspace` and
 `Date` if they are empty.

@@ -8,8 +8,9 @@ import SwiftUI
 /// Notion is an optional step: Live Tips works with plain folders.
 @MainActor
 final class OnboardingModel: ObservableObject {
-    enum Step: Int, CaseIterable { case welcome, permissions, folder, projects, name, claude, notion, install, done }
-    @Published var step: Step = .welcome
+    // Pacenote 0.8 (F0): a splash with the brand comes first. F4 folds the steps after it into four.
+    enum Step: Int, CaseIterable { case splash, welcome, permissions, folder, projects, name, claude, notion, install, done }
+    @Published var step: Step = .splash
     @Published var micState = AVCaptureDevice.authorizationStatus(for: .audio)
     /// true granted, false denied, nil not asked yet (or macOS does not say).
     @Published var sysAudio: Bool? = SystemAudioPermission.granted()
@@ -97,6 +98,32 @@ struct OnboardingView: View {
     }
 
     var body: some View {
+        if m.step == .splash { splash } else { steps }
+    }
+
+    var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.8" }
+
+    /// First launch: the icon, the wordmark, the tagline and one button (no Skip).
+    var splash: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            Image(nsImage: Brand.appIcon).resizable().interpolation(.high).frame(width: 144, height: 144)
+                .accessibilityHidden(true)
+            PacenoteWordmark(height: 40).padding(.top, 22)
+            Text(L("app.tagline")).font(.system(size: 20)).foregroundStyle(PN.C.text2).padding(.top, 14)
+            Spacer()
+            Button { m.next() } label: { Text(L("onboarding.splash.cta")).frame(minWidth: 180) }
+                .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+            Text(L("onboarding.splash.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 10)
+            Spacer().frame(height: 56)
+            Text(L("onboarding.splash.footer", ["version": appVersion])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+        }
+        .padding(32)
+        .frame(width: 760, height: 680)
+        .background(PN.C.bg)
+    }
+
+    var steps: some View {
         VStack(spacing: 0) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
@@ -109,22 +136,28 @@ struct OnboardingView: View {
             VStack(spacing: 18) {
                 HStack {
                     if m.step != .welcome && m.step != .done {
-                        Button { m.back() } label: { Image(systemName: "arrow.left") }.buttonStyle(.borderless)
+                        Button { m.back() } label: { Image(systemName: "arrow.left") }.buttonStyle(.borderless).accessibilityLabel("Back")
                     }
                     Spacer()
-                    if m.step != .done { Button("Skip setup") { close() }.buttonStyle(.borderless).foregroundStyle(.secondary) }
+                    if m.step != .done { Button(L("onboarding.skip")) { close() }.buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3) }
                 }
-                IconTile(symbol: icon, image: logo)
+                if m.step == .done {
+                    Image(nsImage: Brand.appIcon).resizable().interpolation(.high).frame(width: 112, height: 112).accessibilityHidden(true)
+                } else if let logo = logo {
+                    IconTile(symbol: icon, image: logo)
+                } else {
+                    PacenoteSymbol(height: 44)      // the brand symbol above each step's title
+                }
                 Text(title).font(.title.weight(.semibold)).multilineTextAlignment(.center)
-                Text(subtitle).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text(subtitle).font(.body).foregroundStyle(PN.C.text3).multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 520)
                 content.frame(maxWidth: 560)
                 Spacer(minLength: 0)
                 Button { primary() } label: {
                     HStack { Text(primaryLabel); Image(systemName: "arrow.right") }.frame(minWidth: 220)
                 }
-                .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).controlSize(.large).keyboardShortcut(.defaultAction)
-                Text("You can change this any time in Settings").font(.caption).foregroundStyle(.secondary)
+                .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                Text(L("onboarding.changeLater")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             .padding(.horizontal, 40).padding(.vertical, 24)
         }
@@ -151,7 +184,7 @@ struct OnboardingView: View {
 
     var icon: String {
         switch m.step {
-        case .welcome: return "text.bubble"
+        case .splash, .welcome: return "sparkles"
         case .permissions: return "mic"
         case .folder: return "folder"
         case .name: return "person.wave.2"
@@ -165,67 +198,71 @@ struct OnboardingView: View {
 
     var title: String {
         switch m.step {
-        case .welcome: return "A quiet co-pilot for your calls"
-        case .permissions: return "Allow access to capture your calls"
-        case .folder: return "Where your projects live"
-        case .projects: return "Which projects are active"
-        case .name: return "How people call you"
-        case .claude: return "Connect Claude"
-        case .install: return "Install speech recognition"
-        case .notion: return "Connect Notion (optional)"
-        case .done: return "You are ready"
+        case .splash: return L("app.name")
+        case .welcome: return L("onboarding.welcome.title")
+        case .permissions: return L("onboarding.permissions.title")
+        case .folder: return L("onboarding.folder.title")
+        case .projects: return L("onboarding.projects.title")
+        case .name: return L("onboarding.name.title")
+        case .claude: return L("onboarding.claude.title")
+        case .install: return L("onboarding.install.title")
+        case .notion: return L("onboarding.notion.title")
+        case .done: return L("onboarding.done.title")
         }
     }
 
     var subtitle: String {
         switch m.step {
-        case .welcome: return "Live Tips listens to your call on this Mac and shows the right fact or a ready sentence when you need it: a question to you, your turn, a new request. Audio never leaves your Mac."
-        case .permissions: return "Your voice comes from the microphone, the other side from the call's system audio. Both are transcribed on this Mac."
-        case .projects: return "Calls can be started only for active projects. Untick the folders that are done or not projects; you can turn them back on in Settings > Projects."
-        case .folder: return "Live Tips works with plain folders: a work folder, a folder per workspace inside it, a folder per project inside those. Calls, preparations and notes are saved in each project's folder."
-        case .name: return "So Live Tips knows when a question is for you. Add the names and short forms people use on calls."
-        case .claude: return "Tips, answers and the call picture come from Claude with your own API key, about $0.3-0.8 per call. Without a key Live Tips still records, transcribes and shows prepared facts."
-        case .install: return "Speech recognition and a small local AI model run on this Mac (about 2.5 GB, no administrator password)."
-        case .notion: return "After each call Live Tips adds a page to a Notion database: a short summary, decisions, action items, open questions and the transcript. Without Notion the same notes stay in the project folder."
-        case .done: return "Before a call: Live Tips in the menu bar > Start call, pick the project, Start. During the call: \(HotKeys.shared.combo(.help).display) is HELP NOW, \(HotKeys.shared.combo(.pause).display) pauses. Change them in Settings > General > Shortcuts."
+        case .splash: return L("app.tagline")
+        case .welcome: return L("onboarding.welcome.body")
+        case .permissions: return L("onboarding.permissions.body")
+        case .projects: return L("onboarding.projects.body")
+        case .folder: return L("onboarding.folder.body")
+        case .name: return L("onboarding.name.body")
+        case .claude: return L("onboarding.claude.body")
+        case .install: return L("onboarding.install.body")
+        case .notion: return L("onboarding.notion.body")
+        case .done: return L("onboarding.done.body", ["help": HotKeys.shared.combo(.help).display])
         }
     }
 
     @ViewBuilder var content: some View {
         switch m.step {
+        case .splash:
+            EmptyView()
         case .welcome:
             VStack(spacing: 10) {
-                row("waveform", "Records and transcribes on your Mac", "Whisper runs locally; only text goes to Claude.")
-                row("rectangle.on.rectangle", "A small window next to your call", "Facts, a ready phrase, what is on you, your speech.")
-                row("doc.badge.clock", "Prepared before the call", "A brief from your project folder in a few minutes.")
+                row("waveform", L("onboarding.welcome.row1.title"), L("onboarding.welcome.row1.body"))
+                row("rectangle.on.rectangle", L("onboarding.welcome.row2.title"), L("onboarding.welcome.row2.body"))
+                row("doc.badge.clock", L("onboarding.welcome.row3.title"), L("onboarding.welcome.row3.body"))
             }
         case .permissions:
             VStack(spacing: 10) {
-                permissionRow("mic", "Transcribe your voice", ok: m.micState == .authorized,
-                              button: m.micState == .denied ? "Open Settings" : "Allow microphone") {
+                permissionRow("mic", L("onboarding.permissions.mic"), ok: m.micState == .authorized,
+                              button: m.micState == .denied ? L("common.openSettings") : L("onboarding.permissions.micButton")) {
                     if m.micState == .denied {
                         if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") { NSWorkspace.shared.open(u) }
                     } else { m.askMic() }
                 }
-                permissionRow("speaker.wave.2", "Capture the other side of the call", ok: m.sysAudio == true,
-                              button: m.sysAudio == false ? "Open Settings" : "Allow audio access",
-                              note: m.sysAudio == false ? "Turn on Live Tips under Privacy & Security > Screen & System Audio Recording." : "") {
+                permissionRow("speaker.wave.2", L("onboarding.permissions.system"), ok: m.sysAudio == true,
+                              button: m.sysAudio == false ? L("common.openSettings") : L("onboarding.permissions.systemButton"),
+                              note: m.sysAudio == false ? L("onboarding.permissions.systemNote") : "") {
                     m.askSystemAudio()
                 }
                 // 2026-10-27 (owner): optional; the calls from the calendars appear in Home and Start call.
-                permissionRow("calendar", "Your calls from the calendars (optional)", ok: cal.access == .granted,
-                              button: cal.access == .denied ? "Open Settings" : "Connect calendars",
-                              note: "Google and Microsoft accounts added in System Settings > Internet Accounts. Settings > Calendars later.") {
+                permissionRow("calendar", L("onboarding.permissions.calendars"), ok: cal.access == .granted,
+                              button: cal.access == .denied ? L("common.openSettings") : L("onboarding.permissions.calendarsButton"),
+                              note: L("onboarding.permissions.calendarsNote")) {
                     cal.connect()
                 }
             }
         case .folder:
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Image(systemName: "folder").foregroundStyle(.secondary)
-                    Text(settings.config.workRoot.isEmpty ? "No work folder yet" : settings.config.workRoot).lineLimit(1).truncationMode(.middle)
+                    Image(systemName: "folder").foregroundStyle(PN.C.text3)
+                    Text(settings.config.workRoot.isEmpty ? L("onboarding.folder.none") : settings.config.workRoot).lineLimit(1).truncationMode(.middle)
                     Spacer()
-                    Button(settings.config.workRoot.isEmpty ? "Choose…" : "Change…") { m.chooseWorkFolder() }
+                    Button(settings.config.workRoot.isEmpty ? L("onboarding.folder.choose") : L("onboarding.folder.change")) { m.chooseWorkFolder() }
                 }
                 .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
                 let marked = settings.config.workRoot.isEmpty ? [] : WorkspaceScanner.scanFolders(workRoot: settings.config.workRoot,
@@ -233,7 +270,7 @@ struct OnboardingView: View {
                                                                                                     excluded: settings.registry.excluded).workspaces
                 let cands = settings.folderCandidates
                 if !marked.isEmpty || !cands.isEmpty {
-                    Text("Workspaces").font(.caption).foregroundStyle(.secondary)
+                    Text(L("onboarding.folder.workspaces")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     ScrollView {
                         VStack(alignment: .leading, spacing: 6) {
                             ForEach(marked, id: \.self) { d in
@@ -242,7 +279,7 @@ struct OnboardingView: View {
                             ForEach(cands, id: \.dir) { c in
                                 Toggle(isOn: Binding(get: { m.picked.contains(c.dir) },
                                                      set: { if $0 { m.picked.insert(c.dir) } else { m.picked.remove(c.dir) } })) {
-                                    Text((c.dir as NSString).lastPathComponent + "  ·  \(c.projects) project folder\(c.projects == 1 ? "" : "s")")
+                                    Text((c.dir as NSString).lastPathComponent + "  ·  " + L("onboarding.folder.projectFolders", ["n": "\(c.projects)"]))
                                 }
                                 .toggleStyle(.checkbox)
                             }
@@ -251,8 +288,8 @@ struct OnboardingView: View {
                     }
                     .frame(maxHeight: 120)
                 } else if !settings.config.workRoot.isEmpty {
-                    Text("No workspace folders found here yet. You can add project folders later in Settings > Projects.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Text(L("onboarding.folder.empty"))
+                        .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
         case .projects:
@@ -260,7 +297,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(settings.registry.workspaces, id: \.name) { w in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(w.name).font(.caption).foregroundStyle(.secondary)
+                            Text(w.name).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                             ForEach(settings.registry.projects.filter { w.projects.contains($0.slug) }, id: \.slug) { p in projectToggle(p.slug) }
                         }
                     }
@@ -268,30 +305,30 @@ struct OnboardingView: View {
                     let others = settings.registry.projects.filter { !inWs.contains($0.slug) }
                     if !others.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Other").font(.caption).foregroundStyle(.secondary)
+                            Text(L("onboarding.projects.other")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                             ForEach(others, id: \.slug) { p in projectToggle(p.slug) }
                         }
                     }
                     if settings.registry.projects.isEmpty {
-                        Text("No project folders found. Add them later in Settings > Projects.").font(.caption).foregroundStyle(.secondary)
+                        Text(L("onboarding.projects.empty")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxHeight: 200)
         case .name:
-            TextField("", text: $settings.aliasesText, prompt: Text("e.g. Alex, Alexander, Sasha"))
+            TextField("", text: $settings.aliasesText, prompt: Text(L("onboarding.name.placeholder")))
                 .textFieldStyle(.roundedBorder).controlSize(.large)
                 .onChange(of: settings.aliasesText) { settings.saveAliases() }
         case .claude:
             VStack(spacing: 8) {
                 HStack {
-                    SecureField("", text: $m.apiKey, prompt: Text(settings.isSet(.claudeAPIKey) ? "A key is saved; paste a new one to replace it" : "sk-ant-…"))
+                    SecureField("", text: $m.apiKey, prompt: Text(settings.isSet(.claudeAPIKey) ? L("onboarding.claude.saved") : "sk-ant-…"))
                         .textFieldStyle(.roundedBorder)
-                    Button("Save") { m.saveKey() }.disabled(m.apiKey.isEmpty)
+                    Button(L("common.save")) { m.saveKey() }.disabled(m.apiKey.isEmpty)
                 }
                 keyState(settings.keyState[.claudeAPIKey], fallback: m.keyNote)
-                Link("Get a key at console.anthropic.com", destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(.caption)
+                Link(L("onboarding.claude.getKey"), destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(PN.Font.caption)
             }
         case .install:
             VStack(spacing: 6) {
@@ -300,66 +337,72 @@ struct OnboardingView: View {
                         stateIcon(s.state).frame(width: 18)
                         Text(s.title)
                             Spacer()
-                        Text(s.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(s.detail).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                     }
                 }
                 if setup.busy { ProgressView().controlSize(.small) }
-                Text(setup.log.last ?? "").font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                Text(setup.log.last ?? "").font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3).lineLimit(1)
             }
             .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
         case .notion:
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("1.").foregroundStyle(.secondary)
-                    Text("Create an integration: ") + Text("New integration").bold() + Text(", type Internal, then copy its Internal Integration Secret (ntn_…).")
+                    Text("1.").foregroundStyle(PN.C.text3)
+                    Text(L("onboarding.notion.step1a")) + Text(L("onboarding.notion.step1b")).bold() + Text(L("onboarding.notion.step1c"))
                     Spacer()
-                    Link("Open", destination: URL(string: "https://www.notion.so/profile/integrations")!)
+                    Link(L("common.open"), destination: URL(string: "https://www.notion.so/profile/integrations")!)
                 }
                 .font(.callout)
                 HStack(alignment: .firstTextBaseline) {
-                    Text("2.").foregroundStyle(.secondary).font(.callout)
-                    Text("Paste it here:").font(.callout)
+                    Text("2.").foregroundStyle(PN.C.text3).font(.callout)
+                    Text(L("onboarding.notion.step2")).font(.callout)
                 }
                 HStack {
-                    SecureField("", text: $m.notionToken, prompt: Text(settings.isSet(.notionToken) ? "A token is saved" : "ntn_… (an internal integration token)"))
+                    SecureField("", text: $m.notionToken, prompt: Text(settings.isSet(.notionToken) ? L("onboarding.notion.saved") : L("onboarding.notion.placeholder")))
                         .textFieldStyle(.roundedBorder)
-                    Button("Save") { m.saveNotion() }.disabled(m.notionToken.isEmpty)
+                    Button(L("common.save")) { m.saveNotion() }.disabled(m.notionToken.isEmpty)
                 }
                 keyState(settings.keyState[.notionToken], fallback: m.notionNote)
                 HStack(alignment: .firstTextBaseline) {
-                    Text("3.").foregroundStyle(.secondary)
-                    Text("In Notion open the page where meeting notes should live, ") + Text("••• > Connections").bold() + Text(", add your integration. Pages inside it are shared too.")
+                    Text("3.").foregroundStyle(PN.C.text3)
+                    Text(L("onboarding.notion.step3a")) + Text(L("onboarding.notion.step3b")).bold() + Text(L("onboarding.notion.step3c"))
                 }
                 .font(.callout).fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .top) {
-                    Text("4.").foregroundStyle(.secondary).font(.callout)
+                    Text("4.").foregroundStyle(PN.C.text3).font(.callout)
                     NotionDestinationView(compact: true)
                 }
                 if settings.isSet(.notionToken) && NotionMirrorService.mode(workRoot: settings.config.workRoot) == "none" && settings.registry.projects.contains(where: { !$0.config.isEmpty }) {
                     HStack {
-                        Text(settings.mirrorNote.isEmpty ? "Control Tower user: keep a local copy of your Notion for facts and search" : settings.mirrorNote)
-                            .font(.caption).foregroundStyle(.secondary)
+                        Text(settings.mirrorNote.isEmpty ? L("onboarding.notion.mirror") : settings.mirrorNote)
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         Spacer()
-                        Button("Set up sync") { settings.setUpMirror() }
+                        Button(L("onboarding.notion.mirrorButton")) { settings.setUpMirror() }
                             .disabled(settings.config.workRoot.isEmpty || NotionMirrorService.mode(workRoot: settings.config.workRoot) != "none")
                     }
                 }
             }
         case .done:
-            HStack(spacing: 12) {
-                Button("Open the demo window") { (NSApp.delegate as? AppDelegate)?.showDemo() }
-                Button("Settings…") { SettingsWindow.show() }
+            VStack(spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(nsImage: Brand.menuBarImage(recording: false))
+                        .padding(6).background(RoundedRectangle(cornerRadius: 6).fill(PN.C.surface2))
+                    Text(L("onboarding.done.menubarHint")).font(PN.Font.body).foregroundStyle(PN.C.text2)
+                }
+                Button(L("onboarding.done.secondary")) { finish(); (NSApp.delegate as? AppDelegate)?.openHome() }
+                    .buttonStyle(.pnSecondary)
             }
         }
     }
 
     var primaryLabel: String {
         switch m.step {
-        case .install: return setup.allRequiredOK ? "Continue" : (setup.busy ? "Installing…" : "Install all and continue")
-        case .claude: return settings.isSet(.claudeAPIKey) ? "Continue" : "Continue without a key"
-        case .notion: return settings.config.notionMeetingsDB.isEmpty ? "Skip Notion" : "Continue"
-        case .done: return "Start a call"
-        default: return "Continue"
+        case .install: return setup.allRequiredOK ? L("common.continue") : (setup.busy ? L("onboarding.install.running") : L("onboarding.install.all"))
+        case .claude: return settings.isSet(.claudeAPIKey) ? L("common.continue") : L("onboarding.claude.continueNoKey")
+        case .notion: return settings.config.notionMeetingsDB.isEmpty ? L("onboarding.notion.skip") : L("common.continue")
+        case .done: return L("onboarding.done.primary")
+        case .splash: return L("onboarding.splash.cta")
+        default: return L("common.continue")
         }
     }
 
@@ -370,11 +413,15 @@ struct OnboardingView: View {
             if setup.allRequiredOK { m.next() }
             else if !setup.busy { Task { await setup.installMissing(includeOptional: true); if setup.allRequiredOK { m.next() } } }
         case .done:
-            UserDefaults.standard.set(true, forKey: "onboardingDone")
-            close()
-            (NSApp.delegate as? AppDelegate)?.startCall()
+            finish()
+            (NSApp.delegate as? AppDelegate)?.showDemo()     // the tips window on demo data
         default: m.next()
         }
+    }
+
+    func finish() {
+        UserDefaults.standard.set(true, forKey: "onboardingDone")
+        close()
     }
 
     func projectToggle(_ slug: String) -> some View {
@@ -392,7 +439,7 @@ struct OnboardingView: View {
     func row(_ icon: String, _ t: String, _ d: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon).frame(width: 22).foregroundStyle(Color.accentColor)
-            VStack(alignment: .leading, spacing: 2) { Text(t).font(.body.weight(.medium)); Text(d).font(.callout).foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: 2) { Text(t).font(.body.weight(.medium)); Text(d).font(.callout).foregroundStyle(PN.C.text3) }
             Spacer()
         }
         .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
@@ -403,30 +450,30 @@ struct OnboardingView: View {
             Image(systemName: icon).frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
                 Text(t)
-                if !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
+                if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
             }
             Spacer()
-            if ok { Image(systemName: "checkmark").foregroundStyle(.green) } else { Button(button, action: action).buttonStyle(.borderedProminent) }
+            if ok { Image(systemName: "checkmark").foregroundStyle(PN.C.turn) } else { Button(button, action: action).buttonStyle(.pnSecondary) }
         }
         .padding(12).background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
     }
 
     @ViewBuilder func keyState(_ s: KeyState?, fallback: String) -> some View {
         switch s ?? .notSet {
-        case .ok(let msg): Label(msg.isEmpty ? "Works" : msg, systemImage: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
-        case .failed(let msg): Label(msg, systemImage: "xmark.circle.fill").foregroundStyle(.red).font(.caption)
-        case .testing: Label("Checking…", systemImage: "hourglass").foregroundStyle(.secondary).font(.caption)
-        default: Text(fallback).font(.caption).foregroundStyle(.secondary)
+        case .ok(let msg): Label(msg.isEmpty ? L("common.works") : msg, systemImage: "checkmark.circle.fill").foregroundStyle(PN.C.turn).font(PN.Font.caption)
+        case .failed(let msg): Label(msg, systemImage: "xmark.circle.fill").foregroundStyle(PN.C.danger).font(PN.Font.caption)
+        case .testing: Label(L("common.checking"), systemImage: "hourglass").foregroundStyle(PN.C.text3).font(PN.Font.caption)
+        default: Text(fallback).font(PN.Font.caption).foregroundStyle(PN.C.text3)
         }
     }
 
     @ViewBuilder func stateIcon(_ s: SetupModel.Step.State) -> some View {
         switch s {
-        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .missing: Image(systemName: "circle").foregroundStyle(.secondary)
-        case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
+        case .missing: Image(systemName: "circle").foregroundStyle(PN.C.text3)
+        case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(PN.C.danger)
         case .checking, .installing: ProgressView().controlSize(.small)
-        case .unknown: Image(systemName: "circle.dotted").foregroundStyle(.secondary)
+        case .unknown: Image(systemName: "circle.dotted").foregroundStyle(PN.C.text3)
         }
     }
 }
@@ -438,13 +485,14 @@ final class OnboardingWindow {
 
     static func show() {
         if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: OnboardingView(m: model, close: { window?.close() })))
-            w.title = "Welcome to Live Tips"
+            let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { OnboardingView(m: model, close: { window?.close() }) }))
+            w.title = L("onboarding.window.title")
             w.styleMask.remove(.resizable)
             w.isReleasedWhenClosed = false
             window = w
         }
-        model.step = .welcome
+        model.step = .splash
+        window?.title = L("onboarding.window.title")
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

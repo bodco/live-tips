@@ -1,13 +1,16 @@
-# Live Tips
+# Pacenote
 
-**A quiet co-pilot on your calls.** [Українською](README.uk.md) · [Site](https://tower.bodco.pm/live-tips/)
+**Your co-driver on calls.** [Українською](README.uk.md) · [Site](https://tower.bodco.pm/live-tips/)
 
-Live Tips listens to your call on your Mac and speaks up only when a fact or a phrase is needed:
+Pacenote (formerly Live Tips) prepares a short brief before the call, gives quiet, precise tips during it, and writes
+the notes after. You keep the wheel. It listens to your call on your Mac and speaks up only when a fact or a phrase is needed:
 a question to you, your turn, a new request, a date you are about to promise. Audio is transcribed
 on the Mac and never leaves it; only text goes to Claude. After the call the summary, decisions and
 action items land in Notion, and the transcript stays in your project folder.
 
-Beta, built by one project manager for his own calls.
+Beta, built by one project manager for his own calls. The new name changes what you see; the repository,
+the `live-tips` skill, the `LiveTips.app` file, folders and settings keep the old name, so calls, folders and
+permissions carry over.
 
 ## Two ways to run it
 
@@ -45,8 +48,8 @@ How it compares with Fireflies, Fathom and Notion AI Meeting Notes: [tower.bodco
 | `docs/` | The full guide: [English](docs/en/live-tips.md), [українською](docs/uk/live-tips.md) |
 | `DEVELOPMENT.md` | Layout, build and the measurements behind the design |
 
-Live Tips works on its own. With [PM Control Tower](https://github.com/bodco/pm-control-tower) it also reads your project configs (people, Notion pages, the current state).
+Pacenote works on its own. With [PM Control Tower](https://github.com/bodco/pm-control-tower) it also reads your project configs (people, Notion pages, the current state).
 
-History: Live Tips grew inside PM Control Tower; releases up to 0.5.8 are [there](https://github.com/bodco/pm-control-tower/releases). This repository keeps that history.
+History: Pacenote, then called Live Tips, grew inside PM Control Tower; releases up to 0.5.8 are [there](https://github.com/bodco/pm-control-tower/releases). This repository keeps that history.
 
 MIT License. [Privacy policy](PRIVACY.md) and [terms of use](TERMS.md): your audio stays on your Mac, nothing is sent to the author.

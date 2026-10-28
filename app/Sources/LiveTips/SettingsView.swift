@@ -370,7 +370,7 @@ final class SettingsModel: ObservableObject {
         if !registry.excluded.contains(dir) { registry.excluded.append(dir) }
         registry.projects.removeAll { !$0.root.isEmpty && ($0.root + "/").hasPrefix(dir + "/") }
         rescanWorkspaces()
-        note = "Removed \(w.name) from Live Tips (the folder is untouched)"
+        note = "Removed \(w.name) from Pacenote (the folder is untouched)"
     }
 
     func excludeProject(_ slug: String) {
@@ -394,7 +394,7 @@ final class SettingsModel: ObservableObject {
         ]
     }
 
-    func saveConfig() { try? config.save(to: AppPaths.config) }
+    func saveConfig() { try? config.save(to: AppPaths.config); L10n.set(config.uiLanguage) }
     @Published var localAIStatus: (ok: Bool, text: String) = (false, "Checking…")
     func refreshLocalAI(after delay: Double = 0) {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
@@ -419,7 +419,7 @@ struct ModelPicker: View {
     var body: some View {
         Picker(title, selection: $selection) {
             ForEach(choices, id: \.self) { id in
-                (Text(prettyModel(id)) + Text("  " + id).font(.caption).foregroundColor(.secondary)).tag(id)
+                (Text(prettyModel(id)) + Text("  " + id).font(PN.Font.caption).foregroundColor(.secondary)).tag(id)
             }
         }
     }
@@ -432,11 +432,11 @@ struct StateIcon: View {
     var body: some View {
         Group {
             switch state {
-            case .notSet: Image(systemName: "circle.dashed").foregroundStyle(.secondary).help("Not set")
+            case .notSet: Image(systemName: "circle.dashed").foregroundStyle(PN.C.text3).help("Not set")
             case .untested: Image(systemName: "circle.fill").foregroundStyle(.yellow).help("Saved, checking…")
             case .testing: ProgressView().controlSize(.small)
-            case .ok(let m): Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help(m)
-            case .failed(let m): Image(systemName: "xmark.octagon.fill").foregroundStyle(.red).help(m)
+            case .ok(let m): Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn).help(m)
+            case .failed(let m): Image(systemName: "xmark.octagon.fill").foregroundStyle(PN.C.danger).help(m)
             }
         }
         .frame(width: 16, height: 16)
@@ -476,7 +476,7 @@ struct KeyRow: View {
                     IconButton(symbol: "trash", label: "Remove from Keychain", role: .destructive) { model.remove(key) }
                         .disabled(!model.isSet(key))
                     StateIcon(state: model.keyState[key] ?? .notSet)
-                    Text(model.masks[key] ?? "").font(.caption.monospaced()).foregroundStyle(.secondary)
+                    Text(model.masks[key] ?? "").font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3)
                         .frame(width: 64, alignment: .leading)
                 }
                 statusText
@@ -488,9 +488,9 @@ struct KeyRow: View {
 
     @ViewBuilder var statusText: some View {
         switch model.keyState[key] ?? .notSet {
-        case .ok(let m): Label(m, systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
-        case .failed(let m): Label(m, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.red)
-        case .notSet: Text(hint).font(.caption).foregroundStyle(.secondary)
+        case .ok(let m): Label(m, systemImage: "checkmark.circle.fill").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+        case .failed(let m): Label(m, systemImage: "exclamationmark.triangle.fill").font(PN.Font.caption).foregroundStyle(PN.C.danger)
+        case .notSet: Text(hint).font(PN.Font.caption).foregroundStyle(PN.C.text3)
         default: EmptyView()
         }
     }
@@ -523,7 +523,7 @@ struct SettingsView: View {
     @AppStorage("homeShowStats") private var showStats = true      // Home: this week's numbers (2026-10-27)
 
     struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
-    static let panes: [Pane] = [
+    static var panes: [Pane] { [   // titles follow the interface language
         Pane(id: "general", title: "General", symbol: "gearshape", subtitle: "Your name on calls, folders, Notion and how the app behaves."),
         Pane(id: "keys", title: "Keys", symbol: "key", subtitle: "The Claude API key and the Notion token, kept in the macOS Keychain."),
         Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
@@ -532,7 +532,7 @@ struct SettingsView: View {
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
         Pane(id: "how", title: "How it works", symbol: "point.3.connected.trianglepath.dotted", subtitle: "What happens before, during and after a call."),
         Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
-    ]
+    ].map { Pane(id: $0.id, title: L("settings.tab." + $0.id), symbol: $0.symbol, subtitle: L("settings.pane." + $0.id)) } }
 
     // 2026-10-26 (owner): the welcome tour's look: a sidebar of icon tiles, a header per pane, soft cards.
     var body: some View {
@@ -588,7 +588,7 @@ struct SettingsView: View {
                 KeyRow(title: "Notion token", hint: "Optional. Set it up in Settings > Notion.", key: .notionToken, model: model)
             } footer: {
                 Text("Paste with ⌘V and press Return. Each key is checked with one request. Keys live only in the macOS Keychain and survive app updates.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
         .formStyle(.grouped)
@@ -606,10 +606,10 @@ struct SettingsView: View {
                 if !runner.useAPI {
                     HStack(spacing: 8) {
                         Image(systemName: runner.loggedIn == true ? "checkmark.circle.fill" : (runner.loggedIn == false ? "exclamationmark.triangle.fill" : "circle.dotted"))
-                            .foregroundStyle(runner.loggedIn == true ? Color.green : (runner.loggedIn == false ? Color.orange : Color.secondary))
+                            .foregroundStyle(runner.loggedIn == true ? PN.C.turn : (runner.loggedIn == false ? PN.C.onMe : PN.C.text3))
                         Text(runner.loggedIn == true ? "Claude Code signed in" + (runner.authInfo.isEmpty ? "" : " (\(runner.authInfo))")
                              : runner.loggedIn == false ? "Claude Code is not signed in" : "Checking the Claude Code sign-in…")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(PN.C.text3)
                         Spacer()
                         if runner.loggedIn == false { Button("Log in…") { runner.openLogin() } }
                         Button("Check") { runner.refreshAuth() }
@@ -622,7 +622,7 @@ struct SettingsView: View {
             } header: { Text("Preparation (Prepare now in Start call)") } footer: {
                 Text(PrepRunner.claudePath == nil ? "Claude Code is not installed on this Mac: Start call offers the Cowork request instead."
                      : "Claude Code builds the brief, facts and cards from local files (the project folder, the local Notion mirror, earlier calls) and the public web links in Call context.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             .onAppear { runner.refreshAuth() }
             Section {
@@ -636,11 +636,11 @@ struct SettingsView: View {
                 Toggle("Rate tips after each call (blind judge, about $0.10)", isOn: $model.config.judgeAfterCall)
                     .help("After the call Claude Sonnet scores up to 25 tips of the app and of the skill from the transcript, in the background. Results: <call>.judge/judge.summary.json next to the transcript.")
                 if !CallEngine.shared.judgeResult.isEmpty {
-                    Text(CallEngine.shared.judgeResult).font(.caption).foregroundStyle(.secondary)
+                    Text(CallEngine.shared.judgeResult).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             } header: { Text("Models") } footer: {
                 Text(model.config.knownModels.isEmpty ? "Test the Claude key to load the models your key can use." : "Models your key can use.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
                 TextField("Warning per call", value: $model.config.budget.callSoftUSD, format: .currency(code: "USD"))
@@ -651,7 +651,7 @@ struct SettingsView: View {
                     .help("At this amount Claude tips stay off until the next month. The local layer keeps working.")
             } header: { Text("Spending limits") } footer: {
                 Text(String(format: "This month: $%.2f of $%.0f. A typical hour of a call costs $0.10 to $1.20.", SpendLedger.monthSpent(), model.config.budget.monthlyHardUSD))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
                 Toggle("Local AI (default for new calls)", isOn: $model.config.localAI.enabled)
@@ -671,23 +671,23 @@ struct SettingsView: View {
                 LabeledContent("Status") {
                     HStack(spacing: 6) {
                         Image(systemName: model.localAIStatus.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
-                            .foregroundStyle(model.localAIStatus.ok ? .green : .orange)
-                        Text(model.localAIStatus.text).font(.caption).foregroundStyle(.secondary)
+                            .foregroundStyle(model.localAIStatus.ok ? PN.C.turn : PN.C.onMe)
+                        Text(model.localAIStatus.text).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         Button("Check") { model.refreshLocalAI() }.controlSize(.small)
                     }
                 }
                 DisclosureGroup("About the engines") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("**Built-in.** bge-m3 by BAAI (open model, MIT license), a multilingual text embedding model: it turns a line of the call or a piece of a project file into numbers so that texts with the same meaning sit close, in Ukrainian, English and Spanish alike. Live Tips runs the int8 ONNX build (Xenova/bge-m3 on Hugging Face, about 570 MB) with ONNX Runtime on the CPU of this Mac: about 25 ms per line, about 1 s to start. The model lives in <app folder>/models/bge-m3-int8. Text never leaves the Mac.")
-                        Text("**Ollama.** If you already run Ollama (ollama.com) for the Cowork skill, Live Tips can use the same server: `ollama pull bge-m3`, then choose Ollama here. Both engines give the same search results on the existing project index (checked: the same top result on 8 of 8 test queries), so switching needs no reindex.")
+                        Text("**Built-in.** bge-m3 by BAAI (open model, MIT license), a multilingual text embedding model: it turns a line of the call or a piece of a project file into numbers so that texts with the same meaning sit close, in Ukrainian, English and Spanish alike. Pacenote runs the int8 ONNX build (Xenova/bge-m3 on Hugging Face, about 570 MB) with ONNX Runtime on the CPU of this Mac: about 25 ms per line, about 1 s to start. The model lives in <app folder>/models/bge-m3-int8. Text never leaves the Mac.")
+                        Text("**Ollama.** If you already run Ollama (ollama.com) for the Cowork skill, Pacenote can use the same server: `ollama pull bge-m3`, then choose Ollama here. Both engines give the same search results on the existing project index (checked: the same top result on 8 of 8 test queries), so switching needs no reindex.")
                         Text("**Another model.** Any embedding model from the Ollama library (for example multilingual-e5 or nomic-embed-text): `ollama pull <name>`, put the name into Model, then rebuild each project index with `lt index <project folder> --rebuild`. Thresholds in rules/semantic.yaml are tuned for bge-m3, so check them on a recorded call before trusting a new model. Other built-in models (any ONNX export with tokenizer.json) are planned; for now the built-in engine is bge-m3 only.")
                     }
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 }
             } header: { Text("Local AI") } footer: {
-                Text("Audio and voice prints never leave the Mac; only text goes to the Claude API.").font(.caption).foregroundStyle(.secondary)
+                Text("Audio and voice prints never leave the Mac; only text goes to the Claude API.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             .onChange(of: model.config.localAI) { LocalAIService.shared.apply(); model.refreshLocalAI(after: 2) }
             .onAppear { model.refreshLocalAI() }
@@ -700,7 +700,7 @@ struct SettingsView: View {
                     HStack(spacing: 6) {
                         Image(systemName: st.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .foregroundStyle(st.ok ? .green : (model.config.speakersEnabled ? .orange : .secondary))
-                        Text(st.text).font(.caption).foregroundStyle(.secondary)
+                        Text(st.text).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         Spacer()
                         Button("Voice library") {
                             NSWorkspace.shared.open(URL(fileURLWithPath: (CallEngine.shared.appRoot as NSString).appendingPathComponent("voices")))
@@ -708,7 +708,7 @@ struct SettingsView: View {
                     }
                 }
                 DisclosureGroup("Voice library (\(model.voices.count))") {
-                    if model.voices.isEmpty { Text("Nobody yet. Names you give on calls appear here.").font(.caption).foregroundStyle(.secondary) }
+                    if model.voices.isEmpty { Text("Nobody yet. Names you give on calls appear here.").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                     ForEach(model.voices) { v in
                         HStack {
                             Text(v.name)
@@ -717,7 +717,7 @@ struct SettingsView: View {
                                 Button { model.setVoiceSide(v.name, "team") } label: { v.side == "team" ? Label("Team (ours)", systemImage: "checkmark") : Label("Team (ours)", systemImage: "person.2") }
                                 Button { model.setVoiceSide(v.name, "client") } label: { v.side == "client" ? Label("Client side", systemImage: "checkmark") : Label("Client side", systemImage: "building.2") }
                             }
-                            .menuStyle(.borderlessButton).fixedSize().font(.caption)
+                            .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
                             .foregroundStyle(v.side == "team" ? Color.accentColor : .primary)
                             .disabled(CallEngine.shared.isRunning)
                             .help("Which side this person is on: our team or the client's. Not during a call.")
@@ -728,10 +728,10 @@ struct SettingsView: View {
                                     }
                                 }
                             }
-                            .menuStyle(.borderlessButton).fixedSize().font(.caption)
+                            .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
                             .disabled(CallEngine.shared.isRunning)
                             .help("The calls this voice is suggested and recognised on: all projects, whole workspaces, or any number of projects (tick several). Not during a call.")
-                            Text("\(v.calls) call\(v.calls == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
+                            Text("\(v.calls) call\(v.calls == 1 ? "" : "s")").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                             Button("Forget") { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
                                 .help("Removes this person's voice prints from the Mac. Not during a call.")
                         }
@@ -740,7 +740,7 @@ struct SettingsView: View {
                 .onAppear { model.loadVoices() }
             } header: { Text("Speakers") } footer: {
                 Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. A voice named on a meeting series is named by itself on the next call of that series when it matches well (Clear speakers in the window forgets it). Each person has a side (Team, ours, or Client) and the calls they are suggested on: all projects, whole workspaces or several projects. The team table of a project config is Team on all projects; anyone else starts as Client of the call's project, and a person heard on another project's call gets that project added. Nothing is saved on a call marked Public in Start call. Voice prints stay in <app folder>/voices on this Mac.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
         .formStyle(.grouped)
@@ -761,26 +761,26 @@ struct SettingsView: View {
                     }
                     .fixedSize()
                     Button { showProjectsInfo.toggle() } label: { Image(systemName: "info.circle") }
-                        .buttonStyle(.borderless)
+                        .buttonStyle(.borderless).accessibilityLabel("About projects")
                         .popover(isPresented: $showProjectsInfo, arrowEdge: .bottom) { projectsInfo }
                     Spacer()
                     Button("Reindex all") { IndexService.shared.reindexAll() }
                         .help("Rebuild the search index of every project with Index on (in the background, paused during calls).")
                 }
                 if model.config.workRoot.isEmpty {
-                    Text("Set the work folder in General first.").font(.caption).foregroundStyle(.orange)
+                    Text("Set the work folder in General first.").font(PN.Font.caption).foregroundStyle(PN.C.onMe)
                 }
-                if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.secondary) }
+                if !model.note.isEmpty { Text(model.note).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
             }
             let cands = model.folderCandidates
             if !cands.isEmpty {
                 Section {
                     ForEach(cands, id: \.dir) { c in
                         HStack {
-                            Image(systemName: "folder.badge.questionmark").foregroundStyle(.secondary)
+                            Image(systemName: "folder.badge.questionmark").foregroundStyle(PN.C.text3)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text((c.dir as NSString).lastPathComponent)
-                                Text("\(c.projects) folder\(c.projects == 1 ? "" : "s") inside").font(.caption).foregroundStyle(.secondary)
+                                Text("\(c.projects) folder\(c.projects == 1 ? "" : "s") inside").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                             }
                             Spacer()
                             Button("Add as workspace") { model.addWorkspace(c.dir) }
@@ -788,24 +788,24 @@ struct SettingsView: View {
                         }
                     }
                 } header: { Text("Found in your work folder") } footer: {
-                    Text("A workspace's subfolders become its projects. Ignore keeps a folder out of every scan.").font(.caption).foregroundStyle(.secondary)
+                    Text("A workspace's subfolders become its projects. Ignore keeps a folder out of every scan.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
             ForEach(model.registry.workspaces, id: \.name) { w in
                 Section {
                     let members = model.registry.projects.filter { w.projects.contains($0.slug) }
-                    if members.isEmpty { Text("No projects yet: Scan work folder.").font(.caption).foregroundStyle(.secondary) }
+                    if members.isEmpty { Text("No projects yet: Scan work folder.").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                     ForEach(members, id: \.slug) { p in projectRow(p.slug) }
                 } header: {
                     HStack(spacing: 6) {
                         Image(systemName: "square.stack.3d.up")
                         Text(w.name)
-                        if model.workspaceHasNotion(w) { Text("Notion").font(.caption2).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15))) }
+                        if model.workspaceHasNotion(w) { Text("Notion").font(PN.Font.caption).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15))) }
                         Spacer()
-                        Text("calls: " + (w.root as NSString).lastPathComponent).font(.caption).foregroundStyle(.secondary)
+                        Text("calls: " + (w.root as NSString).lastPathComponent).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         Menu {
                             Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: w.root)]) }
-                            Button("Remove workspace from Live Tips", role: .destructive) { model.removeWorkspace(w) }
+                            Button("Remove workspace from Pacenote", role: .destructive) { model.removeWorkspace(w) }
                         } label: { Image(systemName: "ellipsis.circle") }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     }
@@ -821,7 +821,7 @@ struct SettingsView: View {
             if model.registry.projects.isEmpty && model.registry.workspaces.isEmpty && cands.isEmpty {
                 Section {
                     Text("No projects yet. Scan the work folder, or add a project folder. Any folder works; Notion is not needed.")
-                        .font(.callout).foregroundStyle(.secondary)
+                        .font(.callout).foregroundStyle(PN.C.text3)
                 }
             }
         }
@@ -834,7 +834,7 @@ struct SettingsView: View {
             Text("How projects work").font(.headline)
             Text("Each project is a folder on your Mac: work folder > workspace > project. Calls, preparations and notes are saved in the project folder.")
             Text("Tick a project to see it in Start call. Untick a project that is over; nothing is deleted.")
-            Text("⋯ removes a project or a whole workspace from Live Tips. The folders stay on your Mac; Scan work folder or Add brings them back.")
+            Text("⋯ removes a project or a whole workspace from Pacenote. The folders stay on your Mac; Scan work folder or Add brings them back.")
             Text("Optional extras come from PM Control Tower (a separate free framework): a project file projects/<project>.md with the team, the Notion pages and the Meetings database. You get it when you set a project up there; then Add > Import Control Tower configs. Without it everything still works from the folders.")
         }
         .font(.callout).fixedSize(horizontal: false, vertical: true)
@@ -851,10 +851,10 @@ struct SettingsView: View {
             Toggle("Search this folder", isOn: $model.registry.projects[i].index.enabled)
             Button("Reindex now") { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
             Divider()
-            Button("Remove project from Live Tips", role: .destructive) { model.excludeProject(p.slug) }
+            Button("Remove project from Pacenote", role: .destructive) { model.excludeProject(p.slug) }
         } label: { Image(systemName: "ellipsis.circle") }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Show in Finder, remove from Live Tips")
+        .help("Show in Finder, remove from Pacenote")
     }
 
     @ViewBuilder func projectRow(_ slug: String) -> some View {
@@ -865,16 +865,16 @@ struct SettingsView: View {
                                          set: { model.registry.projects[i].status = $0 ? "active" : "archived" }))
                     .toggleStyle(.checkbox).labelsHidden()
                     .help("Active: offered in Start call. Untick a project that is over; its folder and calls stay.")
-                Image(systemName: "folder").foregroundStyle(.secondary)
+                Image(systemName: "folder").foregroundStyle(PN.C.text3)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(p.name).foregroundStyle(p.status == "archived" ? .secondary : .primary)
                         if !p.config.isEmpty {
-                            Text("config").font(.caption2).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15)))
+                            Text("config").font(PN.Font.caption).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15)))
                                 .help("People, Notion pages and settings come from " + p.config)
                         }
                     }
-                    Text(p.root.isEmpty ? "No folder" : p.root).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Text(p.root.isEmpty ? "No folder" : p.root).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer()
                 projectMenu(i)
@@ -882,7 +882,7 @@ struct SettingsView: View {
             .contextMenu {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }.disabled(p.root.isEmpty)
                 Button("Reindex now") { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
-                Button("Remove from Live Tips", role: .destructive) { model.excludeProject(p.slug) }
+                Button("Remove from Pacenote", role: .destructive) { model.excludeProject(p.slug) }
             }
         }
     }
@@ -895,18 +895,18 @@ struct SettingsView: View {
                 KeyRow(title: "Notion token", hint: "An internal integration secret (ntn_…) from notion.so/profile/integrations. Then open the Notion page where meeting notes should live, ••• > Connections, add your integration.", key: .notionToken, model: model)
                 NotionDestinationView()
             } header: { Text("Meeting pages") } footer: {
-                Text("After the call: a short summary, decisions, action items, open questions and the transcript, in the call's language. Missed one? Live Tips menu > Send last call to Notion.")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("After the call: a short summary, decisions, action items, open questions and the transcript, in the call's language. Missed one? Pacenote menu > Send last call to Notion.")
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             let withConfig = model.registry.projects.filter { !$0.config.isEmpty }
             if !withConfig.isEmpty {
                 Section {
                     ForEach(withConfig, id: \.slug) { p in
-                        LabeledContent(p.name) { Text("its own Meetings database").foregroundStyle(.secondary) }
+                        LabeledContent(p.name) { Text("its own Meetings database").foregroundStyle(PN.C.text3) }
                     }
                 } header: { Text("Projects set up with PM Control Tower") } footer: {
                     Text("These projects have a PM Control Tower project file (projects/<project>.md) that names their Meetings database, so their pages go there. Every other project uses the database above. Without PM Control Tower this list is empty and nothing here applies.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
             Section {
@@ -923,19 +923,19 @@ struct SettingsView: View {
                             Button("Check") { model.refreshMirror() }
                         }
                         if !model.mirrorNote.isEmpty {
-                            Text(model.mirrorNote).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            Text(model.mirrorNote).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                         } else if NotionMirrorService.mode(workRoot: model.config.workRoot) == "external" {
-                            Text("Run by your own schedule (notion-mirror in Tools). Live Tips only reads it.").font(.caption).foregroundStyle(.secondary)
+                            Text("Run by your own schedule (notion-mirror in Tools). Pacenote only reads it.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         } else if NotionMirrorService.mode(workRoot: model.config.workRoot) == "managed" {
-                            Text("Live Tips runs it every 2 hours (7:00-22:00), never during a call.").font(.caption).foregroundStyle(.secondary)
+                            Text("Pacenote runs it every 2 hours (7:00-22:00), never during a call.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
                     }
                 } label: {
-                    Text("Notion mirror").help("A read-only copy of your Notion as .md files, refreshed by a background job every 2 hours. Live Tips reads it for facts and search; anything newer comes from the Notion API.")
+                    Text("Notion mirror").help("A read-only copy of your Notion as .md files, refreshed by a background job every 2 hours. Pacenote reads it for facts and search; anything newer comes from the Notion API.")
                 }
             } header: { Text("Local copy of Notion (optional)") } footer: {
                 Text("A read-only copy of your PM Control Tower Notion as files, for facts and search during calls. Needed only with PM Control Tower.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
         .formStyle(.grouped)
@@ -947,21 +947,21 @@ struct SettingsView: View {
                 Section {
                     ForEach(model.readyItems, id: \.title) { it in
                         HStack {
-                            Image(systemName: it.ok ? "checkmark.circle.fill" : "circle").foregroundStyle(it.ok ? Color.green : Color.secondary)
+                            Image(systemName: it.ok ? "checkmark.circle.fill" : "circle").foregroundStyle(it.ok ? PN.C.turn : PN.C.text3)
                             Text(it.title)
                             Spacer()
                             if !it.ok, let tab = it.tab { Button(it.action) { model.tab = tab } }
                             else if !it.ok, it.action == "Import…" { Button(it.action) { model.importProjects() } }
-                            else if !it.ok { Text(it.action).font(.caption).foregroundStyle(.secondary) }
+                            else if !it.ok { Text(it.action).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                         }
                     }
                 } header: { Text("Get ready for the first call") } footer: {
-                    Text("This list disappears when everything is set. The same list is in About.").font(.caption).foregroundStyle(.secondary)
+                    Text("This list disappears when everything is set. The same list is in About.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
             Section {
                 FolderRow(title: "Work folder",
-                          hint: "The folder you connected to Cowork, where your project folders live. Live Tips keeps its files in <work folder>/Tools/LiveTips (the skill sees them) and reads the Notion mirror from <work folder>/_notion.",
+                          hint: "The folder you connected to Cowork, where your project folders live. Pacenote keeps its files in <work folder>/Tools/LiveTips (the skill sees them) and reads the Notion mirror from <work folder>/_notion.",
                           path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder("Choose your work folder") })
                     .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
                 LabeledContent("Your name on calls") {
@@ -982,38 +982,38 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Show this week's numbers on Home")
                         Text("Calls, time on calls, Claude spend, the chart and the monthly spend. Turn off to show Home to colleagues without your numbers.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
-                Toggle("Show Live Tips in the Dock", isOn: $model.config.showInDock)
+                Toggle(L("settings.general.dock"), isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
             } header: { Text("Behaviour") } footer: {
                 HStack {
                     Text("Settings save automatically and survive updates: options in Application Support/LiveTips, keys in the Keychain.")
-                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.config]) }.buttonStyle(.link)
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.config]) }.buttonStyle(.pnTertiary)
                 }
                 HStack {
                     Text("Your corrections (cards, On me, preparations, titles) are logged in edits.jsonl; each new preparation learns from them.")
                     Button("Show log") {
                         if !FileManager.default.fileExists(atPath: EditLog.url.path) { FileManager.default.createFile(atPath: EditLog.url.path, contents: nil) }
                         NSWorkspace.shared.activateFileViewerSelecting([EditLog.url])
-                    }.buttonStyle(.link)
+                    }.buttonStyle(.pnTertiary)
                 }
-                .font(.caption).foregroundStyle(.secondary)
+                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
                 Toggle(isOn: $model.config.consentSay) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Play an audio consent message")
                         Text("When a recording starts, macOS speaks the message through your speakers, so the others hear it through your microphone.")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
                 Toggle(isOn: $model.config.consentChat) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Copy a consent message for the meeting chat")
                         Text("When a recording starts, the message is copied and a notification reminds you to paste it into the chat (Command-V).")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
                 if model.config.consentSay || model.config.consentChat {
@@ -1022,20 +1022,20 @@ struct SettingsView: View {
                 }
             } header: { Text("Recording consent") } footer: {
                 Text("Off by default. The message follows the call's language. Check the rules of your company and your clients' countries: in some places everyone must agree to a recording.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
                 ShortcutRow(action: .help)
                 ShortcutRow(action: .pause)
             } header: { Text("Shortcuts") } footer: {
                 Text("They work from any app during a call, also while the meeting app has the focus. Change: press the new keys with Control, Option or Command (Esc cancels). Pause stops the transcript and the tips for both sides.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
                 LabeledContent {
                     HStack {
                         Text(model.config.effectiveAppRoot(appSupport: AppPaths.support.path))
-                            .font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                            .font(.callout).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Button("Choose…") { if let p = model.chooseFolder("Choose the app folder") { model.config.appRoot = p } }
                         if !model.config.appRoot.isEmpty { Button("Default") { model.config.appRoot = "" } }
@@ -1050,10 +1050,10 @@ struct SettingsView: View {
 
     @ViewBuilder var mirrorLine: some View {
         switch model.mirrorHealth {
-        case "ok": Label(model.mirrorLastRunText, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-        case "stale": Label("Stale: " + model.mirrorLastRunText, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-        case "failed": Label("Last run failed", systemImage: "xmark.octagon.fill").foregroundStyle(.red)
-        default: Label(model.config.workRoot.isEmpty ? "Set the work folder first" : "No mirror found (sync not set up)", systemImage: "circle.dashed").foregroundStyle(.secondary)
+        case "ok": Label(model.mirrorLastRunText, systemImage: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
+        case "stale": Label("Stale: " + model.mirrorLastRunText, systemImage: "exclamationmark.triangle.fill").foregroundStyle(PN.C.onMe)
+        case "failed": Label("Last run failed", systemImage: "xmark.octagon.fill").foregroundStyle(PN.C.danger)
+        default: Label(model.config.workRoot.isEmpty ? "Set the work folder first" : "No mirror found (sync not set up)", systemImage: "circle.dashed").foregroundStyle(PN.C.text3)
         }
     }
 }
@@ -1071,13 +1071,13 @@ struct HowItWorksView: View {
                         arrow
                         box("Transcript", "with speaker names", .gray)
                     }
-                    Image(systemName: "arrow.down").foregroundStyle(.secondary)
+                    Image(systemName: "arrow.down").foregroundStyle(PN.C.text3)
                     HStack(alignment: .top, spacing: 10) {
-                        box("On the Mac, 1-2 s", "keyword rules, prepared facts and cards; Local AI matches them by meaning", .green)
+                        box("On the Mac, 1-2 s", "keyword rules, prepared facts and cards; Local AI matches them by meaning", PN.C.turn)
                         box("Claude, about 5 s", "classifies new lines, writes tips, answers asks and HELP NOW, searches the project folder", .blue)
                     }
-                    Image(systemName: "arrow.down").foregroundStyle(.secondary)
-                    box("Tips window", "facts, tips, answers, transcript; nothing is sent to anyone", .orange)
+                    Image(systemName: "arrow.down").foregroundStyle(PN.C.text3)
+                    box("Tips window", "facts, tips, answers, transcript; nothing is sent to anyone", PN.C.onMe)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
@@ -1107,12 +1107,12 @@ struct HowItWorksView: View {
         .formStyle(.grouped)
     }
 
-    var arrow: some View { Image(systemName: "arrow.right").foregroundStyle(.secondary) }
+    var arrow: some View { Image(systemName: "arrow.right").foregroundStyle(PN.C.text3) }
 
     func box(_ title: String, _ sub: String, _ color: Color) -> some View {
         VStack(spacing: 2) {
             Text(title).font(.callout).bold()
-            Text(sub).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(8)
@@ -1123,10 +1123,10 @@ struct HowItWorksView: View {
 
     func row(_ icon: String, _ title: String, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon).frame(width: 20).foregroundStyle(.secondary)
+            Image(systemName: icon).frame(width: 20).foregroundStyle(PN.C.text3)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).bold()
-                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(text).font(.callout).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -1135,32 +1135,48 @@ struct HowItWorksView: View {
 struct AboutView: View {
     @ObservedObject var model: SettingsModel
 
+    var info: [String: Any] { Bundle.main.infoDictionary ?? [:] }
+    var versionLine: String {
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        return L("settings.about.version", ["version": info["CFBundleShortVersionString"] as? String ?? "dev",
+                                            "build": info["CFBundleVersion"] as? String ?? "dev",
+                                            "os": "\(os.majorVersion).\(os.minorVersion)" + (os.patchVersion > 0 ? ".\(os.patchVersion)" : "")])
+    }
+
+    // Pacenote 0.8 (F0): the brand block, the version with build and macOS, updates, the former name.
     var body: some View {
         Form {
             Section {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Live Tips").font(.largeTitle).bold()
-                    Text("by PM Control Tower").foregroundStyle(.secondary)
+                HStack(alignment: .center, spacing: 18) {
+                    Image(nsImage: Brand.appIcon).resizable().interpolation(.high).frame(width: 88, height: 88).accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 8) {
+                        PacenoteWordmark(height: 26)
+                        Text(L("settings.about.byline")).font(.system(size: 15)).foregroundStyle(PN.C.text2)
+                        Text(versionLine).font(PN.Font.caption).foregroundStyle(PN.C.text3).textSelection(.enabled)
+                    }
                     Spacer()
-                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")").foregroundStyle(.secondary)
+                    // No updater in the app: the releases page opens in the browser, nothing is checked in the background.
+                    Button(L("settings.about.checkUpdates")) { NSWorkspace.shared.open(URL(string: "https://github.com/bodco/live-tips/releases/latest")!) }
+                        .buttonStyle(.pnSecondary)
                 }
-                Text("A quiet co-pilot for video calls. Live Tips transcribes the call on your Mac and shows a small window with the right fact or a ready phrase when you need it: a direct question to you, a new request, a date or an owner to fix. Prepared facts and cards appear instantly; Claude tips arrive in about 5 seconds. Audio never leaves your Mac.")
+                Text(L("app.description")).fixedSize(horizontal: false, vertical: true)
+                Text(L("settings.about.formerly")).font(.callout).foregroundStyle(PN.C.text3)
                 HStack(spacing: 16) {
-                    Link("Website", destination: URL(string: "https://tower.bodco.pm/live-tips/")!)
+                    Link(L("settings.about.website"), destination: URL(string: "https://tower.bodco.pm/live-tips/")!)
                     Link("GitHub", destination: URL(string: "https://github.com/bodco/live-tips")!)
                     Link("PM Control Tower", destination: URL(string: "https://tower.bodco.pm")!)
                 }
             }
             // 2026-10-27 (owner): privacy policy and terms of use, published on the website.
             Section {
-                Text("Audio stays on this Mac. Transcripts, voice prints, settings and logs stay in your folders and the Keychain. Text goes only to the AI provider and Notion you set up, with your own keys. Nothing is sent to the author: no analytics, no tracking. Tell the people on your calls that you transcribe them and get consent where it is required.")
-                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(L("settings.about.dataBody"))
+                    .font(.callout).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 16) {
-                    Link("Privacy policy", destination: URL(string: "https://tower.bodco.pm/live-tips/privacy/")!)
-                    Link("Terms of use", destination: URL(string: "https://tower.bodco.pm/live-tips/terms/")!)
-                    Link("MIT licence", destination: URL(string: "https://github.com/bodco/live-tips/blob/main/LICENSE")!)
+                    Link(L("settings.about.privacy"), destination: URL(string: "https://tower.bodco.pm/live-tips/privacy/")!)
+                    Link(L("settings.about.terms"), destination: URL(string: "https://tower.bodco.pm/live-tips/terms/")!)
+                    Link(L("settings.about.license"), destination: URL(string: "https://github.com/bodco/live-tips/blob/main/LICENSE")!)
                 }
-            } header: { Text("Your data") }
+            } header: { Text(L("settings.about.yourData")) }
             Section {
                 check(isOK(.claudeAPIKey), "Claude API key works", "Keys")
                 check(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, "Microphone allowed", "asked on the first call")
@@ -1169,9 +1185,9 @@ struct AboutView: View {
                 check(!model.config.nameAliases.isEmpty, "Your name on calls", "General")
                 check(model.mirrorHealth == "ok", "Notion mirror is fresh", "General")
                 check(model.config.localAI.enabled, "Local AI on", "AI")
-            } header: { Text("Ready for a call") } footer: {
-                Text("Before a call: click Live Tips in the Dock or the menu bar > Start call, choose the project or workspace, Start. The tips window opens under your camera. During the call: \(HotKeys.shared.combo(.help).display) is HELP NOW, \(HotKeys.shared.combo(.pause).display) pauses (Settings > General > Shortcuts).")
-                    .font(.caption).foregroundStyle(.secondary)
+            } header: { Text(L("settings.about.ready")) } footer: {
+                Text(L("settings.about.readyFooter", ["help": HotKeys.shared.combo(.help).display, "pause": HotKeys.shared.combo(.pause).display]))
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
         .formStyle(.grouped)
@@ -1184,10 +1200,10 @@ struct AboutView: View {
 
     func check(_ ok: Bool, _ title: String, _ whereTo: String) -> some View {
         HStack {
-            Image(systemName: ok ? "checkmark.circle.fill" : "circle").foregroundStyle(ok ? Color.green : Color.secondary)
+            Image(systemName: ok ? "checkmark.circle.fill" : "circle").foregroundStyle(ok ? PN.C.turn : PN.C.text3)
             Text(title)
             Spacer()
-            if !ok { Text(whereTo).font(.caption).foregroundStyle(.secondary) }
+            if !ok { Text(whereTo).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
         }
     }
 }
@@ -1198,14 +1214,19 @@ final class SettingsWindow {
     static let model = SettingsModel()
 
     static func title(for tab: String) -> String {
-        ["general": "General", "calendars": "Calendars", "keys": "Keys", "projects": "Projects", "ai": "AI", "notion": "Notion", "how": "How Live Tips works", "about": "About Live Tips"][tab] ?? "Settings"
+        switch tab {
+        case "how": return L("settings.how.title")
+        case "about": return L("settings.about.windowTitle")
+        case "general", "calendars", "keys", "projects", "ai", "notion": return L("settings.tab." + tab)
+        default: return L("settings.windowTitle")
+        }
     }
 
     static func show(tab: String = "general") {
         model.tab = tab
         window?.title = title(for: tab)
         if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model)))
+            let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { SettingsView(model: model) }))
             w.title = title(for: tab)
             w.setContentSize(NSSize(width: 960, height: 660))
             w.isReleasedWhenClosed = false

@@ -85,7 +85,7 @@ final class StealthDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let w = NSPanel(contentRect: NSRect(x: 200, y: 600, width: 420, height: 160),
                         styleMask: [.titled, .closable, .nonactivatingPanel], backing: .buffered, defer: false)
-        w.title = "LiveTips stealth test"
+        w.title = "Pacenote stealth test"
         w.level = .floating
         w.sharingType = hidden ? .none : .readOnly
         let label = NSTextField(labelWithString: hidden
@@ -137,7 +137,7 @@ func prompterArgs(_ args: [String]) -> PrompterArgs {
         let tmp = NSTemporaryDirectory()
         a.tips = tmp + "livetips-app-demo.tips.jsonl"
         a.inbox = tmp + "livetips-app-demo.inbox.jsonl"
-        a.title = a.demoPresentation ? "Demo Live Tips: presentation" : "Demo Live Tips"
+        a.title = a.demoPresentation ? L("tips.demo.presentation") : L("tips.demo.title")
         // 2026-10-26: every element of the current window, so a change can be checked without a call.
         var demo = [
             #"{"t":"10:30:00","kind":"speech","uid":"speech","level":"info","gist":"🟢 Your speech: since Monday","phrase":"Two projects, short: the export is on dev, the pilot starts Monday.","items":["Export: on dev, production Tuesday","Pilot: 5 users from Monday","Blocker: test accounts from the client","Ask: confirm the pilot list today"],"engine":"app"}"#,

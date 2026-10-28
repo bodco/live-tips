@@ -182,7 +182,7 @@ struct NotionDestinationView: View {
         VStack(alignment: .leading, spacing: 8) {
             if !settings.config.notionMeetingsDB.isEmpty {
                 HStack {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
                     Text("Meeting pages go to ") + Text(settings.config.notionMeetingsName.isEmpty ? "the chosen database" : settings.config.notionMeetingsName).bold()
                     Spacer()
                     Button("Change") { m.clear(); m.find() }.controlSize(.small)
@@ -200,11 +200,11 @@ struct NotionDestinationView: View {
                 if !m.items.isEmpty {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 4) {
-                            if !dbs.isEmpty { Text("Databases: click one to use it").font(.caption).foregroundStyle(.secondary) }
+                            if !dbs.isEmpty { Text("Databases: click one to use it").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                             ForEach(dbs) { it in
                                 destRow(icon: "tablecells", title: it.title, action: "Use") { m.use(it) }
                             }
-                            if !pages.isEmpty { Text("Or create a new Meetings database inside a page").font(.caption).foregroundStyle(.secondary).padding(.top, 6) }
+                            if !pages.isEmpty { Text("Or create a new Meetings database inside a page").font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 6) }
                             ForEach(pages) { it in
                                 destRow(icon: "doc.badge.plus", title: it.title, action: "Create here") { m.create(on: it) }
                             }
@@ -214,7 +214,7 @@ struct NotionDestinationView: View {
                     .frame(maxHeight: compact ? 120 : 220)
                 }
             }
-            if !m.note.isEmpty { Text(m.note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+            if !m.note.isEmpty { Text(m.note).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
         }
     }
 }
@@ -231,7 +231,7 @@ struct DestRow: View {
                 Image(systemName: icon).foregroundStyle(Color.accentColor).frame(width: 18)
                 Text(title).lineLimit(1)
                 Spacer()
-                if hover { Text(action).font(.caption).foregroundStyle(Color.accentColor) }
+                if hover { Text(action).font(PN.Font.caption).foregroundStyle(Color.accentColor) }
             }
             .padding(.horizontal, 8).padding(.vertical, 5)
             .contentShape(Rectangle())

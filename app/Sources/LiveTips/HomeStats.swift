@@ -92,12 +92,12 @@ struct WeekStats: View {
                     DatePicker("From", selection: $from, displayedComponents: .date).fixedSize()
                     DatePicker("to", selection: $to, displayedComponents: .date).fixedSize()
                 }
-                .font(.caption)
+                .font(PN.Font.caption)
             }
             if let d = day {
                 HStack(spacing: 6) {
-                    Label(df.string(from: d), systemImage: "calendar").font(.caption.weight(.semibold))
-                    Button { day = nil } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.borderless).foregroundStyle(.secondary)
+                    Label(df.string(from: d), systemImage: "calendar").font(PN.Font.caption.weight(.semibold))
+                    Button { day = nil } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.borderless).accessibilityLabel("Clear").foregroundStyle(PN.C.text3)
                         .help("Back to the whole period")
                 }
             }
@@ -134,32 +134,32 @@ struct WeekStats: View {
                 .frame(height: compact ? 96 : 160)
                 .help("Click a day to see it; click it again to go back.")
             } else {
-                Text("No calls in this period.").font(.callout).foregroundStyle(.secondary)
+                Text("No calls in this period.").font(.callout).foregroundStyle(PN.C.text3)
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) { facts(longest, busiest, this, mins, spend) }
                 VStack(alignment: .leading, spacing: 4) { facts(longest, busiest, this, mins, spend) }
             }
-            .font(.caption)
+            .font(PN.Font.caption)
             if !this.isEmpty {
                 DisclosureGroup(isExpanded: $showCalls) {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(this) { r in
                             HStack(spacing: 6) {
-                                Text(df.string(from: r.start) + " " + r.start.formatted(date: .omitted, time: .shortened)).monospacedDigit().foregroundStyle(.secondary)
+                                Text(df.string(from: r.start) + " " + r.start.formatted(date: .omitted, time: .shortened)).monospacedDigit().foregroundStyle(PN.C.text3)
                                 Text(r.title).lineLimit(1)
                                 Spacer()
-                                Text(hm(r.minutes ?? 0)).monospacedDigit().foregroundStyle(.secondary)
-                                if let c = r.costUSD, c > 0 { Text(String(format: "$%.2f", c)).monospacedDigit().foregroundStyle(.secondary) }
+                                Text(hm(r.minutes ?? 0)).monospacedDigit().foregroundStyle(PN.C.text3)
+                                if let c = r.costUSD, c > 0 { Text(String(format: "$%.2f", c)).monospacedDigit().foregroundStyle(PN.C.text3) }
                             }
-                            .font(.caption)
+                            .font(PN.Font.caption)
                             .contentShape(Rectangle())
                             .onTapGesture(count: 2) { NSWorkspace.shared.open(URL(fileURLWithPath: r.file)) }
                             .help("Double-click to open the transcript")
                         }
                     }
                     .padding(.top, 4)
-                } label: { Text("Calls in this selection (\(this.count))").font(.caption.weight(.semibold)) }
+                } label: { Text("Calls in this selection (\(this.count))").font(PN.Font.caption.weight(.semibold)) }
             }
         }
         .ltCard(padding: 14)
@@ -201,9 +201,9 @@ struct WeekStats: View {
 
     private func tile(_ label: String, _ value: String, _ sub: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(label).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             Text(value).font(compact ? .headline : .title3.weight(.semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
-            Text(sub).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
         }
         .padding(compact ? 7 : 10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -211,7 +211,7 @@ struct WeekStats: View {
     }
 
     private func fact(_ label: String, _ value: String) -> some View {
-        HStack(spacing: 4) { Text(label + ":").foregroundStyle(.secondary); Text(value).lineLimit(1) }
+        HStack(spacing: 4) { Text(label + ":").foregroundStyle(PN.C.text3); Text(value).lineLimit(1) }
     }
 }
 
@@ -229,10 +229,10 @@ struct PrepareSheet: View {
                 IconTile(symbol: "sparkles", size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Prepare \u{201C}\(model.effectiveTitle)\u{201D}").font(.title3.weight(.semibold)).lineLimit(2)
-                    Text(model.callDate.formatted(date: .abbreviated, time: .shortened)).font(.callout).foregroundStyle(.secondary)
+                    Text(model.callDate.formatted(date: .abbreviated, time: .shortened)).font(.callout).foregroundStyle(PN.C.text3)
                 }
             }
-            if let a = model.appliedFrom { Label(a, systemImage: "arrow.uturn.backward.circle").font(.caption).foregroundStyle(.secondary) }
+            if let a = model.appliedFrom { Label(a, systemImage: "arrow.uturn.backward.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
             Picker("Project or workspace", selection: $model.target) {
                 if model.target.isEmpty { Text("Choose…").tag("") }
                 Section("Projects") {
@@ -246,15 +246,15 @@ struct PrepareSheet: View {
             // 2026-10-28 (owner): the folders or single files this preparation reads first.
             HStack(spacing: 6) {
                 Button { model.addFolders() } label: { Label("Add folder or file", systemImage: "folder.badge.plus") }
-                    .buttonStyle(LTSoftButtonStyle(small: true))
+                    .buttonStyle(.pnTertiary)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(model.folders, id: \.self) { f in
                             HStack(spacing: 4) {
-                                Image(systemName: StartCallModel.isDir(f) ? "folder" : "doc").font(.caption)
-                                Text((f as NSString).lastPathComponent).font(.caption).lineLimit(1)
-                                Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(.caption2) }
-                                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                                Image(systemName: StartCallModel.isDir(f) ? "folder" : "doc").font(PN.Font.caption)
+                                Text((f as NSString).lastPathComponent).font(PN.Font.caption).lineLimit(1)
+                                Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(PN.Font.caption) }
+                                    .buttonStyle(.plain).foregroundStyle(PN.C.text3)
                             }
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Capsule().fill(Color.accentColor.opacity(0.15)))
@@ -270,13 +270,13 @@ struct PrepareSheet: View {
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
                     .frame(height: 150)
                 Text("The preparation reads what you write here (goal, people, questions, documents and links), the added folders and files, the project folder, the local Notion copy and earlier calls. It does not start the call.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             HStack {
-                Button("More settings…", action: onMore).buttonStyle(.link)
+                Button("More settings…", action: onMore).buttonStyle(.pnTertiary)
                 Spacer()
                 Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
-                Button("Prepare", action: onPrepare).keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(model.target.isEmpty)
+                Button("Prepare", action: onPrepare).keyboardShortcut(.defaultAction).buttonStyle(.pnPrimary).disabled(model.target.isEmpty)
             }
         }
         .padding(20)

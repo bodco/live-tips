@@ -54,7 +54,7 @@ struct LanguagePicker: View {
             }
             Text(codes.count == 1 ? "One language: everyone is written in \(Languages.name(codes[0])), other languages come out translated."
                                   : "Several languages: each speaker is written in the language spoken. The first ticked is the main one.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
         }
         .padding(12).frame(width: 300, height: 380)
     }
@@ -68,7 +68,7 @@ struct LanguagePicker: View {
                 Image(systemName: on ? "checkmark.square.fill" : "square").foregroundStyle(on ? Color.accentColor : .secondary)
                 Text(name)
                 Spacer()
-                if on && codes.first == code && codes.count > 1 { Text("main").font(.caption2).foregroundStyle(.secondary) }
+                if on && codes.first == code && codes.count > 1 { Text("main").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
             }
             .padding(.horizontal, 6).padding(.vertical, 4).contentShape(Rectangle())
         }
@@ -90,7 +90,7 @@ struct ChoicePill<Content: View>: View {
                 Image(systemName: symbol).foregroundStyle(Color.accentColor).frame(width: 18)
                 Text(label).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 4)
-                Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(Color.accentColor)
+                Image(systemName: "chevron.down").font(PN.Font.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
             .frame(maxWidth: .infinity)
@@ -117,7 +117,7 @@ struct OptionList: View {
                         Image(systemName: "checkmark").opacity(selection == o.tag ? 1 : 0).foregroundStyle(Color.accentColor)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(o.label)
-                            if !o.hint.isEmpty { Text(o.hint).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                            if !o.hint.isEmpty { Text(o.hint).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
                         }
                         Spacer()
                     }

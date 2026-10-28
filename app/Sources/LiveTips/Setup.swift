@@ -19,7 +19,7 @@ final class SetupModel: ObservableObject {
     @Published var steps: [Step] = [
         Step(id: "python", title: "Python 3.10 or newer", why: "Runs the speech recognition and the tips engine on this Mac.", optional: false),
         Step(id: "core", title: "Recorder core", why: "Records your mic and the call audio, writes the transcript, runs the local fact cards.", optional: false),
-        Step(id: "venv", title: "Private Python environment", why: "Keeps Live Tips' modules apart from anything else on this Mac.", optional: false),
+        Step(id: "venv", title: "Private Python environment", why: "Keeps Pacenote's modules apart from anything else on this Mac.", optional: false),
         Step(id: "recorder", title: "Speech recognition (MLX Whisper)", why: "Turns speech into text on the Mac's GPU; audio never leaves the Mac.", optional: false),
         Step(id: "tips", title: "Tips engine modules", why: "Claude API client, rules reader, and ONNX Runtime for the local AI model.", optional: false),
         Step(id: "whisper", title: "Whisper model (about 1.6 GB)", why: "The speech model itself, downloaded once from Hugging Face.", optional: false),
@@ -124,17 +124,17 @@ struct SetupView: View {
     var body: some View {
         VStack(spacing: 14) {
             WindowHeader(symbol: "arrow.down.circle", title: "Speech recognition and local AI",
-                         subtitle: "Live Tips runs speech recognition and a small AI model on this Mac. Install all puts every missing part in place, one after another, into the app folder; nothing needs an administrator password.")
+                         subtitle: L("setup.subtitle"))
             VStack(spacing: 0) {
                 ForEach(model.steps) { s in
                     HStack(alignment: .top, spacing: 10) {
                         icon(s.state).frame(width: 18)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(s.title)
-                            Text(s.why).font(.caption).foregroundStyle(.secondary)
+                            Text(s.why).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
                         Spacer()
-                        Text(s.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(s.detail).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                     }
                     .padding(.vertical, 6)
                 }
@@ -145,7 +145,7 @@ struct SetupView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 1) {
                             ForEach(Array(model.log.enumerated()), id: \.offset) { i, l in
-                                Text(l).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).id(i)
+                                Text(l).font(.system(size: 12, design: .monospaced)).textSelection(.enabled).id(i)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
                     }
@@ -154,9 +154,9 @@ struct SetupView: View {
                     .onChange(of: model.log.count) { proxy.scrollTo(model.log.count - 1) }
                 }
             }
-            .font(.callout).foregroundStyle(.secondary)
+            .font(.callout).foregroundStyle(PN.C.text3)
             if !showLog, let last = model.log.last {
-                Text(last).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                Text(last).font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             }
             Spacer(minLength: 0)
             VStack(spacing: 8) {
@@ -166,7 +166,7 @@ struct SetupView: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.busy || model.allRequiredOK)
-                Button("Check again") { Task { await model.checkAll() } }.buttonStyle(.borderless).foregroundStyle(.secondary)
+                Button("Check again") { Task { await model.checkAll() } }.buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
                     .disabled(model.busy)
             }
         }
@@ -177,11 +177,11 @@ struct SetupView: View {
 
     @ViewBuilder func icon(_ s: SetupModel.Step.State) -> some View {
         switch s {
-        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .missing: Image(systemName: "circle").foregroundStyle(.secondary)
-        case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
+        case .missing: Image(systemName: "circle").foregroundStyle(PN.C.text3)
+        case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(PN.C.danger)
         case .checking, .installing: ProgressView().controlSize(.small)
-        case .unknown: Image(systemName: "circle.dotted").foregroundStyle(.secondary)
+        case .unknown: Image(systemName: "circle.dotted").foregroundStyle(PN.C.text3)
         }
     }
 }
@@ -193,11 +193,12 @@ final class SetupWindow {
 
     static func show() {
         if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SetupView(model: model)))
-            w.title = "Live Tips Setup"
+            let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { SetupView(model: model) }))
+            w.title = L("setup.window.title")
             w.isReleasedWhenClosed = false
             window = w
         }
+        window?.title = L("setup.window.title")
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

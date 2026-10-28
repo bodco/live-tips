@@ -1,4 +1,4 @@
-# Live Tips privacy policy
+# Pacenote privacy policy
 
 Updated 27 October 2026. The full text is on the website: **[tower.bodco.pm/live-tips/privacy/](https://tower.bodco.pm/live-tips/privacy/)** ([українською](PRIVACY.uk.md)).
 

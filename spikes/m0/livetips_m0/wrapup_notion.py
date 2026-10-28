@@ -6,7 +6,7 @@
 Env: CLAUDE_API (Claude key), NOTION_TOKEN (internal integration token with access to the Meetings DB).
 Steps: `lt wrapup-data` (numbers, clean transcript) -> one Claude call for the wrap-up (JSON) ->
 find this meeting's page in the Meetings DB (Date within 20 min of the start; a Notion AI page made by the
-calendar counts) -> append a "Live Tips" section there, or create a new page -> attach the transcript
+calendar counts) -> append a "Pacenote" section there, or create a new page -> attach the transcript
 as <stem>-transcript.md. Prints one JSON line: {"ok", "url", "created", "error"}.
 Nothing is sent anywhere else. Audio never leaves the Mac; only the transcript text goes to Claude and Notion.
 """
@@ -89,13 +89,15 @@ TXT = {
            "tips": "Підказки: показано {shown}, карток {cards}, фактів {facts}, запізнілих {late}; затримка медіана {med} с, макс {mx} с",
            "prep": "Підготовка: ", "prep_yes": "використана", "prep_no": "не було",
            "tr": "Транскрипт: {n} рядків, мови {langs}, локальний файл {f}", "summary": "Підсумок", "transcript": "Транскрипт",
-           "append": "Live Tips: підсумок ({hhmm})", "tr_app": "Транскрипт (Live Tips)", "write": "Ukrainian"},
+           "append": "Pacenote: підсумок ({hhmm})", "tr_app": "Транскрипт (Pacenote)", "write": "Ukrainian",
+           "footer": "Нотатки Pacenote · транскрибовано на пристрої"},
     "en": {"actions": "Action items", "decisions": "Decisions", "commit": "Our commitments",
            "new": "New requests (possible scope changes)", "open": "Open questions", "risks": "Risks",
            "tips": "Tips: shown {shown}, cards {cards}, facts {facts}, late {late}; delay median {med} s, max {mx} s",
            "prep": "Preparation: ", "prep_yes": "used", "prep_no": "none",
            "tr": "Transcript: {n} lines, languages {langs}, local file {f}", "summary": "Summary", "transcript": "Transcript",
-           "append": "Live Tips: summary ({hhmm})", "tr_app": "Transcript (Live Tips)", "write": "English"},
+           "append": "Pacenote: summary ({hhmm})", "tr_app": "Transcript (Pacenote)", "write": "English",
+           "footer": "Notes by Pacenote · transcribed on device"},
 }
 
 
@@ -173,6 +175,12 @@ def para(s: str) -> dict:
     return {"type": "paragraph", "paragraph": {"rich_text": rt(s)}}
 
 
+def footer_blocks(lang: str) -> list:
+    """Pacenote 0.8: the last blocks of a meeting page, in the page's language: a divider and one quiet line."""
+    return [{"type": "divider", "divider": {}},
+            {"type": "paragraph", "paragraph": {"rich_text": rt(TXT[lang]["footer"]), "color": "gray"}}]
+
+
 def bullet(s: str) -> dict:
     return {"type": "bulleted_list_item", "bulleted_list_item": {"rich_text": rt(s)}}
 
@@ -196,7 +204,7 @@ def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "
             b += [kind(str(i)) for i in items]
     tips = stats.get("tips", {})
     tr = stats.get("transcript", {})
-    b.append(h(3, "Live Tips"))
+    b.append(h(3, "Pacenote"))
     b.append(bullet(T["tips"].format(shown=tips.get('shown', 0), cards=tips.get('cards_fired', 0), facts=tips.get('facts_shown', 0),
                                      late=tips.get('late', 0), med=tips.get('delay_median_s', '?'), mx=tips.get('delay_max_s', '?'))))
     b.append(bullet(T["prep"] + (T["prep_yes"] if prep_used else T["prep_no"])))
@@ -391,6 +399,10 @@ def main(argv=None) -> int:
             append(page["id"], [h(2, TXT[lang]["append"].format(hhmm=hhmm)), para(w.get("summary", ""))] + blocks
                    + [h(3, TXT[lang]["tr_app"])])
             transcript_page(page["id"], TXT[lang]["tr_app"] + " · " + info["title"], plain)
+            try:
+                append(page["id"], footer_blocks(lang))   # the footer never fails the wrap-up
+            except Exception:
+                pass
             res.update(ok=True, url=page.get("url"))
         else:
             start = info["start"]
@@ -408,6 +420,10 @@ def main(argv=None) -> int:
                                           "properties": props,
                                           "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])]})
             transcript_page(p["id"], TXT[lang]["transcript"] + " · " + name, plain)
+            try:
+                append(p["id"], footer_blocks(lang))   # the footer never fails the wrap-up
+            except Exception:
+                pass
             res.update(ok=True, url=p.get("url"), created=True)
     except Exception as e:  # noqa: BLE001
         res["error"] = f"{type(e).__name__}: {e}"[:600]

@@ -22,6 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var demoPresItem = NSMenuItem()
     var notionItem = NSMenuItem()
     var upNextItem = NSMenuItem()
+    var homeItem = NSMenuItem(), settingsItem = NSMenuItem(), setupItem = NSMenuItem(), tourItem = NSMenuItem()
+    var aboutItem = NSMenuItem(), quitItem = NSMenuItem()
+    var menuLang = L10n.lang
+    var clock: Timer?               // the elapsed time next to the menu bar icon while recording
     var lastStatus = EngineStatus()
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
@@ -31,37 +35,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         installMainMenu()
         NSApp.setActivationPolicy(config.showInDock ? .regular : .accessory)
         let it = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        it.button?.image = NSImage(systemSymbolName: "text.bubble", accessibilityDescription: "Live Tips")
-        it.button?.toolTip = "Live Tips"
+        it.button?.image = Brand.menuBarImage(recording: false)     // Pacenote 0.8: the brand template
+        it.button?.imagePosition = .imageLeft
+        it.button?.toolTip = L("menubar.tooltip")
         let menu = NSMenu()
         menu.delegate = self
         // The main action first; the status lines below it (review P2).
-        add(menu, "Home", #selector(openHome), "0")
-        startItem = add(menu, "Start call…", #selector(startCall), "n")
+        homeItem = add(menu, L("menubar.home"), #selector(openHome), "0")
+        startItem = add(menu, L("menubar.startCall"), #selector(startCall), "n")
         upNextItem = NSMenuItem(title: "Up next", action: nil, keyEquivalent: "")
         upNextItem.isHidden = true
         menu.addItem(upNextItem)
-        tipsItem = add(menu, "Open tips window", #selector(showTips), "")
-        pauseItem = add(menu, "Pause or resume tips", #selector(togglePause), "p")
+        tipsItem = add(menu, L("menubar.showTips"), #selector(showTips), "")
+        pauseItem = add(menu, L("menubar.pause"), #selector(togglePause), "p")
         pauseItem.keyEquivalentModifierMask = [.control, .option]      // shown in the menu: the global shortcut
-        helpItem = add(menu, "HELP NOW", #selector(helpNow), "h")
+        helpItem = add(menu, L("menubar.helpNow"), #selector(helpNow), "h")
         helpItem.keyEquivalentModifierMask = [.control, .option]
-        endItem = add(menu, "End call", #selector(endCall), "")
+        endItem = add(menu, L("menubar.endCall"), #selector(endCall), "")
         menu.addItem(.separator())
         for l in statusLines { l.isEnabled = false; menu.addItem(l) }
         menu.addItem(.separator())
-        notionItem = add(menu, "Send last call to Notion", #selector(sendToNotion), "")
-        micItem = add(menu, "Allow microphone…", #selector(requestMic), "")
+        notionItem = add(menu, L("menubar.sendNotion"), #selector(sendToNotion), "")
+        micItem = add(menu, L("menubar.allowMic"), #selector(requestMic), "")
         menu.addItem(.separator())
-        add(menu, "Settings…", #selector(openSettings), ",")
-        add(menu, "Setup", #selector(openSetup), "")
-        add(menu, "Welcome tour", #selector(openOnboarding), "")
-        add(menu, "About Live Tips", #selector(openAbout), "")
+        settingsItem = add(menu, L("menubar.settings"), #selector(openSettings), ",")
+        setupItem = add(menu, L("menubar.setup"), #selector(openSetup), "")
+        tourItem = add(menu, L("menubar.welcomeTour"), #selector(openOnboarding), "")
+        aboutItem = add(menu, L("menubar.about"), #selector(openAbout), "")
         // For checking the window without a call: shown only with Option held while the menu opens.
-        demoItem = add(menu, "Demo Live Tips", #selector(showDemo), "")
-        demoPresItem = add(menu, "Demo Live Tips: presentation", #selector(showDemoPresentation), "")
+        demoItem = add(menu, L("menubar.demo"), #selector(showDemo), "")
+        demoPresItem = add(menu, L("menubar.demoPresentation"), #selector(showDemoPresentation), "")
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Live Tips", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        quitItem = NSMenuItem(title: L("menubar.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(quitItem)
         it.menu = menu
         item = it
         refresh()
@@ -133,27 +139,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let appItem = NSMenuItem()
         main.addItem(appItem)
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About Live Tips", action: #selector(openAbout), keyEquivalent: "").target = self
-        appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        appMenu.addItem(withTitle: L("menubar.about"), action: #selector(openAbout), keyEquivalent: "").target = self
+        appMenu.addItem(withTitle: L("menubar.settings"), action: #selector(openSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit Live Tips", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: L("menubar.quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         let editItem = NSMenuItem()
         main.addItem(editItem)
-        let edit = NSMenu(title: "Edit")
-        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
-        edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        let edit = NSMenu(title: L("menu.edit"))
+        edit.addItem(withTitle: L("menu.undo"), action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: L("menu.redo"), action: Selector(("redo:")), keyEquivalent: "Z")
         edit.addItem(.separator())
-        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(withTitle: L("menu.cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: L("menu.copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: L("menu.paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: L("menu.selectAll"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editItem.submenu = edit
         let winItem = NSMenuItem()
         main.addItem(winItem)
-        let win = NSMenu(title: "Window")
-        win.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        win.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let win = NSMenu(title: L("menu.window"))
+        win.addItem(withTitle: L("menu.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        win.addItem(withTitle: L("menu.close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         winItem.submenu = win
         NSApp.mainMenu = main
     }
@@ -180,7 +186,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         lastStatus = st
         warnIfNoAudio(st)
         // 2026-10-27 (Up next): during a call the same item plans an upcoming call.
-        startItem.title = recording ? "Plan an upcoming call…" : "Start call…"
+        relabelMenu()
+        startItem.title = recording ? L("menubar.planCall") : L("menubar.startCall")
         MainActor.assumeIsolated { rebuildUpNextMenu() }
         endItem.isHidden = !recording
         pauseItem.isHidden = st.state != "recording"
@@ -188,13 +195,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         tipsItem.isHidden = !recording
         notionItem.isHidden = recording || CallEngine.shared.lastFile == nil
         notionItem.toolTip = CallEngine.shared.notionResult
-        statusLines[0].title = st.state == "standby" ? "○ Waiting for the call" + (st.project.map { ": \($0)" } ?? "")
-            : recording ? "● Recording" + (st.project.map { ": \($0)" } ?? "")
-            : (CallEngine.shared.lastCallSummary.isEmpty ? "Not recording" : CallEngine.shared.lastCallSummary)
+        let elapsed = Self.elapsed(st)
+        statusLines[0].title = st.state == "standby" ? L("menubar.status.waiting") + (st.project.map { ": \($0)" } ?? "")
+            : recording ? L("menubar.status.recording", ["elapsed": elapsed]) + (st.project.map { " · \($0)" } ?? "")
+            : (CallEngine.shared.lastCallSummary.isEmpty ? L("menubar.status.notRecording") : CallEngine.shared.lastCallSummary)
         if noAudioWarned != nil, noAudioWarned == st.file, st.lines == 0, ["recording", "standby"].contains(st.state) {
-            statusLines[0].title = "⚠ Not recording: the audio helper keeps failing. End the call and start again"
+            statusLines[0].title = L("menubar.status.audioFailing")
         }
-        statusLines[1].title = String(format: "Lines %d · tips %d · this call $%.2f of $%.0f", st.lines, st.tips, st.callSpentUSD, cfg.budget.callHardUSD)
+        statusLines[1].title = L("menubar.status.callLine", ["lines": "\(st.lines)", "tips": "\(st.tips)",
+                                                              "cost": String(format: "%.2f", st.callSpentUSD), "cap": String(format: "%.0f", cfg.budget.callHardUSD)])
         statusLines[1].isHidden = !recording
         // 2026-10-26 (owner): the last call's cost; the tip rating only when that developer check is on.
         let judge = cfg.judgeAfterCall ? CallEngine.shared.judgeResult : ""
@@ -202,9 +211,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusLines[2].title = [cost, CallEngine.shared.judgeRunning != nil && cfg.judgeAfterCall ? "rating the tips…" : judge]
             .filter { !$0.isEmpty }.joined(separator: " · ")
         statusLines[2].isHidden = recording || statusLines[2].title.isEmpty
-        statusLines[3].title = String(format: "This month: $%.2f of $%.0f", month, cfg.budget.monthlyHardUSD)
+        statusLines[2].toolTip = CallEngine.shared.lastCallDetail
+        statusLines[3].title = L("menubar.thisMonth", ["spent": String(format: "%.2f", month), "cap": String(format: "%.0f", cfg.budget.monthlyHardUSD)])
         micItem.isHidden = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-        item?.button?.image = NSImage(systemSymbolName: recording ? "record.circle.fill" : "text.bubble", accessibilityDescription: "Live Tips")
+        item?.button?.image = Brand.menuBarImage(recording: st.state == "recording")
+        setClock(st.state == "recording")
         if st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9 {
             item?.button?.contentTintColor = .systemOrange
         } else {
@@ -244,9 +255,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard Date().timeIntervalSince(noAudioSince!) > 30, noAudioWarned != st.file else { return }
         noAudioWarned = st.file
         let uk = config.uiLanguage == "uk"
-        let item: [String: Any] = ["kind": "tip", "level": "red", "gist": uk ? "⚠ Запис не йде: аудіо не захоплюється" : "⚠ Not recording: no audio is captured",
-                                   "items": [uk ? "Заверши дзвінок і почни знову: Live Tips перевірить аудіо-помічник перед стартом."
-                                                : "End the call and start again: Live Tips checks the audio helper before the start."],
+        _ = uk
+        let item: [String: Any] = ["kind": "tip", "level": "red", "gist": L("tips.noAudio.title"),
+                                   "items": [L("tips.noAudio.body")],
                                    "t": DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)]
         if let d = try? JSONSerialization.data(withJSONObject: [item]), let js = String(data: d, encoding: .utf8) {
             if tips == nil { showTips() }
@@ -257,10 +268,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func endCall() {
         if let t = tips { MainActor.assumeIsolated { t.window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); t.endCallClicked() }; return }
         let a = NSAlert()
-        a.messageText = "End the call?"
-        a.informativeText = "Recording stops; the transcript and tips stay in the project folder."
-        a.addButton(withTitle: "End call")
-        a.addButton(withTitle: "Cancel")
+        a.messageText = L("alert.endCall.title")
+        a.informativeText = L("alert.endCall.body")
+        a.addButton(withTitle: L("menubar.endCall"))
+        a.addButton(withTitle: L("common.cancel"))
         if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop() }
     }
 
@@ -272,10 +283,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard CallEngine.shared.isRunning else { return .terminateNow }
         let a = NSAlert()
-        a.messageText = "A call is being recorded"
-        a.informativeText = "Quitting stops the recording."
-        a.addButton(withTitle: "Stop and quit")
-        a.addButton(withTitle: "Cancel")
+        a.messageText = L("alert.quit.title")
+        a.informativeText = L("alert.quit.body")
+        a.addButton(withTitle: L("alert.quit.confirm"))
+        a.addButton(withTitle: L("common.cancel"))
         if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop(); return .terminateNow }
         return .terminateCancel
     }
@@ -317,7 +328,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             a.status = call.status
             a.control = call.control
             a.html = Bundle.main.resourceURL?.appendingPathComponent("prompter.html").path ?? ""
-            a.title = lastStatus.project.map { "Live Tips: \($0)" } ?? "Live Tips"
+            // Pacenote 0.8: the window is titled with the call, the brand sits in the title bar.
+            let ce = CallEngine.shared
+            a.title = ce.renamed ?? (ce.callRequest["title"] as? String) ?? lastStatus.project ?? L("app.name")
             let c = PrompterController(args: a)
             c.show()
             tips = c
@@ -690,7 +703,7 @@ struct StartCallView: View {
                         Text(live || planOnly ? "Plan an upcoming call" : saved ? "Upcoming call" : "Start a call").font(.title2.weight(.semibold))
                         if live || saved || planOnly {
                             Text("Set it up and prepare it now; it starts only when you switch to it.")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
                     }
                     Spacer()
@@ -735,9 +748,9 @@ struct StartCallView: View {
                             .frame(height: 96)
                         folderChips
                         Text(model.useProjectFolder ? "The project folder is included; add folders or single files with this call's documents." : "The project folder is left out; only the added folders and files are read.")
-                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                         Text("Names after \u{201C}\(StartCallModel.uiLang == "uk" ? "Учасники:" : "Participants:")\u{201D} are the speakers offered on the call. Empty lines are not sent.")
-                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                     }
                     .ltCard(padding: 14)
                     VStack(alignment: .leading, spacing: 10) {
@@ -745,12 +758,12 @@ struct StartCallView: View {
                             Label("Preparation", systemImage: "doc.badge.clock").font(.callout.weight(.medium))
                             Spacer()
                             Text(runner.useAPI ? "\(runner.model.capitalized) · API key" : "\(runner.model.capitalized) · Claude account")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
                         prepStatus
                         if !model.prepList.isEmpty {
                             HStack(spacing: 8) {
-                                Text("Use").foregroundStyle(.secondary)
+                                Text("Use").foregroundStyle(PN.C.text3)
                                 Picker("", selection: Binding(get: { model.chosenPrep ?? "" },
                                                               set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
                                     Text("Automatic (match by call title)").tag("")
@@ -808,17 +821,17 @@ struct StartCallView: View {
             .clipShape(RoundedRectangle(cornerRadius: LT.radius))
             .padding(.horizontal, 28).padding(.top, 16)
             VStack(spacing: 8) {
-                if !model.note.isEmpty { Text(model.note).font(.caption).foregroundStyle(.orange).lineLimit(2) }
+                if !model.note.isEmpty { Text(model.note).font(PN.Font.caption).foregroundStyle(PN.C.onMe).lineLimit(2) }
                 if live || planOnly {
                     // 2026-10-27 (owner, Up next): during a call the main action keeps this call for later;
                     // switching is a separate, confirmed step.
                     LTPrimaryButton(title: saved ? "Save" : "Add to Up next", symbol: "calendar.badge.plus") { if !needProject() { onSave() } }
                         .keyboardShortcut(.defaultAction)
                     HStack(spacing: 18) {
-                        Button(live ? "End current call and start this…" : "Start now", action: live ? onSwitch : onStart).buttonStyle(.borderless)
+                        Button(live ? "End current call and start this…" : "Start now", action: live ? onSwitch : onStart).buttonStyle(.pnTertiary)
                             .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
-                        if saved { Button("Remove", action: onRemove).buttonStyle(.borderless).foregroundStyle(.secondary) }
-                        Button("Close", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
+                        if saved { Button("Remove", action: onRemove).buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3) }
+                        Button("Close", action: onCancel).buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
                             .keyboardShortcut(.cancelAction)
                     }
                 } else {
@@ -829,11 +842,11 @@ struct StartCallView: View {
                     }
                         .keyboardShortcut(.defaultAction)
                     HStack(spacing: 18) {
-                        Button(saved ? "Save" : "Save for later", action: onSave).buttonStyle(.borderless)
+                        Button(saved ? "Save" : "Save for later", action: onSave).buttonStyle(.pnTertiary)
                             .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
                             .help("Keep this call in Up next: set it up and prepare it now, start it later.")
-                        if saved { Button("Remove", action: onRemove).buttonStyle(.borderless).foregroundStyle(.secondary) }
-                        Button("Cancel", action: onCancel).buttonStyle(.borderless).foregroundStyle(.secondary)
+                        if saved { Button("Remove", action: onRemove).buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3) }
+                        Button("Cancel", action: onCancel).buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
                             .keyboardShortcut(.cancelAction)
                     }
                 }
@@ -874,19 +887,19 @@ struct StartCallView: View {
             VStack(alignment: .leading, spacing: 6) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        Image(systemName: "calendar").foregroundStyle(.secondary)
+                        Image(systemName: "calendar").foregroundStyle(PN.C.text3)
                         ForEach(evs) { e in
                             let on = model.calEventID == e.id
                             Button { model.applyEvent(e); copied = false } label: {
                                 HStack(spacing: 5) {
                                     Circle().fill(Color(nsColor: e.color)).frame(width: 7, height: 7)
-                                    Text(e.timeRange).monospacedDigit().foregroundStyle(.secondary)
+                                    Text(e.timeRange).monospacedDigit().foregroundStyle(PN.C.text3)
                                     Text(e.title).lineLimit(1)
                                     let rel: String = e.relative()
-                                    if !rel.isEmpty && !rel.hasPrefix("ended") { Text(rel).foregroundStyle(rel == "in progress" ? Color.red : Color.secondary) }
-                                    if e.recurring { Image(systemName: "repeat").foregroundStyle(.secondary) }
+                                    if !rel.isEmpty && !rel.hasPrefix("ended") { Text(rel).foregroundStyle(rel == "in progress" ? PN.C.rec : PN.C.text3) }
+                                    if e.recurring { Image(systemName: "repeat").foregroundStyle(PN.C.text3) }
                                 }
-                                .font(.caption)
+                                .font(PN.Font.caption)
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(Capsule().fill(on ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.10)))
                                 .overlay(Capsule().stroke(on ? Color.accentColor : .clear))
@@ -897,32 +910,32 @@ struct StartCallView: View {
                     }
                 }
                 if let a = model.appliedFrom {
-                    Label(a, systemImage: "arrow.uturn.backward.circle").font(.caption).foregroundStyle(.secondary)
+                    Label(a, systemImage: "arrow.uturn.backward.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
         } else if cal.access == .unknown {
             HStack(spacing: 6) {
-                Image(systemName: "calendar").foregroundStyle(.secondary)
-                Text("Pick the call from your calendars").font(.caption).foregroundStyle(.secondary)
-                Button("Connect calendars") { cal.connect() }.buttonStyle(.link).font(.caption)
+                Image(systemName: "calendar").foregroundStyle(PN.C.text3)
+                Text("Pick the call from your calendars").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                Button("Connect calendars") { cal.connect() }.buttonStyle(.pnTertiary).font(PN.Font.caption)
                 Spacer()
             }
         } else if let a = model.appliedFrom {
-            Label(a, systemImage: "arrow.uturn.backward.circle").font(.caption).foregroundStyle(.secondary)
+            Label(a, systemImage: "arrow.uturn.backward.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3)
         }
     }
 
     /// The call being recorded, so it is clear this window does not start a call by itself.
     private var liveBanner: some View {
         HStack(spacing: 8) {
-            Circle().fill(Color.red).frame(width: 8, height: 8)
+            Circle().fill(PN.C.rec).frame(width: 8, height: 8)
             Text("Recording: \(liveTitle)").font(.callout.weight(.medium)).lineLimit(1)
-            if let d = liveSince { Text(d, style: .timer).font(.callout.monospacedDigit()).foregroundStyle(.secondary) }
+            if let d = liveSince { Text(d, style: .timer).font(.callout.monospacedDigit()).foregroundStyle(PN.C.text3) }
             Spacer()
-            Button("Show tips") { (NSApp.delegate as? AppDelegate)?.showTips() }.buttonStyle(.borderless)
+            Button("Show tips") { (NSApp.delegate as? AppDelegate)?.showTips() }.buttonStyle(.pnTertiary)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: LT.radius).fill(Color.red.opacity(0.10)))
+        .background(RoundedRectangle(cornerRadius: LT.radius).fill(PN.C.rec.opacity(0.10)))
     }
 
     /// The project, the call's title and its time: what the call is.
@@ -933,10 +946,10 @@ struct StartCallView: View {
                     IconTile(symbol: model.workspace != nil ? "square.stack.3d.up" : "folder", size: 40)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(model.project?.name ?? model.workspace?.name ?? "Choose a project")
-                            .font(.headline).foregroundStyle(model.target.isEmpty ? Color.orange : Color.primary)
+                            .font(.headline).foregroundStyle(model.target.isEmpty ? PN.C.onMe : Color.primary)
                         Text(model.workspace != nil ? "Workspace: a general call about several projects"
                              : (model.project.map { $0.workspace.isEmpty ? "Project" : "Project in " + $0.workspace } ?? "Recordings and notes go to its folder"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                     Spacer()
                     Image(systemName: "chevron.up.chevron.down").foregroundStyle(Color.accentColor)
@@ -961,12 +974,12 @@ struct StartCallView: View {
             if let e = model.rememberedForTitle {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.uturn.backward.circle").foregroundStyle(Color.accentColor)
-                    Text("A call named \u{201C}\(e.title)\u{201D} was set up before.").font(.caption).foregroundStyle(.secondary)
-                    Button("Use its settings") { model.apply(e); model.scanPrep() }.buttonStyle(.link).font(.caption)
+                    Text("A call named \u{201C}\(e.title)\u{201D} was set up before.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Button("Use its settings") { model.apply(e); model.scanPrep() }.buttonStyle(.pnTertiary).font(PN.Font.caption)
                 }
             }
             HStack(spacing: 8) {
-                Image(systemName: "calendar").foregroundStyle(.secondary)
+                Image(systemName: "calendar").foregroundStyle(PN.C.text3)
                 DatePicker("", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute])
                     .labelsHidden().fixedSize()
                     .onChange(of: model.callDate) { copied = false }
@@ -974,7 +987,7 @@ struct StartCallView: View {
             }
             .help("When the call is: goes into the preparation and the Notion page title.")
             if let r = model.root {
-                Text(model.details).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                Text(model.details).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.tail)
                     .help(r + "\n" + model.details)
             }
         }
@@ -986,16 +999,16 @@ struct StartCallView: View {
         VStack(alignment: .leading, spacing: 6) {
         HStack(alignment: .center, spacing: 6) {
             Button { model.addFolders() } label: { Label("Add folder or file", systemImage: "folder.badge.plus") }
-                .buttonStyle(LTSoftButtonStyle(small: true)).disabled(model.target.isEmpty)
+                .buttonStyle(.pnTertiary).disabled(model.target.isEmpty)
             ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         if let r = model.root {
                             HStack(spacing: 4) {
-                                Image(systemName: "folder").font(.caption)
-                                Text((r as NSString).lastPathComponent).font(.caption).lineLimit(1)
+                                Image(systemName: "folder").font(PN.Font.caption)
+                                Text((r as NSString).lastPathComponent).font(PN.Font.caption).lineLimit(1)
                                     .strikethrough(!model.useProjectFolder)
                                 Button { model.useProjectFolder.toggle() } label: {
-                                    Image(systemName: model.useProjectFolder ? "xmark" : "plus").font(.caption2)
+                                    Image(systemName: model.useProjectFolder ? "xmark" : "plus").font(PN.Font.caption)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -1007,10 +1020,10 @@ struct StartCallView: View {
                         }
                         ForEach(model.folders, id: \.self) { f in
                             HStack(spacing: 4) {
-                                Image(systemName: StartCallModel.isDir(f) ? "folder" : "doc").font(.caption)
-                                Text((f as NSString).lastPathComponent).font(.caption).lineLimit(1)
-                                Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(.caption2) }
-                                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                                Image(systemName: StartCallModel.isDir(f) ? "folder" : "doc").font(PN.Font.caption)
+                                Text((f as NSString).lastPathComponent).font(PN.Font.caption).lineLimit(1)
+                                Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(PN.Font.caption) }
+                                    .buttonStyle(.plain).foregroundStyle(PN.C.text3)
                             }
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(Capsule().fill(Color.accentColor.opacity(0.15)))
@@ -1030,9 +1043,9 @@ struct StartCallView: View {
             TextField("", text: $search, prompt: Text("Find a project")).textFieldStyle(.roundedBorder)
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    if !ps.isEmpty { Text("Projects").font(.caption).foregroundStyle(.secondary).padding(.top, 4) }
+                    if !ps.isEmpty { Text("Projects").font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 4) }
                     ForEach(ps, id: \.slug) { p in pickRow("folder", p.name, p.workspace, "project:" + p.slug) }
-                    if !ws.isEmpty { Text("Workspaces").font(.caption).foregroundStyle(.secondary).padding(.top, 6) }
+                    if !ws.isEmpty { Text("Workspaces").font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 6) }
                     ForEach(ws, id: \.name) { w in pickRow("square.stack.3d.up", w.name, "general calls", "workspace:" + w.name) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1047,7 +1060,7 @@ struct StartCallView: View {
             HStack(spacing: 10) {
                 IconTile(symbol: symbol, size: 26)
                 Text(name)
-                if !sub.isEmpty { Text(sub).font(.caption).foregroundStyle(.secondary) }
+                if !sub.isEmpty { Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                 Spacer()
                 if model.target == tag { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
             }
@@ -1072,9 +1085,9 @@ struct StartCallView: View {
     /// One line: found, being written, for another call, or none.
     @ViewBuilder private var prepStatus: some View {
         if runner.running, runner.callID == model.id {
-            Label("Being written: \(runner.stage.lowercased())…", systemImage: "hourglass").foregroundStyle(.secondary)
+            Label("Being written: \(runner.stage.lowercased())…", systemImage: "hourglass").foregroundStyle(PN.C.text3)
         } else if upnext.prepState(model) == .queued {
-            Label("Waiting in line: starts when the preparation in progress is done.", systemImage: "clock").foregroundStyle(.secondary)
+            Label("Waiting in line: starts when the preparation in progress is done.", systemImage: "clock").foregroundStyle(PN.C.text3)
         } else if let p = model.prep, p.matches {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
@@ -1082,25 +1095,25 @@ struct StartCallView: View {
                     HStack(spacing: 8) {
                         Text(model.chosenPrep != nil ? "Chosen by you, made \(p.made.formatted(date: .abbreviated, time: .shortened))"
                                                      : "Made \(p.made.formatted(date: .omitted, time: .shortened)); used for this call")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         if let path = PrepDocWindow.path(for: model) {
-                            Button("Read") { PrepDocWindow.show(path: path, title: model.effectiveTitle) }.buttonStyle(.link).font(.caption)
+                            Button("Read") { PrepDocWindow.show(path: path, title: model.effectiveTitle) }.buttonStyle(.pnTertiary).font(PN.Font.caption)
                                 .help("Read or correct the whole preparation")
                         }
                     }
                 }
-            } icon: { Image(systemName: "checkmark.seal.fill").foregroundStyle(.green) }
+            } icon: { Image(systemName: "checkmark.seal.fill").foregroundStyle(PN.C.turn) }
         } else if let p = model.prep {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("No preparation for \u{201C}\(model.effectiveTitle)\u{201D} yet")
                     Text("The one made \(p.made.formatted(date: .omitted, time: .shortened)) is for another call (\(p.heading)); pick it below to use it anyway.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 }
-            } icon: { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
+            } icon: { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(PN.C.onMe) }
         } else {
             Label(model.target.isEmpty ? "Choose a project first" : "No preparation yet. Prepare now takes a few minutes. Not ready in time? Start anyway: questions to you, your turn, HELP NOW and answers from the call work without it, and a late preparation joins the call.",
-                  systemImage: "doc.badge.clock").foregroundStyle(.secondary).font(.callout)
+                  systemImage: "doc.badge.clock").foregroundStyle(PN.C.text3).font(.callout)
         }
     }
 
@@ -1111,11 +1124,11 @@ struct StartCallView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text("\(runner.model.capitalized): \(runner.stage)").font(.callout)
-                        Text(runner.startedAt ?? Date(), style: .timer).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                        Text(runner.startedAt ?? Date(), style: .timer).font(.callout.monospacedDigit()).foregroundStyle(PN.C.text3)
                     }
                     ProgressView(value: runner.progress)
                     if !runner.detail.isEmpty {
-                        Text(runner.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        Text(runner.detail).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
                     }
                 }
                 Button("Stop") { runner.cancel() }.controlSize(.small)
@@ -1127,7 +1140,7 @@ struct StartCallView: View {
                     model.note = upnext.prepare(model) ?? ""
                     if !saved && model.note.isEmpty { upnext.save(model) }   // kept in Up next (tracked as prepared until the call); the window stays
                 } label: { Label(runner.running ? "Prepare (after the current one)" : "Prepare now", systemImage: "sparkles") }
-                .buttonStyle(LTSoftButtonStyle())
+                .buttonStyle(.pnSecondary)
                 .disabled(model.target.isEmpty || PrepRunner.claudePath == nil || (!runner.useAPI && runner.loggedIn == false)
                           || upnext.prepState(model) == .queued)
                 .help("Claude Code builds the preparation here from local files: the documents named in the context, the folders above, the local Notion mirror, earlier calls and public web links in the context. A few minutes; you can close this window.")
@@ -1144,27 +1157,27 @@ struct StartCallView: View {
             }
             if upnext.prepState(model) == .queued {
                 HStack {
-                    Text("In line after: \(runner.target)").font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Text("In line after: \(runner.target)").font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
                     Button("Take out of line") { upnext.unqueue(model) }.controlSize(.small)
                 }
             } else if runner.running {
                 Text("Another call is being prepared (\(runner.stage.lowercased())); this one starts after it.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             if PrepRunner.claudePath == nil {
-                Text("Claude Code is not installed: use More > Copy request for Cowork.").font(.caption).foregroundStyle(.secondary)
+                Text("Claude Code is not installed: use More > Copy request for Cowork.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
             } else if !runner.useAPI && runner.loggedIn == false {
                 HStack(spacing: 8) {
-                    Label("Claude Code is not signed in", systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange)
+                    Label("Claude Code is not signed in", systemImage: "exclamationmark.triangle.fill").font(PN.Font.caption).foregroundStyle(PN.C.onMe)
                     Spacer()
                     Button("Log in…") { runner.openLogin() }.controlSize(.small)
                     Button("Use API key") { runner.useAPI = true }.controlSize(.small).disabled(!runner.hasAPIKey)
                     Button("Check") { runner.refreshAuth() }.controlSize(.small)
                 }
             } else if runner.useAPI && !runner.hasAPIKey {
-                Text("No Claude API key: add it in Settings > Keys.").font(.caption).foregroundStyle(.orange)
+                Text("No Claude API key: add it in Settings > Keys.").font(PN.Font.caption).foregroundStyle(PN.C.onMe)
             }
-            if !runner.result.isEmpty { Text(runner.result).font(.caption).foregroundStyle(.secondary) }
+            if !runner.result.isEmpty { Text(runner.result).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
         }
     }
 
@@ -1345,12 +1358,12 @@ extension AppDelegate {
     func rebuildUpNextMenu() {
         let items = UpNext.shared.visible
         upNextItem.isHidden = items.isEmpty
-        upNextItem.title = "Up next (\(items.count))"
+        upNextItem.title = L("menubar.upNextCount", ["n": "\(items.count)"])
         let m = NSMenu()
         let f = DateFormatter(); f.dateFormat = "d MMM HH:mm"
         for c in items {
             let st = UpNext.shared.prepState(c)
-            let mark = ["ready": " · prepared", "running": " · preparing", "queued": " · in line", "failed": " · preparation failed"][st.rawValue] ?? ""
+            let mark = ["ready", "running", "queued", "failed"].contains(st.rawValue) ? " · " + L("menubar.upNext." + st.rawValue) : ""
             let it = NSMenuItem(title: "\(c.effectiveTitle) · \(f.string(from: c.callDate))\(mark)", action: #selector(openUpNext(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = c.id.uuidString
@@ -1363,5 +1376,50 @@ extension AppDelegate {
         MainActor.assumeIsolated {
             if let id = sender.representedObject as? String, let c = UpNext.shared.item(id) { StartCallWindow.show(delegate: self, prepared: c) }
         }
+    }
+}
+
+// MARK: - Pacenote 0.8 (F0): menu language and the recording clock
+
+extension AppDelegate {
+    /// The menu follows the interface language (Settings > General) without a restart.
+    func relabelMenu() {
+        guard menuLang != L10n.lang else { return }
+        menuLang = L10n.lang
+        homeItem.title = L("menubar.home"); tipsItem.title = L("menubar.showTips"); pauseItem.title = L("menubar.pause")
+        helpItem.title = L("menubar.helpNow"); endItem.title = L("menubar.endCall"); notionItem.title = L("menubar.sendNotion")
+        micItem.title = L("menubar.allowMic"); settingsItem.title = L("menubar.settings"); setupItem.title = L("menubar.setup")
+        tourItem.title = L("menubar.welcomeTour"); aboutItem.title = L("menubar.about"); quitItem.title = L("menubar.quit")
+        demoItem.title = L("menubar.demo"); demoPresItem.title = L("menubar.demoPresentation")
+        item?.button?.toolTip = L("menubar.tooltip")
+        installMainMenu()
+    }
+
+    /// Time since the recording started, "32:14" or "1:02:05".
+    static func elapsed(_ st: EngineStatus) -> String {
+        guard let s = st.startedAt, let d = ISO8601DateFormatter().date(from: s) else { return "00:00" }
+        let t = max(0, Int(Date().timeIntervalSince(d)))
+        return t >= 3600 ? String(format: "%d:%02d:%02d", t / 3600, t % 3600 / 60, t % 60)
+                         : String(format: "%02d:%02d", t / 60, t % 60)
+    }
+
+    /// While recording, the elapsed time sits next to the menu bar icon and ticks every second.
+    func setClock(_ on: Bool) {
+        if on {
+            if clock == nil {
+                clock = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.tickClock() }
+            }
+            tickClock()
+        } else if clock != nil {
+            clock?.invalidate()
+            clock = nil
+            item?.button?.title = ""
+        }
+    }
+
+    func tickClock() {
+        guard let b = item?.button else { return }
+        b.attributedTitle = NSAttributedString(string: " " + Self.elapsed(lastStatus),
+                                               attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
     }
 }

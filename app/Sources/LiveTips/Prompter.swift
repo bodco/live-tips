@@ -12,7 +12,7 @@ struct PrompterArgs {
     var status = ""
     var html = ""
     var control = ""
-    var title = "Live Tips (app)"
+    var title = "Pacenote"
     var demo = false
     var demoPresentation = false
 }
@@ -380,7 +380,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 CallEngine.shared.callRequest["title"] = v; CallEngine.shared.renamed = v
                 if !tp.isEmpty { CallHistory.shared.rename(file: tp, title: v) }     // Home and insights at once
             }
-            window.title = "Live Tips: " + v
+            window.title = v                 // Pacenote 0.8: the call's name, no product prefix
             if !args.inbox.isEmpty { appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": "title", "value": v]), to: args.inbox) }
         case "pref":
             // Window settings remembered across calls (opacity, text size, proactive, language...).

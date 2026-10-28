@@ -49,7 +49,7 @@ final class NotionMirrorService: @unchecked Sendable {
         guard !c.workRoot.isEmpty else { done(false, "Set the work folder first."); return }
         guard token != nil else { done(false, "Add the Notion token in Settings > Keys first."); return }
         if Self.mode(workRoot: c.workRoot) == "external" {
-            done(false, "A mirror is already set up in \(Self.dir(workRoot: c.workRoot)) with its own schedule. Live Tips reads it and leaves it alone.")
+            done(false, "A mirror is already set up in \(Self.dir(workRoot: c.workRoot)) with its own schedule. Pacenote reads it and leaves it alone.")
             return
         }
         let fm = FileManager.default

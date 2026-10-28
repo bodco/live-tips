@@ -144,6 +144,34 @@ func mirrorAndWorkspaces() {
     expect(old?.uiLanguage == "uk" && old?.showInDock == true, "config decodes older files")
 }
 
+/// Pacenote 0.8: the interface catalog (Resources/i18n) has the same keys in en and uk, no empty values,
+/// no long dash and no emoji, and the same {placeholders} in both languages.
+func interfaceStrings() {
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources/i18n")
+    func load(_ l: String) -> [String: String] {
+        guard let d = try? Data(contentsOf: dir.appendingPathComponent("\(l).json")),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return [:] }
+        return o.compactMapValues { $0 as? String }
+    }
+    let en = load("en"), uk = load("uk")
+    expect(!en.isEmpty && !uk.isEmpty, "i18n catalogs load")
+    expect(Set(en.keys) == Set(uk.keys), "i18n keys match: \(Set(en.keys).symmetricDifference(Set(uk.keys)).sorted())")
+    func holes(_ s: String) -> Set<String> {
+        var out = Set<String>(), cur: String?
+        for ch in s { if ch == "{" { cur = "" } else if ch == "}" { if let c = cur { out.insert(c) }; cur = nil } else if cur != nil { cur!.append(ch) } }
+        return out
+    }
+    for (k, v) in en {
+        let u = uk[k] ?? ""
+        expect(!v.isEmpty && !u.isEmpty, "i18n empty: \(k)")
+        expect(!v.contains("\u{2014}") && !u.contains("\u{2014}"), "i18n long dash: \(k)")
+        expect(!(v + u).unicodeScalars.contains { $0.properties.isEmojiPresentation }, "i18n emoji: \(k)")
+        expect(holes(v) == holes(u), "i18n placeholders differ: \(k)")
+    }
+}
+
+interfaceStrings()
 frameRoundTripAcrossChunks()
 frameResyncAfterGarbage()
 watchdogStartGraceThenStallTerminateKillRestart()

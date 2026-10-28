@@ -1,0 +1,7 @@
+/* Pacenote 0.8: назви і тексти дозволів, які показує macOS (українська). */
+"CFBundleName" = "Pacenote";
+"CFBundleDisplayName" = "Pacenote";
+"NSMicrophoneUsageDescription" = "Pacenote транскрибує ваш голос на цьому Mac. Аудіо його не залишає.";
+"NSAudioCaptureUsageDescription" = "Pacenote транскрибує іншу сторону дзвінка на цьому Mac.";
+"NSCalendarsFullAccessUsageDescription" = "Pacenote читає ваші календарі, щоб запропонувати і підготувати потрібний дзвінок. Нічого в них не змінює.";
+"NSCalendarsUsageDescription" = "Pacenote читає ваші календарі, щоб запропонувати і підготувати потрібний дзвінок. Нічого в них не змінює.";

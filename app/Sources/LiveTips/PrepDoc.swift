@@ -44,13 +44,13 @@ struct PrepDocView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: "doc.text").foregroundStyle(Color.accentColor)
-                Text((path as NSString).lastPathComponent).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                Text((path as NSString).lastPathComponent).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
                 Spacer()
-                if !saved.isEmpty { Text(saved).font(.caption).foregroundStyle(.green) }
-                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }.buttonStyle(.link)
+                if !saved.isEmpty { Text(saved).font(PN.Font.caption).foregroundStyle(PN.C.turn) }
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }.buttonStyle(.pnTertiary)
                 if editing {
                     Button("Cancel") { load(); editing = false }
-                    Button("Save") { save() }.buttonStyle(.borderedProminent).keyboardShortcut("s", modifiers: .command)
+                    Button("Save") { save() }.buttonStyle(.pnPrimary).keyboardShortcut("s", modifiers: .command)
                 } else {
                     Button("Edit") { editing = true }
                 }
@@ -117,13 +117,13 @@ struct MarkdownBlocks: View {
         } else if t.range(of: "^[-*•]\\s+", options: .regularExpression) != nil {
             let lead = raw.prefix { $0 == " " }.count
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("•").foregroundStyle(.secondary)
+                Text("•").foregroundStyle(PN.C.text3)
                 inline(t.replacingOccurrences(of: "^[-*•]\\s+", with: "", options: .regularExpression))
             }
             .padding(.leading, CGFloat(min(lead, 8)) * 6)
         } else if let r = t.range(of: "^\\d+[.)]\\s+", options: .regularExpression) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(t[r].trimmingCharacters(in: .whitespaces)).foregroundStyle(.secondary).monospacedDigit()
+                Text(t[r].trimmingCharacters(in: .whitespaces)).foregroundStyle(PN.C.text3).monospacedDigit()
                 inline(String(t[r.upperBound...]))
             }
         } else if t.hasPrefix("|") {

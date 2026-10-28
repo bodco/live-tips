@@ -34,7 +34,7 @@ case "$MODE:$STEP" in
     if command -v brew >/dev/null 2>&1; then echo "Installing Python 3.12 with Homebrew..."; brew install python@3.12
     elif ! xcode-select -p >/dev/null 2>&1; then
       echo "Opening the Command Line Tools installer (a macOS window). It brings Python 3.9 only:"
-      echo "for Live Tips install Python 3.12 from python.org (the browser opens), then press Check again."
+      echo "for Pacenote install Python 3.12 from python.org (the browser opens), then press Check again."
       xcode-select --install 2>/dev/null; open "https://www.python.org/downloads/macos/"; exit 1
     else echo "Install Python 3.12 from python.org (the browser opens), then press Check again."; open "https://www.python.org/downloads/macos/"; exit 1; fi ;;
 

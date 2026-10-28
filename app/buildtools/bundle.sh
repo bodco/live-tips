@@ -13,6 +13,10 @@ cp "$SCRATCH/release/LiveTips" "$APP/Contents/MacOS/LiveTips"
 # Shared tips window (same file as the skill's live-transcriber; parity).
 PROMPTER_HTML="${LIVETIPS_PROMPTER_HTML:-$HERE/Resources/prompter.html}"
 cp "$PROMPTER_HTML" "$APP/Contents/Resources/prompter.html"
+# Interface strings (en, uk) and the macOS names and permission texts per language (Pacenote 0.8)
+mkdir -p "$APP/Contents/Resources/i18n"
+cp "$HERE/Resources/i18n/"*.json "$APP/Contents/Resources/i18n/"
+cp -R "$HERE/Resources/InfoPlist/"*.lproj "$APP/Contents/Resources/"
 # App icon, drawn at build time (no binary assets in the repo)
 ICONSET="$(mktemp -d)/AppIcon.iconset"; mkdir -p "$ICONSET"
 xcrun swift "$HERE/buildtools/make_icon.swift" "$ICONSET" >/dev/null && iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" || echo "icon: skipped"
@@ -42,18 +46,21 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
-<key>CFBundleName</key><string>Live Tips</string>
-<key>CFBundleDisplayName</key><string>Live Tips</string>
+<key>CFBundleName</key><string>Pacenote</string>
+<key>CFBundleDisplayName</key><string>Pacenote</string>
+<key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleLocalizations</key><array><string>en</string><string>uk</string></array>
+<key>LSHasLocalizedDisplayName</key><true/>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundleExecutable</key><string>LiveTips</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VER</string>
 <key>CFBundleVersion</key><string>$BUILD</string>
 <key>LSMinimumSystemVersion</key><string>14.4</string>
-<key>NSCalendarsFullAccessUsageDescription</key><string>Live Tips lists your calls from the calendars on this Mac so you can pick the one to prepare and start. Read only.</string>
-<key>NSCalendarsUsageDescription</key><string>Live Tips lists your calls from the calendars on this Mac so you can pick the one to prepare and start. Read only.</string>
-<key>NSMicrophoneUsageDescription</key><string>LiveTips transcribes your side of the call locally on this Mac.</string>
-<key>NSAudioCaptureUsageDescription</key><string>LiveTips transcribes the other side of the call locally on this Mac.</string>
+<key>NSCalendarsFullAccessUsageDescription</key><string>Pacenote reads your calendars to suggest and prepare the right call. It never changes them.</string>
+<key>NSCalendarsUsageDescription</key><string>Pacenote reads your calendars to suggest and prepare the right call. It never changes them.</string>
+<key>NSMicrophoneUsageDescription</key><string>Pacenote transcribes your voice on this Mac. Audio never leaves it.</string>
+<key>NSAudioCaptureUsageDescription</key><string>Pacenote transcribes the other side of the call on this Mac.</string>
 </dict></plist>
 PLIST
 codesign --force --sign "$IDENT" --identifier "$BUNDLE_ID" "$APP"

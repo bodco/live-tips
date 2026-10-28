@@ -15,7 +15,7 @@ else `{work_root}/{project_name}` if it exists, else ask. If the tool folder is 
 call `device_request_folder_access` for the tool root (one request, with a reason), do not
 wait for the user to find the button.
 
-**Live Tips app on the same call.** The macOS app can record the same call next to this skill
+**Pacenote app (formerly Live Tips) on the same call.** The macOS app can record the same call next to this skill
 (for a fair comparison, or as a backup). It runs its own recorder from its own app folder and
 writes only `<stem>.app.*` files (`2026-10-22-1500-team-daily.app.md`, `.app.md.tips.jsonl`), so
 the two never share a transcript, control or state. Never read, edit or delete the `.app.*`

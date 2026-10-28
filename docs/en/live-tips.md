@@ -1,4 +1,4 @@
-# Live Tips: a co-pilot on the call
+# Live Tips skill and the Pacenote app: a co-driver on the call
 
 [Українською](../uk/live-tips.md) · [Back to the README](../../README.md)
 
@@ -17,7 +17,7 @@ Live tips is in **beta**, and it is mostly glue around other people's open-sourc
 goes into the Meetings DB: into the meeting's existing page (for example the one Notion AI
 Meeting Notes created) or into a new one when there is none.
 
-There is also a **Live Tips app (beta)**: a native macOS menu bar app that runs the same loop
+There is also the **Pacenote app (beta, formerly the Live Tips app)**: a native macOS menu bar app that runs the same loop
 without a Cowork chat, with your own Claude API key. It reads the same rules and shows the same
 tips window. See [section 14](#14-live-tips-app-beta).
 
@@ -795,7 +795,7 @@ client signals (quotes with times) for `client-satisfaction-tracker`.
 first looks for this meeting's page: the link you gave, else Notion AI meeting notes started
 within 20 minutes of the recording, else Meetings DB pages of that time window (it searches
 again after ~60 s: Notion AI may finish its page late). Found one: it appends one section
-"Live Tips: підсумок і роздуми" at the end, whatever the page already holds, never edits
+"Pacenote: підсумок і роздуми" (older pages: "Live Tips: ...") at the end, whatever the page already holds, never edits
 existing blocks, adds its transcript only when the page has none, and fills `Project`,
 `Workspace`, `Date` only when empty. Several candidates: it asks which one. None: it creates
 one page in the project's `notion.meetings_db`:
@@ -1043,7 +1043,7 @@ Licences change; the links above are the authority, this table is a snapshot of 
 
 ---
 
-## 14. Live Tips app (beta)
+## 14. Pacenote app (beta, formerly Live Tips)
 
 A native macOS menu bar app that runs the same live-tips loop without a Cowork chat. Code and
 details: [`./`](../../DEVELOPMENT.md).
@@ -1077,7 +1077,7 @@ What it does:
 **It is a beta.**
 
 - Not notarized yet: on the first launch macOS refuses to open it. Open **System Settings >
-  Privacy & Security**, press **Open Anyway** next to Live Tips and confirm (on macOS 14 a
+  Privacy & Security**, press **Open Anyway** next to Pacenote and confirm (on macOS 14 a
   right-click > **Open** also works). Each release lists the SHA-256 of its files
   (`SHA256SUMS.txt`); check a download with `shasum -a 256 ~/Downloads/LiveTips.dmg`.
 - macOS 14.4 or newer on Apple silicon.
@@ -1181,13 +1181,13 @@ window reads the recorder's status every 0.5 s.
 | Recent calls | The last 40 calls (the app's and the skill's transcripts of the last 45 days): Notion, Transcript, Show in Finder, × (hides it from the list; files stay) |
 | Bottom | Claude API key, this month's spend against the limit, a link to the balance in the Anthropic Console (an API key cannot read it), Notion copy, local AI, calendars |
 
-**Calendars (Settings > Calendars).** Live Tips reads calendars through macOS (EventKit), so several Google
+**Calendars (Settings > Calendars).** Pacenote reads calendars through macOS (EventKit), so several Google
 and Microsoft accounts work at once and nothing has to be installed:
 1. System Settings > Internet Accounts > Add Account: Google, or Microsoft Exchange (work) / Outlook.com
    (personal); keep Calendars on. Repeat for every account.
 2. Settings > Calendars > Connect calendars (macOS asks once).
 3. Tick the calendars with your calls (All / None per account); the rest never shows.
-Read only: Live Tips never changes an event. A company that blocks Mail and Calendar on Macs blocks this too.
+Read only: Pacenote never changes an event. A company that blocks Mail and Calendar on Macs blocks this too.
 An optional reminder before calendar calls is off by default (your calendar already reminds you).
 
 **Picking the call.** Start call shows the calls around now as chips (in progress, just ended, the next 3 h),
@@ -1215,9 +1215,9 @@ menu bar: **Send last call to Notion**.
 2. The app looks for this meeting's page in the project's Meetings DB: a page whose `Date` is
    within 20 minutes of the call start (a Notion AI Meeting Notes page created from the calendar
    counts).
-3. Found: it appends a **Live Tips** section to that page. Not found: it creates a new page with
+3. Found: it appends a **Pacenote** section to that page. Not found: it creates a new page with
    the project and workspace relations and a real date mention in the title, like the skill.
-4. The transcript goes into a child page of the meeting page ("Transcript (Live Tips) · <call>"), one line per paragraph; the file stays in the project's `live/` folder.
+4. The transcript goes into a child page of the meeting page ("Transcript (Pacenote) · <call>"), one line per paragraph; the file stays in the project's `live/` folder.
 
 What it needs:
 

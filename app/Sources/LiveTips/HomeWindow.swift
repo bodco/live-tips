@@ -11,12 +11,13 @@ final class HomeWindow {
 
     static func show(delegate: AppDelegate) {
         if let w = window {
+            w.title = L("home.window.title")
             w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let w = NSWindow(contentViewController: NSHostingController(rootView: HomeView(app: delegate)))
-        w.title = "Live Tips"
+        let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { HomeView(app: delegate) }))
+        w.title = L("home.window.title")
         w.styleMask.insert(.resizable)
         w.setContentSize(NSSize(width: 780, height: 760))
         w.isReleasedWhenClosed = false
@@ -54,7 +55,7 @@ struct HomeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         if live { liveCard }
-                        if !note.isEmpty { Text(note).font(.callout).foregroundStyle(.orange) }
+                        if !note.isEmpty { Text(note).font(.callout).foregroundStyle(PN.C.onMe) }
                         if geo.size.width >= 1060 {
                             HStack(alignment: .top, spacing: 18) {
                                 VStack(alignment: .leading, spacing: 18) { aheadSection; recentSection }
@@ -99,15 +100,15 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 14) {
-            IconTile(symbol: "text.bubble", size: 44)
+            PacenoteSymbol(height: 40)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Live Tips").font(.title2.weight(.semibold))
-                Text(now.formatted(date: .complete, time: .omitted)).font(.callout).foregroundStyle(.secondary)
+                Text(L("app.name")).font(.title2.weight(.semibold))
+                Text(now.formatted(date: .complete, time: .omitted)).font(.callout).foregroundStyle(PN.C.text3)
             }
             Spacer()
             if !live {
                 Button { StartCallWindow.show(delegate: app, planOnly: true) } label: { Label("Plan a call", systemImage: "calendar.badge.plus") }
-                    .buttonStyle(LTSoftButtonStyle())
+                    .buttonStyle(.pnSecondary)
                     .help("Set up and prepare a call for later (Up next).")
             }
             LTPrimaryButton(title: live ? "Plan an upcoming call" : "Start call", symbol: live ? "calendar.badge.plus" : "phone.arrow.up.right", minWidth: 150) {
@@ -121,21 +122,21 @@ struct HomeView: View {
         let title = CallEngine.shared.renamed ?? (CallEngine.shared.callRequest["title"] as? String) ?? status.project ?? "Call"
         let since = status.startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
         return HStack(spacing: 12) {
-            Circle().fill(status.state == "recording" ? Color.red : Color.secondary).frame(width: 10, height: 10)
+            Circle().fill(status.state == "recording" ? PN.C.rec : PN.C.text3).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
                 Text((status.state == "standby" ? "Waiting for the call: " : "Recording: ") + title).font(.headline).lineLimit(1)
                 HStack(spacing: 8) {
                     if let s = since { Text(s, style: .timer).monospacedDigit() }
                     Text("\(status.lines) lines · \(status.tips) tips · $" + String(format: "%.2f", status.callSpentUSD))
                 }
-                .font(.caption).foregroundStyle(.secondary)
+                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Spacer()
-            Button("Show tips") { app.showTips() }.buttonStyle(LTSoftButtonStyle(small: true))
-            Button("End call") { app.endCall() }.buttonStyle(LTSoftButtonStyle(small: true)).tint(.red)
+            Button("Show tips") { app.showTips() }.buttonStyle(.pnTertiary)
+            Button("End call") { app.endCall() }.buttonStyle(.pnTertiary)
         }
         .ltCard(padding: 14)
-        .background(RoundedRectangle(cornerRadius: LT.radius).fill(Color.red.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: LT.radius).fill(PN.C.rec.opacity(0.06)))
     }
 
     // MARK: ahead: calendar and Up next
@@ -170,20 +171,20 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Ahead").font(.headline)
-                Text("calendar and Up next").font(.caption).foregroundStyle(.secondary)
+                Text("calendar and Up next").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 Spacer()
                 if cal.access == .granted {
-                    Button("Calendars…") { pickCalendars = true }.buttonStyle(.link)
+                    Button("Calendars…") { pickCalendars = true }.buttonStyle(.pnTertiary)
                         .popover(isPresented: $pickCalendars, arrowEdge: .bottom) { CalendarPicker() }
                 }
                 if cal.access != .granted {
-                    Button(cal.access == .denied ? "Allow calendars…" : "Connect calendars") { cal.connect() }.buttonStyle(.link)
+                    Button(cal.access == .denied ? "Allow calendars…" : "Connect calendars") { cal.connect() }.buttonStyle(.pnTertiary)
                 }
             }
             let rows = ahead
             if rows.isEmpty {
                 Text(cal.access == .granted ? "Nothing in the calendars for the next 36 hours, and Up next is empty." : "Connect your calendars to see the calls ahead, or plan a call with Plan a call.")
-                    .font(.callout).foregroundStyle(.secondary).ltCard(padding: 14)
+                    .font(.callout).foregroundStyle(PN.C.text3).ltCard(padding: 14)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { i, r in
@@ -206,40 +207,40 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(r.event.map { (Calendar.current.isDateInToday($0.start) ? "" : dayName($0.start) + " ") + $0.timeRange } ?? f.string(from: r.start))
-                        .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                        .font(.callout.monospacedDigit()).foregroundStyle(PN.C.text3)
                     if !rel.isEmpty {
-                        Text(rel).font(.caption2.weight(.semibold)).padding(.horizontal, 6).padding(.vertical, 1)
-                            .background(Capsule().fill((rel == "in progress" ? Color.red : Color.accentColor).opacity(0.15)))
+                        Text(rel).font(PN.Font.caption.weight(.semibold)).padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Capsule().fill((rel == "in progress" ? PN.C.rec : Color.accentColor).opacity(0.15)))
                     }
-                    if r.event?.recurring == true { Image(systemName: "repeat").font(.caption2).foregroundStyle(.secondary).help("A regular meeting: set up like the last one") }
+                    if r.event?.recurring == true { Image(systemName: "repeat").font(PN.Font.caption).foregroundStyle(PN.C.text3).help("A regular meeting: set up like the last one") }
                 }
                 Text(m?.effectiveTitle ?? r.event?.title ?? "").font(.body.weight(.medium)).lineLimit(1)
                 HStack(spacing: 6) {
                     if let m = m, !m.target.isEmpty { Text(m.targetName) }
-                    if let e = r.event { Text(e.account + " · " + e.calendar).foregroundStyle(.tertiary) } else { Text("Up next").foregroundStyle(.tertiary) }
+                    if let e = r.event { Text(e.account + " · " + e.calendar).foregroundStyle(PN.C.text3) } else { Text("Up next").foregroundStyle(PN.C.text3) }
                     prepBadge(st)
                 }
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                .font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                 if !overlaps.isEmpty {
                     Label(overlaps.count == 1 ? "Same time as \u{201C}\(overlaps[0].title)\u{201D}" : "Same time as \(overlaps.count) other calls", systemImage: "rectangle.on.rectangle")
-                        .font(.caption).foregroundStyle(.orange).lineLimit(1)
+                        .font(PN.Font.caption).foregroundStyle(PN.C.onMe).lineLimit(1)
                         .help("At the same time: " + overlaps.map(\.title).joined(separator: ", ") + ". Prepare and start the one you actually go to; hide the others with ×.")
                 }
             }
             Spacer(minLength: 8)
             HStack(spacing: 6) {
                 if st == .none || st == .failed {
-                    Button("Prepare") { prepare(r) }.buttonStyle(LTSoftButtonStyle(small: true))
+                    Button("Prepare") { prepare(r) }.buttonStyle(.pnTertiary)
                         .help("Set up this call like the last one of its series and write its preparation now. It does not start the call.")
                 }
                 if st == .ready, let m = m, let p = PrepDocWindow.path(for: m) {
-                    Button("Read prep") { PrepDocWindow.show(path: p, title: m.effectiveTitle) }.buttonStyle(LTSoftButtonStyle(small: true))
+                    Button("Read prep") { PrepDocWindow.show(path: p, title: m.effectiveTitle) }.buttonStyle(.pnTertiary)
                         .help("Read or correct the preparation before the call")
                 }
-                Button("Set up…") { StartCallWindow.show(delegate: app, prepared: model(for: r)) }.buttonStyle(LTSoftButtonStyle(small: true))
-                Button(live ? "Switch…" : "Start") { start(r) }.buttonStyle(LTSoftButtonStyle(small: true))
+                Button("Set up…") { StartCallWindow.show(delegate: app, prepared: model(for: r)) }.buttonStyle(.pnTertiary)
+                Button(live ? "Switch…" : "Start") { start(r) }.buttonStyle(.pnTertiary)
                     .help(live ? "End the current call and start this one (asks first)." : "Start this call now.")
-                Button { dismiss(r) } label: { Image(systemName: "xmark") }.buttonStyle(.borderless).foregroundStyle(.secondary)
+                Button { dismiss(r) } label: { Image(systemName: "xmark") }.buttonStyle(.borderless).accessibilityLabel("Hide").foregroundStyle(PN.C.text3)
                     .help(r.event != nil ? "Hide this event here (the calendar is not changed)." : "Remove from Up next")
             }
         }
@@ -253,10 +254,10 @@ struct HomeView: View {
 
     @ViewBuilder private func prepBadge(_ st: UpNext.PrepState) -> some View {
         switch st {
-        case .ready: Label("prepared", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+        case .ready: Label("prepared", systemImage: "checkmark.seal.fill").foregroundStyle(PN.C.turn)
         case .running: Label("preparing \(Int(runner.progress * 100))%", systemImage: "hourglass").foregroundStyle(Color.accentColor)
         case .queued: Label("in line", systemImage: "clock")
-        case .failed: Label("preparation failed", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        case .failed: Label("preparation failed", systemImage: "exclamationmark.triangle.fill").foregroundStyle(PN.C.onMe)
         case .none: EmptyView()
         }
     }
@@ -298,11 +299,11 @@ struct HomeView: View {
             HStack {
                 Text("Recent calls").font(.headline)
                 Spacer()
-                if all.count > 8 { Button(showAllRecent ? "Show fewer" : "Show all \(all.count)") { showAllRecent.toggle() }.buttonStyle(.link) }
+                if all.count > 8 { Button(showAllRecent ? "Show fewer" : "Show all \(all.count)") { showAllRecent.toggle() }.buttonStyle(.pnTertiary) }
             }
             let rs = showAllRecent ? all : Array(all.prefix(8))
             if rs.isEmpty {
-                Text("Calls you record appear here with their transcript and Notion page.").font(.callout).foregroundStyle(.secondary).ltCard(padding: 14)
+                Text("Calls you record appear here with their transcript and Notion page.").font(.callout).foregroundStyle(PN.C.text3).ltCard(padding: 14)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(rs.enumerated()), id: \.element.id) { i, r in
@@ -323,18 +324,18 @@ struct HomeView: View {
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(f.string(from: r.start)).font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                    Text(f.string(from: r.start)).font(.callout.monospacedDigit()).foregroundStyle(PN.C.text3)
                     Text(r.title).font(.body.weight(.medium)).lineLimit(1)
                 }
-                Text(meta.filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(meta.filter { !$0.isEmpty }.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
             }
             Spacer(minLength: 8)
             if let u = r.notionURL, let url = URL(string: u) {
-                Button("Notion") { NSWorkspace.shared.open(url) }.buttonStyle(LTSoftButtonStyle(small: true))
+                Button("Notion") { NSWorkspace.shared.open(url) }.buttonStyle(.pnTertiary)
             }
-            Button("Transcript") { NSWorkspace.shared.open(URL(fileURLWithPath: r.file)) }.buttonStyle(LTSoftButtonStyle(small: true))
-            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.file)]) }.buttonStyle(LTSoftButtonStyle(small: true))
-            Button { history.hide(r) } label: { Image(systemName: "xmark") }.buttonStyle(.borderless).foregroundStyle(.secondary)
+            Button("Transcript") { NSWorkspace.shared.open(URL(fileURLWithPath: r.file)) }.buttonStyle(.pnTertiary)
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.file)]) }.buttonStyle(.pnTertiary)
+            Button { history.hide(r) } label: { Image(systemName: "xmark") }.buttonStyle(.borderless).accessibilityLabel("Hide").foregroundStyle(PN.C.text3)
                 .help("Remove from this list. The files stay in the project folder.")
         }
         .padding(.horizontal, 8).padding(.vertical, 8)
@@ -352,16 +353,16 @@ struct HomeView: View {
         let mirror = demo ? "ok" : (cfg.workRoot.isEmpty ? "" : MirrorStatus.load(workRoot: cfg.workRoot).health())
         let calCount = demo ? 3 : cal.calendars.filter { !cal.excluded.contains($0.calendarIdentifier) }.count
         return HStack(spacing: 14) {
-            chip(hasKey ? "key.fill" : "key", hasKey ? "Claude API key set" : "No Claude API key", hasKey ? .secondary : .orange) { SettingsWindow.show(tab: "keys") }
+            chip(hasKey ? "key.fill" : "key", hasKey ? "Claude API key set" : "No Claude API key", hasKey ? PN.C.text3 : PN.C.onMe) { SettingsWindow.show(tab: "keys") }
             if showStats { chip("dollarsign.circle", String(format: "Month $%.2f / $%.0f", month, cfg.budget.monthlyHardUSD), month >= cfg.budget.monthlyHardUSD * 0.9 ? .orange : .secondary) { SettingsWindow.show(tab: "ai") }
-            Link("Balance in Anthropic Console", destination: URL(string: "https://console.anthropic.com/settings/billing")!).font(.caption)
+            Link("Balance in Anthropic Console", destination: URL(string: "https://console.anthropic.com/settings/billing")!).font(PN.Font.caption)
                 .help("Anthropic does not let an API key read the balance; it is shown in the Console.") }
-            if !mirror.isEmpty { chip("doc.text", mirror == "ok" ? "Notion mirror fresh" : "Notion mirror \(mirror)", mirror == "ok" ? .secondary : .orange) { SettingsWindow.show(tab: "notion") } }
+            if !mirror.isEmpty { chip("doc.text", mirror == "ok" ? "Notion mirror fresh" : "Notion mirror \(mirror)", mirror == "ok" ? PN.C.text3 : PN.C.onMe) { SettingsWindow.show(tab: "notion") } }
             chip("cpu", cfg.localAI.enabled ? "Local AI on" : "Local AI off", .secondary) { SettingsWindow.show(tab: "ai") }
-            chip("calendar", cal.access == .granted ? "\(calCount) calendars" : "Calendars off", cal.access == .granted ? .secondary : .orange) { SettingsWindow.show(tab: "calendars") }
+            chip("calendar", cal.access == .granted ? "\(calCount) calendars" : "Calendars off", cal.access == .granted ? PN.C.text3 : PN.C.onMe) { SettingsWindow.show(tab: "calendars") }
             Spacer()
         }
-        .font(.caption)
+        .font(PN.Font.caption)
     }
 
     private func chip(_ symbol: String, _ text: String, _ color: Color, action: @escaping () -> Void) -> some View {

@@ -1,11 +1,20 @@
 # Changelog
 
-Pacenote (formerly Live Tips). Earlier versions are described in the commit messages and in
+Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
+
+## 0.8.1
+
+- **Tips window, three tools in the top bar** after On me: microphone (crossed out in red when off), pause (turns
+  into a Resume button; the recording dot and the timer turn grey) and a bulb for proactive tips (tinted blue when
+  on). Each has its shortcut in the tooltip, an `aria-label` and `aria-pressed`.
+- **New shortcut Control-Option-L** for proactive tips, listed in Settings > General > Shortcuts; the choice is
+  remembered for the next call.
+- **About** no longer shows the old product name.
 
 ## 0.8.0 (Pacenote)
 
-Live Tips becomes Pacenote, "your co-driver on calls": a new brand, a new tips window, Home, one call form, a
+Pacenote, "your co-driver on calls": a new brand, a new tips window, Home, one call form, a
 four-step onboarding, and new features before, during and after the call. Built in seven phases (F0 to F6):
 
 ### F6: after the call
@@ -130,8 +139,7 @@ four-step onboarding, and new features before, during and after the call. Built 
 - **macOS names and permission texts** per language (`InfoPlist.strings`, en and uk).
 - **First launch:** a splash with the icon, the wordmark and the tagline before the setup steps; the last
   step offers a demo call or Home.
-- **About:** icon, wordmark, version with build and macOS, Check for updates (opens the releases page),
-  "Formerly Live Tips".
+- **About:** icon, wordmark, version with build and macOS, Check for updates (opens the releases page).
 - **Notion:** sections and the transcript page say Pacenote; the last block of a meeting page is
   "Notes by Pacenote · transcribed on device" in the page's language. The skill does the same and still
   recognizes the older "Live Tips" sections.

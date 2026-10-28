@@ -50,6 +50,6 @@ How it compares with Fireflies, Fathom and Notion AI Meeting Notes: [tower.bodco
 
 Pacenote works on its own. With [PM Control Tower](https://github.com/bodco/pm-control-tower) it also reads your project configs (people, Notion pages, the current state).
 
-History: Pacenote, then called Live Tips, grew inside PM Control Tower; releases up to 0.5.8 are [there](https://github.com/bodco/pm-control-tower/releases). This repository keeps that history.
+History: Pacenote grew inside PM Control Tower; releases up to 0.5.8 are [there](https://github.com/bodco/pm-control-tower/releases). This repository keeps that history.
 
 MIT License. [Privacy policy](PRIVACY.md) and [terms of use](TERMS.md): your audio stays on your Mac, nothing is sent to the author.

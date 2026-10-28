@@ -1026,6 +1026,7 @@ struct SettingsView: View {
                 ShortcutRow(action: .pause)
                 ShortcutRow(action: .mute)
                 ShortcutRow(action: .compact)
+                ShortcutRow(action: .proactive)
             } header: { Text(L("set.shortcuts")) } footer: {
                 Text(L("set.theyWorkFromAny"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -1190,7 +1191,6 @@ struct AboutView: View {
                     }
                 }
                 Text(L("app.description")).fixedSize(horizontal: false, vertical: true)
-                Text(L("settings.about.formerly")).font(.callout).foregroundStyle(PN.C.text3)
                 HStack(spacing: 16) {
                     Link(L("settings.about.website"), destination: URL(string: "https://tower.bodco.pm/pacenote/")!)
                     Link("GitHub", destination: URL(string: "https://github.com/bodco/live-tips")!)

@@ -37,7 +37,7 @@ Notion: {посилання на сторінку з Step 5}
 Далі: звіт по мітингу, change-request, risk-register?
 ```
 
-**Tip quality (optional, never blocks the wrap-up).** If the Pacenote app (formerly Live Tips) is installed
+**Tip quality (optional, never blocks the wrap-up).** If the Pacenote app is installed
 (`<tool_root>/state/sidecar-config.json` exists and its engine folder holds `livetips_m0`), or the
 user asks, run the same blind judge for the skill's tips: from the engine folder,
 `python -m livetips_m0.judge --config <tool_root>/state/sidecar-config.json --md "<transcript>" --quick`

@@ -1302,11 +1302,18 @@ that scores every tip of both sides 1 to 5 without knowing which side wrote it.
 
 - **Control-Option-H**: HELP NOW, also when the meeting app has the focus.
 - **Control-Option-P**: pause or resume tips.
+- **Control-Option-M**: your microphone off or on (the app).
+- **Control-Option-T**: the compact tips window (the app).
+- **Control-Option-L**: proactive tips on or off (the app, since 0.8.1).
 
-The same two actions are in the menu bar menu during a call, with the shortcut next to them.
-The HELP button shows its shortcut, the pause button shows it in its tooltip, and
-**Settings > General > Shortcuts** lists both. The skill's tips window (live-transcriber) has
-the same shortcuts since 2026-10-22; when both run, the one started first owns them.
+In the app the tips window has three icon buttons in its top bar, after On me: the microphone
+(crossed out in red when it is off), pause (on pause it turns into a Resume button, and the
+recording dot and the timer turn grey) and a bulb for proactive tips (tinted blue when they are
+on). Each tooltip shows the shortcut; screen readers get the button's name and whether it is
+pressed. HELP and pause are also in the menu bar menu during a call, with the shortcut next to
+them, and **Settings > General > Shortcuts** lists all five and lets you change them. The skill's
+tips window (live-transcriber) has HELP and pause since 2026-10-22; when both run, the one
+started first owns them.
 ### 14.5 How the tips engine decides (since 0.5.1)
 
 Built from a review of 41 recorded calls (2026-10-23): most weak tips were not slow, they were
@@ -1635,3 +1642,6 @@ address", `references/sweep.md`, `references/presentation.md`).
 97. **One preparation, one occurrence (0.7.5).** A regular meeting's preparation belongs to the occurrence it was made
    for (the date in its name), or else only to the next one: tomorrow's call of the same series is not shown as
    prepared by today's preparation.
+98. **Three tools in the tips window (0.8.1).** Microphone, pause and proactive tips sit as icons after On me, each
+   with its state visible at a glance, its shortcut in the tooltip, a name and a pressed state for screen readers.
+   Proactive tips get their own shortcut (Control-Option-L), and the choice is remembered for the next call.

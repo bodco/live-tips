@@ -19,6 +19,17 @@ button{font:inherit;color:inherit;cursor:pointer}
 .onme[hidden]{display:none}
 .icon-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:0;border-radius:var(--radius-s);background:transparent;color:var(--text-2)}
 .icon-btn:hover{background:var(--surface-2)}
+/* Call controls: mic, pause, proactive tips. 28 px, state readable at a glance. */
+.ctl{display:flex;gap:2px}
+.ctl[hidden]{display:none}
+.ctl-btn{height:28px;min-width:28px;padding:0;display:flex;align-items:center;justify-content:center;gap:5px;border:0;border-radius:var(--radius-s);background:transparent;color:var(--text-2);font-size:12px;font-weight:600}
+.ctl-btn:hover{background:var(--surface-2);color:var(--text)}
+.ctl-btn svg{flex:none}
+.ctl-btn.is-off{color:var(--danger-text)}
+.ctl-btn.is-on{background:var(--accent-soft);color:var(--accent)}
+.ctl-btn.is-resume{padding:0 10px;background:var(--accent-fill);color:#fff}
+.ctl-btn.is-resume:hover{background:var(--accent-fill);color:#fff;filter:brightness(1.08)}
+.paused-call .timer{color:var(--text-3)}
 
 /* ---------- Agenda ---------- */
 .agenda{flex:none;padding:0 16px 14px;display:flex;flex-direction:column;gap:8px}
@@ -139,6 +150,12 @@ button{font:inherit;color:inherit;cursor:pointer}
   .status{display:none}
   .row .kind{width:70px}
   .help .k{display:none}
+}
+/* Narrow bar: On me shows only its count so mic, pause, proactive and ⋯ always fit. */
+@container app (max-width: 460px){
+  #onmeLbl{display:none}
+  .onme{padding:0 8px}
+  .bar{gap:8px;padding-left:14px}
 }
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 

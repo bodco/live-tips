@@ -50,6 +50,6 @@ Pacenote готує короткий бриф перед дзвінком, да�
 
 Pacenote працює сам. З [PM Control Tower](https://github.com/bodco/pm-control-tower) він ще читає конфіги проєктів (люди, сторінки Notion, поточний стан).
 
-Історія: Pacenote, тоді ще Live Tips, виріс усередині PM Control Tower; релізи до 0.5.8 [там](https://github.com/bodco/pm-control-tower/releases). Цей репозиторій зберігає ту історію.
+Історія: Pacenote виріс усередині PM Control Tower; релізи до 0.5.8 [там](https://github.com/bodco/pm-control-tower/releases). Цей репозиторій зберігає ту історію.
 
 Ліцензія MIT. [Політика конфіденційності](PRIVACY.uk.md) і [умови використання](TERMS.uk.md): аудіо лишається на вашому Маку, автору нічого не надсилається.

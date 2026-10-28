@@ -116,7 +116,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         // 2026-10-27 (owner): one interface language for the whole app: the window follows Settings > General.
         prefs["ui_lang"] = MainActor.assumeIsolated { AppConfig.load(from: AppPaths.config).uiLanguage == "uk" ? "uk" : "en" }
         prefs["keys"] = ["help": HotKeys.shared.combo(.help).display, "pause": HotKeys.shared.combo(.pause).display,
-                         "mute": HotKeys.shared.combo(.mute).display, "compact": HotKeys.shared.combo(.compact).display]
+                         "mute": HotKeys.shared.combo(.mute).display, "compact": HotKeys.shared.combo(.compact).display,
+                         "proactive": HotKeys.shared.combo(.proactive).display]
         if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
             uc.addUserScript(WKUserScript(source: "window.LT_PREFS = " + js + ";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -416,8 +417,13 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             }
         case "setting":
             // {"key": ..., "value": ...} -> the skill reads it from the inbox as @@SET key=value
-            guard let d = message.body as? [String: Any], let key = d["key"] as? String,
-                  !args.inbox.isEmpty else { return }
+            guard let d = message.body as? [String: Any], let key = d["key"] as? String else { return }
+            if key == "proactive", let v = d["value"] as? String {   // remembered for the next call too
+                var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
+                prefs["proactive"] = v == "on" ? "1" : "0"
+                UserDefaults.standard.set(prefs, forKey: "prompterPrefs")
+            }
+            guard !args.inbox.isEmpty else { return }
             appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": key, "value": d["value"] ?? NSNull()]),
                        to: args.inbox)
             if key.hasPrefix("speaker_"), let v = d["value"] as? String {   // who is who: corrections too (EditLog)

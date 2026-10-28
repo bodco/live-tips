@@ -438,6 +438,7 @@
         title: this.title || clean(s.title), state: ready ? 'ready' : st === 'stopped' ? 'ended' : 'live',
         startedAt: s.started_at ? Date.parse(s.started_at) : null, startsAt: '',
         paused: s.tips_paused === true || s.tips_paused === 'on' || s.tips_paused === 'true',
+        proactive: s.proactive == null ? null : (s.proactive === true || s.proactive === 'on' || s.proactive === 'true' || s.proactive === '1'),
         micOff: s.mic === 'muted', minutesLeft: s.minutes_left != null ? +s.minutes_left : null,
         recap: this.recap, briefLine, alert: this.alert(), presentable: steps.length > 0, presenting
       },

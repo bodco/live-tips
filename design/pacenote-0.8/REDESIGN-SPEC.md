@@ -71,7 +71,10 @@
 ### 3.1 Структура зверху вниз
 
 1. **Нативний заголовок вікна:** назва дзвінка по центру, `End call` праворуч (червоний тонований). Пін і інші іконки з заголовка прибрати.
-2. **Смуга 48 px:** червона крапка запису, таймер `32:14`, статус (`Listening` / `Paused` / `Mic off`), кнопка `On me N` (ховається, коли N = 0), меню `⋯`. Більше нічого.
+2. **Смуга 48 px:** червона крапка запису, таймер `32:14`, статус (`Listening` / `Paused` / `Mic off`), кнопка `On me N` (ховається, коли N = 0), три кнопки керування дзвінком, меню `⋯`. Більше нічого.
+   - **Кнопки керування** (оновлено 2026-10-28 за досвідом користування: пауза, мікрофон і proactive tips потрібні за секунду і їхній стан має бути видно, тому вони не в меню). Три іконки 28 px праворуч від `On me`, перед `⋯`, у такому порядку: мікрофон, пауза, лампочка (proactive tips).
+   - **Стан з першого погляду:** вимкнений мікрофон - перекреслена іконка червоним (`danger`); пауза - крапка запису і таймер сіріють, а кнопка стає помітною primary-кнопкою `▶ Resume` (`Продовжити`); proactive tips увімкнені - лампочка на тонованому синьому фоні (`accent-soft`, колір `accent`).
+   - **Доступність:** кожна кнопка має тултіп з гарячою клавішею (`Turn mic off (⌃⌥M)`, `Pause listening (⌃⌥P)`, `Proactive tips: off`), `aria-label` і `aria-pressed` (мікрофон: pressed = вимкнено; пауза: pressed = на паузі; лампочка: pressed = увімкнено). Підписи клавіш беруться з фактичних налаштувань (`setState({keys: {mute, pause, proactive}})`), а не літералом. Для proactive tips гаряча клавіша поки не задана, тултіп без неї.
 3. **Агенда:** сегменти за кількістю пунктів брифу (done - зелений, now - синій, todo - сірий) і підпис `Agenda 2 of 3 · <поточний>` + праворуч `Not raised: <перший todo> +N`. Ховається, якщо в брифі немає агенди.
 4. **Героїня-картка:** лейбл типу, хто/коли, питання (15 px, `text-2`), фраза «що сказати» (22 px semibold у вузькому, 24 px у широкому), джерело одним рядком з іконкою документа, тихі дії `Said it`, `Shorter`, `Pin`, `Hide`.
 5. **Earlier:** однорядкові рядки `ЛЕЙБЛ | текст | 2m`. Клік по рядку робить його героєм (Esc повертає). На hover замість часу - `Pin`, `Hide`.
@@ -93,7 +96,9 @@
 - Брейкпоінт - ширина вікна 760 px (container query в `tips.css`).
 - < 760: одна колонка. `On me`, Transcript і Brief відкриваються як sheet поверх вікна (кнопка `On me` або пункт меню).
 - ≥ 760: праворуч панель `min(40%, 420px)` з сегментованим контролом `Transcript | On me · N | Brief`.
+- < 460: `On me` показує лише лічильник (з `aria-label` `On me: N`), щоб мікрофон, пауза, лампочка і `⋯` завжди вміщались.
 - < 400: ховається слово статусу і хінт гарячої клавіші в Help.
+- У стані Ready (до старту) кнопки керування сховані.
 - Режим «вікно з панеллю підготовки зліва» (`tips-prep-pane`) замінюється вкладкою Brief у правій панелі.
 
 ### 3.4 Агенда і фініш (ідея 02 частково)
@@ -118,9 +123,11 @@
 
 ### 3.7 Меню `⋯`
 
-`Pause listening ⌃⌥P`, `Turn mic off ⌃⌥M`, роздільник, `Compact mode ⌃⌥T`, `Presentation mode`, `Transcript`, `Brief`, роздільник, `Forget speaker names`, `Switch to next call…`, `Call settings… ⌘,`.
+`Compact mode ⌃⌥T`, `Presentation mode`, `Transcript`, `Brief`, роздільник, `Forget speaker names`, `Switch to next call…`, `Call settings… ⌘,`.
 
-Поточний великий лист налаштувань (`tips-menu`: Type, Audience, Language, Mic, Proactive tips, Up next, Display) переїжджає у `Call settings…` як окреме нативне вікно-шит. Розмір тексту - `⌘+` / `⌘-` без слайдера.
+Пауза і мікрофон у меню більше не дублюються: вони в смузі (3.1). Proactive tips теж у смузі, а в `Call settings…` лишається лише значення за замовчуванням для нових дзвінків.
+
+Поточний великий лист налаштувань (`tips-menu`: Type, Audience, Language, Mic, Up next, Display) переїжджає у `Call settings…` як окреме нативне вікно-шит. Розмір тексту - `⌘+` / `⌘-` без слайдера.
 
 ### 3.8 Компактний режим (Concept C як режим вікна A)
 
@@ -150,7 +157,7 @@ window.LiveTips.setTheme('auto' | 'light' | 'dark')
 
 ```js
 {
-  call: { title, startedAt /*ms*/, paused, micOff, minutesLeft /*int|null*/, mode: 'normal'|'compact'|'presentation', recap /*string*/ },
+  call: { title, startedAt /*ms*/, paused, micOff, proactive, minutesLeft /*int|null*/, mode: 'normal'|'compact'|'presentation', recap /*string*/ },
   agenda: [{ id, title, state: 'todo'|'now'|'done' }],
   cards: [{ id, kind: 'answer'|'turn'|'onme'|'docs'|'neutral', who, question, say, source, at /*ms*/, state: 'active'|'done'|'hidden', pinned }],
   onMe: [{ id, text, due, done }],
@@ -158,7 +165,8 @@ window.LiveTips.setTheme('auto' | 'light' | 'dark')
   speakers: { [speakerId]: { name, side: 'client'|'team', label } },
   transcript: [{ speakerId, text }],
   brief: { goal, sections: [{ title, items: [string] }] },
-  presentation: { index, running, elapsedInStep, steps: [{ title, say, secs, canSkip }] }
+  presentation: { index, running, elapsedInStep, steps: [{ title, say, secs, canSkip }] },
+  keys: { mute, pause, proactive }   // actual shortcut labels for tooltips, e.g. '⌃⌥M'
 }
 ```
 
@@ -176,7 +184,10 @@ Web → native (`window.webkit.messageHandlers.liveTips.postMessage`), поле 
 | `name-speaker` | `speakerId, name, side` | зберігає голос |
 | `prepare-next`, `open-next` | | |
 | `present-next`, `present-prev` | | |
-| `menu` | `item, mode` | `pause`, `mute`, `compact`, `present`, `transcript`, `brief`, `clear-speakers`, `switch-call`, `settings` |
+| `mute` | `micOff` | вмикає або вимикає мікрофон (кнопка в смузі, ⌃⌥M) |
+| `pause` | `paused` | пауза або продовження прослуховування (кнопка в смузі, ⌃⌥P) |
+| `proactive` | `on` | proactive tips для цього дзвінка (лампочка в смузі) |
+| `menu` | `item, mode` | `compact`, `present`, `transcript`, `brief`, `clear-speakers`, `switch-call`, `settings` |
 
 Гарячі клавіші глобальні, реєструються нативно: `⌃⌥H` Help, `⌃⌥P` пауза, `⌃⌥M` мікрофон, `⌃⌥T` компактний режим.
 
@@ -197,6 +208,7 @@ Web → native (`window.webkit.messageHandlers.liveTips.postMessage`), поле 
 ### 3.12 Критерії приймання
 
 - [ ] Від верху вікна до фрази героя ≤ 170 px у вузькому режимі.
+- [ ] Мікрофон, пауза і proactive tips у смузі на 380, 440 і 1000 px; стан кожної кнопки видно без наведення; тултіпи з фактичними гарячими клавішами; `aria-pressed` міняється разом зі станом.
 - [ ] Жодного емодзі і жодної лівої кольорової смуги у вікні.
 - [ ] 380, 560, 1000 px: нічого не обрізається, в `uk` теж.
 - [ ] Світла і темна тема з `tokens.css`, перемикання без перезавантаження.

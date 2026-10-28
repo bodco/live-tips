@@ -13,6 +13,7 @@
   const STR = {
     en: {
       listening: 'Listening', paused: 'Paused', muted: 'Mic off',
+      ctl: { micOn: 'Turn mic off', micOff: 'Turn mic on', pause: 'Pause listening', resume: 'Resume', resumeTip: 'Resume listening', proOn: 'Proactive tips: on', proOff: 'Proactive tips: off', group: 'Call controls' },
       onMe: 'On me', more: 'More', earlier: 'Earlier',
       agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised:', allRaised: 'All agenda items raised',
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'Min left', neutral: 'Note', answered: 'Answered' },
@@ -34,6 +35,7 @@
     },
     uk: {
       listening: 'Слухаю', paused: 'Пауза', muted: 'Мікрофон вимкнено',
+      ctl: { micOn: 'Вимкнути мікрофон', micOff: 'Увімкнути мікрофон', pause: 'Призупинити', resume: 'Продовжити', resumeTip: 'Продовжити слухати', proOn: 'Ініціативні підказки: увімк.', proOff: 'Ініціативні підказки: вимк.', group: 'Керування дзвінком' },
       onMe: 'На мені', more: 'Більше', earlier: 'Раніше',
       agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', allRaised: 'Усі пункти агенди підняті',
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли' },
@@ -58,7 +60,7 @@
   // ---------- State ----------
   const S = {
     lang: 'en', theme: 'auto',
-    call: { title: '', startedAt: Date.now(), paused: false, micOff: false, minutesLeft: null, mode: 'normal' },
+    call: { title: '', startedAt: Date.now(), paused: false, micOff: false, proactive: false, minutesLeft: null, mode: 'normal' },
     agenda: [], cards: [], onMe: [], next: null,
     transcript: [], speakers: {}, brief: null, presentation: null,
     ui: { paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true }
@@ -129,8 +131,10 @@
     $('status').textContent = isReady ? `${t.ready}${S.call.startsAt ? ' · ' + t.startsAt(S.call.startsAt) : ''}` : S.call.paused ? t.paused : (S.call.micOff ? t.muted : t.listening);
     const openOnMe = S.onMe.filter((o) => !o.done).length;
     $('onmeLbl').textContent = t.onMe; $('onmeN').textContent = openOnMe;
+    $('onmeBtn').setAttribute('aria-label', `${t.onMe}: ${openOnMe}`);
     $('onmeBtn').hidden = openOnMe === 0;
     $('moreBtn').setAttribute('aria-label', t.more);
+    renderControls(isReady);
 
     // agenda
     const ag = $('agenda');
@@ -184,6 +188,36 @@
       el.innerHTML = `<div class="ring">${MARK}</div><div class="t1">${esc(t.listeningTitle)}</div><div class="t2">${esc(t.listeningSub)}</div>`;
     }
     return true;
+  }
+
+  // Mic, pause, proactive tips: always in the 48 px bar, state visible without opening anything.
+  const SVG = {
+    mic: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><rect x="5.5" y="1.8" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2"/></svg>',
+    micOff: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><rect x="5.5" y="1.8" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2M2.5 2.5l11 11"/></svg>',
+    pause: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="3" width="2.6" height="10" rx="1" fill="currentColor"/><rect x="9.4" y="3" width="2.6" height="10" rx="1" fill="currentColor"/></svg>',
+    play: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.8v8.4L10 6z" fill="currentColor"/></svg>',
+    bulb: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.6 10.5C4.4 9.6 3.6 8.3 3.6 6.8a4.4 4.4 0 0 1 8.8 0c0 1.5-.8 2.8-2 3.7v1.3H5.6z"/><path d="M6.2 14h3.6"/></svg>'
+  };
+  function setCtl(id, html, label, tip, pressed, cls) {
+    const b = $(id);
+    b.innerHTML = html; b.className = 'ctl-btn' + (cls ? ' ' + cls : '');
+    b.setAttribute('aria-label', label); b.title = tip;
+    if (pressed === null) b.removeAttribute('aria-pressed'); else b.setAttribute('aria-pressed', String(pressed));
+  }
+  function renderControls(isReady) {
+    const c = T().ctl, k = S.keys || {};
+    const tip = (label, key) => key ? `${label} (${key})` : label;
+    $('micBtn').parentElement.hidden = isReady;
+    $('micBtn').parentElement.setAttribute('aria-label', c.group);
+    // Mic: pressed = mic off. Off reads as a red crossed-out mic.
+    setCtl('micBtn', S.call.micOff ? SVG.micOff : SVG.mic, S.call.micOff ? c.micOff : c.micOn, tip(S.call.micOff ? c.micOff : c.micOn, k.mute || '⌃⌥M'), !!S.call.micOff, S.call.micOff ? 'is-off' : '');
+    // Pause: paused turns the button into a visible Resume; the dot and the timer go grey.
+    if (S.call.paused) setCtl('pauseBtn', SVG.play + `<span>${esc(c.resume)}</span>`, c.resumeTip, tip(c.resumeTip, k.pause || '⌃⌥P'), true, 'is-resume');
+    else setCtl('pauseBtn', SVG.pause, c.pause, tip(c.pause, k.pause || '⌃⌥P'), false, '');
+    // Proactive tips: on = blue tinted background.
+    const pro = !!S.call.proactive;
+    setCtl('proBtn', SVG.bulb, pro ? c.proOn : c.proOff, tip(pro ? c.proOn : c.proOff, k.proactive || ''), pro, pro ? 'is-on' : '');
+    document.querySelector('.bar').classList.toggle('paused-call', !!S.call.paused);
   }
 
   function kindLabel(c) {
@@ -275,9 +309,6 @@
     m.hidden = !S.ui.menuOpen;
     if (!S.ui.menuOpen) return;
     const items = [
-      ['pause', S.call.paused ? t.resume : t.pause, '⌃⌥P'],
-      ['mute', S.call.micOff ? t.unmute : t.mute, '⌃⌥M'],
-      '-',
       ['compact', S.call.mode === 'compact' ? t.full : t.compact, '⌃⌥T'],
       ['present', S.call.mode === 'presentation' ? t.stopPresent : t.present, ''],
       ['transcript', t.transcript, ''], ['brief', t.brief, ''],
@@ -338,6 +369,9 @@
       case 'onme-toggle': { const o = S.onMe.find((x) => x.id === id); if (o) { o.done = b.checked; post('onme-toggle', { id, done: o.done }); } break; }
       case 'start': S.call.state = 'live'; S.call.startedAt = Date.now(); post('start'); break;
       case 'open-brief': if (isWide()) S.ui.paneTab = 'brief'; else S.ui.sheet = 'brief'; post('open-brief'); break;
+      case 'ctl-mic': S.call.micOff = !S.call.micOff; post('mute', { micOff: S.call.micOff }); break;
+      case 'ctl-pause': S.call.paused = !S.call.paused; post('pause', { paused: S.call.paused }); break;
+      case 'ctl-proactive': S.call.proactive = !S.call.proactive; post('proactive', { on: S.call.proactive }); break;
       case 'prepare-next': post('prepare-next'); return;
       case 'open-next': post('open-next'); return;
       case 'present-next': post('present-next'); return;

@@ -28,6 +28,8 @@
       tabs: { transcript: 'Transcript', onme: (n) => `On me · ${n}`, brief: 'Brief' },
       newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team',
       legend: 'Client in purple, team in blue', following: 'Following live', jump: 'Jump to latest',
+      ariaMic: 'Mute microphone', ariaPause: 'Pause listening', ariaProactive: 'Proactive tips',
+      proactiveOn: 'Proactive tips: on', proactiveOff: 'Proactive tips: off', resumeShort: 'Resume',
       menu: { pause: 'Pause listening', resume: 'Resume listening', mute: 'Turn mic off', unmute: 'Turn mic on',
         compact: 'Compact mode', full: 'Full window', present: 'Presentation mode', stopPresent: 'Stop presenting',
         transcript: 'Transcript', brief: 'Brief', settings: 'Call settings…', switchCall: 'Switch to next call…', clearSpeakers: 'Forget speaker names' },
@@ -57,6 +59,8 @@
       tabs: { transcript: 'Транскрипт', onme: (n) => `На мені · ${n}`, brief: 'Бриф' },
       newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда',
       legend: 'Клієнт фіолетовим, команда синім', following: 'Слідкую наживо', jump: 'До останнього',
+      ariaMic: 'Вимкнути мікрофон', ariaPause: 'Пауза прослуховування', ariaProactive: 'Проактивні підказки',
+      proactiveOn: 'Проактивні підказки: увімкнено', proactiveOff: 'Проактивні підказки: вимкнено', resumeShort: 'Продовжити',
       menu: { pause: 'Призупинити', resume: 'Продовжити', mute: 'Вимкнути мікрофон', unmute: 'Увімкнути мікрофон',
         compact: 'Компактний режим', full: 'Повне вікно', present: 'Режим презентації', stopPresent: 'Завершити презентацію',
         transcript: 'Транскрипт', brief: 'Бриф', settings: 'Налаштування дзвінка…', switchCall: 'Перейти до наступного дзвінка…', clearSpeakers: 'Забути імена спікерів' },
@@ -161,15 +165,31 @@
     const openOnMe = S.onMe.filter((o) => !o.done).length;
     $('onmeLbl').textContent = t.onMe; $('onmeN').textContent = openOnMe;
     $('onmeBtn').hidden = openOnMe === 0;
+    $('onmeBtn').setAttribute('aria-label', t.onMe + ': ' + openOnMe);   // below 460 px only the count is visible
     $('moreBtn').setAttribute('aria-label', t.more);
     // 0.8 (owner): the microphone switch is back in the top bar (a cafe: the meeting is muted, the transcript too).
+    // 0.8 (owner): three tools, each with its shortcut in the tooltip, aria-label and aria-pressed.
+    const key = (k) => (S.keys && S.keys[k] ? ' (' + S.keys[k] + ')' : '');
+    $('micBtn').parentElement.hidden = isReady || ended;
     const mb = $('micBtn'), off = !!S.call.micOff;
-    mb.hidden = isReady || ended;
     mb.classList.toggle('off', off);
     mb.setAttribute('aria-pressed', String(off));
-    mb.title = (off ? t.menu.unmute : t.menu.mute) + (S.keys && S.keys.mute ? ' (' + S.keys.mute + ')' : '');
-    mb.setAttribute('aria-label', off ? t.menu.unmute : t.menu.mute);
+    mb.title = (off ? t.menu.unmute : t.menu.mute) + key('mute');
+    mb.setAttribute('aria-label', t.ariaMic);   // stable name; the state is aria-pressed
     mb.innerHTML = off ? MIC_OFF : MIC_ON;
+    const pb = $('pauseBtn'), paused = !!S.call.paused;
+    pb.classList.toggle('resume', paused);
+    pb.setAttribute('aria-pressed', String(paused));
+    pb.title = (paused ? t.menu.resume : t.menu.pause) + key('pause');
+    pb.setAttribute('aria-label', paused ? t.menu.resume : t.ariaPause);   // the name keeps the visible "Resume"
+    pb.innerHTML = paused ? PLAY + `<span>${esc(t.resumeShort)}</span>` : PAUSE;
+    $('timer').classList.toggle('paused', paused);
+    const bb = $('bulbBtn'), pro = proactiveOn();
+    bb.classList.toggle('on', pro);
+    bb.setAttribute('aria-pressed', String(pro));
+    bb.title = (pro ? t.proactiveOn : t.proactiveOff) + key('proactive');
+    bb.setAttribute('aria-label', t.ariaProactive);
+    bb.innerHTML = BULB;
 
     // agenda
     const ag = $('agenda');
@@ -356,10 +376,8 @@
     const m = $('menu'), t = T().menu, k = S.keys;
     m.hidden = !S.ui.menuOpen;
     if (!S.ui.menuOpen) return;
+    // 0.8 (spec 3.7): pause and the microphone live in the top bar, not repeated here.
     const items = [
-      ['pause', S.call.paused ? t.resume : t.pause, k.pause],
-      ['mute', S.call.micOff ? t.unmute : t.mute, k.mute],
-      '-',
       ['compact', S.call.mode === 'compact' ? t.full : t.compact, k.compact],
       S.steps.length ? ['present', presenting() ? t.stopPresent : t.present, ''] : null,
       ['transcript', t.transcript, ''], ['brief', t.brief, ''],
@@ -448,6 +466,20 @@
   }
   const MIC_ON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2"/></svg>';
   const MIC_OFF = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2M2 2l12 12"/></svg>';
+  const PAUSE = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5.5 3v10M10.5 3v10"/></svg>';
+  const PLAY = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8z" fill="currentColor"/></svg>';
+  const BULB = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M5.6 11.5c0-1.6-2.1-2.6-2.1-5.1a4.5 4.5 0 0 1 9 0c0 2.5-2.1 3.5-2.1 5.1z"/><path d="M6 13.5h4M6.8 15h2.4"/></svg>';
+  /** Proactive tips: the PM's click in this call, else the recorder status, else the remembered choice. */
+  function proactiveOn() {
+    if (S.ui.proactive != null) return S.ui.proactive;
+    if (S.call.proactive != null) return !!S.call.proactive;
+    return String((PREFS && PREFS.proactive) || '') === '1';
+  }
+  function toggleProactive() {
+    S.ui.proactive = !proactiveOn();
+    post('setting', { key: 'proactive', value: S.ui.proactive ? 'on' : 'off' });
+    render();
+  }
   function toggleMute() {
     S.call.micOff = !S.call.micOff;
     post('mute', { on: S.call.micOff });
@@ -567,6 +599,8 @@
   });
   $('moreBtn').addEventListener('click', () => { S.ui.menuOpen = !S.ui.menuOpen; renderMenu(); });
   $('micBtn').addEventListener('click', () => toggleMute());
+  $('pauseBtn').addEventListener('click', () => togglePause());
+  $('bulbBtn').addEventListener('click', () => toggleProactive());
   $('onmeBtn').addEventListener('click', () => { if (isWide()) { S.ui.paneTab = 'onme'; } else { S.ui.sheet = S.ui.sheet === 'onme' ? null : 'onme'; } render(); });
   $('helpBtn').addEventListener('click', () => post('help'));
   $('ask').addEventListener('submit', (e) => {
@@ -606,7 +640,7 @@
     setOpacity(v) { document.documentElement.style.setProperty('--fade', String(Math.max(0.35, Math.min(1, +v || 1)))); },
     setMode,
     setKeys(k) { S.keys = Object.assign({}, S.keys, k); render(); },
-    togglePause, toggleMute, openTab,
+    togglePause, toggleMute, toggleProactive, openTab,
     help() { post('help'); },
     rename(title) { if (feed) feed.rename(title); },
     _state: S, _feed: feed

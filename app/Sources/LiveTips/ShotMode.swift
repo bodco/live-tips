@@ -119,10 +119,14 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         log("launched")
         // Pacenote 0.8: every screen in English and Ukrainian (files of the Ukrainian pass end in -uk).
+        // LT_SHOTS_ONLY=tips: only the tips window, when nothing else changed.
+        let env = ProcessInfo.processInfo.environment
+        let all = env["LT_SHOTS_ALL"] == "1", tipsOnly = env["LT_SHOTS_ONLY"] == "tips"
         for lang in ["en", "uk"] {
         steps.append { [unowned self] in SettingsWindow.model.config.uiLanguage = lang; self.next(after: 0.3) }
         for theme in ["dark", "light"] {
             steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
+            if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
             steps.append { [unowned self] in self.planCall(theme) }
@@ -138,16 +142,20 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             steps.append { [unowned self] in self.window("rehearsal-\(theme)") {
                 let b = ShotMode.demoRoot + "/work/Northwind Studio/Orbit SaaS Launch/live/prep-" + ShotMode.day() + "-1400-orbit-pilot-demo"
                 RehearsalWindow.show(base: b, title: "Orbit pilot demo") } }
+            }
             steps.append { [unowned self] in self.tips(theme, presentation: false) }
             steps.append { [unowned self] in self.tips(theme, presentation: true) }
             steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "tips-380", size: NSSize(width: 380, height: 620)) }
             steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "tips-560", size: NSSize(width: 560, height: 620)) }
             steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setStatus({state:'standby',title:'Orbit weekly with the client'});", name: "tips-ready", size: NSSize(width: 560, height: 620)) }
-            if ProcessInfo.processInfo.environment["LT_SHOTS_ALL"] == "1" {
+            if all || tipsOnly {
+                steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "tips-440", size: NSSize(width: 440, height: 760)) }
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "LiveTips.openTab('brief');", name: "tips-brief") }
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('moreBtn').click();", name: "tips-menu", size: NSSize(width: 560, height: 620)) }
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "LiveTips.setMode('compact');", name: "tips-compact", size: NSSize(width: 560, height: 150)) }
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setStatus({state:'recording',title:'Orbit weekly with the client',started_at:new Date(Date.now()-55*60000).toISOString(),minutes_left:4});", name: "tips-finish", size: NSSize(width: 560, height: 620)) }
+            }
+            if all {
                 steps.append { [unowned self] in self.prepDoc(theme) }
                 for st in OnboardingModel.Step.allCases where st != .splash { steps.append { [unowned self] in self.onboarding(st, theme) } }
             }
@@ -299,7 +307,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         keep.append(c)
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [self] in
             c.web.evaluateJavaScript("""
-              try { window.setPrepDoc && window.setPrepDoc({text: \(Self.demoBriefJS), at: '09:40'}); \(js) } catch (e) {}
+              try { \(Self.stillJS) window.setPrepDoc && window.setPrepDoc({text: \(Self.demoBriefJS), at: '09:40'}); \(js) } catch (e) {}
             """, completionHandler: nil)
             c.window.setContentSize(size)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
@@ -307,6 +315,9 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             }
         }
     }
+
+    /// No entrance animation in a still picture: a capture during the card's fade-in showed an empty space.
+    static let stillJS = "document.head.insertAdjacentHTML('beforeend', '<style>*{animation:none!important;transition:none!important}</style>');"
 
     static let demoBrief = """
     # Live Brief: Orbit weekly with the client (prep, today 11:00)
@@ -406,7 +417,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [self] in
             if !presentation {   // the transcript pane with named speakers, as during a call
                 c.web.evaluateJavaScript("""
-                  try { LiveTips.openTab('transcript');
+                  try { \(Self.stillJS) LiveTips.openTab('transcript');
                   window.setSpeakers({clusters:{S1:{name:'Emily C.',seconds:40,side:'client'},S2:{name:'David K.',seconds:22,side:'client'}},
                     roster:[{name:'Emily C.',side:'client'},{name:'David K.',side:'client'},{name:'Sarah L.',side:'team'}]});
                   window.addTranscript(['- Channels: Me = microphone, Other = system audio',

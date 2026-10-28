@@ -150,6 +150,19 @@ func prompterArgs(_ args: [String]) -> PrompterArgs {
         if a.demoPresentation {
             demo.insert(#"{"t":"10:29:00","kind":"slides","title":"Pilot plan","total_min":6,"slides":[{"n":1,"title":"Why a pilot","sec":90,"who":"me","body":[{"k":"p","t":"Five users for two weeks show whether the export saves the team an hour a day."},{"k":"s","t":"Skip if short on time: the history of the request."}]},{"n":2,"title":"Plan and dates","sec":120,"who":"me","body":[{"k":"p","t":"Monday kick-off, daily check-ins, results on the 14th."}]},{"n":3,"title":"What we need from you","sec":90,"who":"me","body":[{"k":"p","t":"The list of five users and test accounts by Friday."}]}]}"#, at: 0)
         }
+        // 0.8.1: the demo times move to now (the last item at now), so the cards read "2m", not "460m".
+        let shift = Int(Date().timeIntervalSince(Calendar.current.startOfDay(for: Date()))) - (10 * 3600 + 40 * 60)
+        demo = demo.map { line in
+            var out = line
+            let re = try! NSRegularExpression(pattern: #""(\d{2}):(\d{2}):(\d{2})""#)
+            for m in re.matches(in: line, range: NSRange(line.startIndex..., in: line)).reversed() {
+                let ns = line as NSString
+                let v = (Int(ns.substring(with: m.range(at: 1)))! * 3600 + Int(ns.substring(with: m.range(at: 2)))! * 60
+                         + Int(ns.substring(with: m.range(at: 3)))! + shift + 86400) % 86400
+                out = (out as NSString).replacingCharacters(in: m.range, with: String(format: "\"%02d:%02d:%02d\"", v / 3600, v / 60 % 60, v % 60))
+            }
+            return out
+        }
         try? (demo.joined(separator: "\n") + "\n").write(toFile: a.tips, atomically: true, encoding: .utf8)
         try? "".write(toFile: a.inbox, atomically: true, encoding: .utf8)
     }

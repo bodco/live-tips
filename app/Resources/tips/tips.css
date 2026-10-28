@@ -14,7 +14,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 .timer{font-weight:600;font-variant-numeric:tabular-nums}
 .status{font-size:13px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .spacer{flex:1}
+/* 0.8 (owner): mic, pause and proactive tips as three 28 px tools between On me and the menu; the state reads at a glance */
+.tools{display:flex;align-items:center;gap:2px}
+.icon-btn.tool{width:28px;height:28px}
 .icon-btn.mic.off{color:var(--danger-text);background:var(--danger-soft)}
+.icon-btn.bulb.on{color:var(--accent);background:var(--accent-soft,color-mix(in srgb,var(--accent) 14%,transparent))}
+.icon-btn.pause.resume{width:auto;padding:0 10px 0 8px;gap:5px;color:#fff;background:var(--accent-fill,var(--accent));font-size:13px;font-weight:600}
+.icon-btn.pause.resume:hover{background:var(--accent-fill,var(--accent));filter:brightness(1.06)}
+.timer.paused{color:var(--text-3)}
 .onme{display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:0;border-radius:var(--radius-s);background:var(--k-onme-soft);color:var(--k-onme);font-size:13px;font-weight:600;white-space:nowrap}
 .onme .n{background:var(--k-onme);color:var(--bg);border-radius:9px;padding:0 6px;font-size:12px;line-height:18px}
 .onme[hidden]{display:none}
@@ -138,6 +145,11 @@ button{font:inherit;color:inherit;cursor:pointer}
   .hero,.present{margin:0 16px}
   .row{padding:11px 20px}
   .agenda{padding:0 20px 14px}
+}
+/* Narrow: On me shows only its count, so the three tools and the menu always fit */
+@container app (max-width: 459px){
+  .onme{padding:0 8px}
+  .onme #onmeLbl{display:none}
 }
 /* Very narrow: hide status word, keep timer */
 @container app (max-width: 400px){

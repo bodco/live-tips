@@ -52,7 +52,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() },
-                               mute: { [weak self] in self?.toggleMute() }, compact: { [weak self] in self?.toggleCompact() })
+                               mute: { [weak self] in self?.toggleMute() }, compact: { [weak self] in self?.toggleCompact() },
+                               proactive: { [weak self] in self?.pushTips("window.LiveTips && LiveTips.toggleProactive()") })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         // 2026-10-26: new users get the onboarding (permissions, folders, Claude, install, Notion optional).
         if !UserDefaults.standard.bool(forKey: "onboardingDone") && !UserDefaults.standard.bool(forKey: "onboarded") {

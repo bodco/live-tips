@@ -73,7 +73,7 @@ extension StartCallModel {
         context = e.context; folders = e.folders.filter { FileManager.default.fileExists(atPath: $0) }
         useProjectFolder = e.useProjectFolder; hiringRole = e.hiringRole; tipModel = e.tipModel; publicCall = e.publicCall
         let f = DateFormatter(); f.dateFormat = "d MMM"
-        appliedFrom = "Set up like the last \u{201C}\(e.title)\u{201D} call (\(f.string(from: e.savedAt))): correct what changed."
+        appliedFrom = L("call.appliedLast", ["title": e.title, "date": f.string(from: e.savedAt)])
     }
 
     /// A calendar event: its title, time and people; the project and the rest from the last call of the series
@@ -94,7 +94,7 @@ extension StartCallModel {
             } else if let t = SeriesMemory.shared.projectFor(calendarKey: ev.account + "|" + ev.calendar),
                       registry.projects.contains(where: { "project:" + $0.slug == t }) || registry.workspaces.contains(where: { "workspace:" + $0.name == t }) {
                 target = t           // the project last used with this calendar
-                appliedFrom = "Project from your last call in the \u{201C}\(ev.calendar)\u{201D} calendar: check it."
+                appliedFrom = L("call.appliedCal", ["cal": ev.calendar])
             } else {
                 target = ""          // owner: never the last used project by default; Start and Prepare ask
             }

@@ -23,10 +23,15 @@ enum Languages {
         ("bo", "Tibetan"), ("tr", "Turkish"), ("tk", "Turkmen"), ("uk", "Ukrainian"), ("ur", "Urdu"), ("uz", "Uzbek"),
         ("vi", "Vietnamese"), ("cy", "Welsh"), ("yi", "Yiddish"), ("yo", "Yoruba"),
     ]
-    static func name(_ code: String) -> String { all.first { $0.code == code }?.name ?? code }
+    static func englishName(_ code: String) -> String { all.first { $0.code == code }?.name ?? code }
+    /// The language name in the interface language (macOS knows them all), English as the fallback.
+    static func name(_ code: String) -> String {
+        guard L10n.lang != "en", let n = Locale(identifier: L10n.lang).localizedString(forLanguageCode: code), !n.isEmpty else { return englishName(code) }
+        return n.prefix(1).uppercased() + n.dropFirst()
+    }
     static func label(_ codes: [String]) -> String {
-        guard !codes.isEmpty else { return "Choose" }
-        if codes.count > 2 { return name(codes[0]) + " + \(codes.count - 1) more" }
+        guard !codes.isEmpty else { return L("lang.choose") }
+        if codes.count > 2 { return L("lang.more", ["name": name(codes[0]), "n": "\(codes.count - 1)"]) }
         return codes.map(name).joined(separator: " + ")
     }
 }
@@ -39,21 +44,21 @@ struct LanguagePicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            TextField("", text: $q, prompt: Text("Find a language")).textFieldStyle(.roundedBorder)
+            TextField("", text: $q, prompt: Text(L("lang.findALanguage"))).textFieldStyle(.roundedBorder)
             ScrollView {
                 VStack(alignment: .leading, spacing: 1) {
                     if q.isEmpty {
                         ForEach(Languages.top, id: \.self) { c in row(c, Languages.name(c)) }
                         Divider().padding(.vertical, 4)
                     }
-                    ForEach(Languages.all.filter { q.isEmpty ? !Languages.top.contains($0.code) : $0.name.lowercased().contains(q.lowercased()) }, id: \.code) { l in
-                        row(l.code, l.name)
+                    ForEach(Languages.all.filter { q.isEmpty ? !Languages.top.contains($0.code) : ($0.name.lowercased().contains(q.lowercased()) || Languages.name($0.code).lowercased().contains(q.lowercased())) }, id: \.code) { l in
+                        row(l.code, Languages.name(l.code))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(codes.count == 1 ? "One language: everyone is written in \(Languages.name(codes[0])), other languages come out translated."
-                                  : "Several languages: each speaker is written in the language spoken. The first ticked is the main one.")
+            Text(codes.count == 1 ? L("lang.one", ["name": Languages.name(codes[0])])
+                                  : L("lang.several"))
                 .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
         }
         .padding(12).frame(width: 300, height: 380)
@@ -68,7 +73,7 @@ struct LanguagePicker: View {
                 Image(systemName: on ? "checkmark.square.fill" : "square").foregroundStyle(on ? Color.accentColor : .secondary)
                 Text(name)
                 Spacer()
-                if on && codes.first == code && codes.count > 1 { Text("main").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                if on && codes.first == code && codes.count > 1 { Text(L("lang.main")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
             }
             .padding(.horizontal, 6).padding(.vertical, 4).contentShape(Rectangle())
         }

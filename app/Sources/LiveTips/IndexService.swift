@@ -118,11 +118,11 @@ final class IndexService: @unchecked Sendable {
             DispatchQueue.main.async {
                 guard let self else { return }
                 let f = DateFormatter(); f.dateFormat = "HH:mm"
-                self.results[root] = proc.terminationStatus == 0 ? "Updated \(f.string(from: Date()))" : "Failed, see logs/index.log"
+                self.results[root] = proc.terminationStatus == 0 ? L("idx.updated", ["time": f.string(from: Date())]) : L("idx.failed")
                 self.running = nil
                 self.runningRoot = nil
             }
         }
-        do { try p.run(); running = p; runningRoot = root } catch { results[root] = "Could not start: \(error.localizedDescription)" }
+        do { try p.run(); running = p; runningRoot = root } catch { results[root] = L("idx.cantStart", ["err": error.localizedDescription]) }
     }
 }

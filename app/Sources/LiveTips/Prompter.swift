@@ -298,8 +298,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             appendLine(jsonLine(["t": nowHMS(), "text": text]), to: args.inbox)
             if args.demo, !args.tips.isEmpty {
                 appendLine(jsonLine(["t": nowHMS(), "kind": "answer", "level": "info", "q": text,
-                                     "gist": "Demo: question received",
-                                     "phrase": "On a real call the answer appears here."]),
+                                     "gist": L("tw.demoQ"),
+                                     "phrase": L("tw.demoA")]),
                            to: args.tips)
             }
         case "pin":
@@ -350,9 +350,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 case "remove":
                     guard let m = m else { return }
                     let a = NSAlert()
-                    a.messageText = "Remove \u{201C}\(m.effectiveTitle)\u{201D} from Up next?"
-                    a.informativeText = "Its preparation files stay in the project's live folder."
-                    a.addButton(withTitle: "Remove"); a.addButton(withTitle: "Cancel")
+                    a.messageText = L("tw.removeUpNext", ["title": m.effectiveTitle])
+                    a.informativeText = L("tw.removeInfo")
+                    a.addButton(withTitle: L("tw.remove")); a.addButton(withTitle: L("hk.cancel"))
                     a.beginSheetModal(for: window) { r in if r == .alertFirstButtonReturn { MainActor.assumeIsolated { UpNext.shared.remove(m) } } }
                 default: break
                 }
@@ -543,9 +543,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func styleOnTop() {
         guard let p = pinButton else { return }
         let on = Self.onTop
-        p.image = NSImage(systemSymbolName: on ? "pin.fill" : "pin.slash", accessibilityDescription: "Always on top")
+        p.image = NSImage(systemSymbolName: on ? "pin.fill" : "pin.slash", accessibilityDescription: L("tw.onTop"))
         p.contentTintColor = on ? .controlAccentColor : .secondaryLabelColor
-        p.toolTip = on ? "Always on top: on (click to let other windows cover it)" : "Always on top: off (click to keep the window above other windows)"
+        p.toolTip = on ? L("tw.onTopOn") : L("tw.onTopOff")
     }
 
     @objc func pinClicked() { setOnTop(!Self.onTop) }
@@ -554,8 +554,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let b = pillButton(L("menubar.endCall"), color: .systemRed, filled: false, action: #selector(endCallClicked))
         b.toolTip = L("tips.endCall.tooltip")
         // Start call while the window waits for the call (standby); it also starts by itself when the other side speaks.
-        let g = pillButton("Start call", color: .controlAccentColor, filled: true, action: #selector(startClicked))
-        g.toolTip = "Start recording now (otherwise it starts when the other side speaks)"
+        let g = pillButton(L("home.startCall"), color: .controlAccentColor, filled: true, action: #selector(startClicked))
+        g.toolTip = L("tw.startNowTip")
         g.isHidden = true
         // Pacenote 0.8 (F2): no pin in the title bar (Always on top is in Call settings); the brand symbol on the left.
         let w = g.frame.width + b.frame.width + 20
@@ -623,13 +623,13 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let live = CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(st.state)
         guard live else { window.close(); return }
         let a = NSAlert()
-        a.messageText = "End the call?"
-        a.informativeText = "Recording stops; the transcript and tips stay in the project folder, and the summary goes to Notion."
-        a.addButton(withTitle: "End call")
+        a.messageText = L("tw.endQ")
+        a.informativeText = L("tw.endInfo")
+        a.addButton(withTitle: L("menubar.endCall"))
         // 2026-10-27 (Up next): the next planned call can start right after this one.
         let next: StartCallModel? = MainActor.assumeIsolated { UpNext.shared.first }
-        if let n = next { a.addButton(withTitle: "End and start \u{201C}\(MainActor.assumeIsolated { n.effectiveTitle })\u{201D}") }
-        a.addButton(withTitle: "Cancel")
+        if let n = next { a.addButton(withTitle: L("tw.endAndStart", ["title": MainActor.assumeIsolated { n.effectiveTitle }])) }
+        a.addButton(withTitle: L("hk.cancel"))
         a.beginSheetModal(for: window) { [weak self] resp in
             if let n = next, resp == .alertSecondButtonReturn {
                 MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.performSwitch(to: n) }
@@ -655,16 +655,16 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func showCallEnded(_ info: [AnyHashable: Any]) {
         let saved = info["saved"] as? Bool ?? false
         if let b = endButton {                  // 2026-10-27: same pill style, green when saved (sizeToFit broke the shape)
-            restylePill(b, saved ? "Ended ✓" : "Ended", color: saved ? .systemGreen : .systemOrange)
+            restylePill(b, saved ? L("tw.endedSaved") : L("tw.ended"), color: saved ? .systemGreen : .systemOrange)
             b.isEnabled = true                  // a click now closes the window
-            b.toolTip = "Close this window"
+            b.toolTip = L("tw.close")
         }
         // 2026-10-27 (owner): start the next call from here: closes this window and opens Start call.
         // With a call in Up next the pill starts it at once ("Start next"; the old call has ended already).
         if let g = startButton {
             callEnded = true
             let next: StartCallModel? = MainActor.assumeIsolated { UpNext.shared.first }
-            let label = next == nil ? "New call" : "Start next"
+            let label = next == nil ? L("tw.newCall") : L("tw.startNext")
             restylePill(g, label, color: .controlAccentColor)
             let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
             g.attributedTitle = NSAttributedString(string: label, attributes: [.foregroundColor: NSColor.white, .font: font])
@@ -672,15 +672,15 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             if let b = endButton { g.frame.origin.x = max(0, b.frame.minX - 6 - g.frame.width) }
             g.action = #selector(newCallClicked)
             g.target = self
-            g.toolTip = next.map { n in "Start \u{201C}" + MainActor.assumeIsolated { n.effectiveTitle } + "\u{201D} now (Up next)" } ?? "Close this window and open Start call"
+            g.toolTip = next.map { n in L("tw.startNextTip", ["title": MainActor.assumeIsolated { n.effectiveTitle }]) } ?? L("tw.closeOpen")
             g.isHidden = false
         }
         let file = ((info["file"] as? String ?? "") as NSString).lastPathComponent
         let lines = info["lines"] as? Int ?? 0
         let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
         let item: [String: Any] = ["kind": "wrapup", "level": "info", "t": f.string(from: Date()), "at": f.string(from: Date()),
-                                   "gist": saved ? "✅ Call ended, transcript saved" : "⚠ Call ended, transcript file not found",
-                                   "items": saved ? ["\(lines) lines: \(file)", "You can close this window."] : ["Check the project's live folder."]]
+                                   "gist": saved ? L("tw.endedOK") : L("tw.endedNoFile"),
+                                   "items": saved ? [L("tw.linesFile", ["n": "\(lines)", "file": file]), L("tw.canClose")] : [L("tw.checkLive")]]
         if let d = try? JSONSerialization.data(withJSONObject: [item]), let js = String(data: d, encoding: .utf8) {
             push("window.addItems && window.addItems(\(js))")
         }

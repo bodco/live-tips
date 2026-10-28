@@ -3,6 +3,27 @@
 Pacenote (formerly Live Tips). Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.4 (F4: forms, brief, onboarding, Settings)
+
+- **One call form for three jobs:** Start call, Prepare and Plan a call share one window (project, title, time
+  from the calendar, call context with folders and files, one brief line with one action). Audience, call type,
+  languages, mic, proactive tips, tip model, recording, Public call and the Cowork request sit under Options.
+  The buttons follow the job: Prepare, Start call (or Prepare first, Save for later), Save or Switch for a plan.
+  The separate Prepare sheet on Home is gone; Home opens the same form.
+- **The brief reads like a document:** prepared and for-the-call times in the header, a line is edited in place
+  with a click, checklist lines are real checkboxes saved to the file; Edit the whole text and Show in Finder in
+  the menu. Edits are logged as before (the original stays in .brief.orig.md).
+- **Onboarding in four steps** (permissions, folder, Claude, done) with a progress bar and Back. Speech
+  recognition installs in the background from the first step; the footer shows its progress or what failed.
+- **Finish setup on Home:** small cards for what is still missing (the speech engine, your name, calendars, the
+  Notion token); each can be hidden.
+- **Settings:** keys show Connected, Saved or the error, with Replace, Test and Remove in a menu; AI starts with
+  this month's spend and a Balance link; About lists the components with Check again and Install or repair;
+  How it works moved to the Help menu; the calendar accounts fold away once calendars are there.
+- **Every native screen in English and Ukrainian:** Settings, the setup window, calendars, Notion setup, shortcuts,
+  the language picker (language names follow the interface language), alerts and notifications. The prompts to
+  Claude stay in English on purpose (see DEVELOPMENT.md, Names).
+
 ## 0.8.3 (F3: Home)
 
 - **Home answers "what is next and am I ready":** Today with the day's calls and time on calls, Plan a call and

@@ -8,8 +8,8 @@ import SwiftUI
 final class SetupModel: ObservableObject {
     struct Step: Identifiable {
         let id: String
-        let title: String
-        let why: String
+        var title: String { L("setup.step.\(id).title") }
+        var why: String { L("setup.step.\(id).why") }
         let optional: Bool
         var state: State = .unknown
         var detail = ""
@@ -17,14 +17,14 @@ final class SetupModel: ObservableObject {
     }
 
     @Published var steps: [Step] = [
-        Step(id: "python", title: "Python 3.10 or newer", why: "Runs the speech recognition and the tips engine on this Mac.", optional: false),
-        Step(id: "core", title: "Recorder core", why: "Records your mic and the call audio, writes the transcript, runs the local fact cards.", optional: false),
-        Step(id: "venv", title: "Private Python environment", why: "Keeps Pacenote's modules apart from anything else on this Mac.", optional: false),
-        Step(id: "recorder", title: "Speech recognition (MLX Whisper)", why: "Turns speech into text on the Mac's GPU; audio never leaves the Mac.", optional: false),
-        Step(id: "tips", title: "Tips engine modules", why: "Claude API client, rules reader, and ONNX Runtime for the local AI model.", optional: false),
-        Step(id: "whisper", title: "Whisper model (about 1.6 GB)", why: "The speech model itself, downloaded once from Hugging Face.", optional: false),
-        Step(id: "localai", title: "Local AI model bge-m3 (about 590 MB)", why: "Finds facts and project files by meaning, for HELP NOW and the fact cards.", optional: false),
-        Step(id: "voices", title: "Speaker identification", why: "Tells the voices apart and remembers who is who. Voice prints stay on this Mac.", optional: false),
+        Step(id: "python", optional: false),
+        Step(id: "core", optional: false),
+        Step(id: "venv", optional: false),
+        Step(id: "recorder", optional: false),
+        Step(id: "tips", optional: false),
+        Step(id: "whisper", optional: false),
+        Step(id: "localai", optional: false),
+        Step(id: "voices", optional: false),
     ]
     @Published var log: [String] = []
     @Published var busy = false
@@ -91,14 +91,14 @@ final class SetupModel: ObservableObject {
             steps[i].state = out.hasPrefix("OK") ? .ok : .failed
             steps[i].detail = String(out.split(separator: " ", maxSplits: 1).dropFirst().first ?? "")
             if steps[i].state != .ok && !steps[i].optional {
-                log.append(rc == 0 ? "Not finished: see the step above." : "Stopped: fix this step, then press Install again.")
+                log.append(rc == 0 ? L("setup.log.notFinished") : L("setup.log.stopped"))
                 return
             }
         }
         if allRequiredOK {
             applyEngineSettings()
             LocalAIService.shared.apply()
-            log.append("All set. Start a call from the menu bar icon.")
+            log.append(L("setup.log.allSet"))
         }
     }
 
@@ -123,7 +123,7 @@ struct SetupView: View {
     // 2026-10-26 (owner): the welcome tour's look: header, one soft card, one big button.
     var body: some View {
         VStack(spacing: 14) {
-            WindowHeader(symbol: "arrow.down.circle", title: "Speech recognition and local AI",
+            WindowHeader(symbol: "arrow.down.circle", title: L("setup.title"),
                          subtitle: L("setup.subtitle"))
             VStack(spacing: 0) {
                 ForEach(model.steps) { s in
@@ -140,7 +140,7 @@ struct SetupView: View {
                 }
             }
             .ltCard()
-            DisclosureGroup("Details", isExpanded: $showLog) {
+            DisclosureGroup(L("home.week.details"), isExpanded: $showLog) {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 1) {
@@ -160,13 +160,13 @@ struct SetupView: View {
             }
             Spacer(minLength: 0)
             VStack(spacing: 8) {
-                LTPrimaryButton(title: model.allRequiredOK ? "Everything is installed" : (model.busy ? "Installing…" : "Install all"),
+                LTPrimaryButton(title: model.allRequiredOK ? L("setup.allInstalled") : (model.busy ? L("setup.installing") : L("setup.installAll")),
                                 symbol: model.allRequiredOK ? "checkmark" : (model.busy ? nil : "arrow.down")) {
                     Task { await model.installMissing(includeOptional: true) }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.busy || model.allRequiredOK)
-                Button("Check again") { Task { await model.checkAll() } }.buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
+                Button(L("about.components.check")) { Task { await model.checkAll() } }.buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
                     .disabled(model.busy)
             }
         }

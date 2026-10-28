@@ -46,16 +46,16 @@ final class NotionMirrorService: @unchecked Sendable {
     /// Copies the script, writes the config, discovers the databases, then starts a full run.
     func setUp(configsDir: String, done: @escaping @Sendable (Bool, String) -> Void) {
         let c = config
-        guard !c.workRoot.isEmpty else { done(false, "Set the work folder first."); return }
-        guard token != nil else { done(false, "Add the Notion token in Settings > Keys first."); return }
+        guard !c.workRoot.isEmpty else { done(false, L("set.workFirst") + "."); return }
+        guard token != nil else { done(false, L("nm.tokenFirst")); return }
         if Self.mode(workRoot: c.workRoot) == "external" {
-            done(false, "A mirror is already set up in \(Self.dir(workRoot: c.workRoot)) with its own schedule. Pacenote reads it and leaves it alone.")
+            done(false, L("nm.external", ["path": Self.dir(workRoot: c.workRoot)]))
             return
         }
         let fm = FileManager.default
         let dst = Self.dir(workRoot: c.workRoot)
         guard let src = Bundle.main.resourceURL?.appendingPathComponent("notion-mirror").path, fm.fileExists(atPath: src) else {
-            done(false, "This build has no notion-mirror inside."); return
+            done(false, L("nm.noMirror")); return
         }
         try? fm.createDirectory(atPath: dst, withIntermediateDirectories: true)
         for f in ["mirror.py", "run.sh", "install.sh", "README.md", "README.uk.md", "mirror.config.example.json"] {
@@ -77,9 +77,9 @@ final class NotionMirrorService: @unchecked Sendable {
             try? out.write(to: URL(fileURLWithPath: Self.configPath(workRoot: c.workRoot)), options: .atomic)
         }
         run(["--discover"]) { [weak self] ok, out in
-            guard ok else { done(false, "Could not find the Control Tower databases: \(out)"); return }
+            guard ok else { done(false, L("nm.noDbs", ["out": out])); return }
             self?.run(["--full"], done: nil)
-            done(true, out + "\nThe first full run is going in the background; it can take a few minutes.")
+            done(true, out + "\n" + L("nm.firstRun"))
         }
     }
 

@@ -97,7 +97,8 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             steps.append { [unowned self] in self.home(theme) }
             steps.append { [unowned self] in self.menuPanel(theme, live: false) }
             steps.append { [unowned self] in self.menuPanel(theme, live: true) }
-            for tab in ["general", "calendars", "keys", "notion", "ai", "how", "about", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
+            for tab in ["general", "calendars", "keys", "notion", "ai", "about", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
+            steps.append { [unowned self] in self.howItWorks(theme) }     // F4: its own window from the Help menu
             steps.append { [unowned self] in self.tips(theme, presentation: false) }
             steps.append { [unowned self] in self.tips(theme, presentation: true) }
             steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "tips-380", size: NSSize(width: 380, height: 620)) }
@@ -211,13 +212,17 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         let f = DateFormatter(); f.dateFormat = "d MMM"
         m.appliedFrom = "Set up like the last \u{201C}\(e.title)\u{201D} call (\(f.string(from: Date().addingTimeInterval(-7 * 86400)))): correct what changed."
         m.context = "Goal: agree the pilot plan and the export release date.\nParticipants: Emily Clark, David Kim\nOpen questions: who tests the pilot, the test accounts.\nWhere to look: kickoff notes, export spec."
-        let w = NSWindow(contentViewController: NSHostingController(rootView: PrepareSheet(model: m, onPrepare: {}, onCancel: {}, onMore: {})))
-        w.title = "Prepare"
-        w.isReleasedWhenClosed = false
-        w.center(); w.makeKeyAndOrderFront(nil)
-        keep.append(w)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
-            capture(w, "prepare-\(theme)"); w.close()
+        StartCallWindow.show(delegate: AppDelegate(), prepared: m, mode: .prepare)     // Pacenote 0.8: the same form
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
+            if let w = StartCallWindow.window { capture(w, "prepare-\(theme)"); w.close() }
+            next()
+        }
+    }
+
+    func howItWorks(_ theme: String) {
+        HowItWorksWindow.show()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [self] in
+            if let w = HowItWorksWindow.window { capture(w, "how-it-works-\(theme)"); w.close() }
             next()
         }
     }

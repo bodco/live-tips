@@ -67,7 +67,6 @@ struct HomeView: View {
     @State private var status = EngineStatus()
     @State private var note = ""
     @State private var pickCalendars = false
-    @State private var prepSheet: StartCallModel?
     @State private var doneTick = 0               // redraw On you after a tick
     /// 2026-10-27 (owner): Settings > General can hide the week's numbers (a demo to colleagues).
     @AppStorage("homeShowStats") private var showStats = true
@@ -101,16 +100,6 @@ struct HomeView: View {
         .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents() }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in upnext.adoptPreparedEvents() }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in tick() }
-        .sheet(item: $prepSheet) { m in
-            PrepareSheet(model: m, onPrepare: {
-                upnext.save(m)
-                note = upnext.prepare(m) ?? ""
-                prepSheet = nil
-            }, onCancel: { prepSheet = nil }, onMore: {
-                prepSheet = nil
-                StartCallWindow.show(delegate: app, prepared: m)
-            })
-        }
     }
 
     private func tick() {
@@ -172,12 +161,61 @@ struct HomeView: View {
     @ViewBuilder private var leftColumn: some View {
         let rows = ahead
         VStack(alignment: .leading, spacing: 20) {
+            finishSetup
             if !note.isEmpty { Text(note).font(PN.Font.body).foregroundStyle(PN.C.onMe) }
             // Up next: the call being recorded, or the nearest one; an event that began more than 5 minutes ago without
             // being recorded stays in Later (with its Live badge).
             let first = live ? nil : rows.first { $0.event == nil || $0.start > now.addingTimeInterval(-5 * 60) }
             if live { liveCard } else if let first = first { upNextCard(first, overlaps: overlaps(first, rows)) } else { emptyCard }
             laterSection(rows.filter { $0.id != first?.id })
+        }
+    }
+
+    // MARK: Finish setup (REDESIGN-SPEC 7: what the onboarding left for later, until it is done)
+
+    @AppStorage("finishSetupHidden") private var finishHidden = ""
+
+    private struct Todo: Identifiable { var id: String; var text: String; var action: String; var run: () -> Void }
+
+    private var todos: [Todo] {
+        let demo = ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"] != nil
+        let settings = SettingsWindow.model
+        var out: [Todo] = []
+        if !demo && !CallEngine.shared.problems().isEmpty {
+            out.append(Todo(id: "install", text: L("home.finish.install"), action: L("home.finish.open"), run: { SetupWindow.show() }))
+        }
+        if settings.config.nameAliases.isEmpty {
+            out.append(Todo(id: "name", text: L("home.finish.name"), action: L("home.finish.add"), run: { SettingsWindow.show(tab: "general") }))
+        }
+        if cal.access != .granted {
+            out.append(Todo(id: "calendars", text: L("home.finish.calendars"), action: L("onboarding.permissions.calendarsButton"), run: { cal.connect() }))
+        }
+        if !demo && !settings.isSet(.notionToken) {
+            out.append(Todo(id: "notion", text: L("home.finish.notion"), action: L("home.finish.connect"), run: { SettingsWindow.show(tab: "notion") }))
+        }
+        let hidden = Set(finishHidden.split(separator: ",").map(String.init))
+        return out.filter { !hidden.contains($0.id) }
+    }
+
+    @ViewBuilder private var finishSetup: some View {
+        let list = todos
+        if !list.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L("home.finish.title")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                ForEach(list) { t in
+                    HStack(spacing: 10) {
+                        Image(systemName: "circle.dashed").foregroundStyle(PN.C.accent).accessibilityHidden(true)
+                        Text(t.text).font(PN.Font.body).foregroundStyle(PN.C.text)
+                        Spacer()
+                        Button(t.action, action: t.run).buttonStyle(.pnTertiary)
+                        Button { finishHidden = (finishHidden.isEmpty ? "" : finishHidden + ",") + t.id } label: { Image(systemName: "xmark") }
+                            .buttonStyle(.borderless).foregroundStyle(PN.C.text3).accessibilityLabel(L("home.finish.later"))
+                            .help(L("home.finish.later"))
+                    }
+                }
+            }
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.accent.opacity(0.07), in: RoundedRectangle(cornerRadius: PN.Radius.m))
         }
     }
 
@@ -442,8 +480,8 @@ struct HomeView: View {
         return m
     }
 
-    /// Asks first: the project or workspace and what matters on this call (PrepareSheet).
-    private func prepare(_ r: Ahead) { prepSheet = model(for: r) }
+    /// Asks first: the project or workspace and what matters on this call (the call form in Prepare mode).
+    private func prepare(_ r: Ahead) { StartCallWindow.show(delegate: app, prepared: model(for: r), mode: .prepare) }
 
     private func start(_ r: Ahead) {
         let m = model(for: r)

@@ -126,7 +126,7 @@ final class CalendarService: ObservableObject {
                 }
             let text = [e.url?.absoluteString, e.location, e.notes].compactMap { $0 }.joined(separator: " ")
             out.append(CalEvent(id: (e.eventIdentifier ?? e.calendarItemIdentifier) + "@" + String(Int(e.startDate.timeIntervalSince1970)),
-                                seriesKey: key, title: (e.title ?? "").isEmpty ? "Untitled event" : e.title!,
+                                seriesKey: key, title: (e.title ?? "").isEmpty ? L("cal.untitled") : e.title!,
                                 start: e.startDate, end: e.endDate, calendar: e.calendar.title, account: e.calendar.source.title,
                                 color: e.calendar.color ?? .systemBlue, attendees: names, link: Self.meetingLink(in: text),
                                 recurring: e.hasRecurrenceRules))
@@ -183,23 +183,28 @@ final class CalendarService: ObservableObject {
 /// macOS signs in to Google and Microsoft (Internet Accounts) and Live Tips reads the calendars through EventKit.
 struct CalendarsPane: View {
     @ObservedObject var cal = CalendarService.shared
+    @State private var accountsOpen = false
     @State private var remembered = SeriesMemory.shared.count
 
     var body: some View {
         Form {
             Section {
+                // Pacenote 0.8 (F4, spec 8): folded once the accounts are there.
+                let hasAccounts = !cal.calendars.isEmpty
+                DisclosureGroup(isExpanded: Binding(get: { !hasAccounts || accountsOpen }, set: { accountsOpen = $0 })) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Add each Google or Microsoft account once in macOS; several of each are fine.")
-                    Text("Google: Add Account > Google, sign in, keep Calendars on. Microsoft 365 or Outlook: Add Account > Microsoft Exchange (work) or Outlook.com (personal).")
+                    Text(L("cal.addEachGoogleOr"))
+                    Text(L("cal.googleAddAccountGoogle"))
                         .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 }
                 HStack {
                     let accounts = Set(cal.calendars.map { $0.source.title }).sorted()
-                    Text(accounts.isEmpty ? "No accounts with calendars yet" : accounts.joined(separator: ", ")).foregroundStyle(PN.C.text3).lineLimit(2)
+                    Text(accounts.isEmpty ? L("cal.noAccounts") : accounts.joined(separator: ", ")).foregroundStyle(PN.C.text3).lineLimit(2)
                     Spacer()
-                    Button("Open Internet Accounts") { CalendarService.openInternetAccounts() }
+                    Button(L("cal.openInternetAccounts")) { CalendarService.openInternetAccounts() }
                 }
-            } header: { Text("1. Your accounts") } footer: {
+                } label: { Text(Set(cal.calendars.map { $0.source.title }).sorted().joined(separator: ", ")).foregroundStyle(PN.C.text3).lineLimit(1) }
+            } header: { Text(L("cal.1YourAccounts")) } footer: {
                 Text(L("settings.calendars.note") + " " + L("settings.calendars.blocked"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
@@ -208,35 +213,35 @@ struct CalendarsPane: View {
                     Image(systemName: cal.access == .granted ? "checkmark.circle.fill" : "circle").foregroundStyle(cal.access == .granted ? PN.C.turn : PN.C.text3)
                     Text(cal.access == .granted ? L("settings.calendars.granted") : cal.access == .denied ? "Access is off in System Settings" : "Not connected yet")
                     Spacer()
-                    if cal.access != .granted { Button(cal.access == .denied ? "Open Privacy settings" : "Connect calendars") { cal.connect() } }
-                    else { Button("Refresh") { cal.refresh() } }
+                    if cal.access != .granted { Button(cal.access == .denied ? L("cal.openPrivacy") : L("cal.connect")) { cal.connect() } }
+                    else { Button(L("cal.refresh")) { cal.refresh() } }
                 }
-            } header: { Text("2. Access") }
+            } header: { Text(L("cal.2Access")) }
             if cal.access == .granted {
                 Section {
                     if cal.calendars.isEmpty {
-                        Text("No calendars yet. Add an account above, wait a minute for the first sync, then Refresh.").foregroundStyle(PN.C.text3)
+                        Text(L("cal.noCalendarsYetAdd")).foregroundStyle(PN.C.text3)
                     }
                     CalendarList()
-                } header: { Text("3. Calendars with your calls") } footer: {
-                    Text("Only the ticked calendars show in Home and Start call. Untick holidays, birthdays and calendars of other people.")
+                } header: { Text(L("cal.3CalendarsWithYour")) } footer: {
+                    Text(L("cal.onlyTheTickedCalendars"))
                         .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
                 Section {
-                    Toggle("Remind me before calendar calls", isOn: $cal.remind)
+                    Toggle(L("cal.remindMeBeforeCalendar"), isOn: $cal.remind)
                     if cal.remind { Stepper("\(cal.remindMinutes) min before", value: $cal.remindMinutes, in: 1...15) }
                     HStack {
-                        Text(cal.hidden.isEmpty ? "No events hidden in Home" : "\(cal.hidden.count) events hidden in Home")
+                        Text(cal.hidden.isEmpty ? L("cal.noHidden") : L("cal.hiddenN", ["n": "\(cal.hidden.count)"]))
                         Spacer()
-                        Button("Show them again") { cal.hidden = [] }.disabled(cal.hidden.isEmpty)
+                        Button(L("cal.showThemAgain")) { cal.hidden = [] }.disabled(cal.hidden.isEmpty)
                     }
                     HStack {
-                        Text("Regular calls remembered: \(remembered)")
+                        Text(L("cal.remembered", ["n": "\(remembered)"]))
                         Spacer()
-                        Button("Forget all") { SeriesMemory.shared.forgetAll(); remembered = 0 }.disabled(remembered == 0)
+                        Button(L("cal.forgetAll")) { SeriesMemory.shared.forgetAll(); remembered = 0 }.disabled(remembered == 0)
                     }
-                } header: { Text("Behaviour") } footer: {
-                    Text("The reminder is off by default: your calendar already reminds you. A regular call starts from the settings and the context of its last call (project, audience, type, languages, what matters, folders), so you only correct them.")
+                } header: { Text(L("set.behaviour")) } footer: {
+                    Text(L("cal.theReminderIsOff"))
                         .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
@@ -257,8 +262,8 @@ struct CalendarList: View {
                 HStack {
                     Text(acc).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3)
                     Spacer()
-                    Button("All") { for c in groups[acc] ?? [] { cal.excluded.remove(c.calendarIdentifier) } }.buttonStyle(.pnTertiary).font(PN.Font.caption)
-                    Button("None") { for c in groups[acc] ?? [] { cal.excluded.insert(c.calendarIdentifier) } }.buttonStyle(.pnTertiary).font(PN.Font.caption)
+                    Button(L("cal.all")) { for c in groups[acc] ?? [] { cal.excluded.remove(c.calendarIdentifier) } }.buttonStyle(.pnTertiary).font(PN.Font.caption)
+                    Button(L("cal.none")) { for c in groups[acc] ?? [] { cal.excluded.insert(c.calendarIdentifier) } }.buttonStyle(.pnTertiary).font(PN.Font.caption)
                 }
                 ForEach(groups[acc] ?? [], id: \.calendarIdentifier) { c in
                     Toggle(isOn: Binding(get: { !cal.excluded.contains(c.calendarIdentifier) },
@@ -279,10 +284,10 @@ struct CalendarList: View {
 struct CalendarPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Calendars with your calls").font(.headline)
-            Text("Only the ticked ones show in Home and Start call.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            Text(L("cal.calendarsWithYourCalls")).font(.headline)
+            Text(L("cal.onlyTheTickedOnes")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             ScrollView { VStack(alignment: .leading, spacing: 10) { CalendarList() } }
-            Button("More in Settings > Calendars") { SettingsWindow.show(tab: "calendars") }.buttonStyle(.pnTertiary).font(PN.Font.caption)
+            Button(L("cal.moreInSettingsCalendars")) { SettingsWindow.show(tab: "calendars") }.buttonStyle(.pnTertiary).font(PN.Font.caption)
         }
         .padding(14)
         .frame(width: 340, height: 400)

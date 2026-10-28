@@ -50,14 +50,14 @@ enum NotionAPI {
                 guard let id = o["id"] as? String, let kind = o["object"] as? String else { continue }
                 if kind == "data_source" || kind == "database" {
                     let t = plain(o["title"])
-                    out.append(Item(id: id, kind: "data_source", title: t.isEmpty ? "Untitled database" : t))
+                    out.append(Item(id: id, kind: "data_source", title: t.isEmpty ? L("nset.untitledDb") : t))
                 } else if kind == "page" {
                     // only pages at the top of what was shared, not every row of every database
                     let parent = (o["parent"] as? [String: Any])?["type"] as? String ?? ""
                     if parent == "data_source_id" || parent == "database_id" { continue }
                     let props = (o["properties"] as? [String: [String: Any]]) ?? [:]
                     let t = props.values.first { ($0["type"] as? String) == "title" }.map { plain($0["title"]) } ?? ""
-                    out.append(Item(id: id, kind: "page", title: t.isEmpty ? "Untitled page" : t))
+                    out.append(Item(id: id, kind: "page", title: t.isEmpty ? L("nset.untitledPage") : t))
                 }
             }
             cursor = (r["has_more"] as? Bool) == true ? r["next_cursor"] as? String : nil
@@ -98,7 +98,7 @@ enum NotionAPI {
             "title": [["type": "text", "text": ["content": "Meetings"]]],
             "initial_data_source": ["properties": props]])
         if let ds = ((r["data_sources"] as? [[String: Any]])?.first?["id"] as? String) { return ds }
-        throw NSError(domain: "Notion", code: 0, userInfo: [NSLocalizedDescriptionKey: "the database was created, but Notion did not return its id"])
+        throw NSError(domain: "Notion", code: 0, userInfo: [NSLocalizedDescriptionKey: L("nset.noId")])
     }
 }
 
@@ -116,12 +116,12 @@ final class NotionDestinationModel: ObservableObject {
     }
 
     func find() {
-        guard let t = token else { note = "Save the Notion token first."; return }
-        busy = true; note = "Looking for what the integration can see…"
+        guard let t = token else { note = L("nset.saveToken"); return }
+        busy = true; note = L("nset.looking")
         Task {
             do {
                 items = try await NotionAPI.search(t)
-                note = items.isEmpty ? "The integration sees nothing yet: share a page with it (step 3), then Find again." : ""
+                note = items.isEmpty ? L("nset.seesNothing") : ""
             } catch { note = "Notion: " + error.localizedDescription }
             searched = true; busy = false
         }
@@ -129,13 +129,13 @@ final class NotionDestinationModel: ObservableObject {
 
     func use(_ it: NotionAPI.Item) {
         guard let t = token else { return }
-        busy = true; note = "Checking \(it.title)…"
+        busy = true; note = L("nset.checking", ["name": it.title])
         Task {
             do {
                 let miss = try await NotionAPI.missing(t, it.id)
                 if !miss.isEmpty { try await NotionAPI.addProperties(t, it.id, miss) }
                 choose(id: it.id, name: it.title)
-                note = miss.isEmpty ? "Meeting pages go to \(it.title)." : "Meeting pages go to \(it.title); added the properties " + miss.joined(separator: ", ") + "."
+                note = miss.isEmpty ? L("nset.goesTo", ["name": it.title]) : L("nset.goesToAdded", ["name": it.title]) + miss.joined(separator: ", ") + "."
             } catch { note = "Notion: " + error.localizedDescription }
             busy = false
         }
@@ -143,12 +143,12 @@ final class NotionDestinationModel: ObservableObject {
 
     func create(on page: NotionAPI.Item) {
         guard let t = token else { return }
-        busy = true; note = "Creating a Meetings database on \(page.title)…"
+        busy = true; note = L("nset.creating", ["name": page.title])
         Task {
             do {
                 let ds = try await NotionAPI.createMeetings(t, page: page.id)
                 choose(id: ds, name: "Meetings (\(page.title))")
-                note = "Created Meetings on \(page.title). Meeting pages go there."
+                note = L("nset.created", ["name": page.title])
                 items = (try? await NotionAPI.search(t)) ?? items
             } catch { note = "Notion: " + error.localizedDescription }
             busy = false
@@ -183,16 +183,16 @@ struct NotionDestinationView: View {
             if !settings.config.notionMeetingsDB.isEmpty {
                 HStack {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
-                    Text("Meeting pages go to ") + Text(settings.config.notionMeetingsName.isEmpty ? "the chosen database" : settings.config.notionMeetingsName).bold()
+                    Text(L("nset.meetingPagesGoTo")) + Text(settings.config.notionMeetingsName.isEmpty ? "the chosen database" : settings.config.notionMeetingsName).bold()
                     Spacer()
-                    Button("Change") { m.clear(); m.find() }.controlSize(.small)
+                    Button(L("nset.change")) { m.clear(); m.find() }.controlSize(.small)
                 }
             } else {
                 HStack {
-                    Text("Where meeting pages go").font(.callout.weight(.medium))
+                    Text(L("nset.whereMeetingPagesGo")).font(.callout.weight(.medium))
                     Spacer()
                     if m.busy { ProgressView().controlSize(.small) }
-                    Button(m.searched ? "Find again" : "Find") { m.find() }.controlSize(.small)
+                    Button(m.searched ? L("nset.findAgain") : L("nset.find")) { m.find() }.controlSize(.small)
                         .disabled(m.busy || !settings.isSet(.notionToken))
                 }
                 let dbs = m.items.filter { $0.kind == "data_source" }
@@ -200,13 +200,13 @@ struct NotionDestinationView: View {
                 if !m.items.isEmpty {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 4) {
-                            if !dbs.isEmpty { Text("Databases: click one to use it").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                            if !dbs.isEmpty { Text(L("nset.databasesClickOneTo")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                             ForEach(dbs) { it in
                                 destRow(icon: "tablecells", title: it.title, action: "Use") { m.use(it) }
                             }
-                            if !pages.isEmpty { Text("Or create a new Meetings database inside a page").font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 6) }
+                            if !pages.isEmpty { Text(L("nset.orCreateANew")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 6) }
                             ForEach(pages) { it in
-                                destRow(icon: "doc.badge.plus", title: it.title, action: "Create here") { m.create(on: it) }
+                                destRow(icon: "doc.badge.plus", title: it.title, action: L("nset.createHere")) { m.create(on: it) }
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)

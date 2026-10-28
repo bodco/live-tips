@@ -124,14 +124,14 @@ struct ShortcutRow: View {
     var body: some View {
         LabeledContent(action.title) {
             HStack(spacing: 8) {
-                Text(recording ? "Press the new keys…" : combo.display)
+                Text(recording ? L("hk.pressNew") : combo.display)
                     .font(.callout.monospaced())
                     .foregroundStyle(recording ? Color.accentColor : .primary)
                     .frame(minWidth: 90, alignment: .trailing)
-                Button(recording ? "Cancel" : "Change") { recording ? stop() : start() }
+                Button(recording ? L("hk.cancel") : L("nset.change")) { recording ? stop() : start() }
                     .buttonStyle(.pnTertiary)
                 if combo != action.defaultCombo && !recording {
-                    Button("Reset") { HotKeys.shared.set(action, nil); combo = HotKeys.shared.combo(action) }
+                    Button(L("hk.reset")) { HotKeys.shared.set(action, nil); combo = HotKeys.shared.combo(action) }
                         .buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
                 }
             }
@@ -147,7 +147,7 @@ struct ShortcutRow: View {
             if e.keyCode == UInt16(kVK_Escape) { stop(); return nil }
             if let c = HotKeys.combo(from: e) {
                 let other = HotKeys.Action.allCases.first { $0 != action && HotKeys.shared.combo($0) == c }
-                if other == nil { HotKeys.shared.set(action, c); combo = c; note = "" } else { note = "Already used by " + (other?.title ?? "") }
+                if other == nil { HotKeys.shared.set(action, c); combo = c; note = "" } else { note = L("hk.usedBy", ["name": other?.title ?? ""]) }
                 stop()
             }
             return nil

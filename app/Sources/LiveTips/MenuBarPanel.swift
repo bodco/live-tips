@@ -239,6 +239,7 @@ struct MenuBarPanel: View {
             Menu(L("menubar.helpAbout")) {
                 Button(L("menubar.setup")) { model.run { $0.openSetup() } }
                 Button(L("menubar.welcomeTour")) { model.run { $0.openOnboarding() } }
+                Button(L("settings.how.title")) { model.run { _ in HowItWorksWindow.show() } }
                 Divider()
                 Button(L("menubar.about")) { model.run { $0.openAbout() } }
                 if model.showDev {      // Option held while opening: the tips window on demo data

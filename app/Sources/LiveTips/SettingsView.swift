@@ -131,18 +131,18 @@ final class SettingsModel: ObservableObject {
         loadVoices()
     }
     static func whereLabel(_ w: [String]) -> String {
-        if w.contains("all") { return "All projects" }
+        if w.contains("all") { return L("set.allProjects") }
         let parts = w.map { x -> String in
             if x.hasPrefix("project:") { return String(x.dropFirst(8)) }
-            if x.hasPrefix("workspace:") { return "workspace " + String(x.dropFirst(10)) }
+            if x.hasPrefix("workspace:") { return L("set.whereWorkspace", ["name": String(x.dropFirst(10))]) }
             return x
         }
-        return parts.isEmpty ? "Nowhere" : parts.joined(separator: ", ")
+        return parts.isEmpty ? L("set.nowhere") : parts.joined(separator: ", ")
     }
     var voiceWheres: [(tag: String, label: String)] {
-        var out: [(String, String)] = [("all", "All projects")]
-        for w in registry.workspaces { out.append(("workspace:" + w.name, "Workspace " + w.name + " (all its projects)")) }
-        for p in registry.projects where p.status != "archived" { out.append(("project:" + p.slug, "Project " + p.name)) }
+        var out: [(String, String)] = [("all", L("set.allProjects"))]
+        for w in registry.workspaces { out.append(("workspace:" + w.name, L("set.workspaceAll", ["name": w.name]))) }
+        for p in registry.projects where p.status != "archived" { out.append(("project:" + p.slug, L("set.projectNamed", ["name": p.name]))) }
         return out
     }
     private func editVoice(_ name: String, _ change: (inout [String: Any]) -> Void) {
@@ -171,18 +171,18 @@ final class SettingsModel: ObservableObject {
         }
     }
     static func scopeLabel(_ s: String) -> String {
-        if s == "team" { return "Team, all projects" }
-        if s.hasPrefix("project:") { return "Client of " + String(s.dropFirst(8)) }
-        if s.hasPrefix("workspace:") { return "Workspace " + String(s.dropFirst(10)) + ", all its projects" }
-        return "All projects (saved before scopes)"
+        if s == "team" { return L("set.teamAll") }
+        if s.hasPrefix("project:") { return L("set.clientOf", ["name": String(s.dropFirst(8))]) }
+        if s.hasPrefix("workspace:") { return L("set.workspaceAllShort", ["name": String(s.dropFirst(10))]) }
+        return L("set.allBeforeScopes")
     }
 
     /// 2026-10-26 (owner): where a voice is suggested: the team (every project), one project, or a whole workspace.
     var voiceScopes: [(tag: String, label: String)] {
-        var out: [(String, String)] = [("team", "Team, all projects")]
-        for w in registry.workspaces { out.append(("workspace:" + w.name, "Workspace " + w.name + ", all its projects")) }
-        for w in registry.workspaces { out.append(("project:" + w.name.lowercased(), "Calls of workspace " + w.name + " only")) }
-        for p in registry.projects where p.status != "archived" { out.append(("project:" + p.slug, "Project " + p.name)) }
+        var out: [(String, String)] = [("team", L("set.teamAll"))]
+        for w in registry.workspaces { out.append(("workspace:" + w.name, L("set.workspaceAllShort", ["name": w.name]))) }
+        for w in registry.workspaces { out.append(("project:" + w.name.lowercased(), L("set.wsCallsOnly", ["name": w.name]))) }
+        for p in registry.projects where p.status != "archived" { out.append(("project:" + p.slug, L("set.projectNamed", ["name": p.name]))) }
         return out
     }
 
@@ -200,7 +200,7 @@ final class SettingsModel: ObservableObject {
     /// The folder with the imported project configs (projects/<slug>.md) feeds the mirror's layout.
     func setUpMirror() {
         let configsDir = registry.projects.first.map { ($0.config as NSString).deletingLastPathComponent } ?? ""
-        mirrorNote = "Setting up: finding your Control Tower databases…"
+        mirrorNote = L("set.mirrorSettingUp")
         NotionMirrorService.shared.setUp(configsDir: configsDir) { ok, msg in
             DispatchQueue.main.async { [weak self] in
                 self?.mirrorNote = msg
@@ -230,12 +230,12 @@ final class SettingsModel: ObservableObject {
     static func friendly(_ msg: String) -> String {
         let m = msg.lowercased()
         if m.contains("401") || m.contains("invalid x-api-key") || m.contains("authentication") || m.contains("unauthorized") {
-            return "Key rejected. Copy the whole key and paste it again."
+            return L("keys.err.rejected")
         }
-        if m.contains("403") || m.contains("permission") { return "The key works but has no access. Check its workspace or integration access." }
-        if m.contains("429") || m.contains("rate") { return "Rate limited. Try again in a minute." }
+        if m.contains("403") || m.contains("permission") { return L("keys.err.noAccess") }
+        if m.contains("429") || m.contains("rate") { return L("keys.err.rate") }
         if m.contains("offline") || m.contains("network") || m.contains("internet") || m.contains("timed out") {
-            return "No connection. Check the internet and press Test."
+            return L("keys.err.offline")
         }
         return msg
     }
@@ -260,7 +260,7 @@ final class SettingsModel: ObservableObject {
     func save(_ key: SecretStore.Key, _ value: String) {
         let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !v.isEmpty else { return }
-        guard store.set(key, v) else { keyState[key] = .failed("Keychain write failed"); return }
+        guard store.set(key, v) else { keyState[key] = .failed(L("keys.err.keychain")); return }
         refreshMasks()
         test(key)
     }
@@ -300,11 +300,11 @@ final class SettingsModel: ObservableObject {
     }
 
     func importProjects() {
-        guard let dir = chooseFolder("Choose the folder with Control Tower project configs (projects/*.md)") else { return }
+        guard let dir = chooseFolder(L("set.chooseConfigs")) else { return }
         let found = ProjectConfigImporter.importFolder(dir)
         registry.merge(imported: found)
         rescanWorkspaces()
-        note = "Imported \(found.count) project(s)"
+        note = L("set.imported", ["n": "\(found.count)"])
     }
 
     func rescanWorkspaces() {
@@ -315,7 +315,7 @@ final class SettingsModel: ObservableObject {
 
     // ---- folder projects (2026-10-26: Notion and configs are optional)
     func scanFolders() {
-        guard !config.workRoot.isEmpty else { note = "Set the work folder in General first."; return }
+        guard !config.workRoot.isEmpty else { note = L("set.setTheWorkFolder"); return }
         let before = registry.projects.count
         let r = WorkspaceScanner.scanFolders(workRoot: config.workRoot, extra: registry.extraWorkspaces, excluded: registry.excluded)
         registry.merge(folders: r.projects)
@@ -347,18 +347,18 @@ final class SettingsModel: ObservableObject {
     }
 
     func addWorkspaceFolder() {
-        guard let dir = chooseFolder("Choose a workspace folder: its subfolders become projects") else { return }
+        guard let dir = chooseFolder(L("set.chooseWorkspace")) else { return }
         addWorkspace(dir)
     }
 
     func addProjectFolder() {
-        guard let dir = chooseFolder("Choose a project folder") else { return }
+        guard let dir = chooseFolder(L("set.chooseProject")) else { return }
         registry.excluded.removeAll { $0 == dir }
         var p = Project(name: (dir as NSString).lastPathComponent, slug: WorkspaceScanner.slug((dir as NSString).lastPathComponent), root: dir)
         p.workspace = ((dir as NSString).deletingLastPathComponent as NSString).lastPathComponent
         registry.merge(folders: [p])
         rescanWorkspaces()
-        note = "Added \(p.name)"
+        note = L("set.added", ["name": p.name])
     }
 
     /// Takes a workspace out of Live Tips: its folder is ignored by scans and its projects leave the list.
@@ -370,7 +370,7 @@ final class SettingsModel: ObservableObject {
         if !registry.excluded.contains(dir) { registry.excluded.append(dir) }
         registry.projects.removeAll { !$0.root.isEmpty && ($0.root + "/").hasPrefix(dir + "/") }
         rescanWorkspaces()
-        note = "Removed \(w.name) from Pacenote (the folder is untouched)"
+        note = L("set.removedWs", ["name": w.name])
     }
 
     func excludeProject(_ slug: String) {
@@ -379,19 +379,6 @@ final class SettingsModel: ObservableObject {
         }
         removeProject(slug)
         rescanWorkspaces()
-    }
-
-    struct ReadyItem { let title: String; let ok: Bool; let action: String; let tab: String? }
-    var readyItems: [ReadyItem] {
-        var keyOK = false
-        if case .ok = keyState[.claudeAPIKey] ?? .notSet { keyOK = true }
-        return [
-            ReadyItem(title: "Claude API key works", ok: keyOK, action: "Open Keys", tab: "keys"),
-            ReadyItem(title: "Work folder set", ok: !config.workRoot.isEmpty, action: "Set below", tab: nil),
-            ReadyItem(title: "Projects imported", ok: !registry.projects.isEmpty, action: "Import…", tab: nil),
-            ReadyItem(title: "Your name on calls", ok: !config.nameAliases.isEmpty, action: "Set below", tab: nil),
-            ReadyItem(title: "Microphone allowed", ok: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, action: "Asked on the first call", tab: nil),
-        ]
     }
 
     func saveConfig() { try? config.save(to: AppPaths.config); L10n.set(config.uiLanguage) }
@@ -432,8 +419,8 @@ struct StateIcon: View {
     var body: some View {
         Group {
             switch state {
-            case .notSet: Image(systemName: "circle.dashed").foregroundStyle(PN.C.text3).help("Not set")
-            case .untested: Image(systemName: "circle.fill").foregroundStyle(.yellow).help("Saved, checking…")
+            case .notSet: Image(systemName: "circle.dashed").foregroundStyle(PN.C.text3).help(L("callSettings.role.none"))
+            case .untested: Image(systemName: "circle.fill").foregroundStyle(.yellow).help(L("set.savedChecking"))
             case .testing: ProgressView().controlSize(.small)
             case .ok(let m): Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn).help(m)
             case .failed(let m): Image(systemName: "xmark.octagon.fill").foregroundStyle(PN.C.danger).help(m)
@@ -456,42 +443,61 @@ struct IconButton: View {
     }
 }
 
+/// Pacenote 0.8 (F4, spec 8): a key is a status line (Connected, Not set, the error) and one menu (Replace, Test, Remove);
+/// the field shows only when there is no key yet or while replacing it.
 struct KeyRow: View {
     let title: String
     let hint: String
     let key: SecretStore.Key
     @ObservedObject var model: SettingsModel
     @State private var value = ""
+    @State private var replacing = false
 
     var body: some View {
         LabeledContent {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    SecureField("", text: $value)
-                        .onSubmit { model.save(key, value); value = "" }
-                    IconButton(symbol: "square.and.arrow.down", label: "Save to Keychain") { model.save(key, value); value = "" }
-                        .disabled(value.isEmpty)
-                    IconButton(symbol: "checkmark.seal", label: "Test with one request") { model.test(key) }
-                        .disabled(!model.isSet(key))
-                    IconButton(symbol: "trash", label: "Remove from Keychain", role: .destructive) { model.remove(key) }
-                        .disabled(!model.isSet(key))
-                    StateIcon(state: model.keyState[key] ?? .notSet)
-                    Text(model.masks[key] ?? "").font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3)
-                        .frame(width: 64, alignment: .leading)
+            VStack(alignment: .trailing, spacing: 4) {
+                if model.isSet(key) && !replacing {
+                    HStack(spacing: 8) {
+                        status
+                        Text(model.masks[key] ?? "").font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3)
+                        Menu {
+                            Button(L("keys.replace")) { replacing = true }
+                            Button(L("keys.test")) { model.test(key) }
+                            Divider()
+                            Button(L("keys.remove"), role: .destructive) { model.remove(key) }
+                        } label: { Image(systemName: "ellipsis.circle") }
+                            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                            .accessibilityLabel(L("home.more"))
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        SecureField("", text: $value, prompt: Text(L("keys.paste")))
+                            .onSubmit { save() }
+                        Button(L("common.save")) { save() }.buttonStyle(.pnSecondary).disabled(value.isEmpty)
+                        if replacing { Button(L("common.cancel")) { replacing = false; value = "" }.buttonStyle(.pnTertiary) }
+                    }
+                    Text(model.isSet(key) ? "" : L("keys.notSet")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
-                statusText
             }
         } label: {
-            Text(title).help(hint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(hint).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
-    @ViewBuilder var statusText: some View {
+    private func save() {
+        guard !value.isEmpty else { return }
+        model.save(key, value); value = ""; replacing = false
+    }
+
+    @ViewBuilder var status: some View {
         switch model.keyState[key] ?? .notSet {
-        case .ok(let m): Label(m, systemImage: "checkmark.circle.fill").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-        case .failed(let m): Label(m, systemImage: "exclamationmark.triangle.fill").font(PN.Font.caption).foregroundStyle(PN.C.danger)
-        case .notSet: Text(hint).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-        default: EmptyView()
+        case .ok: Label(L("keys.connected"), systemImage: "checkmark.circle.fill").font(PN.Font.caption).foregroundStyle(PN.C.turn)
+        case .failed(let m): Label(m, systemImage: "exclamationmark.triangle.fill").font(PN.Font.caption).foregroundStyle(PN.C.danger).lineLimit(2)
+        case .testing: Label(L("common.checking"), systemImage: "hourglass").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+        default: Text(L("keys.saved")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
         }
     }
 }
@@ -506,7 +512,7 @@ struct FolderRow: View {
         LabeledContent {
             HStack {
                 TextField("", text: $path, prompt: Text(placeholder))
-                Button("Browse…") { if let p = choose() { path = p } }
+                Button(L("set.browse")) { if let p = choose() { path = p } }
             }
         } label: {
             Text(title).help(hint)
@@ -530,7 +536,6 @@ struct SettingsView: View {
         Pane(id: "calendars", title: "Calendars", symbol: "calendar", subtitle: "Your Google, Microsoft and iCloud calendars: pick the calls to prepare and start."),
         Pane(id: "notion", title: "Notion", symbol: "doc.text", subtitle: "Meeting pages after each call and the optional local copy of Notion."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
-        Pane(id: "how", title: "How it works", symbol: "point.3.connected.trianglepath.dotted", subtitle: "What happens before, during and after a call."),
         Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
     ].map { Pane(id: $0.id, title: L("settings.tab." + $0.id), symbol: $0.symbol, subtitle: L("settings.pane." + $0.id)) } }
 
@@ -584,10 +589,10 @@ struct SettingsView: View {
     var keys: some View {
         Form {
             Section {
-                KeyRow(title: "Claude API key", hint: "From console.anthropic.com > API keys. Used for tips during the call and the summary after it.", key: .claudeAPIKey, model: model)
-                KeyRow(title: "Notion token", hint: "Optional. Set it up in Settings > Notion.", key: .notionToken, model: model)
+                KeyRow(title: L("keys.claude.title"), hint: L("keys.claude.hint"), key: .claudeAPIKey, model: model)
+                KeyRow(title: L("keys.notion.title"), hint: L("keys.notion.hintShort"), key: .notionToken, model: model)
             } footer: {
-                Text("Paste with ⌘V and press Return. Each key is checked with one request. Keys live only in the macOS Keychain and survive app updates.")
+                Text(L("set.pasteWithVAnd"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
@@ -598,129 +603,137 @@ struct SettingsView: View {
         Form {
             // UI review 26.10: how "Prepare now" runs lives here, Start call keeps one button.
             Section {
-                Picker("Run with", selection: $runner.useAPI) {
-                    Text("Claude account").tag(false); Text("API key").tag(true)
+                Picker(L("set.runWith"), selection: $runner.useAPI) {
+                    Text(L("set.claudeAccount")).tag(false); Text(L("set.apiKey")).tag(true)
                 }
                 .pickerStyle(.segmented)
-                .help("Claude account: Claude Code's own sign-in, uses your Claude plan. API key: the key in Keys, billed like the tips; use it when the plan's limit is reached.")
+                .help(L("set.claudeAccountClaudeCode"))
                 if !runner.useAPI {
                     HStack(spacing: 8) {
                         Image(systemName: runner.loggedIn == true ? "checkmark.circle.fill" : (runner.loggedIn == false ? "exclamationmark.triangle.fill" : "circle.dotted"))
                             .foregroundStyle(runner.loggedIn == true ? PN.C.turn : (runner.loggedIn == false ? PN.C.onMe : PN.C.text3))
-                        Text(runner.loggedIn == true ? "Claude Code signed in" + (runner.authInfo.isEmpty ? "" : " (\(runner.authInfo))")
-                             : runner.loggedIn == false ? "Claude Code is not signed in" : "Checking the Claude Code sign-in…")
+                        Text(runner.loggedIn == true ? L("set.cc.signedIn") + (runner.authInfo.isEmpty ? "" : " (\(runner.authInfo))")
+                             : runner.loggedIn == false ? L("set.cc.notSignedIn") : L("set.cc.checking"))
                             .foregroundStyle(PN.C.text3)
                         Spacer()
-                        if runner.loggedIn == false { Button("Log in…") { runner.openLogin() } }
-                        Button("Check") { runner.refreshAuth() }
+                        if runner.loggedIn == false { Button(L("set.logIn")) { runner.openLogin() } }
+                        Button(L("set.check")) { runner.refreshAuth() }
                     }
                 }
-                Picker("Model", selection: $runner.model) {
+                Picker(L("set.model"), selection: $runner.model) {
                     ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
                 }
-                .help("Sonnet reads the files and pulls out the facts well and fast; Opus is a little better on a hard call but slower and uses the plan's limit several times faster.")
-            } header: { Text("Preparation (Prepare now in Start call)") } footer: {
-                Text(PrepRunner.claudePath == nil ? "Claude Code is not installed on this Mac: Start call offers the Cowork request instead."
-                     : "Claude Code builds the brief, facts and cards from local files (the project folder, the local Notion mirror, earlier calls) and the public web links in Call context.")
+                .help(L("set.sonnetReadsTheFiles"))
+            } header: { Text(L("set.preparationPrepareNowIn")) } footer: {
+                Text(PrepRunner.claudePath == nil ? L("set.cc.notInstalled")
+                     : L("set.cc.builds"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             .onAppear { runner.refreshAuth() }
             Section {
-                ModelPicker(title: "Classify", selection: $model.config.models.classify, choices: model.modelChoices).help("Decides if a tip is needed. Runs often: fast and cheap. Recommended: Haiku.")
-                ModelPicker(title: "Tip", selection: $model.config.models.tip, choices: model.modelChoices).help("Writes the tip you see. Recommended: Sonnet. Opus is too slow for live tips.")
-                ModelPicker(title: "After the call", selection: $model.config.models.analysis, choices: model.modelChoices).help("Summary and analysis. Not time-critical. Recommended: Opus.")
-                Toggle("Answer questions to anyone, not only to me", isOn: $model.config.answerAny)
-                    .help("A question asked to anyone on the call gets a tip when your brief, facts or the project's Current State hold an answer you could give or add. Off: only questions to you by name.")
-                Toggle("Second request when Claude is slow", isOn: $model.config.hedgeEnabled)
-                    .help("If Claude shows no answer after 2 s (classify) or 3 s (tip), or fails at once, the same request is sent again and the first good answer wins. Faster tips on busy hours; costs a little more (both requests are billed and counted in the limits).")
-                Toggle("Rate tips after each call (blind judge, about $0.10)", isOn: $model.config.judgeAfterCall)
-                    .help("After the call Claude Sonnet scores up to 25 tips of the app and of the skill from the transcript, in the background. Results: <call>.judge/judge.summary.json next to the transcript.")
+                ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices).help(L("set.decidesIfATip"))
+                ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices).help(L("set.writesTheTipYou"))
+                ModelPicker(title: L("set.afterTheCall"), selection: $model.config.models.analysis, choices: model.modelChoices).help(L("set.summaryAndAnalysisNot"))
+                Toggle(L("set.answerQuestionsToAnyone"), isOn: $model.config.answerAny)
+                    .help(L("set.aQuestionAskedTo"))
+                Toggle(L("set.secondRequestWhenClaude"), isOn: $model.config.hedgeEnabled)
+                    .help(L("set.ifClaudeShowsNo"))
+                Toggle(L("set.rateTipsAfterEach"), isOn: $model.config.judgeAfterCall)
+                    .help(L("set.afterTheCallClaude"))
                 if !CallEngine.shared.judgeResult.isEmpty {
                     Text(CallEngine.shared.judgeResult).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
-            } header: { Text("Models") } footer: {
-                Text(model.config.knownModels.isEmpty ? "Test the Claude key to load the models your key can use." : "Models your key can use.")
+            } header: { Text(L("set.models")) } footer: {
+                Text(model.config.knownModels.isEmpty ? L("set.modelsTest") : L("set.modelsKnown"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
-                TextField("Warning per call", value: $model.config.budget.callSoftUSD, format: .currency(code: "USD"))
-                    .help("At this amount in one call the tips window shows a warning. Nothing stops.")
-                TextField("Stop per call", value: $model.config.budget.callHardUSD, format: .currency(code: "USD"))
-                    .help("At this amount Claude tips stop for the rest of the call. Local facts, cards and HELP NOW keep working.")
-                TextField("Stop per month", value: $model.config.budget.monthlyHardUSD, format: .currency(code: "USD"))
-                    .help("At this amount Claude tips stay off until the next month. The local layer keeps working.")
-            } header: { Text("Spending limits") } footer: {
-                Text(String(format: "This month: $%.2f of $%.0f. A typical hour of a call costs $0.10 to $1.20.", SpendLedger.monthSpent(), model.config.budget.monthlyHardUSD))
+                // Pacenote 0.8 (F4, spec 8): the month's spend and the balance live here, not on Home.
+                LabeledContent(L("ai.thisMonth")) {
+                    let month = SpendLedger.monthSpent()
+                    HStack(spacing: 10) {
+                        Text(String(format: "$%.2f / $%.0f", month, model.config.budget.monthlyHardUSD)).monospacedDigit()
+                        Link(L("ai.balance"), destination: URL(string: "https://console.anthropic.com/settings/billing")!).font(PN.Font.caption)
+                    }
+                }
+                TextField(L("set.warningPerCall"), value: $model.config.budget.callSoftUSD, format: .currency(code: "USD"))
+                    .help(L("set.atThisAmountIn"))
+                TextField(L("set.stopPerCall"), value: $model.config.budget.callHardUSD, format: .currency(code: "USD"))
+                    .help(L("set.atThisAmountClaude"))
+                TextField(L("set.stopPerMonth"), value: $model.config.budget.monthlyHardUSD, format: .currency(code: "USD"))
+                    .help(L("set.atThisAmountClaude2"))
+            } header: { Text(L("set.spendingLimits")) } footer: {
+                Text(L("set.monthSpend", ["spent": String(format: "%.2f", SpendLedger.monthSpent()), "cap": String(format: "%.0f", model.config.budget.monthlyHardUSD)]))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
-                Toggle("Local AI (default for new calls)", isOn: $model.config.localAI.enabled)
-                    .help("The tips window menu can switch it for one call only. Local models on this Mac: facts and cards by meaning, material for HELP NOW, project search. Off: keywords only.")
-                Picker("Engine", selection: $model.config.localAI.engine) {
-                    Text("Built-in (recommended)").tag("embedded")
+                Toggle(L("set.localAiDefaultFor"), isOn: $model.config.localAI.enabled)
+                    .help(L("set.theTipsWindowMenu"))
+                Picker(L("set.engine"), selection: $model.config.localAI.engine) {
+                    Text(L("set.builtInRecommended")).tag("embedded")
                     Text("Ollama").tag("ollama")
                 }
                 .disabled(!model.config.localAI.enabled)
-                .help("Built-in: nothing else to install. Ollama: your local Ollama server, shared with the Cowork skill.")
+                .help(L("set.builtInNothingElse"))
                 if model.config.localAI.engine == "ollama" {
-                    TextField("Ollama URL", text: $model.config.localAI.ollamaURL).disabled(!model.config.localAI.enabled)
-                    TextField("Model", text: $model.config.localAI.ollamaModel, prompt: Text("bge-m3"))
+                    TextField(L("set.ollamaUrl"), text: $model.config.localAI.ollamaURL).disabled(!model.config.localAI.enabled)
+                    TextField(L("set.model"), text: $model.config.localAI.ollamaModel, prompt: Text("bge-m3"))
                         .disabled(!model.config.localAI.enabled)
-                        .help("An embedding model pulled in Ollama. Another model needs a project reindex (lt index --rebuild) and its own thresholds.")
+                        .help(L("set.anEmbeddingModelPulled"))
                 }
-                LabeledContent("Status") {
+                LabeledContent(L("set.status")) {
                     HStack(spacing: 6) {
                         Image(systemName: model.localAIStatus.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .foregroundStyle(model.localAIStatus.ok ? PN.C.turn : PN.C.onMe)
                         Text(model.localAIStatus.text).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                        Button("Check") { model.refreshLocalAI() }.controlSize(.small)
+                        Button(L("set.check")) { model.refreshLocalAI() }.controlSize(.small)
                     }
                 }
-                DisclosureGroup("About the engines") {
+                DisclosureGroup(L("set.aboutTheEngines")) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("**Built-in.** bge-m3 by BAAI (open model, MIT license), a multilingual text embedding model: it turns a line of the call or a piece of a project file into numbers so that texts with the same meaning sit close, in Ukrainian, English and Spanish alike. Pacenote runs the int8 ONNX build (Xenova/bge-m3 on Hugging Face, about 570 MB) with ONNX Runtime on the CPU of this Mac: about 25 ms per line, about 1 s to start. The model lives in <app folder>/models/bge-m3-int8. Text never leaves the Mac.")
-                        Text("**Ollama.** If you already run Ollama (ollama.com) for the Cowork skill, Pacenote can use the same server: `ollama pull bge-m3`, then choose Ollama here. Both engines give the same search results on the existing project index (checked: the same top result on 8 of 8 test queries), so switching needs no reindex.")
-                        Text("**Another model.** Any embedding model from the Ollama library (for example multilingual-e5 or nomic-embed-text): `ollama pull <name>`, put the name into Model, then rebuild each project index with `lt index <project folder> --rebuild`. Thresholds in rules/semantic.yaml are tuned for bge-m3, so check them on a recorded call before trusting a new model. Other built-in models (any ONNX export with tokenizer.json) are planned; for now the built-in engine is bge-m3 only.")
+                        Text(LocalizedStringKey(L("set.builtInBgeM3")))
+                        Text(LocalizedStringKey(L("set.ollamaIfYouAlready")))
+                        Text(LocalizedStringKey(L("set.anotherModelAnyEmbedding")))
                     }
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 }
-            } header: { Text("Local AI") } footer: {
-                Text("Audio and voice prints never leave the Mac; only text goes to the Claude API.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            } header: { Text(L("set.localAi")) } footer: {
+                Text(L("set.audioAndVoicePrints")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             .onChange(of: model.config.localAI) { LocalAIService.shared.apply(); model.refreshLocalAI(after: 2) }
             .onAppear { model.refreshLocalAI() }
             Section {
-                Toggle("Identify speakers", isOn: $model.config.speakersEnabled)
-                    .help("Tells the voices on the other side apart (Speaker 2, Speaker 3) and asks \"Who is speaking?\" once a new voice talked for a few seconds. Names you give are used in tips and in the summary, and are remembered for the next calls.")
+                Toggle(L("set.identifySpeakers"), isOn: $model.config.speakersEnabled)
+                    .help(L("set.tellsTheVoicesOn"))
                     .onChange(of: model.config.speakersEnabled) { LocalAIService.shared.apply() }
-                LabeledContent("Status") {
+                LabeledContent(L("set.status")) {
                     let st = LocalAIService.shared.speakersLine()
                     HStack(spacing: 6) {
                         Image(systemName: st.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .foregroundStyle(st.ok ? .green : (model.config.speakersEnabled ? .orange : .secondary))
                         Text(st.text).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         Spacer()
-                        Button("Voice library") {
+                        Button(L("set.voiceLibrary")) {
                             NSWorkspace.shared.open(URL(fileURLWithPath: (CallEngine.shared.appRoot as NSString).appendingPathComponent("voices")))
                         }.controlSize(.small)
                     }
                 }
-                DisclosureGroup("Voice library (\(model.voices.count))") {
-                    if model.voices.isEmpty { Text("Nobody yet. Names you give on calls appear here.").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                DisclosureGroup(L("set.voiceLibraryN", ["n": "\(model.voices.count)"])) {
+                    if model.voices.isEmpty { Text(L("set.nobodyYetNamesYou")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                     ForEach(model.voices) { v in
                         HStack {
                             Text(v.name)
                             Spacer()
-                            Menu(v.side == "team" ? "Team" : (v.side == "client" ? "Client" : "Side?")) {
-                                Button { model.setVoiceSide(v.name, "team") } label: { v.side == "team" ? Label("Team (ours)", systemImage: "checkmark") : Label("Team (ours)", systemImage: "person.2") }
-                                Button { model.setVoiceSide(v.name, "client") } label: { v.side == "client" ? Label("Client side", systemImage: "checkmark") : Label("Client side", systemImage: "building.2") }
+                            Menu(v.side == "team" ? L("set.sideTeam") : (v.side == "client" ? L("set.sideClient") : L("set.sideUnknown"))) {
+                                Button { model.setVoiceSide(v.name, "team") } label: { v.side == "team" ? Label(L("set.teamOurs"), systemImage: "checkmark") : Label(L("set.teamOurs"), systemImage: "person.2") }
+                                Button { model.setVoiceSide(v.name, "client") } label: { v.side == "client" ? Label(L("set.clientSide"), systemImage: "checkmark") : Label(L("set.clientSide"), systemImage: "building.2") }
                             }
                             .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
                             .foregroundStyle(v.side == "team" ? Color.accentColor : .primary)
                             .disabled(CallEngine.shared.isRunning)
-                            .help("Which side this person is on: our team or the client's. Not during a call.")
+                            .help(L("set.whichSideThisPerson"))
                             Menu(SettingsModel.whereLabel(v.wherer)) {
                                 ForEach(model.voiceWheres, id: \.tag) { sc in
                                     Button { model.toggleVoiceWhere(v.name, sc.tag) } label: {
@@ -730,16 +743,16 @@ struct SettingsView: View {
                             }
                             .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
                             .disabled(CallEngine.shared.isRunning)
-                            .help("The calls this voice is suggested and recognised on: all projects, whole workspaces, or any number of projects (tick several). Not during a call.")
+                            .help(L("set.theCallsThisVoice"))
                             Text("\(v.calls) call\(v.calls == 1 ? "" : "s")").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                            Button("Forget") { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
-                                .help("Removes this person's voice prints from the Mac. Not during a call.")
+                            Button(L("set.forget")) { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
+                                .help(L("set.removesThisPersonS"))
                         }
                     }
                 }
                 .onAppear { model.loadVoices() }
-            } header: { Text("Speakers") } footer: {
-                Text("In the tips window: the \"Who is speaking?\" card (pick a name from the project's people, type one, or Skip) and the 🗣 chip under the top bar to rename, fix one line or merge two voices. A voice named on a meeting series is named by itself on the next call of that series when it matches well (Clear speakers in the window forgets it). Each person has a side (Team, ours, or Client) and the calls they are suggested on: all projects, whole workspaces or several projects. The team table of a project config is Team on all projects; anyone else starts as Client of the call's project, and a person heard on another project's call gets that project added. Nothing is saved on a call marked Public in Start call. Voice prints stay in <app folder>/voices on this Mac.")
+            } header: { Text(L("set.speakers")) } footer: {
+                Text(L("set.inTheTipsWindow"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
@@ -750,25 +763,25 @@ struct SettingsView: View {
         Form {
             Section {
                 HStack {
-                    Button("Scan work folder") { model.scanFolders() }
+                    Button(L("set.scanWorkFolder")) { model.scanFolders() }
                         .disabled(model.config.workRoot.isEmpty)
-                        .help("Adds the project folders of your workspaces. Folders that only look like workspaces are listed below to add or ignore; nothing else is added by itself.")
-                    Menu("Add") {
-                        Button("Project folder…") { model.addProjectFolder() }
-                        Button("Workspace folder…") { model.addWorkspaceFolder() }
+                        .help(L("set.addsTheProjectFolders"))
+                    Menu(L("home.finish.add")) {
+                        Button(L("set.projectFolder")) { model.addProjectFolder() }
+                        Button(L("set.workspaceFolder")) { model.addWorkspaceFolder() }
                         Divider()
-                        Button("Import Control Tower configs…") { model.importProjects() }
+                        Button(L("set.importControlTowerConfigs")) { model.importProjects() }
                     }
                     .fixedSize()
                     Button { showProjectsInfo.toggle() } label: { Image(systemName: "info.circle") }
-                        .buttonStyle(.borderless).accessibilityLabel("About projects")
+                        .buttonStyle(.borderless).accessibilityLabel(L("set.aboutProjects"))
                         .popover(isPresented: $showProjectsInfo, arrowEdge: .bottom) { projectsInfo }
                     Spacer()
-                    Button("Reindex all") { IndexService.shared.reindexAll() }
-                        .help("Rebuild the search index of every project with Index on (in the background, paused during calls).")
+                    Button(L("set.reindexAll")) { IndexService.shared.reindexAll() }
+                        .help(L("set.rebuildTheSearchIndex"))
                 }
                 if model.config.workRoot.isEmpty {
-                    Text("Set the work folder in General first.").font(PN.Font.caption).foregroundStyle(PN.C.onMe)
+                    Text(L("set.setTheWorkFolder")).font(PN.Font.caption).foregroundStyle(PN.C.onMe)
                 }
                 if !model.note.isEmpty { Text(model.note).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
             }
@@ -783,18 +796,18 @@ struct SettingsView: View {
                                 Text("\(c.projects) folder\(c.projects == 1 ? "" : "s") inside").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                             }
                             Spacer()
-                            Button("Add as workspace") { model.addWorkspace(c.dir) }
-                            Button("Ignore") { model.ignoreFolder(c.dir) }
+                            Button(L("set.addAsWorkspace")) { model.addWorkspace(c.dir) }
+                            Button(L("set.ignore")) { model.ignoreFolder(c.dir) }
                         }
                     }
-                } header: { Text("Found in your work folder") } footer: {
-                    Text("A workspace's subfolders become its projects. Ignore keeps a folder out of every scan.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                } header: { Text(L("set.foundInYourWork")) } footer: {
+                    Text(L("set.aWorkspaceSSubfolders")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
             ForEach(model.registry.workspaces, id: \.name) { w in
                 Section {
                     let members = model.registry.projects.filter { w.projects.contains($0.slug) }
-                    if members.isEmpty { Text("No projects yet: Scan work folder.").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                    if members.isEmpty { Text(L("set.noProjectsYetScan")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                     ForEach(members, id: \.slug) { p in projectRow(p.slug) }
                 } header: {
                     HStack(spacing: 6) {
@@ -802,10 +815,10 @@ struct SettingsView: View {
                         Text(w.name)
                         if model.workspaceHasNotion(w) { Text("Notion").font(PN.Font.caption).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15))) }
                         Spacer()
-                        Text("calls: " + (w.root as NSString).lastPathComponent).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                        Text(L("set.calls") + (w.root as NSString).lastPathComponent).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         Menu {
-                            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: w.root)]) }
-                            Button("Remove workspace from Pacenote", role: .destructive) { model.removeWorkspace(w) }
+                            Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: w.root)]) }
+                            Button(L("set.removeWorkspaceFromPacenote"), role: .destructive) { model.removeWorkspace(w) }
                         } label: { Image(systemName: "ellipsis.circle") }
                         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     }
@@ -816,11 +829,11 @@ struct SettingsView: View {
             if !others.isEmpty {
                 Section {
                     ForEach(others, id: \.slug) { p in projectRow(p.slug) }
-                } header: { Text(model.registry.workspaces.isEmpty ? "Projects" : "Other projects") }
+                } header: { Text(model.registry.workspaces.isEmpty ? L("settings.tab.projects") : L("set.otherProjects")) }
             }
             if model.registry.projects.isEmpty && model.registry.workspaces.isEmpty && cands.isEmpty {
                 Section {
-                    Text("No projects yet. Scan the work folder, or add a project folder. Any folder works; Notion is not needed.")
+                    Text(L("set.noProjectsYetScan2"))
                         .font(.callout).foregroundStyle(PN.C.text3)
                 }
             }
@@ -831,11 +844,11 @@ struct SettingsView: View {
     /// 2026-10-27 (owner): plain words instead of the long text on top of the tab.
     var projectsInfo: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("How projects work").font(.headline)
-            Text("Each project is a folder on your Mac: work folder > workspace > project. Calls, preparations and notes are saved in the project folder.")
-            Text("Tick a project to see it in Start call. Untick a project that is over; nothing is deleted.")
-            Text("⋯ removes a project or a whole workspace from Pacenote. The folders stay on your Mac; Scan work folder or Add brings them back.")
-            Text("Optional extras come from PM Control Tower (a separate free framework): a project file projects/<project>.md with the team, the Notion pages and the Meetings database. You get it when you set a project up there; then Add > Import Control Tower configs. Without it everything still works from the folders.")
+            Text(L("set.howProjectsWork")).font(.headline)
+            Text(L("set.eachProjectIsA"))
+            Text(L("set.tickAProjectTo"))
+            Text(L("set.removesAProjectOr"))
+            Text(L("set.optionalExtrasComeFrom"))
         }
         .font(.callout).fixedSize(horizontal: false, vertical: true)
         .padding(16).frame(width: 380)
@@ -844,17 +857,17 @@ struct SettingsView: View {
     func projectMenu(_ i: Int) -> some View {
         let p = model.registry.projects[i]
         return Menu {
-            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }.disabled(p.root.isEmpty)
+            Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }.disabled(p.root.isEmpty)
             Divider()
             // Both on by default; kept here for a project whose call text must not leave the Mac.
-            Toggle("Use Claude for tips", isOn: $model.registry.projects[i].apiAllowed)
-            Toggle("Search this folder", isOn: $model.registry.projects[i].index.enabled)
-            Button("Reindex now") { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
+            Toggle(L("set.useClaudeForTips"), isOn: $model.registry.projects[i].apiAllowed)
+            Toggle(L("set.searchThisFolder"), isOn: $model.registry.projects[i].index.enabled)
+            Button(L("set.reindexNow")) { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
             Divider()
-            Button("Remove project from Pacenote", role: .destructive) { model.excludeProject(p.slug) }
+            Button(L("set.removeProjectFromPacenote"), role: .destructive) { model.excludeProject(p.slug) }
         } label: { Image(systemName: "ellipsis.circle") }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Show in Finder, remove from Pacenote")
+        .help(L("set.showInFinderRemove"))
     }
 
     @ViewBuilder func projectRow(_ slug: String) -> some View {
@@ -864,25 +877,25 @@ struct SettingsView: View {
                 Toggle("", isOn: Binding(get: { model.registry.projects[i].status != "archived" },
                                          set: { model.registry.projects[i].status = $0 ? "active" : "archived" }))
                     .toggleStyle(.checkbox).labelsHidden()
-                    .help("Active: offered in Start call. Untick a project that is over; its folder and calls stay.")
+                    .help(L("set.activeOfferedInStart"))
                 Image(systemName: "folder").foregroundStyle(PN.C.text3)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(p.name).foregroundStyle(p.status == "archived" ? .secondary : .primary)
                         if !p.config.isEmpty {
-                            Text("config").font(PN.Font.caption).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15)))
-                                .help("People, Notion pages and settings come from " + p.config)
+                            Text(L("set.config")).font(PN.Font.caption).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15)))
+                                .help(L("set.peopleNotionPagesAnd") + p.config)
                         }
                     }
-                    Text(p.root.isEmpty ? "No folder" : p.root).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
+                    Text(p.root.isEmpty ? L("set.noFolder") : p.root).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer()
                 projectMenu(i)
             }
             .contextMenu {
-                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }.disabled(p.root.isEmpty)
-                Button("Reindex now") { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
-                Button("Remove from Pacenote", role: .destructive) { model.excludeProject(p.slug) }
+                Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }.disabled(p.root.isEmpty)
+                Button(L("set.reindexNow")) { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
+                Button(L("set.removeFromPacenote"), role: .destructive) { model.excludeProject(p.slug) }
             }
         }
     }
@@ -891,21 +904,21 @@ struct SettingsView: View {
     var notion: some View {
         Form {
             Section {
-                Toggle("Write a meeting page after each call", isOn: $model.config.notionWriteSummary)
-                KeyRow(title: "Notion token", hint: "An internal integration secret (ntn_…) from notion.so/profile/integrations. Then open the Notion page where meeting notes should live, ••• > Connections, add your integration.", key: .notionToken, model: model)
+                Toggle(L("set.writeAMeetingPage"), isOn: $model.config.notionWriteSummary)
+                KeyRow(title: L("keys.notion.title"), hint: L("keys.notion.hint"), key: .notionToken, model: model)
                 NotionDestinationView()
-            } header: { Text("Meeting pages") } footer: {
-                Text("After the call: a short summary, decisions, action items, open questions and the transcript, in the call's language. Missed one? Pacenote menu > Send last call to Notion.")
+            } header: { Text(L("set.meetingPages")) } footer: {
+                Text(L("set.afterTheCallA"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             let withConfig = model.registry.projects.filter { !$0.config.isEmpty }
             if !withConfig.isEmpty {
                 Section {
                     ForEach(withConfig, id: \.slug) { p in
-                        LabeledContent(p.name) { Text("its own Meetings database").foregroundStyle(PN.C.text3) }
+                        LabeledContent(p.name) { Text(L("set.itsOwnMeetingsDatabase")).foregroundStyle(PN.C.text3) }
                     }
-                } header: { Text("Projects set up with PM Control Tower") } footer: {
-                    Text("These projects have a PM Control Tower project file (projects/<project>.md) that names their Meetings database, so their pages go there. Every other project uses the database above. Without PM Control Tower this list is empty and nothing here applies.")
+                } header: { Text(L("set.projectsSetUpWith")) } footer: {
+                    Text(L("set.theseProjectsHaveA"))
                         .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
@@ -916,25 +929,25 @@ struct SettingsView: View {
                             mirrorLine
                             Spacer()
                             switch NotionMirrorService.mode(workRoot: model.config.workRoot) {
-                            case "managed": Button("Sync now") { NotionMirrorService.shared.syncNow(); model.mirrorNote = "Syncing in the background…" }
-                            case "none": Button("Set up sync…") { model.setUpMirror() }.disabled(model.config.workRoot.isEmpty)
+                            case "managed": Button(L("set.syncNow")) { NotionMirrorService.shared.syncNow(); model.mirrorNote = "Syncing in the background…" }
+                            case "none": Button(L("set.setUpSync")) { model.setUpMirror() }.disabled(model.config.workRoot.isEmpty)
                             default: EmptyView()
                             }
-                            Button("Check") { model.refreshMirror() }
+                            Button(L("set.check")) { model.refreshMirror() }
                         }
                         if !model.mirrorNote.isEmpty {
                             Text(model.mirrorNote).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                         } else if NotionMirrorService.mode(workRoot: model.config.workRoot) == "external" {
-                            Text("Run by your own schedule (notion-mirror in Tools). Pacenote only reads it.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                            Text(L("set.runByYourOwn")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         } else if NotionMirrorService.mode(workRoot: model.config.workRoot) == "managed" {
-                            Text("Pacenote runs it every 2 hours (7:00-22:00), never during a call.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                            Text(L("set.pacenoteRunsItEvery")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
                     }
                 } label: {
-                    Text("Notion mirror").help("A read-only copy of your Notion as .md files, refreshed by a background job every 2 hours. Pacenote reads it for facts and search; anything newer comes from the Notion API.")
+                    Text(L("set.notionMirror")).help(L("set.aReadOnlyCopy"))
                 }
-            } header: { Text("Local copy of Notion (optional)") } footer: {
-                Text("A read-only copy of your PM Control Tower Notion as files, for facts and search during calls. Needed only with PM Control Tower.")
+            } header: { Text(L("set.localCopyOfNotion")) } footer: {
+                Text(L("set.aReadOnlyCopy2"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
@@ -943,58 +956,42 @@ struct SettingsView: View {
 
     var general: some View {
         Form {
-            if !model.readyItems.allSatisfy(\.ok) {
-                Section {
-                    ForEach(model.readyItems, id: \.title) { it in
-                        HStack {
-                            Image(systemName: it.ok ? "checkmark.circle.fill" : "circle").foregroundStyle(it.ok ? PN.C.turn : PN.C.text3)
-                            Text(it.title)
-                            Spacer()
-                            if !it.ok, let tab = it.tab { Button(it.action) { model.tab = tab } }
-                            else if !it.ok, it.action == "Import…" { Button(it.action) { model.importProjects() } }
-                            else if !it.ok { Text(it.action).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                        }
-                    }
-                } header: { Text("Get ready for the first call") } footer: {
-                    Text("This list disappears when everything is set. The same list is in About.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                }
-            }
             Section {
-                FolderRow(title: "Work folder",
-                          hint: "The folder you connected to Cowork, where your project folders live. Pacenote keeps its files in <work folder>/Tools/LiveTips (the skill sees them) and reads the Notion mirror from <work folder>/_notion.",
-                          path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder("Choose your work folder") })
+                FolderRow(title: L("set.workFolder"),
+                          hint: L("set.workFolderHint"),
+                          path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder(L("set.chooseWork")) })
                     .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
-                LabeledContent("Your name on calls") {
-                    TextField("", text: $model.aliasesText, prompt: Text("e.g. Alex, Alexander, Sasha"))
+                LabeledContent(L("set.yourNameOnCalls")) {
+                    TextField("", text: $model.aliasesText, prompt: Text(L("onboarding.name.placeholder")))
                         .onSubmit { model.saveAliases() }
                         .onChange(of: model.aliasesText) { model.saveAliases() }
                 }
-                .help("Every form people use when they address you. When the other side says it with a question, you get a red \"your turn\" tip.")
-            } header: { Text("Setup") }
+                .help(L("set.everyFormPeopleUse"))
+            } header: { Text(L("set.setup")) }
             Section {
-                Picker("Interface language", selection: $model.config.uiLanguage) {
+                Picker(L("callSettings.uiLang"), selection: $model.config.uiLanguage) {
                     Text("English").tag("en")
                     Text("Українська").tag("uk")
                 }
-                Toggle("Hide the tips window from screen sharing and screenshots", isOn: $model.config.stealthDefault)
-                    .help("Default for new calls. The tips window menu changes it for one call only.")
+                Toggle(L("set.hideTheTipsWindow"), isOn: $model.config.stealthDefault)
+                    .help(L("set.defaultForNewCalls"))
                 Toggle(isOn: $showStats) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Show this week's numbers on Home")
-                        Text("Calls, time on calls, Claude spend, the chart and the monthly spend. Turn off to show Home to colleagues without your numbers.")
+                        Text(L("set.showThisWeekS"))
+                        Text(L("set.callsTimeOnCalls"))
                             .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
                 Toggle(L("settings.general.dock"), isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
-            } header: { Text("Behaviour") } footer: {
+            } header: { Text(L("set.behaviour")) } footer: {
                 HStack {
-                    Text("Settings save automatically and survive updates: options in Application Support/LiveTips, keys in the Keychain.")
-                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.config]) }.buttonStyle(.pnTertiary)
+                    Text(L("set.settingsSaveAutomaticallyAnd"))
+                    Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([AppPaths.config]) }.buttonStyle(.pnTertiary)
                 }
                 HStack {
-                    Text("Your corrections (cards, On me, preparations, titles) are logged in edits.jsonl; each new preparation learns from them.")
-                    Button("Show log") {
+                    Text(L("set.yourCorrectionsCardsOn"))
+                    Button(L("set.showLog")) {
                         if !FileManager.default.fileExists(atPath: EditLog.url.path) { FileManager.default.createFile(atPath: EditLog.url.path, contents: nil) }
                         NSWorkspace.shared.activateFileViewerSelecting([EditLog.url])
                     }.buttonStyle(.pnTertiary)
@@ -1004,15 +1001,15 @@ struct SettingsView: View {
             Section {
                 Toggle(isOn: $model.config.consentSay) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Play an audio consent message")
-                        Text("When a recording starts, macOS speaks the message through your speakers, so the others hear it through your microphone.")
+                        Text(L("set.playAnAudioConsent"))
+                        Text(L("set.whenARecordingStarts"))
                             .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
                 Toggle(isOn: $model.config.consentChat) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Copy a consent message for the meeting chat")
-                        Text("When a recording starts, the message is copied and a notification reminds you to paste it into the chat (Command-V).")
+                        Text(L("set.copyAConsentMessage"))
+                        Text(L("set.whenARecordingStarts2"))
                             .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
@@ -1020,8 +1017,8 @@ struct SettingsView: View {
                     TextField("English", text: $model.config.consentTextEN, axis: .vertical).lineLimit(2...4)
                     TextField("Українська", text: $model.config.consentTextUK, axis: .vertical).lineLimit(2...4)
                 }
-            } header: { Text("Recording consent") } footer: {
-                Text("Off by default. The message follows the call's language. Check the rules of your company and your clients' countries: in some places everyone must agree to a recording.")
+            } header: { Text(L("set.recordingConsent")) } footer: {
+                Text(L("set.offByDefaultThe"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
@@ -1029,8 +1026,8 @@ struct SettingsView: View {
                 ShortcutRow(action: .pause)
                 ShortcutRow(action: .mute)
                 ShortcutRow(action: .compact)
-            } header: { Text("Shortcuts") } footer: {
-                Text("They work from any app during a call, also while the meeting app has the focus. Change: press the new keys with Control, Option or Command (Esc cancels). Pause stops the transcript and the tips for both sides.")
+            } header: { Text(L("set.shortcuts")) } footer: {
+                Text(L("set.theyWorkFromAny"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
@@ -1039,13 +1036,13 @@ struct SettingsView: View {
                         Text(model.config.effectiveAppRoot(appSupport: AppPaths.support.path))
                             .font(.callout).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
                         Spacer()
-                        Button("Choose…") { if let p = model.chooseFolder("Choose the app folder") { model.config.appRoot = p } }
-                        if !model.config.appRoot.isEmpty { Button("Default") { model.config.appRoot = "" } }
+                        Button(L("onboarding.folder.choose")) { if let p = model.chooseFolder(L("set.chooseApp")) { model.config.appRoot = p } }
+                        if !model.config.appRoot.isEmpty { Button(L("set.default")) { model.config.appRoot = "" } }
                     }
                 } label: {
-                    Text("App folder").help("Where the app keeps its recorder core, local AI model, state and logs. Default: <work folder>/Tools/LiveTips. When it changes, the files move there by themselves (not during a call).")
+                    Text(L("set.appFolder")).help(L("set.whereTheAppKeeps"))
                 }
-            } header: { Text("Advanced") }
+            } header: { Text(L("set.advanced")) }
         }
         .formStyle(.grouped)
     }
@@ -1053,9 +1050,9 @@ struct SettingsView: View {
     @ViewBuilder var mirrorLine: some View {
         switch model.mirrorHealth {
         case "ok": Label(model.mirrorLastRunText, systemImage: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
-        case "stale": Label("Stale: " + model.mirrorLastRunText, systemImage: "exclamationmark.triangle.fill").foregroundStyle(PN.C.onMe)
-        case "failed": Label("Last run failed", systemImage: "xmark.octagon.fill").foregroundStyle(PN.C.danger)
-        default: Label(model.config.workRoot.isEmpty ? "Set the work folder first" : "No mirror found (sync not set up)", systemImage: "circle.dashed").foregroundStyle(PN.C.text3)
+        case "stale": Label(L("set.stale") + model.mirrorLastRunText, systemImage: "exclamationmark.triangle.fill").foregroundStyle(PN.C.onMe)
+        case "failed": Label(L("set.lastRunFailed"), systemImage: "xmark.octagon.fill").foregroundStyle(PN.C.danger)
+        default: Label(model.config.workRoot.isEmpty ? L("set.workFirst") : L("set.noMirror"), systemImage: "circle.dashed").foregroundStyle(PN.C.text3)
         }
     }
 }
@@ -1067,44 +1064,44 @@ struct HowItWorksView: View {
             Section {
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
-                        box("Your mic + call audio", "captured on the Mac", .gray)
+                        box(L("how.0"), L("how.1"), .gray)
                         arrow
-                        box("Whisper", "speech to text on the Mac", .gray)
+                        box("Whisper", L("how.2"), .gray)
                         arrow
-                        box("Transcript", "with speaker names", .gray)
+                        box(L("how.3"), L("how.4"), .gray)
                     }
                     Image(systemName: "arrow.down").foregroundStyle(PN.C.text3)
                     HStack(alignment: .top, spacing: 10) {
-                        box("On the Mac, 1-2 s", "keyword rules, prepared facts and cards; Local AI matches them by meaning", PN.C.turn)
-                        box("Claude, about 5 s", "classifies new lines, writes tips, answers asks and HELP NOW, searches the project folder", .blue)
+                        box(L("how.5"), L("how.6"), PN.C.turn)
+                        box(L("how.7"), L("how.8"), .blue)
                     }
                     Image(systemName: "arrow.down").foregroundStyle(PN.C.text3)
-                    box("Tips window", "facts, tips, answers, transcript; nothing is sent to anyone", PN.C.onMe)
+                    box(L("how.9"), L("how.10"), PN.C.onMe)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
-            } header: { Text("The flow") }
+            } header: { Text(L("set.theFlow")) }
 
             Section {
-                row("waveform", "Recording", "Your microphone and the call's system audio. Audio never leaves the Mac; the text transcript is written to the project's live folder.")
-                row("text.bubble", "Transcription", "Whisper (large-v3-turbo) runs on the Mac in the languages chosen in Start call. Ukrainian only is the default; add English when the call mixes languages.")
-                row("person.2.wave.2", "Speakers", "A small voice model on the Mac tells voices apart. You name a voice once in the window; the name is remembered for the next calls of the same meeting series (project + title) and filled in by itself when the voice matches well. \"Clear speakers\" in the window forgets them.")
-                row("cpu", "Local AI (optional)", "bge-m3, an embedding model on the Mac, not a chat model. It finds prepared facts and cards by meaning, builds the search index of each project folder (updated after files change, paused during calls) and helps HELP NOW. It never writes tips by itself.")
-            } header: { Text("On your Mac") }
+                row("waveform", L("how.11"), L("how.12"))
+                row("text.bubble", L("how.13"), L("how.14"))
+                row("person.2.wave.2", L("how.15"), L("how.16"))
+                row("cpu", L("how.17"), L("how.18"))
+            } header: { Text(L("set.onYourMac")) }
 
             Section {
-                row("doc.text.magnifyingglass", "What Claude gets", "Only for projects with Claude tips on: the Cowork preparation (brief, facts, cards, outline), the call context you typed, the project's Current State from the Notion mirror, passages from the project folder found for that context, a digest of recent calls, and the last minutes of the transcript with speaker names. This context is cached for an hour, so each tip costs little.")
-                row("bolt", "When Claude is called", "A direct question or request to you, a date, an owner or a number goes straight to a tip; other new lines are checked by a fast model (Haiku) and turned into a tip only when they need one. Your asks in the window, HELP NOW and the folder search always go to Claude.")
-                row("list.bullet.rectangle", "Call picture", "Every ~10 s a fast model (Haiku) updates the picture of the call: the topic and whose it is, open questions and requests to you, what you took on, decisions, and which speech points you said. The window shows it as the status line, the On me panel and the speech card; an open question to you that no tip covered gets one red tip.")
-                row("folder", "Folder search", "The folder button: Claude turns your question into a few searches, reads the best passages from the project's files (by meaning with Local AI on, by words otherwise) and answers with the file names, in 10-30 s.")
-                row("checkmark.seal", "After the call", "A wrap-up goes to the meeting's page in Notion (when the Notion token is set) and a quality check of the tips runs in the background.")
-                row("dollarsign.circle", "Limits", "The call and monthly budgets in Settings > AI stop Claude when reached; the Mac part keeps working.")
-            } header: { Text("Claude (cloud)") }
+                row("doc.text.magnifyingglass", L("how.19"), L("how.20"))
+                row("bolt", L("how.21"), L("how.22"))
+                row("list.bullet.rectangle", L("how.23"), L("how.24"))
+                row("folder", L("how.25"), L("how.26"))
+                row("checkmark.seal", L("how.27"), L("how.28"))
+                row("dollarsign.circle", L("how.29"), L("how.30"))
+            } header: { Text(L("set.claudeCloud")) }
 
             Section {
-                row("checkmark.circle", "Count on", "Instant prepared facts; a tip within seconds after a direct question; answers to what you type; the transcript and speaker names saved in the project folder; nothing sent to the client or posted anywhere by itself.")
-                row("exclamationmark.triangle", "Do not count on", "Names, numbers and terms heard right every time (check them); similar voices always told apart; short replies tagged; Claude seeing your screen, chats or files outside the project folder; information newer than the last Notion mirror or index update; numbers Claude was not given. A project with Claude off gets only the Mac part.")
-            } header: { Text("What to expect") }
+                row("checkmark.circle", L("how.31"), L("how.32"))
+                row("exclamationmark.triangle", L("how.33"), L("how.34"))
+            } header: { Text(L("set.whatToExpect")) }
         }
         .formStyle(.grouped)
     }
@@ -1136,6 +1133,7 @@ struct HowItWorksView: View {
 
 struct AboutView: View {
     @ObservedObject var model: SettingsModel
+    @ObservedObject var setup = SetupWindow.model
     @State private var checking = false
     @State private var updateNote = ""
     @State private var updateURL: URL?
@@ -1209,20 +1207,30 @@ struct AboutView: View {
                     Link(L("settings.about.license"), destination: URL(string: "https://github.com/bodco/live-tips/blob/main/LICENSE")!)
                 }
             } header: { Text(L("settings.about.yourData")) }
+            // Pacenote 0.8 (F4, spec 7-8): the technical install status lives here (onboarding shows one progress line).
             Section {
-                check(isOK(.claudeAPIKey), "Claude API key works", "Keys")
-                check(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized, "Microphone allowed", "asked on the first call")
-                check(!model.registry.projects.isEmpty, "Projects imported", "Projects")
-                check(!model.config.workRoot.isEmpty, "Work folder set", "General")
-                check(!model.config.nameAliases.isEmpty, "Your name on calls", "General")
-                check(model.mirrorHealth == "ok", "Notion mirror is fresh", "General")
-                check(model.config.localAI.enabled, "Local AI on", "AI")
-            } header: { Text(L("settings.about.ready")) } footer: {
+                ForEach(setup.steps) { st in
+                    HStack(spacing: 8) {
+                        Image(systemName: st.state == .ok ? "checkmark.circle.fill" : st.state == .failed ? "xmark.circle.fill" : "circle")
+                            .foregroundStyle(st.state == .ok ? PN.C.turn : st.state == .failed ? PN.C.danger : PN.C.text3)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(st.title)
+                            if !st.detail.isEmpty { Text(st.detail).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
+                        }
+                    }
+                }
+                HStack {
+                    Button(L("about.components.check")) { Task { await setup.checkAll() } }.buttonStyle(.pnTertiary).disabled(setup.busy)
+                    Button(L("about.components.open")) { SetupWindow.show() }.buttonStyle(.pnTertiary)
+                }
+            } header: { Text(L("about.components")) } footer: {
                 Text(L("settings.about.readyFooter", ["help": HotKeys.shared.combo(.help).display, "pause": HotKeys.shared.combo(.pause).display]))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
         .formStyle(.grouped)
+        .onAppear { if setup.steps.allSatisfy({ $0.state == .unknown }) { Task { await setup.checkAll() } } }
     }
 
     func isOK(_ k: SecretStore.Key) -> Bool {
@@ -1264,6 +1272,23 @@ final class SettingsWindow {
             w.isReleasedWhenClosed = false
             window = w
         }
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+/// "How Pacenote works" moved from Settings to the Help menu (Pacenote 0.8, F4, spec 8).
+@MainActor
+enum HowItWorksWindow {
+    static var window: NSWindow?
+    static func show() {
+        if window == nil {
+            let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { HowItWorksView().frame(width: 680, height: 620) }))
+            w.isReleasedWhenClosed = false
+            window = w
+        }
+        window?.title = L("settings.how.title")
+        window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

@@ -83,29 +83,29 @@ final class LocalAIService: @unchecked Sendable {
     /// Speakers: the voice model in <app folder>/models and the people in the voice library.
     func speakersLine() -> (ok: Bool, text: String) {
         let c = config
-        if !c.speakersEnabled { return (false, "Off: the other side is one speaker (\"Them\")") }
+        if !c.speakersEnabled { return (false, L("lai.voicesOff")) }
         let models = (appRoot as NSString).appendingPathComponent("models")
         let hasModel = ((try? FileManager.default.contentsOfDirectory(atPath: models)) ?? []).contains { $0.hasPrefix("wespeaker") && $0.hasSuffix(".onnx") }
-        if !hasModel { return (false, "Voice model not installed: open Setup and install Voices") }
+        if !hasModel { return (false, L("lai.noVoiceModel")) }
         let lib = (appRoot as NSString).appendingPathComponent("voices/voices.json")
         var n = 0
         if let d = try? Data(contentsOf: URL(fileURLWithPath: lib)), let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
             n = ((o["people"] as? [String: Any])?.count) ?? ((o["people"] as? [Any])?.count) ?? 0
         }
-        return (true, "On. Voice library: \(n) \(n == 1 ? "person" : "people") (stays on this Mac)")
+        return (true, L("lai.voicesOn", ["n": "\(n)"]))
     }
 
     /// One short status line for Settings and the menu.
     func statusLine() -> (ok: Bool, text: String) {
         let c = config
-        if !c.localAI.enabled { return (false, "Off: facts and cards match by keywords only") }
+        if !c.localAI.enabled { return (false, L("lai.off")) }
         if c.localAI.engine == "embedded" {
-            if !modelInstalled { return (false, "Built-in model is not installed in \(modelDir)") }
-            return Self.ping(Self.builtinURL) ? (true, "Built-in engine is running (bge-m3, on this Mac)")
-                                              : (false, "Built-in engine is not running yet")
+            if !modelInstalled { return (false, L("lai.noModel", ["path": modelDir])) }
+            return Self.ping(Self.builtinURL) ? (true, L("lai.running"))
+                                              : (false, L("lai.notRunning"))
         }
-        return Self.ping(c.localAI.ollamaURL) ? (true, "Ollama answers at \(c.localAI.ollamaURL)")
-                                              : (false, "Ollama does not answer at \(c.localAI.ollamaURL)")
+        return Self.ping(c.localAI.ollamaURL) ? (true, L("lai.ollamaOK", ["url": c.localAI.ollamaURL]))
+                                              : (false, L("lai.ollamaNo", ["url": c.localAI.ollamaURL]))
     }
 
     static func ping(_ base: String) -> Bool {

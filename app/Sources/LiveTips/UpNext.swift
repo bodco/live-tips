@@ -111,7 +111,7 @@ final class UpNext: ObservableObject {
     /// Prepare now: starts at once, or waits in line behind the preparation that is running.
     /// Returns an error line, or nil.
     func prepare(_ m: StartCallModel) -> String? {
-        guard let r = m.prepRequest() else { return "Choose a project first." }
+        guard let r = m.prepRequest() else { return L("call.chooseProjectFirst") }
         m.prepFailed = false
         let runner = PrepRunner.shared
         if runner.running {

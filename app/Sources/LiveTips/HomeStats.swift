@@ -96,8 +96,8 @@ struct WeekStats: View {
             if let d = day {
                 HStack(spacing: 6) {
                     Label(df.string(from: d), systemImage: "calendar").font(PN.Font.caption.weight(.semibold))
-                    Button { day = nil } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.borderless).accessibilityLabel("Clear").foregroundStyle(PN.C.text3)
-                        .help("Back to the whole period")
+                    Button { day = nil } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.borderless).accessibilityLabel(L("stats.clear")).foregroundStyle(PN.C.text3)
+                        .help(L("stats.backToTheWhole"))
                 }
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: compact ? 120 : 150), spacing: 10)], spacing: 10) {
@@ -108,8 +108,8 @@ struct WeekStats: View {
             }
             if !bars.isEmpty {
                 Chart(bars) { b in
-                    BarMark(x: .value("Day", b.date, unit: .day), y: .value("Minutes", b.minutes))
-                        .foregroundStyle(by: .value("Project", b.project))
+                    BarMark(x: .value(LocalizedStringKey(L("stats.axisDay")), b.date, unit: .day), y: .value(LocalizedStringKey(L("stats.axisMinutes")), b.minutes))
+                        .foregroundStyle(by: .value(LocalizedStringKey(L("stats.axisProject")), b.project))
                         .opacity(day == nil || cal.isDate(b.date, inSameDayAs: day!) ? 1 : 0.35)
                 }
                 .chartXScale(domain: rs...re.addingTimeInterval(-1))
@@ -154,7 +154,7 @@ struct WeekStats: View {
                             .font(PN.Font.caption)
                             .contentShape(Rectangle())
                             .onTapGesture(count: 2) { NSWorkspace.shared.open(URL(fileURLWithPath: r.file)) }
-                            .help("Double-click to open the transcript")
+                            .help(L("stats.doubleClickToOpen"))
                         }
                     }
                     .padding(.top, 4)
@@ -208,75 +208,5 @@ struct WeekStats: View {
 
     private func fact(_ label: String, _ value: String) -> some View {
         HStack(spacing: 4) { Text(label + ":").foregroundStyle(PN.C.text3); Text(value).lineLimit(1) }
-    }
-}
-
-/// 2026-10-27 (owner): Prepare from Home asks first what the preparation is based on: the project or workspace
-/// and "What matters on this call" (a regular meeting comes with the text of its last call).
-struct PrepareSheet: View {
-    @ObservedObject var model: StartCallModel
-    var onPrepare: () -> Void
-    var onCancel: () -> Void
-    var onMore: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                IconTile(symbol: "sparkles", size: 40)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Prepare \u{201C}\(model.effectiveTitle)\u{201D}").font(.title3.weight(.semibold)).lineLimit(2)
-                    Text(model.callDate.formatted(date: .abbreviated, time: .shortened)).font(.callout).foregroundStyle(PN.C.text3)
-                }
-            }
-            if let a = model.appliedFrom { Label(a, systemImage: "arrow.uturn.backward.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-            Picker("Project or workspace", selection: $model.target) {
-                if model.target.isEmpty { Text("Choose…").tag("") }
-                Section("Projects") {
-                    ForEach(model.registry.projects.filter { $0.status != "archived" }, id: \.slug) { p in Text(p.name).tag("project:" + p.slug) }
-                }
-                Section("Workspaces") {
-                    ForEach(model.registry.workspaces, id: \.name) { w in Text(w.name).tag("workspace:" + w.name) }
-                }
-            }
-            .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep() }
-            // 2026-10-28 (owner): the folders or single files this preparation reads first.
-            HStack(spacing: 6) {
-                Button { model.addFolders() } label: { Label("Add folder or file", systemImage: "folder.badge.plus") }
-                    .buttonStyle(.pnTertiary)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(model.folders, id: \.self) { f in
-                            HStack(spacing: 4) {
-                                Image(systemName: StartCallModel.isDir(f) ? "folder" : "doc").font(PN.Font.caption)
-                                Text((f as NSString).lastPathComponent).font(PN.Font.caption).lineLimit(1)
-                                Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(PN.Font.caption) }
-                                    .buttonStyle(.plain).foregroundStyle(PN.C.text3)
-                            }
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                            .help(f)
-                        }
-                    }
-                }
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("What matters on this call").font(.callout.weight(.medium))
-                TextEditor(text: $model.context)
-                    .font(.callout).scrollContentBackground(.hidden).padding(6)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
-                    .frame(height: 150)
-                Text("The preparation reads what you write here (goal, people, questions, documents and links), the added folders and files, the project folder, the local Notion copy and earlier calls. It does not start the call.")
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            }
-            HStack {
-                Button("More settings…", action: onMore).buttonStyle(.pnTertiary)
-                Spacer()
-                Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
-                Button("Prepare", action: onPrepare).keyboardShortcut(.defaultAction).buttonStyle(.pnPrimary).disabled(model.target.isEmpty)
-            }
-        }
-        .padding(20)
-        .frame(width: 560)
-        .onAppear { model.refreshTemplate() }
     }
 }

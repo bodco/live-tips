@@ -65,7 +65,7 @@ final class CallEngine {
         var p: [String] = []
         let fm = FileManager.default
         if !fm.fileExists(atPath: (appRoot as NSString).appendingPathComponent("src/transcriber.py")) {
-            p.append("Recorder core not installed in \(appRoot)")
+            p.append(L("eng.noCore", ["path": appRoot]))
         }
         if c.engine.python.isEmpty || !fm.isExecutableFile(atPath: c.engine.python) { p.append("Recorder Python not set") }
         return p
@@ -128,7 +128,7 @@ final class CallEngine {
             try? s.run()
             s.waitUntilExit()
         }
-        return probe() ? nil : "The audio helper is blocked by macOS (killed at launch). Open Settings > About and run Setup again, or reinstall Pacenote."
+        return probe() ? nil : L("eng.helperBlocked")
     }
 
     /// Starts recording. `request` goes to control/start.json (project_dir, title, slug, langs, call_type, audience).
@@ -154,7 +154,7 @@ final class CallEngine {
         req["prompter"] = false            // Live Tips shows its own window
         req["stem_suffix"] = ".app"        // own files (<stem>.app.*): the skill can record the same call
         req["ui_lang"] = config.uiLanguage == "uk" ? "uk" : "en"   // service lines in the transcript follow the window language
-        guard let d = try? JSONSerialization.data(withJSONObject: req, options: [.prettyPrinted, .sortedKeys]) else { return "Bad request" }
+        guard let d = try? JSONSerialization.data(withJSONObject: req, options: [.prettyPrinted, .sortedKeys]) else { return L("eng.badRequest") }
         try? d.write(to: URL(fileURLWithPath: (control as NSString).appendingPathComponent("start.json")), options: .atomic)
 
         let p = Process()
@@ -164,7 +164,7 @@ final class CallEngine {
         let log = FileHandle.forAppending(path: (logs as NSString).appendingPathComponent("recorder.log"))
         p.standardOutput = log
         p.standardError = log
-        do { try p.run() } catch { return "Could not start the recorder: \(error.localizedDescription)" }
+        do { try p.run() } catch { return L("eng.cantStart", ["err": error.localizedDescription]) }
         recorder = p
         IndexService.shared.pause()        // the indexer waits while Whisper and the tips engine run
         self.onReady = onReady
@@ -236,7 +236,7 @@ final class CallEngine {
                 if fm.fileExists(atPath: tmp) { try? fm.moveItem(atPath: tmp, toPath: stem + ext) }
             }
         }
-        notify("Preparation ready: loaded into the call")
+        notify(L("eng.prepLoaded"))
     }
 
     func adoptPrep(file: String) {
@@ -389,9 +389,9 @@ final class CallEngine {
                 if (d["ok"] as? Bool) == true, let url = d["url"] as? String {
                     self.notionResult = url
                     MainActor.assumeIsolated { CallHistory.shared.setNotion(file: file, url: url) }
-                    self.notify(((d["created"] as? Bool) == true ? "Meeting page created in Notion" : "Wrap-up added to the meeting page in Notion"), url: url)
+                    self.notify(((d["created"] as? Bool) == true ? L("eng.notionCreated") : L("eng.notionAdded")), url: url)
                 } else {
-                    self.notionResult = "Notion: " + ((d["error"] as? String) ?? "failed, see logs/notion.log")
+                    self.notionResult = "Notion: " + ((d["error"] as? String) ?? L("eng.notionFailed"))
                     self.notify(self.notionResult)
                 }
             }
@@ -437,13 +437,13 @@ final class CallEngine {
             var parts: [String] = []
             for eng in ["app", "skill"] {
                 if let e = d[eng] as? [String: Any], let n = e["n"] as? Int, n > 0, let m = e["mean"] as? Double {
-                    parts.append(String(format: "%@ %.1f/5 (%d tips)", eng, m, n))
+                    parts.append(L("eng.judgeLine", ["eng": eng, "mean": String(format: "%.1f", m), "n": "\(n)"]))
                 }
             }
-            let line = parts.isEmpty ? "Tips rated: none" : "Tips rated: " + parts.joined(separator: ", ")
+            let line = parts.isEmpty ? L("eng.judgeNone") : L("eng.judge") + parts.joined(separator: ", ")
             DispatchQueue.main.async { self?.judgeResult = line; self?.judgeRunning = nil }
         }
-        do { try p.run(); judgeRunning = p } catch { judgeResult = "Tips rated: the check could not start" }
+        do { try p.run(); judgeRunning = p } catch { judgeResult = L("eng.judgeFailed") }
     }
 
     func notify(_ text: String, url: String? = nil, settingsTab: String? = nil) {
@@ -507,7 +507,7 @@ final class CallEngine {
         if c.consentChat {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
-            notify("Consent message copied: paste it into the meeting chat (Command-V)")
+            notify(L("eng.consentCopied"))
         }
         if c.consentSay {
             DispatchQueue.global().async {

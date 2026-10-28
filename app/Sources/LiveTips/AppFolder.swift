@@ -13,11 +13,11 @@ enum AppFolderMover {
         let o = (old as NSString).standardizingPath, n = (new as NSString).standardizingPath
         guard o != n, fm.fileExists(atPath: o) else { return r }
         if n.hasPrefix(o + "/") || o.hasPrefix(n + "/") {
-            r.error = "The new folder is inside the old one (or the other way round). Choose a separate folder."
+            r.error = L("af.inside")
             return r
         }
         do { try fm.createDirectory(atPath: n, withIntermediateDirectories: true) } catch {
-            r.error = "Could not create \(n): \(error.localizedDescription)"
+            r.error = L("af.cantCreate", ["path": n, "err": error.localizedDescription])
             return r
         }
         let items = (try? fm.contentsOfDirectory(atPath: o)) ?? []
@@ -38,19 +38,19 @@ enum AppFolderMover {
     /// Runs the move with the local engine stopped, then tells the PM what happened.
     static func relocate(from old: String, to new: String) {
         if CallEngine.shared.isRunning {
-            alert("The app folder was not moved", "A call is being recorded. End the call, then choose the folder again.")
+            alert(L("af.notMoved"), L("af.callRunning"))
             return
         }
         LocalAIService.shared.stop()
         let r = move(from: old, to: new)
         LocalAIService.shared.apply()
-        if let e = r.error { alert("The app folder was not moved", e); return }
+        if let e = r.error { alert(L("af.notMoved"), e); return }
         if r.moved.isEmpty && r.skipped.isEmpty { return }
-        var text = "Moved to \(new): " + (r.moved.isEmpty ? "nothing" : r.moved.joined(separator: ", ")) + "."
+        var text = L("af.movedTo", ["path": new]) + (r.moved.isEmpty ? L("af.nothing") : r.moved.joined(separator: ", ")) + "."
         if !r.skipped.isEmpty {
-            text += "\n\nLeft in \(old) because the new folder already has them: " + r.skipped.joined(separator: ", ") + "."
+            text += "\n\n" + L("af.leftIn", ["path": old]) + r.skipped.joined(separator: ", ") + "."
         }
-        alert("App folder moved", text)
+        alert(L("af.moved"), text)
     }
 
     static func alert(_ title: String, _ text: String) {

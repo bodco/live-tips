@@ -150,10 +150,10 @@ final class PrepRunner: ObservableObject {
 
     /// Starts the prep. Returns an error line, or nil when it started.
     func start(_ r: Request) -> String? {
-        if running { return "A preparation is already running" }
-        guard let claude = Self.claudePath else { return "Claude Code (the claude command) is not installed" }
+        if running { return L("prep.err.running") }
+        guard let claude = Self.claudePath else { return L("prep.err.noClaude") }
         let c = AppConfig.load(from: AppPaths.config)
-        guard let skill = Self.skillDir(workRoot: c.workRoot) else { return "The live-tips skill folder was not found" }
+        guard let skill = Self.skillDir(workRoot: c.workRoot) else { return L("prep.err.noSkill") }
         let appRoot = c.effectiveAppRoot(appSupport: AppPaths.support.path)
         let lt = (appRoot as NSString).appendingPathComponent("bin/lt")
         let live = (r.root as NSString).appendingPathComponent("live")
@@ -216,7 +216,7 @@ final class PrepRunner: ObservableObject {
         End with one line: the sources used.
         """
         if useAPI && !hasAPIKey { return "No Claude API key in Settings > Keys" }
-        if !useAPI && loggedIn == false { return "Claude Code is not signed in: Log in, or switch to API key" }
+        if !useAPI && loggedIn == false { return L("prep.err.notSigned") }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
         let py = c.engine.python
@@ -290,17 +290,17 @@ final class PrepRunner: ObservableObject {
                 let tail = (try? String(contentsOfFile: (logs as NSString).appendingPathComponent("prep-claude.log"), encoding: .utf8))
                     .map { String($0.suffix(600)) } ?? ""
                 if !ok && (tail.contains("authenticate") || tail.contains("OAuth") || tail.contains("log in") || tail.contains("/login")) {
-                    self.result = "Claude Code is not signed in: Log in, or switch to API key"
+                    self.result = L("prep.err.notSigned")
                     self.refreshAuth()
                 } else if !ok && (tail.lowercased().contains("usage limit") || tail.lowercased().contains("rate limit")) {
-                    self.result = "The Claude account hit its limit: switch to API key and try again"
+                    self.result = L("prep.err.limit")
                 } else {
-                    let cost = self.costUSD.map { String(format: " · $%.2f%@", $0, self.useAPI ? "" : " (plan)") } ?? ""
-                    self.result = ok ? "✓ Preparation ready in \(max(1, mins)) min" + cost : "Preparation failed (exit \(proc.terminationStatus)); see logs/prep-claude.log"
+                    let cost = self.costUSD.map { String(format: " · $%.2f", $0) + (self.useAPI ? "" : L("prep.plan")) } ?? ""
+                    self.result = ok ? L("prep.readyIn", ["min": "\(max(1, mins))"]) + cost : L("prep.failedExit", ["code": "\(proc.terminationStatus)"])
                 }
             }
         }
-        do { try p.run() } catch { return "Could not start Claude Code: \(error.localizedDescription)" }
+        do { try p.run() } catch { return L("prep.err.cantStart", ["err": error.localizedDescription]) }
         process = p
         running = true
         startedAt = Date()
@@ -357,7 +357,7 @@ final class PrepRunner: ObservableObject {
             let ln = lineBuf.subdata(in: lineBuf.startIndex..<r.lowerBound)
             lineBuf.removeSubrange(lineBuf.startIndex..<r.upperBound)
             guard let o = try? JSONSerialization.jsonObject(with: ln) as? [String: Any] else { continue }
-            if (o["type"] as? String) == "system", progress < 0.05 { set(0.05, "Reading the instructions", "") }
+            if (o["type"] as? String) == "system", progress < 0.05 { set(0.05, L("prep.st.instructions"), "") }
             if (o["type"] as? String) == "result" { costUSD = (o["total_cost_usd"] as? Double) ?? (o["total_cost_usd"] as? NSNumber)?.doubleValue }
             guard (o["type"] as? String) == "assistant", let msg = o["message"] as? [String: Any],
                   let content = msg["content"] as? [[String: Any]] else { continue }
@@ -368,19 +368,19 @@ final class PrepRunner: ObservableObject {
                 let file = (path as NSString).lastPathComponent
                 switch name {
                 case "Write", "Edit":
-                    if path.hasSuffix(".brief.md") { set(0.70, "Writing the brief", file) }
-                    else if path.hasSuffix(".cards.json") { set(0.80, "Writing the cards", file) }
-                    else if path.hasSuffix(".facts.json") { set(0.87, "Writing the fact book", file) }
-                    else if path.hasSuffix(".outline.json") { set(0.90, "Writing the outline", file) }
-                    else { set(max(progress, 0.65), "Writing", file) }
+                    if path.hasSuffix(".brief.md") { set(0.70, L("prep.st.brief"), file) }
+                    else if path.hasSuffix(".cards.json") { set(0.80, L("prep.st.cards"), file) }
+                    else if path.hasSuffix(".facts.json") { set(0.87, L("prep.st.facts"), file) }
+                    else if path.hasSuffix(".outline.json") { set(0.90, L("prep.st.outline"), file) }
+                    else { set(max(progress, 0.65), L("prep.st.writing"), file) }
                 case "Bash":
                     let cmd = input["command"] as? String ?? ""
-                    if cmd.contains("prep-check") { set(max(progress, 0.93), "Checking the preparation", "lt prep-check") }
-                    else if cmd.contains("digest") { set(max(progress, 0.2), "Reading the recent calls", "lt digest") }
+                    if cmd.contains("prep-check") { set(max(progress, 0.93), L("prep.st.check"), "lt prep-check") }
+                    else if cmd.contains("digest") { set(max(progress, 0.2), L("prep.st.recent"), "lt digest") }
                     else if cmd.contains("textutil") { filesRead += 1; sources(file.isEmpty ? "a document" : file) }
                     else { sources("") }
                 case "Read":
-                    if path.hasPrefix(skill) { set(max(progress, 0.08), "Reading the instructions", file) }
+                    if path.hasPrefix(skill) { set(max(progress, 0.08), L("prep.st.instructions"), file) }
                     else { filesRead += 1; sources(file) }
                 case "WebFetch":
                     filesRead += 1; sources("web: " + String(((input["url"] as? String) ?? "").prefix(60)))
@@ -397,7 +397,7 @@ final class PrepRunner: ObservableObject {
     private func sources(_ what: String) {
         guard progress < 0.65 else { return }
         let p = min(0.64, 0.15 + Double(filesRead) * 0.02)
-        set(max(progress, p), "Reading the sources (\(filesRead) file\(filesRead == 1 ? "" : "s"))", what)
+        set(max(progress, p), L("prep.st.sources", ["n": "\(filesRead)"]), what)
     }
 
     private func set(_ p: Double, _ s: String, _ d: String) { progress = p; stage = s; detail = d }

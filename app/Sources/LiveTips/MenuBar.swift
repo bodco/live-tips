@@ -128,6 +128,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         win.addItem(withTitle: L("menu.minimize"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         win.addItem(withTitle: L("menu.close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         winItem.submenu = win
+        // Pacenote 0.8 (F4): Help > How Pacenote works (it left Settings).
+        let helpItem = NSMenuItem()
+        main.addItem(helpItem)
+        let help = NSMenu(title: L("menu.help"))
+        help.addItem(withTitle: L("settings.how.title"), action: #selector(openHowItWorks), keyEquivalent: "").target = self
+        helpItem.submenu = help
+        NSApp.helpMenu = help
         NSApp.mainMenu = main
     }
 
@@ -201,6 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openSetup() { MainActor.assumeIsolated { SetupWindow.show() } }
     @objc func openOnboarding() { MainActor.assumeIsolated { OnboardingWindow.show() } }
     @objc func openSettings() { MainActor.assumeIsolated { SettingsWindow.show() } }
+    @objc func openHowItWorks() { MainActor.assumeIsolated { HowItWorksWindow.show() } }
     @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
     @objc func openSettingsTab() { MainActor.assumeIsolated { SettingsWindow.show() } }
 
@@ -365,7 +373,7 @@ final class StartCallModel: ObservableObject {
     func addFolders() {
         let p = NSOpenPanel()
         p.canChooseDirectories = true; p.canChooseFiles = true; p.allowsMultipleSelection = true
-        p.message = "Folders or files to read for this call"
+        p.message = L("call.pickMessage")
         p.prompt = "Add"
         if let r = root { p.directoryURL = URL(fileURLWithPath: r) }
         guard p.runModal() == .OK else { return }
@@ -572,24 +580,24 @@ final class StartCallModel: ObservableObject {
         var parts: [String] = []
         if let p = project {
             let team = p.people.filter { $0.side == "team" }.count, client = p.people.filter { $0.side == "client" }.count
-            parts.append("Team \(team) · client \(client)")
-            parts.append(p.apiAllowed ? "Claude tips on" : "local only (Claude off for this project)")
+            parts.append(L("call.det.people", ["team": "\(team)", "client": "\(client)"]))
+            parts.append(p.apiAllowed ? L("call.det.claudeOn") : L("call.det.localOnly"))
         } else if let w = workspace {
-            parts.append("Projects: " + w.projects.joined(separator: ", "))
+            parts.append(L("call.det.projects") + w.projects.joined(separator: ", "))
         } else { return "" }
         let rel = RelativeDateTimeFormatter()
         if let s = registry.lastUsedAt[target], let d = ISO8601DateFormatter().date(from: s) {
-            parts.append("last call " + rel.localizedString(for: d, relativeTo: Date()))
+            parts.append(L("call.det.lastCall") + rel.localizedString(for: d, relativeTo: Date()))
         } else {
-            parts.append("first call here")
+            parts.append(L("call.det.first"))
         }
         let cfg = AppConfig.load(from: AppPaths.config)
         if !cfg.workRoot.isEmpty {
             let st = MirrorStatus.load(workRoot: cfg.workRoot)
             switch st.health() {
-            case "ok", "stale": parts.append("Notion mirror " + rel.localizedString(for: st.lastRunUTC ?? Date(), relativeTo: Date()) + (st.health() == "stale" ? " (stale)" : ""))
-            case "failed": parts.append("Notion mirror: last run failed")
-            default: parts.append("no Notion mirror")
+            case "ok", "stale": parts.append(L("call.det.mirror") + rel.localizedString(for: st.lastRunUTC ?? Date(), relativeTo: Date()) + (st.health() == "stale" ? L("call.det.stale") : ""))
+            case "failed": parts.append(L("call.det.mirrorFailed"))
+            default: parts.append(L("call.det.noMirror"))
             }
         }
         return parts.joined(separator: " · ")
@@ -603,7 +611,7 @@ final class StartCallModel: ObservableObject {
     }
 
     func requestJSON() -> [String: Any]? {
-        guard let root = root, !root.isEmpty else { note = "This project has no folder in its config."; return nil }
+        guard let root = root, !root.isEmpty else { note = L("call.noFolder"); return nil }
         let langs: (String, [String]) = language == "en" ? ("en", ["en"]) : language == "en+es" ? ("en", ["en", "es"])
             : language == "uk" ? ("uk", ["uk"]) : ("uk", ["uk", "en"])
         var reg = registry
@@ -644,575 +652,8 @@ final class StartCallModel: ObservableObject {
     }
 }
 
-struct StartCallView: View {
-    @ObservedObject var model: StartCallModel
-    @ObservedObject var runner = PrepRunner.shared
-    @ObservedObject var upnext = UpNext.shared
-    /// 2026-10-27 (owner, Up next): a call is being recorded; this window sets up an upcoming one.
-    var live = false
-    var planOnly = false            // Plan a call from Home: plan mode without a live call
-    var liveTitle = ""
-    var liveSince: Date?
-    var onStart: () -> Void
-    var onCancel: () -> Void
-    var onSave: () -> Void = {}
-    var onSwitch: () -> Void = {}
-    var onRemove: () -> Void = {}
-    @State private var copied = false
+// StartCallView moved to CallSetup.swift as CallSetupView (Pacenote 0.8, F4).
 
-    @AppStorage("startCallAdvanced") private var advanced = false
-    @State private var picking = false
-    @FocusState private var titleFocus: Bool
-    @State private var search = ""
-
-    // 2026-10-26 (owner): the main window before a call, not a settings form: one hero card with the
-    // project, the title and the time, the context, the preparation, then one big Start button.
-    // 2026-10-27 (owner): what the call is stays in place (header, project, title, time, who, type,
-    // language); the context, the preparation and more options scroll under it.
-    var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    IconTile(symbol: live || planOnly ? "calendar.badge.plus" : "text.bubble", size: 40)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(live || planOnly ? "Plan an upcoming call" : saved ? "Upcoming call" : "Start a call").font(.title2.weight(.semibold))
-                        if live || saved || planOnly {
-                            Text("Set it up and prepare it now; it starts only when you switch to it.")
-                                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                        }
-                    }
-                    Spacer()
-                }
-                if live { liveBanner }
-                calendarStrip
-                hero
-                HStack(spacing: 10) {
-                    ChoicePill(symbol: "person.2", label: ["auto": "Auto", "team": "Team", "client": "Client"][model.audience] ?? "Auto",
-                               help: "Who is on the other side of the call") { close in
-                        OptionList(options: [("auto", "Auto", "Detected from who speaks."),
-                                             ("team", "Team", "An internal call: no corrections of your facts."),
-                                             ("client", "Client", "Stricter: internal numbers are never shown, the client's culture profile is used.")],
-                                   selection: $model.audience, close: close)
-                    }
-                    ChoicePill(symbol: "rectangle.3.group", label: ["auto": "Regular", "presentation": "Presentation", "interview": "Interview"][model.callType] ?? "Regular",
-                               help: "Meeting type") { close in
-                        OptionList(options: [("auto", "Regular", "A usual meeting; talk and discussion are told apart by themselves."),
-                                             ("presentation", "Presentation", "Your talk with an outline; best with a preparation."),
-                                             ("interview", "Interview", "A hiring interview; choose your role in More options.")],
-                                   selection: $model.callType, close: close)
-                    }
-                    ChoicePill(symbol: "globe", label: Languages.label(model.language.split(separator: "+").map(String.init)),
-                               help: "Languages spoken on the call") { _ in
-                        LanguagePicker(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
-                                                      set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
-                    }
-                }
-            }
-            .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 14)
-            .background(Color.secondary.opacity(0.04))
-            .overlay(alignment: .bottom) { Divider() }
-            ScrollView {
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("What matters on this call", systemImage: "text.alignleft").font(.callout.weight(.medium))
-                        TextEditor(text: $model.context)
-                            .font(.callout)
-                            .scrollContentBackground(.hidden)
-                            .padding(6)
-                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.07)))
-                            .frame(height: 96)
-                        folderChips
-                        Text(model.useProjectFolder ? "The project folder is included; add folders or single files with this call's documents." : "The project folder is left out; only the added folders and files are read.")
-                            .font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
-                        Text("Names after \u{201C}\(StartCallModel.uiLang == "uk" ? "Учасники:" : "Participants:")\u{201D} are the speakers offered on the call. Empty lines are not sent.")
-                            .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .ltCard(padding: 14)
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Label("Preparation", systemImage: "doc.badge.clock").font(.callout.weight(.medium))
-                            Spacer()
-                            Text(runner.useAPI ? "\(runner.model.capitalized) · API key" : "\(runner.model.capitalized) · Claude account")
-                                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                        }
-                        prepStatus
-                        if !model.prepList.isEmpty {
-                            HStack(spacing: 8) {
-                                Text("Use").foregroundStyle(PN.C.text3)
-                                Picker("", selection: Binding(get: { model.chosenPrep ?? "" },
-                                                              set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
-                                    Text("Automatic (match by call title)").tag("")
-                                    ForEach(model.prepList, id: \.file) { p in
-                                        Text("\(p.heading) · \(p.made.formatted(date: .abbreviated, time: .shortened))").tag(p.file)
-                                    }
-                                }
-                                .labelsHidden().frame(maxWidth: .infinity)
-                            }
-                        }
-                        prepActions
-                    }
-                    .ltCard(padding: 14)
-                    DisclosureGroup(isExpanded: $advanced) {
-                        Form {
-                            if model.callType == "interview" {
-                                Picker("Your role", selection: $model.hiringRole) {
-                                    Text("Observer").tag("observer"); Text("Interviewer").tag("interviewer"); Text("Coach (I am interviewed)").tag("coach")
-                                }
-                                .help("Observer: you watch someone interview a candidate; tips show each question and what a strong answer has. Interviewer: you ask; tips give the next question and follow-ups. Coach: you are the one being interviewed; tips give a structure and an opening sentence for your answer.")
-                            }
-                            Picker("Tip model", selection: $model.tipModel) {
-                                Text("Default (\(prettyModel(AppConfig.load(from: AppPaths.config).models.tip)))").tag("")
-                                ForEach(model.tipModelChoices, id: \.self) { id in Text(prettyModel(id) + "  " + id).tag(id) }
-                            }
-                            .help("For this call only. Settings > AI sets the default.")
-                            Picker("Microphone", selection: $model.micDevice) {
-                                Text("System default" + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
-                                Text("Mac built-in microphone").tag("builtin")
-                                ForEach(model.micInputs.filter { !$0.builtin }, id: \.uid) { d in
-                                    Text(d.name).tag("uid:" + d.uid)
-                                }
-                                if model.micDevice.hasPrefix("uid:") && !model.micInputs.contains(where: { "uid:" + $0.uid == model.micDevice }) {
-                                    Text("Not connected: " + String(model.micDevice.dropFirst(4))).tag(model.micDevice)
-                                }
-                            }
-                            .help("Your voice. System default follows macOS (AirPods, a headset or the Mac). Can be changed during the call in the tips window.")
-                            Picker("Start recording", selection: $model.standby) {
-                                Text("When the other side speaks").tag(true)
-                                Text("Right away").tag(false)
-                            }
-                            .help("When the other side speaks: the window opens now and waits; recording starts when the other side speaks for a few seconds, or when you press the green Start.")
-                            Toggle("Don't save new voices (webinar, strangers)", isOn: $model.publicCall)
-                                .help("Speakers can still be named during the call, but no voice prints are saved. On other calls your team's voices are remembered for every project and the client's for this project only.")
-                        }
-                        .formStyle(.columns)
-                        .padding(.top, 8)
-                    } label: {
-                        Label("More options", systemImage: "slider.horizontal.3").font(.callout.weight(.medium))
-                    }
-                    .ltCard(padding: 14)
-                }
-            }
-            // 2026-10-27 (owner): mid-scroll the cut edge is rounded like a card, with the same gap above the button.
-            .clipShape(RoundedRectangle(cornerRadius: LT.radius))
-            .padding(.horizontal, 28).padding(.top, 16)
-            VStack(spacing: 8) {
-                if !model.note.isEmpty { Text(model.note).font(PN.Font.caption).foregroundStyle(PN.C.onMe).lineLimit(2) }
-                if live || planOnly {
-                    // 2026-10-27 (owner, Up next): during a call the main action keeps this call for later;
-                    // switching is a separate, confirmed step.
-                    LTPrimaryButton(title: saved ? "Save" : "Add to Up next", symbol: "calendar.badge.plus") { if !needProject() { onSave() } }
-                        .keyboardShortcut(.defaultAction)
-                    HStack(spacing: 18) {
-                        Button(live ? "End current call and start this…" : "Start now", action: live ? onSwitch : onStart).buttonStyle(.pnTertiary)
-                            .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
-                        if saved { Button("Remove", action: onRemove).buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3) }
-                        Button("Close", action: onCancel).buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
-                            .keyboardShortcut(.cancelAction)
-                    }
-                } else {
-                    // 2026-10-28 (owner): never a dead button: without a project it opens the project list and says why.
-                    LTPrimaryButton(title: "Start call", symbol: "phone.arrow.up.right") {
-                        if needProject() { return }
-                        onStart()
-                    }
-                        .keyboardShortcut(.defaultAction)
-                    HStack(spacing: 18) {
-                        Button(saved ? "Save" : "Save for later", action: onSave).buttonStyle(.pnTertiary)
-                            .foregroundStyle(Color.accentColor).disabled(model.target.isEmpty)
-                            .help("Keep this call in Up next: set it up and prepare it now, start it later.")
-                        if saved { Button("Remove", action: onRemove).buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3) }
-                        Button("Cancel", action: onCancel).buttonStyle(.pnTertiary).foregroundStyle(PN.C.text3)
-                            .keyboardShortcut(.cancelAction)
-                    }
-                }
-            }
-            .padding(.top, 16).padding(.bottom, 16)
-        }
-        .frame(width: 580, height: 800)
-        .onAppear { model.refreshTemplate() }
-        .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false; if !model.target.isEmpty { model.note = "" } }
-        .onAppear { model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
-        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
-        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in if !PrepRunner.shared.useAPI { PrepRunner.shared.refreshAuth() } }
-    }
-
-    var saved: Bool { upnext.contains(model) }
-
-    /// No project or workspace yet (a new calendar meeting has none by default): open the list and say so.
-    private func needProject() -> Bool {
-        guard model.target.isEmpty else { return false }
-        model.note = "Choose the project or workspace of this call first: its folder gets the transcript and the notes."
-        search = ""; picking = true
-        return true
-    }
-
-    /// 2026-10-27 (owner, calendars): the calls around now, from every calendar on this Mac. Two or three at the
-    /// same time are normal (one in the calendar he skips, another he joins): the PM picks the one he goes to.
-    @ObservedObject private var cal = CalendarService.shared
-    static func eventHelp(_ e: CalendarService.CalEvent) -> String {
-        var t: String = e.title + "\n" + e.account + " · " + e.calendar
-        if !e.attendees.isEmpty { t += "\n" + e.attendees.joined(separator: ", ") }
-        t += "\nClick to set up this call from the event"
-        if e.recurring { t += " (and like its last call)" }
-        return t
-    }
-    @ViewBuilder private var calendarStrip: some View {
-        let evs = cal.aroundNow()
-        if cal.access == .granted, !evs.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "calendar").foregroundStyle(PN.C.text3)
-                        ForEach(evs) { e in
-                            let on = model.calEventID == e.id
-                            Button { model.applyEvent(e); copied = false } label: {
-                                HStack(spacing: 5) {
-                                    Circle().fill(Color(nsColor: e.color)).frame(width: 7, height: 7)
-                                    Text(e.timeRange).monospacedDigit().foregroundStyle(PN.C.text3)
-                                    Text(e.title).lineLimit(1)
-                                    let rel: String = e.relative()
-                                    if !rel.isEmpty && !rel.hasPrefix("ended") { Text(rel).foregroundStyle(rel == "in progress" ? PN.C.rec : PN.C.text3) }
-                                    if e.recurring { Image(systemName: "repeat").foregroundStyle(PN.C.text3) }
-                                }
-                                .font(PN.Font.caption)
-                                .padding(.horizontal, 8).padding(.vertical, 4)
-                                .background(Capsule().fill(on ? Color.accentColor.opacity(0.25) : Color.secondary.opacity(0.10)))
-                                .overlay(Capsule().stroke(on ? Color.accentColor : .clear))
-                            }
-                            .buttonStyle(.plain)
-                            .help(Self.eventHelp(e))
-                        }
-                    }
-                }
-                if let a = model.appliedFrom {
-                    Label(a, systemImage: "arrow.uturn.backward.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                }
-            }
-        } else if cal.access == .unknown {
-            HStack(spacing: 6) {
-                Image(systemName: "calendar").foregroundStyle(PN.C.text3)
-                Text("Pick the call from your calendars").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                Button("Connect calendars") { cal.connect() }.buttonStyle(.pnTertiary).font(PN.Font.caption)
-                Spacer()
-            }
-        } else if let a = model.appliedFrom {
-            Label(a, systemImage: "arrow.uturn.backward.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-        }
-    }
-
-    /// The call being recorded, so it is clear this window does not start a call by itself.
-    private var liveBanner: some View {
-        HStack(spacing: 8) {
-            Circle().fill(PN.C.rec).frame(width: 8, height: 8)
-            Text("Recording: \(liveTitle)").font(.callout.weight(.medium)).lineLimit(1)
-            if let d = liveSince { Text(d, style: .timer).font(.callout.monospacedDigit()).foregroundStyle(PN.C.text3) }
-            Spacer()
-            Button("Show tips") { (NSApp.delegate as? AppDelegate)?.showTips() }.buttonStyle(.pnTertiary)
-        }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: LT.radius).fill(PN.C.rec.opacity(0.10)))
-    }
-
-    /// The project, the call's title and its time: what the call is.
-    private var hero: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button { search = ""; picking = true } label: {
-                HStack(spacing: 12) {
-                    IconTile(symbol: model.workspace != nil ? "square.stack.3d.up" : "folder", size: 40)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(model.project?.name ?? model.workspace?.name ?? "Choose a project")
-                            .font(.headline).foregroundStyle(model.target.isEmpty ? PN.C.onMe : Color.primary)
-                        Text(model.workspace != nil ? "Workspace: a general call about several projects"
-                             : (model.project.map { $0.workspace.isEmpty ? "Project" : "Project in " + $0.workspace } ?? "Recordings and notes go to its folder"))
-                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down").foregroundStyle(Color.accentColor)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .popover(isPresented: $picking, arrowEdge: .bottom) { projectPicker }
-            // 2026-10-27 (owner): optional, but clearly the place to type the call's name.
-            HStack(spacing: 8) {
-                Image(systemName: "pencil").foregroundStyle(Color.accentColor)
-                TextField("", text: $model.title, prompt: Text("Call title, e.g. Weekly sync"))
-                    .textFieldStyle(.plain).font(.title3)
-                    .focused($titleFocus)
-                    .onChange(of: model.title) { model.scanPrep(); copied = false }
-            }
-            .padding(.vertical, 8).padding(.horizontal, 10)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.10)))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(titleFocus ? Color.accentColor : Color.secondary.opacity(0.25),
-                                                                lineWidth: titleFocus ? 2 : 1))
-            .onTapGesture { titleFocus = true }
-            if let e = model.rememberedForTitle {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.uturn.backward.circle").foregroundStyle(Color.accentColor)
-                    Text("A call named \u{201C}\(e.title)\u{201D} was set up before.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    Button("Use its settings") { model.apply(e); model.scanPrep() }.buttonStyle(.pnTertiary).font(PN.Font.caption)
-                }
-            }
-            HStack(spacing: 8) {
-                Image(systemName: "calendar").foregroundStyle(PN.C.text3)
-                DatePicker("", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute])
-                    .labelsHidden().fixedSize()
-                    .onChange(of: model.callDate) { copied = false }
-                Spacer()
-            }
-            .help("When the call is: goes into the preparation and the Notion page title.")
-            if let r = model.root {
-                Text(model.details).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.tail)
-                    .help(r + "\n" + model.details)
-            }
-        }
-        .ltCard(padding: 16)
-    }
-
-    /// Folders and files added for this call, as removable chips, and the Add folder or file button.
-    private var folderChips: some View {
-        VStack(alignment: .leading, spacing: 6) {
-        HStack(alignment: .center, spacing: 6) {
-            Button { model.addFolders() } label: { Label("Add folder or file", systemImage: "folder.badge.plus") }
-                .buttonStyle(.pnTertiary).disabled(model.target.isEmpty)
-            ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        if let r = model.root {
-                            HStack(spacing: 4) {
-                                Image(systemName: "folder").font(PN.Font.caption)
-                                Text((r as NSString).lastPathComponent).font(PN.Font.caption).lineLimit(1)
-                                    .strikethrough(!model.useProjectFolder)
-                                Button { model.useProjectFolder.toggle() } label: {
-                                    Image(systemName: model.useProjectFolder ? "xmark" : "plus").font(PN.Font.caption)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .foregroundStyle(model.useProjectFolder ? Color.accentColor : .secondary)
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(model.useProjectFolder ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12)))
-                            .help(model.useProjectFolder ? "The project folder: " + r + "\nIts files and earlier calls are read for the preparation. × leaves it out for this call."
-                                                          : "Left out: the preparation will not read this folder (only the new files are written into its live folder). + brings it back.")
-                        }
-                        ForEach(model.folders, id: \.self) { f in
-                            HStack(spacing: 4) {
-                                Image(systemName: StartCallModel.isDir(f) ? "folder" : "doc").font(PN.Font.caption)
-                                Text((f as NSString).lastPathComponent).font(PN.Font.caption).lineLimit(1)
-                                Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(PN.Font.caption) }
-                                    .buttonStyle(.plain).foregroundStyle(PN.C.text3)
-                            }
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                            .help(f)
-                        }
-                    }
-            }
-        }
-        }
-    }
-
-    private var projectPicker: some View {
-        let q = search.lowercased()
-        let ws = model.registry.workspaces.filter { q.isEmpty || $0.name.lowercased().contains(q) }
-        let ps = model.registry.projects.filter { $0.status != "archived" && (q.isEmpty || $0.name.lowercased().contains(q)) }
-        return VStack(alignment: .leading, spacing: 6) {
-            TextField("", text: $search, prompt: Text("Find a project")).textFieldStyle(.roundedBorder)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    if !ps.isEmpty { Text("Projects").font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 4) }
-                    ForEach(ps, id: \.slug) { p in pickRow("folder", p.name, p.workspace, "project:" + p.slug) }
-                    if !ws.isEmpty { Text("Workspaces").font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 6) }
-                    ForEach(ws, id: \.name) { w in pickRow("square.stack.3d.up", w.name, "general calls", "workspace:" + w.name) }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(12)
-        .frame(width: 340, height: 360)
-    }
-
-    private func pickRow(_ symbol: String, _ name: String, _ sub: String, _ tag: String) -> some View {
-        Button { model.target = tag; picking = false } label: {
-            HStack(spacing: 10) {
-                IconTile(symbol: symbol, size: 26)
-                Text(name)
-                if !sub.isEmpty { Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                Spacer()
-                if model.target == tag { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
-            }
-            .padding(.horizontal, 6).padding(.vertical, 4)
-            .contentShape(Rectangle())
-            .background(RoundedRectangle(cornerRadius: 6).fill(model.target == tag ? Color.accentColor.opacity(0.15) : .clear))
-        }
-        .buttonStyle(.plain)
-    }
-
-    // 2026-10-27 (owner): three equal controls, tinted because they are clickable.
-    private func pill<C: View>(_ symbol: String, @ViewBuilder _ content: () -> C) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbol).foregroundStyle(Color.accentColor).frame(width: 18)
-            content().frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: LT.radius).fill(Color.accentColor.opacity(0.10)))
-    }
-
-    /// One line: found, being written, for another call, or none.
-    @ViewBuilder private var prepStatus: some View {
-        if runner.running, runner.callID == model.id {
-            Label("Being written: \(runner.stage.lowercased())…", systemImage: "hourglass").foregroundStyle(PN.C.text3)
-        } else if upnext.prepState(model) == .queued {
-            Label("Waiting in line: starts when the preparation in progress is done.", systemImage: "clock").foregroundStyle(PN.C.text3)
-        } else if let p = model.prep, p.matches {
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(p.heading).lineLimit(2)
-                    HStack(spacing: 8) {
-                        Text(model.chosenPrep != nil ? "Chosen by you, made \(p.made.formatted(date: .abbreviated, time: .shortened))"
-                                                     : "Made \(p.made.formatted(date: .omitted, time: .shortened)); used for this call")
-                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                        if let path = PrepDocWindow.path(for: model) {
-                            Button("Read") { PrepDocWindow.show(path: path, title: model.effectiveTitle) }.buttonStyle(.pnTertiary).font(PN.Font.caption)
-                                .help("Read or correct the whole preparation")
-                        }
-                    }
-                }
-            } icon: { Image(systemName: "checkmark.seal.fill").foregroundStyle(PN.C.turn) }
-        } else if let p = model.prep {
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("No preparation for \u{201C}\(model.effectiveTitle)\u{201D} yet")
-                    Text("The one made \(p.made.formatted(date: .omitted, time: .shortened)) is for another call (\(p.heading)); pick it below to use it anyway.")
-                        .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                }
-            } icon: { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(PN.C.onMe) }
-        } else {
-            Label(model.target.isEmpty ? "Choose a project first" : "No preparation yet. Prepare now takes a few minutes. Not ready in time? Start anyway: questions to you, your turn, HELP NOW and answers from the call work without it, and a late preparation joins the call.",
-                  systemImage: "doc.badge.clock").foregroundStyle(PN.C.text3).font(.callout)
-        }
-    }
-
-    /// Prepare now (Claude Code) with its progress; how it runs is set in Settings > AI > Preparation.
-    @ViewBuilder private var prepActions: some View {
-        if runner.running && runner.callID == model.id {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text("\(runner.model.capitalized): \(runner.stage)").font(.callout)
-                        Text(runner.startedAt ?? Date(), style: .timer).font(.callout.monospacedDigit()).foregroundStyle(PN.C.text3)
-                    }
-                    ProgressView(value: runner.progress)
-                    if !runner.detail.isEmpty {
-                        Text(runner.detail).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
-                    }
-                }
-                Button("Stop") { runner.cancel() }.controlSize(.small)
-            }
-        } else {
-            HStack(spacing: 10) {
-                Button {
-                    // 2026-10-27 (Up next): one preparation runs at a time; the others wait in line.
-                    model.note = upnext.prepare(model) ?? ""
-                    if !saved && model.note.isEmpty { upnext.save(model) }   // kept in Up next (tracked as prepared until the call); the window stays
-                } label: { Label(runner.running ? "Prepare (after the current one)" : "Prepare now", systemImage: "sparkles") }
-                .buttonStyle(.pnSecondary)
-                .disabled(model.target.isEmpty || PrepRunner.claudePath == nil || (!runner.useAPI && runner.loggedIn == false)
-                          || upnext.prepState(model) == .queued)
-                .help("Claude Code builds the preparation here from local files: the documents named in the context, the folders above, the local Notion mirror, earlier calls and public web links in the context. A few minutes; you can close this window.")
-                Menu {
-                    Button(copied ? "Copied" : "Copy request for Cowork") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(model.prepPhrase, forType: .string)
-                        copied = true
-                    }
-                    Button("Preparation settings…") { SettingsWindow.show(tab: "ai") }
-                } label: { Text("More") }
-                .menuStyle(.borderlessButton).tint(.accentColor).fixedSize().disabled(model.target.isEmpty)
-                Spacer()
-            }
-            if upnext.prepState(model) == .queued {
-                HStack {
-                    Text("In line after: \(runner.target)").font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
-                    Button("Take out of line") { upnext.unqueue(model) }.controlSize(.small)
-                }
-            } else if runner.running {
-                Text("Another call is being prepared (\(runner.stage.lowercased())); this one starts after it.")
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            }
-            if PrepRunner.claudePath == nil {
-                Text("Claude Code is not installed: use More > Copy request for Cowork.").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-            } else if !runner.useAPI && runner.loggedIn == false {
-                HStack(spacing: 8) {
-                    Label("Claude Code is not signed in", systemImage: "exclamationmark.triangle.fill").font(PN.Font.caption).foregroundStyle(PN.C.onMe)
-                    Spacer()
-                    Button("Log in…") { runner.openLogin() }.controlSize(.small)
-                    Button("Use API key") { runner.useAPI = true }.controlSize(.small).disabled(!runner.hasAPIKey)
-                    Button("Check") { runner.refreshAuth() }.controlSize(.small)
-                }
-            } else if runner.useAPI && !runner.hasAPIKey {
-                Text("No Claude API key: add it in Settings > Keys.").font(PN.Font.caption).foregroundStyle(PN.C.onMe)
-            }
-            if !runner.result.isEmpty { Text(runner.result).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-        }
-    }
-
-    /// Copies the Cowork request for this call (title, time, project, call context).
-    private func copyButton(_ label: String) -> some View {
-        Button(copied ? "Copied" : label) {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(model.prepPhrase, forType: .string)
-            copied = true
-        }
-        .controlSize(.small)
-        .disabled(model.target.isEmpty)
-    }
-}
-
-@MainActor
-final class StartCallWindow {
-    static var window: NSWindow?
-    static var model: StartCallModel?
-
-    /// 2026-10-27 (owner, Up next): while a call is live this window plans an upcoming call: Add to Up next,
-    /// Prepare, or End current call and start this (confirmed). Without a live call it starts a call as before,
-    /// and Save for later keeps the call in Up next.
-    static func show(delegate: AppDelegate, prepared: StartCallModel? = nil, planOnly: Bool = false) {
-        let model = prepared ?? StartCallModel()
-        Self.model = model
-        let live = delegate.callIsLive
-        let liveTitle = CallEngine.shared.renamed ?? (CallEngine.shared.callRequest["title"] as? String) ?? "the current call"
-        let since = EngineStatus.load(path: CallEngine.shared.statusPath).startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
-        let view = StartCallView(model: model, live: live, planOnly: planOnly && !live, liveTitle: liveTitle, liveSince: since, onStart: {
-            if let err = delegate.launch(model) { model.note = err } else { window?.close() }
-        }, onCancel: {
-            // A call with a preparation running or waiting is kept, so the preparation is not lost.
-            if live, !UpNext.shared.contains(model), [.running, .queued].contains(UpNext.shared.prepState(model)) { UpNext.shared.save(model) }
-            window?.close()
-        }, onSave: {
-            guard !model.target.isEmpty else { return }
-            UpNext.shared.save(model)
-            model.note = ""
-            window?.close()
-        }, onSwitch: {
-            UpNext.shared.save(model)
-            delegate.confirmSwitch(to: model, on: window)
-        }, onRemove: {
-            UpNext.shared.remove(model)
-            window?.close()
-        })
-        let host = NSHostingController(rootView: view)
-        let w = window ?? NSWindow(contentViewController: host)
-        w.contentViewController = host
-        w.styleMask.insert(.resizable)
-        w.setContentSize(NSSize(width: 580, height: 800))
-        w.title = live || planOnly ? "Plan an upcoming call" : "Start call"
-        w.isReleasedWhenClosed = false
-        window = w
-        w.center()
-        w.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-}
 
 // MARK: - Up next: start, switch (2026-10-27, owner)
 
@@ -1233,7 +674,7 @@ extension AppDelegate {
                 model.chosenPrep = name
             }
         }
-        guard let req = model.requestJSON() else { return model.note.isEmpty ? "This call cannot start yet." : model.note }
+        guard let req = model.requestJSON() else { return model.note.isEmpty ? L("call.cannotStart") : model.note }
         let before = CallEngine.shared.currentCallID
         CallEngine.shared.currentCallID = model.id
         let err = CallEngine.shared.start(request: req, apiAllowed: model.project?.apiAllowed ?? true) { [weak self] st in
@@ -1256,22 +697,22 @@ extension AppDelegate {
             if let e = launch(model) { model.note = e } else { StartCallWindow.window?.close() }
             return
         }
-        let cur = CallEngine.shared.renamed ?? (CallEngine.shared.callRequest["title"] as? String) ?? "the current call"
+        let cur = CallEngine.shared.renamed ?? (CallEngine.shared.callRequest["title"] as? String) ?? L("sw.current")
         let next = model.effectiveTitle
         let a = NSAlert()
-        a.messageText = "End \u{201C}\(cur)\u{201D} and start \u{201C}\(next)\u{201D}?"
-        var info = "Recording stops now. The transcript is saved and the Notion summary is written in the background. "
-        info += model.standby ? "\(next) opens right away and records when the other side speaks or you press Start." : "\(next) starts recording right away."
+        a.messageText = L("sw.title", ["cur": cur, "next": next])
+        var info = L("sw.stops")
+        info += model.standby ? L("sw.standby", ["next": next]) : L("sw.now", ["next": next])
         switch UpNext.shared.prepState(model) {
-        case .running: info += "\n\nIts preparation is \(Int(PrepRunner.shared.progress * 100))% done; it goes on and joins the call when ready."
-        case .queued: info += "\n\nIts preparation is waiting in line; it joins the call when ready."
-        case .failed: info += "\n\nIts preparation failed; the call starts without it."
-        case .none: info += "\n\nNo preparation: questions to you, HELP NOW and answers from the call still work."
+        case .running: info += "\n\n" + L("sw.prepRunning", ["pct": "\(Int(PrepRunner.shared.progress * 100))"])
+        case .queued: info += "\n\n" + L("sw.prepQueued")
+        case .failed: info += "\n\n" + L("sw.prepFailed")
+        case .none: info += "\n\n" + L("sw.prepNone")
         case .ready: break
         }
         a.informativeText = info
-        a.addButton(withTitle: "End and start")
-        a.addButton(withTitle: "Cancel")
+        a.addButton(withTitle: L("sw.endStart"))
+        a.addButton(withTitle: L("hk.cancel"))
         let go: () -> Void = { [weak self] in self?.performSwitch(to: model) }
         if let w = window, w.isVisible {
             a.beginSheetModal(for: w) { r in if r == .alertFirstButtonReturn { MainActor.assumeIsolated { go() } } }
@@ -1298,7 +739,7 @@ extension AppDelegate {
             MainActor.assumeIsolated {
                 guard let m = UpNext.shared.switchingTo, m === model else { return }
                 UpNext.shared.switchingTo = nil
-                self?.notifySwitchFailed("The current call did not stop in 45 s. End it in the tips window, then start \u{201C}\(model.effectiveTitle)\u{201D} from Up next.", model)
+                self?.notifySwitchFailed(L("sw.stuck", ["next": model.effectiveTitle]), model)
             }
         }
     }

@@ -369,11 +369,13 @@ final class StartCallModel: ObservableObject {
     /// 2026-10-27 (owner): "Add folder" like in Cowork; the context then names only files or links.
     @Published var folders: [String] = []
     @Published var useProjectFolder = true     // 2026-10-27 (owner): the project folder can be left out of the preparation
+    nonisolated static func isDir(_ path: String) -> Bool { var d: ObjCBool = false; return FileManager.default.fileExists(atPath: path, isDirectory: &d) && d.boolValue }
 
+    /// 2026-10-28 (owner): folders or single files (one document from Downloads, not the whole folder).
     func addFolders() {
         let p = NSOpenPanel()
-        p.canChooseDirectories = true; p.canChooseFiles = false; p.allowsMultipleSelection = true
-        p.message = "Folders to look through for this call"
+        p.canChooseDirectories = true; p.canChooseFiles = true; p.allowsMultipleSelection = true
+        p.message = "Folders or files to read for this call"
         p.prompt = "Add"
         if let r = root { p.directoryURL = URL(fileURLWithPath: r) }
         guard p.runModal() == .OK else { return }
@@ -401,7 +403,9 @@ final class StartCallModel: ObservableObject {
             }
             out.append(t)
         }
-        if !folders.isEmpty { out.append((StartCallModel.uiLang == "uk" ? "Папки: " : "Folders: ") + folders.joined(separator: "; ")) }
+        let fl = folders.filter { Self.isDir($0) }, fi = folders.filter { !Self.isDir($0) }
+        if !fl.isEmpty { out.append((StartCallModel.uiLang == "uk" ? "Папки: " : "Folders: ") + fl.joined(separator: "; ")) }
+        if !fi.isEmpty { out.append((StartCallModel.uiLang == "uk" ? "Файли: " : "Files: ") + fi.joined(separator: "; ")) }
         return out.joined(separator: "\n")
     }
 
@@ -728,7 +732,7 @@ struct StartCallView: View {
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.07)))
                             .frame(height: 96)
                         folderChips
-                        Text(model.useProjectFolder ? "The project folder is included; add folders with this call's documents." : "The project folder is left out; only the added folders are read.")
+                        Text(model.useProjectFolder ? "The project folder is included; add folders or single files with this call's documents." : "The project folder is left out; only the added folders and files are read.")
                             .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         Text("Names after \u{201C}\(StartCallModel.uiLang == "uk" ? "Учасники:" : "Participants:")\u{201D} are the speakers offered on the call. Empty lines are not sent.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -965,11 +969,11 @@ struct StartCallView: View {
         .ltCard(padding: 16)
     }
 
-    /// Folders added for this call, as removable chips, and the Add folder button.
+    /// Folders and files added for this call, as removable chips, and the Add folder or file button.
     private var folderChips: some View {
         VStack(alignment: .leading, spacing: 6) {
         HStack(alignment: .center, spacing: 6) {
-            Button { model.addFolders() } label: { Label("Add folder", systemImage: "folder.badge.plus") }
+            Button { model.addFolders() } label: { Label("Add folder or file", systemImage: "folder.badge.plus") }
                 .buttonStyle(LTSoftButtonStyle(small: true)).disabled(model.target.isEmpty)
             ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
@@ -991,7 +995,7 @@ struct StartCallView: View {
                         }
                         ForEach(model.folders, id: \.self) { f in
                             HStack(spacing: 4) {
-                                Image(systemName: "folder").font(.caption)
+                                Image(systemName: StartCallModel.isDir(f) ? "folder" : "doc").font(.caption)
                                 Text((f as NSString).lastPathComponent).font(.caption).lineLimit(1)
                                 Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(.caption2) }
                                     .buttonStyle(.plain).foregroundStyle(.secondary)

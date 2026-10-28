@@ -179,7 +179,8 @@ final class PrepRunner: ObservableObject {
 
         The PM's call context (what matters, the folders and documents to read first):
         \(r.context.isEmpty ? "(none)" : r.context)
-        \(r.folders.isEmpty ? "" : "Folders the PM added (look through them first; read fully the files the context names): " + r.folders.joined(separator: "; "))
+        \(r.folders.filter { StartCallModel.isDir($0) }.isEmpty ? "" : "Folders the PM added (look through them first; read fully the files the context names): " + r.folders.filter { StartCallModel.isDir($0) }.joined(separator: "; "))
+        \(r.folders.filter { !StartCallModel.isDir($0) }.isEmpty ? "" : "Files the PM added (read each fully; read nothing else in their folders): " + r.folders.filter { !StartCallModel.isDir($0) }.joined(separator: "; "))
 
         Read first: \(skill)/SKILL.md (the Start checklist, steps 5-6, and "prep ahead"), then \
         \(refs.map { skill + "/references/" + $0 }.joined(separator: ", ")). Follow their content rules and file formats \
@@ -236,7 +237,7 @@ final class PrepRunner: ObservableObject {
                        "--disallowedTools", denied.joined(separator: ","),
                        "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}",
                        "--add-dir", skill, "--add-dir", live] + (r.workspaceRoot.isEmpty ? [] : ["--add-dir", r.workspaceRoot])
-                       + r.folders.flatMap { ["--add-dir", $0] }
+                       + Array(Set(r.folders.map { StartCallModel.isDir($0) ? $0 : ($0 as NSString).deletingLastPathComponent })).flatMap { ["--add-dir", $0] }
         p.currentDirectoryURL = URL(fileURLWithPath: r.useProjectFolder ? r.root : live)
         var env = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path

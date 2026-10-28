@@ -1552,3 +1552,5 @@ address", `references/sweep.md`, `references/presentation.md`).
 86. **Preparation pane (0.7.1).** The 📄 button opens the full preparation next to the tips; Edit corrects it and the
    tips reload it at once (the first version is kept as `.brief.orig.md`). Before the call: Read prep in Home and
    Read in Start call open the same document, editable; the corrected text is what the call uses.
+87. **Add folder or file (0.7.2).** Start call and the Prepare form add whole folders or single files (one document
+   from Downloads without the rest). The preparation reads the added files fully and nothing else in their folders.

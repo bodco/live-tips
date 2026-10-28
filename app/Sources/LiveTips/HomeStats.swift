@@ -242,13 +242,33 @@ struct PrepareSheet: View {
                 }
             }
             .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep() }
+            // 2026-10-28 (owner): the folders or single files this preparation reads first.
+            HStack(spacing: 6) {
+                Button { model.addFolders() } label: { Label("Add folder or file", systemImage: "folder.badge.plus") }
+                    .buttonStyle(LTSoftButtonStyle(small: true))
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(model.folders, id: \.self) { f in
+                            HStack(spacing: 4) {
+                                Image(systemName: StartCallModel.isDir(f) ? "folder" : "doc").font(.caption)
+                                Text((f as NSString).lastPathComponent).font(.caption).lineLimit(1)
+                                Button { model.folders.removeAll { $0 == f } } label: { Image(systemName: "xmark").font(.caption2) }
+                                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                            .help(f)
+                        }
+                    }
+                }
+            }
             VStack(alignment: .leading, spacing: 6) {
                 Text("What matters on this call").font(.callout.weight(.medium))
                 TextEditor(text: $model.context)
                     .font(.callout).scrollContentBackground(.hidden).padding(6)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
                     .frame(height: 150)
-                Text("The preparation reads what you write here (goal, people, questions, documents and links), the project folder\(model.folders.isEmpty ? "" : " and \(model.folders.count) added folder(s)"), the local Notion copy and earlier calls. It does not start the call.")
+                Text("The preparation reads what you write here (goal, people, questions, documents and links), the added folders and files, the project folder, the local Notion copy and earlier calls. It does not start the call.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             HStack {

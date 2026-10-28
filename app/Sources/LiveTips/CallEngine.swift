@@ -300,7 +300,12 @@ final class CallEngine {
         // 2026-10-27 (owner): a question with no ready answer starts a read-only Claude Code search of the project folder.
         sc["deep_lookup"] = true
         if let cl = PrepRunner.claudePath { sc["claude_cli"] = cl }
-        let extra = ((callRequest["workspace_root"] as? String).flatMap { $0.isEmpty ? nil : [$0] } ?? []) + ((callRequest["folders"] as? [String]) ?? [])
+        let ws: [String] = (callRequest["workspace_root"] as? String).flatMap { $0.isEmpty ? nil : [$0] } ?? []
+        let added: [String] = (callRequest["folders"] as? [String]) ?? []
+        // A single added file: its folder is searched (2026-10-28, files next to folders).
+        let dirs: [String] = added.map { (p: String) -> String in StartCallModel.isDir(p) ? p : (p as NSString).deletingLastPathComponent }
+        var extra: [String] = ws
+        for d in dirs where !extra.contains(d) { extra.append(d) }
         if !extra.isEmpty { sc["extra_dirs"] = extra }
         if let d = try? JSONSerialization.data(withJSONObject: sc, options: [.prettyPrinted]) {
             try? d.write(to: URL(fileURLWithPath: cfgPath), options: .atomic)

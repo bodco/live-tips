@@ -270,6 +270,7 @@ decisions, what is on the PM, unanswered asks and the speech theses never said.
 Since Pacenote 0.8.5 the picture also keeps the agenda (`agenda_now`, `agenda_done`), promises made to
 the PM's side (`theirs`: who, what, due) and `done_commitments` (open commitments from earlier calls said
 to be done), as the section below says; at `stopped` the actions and `theirs` go into the commitments register.
+Since 0.8.6 it also keeps `risks` (conditional threats, "Risks and the follow-up email" below).
 
 ### Agenda, commitments, brief freshness
 
@@ -305,6 +306,19 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - Refresh: Refresh = an incremental update: Claude gets the old brief and the list of changed files, reads only those, and rewrites only the sections they change. The checklist and the PM's edits stay. The facts and cards follow the same changes. It never starts by itself.
 - Snapshot: After a preparation or a refresh, write <stem>.prep.json: {"prepared_at": "<ISO time>", "by": "app|skill", "refresh_of": "<ISO time of the previous one, or empty>"}.
 - Ignored paths: `live/`, `.livetips-index/`, `.git/`, `node_modules/`, `.DS_Store`, `Tools/`; hidden files ignored: yes; stale after 24 h.
+
+### Risks and the follow-up email
+
+Generated from `rules/risks.yaml` and `rules/followup.yaml`; do not edit here.
+
+**Risks.** Call picture: risks = conditional threats said on this call ("if X slips, Y moves", "we might not make the date", "depends on their approval"): what may go wrong and what it depends on, max 16 words each, with the time of the line and who said it. Keep earlier ones. Not every problem is a risk: a bug that is being fixed now is not.
+- During the call: A new risk becomes one quiet card `{"kind":"risk","level":"info","gist":"Risk: <what>","t":"HH:MM:SS","who":"<name>"}` in Earlier (the On me colour), never the main card, never red.
+- After the call: The call summary has a "Risks" section. "Add to risk register" writes one page into the project's Notion risk database (risks_db in the project config) only after the PM confirms it; nothing is added by itself.
+
+**Follow-up email.** After the call, only when the PM asks (the app's "Draft follow-up email"; the skill's wrap-up offers it in one line).
+- Language: The client's language from the project config (client_language), English when it is not set.
+- Structure: Subject: the meeting's name and date. Body: one line of thanks, the decisions, who does what and by when (both sides), the open questions; at most ~150 words, plain sentences, no long dashes, no internal notes (estimates the team did not agree, prices, names of internal tools).
+- Never: Nothing is sent. The draft is shown to edit, Copy, or Open in Mail (a mailto link with the text).
 
 ### Tip diet and rates (wins over any rule that allows more)
 

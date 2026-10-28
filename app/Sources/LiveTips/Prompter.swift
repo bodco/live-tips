@@ -720,6 +720,12 @@ extension PrompterController {
                                 "after": ["text": d["title"] as? String ?? "", "state": d["state"] as? String ?? ""]] as [String: Any])
             // Pacenote 0.8.5 (rules/agenda.yaml > emit): the PM's state of an item wins over the model's.
             if let id = d["id"] as? String, let st = d["state"] as? String { sendSetting("agenda_state", id + "|" + st) }
+        case "after":
+            // Pacenote 0.8.6: after the call, the call page or the follow-up email draft (nothing is sent).
+            let file = stem + ".md"
+            MainActor.assumeIsolated {
+                if (d["item"] as? String) == "followup" { FollowUpWindow.show(file: file) } else { CallPageWindow.show(file: file) }
+            }
         case "commitment-done":
             // Pacenote 0.8.5: Mark done on a "Done?" card closes the open commitment in the register (source detected).
             guard let id = d["id"] as? String, id.hasPrefix("c-") else { return }

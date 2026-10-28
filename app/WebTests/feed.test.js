@@ -183,5 +183,15 @@ test('a commitment said to be done: one quiet On me card, Mark done closes it he
   assert.strictEqual(other.who, 'Dana');
 });
 
+test('a risk is one quiet card without the label in its text', () => {
+  const { f, get } = make();
+  const it = { kind: 'risk', level: 'info', t: '10:30:00', who: 'Dana', gist: 'Risk: if the API slips, the pilot moves a week' };
+  f.addItems([it]); f.addItems([it]);
+  const rs = get().cards.filter((c) => c.kind === 'risk');
+  assert.strictEqual(rs.length, 1);
+  assert.strictEqual(rs[0].quiet, true);
+  assert.strictEqual(rs[0].say, 'if the API slips, the pilot moves a week');
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

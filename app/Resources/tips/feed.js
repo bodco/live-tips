@@ -194,6 +194,17 @@
         });
         return true;
       }
+      case 'risk': {
+        // Pacenote 0.8.6 (rules/risks.yaml): a risk heard on the call is a quiet card in Earlier, never the main one.
+        const id = 'r:' + clean(it.gist).toLowerCase().slice(0, 60);
+        if (this.byId[id]) return false;
+        this.put({
+          id, kind: 'risk', quiet: true, who: clean(it.who), question: '', say: clean(String(it.gist || '').replace(/^\s*\S*\s*(risk|ризик)\s*:\s*/i, '')),
+          source: '', meta: '', unverified: false, items: [], at: hmsToMs(it.at || it.t, this.now()), state: 'active', pinned: false,
+          partial: false, late: false, card: '', t: it.t || '', raw: { kind: 'risk', gist: it.gist || '', phrase: '', items: [] }
+        });
+        return true;
+      }
       case 'checklist':
         if (!this.agendaEngine) this.agendaBrief = (it.items || []).map((x, i) => ({ id: 'b' + i, title: clean(itemText(x)), done: false, cur: false }));
         return true;

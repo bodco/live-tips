@@ -18,7 +18,8 @@
       engineDeaf: 'Tips are not coming: end the call and start again',
       onMe: 'On me', more: 'More', earlier: 'Earlier',
       agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised yet:', allRaised: 'All agenda items raised',
-      kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered' },
+      kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk' },
+      afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
       saidIt: 'Said it', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
       unverified: 'Not verified against documents',
@@ -46,7 +47,8 @@
       engineDeaf: 'Підказки не надходять: заверши дзвінок і почни знову',
       onMe: 'На мені', more: 'Більше', earlier: 'Раніше',
       agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', allRaised: 'Усі пункти агенди підняті',
-      kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли' },
+      kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик' },
+      afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
       saidIt: 'Сказав', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
       unverified: 'Не звірено з документами',
@@ -173,6 +175,13 @@
       const missing = S.agenda.filter((a) => a.state === 'todo').map((a) => a.title);
       $('agendaMissing').textContent = missing.length ? `${t.notRaised} ${missing[0]}${missing.length > 1 ? ` +${missing.length - 1}` : ''}` : '';
     }
+
+    // Pacenote 0.8.6: after the call, the call page and the follow-up email draft (nothing is sent).
+    const af = $('after');
+    af.hidden = !ended;
+    if (ended) af.innerHTML = `<span class="meta">${esc(t.afterCall)}</span>
+      <button class="btn1" type="button" data-act="after" data-item="followup">${esc(t.followup)}</button>
+      <button class="ghost" type="button" data-act="after" data-item="callpage">${esc(t.callPage)}</button>`;
 
     const list = visibleCards();
     const hero = presenting() ? null : pickHero(list);
@@ -441,6 +450,7 @@
         break;
       }
       case 'promote': S.ui.heroOverride = id; break;
+      case 'after': post('after', { item: b.dataset.item }); return;
       case 'commit-done': {
         if (!card || !card.commit) return;
         card.state = 'done'; if (feed) feed.commitDone(id);
@@ -598,6 +608,7 @@
         { id: 'c5', kind: 'answer', who: 'Emily C.', question: 'Who tests the pilot?', say: 'Our QA covers the first week, then your team takes over.', source: 'Kick-off notes, 21 Oct: 5 pilot users, names by Friday', at: now - 10000, state: 'active', raw: {} },
         { id: 'c4', kind: 'turn', say: 'Pilot plan: 5 users, 2 weeks, starts Monday', at: now - 2 * min, state: 'active', raw: {} },
         { id: 'c3', kind: 'onme', say: 'Send the test account list today', at: now - 6 * min, state: 'active', raw: {} },
+        { id: 'r:demo', kind: 'risk', quiet: true, who: 'David K.', say: 'If the API release slips, the pilot moves a week', at: now - 8 * min, state: 'active', raw: {} },
         { id: 'k:c-demo', kind: 'onme', quiet: true, say: 'Share the pilot schedule with Emily', commit: { id: 'c-demo', text: 'Share the pilot schedule with Emily', mine: true }, at: now - 7 * min, state: 'active', raw: {} },
         { id: 'c2', kind: 'docs', say: 'Pilot: 5 users, list from the client', meta: 'You searched: pilot users', source: 'kickoff-notes.md', at: now - 8 * min, state: 'active', raw: {} },
         { id: 'c1', kind: 'answer', who: 'Emily C.', question: 'When is the export live?', say: 'Tuesday, after the review', at: now - 12 * min, state: 'done', raw: {} }

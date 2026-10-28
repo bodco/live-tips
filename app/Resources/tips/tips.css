@@ -37,6 +37,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .hero[hidden]{display:none}
 @keyframes in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .kind{font-size:var(--fs-label);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.k-risk{color:var(--k-onme)}
+.after{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}
+.after .meta{flex:1 1 100%}
 .k-answer{color:var(--k-answer)} .k-turn{color:var(--k-turn)} .k-onme{color:var(--k-onme)} .k-docs{color:var(--k-docs)} .k-neutral{color:var(--k-neutral)}
 .hero .head{display:flex;align-items:center;gap:8px}
 .meta{font-size:12px;color:var(--text-3)}

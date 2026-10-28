@@ -72,6 +72,13 @@ def handle_inbox(eng, raw: str) -> None:
                 eng.prompt.set_meeting({"title": eng.cfg["title"]})
             except Exception:  # noqa: BLE001
                 pass
+        elif key == "call_lang" and str(value or ""):   # Pacenote 0.8.6: the call's languages changed in Call settings
+            v = str(value)
+            codes = ["uk", "en"] if v == "mix" else [c for c in v.split("+") if c]
+            try:
+                eng.prompt.set_meeting({"langs": codes})
+            except Exception:  # noqa: BLE001
+                pass
         elif key == "agenda_state":       # Pacenote 0.8.5: the PM set an agenda item's state in the window
             eng.set_agenda_state(str(value or ""))
         elif key == "onme_state":         # "<action text>|done" or "|open": a tick in the window's On me

@@ -60,7 +60,7 @@ def config_ids(cfg_path: Path) -> dict:
     """meetings_db, project_page_id, workspace_page_id from the project config (projects/<slug>.md)."""
     t = cfg_path.read_text(encoding="utf-8")
     out = {}
-    for key in ("meetings_db", "project_page_id", "workspace_page_id"):
+    for key in ("meetings_db", "project_page_id", "workspace_page_id", "risks_db"):
         m = re.search(r"\*\*" + key + r"\*\*\s*:\s*`?([^`\s]+)", t) or re.search(key + r"\s*:\s*`?([^`\s]+)", t)
         if m:
             out[key] = m.group(1).replace("collection://", "").strip()

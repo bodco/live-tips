@@ -1,0 +1,15 @@
+# Rehearsal of a presentation (Pacenote 0.8, idea 10). App only (the skill needs a live call).
+schema_version: 1
+start: Home or the call form, "Rehearse" for a call of type Presentation with a preparation (outline or slides).
+recording: none. The steps run with their timers; nothing is written to the project folder.
+questions: 4
+answers: written (typed), one per question
+questions_prompt: >-
+  You play the client at the end of a presentation. From the preparation below (brief, outline, slides, facts),
+  ask {N} hard but fair questions a client would really ask: about scope, dates, cost, risks and what is not
+  covered. Write in {LANG}, one sentence each. Return JSON only: {{"questions": ["...", "..."]}}
+score_prompt: >-
+  You coach a project manager after a rehearsal. For each written answer give a score from 1 to 5 (5 = clear,
+  correct against the preparation, answers the question, commits to nothing the team did not agree), one line of
+  feedback and one better first sentence. Then one line overall. Write in {LANG}, plain words, no long dashes.
+  Return JSON only: {{"answers": [{{"score": 4, "feedback": "...", "better": "..."}}], "overall": "..."}}

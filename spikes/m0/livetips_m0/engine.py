@@ -222,6 +222,7 @@ class Engine:
         self.open_commitments: List[dict] = []
         self.commit_proposed: set = set()
         self.onme_ticked: Dict[str, bool] = {}
+        self.risks_shown: set = set()
         if cfg.get("commitments", True) and self.register_dir:
             try:
                 m = self.meta()
@@ -1230,6 +1231,12 @@ class Engine:
                    "theirs": [a for a in (obj.get("theirs") or []) if isinstance(a, dict) and a.get("what") and a.get("who")][:20]}
             if not sit["theirs"] and (self.situation or {}).get("theirs"):
                 sit["theirs"] = self.situation["theirs"]          # promises made earlier stay until the end of the call
+            # Pacenote 0.8.6 (rules/risks.yaml): risks heard on the call, kept until the end.
+            old = list((self.situation or {}).get("risks") or [])
+            for r in [r for r in (obj.get("risks") or []) if isinstance(r, dict) and r.get("what")][:12]:
+                if not any(jaccard(r["what"], o.get("what", "")) >= 0.5 for o in old):
+                    old.append({"what": str(r["what"])[:160], "who": str(r.get("who") or "")[:40], "t": str(r.get("t") or "")[:8]})
+            sit["risks"] = old[:12]
             # A speech point counts as said only when the PM really spoke in the new lines (review: a replay
             # struck the whole speech through during someone else's update).
             prev_done = set(self.situation.get("speech_done") or [])
@@ -1254,6 +1261,7 @@ class Engine:
             self._asks_to_tips(sit, hist)
             self._agenda_from_model(obj)
             self._commitments_done(obj)
+            self._risk_cards(sit)
         except Exception as e:  # noqa: BLE001  (the state is a helper; tips go on without it)
             self.out_timing.write({"outcome": "situation_error", "error": repr(e)[:200]})
         finally:
@@ -1300,6 +1308,9 @@ class Engine:
         ag, cm = getattr(self.rules, "agenda", {}) or {}, getattr(self.rules, "commitments", {}) or {}
         keys = ['"theirs": [{"who": "<name>", "what": "<what they promised, max 12 words, in the call\'s language>", "due": "<day or date, or empty>", "t": "<HH:MM:SS>"}]']
         rules = ["- " + cm.get("model_rule_theirs", "theirs = promises other people made to the PM's side on this call.")]
+        rk = getattr(self.rules, "risks", {}) or {}
+        keys.append('"risks": [{"what": "<what may go wrong and on what it depends, max 16 words, in the call\'s language>", "who": "<name>", "t": "<HH:MM:SS>"}]')
+        rules.append("- " + rk.get("model_rule", "risks = conditional threats said on this call."))
         if self.agenda_items:
             keys += ['"agenda_now": <number or -1>', '"agenda_done": [<numbers>]']
             rules.append("- " + ag.get("model_rule", "agenda_now = the AGENDA item discussed now; agenda_done = items discussed."))
@@ -1391,6 +1402,18 @@ class Engine:
                                  "gist": (("На мені" if mine else "На них") if uk else ("On me" if mine else "On them")) +
                                          " · " + ("Зроблено? " if uk else "Done? ") + c.get("text", "")})
 
+    def _risk_cards(self, sit: dict) -> None:
+        """A new risk: one quiet card in Earlier (rules/risks.yaml > during_call), never red."""
+        for r in sit.get("risks") or []:
+            key = r.get("what", "")[:60].lower()
+            if key in self.risks_shown:
+                continue
+            self.risks_shown.add(key)
+            t = s_to_hms(self.clock())
+            self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "risk", "level": "info", "t": t, "at": t,
+                                 "src": r.get("t") or t, "who": r.get("who", ""),
+                                 "gist": ("Ризик: " if self._ui_uk() else "Risk: ") + r.get("what", "")})
+
     def commitment_closed(self, cid: str) -> None:
         self.commit_proposed.add(str(cid))
 
@@ -1419,6 +1442,7 @@ class Engine:
                   for a in sit.get("actions") or []]
         items += [L("За ними: ", "On them: ") + a.get("who", "") + ": " + a.get("what", "") + (" (" + a["due"] + ")" if a.get("due") else "")
                   for a in sit.get("theirs") or []]
+        items += [L("Ризик: ", "Risk: ") + r.get("what", "") for r in sit.get("risks") or []]
         items += [L("Без відповіді: ", "Unanswered: ") + a.get("what", "") + (" · " + a["who"] if a.get("who") else "")
                   for a in sit.get("asks") or [] if a.get("type") != "update"]
         done = set(sit.get("speech_done") or [])

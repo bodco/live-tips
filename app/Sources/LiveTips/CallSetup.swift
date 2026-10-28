@@ -281,6 +281,9 @@ struct CallSetupView: View {
                     .font(PN.Font.body).foregroundStyle(PN.C.text)
                 Spacer()
                 if let path = PrepDocWindow.path(for: model) { Button(L("common.open")) { PrepDocWindow.show(path: path, title: model.effectiveTitle) }.buttonStyle(.pnTertiary) }
+                if model.callType == "presentation", let path = PrepDocWindow.path(for: model) {
+                    Button(L("rehearse.button")) { RehearsalWindow.show(base: String(path.dropLast(9)), title: model.effectiveTitle) }.buttonStyle(.pnTertiary)
+                }
             } else {
                 Image(systemName: "doc.badge.clock").foregroundStyle(PN.C.onMe)
                 Text(model.target.isEmpty ? L("call.chooseProjectFirst") : L("home.check.noBrief")).font(PN.Font.body).foregroundStyle(PN.C.text2)

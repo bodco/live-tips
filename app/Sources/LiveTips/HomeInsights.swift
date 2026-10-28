@@ -10,6 +10,13 @@ struct CallOutcome: Equatable {
     var decisions: [String] = []
     var onMe: [String] = []             // what the PM took on
     var openQuestions: [String] = []    // questions to the PM still open at the end
+    var theirs: [(who: String, what: String)] = []   // 0.8.5: promises made to the PM's side
+    var risks: [String] = []            // 0.8.6: risks heard on the call (rules/risks.yaml)
+
+    static func == (a: CallOutcome, b: CallOutcome) -> Bool {
+        a.decisions == b.decisions && a.onMe == b.onMe && a.openQuestions == b.openQuestions && a.risks == b.risks
+            && a.theirs.map { $0.who + "|" + $0.what } == b.theirs.map { $0.who + "|" + $0.what }
+    }
 
     var isEmpty: Bool { decisions.isEmpty && onMe.isEmpty && openQuestions.isEmpty }
 
@@ -35,6 +42,11 @@ struct CallOutcome: Equatable {
                 c.onMe = ((o["actions"] as? [[String: Any]]) ?? []).compactMap { $0["what"] as? String }.filter { !$0.isEmpty }
                 c.openQuestions = ((o["asks"] as? [[String: Any]]) ?? []).filter { ($0["type"] as? String) != "update" }
                     .compactMap { $0["what"] as? String }.filter { !$0.isEmpty }
+                c.theirs = ((o["theirs"] as? [[String: Any]]) ?? []).compactMap { d in
+                    guard let w = d["what"] as? String, !w.isEmpty else { return nil }
+                    return (who: (d["who"] as? String) ?? "", what: w)
+                }
+                c.risks = ((o["risks"] as? [[String: Any]]) ?? []).compactMap { $0["what"] as? String }.filter { !$0.isEmpty }
                 return c
             }
         }

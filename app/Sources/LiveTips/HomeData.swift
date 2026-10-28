@@ -94,16 +94,21 @@ extension StartCallModel {
 
     /// The items of the last agenda strip of a call that were never raised (state todo).
     static func notRaised(transcript file: String) -> [String] {
+        agenda(transcript: file).filter { $0.state == "todo" }.map { $0.text }
+    }
+
+    /// The last agenda strip of a call: each item and its state (todo, now, done).
+    static func agenda(transcript file: String) -> [(text: String, state: String)] {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         for p in [file + ".tips.jsonl", stem + ".tips.jsonl"] {
             guard let s = try? String(contentsOfFile: p, encoding: .utf8) else { continue }
             for ln in s.split(separator: "\n").reversed() where ln.contains("\"agenda\"") {
                 guard let o = (try? JSONSerialization.jsonObject(with: Data(ln.utf8))) as? [String: Any], (o["kind"] as? String) == "agenda",
                       let items = o["items"] as? [Any] else { continue }
-                return items.compactMap { x -> String? in
+                return items.compactMap { x -> (text: String, state: String)? in
                     guard let d = x as? [String: Any], let t = d["text"] as? String, !t.isEmpty else { return nil }
                     let st = (d["state"] as? String) ?? ((d["done"] as? Bool) == true ? "done" : (d["cur"] as? Bool) == true ? "now" : "todo")
-                    return st == "todo" ? t : nil
+                    return (text: t, state: st)
                 }
             }
         }

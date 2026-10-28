@@ -106,6 +106,7 @@ struct WeekStats: View {
                 tile(L("stats.onCalls"), hm(mins), delta(mins, prevMins, fmt: hm))
                 tile(L("stats.prepared"), this.isEmpty ? "-" : L("home.week.preparedOf", ["x": "\(prepared)", "y": "\(this.count)"]), this.isEmpty ? "" : "\(Int((Double(prepared) / Double(max(1, this.count)) * 100).rounded()))%")
             }
+            if !compact && !this.isEmpty { quality(this) }
             if !bars.isEmpty {
                 Chart(bars) { b in
                     BarMark(x: .value(LocalizedStringKey(L("stats.axisDay")), b.date, unit: .day), y: .value(LocalizedStringKey(L("stats.axisMinutes")), b.minutes))
@@ -165,6 +166,28 @@ struct WeekStats: View {
         .onAppear { history.fillDetails() }
     }
 
+    /// Pacenote 0.8.6 (idea 07): how the calls went, from their own files. No dollars (they live in Settings > AI).
+    @ViewBuilder private func quality(_ calls: [CallHistory.Record]) -> some View {
+        let ms = calls.map { ($0, CallMetrics.shared.of($0.file)) }
+        let shares = ms.compactMap { $0.1.talkShare }
+        let open = ms.reduce(0) { $0 + $1.1.unanswered }
+        let noDecision = ms.filter { $0.1.hasPicture && $0.1.decisions == 0 }.count
+        let prep = ms.filter { $0.0.prepared == true }, noPrep = ms.filter { $0.0.prepared != true }
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L("stats.quality")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                tile(L("stats.talkShare"), shares.isEmpty ? "-" : "\(Int((shares.reduce(0, +) / Double(shares.count) * 100).rounded()))%", L("stats.talkShare.sub"))
+                tile(L("stats.unanswered"), "\(open)", L("stats.unanswered.sub"))
+                tile(L("stats.noDecision"), "\(noDecision)", L("stats.noDecision.sub", ["n": "\(calls.count)"]))
+            }
+            Text(L("stats.prepVsNot", ["a": Self.perCall(prep), "b": Self.perCall(noPrep)])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+        }
+    }
+
+    private static func perCall(_ xs: [(CallHistory.Record, CallMetrics.Result)]) -> String {
+        xs.isEmpty ? "-" : String(format: "%.1f", Double(xs.reduce(0) { $0 + $1.1.decisions }) / Double(xs.count))
+    }
+
     @ViewBuilder private func facts(_ longest: CallHistory.Record?, _ busiest: (key: Date, value: Double)?, _ this: [CallHistory.Record], _ mins: Double, _ spend: Double) -> some View {
         let wd = Self.dayFmt
         if let l = longest, (l.minutes ?? 0) > 0 { fact(L("stats.longest"), "\(l.title), \(hm(l.minutes ?? 0))") }
@@ -208,5 +231,29 @@ struct WeekStats: View {
 
     private func fact(_ label: String, _ value: String) -> some View {
         HStack(spacing: 4) { Text(label + ":").foregroundStyle(PN.C.text3); Text(value).lineLimit(1) }
+    }
+}
+
+/// Pacenote 0.8.6 (idea 07): what a held call says about itself, read once per file version.
+@MainActor
+final class CallMetrics {
+    static let shared = CallMetrics()
+    struct Result { var talkShare: Double?; var unanswered = 0; var decisions = 0; var hasPicture = false }
+    private var cache: [String: (Date, Result)] = [:]
+    private lazy var me = PyTool.meLabel
+
+    func of(_ file: String) -> Result {
+        let m = ((try? FileManager.default.attributesOfItem(atPath: file))?[.modificationDate] as? Date) ?? .distantPast
+        if let c = cache[file], c.0 == m { return c.1 }
+        var r = Result()
+        let lines = TranscriptLine.read(file, me: me)
+        let words = { (l: TranscriptLine) in l.text.split(separator: " ").count }
+        let all = lines.reduce(0) { $0 + words($1) }, mine = lines.filter { $0.me }.reduce(0) { $0 + words($1) }
+        if all > 50 { r.talkShare = Double(mine) / Double(all) }
+        if let o = CallOutcome.read(transcript: file) {
+            r.hasPicture = true; r.decisions = o.decisions.count; r.unanswered = o.openQuestions.count
+        }
+        cache[file] = (m, r)
+        return r
     }
 }

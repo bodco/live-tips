@@ -1228,6 +1228,31 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
   as a notification and a banner on Home: "Start tips for Orbit weekly?" with the project of the series. It never
   records by itself. Settings > Calendars > "Suggest starting tips when a call begins" (on by default).
 
+### 14.1e After the call: call page, follow-up email, memory, series, statistics, risks, rehearsal (0.8.6)
+
+- **Call page.** Home > Recent > a click opens the page of the call: decisions, what is on you and on them (tick to
+  close, Copy), open questions, the agenda (discussed, raised, not raised) and the risks. From there: the follow-up
+  email, the transcript, the series and, in the menu, Notion and Finder. The tips window shows the same two actions
+  when the call has ended.
+- **Follow-up email.** A draft in the client's language (the project config's client language, English otherwise):
+  thanks, decisions, next steps for both sides, open questions. Edit it, then Copy or Open in Mail. Nothing is sent.
+- **Call memory.** Home > Search calls (Command-F): choose the project, ask in plain words ("what did we agree about
+  the export?"). The answer is 1-2 sentences, a quote and "Jump to 12:34", which opens the transcript at that moment.
+  Only the chosen project's transcripts are read (its local index, or a word search when there is none).
+- **Series.** A regular meeting (same project and title) as one page: what changed since last time, the open
+  commitments of the series, the questions that stay open call after call ("open for 3 calls, since ..."), and the
+  decisions call by call. It opens from the call page, Recent and Up next.
+- **Statistics.** Home > This week > Details adds "How the calls went": how much you spoke, questions to you left
+  open, calls without a decision, and decisions per call with a brief and without. No dollars.
+- **Risks.** The call picture catches conditional threats ("if the API slips, the pilot moves a week"): a quiet Risk
+  card during the call, a Risks section after it. "Add to risk register" writes one page into the project's Notion
+  risk database (`risks_db` in the project config) only after you confirm.
+- **Rehearsal.** For a presentation with a preparation (outline or slides): Rehearse on Home or in the call form.
+  Nothing is recorded: the steps run with their timers, then Claude asks 4 client questions, you answer in writing
+  and get a score and one better first sentence for each answer.
+- **Call languages during the call.** Call settings now take one or several languages, as the call form does (the
+  first is the main one); the change applies from the next line.
+
 ### 14.2 After the call: the meeting page in Notion
 
 With **Settings > General > Write the call summary to Notion** on, the app writes the wrap-up

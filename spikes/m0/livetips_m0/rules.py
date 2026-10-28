@@ -24,6 +24,7 @@ class Rules:
         # Pacenote 0.8.5: the agenda and the commitments register (optional, so older rules folders still load).
         self.agenda = self._y("agenda.yaml") if (self.root / "agenda.yaml").exists() else {}
         self.commitments = self._y("commitments.yaml") if (self.root / "commitments.yaml").exists() else {}
+        self.risks = self._y("risks.yaml") if (self.root / "risks.yaml").exists() else {}       # 0.8.6
 
     def _y(self, name):
         return yaml.safe_load((self.root / name).read_text(encoding="utf-8"))

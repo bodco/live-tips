@@ -3,6 +3,23 @@
 Pacenote (formerly Live Tips). Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.6 (F6: after the call)
+
+- **Call page:** a click in Recent opens what the call left: decisions, on you and on them, open questions, the
+  agenda, the risks; with the follow-up email, the transcript, the series, Notion and Finder. The tips window offers
+  the call page and the follow-up email when the call has ended.
+- **Follow-up email:** a draft in the client's language to edit, copy or open in Mail. Nothing is sent.
+- **Call memory:** Home > Search calls (Command-F), one project at a time: an answer, a quote and Jump to the moment
+  in the transcript.
+- **Series page:** what changed since last time, open commitments, questions open for several calls, decisions call
+  by call.
+- **Statistics:** how much you spoke, questions left open, calls without a decision, decisions with a brief and without.
+- **Risks:** a quiet Risk card during the call, a Risks section after it, "Add to risk register" (Notion) only after
+  you confirm.
+- **Rehearsal** of a presentation without recording: steps with timers, 4 client questions answered in writing, a score.
+- **Fixed:** Call settings during a call allow one or several languages, as the call form does (in 0.7 only one).
+- Shared rules: `rules/followup.yaml`, `rules/risks.yaml`, `rules/rehearsal.yaml` (rules 0.3.0).
+
 ## 0.8.5 (F5: agenda, commitments, brief freshness, call-start offer)
 
 - **Agenda as a contract:** the brief's checklist is the agenda; the call picture marks the item being discussed and

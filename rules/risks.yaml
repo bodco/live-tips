@@ -1,0 +1,12 @@
+# Risks heard on the call (Pacenote 0.8, idea 09). Shared by the skill and the app.
+schema_version: 1
+model_rule: >-
+  risks = conditional threats said on this call ("if X slips, Y moves", "we might not make the date", "depends on
+  their approval"): what may go wrong and what it depends on, max 16 words each, with the time of the line and who
+  said it. Keep earlier ones. Not every problem is a risk: a bug that is being fixed now is not.
+during_call: >-
+  A new risk becomes one quiet card `{"kind":"risk","level":"info","gist":"Risk: <what>","t":"HH:MM:SS","who":"<name>"}`
+  in Earlier (the On me colour), never the main card, never red.
+after_call: >-
+  The call summary has a "Risks" section. "Add to risk register" writes one page into the project's Notion risk
+  database (risks_db in the project config) only after the PM confirms it; nothing is added by itself.

@@ -48,7 +48,10 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             let sit: [String: Any] = ["kind": "situation", "t": "10:40:00",
                                       "decisions": days == 0 ? ["Export goes to production on Tuesday", "Pilot starts Monday with 5 users"] : ["Release checklist approved"],
                                       "actions": days == 0 ? [["what": "Send the test account list", "due": "today", "from": "Emily"]] : days == 1 ? [["what": "Share the release notes draft", "due": "Friday", "from": "PM"]] : [],
-                                      "asks": days == 0 ? [["who": "David", "what": "Who tests the pilot after week one?", "type": "question"]] : []]
+                                      "asks": days == 0 ? [["who": "David", "what": "Who tests the pilot after week one?", "type": "question"]] : [],
+                                      // Pacenote 0.8.6: promises of the other side and risks, for the call page and the series.
+                                      "theirs": days == 0 ? [["who": "Emily Clark", "what": "Names of the 5 pilot users", "due": "Friday"]] : [],
+                                      "risks": days == 0 ? [["what": "If the API release slips, the pilot moves a week", "who": "David", "t": "10:31:10"]] : []]
             // Pacenote 0.8.5: the last agenda strip of the call (one item not raised: carried into the next call of the series).
             let agenda: [String: Any] = ["kind": "agenda", "final": true, "items": [["text": "Export release date", "done": true, "state": "done"],
                                                                                  ["text": "Who tests the pilot", "done": true, "state": "done"],
@@ -58,6 +61,13 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                 try? (s + "\n" + (days == 0 ? s2 + "\n" : "")).write(toFile: f + ".tips.jsonl", atomically: true, encoding: .utf8)
             }
         }
+        // Pacenote 0.8.6 (F6): a presentation preparation with an outline, for the rehearsal window.
+        let pbase = orbit + "/live/prep-" + df.string(from: Date()) + "-1400-orbit-pilot-demo"
+        try? "# Live Brief: Orbit pilot demo\n\n**Goal:** agree the pilot plan.\n".write(toFile: pbase + ".brief.md", atomically: true, encoding: .utf8)
+        write(["sections": [["title": "Where we are", "sec": 90, "points": ["Export is on staging", "QA signed off the release checklist"]],
+                            ["title": "Pilot plan", "sec": 120, "points": ["5 users, 2 weeks, starts Monday", "Our QA covers week one"]],
+                            ["title": "What we need from you", "sec": 60, "points": ["Names of the pilot users by Friday", "One contact for feedback"]]]],
+              pbase + ".outline.json")
         // Pacenote 0.8.5 (F5): the commitments register for Home's On you and the readiness checks (demo items only).
         let iso = ISO8601DateFormatter()
         let yesterday = df.string(from: Date().addingTimeInterval(-86400)), today = df.string(from: Date().addingTimeInterval(-3600))
@@ -121,6 +131,13 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             steps.append { [unowned self] in self.menuPanel(theme, live: true) }
             for tab in ["general", "calendars", "keys", "notion", "ai", "about", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
             steps.append { [unowned self] in self.howItWorks(theme) }     // F4: its own window from the Help menu
+            // F6: the call page, the series, the call memory and the rehearsal (no model call in shot mode).
+            steps.append { [unowned self] in self.window("call-page-\(theme)") { if let r = self.demoCall { CallPageWindow.show(file: r.file) } } }
+            steps.append { [unowned self] in self.window("series-\(theme)") { if let r = self.demoCall { SeriesWindow.show(record: r) } } }
+            steps.append { [unowned self] in self.window("memory-\(theme)") { MemoryWindow.show(project: ShotMode.demoRoot + "/work/Northwind Studio/Orbit SaaS Launch") } }
+            steps.append { [unowned self] in self.window("rehearsal-\(theme)") {
+                let b = ShotMode.demoRoot + "/work/Northwind Studio/Orbit SaaS Launch/live/prep-" + ShotMode.day() + "-1400-orbit-pilot-demo"
+                RehearsalWindow.show(base: b, title: "Orbit pilot demo") } }
             steps.append { [unowned self] in self.tips(theme, presentation: false) }
             steps.append { [unowned self] in self.tips(theme, presentation: true) }
             steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "tips-380", size: NSSize(width: 380, height: 620)) }
@@ -237,6 +254,18 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         StartCallWindow.show(delegate: AppDelegate(), prepared: m, mode: .prepare)     // Pacenote 0.8: the same form
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
             if let w = StartCallWindow.window { capture(w, "prepare-\(theme)"); w.close() }
+            next()
+        }
+    }
+
+    var demoCall: CallHistory.Record? { CallHistory.shared.visible.first { $0.title.hasPrefix("Orbit weekly") } }
+    nonisolated static func day() -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date()) }
+
+    /// Opens a window and captures the key window after it settles.
+    func window(_ name: String, open: () -> Void) {
+        open()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
+            if let w = NSApp.keyWindow { capture(w, name); w.close() }
             next()
         }
     }

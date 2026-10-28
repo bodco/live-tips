@@ -124,6 +124,9 @@ struct HomeView: View {
                 Text(sub).font(PN.Font.body).foregroundStyle(PN.C.text3)
             }
             Spacer()
+            // Pacenote 0.8.6 (idea 05): ask about past calls of a project (Command-F).
+            Button { MemoryWindow.show() } label: { Label(L("memory.button"), systemImage: "magnifyingglass") }
+                .buttonStyle(.pnTertiary).keyboardShortcut("f", modifiers: .command).help(L("memory.help"))
             Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
                 .buttonStyle(.pnSecondary)
                 .help(L("home.planCall.help"))
@@ -314,6 +317,13 @@ struct HomeView: View {
             HStack(spacing: 8) {
                 Button(L("home.startTips")) { start(r) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                 Button(L("home.editSetup")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) }.buttonStyle(.pnSecondary)
+                // Pacenote 0.8.6: the series page (idea 06) and a rehearsal of a presentation (idea 10).
+                if let m = r.model, m.callType == "presentation", let p = PrepDocWindow.path(for: m) {
+                    Button(L("rehearse.button")) { RehearsalWindow.show(base: String(p.dropLast(9)), title: m.effectiveTitle) }.buttonStyle(.pnTertiary)
+                }
+                if let last = lastOfSeries(r), CallPageView.series(of: last).count > 0 {
+                    Button(L("call.page.series", ["n": "\(CallPageView.series(of: last).count)"])) { SeriesWindow.show(record: last) }.buttonStyle(.pnTertiary)
+                }
             }
         }
         .padding(20).frame(maxWidth: .infinity, alignment: .leading)
@@ -686,15 +696,17 @@ struct HomeView: View {
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
-                        .onTapGesture { if let u = r.notionURL.flatMap({ URL(string: $0) }) { NSWorkspace.shared.open(u) } else { NSWorkspace.shared.open(URL(fileURLWithPath: r.file)) } }
+                        .onTapGesture { CallPageWindow.show(file: r.file) }       // 0.8.6: the call page (spec 4.4)
                         .contextMenu {
                             if let u = r.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
-                            Button(L("home.recent.transcript")) { NSWorkspace.shared.open(URL(fileURLWithPath: r.file)) }
+                            Button(L("home.recent.transcript")) { TranscriptWindow.show(file: r.file) }
+                            Button(L("call.page.followup")) { FollowUpWindow.show(file: r.file) }
+                            if CallPageView.series(of: r).count > 1 { Button(L("call.page.series", ["n": "\(CallPageView.series(of: r).count)"])) { SeriesWindow.show(record: r) } }
                             Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.file)]) }
                             Divider()
                             Button(L("home.recent.hide")) { history.hide(r) }
                         }
-                        .help(r.notionURL != nil ? L("home.recent.help.notion") : L("home.recent.help.transcript"))
+                        .help(L("home.recent.help.page"))
                     }
                 }
             }

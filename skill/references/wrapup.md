@@ -61,6 +61,13 @@ recognised as a duplicate. Commitments the call picture said are done (`done_com
 proposals: list them in the wrap-up as `Схоже, зроблено: {пункт}. Закрити?` and append a `done`
 event (`"source":"detected"`) only for the ones the PM confirms in the chat. Add one line to the
 wrap-up: `Реєстр обіцянок: додано {N} (на мені {n}, на них {m}), відкритих у проєкті {K}`.
+**Follow-up email (Pacenote 0.8.6, SKILL.md > "Risks and the follow-up email").** End the wrap-up
+message with one line `Чернетка листа-підсумку для клієнта? (так/ні)`; on yes, write the draft in the
+chat in the client's language, by the rules (thanks, decisions, next steps both sides, open questions,
+~150 words). Never send it, never put it into Notion or a tracker.
+**Risks.** The risks of the call picture go into `Ризики` of the wrap-up and the Notion page; adding one
+to the project's risk database (`risks_db` in the config) only after the PM's explicit yes.
+
 **Agenda.** The Notion page (Step 5) gets a section `### Агенда` (English call: `### Agenda`): each
 checklist item with `обговорено` / `піднято` / `не піднято` (the last agenda strip of the call).
 

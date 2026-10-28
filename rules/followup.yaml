@@ -1,0 +1,16 @@
+# Follow-up email draft after a call (Pacenote 0.8, idea 04). Shared by the skill and the app.
+schema_version: 1
+when: After the call, only when the PM asks (the app's "Draft follow-up email"; the skill's wrap-up offers it in one line).
+language: The client's language from the project config (client_language), English when it is not set.
+structure: >-
+  Subject: the meeting's name and date. Body: one line of thanks, the decisions, who does what and by when
+  (both sides), the open questions; at most ~150 words, plain sentences, no long dashes, no internal notes
+  (estimates the team did not agree, prices, names of internal tools).
+never: Nothing is sent. The draft is shown to edit, Copy, or Open in Mail (a mailto link with the text).
+model_prompt: >-
+  You write a short follow-up email after a work call, for the project manager (the PM) to send to the other side.
+  Write in {LANG}. Use only what was said on the call (the call picture and the transcript); never invent dates,
+  numbers or promises. Structure: one line of thanks; "Decisions" as short lines; "Next steps" as "who: what (by
+  when)" for both sides; "Open questions" when there are any. At most about 150 words, plain sentences, no long
+  dashes, no internal notes. Return JSON only: {{"subject": "<meeting name and date>", "body": "<the email text,
+  with line breaks, ending with the PM's sign-off placeholder [Name]>"}}

@@ -57,6 +57,14 @@ reads and ticks it (`LiveTipsCore/Commitments.swift`, `Register.swift`), checks 
 Refresh (`PrepRunner`, `refreshBase`) and offers to start tips when a call begins (`AutoStart.swift`). The register is
 one append-only file per project, `<project>/live/commitments.jsonl`, so a project's data never mixes with another's.
 
+## After the call (0.8.6)
+
+`livetips_m0/followup.py`, `memory.py`, `rehearse.py` and `risk_notion.py` are small command-line modules the app runs
+through `PyTool.swift` (one JSON object out; the key and the Notion token go to the child only). Shared rules:
+`rules/followup.yaml`, `rules/risks.yaml`, `rules/rehearsal.yaml`; the skill's copy is the SKILL.md section "Risks and
+the follow-up email". Native windows: `CallPage.swift` (call page, transcript, follow-up), `Memory.swift` (call
+memory, series), `Rehearsal.swift`; statistics in `HomeStats.swift` (`CallMetrics`).
+
 ## Install (beta)
 
 1. Download the dmg from the release page:

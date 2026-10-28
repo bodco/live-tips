@@ -22,6 +22,8 @@ RULES = ROOT / "rules"
 OUT = RULES / "generated" / "skill_triggers.md"
 OUT_REG = RULES / "generated" / "skill_register.md"
 REG_HEAD = "### Agenda, commitments, brief freshness"
+OUT_AFTER = RULES / "generated" / "skill_after.md"
+AFTER_HEAD = "### Risks and the follow-up email"
 
 
 def render(rules_dir: Path = RULES) -> str:
@@ -63,6 +65,21 @@ def render_register(rules_dir: Path = RULES) -> str:
     return "\n".join(out) + "\n"
 
 
+def render_after(rules_dir: Path = RULES) -> str:
+    """Pacenote 0.8.6: risks heard on the call and the follow-up email draft (rules/risks.yaml, rules/followup.yaml)."""
+    rk = yaml.safe_load((rules_dir / "risks.yaml").read_text(encoding="utf-8"))
+    fu = yaml.safe_load((rules_dir / "followup.yaml").read_text(encoding="utf-8"))
+    out = ["Generated from `rules/risks.yaml` and `rules/followup.yaml`; do not edit here.", ""]
+    out.append("**Risks.** Call picture: " + rk["model_rule"])
+    out.append("- During the call: " + rk["during_call"])
+    out.append("- After the call: " + rk["after_call"])
+    out.append("")
+    out.append("**Follow-up email.** " + fu["when"])
+    for k in ("language", "structure", "never"):
+        out.append("- {}: {}".format(k.capitalize(), fu[k]))
+    return "\n".join(out) + "\n"
+
+
 def extract_section(skill_md: str, head: str) -> str:
     """The body of the SKILL.md section `head` up to the next heading, blank lines at the ends removed."""
     lines = skill_md.split("\n")
@@ -88,28 +105,29 @@ def main(argv=None) -> int:
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--compare", type=Path)
     a = ap.parse_args(argv)
-    text, reg = render(), render_register()
+    text, reg, after = render(), render_register(), render_after()
     if a.compare:
         md = a.compare.read_text(encoding="utf-8")
         bad = 0
         if extract_table(md) != text:
             sys.stderr.write("DRIFT: the Triggers table in {} differs from rules/triggers.yaml\n".format(a.compare))
             bad = 1
-        if REG_HEAD not in md or extract_section(md, REG_HEAD) != reg:
-            sys.stderr.write("DRIFT: the section '{}' in {} differs from rules/\n".format(REG_HEAD, a.compare))
-            bad = 1
+        for head, body in ((REG_HEAD, reg), (AFTER_HEAD, after)):
+            if head not in md or extract_section(md, head) != body:
+                sys.stderr.write("DRIFT: the section '{}' in {} differs from rules/\n".format(head, a.compare))
+                bad = 1
         if not bad:
             print("OK: generated sections match rules/")
         return bad
     if a.check:
-        for out, t in ((OUT, text), (OUT_REG, reg)):
+        for out, t in ((OUT, text), (OUT_REG, reg), (OUT_AFTER, after)):
             if not out.exists() or out.read_text(encoding="utf-8") != t:
                 sys.stderr.write("STALE: run tools/gen_skill_section.py\n")
                 return 1
         print("OK: generated section is up to date")
         return 0
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    for out, t in ((OUT, text), (OUT_REG, reg)):
+    for out, t in ((OUT, text), (OUT_REG, reg), (OUT_AFTER, after)):
         out.write_text(t, encoding="utf-8")
         print("wrote", out.relative_to(ROOT))
     return 0

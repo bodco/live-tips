@@ -15,7 +15,8 @@ final class CallSettingsModel: ObservableObject {
     @Published var callType = "auto"
     @Published var hiringRole = ""
     @Published var audience = "auto"
-    @Published var language = "en"
+    @Published var language = "en"          // "uk", "en", "uk+en", "de+en": the first is the main one
+    var languageCodes: [String] { language.split(separator: "+").map(String.init).filter { !$0.isEmpty } }
     @Published var mic = "default"
     @Published var mics: [Mic] = []
     @Published var proactive = false
@@ -37,8 +38,10 @@ final class CallSettingsModel: ObservableObject {
         if let v = s["call_type"] as? String { callType = v == "presentation" || v == "interview" ? v : "auto" }
         if let v = s["hiring_role"] as? String { hiringRole = v }
         if let v = s["audience"] as? String, !v.isEmpty { audience = v } else if (s["call_type"] as? String) == "client" { audience = "client" }
-        if let v = s["call_lang"] as? String, !v.isEmpty { language = v }
-        else if let l = s["langs"] as? [String], l.count > 1 { language = "mix" }
+        // Pacenote 0.8.6 (owner: the 0.7 bug): one or several languages, as in the call form. The recorder takes any
+        // set ("uk+en", "de+en+uk"; the first is the main one) and reports the languages in use as "langs".
+        if let l = s["langs"] as? [String], !l.isEmpty { language = l.prefix(5).joined(separator: "+") }
+        else if let v = s["call_lang"] as? String, !v.isEmpty { language = v == "mix" ? "uk+en" : v }
         else if let v = s["me_lang"] as? String { language = v == "en" ? "en" : "uk" }
         if let v = s["mic_device"] as? String, !v.isEmpty { mic = v }
         if let p = s["proactive"] { proactive = (p as? Bool) ?? ["on", "true", "1"].contains("\(p)") }
@@ -65,6 +68,7 @@ final class CallSettingsModel: ObservableObject {
 
 struct CallSettingsView: View {
     @ObservedObject var model: CallSettingsModel
+    @State private var langs = false               // the language picker (one or several)
     var close: () -> Void
 
     var body: some View {
@@ -92,10 +96,14 @@ struct CallSettingsView: View {
                         Text(L("callSettings.audience.team")).tag("team")
                     }
                     .onChange(of: model.audience) { model.send("audience", model.audience) }
-                    Picker(L("callSettings.language"), selection: $model.language) {
-                        Text("English").tag("en")
-                        Text("Українська").tag("uk")
-                        Text(L("callSettings.language.mixed")).tag("mix")
+                    LabeledContent(L("callSettings.language")) {
+                        Button(Languages.label(model.languageCodes)) { langs = true }
+                            .buttonStyle(.pnSecondary)
+                            .help(L("callSettings.language.help"))
+                            .popover(isPresented: $langs, arrowEdge: .bottom) {
+                                LanguagePicker(codes: Binding(get: { model.languageCodes },
+                                                              set: { model.language = Array($0.prefix(5)).joined(separator: "+") }))
+                            }
                     }
                     .onChange(of: model.language) { model.send("call_lang", model.language) }
                     Picker(L("callSettings.mic"), selection: $model.mic) {

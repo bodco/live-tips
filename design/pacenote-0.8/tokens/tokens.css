@@ -1,0 +1,63 @@
+/* Pacenote design tokens, v0.8 (brand v1). Light is default; dark via prefers-color-scheme or [data-theme="dark"]. */
+:root{
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --bg:#F5F5F7;          /* window */
+  --surface:#FFFFFF;     /* cards, panels */
+  --surface-2:#EEEEF1;   /* segmented, inputs */
+  --border:#D2D2D7;
+  --separator:#E8E8ED;
+  --text:#1D1D1F;
+  --text-2:#3A3A3C;      /* secondary, 10.4:1 on surface */
+  --text-3:#6E6E73;      /* captions, 5.1:1 on surface. Never lighter. */
+
+  --brand:#0A6CFF;       /* Pacenote Blue, graphics */
+  --ink:#1C1D21;
+  --accent:#0058B0;      /* Blue Deep: accent text and links, 7.0:1 on white */
+  --accent-fill:#0A6CFF; /* Pacenote Blue: buttons, progress, mark. White text 4.6:1 */
+  --accent-soft:#E5F0FF;
+  --rec:#FF3B30;
+  --danger-text:#C4000F; --danger-soft:#FFE5E3;
+
+  /* card kinds: label text color + soft background */
+  --k-answer:#0058B0;  --k-answer-soft:#E5F0FF;
+  --k-turn:#1A7431;    --k-turn-soft:#E3F5E7;
+  --k-onme:#9A4600;    --k-onme-soft:#FFF1DE;
+  --k-docs:#7D3C9E;    --k-docs-soft:#F3E8FA;
+  --k-neutral:#3A3A3C; --k-neutral-soft:#EEEEF1;
+
+  --radius-s:6px; --radius-m:10px; --radius-l:14px;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px;
+  --shadow-card:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.04);
+
+  --fs-caption:12px; --fs-body:14px; --fs-label:11px; --fs-hero:22px; --fs-hero-wide:24px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --brand:#4D9DFF;
+    --bg:#1E1E20; --surface:#2C2C2E; --surface-2:#3A3A3C; --border:rgba(255,255,255,.12); --separator:rgba(255,255,255,.07);
+    --text:#F5F5F7; --text-2:#C7C7CC; --text-3:#98989D;
+    --accent:#4D9DFF; --accent-fill:#0A6CFF; --accent-soft:rgba(10,132,255,.16);
+    --rec:#FF453A; --danger-text:#FF6961; --danger-soft:rgba(255,69,58,.18);
+    --k-answer:#64B5FF; --k-answer-soft:rgba(10,132,255,.16);
+    --k-turn:#4CD964;   --k-turn-soft:rgba(48,209,88,.14);
+    --k-onme:#FFB340;   --k-onme-soft:rgba(255,159,10,.14);
+    --k-docs:#D29BF5;   --k-docs-soft:rgba(191,90,242,.16);
+    --k-neutral:#C7C7CC;--k-neutral-soft:rgba(255,255,255,.06);
+    --shadow-card:0 1px 0 rgba(255,255,255,.06) inset;
+  }
+}
+:root[data-theme="dark"]{
+  --brand:#4D9DFF;
+  --bg:#1E1E20; --surface:#2C2C2E; --surface-2:#3A3A3C; --border:rgba(255,255,255,.12); --separator:rgba(255,255,255,.07);
+  --text:#F5F5F7; --text-2:#C7C7CC; --text-3:#98989D;
+  --accent:#4D9DFF; --accent-fill:#0A6CFF; --accent-soft:rgba(10,132,255,.16);
+  --rec:#FF453A; --danger-text:#FF6961; --danger-soft:rgba(255,69,58,.18);
+  --k-answer:#64B5FF; --k-answer-soft:rgba(10,132,255,.16);
+  --k-turn:#4CD964;   --k-turn-soft:rgba(48,209,88,.14);
+  --k-onme:#FFB340;   --k-onme-soft:rgba(255,159,10,.14);
+  --k-docs:#D29BF5;   --k-docs-soft:rgba(191,90,242,.16);
+  --k-neutral:#C7C7CC;--k-neutral-soft:rgba(255,255,255,.06);
+  --shadow-card:0 1px 0 rgba(255,255,255,.06) inset;
+}

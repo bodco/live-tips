@@ -272,12 +272,16 @@ class HedgedProvider(Provider):
             self.stats["hedged"] += 1
         winner, last, pending = race.wait(pending)
         if winner is not None and hedged:
-            winner.hedge = race.winner_tag
-            if race.winner_tag == "hedge":
-                self.stats["hedge_won"] += 1
+            self._tag(winner, race.winner_tag)
         if pending and self.on_extra:
             race.bill_later(pending, self.on_extra)
         return winner or last
+
+
+    def _tag(self, winner: Completion, tag: str) -> None:
+        winner.hedge = tag
+        if tag == "hedge":
+            self.stats["hedge_won"] += 1
 
 
 class _Race:

@@ -127,12 +127,12 @@ def fact_lines(data, kind: str) -> List[str]:
     if data is None:
         return []
     items = data if isinstance(data, list) else data.get(kind + "s", data.get("items", []))
-    out = []
-    for it in items if isinstance(items, list) else []:
-        if isinstance(it, dict):
-            out.append("- [{}:{}] {} | {} | {}".format(kind, it.get("id", ""), it.get("title") or it.get("gist") or "",
-                                                      it.get("text") or it.get("phrase") or "", it.get("source") or it.get("note") or ""))
-    return out
+    return [fact_line(kind, it) for it in (items if isinstance(items, list) else []) if isinstance(it, dict)]
+
+
+def fact_line(kind: str, it: dict) -> str:
+    return "- [{}:{}] {} | {} | {}".format(kind, it.get("id", ""), it.get("title") or it.get("gist") or "",
+                                          it.get("text") or it.get("phrase") or "", it.get("source") or it.get("note") or "")
 
 
 # Interview roles, same meaning as the skill's references/hiring.md (hiring_role).

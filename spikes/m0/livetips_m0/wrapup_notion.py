@@ -319,15 +319,15 @@ def schema(ds: str) -> dict:
     props = notion("GET", f"/data_sources/{ds}").get("properties", {})
     by = lambda t: [n for n, v in props.items() if v.get("type") == t]  # noqa: E731
     pick = lambda t, pref: (pref if (props.get(pref) or {}).get("type") == t else (by(t) or [None])[0])  # noqa: E731
-    out = {"title": (by("title") or ["Name"])[0], "date": pick("date", "Date"), "summary": None,
-           "project": None, "workspace": None}
-    if (props.get("Summary") or {}).get("type") == "rich_text":
-        out["summary"] = "Summary"
-    for key, name in (("project", "Project"), ("workspace", "Workspace")):
-        t = (props.get(name) or {}).get("type")
-        if t in ("relation", "select", "rich_text"):
-            out[key] = (name, t)
-    return out
+    return {"title": (by("title") or ["Name"])[0], "date": pick("date", "Date"),
+            "summary": "Summary" if (props.get("Summary") or {}).get("type") == "rich_text" else None,
+            "project": link_prop(props, "Project"), "workspace": link_prop(props, "Workspace")}
+
+
+def link_prop(props: dict, name: str):
+    """(name, type) when the property can carry a link (relation, select or text), else None."""
+    t = (props.get(name) or {}).get("type")
+    return (name, t) if t in ("relation", "select", "rich_text") else None
 
 
 def find_page(ds: str, start: dt.datetime, date_prop: str | None = "Date") -> dict | None:

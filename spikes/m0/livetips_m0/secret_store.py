@@ -10,14 +10,22 @@ def load_secret(name: str, secrets_file: Optional[str] = None) -> str:
     v = os.environ.get(name)
     if v:
         return v.strip()
-    if secrets_file:
-        p = Path(os.path.expanduser(secrets_file))
-        if p.exists():
-            for raw in p.read_text(encoding="utf-8").splitlines():
-                m = re.match(r"\s*(?:export\s+)?" + re.escape(name) + r"\s*=\s*(.*)$", raw)
-                if m:
-                    return m.group(1).strip().strip('"').strip("'")
+    v = from_file(name, secrets_file) if secrets_file else None
+    if v is not None:
+        return v
     raise KeyError("secret {} not found (env or secrets file)".format(name))
+
+
+def from_file(name: str, secrets_file: str) -> Optional[str]:
+    """NAME=value (or export NAME="value") from a dotenv-style file; None when it is not there."""
+    p = Path(os.path.expanduser(secrets_file))
+    if not p.exists():
+        return None
+    for raw in p.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"\s*(?:export\s+)?" + re.escape(name) + r"\s*=\s*(.*)$", raw)
+        if m:
+            return m.group(1).strip().strip('"').strip("'")
+    return None
 
 
 def masked(v: str) -> str:

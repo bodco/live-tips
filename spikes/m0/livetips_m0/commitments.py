@@ -171,6 +171,11 @@ class _CallRecord:
             self.events.append({"op": "done", "id": cid, "at": self.created, "source": "manual", "call": name})
 
 
+def is_ticked(a: dict, ticked: Dict[str, bool]) -> bool:
+    """Ticked in the window's On me, by action id or by its normalised text."""
+    return bool(ticked.get(str(a.get("id") or "")) or ticked.get(norm_text(a.get("what") or "")))
+
+
 def promiser(a: dict) -> str:
     """Who made a promise to the PM's side; empty for the PM or nobody."""
     who = str(a.get("who") or "").strip()[:40]
@@ -184,8 +189,7 @@ def record_call(folder, *, call: str, project: str, title: str, actions: List[di
     ticked = ticked or {}       # by action id or by norm_text(what)
     rec = _CallRecord(load(folder), call, project, series_key(project, title), now_iso(), by)
     for a in actions or []:
-        rec.add(a.get("what"), "me", a.get("due"), a.get("t"),
-                bool(ticked.get(str(a.get("id") or "")) or ticked.get(norm_text(a.get("what") or ""))))
+        rec.add(a.get("what"), "me", a.get("due"), a.get("t"), is_ticked(a, ticked))
     for a in theirs or []:
         if promiser(a):
             rec.add(a.get("what"), promiser(a), a.get("due"), a.get("t"), False)

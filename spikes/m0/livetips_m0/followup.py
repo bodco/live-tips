@@ -25,13 +25,21 @@ def build_user(md: Path) -> str:
     head = callinfo.header(md)
     parts = ["CALL: {} ({})".format(head["title"], head["start"])]
     if sit:
-        parts.append("CALL PICTURE (decisions, the PM's actions, promises of the other side, open questions):\n" + "\n".join(
-            ["Decision: " + d for d in sit.get("decisions") or []] +
-            ["PM will: {} {}".format(a.get("what", ""), "(" + a["due"] + ")" if a.get("due") else "") for a in sit.get("actions") or []] +
-            ["{} will: {} {}".format(a.get("who", ""), a.get("what", ""), "(" + a["due"] + ")" if a.get("due") else "") for a in sit.get("theirs") or []] +
-            ["Open: " + a.get("what", "") for a in sit.get("asks") or [] if a.get("type") != "update"]))
+        parts.append("CALL PICTURE (decisions, the PM's actions, promises of the other side, open questions):\n" +
+                     "\n".join(picture_lines(sit)))
     parts.append("TRANSCRIPT:\n" + callinfo.transcript_text(md, 60000))
     return "\n\n".join(parts)
+
+
+def _due(a: dict) -> str:
+    return "(" + a["due"] + ")" if a.get("due") else ""
+
+
+def picture_lines(sit: dict) -> list:
+    return (["Decision: " + d for d in sit.get("decisions") or []] +
+            ["PM will: {} {}".format(a.get("what", ""), _due(a)) for a in sit.get("actions") or []] +
+            ["{} will: {} {}".format(a.get("who", ""), a.get("what", ""), _due(a)) for a in sit.get("theirs") or []] +
+            ["Open: " + a.get("what", "") for a in sit.get("asks") or [] if a.get("type") != "update"])
 
 
 def draft(md: Path, lang: str = "en", model: str = "claude-sonnet-5-5", provider=None) -> dict:

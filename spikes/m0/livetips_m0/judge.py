@@ -186,6 +186,12 @@ def quick_sample(items):
     return sample_even(ap_, n_app) + sample_even(sk_, QUICK_MAX - n_app)
 
 
+def judge_extra(quick: bool) -> dict:
+    if quick:
+        return {"extra_body": {"thinking": {"type": "between_tools"}}}   # Sonnet 5.5 refuses "disabled" (400)
+    return {"extra_body": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}}}
+
+
 def judge_one(prov, model, system, lines, it, extra) -> dict:
     hint = "gist: {}\nphrase: {}\nitems: {}".format(it["gist"], it["phrase"], "; ".join(str(x) for x in it["items"]))
     user = "TRANSCRIPT (trigger line marked; hint shown at {}):\n{}\n\nHINT:\n{}".format(
@@ -230,9 +236,7 @@ def main(argv=None, provider=None):
     outp = out / "judge.jsonl"
     if outp.exists():
         outp.write_text("")               # a rerun replaces the old scores
-    extra = {"extra_body": {"thinking": {"type": "adaptive"}, "output_config": {"effort": "low"}}}
-    if a.quick:
-        extra = {"extra_body": {"thinking": {"type": "between_tools"}}}   # Sonnet 5.5 refuses "disabled" (400)
+    extra = judge_extra(a.quick)
     recs = []
     for it in items:
         rec = judge_one(prov, model, system, lines, it, extra)

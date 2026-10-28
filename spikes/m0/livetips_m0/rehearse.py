@@ -47,16 +47,22 @@ def score(base: str, answers: list, lang: str = "en", model: str = "claude-sonne
         "Q{}: {}\nA{}: {}".format(i + 1, a.get("q", ""), i + 1, a.get("a", "") or "(no answer)") for i, a in enumerate(answers))
     obj, usd = ask_json(system, user, model, 1500, provider)
     obj = obj or {}
-    items = []
-    for i, a in enumerate(answers):
-        s = (obj.get("answers") or [])[i] if i < len(obj.get("answers") or []) else {}
-        try:
-            sc = max(1, min(5, int(s.get("score", 0))))
-        except (TypeError, ValueError):
-            sc = 0
-        items.append({"q": a.get("q", ""), "score": sc, "feedback": str(s.get("feedback") or "").replace(chr(0x2014), "-"),
-                      "better": str(s.get("better") or "").replace(chr(0x2014), "-")})
-    return {"ok": True, "answers": items, "overall": str(obj.get("overall") or "").replace(chr(0x2014), "-"), "cost_usd": usd}
+    got = obj.get("answers") or []
+    items = [scored(a, got[i] if i < len(got) else {}) for i, a in enumerate(answers)]
+    return {"ok": True, "answers": items, "overall": nodash(obj.get("overall")), "cost_usd": usd}
+
+
+def nodash(v) -> str:
+    return str(v or "").replace(chr(0x2014), "-")
+
+
+def scored(a: dict, s: dict) -> dict:
+    """One answer with its score clamped to 1-5 (0 when the model gave none) and the feedback."""
+    try:
+        sc = max(1, min(5, int(s.get("score", 0))))
+    except (TypeError, ValueError):
+        sc = 0
+    return {"q": a.get("q", ""), "score": sc, "feedback": nodash(s.get("feedback")), "better": nodash(s.get("better"))}
 
 
 def main(argv=None) -> int:

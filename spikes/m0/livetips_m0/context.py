@@ -116,10 +116,11 @@ def state_part(root: Path) -> str:
 def hits_part(hits: List[dict]) -> str:
     if not hits:
         return ""
-    lines = []
-    for h in hits[:8]:
-        src = h.get("rel") or h.get("path") or ""
-        date = h.get("date") or h.get("last_edited") or ""
-        text = (h.get("preview") or h.get("text") or "").replace("\n", " ")[:400]
-        lines.append("- [{}{}] {}".format(src, ", " + date if date else "", text))
-    return "LOCAL MATERIALS FOUND FOR THE CONTEXT (project index):\n" + "\n".join(lines)
+    return "LOCAL MATERIALS FOUND FOR THE CONTEXT (project index):\n" + "\n".join(hit_line(h) for h in hits[:8])
+
+
+def hit_line(h: dict) -> str:
+    src = h.get("rel") or h.get("path") or ""
+    date = h.get("date") or h.get("last_edited") or ""
+    text = (h.get("preview") or h.get("text") or "").replace("\n", " ")[:400]
+    return "- [{}{}] {}".format(src, ", " + date if date else "", text)

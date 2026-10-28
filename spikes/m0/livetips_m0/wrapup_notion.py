@@ -141,22 +141,24 @@ def pm_corrections(path: Path) -> str:
     return ("\n\nCORRECTIONS BY THE PM DURING THE CALL (true; they win over the transcript):\n" + "\n".join(out[-60:])) if out else ""
 
 
-def claude_wrapup(transcript: str, brief: str, model: str, lang: str = "uk") -> dict:
-    key = os.environ.get("CLAUDE_API", "")
+def claude_wrapup(transcript: str, brief: str, model: str, lang: str = "uk", provider=None) -> dict:
+    """0.8.2: through the app's "After the call" route: the key, or Claude Code on the PM's Claude account."""
+    from .routing import provider_from_env
+    prov = provider or provider_from_env("after", timeout=180.0)
     user = (f"PREP BRIEF (may be empty):\n{brief[:14000]}\n\n" if brief else "") + f"TRANSCRIPT:\n{transcript[:120000]}"
-    r = http("POST", ANTHROPIC, {"x-api-key": key, "anthropic-version": "2023-06-01"},
-             {"model": model, "max_tokens": 2500, "system": SYSTEM.replace("{LANG}", TXT[lang]["write"]),
-              "messages": [{"role": "user", "content": user}]}, timeout=180)
-    text = "".join(b.get("text", "") for b in r.get("content", []) if b.get("type") == "text")
+    c = prov.complete(model=model, system=[{"text": SYSTEM.replace("{LANG}", TXT[lang]["write"])}], user=user,
+                      max_tokens=2500, cache_ttl=None)
+    if c.error:
+        raise RuntimeError("summary request failed: " + str(c.error)[:200])
+    text = c.text
     i, j = text.find("{"), text.rfind("}")
     out = json.loads(text[i:j + 1])
-    u = r.get("usage") or {}
-    try:   # 2026-10-26 (owner): the menu shows what the last call cost, the wrap-up included
+    try:   # 2026-10-26 (owner): the menu shows what the last call cost, the wrap-up included (Claude Code: 0, the plan)
         from .cost import cost_usd
-        out["_cost"] = cost_usd(model, u.get("input_tokens", 0), u.get("cache_creation_input_tokens", 0), 0,
-                                u.get("cache_read_input_tokens", 0), u.get("output_tokens", 0))
+        out["_cost"] = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)
     except Exception:  # noqa: BLE001
         out["_cost"] = None
+    out["_route"] = getattr(c, "route", "api")
     return out
 
 

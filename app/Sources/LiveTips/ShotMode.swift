@@ -119,13 +119,14 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         log("launched")
         // Pacenote 0.8: every screen in English and Ukrainian (files of the Ukrainian pass end in -uk).
-        // LT_SHOTS_ONLY=tips: only the tips window, when nothing else changed.
+        // LT_SHOTS_ONLY=tips: only the tips window, =ai: only Settings > AI, when nothing else changed.
         let env = ProcessInfo.processInfo.environment
         let all = env["LT_SHOTS_ALL"] == "1", tipsOnly = env["LT_SHOTS_ONLY"] == "tips"
         for lang in ["en", "uk"] {
         steps.append { [unowned self] in SettingsWindow.model.config.uiLanguage = lang; self.next(after: 0.3) }
         for theme in ["dark", "light"] {
             steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
+            if env["LT_SHOTS_ONLY"] == "ai" { steps.append { [unowned self] in self.settings("ai", theme) }; continue }   // Settings > AI only
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }

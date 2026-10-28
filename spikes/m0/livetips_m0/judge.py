@@ -193,7 +193,7 @@ def main(argv=None, provider=None):
     random.Random(7).shuffle(items)
     call_type = resolve_call_type(a, cfg)
     system = system_prompt(call_type, load_slides(a.slides), a.role or str(cfg.get("hiring_role") or ""))
-    prov = provider or make_provider(cfg, lambda n: load_secret(n, cfg.get("secrets_file")))
+    prov = provider or make_provider(cfg, lambda n: load_secret(n, cfg.get("secrets_file")), job="after")   # 0.8.2: the "After the call" route
     out.mkdir(parents=True, exist_ok=True)
     outp = out / "judge.jsonl"
     if outp.exists():

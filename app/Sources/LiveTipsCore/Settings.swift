@@ -33,6 +33,26 @@ public struct AppConfig: Codable, Equatable {
             ollamaModel = (try? c.decodeIfPresent(String.self, forKey: .ollamaModel)) ?? d.ollamaModel
         }
     }
+    /// 0.8.2 (owner): which way each job reaches Claude. "code": the PM's Claude account through Claude Code
+    /// (the plan's limits, no key); "api": the Claude API key (billed per token, the fastest). Auto-switch: when the
+    /// chosen way is out (no credit, the plan limit, signed out), the job uses the other one and goes back once the
+    /// chosen one answers again (state/ai-routes.json, shared with the engine).
+    public struct AIRoutes: Codable, Equatable {
+        public var prep = "code"
+        public var tips = "api"
+        public var after = "code"
+        public var autoSwitch = true
+        public init() {}
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let d = AIRoutes()
+            prep = (try? c.decodeIfPresent(String.self, forKey: .prep)) ?? d.prep
+            tips = (try? c.decodeIfPresent(String.self, forKey: .tips)) ?? d.tips
+            after = (try? c.decodeIfPresent(String.self, forKey: .after)) ?? d.after
+            autoSwitch = (try? c.decodeIfPresent(Bool.self, forKey: .autoSwitch)) ?? d.autoSwitch
+        }
+        public func route(_ job: String) -> String { job == "prep" ? prep : job == "tips" ? tips : after }
+    }
     /// Engine processes (M1-M2: Python core). Not shown in the UI; set by the installer.
     public struct Engine: Codable, Equatable {
         public var python = ""            // python that runs <appRoot>/src/transcriber.py (MLX Whisper)
@@ -44,6 +64,7 @@ public struct AppConfig: Codable, Equatable {
     /// How people address the PM on calls (any form); the "your turn" trigger.
     public var nameAliases: [String] = []
     public var models = Models()
+    public var ai = AIRoutes()
     public var budget = Budget()
     public var localAI = LocalAI()
     public var uiLanguage = "en"           // en | uk
@@ -84,6 +105,11 @@ public struct AppConfig: Codable, Equatable {
         engine = (try? c.decode(Engine.self, forKey: .engine)) ?? d.engine
         nameAliases = (try? c.decode([String].self, forKey: .nameAliases)) ?? d.nameAliases
         models = (try? c.decode(Models.self, forKey: .models)) ?? d.models
+        if let a = try? c.decode(AIRoutes.self, forKey: .ai) { ai = a } else {
+            // Before 0.8.2 the preparation's way was a separate switch; keep what the PM chose there.
+            ai = d.ai
+            if UserDefaults.standard.object(forKey: "prepUseAPI") != nil { ai.prep = UserDefaults.standard.bool(forKey: "prepUseAPI") ? "api" : "code" }
+        }
         budget = (try? c.decode(Budget.self, forKey: .budget)) ?? d.budget
         localAI = (try? c.decode(LocalAI.self, forKey: .localAI)) ?? d.localAI
         uiLanguage = (try? c.decode(String.self, forKey: .uiLanguage)) ?? d.uiLanguage

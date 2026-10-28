@@ -273,8 +273,8 @@ final class CallEngine {
     func startSidecar(file: String, status: EngineStatus, fromStart: Bool = true) {
         let c = config
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
-        let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        guard let key = store.get(.claudeAPIKey) else { return }
+        // 0.8.2: the tips go the way set in Settings > AI (the key, or Claude Code on the PM's account).
+        guard AIRoute.canRun(job: "tips", config: c) else { return }
         let state = (appRoot as NSString).appendingPathComponent("state")
         let cfgPath = (state as NSString).appendingPathComponent("sidecar-config.json")
         let core = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: (appRoot as NSString).appendingPathComponent("config.json"))))) as? [String: Any] ?? [:]
@@ -291,7 +291,7 @@ final class CallEngine {
         sc["call_context"] = callContext
         // The meeting concept of this call (Start call): type, audience, interview role, tip model.
         for k in ["call_type", "audience", "hiring_role"] { if let v = callRequest[k] as? String, !v.isEmpty { sc[k] = v } }
-        if let m = callRequest["tip_model"] as? String, !m.isEmpty { sc["models"] = ["classify": c.models.classify, "tip": m] }
+        sc["ai"] = AIRoute.sidecarBlock(config: c)      // 0.8.2: models live in Settings > AI only, not per call
         sc["hedge"] = ["enabled": c.hedgeEnabled]
         sc["answer_any"] = c.answerAny
         // 2026-10-26: the running call picture needs who the PM is on this call.
@@ -326,8 +326,7 @@ final class CallEngine {
                        "--tips-out", tipsOut,
                        "--inbox", status.inboxFile ?? ""]
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
-        var env = ProcessInfo.processInfo.environment
-        env["CLAUDE_API"] = key
+        var env = AIRoute.env(job: "tips", config: c)
         env["LT_PM_NAMES"] = c.nameAliases.joined(separator: ",")   // lt digest: questions addressed to the PM
         env["PYTHONDONTWRITEBYTECODE"] = "1"     // the engine may live inside the signed app bundle; the key goes to the child only, never written or logged
         p.environment = env
@@ -345,7 +344,7 @@ final class CallEngine {
         let c = config
         guard c.notionWriteSummary else { return }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        guard let key = store.get(.claudeAPIKey), let notionToken = store.get(.notionToken) else {
+        guard AIRoute.canRun(job: "after", config: c), let notionToken = store.get(.notionToken) else {
             notionResult = "Notion: add the Notion token in Settings > Notion"; notify(notionResult, settingsTab: "notion"); return
         }
         let hasConfig = !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig)
@@ -358,14 +357,13 @@ final class CallEngine {
         let projectName = ((callRequest["project_dir"] as? String).map { ($0 as NSString).lastPathComponent }) ?? ""
         p.arguments = ["-m", "livetips_m0.wrapup_notion", "--md", file,
                        "--lt", c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt"),
-                       "--model", c.models.tip, "--project-name", projectName]
+                       "--model", c.models.analysis, "--project-name", projectName]   // 0.8.2: the "After the call" model
             + (hasConfig ? ["--project-config", projectConfig] : [])
             + (c.notionMeetingsDB.isEmpty ? [] : ["--meetings-db", c.notionMeetingsDB])
             + (renamed.map { ["--title", $0] } ?? [])
             + ((callRequest["scheduled_at"] as? String).map { ["--when", $0] } ?? [])   // the date and time set in Start call
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
-        var env = ProcessInfo.processInfo.environment
-        env["CLAUDE_API"] = key
+        var env = AIRoute.env(job: "after", config: c)
         env["NOTION_TOKEN"] = notionToken          // passed to the child only, never written or logged
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         p.environment = env
@@ -408,8 +406,7 @@ final class CallEngine {
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
         let cfgPath = (appRoot as NSString).appendingPathComponent("state/sidecar-config.json")
         guard FileManager.default.fileExists(atPath: cfgPath) else { return }
-        let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        guard let key = store.get(.claudeAPIKey) else { return }
+        guard AIRoute.canRun(job: "after", config: c) else { return }
         let dir = (file as NSString).deletingLastPathComponent
         var stem = (file as NSString).lastPathComponent
         if stem.hasSuffix(".md") { stem = String(stem.dropLast(3)) }
@@ -424,8 +421,7 @@ final class CallEngine {
         p.arguments = args
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         p.qualityOfService = .background
-        var env = ProcessInfo.processInfo.environment
-        env["CLAUDE_API"] = key                    // passed to the child only, never written or logged
+        var env = AIRoute.env(job: "after", config: c)   // the key to the child only, never written or logged
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         p.environment = env
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/judge.log"))

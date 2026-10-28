@@ -17,7 +17,7 @@ permissions carry over. What "live tips" means inside the code: [DEVELOPMENT.md]
 | | The app | The skill |
 |---|---|---|
 | What | A native macOS menu bar app | A Claude Cowork skill |
-| You need | Apple Silicon Mac, macOS 14.4+, a Claude API key | Claude Cowork with a computer linked, the recorder from this repo |
+| You need | Apple Silicon Mac, macOS 14.4+, a Claude API key or a Claude plan with Claude Code | Claude Cowork with a computer linked, the recorder from this repo |
 | Tips come from | Claude API, called on events | Claude in your Cowork chat |
 | Download | [Pacenote.dmg](https://github.com/bodco/live-tips/releases/latest/download/Pacenote.dmg) | [live-tips.skill](https://github.com/bodco/live-tips/releases/latest/download/live-tips.skill) |
 

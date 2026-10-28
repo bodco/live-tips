@@ -3,6 +3,20 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.2
+
+- **Settings > AI is the one place for Claude.** Access once for the whole app: your Claude account (Claude
+  Code sign-in, the plan pays) and the API key (moved here from Keys). Then each job picks its way and its
+  models: preparation (Claude account by default), during the call (API key; the Claude account is there too,
+  marked "not recommended", with the reason), after the call (Claude account by default: summary and Notion
+  page, follow-up email, call memory, rehearsal, the tip judge).
+- **Automatic switch** (on by default): when the chosen way is out (no API credit, the app's monthly limit, the
+  plan limit, signed out, Claude Code missing), the job goes the other way; the chosen way is checked again
+  before the next job (during a call every 2 minutes) and the job goes back as soon as it answers. Settings > AI
+  shows what is out and why, with Check now. Shared with the engine in `state/ai-routes.json`.
+- The call form no longer has its own tip model. The after-call summary now uses the "After the call" model
+  (it used the tip model).
+
 ## 0.8.1
 
 - **Tips window, three tools in the top bar** after On me: microphone (crossed out in red when off), pause (turns

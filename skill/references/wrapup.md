@@ -41,7 +41,10 @@ Notion: {посилання на сторінку з Step 5}
 (`<tool_root>/state/sidecar-config.json` exists and its engine folder holds `livetips_m0`), or the
 user asks, run the same blind judge for the skill's tips: from the engine folder,
 `python -m livetips_m0.judge --config <tool_root>/state/sidecar-config.json --md "<transcript>" --quick`
-(Sonnet, at most 25 tips, about $0.10; the key comes from the environment, never print it).
+(Sonnet, at most 25 tips). It goes the app's "After the call" way from that config (`ai`, Settings > AI):
+on the PM's Claude account through Claude Code with no key, or on the API key (about $0.10), switching by
+itself when one way is out (without a key in the environment it goes through the account). `LT_AI_ROUTE=code`
+or `api` before the command picks the way for this run; never print a key.
 It writes `<stem>.judge/judge.summary.json` next to the transcript; if the app already rated
 the call, just read that file. Add one line to the wrap-up: `Оцінка підказок (суддя): skill
 {mean}/5 ({n}), app {mean}/5 ({n}); найгірше: ...` (the `worst` reasons). Without the app,

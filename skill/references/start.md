@@ -21,6 +21,10 @@ writes only `<stem>.app.*` files (`2026-10-22-1500-team-daily.app.md`, `.app.md.
 the two never share a transcript, control or state. Never read, edit or delete the `.app.*`
 files during the call. `<app folder>/bin/lt status` shows the app's recorder the same way
 `lt status` shows this one. Both recorders run Whisper, so expect about twice the CPU and memory.
+The app reaches Claude per job (preparation, during the call, after the call) through its API key or
+the PM's Claude account with Claude Code (Settings > AI), with an automatic switch when one way is
+out; `<app folder>/state/ai-routes.json` says which way is out and why. Read it if the PM asks why
+the app's tips are slow or stopped; never change it from the skill.
 
 ## Step 0 - Project and meeting
 

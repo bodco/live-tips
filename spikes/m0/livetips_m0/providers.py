@@ -29,6 +29,9 @@ class Completion:
     error: Optional[str] = None
     stop_reason: Optional[str] = None
     hedge: Optional[str] = None   # None: one request; "primary" / "hedge": a second request ran, this one won
+    route: str = "api"            # 0.8.2: "api" (the key) or "code" (Claude Code on the PM's account)
+    equiv_usd: Optional[float] = None   # Claude Code: what the request would cost on the API (not billed to the key)
+    switched_from: Optional[str] = None # auto-switch: the route that was out
 
     def ms(self, t):
         return None if t is None else round((t - self.t_start) * 1000)
@@ -285,7 +288,10 @@ class HedgedProvider(Provider):
         return winner or last
 
 
-def make_provider(cfg: dict, secret_loader: Callable[[str], str]) -> Provider:
+def make_provider(cfg: dict, secret_loader: Callable[[str], str], job: Optional[str] = None) -> Provider:
+    if cfg.get("ai"):   # 0.8.2: the app's AI routes (the key or Claude Code, with auto-switch)
+        from .routing import provider_from_cfg
+        return provider_from_cfg(cfg, secret_loader, job)
     kind = cfg.get("provider", "anthropic")
     if kind == "anthropic":
         ws = cfg.get("workspace_id", "")

@@ -12,15 +12,13 @@ enum PyTool {
             done(["ok": false, "error": L("py.noEngine")]); return
         }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        let key = store.get(.claudeAPIKey) ?? ""
-        if key.isEmpty && !notion { done(["ok": false, "error": L("prep.err.noKey")]); return }
+        // 0.8.2: the "After the call" way from Settings > AI (the key or Claude Code, with auto-switch).
+        if !notion && !AIRoute.canRun(job: "after", config: c) { done(["ok": false, "error": L("prep.err.noKey")]); return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
         p.arguments = ["-m", "livetips_m0." + module] + args
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
-        var env = ProcessInfo.processInfo.environment
-        env["CLAUDE_API"] = key
-        if let ws = store.get(.claudeWorkspaceID), !ws.isEmpty { env["CLAUDE_WORKSPACE"] = ws }
+        var env = AIRoute.env(job: "after", config: c)
         if notion { env["NOTION_TOKEN"] = store.get(.notionToken) ?? "" }
         env["LT_LEDGER"] = SpendLedger.defaultPath
         env["PYTHONDONTWRITEBYTECODE"] = "1"

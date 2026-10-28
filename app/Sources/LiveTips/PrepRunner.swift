@@ -29,17 +29,17 @@ final class PrepRunner: ObservableObject {
     private var process: Process?
 
     /// How Claude Code is paid for: the PM's Claude account (Claude Code sign-in) or the app's API key.
-    @Published var useAPI = UserDefaults.standard.bool(forKey: "prepUseAPI") {
-        didSet { UserDefaults.standard.set(useAPI, forKey: "prepUseAPI") }
-    }
+    /// 0.8.2: chosen in Settings > AI (AppConfig.ai.prep); `runRoute` is the way this run took (auto-switch).
+    var useAPI: Bool { AppConfig.load(from: AppPaths.config).ai.prep == AIRoute.api }
+    @Published var runRoute = AIRoute.code
+    private var switchedOnce = false
     /// Claude Code model alias (always the newest of the family). Sonnet by default: it reads and
     /// extracts well, is quicker, and uses the account's limits several times slower than Opus.
     @Published var model = UserDefaults.standard.string(forKey: "prepModel") ?? "sonnet" {
         didSet { UserDefaults.standard.set(model, forKey: "prepModel") }
     }
-    static let models: [(id: String, label: String)] = [("sonnet", "Sonnet, newest (recommended)"),
-                                                         ("opus", "Opus, newest (best, slower)"),
-                                                         ("haiku", "Haiku, newest (fastest)")]
+    static var models: [(id: String, label: String)] { [("sonnet", L("prep.model.sonnet")), ("opus", L("prep.model.opus")),
+                                                         ("haiku", L("prep.model.haiku"))] }
     /// Claude Code sign-in (`claude auth status --json`): nil = not checked yet.
     @Published var loggedIn: Bool?
     @Published var authInfo = ""
@@ -153,8 +153,9 @@ final class PrepRunner: ObservableObject {
     }
 
     /// Starts the prep. Returns an error line, or nil when it started.
-    func start(_ r: Request) -> String? {
+    func start(_ r: Request, route forced: String? = nil) -> String? {
         if running { return L("prep.err.running") }
+        if forced == nil { switchedOnce = false }
         guard let claude = Self.claudePath else { return L("prep.err.noClaude") }
         let c = AppConfig.load(from: AppPaths.config)
         guard let skill = Self.skillDir(workRoot: c.workRoot) else { return L("prep.err.noSkill") }
@@ -236,8 +237,14 @@ final class PrepRunner: ObservableObject {
         and fix the files until it prints verdict: OK. End with one line: what changed.
         """
         let prompt = r.refreshBase == nil ? fullPrompt : refreshPrompt
-        if useAPI && !hasAPIKey { return L("prep.err.noKey") }
-        if !useAPI && loggedIn == false { return L("prep.err.notSigned") }
+        // 0.8.2: the way from Settings > AI; with auto-switch the other one when this one cannot run at all.
+        let routes = c.ai
+        var route = forced ?? routes.prep
+        let usable: (String) -> Bool = { $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
+        if forced == nil && routes.autoSwitch && !usable(route) && usable(AIRoute.other(route)) { route = AIRoute.other(route) }
+        if route == AIRoute.api && !hasAPIKey { return L("prep.err.noKey") }
+        if route == AIRoute.code && loggedIn == false { return L("prep.err.notSigned") }
+        let useAPI = route == AIRoute.api
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
         let py = c.engine.python
@@ -296,7 +303,24 @@ final class PrepRunner: ObservableObject {
                 guard let self = self, self.process === proc else { return }
                 (proc.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
                 let forID = self.callID
-                if self.useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
+                // 0.8.2: the way that is out is marked for everyone; with auto-switch the same preparation runs once
+                // more on the other way (the next preparation tries the chosen way first again).
+                let logText = (try? String(contentsOfFile: (logs as NSString).appendingPathComponent("prep-claude.log"), encoding: .utf8))
+                    .map { String(($0.components(separatedBy: "\n==== ").last ?? "").suffix(1500)) } ?? ""   // this run only
+                if ok { AIRoute.markUp(route) } else if let why = AIRoute.outReason(route, logText) {
+                    AIRoute.markDown(route, why)
+                    let alt = AIRoute.other(route)
+                    if routes.autoSwitch && !self.switchedOnce && usable(alt) {
+                        self.switchedOnce = true
+                        self.running = false
+                        self.process = nil
+                        if self.start(r, route: alt) == nil {
+                            self.detail = L("prep.switched", ["route": AIRoute.name(alt)])
+                            return
+                        }
+                    }
+                }
+                if useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
                 if ok {
                     Freshness.writeSnapshot(base: base, refreshOf: r.refreshOf)      // rules/freshness.json > snapshot
                     self.progress = 1; self.stage = L("prep.st.done")
@@ -317,7 +341,7 @@ final class PrepRunner: ObservableObject {
                 } else if !ok && (tail.lowercased().contains("usage limit") || tail.lowercased().contains("rate limit")) {
                     self.result = L("prep.err.limit")
                 } else {
-                    let cost = self.costUSD.map { String(format: " · $%.2f", $0) + (self.useAPI ? "" : L("prep.plan")) } ?? ""
+                    let cost = self.costUSD.map { String(format: " · $%.2f", $0) + (useAPI ? "" : L("prep.plan")) } ?? ""
                     self.result = ok ? L("prep.readyIn", ["min": "\(max(1, mins))"]) + cost : L("prep.failedExit", ["code": "\(proc.terminationStatus)"])
                 }
             }
@@ -325,6 +349,7 @@ final class PrepRunner: ObservableObject {
         do { try p.run() } catch { return L("prep.err.cantStart", ["err": error.localizedDescription]) }
         process = p
         running = true
+        runRoute = route
         startedAt = Date()
         target = (base as NSString).lastPathComponent
         callID = r.callID

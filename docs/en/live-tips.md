@@ -1054,8 +1054,9 @@ details: [`./`](../../DEVELOPMENT.md).
 What it does:
 
 - records the call on the Mac and transcribes it there with MLX Whisper (the same recorder core);
-- calls the Claude API directly with your own key, stored in the macOS Keychain, on events
-  (a question, your name, a new request) instead of a chat loop that can fall silent;
+- calls Claude on events (a question, your name, a new request) instead of a chat loop that can
+  fall silent: through your own API key (stored in the macOS Keychain) or through your Claude
+  account with Claude Code, chosen per job in Settings > AI (14.1f);
 - spending limits: a soft and a hard limit per call and a monthly cap; at the hard limit only the
   local layer runs. Usually $0.10 to $1.20 per hour of a call;
 - built-in local AI (`bge-m3`) for facts and cards by meaning, 🆘 HELP NOW and project search,
@@ -1069,7 +1070,7 @@ What it does:
 - a second request when Claude is slow (no answer after 2-3 s or a fast failure: the same
   request goes again and the first good answer wins; Settings > AI);
 - in **Start call**: your role on an interview (observer, interviewer, or coach when you are
-  the one being interviewed, as in the skill), the tip model for this call only, and a line
+  the one being interviewed, as in the skill) and a line
   that confirms the project (people, Claude on or off, the last call, the Notion mirror);
 - the Notion mirror without a terminal: Settings > General > Notion mirror > **Set up sync**
   (details in [`notion-mirror`](../../notion-mirror/README.md)).
@@ -1093,7 +1094,7 @@ Both do roughly the same job: the same rules (the app and the skill read one sha
 
 | | Skill in Cowork | App |
 |---|---|---|
-| Model access | Your Claude plan, no API key | Your own Claude API key, billed per use |
+| Model access | Your Claude plan, no API key | Per job: your API key (billed per use) or your Claude account through Claude Code (14.1f) |
 | During the call | The Cowork chat stays busy for the whole call | Nothing to keep open, one click from the menu bar |
 | Context lookups mid-call | Notion, the tracker, project files through a subagent | The call context, the prep, local search over the project folder |
 | Cost control | Plan limits | Per call and monthly limits in Settings |
@@ -1252,6 +1253,32 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
   and get a score and one better first sentence for each answer.
 - **Call languages during the call.** Call settings now take one or several languages, as the call form does (the
   first is the main one); the change applies from the next line.
+
+### 14.1f Access to Claude: the API key or your Claude account (0.8.2)
+
+**Settings > AI** holds everything about Claude. At the top, **Access to Claude**, set once for
+the whole app: the Claude account (Claude Code sign-in, the work counts against your plan's
+limits, no key) and the API key (billed per token). Then each job picks its way and its models:
+
+| Job | Default | Why |
+|---|---|---|
+| Preparation (Prepare now) | Claude account | One long job: Claude Code reads the project files and writes the brief |
+| During the call | API key | Fast: prompt caching, a second request when Claude is slow. **Claude account** is there too, marked "not recommended": each request starts a few seconds later, and an hour of a call is hundreds of requests from the plan's limits. Good as a backup when the API credit runs out |
+| After the call | Claude account | Summary and Notion page, follow-up email, call memory, rehearsal, the tip judge: not time-critical |
+
+Models live only here: the call form no longer has its own tip model.
+
+**Switch automatically when one way is out** (on by default). When the chosen way stops working
+(the API credit is used up, the app's own monthly limit is reached, the plan limit is reached,
+you are signed out of Claude Code, or it is not installed), the job goes the other way. The
+chosen way is checked again before the next job (during a call: in the background, every 2
+minutes, with a one-word request), and the job goes back to it as soon as it answers. Settings >
+AI shows which way is out, why and since when, with **Check now**. The app, the tips engine and
+the one-off jobs share this state in `state/ai-routes.json` under the app folder. With the switch
+off, a job on a way that is out fails with the reason, and Settings shows it.
+
+Through the Claude account, requests run as `claude -p` with no tools, no settings and no MCP
+servers, in an empty folder; their cost does not go into the API spending ledger (the plan pays).
 
 ### 14.2 After the call: the meeting page in Notion
 
@@ -1645,3 +1672,7 @@ address", `references/sweep.md`, `references/presentation.md`).
 98. **Three tools in the tips window (0.8.1).** Microphone, pause and proactive tips sit as icons after On me, each
    with its state visible at a glance, its shortcut in the tooltip, a name and a pressed state for screen readers.
    Proactive tips get their own shortcut (Control-Option-L), and the choice is remembered for the next call.
+99. **One place for Claude, two ways to reach it (0.8.2).** Settings > AI: access once (Claude account and API
+   key), then per job the way and the models (preparation, during the call, after the call), and an automatic
+   switch when a way is out (no credit, plan limit, signed out) that returns as soon as the chosen way answers
+   (14.1f). The call form lost its own tip model.

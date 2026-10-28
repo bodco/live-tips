@@ -376,10 +376,7 @@ struct CallSetupView: View {
                         Text(L("callSettings.proactive.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
-                Picker(L("call.tipModel"), selection: $model.tipModel) {
-                    Text(L("call.tipModel.default", ["model": prettyModel(AppConfig.load(from: AppPaths.config).models.tip)])).tag("")
-                    ForEach(model.tipModelChoices, id: \.self) { id in Text(prettyModel(id)).tag(id) }
-                }
+                // 0.8.2 (owner): models and the way to Claude live in Settings > AI only, not per call.
                 Picker(L("call.startRecording"), selection: $model.standby) {
                     Text(L("call.startRecording.whenSpeaks")).tag(true)
                     Text(L("call.startRecording.now")).tag(false)

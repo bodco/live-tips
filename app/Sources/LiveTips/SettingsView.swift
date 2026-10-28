@@ -445,6 +445,20 @@ struct IconButton: View {
 
 /// Pacenote 0.8 (F4, spec 8): a key is a status line (Connected, Not set, the error) and one menu (Replace, Test, Remove);
 /// the field shows only when there is no key yet or while replacing it.
+/// 0.8.2: the way one job reaches Claude: the PM's Claude account (Claude Code) or the API key.
+struct RoutePicker: View {
+    @Binding var selection: String
+    var recommended: String
+    var discouraged: String? = nil
+    var body: some View {
+        Picker(L("ai.route"), selection: $selection) {
+            ForEach([AIRoute.code, AIRoute.api], id: \.self) { r in
+                Text(AIRoute.name(r) + (r == recommended ? L("ai.route.recommended") : r == discouraged ? L("ai.route.notRecommended") : "")).tag(r)
+            }
+        }
+    }
+}
+
 struct KeyRow: View {
     let title: String
     let hint: String
@@ -526,6 +540,8 @@ struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var runner = PrepRunner.shared
     @State private var showProjectsInfo = false
+    @State private var aiChecking = false     // 0.8.2: Check now on the ways that are out
+    @State private var aiTick = 0
     @AppStorage("homeShowStats") private var showStats = true      // Home: this week's numbers (2026-10-27)
 
     struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
@@ -589,7 +605,6 @@ struct SettingsView: View {
     var keys: some View {
         Form {
             Section {
-                KeyRow(title: L("keys.claude.title"), hint: L("keys.claude.hint"), key: .claudeAPIKey, model: model)
                 KeyRow(title: L("keys.notion.title"), hint: L("keys.notion.hintShort"), key: .notionToken, model: model)
             } footer: {
                 Text(L("set.pasteWithVAnd"))
@@ -601,52 +616,83 @@ struct SettingsView: View {
 
     var ai: some View {
         Form {
-            // UI review 26.10: how "Prepare now" runs lives here, Start call keeps one button.
+            // 0.8.2 (owner): everything about Claude in one tab. Access once for the whole app, then the way and the
+            // models for each job, then the automatic switch between the two ways.
             Section {
-                Picker(L("set.runWith"), selection: $runner.useAPI) {
-                    Text(L("set.claudeAccount")).tag(false); Text(L("set.apiKey")).tag(true)
-                }
-                .pickerStyle(.segmented)
-                .help(L("set.claudeAccountClaudeCode"))
-                if !runner.useAPI {
+                LabeledContent(L("ai.access.account")) {
                     HStack(spacing: 8) {
-                        Image(systemName: runner.loggedIn == true ? "checkmark.circle.fill" : (runner.loggedIn == false ? "exclamationmark.triangle.fill" : "circle.dotted"))
-                            .foregroundStyle(runner.loggedIn == true ? PN.C.turn : (runner.loggedIn == false ? PN.C.onMe : PN.C.text3))
-                        Text(runner.loggedIn == true ? L("set.cc.signedIn") + (runner.authInfo.isEmpty ? "" : " (\(runner.authInfo))")
-                             : runner.loggedIn == false ? L("set.cc.notSignedIn") : L("set.cc.checking"))
-                            .foregroundStyle(PN.C.text3)
-                        Spacer()
-                        if runner.loggedIn == false { Button(L("set.logIn")) { runner.openLogin() } }
-                        Button(L("set.check")) { runner.refreshAuth() }
+                        if PrepRunner.claudePath == nil {
+                            Text(L("set.cc.notInstalled")).foregroundStyle(PN.C.text3)
+                        } else {
+                            Image(systemName: runner.loggedIn == true ? "checkmark.circle.fill" : (runner.loggedIn == false ? "exclamationmark.triangle.fill" : "circle.dotted"))
+                                .foregroundStyle(runner.loggedIn == true ? PN.C.turn : (runner.loggedIn == false ? PN.C.onMe : PN.C.text3))
+                            Text(runner.loggedIn == true ? L("set.cc.signedIn") + (runner.authInfo.isEmpty ? "" : " (\(runner.authInfo))")
+                                 : runner.loggedIn == false ? L("set.cc.notSignedIn") : L("set.cc.checking"))
+                                .foregroundStyle(PN.C.text3)
+                            if runner.loggedIn == false { Button(L("set.logIn")) { runner.openLogin() } }
+                            Button(L("set.check")) { runner.refreshAuth() }
+                        }
                     }
                 }
+                .help(L("ai.access.accountHelp"))
+                KeyRow(title: L("keys.claude.title"), hint: L("keys.claude.hint"), key: .claudeAPIKey, model: model)
+            } header: { Text(L("ai.access")) } footer: {
+                Text(L("ai.access.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
+            .onAppear { runner.refreshAuth() }
+            Section {
+                RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code)
                 Picker(L("set.model"), selection: $runner.model) {
                     ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
                 }
                 .help(L("set.sonnetReadsTheFiles"))
-            } header: { Text(L("set.preparationPrepareNowIn")) } footer: {
-                Text(PrepRunner.claudePath == nil ? L("set.cc.notInstalled")
-                     : L("set.cc.builds"))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            } header: { Text(L("ai.job.prep")) } footer: {
+                Text(L("set.cc.builds")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            .onAppear { runner.refreshAuth() }
             Section {
+                RoutePicker(selection: $model.config.ai.tips, recommended: AIRoute.api, discouraged: AIRoute.code)
+                    .help(L("ai.tips.codeWhy"))
+                if model.config.ai.tips == AIRoute.code {
+                    Text(L("ai.tips.codeWhy")).font(PN.Font.caption).foregroundStyle(PN.C.onMe)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices).help(L("set.decidesIfATip"))
                 ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices).help(L("set.writesTheTipYou"))
-                ModelPicker(title: L("set.afterTheCall"), selection: $model.config.models.analysis, choices: model.modelChoices).help(L("set.summaryAndAnalysisNot"))
                 Toggle(L("set.answerQuestionsToAnyone"), isOn: $model.config.answerAny)
                     .help(L("set.aQuestionAskedTo"))
                 Toggle(L("set.secondRequestWhenClaude"), isOn: $model.config.hedgeEnabled)
                     .help(L("set.ifClaudeShowsNo"))
+            } header: { Text(L("ai.job.tips")) } footer: {
+                Text(model.config.knownModels.isEmpty ? L("set.modelsTest") : L("set.modelsKnown"))
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
+            Section {
+                RoutePicker(selection: $model.config.ai.after, recommended: AIRoute.code)
+                ModelPicker(title: L("set.model"), selection: $model.config.models.analysis, choices: model.modelChoices).help(L("set.summaryAndAnalysisNot"))
                 Toggle(L("set.rateTipsAfterEach"), isOn: $model.config.judgeAfterCall)
                     .help(L("set.afterTheCallClaude"))
                 if !CallEngine.shared.judgeResult.isEmpty {
                     Text(CallEngine.shared.judgeResult).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
-            } header: { Text(L("set.models")) } footer: {
-                Text(model.config.knownModels.isEmpty ? L("set.modelsTest") : L("set.modelsKnown"))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            } header: { Text(L("ai.job.after")) } footer: {
+                Text(L("ai.after.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
+            Section {
+                Toggle(L("ai.auto"), isOn: $model.config.ai.autoSwitch)
+                    .help(L("ai.auto.help"))
+                let lines = AIRoute.statusLines()
+                if lines.isEmpty {
+                    Text(L("ai.status.ok")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                } else {
+                    ForEach(lines, id: \.self) { Text($0).font(PN.Font.caption).foregroundStyle(PN.C.onMe) }
+                    Button(L("ai.status.checkNow")) { aiChecking = true; AIRoute.checkNow { aiChecking = false; aiTick += 1 } }
+                        .disabled(aiChecking)
+                }
+            } header: { Text(L("ai.auto.header")) } footer: {
+                Text(L("ai.auto.help")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .id(aiTick)
             Section {
                 // Pacenote 0.8 (F4, spec 8): the month's spend and the balance live here, not on Home.
                 LabeledContent(L("ai.thisMonth")) {

@@ -155,13 +155,19 @@ class Engine:
         self.models = cfg["models"]                      # {"classify": id, "tip": id}
         # M2 hedging: a second request when the first one is slow (cfg "hedge", on by default).
         hg = cfg.get("hedge", {}) if isinstance(cfg.get("hedge"), dict) else {}
+        routed = getattr(provider, "name", "") == "routed"
+        if routed:   # 0.8.2: the app's monthly API limit stops the key, not Claude Code
+            provider.api_blocked = lambda: bool(self.budget and self.budget.state() == "hard")
         if hg.get("enabled", True) and not isinstance(provider, HedgedProvider):
             after = dict({"classify": 2.0, "tip": 3.0}, **(hg.get("after_s") or {}))
             by_model = {}
             for role, mid in self.models.items():
                 if mid and role in after:
                     by_model[mid] = min(after[role], by_model.get(mid, after[role]))
-            self.provider = provider = HedgedProvider(provider, by_model, on_extra=self._extra_usage)
+            if routed:   # a second request only on the API: Claude Code is slow to start and spends the plan
+                provider.wrap("api", lambda p: HedgedProvider(p, by_model, on_extra=self._extra_usage))
+            else:
+                self.provider = provider = HedgedProvider(provider, by_model, on_extra=self._extra_usage)
         self.ttl = cfg.get("cache_ttl", "1h")
         self.direct_enabled = cfg.get("direct_route", True)
         self.classify_enabled = bool(self.models.get("classify"))
@@ -247,7 +253,7 @@ class Engine:
         span = {"line_id": line.line_id, "src": line.t, "speaker": line.speaker, "seg_end": line.seg_end,
                 "written": line.written, "available_at": now, "signals": sig.tags,
                 "to_pm": bool(sig.name_vocative or (sig.question and sig.second_person))}
-        if self.paused or (self.budget and self.budget.state() == "hard"):
+        if self.paused or self._budget_stops():
             return
         self._maybe_situation(line, sig, now)
         mh = self.meeting_hint(line, sig, now)
@@ -392,6 +398,12 @@ class Engine:
         if obj.get("phrase") and not ok(obj["phrase"]):
             obj["_unseen_number_in_phrase"] = True
         return obj
+
+    def _budget_stops(self) -> bool:
+        """The app's own API limit is reached and this call has no way around the key."""
+        if not (self.budget and self.budget.state() == "hard"):
+            return False
+        return not (getattr(self.provider, "name", "") == "routed" and self.provider.can_run_without_api())
 
     def _extra_usage(self, c) -> None:
         """The losing request of a hedged pair finished: it is billed, so it counts."""
@@ -900,7 +912,7 @@ class Engine:
     def on_request(self, kind: str, text: str = "") -> None:
         """kind: "ask" (a question typed in the window), "find" (search the project folder, then answer)
         or "sos" (HELP NOW). Never rate-limited."""
-        if self.budget and self.budget.state() == "hard":
+        if self._budget_stops():
             return
         now = self.clock()
         with self.lock:

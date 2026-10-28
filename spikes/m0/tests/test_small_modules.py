@@ -210,3 +210,31 @@ def test_judge_helpers(tmp_path):
     assert engine_summary([])["n"] == 0
     s = engine_summary([{"score": 5, "timely": True}, {"score": 2, "gist": "g", "reason": "r"}])
     assert s["mean"] == 3.5 and s["share_4plus"] == 0.5 and s["timely"] == 0.5 and s["worst"] == ["2 (g): r"]
+
+
+def test_prices_and_cost():
+    from livetips_m0.cost import cost_usd, price_for
+    assert price_for("claude-SONNET-5-5") == (2.0, 2.5, 4.0, 0.10, 10.0) and price_for("gpt") is None
+    assert price_for("claude-sonnet-5") == (2.0, 2.5, 4.0, 0.20, 10.0)
+    m = "claude-opus-5-5"
+    assert cost_usd(m, 1_000_000, 0, 0, 0, 0) == 4.0 and cost_usd(m, 0, 1_000_000, 0, 0, 0) == 5.0
+    assert cost_usd(m, 0, 0, 1_000_000, 0, 0) == 8.0 and cost_usd(m, 0, 0, 0, 1_000_000, 0) == 0.2
+    assert cost_usd(m, 0, 0, 0, 0, 1_000_000) == 20.0 and cost_usd(m, 1, 1, 1, 1, 1) == (4 + 5 + 8 + 0.2 + 20) / 1e6
+    assert cost_usd("unknown", 1, 1, 1, 1, 1) is None
+
+
+def test_budget_boundaries(tmp_path, monkeypatch):
+    g = BudgetGuard(str(tmp_path / "s.json"), 1.0, 2.0, 5.0)
+    assert g.warned is False and g._month() == __import__("time").strftime("%Y-%m")
+    g.call_spent = 1.0
+    assert g.state() == "soft"
+    g.call_spent = 2.0
+    assert g.state() == "hard"
+    g.call_spent = 0.0
+    (tmp_path / "s.json").write_text(json.dumps({g._month(): 5.0}))
+    assert g.state() == "hard"
+    (tmp_path / "s.json").write_text(json.dumps({g._month(): 4.99}))
+    assert g.state() == "ok"
+    deep = BudgetGuard(str(tmp_path / "a" / "b" / "s.json"), 1, 2, 3)
+    deep.add(0.1)
+    assert (tmp_path / "a" / "b" / "s.json").exists()

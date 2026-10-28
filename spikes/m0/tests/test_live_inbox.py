@@ -135,3 +135,51 @@ def test_wait_for(tmp_path):
     wait_for(tmp_path / "never", limit_s=0.02, step=0.01)
     (tmp_path / "x").write_text("")
     wait_for(tmp_path / "x")
+
+
+def test_live_run_boundaries(tmp_path, monkeypatch):
+    from livetips_m0 import live
+    md = tmp_path / "c.md"
+    md.write_text("")
+    now = {"t": 1000.0}
+    monkeypatch.setattr(live.time, "monotonic", lambda: now["t"])
+    eng = LoopEngine()
+    lr = live.LiveRun({"me_label": "Me"}, eng, md, None, from_start=True)
+    lr.last_new = 1000.0 - 60.0
+    assert not lr.timed_out(1, None)
+    lr.last_new = 1000.0 - 60.5
+    assert lr.timed_out(1, None)
+    lr.t0 = 1000.0 - 5
+    assert not lr.timed_out(0, 5) and lr.timed_out(0, 4.9)
+    state = tmp_path / "state"
+    state.mkdir()
+    lr.last_touch = 995.0
+    lr.touch_state(state)
+    assert not (state / "listener").exists()
+    lr.last_touch = 994.9
+    lr.touch_state(state)
+    assert (state / "listener").exists() and lr.last_touch == 1000.0
+    eng.budget = None
+    lr.touch_state(state)
+    lr.last_touch = 0
+    lr.touch_state(state)
+    assert json.loads((state / "llm.json").read_text())["spent_usd"] == 0 and json.loads((state / "llm.json").read_text())["budget"] == "ok"
+    ln = SimpleNamespace(t="10:00:00", speaker="them", seg_end=None, written=None)
+    lr.pending = [(ln, 999.0)]
+    lr.feed_ready()
+    assert lr.pending == [(ln, 999.0)]                       # exactly 1 s: still waiting for its timing
+    now["t"] = 1000.01
+    monkeypatch.setattr(live, "now_sod", lambda: 7.0)
+    lr.feed_ready()
+    assert lr.pending == [] and eng.lines[-1].written == 7.0
+    lr.first_written, lr.last_written = 10.0, 75.55
+    assert lr.summary()["call_span_s"] == 65.5 and lr.summary()["spent_usd"] is None
+    assert 0 <= live.now_sod() < 86400
+
+
+def test_wait_for_steps(tmp_path, monkeypatch):
+    from livetips_m0 import live
+    slept = []
+    monkeypatch.setattr(live.time, "sleep", slept.append)
+    live.wait_for(tmp_path / "never", limit_s=1.0, step=0.25)
+    assert slept == [0.25] * 4

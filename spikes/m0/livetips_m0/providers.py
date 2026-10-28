@@ -32,6 +32,7 @@ class Completion:
     route: str = "api"            # 0.8.2: "api" (the key) or "code" (Claude Code on the PM's account)
     equiv_usd: Optional[float] = None   # Claude Code: what the request would cost on the API (not billed to the key)
     switched_from: Optional[str] = None # auto-switch: the route that was out
+    usd: Optional[float] = None   # what the engine counted against the budget (set by Engine._bill)
 
     def ms(self, t):
         return None if t is None else round((t - self.t_start) * 1000)

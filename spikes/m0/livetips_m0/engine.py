@@ -3,11 +3,13 @@
 Times: every timestamp in spans is "call seconds of day" from the injected clock, so it can be
 compared with the recorder's seg_end. Monotonic time is used for durations of model calls.
 """
+import functools
 import json
 import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -19,6 +21,7 @@ from .cost import cost_usd
 from .prompt import disabled_triggers
 from .providers import HedgedProvider
 from .signals import Detector
+from .situation import jaccard, next_situation
 from .transcript import Line, s_to_hms
 
 WORD = re.compile(r"\w+", re.UNICODE)
@@ -100,13 +103,6 @@ def first_json(text: str) -> Optional[dict]:
     return None
 
 
-def jaccard(a: str, b: str) -> float:
-    x, y = set(WORD.findall(a.lower())), set(WORD.findall(b.lower()))
-    if not x or not y:
-        return 0.0
-    return len(x & y) / len(x | y)
-
-
 class JsonlWriter:
     def __init__(self, path: Path):
         self.path = path
@@ -152,6 +148,64 @@ def context_windows(lines, end: float, span: float, bucket: float, tail_s: float
     lines = [l for l in lines if l.t_s <= end]
     earlier = [l for l in lines if cut - span < l.t_s <= cut]
     return earlier, [l for l in lines if l.t_s > cut]
+
+
+# 2026-10-26 client call: 16 red tips in 33 min, most for questions to the room. Red is for the PM:
+# addressed by name or "you", a new request, the PM's commitment, or an open ask the call picture found.
+RED_TRIGGERS = ("new_requirement", "pm_commitment", "contradicts_decision", "pm_factual_error")
+
+
+def demote_red(obj: dict, trigger: str, span: dict) -> None:
+    if obj.get("level") != "red" or span.get("to_pm") or span.get("force_level") or obj.get("trigger", trigger) in RED_TRIGGERS:
+        return
+    obj["level"] = "orange"
+    if obj.get("gist", "").startswith(("\U0001f3af", "\U0001f534")):
+        obj["gist"] = "\U0001f7e0" + obj["gist"][1:]
+
+
+def tip_timing(span: dict, c, done: float) -> None:
+    span["tip_ttft_ms"] = c.ms(c.t_first_token)
+    span["tip_gist_ms"] = c.ms(c.t_gist)
+    span["tip_ms"] = c.ms(c.t_done)
+    if c.t_gist is not None:
+        span["gist_at"] = span["tip_start"] + (c.t_gist - c.t_start)
+    span["tip_done"] = done
+
+
+def tip_item(obj: dict, uid: str, line: Line, trigger: str, done: float, late: bool) -> dict:
+    item = {"schema_version": 1, "engine": "app", "uid": uid, "t": s_to_hms(done), "src": line.t, "kind": "tip",
+            "level": obj.get("level", "orange"), "gist": obj["gist"], "phrase": obj.get("phrase", ""),
+            "items": obj.get("items", []), "note": obj.get("note", ""), "topic": obj.get("topic", ""),
+            "trigger": obj.get("trigger", trigger), "fact_ids": obj.get("fact_ids", []),
+            "at": s_to_hms(done), "late": late}
+    return {k: v for k, v in item.items() if v not in ("", [], None) or k == "late"}
+
+
+def asks_the_pm(sig) -> bool:
+    """A question to the PM by name or "you", not about a third person."""
+    return bool((sig.name_vocative or (sig.question and sig.second_person)) and not sig.third_person)
+
+
+def route_when_off(sig) -> Optional[str]:
+    """The trigger is switched off for this meeting: a question or a name still goes to classify,
+    except for the PM's own commitments and new requirements."""
+    if (sig.question or sig.name_mention) and sig.trigger_hint not in ("pm_commitment", "new_requirement"):
+        return "classify"
+    return None
+
+
+@dataclass
+class TipRun:
+    """One tip request on its way from the model to the window."""
+    line: Line
+    trigger: str
+    span: dict
+    gate: Optional[dict]
+    uid: str
+    shown: Optional[bool] = False     # early gist: False not yet, True on screen, None decided against
+    kept: bool = False                # the early gist was on screen when the full tip arrived
+    obj: Optional[dict] = None
+    done: float = 0.0
 
 
 class Engine:
@@ -257,10 +311,7 @@ class Engine:
         now = self.clock()
         with self.lock:
             self.history.append(line)
-        if hasattr(self.prompt, "refresh_facts") and line.line_id % 5 == 0 and self.prompt.refresh_facts():
-            self.out_timing.write({"line_id": line.line_id, "src": line.t, "outcome": "facts_reloaded"})
-        if line.line_id % 5 == 0:
-            self.reload_prep()
+        self._every_fifth_line(line)
         sig = self.detector.detect(line)
         span = {"line_id": line.line_id, "src": line.t, "speaker": line.speaker, "seg_end": line.seg_end,
                 "written": line.written, "available_at": now, "signals": sig.tags,
@@ -268,52 +319,73 @@ class Engine:
         if self.paused or self._budget_stops():
             return
         self._maybe_situation(line, sig, now)
-        mh = self.meeting_hint(line, sig, now)
-        if mh:
-            span["route"] = "direct"
-            span["meeting"] = mh["kind"]
-            span["event"] = mh["event"]
-            if mh.get("level"):
-                span["force_level"] = mh["level"]
-            if mh.get("exempt"):
-                span["rate_exempt"] = True
-            self._submit_tip(line, mh["trigger"], span)
+        if self._meeting_route(line, sig, span, now):
             return
         if meeting_role(self.meta()) == "observer":
             return                            # observer: only the question tips above, nothing after the answer
+        route = self._route(line, sig, span)
+        if route == "direct":
+            span["route"] = "direct"
+            self._submit_tip(line, sig.trigger_hint, span)
+        elif route == "classify":
+            self._classify_route(line, sig, span)
+        elif self._periodic_due(line, now):
+            span["route"] = "periodic"
+            self._submit_classify(line, span)
+
+    def _every_fifth_line(self, line: Line) -> None:
+        if line.line_id % 5:
+            return
+        if hasattr(self.prompt, "refresh_facts") and self.prompt.refresh_facts():
+            self.out_timing.write({"line_id": line.line_id, "src": line.t, "outcome": "facts_reloaded"})
+        self.reload_prep()
+
+    def _meeting_route(self, line: Line, sig, span: dict, now: float) -> bool:
+        mh = self.meeting_hint(line, sig, now)
+        if not mh:
+            return False
+        span["route"] = "direct"
+        span["meeting"] = mh["kind"]
+        span["event"] = mh["event"]
+        if mh.get("level"):
+            span["force_level"] = mh["level"]
+        if mh.get("exempt"):
+            span["rate_exempt"] = True
+        self._submit_tip(line, mh["trigger"], span)
+        return True
+
+    def _route(self, line: Line, sig, span: dict) -> Optional[str]:
         route = sig.route if self.direct_enabled else ("classify" if sig.route else None)
         if not route and self.answer_any and line.speaker == "them" and sig.question:
             route = "classify"                # a question to anyone: the PM may answer or add (2026-10-23)
         # Meeting concept (2026-10-23): triggers the skill switches off for this call type / audience.
-        off = disabled_triggers(getattr(self.prompt, "meta", None))
-        if route and sig.trigger_hint in off:
+        if route and sig.trigger_hint in disabled_triggers(getattr(self.prompt, "meta", None)):
             span["off"] = sig.trigger_hint
-            route = "classify" if (sig.question or sig.name_mention) and sig.trigger_hint not in ("pm_commitment", "new_requirement") else None
-        if route == "direct":
-            span["route"] = "direct"
-            self._submit_tip(line, sig.trigger_hint, span)
-        elif route == "classify" and self.classify_enabled and self.cfg.get("parallel_tip", True) \
-                and (sig.name_vocative or (sig.question and sig.second_person)) and not sig.third_person:
-            # 2026-10-26 replay: a question to anyone ran Sonnet in parallel 30 times per call for 3 tips;
-            # now only a question to the PM (by name or "you") runs in parallel, others wait for classify.
-            # 2026-10-23: a likely trigger runs classify and the tip at once; classify only vetoes the
-            # tip before it is shown (saves the 1.3 s classify step on about 20% of tips).
-            span["route"] = "parallel"
-            gate = {"event": threading.Event(), "need_tip": None, "obj": None}
-            span["gate"] = gate
-            tip_span = dict(span)
-            self._submit_classify(line, span)
-            self._submit_tip(line, sig.trigger_hint, tip_span)
-        elif route == "classify" and self.classify_enabled:
-            span["route"] = "classify"
-            self._submit_classify(line, span)
-        elif route == "classify" and not self.classify_enabled:
+            route = route_when_off(sig)
+        return route
+
+    def _classify_route(self, line: Line, sig, span: dict) -> None:
+        if not self.classify_enabled:
             span["route"] = "tip_only"
             self._submit_tip(line, sig.trigger_hint, span)
-        elif self.proactive and line.speaker == "them" and self.classify_enabled and (
-                self.last_classify_at is None or now - self.last_classify_at >= self.periodic_s):
-            span["route"] = "periodic"
+            return
+        if not (self.cfg.get("parallel_tip", True) and asks_the_pm(sig)):
+            span["route"] = "classify"
             self._submit_classify(line, span)
+            return
+        # 2026-10-26 replay: a question to anyone ran Sonnet in parallel 30 times per call for 3 tips;
+        # now only a question to the PM (by name or "you") runs in parallel, others wait for classify.
+        # 2026-10-23: a likely trigger runs classify and the tip at once; classify only vetoes the
+        # tip before it is shown (saves the 1.3 s classify step on about 20% of tips).
+        span["route"] = "parallel"
+        span["gate"] = {"event": threading.Event(), "need_tip": None, "obj": None}
+        tip_span = dict(span)
+        self._submit_classify(line, span)
+        self._submit_tip(line, sig.trigger_hint, tip_span)
+
+    def _periodic_due(self, line: Line, now: float) -> bool:
+        return bool(self.proactive and line.speaker == "them" and self.classify_enabled and (
+            self.last_classify_at is None or now - self.last_classify_at >= self.periodic_s))
 
     # ---------- model roles ----------
     def _windows(self, line: Line):
@@ -407,16 +479,22 @@ class Engine:
             return False
         return not (getattr(self.provider, "name", "") == "routed" and self.provider.can_run_without_api())
 
-    def _extra_usage(self, c) -> None:
-        """The losing request of a hedged pair finished: it is billed, so it counts."""
+    def _bill(self, c):
+        """Count what a model call cost against the app's budget; the rounded price rides on the completion."""
         usd = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)
         if self.budget and usd:
             self.budget.add(usd)
+        c.usd = round(usd, 6) if usd is not None else None
+        return c
+
+    def _extra_usage(self, c) -> None:
+        """The losing request of a hedged pair finished: it is billed, so it counts."""
+        self._bill(c)
         self.out_llm.write({"at": s_to_hms(self.clock()), "role": "hedge_extra", "model": c.model,
                             "ttft_ms": c.ms(c.t_first_token), "total_ms": c.ms(c.t_done),
                             "input": c.input_tokens, "cache_read": c.cache_read, "cache_write_5m": c.cache_write_5m,
                             "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
-                            "usd": round(usd, 6) if usd is not None else None, "error": c.error})
+                            "usd": c.usd, "error": c.error})
 
     def _call(self, role: str, line: Line, event: str, on_text=None):
         user = self.prompt.user(role, event, self._tail(line), self._state(), self._earlier(line))
@@ -424,14 +502,12 @@ class Engine:
         extra = (self.cfg.get("request_extra") or {}).get(role)
         c = self.provider.complete(model=self.models[role], system=self.prompt.blocks, user=user,
                                    max_tokens=max_tokens, cache_ttl=self.ttl, extra=extra, on_text=on_text)
-        usd = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)
-        if self.budget and usd:
-            self.budget.add(usd)
+        self._bill(c)
         self.out_llm.write({"at": s_to_hms(self.clock()), "role": role, "model": c.model, "line_id": line.line_id,
                             "ttft_ms": c.ms(c.t_first_token), "gist_ms": c.ms(c.t_gist), "total_ms": c.ms(c.t_done),
                             "input": c.input_tokens, "cache_read": c.cache_read, "cache_write_5m": c.cache_write_5m,
                             "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
-                            "usd": round(usd, 6) if usd is not None else None, "error": c.error,
+                            "usd": c.usd, "error": c.error,
                             "stop": c.stop_reason, "hedge": c.hedge,
                             "text_head": None if c.error else c.text[:160],
                             "text": c.text if (self.cfg.get("debug_log_text") and not c.error) else None})
@@ -497,166 +573,164 @@ class Engine:
 
     def _run_tip(self, line: Line, trigger: str, span: dict) -> None:
         span["tip_start"] = self.clock()
-        gate = span.pop("gate", None)          # parallel route: classify's verdict arrives here
-        uid = "a{}-{}".format(line.line_id, int(span["tip_start"] * 1000) % 1000000)
-        early = {"shown": False}
-        stream = self.cfg.get("stream_gist", True)
+        run = TipRun(line, trigger, span, span.pop("gate", None),        # parallel route: classify's verdict arrives here
+                     "a{}-{}".format(line.line_id, int(span["tip_start"] * 1000) % 1000000))
+        c = self._tip_call(line, span.get("event") or trigger, functools.partial(self._early_gist, run))
+        run.done = self.clock()
+        run.kept = run.shown is True
+        tip_timing(span, c, run.done)
+        outcome = self._judge_tip(run, c)
+        if outcome:
+            span["outcome"] = outcome
+            if run.kept:
+                self._retract(run.uid)
+            self.out_timing.write(span)
+            return
+        self._emit_tip(run)
 
-        def on_text(buf: str) -> None:
-            """Streamed gist (2026-10-23): as soon as the gist, level and topic are complete in the
-            stream, run the diet on them and show the gist; the full tip replaces it by uid."""
-            if early["shown"] or not stream:
-                return
-            part = partial_head(buf)
-            if not part:
-                return
-            if span.get("force_level"):
-                part["level"] = span["force_level"]
-            if self.meeting_block(part, trigger, span):
-                early["shown"] = None
-                return
-            now = self.clock()
-            if self.stale(line, trigger):
-                early["shown"] = None          # the trigger is already resolved: no early card
-                return
-            if gate is not None and not gate["event"].is_set():
-                return                         # classify still running: the gist waits for its verdict
-            if gate is not None and gate["need_tip"] is False:
-                early["shown"] = None
-                return
-            with self.diet_lock:
-                if self._diet(part, now, exempt=bool(span.get("rate_exempt"))):
-                    early["shown"] = None      # decided: wait for the full tip, no early card
-                    return
-                with self.lock:                # counts for the rate and same-topic checks at once
-                    self.tips.append(dict(part, uid=uid, partial=True, _at=now, _exempt=bool(span.get("rate_exempt"))))
-                    if part["level"] != "red":
-                        self.last_nonred_emit = now
-            seg_end0 = line.seg_end if line.seg_end is not None else line.t_s
-            item = {"schema_version": 1, "engine": "app", "uid": uid, "partial": True, "t": s_to_hms(now),
-                    "src": line.t, "kind": "tip", "level": part["level"], "gist": part["gist"], "at": s_to_hms(now)}
-            self.out_tips.write(item)
-            early["shown"] = True
-            span["shown_at"] = now
-            span["e2e_shown_s"] = round(now - seg_end0, 2)
-
-        event = span.get("event") or trigger
+    def _tip_call(self, line: Line, event: str, on_text):
         if self.tip_cache_warm.is_set():
+            return self._call("tip", line, event, on_text=on_text)
+        with self.tip_warm_lock:
             c = self._call("tip", line, event, on_text=on_text)
-        else:
-            with self.tip_warm_lock:
-                c = self._call("tip", line, event, on_text=on_text)
-                if not c.error:
-                    self.tip_cache_warm.set()
-        done = self.clock()
-        shown = early["shown"] is True
+            if not c.error:
+                self.tip_cache_warm.set()
+        return c
 
-        def retract():
-            if shown:
-                with self.lock:
-                    self.tips[:] = [t for t in self.tips if t.get("uid") != uid]
-                self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "retract", "uid": uid})
-        span["tip_ttft_ms"] = c.ms(c.t_first_token)
-        span["tip_gist_ms"] = c.ms(c.t_gist)
-        span["tip_ms"] = c.ms(c.t_done)
-        if c.t_gist is not None:
-            span["gist_at"] = span["tip_start"] + (c.t_gist - c.t_start)
-        span["tip_done"] = done
+    # Streamed gist (2026-10-23): as soon as the gist, level and topic are complete in the stream, run the
+    # diet on them and show the gist; the full tip replaces it by uid.
+    def _early_gist(self, run: "TipRun", buf: str) -> None:
+        if run.shown or not self.cfg.get("stream_gist", True):
+            return
+        part = partial_head(buf)
+        if not part:
+            return
+        if run.span.get("force_level"):
+            part["level"] = run.span["force_level"]
+        if self.meeting_block(part, run.trigger, run.span):
+            run.shown = None
+            return
+        now = self.clock()
+        hold = self._early_hold(run)
+        if hold == "wait":
+            return                             # classify still running: the gist waits for its verdict
+        if hold or not self._early_admit(run, part, now):
+            run.shown = None                   # decided: wait for the full tip, no early card
+            return
+        self._show_early(run, part, now)
+
+    def _early_hold(self, run: "TipRun") -> Optional[str]:
+        if self.stale(run.line, run.trigger):
+            return "drop"                      # the trigger is already resolved: no early card
+        gate = run.gate
+        if gate is None:
+            return None
+        if not gate["event"].is_set():
+            return "wait"
+        return "drop" if gate["need_tip"] is False else None
+
+    def _early_admit(self, run: "TipRun", part: dict, now: float) -> bool:
+        exempt = bool(run.span.get("rate_exempt"))
+        with self.diet_lock:
+            if self._diet(part, now, exempt=exempt):
+                return False
+            with self.lock:                    # counts for the rate and same-topic checks at once
+                self.tips.append(dict(part, uid=run.uid, partial=True, _at=now, _exempt=exempt))
+                if part["level"] != "red":
+                    self.last_nonred_emit = now
+        return True
+
+    def _show_early(self, run: "TipRun", part: dict, now: float) -> None:
+        line = run.line
+        seg_end0 = line.seg_end if line.seg_end is not None else line.t_s
+        self.out_tips.write({"schema_version": 1, "engine": "app", "uid": run.uid, "partial": True, "t": s_to_hms(now),
+                             "src": line.t, "kind": "tip", "level": part["level"], "gist": part["gist"], "at": s_to_hms(now)})
+        run.shown = True
+        run.span["shown_at"] = now
+        run.span["e2e_shown_s"] = round(now - seg_end0, 2)
+
+    def _retract(self, uid: str) -> None:
+        with self.lock:
+            self.tips[:] = [t for t in self.tips if t.get("uid") != uid]
+        self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "retract", "uid": uid})
+
+    def _judge_tip(self, run: "TipRun", c) -> Optional[str]:
+        """None: the tip goes out. Otherwise the outcome that stopped it (span carries the details)."""
+        span = run.span
         obj = first_json(c.text) if not c.error else None
         if c.error or obj is None:
-            span["outcome"] = "tip_error" if c.error else "tip_invalid"
             span["error"] = c.error
-            retract()
-            self.out_timing.write(span)
-            return
-        errs = list(self.tip_validator.iter_errors(obj))
-        if errs:
-            import jsonschema
-            best = jsonschema.exceptions.best_match(errs)
-            span["outcome"] = "tip_invalid"
-            span["error"] = "{}: {}".format("/".join(str(p) for p in best.absolute_path), best.message[:160])
-            retract()
-            self.out_timing.write(span)
-            return
+            return "tip_error" if c.error else "tip_invalid"
+        bad = self._schema_error(obj)
+        if bad:
+            span["error"] = bad
+            return "tip_invalid"
         if obj.get("skip"):
-            span["outcome"] = "skip"
             span["reason"] = obj.get("reason")
-            retract()
-            self.out_timing.write(span)
-            return
+            return "skip"
         if span.get("force_level"):
             obj["level"] = span["force_level"]
-        blocked = self.meeting_block(obj, obj.get("trigger", trigger), span)
-        if blocked:
-            span["outcome"] = blocked
-            span["gist"] = obj.get("gist")
-            retract()
-            self.out_timing.write(span)
-            return
-        if gate is not None:
-            gate["event"].wait(2.0)
-            if gate["need_tip"] is False:
-                span["outcome"] = "classify_vetoed"
+        run.obj = obj
+        for step in (self._tip_blocked, self._tip_vetoed, self._tip_stale, self._tip_unseen_number, self._tip_diet):
+            outcome = step(run)
+            if outcome:
                 span["gist"] = obj.get("gist")
-                retract()
-                self.out_timing.write(span)
-                return
-            if gate.get("obj") and gate["obj"].get("trigger") and trigger == "none":
-                trigger = gate["obj"]["trigger"]
-        # 2026-10-26 client call: 16 red tips in 33 min, most for questions to the room. Red is for the PM:
-        # addressed by name or "you", a new request, the PM's commitment, or an open ask the call picture found.
-        if obj.get("level") == "red" and not span.get("to_pm") and not span.get("force_level") \
-                and obj.get("trigger", trigger) not in ("new_requirement", "pm_commitment", "contradicts_decision", "pm_factual_error"):
-            obj["level"] = "orange"
-            if obj.get("gist", "").startswith(("🎯", "🔴")):
-                obj["gist"] = "🟠" + obj["gist"][1:]
-        why = self.stale(line, obj.get("trigger", trigger), obj)
-        if why:
-            span["outcome"] = "stale_" + why
-            span["gist"] = obj.get("gist")
-            retract()
-            self.out_timing.write(span)
-            return
-        obj = self.validate_facts(obj, line)
+                return outcome
+        return None
+
+    def _schema_error(self, obj: dict) -> Optional[str]:
+        errs = list(self.tip_validator.iter_errors(obj))
+        if not errs:
+            return None
+        best = jsonschema.exceptions.best_match(errs)
+        return "{}: {}".format("/".join(str(p) for p in best.absolute_path), best.message[:160])
+
+    def _tip_blocked(self, run: "TipRun") -> Optional[str]:
+        return self.meeting_block(run.obj, run.obj.get("trigger", run.trigger), run.span)
+
+    def _tip_vetoed(self, run: "TipRun") -> Optional[str]:
+        gate = run.gate
+        if gate is None:
+            return None
+        gate["event"].wait(2.0)
+        if gate["need_tip"] is False:
+            return "classify_vetoed"
+        if gate.get("obj") and gate["obj"].get("trigger") and run.trigger == "none":
+            run.trigger = gate["obj"]["trigger"]
+        return None
+
+    def _tip_stale(self, run: "TipRun") -> Optional[str]:
+        demote_red(run.obj, run.trigger, run.span)
+        why = self.stale(run.line, run.obj.get("trigger", run.trigger), run.obj)
+        return "stale_" + why if why else None
+
+    def _tip_unseen_number(self, run: "TipRun") -> Optional[str]:
+        obj = self.validate_facts(run.obj, run.line)
         if obj.get("_dropped_items"):
-            span["dropped_items"] = obj.pop("_dropped_items")
-        if obj.pop("_unseen_number_in_phrase", False):
-            span["outcome"] = "unseen_number"
-            span["gist"] = obj.get("gist")
-            retract()
-            self.out_timing.write(span)
-            return
-        if shown:
-            verdict = None                     # a gist already on screen is kept
-        else:
-            with self.diet_lock:
-                verdict = self._diet(obj, done, exempt=bool(span.get("rate_exempt")))
-                if not verdict and obj.get("level") != "red":
-                    with self.lock:
-                        self.last_nonred_emit = done
-        if verdict:
-            span["outcome"] = "diet_" + verdict
-            span["gist"] = obj.get("gist")
-            self.out_timing.write(span)
-            return
+            run.span["dropped_items"] = obj.pop("_dropped_items")
+        return "unseen_number" if obj.pop("_unseen_number_in_phrase", False) else None
+
+    def _tip_diet(self, run: "TipRun") -> Optional[str]:
+        if run.kept:
+            return None                        # a gist already on screen is kept
+        with self.diet_lock:
+            verdict = self._diet(run.obj, run.done, exempt=bool(run.span.get("rate_exempt")))
+            if not verdict and run.obj.get("level") != "red":
+                with self.lock:
+                    self.last_nonred_emit = run.done
+        return "diet_" + verdict if verdict else None
+
+    def _emit_tip(self, run: "TipRun") -> None:
+        line, span, done = run.line, run.span, run.done
         seg_end = line.seg_end if line.seg_end is not None else line.t_s
-        late = (done - seg_end) > self.stale_s
-        item = {"schema_version": 1, "engine": "app", "uid": uid, "t": s_to_hms(done), "src": line.t, "kind": "tip",
-                "level": obj.get("level", "orange"), "gist": obj["gist"], "phrase": obj.get("phrase", ""),
-                "items": obj.get("items", []), "note": obj.get("note", ""), "topic": obj.get("topic", ""),
-                "trigger": obj.get("trigger", trigger), "fact_ids": obj.get("fact_ids", []),
-                "at": s_to_hms(done), "late": late}
-        item = {k: v for k, v in item.items() if v not in ("", [], None) or k in ("late",)}
+        item = tip_item(run.obj, run.uid, line, run.trigger, done, late=(done - seg_end) > self.stale_s)
         with self.lock:
-            self.tips[:] = [t for t in self.tips if not (t.get("uid") == uid and t.get("partial"))]
+            self.tips[:] = [t for t in self.tips if not (t.get("uid") == run.uid and t.get("partial"))]
             self.tips.append(dict(item, _at=done, _exempt=bool(span.get("rate_exempt"))))
             if item["level"] != "red":
                 self.last_nonred_emit = done
         self.out_tips.write(item)
-        span["outcome"] = "emitted"
-        span["emit_at"] = done
-        span["level"] = item["level"]
-        span["e2e_s"] = round(done - seg_end, 2)
+        span.update(outcome="emitted", emit_at=done, level=item["level"], e2e_s=round(done - seg_end, 2))
         if span.get("gist_at") is not None:
             span["e2e_gist_s"] = round(span["gist_at"] - seg_end, 2)
         span["gist"] = item["gist"]
@@ -935,9 +1009,7 @@ class Engine:
             c = self.provider.complete(model=self.models["classify"], system=[{"text": self.FIND_QUERIES}],
                                        user="Question: " + text, max_tokens=150, cache_ttl=None,
                                        extra=(self.cfg.get("request_extra") or {}).get("classify"))
-            usd = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)
-            if self.budget and usd:
-                self.budget.add(usd)
+            self._bill(c)
             obj = first_json(c.text) if not c.error else None
             for q in (obj or {}).get("queries") or []:
                 if isinstance(q, str) and q.strip() and q.strip().lower() not in [x.lower() for x in qs]:
@@ -1202,92 +1274,78 @@ class Engine:
 
     def _run_situation(self) -> None:
         try:
-            with self.lock:
-                hist = list(self.history)
-                last_done = self.sit_last_line
-            new = [h for h in hist if h.line_id > last_done]
-            if not new:
-                return
-            ctx = [h for h in hist if h.line_id <= last_done][-12:]
-            meta = self.meta()
-            lang = "Ukrainian" if (self.cfg.get("tips_lang") or meta.get("tips_lang", "uk")) == "uk" else "English"
-            import datetime as _dt
-            sysmsg = SITUATION_SYS.format(me=meta.get("me_label", "Me"), aliases=", ".join(meta.get("name_aliases", [])) or "-",
-                                          projects=", ".join(meta.get("pm_projects") or [meta.get("project", "")]) or "-",
-                                          people=", ".join(meta.get("participants") or []) or "unknown",
-                                          today=_dt.date.today().strftime("%A %Y-%m-%d"), lang=lang)
-            sysmsg += self._situation_extra_rules()
-            fmt = lambda h: "[{}] {}: {}".format(h.t, self.speakers.who(h), h.text[:400])
-            speech = "\n".join("{}. {}".format(i, x) for i, x in enumerate(self.speech_items)) or "(none)"
-            user = "PREVIOUS STATE: {}\n\nPM SPEECH POINTS:\n{}\n\nEARLIER LINES (context):\n{}\n\nNEW LINES:\n{}".format(
-                json.dumps(self.situation or {}, ensure_ascii=False), speech, "\n".join(fmt(h) for h in ctx) or "-",
-                "\n".join(fmt(h) for h in new[-60:]))
-            user = self._situation_extra_input() + user
-            extra = (self.cfg.get("request_extra") or {}).get("classify")
-            c = self.provider.complete(model=self.models["classify"], system=[{"text": sysmsg}], user=user,
-                                       max_tokens=self.cfg.get("situation_max_tokens", 900), cache_ttl=None, extra=extra)
-            usd = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)
-            if self.budget and usd:
-                self.budget.add(usd)
-            self.out_llm.write({"at": s_to_hms(self.clock()), "role": "situation", "model": c.model, "line_id": new[-1].line_id,
-                                "total_ms": c.ms(c.t_done), "input": c.input_tokens, "output": c.output_tokens,
-                                "usd": round(usd, 6) if usd is not None else None, "error": c.error,
-                                "text_head": None if c.error else c.text[:160]})
-            obj = first_json(c.text) if not c.error else None
-            if not isinstance(obj, dict):
-                return
-            sit = {"topic": str(obj.get("topic") or "")[:80], "owner": str(obj.get("owner") or "")[:40],
-                   "mine": bool(obj.get("mine")), "floor": str(obj.get("floor") or "")[:40],
-                   "asks": [a for a in (obj.get("asks") or []) if isinstance(a, dict) and a.get("what")][:6],
-                   "actions": [a for a in (obj.get("actions") or []) if isinstance(a, dict) and a.get("what")][:20],
-                   "decisions": [str(d) for d in (obj.get("decisions") or []) if d][:20],
-                   "speech_done": [int(i) for i in (obj.get("speech_done") or []) if str(i).isdigit()],
-                   "theirs": [a for a in (obj.get("theirs") or []) if isinstance(a, dict) and a.get("what") and a.get("who")][:20]}
-            if not sit["theirs"] and (self.situation or {}).get("theirs"):
-                sit["theirs"] = self.situation["theirs"]          # promises made earlier stay until the end of the call
-            # Pacenote 0.8 (rules/risks.yaml): risks heard on the call, kept until the end.
-            old = list((self.situation or {}).get("risks") or [])
-            for r in [r for r in (obj.get("risks") or []) if isinstance(r, dict) and r.get("what")][:12]:
-                if not any(jaccard(r["what"], o.get("what", "")) >= 0.5 for o in old):
-                    old.append({"what": str(r["what"])[:160], "who": str(r.get("who") or "")[:40], "t": str(r.get("t") or "")[:8]})
-            sit["risks"] = old[:12]
-            # A speech point counts as said only when the PM really spoke in the new lines (review: a replay
-            # struck the whole speech through during someone else's update).
-            prev_done = set(self.situation.get("speech_done") or [])
-            pm_spoke = sum(len(h.text.split()) for h in new if h.speaker == "me") >= 8
-            sit["speech_done"] = sorted(prev_done | (set(sit["speech_done"]) if pm_spoke else set()))
-            # An ask nobody answered for 6 minutes is old news (user review: one ask stayed red all call).
-            now_s = new[-1].t_s
-            def _age(t):
-                try:
-                    h, m, x = (int(v) for v in str(t).split(":"))
-                    return now_s - (h * 3600 + m * 60 + x)
-                except ValueError:
-                    return 0
-            sit["asks"] = [a for a in sit["asks"] if _age(a.get("t")) <= self.cfg.get("ask_ttl_s", 360)]
-            with self.lock:
-                self.sit_last_line = new[-1].line_id
-                changed = sit != self.situation
-                self.situation = sit
-            if changed:
-                now = self.clock()
-                self.out_tips.write(dict(sit, schema_version=1, engine="app", kind="situation", t=s_to_hms(now), at=s_to_hms(now)))
-            self._asks_to_tips(sit, hist)
-            self._agenda_from_model(obj)
-            self._commitments_done(obj)
-            self._risk_cards(sit)
+            self._situation_round()
         except Exception as e:  # noqa: BLE001  (the state is a helper; tips go on without it)
             self.out_timing.write({"outcome": "situation_error", "error": repr(e)[:200]})
         finally:
+            self._situation_done()
+
+    def _situation_done(self) -> None:
+        with self.lock:
+            self.sit_busy = False
+            again = self.sit_pending
+            self.sit_pending = False
+        if again:
             with self.lock:
-                self.sit_busy = False
-                again = self.sit_pending
-                self.sit_pending = False
-            if again:
-                with self.lock:
-                    self.sit_busy = True
-                    self.sit_last_at = self.clock()
-                self.futures.append(self.pool.submit(self._run_situation))
+                self.sit_busy = True
+                self.sit_last_at = self.clock()
+            self.futures.append(self.pool.submit(self._run_situation))
+
+    def _situation_round(self) -> None:
+        with self.lock:
+            hist = list(self.history)
+            last_done = self.sit_last_line
+        new = [h for h in hist if h.line_id > last_done]
+        if not new:
+            return
+        obj = self._situation_ask([h for h in hist if h.line_id <= last_done][-12:], new)
+        if not isinstance(obj, dict):
+            return
+        pm_words = sum(len(h.text.split()) for h in new if h.speaker == "me")
+        sit = next_situation(obj, self.situation or {}, pm_words, new[-1].t_s, self.cfg.get("ask_ttl_s", 360))
+        self._publish_situation(sit, new[-1].line_id)
+        self._asks_to_tips(sit, hist)
+        self._agenda_from_model(obj)
+        self._commitments_done(obj)
+        self._risk_cards(sit)
+
+    def _situation_ask(self, ctx: List[Line], new: List[Line]):
+        """One model call for the picture of the call; returns its JSON (or None) and logs what it cost."""
+        c = self._bill(self.provider.complete(model=self.models["classify"], system=[{"text": self._situation_system()}],
+                                              user=self._situation_user(ctx, new),
+                                              max_tokens=self.cfg.get("situation_max_tokens", 900), cache_ttl=None,
+                                              extra=(self.cfg.get("request_extra") or {}).get("classify")))
+        self.out_llm.write({"at": s_to_hms(self.clock()), "role": "situation", "model": c.model, "line_id": new[-1].line_id,
+                            "total_ms": c.ms(c.t_done), "input": c.input_tokens, "output": c.output_tokens,
+                            "usd": c.usd, "error": c.error, "text_head": None if c.error else c.text[:160]})
+        return first_json(c.text) if not c.error else None
+
+    def _situation_system(self) -> str:
+        import datetime as _dt
+        meta = self.meta()
+        lang = "Ukrainian" if (self.cfg.get("tips_lang") or meta.get("tips_lang", "uk")) == "uk" else "English"
+        sysmsg = SITUATION_SYS.format(me=meta.get("me_label", "Me"), aliases=", ".join(meta.get("name_aliases", [])) or "-",
+                                      projects=", ".join(meta.get("pm_projects") or [meta.get("project", "")]) or "-",
+                                      people=", ".join(meta.get("participants") or []) or "unknown",
+                                      today=_dt.date.today().strftime("%A %Y-%m-%d"), lang=lang)
+        return sysmsg + self._situation_extra_rules()
+
+    def _situation_user(self, ctx: List[Line], new: List[Line]) -> str:
+        fmt = lambda h: "[{}] {}: {}".format(h.t, self.speakers.who(h), h.text[:400])  # noqa: E731
+        speech = "\n".join("{}. {}".format(i, x) for i, x in enumerate(self.speech_items)) or "(none)"
+        user = "PREVIOUS STATE: {}\n\nPM SPEECH POINTS:\n{}\n\nEARLIER LINES (context):\n{}\n\nNEW LINES:\n{}".format(
+            json.dumps(self.situation or {}, ensure_ascii=False), speech, "\n".join(fmt(h) for h in ctx) or "-",
+            "\n".join(fmt(h) for h in new[-60:]))
+        return self._situation_extra_input() + user
+
+    def _publish_situation(self, sit: dict, line_id: int) -> None:
+        with self.lock:
+            self.sit_last_line = line_id
+            changed = sit != self.situation
+            self.situation = sit
+        if changed:
+            now = self.clock()
+            self.out_tips.write(dict(sit, schema_version=1, engine="app", kind="situation", t=s_to_hms(now), at=s_to_hms(now)))
 
     def _asks_to_tips(self, sit: dict, hist: List[Line]) -> None:
         """A new open question or request to the PM that no tip covered yet (a third-person request, an

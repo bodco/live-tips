@@ -1,4 +1,4 @@
-"""Rehearsal of a presentation (Pacenote 0.8.6, F6, idea 10; rules/rehearsal.yaml). Nothing is recorded: the PM
+"""Rehearsal of a presentation (Pacenote 0.8, F6, idea 10; rules/rehearsal.yaml). Nothing is recorded: the PM
 goes through the steps with a timer, then answers 3-4 hard questions in writing and gets a short assessment.
 
   python -m livetips_m0.rehearse questions --base <prep base> [--lang en] [--model ...]

@@ -1,7 +1,7 @@
 # LiveTips.app (beta)
 
 Native macOS companion for the `live-tips` skill: records the call locally, transcribes it on
-the Mac and asks a model for tips on events instead of polling. Status: **beta 0.6.0**, a
+the Mac and asks a model for tips on events instead of polling. Status: **beta 0.8.0** (Pacenote), a
 downloadable app (see Install below); the M0 spike that measured the approach is kept further down.
 
 The skill and the app are both supported and behave the same way. Behaviour lives in one
@@ -47,7 +47,7 @@ DOM and is tested with `node app/WebTests/feed.test.js`. The window answers on o
 with `{"action": ...}` (`PrompterController.handleAction`). Open `index.html` in a browser to see it on demo data:
 `?state=ready`, `?state=empty`, `?theme=dark`, `?lang=uk`, `?mode=compact`, `?mode=presentation`, `?left=4`.
 
-## Agenda, commitments, brief freshness (0.8.5)
+## Agenda, commitments, brief freshness (0.8)
 
 Rules: `rules/agenda.yaml`, `rules/commitments.yaml`, `rules/freshness.json`; `tools/gen_skill_section.py` renders them
 into `rules/generated/skill_register.md`, and the skill keeps that text in SKILL.md (`--compare` checks it). The
@@ -57,7 +57,7 @@ reads and ticks it (`LiveTipsCore/Commitments.swift`, `Register.swift`), checks 
 Refresh (`PrepRunner`, `refreshBase`) and offers to start tips when a call begins (`AutoStart.swift`). The register is
 one append-only file per project, `<project>/live/commitments.jsonl`, so a project's data never mixes with another's.
 
-## After the call (0.8.6)
+## After the call (0.8)
 
 `livetips_m0/followup.py`, `memory.py`, `rehearse.py` and `risk_notion.py` are small command-line modules the app runs
 through `PyTool.swift` (one JSON object out; the key and the Notion token go to the child only). Shared rules:
@@ -68,12 +68,12 @@ memory, series), `Rehearsal.swift`; statistics in `HomeStats.swift` (`CallMetric
 ## Install (beta)
 
 1. Download the dmg from the release page:
-   [LiveTips.dmg](https://github.com/bodco/live-tips/releases/latest/download/LiveTips.dmg).
+   [Pacenote.dmg](https://github.com/bodco/live-tips/releases/latest/download/Pacenote.dmg).
    Open it and drag **Pacenote** into Applications.
 2. **First open:** the beta is not notarized by Apple yet, so macOS blocks the first launch. Open
    **System Settings > Privacy & Security** and press **Open Anyway** (on macOS 14 a right-click >
    **Open** also works). After that it opens normally. Check the download first against
-   `SHA256SUMS.txt` in the release: `shasum -a 256 ~/Downloads/LiveTips.dmg`.
+   `SHA256SUMS.txt` in the release: `shasum -a 256 ~/Downloads/Pacenote.dmg`.
 3. The **Setup** window checks what is there and installs the rest: the Python modules, the speech
    model and the local AI model. Each step gets a tick when it is done. In total it is about
    2.5 GB, and nothing needs an administrator password.
@@ -206,7 +206,7 @@ never printed or logged.
 The pictures on the Pacenote pages are made by the app itself, on demo data:
 
 ```bash
-"/Applications/Live Tips.app/Contents/MacOS/LiveTips" --shots ~/Desktop/livetips-shots
+"/Applications/Pacenote.app/Contents/MacOS/LiveTips" --shots ~/Desktop/livetips-shots
 ```
 
 It writes the demo projects (Orbit SaaS Launch, Internal Delivery Playbook in the Northwind Studio

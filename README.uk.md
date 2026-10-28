@@ -19,7 +19,7 @@ Pacenote готує короткий бриф перед дзвінком, да�
 | Що це | Нативний застосунок macOS у рядку меню | Скіл для Claude Cowork |
 | Потрібно | Mac на Apple Silicon, macOS 14.4+, API-ключ Claude | Claude Cowork з підʼєднаним компʼютером, рекордер з цього репо |
 | Підказки дає | Claude API, за подіями | Claude у твоєму чаті Cowork |
-| Завантажити | [LiveTips.dmg](https://github.com/bodco/live-tips/releases/latest/download/LiveTips.dmg) | [live-tips.skill](https://github.com/bodco/live-tips/releases/latest/download/live-tips.skill) |
+| Завантажити | [Pacenote.dmg](https://github.com/bodco/live-tips/releases/latest/download/Pacenote.dmg) | [live-tips.skill](https://github.com/bodco/live-tips/releases/latest/download/live-tips.skill) |
 
 Обидва мають ті самі правила (`rules/`) і той самий рекордер, тож підказки поводяться однаково.
 

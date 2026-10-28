@@ -38,7 +38,7 @@
       readyStatus: 'Ready', readyTitle: 'Ready when you are', startListening: 'Start listening', openBrief: 'Open brief',
       listeningTitle: 'Listening', listeningSub: (k) => `Tips show up here when they matter. Stuck? Press ${k}.`, onDevice: 'Audio stays on this Mac',
       searched: (o) => `You searched: ${o.q}`, shorterMeta: 'Shorter', applied: 'Settings applied', prepReady: 'The brief is ready',
-      speakerN: (o) => `Speaker ${o.n}`, yourTurn: 'Your turn: give your update', me: 'Me', them: 'Other side',
+      speakerN: (o) => `Speaker ${o.n}`, yourTurn: 'Your turn: give your update', me: 'Me', them: 'Unknown voice', lineWhoTip: 'The voice was not recognised. Click to say who said this line.', lineWhoSaved: 'Saved: the transcript shows it after the call',
       briefReady: (o) => o.at ? `Brief ready · ${o.at}` : 'Brief ready', briefPreparing: 'Preparing the brief…', briefFailed: 'The brief could not be prepared', noBrief: 'No brief yet'
     },
     uk: {
@@ -67,7 +67,7 @@
       readyStatus: 'Готово', readyTitle: 'Можна починати', startListening: 'Почати слухати', openBrief: 'Відкрити бриф',
       listeningTitle: 'Слухаю', listeningSub: (k) => `Підказки зʼявляться тут, коли будуть потрібні. Застряг? Натисни ${k}.`, onDevice: 'Аудіо лишається на цьому Mac',
       searched: (o) => `Ви шукали: ${o.q}`, shorterMeta: 'Коротше', applied: 'Налаштування застосовано', prepReady: 'Бриф готовий',
-      speakerN: (o) => `Спікер ${o.n}`, yourTurn: 'Твоя черга: розкажи свій апдейт', me: 'Я', them: 'Інша сторона',
+      speakerN: (o) => `Спікер ${o.n}`, yourTurn: 'Твоя черга: розкажи свій апдейт', me: 'Я', them: 'Невідомий голос', lineWhoTip: 'Голос не розпізнано. Клацніть, щоб вказати, хто сказав цей рядок.', lineWhoSaved: 'Збережено: у транскрипті буде після дзвінка',
       briefReady: (o) => o.at ? `Бриф готовий · ${o.at}` : 'Бриф готовий', briefPreparing: 'Готую бриф…', briefFailed: 'Бриф не вдалося підготувати', noBrief: 'Брифу ще немає'
     }
   };
@@ -80,7 +80,7 @@
     agenda: [], cards: [], onMe: [], next: null,
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T' },
-    ui: { paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
+    ui: { lineWho: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
   };
   const T = () => STR[S.lang] || STR.en;
@@ -162,6 +162,14 @@
     $('onmeLbl').textContent = t.onMe; $('onmeN').textContent = openOnMe;
     $('onmeBtn').hidden = openOnMe === 0;
     $('moreBtn').setAttribute('aria-label', t.more);
+    // 0.8 (owner): the microphone switch is back in the top bar (a cafe: the meeting is muted, the transcript too).
+    const mb = $('micBtn'), off = !!S.call.micOff;
+    mb.hidden = isReady || ended;
+    mb.classList.toggle('off', off);
+    mb.setAttribute('aria-pressed', String(off));
+    mb.title = (off ? t.menu.unmute : t.menu.mute) + (S.keys && S.keys.mute ? ' (' + S.keys.mute + ')' : '');
+    mb.setAttribute('aria-label', off ? t.menu.unmute : t.menu.mute);
+    mb.innerHTML = off ? MIC_OFF : MIC_ON;
 
     // agenda
     const ag = $('agenda');
@@ -176,7 +184,7 @@
       $('agendaMissing').textContent = missing.length ? `${t.notRaised} ${missing[0]}${missing.length > 1 ? ` +${missing.length - 1}` : ''}` : '';
     }
 
-    // Pacenote 0.8.6: after the call, the call page and the follow-up email draft (nothing is sent).
+    // Pacenote 0.8: after the call, the call page and the follow-up email draft (nothing is sent).
     const af = $('after');
     af.hidden = !ended;
     if (ended) af.innerHTML = `<span class="meta">${esc(t.afterCall)}</span>
@@ -203,6 +211,8 @@
     $('helpLbl').textContent = t.help; $('helpKey').textContent = S.keys.help;
 
     renderPane($('pane'), S.ui.paneTab, false);
+    // A sheet opened in a narrow window becomes the side pane when the window gets wide (no double tabs).
+    if (S.ui.sheet && isWide()) { S.ui.paneTab = S.ui.sheet; S.ui.sheet = null; }
     if (S.ui.sheet) { $('sheet').hidden = false; renderPane($('sheet'), S.ui.sheet, true); } else $('sheet').hidden = true;
     renderMenu();
     tick();
@@ -316,12 +326,17 @@
     if (tab === 'transcript') {
       const unknown = Object.entries(S.speakers).find(([sid, s]) => /^S\d+$/i.test(sid) && !s.name);
       body = (unknown ? `<div class="newvoice">${ICON.person}<span class="t">${esc(t.newVoice)} <b>${esc(unknown[1].label || unknown[0])}</b></span><button class="link" type="button" data-act="name" data-sid="${esc(unknown[0])}">${esc(t.name)}</button></div>` : '') +
-        S.transcript.map((l) => {
+        S.transcript.map((l, i) => {
           const sp = S.speakers[l.speakerId] || {};
           const cls = sp.side === 'client' ? 'client' : sp.side === 'team' ? 'team' : 'unknown';
           const named = /^S\d+$/i.test(l.speakerId);
-          const who = esc(sp.name || sp.label || l.speakerId);
-          return `<div class="tl">${named ? `<button class="who ${cls}" type="button" data-act="name" data-sid="${esc(l.speakerId)}">${who}</button>` : `<span class="who ${cls}">${who}</span>`}<span>${esc(l.text)}</span></div>`;
+          const fixed = S.ui.lineWho[lineKey(l)];
+          const who = esc(fixed || sp.name || sp.label || l.speakerId);
+          // 0.8 (owner): a line whose voice was not recognised can be given to a person (recorder: line_who).
+          const btn = named ? `<button class="who ${cls}" type="button" data-act="name" data-sid="${esc(l.speakerId)}">${who}</button>`
+            : l.speakerId === 'me' ? `<span class="who ${cls}">${who}</span>`
+            : `<button class="who ${fixed ? 'client' : cls}" type="button" data-act="line-who" data-i="${i}" title="${esc(t.lineWhoTip)}">${who}</button>`;
+          return `<div class="tl">${btn}<span>${esc(l.text)}</span></div>`;
         }).join('');
     } else if (tab === 'onme') {
       body = S.onMe.length ? S.onMe.map((o) => `<label class="onme-item"><input type="checkbox" data-act="onme-toggle" data-id="${esc(o.id)}" ${o.done ? 'checked' : ''}><span><span class="${o.done ? 'struck' : ''}">${esc(o.text)}</span>${o.due ? `<br><span class="meta">${esc(o.due)}</span>` : ''}</span></label>`).join('') : `<p class="meta">${esc(t.noItems)}</p>`;
@@ -377,6 +392,30 @@
   }
 
   // ---------- Speaker naming popover ----------
+  function lineKey(l) { return (l.t || '') + '|' + String(l.text || '').slice(0, 40); }
+  /** A line nobody's voice was matched to: say who said it. Applied to the transcript file after the call. */
+  function openLinePopover(i, anchor) {
+    const t = T(), l = S.transcript[+i], pop = $('pop');
+    if (!l || !l.t) return;
+    const r = anchor.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 270)) + 'px';
+    pop.style.top = (r.bottom + 6) + 'px';
+    const names = Array.from(new Set(Object.values(S.speakers).map((s) => s && s.name).filter((n) => n && n !== t.me && n !== t.them)));
+    pop.innerHTML = `<label class="meta" for="lnName">${esc(t.name)}</label><input id="lnName" type="text" list="lnNames" value="${esc(S.ui.lineWho[lineKey(l)] || '')}">
+      <datalist id="lnNames">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+      <button class="btn1" type="button" id="lnSave">${esc(t.save)}</button>`;
+    pop.hidden = false;
+    const input = pop.querySelector('#lnName'); input.focus();
+    const save = () => {
+      const name = input.value.replace(/\s+/g, ' ').replace(/\|/g, ' ').trim().slice(0, 60); if (!name) return;
+      S.ui.lineWho[lineKey(l)] = name;
+      post('setting', { key: 'line_who', value: l.t + '|' + String(l.text || '').slice(0, 40).replace(/\|/g, ' ') + '|' + name });
+      pop.hidden = true; showToast({ text: t.lineWhoSaved, kind: 'ok', at: Date.now() }); render();
+    };
+    pop.querySelector('#lnSave').onclick = save;
+    input.onkeydown = (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') pop.hidden = true; e.stopPropagation(); };
+  }
+
   function openNamePopover(sid, anchor) {
     const t = T(), sp = S.speakers[sid] || {}, pop = $('pop');
     const r = anchor.getBoundingClientRect();
@@ -407,19 +446,23 @@
     post('setting', { key: 'tips_paused', value: S.call.paused ? 'on' : 'off' });
     render();
   }
+  const MIC_ON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2"/></svg>';
+  const MIC_OFF = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2M2 2l12 12"/></svg>';
   function toggleMute() {
     S.call.micOff = !S.call.micOff;
     post('mute', { on: S.call.micOff });
     render();
   }
   function isWide() { return $('app').clientWidth >= 760; }
+  // A window made wide with a sheet open: the sheet becomes the side pane (render() moves it).
+  window.addEventListener('resize', () => { if (S.ui.sheet && isWide()) render(); });
   function openTab(tab) { if (isWide()) S.ui.paneTab = tab; else S.ui.sheet = tab; render(); }
   function cardKey(c) { return (c.card || '') + '|' + (c.t || '') + '|' + String((c.raw && c.raw.gist) || '').slice(0, 60); }
 
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('#moreBtn')) { S.ui.menuOpen = false; renderMenu(); }
-    if (!$('pop').hidden && !e.target.closest('#pop') && !(b && b.dataset.act === 'name')) $('pop').hidden = true;
+    if (!$('pop').hidden && !e.target.closest('#pop') && !(b && (b.dataset.act === 'name' || b.dataset.act === 'line-who'))) $('pop').hidden = true;
     if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
     const card = id && S.cards.find((c) => c.id === id);
@@ -469,6 +512,7 @@
       case 'close-sheet': S.ui.sheet = null; S.ui.briefEdit = false; break;
       case 'follow': S.ui.follow = true; break;
       case 'name': openNamePopover(b.dataset.sid, b); return;
+      case 'line-who': openLinePopover(b.dataset.i, b); return;
       case 'onme-toggle': {
         const o = S.onMe.find((x) => x.id === id);
         if (o) { o.done = b.checked; if (feed) feed.toggleOnMe(id, o.done); post('onme-toggle', { id, done: o.done, text: o.text }); }
@@ -522,6 +566,7 @@
     }
   });
   $('moreBtn').addEventListener('click', () => { S.ui.menuOpen = !S.ui.menuOpen; renderMenu(); });
+  $('micBtn').addEventListener('click', () => toggleMute());
   $('onmeBtn').addEventListener('click', () => { if (isWide()) { S.ui.paneTab = 'onme'; } else { S.ui.sheet = S.ui.sheet === 'onme' ? null : 'onme'; } render(); });
   $('helpBtn').addEventListener('click', () => post('help'));
   $('ask').addEventListener('submit', (e) => {

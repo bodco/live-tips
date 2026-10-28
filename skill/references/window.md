@@ -117,15 +117,17 @@ Read once early in the call (in a quiet poll after the speech), and again when a
   `boss`), `@@SET proactive=` (`on` | `off`), `@@SET comment_rate_seconds=N` (only matters
   with proactive on; overrides `settings.tips.comment_rate_seconds`, `0` = off),
   `@@SET call_lang=` (`uk` | `en` | `mix`) and `@@SET mic_device=` (`default` | `builtin`).
-  Since Pacenote 0.8.5 also `@@SET agenda_state=<index>|todo|now|done` (the PM's state of an
+  Since Pacenote 0.8 also `@@SET agenda_state=<index>|todo|now|done` (the PM's state of an
   agenda item wins: re-emit the strip), `@@SET onme_state=<id>|done|open` (a tick in On me: at
   the end that action is added to the register already closed) and `@@SET commitment_closed=<id>`
-  (the PM closed an open commitment in the Pacenote window; the app wrote the register, never
-  propose it again). These three need no ack.
+  (the PM pressed Mark done on a "Done?" card, in the Pacenote window or in this window: append
+  `{"v":1,"op":"done","id":"<id>","at":"<ISO time>","source":"detected","call":"<transcript name>"}`
+  to the register unless it already shows the item closed, and never propose it again). These
+  three need no ack.
 - **Commitment said to be done** (`done_commitments` of the call picture, rules in SKILL.md):
   emit once `{"kind":"commitment_done","id":"<id>","text":"<item>","owner":"me|<name>","level":"info","src":"HH:MM:SS","gist":"На мені · Зроблено? <item>"}`.
-  The Pacenote window shows it as a quiet card with Mark done; nothing is closed until the PM
-  confirms (window button or the chat at the wrap-up).
+  Both windows (Pacenote's and this one) show it as a card with Mark done; nothing is closed until
+  the PM confirms (the button or the chat at the wrap-up).
   **Ack every setting**: the window shows a pending pill until it is confirmed. `call_lang`
   and `mic_device` are confirmed by the recorder through the status echo. For `call_type`,
   `hiring_role`, `audience`, `proactive` and `comment_rate_seconds` (applied by you) emit in

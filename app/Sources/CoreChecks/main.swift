@@ -179,7 +179,7 @@ func versions() {
     expect(!AppVersion.isNewer("v0.8.0", than: "0.8.1"), "older tag")
 }
 
-/// Pacenote 0.8.5: the commitments register folds like livetips_m0/commitments.py (same ids, same duplicates).
+/// Pacenote 0.8: the commitments register folds like livetips_m0/commitments.py (same ids, same duplicates).
 func commitmentsRegister() {
     expect(CommitmentRegister.makeID(call: "/x/live/call-1.app.md", owner: "me", text: "Send the test account list") == "c-bb87a2a300", "id parity with Python")
     expect(CommitmentRegister.seriesKey(project: "orbit", title: "Weekly Sync #2") == "orbit|weeklysync2")

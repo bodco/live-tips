@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import LiveTipsCore
 
-/// Pacenote 0.8.6 (F6, idea 10; rules/rehearsal.yaml): rehearse a presentation. Nothing is recorded: the steps of
+/// Pacenote 0.8 (F6, idea 10; rules/rehearsal.yaml): rehearse a presentation. Nothing is recorded: the steps of
 /// the preparation run with their timers, then Claude asks 4 hard questions as the client, the PM answers in writing
 /// (owner 2026-10-28: text, not voice) and gets a short assessment.
 @MainActor

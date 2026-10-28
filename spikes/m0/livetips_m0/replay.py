@@ -57,7 +57,7 @@ def build_engine(cfg, md: Path, out: Path, clock, provider=None):
     budget = BudgetGuard(b.get("ledger", "~/.livetips/spend.json"), b.get("call_soft_usd", 2.0),
                          b.get("call_hard_usd", 5.0), b.get("monthly_hard_usd", 100.0))
     cfg.setdefault("speakers_file", str(base) + ".speakers.json")
-    # Pacenote 0.8.5: the commitments register (rules/commitments.yaml); live mode sets register_dir, a replay
+    # Pacenote 0.8: the commitments register (rules/commitments.yaml); live mode sets register_dir, a replay
     # writes nothing there unless its config asks for it.
     cfg.setdefault("call_file", str(md))
     eng = Engine(cfg=cfg, rules=rules, provider=provider, prompt=prompt, out_dir=out, stem=stem,

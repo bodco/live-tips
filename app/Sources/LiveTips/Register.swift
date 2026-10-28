@@ -1,7 +1,7 @@
 import AppKit
 import LiveTipsCore
 
-/// Pacenote 0.8.5 (F5, idea 01): the commitments register for Home and the windows. The file format and the fold
+/// Pacenote 0.8 (F5, idea 01): the commitments register for Home and the windows. The file format and the fold
 /// live in LiveTipsCore (CommitmentRegister, rules/commitments.yaml); this reads every project's live folder,
 /// caches by file date and writes the PM's ticks. Nothing leaves the Mac.
 @MainActor
@@ -70,14 +70,23 @@ final class Register: ObservableObject {
         return FileManager.default.fileExists(atPath: p) ? p : nil
     }
 
+    /// The due date as people say it: an ISO date becomes "27 Oct"; free text ("Friday") stays as it is.
+    nonisolated static func dueText(_ due: String) -> String {
+        guard due.range(of: "^\\d{4}-\\d{2}-\\d{2}$", options: .regularExpression) != nil else { return due }
+        let i = DateFormatter(); i.dateFormat = "yyyy-MM-dd"; i.locale = Locale(identifier: "en_US_POSIX")
+        guard let d = i.date(from: due) else { return due }
+        let o = DateFormatter(); o.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); o.setLocalizedDateFormatFromTemplate("dMMM")
+        return o.string(from: d)
+    }
+
     func copyText(_ c: Commitment) {
         var s = c.mine ? c.text : c.owner + ": " + c.text
-        if !c.due.isEmpty { s += " (" + c.due + ")" }
+        if !c.due.isEmpty { s += " (" + Self.dueText(c.due) + ")" }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(s, forType: .string)
     }
 
-    /// One time, when 0.8.5 first runs: what the PM took on in the calls of the last two weeks (read from their call
+    /// One time, when 0.8 first runs: what the PM took on in the calls of the last two weeks (read from their call
     /// picture until now) goes into the register, so On you keeps its items. Ticks made on Home before stay closed.
     func importOnce() {
         guard !UserDefaults.standard.bool(forKey: "registerImported") else { return }

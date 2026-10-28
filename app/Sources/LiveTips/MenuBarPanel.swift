@@ -14,7 +14,7 @@ struct AheadCall: Identifiable {
     var event: CalendarService.CalEvent?
     var model: StartCallModel?
     var start: Date
-    var title: String { model?.effectiveTitle ?? event?.title ?? "" }
+    @MainActor var title: String { model?.effectiveTitle ?? event?.title ?? "" }
 
     /// The same list as Home's "Ahead": the calendars and Up next, without the call being recorded.
     @MainActor static func list(now: Date = Date()) -> [AheadCall] {

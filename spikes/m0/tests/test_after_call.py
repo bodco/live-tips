@@ -1,4 +1,4 @@
-"""Pacenote 0.8.6 (F6): follow-up email, call memory, rehearsal, risks."""
+"""Pacenote 0.8 (F6): follow-up email, call memory, rehearsal, risks."""
 import json
 import shutil
 

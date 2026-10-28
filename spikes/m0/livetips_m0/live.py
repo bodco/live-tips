@@ -72,14 +72,14 @@ def handle_inbox(eng, raw: str) -> None:
                 eng.prompt.set_meeting({"title": eng.cfg["title"]})
             except Exception:  # noqa: BLE001
                 pass
-        elif key == "call_lang" and str(value or ""):   # Pacenote 0.8.6: the call's languages changed in Call settings
+        elif key == "call_lang" and str(value or ""):   # Pacenote 0.8: the call's languages changed in Call settings
             v = str(value)
             codes = ["uk", "en"] if v == "mix" else [c for c in v.split("+") if c]
             try:
                 eng.prompt.set_meeting({"langs": codes})
             except Exception:  # noqa: BLE001
                 pass
-        elif key == "agenda_state":       # Pacenote 0.8.5: the PM set an agenda item's state in the window
+        elif key == "agenda_state":       # Pacenote 0.8: the PM set an agenda item's state in the window
             eng.set_agenda_state(str(value or ""))
         elif key == "onme_state":         # "<action text>|done" or "|open": a tick in the window's On me
             text, _, st = str(value or "").rpartition("|")
@@ -117,7 +117,7 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
     while not md.exists() and waited < 3 * 3600:
         time.sleep(0.5)
         waited += 0.5
-    if cfg.get("variant") == "app":           # Pacenote 0.8.5: the register next to the transcript
+    if cfg.get("variant") == "app":           # Pacenote 0.8: the register next to the transcript
         cfg.setdefault("register_dir", str(md.parent))
     eng, stem = build_engine(cfg, md, out, now_sod, provider)
     (out / (stem + ".app.run.json")).write_text(json.dumps({

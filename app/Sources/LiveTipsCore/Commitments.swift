@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// Pacenote 0.8.5 (F5, idea 01): the commitments register, rules/commitments.yaml. One append-only JSON-lines file
+/// Pacenote 0.8 (F5, idea 01): the commitments register, rules/commitments.yaml. One append-only JSON-lines file
 /// per project, next to the transcripts (<project>/live/commitments.jsonl), written by the app's engine, the app and
 /// the skill. The register is the events folded by id; the same fold as livetips_m0/commitments.py.
 public struct Commitment: Equatable, Identifiable {

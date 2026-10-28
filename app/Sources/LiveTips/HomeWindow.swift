@@ -54,7 +54,7 @@ private struct Ahead: Identifiable {
     var model: StartCallModel?
     var start: Date
     var end: Date? { event?.end }
-    var title: String { model?.effectiveTitle ?? event?.title ?? "" }
+    @MainActor var title: String { model?.effectiveTitle ?? event?.title ?? "" }
 }
 
 struct HomeView: View {
@@ -63,8 +63,8 @@ struct HomeView: View {
     @ObservedObject var upnext = UpNext.shared
     @ObservedObject var history = CallHistory.shared
     @ObservedObject var runner = PrepRunner.shared
-    @ObservedObject var register = Register.shared        // Pacenote 0.8.5: the commitments register
-    @ObservedObject var auto = AutoStart.shared            // Pacenote 0.8.5: "Start tips for ...?" when a call begins
+    @ObservedObject var register = Register.shared        // Pacenote 0.8: the commitments register
+    @ObservedObject var auto = AutoStart.shared            // Pacenote 0.8: "Start tips for ...?" when a call begins
     @State private var now = Date()
     @State private var status = EngineStatus()
     @State private var note = ""
@@ -124,7 +124,7 @@ struct HomeView: View {
                 Text(sub).font(PN.Font.body).foregroundStyle(PN.C.text3)
             }
             Spacer()
-            // Pacenote 0.8.6 (idea 05): ask about past calls of a project (Command-F).
+            // Pacenote 0.8 (idea 05): ask about past calls of a project (Command-F).
             Button { MemoryWindow.show() } label: { Label(L("memory.button"), systemImage: "magnifyingglass") }
                 .buttonStyle(.pnTertiary).keyboardShortcut("f", modifiers: .command).help(L("memory.help"))
             Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
@@ -317,7 +317,7 @@ struct HomeView: View {
             HStack(spacing: 8) {
                 Button(L("home.startTips")) { start(r) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                 Button(L("home.editSetup")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) }.buttonStyle(.pnSecondary)
-                // Pacenote 0.8.6: the series page (idea 06) and a rehearsal of a presentation (idea 10).
+                // Pacenote 0.8: the series page (idea 06) and a rehearsal of a presentation (idea 10).
                 if let m = r.model, m.callType == "presentation", let p = PrepDocWindow.path(for: m) {
                     Button(L("rehearse.button")) { RehearsalWindow.show(base: String(p.dropLast(9)), title: m.effectiveTitle) }.buttonStyle(.pnTertiary)
                 }
@@ -338,7 +338,7 @@ struct HomeView: View {
         return ""
     }
 
-    /// Pacenote 0.8.5 (idea 08): "Start tips for Orbit weekly?" when a meeting app is on at a calendar call.
+    /// Pacenote 0.8 (idea 08): "Start tips for Orbit weekly?" when a meeting app is on at a calendar call.
     private func autoBanner(_ e: CalendarService.CalEvent) -> some View {
         let m = auto.model(for: e)
         return HStack(alignment: .center, spacing: 12) {
@@ -378,7 +378,7 @@ struct HomeView: View {
         let m = r.model
         let st = m.map { upnext.prepState($0) } ?? .none
         if let m = m, st != .running, let fr = Freshness.check(m), fr.stale {
-            // Pacenote 0.8.5 (idea 03): "Brief is 2 days old · 3 changes since" with Refresh, never by itself.
+            // Pacenote 0.8 (idea 03): "Brief is 2 days old · 3 changes since" with Refresh, never by itself.
             out.append(Check(id: "brief", ok: false, text: fr.line,
                              sub: fr.changes.prefix(3).map { ($0 as NSString).lastPathComponent }.joined(separator: ", "),
                              action: L("fresh.refresh"), run: { refresh(r) }))
@@ -394,7 +394,7 @@ struct HomeView: View {
             out.append(Check(id: "brief", ok: false, text: L("home.check.noBrief"), sub: st == .failed ? L("badge.failed") : "",
                              action: L("menubar.prepare"), run: { prepare(r) }))
         }
-        // Pacenote 0.8.5 (idea 01): what is still open from this series, from the commitments register.
+        // Pacenote 0.8 (idea 01): what is still open from this series, from the commitments register.
         let series = seriesCommitments(r)
         let mine = series.filter { $0.mine }, theirs = series.filter { !$0.mine }
         if let first = mine.first {
@@ -596,7 +596,7 @@ struct HomeView: View {
                         let overdue = CommitmentRegister.isOverdue(c)
                         let when = c.createdDate.map { df.string(from: $0) } ?? ""
                         let sub = [register.projectName(c), when.isEmpty ? "" : L("reg.promised", ["date": when]),
-                                   c.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": c.due]) : L("reg.due", ["due": c.due]))]
+                                   c.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": Register.dueText(c.due)]) : L("reg.due", ["due": Register.dueText(c.due)]))]
                             .filter { !$0.isEmpty }.joined(separator: " · ")
                         HStack(alignment: .top, spacing: 8) {
                             Toggle("", isOn: Binding(get: { false }, set: { _ in register.mark(c) }))
@@ -696,7 +696,7 @@ struct HomeView: View {
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
-                        .onTapGesture { CallPageWindow.show(file: r.file) }       // 0.8.6: the call page (spec 4.4)
+                        .onTapGesture { CallPageWindow.show(file: r.file) }       // 0.8: the call page (spec 4.4)
                         .contextMenu {
                             if let u = r.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
                             Button(L("home.recent.transcript")) { TranscriptWindow.show(file: r.file) }

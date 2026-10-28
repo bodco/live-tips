@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import LiveTipsCore
 
-/// Pacenote 0.8.6 (F6, idea 05): "what did we agree about the export?" over the transcripts of ONE project. The
+/// Pacenote 0.8 (F6, idea 05): "what did we agree about the export?" over the transcripts of ONE project. The
 /// project is always chosen by the PM (never guessed); the answer is 1-2 sentences, a quote and the moment.
 @MainActor
 enum MemoryWindow {
@@ -93,7 +93,7 @@ struct MemoryView: View {
 
 // MARK: - Series
 
-/// Pacenote 0.8.6 (F6, idea 06): a regular meeting (same project, same title) as one page: what changed since last
+/// Pacenote 0.8 (F6, idea 06): a regular meeting (same project, same title) as one page: what changed since last
 /// time, the decisions of every call, the series' commitments and the questions that stay open call after call.
 @MainActor
 enum SeriesWindow {
@@ -127,7 +127,7 @@ struct SeriesView: View {
 
     var body: some View {
         let calls = CallPageView.series(of: record)
-        let df = DateFormatter(); df.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); df.setLocalizedDateFormatFromTemplate("EEEdMMM")
+        let df = CallPageView.fmt("EEEdMMM")
         let folder = (record.file as NSString).deletingLastPathComponent
         let key = EditLog.seriesKey(record.title)
         let items = register.items(in: folder).filter { $0.series.split(separator: "|", maxSplits: 1).last.map(String.init) == key && $0.status != "dropped" }
@@ -155,7 +155,7 @@ struct SeriesView: View {
                     block(L("series.lingering"), lingering.filter { $0.calls > 1 }.map { L("series.openFor", ["text": $0.text, "n": "\($0.calls)", "since": df.string(from: $0.since)]) }
                           + lingering.filter { $0.calls == 1 }.map { $0.text })
                 }
-                block(L("series.commitments"), items.filter { $0.status == "open" }.map { ($0.mine ? "" : $0.owner + ": ") + $0.text + ($0.due.isEmpty ? "" : " (" + $0.due + ")") })
+                block(L("series.commitments"), items.filter { $0.status == "open" }.map { ($0.mine ? "" : $0.owner + ": ") + $0.text + ($0.due.isEmpty ? "" : " (" + Register.dueText($0.due) + ")") })
                 VStack(alignment: .leading, spacing: 8) {
                     Text(L("series.timeline")).font(PN.Font.section).foregroundStyle(PN.C.text)
                     ForEach(calls) { c in

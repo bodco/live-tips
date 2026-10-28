@@ -1,4 +1,4 @@
-"""What a held call left behind, read from its files (Pacenote 0.8.6, F6): the transcript, the last call picture,
+"""What a held call left behind, read from its files (Pacenote 0.8, F6): the transcript, the last call picture,
 the last agenda strip, the risks. Shared by the follow-up email, the call memory and the tests."""
 import json
 import re

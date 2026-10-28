@@ -38,7 +38,7 @@ final class CallSettingsModel: ObservableObject {
         if let v = s["call_type"] as? String { callType = v == "presentation" || v == "interview" ? v : "auto" }
         if let v = s["hiring_role"] as? String { hiringRole = v }
         if let v = s["audience"] as? String, !v.isEmpty { audience = v } else if (s["call_type"] as? String) == "client" { audience = "client" }
-        // Pacenote 0.8.6 (owner: the 0.7 bug): one or several languages, as in the call form. The recorder takes any
+        // Pacenote 0.8 (owner: the 0.7 bug): one or several languages, as in the call form. The recorder takes any
         // set ("uk+en", "de+en+uk"; the first is the main one) and reports the languages in use as "langs".
         if let l = s["langs"] as? [String], !l.isEmpty { language = l.prefix(5).joined(separator: "+") }
         else if let v = s["call_lang"] as? String, !v.isEmpty { language = v == "mix" ? "uk+en" : v }
@@ -154,13 +154,14 @@ struct CallSettingsView: View {
                 } header: { Text(L("callSettings.section.window")) }
             }
             .formStyle(.grouped)
+            .frame(minHeight: 520, idealHeight: 640)       // 0.8 (owner): a Form has no height of its own; without this the window was empty
             HStack {
                 Spacer()
                 Button(L("callSettings.done"), action: close).buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 20).padding(.bottom, 16)
         }
-        .frame(width: 460)
+        .frame(width: 480)
     }
 
     private func rename() {
@@ -185,7 +186,7 @@ enum CallSettingsWindow {
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.level = .floating                 // above the tips window, which floats too
-            w.sharingType = .none               // like the tips window: not in a screen share
+            w.sharingType = AppConfig.load(from: AppPaths.config).stealthDefault ? .none : .readOnly   // like the tips window
             window = w
         }
         window?.title = L("callSettings.windowTitle")

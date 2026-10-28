@@ -1,4 +1,4 @@
-"""Follow-up email draft after a call (Pacenote 0.8.6, F6, idea 04; rules/followup.yaml). Prints JSON
+"""Follow-up email draft after a call (Pacenote 0.8, F6, idea 04; rules/followup.yaml). Prints JSON
 {"subject", "body", "lang"}; nothing is sent: the app shows it to edit, copy or open in Mail.
 
   python -m livetips_m0.followup --md <transcript> [--lang en] [--model claude-sonnet-...]

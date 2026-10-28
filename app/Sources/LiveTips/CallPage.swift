@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import LiveTipsCore
 
-/// Pacenote 0.8.6 (F6): the page of a held call (REDESIGN-SPEC 4.4 "Recent: a click opens the call page"): what was
+/// Pacenote 0.8 (F6): the page of a held call (REDESIGN-SPEC 4.4 "Recent: a click opens the call page"): what was
 /// decided, what is on you and on them (the register), open questions, the agenda, the risks; then the follow-up
 /// email, the transcript, Notion and the series. Everything is read from the call's own files.
 @MainActor
@@ -30,6 +30,12 @@ struct CallPageView: View {
     @State private var note = ""
     @State private var added: Set<String> = []
 
+    /// A date format in the interface language.
+    static func fmt(_ template: String) -> DateFormatter {
+        let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate(template)
+        return f
+    }
+
     static func title(_ file: String) -> String {
         CallHistory.shared.records.first { $0.file == file }?.title
             ?? ((file as NSString).lastPathComponent as NSString).deletingPathExtension
@@ -50,7 +56,7 @@ struct CallPageView: View {
     var body: some View {
         let o = CallOutcome.read(transcript: file) ?? CallOutcome()
         let agenda = StartCallModel.agenda(transcript: file)
-        let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate("EEEEdMMMMHHmm")
+        let f = Self.fmt("EEEEdMMMMHHmm")
         let pw = PyTool.project(of: file)
         let proj = pw.project, ws = pw.workspace
         ScrollView {
@@ -122,7 +128,7 @@ struct CallPageView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(c.mine ? c.text : c.owner + ": " + c.text).font(PN.Font.body).foregroundStyle(c.status == "done" ? PN.C.text3 : PN.C.text)
                                 .strikethrough(c.status == "done").fixedSize(horizontal: false, vertical: true)
-                            if !c.due.isEmpty { Text(L("reg.due", ["due": c.due])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                            if !c.due.isEmpty { Text(L("reg.due", ["due": Register.dueText(c.due)])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                         }
                         Spacer()
                         Button(L("reg.copy")) { register.copyText(c) }.buttonStyle(.pnTertiary)

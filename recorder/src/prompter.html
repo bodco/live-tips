@@ -219,6 +219,8 @@
   .fb button svg { width: 14px; height: 14px; }
   .fb button:hover { border-color: var(--line); background: var(--panel2); color: var(--text); }
   .fb button.on { color: #fff; }
+  .fb button.cdone { width: auto; padding: 0 9px; font-size: 12px; font-weight: 600; border-color: var(--line); color: var(--text); }
+  .fb button.cdone:disabled { opacity: .6; }
   .fb .yes.on { background: var(--green); } .fb .part.on { background: var(--orange); } .fb .no.on { background: var(--red); }
   .fb .pin.on { background: var(--blue); }
   /* the newest card is the big one; older cards are smaller and calmer by colour, not by opacity */
@@ -824,6 +826,7 @@
       ask_find_note: 'searching the project sources',
       n_points: '{n} points',
       pin_card_tt: 'Pin this card to the top',
+      cd_mark: 'Mark done', cd_closed: 'Closed', cd_mark_tt: 'Close this commitment in the register (only your click closes it)',
       yes_tt: 'Useful, I used it',
       part_tt: 'Partly useful: say what was off',
       no_tt: 'Not useful here',
@@ -1111,6 +1114,7 @@
       ask_find_note: 'шукаю в джерелах проєкту',
       n_points: 'пунктів: {n}',
       pin_card_tt: 'Закріпити картку вгорі',
+      cd_mark: 'Позначити зробленим', cd_closed: 'Закрито', cd_mark_tt: 'Закрити це зобовʼязання в реєстрі (закриває лише ваш клік)',
       yes_tt: 'Корисно, я цим скористався',
       part_tt: 'Частково корисно: скажи, що не так',
       no_tt: 'Тут не допомогло',
@@ -1726,8 +1730,16 @@
     function fbBtn(cls, key, icon) { return '<button class="' + cls + '" type="button" data-i18n-title="' + esc(key) + '" data-i18n-aria="' + esc(key) + '" title="' + esc(t(key)) + '" aria-label="' + esc(t(key)) + '">' + icon + '</button>'; }
     if (pinnable) fb += fbBtn('pin', 'pin_card_tt', ICON.pin);
     if (rateable) fb += fbBtn('yes', 'yes_tt', ICON.yes) + fbBtn('part', 'part_tt', ICON.part) + fbBtn('no', 'no_tt', ICON.no);
+    // Pacenote 0.8 (rules/commitments.yaml > closing): an open commitment said to be done gets Mark done; only the
+    // PM's click closes it (@@SET commitment_closed=<id>, the skill writes the register).
+    if (kind === 'commitment_done' && it.id) fb = '<button class="cdone" type="button" data-i18n="cd_mark" data-i18n-title="cd_mark_tt" title="' + esc(t('cd_mark_tt')) + '">' + esc(t('cd_mark')) + '</button>' + fb;
     html += '<div class="foot"><div class="meta">' + meta + '</div>' + (fb ? '<div class="fb">' + fb + '</div>' : '') + '</div>';
     el.innerHTML = html;
+    var cdb = el.querySelector('.fb .cdone');
+    if (cdb) cdb.onclick = function () {
+      send('setting', { key: 'commitment_closed', value: String(it.id) });
+      cdb.disabled = true; cdb.dataset.i18n = 'cd_closed'; cdb.textContent = t('cd_closed'); el.classList.add('dismissed');
+    };
     var more = el.querySelector('.more');
     if (more) more.onclick = function () { el.classList.toggle('open'); };
     if (rateable) {

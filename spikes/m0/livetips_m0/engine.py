@@ -211,7 +211,7 @@ class Engine:
         self.speech_items: List[str] = []
         self.speech_item: Optional[dict] = None
         self.ask_log: List[dict] = []
-        # Pacenote 0.8.5 (F5): the agenda as a contract and the commitments register (rules/agenda.yaml,
+        # Pacenote 0.8 (F5): the agenda as a contract and the commitments register (rules/agenda.yaml,
         # rules/commitments.yaml). The register lives in the call's folder (<project>/live/commitments.jsonl).
         self.agenda_items: List[tuple] = []
         self.agenda_done: set = set()
@@ -1231,7 +1231,7 @@ class Engine:
                    "theirs": [a for a in (obj.get("theirs") or []) if isinstance(a, dict) and a.get("what") and a.get("who")][:20]}
             if not sit["theirs"] and (self.situation or {}).get("theirs"):
                 sit["theirs"] = self.situation["theirs"]          # promises made earlier stay until the end of the call
-            # Pacenote 0.8.6 (rules/risks.yaml): risks heard on the call, kept until the end.
+            # Pacenote 0.8 (rules/risks.yaml): risks heard on the call, kept until the end.
             old = list((self.situation or {}).get("risks") or [])
             for r in [r for r in (obj.get("risks") or []) if isinstance(r, dict) and r.get("what")][:12]:
                 if not any(jaccard(r["what"], o.get("what", "")) >= 0.5 for o in old):
@@ -1303,7 +1303,7 @@ class Engine:
             if a.get("type") == "question" and (getattr(self.prompt, "_brief", "") or "(no brief)").strip() == "(no brief)":
                 self._start_deep(a.get("what", ""), "ask")
 
-    # ---------- agenda and commitments register (Pacenote 0.8.5, F5) ----------
+    # ---------- agenda and commitments register (Pacenote 0.8, F5) ----------
     def _situation_extra_rules(self) -> str:
         ag, cm = getattr(self.rules, "agenda", {}) or {}, getattr(self.rules, "commitments", {}) or {}
         keys = ['"theirs": [{"who": "<name>", "what": "<what they promised, max 12 words, in the call\'s language>", "due": "<day or date, or empty>", "t": "<HH:MM:SS>"}]']

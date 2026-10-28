@@ -1,4 +1,4 @@
-"""Add one risk heard on a call to the project's Notion risk database (Pacenote 0.8.6, F6, idea 09;
+"""Add one risk heard on a call to the project's Notion risk database (Pacenote 0.8, F6, idea 09;
 rules/risks.yaml > after_call). The app runs it only after the PM confirms; it never runs by itself.
 
   python -m livetips_m0.risk_notion --project-config <projects/<slug>.md> --title "<risk>" [--call "<call title, date>"]

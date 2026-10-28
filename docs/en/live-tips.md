@@ -1049,7 +1049,7 @@ A native macOS menu bar app that runs the same live-tips loop without a Cowork c
 details: [`./`](../../DEVELOPMENT.md).
 
 **Download:**
-[LiveTips.dmg](https://github.com/bodco/live-tips/releases/latest/download/LiveTips.dmg)
+[Pacenote.dmg](https://github.com/bodco/live-tips/releases/latest/download/Pacenote.dmg)
 
 What it does:
 
@@ -1079,7 +1079,7 @@ What it does:
 - Not notarized yet: on the first launch macOS refuses to open it. Open **System Settings >
   Privacy & Security**, press **Open Anyway** next to Pacenote and confirm (on macOS 14 a
   right-click > **Open** also works). Each release lists the SHA-256 of its files
-  (`SHA256SUMS.txt`); check a download with `shasum -a 256 ~/Downloads/LiveTips.dmg`.
+  (`SHA256SUMS.txt`); check a download with `shasum -a 256 ~/Downloads/Pacenote.dmg`.
 - macOS 14.4 or newer on Apple silicon.
 - Python 3.10 or newer. The **Setup** window checks it and installs the rest (Python modules,
   the speech model, the local AI model; about 2.5 GB in total) with a tick next to each step.
@@ -1203,7 +1203,7 @@ a typed title that was used before offers "Use its settings". Settings > Calenda
 the status dot, the title, the timer; 💡 proactive, ⏸ pause (tips and transcript), 🎙 mic; transcript, ⚙.
 End call stays apart in the title bar and always asks.
 
-### 14.1d Agenda, commitments, brief freshness and the call-start offer (0.8.5)
+### 14.1d Agenda, commitments, brief freshness and the call-start offer (0.8)
 
 The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/commitments.yaml` and
 `rules/freshness.json` (the skill keeps a generated copy in SKILL.md, "Agenda, commitments, brief freshness").
@@ -1228,7 +1228,7 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
   as a notification and a banner on Home: "Start tips for Orbit weekly?" with the project of the series. It never
   records by itself. Settings > Calendars > "Suggest starting tips when a call begins" (on by default).
 
-### 14.1e After the call: call page, follow-up email, memory, series, statistics, risks, rehearsal (0.8.6)
+### 14.1e After the call: call page, follow-up email, memory, series, statistics, risks, rehearsal (0.8)
 
 - **Call page.** Home > Recent > a click opens the page of the call: decisions, what is on you and on them (tick to
   close, Copy), open questions, the agenda (discussed, raised, not raised) and the risks. From there: the follow-up
@@ -1514,7 +1514,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    help during the call, summary, prices as of 27 October 2026): https://tower.bodco.pm/pacenote/compare/
 55. **Its own repository (0.6.0).** Live Tips moved out of PM Control Tower into
    github.com/bodco/live-tips with its history: the app (`app/`), the recorder (`recorder/`), the skill
-   (`skill/`), the engine (`spikes/m0/`) and this guide. Downloads: `LiveTips.dmg` and `live-tips.skill`
+   (`skill/`), the engine (`spikes/m0/`) and this guide. Downloads: `Pacenote.dmg` and `live-tips.skill`
    from the latest release.
 56. **A preparation that is late (0.6.0).** Start the call while Prepare now is still writing: the
    preparation finishes in the background, its files join the call, the window shows "Preparation ready"

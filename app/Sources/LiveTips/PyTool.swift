@@ -1,7 +1,7 @@
 import AppKit
 import LiveTipsCore
 
-/// Pacenote 0.8.6 (F6): one run of a tips-engine module outside a call (follow-up email, call memory, rehearsal,
+/// Pacenote 0.8 (F6): one run of a tips-engine module outside a call (follow-up email, call memory, rehearsal,
 /// risk register). The Claude key and the Notion token go to the child process only, never written or logged; the
 /// module prints one JSON object.
 @MainActor

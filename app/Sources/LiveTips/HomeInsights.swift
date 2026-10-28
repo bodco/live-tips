@@ -10,8 +10,8 @@ struct CallOutcome: Equatable {
     var decisions: [String] = []
     var onMe: [String] = []             // what the PM took on
     var openQuestions: [String] = []    // questions to the PM still open at the end
-    var theirs: [(who: String, what: String)] = []   // 0.8.5: promises made to the PM's side
-    var risks: [String] = []            // 0.8.6: risks heard on the call (rules/risks.yaml)
+    var theirs: [(who: String, what: String)] = []   // 0.8: promises made to the PM's side
+    var risks: [String] = []            // 0.8: risks heard on the call (rules/risks.yaml)
 
     static func == (a: CallOutcome, b: CallOutcome) -> Bool {
         a.decisions == b.decisions && a.onMe == b.onMe && a.openQuestions == b.openQuestions && a.risks == b.risks
@@ -72,4 +72,4 @@ final class OutcomeCache {
     }
 }
 
-// "On you" on Home reads the commitments register since Pacenote 0.8.5 (Register.swift, rules/commitments.yaml).
+// "On you" on Home reads the commitments register since Pacenote 0.8 (Register.swift, rules/commitments.yaml).

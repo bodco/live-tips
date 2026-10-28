@@ -1,7 +1,7 @@
 import AppKit
 import LiveTipsCore
 
-/// Pacenote 0.8.5 (F5, idea 03, instead of overnight preparation): is the brief still fresh? rules/freshness.json:
+/// Pacenote 0.8 (F5, idea 03, instead of overnight preparation): is the brief still fresh? rules/freshness.json:
 /// the files of the project folder (and the folders added in the call form) changed after the preparation was made.
 /// Nothing runs by itself: the PM presses Refresh, which updates only what changed.
 struct BriefFreshness {

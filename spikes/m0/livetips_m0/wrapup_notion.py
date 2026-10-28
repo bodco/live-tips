@@ -197,7 +197,7 @@ def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "
                 (T["decisions"], w.get("decisions", []), bullet), (T["commit"], w.get("commitments", []), bullet),
                 (T["new"], w.get("new_requests", []), bullet),
                 (T["open"], w.get("open_questions", []), bullet), (T["risks"], w.get("risks", []), bullet)]
-    # Pacenote 0.8.5 (rules/agenda.yaml > wrapup): each agenda item with Discussed, Raised or Not raised.
+    # Pacenote 0.8 (rules/agenda.yaml > wrapup): each agenda item with Discussed, Raised or Not raised.
     from .agenda import last_from_tips, status_label
     stem = str(md)[:-3] if str(md).endswith(".md") else str(md)
     strip = next((x for x in (last_from_tips(Path(p)) for p in (str(md) + ".tips.jsonl", stem + ".tips.jsonl")) if x), None)

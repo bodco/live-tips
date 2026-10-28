@@ -49,10 +49,10 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                                       "decisions": days == 0 ? ["Export goes to production on Tuesday", "Pilot starts Monday with 5 users"] : ["Release checklist approved"],
                                       "actions": days == 0 ? [["what": "Send the test account list", "due": "today", "from": "Emily"]] : days == 1 ? [["what": "Share the release notes draft", "due": "Friday", "from": "PM"]] : [],
                                       "asks": days == 0 ? [["who": "David", "what": "Who tests the pilot after week one?", "type": "question"]] : [],
-                                      // Pacenote 0.8.6: promises of the other side and risks, for the call page and the series.
+                                      // Pacenote 0.8: promises of the other side and risks, for the call page and the series.
                                       "theirs": days == 0 ? [["who": "Emily Clark", "what": "Names of the 5 pilot users", "due": "Friday"]] : [],
                                       "risks": days == 0 ? [["what": "If the API release slips, the pilot moves a week", "who": "David", "t": "10:31:10"]] : []]
-            // Pacenote 0.8.5: the last agenda strip of the call (one item not raised: carried into the next call of the series).
+            // Pacenote 0.8: the last agenda strip of the call (one item not raised: carried into the next call of the series).
             let agenda: [String: Any] = ["kind": "agenda", "final": true, "items": [["text": "Export release date", "done": true, "state": "done"],
                                                                                  ["text": "Who tests the pilot", "done": true, "state": "done"],
                                                                                  ["text": "Test accounts", "done": false, "state": "todo"]]]
@@ -61,14 +61,14 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                 try? (s + "\n" + (days == 0 ? s2 + "\n" : "")).write(toFile: f + ".tips.jsonl", atomically: true, encoding: .utf8)
             }
         }
-        // Pacenote 0.8.6 (F6): a presentation preparation with an outline, for the rehearsal window.
+        // Pacenote 0.8 (F6): a presentation preparation with an outline, for the rehearsal window.
         let pbase = orbit + "/live/prep-" + df.string(from: Date()) + "-1400-orbit-pilot-demo"
         try? "# Live Brief: Orbit pilot demo\n\n**Goal:** agree the pilot plan.\n".write(toFile: pbase + ".brief.md", atomically: true, encoding: .utf8)
         write(["sections": [["title": "Where we are", "sec": 90, "points": ["Export is on staging", "QA signed off the release checklist"]],
                             ["title": "Pilot plan", "sec": 120, "points": ["5 users, 2 weeks, starts Monday", "Our QA covers week one"]],
                             ["title": "What we need from you", "sec": 60, "points": ["Names of the pilot users by Friday", "One contact for feedback"]]]],
               pbase + ".outline.json")
-        // Pacenote 0.8.5 (F5): the commitments register for Home's On you and the readiness checks (demo items only).
+        // Pacenote 0.8 (F5): the commitments register for Home's On you and the readiness checks (demo items only).
         let iso = ISO8601DateFormatter()
         let yesterday = df.string(from: Date().addingTimeInterval(-86400)), today = df.string(from: Date().addingTimeInterval(-3600))
         let regItems: [(String, String, String, String, String, Double)] = [
@@ -263,9 +263,12 @@ final class ShotMode: NSObject, NSApplicationDelegate {
 
     /// Opens a window and captures the key window after it settles.
     func window(_ name: String, open: () -> Void) {
+        let before = Set(NSApp.windows.filter { $0.isVisible }.map { ObjectIdentifier($0) })
         open()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
-            if let w = NSApp.keyWindow { capture(w, name); w.close() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
+            // The window that has just appeared (the key window is not reliable while shots run).
+            let w = NSApp.windows.last { $0.isVisible && !before.contains(ObjectIdentifier($0)) } ?? NSApp.keyWindow
+            if let w = w { capture(w, name); w.close() } else { log("no window for " + name) }
             next()
         }
     }

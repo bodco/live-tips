@@ -159,7 +159,7 @@ lines (tips only for what is still relevant), back to the loop.
    short lines) and `Підкажу, коли буде що додати.`
 8. Load `workflow-authoring` once if research is on (`research.md`), and read `window.md` and
    (audience `client`) `culture.md` in quiet polls.
-9. **Register, agenda, freshness** (since Pacenote 0.8.5, rules in "Agenda, commitments, brief
+9. **Register, agenda, freshness** (since Pacenote 0.8, rules in "Agenda, commitments, brief
    freshness" below): read the open items of `<project>/live/commitments.jsonl` (this series first,
    max 15) and keep them in state as `open_commitments`; emit the agenda strip from the brief's
    checklist; for a prep picked up with `--adopt-prep`, count the project files changed since it
@@ -267,10 +267,10 @@ said in the PM's own lines). When it changes, emit one item
 the window shows a status line, an "On me" panel and strikes the said theses through. A new open
 ask to the PM that no tip covered gets one 🔴 tip. At `stopped`, the wrap-up item starts with
 decisions, what is on the PM, unanswered asks and the speech theses never said.
-Since Pacenote 0.8.5 the picture also keeps the agenda (`agenda_now`, `agenda_done`), promises made to
+Since Pacenote 0.8 the picture also keeps the agenda (`agenda_now`, `agenda_done`), promises made to
 the PM's side (`theirs`: who, what, due) and `done_commitments` (open commitments from earlier calls said
 to be done), as the section below says; at `stopped` the actions and `theirs` go into the commitments register.
-Since 0.8.6 it also keeps `risks` (conditional threats, "Risks and the follow-up email" below).
+since 0.8 it also keeps `risks` (conditional threats, "Risks and the follow-up email" below).
 
 ### Agenda, commitments, brief freshness
 

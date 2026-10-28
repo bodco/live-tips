@@ -18,7 +18,7 @@ triggers:
   level: red
   level_label: 🔴
   route: direct
-  skill_trigger: '**Your turn**: `{them_label}` addresses the PM by any of `settings.user.name_aliases` (any grammatical form or misspelling) with a request for an update or opinion, or a round of updates reaches the PM'
+  skill_trigger: '**Your turn**: `{them_label}` addresses the PM by any of `settings.user.name_aliases` (any grammatical form or misspelling) with a request for an update or opinion (never predicted from the order of a round)'
   skill_tip: opening sentence + the speech theses not used yet, in order (format in `speech.md`); one topic asked = that topic only. Immediate
 - id: direct_question
   level: red
@@ -26,6 +26,12 @@ triggers:
   route: direct
   skill_trigger: A direct question to the PM
   skill_tip: gist "🎯 {тема}" + the answer as a ready phrase + up to 2 facts with sources, from the brief, cards, fact book
+- id: question_to_others
+  level: orange
+  level_label: 🟠
+  route: local
+  skill_trigger: A question to anyone else on the call (or to the room) that the brief, the cards, the fact book or Current State answer
+  skill_tip: 'gist "🟠 {тема}" (orange, never 🎯 or 🔴: red is only for the PM) + the fact the PM could give or add, with its source. Who was asked does not matter: the PM may be expected to answer or add. No fact = silence'
 - id: new_requirement
   level: red
   level_label: 🔴
@@ -58,16 +64,16 @@ triggers:
   skill_tip: '"Неточно: {Y}, не {X}" + correction phrase + source (`checks.md`)'
 - id: fix_owner_date
   level: orange
-  level_label: 🟠
+  level_label: silent
   route: classify
   skill_trigger: A decision, owner or date was discussed and not fixed
-  skill_tip: '"Зафіксуй: {що}" + "So, {owner} will {action} by {day}. Is that right?" (never a number for an estimate)'
+  skill_tip: 'log in the call picture (`decisions`, `on_me`); a tip "Зафіксуй: {що}" only with `proactive.md` on (phrase in the call''s language, never a number for an estimate)'
 - id: add_fact
   level: orange
-  level_label: 🟠
+  level_label: silent
   route: classify
   skill_trigger: A topic of the brief is being discussed and the brief, cards or fact book hold a fact the others did not say
-  skill_tip: '"Додай: {тема}" + one fact line with the number and source'
+  skill_tip: 'a tip "Додай: {тема}" only with `proactive.md` on (2026-10-26: these were noise during other people''s updates)'
 - id: side_talk
   level: orange
   level_label: 🟠

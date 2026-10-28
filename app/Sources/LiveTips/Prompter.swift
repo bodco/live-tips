@@ -133,7 +133,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         window.titlebarAppearsTransparent = true   // the title bar blends with the page background
         window.level = Self.onTop ? .floating : .normal      // 2026-10-28: "Always on top" is remembered
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        window.sharingType = .none          // ask macOS to keep the window out of screen capture
+        // 0.8 (owner): Settings > General > "Hide the tips window from screen sharing" decides for a new call; the
+        // window's Call settings change it for this call only. Off = the window can be shared and screenshotted.
+        window.sharingType = AppConfig.load(from: AppPaths.config).stealthDefault ? .none : .readOnly
         window.isMovableByWindowBackground = true
         window.alphaValue = 1.0                 // opacity fades the page backgrounds only (text stays readable)
         window.isOpaque = false
@@ -516,9 +518,11 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         guard let h = titleHolder else { return }
         let views: [NSView] = [pinButton, startButton, endButton].compactMap { $0 }.filter { !$0.isHidden }
         let gap: CGFloat = 8
-        let need = views.reduce(CGFloat(0)) { $0 + $1.frame.width } + gap * CGFloat(max(0, views.count - 1)) + 10
+        // 0.8 (owner): End call keeps ~20 pt from the right edge of the window.
+        let right: CGFloat = 20
+        let need = views.reduce(CGFloat(0)) { $0 + $1.frame.width } + gap * CGFloat(max(0, views.count - 1)) + 6 + right
         if abs(h.frame.width - need) > 0.5 { h.setFrameSize(NSSize(width: need, height: h.frame.height)) }
-        var x = h.frame.width - 4
+        var x = h.frame.width - right
         for v in views.reversed() {
             x -= v.frame.width
             v.frame.origin = NSPoint(x: x, y: (h.frame.height - v.frame.height) / 2)
@@ -558,7 +562,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         g.toolTip = L("tw.startNowTip")
         g.isHidden = true
         // Pacenote 0.8 (F2): no pin in the title bar (Always on top is in Call settings); the brand symbol on the left.
-        let w = g.frame.width + b.frame.width + 20
+        let w = g.frame.width + b.frame.width + 34      // 0.8: End call keeps ~24 pt from the right edge (owner)
         let holder = NSView(frame: NSRect(x: 0, y: 0, width: w, height: 28))
         g.frame.origin = NSPoint(x: 4, y: (28 - g.frame.height) / 2)
         b.frame.origin = NSPoint(x: g.frame.maxX + 6, y: (28 - b.frame.height) / 2)
@@ -669,11 +673,11 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
             g.attributedTitle = NSAttributedString(string: label, attributes: [.foregroundColor: NSColor.white, .font: font])
             g.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
-            if let b = endButton { g.frame.origin.x = max(0, b.frame.minX - 6 - g.frame.width) }
             g.action = #selector(newCallClicked)
             g.target = self
             g.toolTip = next.map { n in L("tw.startNextTip", ["title": MainActor.assumeIsolated { n.effectiveTitle }]) } ?? L("tw.closeOpen")
             g.isHidden = false
+            layoutTitleButtons()        // 0.8 (owner): "New call" and "Ended" side by side, never on top of each other
         }
         let file = ((info["file"] as? String ?? "") as NSString).lastPathComponent
         let lines = info["lines"] as? Int ?? 0
@@ -713,21 +717,21 @@ extension PrompterController {
             let done = d["done"] as? Bool ?? false
             handle("cardedit", ["action": done ? "onme_done" : "onme_open", "kind": "onme", "key": d["id"] ?? "",
                                 "after": ["text": d["text"] as? String ?? ""]] as [String: Any])
-            // Pacenote 0.8.5: the engine adds a ticked action to the register already closed (rules/commitments.yaml).
+            // Pacenote 0.8: the engine adds a ticked action to the register already closed (rules/commitments.yaml).
             if let id = d["id"] as? String, id.hasPrefix("m:"), let t = d["text"] as? String, !t.isEmpty { sendSetting("onme_state", t + "|" + (done ? "done" : "open")) }
         case "agenda":
             handle("cardedit", ["action": "agenda", "kind": "agenda", "key": d["id"] ?? "",
                                 "after": ["text": d["title"] as? String ?? "", "state": d["state"] as? String ?? ""]] as [String: Any])
-            // Pacenote 0.8.5 (rules/agenda.yaml > emit): the PM's state of an item wins over the model's.
+            // Pacenote 0.8 (rules/agenda.yaml > emit): the PM's state of an item wins over the model's.
             if let id = d["id"] as? String, let st = d["state"] as? String { sendSetting("agenda_state", id + "|" + st) }
         case "after":
-            // Pacenote 0.8.6: after the call, the call page or the follow-up email draft (nothing is sent).
+            // Pacenote 0.8: after the call, the call page or the follow-up email draft (nothing is sent).
             let file = stem + ".md"
             MainActor.assumeIsolated {
                 if (d["item"] as? String) == "followup" { FollowUpWindow.show(file: file) } else { CallPageWindow.show(file: file) }
             }
         case "commitment-done":
-            // Pacenote 0.8.5: Mark done on a "Done?" card closes the open commitment in the register (source detected).
+            // Pacenote 0.8: Mark done on a "Done?" card closes the open commitment in the register (source detected).
             guard let id = d["id"] as? String, id.hasPrefix("c-") else { return }
             let file = stem + ".md"
             MainActor.assumeIsolated { Register.shared.markDone(id: id, callFile: file) }

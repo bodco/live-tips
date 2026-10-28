@@ -268,7 +268,7 @@ struct CallSetupView: View {
                 Spacer()
                 Button(L("call.brief.unqueue")) { upnext.unqueue(model) }.buttonStyle(.pnTertiary)
             } else if model.prep?.matches == true, let fr = Freshness.check(model), fr.stale {
-                // Pacenote 0.8.5 (idea 03): an old brief says so and offers Refresh; it never refreshes by itself.
+                // Pacenote 0.8 (idea 03): an old brief says so and offers Refresh; it never refreshes by itself.
                 Image(systemName: "clock.arrow.circlepath").foregroundStyle(PN.C.onMe)
                 Text(fr.line).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1)
                     .help(fr.changes.prefix(8).map { ($0 as NSString).lastPathComponent }.joined(separator: "\n"))

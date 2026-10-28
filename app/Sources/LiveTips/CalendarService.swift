@@ -229,7 +229,7 @@ struct CalendarsPane: View {
                         .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
                 Section {
-                    // Pacenote 0.8.5 (idea 08): a quiet offer to start tips when a meeting app is on at a calendar call.
+                    // Pacenote 0.8 (idea 08): a quiet offer to start tips when a meeting app is on at a calendar call.
                     Toggle(L("auto.setting"), isOn: $autoSuggest).help(L("auto.settingHelp"))
                     Toggle(L("cal.remindMeBeforeCalendar"), isOn: $cal.remind)
                     if cal.remind { Stepper(L("cal.minBefore", ["n": "\(cal.remindMinutes)"]), value: $cal.remindMinutes, in: 1...15) }

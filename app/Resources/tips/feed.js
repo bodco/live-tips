@@ -180,7 +180,7 @@
         });
         return true;
       case 'commitment_done': {
-        // Pacenote 0.8.5 (rules/commitments.yaml > closing): an open commitment was said to be done. A quiet card
+        // Pacenote 0.8 (rules/commitments.yaml > closing): an open commitment was said to be done. A quiet card
         // (never the hero); only the PM's Mark done closes it in the register.
         if (!it.id) return false;
         const id = 'k:' + it.id;
@@ -195,7 +195,7 @@
         return true;
       }
       case 'risk': {
-        // Pacenote 0.8.6 (rules/risks.yaml): a risk heard on the call is a quiet card in Earlier, never the main one.
+        // Pacenote 0.8 (rules/risks.yaml): a risk heard on the call is a quiet card in Earlier, never the main one.
         const id = 'r:' + clean(it.gist).toLowerCase().slice(0, 60);
         if (this.byId[id]) return false;
         this.put({

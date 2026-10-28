@@ -52,16 +52,16 @@ FAILED). Do not run the next skills without the user's command. If the call went
 different subject than the checklist, say so in one line instead of listing every checklist
 item as missed.
 
-**Commitments register (Pacenote 0.8.5, rules in SKILL.md > "Agenda, commitments, brief freshness").**
+**Commitments register (Pacenote 0.8, rules in SKILL.md > "Agenda, commitments, brief freshness").**
 After the wrap-up message, append the call's items to `<project>/live/commitments.jsonl` with one
 device_bash `cat >>` (JSON lines exactly as in the rules, `"by":"skill"`): every action of the call
 picture with `"owner":"me"`, every promise made to the PM's side with the person's name as owner.
 Compute `id` with `python3 -c` (sha1 as the rules say) so the app's record of the same call is
 recognised as a duplicate. Commitments the call picture said are done (`done_commitments`) are only
-proposals: list them in the wrap-up as `Схоже, зроблено: {пункт}. Закрити?` and append a `done`
+proposals (unless the PM already pressed Mark done in a window): list them in the wrap-up as `Схоже, зроблено: {пункт}. Закрити?` and append a `done`
 event (`"source":"detected"`) only for the ones the PM confirms in the chat. Add one line to the
 wrap-up: `Реєстр обіцянок: додано {N} (на мені {n}, на них {m}), відкритих у проєкті {K}`.
-**Follow-up email (Pacenote 0.8.6, SKILL.md > "Risks and the follow-up email").** End the wrap-up
+**Follow-up email (Pacenote 0.8, SKILL.md > "Risks and the follow-up email").** End the wrap-up
 message with one line `Чернетка листа-підсумку для клієнта? (так/ні)`; on yes, write the draft in the
 chat in the client's language, by the rules (thanks, decisions, next steps both sides, open questions,
 ~150 words). Never send it, never put it into Notion or a tracker.

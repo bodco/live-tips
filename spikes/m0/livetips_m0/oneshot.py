@@ -1,4 +1,4 @@
-"""One model request outside a call (Pacenote 0.8.6, F6): follow-up email, call memory, rehearsal.
+"""One model request outside a call (Pacenote 0.8, F6): follow-up email, call memory, rehearsal.
 
 The key comes from the environment (CLAUDE_API, set by the app for the child process only); the cost goes into the
 same monthly ledger as the tips (LT_LEDGER). Tests pass a FakeProvider.

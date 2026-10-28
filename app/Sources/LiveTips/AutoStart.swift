@@ -3,7 +3,7 @@ import CoreAudio
 import UserNotifications
 import LiveTipsCore
 
-/// Pacenote 0.8.5 (F5, idea 08): when a meeting app is on (Zoom, Microsoft Teams, or Google Meet in a browser, seen as
+/// Pacenote 0.8 (F5, idea 08): when a meeting app is on (Zoom, Microsoft Teams, or Google Meet in a browser, seen as
 /// the microphone in use by another app) and the calendar has a call now (within 5 minutes of its start), Pacenote
 /// offers to start tips once: a quiet notification and a banner on Home. It never records by itself: Start tips is
 /// the PM's click. Settings > Calendars > "Suggest starting tips when a call begins" (on by default).

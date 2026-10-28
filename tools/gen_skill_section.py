@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate the sections of the live-tips SKILL.md that come from rules/: the "Triggers" table
-(rules/triggers.yaml) and, since Pacenote 0.8.5, "Agenda, commitments, brief freshness"
+(rules/triggers.yaml) and, since Pacenote 0.8, "Agenda, commitments, brief freshness"
 (rules/agenda.yaml, rules/commitments.yaml, rules/freshness.json).
 
 Usage:
@@ -66,7 +66,7 @@ def render_register(rules_dir: Path = RULES) -> str:
 
 
 def render_after(rules_dir: Path = RULES) -> str:
-    """Pacenote 0.8.6: risks heard on the call and the follow-up email draft (rules/risks.yaml, rules/followup.yaml)."""
+    """Pacenote 0.8: risks heard on the call and the follow-up email draft (rules/risks.yaml, rules/followup.yaml)."""
     rk = yaml.safe_load((rules_dir / "risks.yaml").read_text(encoding="utf-8"))
     fu = yaml.safe_load((rules_dir / "followup.yaml").read_text(encoding="utf-8"))
     out = ["Generated from `rules/risks.yaml` and `rules/followup.yaml`; do not edit here.", ""]

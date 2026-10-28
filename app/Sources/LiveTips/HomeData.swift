@@ -77,7 +77,7 @@ extension StartCallModel {
         carryNotRaised(title: e.title)
     }
 
-    /// Pacenote 0.8.5 (rules/agenda.yaml > wrapup): agenda items not raised on the last call of this series go into
+    /// Pacenote 0.8 (rules/agenda.yaml > wrapup): agenda items not raised on the last call of this series go into
     /// "What matters" as one line, so the next preparation and the tips pick them up. Same project only.
     func carryNotRaised(title: String) {
         let key = EditLog.seriesKey(title)

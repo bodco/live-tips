@@ -166,7 +166,7 @@ struct WeekStats: View {
         .onAppear { history.fillDetails() }
     }
 
-    /// Pacenote 0.8.6 (idea 07): how the calls went, from their own files. No dollars (they live in Settings > AI).
+    /// Pacenote 0.8 (idea 07): how the calls went, from their own files. No dollars (they live in Settings > AI).
     @ViewBuilder private func quality(_ calls: [CallHistory.Record]) -> some View {
         let ms = calls.map { ($0, CallMetrics.shared.of($0.file)) }
         let shares = ms.compactMap { $0.1.talkShare }
@@ -234,7 +234,7 @@ struct WeekStats: View {
     }
 }
 
-/// Pacenote 0.8.6 (idea 07): what a held call says about itself, read once per file version.
+/// Pacenote 0.8 (idea 07): what a held call says about itself, read once per file version.
 @MainActor
 final class CallMetrics {
     static let shared = CallMetrics()

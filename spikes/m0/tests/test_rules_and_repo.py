@@ -16,7 +16,7 @@ def test_rules_load_and_versions():
     ids = [t["id"] for t in r.triggers["triggers"]]
     assert len(ids) == len(set(ids))
     cls_enum = set(r.classify_schema["properties"]["trigger"]["enum"])
-    assert {i for i in ids if i not in ("unanswered_question", "timer_checkpoint", "silent_log")} <= cls_enum
+    assert {i for i in ids if i not in ("unanswered_question", "timer_checkpoint", "silent_log", "question_to_others")} <= cls_enum
 
 
 def test_i18n_keys_match():

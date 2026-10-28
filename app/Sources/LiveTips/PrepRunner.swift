@@ -130,7 +130,7 @@ final class PrepRunner: ObservableObject {
         var folders: [String] = []          // "Add folder" in Start call: read these first, they may be outside the project
         var useProjectFolder = true         // 2026-10-27 (owner): off = never read the project folder, only write the prep into live/
         var callID: UUID? = nil             // 2026-10-27 (owner, Up next): which call it is for
-        // Pacenote 0.8.5 (rules/freshness.json > refresh): update an existing brief from the files changed since.
+        // Pacenote 0.8 (rules/freshness.json > refresh): update an existing brief from the files changed since.
         var refreshBase: String? = nil
         var refreshOf: Date? = nil
         var changed: [String] = []

@@ -1,4 +1,4 @@
-"""Call memory (Pacenote 0.8.6, F6, idea 05): a question in plain words over every transcript of one project.
+"""Call memory (Pacenote 0.8, F6, idea 05): a question in plain words over every transcript of one project.
 
 The project's own local index (lt search: bge-m3 with Local AI on, text search otherwise) finds the passages; a plain
 word match over the transcripts in <project>/live/ fills in when the index has none. Claude answers in 1-2 sentences

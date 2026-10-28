@@ -1,4 +1,4 @@
-"""Pacenote 0.8.5 (F5): the commitments register (rules/commitments.yaml) and the agenda (rules/agenda.yaml)."""
+"""Pacenote 0.8 (F5): the commitments register (rules/commitments.yaml) and the agenda (rules/agenda.yaml)."""
 import json
 import time
 

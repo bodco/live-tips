@@ -21,10 +21,10 @@ class Rules:
         self.tip_schema = self._j("tip_schema.json")
         self.model_tip_schema = self._j("model_tip_schema.json")
         self.classify_schema = self._j("classify_schema.json")
-        # Pacenote 0.8.5: the agenda and the commitments register (optional, so older rules folders still load).
+        # Pacenote 0.8: the agenda and the commitments register (optional, so older rules folders still load).
         self.agenda = self._y("agenda.yaml") if (self.root / "agenda.yaml").exists() else {}
         self.commitments = self._y("commitments.yaml") if (self.root / "commitments.yaml").exists() else {}
-        self.risks = self._y("risks.yaml") if (self.root / "risks.yaml").exists() else {}       # 0.8.6
+        self.risks = self._y("risks.yaml") if (self.root / "risks.yaml").exists() else {}       # 0.8
 
     def _y(self, name):
         return yaml.safe_load((self.root / name).read_text(encoding="utf-8"))

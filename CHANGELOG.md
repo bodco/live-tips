@@ -3,7 +3,12 @@
 Pacenote (formerly Live Tips). Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.8.6 (F6: after the call)
+## 0.8.0 (Pacenote)
+
+Live Tips becomes Pacenote, "your co-driver on calls": a new brand, a new tips window, Home, one call form, a
+four-step onboarding, and new features before, during and after the call. Built in seven phases (F0 to F6):
+
+### F6: after the call
 
 - **Call page:** a click in Recent opens what the call left: decisions, on you and on them, open questions, the
   agenda, the risks; with the follow-up email, the transcript, the series, Notion and Finder. The tips window offers
@@ -20,7 +25,7 @@ Pacenote (formerly Live Tips). Earlier versions are described in the commit mess
 - **Fixed:** Call settings during a call allow one or several languages, as the call form does (in 0.7 only one).
 - Shared rules: `rules/followup.yaml`, `rules/risks.yaml`, `rules/rehearsal.yaml` (rules 0.3.0).
 
-## 0.8.5 (F5: agenda, commitments, brief freshness, call-start offer)
+### F5: agenda, commitments, brief freshness, call-start offer
 
 - **Agenda as a contract:** the brief's checklist is the agenda; the call picture marks the item being discussed and
   the ones done, a click on the agenda bar sets a state by hand. The Notion page gets an "Agenda" section, and items
@@ -36,7 +41,7 @@ Pacenote (formerly Live Tips). Earlier versions are described in the commit mess
 - Shared rules: `rules/agenda.yaml`, `rules/commitments.yaml`, `rules/freshness.json` (rules 0.2.0); the skill's
   SKILL.md and references follow them.
 
-## 0.8.4 (F4: forms, brief, onboarding, Settings)
+### F4: forms, brief, onboarding, Settings
 
 - **One call form for three jobs:** Start call, Prepare and Plan a call share one window (project, title, time
   from the calendar, call context with folders and files, one brief line with one action). Audience, call type,
@@ -57,7 +62,7 @@ Pacenote (formerly Live Tips). Earlier versions are described in the commit mess
   the language picker (language names follow the interface language), alerts and notifications. The prompts to
   Claude stay in English on purpose (see DEVELOPMENT.md, Names).
 
-## 0.8.3 (F3: Home)
+### F3: Home
 
 - **Home answers "what is next and am I ready":** Today with the day's calls and time on calls, Plan a call and
   Start call on top. Up next is one big card: the call (or the live one with its timer and Show tips), the project,
@@ -74,7 +79,7 @@ Pacenote (formerly Live Tips). Earlier versions are described in the commit mess
   as a warning near the monthly limit. Dollars are left to Settings > AI (also gone from the statistics).
 - Home and the statistics in English and Ukrainian.
 
-## 0.8.2 (F2: tips window)
+### F2: tips window
 
 - **New tips window** (Concept A "Focus"): one card answers "what do I say now" (hero), older cards one line each
   under Earlier, the agenda as a bar on top, On me, the next call when it is 10 minutes away, Ask and Help. Wide
@@ -96,7 +101,7 @@ Pacenote (formerly Live Tips). Earlier versions are described in the commit mess
 - **Check for updates** asks GitHub for the latest release and offers the download.
 - The old window (`app/Resources/prompter.html`) is removed from the app; the skill's live-transcriber keeps its own.
 
-## 0.8.1 (F1: foundation)
+### F1: foundation
 
 - **Design tokens** (`PacenoteTheme.swift`, the same values as the web `tokens.css`): colors for text, accent,
   status and recording, radii, spacing, type sizes.
@@ -112,7 +117,7 @@ Pacenote (formerly Live Tips). Earlier versions are described in the commit mess
 - **Home ⌘0 and Start a call ⌘N** are also in the app menu.
 - **Screenshots:** the panel between calls and during a call.
 
-## 0.8.0 (F0: rebrand)
+### F0: rebrand
 
 - **New name: Pacenote**, "Your co-driver on calls" / "Ваш штурман на дзвінках". The bundle identifier,
   the `LiveTips.app` file, folders, settings, the CLI, `.livetips-index/` and the `live-tips` skill keep

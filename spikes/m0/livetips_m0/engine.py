@@ -257,6 +257,55 @@ def same_tip(obj: dict, shown: dict, sim: float) -> bool:
     return obj.get("gist", "") == shown.get("gist") or similar_topic(obj.get("topic", ""), [shown.get("topic", "")], sim)
 
 
+def mentions_money(text: str) -> bool:
+    tl = text.lower()
+    words = re.findall(r"[\w'ʼ’]+", tl)
+    if any(w in COACH_MONEY_WORDS for w in words):
+        return True
+    return any((c in tl) if " " in c else any(w.startswith(c) for w in words)
+               for c in COACH_MONEY_CUES if c not in ("rate", "cost"))
+
+
+def last_question_and_answer(hist: List[Line]):
+    """The PM's last line and the other side's lines after it (newest first)."""
+    answer = []
+    for h in reversed(hist):
+        if h.speaker == "me":
+            return h, answer
+        answer.append(h)
+    return None, answer
+
+
+OWNER_DATE = (re.compile(r"\b(by|till|until|до|на|в)\s+(monday|tuesday|wednesday|thursday|friday|понеділ|вівтор|серед|четвер|п.ятниц|завтра|tomorrow|\d{1,2}[./]\d{1,2})"),
+              re.compile(r"\b(i will|i'll|я зроблю|я візьму|беру на себе|will do|візьм)"))
+
+
+def turn_resolved(trigger: str, after: List[Line]) -> Optional[str]:
+    if trigger not in ("your_turn", "direct_question"):
+        return None
+    pm = [h for h in after if h.speaker == "me"]
+    if len(pm) >= 2 or any(len(h.text) > 80 for h in pm):
+        return "pm_answered"
+    if len([h for h in after if h.speaker == "them"]) >= 3 and not pm:
+        return "talk_moved_on"
+    return None
+
+
+def owner_or_date_said(trigger: str, after: List[Line]) -> Optional[str]:
+    if trigger != "fix_owner_date":
+        return None
+    txt = " ".join(h.text for h in after).lower()
+    return "owner_or_date_said" if any(r.search(txt) for r in OWNER_DATE) else None
+
+
+def numbers_said(obj: Optional[dict], after: List[Line]) -> Optional[str]:
+    if not (obj and obj.get("topic")):
+        return None
+    said = " ".join(h.text for h in after).lower()
+    nums = re.findall(r"\d[\d.,]*", " ".join([obj.get("phrase", "")] + list(obj.get("items") or [])))
+    return "numbers_already_said" if nums and all(n in said for n in nums) else None
+
+
 def asks_the_pm(sig) -> bool:
     """A question to the PM by name or "you", not about a third person."""
     return bool((sig.name_vocative or (sig.question and sig.second_person)) and not sig.third_person)
@@ -507,23 +556,7 @@ class Engine:
         after = self._after(line)
         if not after:
             return None
-        pm = [h for h in after if h.speaker == "me"]
-        if trigger in ("your_turn", "direct_question"):
-            if len(pm) >= 2 or any(len(h.text) > 80 for h in pm):
-                return "pm_answered"
-            if len([h for h in after if h.speaker == "them"]) >= 3 and not pm:
-                return "talk_moved_on"
-        if trigger == "fix_owner_date":
-            txt = " ".join(h.text for h in after).lower()
-            if re.search(r"\b(by|till|until|до|на|в)\s+(monday|tuesday|wednesday|thursday|friday|понеділ|вівтор|серед|четвер|п.ятниц|завтра|tomorrow|\d{1,2}[./]\d{1,2})", txt) \
-                    or re.search(r"\b(i will|i'll|я зроблю|я візьму|беру на себе|will do|візьм)", txt):
-                return "owner_or_date_said"
-        if obj and obj.get("topic"):
-            said = " ".join(h.text for h in after).lower()
-            nums = re.findall(r"\d[\d.,]*", " ".join([obj.get("phrase", "")] + list(obj.get("items") or [])))
-            if nums and all(n in said for n in nums):
-                return "numbers_already_said"
-        return None
+        return turn_resolved(trigger, after) or owner_or_date_said(trigger, after) or numbers_said(obj, after)
 
     def validate_facts(self, obj: dict, line: Line) -> dict:
         """Numbers in items must exist in the brief, the fact book, the cards or the transcript so far
@@ -905,42 +938,39 @@ class Engine:
         role = meeting_role(meta)
         if line.speaker != "them":
             return None
-        if role == "observer":
-            if self._is_question(line, sig) and not sig.name_mention:
-                return {"kind": "observer_question", "trigger": "direct_question", "event": OBSERVER_EVENT,
-                        "level": "orange", "exempt": True}
-            return None
-        if role == "coach":
-            tl = line.text.lower()
-            words = re.findall(r"[\w'ʼ’]+", tl)
-            if any(w in COACH_MONEY_WORDS for w in words) or any(
-                    (c in tl) if " " in c else any(w.startswith(c) for w in words)
-                    for c in COACH_MONEY_CUES if c not in ("rate", "cost")):
-                return {"kind": "coach_money", "trigger": "direct_question", "event": COACH_MONEY_EVENT, "level": "red"}
-            if self._is_question(line, sig):
-                return {"kind": "coach_question", "trigger": "direct_question", "event": COACH_QUESTION_EVENT, "level": "red"}
-            return None
-        if role == "interviewer":
-            with self.lock:
-                hist = [h for h in self.history if h.line_id <= line.line_id]
-            q, answer = None, []
-            for h in reversed(hist):
-                if h.speaker == "me":
-                    q = h
-                    break
-                answer.append(h)
-            if q is None or not self._is_question(q) or q.line_id in self.clarified_for:
-                return None
-            n = sum(len(h.text.split()) for h in answer)
-            if n >= INTERVIEWER_ANSWER_WORDS:
-                with self.lock:
-                    self.clarified_for.add(q.line_id)
-                return {"kind": "interviewer_clarify", "trigger": "add_fact", "event": INTERVIEWER_EVENT,
-                        "level": "orange", "exempt": True}
-            return None
+        by_role = {"observer": self._observer_hint, "coach": self._coach_hint, "interviewer": self._interviewer_hint}
+        if role in by_role:
+            return by_role[role](line, sig)
         if meta.get("call_type") == "presentation" and self._is_question(line, sig) and self.qa_mode(now):
             return {"kind": "presentation_qa", "trigger": "direct_question", "event": QA_EVENT}
         return None
+
+    def _observer_hint(self, line: Line, sig) -> Optional[dict]:
+        if self._is_question(line, sig) and not sig.name_mention:
+            return {"kind": "observer_question", "trigger": "direct_question", "event": OBSERVER_EVENT,
+                    "level": "orange", "exempt": True}
+        return None
+
+    def _coach_hint(self, line: Line, sig) -> Optional[dict]:
+        if mentions_money(line.text):
+            return {"kind": "coach_money", "trigger": "direct_question", "event": COACH_MONEY_EVENT, "level": "red"}
+        if self._is_question(line, sig):
+            return {"kind": "coach_question", "trigger": "direct_question", "event": COACH_QUESTION_EVENT, "level": "red"}
+        return None
+
+    def _interviewer_hint(self, line: Line, sig) -> Optional[dict]:
+        """One clarifying tip per long answer to the PM's last question."""
+        with self.lock:
+            hist = [h for h in self.history if h.line_id <= line.line_id]
+        q, answer = last_question_and_answer(hist)
+        if q is None or not self._is_question(q) or q.line_id in self.clarified_for:
+            return None
+        if sum(len(h.text.split()) for h in answer) < INTERVIEWER_ANSWER_WORDS:
+            return None
+        with self.lock:
+            self.clarified_for.add(q.line_id)
+        return {"kind": "interviewer_clarify", "trigger": "add_fact", "event": INTERVIEWER_EVENT,
+                "level": "orange", "exempt": True}
 
     def qa_mode(self, now: float) -> bool:
         """Presentation Q&A: the PM spoke before, and the PM's share of the last QA_WINDOW_S seconds

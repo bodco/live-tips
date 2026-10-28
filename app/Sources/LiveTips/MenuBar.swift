@@ -1063,9 +1063,15 @@ struct StartCallView: View {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(p.heading).lineLimit(2)
-                    Text(model.chosenPrep != nil ? "Chosen by you, made \(p.made.formatted(date: .abbreviated, time: .shortened))"
-                                                 : "Made \(p.made.formatted(date: .omitted, time: .shortened)); used for this call")
-                        .font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text(model.chosenPrep != nil ? "Chosen by you, made \(p.made.formatted(date: .abbreviated, time: .shortened))"
+                                                     : "Made \(p.made.formatted(date: .omitted, time: .shortened)); used for this call")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if let path = PrepDocWindow.path(for: model) {
+                            Button("Read") { PrepDocWindow.show(path: path, title: model.effectiveTitle) }.buttonStyle(.link).font(.caption)
+                                .help("Read or correct the whole preparation")
+                        }
+                    }
                 }
             } icon: { Image(systemName: "checkmark.seal.fill").foregroundStyle(.green) }
         } else if let p = model.prep {

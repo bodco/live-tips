@@ -203,8 +203,8 @@ final class PrepRunner: ObservableObject {
         Previous meetings (2026-10-28, owner): read the previous calls of this meeting in depth, as the skill's sweep.md \
         step 3b says: what was discussed, every question and whether it was answered fully, partly or not, open items, \
         action items (owner, due, status checked against newer sources), promises, the other side's concerns. The brief \
-        is detailed (up to ~2500 words) and has the "Previous meetings" section (sweep.md, item 1a); every open question \
-        or action item becomes a checklist line and a card.
+        is detailed (up to ~2500 words) and has the "Previous meetings" section (sweep.md, item 1a); open items go into \
+        that section; only those likely to come up on this call become checklist lines and cards (fewer, surer cards).
 
         Write exactly these files and nothing else:
         - \(base).brief.md, first line: "# Live Brief: \(r.title) (prep, \(h.string(from: r.date)))"

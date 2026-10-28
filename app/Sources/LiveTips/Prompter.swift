@@ -96,6 +96,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     var transcript: TailReader?      // the call's transcript (.md), pushed to the transcript pane
     var transcriptPath = ""
     var speakersMtime: Date?
+    var briefMtime: Date?
+    /// <transcript stem> (without .md): the call's files share it.
+    var stem: String { transcriptPath.hasSuffix(".md") ? String(transcriptPath.dropLast(3)) : transcriptPath }
     var lastPrep = ""
     var ticker: Timer?               // stopped when the window closes (QA: closed windows kept reading files)
 
@@ -104,7 +107,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func show() {
 
         let uc = WKUserContentController()
-        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript", "pref", "rename", "upnext"] { uc.add(self, name: name) }
+        for name in ["ask", "pin", "opacity", "ready", "mute", "setting", "stealth", "split", "transcript", "pref", "rename", "upnext", "cardedit", "prepdoc"] { uc.add(self, name: name) }
         // The remembered window settings, before the page's own script runs.
         var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
         // 2026-10-27 (owner): one interface language for the whole app: the window follows Settings > General.
@@ -211,6 +214,18 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             let lines = tr.newLines()
             if !lines.isEmpty, let d = try? JSONSerialization.data(withJSONObject: lines), let js = String(data: d, encoding: .utf8) {
                 push("window.addTranscript && window.addTranscript(" + js + ")")
+            }
+        }
+        // 2026-10-28 (owner): the full preparation for the Preparation pane, again when it changes.
+        if ticks % 4 == 1, !transcriptPath.isEmpty {
+            let bp = stem + ".brief.md"
+            if let m = (try? FileManager.default.attributesOfItem(atPath: bp))?[.modificationDate] as? Date, m != briefMtime,
+               let text = try? String(contentsOfFile: bp, encoding: .utf8) {
+                briefMtime = m
+                let f = DateFormatter(); f.dateFormat = "HH:mm"
+                if let d = try? JSONSerialization.data(withJSONObject: ["text": text, "at": f.string(from: m)]), let js = String(data: d, encoding: .utf8) {
+                    push("window.setPrepDoc && window.setPrepDoc(" + js + ")")
+                }
             }
         }
         if ticks % 4 == 2, !transcriptPath.isEmpty {
@@ -324,6 +339,30 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 default: break
                 }
             }
+        case "cardedit":
+            // 2026-10-28 (owner): a card or an On me line corrected in the window. Kept next to the transcript
+            // (<stem>.edits.jsonl, read by the Notion wrap-up as true), a prepared card is changed in <stem>.cards.json,
+            // and the tips engine and the skill see it in the inbox.
+            guard let d = message.body as? [String: Any], !transcriptPath.isEmpty else { return }
+            var rec = d; rec["at"] = nowHMS()
+            appendLine(jsonLine(rec), to: stem + ".edits.jsonl")
+            if let card = d["card"] as? String, !card.isEmpty { updatePreparedCard(card, d) }
+            if !args.inbox.isEmpty {
+                let after = (d["after"] as? [String: Any]).flatMap { try? JSONSerialization.data(withJSONObject: $0) }.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": "card_edit",
+                                     "value": "\(d["action"] ?? "edit") \(d["kind"] ?? "") \(after)"]), to: args.inbox)
+            }
+        case "prepdoc":
+            // The PM corrected the preparation in the Preparation pane: saved over <stem>.brief.md (the first version is kept).
+            guard let text = message.body as? String, !transcriptPath.isEmpty else { return }
+            let bp = stem + ".brief.md", orig = stem + ".brief.orig.md"
+            if FileManager.default.fileExists(atPath: bp), !FileManager.default.fileExists(atPath: orig) { try? FileManager.default.copyItem(atPath: bp, toPath: orig) }
+            try? text.write(toFile: bp, atomically: true, encoding: .utf8)
+            briefMtime = (try? FileManager.default.attributesOfItem(atPath: bp))?[.modificationDate] as? Date
+            if !args.inbox.isEmpty {
+                appendLine(jsonLine(["t": nowHMS(), "kind": "setting", "key": "brief_edited", "value": "on"]), to: args.inbox)
+                appendLine(jsonLine(["t": nowHMS(), "text": "refresh context"]), to: args.inbox)   // the tips engine reloads it now
+            }
         case "rename":
             // 2026-10-27 (owner): rename the call while it runs (a title typed in a hurry).
             guard let v = (message.body as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty else { return }
@@ -351,6 +390,25 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                        to: args.inbox)
         default:
             break
+        }
+    }
+
+    /// A prepared card corrected or removed in the window: the same change in <stem>.cards.json, so it fires corrected
+    /// (or not at all) for the rest of the call.
+    func updatePreparedCard(_ id: String, _ d: [String: Any]) {
+        let path = stem + ".cards.json"
+        guard let data = FileManager.default.contents(atPath: path),
+              var cards = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]],
+              let i = cards.firstIndex(where: { ($0["id"] as? String) == id }) else { return }
+        if (d["action"] as? String) == "remove" {
+            cards.remove(at: i)
+        } else if let a = d["after"] as? [String: Any] {
+            if let g = a["gist"] as? String, !g.isEmpty { cards[i]["gist"] = g }
+            if let p = a["phrase"] as? String { cards[i]["phrase"] = p }
+            if let items = a["items"] as? [String] { cards[i]["items"] = items }
+        }
+        if let out = try? JSONSerialization.data(withJSONObject: cards, options: [.prettyPrinted]) {
+            try? out.write(to: URL(fileURLWithPath: path), options: .atomic)
         }
     }
 

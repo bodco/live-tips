@@ -390,6 +390,41 @@
   .tip.speech.turn { border-color: var(--red); box-shadow: 0 0 0 2px var(--red-bg); }
   /* ---------- transcript split view (2026-10-26): the live transcript next to the tips ---------- */
   #trpane { display: none; }
+  /* 2026-10-28 (owner): the preparation document next to the tips, like the transcript */
+  #prpane { display: none; }
+  body.prsplit { flex-direction: row; }
+  body.prsplit #deckpane, body.prsplit #trpane { display: none !important; }
+  body.prsplit #prpane { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; height: 100%;
+    border-right: 1px solid var(--line); background: var(--bg); }
+  #pr-top { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px 10px 6px 12px; border-bottom: 1px solid var(--line); }
+  #pr-top .grow { flex: 1 1 0; } #pr-at { color: var(--muted); font-size: 12px; }
+  #pr-doc { flex: 1 1 0; overflow-y: auto; padding: 8px 14px 16px; font-size: 13.5px; line-height: 1.5; }
+  #pr-doc h1 { font-size: 16px; margin: 6px 0 8px; } #pr-doc h2 { font-size: 14.5px; margin: 14px 0 6px; }
+  #pr-doc h3 { font-size: 13.5px; margin: 10px 0 4px; } #pr-doc ul, #pr-doc ol { margin: 4px 0; padding-left: 20px; }
+  #pr-doc p { margin: 4px 0; } #pr-doc code { font-size: 12px; background: var(--blue-soft); border-radius: 4px; padding: 0 3px; }
+  #pr-doc table { border-collapse: collapse; margin: 6px 0; font-size: 12.5px; } #pr-doc td, #pr-doc th { border: 1px solid var(--line); padding: 3px 6px; vertical-align: top; }
+  #pr-doc .empty { color: var(--muted); }
+  #pr-edit { flex: 1 1 0; display: none; margin: 8px 12px 12px; font: 12.5px/1.45 ui-monospace, Menlo, monospace; color: var(--text);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; resize: none; }
+  body.predit #pr-doc { display: none; } body.predit #pr-edit { display: block; }
+  #prbtn[aria-pressed="true"] { background: var(--blue-bg); color: var(--blue); box-shadow: inset 0 0 0 1.5px var(--blue); }
+  /* inline card editing */
+  .tip .fb .edit svg { width: 14px; height: 14px; }
+  .tip.editing .gist, .tip.editing .phrase, .tip.editing .items, .tip.editing .more, .tip.editing .foot { display: none; }
+  .cedit { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .cedit input, .cedit textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; width: 100%; box-sizing: border-box; }
+  .cedit textarea { min-height: 54px; resize: vertical; }
+  .cedit .row { display: flex; gap: 4px; align-items: center; } .cedit .row input { flex: 1; }
+  .cedit .x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 4px; }
+  .cedit .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cedit .btns .rm { margin-left: auto; color: var(--red); }
+  .tip.edited .meta::after { content: '✎'; margin-left: 6px; color: var(--muted); }
+  #onme li .ox { margin-left: auto; border: 0; background: none; color: var(--muted); cursor: pointer; visibility: hidden; padding: 0 2px; }
+  #onme li:hover .ox { visibility: visible; }
+  #onme li.manual .ic { color: var(--green); }
+  #onme .addrow { display: flex; gap: 4px; margin-top: 4px; } #onme .addrow input { flex: 1; font: inherit; color: var(--text);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+  #onme.collapsed .addrow { display: none; }
   body.trsplit { flex-direction: row; }
   body.trsplit #deckpane { display: none; }
   body.trsplit #trpane { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; height: 100%;
@@ -600,6 +635,16 @@
   <div id="dk-cards"></div>
   <div id="dk-wrap"></div>
 </div>
+<div id="prpane" aria-label="Preparation">
+  <div id="pr-top">
+    <b data-i18n="pr_title">Preparation</b><span id="pr-at"></span><span class="grow"></span>
+    <button id="pr-editbtn" class="dk-b" type="button" data-i18n="pr_edit" data-i18n-title="pr_edit_tt">Edit</button>
+    <button id="pr-save" class="dk-b" type="button" data-i18n="pr_save" style="display:none">Save</button>
+    <button id="pr-close" class="dk-b" type="button" data-i18n="pr_close">Close</button>
+  </div>
+  <div id="pr-doc"><div class="empty" data-i18n="pr_none">No preparation for this call yet.</div></div>
+  <textarea id="pr-edit" spellcheck="false"></textarea>
+</div>
 <div id="trpane" aria-label="Transcript">
   <div id="tr-top">
     <b data-i18n="tr_title">Transcript</b><span id="tr-n"></span><span class="grow"></span>
@@ -625,6 +670,9 @@
   <button id="pause" class="ib" type="button" aria-pressed="false"></button>
   <button id="mute" class="ib" data-i18n-title="mute_tt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
   <span class="bsep" aria-hidden="true"></span>
+  <button id="prbtn" class="ib" type="button" aria-pressed="false" data-i18n-title="pr_btn_tt" data-i18n-aria="pr_btn_tt" title="Preparation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+  </button>
   <button id="trbtn" class="ib" type="button" aria-pressed="false" data-i18n-title="tr_btn_tt" data-i18n-aria="tr_btn_tt" title="Transcript">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg>
   </button>
@@ -794,6 +842,11 @@
       dot_go: 'Starting the recording...', dot_end: 'Stopping the recording...', dot_rec: 'Recording',
       dot_paused: 'Paused: nothing is transcribed', dot_ok: 'Stopped, the transcript is saved', dot_warn: 'Recording, but the microphone has a problem',
       who_me: 'me', who_them: 'the other side',
+      pr_title: 'Preparation', pr_edit: 'Edit', pr_edit_tt: 'Correct the preparation: the tips use the saved text', pr_save: 'Save', pr_close: 'Close',
+      pr_none: 'No preparation for this call yet.', pr_btn_tt: 'The full preparation of this call', pr_saved: 'Preparation saved', pr_updated: 'Preparation updated: the tips use your text',
+      ce_edit_tt: 'Edit this card: text and points', ce_gist: 'Heading', ce_phrase: 'Phrase', ce_add: '+ Point', ce_save: 'Save', ce_cancel: 'Cancel',
+      ce_remove: 'Remove card', ce_saved: 'Card corrected', ce_removed: 'Card removed for this call',
+      om_add_ph: 'Add what is on you…', om_hide_tt: 'Not on me: remove', om_edit_tt: 'Double-click to correct',
       sec_upnext: 'Up next', up_plan: 'Plan an upcoming call…', up_label: 'Next:', up_switch: 'Switch…',
       up_hint: 'Set up and prepare the next calls while this one runs. Switch ends this call (transcript and Notion summary are saved) and starts the chosen one.',
       up_empty: 'No upcoming calls.', up_edit: 'Edit', up_prep: 'Prepare', up_remove_tt: 'Remove from Up next',
@@ -1117,6 +1170,11 @@
       dot_go: 'Запускаю запис...', dot_end: 'Зупиняю запис...', dot_rec: 'Йде запис',
       dot_paused: 'Пауза: нічого не транскрибується', dot_ok: 'Зупинено, транскрипт збережено', dot_warn: 'Йде запис, але з мікрофоном проблема',
       who_me: 'я', who_them: 'співрозмовник',
+      pr_title: 'Підготовка', pr_edit: 'Редагувати', pr_edit_tt: 'Виправити підготовку: підказки беруть збережений текст', pr_save: 'Зберегти', pr_close: 'Закрити',
+      pr_none: 'Підготовки до цього дзвінка ще немає.', pr_btn_tt: 'Повна підготовка до цього дзвінка', pr_saved: 'Підготовку збережено', pr_updated: 'Підготовку оновлено: підказки беруть твій текст',
+      ce_edit_tt: 'Редагувати картку: текст і пункти', ce_gist: 'Заголовок', ce_phrase: 'Фраза', ce_add: '+ Пункт', ce_save: 'Зберегти', ce_cancel: 'Скасувати',
+      ce_remove: 'Прибрати картку', ce_saved: 'Картку виправлено', ce_removed: 'Картку прибрано з цього дзвінка',
+      om_add_ph: 'Додати, що на мені…', om_hide_tt: 'Не на мені: прибрати', om_edit_tt: 'Подвійний клік, щоб виправити',
       sec_upnext: 'Далі', up_plan: 'Запланувати наступний дзвінок…', up_label: 'Далі:', up_switch: 'Перейти…',
       up_hint: 'Налаштуй і підготуй наступні дзвінки, поки йде цей. Перехід завершує цей дзвінок (транскрипт і підсумок у Notion зберігаються) і запускає обраний.',
       up_empty: 'Наступних дзвінків немає.', up_edit: 'Змінити', up_prep: 'Підготувати', up_remove_tt: 'Прибрати з черги',
@@ -1857,8 +1915,58 @@
     pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 4 3v2H6v-2l4-3z"/><path d="M12 15v6"/></svg>',
     yes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
     part: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 13c2-3 4-3 6-1.5s4 1.5 6-1.5 3-1 4 0"/></svg>',
-    no: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+    no: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>'
   };
+  // 2026-10-28 (owner): every card can be corrected in place: the heading, the phrase, each point (change,
+  // remove, add). The correction stays for the call (also when the same card comes again) and is saved next to
+  // the transcript (<stem>.edits.jsonl); a prepared card is changed in <stem>.cards.json, and the Notion summary
+  // takes the corrections as true.
+  var EDITS = {};
+  function editKey(it) { return it.card ? 'c:' + it.card : (it.uid ? 'u:' + it.uid : 'g:' + (it.kind || 'tip') + '|' + String(it.gist || '').slice(0, 40)); }
+  function itemText(x) { return typeof x === 'string' ? x : (x && x.text) || ''; }
+  function editCard(el, it) {
+    if (el.classList.contains('editing')) return;
+    el.classList.add('editing');
+    var box = document.createElement('div'); box.className = 'cedit';
+    var g = document.createElement('input'); g.value = it.gist || ''; g.placeholder = t('ce_gist');
+    var ph = document.createElement('textarea'); ph.value = it.phrase || ''; ph.placeholder = t('ce_phrase');
+    var rows = document.createElement('div');
+    function addRow(v) {
+      var r = document.createElement('div'); r.className = 'row';
+      var inp = document.createElement('input'); inp.value = v || '';
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addRow('').querySelector('input').focus(); } });
+      var x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '×';
+      x.onclick = function () { r.remove(); };
+      r.appendChild(inp); r.appendChild(x); rows.appendChild(r); return r;
+    }
+    (it.items || []).forEach(function (x) { addRow(itemText(x)); });
+    var btns = document.createElement('div'); btns.className = 'btns';
+    function b(label, cls, fn) { var e = document.createElement('button'); e.type = 'button'; e.className = 'btn' + (cls ? ' ' + cls : ''); e.textContent = label; e.onclick = fn; btns.appendChild(e); }
+    b(t('ce_add'), '', function () { addRow('').querySelector('input').focus(); });
+    b(t('ce_save'), '', function () {
+      var items = Array.prototype.map.call(rows.querySelectorAll('input'), function (i) { return i.value.trim(); }).filter(Boolean);
+      var ch = { gist: g.value.trim(), phrase: ph.value.trim(), items: items };
+      var k = editKey(it);
+      EDITS[k] = ch;
+      var nu = Object.assign({}, it, ch, { _edited: true, edited: true });
+      if (!nu.uid) { nu.uid = 'ed' + el.dataset.seq; el.dataset.uid = nu.uid; }
+      send('cardedit', { action: 'edit', key: k, card: it.card || '', kind: it.kind || 'tip', t: it.t || '', before: { gist: it.gist || '', phrase: it.phrase || '', items: (it.items || []).map(itemText) }, after: ch });
+      render(nu);
+      toast(t('ce_saved'), 'ok');
+    });
+    b(t('ce_cancel'), '', function () { box.remove(); el.classList.remove('editing'); });
+    b(t('ce_remove'), 'rm', function () {
+      var k = editKey(it);
+      EDITS[k] = { removed: true };
+      send('cardedit', { action: 'remove', key: k, card: it.card || '', kind: it.kind || 'tip', t: it.t || '', before: { gist: it.gist || '', phrase: it.phrase || '', items: (it.items || []).map(itemText) } });
+      var box2 = $('pinbox'); el.remove(); if (box2 && !box2.children.length) box2.classList.remove('has');
+      toast(t('ce_removed'), 'ok');
+    });
+    box.appendChild(g); box.appendChild(ph); box.appendChild(rows); box.appendChild(btns);
+    el.appendChild(box);
+    g.focus();
+  }
   var SOS_RE = /^\s*\u{1F198}/u;
   var seqNo = 0;
   function dropQuestions() {
@@ -1868,6 +1976,11 @@
   function byUid(uid) { return uid ? list.querySelector('[data-uid="' + String(uid).replace(/"/g, '') + '"]') || $('pinbox').querySelector('[data-uid="' + String(uid).replace(/"/g, '') + '"]') : null; }
   function render(it) {
     if (empty) { empty.remove(); empty = null; }
+    if (!it._edited && (it.kind || 'tip') !== 'retract' && (it.kind || 'tip') !== 'question') {
+      var ov = EDITS[editKey(it)];
+      if (ov && ov.removed) return;                       // removed by the PM for this call
+      if (ov) it = Object.assign({}, it, ov, { edited: true });
+    }
     var kind = it.kind || 'tip';
     // Streamed tips: the engine sends the gist first (partial) and the full tip with the same uid;
     // "retract" removes a gist whose tip was dropped. The card keeps its place and pin.
@@ -1885,7 +1998,7 @@
       list.scrollTop = 0;
       return;
     }
-    el.className = 'tip ' + (it.level || 'info') + ' ' + kind + (it.late ? ' late' : '') + (SOS_RE.test(it.gist || '') ? ' sos' : '') + (it.partial ? ' partial' : '');
+    el.className = 'tip ' + (it.level || 'info') + ' ' + kind + (it.edited ? ' edited' : '') + (it.late ? ' late' : '') + (SOS_RE.test(it.gist || '') ? ' sos' : '') + (it.partial ? ' partial' : '');
     if (it.uid) el.dataset.uid = String(it.uid);
     var html = '';
     var lag = lagOf(it);
@@ -1912,7 +2025,7 @@
     var pinnable = rateable || kind === 'speech' || kind === 'checklist' || kind === 'status' || kind === 'wrapup';
     var fb = '';
     function fbBtn(cls, key, icon) { return '<button class="' + cls + '" type="button" data-i18n-title="' + esc(key) + '" data-i18n-aria="' + esc(key) + '" title="' + esc(t(key)) + '" aria-label="' + esc(t(key)) + '">' + icon + '</button>'; }
-    if (pinnable) fb += fbBtn('pin', 'pin_card_tt', ICON.pin);
+    if (pinnable) fb += fbBtn('edit', 'ce_edit_tt', ICON.edit) + fbBtn('pin', 'pin_card_tt', ICON.pin);
     if (rateable) fb += fbBtn('yes', 'yes_tt', ICON.yes) + fbBtn('part', 'part_tt', ICON.part) + fbBtn('no', 'no_tt', ICON.no);
     html += '<div class="foot"><div class="meta">' + meta + '</div>' + (fb ? '<div class="fb">' + fb + '</div>' : '') + '</div>';
     el.innerHTML = html;
@@ -1924,6 +2037,8 @@
       el.querySelector('.fb .part').onclick = function () { rate(el, this, 'partly', key); el.classList.remove('dismissed'); openWhy(el, 'partly', key); };
       el.querySelector('.fb .no').onclick = function () { rate(el, this, 'not_useful', key); el.classList.add('dismissed'); openWhy(el, 'not_useful', key); };
     }
+    var eb = el.querySelector('.fb .edit');
+    if (eb) eb.onclick = function () { editCard(el, it); };
     var pb = el.querySelector('.fb .pin');
     if (pb) pb.onclick = function () {
       var box = $('pinbox');
@@ -2370,6 +2485,30 @@
 
   // ---------- call picture from the engine (2026-10-26) ----------
   var sit = null, cardSeen = {}, onmeKnown = {};
+  var ONME = { hide: {}, edit: {}, add: [] };
+  (function () {
+    var ul = $('onme').querySelector('ul');
+    ul.addEventListener('click', function (e) {
+      var x = e.target.closest && e.target.closest('.ox'); if (!x) return;
+      var li = x.closest('li'), k = li.getAttribute('data-k');
+      ONME.hide[k] = 1;
+      send('cardedit', { action: 'onme_remove', kind: 'onme', key: k, before: { text: li.querySelector('.ot').textContent } });
+      renderSituation(sit);
+    });
+    ul.addEventListener('dblclick', function (e) {
+      var li = e.target.closest && e.target.closest('li'); if (!li || li.querySelector('input')) return;
+      var k = li.getAttribute('data-k'), ot = li.querySelector('.ot'), old = ot.textContent;
+      var inp = document.createElement('input'); inp.value = old; inp.style.flex = '1';
+      ot.replaceWith(inp); inp.focus();
+      function done(save) {
+        var v = inp.value.trim();
+        if (save && v && v !== old) { ONME.edit[k] = v; send('cardedit', { action: 'onme_edit', kind: 'onme', key: k, before: { text: old }, after: { text: v } }); }
+        renderSituation(sit);
+      }
+      inp.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); });
+      inp.addEventListener('blur', function () { done(true); });
+    });
+  })();
   function cardPasses(it) {
     var key = String(it.card || it.id || it.gist || '').toLowerCase().slice(0, 80), now = Date.now();
     if (cardSeen[key] && now - cardSeen[key] < 10 * 60 * 1000) return false;      // the same card twice in 10 min
@@ -2408,15 +2547,37 @@
     line.title = line.textContent;
     // "On me": open asks to the PM first, then what the PM took on.
     var box = $('onme'), ul = box.querySelector('ul'), rows = [];
+    // 2026-10-28 (owner): the PM corrects "On me" in place: × removes a line, a double-click corrects it,
+    // the field adds what the call picture missed. Kept for the call and sent to the wrap-up as corrections.
+    function txt(k, v) { return ONME.edit[k] != null ? ONME.edit[k] : v; }
     (s.asks || []).filter(function (a) { return a.type !== 'update'; }).forEach(function (a) {
-      rows.push({ k: 'a:' + (a.what || ''), cls: 'ask', html: ICONS.ask + ' ' + esc(a.what || '') + (a.who ? ' <span class="who">· ' + esc(a.who) + '</span>' : '') });
+      var k = 'a:' + (a.what || ''); if (ONME.hide[k]) return;
+      rows.push({ k: k, cls: 'ask', html: ICONS.ask + ' <span class="ot">' + esc(txt(k, a.what || '')) + '</span>' + (a.who ? ' <span class="who">· ' + esc(a.who) + '</span>' : '') });
     });
     (s.actions || []).forEach(function (a) {
-      rows.push({ k: 'm:' + (a.what || ''), cls: 'mine', html: ICONS.check + ' ' + esc(a.what || '') + (a.due ? ' <span class="who">· ' + esc(a.due) + '</span>' : '') +
+      var k = 'm:' + (a.what || ''); if (ONME.hide[k]) return;
+      rows.push({ k: k, cls: 'mine', html: ICONS.check + ' <span class="ot">' + esc(txt(k, a.what || '')) + '</span>' + (a.due ? ' <span class="who">· ' + esc(a.due) + '</span>' : '') +
         (a.from && a.from !== 'PM' ? ' <span class="who">· ' + esc(a.from) + '</span>' : '') });
     });
+    ONME.add.forEach(function (w, i) {
+      var k = 'x:' + i; if (ONME.hide[k]) return;
+      rows.push({ k: k, cls: 'mine manual', html: ICONS.check + ' <span class="ot">' + esc(txt(k, w)) + '</span>' });
+    });
     ul.innerHTML = rows.map(function (r) { var isNew = !onmeKnown[r.k]; onmeKnown[r.k] = 1;
-      return '<li class="' + r.cls + (isNew ? ' new' : '') + '">' + r.html + '</li>'; }).join('');
+      return '<li class="' + r.cls + (isNew ? ' new' : '') + '" data-k="' + esc(r.k) + '" title="' + esc(t('om_edit_tt')) + '">' + r.html +
+        '<button type="button" class="ox" title="' + esc(t('om_hide_tt')) + '">×</button></li>'; }).join('');
+    if (!box.querySelector('.addrow')) {
+      var ar = document.createElement('div'); ar.className = 'addrow';
+      ar.innerHTML = '<input type="text" placeholder="' + esc(t('om_add_ph')) + '">';
+      box.appendChild(ar);
+      ar.querySelector('input').addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        var v = this.value.trim(); if (!v) return;
+        ONME.add.push(v); this.value = '';
+        send('cardedit', { action: 'onme_add', kind: 'onme', after: { text: v } });
+        renderSituation(sit);
+      });
+    }
     box.querySelector('.head').innerHTML = ICONS.list + ' ' + esc(t('onme')) + ' <span class="n">' + rows.length + '</span>';
     box.querySelector('.head').title = t('onme_tt');
     box.classList.toggle('has', rows.length > 0);
@@ -2485,7 +2646,61 @@
     send('transcript', on);
     if (on) { trFollow = true; trRender(); }
   }
-  trBtn.onclick = function () { setTr(!trOpen); };
+  trBtn.onclick = function () { if (prOpen) setPr(false); setTr(!trOpen); };
+  // 2026-10-28 (owner): the full preparation in its own pane, like the transcript; editable.
+  var prOpen = false, prText = '', prBtn = $('prbtn');
+  function mdTable(rows) {
+    var h = '<table>';
+    rows.forEach(function (r, i) {
+      if (/^\|?\s*:?-{2,}/.test(r)) return;
+      var cells = r.replace(/^\||\|$/g, '').split('|');
+      h += '<tr>' + cells.map(function (c) { return (i === 0 ? '<th>' : '<td>') + inline(c.trim()) + (i === 0 ? '</th>' : '</td>'); }).join('') + '</tr>';
+    });
+    return h + '</table>';
+  }
+  function md(text) {
+    var out = [], lines = String(text || '').split('\n'), list = null, table = [];
+    function close() { if (list) { out.push('</' + list + '>'); list = null; } if (table.length) { out.push(mdTable(table)); table = []; } }
+    lines.forEach(function (l) {
+      var m;
+      if (/^\s*\|/.test(l)) { if (list) { out.push('</' + list + '>'); list = null; } table.push(l.trim()); return; }
+      if (table.length) { out.push(mdTable(table)); table = []; }
+      if ((m = /^(#{1,3})\s+(.*)$/.exec(l))) { close(); out.push('<h' + m[1].length + '>' + inline(m[2]) + '</h' + m[1].length + '>'); return; }
+      if ((m = /^\s*[-*•]\s+(.*)$/.exec(l))) { if (list !== 'ul') { close(); out.push('<ul>'); list = 'ul'; } out.push('<li>' + inline(m[1]).replace(/`([^`]+)`/g, '<code>$1</code>') + '</li>'); return; }
+      if ((m = /^\s*\d+[.)]\s+(.*)$/.exec(l))) { if (list !== 'ol') { close(); out.push('<ol>'); list = 'ol'; } out.push('<li>' + inline(m[1]).replace(/`([^`]+)`/g, '<code>$1</code>') + '</li>'); return; }
+      if (!l.trim()) { close(); return; }
+      close(); out.push('<p>' + inline(l).replace(/`([^`]+)`/g, '<code>$1</code>') + '</p>');
+    });
+    close();
+    return out.join('');
+  }
+  function prRender() {
+    var d = $('pr-doc');
+    d.innerHTML = prText.trim() ? md(prText) : '<div class="empty">' + esc(t('pr_none')) + '</div>';
+  }
+  window.setPrepDoc = function (p) {
+    p = p || {};
+    if (document.body.classList.contains('predit')) return;      // never overwrite the PM's editing
+    prText = p.text || ''; $('pr-at').textContent = p.at ? ' · ' + p.at : '';
+    prRender();
+  };
+  function setPr(on) {
+    prOpen = on; document.body.classList.toggle('prsplit', on); prBtn.setAttribute('aria-pressed', String(on));
+    if (on && trOpen) { trOpen = false; document.body.classList.remove('trsplit'); trBtn.setAttribute('aria-pressed', 'false'); }
+    send('transcript', on);
+    if (!on) { document.body.classList.remove('predit'); $('pr-save').style.display = 'none'; $('pr-editbtn').style.display = ''; }
+  }
+  prBtn.onclick = function () { setPr(!prOpen); };
+  $('pr-close').onclick = function () { setPr(false); };
+  $('pr-editbtn').onclick = function () {
+    $('pr-edit').value = prText; document.body.classList.add('predit');
+    $('pr-editbtn').style.display = 'none'; $('pr-save').style.display = ''; $('pr-edit').focus();
+  };
+  $('pr-save').onclick = function () {
+    prText = $('pr-edit').value; send('prepdoc', prText);
+    document.body.classList.remove('predit'); $('pr-save').style.display = 'none'; $('pr-editbtn').style.display = '';
+    prRender(); toast(t('pr_saved'), 'ok');
+  };
   // Reassign a line from the transcript (2026-10-26): click the speaker of a line.
   var knownNames = [], trMenu = $('trmenu'), trMenuT = null, trMenuX = null;
   function lineWho(x, name) {      // works with or without speaker identification: applied to the file after the stop
@@ -2650,7 +2865,7 @@
   window.addItems = function (items) {
     (items || []).forEach(function (it) {
       if (!it) return;
-      if (it.kind === 'notice') { toast(t('prep_ready_toast'), 'ok'); window.setPrep({ state: 'ready' }); return; }
+      if (it.kind === 'notice') { toast(/updated/i.test(it.gist || '') ? t('pr_updated') : t('prep_ready_toast'), 'ok'); window.setPrep({ state: 'ready' }); return; }
       if (it.kind === 'agenda') { renderAgenda(it); return; }
       if (it.kind === 'facts') { facts = it.facts || []; indexFacts(); searchFacts(); return; }
       if (it.kind === 'outline') { outline = it.sections || []; renderNow(); return; }

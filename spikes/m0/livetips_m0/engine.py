@@ -803,6 +803,7 @@ class Engine:
         and a short notice in the window (2026-10-27, owner)."""
         if not hasattr(self.prompt, "refresh_brief"):
             return False
+        had = bool(getattr(self.prompt, "_brief", ""))
         try:
             changed = self.prompt.refresh_brief()
         except Exception:  # noqa: BLE001
@@ -813,7 +814,8 @@ class Engine:
             self.prompt.refresh_facts()
         t = s_to_hms(self.clock())
         self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "notice", "level": "info", "t": t, "at": t,
-                             "gist": "Preparation ready: the brief, the facts and the cards are loaded"})
+                             "gist": ("Preparation updated: the tips use the corrected text" if had else
+                                      "Preparation ready: the brief, the facts and the cards are loaded")})
         if self.speech_item is None and self.cfg.get("speech_card", True):
             self.speech_card(self.prompt._brief)
         return True

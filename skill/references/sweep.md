@@ -112,8 +112,10 @@ is older than 3 days -> say so in the sources line (item 4) as
    and names); every question asked to us or by us and whether it was answered fully, partly or not
    at all (the answer and who gave it); open items (raised, not closed); action items (owner, due date,
    done / not done / unknown, checked against newer sources: the tracker, threads, later meetings);
-   promises we made; what the other side was unhappy about or kept pushing. A question or an action
-   item that stayed open is a topic of this call: put it on the checklist and make a card for it.
+   promises we made; what the other side was unhappy about or kept pushing. Everything that stayed open
+   goes into the brief's Previous meetings list; only what is likely to come up on THIS call (its
+   agenda, its people, a due date now) becomes a checklist line and a card. The PM removes or
+   corrects cards in the tips window, so prefer fewer, surer cards.
 3a. **Topic documents rule (mandatory).** For EVERY item of the checklist and every topic
    expected on the call (the user's words, the prep report, the open threads), find the project
    documents that touch it, created or changed in the last 3 days (Project docs `DESIGN-`,

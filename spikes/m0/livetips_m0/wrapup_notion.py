@@ -113,9 +113,35 @@ Write in {LANG}, plain and short, no long dashes. Return ONLY one JSON object:
 Empty lists are fine. Do not repeat the same item in two lists."""
 
 
+def pm_corrections(path: Path) -> str:
+    """2026-10-28 (owner): cards and "On me" lines the PM corrected, removed or added in the tips window during the
+    call (<stem>.edits.jsonl). They are true and win over the transcript and the call picture."""
+    if not path.exists():
+        return ""
+    out = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        try:
+            d = json.loads(raw)
+        except Exception:  # noqa: BLE001
+            continue
+        act, before, after = d.get("action", ""), d.get("before") or {}, d.get("after") or {}
+        if act == "onme_add":
+            out.append(f"- On the PM (added by the PM): {after.get('text', '')}")
+        elif act == "onme_remove":
+            out.append(f"- NOT on the PM (removed by the PM): {before.get('text', '')}")
+        elif act == "onme_edit":
+            out.append(f"- Corrected by the PM: \"{before.get('text', '')}\" is really \"{after.get('text', '')}\"")
+        elif act == "remove":
+            out.append(f"- Wrong or irrelevant (removed by the PM): {before.get('gist', '')}")
+        elif act == "edit":
+            pts = "; ".join(after.get("items") or [])
+            out.append(f"- Corrected by the PM: {after.get('gist', '')}" + (f" ({after.get('phrase', '')})" if after.get("phrase") else "") + (f": {pts}" if pts else ""))
+    return ("\n\nCORRECTIONS BY THE PM DURING THE CALL (true; they win over the transcript):\n" + "\n".join(out[-60:])) if out else ""
+
+
 def claude_wrapup(transcript: str, brief: str, model: str, lang: str = "uk") -> dict:
     key = os.environ.get("CLAUDE_API", "")
-    user = (f"PREP BRIEF (may be empty):\n{brief[:6000]}\n\n" if brief else "") + f"TRANSCRIPT:\n{transcript[:120000]}"
+    user = (f"PREP BRIEF (may be empty):\n{brief[:14000]}\n\n" if brief else "") + f"TRANSCRIPT:\n{transcript[:120000]}"
     r = http("POST", ANTHROPIC, {"x-api-key": key, "anthropic-version": "2023-06-01"},
              {"model": model, "max_tokens": 2500, "system": SYSTEM.replace("{LANG}", TXT[lang]["write"]),
               "messages": [{"role": "user", "content": user}]}, timeout=180)
@@ -314,6 +340,7 @@ def main(argv=None) -> int:
             raise RuntimeError("fewer than 5 transcript lines: nothing to write")
         brief_f = Path(str(a.md)[:-3] + ".brief.md")
         brief = brief_f.read_text(encoding="utf-8") if brief_f.exists() else ""
+        brief = (pm_corrections(Path(str(a.md)[:-3] + ".edits.jsonl")).strip() + "\n\n" + brief).strip()
         info = header_info(a.md)
         if a.title.strip():
             info["title"] = a.title.strip()

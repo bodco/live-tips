@@ -1545,3 +1545,10 @@ address", `references/sweep.md`, `references/presentation.md`).
 84. **Deeper preparation (0.7.0, skill v54).** Prepare reads the last 3 calls of the same meeting in full (the app
    names their transcripts) and the brief (up to ~2500 words) has a "Previous meetings" section: what was discussed,
    questions and whether they were answered, open items, action items with owner, due and status, promises.
+85. **Correct cards and On me in the window (0.7.1).** ✎ on a card edits its heading, phrase and points (change,
+   remove, add) or removes the card; the correction stays for the call, a prepared card is changed in
+   `<stem>.cards.json`. On me: × removes a line, a double-click corrects it, the field adds a missing one. All
+   corrections go to `<stem>.edits.jsonl` and the Notion summary takes them as true.
+86. **Preparation pane (0.7.1).** The 📄 button opens the full preparation next to the tips; Edit corrects it and the
+   tips reload it at once (the first version is kept as `.brief.orig.md`). Before the call: Read prep in Home and
+   Read in Start call open the same document, editable; the corrected text is what the call uses.

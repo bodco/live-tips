@@ -227,6 +227,10 @@ struct HomeView: View {
                     Button("Prepare") { prepare(r) }.buttonStyle(LTSoftButtonStyle(small: true))
                         .help("Set up this call like the last one of its series and write its preparation now. It does not start the call.")
                 }
+                if st == .ready, let m = m, let p = PrepDocWindow.path(for: m) {
+                    Button("Read prep") { PrepDocWindow.show(path: p, title: m.effectiveTitle) }.buttonStyle(LTSoftButtonStyle(small: true))
+                        .help("Read or correct the preparation before the call")
+                }
                 Button("Set up…") { StartCallWindow.show(delegate: app, prepared: model(for: r)) }.buttonStyle(LTSoftButtonStyle(small: true))
                 Button(live ? "Switch…" : "Start") { start(r) }.buttonStyle(LTSoftButtonStyle(small: true))
                     .help(live ? "End the current call and start this one (asks first)." : "Start this call now.")

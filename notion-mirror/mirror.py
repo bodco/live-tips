@@ -298,43 +298,46 @@ class Notion:
 
     def block_lines(self, b, depth):
         t = b.get("type")
-        v = b.get(t, {}) or {}
-        ind = "  " * depth
-        txt = rich(v.get("rich_text", []))
-        pre = {"heading_1": "# ", "heading_2": "## ", "heading_3": "### ",
-               "bulleted_list_item": "- ", "numbered_list_item": "1. ", "quote": "> "}
-        out = []
-        if t in pre:
-            out.append(ind + pre[t] + txt)
-        elif t == "paragraph":
-            out.append(ind + txt)
-        elif t == "to_do":
-            out.append(ind + ("- [x] " if v.get("checked") else "- [ ] ") + txt)
-        elif t == "toggle":
-            out.append(ind + "- " + txt)
-        elif t == "callout":
-            out.append(ind + "> " + txt)
-        elif t == "code":
-            out += [ind + "```" + (v.get("language") or ""), txt, ind + "```"]
-        elif t == "divider":
-            out.append("---")
-        elif t == "child_page":
-            out.append('<page url="https://app.notion.com/p/%s">%s</page>'
-                       % (b["id"].replace("-", ""), v.get("title", "")))
-        elif t == "child_database":
-            out.append("[database: %s]" % v.get("title", ""))
-        elif t in ("bookmark", "embed", "link_preview"):
-            out.append(ind + (v.get("url") or ""))
-        elif t in ("image", "file", "pdf", "video"):
-            f = v.get("file") or v.get("external") or {}
-            out.append(ind + "[%s: %s]" % (t, rich(v.get("caption", [])) or f.get("url", "")))
-        elif t == "table_row":
-            out.append(ind + "| " + " | ".join(rich(c) for c in v.get("cells", [])) + " |")
-        elif txt:
-            out.append(ind + txt)
+        out = block_text(b, "  " * depth)
         if b.get("has_children") and t not in ("child_page", "child_database"):
             out.append(self.blocks_md(b["id"], depth + 1))
         return out
+
+
+BLOCK_PREFIX = {"heading_1": "# ", "heading_2": "## ", "heading_3": "### ", "bulleted_list_item": "- ",
+                "numbered_list_item": "1. ", "quote": "> ", "paragraph": "", "toggle": "- ", "callout": "> "}
+
+
+def _media(t, v, ind):
+    f = v.get("file") or v.get("external") or {}
+    return [ind + "[%s: %s]" % (t, rich(v.get("caption", [])) or f.get("url", ""))]
+
+
+BLOCK_WRITERS = {
+    "to_do": lambda b, v, ind, txt: [ind + ("- [x] " if v.get("checked") else "- [ ] ") + txt],
+    "code": lambda b, v, ind, txt: [ind + "```" + (v.get("language") or ""), txt, ind + "```"],
+    "divider": lambda b, v, ind, txt: ["---"],
+    "child_page": lambda b, v, ind, txt: ['<page url="https://app.notion.com/p/%s">%s</page>'
+                                          % (b["id"].replace("-", ""), v.get("title", ""))],
+    "child_database": lambda b, v, ind, txt: ["[database: %s]" % v.get("title", "")],
+    "table_row": lambda b, v, ind, txt: [ind + "| " + " | ".join(rich(c) for c in v.get("cells", [])) + " |"],
+}
+for _t in ("bookmark", "embed", "link_preview"):
+    BLOCK_WRITERS[_t] = lambda b, v, ind, txt: [ind + (v.get("url") or "")]
+for _t in ("image", "file", "pdf", "video"):
+    BLOCK_WRITERS[_t] = lambda b, v, ind, txt, _t=_t: _media(_t, v, ind)
+
+
+def block_text(b, ind):
+    """Markdown lines of one block (without its children)."""
+    t = b.get("type")
+    v = b.get(t, {}) or {}
+    txt = rich(v.get("rich_text", []))
+    if t in BLOCK_PREFIX:
+        return [ind + BLOCK_PREFIX[t] + txt]
+    if t in BLOCK_WRITERS:
+        return BLOCK_WRITERS[t](b, v, ind, txt)
+    return [ind + txt] if txt else []
 
 
 class NotionError(Exception):
@@ -354,54 +357,60 @@ def title_of(page):
     return "Untitled"
 
 
+def _who(v, users):
+    v = v or {}
+    return v.get("name") or users.get(norm_id(v.get("id"))) or v.get("id")
+
+
+def _date(v):
+    return v.get("start") + ("/" + v["end"] if v.get("end") else "") if v else None
+
+
+def _rollup(v, titles, users):
+    if not v:
+        return None
+    rt = v.get("type")
+    if rt == "array":
+        return [prop_value(x, titles, users) for x in v.get("array", [])]
+    return v.get(rt)
+
+
+def _unique_id(v):
+    return "%s-%s" % (v.get("prefix"), v.get("number")) if v.get("prefix") else v.get("number")
+
+
+PLAIN_TYPES = ("number", "checkbox", "url", "email", "phone_number", "created_time", "last_edited_time")
+PROP_READERS = {
+    "title": lambda v, t, u: rich(v), "rich_text": lambda v, t, u: rich(v),
+    "select": lambda v, t, u: v.get("name") if v else None, "status": lambda v, t, u: v.get("name") if v else None,
+    "multi_select": lambda v, t, u: [x.get("name") for x in v or []],
+    "date": lambda v, t, u: _date(v),
+    "relation": lambda v, t, u: [t.get(norm_id(x["id"]), x["id"]) for x in v or []],
+    "people": lambda v, t, u: [_who(x, u) for x in v or []],
+    "created_by": lambda v, t, u: _who(v, u), "last_edited_by": lambda v, t, u: _who(v, u),
+    "formula": lambda v, t, u: (v or {}).get((v or {}).get("type")),
+    "rollup": _rollup,
+    "unique_id": lambda v, t, u: _unique_id(v),
+    "files": lambda v, t, u: [x.get("name") for x in v or []],
+}
+
+
 def prop_value(p, titles, users=None):
-    users = users or {}
+    """A Notion property as a plain value (text, list, number, date range); None for types it does not read."""
     t = p.get("type")
-    v = p.get(t)
-    if t in ("title", "rich_text"):
-        return rich(v)
-    if t in ("select", "status"):
-        return v.get("name") if v else None
-    if t == "multi_select":
-        return [x.get("name") for x in v or []]
-    if t == "date":
-        if not v:
-            return None
-        return v.get("start") + ("/" + v["end"] if v.get("end") else "")
-    if t == "relation":
-        return [titles.get(norm_id(x["id"]), x["id"]) for x in v or []]
-    if t == "people":
-        return [x.get("name") or users.get(norm_id(x.get("id"))) or x.get("id") for x in v or []]
-    if t in ("number", "checkbox", "url", "email", "phone_number"):
-        return v
-    if t in ("created_time", "last_edited_time"):
-        return v
-    if t in ("created_by", "last_edited_by"):
-        return (v or {}).get("name") or users.get(norm_id((v or {}).get("id"))) or (v or {}).get("id")
-    if t == "formula":
-        return (v or {}).get((v or {}).get("type"))
-    if t == "rollup":
-        if not v:
-            return None
-        rt = v.get("type")
-        if rt == "array":
-            return [prop_value(x, titles, users) for x in v.get("array", [])]
-        return v.get(rt)
-    if t == "unique_id":
-        return "%s-%s" % (v.get("prefix"), v.get("number")) if v.get("prefix") else v.get("number")
-    if t == "files":
-        return [x.get("name") for x in v or []]
-    return None
+    if t in PLAIN_TYPES:
+        return p.get(t)
+    read = PROP_READERS.get(t)
+    return read(p.get(t), titles, users or {}) if read else None
 
 
 def first_date(page, prefer=None):
+    """The first preferred date property that is set, else any date except reply dates, else the creation day."""
     props = page.get("properties") or {}
-    for name in (prefer or []):
-        p = props.get(name)
+    named = [props.get(name) for name in (prefer or [])]
+    others = [p for name, p in props.items() if "reply" not in name.lower()]
+    for p in named + others:
         if p and p.get("type") == "date" and p.get("date"):
-            return p["date"]["start"][:10]
-    for name, p in props.items():
-        if p.get("type") == "date" and p.get("date") and "reply" not in name.lower():
             return p["date"]["start"][:10]
     return (page.get("created_time") or "")[:10]
 
@@ -549,6 +558,23 @@ def in_git(path, stop_at):
         cur = os.path.dirname(cur)
 
 
+LAYOUT_SKIP = {"skills", "tools", "mail", "secrets", "scheduled", "_archive", "_to_delete", "_notion", "control tower"}
+
+
+def existing_folders(work):
+    """Lower-case name -> path of the folders directly under the work root that may be projects."""
+    out = {}
+    for d in os.listdir(work):
+        if os.path.isdir(os.path.join(work, d)) and d.lower() not in LAYOUT_SKIP and not d.startswith("."):
+            out[d.lower()] = os.path.join(work, d)
+    return out
+
+
+def project_slug(p):
+    sp = (p.get("properties") or {}).get("Slug")
+    return rich(sp.get("rich_text")).strip() if sp and sp.get("type") == "rich_text" else ""
+
+
 class Layout:
     def __init__(self, cfg, workspaces, projects):
         self.work = cfg["work_root"].rstrip("/")
@@ -557,40 +583,31 @@ class Layout:
             wid = norm_id(w["id"])
             name = cfg.get("workspace_folders", {}).get(wid) or folder_name(title_of(w))
             self.ws_folder[wid] = os.path.join(self.work, name)
-        cfg_roots = parse_configs(cfg.get("configs_dir"))
-        overrides = {norm_id(k): v for k, v in cfg.get("project_folders", {}).items()}
-        existing = {}
-        stop = {"skills", "tools", "mail", "secrets", "scheduled", "_archive", "_to_delete", "_notion", "control tower"}
-        for d in os.listdir(self.work):
-            if os.path.isdir(os.path.join(self.work, d)) and d.lower() not in stop and not d.startswith("."):
-                existing[d.lower()] = os.path.join(self.work, d)
+        self.cfg_roots = parse_configs(cfg.get("configs_dir"))
+        self.overrides = {norm_id(k): v for k, v in cfg.get("project_folders", {}).items()}
+        self.existing = existing_folders(self.work)
         self.proj_folder, self.proj_ws = {}, {}
         for p in projects:
             pid = norm_id(p["id"])
             ws = relation_ids(p, cfg["relation_workspace"])
             self.proj_ws[pid] = ws[0] if ws else None
-            name = folder_name(title_of(p))
-            slug = ""
-            sp = (p.get("properties") or {}).get("Slug")
-            if sp and sp.get("type") == "rich_text":
-                slug = rich(sp.get("rich_text")).strip()
-            if pid in overrides:
-                path = overrides[pid]
-            elif pid in cfg_roots:
-                path = cfg_roots[pid]
-            elif name.lower() in existing:
-                path = existing[name.lower()]
-            elif slug and slug.lower() in existing:
-                path = existing[slug.lower()]
-            else:
-                base = self.ws_folder.get(self.proj_ws[pid]) or os.path.join(self.work, "_no-workspace")
-                path = os.path.join(base, name)
-            if in_git(path, self.work):
-                # Never write a private mirror into a git repository (e.g. the public framework repo).
-                log("  project %s: folder %s is inside a git repo, mirror goes to the workspace folder" % (name, path))
-                base = self.ws_folder.get(self.proj_ws[pid]) or os.path.join(self.work, "_no-workspace")
-                path = os.path.join(base, name)
-            self.proj_folder[pid] = path
+            self.proj_folder[pid] = self.project_path(pid, p)
+
+    def ws_base(self, pid):
+        return self.ws_folder.get(self.proj_ws[pid]) or os.path.join(self.work, "_no-workspace")
+
+    def project_path(self, pid, p):
+        """Config override, then the project config's root, then an existing folder (name or slug), else
+        <workspace>/<project>. Never a folder inside a git repository."""
+        name = folder_name(title_of(p))
+        slug = project_slug(p)
+        path = (self.overrides.get(pid) or self.cfg_roots.get(pid) or self.existing.get(name.lower())
+                or (self.existing.get(slug.lower()) if slug else None) or os.path.join(self.ws_base(pid), name))
+        if in_git(path, self.work):
+            # Never write a private mirror into a git repository (e.g. the public framework repo).
+            log("  project %s: folder %s is inside a git repo, mirror goes to the workspace folder" % (name, path))
+            path = os.path.join(self.ws_base(pid), name)
+        return path
 
     def base_for(self, page, cfg):
         """Folder that gets `_notion/` for this row."""
@@ -644,22 +661,23 @@ def move_file(src, dst, touch=False):
     return dst
 
 
+def mirror_files(top):
+    """*.md files under a _notion/ tree, outside _archived/, except the mirror's own files."""
+    for d, dirs, files in os.walk(top):
+        dirs[:] = [x for x in dirs if x != "_archived"]
+        for fn in files:
+            if fn.endswith(".md") and fn not in ORPHAN_SKIP:
+                yield os.path.join(d, fn)
+
+
 def find_orphans(roots, known_paths):
     """(tree_top, path) for *.md under <root>/_notion/ that state does not reference."""
     known = set(_nkey(p) for p in known_paths if p)
     out = []
     for root in roots:
         top = os.path.join(root, MIRROR_DIR)
-        if not os.path.isdir(top):
-            continue
-        for d, dirs, files in os.walk(top):
-            dirs[:] = [x for x in dirs if x != "_archived"]
-            for fn in files:
-                if not fn.endswith(".md") or fn in ORPHAN_SKIP:
-                    continue
-                p = os.path.join(d, fn)
-                if _nkey(p) not in known:
-                    out.append((top, p))
+        if os.path.isdir(top):
+            out += [(top, p) for p in mirror_files(top) if _nkey(p) not in known]
     return out
 
 
@@ -700,12 +718,14 @@ def sweep_archived(roots, work_root, days, day_str):
 def render(page, db_key, rs, body, truncated, extra=None, head_extra=None):
     if not isinstance(rs, Resolver):
         rs = Resolver(rs)
-    props = {}
-    for name, p in (page.get("properties") or {}).items():
-        val = prop_value(p, rs.titles, rs.users)
-        if val in (None, "", []):
-            continue
-        props[name] = val
+    head = front_matter(page, db_key, rs, truncated, head_extra)
+    head += ["---", "<!-- %s -->" % GENERATED_NOTE, "", "# " + title_of(page), "", rs.text(body or "")]
+    for t, md in extra or []:
+        head += ["", "---", "", "## [child page] " + t, "", rs.text(md)]
+    return "\n".join(head).rstrip() + "\n"
+
+
+def front_matter(page, db_key, rs, truncated, head_extra):
     head = ["---",
             "title: %s" % json.dumps(title_of(page), ensure_ascii=False),
             "notion_id: %s" % norm_id(page["id"]),
@@ -717,17 +737,13 @@ def render(page, db_key, rs, body, truncated, extra=None, head_extra=None):
     if truncated:
         # The markdown export skipped blocks it cannot render (files, embeds, AI blocks);
         # we keep what came back and do not fall back to the (expensive) blocks API.
-        head.append("truncated: true")
-        head.append("truncated_reason: unsupported_blocks")
-    head += list(head_extra or [])
-    head.append("properties:")
-    for k, v in props.items():
-        head.append("  %s: %s" % (json.dumps(k, ensure_ascii=False), json.dumps(v, ensure_ascii=False)))
-    head += ["---", "<!-- %s -->" % GENERATED_NOTE, "", "# " + title_of(page), "",
-             rs.text(body or "")]
-    for t, md in extra or []:
-        head += ["", "---", "", "## [child page] " + t, "", rs.text(md)]
-    return "\n".join(head).rstrip() + "\n"
+        head += ["truncated: true", "truncated_reason: unsupported_blocks"]
+    head += list(head_extra or []) + ["properties:"]
+    for name, p in (page.get("properties") or {}).items():
+        val = prop_value(p, rs.titles, rs.users)
+        if val not in (None, "", []):
+            head.append("  %s: %s" % (json.dumps(name, ensure_ascii=False), json.dumps(val, ensure_ascii=False)))
+    return head
 
 
 # ---------------------------------------------------------------- main

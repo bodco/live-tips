@@ -306,6 +306,127 @@ def numbers_said(obj: Optional[dict], after: List[Line]) -> Optional[str]:
     return "numbers_already_said" if nums and all(n in said for n in nums) else None
 
 
+def hedge_delays(models: dict, after_s: Optional[dict]) -> dict:
+    """Seconds to wait before a second request, per model id (the shortest of its roles)."""
+    after = dict({"classify": 2.0, "tip": 3.0}, **(after_s or {}))
+    by_model = {}
+    for role, mid in models.items():
+        if mid and role in after:
+            by_model[mid] = min(after[role], by_model.get(mid, after[role]))
+    return by_model
+
+
+def raise_tip_tokens(cfg: dict) -> None:
+    mt = cfg.setdefault("max_tokens", {})
+    if isinstance(mt, dict) and mt.get("tip", 0) and mt["tip"] < 700:
+        mt["tip"] = 700                   # 300 cut the two best tips of the PM sync (long Ukrainian phrase)
+
+
+def _due(a: dict) -> str:
+    return " (" + a["due"] + ")" if a.get("due") else ""
+
+
+def picture_items(sit: dict, uk: bool) -> List[str]:
+    """The call picture as summary lines: decisions, what is on the PM and on them, risks, open asks."""
+    L = (lambda u, e: u if uk else e)  # noqa: E731
+    items = [L("Рішення: ", "Decision: ") + d for d in sit.get("decisions") or []]
+    items += [L("На мені: ", "On me: ") + a.get("what", "") + _due(a) for a in sit.get("actions") or []]
+    items += [L("За ними: ", "On them: ") + a.get("who", "") + ": " + a.get("what", "") + _due(a) for a in sit.get("theirs") or []]
+    items += [L("Ризик: ", "Risk: ") + r.get("what", "") for r in sit.get("risks") or []]
+    items += [L("Без відповіді: ", "Unanswered: ") + a.get("what", "") + (" · " + a["who"] if a.get("who") else "")
+              for a in sit.get("asks") or [] if a.get("type") != "update"]
+    return items
+
+
+def missed_speech(speech_items: List[str], done, uk: bool) -> List[str]:
+    """Speech points never said, only when some were said (otherwise the speech did not happen at all)."""
+    done = set(done or [])
+    missed = [x for i, x in enumerate(speech_items) if i not in done]
+    if not (speech_items and missed and len(missed) < len(speech_items)):
+        return []
+    return [("Не сказав зі спічу: " if uk else "Not said from the speech: ") + x for x in missed[:5]]
+
+
+def passages(snips: List[dict]) -> str:
+    return "\n\n".join("[{}{}]\n{}".format(x["src"], ", " + x["date"] if x["date"] else "", x["text"]) for x in snips)
+
+
+def unique_sources(snips: List[dict]) -> List[str]:
+    srcs = []
+    for x in snips:
+        if x["src"] not in srcs:
+            srcs.append(x["src"])
+    return srcs
+
+
+def find_event(text: str, snips: List[dict]) -> str:
+    if snips:
+        found = passages(snips)
+        return ("The PM asked to search the project folder: " + text + ". Below are passages found in the project "
+            "files (newest facts win when they disagree). Answer as one tip: gist = the answer in a few words, "
+            "phrase = a sentence the PM can say if useful, items = up to 4 facts with numbers, dates and owners, "
+            "note = the file names used. Only what the passages, the brief or the call say; when the answer is "
+            "not there, say so in the gist and name the closest thing found.\n\nPASSAGES FROM THE PROJECT FOLDER:\n" + found)
+    return ("The PM asked to search the project folder: " + text + ". The search found nothing in the project "
+            "files. Answer from the brief, the fact book, the current state and the call if they cover it; "
+            "otherwise gist = 'Nothing found in the project folder'.")
+
+
+def find_item(obj: dict, srcs: List[str], text: str, src: str, done: float) -> dict:
+    note = obj.get("note") or ""
+    if srcs and not note:
+        note = "Sources: " + ", ".join(srcs[:4])
+    item = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": src, "kind": "answer",
+            "level": obj.get("level", "info"), "gist": "🔎 " + str(obj.get("gist", "")).lstrip("🔎 "),
+            "phrase": obj.get("phrase", ""), "items": obj.get("items", []), "note": note, "at": s_to_hms(done),
+            "q": "find: " + text, "sources": srcs[:6]}
+    return {k: v for k, v in item.items() if v not in ("", [], None)}
+
+
+def ask_span(line: Line, a: dict, now: float) -> dict:
+    return {"line_id": line.line_id, "src": line.t, "speaker": line.speaker, "seg_end": line.seg_end,
+            "written": line.written, "available_at": now, "route": "situation",
+            "event": "Open {} to the PM from {}: {}. Give the PM the answer or the next step: gist = what is asked, "
+                     "phrase = a ready sentence, items = 1-2 facts from the brief, fact book or call. Skip if the PM "
+                     "already answered.".format(a.get("type", "question"), a.get("who", "someone"), a.get("what", "")),
+            "force_level": "red"}
+
+
+def merge_hits(results) -> List[dict]:
+    """Index hits of several queries, one per (path, preview start), best score first."""
+    seen, hits = set(), []
+    for res in results:
+        for h in res:
+            key = (h.get("path"), (h.get("preview") or "")[:60])
+            if key not in seen:
+                seen.add(key)
+                hits.append(h)
+    hits.sort(key=lambda h: -(h.get("score") or 0))
+    return hits
+
+
+def fit_snippets(hits: List[dict], budget_chars: int, hit_text) -> List[dict]:
+    """Up to 10 passages that fit the character budget, in hit order."""
+    out, used = [], 0
+    for h in hits:
+        body = hit_text(h)
+        if not body or used + len(body) > budget_chars:
+            continue
+        used += len(body)
+        out.append({"src": h.get("rel") or Path(h.get("path") or "").name, "date": h.get("date") or "", "text": body})
+        if len(out) >= 10:
+            break
+    return out
+
+
+def pacing_tip(obj: dict, trigger: str) -> bool:
+    """A non-red tip about time or pacing (in a presentation the recorder owns the time line)."""
+    if obj.get("level") == "red":
+        return False
+    text = " ".join([obj.get("gist", ""), obj.get("topic", ""), obj.get("phrase", "")])
+    return trigger == "timer_checkpoint" or obj.get("trigger") == "timer_checkpoint" or bool(PACING.search(text))
+
+
 def asks_the_pm(sig) -> bool:
     """A question to the PM by name or "you", not about a third person."""
     return bool((sig.name_vocative or (sig.question and sig.second_person)) and not sig.third_person)
@@ -344,21 +465,7 @@ class Engine:
         self.budget = budget
         self.detector = Detector(rules, cfg.get("name_aliases", []))
         self.models = cfg["models"]                      # {"classify": id, "tip": id}
-        # M2 hedging: a second request when the first one is slow (cfg "hedge", on by default).
-        hg = cfg.get("hedge", {}) if isinstance(cfg.get("hedge"), dict) else {}
-        routed = getattr(provider, "name", "") == "routed"
-        if routed:   # 0.8.2: the app's monthly API limit stops the key, not Claude Code
-            provider.api_blocked = lambda: bool(self.budget and self.budget.state() == "hard")
-        if hg.get("enabled", True) and not isinstance(provider, HedgedProvider):
-            after = dict({"classify": 2.0, "tip": 3.0}, **(hg.get("after_s") or {}))
-            by_model = {}
-            for role, mid in self.models.items():
-                if mid and role in after:
-                    by_model[mid] = min(after[role], by_model.get(mid, after[role]))
-            if routed:   # a second request only on the API: Claude Code is slow to start and spends the plan
-                provider.wrap("api", lambda p: HedgedProvider(p, by_model, on_extra=self._extra_usage))
-            else:
-                self.provider = provider = HedgedProvider(provider, by_model, on_extra=self._extra_usage)
+        self._setup_hedging(provider, cfg)
         self.ttl = cfg.get("cache_ttl", "1h")
         self.direct_enabled = cfg.get("direct_route", True)
         self.classify_enabled = bool(self.models.get("classify"))
@@ -416,20 +523,36 @@ class Engine:
         self.agenda_manual: Dict[int, str] = {}
         self.agenda_sent: Optional[list] = None
         self.register_dir = cfg.get("register_dir") or ""
-        self.open_commitments: List[dict] = []
         self.commit_proposed: set = set()
         self.onme_ticked: Dict[str, bool] = {}
         self.risks_shown: set = set()
-        if cfg.get("commitments", True) and self.register_dir:
-            try:
-                m = self.meta()
-                self.open_commitments = register.open_items(self.register_dir, register.series_key(m.get("project", ""), m.get("title", "")),
-                                                            int((getattr(rules, "commitments", None) or {}).get("open_limit", 15)))
-            except Exception:  # noqa: BLE001  (the register is a helper; tips go on without it)
-                self.open_commitments = []
-        mt = cfg.setdefault("max_tokens", {})
-        if isinstance(mt, dict) and mt.get("tip", 0) and mt["tip"] < 700:
-            mt["tip"] = 700                   # 300 cut the two best tips of the PM sync (long Ukrainian phrase)
+        self.open_commitments = self._load_commitments(cfg, rules)
+        raise_tip_tokens(cfg)
+
+    def _setup_hedging(self, provider, cfg: dict) -> None:
+        """M2 hedging: a second request when the first one is slow (cfg "hedge", on by default)."""
+        hg = cfg.get("hedge", {}) if isinstance(cfg.get("hedge"), dict) else {}
+        routed = getattr(provider, "name", "") == "routed"
+        if routed:   # 0.8.2: the app's monthly API limit stops the key, not Claude Code
+            provider.api_blocked = lambda: bool(self.budget and self.budget.state() == "hard")
+        if not hg.get("enabled", True) or isinstance(provider, HedgedProvider):
+            return
+        by_model = hedge_delays(self.models, hg.get("after_s"))
+        if routed:   # a second request only on the API: Claude Code is slow to start and spends the plan
+            provider.wrap("api", lambda p: HedgedProvider(p, by_model, on_extra=self._extra_usage))
+        else:
+            self.provider = HedgedProvider(provider, by_model, on_extra=self._extra_usage)
+
+    def _load_commitments(self, cfg: dict, rules) -> List[dict]:
+        """Open commitments of this meeting series from the register (rules/commitments.yaml)."""
+        if not (cfg.get("commitments", True) and self.register_dir):
+            return []
+        try:
+            m = self.meta()
+            return register.open_items(self.register_dir, register.series_key(m.get("project", ""), m.get("title", "")),
+                                       int((getattr(rules, "commitments", None) or {}).get("open_limit", 15)))
+        except Exception:  # noqa: BLE001  (the register is a helper; tips go on without it)
+            return []
 
     # ---------- input ----------
     def on_line(self, line: Line) -> None:
@@ -996,10 +1119,8 @@ class Engine:
             return "speech_repeat"            # the speech card is already on screen
         if meeting_role(meta) == "observer" and not span.get("meeting"):
             return "role_observer"            # after the answer: nothing (no add_fact, no fix_owner_date)
-        if meta.get("call_type") == "presentation" and obj.get("level") != "red":
-            text = " ".join([obj.get("gist", ""), obj.get("topic", ""), obj.get("phrase", "")])
-            if trigger == "timer_checkpoint" or obj.get("trigger") == "timer_checkpoint" or PACING.search(text):
-                return "presentation_timing"  # the recorder owns the time line
+        if meta.get("call_type") == "presentation" and pacing_tip(obj, trigger):
+            return "presentation_timing"      # the recorder owns the time line
         return None
 
     def presenting(self, now: float) -> bool:
@@ -1143,62 +1264,23 @@ class Engine:
         if not root or not lt:
             return []
         from .context import index_snippets
-        seen, hits = set(), []
         from concurrent.futures import ThreadPoolExecutor as _TP
         qs = self._find_queries(text)
         with _TP(max_workers=len(qs) or 1) as ex:      # parallel, one overall wait (QA: up to 100 s in a row)
             results = list(ex.map(lambda q: index_snippets(lt, Path(root), q, k=6, timeout=15.0), qs))
-        for res in results:
-            for h in res:
-                key = (h.get("path"), (h.get("preview") or "")[:60])
-                if key not in seen:
-                    seen.add(key)
-                    hits.append(h)
-        hits.sort(key=lambda h: -(h.get("score") or 0))
-        out, used = [], 0
-        for h in hits:
-            body = self._hit_text(h)
-            if not body or used + len(body) > budget_chars:
-                continue
-            used += len(body)
-            out.append({"src": h.get("rel") or Path(h.get("path") or "").name, "date": h.get("date") or "", "text": body})
-            if len(out) >= 10:
-                break
-        return out
+        return fit_snippets(merge_hits(results), budget_chars, self._hit_text)
 
     def _run_find(self, text: str, line: Line, span: dict) -> None:
         span["tip_start"] = self.clock()
         snips = self._project_snippets(text)
-        srcs = []
-        for x in snips:
-            if x["src"] not in srcs:
-                srcs.append(x["src"])
-        if snips:
-            found = "\n\n".join("[{}{}]\n{}".format(x["src"], ", " + x["date"] if x["date"] else "", x["text"]) for x in snips)
-            event = ("The PM asked to search the project folder: " + text + ". Below are passages found in the project "
-                     "files (newest facts win when they disagree). Answer as one tip: gist = the answer in a few words, "
-                     "phrase = a sentence the PM can say if useful, items = up to 4 facts with numbers, dates and owners, "
-                     "note = the file names used. Only what the passages, the brief or the call say; when the answer is "
-                     "not there, say so in the gist and name the closest thing found.\n\nPASSAGES FROM THE PROJECT FOLDER:\n" + found)
-        else:
-            event = ("The PM asked to search the project folder: " + text + ". The search found nothing in the project "
-                     "files. Answer from the brief, the fact book, the current state and the call if they cover it; "
-                     "otherwise gist = 'Nothing found in the project folder'.")
-        c = self._call("tip", line, event)
+        c = self._call("tip", line, find_event(text, snips))
         done = self.clock()
         obj = first_json(c.text) if not c.error else None
         if not obj or obj.get("skip"):
             obj = {"gist": "Nothing found in the project folder" if not c.error else "Search failed: " + c.error[:80]}
-        if not snips or not obj or obj.get("skip") or "Nothing found" in str(obj.get("gist", "")):
+        if not snips or "Nothing found" in str(obj.get("gist", "")):
             self._start_deep(text, "ask")
-        note = obj.get("note") or ""
-        if srcs and not note:
-            note = "Sources: " + ", ".join(srcs[:4])
-        item = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": span["src"], "kind": "answer",
-                "level": obj.get("level", "info"), "gist": "🔎 " + str(obj.get("gist", "")).lstrip("🔎 "),
-                "phrase": obj.get("phrase", ""), "items": obj.get("items", []), "note": note, "at": s_to_hms(done),
-                "q": "find: " + text, "sources": srcs[:6]}
-        item = {k: v for k, v in item.items() if v not in ("", [], None)}
+        item = find_item(obj, unique_sources(snips), text, span["src"], done)
         with self.lock:
             self.tips.append(item)
         self.out_tips.write(item)
@@ -1286,8 +1368,7 @@ class Engine:
         # 2026-10-27 (owner): without a preparation the brief is empty; the project folder still holds the answer.
         snips = self._project_snippets(text, budget_chars=9000)
         if snips:
-            event += ("\n\nPASSAGES FROM THE PROJECT FOLDER (search for this question; newest facts win):\n" +
-                      "\n\n".join("[{}{}]\n{}".format(x["src"], ", " + x["date"] if x["date"] else "", x["text"]) for x in snips))
+            event += "\n\nPASSAGES FROM THE PROJECT FOLDER (search for this question; newest facts win):\n" + passages(snips)
         return event + ASK_TAIL
 
     def _request_answer(self, c, kind: str, text: str, line: Line) -> dict:
@@ -1444,31 +1525,29 @@ class Engine:
         """A new open question or request to the PM that no tip covered yet (a third-person request, an
         implicit question) gets one red "answer" tip, once per ask."""
         for a in sit.get("asks") or []:
-            key = (a.get("t"), (a.get("what") or "")[:40])
-            if a.get("type") == "update" or key in self.sit_asks_tipped:
+            line = self._ask_line(a, hist)
+            if line is None:
                 continue
-            self.sit_asks_tipped.add(key)
-            line = next((h for h in reversed(hist) if h.t == a.get("t")), None)
-            if line is None or line.speaker != "them":
-                continue
-            with self.lock:
-                if line.line_id in self.tipped_lines:
-                    continue
-            if self.stale(line, "direct_question"):
-                continue
-            span = {"line_id": line.line_id, "src": line.t, "speaker": line.speaker, "seg_end": line.seg_end,
-                    "written": line.written, "available_at": self.clock(), "route": "situation",
-                    "event": "Open {} to the PM from {}: {}. Give the PM the answer or the next step: gist = what is asked, "
-                             "phrase = a ready sentence, items = 1-2 facts from the brief, fact book or call. Skip if the PM "
-                             "already answered.".format(a.get("type", "question"), a.get("who", "someone"), a.get("what", "")),
-                    "force_level": "red"}
-            self._submit_tip(line, "direct_question", span)
+            self._submit_tip(line, "direct_question", ask_span(line, a, self.clock()))
             # 2026-10-27 (owner): with no preparation, a question to the PM also starts a search of the project
             # folder at once, so the answer may be there before the PM has to ask for it.
             if a.get("type") == "question" and (getattr(self.prompt, "_brief", "") or "(no brief)").strip() == "(no brief)":
                 self._start_deep(a.get("what", ""), "ask")
 
-    # ---------- agenda and commitments register (Pacenote 0.8, F5) ----------
+    def _ask_line(self, a: dict, hist: List[Line]) -> Optional[Line]:
+        """The other side's line an ask came from, when it still needs a tip (each ask is looked at once)."""
+        key = (a.get("t"), (a.get("what") or "")[:40])
+        if a.get("type") == "update" or key in self.sit_asks_tipped:
+            return None
+        self.sit_asks_tipped.add(key)
+        line = next((h for h in reversed(hist) if h.t == a.get("t")), None)
+        if line is None or line.speaker != "them":
+            return None
+        with self.lock:
+            if line.line_id in self.tipped_lines:
+                return None
+        return None if self.stale(line, "direct_question") else line
+
     def _situation_extra_rules(self) -> str:
         ag, cm = getattr(self.rules, "agenda", {}) or {}, getattr(self.rules, "commitments", {}) or {}
         keys = ['"theirs": [{"who": "<name>", "what": "<what they promised, max 12 words, in the call\'s language>", "due": "<day or date, or empty>", "t": "<HH:MM:SS>"}]']
@@ -1600,20 +1679,9 @@ class Engine:
             self.write_register()
         except Exception as e:  # noqa: BLE001
             self.out_timing.write({"outcome": "register_error", "error": repr(e)[:200]})
-        uk = (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
-        L = (lambda u, e: u if uk else e)
-        items = [L("Рішення: ", "Decision: ") + d for d in sit.get("decisions") or []]
-        items += [L("На мені: ", "On me: ") + a.get("what", "") + (" (" + a["due"] + ")" if a.get("due") else "")
-                  for a in sit.get("actions") or []]
-        items += [L("За ними: ", "On them: ") + a.get("who", "") + ": " + a.get("what", "") + (" (" + a["due"] + ")" if a.get("due") else "")
-                  for a in sit.get("theirs") or []]
-        items += [L("Ризик: ", "Risk: ") + r.get("what", "") for r in sit.get("risks") or []]
-        items += [L("Без відповіді: ", "Unanswered: ") + a.get("what", "") + (" · " + a["who"] if a.get("who") else "")
-                  for a in sit.get("asks") or [] if a.get("type") != "update"]
-        done = set(sit.get("speech_done") or [])
-        missed = [x for i, x in enumerate(self.speech_items) if i not in done]
-        if self.speech_items and missed and len(missed) < len(self.speech_items):
-            items += [L("Не сказав зі спічу: ", "Not said from the speech: ") + x for x in missed[:5]]
+        uk = self._ui_uk()
+        L = (lambda u, e: u if uk else e)  # noqa: E731
+        items = picture_items(sit, uk) + missed_speech(self.speech_items, sit.get("speech_done"), uk)
         if not items:
             return None
         now = self.clock()

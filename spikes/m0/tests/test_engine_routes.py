@@ -118,3 +118,64 @@ def test_reload_prep(tmp_path):
     assert any(t.get("kind") == "speech" and t["items"] == ["point one"] for t in tips)
     eng.prompt = object()
     assert eng.reload_prep() is False
+
+
+def test_hedge_delays_and_tip_tokens():
+    from livetips_m0.engine import hedge_delays, raise_tip_tokens
+    assert hedge_delays({"classify": "m", "tip": "m", "x": "y", "deep": ""}, None) == {"m": 2.0}
+    assert hedge_delays({"classify": "a", "tip": "b"}, {"tip": 1.0}) == {"a": 2.0, "b": 1.0}
+    cfg = {"max_tokens": {"tip": 300}}
+    raise_tip_tokens(cfg)
+    assert cfg["max_tokens"]["tip"] == 700
+    cfg = {}
+    raise_tip_tokens(cfg)
+    assert cfg == {"max_tokens": {}}
+
+
+def test_wrapup_lines():
+    from livetips_m0.engine import missed_speech, picture_items
+    sit = {"decisions": ["go"], "actions": [{"what": "send", "due": "Fri"}], "theirs": [{"who": "Ann", "what": "deck"}],
+           "risks": [{"what": "late"}], "asks": [{"what": "q", "who": "Bo"}, {"what": "u", "type": "update"}]}
+    assert picture_items(sit, False) == ["Decision: go", "On me: send (Fri)", "On them: Ann: deck", "Risk: late", "Unanswered: q · Bo"]
+    assert picture_items({}, True) == []
+    assert missed_speech(["a", "b", "c"], [0], False) == ["Not said from the speech: b", "Not said from the speech: c"]
+    assert missed_speech(["a", "b"], [], False) == [] and missed_speech(["a"], [0], True) == [] and missed_speech([], None, True) == []
+
+
+def test_find_parts():
+    from livetips_m0.engine import find_event, find_item, passages, unique_sources
+    snips = [{"src": "a.md", "date": "2026-10-01", "text": "A"}, {"src": "a.md", "date": "", "text": "B"}, {"src": "b.md", "date": "", "text": "C"}]
+    assert passages(snips[:2]) == "[a.md, 2026-10-01]\nA\n\n[a.md]\nB"
+    assert unique_sources(snips) == ["a.md", "b.md"]
+    assert find_event("pilot", snips).endswith("PASSAGES FROM THE PROJECT FOLDER:\n" + passages(snips))
+    assert "found nothing" in find_event("pilot", [])
+    it = find_item({"gist": "🔎 42 users"}, ["a.md"], "pilot", "00:00:01", 3.0)
+    assert it["gist"] == "🔎 42 users" and it["note"] == "Sources: a.md" and it["q"] == "find: pilot" and it["sources"] == ["a.md"]
+    assert find_item({"gist": "x", "note": "mine"}, ["a.md"], "q", "s", 1.0)["note"] == "mine"
+    assert "note" not in find_item({"gist": "x"}, [], "q", "s", 1.0)
+
+
+def test_ask_span():
+    from livetips_m0.engine import ask_span
+    s = ask_span(_l(4, "them", "x"), {"type": "request", "who": "Ann", "what": "the deck"}, 9.0)
+    assert s["route"] == "situation" and s["force_level"] == "red" and s["available_at"] == 9.0
+    assert s["event"].startswith("Open request to the PM from Ann: the deck.")
+    assert ask_span(_l(4, "them", "x"), {}, 1.0)["event"].startswith("Open question to the PM from someone: .")
+
+
+def test_hits_and_snippets():
+    from livetips_m0.engine import fit_snippets, merge_hits
+    hits = merge_hits([[{"path": "/p/a", "preview": "x", "score": 1}], [{"path": "/p/a", "preview": "x", "score": 9},
+                                                                       {"path": "/p/b", "preview": "y", "score": 5}]])
+    assert [h["path"] for h in hits] == ["/p/b", "/p/a"]
+    out = fit_snippets([{"path": "/p/a", "date": "d"}, {"path": "/p/b"}, {"rel": "r/c"}], 5, lambda h: {"/p/a": "abc", "/p/b": "toolong"}.get(h.get("path"), "z"))
+    assert out == [{"src": "a", "date": "d", "text": "abc"}, {"src": "r/c", "date": "", "text": "z"}]
+    many = fit_snippets([{"path": "/p/%d" % i} for i in range(20)], 10 ** 6, lambda h: "t")
+    assert len(many) == 10 and fit_snippets([{"path": "/p"}], 10, lambda h: "") == []
+
+
+def test_pacing_tip():
+    from livetips_m0.engine import pacing_tip
+    assert pacing_tip({"gist": "5 minutes left"}, "x")
+    assert pacing_tip({"gist": "g"}, "timer_checkpoint") and pacing_tip({"gist": "g", "trigger": "timer_checkpoint"}, "x")
+    assert not pacing_tip({"gist": "5 minutes left", "level": "red"}, "x") and not pacing_tip({"gist": "hello"}, "x")

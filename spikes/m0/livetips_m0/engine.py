@@ -159,8 +159,8 @@ def demote_red(obj: dict, trigger: str, span: dict) -> None:
     if obj.get("level") != "red" or span.get("to_pm") or span.get("force_level") or obj.get("trigger", trigger) in RED_TRIGGERS:
         return
     obj["level"] = "orange"
-    if obj.get("gist", "").startswith(("\U0001f3af", "\U0001f534")):
-        obj["gist"] = "\U0001f7e0" + obj["gist"][1:]
+    if obj.get("gist", "").startswith(("🎯", "🔴")):
+        obj["gist"] = "🟠" + obj["gist"][1:]
 
 
 def tip_timing(span: dict, c, done: float) -> None:
@@ -179,6 +179,82 @@ def tip_item(obj: dict, uid: str, line: Line, trigger: str, done: float, late: b
             "trigger": obj.get("trigger", trigger), "fact_ids": obj.get("fact_ids", []),
             "at": s_to_hms(done), "late": late}
     return {k: v for k, v in item.items() if v not in ("", [], None) or k == "late"}
+
+
+SOS_EVENT = ("HELP NOW pressed: the PM is speaking and cannot type. Give ONE red tip now: gist starting with "
+                     "'🆘 ', the next sentence the PM can say right now (answer to the open question, a fact with its number, "
+                     "or a bridge such as 'Let me give you the exact number after the call.'), up to 2 fact lines. Never skip. Add \"answered\": false when no concrete fact answers the open question (a deeper search then starts by itself).")
+ASK_TAIL = (" Add \"answered\": true when the context really answers it, false otherwise. Never skip a typed "
+                      "question: when the answer is not here, gist says what is known nearest, phrase is a sentence the PM "
+                      "can say right now (an honest bridge such as checking and coming back with a date), and a deeper "
+                      "search of the project folder starts by itself.")
+
+
+def no_ready_answer(kind: str, uk: bool) -> dict:
+    gist = ("🆘 " if kind == "sos" else "") + ("Готової відповіді немає, шукаю в папці проєкту" if uk else
+                                                   "No ready answer, searching the project folder")
+    phrase = ("Дайте мені хвилину, я перевірю і скажу точно." if uk else "Give me a minute, I will check and tell you exactly.")
+    return {"gist": gist, "phrase": phrase, "level": "info", "topic": kind}
+
+
+def request_item(obj: dict, kind: str, text: str, src: str, done: float) -> dict:
+    item = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": src,
+            "kind": "tip" if kind == "sos" else "answer", "level": "red" if kind == "sos" else obj.get("level", "info"),
+            "gist": obj.get("gist", ""), "phrase": obj.get("phrase", ""), "items": obj.get("items", []),
+            "note": obj.get("note", ""), "at": s_to_hms(done)}
+    if kind == "ask":
+        item["q"] = text
+    return {k: v for k, v in item.items() if v not in ("", [], None)}
+
+
+SPEECH_JSON = re.compile(r"^##\s*speech\.json\s*\n(\{.*?\})\s*$", re.M | re.S)
+SPEECH_SECTION = re.compile(r"^##\s*(?:\d+\.\s*)?(?:Мій спіч|Твій спіч|My speech|Your speech|My update|Мій апдейт)[^\n]*\n(.*?)(?=^##\s|\Z)",
+                            re.M | re.S | re.I)
+
+
+def speech_cards(text: str) -> List[dict]:
+    """Speech cards already written to a tips file, oldest first."""
+    out = []
+    for ln in text.splitlines():
+        if '"speech"' not in ln:
+            continue
+        try:
+            it = json.loads(ln)
+        except ValueError:
+            continue
+        if it.get("kind") == "speech":
+            out.append(it)
+    return out
+
+
+def speech_from_brief(brief_text: str, default_gist: str):
+    """The ready "## speech.json" item of the brief, else one built from the speech section, else None."""
+    m = SPEECH_JSON.search(brief_text)
+    if m:
+        try:
+            item = json.loads(m.group(1))
+        except ValueError:
+            item = None
+        if item:
+            return item
+    m = SPEECH_SECTION.search(brief_text)
+    if not m:
+        return None
+    body = [l.strip() for l in m.group(1).splitlines() if l.strip() and not l.startswith("#")]
+    quoted = lambda l: l.startswith('"') or l.startswith("“")  # noqa: E731
+    gist = next((l.strip("* ") for l in body if l.startswith("**")), default_gist)
+    phrase = next((l.strip('"“” ') for l in body if quoted(l)), "")
+    items = [l.lstrip("-* ") for l in body if not l.startswith("**") and not quoted(l)]
+    return {"gist": gist, "phrase": phrase, "items": items[:12]}
+
+
+def similar_topic(topic: str, topics: List[str], sim: float) -> bool:
+    return bool(topic) and any(jaccard(topic, t) >= sim for t in topics)
+
+
+def same_tip(obj: dict, shown: dict, sim: float) -> bool:
+    """The same gist, or a topic close enough to one already shown."""
+    return obj.get("gist", "") == shown.get("gist") or similar_topic(obj.get("topic", ""), [shown.get("topic", "")], sim)
 
 
 def asks_the_pm(sig) -> bool:
@@ -751,35 +827,47 @@ class Engine:
         if self._phrase_repeat(obj, now):
             return "phrase_repeat"
         if obj.get("level") == "red":
-            # A red tip is never rate-limited, but the same red tip twice within a minute is noise
-            # (two lines of one turn can both trigger "your turn").
-            with self.lock:
-                recent = [t for t in self.tips if t.get("level") == "red" and t.get("_at", -1e9) >= now - self.red_repeat_s]
-            g, topic = obj.get("gist", ""), obj.get("topic", "")
-            if any(t.get("gist") == g or (topic and jaccard(topic, t.get("topic", "")) >= self.topic_sim) for t in recent):
-                return "red_repeat"
-            # 2026-10-26 replay: one question in two or three lines gave three red tips in 20 s.
-            if any(t.get("_at", -1e9) >= now - self.cfg.get("red_burst_s", 15) for t in recent):
-                return "red_burst"
-            return None
+            return self._red_diet(obj, now)
         if self.presenting(now):
             return "presenting"
-        meta = self.meta()
-        if meta.get("audience") == "team":
-            # Team calls: no info tips (the PM did not ask; window asks and SOS do not pass the diet) and
-            # at most TEAM_TIPS_PER_HOUR non-red model tips per hour.
-            if obj.get("level") == "info":
-                return "team_info"
-            with self.lock:
-                uids = {t.get("uid") or id(t) for t in self.tips if t.get("level") != "red" and "_at" in t
-                        and t["_at"] >= now - 3600 and t.get("kind", "tip") == "tip"}
-            if len(uids) >= TEAM_TIPS_PER_HOUR:
-                return "team_hour_cap"
+        why = self._team_diet(obj, now)
+        if why:
+            return why
         if exempt:
-            # Hiring tips ignore the orange rate (hiring.md "Live tips by role"), max 2 per minute.
-            with self.lock:
-                n = len({t.get("uid") for t in self.tips if t.get("_exempt") and t.get("_at", -1e9) >= now - 60})
-            return "meeting_rate" if n >= MEETING_EXEMPT_PER_MIN else None
+            return self._exempt_diet(now)
+        return self._rate_diet(obj, now)
+
+    def _red_diet(self, obj: dict, now: float) -> Optional[str]:
+        """A red tip is never rate-limited, but the same red tip twice within a minute is noise
+        (two lines of one turn can both trigger "your turn")."""
+        with self.lock:
+            recent = [t for t in self.tips if t.get("level") == "red" and t.get("_at", -1e9) >= now - self.red_repeat_s]
+        if any(same_tip(obj, t, self.topic_sim) for t in recent):
+            return "red_repeat"
+        # 2026-10-26 replay: one question in two or three lines gave three red tips in 20 s.
+        if any(t.get("_at", -1e9) >= now - self.cfg.get("red_burst_s", 15) for t in recent):
+            return "red_burst"
+        return None
+
+    def _team_diet(self, obj: dict, now: float) -> Optional[str]:
+        """Team calls: no info tips (the PM did not ask; window asks and SOS do not pass the diet) and
+        at most TEAM_TIPS_PER_HOUR non-red model tips per hour."""
+        if self.meta().get("audience") != "team":
+            return None
+        if obj.get("level") == "info":
+            return "team_info"
+        with self.lock:
+            uids = {t.get("uid") or id(t) for t in self.tips if t.get("level") != "red" and "_at" in t
+                    and t["_at"] >= now - 3600 and t.get("kind", "tip") == "tip"}
+        return "team_hour_cap" if len(uids) >= TEAM_TIPS_PER_HOUR else None
+
+    def _exempt_diet(self, now: float) -> Optional[str]:
+        """Hiring tips ignore the orange rate (hiring.md "Live tips by role"), max 2 per minute."""
+        with self.lock:
+            n = len({t.get("uid") for t in self.tips if t.get("_exempt") and t.get("_at", -1e9) >= now - 60})
+        return "meeting_rate" if n >= MEETING_EXEMPT_PER_MIN else None
+
+    def _rate_diet(self, obj: dict, now: float) -> Optional[str]:
         if self.last_nonred_emit is not None and now - self.last_nonred_emit < self.rate_s:
             return "rate"
         with self.lock:
@@ -788,10 +876,7 @@ class Engine:
             topics = [t.get("topic", "") for t in self.tips if t.get("_at", -1e9) >= now - 600]
         if pm_recent:
             return "pm_speaking"
-        topic = obj.get("topic", "")
-        if topic and any(jaccard(topic, t) >= self.topic_sim for t in topics):
-            return "same_topic"
-        return None
+        return "same_topic" if similar_topic(obj.get("topic", ""), topics, self.topic_sim) else None
 
     # ---------- meeting concept and live mode ----------
     def meta(self) -> dict:
@@ -937,52 +1022,38 @@ class Engine:
     def speech_card(self, brief_text: str) -> Optional[dict]:
         """The skill shows "Твій спіч" from the brief as the first card (no model call). The brief carries
         it as a ready item under "## speech.json"; without one, the "спіч / speech" section is used."""
-        if not brief_text:
+        if not brief_text or self._restore_speech():
             return None
-        try:                                   # an engine restart must not show the speech twice
-            prev = self.out_tips.path.read_text(encoding="utf-8", errors="replace")
-            if '"kind": "speech"' in prev or '"kind":"speech"' in prev:
-                for ln in prev.splitlines():
-                    if '"speech"' in ln:
-                        try:
-                            it = json.loads(ln)
-                            if it.get("kind") == "speech":
-                                self.speech_phrase = it.get("phrase", "")
-                                self.speech_items = list(it.get("items") or [])
-                                self.speech_item = it
-                        except ValueError:
-                            pass
-                return None
-        except (OSError, AttributeError):
-            pass
-        item = None
-        m = re.search(r"^##\s*speech\.json\s*\n(\{.*?\})\s*$", brief_text, re.M | re.S)
-        if m:
-            try:
-                item = json.loads(m.group(1))
-            except ValueError:
-                item = None
+        default = "🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech"
+        item = speech_from_brief(brief_text, default)
         if not item:
-            m = re.search(r"^##\s*(?:\d+\.\s*)?(?:Мій спіч|Твій спіч|My speech|Your speech|My update|Мій апдейт)[^\n]*\n(.*?)(?=^##\s|\Z)",
-                          brief_text, re.M | re.S | re.I)
-            if not m:
-                return None
-            body = [l.strip() for l in m.group(1).splitlines() if l.strip() and not l.startswith("#")]
-            gist = next((l.strip("* ") for l in body if l.startswith("**")), ("🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech"))
-            phrase = next((l.strip('"“” ') for l in body if l.startswith('"') or l.startswith("“")), "")
-            items = [l.lstrip("-* ") for l in body if not l.startswith("**") and not l.startswith('"') and not l.startswith("“")]
-            item = {"gist": gist, "phrase": phrase, "items": items[:12]}
+            return None
         now = self.clock()
         out = {"schema_version": 1, "engine": "app", "uid": "speech", "t": s_to_hms(now), "src": s_to_hms(now), "kind": "speech",
-               "level": "info", "gist": item.get("gist") or ("🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech"), "phrase": item.get("phrase", ""),
+               "level": "info", "gist": item.get("gist") or default, "phrase": item.get("phrase", ""),
                "items": [str(x) for x in (item.get("items") or [])][:14], "note": item.get("note", "бриф" if self._ui_uk() else "brief"),
                "at": s_to_hms(now)}
         out = {k: v for k, v in out.items() if v not in ("", [], None)}
-        self.speech_phrase = out.get("phrase", "")
-        self.speech_items = list(out.get("items") or [])
-        self.speech_item = out
+        self._remember_speech(out)
         self.out_tips.write(out)
         return out
+
+    def _remember_speech(self, it: dict) -> None:
+        self.speech_phrase = it.get("phrase", "")
+        self.speech_items = list(it.get("items") or [])
+        self.speech_item = it
+
+    def _restore_speech(self) -> bool:
+        """An engine restart must not show the speech twice: the card already in the tips file comes back."""
+        try:
+            prev = self.out_tips.path.read_text(encoding="utf-8", errors="replace")
+            if '"kind": "speech"' not in prev and '"kind":"speech"' not in prev:
+                return False
+            for it in speech_cards(prev):
+                self._remember_speech(it)
+            return True
+        except (OSError, AttributeError):
+            return False
 
     # ---------- requests from the tips window (asks, HELP NOW) ----------
     def on_request(self, kind: str, text: str = "") -> None:
@@ -1162,54 +1233,46 @@ class Engine:
         if kind == "find":
             self._run_find(text, line, span)
             return
-        if kind == "sos":
-            event = ("HELP NOW pressed: the PM is speaking and cannot type. Give ONE red tip now: gist starting with "
-                     "'🆘 ', the next sentence the PM can say right now (answer to the open question, a fact with its number, "
-                     "or a bridge such as 'Let me give you the exact number after the call.'), up to 2 fact lines. Never skip. Add \"answered\": false when no concrete fact answers the open question (a deeper search then starts by itself).")
-        else:
-            hist = ""
-            if self.ask_log:
-                hist = " Earlier asks in this call (the PM may refer to them, e.g. 'more detail', 'and the other one'): " + \
-                       " | ".join("Q: {} A: {}".format(x["q"], x["a"]) for x in self.ask_log[-5:]) + "."
-            event = "The PM typed a question in the tips window: " + text + "." + hist + " Answer it like a short chat reply (gist = the answer in a few words, items = details when asked for detail). Everything in the brief counts (the PM's speech, open questions, blocks), as do the fact book, the cards, the project current state, the call situation and the transcript. Never answer 'no answer' to a follow-up of an earlier answer: build on it. Skip only if nothing in the context answers it, then say so in the gist."
-            # 2026-10-27 (owner): without a preparation the brief is empty; the project folder still holds the answer.
-            snips = self._project_snippets(text, budget_chars=9000)
-            if snips:
-                event += ("\n\nPASSAGES FROM THE PROJECT FOLDER (search for this question; newest facts win):\n" +
-                          "\n\n".join("[{}{}]\n{}".format(x["src"], ", " + x["date"] if x["date"] else "", x["text"]) for x in snips))
-            event += (" Add \"answered\": true when the context really answers it, false otherwise. Never skip a typed "
-                      "question: when the answer is not here, gist says what is known nearest, phrase is a sentence the PM "
-                      "can say right now (an honest bridge such as checking and coming back with a date), and a deeper "
-                      "search of the project folder starts by itself.")
+        event = SOS_EVENT if kind == "sos" else self._ask_event(text)
         span["tip_start"] = self.clock()
         c = self._call("tip", line, event)
         done = self.clock()
-        obj = first_json(c.text) if not c.error else None
-        unanswered = (not obj) or bool(obj.get("skip")) or obj.get("answered") is False
-        if not obj or obj.get("skip"):
-            uk = (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
-            gist = ("🆘 " if kind == "sos" else "") + ("Готової відповіді немає, шукаю в папці проєкту" if uk else
-                                                     "No ready answer, searching the project folder")
-            phrase = ("Дайте мені хвилину, я перевірю і скажу точно." if uk else "Give me a minute, I will check and tell you exactly.")
-            obj = {"gist": gist, "phrase": phrase, "level": "info", "topic": kind}
-        if unanswered and kind in ("ask", "sos"):
-            self._start_deep(text or (line.text if line else ""), kind)
-            obj["note"] = (obj.get("note") + " · " if obj.get("note") else "") + (
-                "шукаю глибше в папці проєкту, ~1 хв" if (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
-                else "searching the project folder, about 1 min")
-        item = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": span["src"],
-                "kind": "tip" if kind == "sos" else "answer", "level": "red" if kind == "sos" else obj.get("level", "info"),
-                "gist": obj.get("gist", ""), "phrase": obj.get("phrase", ""), "items": obj.get("items", []),
-                "note": obj.get("note", ""), "at": s_to_hms(done)}
+        obj = self._request_answer(c, kind, text, line)
+        item = request_item(obj, kind, text, span["src"], done)
         if kind == "ask":
-            item["q"] = text
             self.ask_log.append({"q": text, "a": (str(obj.get("gist", "")) + " " + str(obj.get("phrase", "")))[:200]})
-        item = {k: v for k, v in item.items() if v not in ("", [], None)}
         with self.lock:
             self.tips.append(item)
         self.out_tips.write(item)
         span.update({"outcome": "emitted", "emit_at": done, "tip_ms": c.ms(c.t_done), "error": c.error})
         self.out_timing.write(span)
+
+    def _ask_event(self, text: str) -> str:
+        hist = ""
+        if self.ask_log:
+            hist = " Earlier asks in this call (the PM may refer to them, e.g. 'more detail', 'and the other one'): " + \
+                   " | ".join("Q: {} A: {}".format(x["q"], x["a"]) for x in self.ask_log[-5:]) + "."
+        event = "The PM typed a question in the tips window: " + text + "." + hist + " Answer it like a short chat reply (gist = the answer in a few words, items = details when asked for detail). Everything in the brief counts (the PM's speech, open questions, blocks), as do the fact book, the cards, the project current state, the call situation and the transcript. Never answer 'no answer' to a follow-up of an earlier answer: build on it. Skip only if nothing in the context answers it, then say so in the gist."
+        # 2026-10-27 (owner): without a preparation the brief is empty; the project folder still holds the answer.
+        snips = self._project_snippets(text, budget_chars=9000)
+        if snips:
+            event += ("\n\nPASSAGES FROM THE PROJECT FOLDER (search for this question; newest facts win):\n" +
+                      "\n\n".join("[{}{}]\n{}".format(x["src"], ", " + x["date"] if x["date"] else "", x["text"]) for x in snips))
+        return event + ASK_TAIL
+
+    def _request_answer(self, c, kind: str, text: str, line: Line) -> dict:
+        """The model's answer to an ask or HELP NOW; never empty: a bridge phrase and a deeper search when it has none."""
+        obj = first_json(c.text) if not c.error else None
+        unanswered = (not obj) or bool(obj.get("skip")) or obj.get("answered") is False
+        uk = self._ui_uk()
+        if not obj or obj.get("skip"):
+            obj = no_ready_answer(kind, uk)
+        if unanswered and kind in ("ask", "sos"):
+            self._start_deep(text or (line.text if line else ""), kind)
+            obj["note"] = (obj.get("note") + " · " if obj.get("note") else "") + (
+                "шукаю глибше в папці проєкту, ~1 хв" if uk
+                else "searching the project folder, about 1 min")
+        return obj
 
     # ---------- deep lookup with Claude Code (2026-10-27) ----------
     def _start_deep(self, question: str, kind: str) -> None:

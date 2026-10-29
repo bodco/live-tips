@@ -535,6 +535,31 @@ struct LocalStatus: View {
     }
 }
 
+/// 0.8.5 (owner): the search model is picked from what Ollama has; a model that writes text is listed with why it
+/// cannot search (Ollama gives no search vectors for it), so both installed models are visible here.
+struct SearchModelRow: View {
+    @Binding var selection: String
+    @ObservedObject var local = LocalLLM.shared
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if local.searchModels.isEmpty {
+                TextField(L("set.model"), text: $selection, prompt: Text("bge-m3")).help(L("set.anEmbeddingModelPulled"))
+            } else {
+                Picker(L("set.model"), selection: $selection) {
+                    ForEach(local.searchModels + (local.searchModels.contains(selection) || selection.isEmpty ? [] : [selection]), id: \.self) {
+                        Text($0).tag($0)
+                    }
+                }
+            }
+            ForEach(local.models, id: \.self) { m in
+                Text(L("search.textModel", ["name": m])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .onAppear { local.refresh() }
+    }
+}
+
 struct RoutePicker: View {
     @Binding var selection: String
     var recommended: String
@@ -816,6 +841,7 @@ struct SettingsView: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
+                Text(L("search.what")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 Toggle(L("set.localAiDefaultFor"), isOn: $model.config.localAI.enabled)
                     .help(L("set.theTipsWindowMenu"))
                 Picker(L("set.engine"), selection: $model.config.localAI.engine) {
@@ -826,9 +852,7 @@ struct SettingsView: View {
                 .help(L("set.builtInNothingElse"))
                 if model.config.localAI.engine == "ollama" {
                     TextField(L("set.ollamaUrl"), text: $model.config.localAI.ollamaURL).disabled(!model.config.localAI.enabled)
-                    TextField(L("set.model"), text: $model.config.localAI.ollamaModel, prompt: Text("bge-m3"))
-                        .disabled(!model.config.localAI.enabled)
-                        .help(L("set.anEmbeddingModelPulled"))
+                    SearchModelRow(selection: $model.config.localAI.ollamaModel).disabled(!model.config.localAI.enabled)
                 }
                 LabeledContent(L("set.status")) {
                     HStack(spacing: 6) {

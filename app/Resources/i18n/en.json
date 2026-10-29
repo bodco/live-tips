@@ -436,10 +436,10 @@
  "set.stopPerMonth": "Stop per month",
  "set.atThisAmountClaude2": "At this amount Claude tips stay off until the next month. The local layer keeps working.",
  "set.spendingLimits": "Spending limits",
- "set.localAiDefaultFor": "Local AI (default for new calls)",
+ "set.localAiDefaultFor": "Instant search (default for new calls)",
  "set.theTipsWindowMenu": "The tips window menu can switch it for one call only. Local models on this Mac: facts and cards by meaning, material for HELP NOW, project search. Off: keywords only.",
- "set.engine": "Engine",
- "set.builtInRecommended": "Built-in (recommended)",
+ "set.engine": "Search model runs in",
+ "set.builtInRecommended": "Built-in bge-m3 (recommended)",
  "set.builtInNothingElse": "Built-in: nothing else to install. Ollama: your local Ollama server, shared with the Cowork skill.",
  "set.ollamaUrl": "Ollama URL",
  "set.anEmbeddingModelPulled": "An embedding model pulled in Ollama. Another model needs a project reindex (lt index --rebuild) and its own thresholds.",
@@ -448,7 +448,7 @@
  "set.builtInBgeM3": "**Built-in.** bge-m3 by BAAI (open model, MIT license), a multilingual text embedding model: it turns a line of the call or a piece of a project file into numbers so that texts with the same meaning sit close, in Ukrainian, English and Spanish alike. Pacenote runs the int8 ONNX build (Xenova/bge-m3 on Hugging Face, about 570 MB) with ONNX Runtime on the CPU of this Mac: about 25 ms per line, about 1 s to start. The model lives in <app folder>/models/bge-m3-int8. Text never leaves the Mac.",
  "set.ollamaIfYouAlready": "**Ollama.** If you already run Ollama (ollama.com) for the Cowork skill, Pacenote can use the same server: `ollama pull bge-m3`, then choose Ollama here. Both engines give the same search results on the existing project index (checked: the same top result on 8 of 8 test queries), so switching needs no reindex.",
  "set.anotherModelAnyEmbedding": "**Another model.** Any embedding model from the Ollama library (for example multilingual-e5 or nomic-embed-text): `ollama pull <name>`, put the name into Model, then rebuild each project index with `lt index <project folder> --rebuild`. Thresholds in rules/semantic.yaml are tuned for bge-m3, so check them on a recorded call before trusting a new model. Other built-in models (any ONNX export with tokenizer.json) are planned; for now the built-in engine is bge-m3 only.",
- "set.localAi": "Local AI",
+ "set.localAi": "Instant search in your materials (on this Mac)",
  "set.audioAndVoicePrints": "Audio and voice prints never leave the Mac; only text goes to the Claude API.",
  "set.identifySpeakers": "Identify speakers",
  "set.tellsTheVoicesOn": "Tells the voices on the other side apart (Speaker 2, Speaker 3) and asks \"Who is speaking?\" once a new voice talked for a few seconds. Names you give are used in tips and in the summary, and are remembered for the next calls.",
@@ -1203,5 +1203,7 @@
  "local.model.text": "{name}: writes text (preparation, after the call)",
  "local.model.chosen": " · chosen",
  "local.model.search": "{name}: search in documents (Local AI), cannot write text",
- "ai.route.local.model": "On this Mac ({model})"
+ "ai.route.local.model": "On this Mac ({model})",
+ "search.textModel": "{name} is also on this Mac: it writes text (preparation, after the call), but cannot search (Ollama makes no search vectors for it).",
+ "search.what": "During a call, every line is matched against your facts, cards and project documents in about a second, so the right fact shows up without waiting for Claude. bge-m3 is a search model: it finds, it does not write."
 }

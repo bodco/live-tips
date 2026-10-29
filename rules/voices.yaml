@@ -1,0 +1,15 @@
+# Voices (Pacenote 0.8.5). The recorder applies these for the skill and the app alike.
+schema_version: 1
+library:
+  file: <tool root>/voices/voices.json  # {"people": {...}, "aliases": {"<other spelling, lowercase>": "<name kept>"}}
+  merge: two entries of one person become one (Settings > Voice library > Merge into); the voice prints join, the merged name becomes an alias
+  aliases: a name typed or picked on a call, a calendar participant and an older entry under an alias all mean the name kept
+named_voice:
+  rule: a speaker named on this call takes only that person's voice. A line whose voice the library places clearly closer to another visible person does not join it
+  min: speaker_lib_min (0.55, cosine to the other person's voice)
+  margin: speaker_lib_margin (0.08 closer than to the speaker's own name)
+  goes_to: that person's speaker on this call, else a new speaker (asked or suggested as usual)
+  automerge: an unnamed speaker is not merged into a named one when the library places it with another person
+rename:
+  rule: when the PM renames a named speaker to another known person, the lines whose voice is clearly the old person's move to a speaker with the old name
+suggestions: the window shows up to 3 library names (score 0.5 and more, participants first) as one-click names

@@ -42,6 +42,12 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Fixes:** the tips window offers the voice library's suggested names again (one click, the side kept); a
   preparation still running when the call starts is recognised by the call's title and day, so its progress shows
   and its files join the call when ready; a deck attached during the call gives a basic talk at once.
+- **Voices:** a speaker named on the call takes only that person's voice (the library decides when a line is
+  clearly someone else's), renaming a speaker to another known person moves the old person's lines back, and
+  Settings > Voice library can merge two entries of one person ("Maria H." and "m.holosovska" into "Mariia H.");
+  the merged spelling then names the kept person everywhere (rules/voices.yaml).
+- **One preparation, one call:** a preparation finished before a held call of its series ended belongs to that
+  call; the next call of the series is not shown as prepared by it. Home's Later badges and actions line up.
 - **Skill and app behave the same:** the time line, the advice and "Move to slide N?" are computed once by the
   recorder (rules/presentation.yaml, a shared fixture checked in Python and in the window); slide sync from
   Keynote or PowerPoint is marked app only.

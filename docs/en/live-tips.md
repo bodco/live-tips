@@ -1687,3 +1687,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    (rules/learning.yaml). The follow-up is written with Write draft and changed with plain instructions.
 102. **Recording problems are a system state (0.8.5).** After 30 s without audio (or without the call's audio) the
    tips area becomes the state with Mic and Call levels and one action; it clears by itself (rules/recording.yaml).
+103. **Voices stay apart (0.8.5).** A named speaker takes only that person's voice; a rename to another known person
+   moves the old person's lines back; the voice library merges two entries of one person and keeps the other
+   spelling as an alias (rules/voices.yaml). A preparation finished before a held call of its series ended is that
+   call's, not the next one's.

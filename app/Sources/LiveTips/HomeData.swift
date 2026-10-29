@@ -157,6 +157,12 @@ extension StartCallModel {
         if abs(pd.timeIntervalSince(callDate)) < 3 * 3600 { return true }
         if pd > callDate { return false }
         let key = EditLog.seriesKey(effectiveTitle)
+        // 2026-10-29 (owner): a preparation that was finished before a held call of its series ended belongs to that
+        // call (the PM started it early, the preparation joined it late). The next call of the series is not prepared by it.
+        let made = (try? FileManager.default.attributesOfItem(atPath: base + ".brief.md"))?[.modificationDate] as? Date
+        if PrepOwnership.belongsToHeld(prepDate: pd, made: made, held: CallHistory.shared.records.filter { EditLog.seriesKey($0.title) == key }
+                                        .map { (start: $0.start, end: $0.end ?? $0.start.addingTimeInterval(($0.minutes ?? 120) * 60)) },
+                                  before: callDate) { return false }
         let earlier = CalendarService.shared.upcoming().contains { e in
             e.id != calEventID && e.start < callDate.addingTimeInterval(-3600)
                 && ((seriesKey != nil && e.seriesKey == seriesKey) || EditLog.seriesKey(e.title) == key)

@@ -1160,5 +1160,8 @@
  "after.write": "Write draft",
  "after.instruct": "What to change: \"drop the pricing line\", \"shorter\"",
  "after.rewrite": "Rewrite",
- "after.lessons": "Uses {n} of your recurring corrections"
+ "after.lessons": "Uses {n} of your recurring corrections",
+ "set.mergeInto": "Merge into",
+ "set.mergeHelp": "The same person under another name: {name}'s voice prints join the chosen person, and {name} becomes another spelling of that name (typing or picking it names the kept person).",
+ "set.aliases": "Other spellings: {list}"
 }

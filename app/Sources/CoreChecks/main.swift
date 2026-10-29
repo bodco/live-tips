@@ -264,8 +264,20 @@ func learningPatterns() {
     expect(Learning.standing([["kind": "followup_instruction", "file": "a", "text": "Drop pricing"], ["kind": "followup_instruction", "file": "a", "text": "drop the pricing"]]).isEmpty, "one call is not a pattern")
 }
 
+/// 2026-10-29 (owner): a preparation finished during a held call is that call's, not the next one's.
+func prepOwnership() {
+    let d = { (s: String) in ISO8601DateFormatter().date(from: s)! }
+    let held = [(start: d("2026-10-29T08:58:00Z"), end: d("2026-10-29T09:50:00Z"))]
+    let friday = d("2026-10-30T09:00:00Z")
+    expect(PrepOwnership.belongsToHeld(prepDate: d("2026-10-29T09:00:00Z"), made: d("2026-10-29T09:25:00Z"), held: held, before: friday), "made during the held call")
+    expect(PrepOwnership.belongsToHeld(prepDate: d("2026-10-29T15:00:00Z"), made: d("2026-10-29T09:40:00Z"), held: held, before: friday), "finished before the held call ended")
+    expect(!PrepOwnership.belongsToHeld(prepDate: d("2026-10-30T09:00:00Z"), made: d("2026-10-29T16:00:00Z"), held: held, before: friday), "made after the call, for Friday")
+    expect(!PrepOwnership.belongsToHeld(prepDate: d("2026-10-29T09:00:00Z"), made: nil, held: held, before: d("2026-10-29T09:30:00Z")), "the held call itself is not 'before'")
+}
+
 interfaceStrings()
 presentationCore()
+prepOwnership()
 learningPatterns()
 enginePathsFollowTheApp()
 versions()

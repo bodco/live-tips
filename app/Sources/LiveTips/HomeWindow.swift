@@ -509,27 +509,25 @@ struct HomeView: View {
                 if !sub.isEmpty { Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
             }
             Spacer(minLength: 8)
-            if inProgress {
-                PNBadge(text: L("home.live"), kind: .live)
-                Button(live ? L("home.switch") : L("home.startTips.short")) { start(r) }.buttonStyle(.pnTertiary)
-            } else {
-                switch st {
-                case .ready:
-                    if let m = m, let fr = Freshness.check(m), fr.stale {
-                        PNBadge(text: fr.badge, kind: .stale).help(fr.line)
-                        Button(L("fresh.refresh")) { refresh(r) }.buttonStyle(.pnTertiary)
-                    } else {
-                        PNBadge(text: L("badge.ready"), kind: .ready)
-                        if let m = m, let p = PrepDocWindow.path(for: m) { Button(L("common.open")) { PrepDocWindow.show(path: p, title: m.effectiveTitle) }.buttonStyle(.pnTertiary) }
+            // 2026-10-29 (owner): the badges and their actions in two fixed columns, so they line up row to row.
+            Group {
+                if inProgress {
+                    statusCell(PNBadge(text: L("home.live"), kind: .live)) { Button(live ? L("home.switch") : L("home.startTips.short")) { start(r) }.buttonStyle(.pnTertiary) }
+                } else {
+                    switch st {
+                    case .ready:
+                        if let m = m, let fr = Freshness.check(m), fr.stale {
+                            statusCell(PNBadge(text: fr.badge, kind: .stale).help(fr.line)) { Button(L("fresh.refresh")) { refresh(r) }.buttonStyle(.pnTertiary) }
+                        } else {
+                            statusCell(PNBadge(text: L("badge.ready"), kind: .ready)) {
+                                if let m = m, let p = PrepDocWindow.path(for: m) { Button(L("common.open")) { PrepDocWindow.show(path: p, title: m.effectiveTitle) }.buttonStyle(.pnTertiary) }
+                            }
+                        }
+                    case .running: statusCell(PNBadge(text: L("badge.preparing"), kind: .stale)) { EmptyView() }
+                    case .queued: statusCell(PNBadge(text: L("badge.queued"), kind: .stale)) { EmptyView() }
+                    case .failed: statusCell(PNBadge(text: L("badge.failed"), kind: .live)) { Button(L("menubar.prepare")) { prepare(r) }.buttonStyle(.pnTertiary) }
+                    case .none: statusCell(PNBadge(text: L("badge.notPrepared"), kind: .notPrepared)) { Button(L("menubar.prepare")) { prepare(r) }.buttonStyle(.pnTertiary) }
                     }
-                case .running: PNBadge(text: L("badge.preparing"), kind: .stale)
-                case .queued: PNBadge(text: L("badge.queued"), kind: .stale)
-                case .failed:
-                    PNBadge(text: L("badge.failed"), kind: .live)
-                    Button(L("menubar.prepare")) { prepare(r) }.buttonStyle(.pnTertiary)
-                case .none:
-                    PNBadge(text: L("badge.notPrepared"), kind: .notPrepared)
-                    Button(L("menubar.prepare")) { prepare(r) }.buttonStyle(.pnTertiary)
                 }
             }
             Menu {
@@ -549,6 +547,14 @@ struct HomeView: View {
         .contextMenu {
             Button(L("home.setUp")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) }
             Button(r.event != nil ? L("home.hide") : L("home.removeUpNext")) { dismiss(r) }
+        }
+    }
+
+    /// A badge right-aligned in its column and its action left-aligned in the next one (Later rows line up).
+    private func statusCell<B: View, A: View>(_ badge: B, @ViewBuilder action: () -> A) -> some View {
+        HStack(spacing: 8) {
+            badge.frame(width: 120, alignment: .trailing)
+            action().frame(width: 72, alignment: .leading)
         }
     }
 

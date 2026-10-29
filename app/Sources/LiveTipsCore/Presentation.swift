@@ -119,3 +119,18 @@ public enum TalkMerge {
 
     public static func num(_ s: [String: Any]) -> Int? { s["n"] as? Int ?? (s["n"] as? Double).map(Int.init) ?? (s["n"] as? String).flatMap(Int.init) }
 }
+
+/// 2026-10-29 (owner): which call a preparation belongs to.
+public enum PrepOwnership {
+    /// A preparation is a held call's (not the next one's of the series) when that call started within 3 hours of the
+    /// preparation's own time (its file name), or the preparation was finished before that call ended (and not more
+    /// than 12 hours before it started): the PM started the call early and the preparation joined it late.
+    public static func belongsToHeld(prepDate: Date, made: Date?, held: [(start: Date, end: Date)], before callDate: Date) -> Bool {
+        held.contains { h in
+            guard h.start < callDate.addingTimeInterval(-3600) else { return false }
+            if abs(h.start.timeIntervalSince(prepDate)) < 3 * 3600 { return true }
+            if let m = made, m <= h.end, m >= h.start.addingTimeInterval(-12 * 3600) { return true }
+            return false
+        }
+    }
+}

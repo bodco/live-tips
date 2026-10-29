@@ -130,6 +130,38 @@ final class SettingsModel: ObservableObject {
         if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
         loadVoices()
     }
+    /// 0.8.5 (owner, rules/voices.yaml): two entries are one person ("Maria H." and "m.holosovska" are "Mariia H."):
+    /// src's voice prints join dst and src becomes an alias, so typing or picking it names dst. Not during a call.
+    func mergeVoice(_ src: String, into dst: String) {
+        guard !CallEngine.shared.isRunning, src != dst, let d = try? Data(contentsOf: URL(fileURLWithPath: voicesPath)),
+              var o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              var people = o["people"] as? [String: Any] else { return }
+        var aliases = (o["aliases"] as? [String: String]) ?? [:]
+        aliases[src.lowercased()] = dst
+        for (k, v) in aliases where v.lowercased() == src.lowercased() { aliases[k] = dst }
+        if let a = people.removeValue(forKey: src) as? [String: Any] {
+            if var b = people[dst] as? [String: Any] {
+                let ea = (a["embeddings"] as? [Any]) ?? [], eb = (b["embeddings"] as? [Any]) ?? []
+                b["embeddings"] = Array((eb + ea).suffix(20))
+                b["calls"] = ((b["calls"] as? Int) ?? 0) + ((a["calls"] as? Int) ?? 0)
+                var wh = Self.whereOf(b)
+                for x in Self.whereOf(a) where !wh.contains(x) { wh.append(x) }
+                b["where"] = wh.contains("all") ? ["all"] : wh
+                if Self.side(of: b).isEmpty, !Self.side(of: a).isEmpty { b["side"] = Self.side(of: a) }
+                people[dst] = b
+            } else { people[dst] = a }
+        }
+        o["people"] = people
+        o["aliases"] = aliases
+        if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
+        loadVoices()
+    }
+    var voiceAliases: [String: String] {
+        guard let d = try? Data(contentsOf: URL(fileURLWithPath: voicesPath)),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
+        return (o["aliases"] as? [String: String]) ?? [:]
+    }
+
     static func whereLabel(_ w: [String]) -> String {
         if w.contains("all") { return L("set.allProjects") }
         let parts = w.map { x -> String in
@@ -791,10 +823,23 @@ struct SettingsView: View {
                             .disabled(CallEngine.shared.isRunning)
                             .help(L("set.theCallsThisVoice"))
                             Text("\(v.calls) call\(v.calls == 1 ? "" : "s")").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                            Menu(L("set.mergeInto")) {
+                                ForEach(model.voices.filter { $0.name != v.name }) { o in
+                                    Button(o.name) { model.mergeVoice(v.name, into: o.name) }
+                                }
+                            }
+                            .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
+                            .disabled(CallEngine.shared.isRunning || model.voices.count < 2)
+                            .help(L("set.mergeHelp", ["name": v.name]))
                             Button(L("set.forget")) { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
                                 .help(L("set.removesThisPersonS"))
                         }
                     }
+                let al = model.voiceAliases
+                if !al.isEmpty {
+                    Text(L("set.aliases", ["list": al.sorted { $0.key < $1.key }.map { "\($0.key) → \($0.value)" }.joined(separator: ", ")]))
+                        .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                }
                 }
                 .onAppear { model.loadVoices() }
             } header: { Text(L("set.speakers")) } footer: {

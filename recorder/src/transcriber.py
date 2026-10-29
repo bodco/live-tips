@@ -91,6 +91,8 @@ DEFAULTS = {
     "speaker_join": 0.45,       # cosine to a cluster centroid needed to join it (tuned on real speech, see README)
     "speaker_new_min_s": 1.5,   # only segments this long may open a new cluster (shorter ones are too noisy)
     "speaker_automerge": 0.6,   # two clusters whose centroids are this close are the same person
+    "speaker_lib_min": 0.55,    # 0.8.5: a line is another library person's only from this cosine to their voice
+    "speaker_lib_margin": 0.08, # 0.8.5: ... and only when it is this much closer to them than to the cluster's own name
     "speaker_suggest": 0.5,     # library people with cosine >= this are offered as suggestions
     "speaker_auto": 0.72,       # 2026-10-26: a voice this close to a name used on this meeting series is named by itself
     "speaker_prompt_s": 15.0,   # 2026-10-26 (was 8: short exclamations were asked about); s of speech of an unnamed cluster before the window asks "Who is speaking?"
@@ -2612,6 +2614,8 @@ class VoiceLibrary:
         self.workspace = _s(workspace).strip().casefold()     # 2026-10-26: "workspace:<name>" scope
         self.team = {short_name(n).lower() for n in (team_names or []) if _s(n).strip()}
         self.remember = remember
+        # 0.8.5 (owner, rules/voices.yaml): other spellings of one person ("Maria H.", "m.holosovska") -> the name kept
+        self.aliases: dict[str, str] = {}
         self.load()
 
     # 2026-10-27 (owner): two separate things per person. "side": team (ours) or client (the other side);
@@ -2661,6 +2665,8 @@ class VoiceLibrary:
             log(f"voices: cannot read {self.path} ({e!r}); a fresh library is started, the old file is kept")
             return
         people = data.get("people") if isinstance(data, dict) else None
+        al = data.get("aliases") if isinstance(data, dict) else None
+        self.aliases = {str(k).casefold(): str(v) for k, v in (al or {}).items() if _s(k).strip() and _s(v).strip()}
         for name, p in (people or {}).items():
             if not isinstance(p, dict):
                 continue
@@ -2678,7 +2684,67 @@ class VoiceLibrary:
                 if isinstance(p.get("where"), list) and p["where"]:
                     self.people[str(name)]["where"] = [str(x) for x in p["where"]]
         self._merge_short()
+        for a in list(self.aliases):              # a person still kept under an alias joins the name kept
+            src = next((n for n in self.people if n.casefold() == a), None)
+            if src and self.canonical(src) != src:
+                self.merge(src, self.canonical(src))
         self._cents()
+
+    def canonical(self, name: str) -> str:
+        """The name a person is kept under: aliases are followed (a chain at most 5 long)."""
+        n = _s(name).strip()
+        for _ in range(5):
+            nxt = self.aliases.get(n.casefold())
+            if not nxt or nxt.casefold() == n.casefold():
+                break
+            n = nxt
+        return n
+
+    def merge(self, src: str, dst: str) -> bool:
+        """0.8.5: two library entries are one person: src's voice prints join dst, src becomes an alias of dst."""
+        src, dst = _s(src).strip(), _s(dst).strip()
+        if not src or not dst or src.casefold() == dst.casefold():
+            return False
+        a = self.people.pop(src, None)
+        self.aliases[src.casefold()] = dst
+        for k, v in list(self.aliases.items()):        # aliases of src now point at dst
+            if v.casefold() == src.casefold():
+                self.aliases[k] = dst
+        if a is None:
+            return True
+        b = self.people.get(dst)
+        if b is None:
+            self.people[dst] = a
+        else:
+            b["embeddings"] = prune_embeddings(b["embeddings"] + a["embeddings"], self.MAX)
+            b["calls"] = int(b.get("calls") or 0) + int(a.get("calls") or 0)
+            wh = self.where_of(b) + [x for x in self.where_of(a) if x not in self.where_of(b)]
+            b["where"] = ["all"] if "all" in wh else wh
+            if not self.side_of(b) and self.side_of(a):
+                b["side"] = self.side_of(a)
+            b["updated"] = max(filter(None, [b.get("updated"), a.get("updated")]), default=None)
+        self._cents()
+        return True
+
+    def best(self, vec, names=None) -> tuple[str | None, float]:
+        """The library person closest to a voice print (among `names` when given), visible on this call."""
+        if vec is None:
+            return None, -2.0
+        v, out, sc = unit(vec), None, -2.0
+        allow = {n.casefold() for n in names} if names else None
+        for name, c in self.cents.items():
+            if len(c) != len(v) or not self.visible(name) or (allow is not None and name.casefold() not in allow):
+                continue
+            x = float(np.dot(v, c))
+            if x > sc:
+                out, sc = name, x
+        return out, sc
+
+    def score(self, vec, name: str) -> float | None:
+        c = self.cents.get(name)
+        if vec is None or c is None or len(c) != len(vec):
+            return None
+        return float(np.dot(unit(vec), c))
 
     def _merge_short(self) -> None:
         """2026-10-26: older full names join their short form ("Ed Stone" -> "Ed S."), but only when exactly
@@ -2775,7 +2841,10 @@ class VoiceLibrary:
             self.broken = False
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_name(self.path.name + f".{os.getpid()}.tmp")
-        tmp.write_text(json.dumps({"people": self.people}, ensure_ascii=False), encoding="utf-8")
+        data = {"people": self.people}
+        if self.aliases:
+            data["aliases"] = self.aliases
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         os.replace(tmp, self.path)
 
 
@@ -2986,6 +3055,8 @@ class SpeakerTracker:
         self.people: list[str] = clean_people(cfg.get("people") or [])
         # 2026-10-26 (owner): participants typed in Start call ("Учасники: ..."): the only names offered.
         self.participants: list[str] = clean_people(cfg.get("participants") or [])
+        if library is not None:    # 0.8.5: a calendar's "m.holosovska" is the library's "Mariia H."
+            self.participants = clean_people([library.canonical(p) for p in self.participants])
         self.people = clean_people(self.participants + self.people)
         self.rosters: Rosters | None = None
         self.auto: set[str] = set()           # sids named by the series roster (not by the PM)
@@ -3041,6 +3112,51 @@ class SpeakerTracker:
                 best, score = sid, s
         return best, score
 
+    def _lib_other(self, sid: str, emb) -> str | None:
+        """A named cluster takes only its own person's voice: when the library knows that name and the voice is
+        clearly closer to another visible person (by speaker_lib_margin, at least speaker_lib_min), returns that name."""
+        c = self.clusters.get(sid) or {}
+        if self.lib is None or not c.get("name"):
+            return None
+        own = self.lib.score(emb, self.lib.canonical(c["name"]))
+        if own is None:
+            return None
+        names = self.participants or None
+        name, sc = self.lib.best(emb, names)
+        if not name or name.casefold() == self.lib.canonical(c["name"]).casefold():
+            return None
+        if sc >= self._f("speaker_lib_min") and sc - own >= self._f("speaker_lib_margin"):
+            return name
+        return None
+
+    def _split_on_rename(self, sid: str, old: str, new: str) -> None:
+        """The PM renamed a named cluster to another known person: the members whose voice is clearly the old
+        person's leave for a cluster with the old name (the cluster had taken two voices)."""
+        if self.lib is None or not old or not new or old.casefold() == new.casefold():
+            return
+        a, b = self.lib.canonical(old), self.lib.canonical(new)
+        c = self.clusters.get(sid)
+        if not c or a not in self.lib.cents or b not in self.lib.cents:
+            return
+        margin = self._f("speaker_lib_margin")
+        move = [m for m in c["members"] if m["emb"] is not None
+                and (self.lib.score(m["emb"], a) or -2) - (self.lib.score(m["emb"], b) or -2) >= margin]
+        if not move or len(move) == len(c["members"]):
+            return
+        dst = self.by_name(a, exclude=sid) or self._new_cluster(a)
+        d = self.clusters[dst]
+        moved = {m["t"] for m in move}
+        c["members"] = [m for m in c["members"] if m["t"] not in moved]
+        d["members"] = sorted(d["members"] + move, key=lambda m: m["t"])
+        secs = sum(m["dur"] for m in move)
+        c["seconds"] = max(0.0, c["seconds"] - secs)
+        d["seconds"] += secs
+        for t in moved:
+            self.overrides[t] = dst
+        self._recompute(sid)
+        self._recompute(dst)
+        log(f"speakers: {len(move)} line(s) of {sid} moved to {dst} ({a}) after the rename to {b}")
+
     def by_name(self, name: str, exclude: str | None = None) -> str | None:
         for sid, c in self.clusters.items():
             if sid != exclude and c["name"] and c["name"].casefold() == name.casefold():
@@ -3064,7 +3180,16 @@ class SpeakerTracker:
             if emb is not None:
                 emb = unit(emb)
                 best, score = self._best(emb)
-                if best is not None and score >= self._f("speaker_join"):
+                other = self._lib_other(best, emb) if best is not None and score >= self._f("speaker_join") else None
+                if other is not None:
+                    # 0.8.5 (rules/voices.yaml): the voice is clearly another known person, not the cluster's name
+                    tgt = self.by_name(other)
+                    if tgt:
+                        sid, member = tgt, True
+                    elif dur >= self._f("speaker_new_min_s"):
+                        sid, member = self._new_cluster(), True
+                    log(f"speakers: a line of {best} goes to {sid or 'nobody'} (the voice is {other}'s)")
+                elif best is not None and score >= self._f("speaker_join"):
                     sid, member = best, True
                 elif dur >= self._f("speaker_new_min_s"):
                     sid, member = self._new_cluster(), True
@@ -3147,6 +3272,10 @@ class SpeakerTracker:
                 continue
             if c["name"] and o["name"] and c["name"] != o["name"]:
                 continue
+            if bool(c["name"]) != bool(o["name"]):     # 0.8.5: not into a named voice the library says is someone else
+                named, plain = (sid, o) if c["name"] else (other, c)
+                if self._lib_other(named, plain["centroid"]):
+                    continue
             if float(np.dot(c["centroid"], o["centroid"])) >= self._f("speaker_automerge"):
                 keep, drop = sorted((sid, other), key=lambda s: int(s[1:]))   # the older label stays
                 log(f"speakers: {drop} merged into {keep} (same voice)")
@@ -3223,6 +3352,8 @@ class SpeakerTracker:
 
     def _name(self, raw) -> str | None:
         n = clean_name(raw)
+        if n and self.lib is not None:
+            n = self.lib.canonical(n)          # 0.8.5: "Maria H." / "m.holosovska" -> "Mariia H."
         return normalize_person(n, self.people) if n else None
 
     def _maybe_ask(self, sid: str | None) -> None:
@@ -3341,12 +3472,15 @@ class SpeakerTracker:
                 if name is None:
                     return False
                 other = self.by_name(name, exclude=sid) if name else None
+                old = self.clusters[sid]["name"]
                 if other:
                     changed = self._merge(sid, other)      # the name already belongs to a speaker of this call
                     sid = other
                 else:
                     self.clusters[sid]["name"] = name or None
                     self._recompute(sid)
+                    if old and name:
+                        self._split_on_rename(sid, old, name)
                     changed = True
                 self._ask_answered()
             elif key == "speaker_merge":

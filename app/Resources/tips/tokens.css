@@ -14,7 +14,7 @@
 
   --brand:#0A6CFF;       /* Pacenote Blue, graphics */
   --ink:#1C1D21;
-  --accent:#0058B0;      /* Blue Deep: accent text and links, 7.0:1 on white */
+  --accent:#0A6CFF;      /* 0.8.5 (owner): links are the buttons' Pacenote Blue, 4.6:1 on white */
   --accent-fill:#0A6CFF; /* Pacenote Blue: buttons, progress, mark. White text 4.6:1 */
   --accent-soft:#E5F0FF;
   --rec:#FF3B30;

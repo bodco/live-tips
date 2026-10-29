@@ -28,7 +28,7 @@ enum PN {
         static let text      = Color.pn(0x1D1D1F, 0xF5F5F7)
         static let text2     = Color.pn(0x3A3A3C, 0xC7C7CC)
         static let text3     = Color.pn(0x6E6E73, 0x98989D) // captions, never lighter
-        static let accent    = Color.pn(0x0058B0, 0x4D9DFF) // Blue Deep / Blue Light: links, accent text (AA)
+        static let accent    = Color.pn(0x0A6CFF, 0x4D9DFF) // 0.8.5 (owner): links are the buttons' Pacenote Blue (was a dull #0058B0)
         static let accentFill = Color(red: 0x0A/255, green: 0x6C/255, blue: 0xFF/255) // Pacenote Blue: buttons, white text 4.6:1
         static let brand     = Color.pn(0x0A6CFF, 0x4D9DFF) // the mark's start dot, progress, selection
         static let ink       = Color(red: 0x1C/255, green: 0x1D/255, blue: 0x21/255)
@@ -114,10 +114,11 @@ struct PNBadge: View {
     var body: some View {
         let (fg, bg): (Color, Color) = {
             switch kind {
-            case .ready:       return (PN.C.turn, PN.C.turn.opacity(0.14))
-            case .notPrepared: return (PN.C.onMe, PN.C.onMe.opacity(0.14))
-            case .stale:       return (PN.C.text2, PN.C.surface2)
-            case .live:        return (PN.C.danger, PN.C.danger.opacity(0.14))
+            // 0.8.5 (owner: "make the greens and oranges bright"): status badges are solid, white text
+            case .ready:       return (.white, Color(red: 0x16/255, green: 0xA3/255, blue: 0x4A/255))
+            case .notPrepared: return (.white, Color(red: 0xF0/255, green: 0x6E/255, blue: 0x00/255))
+            case .stale:       return (.white, Color(red: 0xE8/255, green: 0x9B/255, blue: 0x00/255))
+            case .live:        return (.white, Color(red: 0xFF/255, green: 0x3B/255, blue: 0x30/255))
             case .neutral:     return (PN.C.answer, PN.C.answer.opacity(0.14))
             }
         }()

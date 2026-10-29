@@ -59,7 +59,7 @@
       doneQ: 'Done?', markDone: 'Mark done', onThem: 'On them', closed: 'Closed',
       noItems: 'Nothing on you yet', notMine: 'Not mine', tipsIn: (o) => `Tips in ${o.l}, click for ${o.o}`, close: 'Close', noBriefYet: 'No brief for this call yet.',
       readyStatus: 'Ready', readyTitle: 'Ready when you are', startListening: 'Start listening', openBrief: 'Open brief',
-      listeningTitle: 'Listening', listeningSub: (k) => `Tips show up here when they matter. Stuck? Press ${k}.`, onDevice: 'Audio stays on this Mac',
+      listeningTitle: 'Listening', tipsOffTitle: 'Transcript only', tipsOffSub: 'Tips are off. The summary and the follow-up come after the call. Turn tips on in Call settings.', listeningSub: (k) => `Tips show up here when they matter. Stuck? Press ${k}.`, onDevice: 'Audio stays on this Mac',
       searched: (o) => `You searched: ${o.q}`, shorterMeta: 'Shorter', applied: 'Settings applied', prepReady: 'The brief is ready',
       speakerN: (o) => `Speaker ${o.n}`, yourTurn: 'Your turn: give your update', me: 'Me', them: 'Unknown voice', lineWhoTip: 'The voice was not recognised. Click to say who said this line.', lineWhoSaved: 'Saved: the transcript shows it after the call',
       briefReady: (o) => o.at ? `Brief ready · ${o.at}` : 'Brief ready', briefPreparing: 'Preparing the brief…', briefFailed: 'The brief could not be prepared', noBrief: 'No brief yet'
@@ -110,7 +110,7 @@
       present: { next: 'Далі', prev: 'Назад', start: 'Почати', nextUp: (t, s) => `Далі: ${t} (${s})`, canSkip: 'Можна пропустити, якщо бракує часу' },
       noItems: 'Поки нічого на тобі', notMine: 'Не моє', tipsIn: (o) => `Підказки: ${o.l}, клацніть для ${o.o}`, close: 'Закрити', noBriefYet: 'Брифу для цього дзвінка ще немає.',
       readyStatus: 'Готово', readyTitle: 'Можна починати', startListening: 'Почати слухати', openBrief: 'Відкрити бриф',
-      listeningTitle: 'Слухаю', listeningSub: (k) => `Підказки зʼявляться тут, коли будуть потрібні. Застряг? Натисни ${k}.`, onDevice: 'Аудіо лишається на цьому Mac',
+      listeningTitle: 'Слухаю', tipsOffTitle: 'Лише транскрипт', tipsOffSub: 'Підказки вимкнено. Підсумок і фоллоу-ап будуть після дзвінка. Увімкнути підказки можна в налаштуваннях дзвінка.', listeningSub: (k) => `Підказки зʼявляться тут, коли будуть потрібні. Застряг? Натисни ${k}.`, onDevice: 'Аудіо лишається на цьому Mac',
       searched: (o) => `Ви шукали: ${o.q}`, shorterMeta: 'Коротше', applied: 'Налаштування застосовано', prepReady: 'Бриф готовий',
       speakerN: (o) => `Спікер ${o.n}`, yourTurn: 'Твоя черга: розкажи свій апдейт', me: 'Я', them: 'Невідомий голос', lineWhoTip: 'Голос не розпізнано. Клацніть, щоб вказати, хто сказав цей рядок.', lineWhoSaved: 'Збережено: у транскрипті буде після дзвінка',
       briefReady: (o) => o.at ? `Бриф готовий · ${o.at}` : 'Бриф готовий', briefPreparing: 'Готую бриф…', briefFailed: 'Бриф не вдалося підготувати', noBrief: 'Брифу ще немає'
@@ -305,8 +305,9 @@
         <div class="ctl"><button class="btn1" type="button" data-act="start">${esc(t.startListening)}</button>${S.brief ? `<button class="btn2" type="button" data-act="open-brief">${esc(t.openBrief)}</button>` : ''}</div>
         <div class="foot">${esc(t.onDevice)}</div>`;
     } else {
-      el.innerHTML = `<div class="ring">${MARK}</div><div class="t1">${esc(S.call.state === 'ended' ? t.ended : t.listeningTitle)}</div>` +
-        (S.call.state === 'ended' ? '' : `<div class="t2">${esc(t.listeningSub(S.keys.help))}</div>`);
+      const off = S.call.tipsOff && S.call.state !== 'ended';     // 0.8.5: Tips off or a Transcript call
+      el.innerHTML = `<div class="ring">${MARK}</div><div class="t1">${esc(S.call.state === 'ended' ? t.ended : off ? t.tipsOffTitle : t.listeningTitle)}</div>` +
+        (S.call.state === 'ended' ? '' : `<div class="t2">${esc(off ? t.tipsOffSub : t.listeningSub(S.keys.help))}</div>`);
     }
     return true;
   }

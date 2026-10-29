@@ -183,3 +183,20 @@ def test_wait_for_steps(tmp_path, monkeypatch):
     monkeypatch.setattr(live.time, "sleep", slept.append)
     live.wait_for(tmp_path / "never", limit_s=1.0, step=0.25)
     assert slept == [0.25] * 4
+
+
+def test_tips_switch_and_transcript_type(tmp_path):
+    """rules/meeting.yaml > tips (0.8.5): Tips off stops automatic tips; a Transcript call starts with them off."""
+    from livetips_m0 import live
+    class E:
+        tips_set = None
+        out_tips = type("W", (), {"write": lambda self, x: None})()
+        def meta(self):
+            return {"call_type": "auto"}
+    e = E()
+    live.handle_setting(e, "tips", "off")
+    assert e.tips_set is False
+    live.handle_setting(e, "tips", "on")
+    assert e.tips_set is True
+    live.handle_setting(e, "call_type", "transcript")
+    assert e.tips_set is False

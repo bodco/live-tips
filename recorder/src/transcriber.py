@@ -1644,7 +1644,7 @@ def _append_json(path: Path, obj: dict) -> None:
 
 # --------------------------------------------------------------------------- Meeting settings
 
-CALL_TYPES = ("auto", "presentation", "interview")
+CALL_TYPES = ("auto", "presentation", "interview", "transcript")
 AUDIENCES = ("auto", "team", "client", "boss")
 
 
@@ -2151,7 +2151,7 @@ class SemanticLive(threading.Thread):
             why = None
             if not (is_q or (held and not presenting_quiet())):
                 why = "not a question, topic not held"
-            elif self.flags.get("tips_paused"):
+            elif self.flags.get("tips_paused") or self.flags.get("tips_off"):
                 why = "tips paused"
             elif not self.facts.claim(fid):
                 why = "cooldown (or keyword hit)"
@@ -2192,7 +2192,7 @@ class SemanticLive(threading.Thread):
                 self.count("near")
                 self._log(rec | {"shown": False, "why": "below threshold"})
                 continue
-            if self.flags.get("tips_paused"):
+            if self.flags.get("tips_paused") or self.flags.get("tips_off"):
                 why = "tips paused"
             else:
                 why = self.cards.fire_semantic(cid, line, float(best[k]))
@@ -4015,7 +4015,7 @@ def main() -> int:
               "proactive": normalize_proactive(cfg.get("proactive")),
               "hiring_role": normalize_hiring_role(cfg.get("hiring_role")), "req_id": cfg.get("req_id"), "seq": 0,
               "mic_stall_restarts": 0, "mic_stall_streak": 0, "mic_auto_switched": False,
-              "last_question": None, "tips_paused": "off",
+              "last_question": None, "tips_paused": "off", "tips": "off" if call_type == "transcript" else "on",
               "speakers": "loading" if cfg.get("speakers_enabled", True) not in (False, "false", "off", "0", 0) else "off",
               "speakers_reason": None, "speakers_rev": 0, "speaker_now": None,
               "people": clean_people(cfg.get("people") or []), "ui_lang": cfg.get("ui_lang") or None,
@@ -4071,7 +4071,7 @@ def main() -> int:
               f"- Канали: {cfg['me_label']} = мікрофон, {cfg['them_label']} = системний звук\n"
               f"- Мікрофон: {'вбудований мікрофон Мака' if cfg['mic_device'] == 'builtin' else 'системний вхід за замовчуванням (навушники або Мак)'}\n\n")
     # Speakers (v37): the model loads in the background; until it is ready lines have no [Sx] tag.
-    flags = {"tips_paused": False}
+    flags = {"tips_paused": False, "tips_off": call_type == "transcript"}   # rules/meeting.yaml > tips
     spk: dict = {"worker": None, "ready": False}
     tracker: SpeakerTracker | None = None
     if status["speakers"] == "loading":
@@ -4208,7 +4208,7 @@ def main() -> int:
             recent.append((seg.t_start, seg.channel, text))
             while recent and seg.t_start - recent[0][0] > 120:
                 recent.pop(0)
-        paused = flags["tips_paused"]
+        paused = flags["tips_paused"] or flags.get("tips_off", False)     # 0.8.5: Tips off or a Transcript call
         MEETING["call_type"] = status.get("call_type") or "auto"
         MEETING["audience"] = status.get("audience") or "auto"
         q = None
@@ -4410,6 +4410,10 @@ def main() -> int:
             elif key == "call_type":
                 # Shown back in the window; the skill reads it as @@SET. Legacy values are mapped.
                 ct, au = normalize_meeting(val, status.get("audience"))
+                if (ct == "transcript") != (status.get("call_type") == "transcript"):
+                    # rules/meeting.yaml > call_type.transcript: the type switches tips off, another type back on
+                    flags["tips_off"] = ct == "transcript"
+                    status["tips"] = "off" if ct == "transcript" else "on"
                 status.update(call_type=ct, audience=au)
             elif key == "audience":
                 status["audience"] = normalize_meeting(status.get("call_type"), val)[1]
@@ -4423,6 +4427,10 @@ def main() -> int:
                 if _s(val).lower() in ("en", "uk"):
                     status["ui_lang"] = _s(val).lower()     # echoed for the skill and a reopened window
                     changed = True
+            elif key == "tips":
+                # 0.8.5 (owner): Tips on/off in Call settings; the transcript, summary and follow-up go on
+                flags["tips_off"] = _s(val).lower() in ("off", "false", "0", "no")
+                status["tips"] = "off" if flags["tips_off"] else "on"
             elif key == "tips_paused":
                 on = _s(val).lower() in ("on", "true", "1", "yes")
                 flags["tips_paused"] = on

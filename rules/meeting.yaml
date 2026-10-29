@@ -5,7 +5,8 @@ audience:
   boss: internal project where the PM's manager acts as the client; client rules, default language Ukrainian
   effects: [language_default, restricted_marker_strictness, culture_lens]
 call_type:
-  values: [auto, presentation, interview, coach]
+  values: [auto, presentation, interview, coach, transcript]
+  transcript: {tips: off, preparation: not needed, after_call: summary, meeting page and follow-up as usual}   # 0.8.5 (owner)
   presentation: {requires: outline.json or slides.json, rules: rules/presentation.yaml}
   interview: {roles: [interviewer, observer]}
   coach:
@@ -25,3 +26,9 @@ tips_language:
   # changes it to the interface language and back when the two differ. The phrase to say follows answer_lang as before.
   default: the call's main language (me_lang)
   switch: setting tips_lang = uk | en, shown only when the interface language differs
+tips:
+  # 0.8.5 (owner): a Tips switch in Call settings, before Proactive tips, for any call
+  setting: tips = on | off (status field "tips")
+  off: no automatic tips, cards, facts, question items or speech card; the transcript, speakers, asks the PM types, the summary, the meeting page and the follow-up go on
+  default: on; off for call_type transcript; changing the type to or from transcript switches it
+

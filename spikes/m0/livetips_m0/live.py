@@ -50,7 +50,7 @@ class Tail:
         return lines
 
 
-ACK_KEYS = {"call_type", "hiring_role", "audience", "comment_rate_seconds", "proactive", "ui_lang", "tips_paused", "tips_lang"}
+ACK_KEYS = {"call_type", "hiring_role", "audience", "comment_rate_seconds", "proactive", "ui_lang", "tips_paused", "tips_lang", "tips"}
 
 
 def _on(value) -> bool:
@@ -107,7 +107,18 @@ def _tips_lang(eng, value) -> None:
             eng.prompt.fmt["tips_lang"] = v
 
 
+def _tips(eng, value) -> None:
+    eng.tips_set = str(value).lower() not in ("off", "false", "0", "no")   # 0.8.5: the Tips switch in Call settings
+
+
+def _call_type(eng, value) -> None:
+    if (str(value or "").lower() == "transcript") != (eng.meta().get("call_type") == "transcript"):
+        eng.tips_set = str(value or "").lower() != "transcript"          # the type switches tips, as in the recorder
+
+
 SETTINGS = {
+    "tips": _tips,
+    "call_type": _call_type,
     "tips_paused": _paused,
     "proactive": _proactive,
     "title": _title,

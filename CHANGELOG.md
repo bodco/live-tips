@@ -75,6 +75,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   it Ukrainian and names came out worse.
 - **Meeting page:** a quote inside the summary no longer stops the Notion page (the JSON is repaired or asked
   again), and Send last call to Notion in the menu works after the app restarts.
+- **Transcript call type and a Tips switch:** a Transcript call records and transcribes with no tips; the summary,
+  the meeting page and the follow-up come after it as usual. Call settings has Tips on/off before Proactive tips,
+  for any call (rules/meeting.yaml > tips; the skill reads `@@SET tips`).
 - **Write draft works on every model:** a model that refuses thinking "disabled" (a 400 on the follow-up draft)
   gets "between_tools", the form it asks for, and keeps it for the rest of the session.
 - **Speakers in the transcript:** the top of the Transcript tab lists every voice of the call, as in 0.7: named or

@@ -1172,5 +1172,9 @@
  "sign.title": "Signature",
  "sign.notarized": "Signed and notarized by Apple",
  "sign.developer": "Signed by the developer, not notarized by Apple (beta). macOS asks for Open Anyway on the first launch of each downloaded version.",
- "sign.unsigned": "Not signed (a development build)"
+ "sign.unsigned": "Not signed (a development build)",
+ "callSettings.type.transcript": "Transcript",
+ "start.transcriptHint": "Records the call and writes the transcript, no tips during the call. After it: the summary, the meeting page and the follow-up as usual. No preparation needed.",
+ "callSettings.tips": "Tips",
+ "callSettings.tips.hint": "Off: only the transcript; the summary and the follow-up after the call as usual"
 }

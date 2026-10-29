@@ -619,6 +619,7 @@ class Engine:
         self.tip_validator = jsonschema.Draft202012Validator(rules.model_tip_schema)
         self.cls_validator = jsonschema.Draft202012Validator(rules.classify_schema)
         self.paused = False
+        self.tips_set: Optional[bool] = None     # 0.8.5: the Tips switch (None: by the call type, off for Transcript)
         # The first tip call writes the prompt cache; parallel first calls would each pay the write.
         self.tip_cache_warm = threading.Event()
         self.tip_warm_lock = threading.Lock()
@@ -692,7 +693,7 @@ class Engine:
         self._every_fifth_line(line)
         sig = self.detector.detect(line)
         span = line_span(line, sig, now)
-        if self.paused or self._budget_stops():
+        if self.paused or self._budget_stops() or self.tips_off():
             return
         self._maybe_situation(line, sig, now)
         if self._meeting_route(line, sig, span, now):
@@ -1295,10 +1296,16 @@ class Engine:
         """2026-10-27 (owner): labels and gists follow the window language (tips_lang); a phrase to say follows the call."""
         return (self.cfg.get("tips_lang") or self.meta().get("tips_lang", "uk")) == "uk"
 
+    def tips_off(self) -> bool:
+        """rules/meeting.yaml > tips: off by the switch, or a Transcript call; asks typed by the PM still answer."""
+        if self.tips_set is not None:
+            return not self.tips_set
+        return (self.meta().get("tips") == "off") or (self.meta().get("call_type") == "transcript")
+
     def speech_card(self, brief_text: str) -> Optional[dict]:
         """The skill shows "Твій спіч" from the brief as the first card (no model call). The brief carries
         it as a ready item under "## speech.json"; without one, the "спіч / speech" section is used."""
-        if not brief_text or self._restore_speech():
+        if not brief_text or self.tips_off() or self._restore_speech():
             return None
         default = "🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech"
         item = speech_from_brief(brief_text, default)

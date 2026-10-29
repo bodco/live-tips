@@ -222,6 +222,7 @@ struct CallSetupView: View {
                     Text(L("start.type.regular")).tag("auto")
                     Text(L("start.type.presentation")).tag("presentation")
                     Text(L("callSettings.type.interview")).tag("interview")
+                    Text(L("callSettings.type.transcript")).tag("transcript")
                 }.labelsHidden().pickerStyle(.segmented).fixedSize()
             }
             GridRow {
@@ -257,6 +258,14 @@ struct CallSetupView: View {
                     Text(L("callSettings.role.interviewer")).tag("interviewer")
                     Text(L("callSettings.role.coach")).tag("coach")
                 }.fixedSize()
+            }
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+        case "transcript":
+            // rules/meeting.yaml > call_type.transcript: no tips, the summary and the follow-up after the call
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("callSettings.type.transcript")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("start.transcriptHint")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             }
             .padding(14).frame(maxWidth: .infinity, alignment: .leading)
             .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))

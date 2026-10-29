@@ -20,6 +20,7 @@ final class CallSettingsModel: ObservableObject {
     @Published var mic = "default"
     @Published var mics: [Mic] = []
     @Published var proactive = false
+    @Published var tipsOn = true           // 0.8.5 (owner): Tips on/off for any call (rules/meeting.yaml > tips)
     @Published var title = ""
     @Published var opacity = 1.0
     @Published var onTop = PrompterController.onTop
@@ -35,7 +36,8 @@ final class CallSettingsModel: ObservableObject {
         uiLang = L10n.lang
         let s = FileManager.default.contents(atPath: CallEngine.shared.statusPath)
             .flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] } ?? [:]
-        if let v = s["call_type"] as? String { callType = v == "presentation" || v == "interview" ? v : "auto" }
+        if let v = s["call_type"] as? String { callType = ["presentation", "interview", "transcript"].contains(v) ? v : "auto" }
+        tipsOn = (s["tips"] as? String).map { $0 != "off" } ?? (callType != "transcript")
         if let v = s["hiring_role"] as? String { hiringRole = v }
         if let v = s["audience"] as? String, !v.isEmpty { audience = v } else if (s["call_type"] as? String) == "client" { audience = "client" }
         // Pacenote 0.8 (owner: the 0.7 bug): one or several languages, as in the call form. The recorder takes any
@@ -52,11 +54,14 @@ final class CallSettingsModel: ObservableObject {
         if !list.contains(where: { $0.id == mic }) { list.append(Mic(id: mic, name: mic.hasPrefix("uid:") ? String(mic.dropFirst(4)) : mic)) }
         mics = list
         sent = ["call_type": callType, "hiring_role": hiringRole, "audience": audience, "call_lang": language,
-                "mic_device": mic, "proactive": proactive ? "on" : "off"]
+                "mic_device": mic, "proactive": proactive ? "on" : "off", "tips": tipsOn ? "on" : "off"]
     }
 
     /// The values as loaded: a picker that only shows the loaded value sends nothing.
     private var sent: [String: String] = [:]
+
+    /// The recorder already switched it (a type change): remember the value without sending it again.
+    func markSent(_ key: String, _ value: String) { sent[key] = value }
 
     func send(_ key: String, _ value: Any) {
         let v = "\(value)"
@@ -79,8 +84,14 @@ struct CallSettingsView: View {
                         Text(L("callSettings.type.regular")).tag("auto")
                         Text(L("callSettings.type.presentation")).tag("presentation")
                         Text(L("callSettings.type.interview")).tag("interview")
+                        Text(L("callSettings.type.transcript")).tag("transcript")
                     }
-                    .onChange(of: model.callType) { model.send("call_type", model.callType) }
+                    .onChange(of: model.callType) { old, new in
+                        model.send("call_type", new)
+                        if (old == "transcript") != (new == "transcript") {   // the recorder switches tips the same way
+                            model.markSent("tips", new == "transcript" ? "off" : "on"); model.tipsOn = new != "transcript"
+                        }
+                    }
                     if model.callType == "interview" {
                         Picker(L("callSettings.role"), selection: $model.hiringRole) {
                             Text(L("callSettings.role.none")).tag("")
@@ -110,12 +121,20 @@ struct CallSettingsView: View {
                         ForEach(model.mics) { m in Text(m.name).tag(m.id) }
                     }
                     .onChange(of: model.mic) { model.send("mic_device", model.mic) }
+                    Toggle(isOn: $model.tipsOn) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L("callSettings.tips"))
+                            Text(L("callSettings.tips.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                        }
+                    }
+                    .onChange(of: model.tipsOn) { model.send("tips", model.tipsOn ? "on" : "off") }
                     Toggle(isOn: $model.proactive) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(L("callSettings.proactive"))
                             Text(L("callSettings.proactive.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
                     }
+                    .disabled(!model.tipsOn)
                     .onChange(of: model.proactive) { model.send("proactive", model.proactive ? "on" : "off") }
                 } header: { Text(L("callSettings.section.call")) }
 

@@ -114,9 +114,11 @@ Read once early in the call (in a quiet poll after the speech), and again when a
   PM has not reported yet or that their turn is still ahead. In a status round, if the PM may
   have spoken while unheard, ask once in the window ("Ти вже звітував?") instead of guessing.
 - **Settings from the ⚙ menu** arrive as `@@SET call_type=` (`auto` | `presentation` |
-  `interview`), `@@SET hiring_role=`, `@@SET audience=` (`auto` | `team` | `client` |
+  `interview` | `transcript`), `@@SET hiring_role=`, `@@SET audience=` (`auto` | `team` | `client` |
   `boss`), `@@SET proactive=` (`on` | `off`), `@@SET comment_rate_seconds=N` (only matters
   with proactive on; overrides `settings.tips.comment_rate_seconds`, `0` = off),
+  `@@SET tips=` (`on` | `off`; off: emit nothing except answers to `@@ASK`, `@@SOS` and acks, keep the
+  transcript and the wrap-up; `call_type=transcript` means tips off from the start, rules/meeting.yaml > tips),
   `@@SET call_lang=` (`uk` | `en` | `mix`, or a set like `de+en`; 0.8.5, owner: `uk` and `en` mean that
   language only, as at the start of a call, `mix` is Ukrainian with English) and `@@SET mic_device=`
   (`default` | `builtin`).

@@ -26,7 +26,7 @@
       next: (t, m) => `${t} in ${m} min`, notPrepared: 'not prepared', ready: 'brief ready', preparing: 'preparing', prepare: 'Prepare', open: 'Open',
       ask: 'Ask about this project', help: 'Help',
       tabs: { transcript: 'Transcript', onme: (n) => `On me · ${n}`, brief: 'Brief' },
-      newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team',
+      newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team', speakersH: 'Speakers', namedOf: (o) => `${o.n} of ${o.m} named`, notNamed: 'not named yet',
       legend: 'Client in purple, team in blue', following: 'Following live', jump: 'Jump to latest',
       ariaMic: 'Mute microphone', ariaPause: 'Pause listening', ariaProactive: 'Proactive tips',
       proactiveOn: 'Proactive tips: on', proactiveOff: 'Proactive tips: off', resumeShort: 'Resume',
@@ -78,7 +78,7 @@
       next: (t, m) => `${t} за ${m} хв`, notPrepared: 'не підготовлено', ready: 'бриф готовий', preparing: 'готується', prepare: 'Підготувати', open: 'Відкрити',
       ask: 'Запитай про проєкт', help: 'Допоможи',
       tabs: { transcript: 'Транскрипт', onme: (n) => `На мені · ${n}`, brief: 'Бриф' },
-      newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда',
+      newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда', speakersH: 'Спікери', namedOf: (o) => `названо ${o.n} з ${o.m}`, notNamed: 'ще без імені',
       legend: 'Клієнт фіолетовим, команда синім', following: 'Слідкую наживо', jump: 'До останнього',
       ariaMic: 'Вимкнути мікрофон', ariaPause: 'Пауза прослуховування', ariaProactive: 'Проактивні підказки',
       proactiveOn: 'Проактивні підказки: увімкнено', proactiveOff: 'Проактивні підказки: вимкнено', resumeShort: 'Продовжити',
@@ -126,7 +126,7 @@
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
-    ui: { lineWho: {}, lineDel: {}, delArm: null, openPts: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
+    ui: { spkOpen: null, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
   };
   const T = () => STR[S.lang] || STR.en;
@@ -588,6 +588,35 @@
       ${S.briefText ? `<div><button class="link" type="button" data-act="brief-edit">${esc(t.edit)}</button></div>` : ''}`;
   }
 
+  /** 0.8.5 (owner): a line given to a person shows that person's side; nobody known = grey, like Speaker N. */
+  function sideOfName(n) {
+    const sp = Object.values(S.speakers).find((x) => x && x.name && x.name === n);
+    const side = (sp && sp.side) || (S.rosterSide && S.rosterSide[n]) || '';
+    return side === 'client' ? 'client' : side === 'team' ? 'team' : 'unknown';
+  }
+  /** 0.8.5 (owner, back from 0.7): every voice of the call at the top of the transcript: named or not, what it
+   *  said last, Team or Client in one click, and one-click names for the ones still unnamed. */
+  function speakersSummary(sugBtns, unknown) {
+    const t = T();
+    const list = Object.entries(S.speakers).filter(([sid, sp]) => /^S\d+$/i.test(sid) && sp && (sp.name || (sp.seconds || 0) >= 2))
+      .sort((a, b) => (+a[0].slice(1)) - (+b[0].slice(1)));
+    const names = new Set(), rows = [];
+    for (const [sid, sp] of list) {
+      if (sp.name && names.has(sp.name)) continue;        // merged speakers show once
+      if (sp.name) names.add(sp.name);
+      const side = sp.side === 'client' ? 'client' : sp.side === 'team' ? 'team' : 'unknown';
+      rows.push(`<div class="spk-row${sp.name ? '' : ' open'}">
+        <button class="who ${side}" type="button" data-act="name" data-sid="${esc(sid)}">${esc(sp.name || sp.label || sid)}</button>
+        <span class="q" title="${esc(sp.lastQuote || '')}">${sp.name ? '' : esc(t.notNamed) + (sp.lastQuote ? ': ' : '')}${sp.lastQuote ? '\u201c' + esc(sp.lastQuote) + '\u201d' : ''}</span>
+        <span class="seg2 sm"><button type="button" data-act="spk-side" data-sid="${esc(sid)}" data-side="team" aria-pressed="${side === 'team'}">${esc(t.team)}</button><button type="button" data-act="spk-side" data-sid="${esc(sid)}" data-side="client" aria-pressed="${side === 'client'}">${esc(t.client)}</button></span>
+        ${sp.name ? '' : `<div class="sugs">${sugBtns(sid, sp)}</div>`}
+      </div>`);
+    }
+    if (!rows.length) return '';
+    const unnamed = list.filter(([, sp]) => !sp.name).length;
+    const open = S.ui.spkOpen == null ? !!unnamed : S.ui.spkOpen;
+    return `<div class="spks"><button class="spks-h" type="button" data-act="spk-toggle" aria-expanded="${open}"><b>${esc(t.speakersH)}</b><span class="meta">${esc(t.namedOf({ n: rows.length - unnamed, m: rows.length }))}</span></button>${open ? rows.join('') : ''}</div>`;
+  }
   function renderPane(root, tab, isSheet) {
     const t = T();
     const openN = S.onMe.filter((o) => !o.done).length;
@@ -600,7 +629,7 @@
     if (tab === 'transcript') {
       const unknown = Object.entries(S.speakers).find(([sid, s]) => /^S\d+$/i.test(sid) && !s.name);
       const sugBtns = (sid, sp) => (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-act="name-pick" data-sid="${esc(sid)}" data-name="${esc(x.name)}" title="${x.score == null ? esc(T().notByVoice) : Math.round(x.score * 100) + '%'}">${esc(x.name)}</button>`).join('');
-      body = (unknown ? `<div class="newvoice">${ICON.person}<span class="t">${esc(t.newVoice)} <b>${esc(unknown[1].label || unknown[0])}</b></span>${sugBtns(unknown[0], unknown[1])}<button class="link" type="button" data-act="name" data-sid="${esc(unknown[0])}">${esc(t.name)}</button></div>` : '') +
+      body = speakersSummary(sugBtns, unknown) +
         S.transcript.map((l, i) => {
           const sp = S.speakers[l.speakerId] || {};
           const cls = sp.side === 'client' ? 'client' : sp.side === 'team' ? 'team' : 'unknown';
@@ -610,7 +639,7 @@
           // 0.8 (owner): a line whose voice was not recognised can be given to a person (recorder: line_who).
           const btn = named ? `<button class="who ${cls}" type="button" data-act="name" data-sid="${esc(l.speakerId)}">${who}</button>`
             : l.speakerId === 'me' ? `<span class="who ${cls}">${who}</span>`
-            : `<button class="who ${fixed ? 'client' : cls}" type="button" data-act="line-who" data-i="${i}" title="${esc(t.lineWhoTip)}">${who}</button>`;
+            : `<button class="who ${fixed ? sideOfName(fixed) : 'unknown'}" type="button" data-act="line-who" data-i="${i}" title="${esc(t.lineWhoTip)}">${who}</button>`;
           // 0.8.5 (owner, back from 0.7): any line can be deleted (two clicks) and restored; applied after the stop.
           const k = lineKey(l), gone = !!S.ui.lineDel[k];
           const del = !l.t ? '' : gone
@@ -844,6 +873,17 @@
         render(); return;
       }
       case 'line-who': openLinePopover(b.dataset.i, b); return;
+      case 'spk-toggle': {
+        const unnamed = Object.entries(S.speakers).some(([sid, sp]) => /^S\d+$/i.test(sid) && sp && !sp.name && (sp.seconds || 0) >= 2);
+        S.ui.spkOpen = !(S.ui.spkOpen == null ? unnamed : S.ui.spkOpen); render(); return;
+      }
+      case 'spk-side': {
+        const sid = b.dataset.sid, side = b.dataset.side, sp = S.speakers[sid] || {};
+        S.speakers[sid] = Object.assign({}, sp, { side });
+        if (feed) feed.speakers[sid] = Object.assign({}, feed.speakers[sid], { side });
+        post('setting', { key: 'speaker_side', value: sid + '|' + side });
+        render(); return;
+      }
       case 'line-del': case 'line-undel': {
         const l = S.transcript[+b.dataset.i]; if (!l || !l.t) return;
         const k = lineKey(l), v = l.t + '|' + String(l.text || '').slice(0, 40).replace(/\|/g, ' ');

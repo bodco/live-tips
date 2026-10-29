@@ -75,6 +75,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   it Ukrainian and names came out worse.
 - **Meeting page:** a quote inside the summary no longer stops the Notion page (the JSON is repaired or asked
   again), and Send last call to Notion in the menu works after the app restarts.
+- **Speakers in the transcript:** the top of the Transcript tab lists every voice of the call, as in 0.7: named or
+  not, what an unnamed one said last, Team or Client in one click, and one-click names. An unknown voice is grey
+  like Speaker N (it was purple, as if a client); a line given to a person takes that person's colour.
 - **Bluetooth headsets:** with AirPods or another Bluetooth headset as the default input, Pacenote records you
   from the Mac's built-in microphone and leaves the headset to the call app (a second app on a Bluetooth mic, and
   every restart of it, made the headset cut in and out for the call too). A chosen input in the Mic menu still wins.

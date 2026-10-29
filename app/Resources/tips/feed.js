@@ -415,7 +415,8 @@
     for (const sid of Object.keys(cl)) {
       const c = cl[sid] || {};
       this.speakers[sid] = Object.assign({ label: this.tr('speakerN', { n: sid.replace(/^S/i, '') }) }, this.speakers[sid],
-                                         { name: c.name ? clean(c.name) : '', side: c.side || (this.speakers[sid] || {}).side || '' },
+                                         { name: c.name ? clean(c.name) : '', side: c.side || (this.speakers[sid] || {}).side || '',
+                                           seconds: +c.seconds || 0, first: c.first || '', lastQuote: c.last_quote && c.last_quote.text ? clean(c.last_quote.text) : '' },
                                          // 0.8.5 (owner): the suggestions of every update, not only of the "Who is speaking?" ask
                                          c.name ? { suggestions: [] } : (Array.isArray(c.suggestions) ? { suggestions: pickSug(c.suggestions) } : {}));
     }
@@ -531,7 +532,7 @@
       cards: this.cards.map((c) => Object.assign({}, c)),
       onMe: this.onMe(),
       next: this.next,
-      speakers: Object.assign({ me: { name: this.tr('me'), side: 'team' }, other: { name: this.tr('them'), side: 'client' } }, this.speakers),
+      speakers: Object.assign({ me: { name: this.tr('me'), side: 'team' }, other: { name: this.tr('them'), side: '' } }, this.speakers),
       rosterSide: this.rosterSide || {}, knownNames: this.known || [],
       transcript: this.transcript.slice(-400),
       brief: this.brief, briefText: this.briefText,

@@ -93,8 +93,9 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Transcript call type and a Tips switch:** a Transcript call records and transcribes with no tips; the summary,
   the meeting page and the follow-up come after it as usual. Call settings has Tips on/off before Proactive tips,
   for any call (rules/meeting.yaml > tips; the skill reads `@@SET tips`).
-- **Write draft works on every model:** a model that refuses thinking "disabled" (a 400 on the follow-up draft)
-  gets "between_tools", the form it asks for, and keeps it for the rest of the session.
+- **Every Claude model turns thinking off its own way:** Sonnet 5.5 needs "between_tools", Haiku 5.5 "disabled",
+  Opus 5.5 adaptive thinking at low effort; on such a 400 the request goes once more in the form the model asks for
+  and the model keeps it (the follow-up draft failed, and Haiku or Opus as the tip model would have failed every tip).
 - **Speakers in the transcript:** the top of the Transcript tab lists every voice of the call, as in 0.7: named or
   not, what an unnamed one said last, Team or Client in one click, and one-click names. An unknown voice is grey
   like Speaker N (it was purple, as if a client); a line given to a person takes that person's colour.

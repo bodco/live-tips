@@ -161,31 +161,60 @@ class AnthropicProvider(Provider):
         headers = {"anthropic-workspace-id": workspace_id} if workspace_id else None
         self.client = anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=1, default_headers=headers)
 
-    # 0.8.5 (owner: "Write draft" failed with 400): some models refuse thinking "disabled" and ask for
-    # "between_tools" instead. Such a model is remembered and gets "between_tools" from then on.
-    no_disabled: set = set()
+    # 0.8.5 (owner: "Write draft" failed with 400): models differ in how thinking is turned off. Sonnet 5.5 refuses
+    # "disabled" and asks for "between_tools"; Haiku 5.5 refuses "between_tools". On such a 400 the request goes once
+    # more with the other form, and the model keeps that form for the rest of the session.
+    thinking_form: dict = {}          # model -> "disabled" | "between_tools"
+    no_disabled: set = set()          # kept for older callers and tests
 
     @staticmethod
-    def _thinking_off(extra, use_between: bool):
-        if not extra or not use_between:
+    def _thinking_as(extra, form: Optional[str]):
+        """form: "disabled", "between_tools" or "adaptive_low" (Opus 5.5 takes only adaptive thinking, at low effort)."""
+        if not extra or not form:
             return extra
         def fix(d):
             t = d.get("thinking") if isinstance(d, dict) else None
-            if isinstance(t, dict) and t.get("type") == "disabled":
-                d = dict(d, thinking={"type": "between_tools"})
+            if isinstance(t, dict) and t.get("type") in ("disabled", "between_tools", "adaptive"):
+                if form == "adaptive_low":
+                    d = dict(d, thinking={"type": "adaptive"}, output_config={"effort": "low"})
+                else:
+                    d = {k: v for k, v in d.items() if k != "output_config"}
+                    d["thinking"] = {"type": form}
             return d
         out = fix(dict(extra))
         if isinstance(out.get("extra_body"), dict):
             out["extra_body"] = fix(out["extra_body"])
         return out
 
+    @staticmethod
+    def _thinking_off(extra, use_between: bool):
+        return AnthropicProvider._thinking_as(extra, "between_tools" if use_between else None)
+
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
+        form = self.thinking_form.get(model) or ("between_tools" if model in self.no_disabled else None)
         c = self._complete(model=model, system=system, user=user, max_tokens=max_tokens, cache_ttl=cache_ttl, on_text=on_text,
-                           extra=self._thinking_off(extra, model in self.no_disabled))
-        if c.error and "between_tools" in str(c.error) and model not in self.no_disabled and c.text == "":
-            AnthropicProvider.no_disabled.add(model)
+                           extra=self._thinking_as(extra, form))
+        tried = {form}
+        for _ in range(2):
+            err = str(c.error or "")
+            if not (c.error and c.text == "" and "thinking" in err):
+                break
+            if "adaptive" in err:
+                other = "adaptive_low"
+            elif "between_tools" in err and "not supported" in err:
+                other = "disabled"
+            elif "between_tools" in err:
+                other = "between_tools"
+            else:
+                break
+            if other in tried:
+                break
+            tried.add(other)
+            AnthropicProvider.thinking_form[model] = other
+            if other == "between_tools":
+                AnthropicProvider.no_disabled.add(model)
             c = self._complete(model=model, system=system, user=user, max_tokens=max_tokens, cache_ttl=cache_ttl,
-                               on_text=on_text, extra=self._thinking_off(extra, True))
+                               on_text=on_text, extra=self._thinking_as(extra, other))
         return c
 
     def _complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
@@ -433,6 +462,8 @@ def make_provider(cfg: dict, secret_loader: Callable[[str], str], job: Optional[
             except KeyError:
                 ws = ""
         return AnthropicProvider(secret_loader(cfg.get("api_key_env", "CLAUDE_API")), workspace_id=ws)
+    if kind == "ollama":   # 0.8.5: a model on this Mac (rules/ai.yaml > routes.local)
+        return OllamaProvider(cfg.get("base_url", "http://127.0.0.1:11434"))
     if kind == "openai_compat":
         key_env = cfg.get("api_key_env")
         return OpenAICompatProvider(cfg["base_url"], secret_loader(key_env) if key_env else "")

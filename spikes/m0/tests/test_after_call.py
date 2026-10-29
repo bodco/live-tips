@@ -125,3 +125,48 @@ def test_localprep_keeps_the_complete_objects_of_a_cut_list():
     from livetips_m0.localprep import as_list
     assert as_list('[{"id": "a"}, {"id": "b"}, {"id": "c", "te') == [{"id": "a"}, {"id": "b"}]
     assert as_list('```json\n[{"id": "a"}]\n```') == [{"id": "a"}]
+
+
+def test_haiku_gets_disabled_when_it_refuses_between_tools():
+    """0.8.5: Haiku 5.5 refuses thinking "between_tools" (all its tips failed in an A/B replay)."""
+    from livetips_m0.providers import AnthropicProvider, Completion
+    seen = []
+
+    class P(AnthropicProvider):
+        def __init__(self):
+            pass
+
+        def _complete(self, **kw):
+            seen.append(kw["extra"]["thinking"]["type"])
+            c = Completion(model=kw["model"], t_start=0)
+            if kw["extra"]["thinking"]["type"] == "between_tools":
+                c.error = "BadRequestError: 400 \"thinking.type.between_tools\" is not supported for this model"
+            return c
+
+    AnthropicProvider.thinking_form.pop("h-test", None)
+    c = P().complete(model="h-test", system=[], user="x", max_tokens=10, cache_ttl=None, extra={"thinking": {"type": "between_tools"}})
+    assert c.error is None and seen == ["between_tools", "disabled"]
+    P().complete(model="h-test", system=[], user="x", max_tokens=10, cache_ttl=None, extra={"thinking": {"type": "between_tools"}})
+    assert seen[-1] == "disabled"
+
+
+def test_opus_gets_adaptive_low_thinking():
+    """0.8.5: Opus 5.5 refuses "disabled" and "between_tools" and asks for adaptive thinking with an effort."""
+    from livetips_m0.providers import AnthropicProvider, Completion
+    seen = []
+
+    class P(AnthropicProvider):
+        def __init__(self):
+            pass
+
+        def _complete(self, **kw):
+            e = kw["extra"]
+            seen.append((e["thinking"]["type"], (e.get("output_config") or {}).get("effort")))
+            c = Completion(model=kw["model"], t_start=0)
+            if e["thinking"]["type"] != "adaptive":
+                c.error = 'BadRequestError: 400 "thinking.type.disabled" is not supported for this model. Use "thinking.type.adaptive" and "output_config.effort"'
+            return c
+
+    AnthropicProvider.thinking_form.pop("o-test", None)
+    c = P().complete(model="o-test", system=[], user="x", max_tokens=10, cache_ttl=None, extra={"thinking": {"type": "between_tools"}})
+    assert c.error is None and seen[-1] == ("adaptive", "low")

@@ -1176,5 +1176,16 @@
  "callSettings.type.transcript": "Transcript",
  "start.transcriptHint": "Records the call and writes the transcript, no tips during the call. After it: the summary, the meeting page and the follow-up as usual. No preparation needed.",
  "callSettings.tips": "Tips",
- "callSettings.tips.hint": "Off: only the transcript; the summary and the follow-up after the call as usual"
+ "callSettings.tips.hint": "Off: only the transcript; the summary and the follow-up after the call as usual",
+ "ai.route.local": "On this Mac (Ollama)",
+ "ai.local.model": "Ollama model",
+ "ai.local.hint": "A preparation on this Mac: the app gathers the files and the model writes the brief. Free, slower, simpler than Claude.",
+ "ai.local.noOllama": "Ollama does not answer. Open the Ollama app (or run: ollama serve).",
+ "ai.local.ready": "Ollama is running and has this model.",
+ "ai.local.notPulled": "Ollama is running, the model is not downloaded yet: {cmd}",
+ "prep.local": " · on this Mac, free",
+ "prep.st.local.pack": "Gathering the files",
+ "prep.st.local.model": "The model reads the material",
+ "prep.st.local.writing": "The model writes the brief",
+ "prep.st.local.check": "Checking the files"
 }

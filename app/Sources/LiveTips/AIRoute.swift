@@ -6,6 +6,8 @@ import LiveTipsCore
 /// {"api": {"down": true, "reason": "credit", "since": <unix time>, "checked": <unix time>}, "code": {...}}.
 enum AIRoute {
     static let api = "api", code = "code"
+    /// 0.8.5 (owner): a preparation on this Mac (Ollama), chosen by hand; never an automatic switch target yet.
+    static let local = "local"
 
     static func other(_ r: String) -> String { r == api ? code : api }
 
@@ -91,7 +93,7 @@ enum AIRoute {
          "claude_cli": PrepRunner.claudePath ?? ""]
     }
 
-    static func name(_ r: String) -> String { L(r == api ? "ai.route.api" : "ai.route.code") }
+    static func name(_ r: String) -> String { L(r == api ? "ai.route.api" : r == local ? "ai.route.local" : "ai.route.code") }
 
     /// One line per way that is out, for Settings > AI; empty when both answer.
     static func statusLines() -> [String] {

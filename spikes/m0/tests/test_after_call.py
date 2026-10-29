@@ -110,3 +110,12 @@ def test_thinking_disabled_becomes_between_tools_when_the_model_asks():
     assert c.error is None and seen[-1]["thinking"]["type"] == "between_tools"
     P().complete(model="m-test", system=[], user="x", max_tokens=10, cache_ttl=None, extra={"thinking": {"type": "disabled"}})
     assert seen[-1]["thinking"]["type"] == "between_tools" and len(seen) == 3
+
+
+def test_localprep_reads_the_three_parts():
+    """rules/ai.yaml > routes.local: the local model answers with BRIEF, CARDS and FACTS parts."""
+    from livetips_m0.localprep import split_parts
+    brief, cards, facts = split_parts('===BRIEF===\n# Live Brief: X\n- a\n===CARDS===\n```json\n[{"id": "c1", "triggers": ["x"], "gist": "g"}]\n```\n'
+                                      '===FACTS===\n[{"id": "f1", "title": "t", "text": "x", "keywords": ["k"]}]')
+    assert brief.startswith("# Live Brief") and cards[0]["id"] == "c1" and facts[0]["id"] == "f1"
+    assert split_parts("nothing")[0] == ""

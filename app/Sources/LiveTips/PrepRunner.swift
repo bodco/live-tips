@@ -35,12 +35,74 @@ final class PrepRunner: ObservableObject {
     /// 0.8.2: chosen in Settings > AI (AppConfig.ai.prep); `runRoute` is the way this run took (auto-switch).
     var useAPI: Bool { AppConfig.load(from: AppPaths.config).ai.prep == AIRoute.api }
     @Published var runRoute = AIRoute.code
-    private var switchedOnce = false
+    var switchedOnce = false
     /// Claude Code model alias (always the newest of the family). Sonnet by default: it reads and
     /// extracts well, is quicker, and uses the account's limits several times slower than Opus.
     @Published var model = UserDefaults.standard.string(forKey: "prepModel") ?? "sonnet" {
         didSet { UserDefaults.standard.set(model, forKey: "prepModel") }
     }
+    /// 0.8.5 (owner): the Ollama model of a preparation on this Mac (Settings > AI, route "local").
+    @Published var localModel = UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b" {
+        didSet { UserDefaults.standard.set(localModel, forKey: "prepLocalModel") }
+    }
+    static let ollamaURL = "http://127.0.0.1:11434"
+
+    /// The models Ollama has, or nil when it does not answer.
+    static func ollamaModels(_ done: @escaping ([String]?) -> Void) {
+        var req = URLRequest(url: URL(string: ollamaURL + "/api/tags")!); req.timeoutInterval = 3
+        URLSession.shared.dataTask(with: req) { d, _, e in
+            let names = (d.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["models"] as? [[String: Any]])?
+                .compactMap { $0["name"] as? String }
+            DispatchQueue.main.async { done(e == nil ? (names ?? []) : nil) }
+        }.resume()
+    }
+
+    // MARK: 0.8.5 (owner): every preparation kept for comparison, each one made from a clean start
+
+    /// <appRoot>/prep-runs/<base name>/: outside the project, so no preparation reads another one.
+    static func runsDir(_ base: String) -> String {
+        let c = AppConfig.load(from: AppPaths.config)
+        return (((c.effectiveAppRoot(appSupport: AppPaths.support.path) as NSString).appendingPathComponent("prep-runs") as NSString)
+            .appendingPathComponent((base as NSString).lastPathComponent))
+    }
+    static let runFiles = ["brief.md", "cards.json", "facts.json", "prep.json", "brief.orig.md", "brief.prev.md"]
+    static func stamp() -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmmss"; return f.string(from: Date()) }
+
+    /// Before a full preparation: the previous one's files leave the live folder (kept in prep-runs), so the new one
+    /// cannot read or continue it. Returns that folder, or nil when there was nothing.
+    static func moveAside(base: String) -> String? {
+        let fm = FileManager.default
+        let have = runFiles.filter { fm.fileExists(atPath: base + "." + $0) }
+        guard !have.isEmpty else { return nil }
+        let dir = (runsDir(base) as NSString).appendingPathComponent(stamp() + "-before")
+        try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        for f in have { try? fm.moveItem(atPath: base + "." + f, toPath: (dir as NSString).appendingPathComponent(f)) }
+        return dir
+    }
+
+    /// After it: a copy of what it wrote and run.json (route, model, time, price, tokens, turns, sources); the
+    /// previous brief is back as <base>.brief.prev.md (Restore previous version); a failed run puts the old files back.
+    static func keepRun(base: String, aside: String?, ok: Bool, meta: [String: Any]) {
+        let fm = FileManager.default
+        let route = meta["route"] as? String ?? "", model = meta["model"] as? String ?? ""
+        let dir = (runsDir(base) as NSString).appendingPathComponent(stamp() + "-" + route + "-" + model.replacingOccurrences(of: ":", with: "_") + (ok ? "" : "-failed"))
+        try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        for f in runFiles where fm.fileExists(atPath: base + "." + f) { try? fm.copyItem(atPath: base + "." + f, toPath: (dir as NSString).appendingPathComponent(f)) }
+        if let d = try? JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys]) {
+            try? d.write(to: URL(fileURLWithPath: (dir as NSString).appendingPathComponent("run.json")))
+        }
+        guard let aside else { return }
+        if ok {
+            let old = (aside as NSString).appendingPathComponent("brief.md")
+            if fm.fileExists(atPath: old) { try? fm.removeItem(atPath: base + ".brief.prev.md"); try? fm.copyItem(atPath: old, toPath: base + ".brief.prev.md") }
+        } else {
+            for f in runFiles where !fm.fileExists(atPath: base + "." + f) {
+                let src = (aside as NSString).appendingPathComponent(f)
+                if fm.fileExists(atPath: src) { try? fm.copyItem(atPath: src, toPath: base + "." + f) }
+            }
+        }
+    }
+
     static var models: [(id: String, label: String)] { [("sonnet", L("prep.model.sonnet")), ("opus", L("prep.model.opus")),
                                                          ("haiku", L("prep.model.haiku"))] }
     /// Claude Code sign-in (`claude auth status --json`): nil = not checked yet.
@@ -205,7 +267,8 @@ final class PrepRunner: ObservableObject {
     func start(_ r: Request, route forced: String? = nil) -> String? {
         if running { return L("prep.err.running") }
         if forced == nil { switchedOnce = false }
-        guard let claude = Self.claudePath else { return L("prep.err.noClaude") }
+        let wantsLocal = (forced ?? AppConfig.load(from: AppPaths.config).ai.prep) == AIRoute.local
+        guard let claude = Self.claudePath ?? (wantsLocal ? "/usr/bin/true" : nil) else { return L("prep.err.noClaude") }
         let c = AppConfig.load(from: AppPaths.config)
         guard let skill = Self.skillDir(workRoot: c.workRoot) else { return L("prep.err.noSkill") }
         let appRoot = c.effectiveAppRoot(appSupport: AppPaths.support.path)
@@ -297,6 +360,9 @@ final class PrepRunner: ObservableObject {
         if route == AIRoute.api && !hasAPIKey { return L("prep.err.noKey") }
         if route == AIRoute.code && loggedIn == false { return L("prep.err.notSigned") }
         let useAPI = route == AIRoute.api
+        let isLocal = route == AIRoute.local
+        let runModel = isLocal ? localModel : model
+        let aside = r.refreshBase == nil ? Self.moveAside(base: base) : nil      // a clean start, the old one kept
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
         let py = c.engine.python
@@ -320,7 +386,19 @@ final class PrepRunner: ObservableObject {
                        "--add-dir", skill, "--add-dir", live] + (r.workspaceRoot.isEmpty ? [] : ["--add-dir", r.workspaceRoot])
                        + Array(Set(r.folders.map { StartCallModel.isDir($0) ? $0 : ($0 as NSString).deletingLastPathComponent })).flatMap { ["--add-dir", $0] }
         if let dir = r.deck?.info?.dir { p.arguments! += ["--add-dir", dir] }
-        p.currentDirectoryURL = URL(fileURLWithPath: r.useProjectFolder ? r.root : live)
+        if isLocal {
+            // rules/ai.yaml > local: the engine builds the context pack and asks Ollama once (livetips_m0.localprep)
+            let req: [String: Any] = ["title": r.title, "when": h.string(from: r.date), "project_name": r.projectName, "root": r.root,
+                "config": r.config, "audience": r.audience, "call_type": r.callType, "languages": r.languages, "context": r.context,
+                "files": r.folders.filter { !StartCallModel.isDir($0) }, "folders": r.folders.filter { StartCallModel.isDir($0) },
+                "live": live, "notion": notion, "skill": skill, "base": base, "lt": [c.engine.python, lt], "model": localModel,
+                "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder]
+            let reqPath = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("localprep-request.json")
+            if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
+            p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
+            p.arguments = ["-m", "livetips_m0.localprep", "--request", reqPath]
+        }
+        p.currentDirectoryURL = URL(fileURLWithPath: isLocal ? c.engine.sidecarDir : (r.useProjectFolder ? r.root : live))
         var env = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         env["PATH"] = [home + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", env["PATH"] ?? ""].joined(separator: ":")
@@ -374,10 +452,22 @@ final class PrepRunner: ObservableObject {
                     }
                 }
                 if useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
-                Self.ledger(job: r.refreshOf == nil ? "prep" : "prep_refresh", route: useAPI ? "api" : "plan", usd: self.costUSD, meta: self.resultMeta, ok: ok)
+                let routeName = useAPI ? "api" : isLocal ? "local" : "plan"
+                var meta = self.resultMeta
+                meta["model"] = runModel
+                Self.ledger(job: r.refreshOf == nil ? "prep" : "prep_refresh", route: routeName, usd: self.costUSD, meta: meta, ok: ok)
+                if r.refreshBase == nil {
+                    var run = meta
+                    run["route"] = routeName; run["ok"] = ok; run["title"] = r.title
+                    run["started"] = ISO8601DateFormatter().string(from: self.startedAt ?? Date())
+                    run["duration_s"] = run["duration_s"] ?? Int(Date().timeIntervalSince(self.startedAt ?? Date()))
+                    if let c = self.costUSD { run["cost_usd"] = (c * 10000).rounded() / 10000 }
+                    Self.keepRun(base: base, aside: aside, ok: ok, meta: run)
+                }
                 if ok {
                     var extra = self.resultMeta
-                    extra["route"] = useAPI ? "api" : "plan"
+                    extra["route"] = routeName
+                    extra["model"] = runModel
                     if let c = self.costUSD { extra["cost_usd"] = (c * 10000).rounded() / 10000 }
                     Freshness.writeSnapshot(base: base, refreshOf: r.refreshOf, extra: extra)      // rules/freshness.json > snapshot
                     if let res = TalkFiles.after(base: base, deck: r.deck, oldTexts: deckTexts) { self.lastTalk = res }
@@ -399,7 +489,7 @@ final class PrepRunner: ObservableObject {
                 } else if !ok && (tail.lowercased().contains("usage limit") || tail.lowercased().contains("rate limit")) {
                     self.result = L("prep.err.limit")
                 } else {
-                    let cost = self.costUSD.map { String(format: " · $%.2f", $0) + (useAPI ? "" : L("prep.plan")) } ?? ""
+                    let cost = isLocal ? L("prep.local") : self.costUSD.map { String(format: " · $%.2f", $0) + (useAPI ? "" : L("prep.plan")) } ?? ""
                     self.result = ok ? L("prep.readyIn", ["min": "\(max(1, mins))"]) + cost : L("prep.failedExit", ["code": "\(proc.terminationStatus)"])
                 }
             }
@@ -464,6 +554,22 @@ final class PrepRunner: ObservableObject {
             lineBuf.removeSubrange(lineBuf.startIndex..<r.upperBound)
             guard let o = try? JSONSerialization.jsonObject(with: ln) as? [String: Any] else { continue }
             if (o["type"] as? String) == "system", progress < 0.05 { set(0.05, L("prep.st.instructions"), "") }
+            if let st = o["stage"] as? String {      // livetips_m0.localprep
+                switch st {
+                case "pack": set(0.1, L("prep.st.local.pack"), "")
+                case "model": set(0.25, L("prep.st.local.model"), "")
+                case "writing": set(min(0.9, 0.3 + Double((o["pieces"] as? Int) ?? 0) / 6000), L("prep.st.local.writing"), "")
+                default: set(0.92, L("prep.st.local.check"), "")
+                }
+            }
+            if o["ok"] != nil, o["tokens"] != nil {
+                costUSD = 0
+                var m: [String: Any] = ["tokens": o["tokens"] ?? [:]]
+                if let d = o["duration_s"] { m["duration_s"] = d }
+                if let s = o["sources"] { m["sources"] = s }
+                if let e = o["error"] as? String { m["error"] = e }
+                resultMeta = m
+            }
             if (o["type"] as? String) == "result" {
                 costUSD = (o["total_cost_usd"] as? Double) ?? (o["total_cost_usd"] as? NSNumber)?.doubleValue
                 // 0.8.5 (owner): what a preparation costs, kept in <base>.prep.json (rules/freshness.json > snapshot)
@@ -520,3 +626,70 @@ final class PrepRunner: ObservableObject {
 
     private func set(_ p: Double, _ s: String, _ d: String) { progress = p; stage = s; detail = d }
 }
+
+/// 0.8.5 (owner: compare the preparations of one call by time, price and quality): control/prep-bench.json
+/// {"title": "<part of the event title>", "runs": [{"route": "api|code|local", "model": "sonnet|opus|gemma4:26b"}],
+///  "next": 0} runs every listed preparation for the next calendar event with that title, one after another, never
+/// during a recorded call and with no automatic switch. Each run is kept in prep-runs (rules/ai.yaml > prep_runs);
+/// the file gets each result line and "done". The PM's model choice comes back at the end.
+@MainActor
+enum PrepBench {
+    static var localReady = false
+    static var path: String {
+        let c = AppConfig.load(from: AppPaths.config)
+        return ((c.effectiveAppRoot(appSupport: AppPaths.support.path) as NSString).appendingPathComponent("control") as NSString)
+            .appendingPathComponent("prep-bench.json")
+    }
+
+    static func tick() {
+        guard let data = FileManager.default.contents(atPath: path),
+              var d = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              d["done"] as? Bool != true, let runs = d["runs"] as? [[String: String]] else { return }
+        let runner = PrepRunner.shared
+        if runner.running || CallEngine.shared.isRunning { return }
+        var next = d["next"] as? Int ?? 0
+        var results = d["results"] as? [String] ?? []
+        if d["active"] as? Bool == true {
+            results.append("\(runs[min(next, runs.count - 1)]["route"] ?? "") \(runs[min(next, runs.count - 1)]["model"] ?? ""): \(runner.result)")
+            next += 1
+            d["active"] = false
+        }
+        if d["saved_model"] == nil { d["saved_model"] = runner.model; d["saved_local"] = runner.localModel }
+        func finish() {
+            runner.model = d["saved_model"] as? String ?? runner.model
+            runner.localModel = d["saved_local"] as? String ?? runner.localModel
+            d["done"] = true
+        }
+        defer {
+            d["next"] = next; d["results"] = results
+            if let out = try? JSONSerialization.data(withJSONObject: d, options: [.prettyPrinted, .sortedKeys]) {
+                try? out.write(to: URL(fileURLWithPath: path))
+            }
+        }
+        guard next < runs.count else { finish(); return }
+        let want = (d["title"] as? String ?? "").lowercased()
+        guard !want.isEmpty, let ev = CalendarService.shared.upcoming().filter({ $0.title.lowercased().contains(want) && $0.start > Date() })
+                .min(by: { $0.start < $1.start }) else { results.append("no upcoming event with \"\(want)\""); finish(); return }
+        let m = StartCallModel()
+        m.applyEvent(ev)
+        guard let r = m.prepRequest() else { results.append("no project for \(ev.title)"); finish(); return }
+        let run = runs[next]
+        if run["route"] == AIRoute.local {
+            // the local model may still be downloading: wait for Ollama to have it
+            let want = run["model"] ?? ""
+            PrepRunner.ollamaModels { names in localReady = names?.contains { $0 == want || $0 == want + ":latest" } ?? false }
+            guard localReady else { d["waiting"] = "ollama: " + want; return }
+        }
+        if run["route"] == AIRoute.local { runner.localModel = run["model"] ?? runner.localModel } else { runner.model = run["model"] ?? runner.model }
+        runner.switchedOnce = true
+        d["event"] = ev.title + " " + ISO8601DateFormatter().string(from: ev.start)
+        if let err = runner.start(r, route: run["route"]) {
+            results.append("\(run["route"] ?? "") \(run["model"] ?? ""): not started: \(err)")
+            next += 1
+        } else {
+            runner.switchedOnce = true          // start() reset it for a forced route: no automatic switch in a comparison
+            d["active"] = true
+        }
+    }
+}
+

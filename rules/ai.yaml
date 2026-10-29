@@ -1,0 +1,22 @@
+# Ways to a model per job (Pacenote 0.8.5). Shared by the app and the engine.
+schema_version: 1
+routes:
+  code: the PM's Claude account through Claude Code (the plan's limits, no key)
+  api: the Claude API key through Claude Code or the API (billed per token)
+  local: |
+    0.8.5 (owner): a preparation on this Mac through Ollama (Settings > AI > Preparation, model gemma4:26b by
+    default). A local model reads files poorly by itself, so the engine (livetips_m0.localprep) builds one context
+    pack and asks once: the call context, the files the PM added, the project config, the last 3 calls of this
+    meeting, the Current State page of the Notion mirror, `lt digest` for 14 days, the folders the PM added; about
+    120,000 characters at most, num_ctx 65,536. The rules given are the skill's sweep.md and speech.md. Output:
+    brief.md, cards.json, facts.json, then `lt prep-check`. Nothing leaves the Mac. Chosen by hand only for now.
+prep_runs:
+  rule: |
+    0.8.5 (owner: compare preparations by time, price and quality): a full preparation (not a refresh) moves the
+    previous one's files (brief.md, cards.json, facts.json, prep.json, brief.orig.md, brief.prev.md) out of the live
+    folder to <appRoot>/prep-runs/<base>/<time>-before, so the new one starts clean and cannot read it; afterwards
+    it copies what it wrote and run.json (route, model, started, duration_s, cost_usd, tokens, turns, sources, ok) to
+    <appRoot>/prep-runs/<base>/<time>-<route>-<model>. The previous brief comes back as <base>.brief.prev.md
+    (Restore previous version); a failed run puts the old files back.
+  compare: tools/prep_compare.py <appRoot>/prep-runs/<base> prints one table (time, price, tokens, brief size,
+    sections, speech points with full text, cards, facts) for a quality review

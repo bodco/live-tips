@@ -19,7 +19,12 @@ final class UpNext: ObservableObject {
 
     private var path: URL { AppPaths.support.appendingPathComponent("upnext.json") }
 
-    private init() { load(); pruneHeld() }
+    private var benchTimer: Timer?
+    private init() {
+        load(); pruneHeld()
+        // 0.8.5: a comparison of preparations asked for in control/prep-bench.json (PrepBench)
+        benchTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { _ in MainActor.assumeIsolated { PrepBench.tick() } }
+    }
 
     // MARK: list
 

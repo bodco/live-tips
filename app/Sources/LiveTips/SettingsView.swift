@@ -478,13 +478,39 @@ struct IconButton: View {
 /// Pacenote 0.8 (F4, spec 8): a key is a status line (Connected, Not set, the error) and one menu (Replace, Test, Remove);
 /// the field shows only when there is no key yet or while replacing it.
 /// 0.8.2: the way one job reaches Claude: the PM's Claude account (Claude Code) or the API key.
+/// 0.8.5: the Ollama model for a preparation on this Mac, and whether Ollama answers and has it.
+struct LocalModelRow: View {
+    @ObservedObject var runner: PrepRunner
+    @State private var status = ""
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                TextField(L("ai.local.model"), text: $runner.localModel).onSubmit { check() }
+                Button(L("set.check")) { check() }.buttonStyle(.pnTertiary)
+            }
+            Text(status.isEmpty ? L("ai.local.hint") : status).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear { check() }
+    }
+    private func check() {
+        let want = runner.localModel
+        PrepRunner.ollamaModels { names in
+            if names == nil { status = L("ai.local.noOllama") }
+            else if names!.contains(where: { $0 == want || $0 == want + ":latest" }) { status = L("ai.local.ready") }
+            else { status = L("ai.local.notPulled", ["cmd": "ollama pull " + want]) }
+        }
+    }
+}
+
 struct RoutePicker: View {
     @Binding var selection: String
     var recommended: String
     var discouraged: String? = nil
+    var withLocal = false          // 0.8.5: the preparation can also run on this Mac (Ollama)
     var body: some View {
         Picker(L("ai.route"), selection: $selection) {
-            ForEach([AIRoute.code, AIRoute.api], id: \.self) { r in
+            ForEach([AIRoute.code, AIRoute.api] + (withLocal ? [AIRoute.local] : []), id: \.self) { r in
                 Text(AIRoute.name(r) + (r == recommended ? L("ai.route.recommended") : r == discouraged ? L("ai.route.notRecommended") : "")).tag(r)
             }
         }
@@ -673,11 +699,15 @@ struct SettingsView: View {
             }
             .onAppear { runner.refreshAuth() }
             Section {
-                RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code)
-                Picker(L("set.model"), selection: $runner.model) {
-                    ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
+                RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withLocal: true)
+                if model.config.ai.prep == AIRoute.local {
+                    LocalModelRow(runner: runner)
+                } else {
+                    Picker(L("set.model"), selection: $runner.model) {
+                        ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
+                    }
+                    .help(L("set.sonnetReadsTheFiles"))
                 }
-                .help(L("set.sonnetReadsTheFiles"))
             } header: { Text(L("ai.job.prep")) } footer: {
                 Text(L("set.cc.builds")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }

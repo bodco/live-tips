@@ -1176,5 +1176,16 @@
  "callSettings.type.transcript": "Транскрипт",
  "start.transcriptHint": "Записує дзвінок і пише транскрипт, без підказок під час дзвінка. Після нього: підсумок, сторінка зустрічі і фоллоу-ап, як завжди. Підготовка не потрібна.",
  "callSettings.tips": "Підказки",
- "callSettings.tips.hint": "Вимкнено: лише транскрипт; підсумок і фоллоу-ап після дзвінка, як завжди"
+ "callSettings.tips.hint": "Вимкнено: лише транскрипт; підсумок і фоллоу-ап після дзвінка, як завжди",
+ "ai.route.local": "На цьому Mac (Ollama)",
+ "ai.local.model": "Модель Ollama",
+ "ai.local.hint": "Підготовка на цьому Mac: застосунок збирає файли, модель пише бриф. Безкоштовно, повільніше і простіше, ніж Claude.",
+ "ai.local.noOllama": "Ollama не відповідає. Відкрий застосунок Ollama (або виконай: ollama serve).",
+ "ai.local.ready": "Ollama працює, модель є.",
+ "ai.local.notPulled": "Ollama працює, модель ще не завантажено: {cmd}",
+ "prep.local": " · на цьому Mac, безкоштовно",
+ "prep.st.local.pack": "Збираю файли",
+ "prep.st.local.model": "Модель читає матеріал",
+ "prep.st.local.writing": "Модель пише бриф",
+ "prep.st.local.check": "Перевіряю файли"
 }

@@ -31,6 +31,7 @@ struct CallSetupView: View {
     @State private var copied = false
     @State private var info = false
     @State private var langs = false
+    @State private var confirmAgain = false
     @FocusState private var titleFocus: Bool
 
     private var saved: Bool { upnext.contains(model) }
@@ -403,6 +404,19 @@ struct CallSetupView: View {
         return nil
     }
 
+    /// Prepare again: a presentation with a talk opens Your talk (Keep my edits, replace the deck); any other call asks first.
+    private func againClicked() {
+        if model.callType == "presentation", let path = PrepDocWindow.path(for: model), TalkWindow.available(base: String(path.dropLast(9))) {
+            TalkWindow.show(base: String(path.dropLast(9)), title: model.effectiveTitle, call: model, openAgain: true)
+        } else { confirmAgain = true }
+    }
+    private var againMessage: String {
+        guard let path = PrepDocWindow.path(for: model), let made = Freshness.preparedAt(brief: path) else { return L("again.keepBrief") }
+        let days = max(0, Calendar.current.dateComponents([.day], from: made, to: Date()).day ?? 0)
+        let n = Freshness.check(model)?.changes.count ?? 0
+        return L("again.age", ["d": "\(days)", "n": "\(n)"]) + "\n" + L("again.keepBrief")
+    }
+
     private func prepareNow() {
         model.note = upnext.prepare(model) ?? ""
         if !saved && model.note.isEmpty { upnext.save(model) }   // kept in Up next until the call; the window stays
@@ -477,8 +491,17 @@ struct CallSetupView: View {
                 if saved { Button(L("home.removeUpNext"), action: onRemove).buttonStyle(.pnTertiary) }
                 Spacer()
                 Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
-                Button(L("call.prepareFirst")) { if !needProject() { prepareNow() } }.buttonStyle(.pnSecondary)
-                    .disabled(!canPrepare || model.prep?.matches == true || (runner.running && runner.callID == model.id))
+                // 2026-10-29 (owner): once the brief is ready the same button prepares again (with one previous version kept).
+                Button(model.prep?.matches == true ? L("talk.prepareAgain") : L("call.prepareFirst")) {
+                    if needProject() { return }
+                    if model.prep?.matches == true { againClicked() } else { prepareNow() }
+                }
+                .buttonStyle(.pnSecondary)
+                .disabled(!canPrepare || (runner.running && runner.callID == model.id))
+                .confirmationDialog(L("again.title"), isPresented: $confirmAgain) {
+                    Button(L("talk.prepareAgain")) { prepareNow() }
+                    Button(L("common.cancel"), role: .cancel) {}
+                } message: { Text(againMessage) }
                 // 0.8.5 (P6, entry 1): Rehearse next to Start call as soon as the talk exists.
                 if model.callType == "presentation", let path = PrepDocWindow.path(for: model), TalkWindow.available(base: String(path.dropLast(9))) {
                     Button(L("rehearse.button")) { RehearsalWindow.show(base: String(path.dropLast(9)), title: model.effectiveTitle, call: model) }.buttonStyle(.pnSecondary)

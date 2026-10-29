@@ -88,7 +88,6 @@
 | again.age | Brief is {d} days old · {n} changes since | Брифу {d} дні · з того часу {n} змін |
 | again.deckChanged | The deck file changed | Файл презентації змінився |
 | again.callLonger | The call is now {d} | Дзвінок тепер {d} |
-| again.newDecision | New decision on the project | Нове рішення в проєкті |
 | again.keep | Keep my edits | Зберегти мої правки |
 | again.keepHint | Slides you edited ({list}) stay as they are. The rest is rewritten. | Слайди, які ви змінили ({list}), лишаються як є. Решту переписуємо. |
 | again.rewrite | Rewrite everything | Переписати все |
@@ -233,6 +232,45 @@
 | sys.mic | Mic | Мікр. |
 | sys.call | Call | Дзвінок |
 
+### Додано під час реалізації 0.8.5 (29.10)
+
+Ключі, яких не було в макетах, але без яких екрани не працюють. Кожен є в en.json і uk.json.
+
+| Key | EN | UK |
+|---|---|---|
+| after.instruct | What to change: "drop the pricing line", "shorter" | Що змінити: «прибери рядок про ціну», «коротше» |
+| after.lessons | Uses {n} of your recurring corrections | Враховує ваші повторювані правки: {n} |
+| after.rewrite | Rewrite | Переписати |
+| after.write | Write draft | Написати чернетку |
+| again.keepBrief | The brief is written again from the newest sources. The current one is kept as the previous version. | Бриф буде написано знову з найновіших джерел. Поточний збережеться як попередня версія. |
+| deck.assignUnknown | Not understood. Try "5-9 Ann". | Не зрозуміло. Спробуйте «5-9 Ann». |
+| deck.colleague | your colleague | колеги |
+| deck.err.generic | The file can't be opened or has no slides. Export the deck as PDF and attach it, or paste the talk as text. | Файл не відкривається або в ньому немає слайдів. Експортуйте презентацію в PDF і додайте її або вставте виступ текстом. |
+| deck.formatText | Text outline | Текстовий план |
+| deck.min | min | хв |
+| deck.otherName | Someone else | Інша людина |
+| deck.pasteHint | One slide per block: start each with "# Title" or "Slide 3:", or leave a blank line between slides. | Один слайд на блок: починайте кожен з «# Назва» або «Слайд 3:», або залишайте порожній рядок між слайдами. |
+| deck.readingStart | Opening the file | Відкриваю файл |
+| deck.speakerName | Name | Імʼя |
+| hotkey.add30 | +30 s on this slide (while presenting) | +30 с на цьому слайді (під час презентації) |
+| hotkey.nextSlide | Next slide (while presenting) | Наступний слайд (під час презентації) |
+| hotkey.presentation | Presentation mode on or off | Режим презентації |
+| hotkey.prevSlide | Previous slide (while presenting) | Попередній слайд (під час презентації) |
+| set.aliases | Other spellings: {list} | Інші написання: {list} |
+| set.mergeHelp | The same person under another name: {name}'s voice prints join the chosen person, and {name} becomes another spelling of that name (typing or picking it names the kept person). | Та сама людина під іншим імʼям: зразки голосу {name} додаються до обраної людини, а {name} стає іншим написанням її імені (вибір або введення цього імені назве збережену людину). |
+| set.mergeInto | Merge into | Обʼєднати з |
+| talk.addQuestion | Add question | Додати питання |
+| talk.adv | Shorten slide {n} or mark slide {m} as can skip. | Скоротіть слайд {n} або позначте слайд {m} як «можна пропустити». |
+| talk.advShort | Shorten slide {n}. | Скоротіть слайд {n}. |
+| talk.budget | Time budget | Бюджет часу |
+| talk.done | Done | Готово |
+| talk.open | Your talk | Ваш виступ |
+| talk.proposal | From the rehearsal: slides {list} shortened, {k} better answers added. Review them below, then save. | З репетиції: скорочено слайди {list}, додано кращих відповідей: {k}. Перегляньте нижче і збережіть. |
+| talk.proposalDiscard | Discard | Відкинути |
+| talk.proposalSave | Save to talk | Зберегти у виступ |
+| talk.proposed | Proposed | Запропоновано |
+| talk.short | If short on time, say only | Якщо бракує часу, скажіть лише |
+
 ## 3. Рішення PM (29.10)
 
 1. **Синхронізація слайдів: прийнято.** Застосунок: варіант A (номер слайда з Keynote або PowerPoint, потрібен дозвіл Automation). Скіл: варіант B (локальний трекер за мовою PM, перехід лише після «Move to slide N?» з Enter/Esc). Застосунок падає на B, коли презентація PDF, Google Slides або немає доступу Automation. Previous/Next і хоткеї працюють завжди. У rules/ позначити A як `app only`.
@@ -240,6 +278,12 @@
 3. **Хоткеї: прийнято як дефолти.** ⌃⌥M, ⌃⌥P, ⌃⌥T, ⌃⌥←/→, ⌃⌥=, ⌃⌥S, PM може їх змінити в Settings · Keys. Перед реалізацією звірити з уже зайнятими (⌃⌥H лишається за допомогою).
 4. **Серії: рішення не потрібне.** Правило вже є в rules/commitments.yaml: `series_key = <project slug>|<назва дзвінка малими літерами, лише літери і цифри>`. Тексти P7 виправлено під нього: серія = той самий проєкт і та сама назва; переносяться відкриті обіцянки (commitments, this series first) і пункти агенди «Not raised» (rules/agenda.yaml). Кнопку «Not a series» прибрано, бо такої поведінки немає: нова серія починається зі зміною назви.
 5. **Поради про час: прийнято (29.10).** Однаково для скіла й застосунку, див. розділ 3a.
+6. **Prepare again для будь-якого дзвінка (29.10).** Коли бриф готовий, кнопка «Prepare first» у Start call стає «Prepare again» і спершу питає (вік брифу, кількість змін, попередня версія зберігається як `<base>.brief.prev.md`). Для презентації з виступом вона відкриває «Your talk» з листом Prepare again (Keep my edits, заміна файлу). На Home у картці Up next є та сама дія. Причину «New decision on the project» прибрано: надійного джерела для неї немає.
+7. **Прогрес «Updating the talk · slide i of n» (29.10).** Номер слайда оцінюється із загального прогресу підготовки; лишаємо так.
+8. **Хоткеї (29.10).** ⌃⌥S режим презентації; ⌃⌥←/→ і ⌃⌥= реєструються лише під час презентації. Компактний вигляд лишається на ⌃⌥T, проактивні підказки на ⌃⌥L (як у 0.8.1). Усі змінюються в Settings · Keys.
+9. **Мова підказок (29.10).** Підказки й картки мовою мітингу; якщо мова інтерфейсу інша, у заголовку вікна перемикач УК/EN (rules/meeting.yaml > tips_language).
+10. **Голоси (29.10).** Названий спікер бере лише голос своєї людини, перейменування повертає рядки попередньої, у бібліотеці є «Merge into» з псевдонімами (rules/voices.yaml).
+11. **Одна підготовка, один дзвінок (29.10).** Підготовка, завершена до кінця проведеного дзвінка серії, належить йому; наступний дзвінок серії не показується як підготовлений.
 
 ### 3a. Поради про час (прийнято)
 

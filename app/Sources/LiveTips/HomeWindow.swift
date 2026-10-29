@@ -330,6 +330,8 @@ struct HomeView: View {
             HStack(spacing: 8) {
                 Button(L("home.startTips")) { start(r) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                 Button(L("home.editSetup")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) }.buttonStyle(.pnSecondary)
+                // 2026-10-29 (owner): a ready brief can be prepared again from here too (the form asks first).
+                if hasBrief { Button(L("talk.prepareAgain")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) }.buttonStyle(.pnTertiary) }
                 // Pacenote 0.8: the series page (idea 06) and a rehearsal of a presentation (idea 10).
                 if let m = r.model, m.callType == "presentation", let p = PrepDocWindow.path(for: m), TalkWindow.available(base: String(p.dropLast(9))) {
                     Button(L("talk.open")) { TalkWindow.show(base: String(p.dropLast(9)), title: m.effectiveTitle, call: m) }.buttonStyle(.pnTertiary)

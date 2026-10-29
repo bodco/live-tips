@@ -85,6 +85,8 @@ final class TalkModel: ObservableObject {
     @Published var mtime: Date?
     /// Changes offered by a rehearsal; saved only when the PM saves them (rules/rehearsal.yaml > apply_to_talk).
     @Published var proposal: TalkProposal?
+    /// Opened from Start call's Prepare again: the sheet shows at once.
+    @Published var askAgain = false
 
     func applyProposal() {
         guard let p = proposal else { return }
@@ -180,13 +182,15 @@ enum TalkWindow {
     static var windows: [String: NSWindow] = [:]
     static var models: [String: TalkModel] = [:]
 
-    static func show(base: String, title: String, call: StartCallModel?, proposal: TalkProposal? = nil) {
+    static func show(base: String, title: String, call: StartCallModel?, proposal: TalkProposal? = nil, openAgain: Bool = false) {
         if let w = windows[base] {
             if let p = proposal, !p.isEmpty { models[base]?.proposal = p }
+            if openAgain { models[base]?.askAgain = true }
             w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return
         }
         let model = TalkModel(base: base, title: title, call: call)
         if let p = proposal, !p.isEmpty { model.proposal = p }
+        model.askAgain = openAgain
         models[base] = model
         let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { TalkView(model: model).frame(minWidth: 720, minHeight: 640) }))
         w.styleMask.insert(.resizable)
@@ -245,6 +249,8 @@ struct TalkView: View {
             .padding(.horizontal, 24).padding(.vertical, 14)
         }
         .background(PN.C.bg)
+        .onAppear { if model.askAgain { model.askAgain = false; again = true } }
+        .onChange(of: model.askAgain) { if model.askAgain { model.askAgain = false; again = true } }
         .sheet(isPresented: $again) { PrepareAgainSheet(model: model, onStart: { wasRunning = true; review = false }) }
         .onChange(of: runner.running) { if !runner.running && wasRunning { model.load() } }
     }

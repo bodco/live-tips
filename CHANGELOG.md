@@ -46,6 +46,8 @@ Pacenote. Earlier versions are described in the commit messages and in
   clearly someone else's), renaming a speaker to another known person moves the old person's lines back, and
   Settings > Voice library can merge two entries of one person ("Maria H." and "m.holosovska" into "Mariia H.");
   the merged spelling then names the kept person everywhere (rules/voices.yaml).
+- **Prepare again for every call:** once the brief is ready, Prepare first becomes Prepare again (asks first, keeps the
+  previous brief); a presentation opens Your talk with Keep my edits. Home's Up next card has it too.
 - **One preparation, one call:** a preparation finished before a held call of its series ended belongs to that
   call; the next call of the series is not shown as prepared by it. Home's Later badges and actions line up.
 - **Skill and app behave the same:** the time line, the advice and "Move to slide N?" are computed once by the

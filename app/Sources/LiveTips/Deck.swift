@@ -531,6 +531,11 @@ enum TalkFiles {
             try? fm.removeItem(atPath: "\(base).\(ext).prev.json")
             try? fm.copyItem(atPath: "\(base).\(ext).json", toPath: "\(base).\(ext).prev.json")
         }
+        // 2026-10-29 (owner): Prepare again for any call keeps the previous brief too (<base>.brief.prev.md).
+        if fm.fileExists(atPath: base + ".brief.md") {
+            try? fm.removeItem(atPath: base + ".brief.prev.md")
+            try? fm.copyItem(atPath: base + ".brief.md", toPath: base + ".brief.prev.md")
+        }
         var old: [Int: String] = [:]
         if let o = load(base + ".deck.json"), let s = o["slides"] as? [[String: Any]] {
             for x in s { if let n = TalkMerge.num(x) { old[n] = "\(x["title"] ?? "")\n\(x["text"] ?? "")" } }

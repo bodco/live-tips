@@ -1009,7 +1009,6 @@
  "again.age": "Brief is {d} days old · {n} changes since",
  "again.deckChanged": "The deck file changed",
  "again.callLonger": "The call is now {d}",
- "again.newDecision": "New decision on the project",
  "again.keep": "Keep my edits",
  "again.keepHint": "Slides you edited ({list}) stay as they are. The rest is rewritten.",
  "again.rewrite": "Rewrite everything",
@@ -1163,5 +1162,6 @@
  "after.lessons": "Uses {n} of your recurring corrections",
  "set.mergeInto": "Merge into",
  "set.mergeHelp": "The same person under another name: {name}'s voice prints join the chosen person, and {name} becomes another spelling of that name (typing or picking it names the kept person).",
- "set.aliases": "Other spellings: {list}"
+ "set.aliases": "Other spellings: {list}",
+ "again.keepBrief": "The brief is written again from the newest sources. The current one is kept as the previous version."
 }

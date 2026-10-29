@@ -478,27 +478,49 @@ struct IconButton: View {
 /// Pacenote 0.8 (F4, spec 8): a key is a status line (Connected, Not set, the error) and one menu (Replace, Test, Remove);
 /// the field shows only when there is no key yet or while replacing it.
 /// 0.8.2: the way one job reaches Claude: the PM's Claude account (Claude Code) or the API key.
-/// 0.8.5: the Ollama model for a preparation on this Mac, and whether Ollama answers and has it.
+/// 0.8.5 (owner): the model on this Mac for a job: the models Ollama has, or Install Gemma when it has none.
 struct LocalModelRow: View {
-    @ObservedObject var runner: PrepRunner
-    @State private var status = ""
+    @ObservedObject var local = LocalLLM.shared
+    @State private var pick = LocalLLM.model
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if local.running && !local.models.isEmpty {
+                Picker(L("set.model"), selection: $pick) {
+                    ForEach(local.models, id: \.self) { Text($0).tag($0) }
+                }
+                .onChange(of: pick) { LocalLLM.model = pick }
+            }
+            LocalStatus(local: local)
+        }
+        .onAppear { local.refresh(); if !local.models.contains(pick), let f = local.models.first { pick = f } }
+    }
+}
+
+/// Ollama's state and the one action that moves it on: Get Ollama, Start Ollama, Install Gemma, or the progress.
+struct LocalStatus: View {
+    @ObservedObject var local: LocalLLM
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                TextField(L("ai.local.model"), text: $runner.localModel).onSubmit { check() }
-                Button(L("set.check")) { check() }.buttonStyle(.pnTertiary)
+            HStack(spacing: 8) {
+                if !local.installed {
+                    Text(L("local.noOllama")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Spacer()
+                    Button(L("local.getOllama")) { NSWorkspace.shared.open(URL(string: "https://ollama.com/download")!) }.buttonStyle(.pnTertiary)
+                } else if !local.running {
+                    Text(L("local.notRunning")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Spacer()
+                    Button(L("local.start")) { local.start() }.buttonStyle(.pnTertiary)
+                } else if let p = local.pulling {
+                    ProgressView(value: local.progress).frame(maxWidth: 160)
+                    Text(p + " · " + local.note).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                } else if !local.hasSuggested {
+                    Text(local.models.isEmpty ? L("local.noModels") : L("local.ready")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Spacer()
+                    Button(L("local.install", ["name": LocalLLM.suggestedLabel])) { local.install() }.buttonStyle(.pnTertiary)
+                } else {
+                    Text(local.note.isEmpty ? L("local.ready") : local.note).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
             }
-            Text(status.isEmpty ? L("ai.local.hint") : status).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .onAppear { check() }
-    }
-    private func check() {
-        let want = runner.localModel
-        PrepRunner.ollamaModels { names in
-            if names == nil { status = L("ai.local.noOllama") }
-            else if names!.contains(where: { $0 == want || $0 == want + ":latest" }) { status = L("ai.local.ready") }
-            else { status = L("ai.local.notPulled", ["cmd": "ollama pull " + want]) }
         }
     }
 }
@@ -699,9 +721,14 @@ struct SettingsView: View {
             }
             .onAppear { runner.refreshAuth() }
             Section {
+                LocalStatus(local: LocalLLM.shared)
+            } header: { Text(L("local.section")) } footer: {
+                Text(L("local.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
+            Section {
                 RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withLocal: true)
                 if model.config.ai.prep == AIRoute.local {
-                    LocalModelRow(runner: runner)
+                    LocalModelRow()
                 } else {
                     Picker(L("set.model"), selection: $runner.model) {
                         ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
@@ -729,8 +756,12 @@ struct SettingsView: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
-                RoutePicker(selection: $model.config.ai.after, recommended: AIRoute.code)
-                ModelPicker(title: L("set.model"), selection: $model.config.models.analysis, choices: model.modelChoices).help(L("set.summaryAndAnalysisNot"))
+                RoutePicker(selection: $model.config.ai.after, recommended: AIRoute.code, withLocal: true)
+                if model.config.ai.after == AIRoute.local {
+                    LocalModelRow()
+                } else {
+                    ModelPicker(title: L("set.model"), selection: $model.config.models.analysis, choices: model.modelChoices).help(L("set.summaryAndAnalysisNot"))
+                }
                 Toggle(L("set.rateTipsAfterEach"), isOn: $model.config.judgeAfterCall)
                     .help(L("set.afterTheCallClaude"))
                 if !CallEngine.shared.judgeResult.isEmpty {

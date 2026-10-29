@@ -195,9 +195,10 @@ emoji; phrase in {CALL_LANG}, ready to say>
 every call language; source = the call date or the document>"""
 
 
-def ollama_chat(url: str, model: str, system: str, user: str, on_tokens) -> dict:
-    body = json.dumps({"model": model, "stream": True, "keep_alive": "2m",
-                       "options": {"num_ctx": NUM_CTX, "temperature": 0.3},
+def ollama_chat(url: str, model: str, system: str, user: str, on_tokens, max_out: int = 6000) -> dict:
+    # 0.8.5: a cap on every pass and a repeat penalty: one pass looped for 25 minutes without them
+    body = json.dumps({"model": model, "stream": True, "keep_alive": "5m",
+                       "options": {"num_ctx": NUM_CTX, "temperature": 0.3, "num_predict": max_out, "repeat_penalty": 1.1},
                        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}).encode()
     req = urllib.request.Request(url.rstrip("/") + "/api/chat", data=body, headers={"Content-Type": "application/json"})
     text, last, n = [], {}, 0
@@ -264,9 +265,11 @@ def main(argv=None) -> int:
            "sources": [], "passes": []}
     url, model = r.get("url") or "http://127.0.0.1:11434", r["model"]
 
+    caps = {"notes": 1500, "brief": 6000, "speech": 1800, "cards": 7000}
+
     def ask(name: str, system: str, user: str) -> str:
         t = time.time()
-        out = ollama_chat(url, model, system, user, lambda n: say(stage="writing", pass_=name, pieces=n))
+        out = ollama_chat(url, model, system, user, lambda n: say(stage="writing", pass_=name, pieces=n), caps.get(name, 6000))
         res["tokens"]["input"] += int(out.get("prompt_eval_count") or 0)
         res["tokens"]["output"] += int(out.get("eval_count") or 0)
         res["passes"].append({"pass": name, "s": int(time.time() - t), "in": int(out.get("prompt_eval_count") or 0),
@@ -326,7 +329,8 @@ def main(argv=None) -> int:
             say(stage="check")
             fix = ["--fix"] if not cards else []
             chk = subprocess.run(r["lt"] + ["prep-check", base + ".md"] + fix, capture_output=True, text=True, timeout=60)
-            res["check"] = (chk.stdout.strip().splitlines() or [""])[-1][:300]
+            m = re.search(r'"verdict"\s*:\s*"([^"]*)"', chk.stdout)
+            res["check"] = m.group(1) if m else chk.stdout.strip()[-200:]
         res["ok"] = True
     except Exception as e:  # noqa: BLE001
         res["error"] = f"{type(e).__name__}: {e}"[:400]

@@ -29,7 +29,7 @@ from .providers import AnthropicProvider, Completion, Provider, gist_closed, use
 ROUTES = ("api", "code")
 JOBS = ("prep", "tips", "after")
 PROBE_EVERY_S = 120
-PING_MODEL = {"api": "claude-haiku-5-5", "code": "haiku"}
+PING_MODEL = {"api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}
 
 
 def other(route: str) -> str:
@@ -43,7 +43,7 @@ def spend_ledger(job: str, route: str, c, state_path) -> None:
         from .cost import cost_usd
         g = lambda k: int(getattr(c, k, 0) or 0)  # noqa: E731
         usd = cost_usd(c.model, g("input_tokens"), g("cache_write_5m"), g("cache_write_1h"), g("cache_read"), g("output_tokens")) \
-            if route == "api" else getattr(c, "equiv_usd", None)
+            if route == "api" else (0.0 if route == "local" else getattr(c, "equiv_usd", None))
         row = {"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "job": os.environ.get("LT_AI_STAGE") or job, "route": route,
                "model": c.model, "input": g("input_tokens"), "output": g("output_tokens"), "cache_read": g("cache_read"),
                "cache_write": g("cache_write_5m") + g("cache_write_1h"), "usd": round(usd, 6) if usd is not None else None,
@@ -366,6 +366,8 @@ class RoutedProvider(Provider):
         else:
             if route != "api":
                 kw = dict(kw, extra=None)
+            if route == "local":
+                kw = dict(kw, model=os.environ.get("LT_LOCAL_MODEL", "gemma4:26b"))   # the Claude model name means nothing here
             c = leg.complete(**kw)
         c.route = route
         self.last_route = route
@@ -401,8 +403,11 @@ CODE_TIMEOUT = {True: 60.0, False: 300.0}    # during the call / any other job
 
 def make_legs(key: str, workspace: str, cli: Optional[str], api_timeout: float, code_timeout: float) -> dict:
     """The two ways to Claude; a way that cannot be used (no key, no Claude Code) is None."""
+    from .providers import OllamaProvider
     return {"api": AnthropicProvider(key, timeout=api_timeout, workspace_id=workspace) if key else None,
-            "code": ClaudeCodeProvider(cli, timeout=code_timeout) if cli else None}
+            "code": ClaudeCodeProvider(cli, timeout=code_timeout) if cli else None,
+            # 0.8.5 (rules/ai.yaml > routes.local): a model on this Mac, only when the PM chose it for the job
+            "local": OllamaProvider(os.environ.get("LT_OLLAMA_URL", "http://127.0.0.1:11434"))}
 
 
 def _secret(loader: Callable[[str], str], name: str) -> str:

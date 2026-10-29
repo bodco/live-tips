@@ -63,7 +63,7 @@ enum AIRoute {
     }
 
     /// The way can be tried at all: a key for the API, the Claude Code tool for the account.
-    static func available(_ r: String) -> Bool { r == api ? hasKey : PrepRunner.claudePath != nil }
+    static func available(_ r: String) -> Bool { r == api ? hasKey : r == local ? true : PrepRunner.claudePath != nil }
 
     /// A job on this way can run: the way itself, or with auto-switch the other one.
     static func canRun(job: String, config c: AppConfig) -> Bool {
@@ -80,6 +80,7 @@ enum AIRoute {
         if let ws = store.get(.claudeWorkspaceID), !ws.isEmpty { env["CLAUDE_WORKSPACE"] = ws }
         env["LT_AI_JOB"] = job
         env["LT_AI_ROUTE"] = c.ai.route(job)
+        env["LT_LOCAL_MODEL"] = UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"   // rules/ai.yaml > local
         env["LT_AI_AUTO"] = c.ai.autoSwitch ? "1" : "0"
         env["LT_AI_STATE"] = statePath
         if let cl = PrepRunner.claudePath { env["LT_CLAUDE_CLI"] = cl }

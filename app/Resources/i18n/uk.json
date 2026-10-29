@@ -1187,5 +1187,17 @@
  "prep.st.local.pack": "Збираю файли",
  "prep.st.local.model": "Модель читає матеріал",
  "prep.st.local.writing": "Модель пише бриф",
- "prep.st.local.check": "Перевіряю файли"
+ "prep.st.local.check": "Перевіряю файли",
+ "local.section": "Модель на цьому Mac (Ollama)",
+ "local.footer": "Безкоштовно і приватно, повільніше і простіше за Claude. Працює там, де в роботи вибрано «На цьому Mac» (підготовка, після дзвінка); не для підказок під час дзвінка (надто повільно, і дзвінку потрібна памʼять).",
+ "local.noOllama": "Ollama не встановлено.",
+ "local.getOllama": "Завантажити Ollama",
+ "local.notRunning": "Ollama встановлено, але не запущено.",
+ "local.start": "Запустити Ollama",
+ "local.noModels": "Ollama працює, моделі ще немає.",
+ "local.ready": "Ollama працює.",
+ "local.install": "Встановити {name} (16 ГБ)",
+ "local.pull.starting": "Починаю завантаження",
+ "local.pull.failed": "Завантаження не вдалося: {err}",
+ "local.pull.done": "Встановлено. Модель уже в списках."
 }

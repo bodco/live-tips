@@ -241,6 +241,44 @@ class OpenAICompatProvider(Provider):
                                                **({"Authorization": "Bearer " + self.api_key} if self.api_key else {})})
 
 
+class OllamaProvider(Provider):
+    """0.8.5 (rules/ai.yaml > routes.local): a model on this Mac through Ollama's own /api/chat, so the context
+    length can be set (the OpenAI-compatible endpoint keeps Ollama's small default). Free; usage from the last chunk."""
+    name = "ollama"
+
+    def __init__(self, base_url: str = "http://127.0.0.1:11434", num_ctx: int = 65536, timeout: float = 1800.0):
+        self.base_url = base_url.rstrip("/")
+        self.num_ctx = num_ctx
+        self.timeout = timeout
+
+    def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
+        c = Completion(model=model, t_start=time.monotonic())
+        body = {"model": model, "stream": True, "keep_alive": "5m",
+                "options": {"num_ctx": self.num_ctx, "num_predict": max(256, int(max_tokens) * 2), "temperature": 0.2},
+                "messages": [{"role": "system", "content": "\n\n".join(b["text"] for b in system)},
+                             {"role": "user", "content": user_text(user)}]}
+        req = urllib.request.Request(self.base_url + "/api/chat", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                for raw in r:
+                    if not raw.strip():
+                        continue
+                    ev = json.loads(raw)
+                    if ev.get("error"):
+                        raise RuntimeError(ev["error"])
+                    piece = (ev.get("message") or {}).get("content") or ""
+                    if piece:
+                        take_piece(c, piece, on_text)
+                    if ev.get("done"):
+                        c.input_tokens = int(ev.get("prompt_eval_count") or 0)
+                        c.output_tokens = int(ev.get("eval_count") or 0)
+            c.t_done = time.monotonic()
+        except Exception as e:  # noqa: BLE001
+            failed(c, e)
+        return c
+
+
 class FakeProvider(Provider):
     """Deterministic provider for tests and dry runs."""
     name = "fake"

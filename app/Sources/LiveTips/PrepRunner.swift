@@ -42,9 +42,7 @@ final class PrepRunner: ObservableObject {
         didSet { UserDefaults.standard.set(model, forKey: "prepModel") }
     }
     /// 0.8.5 (owner): the Ollama model of a preparation on this Mac (Settings > AI, route "local").
-    @Published var localModel = UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b" {
-        didSet { UserDefaults.standard.set(localModel, forKey: "prepLocalModel") }
-    }
+    var localModel: String { get { LocalLLM.model } set { LocalLLM.model = newValue } }
     static let ollamaURL = "http://127.0.0.1:11434"
 
     /// The models Ollama has, or nil when it does not answer.

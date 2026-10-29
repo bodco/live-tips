@@ -13,6 +13,13 @@ routes:
     open items); (2) the brief, every section of sweep.md in the order and depth of a Claude brief, from the notes and
     the pack, in the PM's language; (3) the speech with a full text under every point (speech.md), then the cards and
     the facts with sweep.md's card and fact rules. Then `lt prep-check`. Nothing leaves the Mac. Chosen by hand only.
+  local_jobs: |
+    0.8.5 (owner: local models in every model list): After the call can also run On this Mac (summary, meeting
+    page, follow-up, memory, rehearsal) through livetips_m0.providers.OllamaProvider (/api/chat, num_ctx 65,536);
+    the model is the one chosen in Settings (LT_LOCAL_MODEL, shared with the preparation). Tips during a call never
+    run locally: too slow, and the call needs the memory. Settings > AI shows Ollama's state with one action: Get
+    Ollama, Start Ollama, Install Gemma 4 26B (Ollama's /api/pull with progress), then the installed models.
+    Every local pass has an output cap and a repeat penalty (a pass once looped for 25 minutes).
   claude_tools: |
     0.8.5: Claude Code was refused `lt digest` and `lt prep-check` in every run; the app now makes <base>.digest.md
     right before Claude starts and runs `lt prep-check --fix` after it; Claude reads the digest with Read.

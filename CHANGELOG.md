@@ -81,6 +81,9 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **What a preparation costs, measured:** five runs of one real preparation (docs 14.1g): Sonnet through the API
   key $0.77 in 3 minutes, Opus $2.57 in 6, the Claude account the same work from the plan, the local Gemma 4 26B
   free but thin. Sonnet through the key is the recommended default.
+- **Local models everywhere a job can use them:** Settings > AI shows Ollama's state with one action (Get Ollama,
+  Start Ollama, Install Gemma 4 26B with progress); the installed models appear in the model lists of Preparation
+  and After the call, both of which can now run On this Mac.
 - **Local preparation in three passes:** notes of each earlier call, then the brief section by section, then the
   speech with full texts and the cards and facts, to come closer to a Claude brief. The digest and the file check
   that Claude Code was refused are now made by the app around it; a person in the invitation who has left the

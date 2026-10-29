@@ -1187,5 +1187,17 @@
  "prep.st.local.pack": "Gathering the files",
  "prep.st.local.model": "The model reads the material",
  "prep.st.local.writing": "The model writes the brief",
- "prep.st.local.check": "Checking the files"
+ "prep.st.local.check": "Checking the files",
+ "local.section": "Model on this Mac (Ollama)",
+ "local.footer": "Free and private, slower and simpler than Claude. Used where a job's \"Runs on\" is On this Mac (preparation, after the call); not for tips during a call (too slow, and the call needs the memory).",
+ "local.noOllama": "Ollama is not installed.",
+ "local.getOllama": "Get Ollama",
+ "local.notRunning": "Ollama is installed but not running.",
+ "local.start": "Start Ollama",
+ "local.noModels": "Ollama is running, no model yet.",
+ "local.ready": "Ollama is running.",
+ "local.install": "Install {name} (16 GB)",
+ "local.pull.starting": "Starting the download",
+ "local.pull.failed": "The download failed: {err}",
+ "local.pull.done": "Installed. It is in the model lists now."
 }

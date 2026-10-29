@@ -26,7 +26,7 @@ from typing import Callable, Dict, Optional
 
 from .providers import AnthropicProvider, Completion, Provider, gist_closed, user_text
 
-ROUTES = ("api", "code")
+ROUTES = ("api", "code", "local")   # 0.8.5: "local" = a model on this Mac (rules/ai.yaml)
 JOBS = ("prep", "tips", "after")
 PROBE_EVERY_S = 120
 PING_MODEL = {"api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}

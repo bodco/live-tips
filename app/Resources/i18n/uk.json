@@ -1199,5 +1199,9 @@
  "local.install": "Встановити {name} (16 ГБ)",
  "local.pull.starting": "Починаю завантаження",
  "local.pull.failed": "Завантаження не вдалося: {err}",
- "local.pull.done": "Встановлено. Модель уже в списках."
+ "local.pull.done": "Встановлено. Модель уже в списках.",
+ "local.model.text": "{name}: пише текст (підготовка, після дзвінка)",
+ "local.model.chosen": " · вибрано",
+ "local.model.search": "{name}: пошук по документах (Local AI), текст не пише",
+ "ai.route.local.model": "На цьому Mac ({model})"
 }

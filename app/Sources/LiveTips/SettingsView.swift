@@ -521,6 +521,16 @@ struct LocalStatus: View {
                     Text(local.note.isEmpty ? L("local.ready") : local.note).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
+            // 0.8.5 (owner: "which of my Ollama models is used?"): every model Ollama has, and what it is for
+            if local.running && !(local.models.isEmpty && local.searchModels.isEmpty) {
+                ForEach(local.models, id: \.self) { m in
+                    Text(L("local.model.text", ["name": m]) + (m == LocalLLM.model ? L("local.model.chosen") : ""))
+                        .font(PN.Font.caption).foregroundStyle(PN.C.text2)
+                }
+                ForEach(local.searchModels, id: \.self) { m in
+                    Text(L("local.model.search", ["name": m])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
+            }
         }
     }
 }

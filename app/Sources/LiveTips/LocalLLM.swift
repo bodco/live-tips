@@ -14,7 +14,8 @@ final class LocalLLM: ObservableObject {
 
     @Published private(set) var installed = false      // the Ollama app is on this Mac
     @Published private(set) var running = false
-    @Published private(set) var models: [String] = []
+    @Published private(set) var models: [String] = []         // models that write text (the job lists)
+    @Published private(set) var searchModels: [String] = []   // embedding models (bge-m3 ...): Local AI search only
     @Published private(set) var pulling: String? = nil
     @Published private(set) var progress: Double = 0    // 0...1 while pulling
     @Published private(set) var note = ""
@@ -40,7 +41,10 @@ final class LocalLLM: ObservableObject {
                 .compactMap { $0["name"] as? String }.map { $0.hasSuffix(":latest") ? String($0.dropLast(7)) : $0 }
             DispatchQueue.main.async { MainActor.assumeIsolated {
                 self.running = e == nil
-                self.models = (names ?? []).filter { !$0.contains("embed") && !$0.hasPrefix("bge") }.sorted()
+                let all = names ?? []
+                let isSearch = { (n: String) in n.contains("embed") || n.hasPrefix("bge") }
+                self.models = all.filter { !isSearch($0) }.sorted()
+                self.searchModels = all.filter(isSearch).sorted()
             } }
         }.resume()
     }

@@ -1199,5 +1199,9 @@
  "local.install": "Install {name} (16 GB)",
  "local.pull.starting": "Starting the download",
  "local.pull.failed": "The download failed: {err}",
- "local.pull.done": "Installed. It is in the model lists now."
+ "local.pull.done": "Installed. It is in the model lists now.",
+ "local.model.text": "{name}: writes text (preparation, after the call)",
+ "local.model.chosen": " · chosen",
+ "local.model.search": "{name}: search in documents (Local AI), cannot write text",
+ "ai.route.local.model": "On this Mac ({model})"
 }

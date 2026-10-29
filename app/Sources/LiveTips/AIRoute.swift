@@ -94,7 +94,10 @@ enum AIRoute {
          "claude_cli": PrepRunner.claudePath ?? ""]
     }
 
-    static func name(_ r: String) -> String { L(r == api ? "ai.route.api" : r == local ? "ai.route.local" : "ai.route.code") }
+    static func name(_ r: String) -> String {
+        r == local ? L("ai.route.local.model", ["model": UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"])
+            : L(r == api ? "ai.route.api" : "ai.route.code")
+    }
 
     /// One line per way that is out, for Settings > AI; empty when both answer.
     static func statusLines() -> [String] {

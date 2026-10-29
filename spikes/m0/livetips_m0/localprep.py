@@ -126,6 +126,25 @@ def build_pack(r: dict) -> tuple:
     return "\n\n".join(blocks), used
 
 
+OPEN_SYS = """From the notes of the earlier calls and the material, list what is still OPEN for the next call. Be
+exhaustive: a missing item costs the PM more than a repeated one. Write in {BRIEF_LANG}. No long dashes. Sections:
+## Questions to the other side not answered yet (who asked, when, what is missing)
+## Questions to us not answered yet
+## Action items (owner, what, due, status: done / not done / unknown, with the source)
+## Promises in flight (ours and theirs, with dates)
+## Dates and deadlines ahead (expiries, releases, holidays, reports)
+## People (who joined, left or is replaced; anyone in the invitation who has left the project)
+## Things to check before the call (what may have changed since the newest source)"""
+
+REVIEW_SYS = """You review a Live Brief for a project manager's call like a demanding senior PM. Compare it with the
+open items list and the notes. List concretely what is missing, wrong, vague, unsupported by the sources, or in the
+wrong language ({BRIEF_LANG} expected), section by section; also anything that should be marked "check before the
+call". No praise, only the fixes, numbered. No long dashes."""
+
+REVISE_SYS = """Rewrite the Live Brief applying every fix of the review, using only the notes and the material (never
+invent). Keep its first line, its sections and their order; keep everything correct that the review did not touch.
+Write in {BRIEF_LANG}, quotes and ready phrases in {CALL_LANG}. No long dashes. Answer with the whole brief only."""
+
 LANGS = {"uk": "Ukrainian", "en": "English", "es": "Spanish", "de": "German", "pl": "Polish", "ru": "Russian"}
 
 NOTES_SYS = """You read one transcript of an earlier work call and write notes for the project manager (the PM) who
@@ -175,7 +194,9 @@ Do not write a section 6 (the speech is written separately)."""
 
 SPEECH_SYS = """You write the PM's speech for the call: the update the PM gives when asked, from the brief and the notes.
 In the call language ({CALL_LANG}); the explanation lines in {BRIEF_LANG}. No long dashes. Only facts from the material;
-mark a point the PM must check first with "[check]". Format, exactly:
+mark a point the PM must check first with "[check]". The full texts are said to the other side as they are: confident,
+client-ready sentences ("Two-step login is on dev. Did your team try it?"), never notes to self ("I need to confirm
+whether...") and never internal details the red lines exclude. Format, exactly:
 ## 6. My update
 <one line in {BRIEF_LANG}: the period and what to check before the call>
 Opening: "<one ready sentence>"
@@ -281,7 +302,8 @@ def main(argv=None) -> int:
            "sources": [], "passes": []}
     url, model = r.get("url") or "http://127.0.0.1:11434", r["model"]
 
-    caps = {"notes": 2500, "brief": 7000, "speech": 3000, "cards": 5000, "facts": 8000}
+    caps = {"notes": 2500, "brief": 7000, "speech": 3000, "cards": 5000, "facts": 8000, "open": 3000, "review": 2500,
+            "revise": 9000}
 
     def ask(name: str, system: str, user: str) -> str:
         t = time.time()
@@ -296,6 +318,8 @@ def main(argv=None) -> int:
         call_codes = r.get("languages") or ["uk"]
         call_lang = LANGS.get(call_codes[0], call_codes[0])
         brief_lang = LANGS.get(r.get("brief_lang") or "uk", "Ukrainian")
+        if r.get("config") and re.search(r"бриф українською|brief in ukrainian", read_text(r["config"], 60_000), re.I):
+            brief_lang = "Ukrainian"                   # the project config decides the brief language
         langs = ", ".join(LANGS.get(c, c) for c in call_codes)
         head = f'# Live Brief: {r["title"]} (prep, {r.get("when", "")}, local model {model})'
         call = (f'Call: "{r["title"]}", {r.get("when", "")}. Project: {r.get("project_name", "")}. Audience: '
@@ -309,7 +333,7 @@ def main(argv=None) -> int:
             # rules/notes.yaml > preparation: an older call with full notes is read from them (no notes pass)
             stem = re.sub(r"(\.named)?\.md$", "", p)
             saved = stem + ".notes.md"
-            if i > 0 and os.path.exists(saved):
+            if i > 0 and os.path.exists(saved) and not r.get("own_notes"):
                 notes.append(f"### Notes: {os.path.basename(saved)}\n{read_text(saved, 40_000)}")
                 res["sources"].append("Call notes: " + os.path.basename(saved))
                 continue
@@ -328,6 +352,22 @@ def main(argv=None) -> int:
                              f"{call}\n\n## Notes of the earlier calls (newest first)\n{notes_txt}\n\n## Material\n{pack}"))
         if not brief:
             raise RuntimeError("the model returned no brief")
+
+        if r.get("deep"):
+            # 0.8.5 (owner: can a local model come near Sonnet in 5-7 passes?): open items, a review, a revision
+            say(stage="model", pass_="open")
+            open_items = ask("open", OPEN_SYS.format(BRIEF_LANG=brief_lang),
+                             f"{call}\n\n## Notes of the earlier calls (newest first)\n{notes_txt}\n\n## Material\n{pack}")
+            say(stage="model", pass_="review")
+            review = ask("review", REVIEW_SYS.format(BRIEF_LANG=brief_lang),
+                         f"{call}\n\n## The brief\n{brief}\n\n## Open items\n{open_items}\n\n## Notes of the earlier calls\n{notes_txt}")
+            say(stage="model", pass_="revise")
+            revised = clean_md(ask("revise", REVISE_SYS.format(BRIEF_LANG=brief_lang, CALL_LANG=call_lang),
+                                   f"{call}\n\n## The brief\n{brief}\n\n## The review\n{review}\n\n## Open items\n{open_items}"
+                                   f"\n\n## Notes of the earlier calls\n{notes_txt}\n\n## Material\n{pack}"))
+            if len(revised) > len(brief) * 0.6:
+                brief = revised
+            notes_txt += "\n\n## Open items\n" + open_items
 
         # Pass 3: the speech with full texts, then the cards and the facts
         say(stage="model", pass_="speech")

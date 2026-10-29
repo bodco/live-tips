@@ -334,6 +334,7 @@ final class CallEngine {
                        "--inbox", status.inboxFile ?? ""]
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = AIRoute.env(job: "tips", config: c)
+        env["LT_AI_STAGE"] = "live"              // spend-ledger.jsonl: what each stage costs
         env["LT_PM_NAMES"] = c.nameAliases.joined(separator: ",")   // lt digest: questions addressed to the PM
         env["PYTHONDONTWRITEBYTECODE"] = "1"     // the engine may live inside the signed app bundle; the key goes to the child only, never written or logged
         p.environment = env
@@ -396,6 +397,7 @@ final class CallEngine {
             + ((callRequest["scheduled_at"] as? String).map { ["--when", $0] } ?? [])   // the date and time set in Start call
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = AIRoute.env(job: "after", config: c)
+        env["LT_AI_STAGE"] = "after_notion"
         env["NOTION_TOKEN"] = notionToken          // passed to the child only, never written or logged
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         p.environment = env
@@ -454,6 +456,7 @@ final class CallEngine {
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         p.qualityOfService = .background
         var env = AIRoute.env(job: "after", config: c)   // the key to the child only, never written or logged
+        env["LT_AI_STAGE"] = "judge"
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         p.environment = env
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/judge.log"))

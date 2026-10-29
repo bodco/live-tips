@@ -28,5 +28,5 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - Stale rule: A brief is stale when at least one change happened since prepared_at, or it is older than stale_after_hours and the call is a different day.
 - Label: Brief is <age> old · <n> changes since
 - Refresh: Refresh = an incremental update: Claude gets the old brief and the list of changed files, reads only those, and rewrites only the sections they change. The checklist and the PM's edits stay. The facts and cards follow the same changes. It never starts by itself.
-- Snapshot: After a preparation or a refresh, write <stem>.prep.json: {"prepared_at": "<ISO time>", "by": "app|skill", "refresh_of": "<ISO time of the previous one, or empty>"}.
+- Snapshot: After a preparation or a refresh, write <stem>.prep.json: {"prepared_at": "<ISO time>", "by": "app|skill", "refresh_of": "<ISO time of the previous one, or empty>"}. 0.8.5 (owner: what each stage costs through the API) adds, when known: "route": "api|plan", "cost_usd" (the API price; on the plan the equivalent), "duration_s", "turns", "tokens": {"input", "output", "cache_read", "cache_write"}.
 - Ignored paths: `live/`, `.livetips-index/`, `.git/`, `node_modules/`, `.DS_Store`, `Tools/`; hidden files ignored: yes; stale after 24 h.

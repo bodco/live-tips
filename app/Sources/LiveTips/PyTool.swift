@@ -21,6 +21,7 @@ enum PyTool {
         var env = AIRoute.env(job: "after", config: c)
         if notion { env["NOTION_TOKEN"] = store.get(.notionToken) ?? "" }
         env["LT_LEDGER"] = SpendLedger.defaultPath
+        env["LT_AI_STAGE"] = "after_" + module
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         p.environment = env
         let out = Pipe()

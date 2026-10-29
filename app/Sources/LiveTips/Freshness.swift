@@ -95,9 +95,10 @@ enum Freshness {
     }
 
     /// <base>.prep.json after a preparation or a refresh (rules/freshness.json > snapshot).
-    nonisolated static func writeSnapshot(base: String, refreshOf: Date?) {
+    nonisolated static func writeSnapshot(base: String, refreshOf: Date?, extra: [String: Any] = [:]) {
         let f = ISO8601DateFormatter(); f.timeZone = .current
-        let o: [String: Any] = ["prepared_at": f.string(from: Date()), "by": "app", "refresh_of": refreshOf.map { f.string(from: $0) } ?? ""]
+        var o: [String: Any] = ["prepared_at": f.string(from: Date()), "by": "app", "refresh_of": refreshOf.map { f.string(from: $0) } ?? ""]
+        for (k, v) in extra { o[k] = v }      // 0.8.5: route, cost_usd, duration_s, turns, tokens (added keys only)
         if let d = try? JSONSerialization.data(withJSONObject: o, options: [.prettyPrinted, .sortedKeys]) {
             try? d.write(to: URL(fileURLWithPath: base + ".prep.json"), options: .atomic)
         }

@@ -75,6 +75,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   it Ukrainian and names came out worse.
 - **Meeting page:** a quote inside the summary no longer stops the Notion page (the JSON is repaired or asked
   again), and Send last call to Notion in the menu works after the app restarts.
+- **What each stage costs:** every model request (live tips, the meeting page, the after-call drafts, the judge)
+  and every preparation adds one line to `state/spend-ledger.jsonl` (stage, route, model, tokens, price; never
+  the text), and `<stem>.prep.json` keeps the preparation's price, time and tokens.
 - **Skill and app behave the same:** the time line, the advice and "Move to slide N?" are computed once by the
   recorder (rules/presentation.yaml, a shared fixture checked in Python and in the window); slide sync from
   Keynote or PowerPoint is marked app only.

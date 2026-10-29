@@ -26,6 +26,7 @@ final class PrepRunner: ObservableObject {
     private var filesRead = 0
     /// 0.8.5: the last Prepare of a talk: slides rewritten and the ones kept with the PM's edits (P4 done).
     @Published var lastTalk: (rewritten: Int, kept: [Int])?
+    var resultMeta: [String: Any] = [:]       // 0.8.5: duration, turns and tokens of the last preparation
     @Published var costUSD: Double?          // from the stream's final "result" event (API key; the plan shows the equivalent)
     private var lineBuf = Data()
     private var process: Process?
@@ -107,6 +108,20 @@ final class PrepRunner: ObservableObject {
     }
 
     /// The live-tips skill folder with SKILL.md and references/ (the prep instructions).
+    /// 0.8.5 (owner): one line per preparation in state/spend-ledger.jsonl, next to the Python stages.
+    static func ledger(job: String, route: String, usd: Double?, meta: [String: Any], ok: Bool) {
+        let f = ISO8601DateFormatter(); f.timeZone = .current
+        var row: [String: Any] = ["at": f.string(from: Date()), "job": job, "route": route, "error": !ok]
+        if let u = usd { row["usd"] = (u * 1_000_000).rounded() / 1_000_000 }
+        if let t = meta["tokens"] as? [String: Any] { for (k, v) in t { row[k] = v } }
+        if let d = meta["duration_s"] { row["duration_s"] = d }
+        if let n = meta["turns"] { row["turns"] = n }
+        let path = ((AIRoute.statePath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("spend-ledger.jsonl")
+        guard let d = try? JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]) else { return }
+        if let h = FileHandle(forWritingAtPath: path) { h.seekToEndOfFile(); h.write(d + Data([0x0A])); try? h.close() }
+        else { try? (d + Data([0x0A])).write(to: URL(fileURLWithPath: path)) }
+    }
+
     static func skillDir(workRoot: String) -> String? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let w = (workRoot as NSString).expandingTildeInPath
@@ -359,8 +374,12 @@ final class PrepRunner: ObservableObject {
                     }
                 }
                 if useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
+                Self.ledger(job: r.refreshOf == nil ? "prep" : "prep_refresh", route: useAPI ? "api" : "plan", usd: self.costUSD, meta: self.resultMeta, ok: ok)
                 if ok {
-                    Freshness.writeSnapshot(base: base, refreshOf: r.refreshOf)      // rules/freshness.json > snapshot
+                    var extra = self.resultMeta
+                    extra["route"] = useAPI ? "api" : "plan"
+                    if let c = self.costUSD { extra["cost_usd"] = (c * 10000).rounded() / 10000 }
+                    Freshness.writeSnapshot(base: base, refreshOf: r.refreshOf, extra: extra)      // rules/freshness.json > snapshot
                     if let res = TalkFiles.after(base: base, deck: r.deck, oldTexts: deckTexts) { self.lastTalk = res }
                     self.progress = 1; self.stage = L("prep.st.done")
                     // QA 26.10: the call may have started while the prep was written: pick up the rest now.
@@ -394,7 +413,7 @@ final class PrepRunner: ObservableObject {
         callID = r.callID
         forTitle = r.title; forDate = r.date
         result = ""
-        progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil
+        progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil; resultMeta = [:]
         return nil
     }
 
@@ -445,7 +464,19 @@ final class PrepRunner: ObservableObject {
             lineBuf.removeSubrange(lineBuf.startIndex..<r.upperBound)
             guard let o = try? JSONSerialization.jsonObject(with: ln) as? [String: Any] else { continue }
             if (o["type"] as? String) == "system", progress < 0.05 { set(0.05, L("prep.st.instructions"), "") }
-            if (o["type"] as? String) == "result" { costUSD = (o["total_cost_usd"] as? Double) ?? (o["total_cost_usd"] as? NSNumber)?.doubleValue }
+            if (o["type"] as? String) == "result" {
+                costUSD = (o["total_cost_usd"] as? Double) ?? (o["total_cost_usd"] as? NSNumber)?.doubleValue
+                // 0.8.5 (owner): what a preparation costs, kept in <base>.prep.json (rules/freshness.json > snapshot)
+                var m: [String: Any] = [:]
+                if let d = (o["duration_ms"] as? NSNumber)?.doubleValue { m["duration_s"] = Int(d / 1000) }
+                if let t = o["num_turns"] as? Int { m["turns"] = t }
+                if let u = o["usage"] as? [String: Any] {
+                    let n = { (k: String) in (u[k] as? NSNumber)?.intValue ?? 0 }
+                    m["tokens"] = ["input": n("input_tokens"), "output": n("output_tokens"), "cache_read": n("cache_read_input_tokens"),
+                                   "cache_write": n("cache_creation_input_tokens")]
+                }
+                resultMeta = m
+            }
             guard (o["type"] as? String) == "assistant", let msg = o["message"] as? [String: Any],
                   let content = msg["content"] as? [[String: Any]] else { continue }
             for c in content where (c["type"] as? String) == "tool_use" {

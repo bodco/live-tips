@@ -126,6 +126,8 @@ prep check, state, wrap-up numbers). Call it inside device_bash as `python3 <too
    turns it into Ukrainian gibberish. For an English call write an English prompt. Also
    give `prompt_en` and `prompt_uk` in `start.json`: when the window switches the language
    the recorder swaps to the matching prompt (or drops it for `en` if none).
+   A start without `prompt` (the app) gets one built by the recorder the same way: the first names of
+   the participants and the team (up to 6), then "обговорюють" / "discuss" and the title.
 3. Start (one device_bash call; the JSON goes on stdin, so a title like "Client's weekly" cannot
    break the command): `python3 <tool_root>/bin/lt start - <<'LT_JSON_7f3a'`, then the JSON on one
    line, then `LT_JSON_7f3a` on its own line. The JSON:

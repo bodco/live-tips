@@ -68,6 +68,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   How close a voice must be to join a speaker or to merge two speakers now grows with the number of lines behind
   them (one line's voice print is noisy), so two similar colleagues stay apart. With no voice match, the name
   popover offers the people of the meeting series and the calendar event.
+- **Ukrainian and names transcribed better again:** a call started from the app now gives Whisper the same short
+  prompt the skill always gave (the first names of the people and the title, in the call's language); without
+  it Ukrainian and names came out worse.
 - **Meeting page:** a quote inside the summary no longer stops the Notion page (the JSON is repaired or asked
   again), and Send last call to Notion in the menu works after the app restarts.
 - **Skill and app behave the same:** the time line, the advice and "Move to slide N?" are computed once by the

@@ -3924,7 +3924,35 @@ def load_request(args) -> dict:
     for l in me_langs:
         if l not in cfg["langs"]:
             cfg["langs"] = list(cfg["langs"]) + [l]
+    if not cfg.get("prompt"):
+        auto_prompt(cfg)
     return cfg
+
+
+def auto_prompt(cfg: dict) -> None:
+    """0.8.5 (owner: "Ukrainian was transcribed much better a week ago"): the skill always gives Whisper a prompt
+    (start.md step 2: one natural sentence in the call language, names first), the app gave none, so names and
+    Ukrainian came out worse. Without a prompt one is built the same way from the people and the title."""
+    names, seen = [], set()
+    for raw in list(cfg.get("participants") or []) + list(cfg.get("people") or []) + list(cfg.get("people_team") or []):
+        n = _s(raw).strip()
+        if not n or "@" in n:
+            continue
+        first = re.split(r"[\s.]+", n)[0]
+        if len(first) >= 2 and first.casefold() not in seen:
+            seen.add(first.casefold()); names.append(first)
+    names = names[:6]
+    title = re.sub(r"\s+", " ", _s(cfg.get("title"))).strip()[:60]
+    def one(lang: str) -> str:
+        if not names:
+            return ""
+        who = (", ".join(names[:-1]) + (" і " if lang == "uk" else " and ") + names[-1]) if len(names) > 1 else names[0]
+        verb = ("обговорюють " if len(names) > 1 else "обговорює ") if lang == "uk" else ("discuss " if len(names) > 1 else "discusses ")
+        return (who + " " + verb + (title or ("проєкт" if lang == "uk" else "the project")) + ".")[:150]
+    main = (cfg.get("langs") or ["uk"])[0]
+    cfg["prompt_uk"] = cfg.get("prompt_uk") or one("uk")
+    cfg["prompt_en"] = cfg.get("prompt_en") or one("en")
+    cfg["prompt"] = cfg["prompt_uk"] if main == "uk" else cfg["prompt_en"] if main == "en" else ""
 
 
 def main() -> int:

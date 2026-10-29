@@ -150,3 +150,10 @@ def test_people_of_the_meeting_are_offered_without_a_voice_match(T, tmp_path):
     sp = T.SpeakerTracker({"participants": ["Ann Lee", "Mike Johnson"], "name_aliases": ["Mike"]}, tmp_path / "s.speakers.json", library=L)
     a = sp.observe("10:00:01", 0, 3, vec(5), 3.0, "hello")
     assert [x["name"] for x in sp.clusters[a]["suggestions"]] == ["Ann L."] and sp.clusters[a]["suggestions"][0]["score"] is None
+
+
+def test_a_start_without_a_prompt_gets_one(T):
+    """skill/references/start.md step 2: the app gave Whisper no prompt, so names and Ukrainian came out worse."""
+    cfg = {"title": "Weekly sync", "langs": ["uk"], "participants": ["Ann Lee", "ann.lee@example.com"], "people_team": ["Mike Johnson", "Ann L."]}
+    T.auto_prompt(cfg)
+    assert cfg["prompt"] == "Ann і Mike обговорюють Weekly sync." and cfg["prompt_en"] == "Ann and Mike discuss Weekly sync."

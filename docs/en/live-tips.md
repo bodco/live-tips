@@ -1280,6 +1280,39 @@ off, a job on a way that is out fails with the reason, and Settings shows it.
 Through the Claude account, requests run as `claude -p` with no tools, no settings and no MCP
 servers, in an empty folder; their cost does not go into the API spending ledger (the plan pays).
 
+### 14.1g What a preparation costs, and how the ways compare (0.8.5)
+
+A measured comparison on one real call (a 15-minute client stand-up held in English, with three earlier calls of
+the same meeting, a project config and a local Notion copy as sources). The same preparation ran five times, each
+from a clean start (the previous files were moved out of the project, rules/ai.yaml > prep_runs):
+
+| Way | Model | Time | Price | Steps | Output tokens | Cache read | Brief, words | Speech points with full text | Cards | Facts |
+|---|---|---|---|---|---|---|---|---|---|---|
+| API key | Sonnet | 3.0 min | $0.77 | 31 | 25.5K | 1.17M | 2,172 | 8 of 8 | 23 | 46 |
+| API key | Opus | 5.7 min | $2.57 | 47 | 35.6K | 4.25M | 2,486 | 7 of 7 | 23 | 64 |
+| Claude account | Sonnet | 4.3 min | $1.16 (plan) | 35 | 30.4K | 1.96M | 2,770 | 9 of 9 | 20 | 51 |
+| Claude account | Opus | 5.5 min | $2.38 (plan) | 39 | 28.1K | 2.87M | 2,367 | 8 of 8 | 18 | 48 |
+| This Mac (Ollama) | Gemma 4 26B | 6.1 min | free | 1 request | 6.9K | (35K in) | 312 | 0 | 15 | 40 |
+
+"(plan)" is what the same work would cost through the API; on a Claude plan it comes out of the plan's limits.
+
+**Quality.** All four Claude runs wrote a complete brief: every section of the skill's brief, the three earlier
+calls read in depth (what was asked, what was answered, what is still open, with short quotes), the red lines,
+the names as speech recognition spells them, and a speech whose every point opens to a full text. Opus noticed a
+little more (a person still in the invitation who had left the project, a support request with no agreed
+channel, a microphone problem on the last call); one Opus run got a weekday wrong. The local model wrote a correct
+but thin skeleton: one earlier call in "Previous meetings", no speech (a placeholder), the brief in the call's
+language instead of the brief language, generic cards.
+
+**Where the money goes.** A preparation is a chain of steps (read a file, read another, write), and every step
+sends the growing context again. Cache reads (1-4 million tokens) and cache writes make most of the price; the
+brief itself is 25-35K output tokens. The price follows the number of steps, and Opus costs about twice as much
+per token and takes more steps.
+
+**Recommendation.** Sonnet through the API key for everyday calls (about $0.80, 3 minutes); Opus for the calls
+that matter most; a preparation on this Mac (Settings > AI > Preparation > On this Mac) only when neither the key
+nor the Claude account can run. To compare on your own calls: `tools/prep_compare.py <app folder>/prep-runs/<call>`.
+
 ### 14.2 After the call: the meeting page in Notion
 
 With **Settings > General > Write the call summary to Notion** on, the app writes the wrap-up
@@ -1695,3 +1728,6 @@ address", `references/sweep.md`, `references/presentation.md`).
    an API key pays), the app installs it on request. The skill's instructions travel inside the app. Until the app
    is notarized, the first launch of each downloaded version needs Open Anyway; the DMG, the README, onboarding and
    About say so.
+105. **What a preparation costs (0.8.5).** Five runs of one preparation compared (14.1g): Sonnet through the API
+   key $0.77 in 3 minutes, Opus $2.57, the local Gemma 4 26B free but thin. Every preparation keeps its files and
+   run.json in prep-runs; a preparation can run on this Mac through Ollama (rules/ai.yaml).

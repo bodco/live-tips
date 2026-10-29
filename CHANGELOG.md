@@ -78,6 +78,9 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Preparation on this Mac (Ollama):** Settings > AI > Preparation can run on a local model (gemma4:26b by
   default): the app gathers the call's material into one pack and the model writes the brief, the cards and the
   facts; free, nothing leaves the Mac (rules/ai.yaml > local).
+- **What a preparation costs, measured:** five runs of one real preparation (docs 14.1g): Sonnet through the API
+  key $0.77 in 3 minutes, Opus $2.57 in 6, the Claude account the same work from the plan, the local Gemma 4 26B
+  free but thin. Sonnet through the key is the recommended default.
 - **Every preparation kept for comparison:** a full preparation starts clean (the previous one's files move to
   prep-runs) and keeps its files with run.json (route, model, time, price, tokens); tools/prep_compare.py lines them up.
 - **Transcript call type and a Tips switch:** a Transcript call records and transcribes with no tips; the summary,

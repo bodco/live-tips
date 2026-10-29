@@ -26,7 +26,9 @@ PART_SYS = """You take notes of one part of a work call for the project manager 
 These notes replace the transcript for later preparations, so nothing that matters may be lost. Write in {LANG};
 keep quotes, names, product and ticket names, numbers, dates, times and addresses exactly as said (quotes in the
 original language). Speech recognition garbles names: keep the spelling and add the likely name in brackets.
-Speaker labels can be wrong. Never invent. No long dashes. Use these headings:
+Speaker labels can be wrong. Never invent. No long dashes.
+{NAMES}
+Use these headings:
 ### Topics
 For every topic: who said what (by name), the numbers and dates, what was decided or left open, 1-3 short quotes.
 ### Questions
@@ -122,7 +124,22 @@ def coverage_line(c: dict) -> str:
     return "Coverage: " + ", ".join(f"{k} {c[k][0]}/{c[k][1]}" for k in ("numbers", "keys", "addresses", "questions") if c[k][1])
 
 
-def make_notes(md: Path, model: str, lang: str, provider=None) -> dict:
+def names_block(aliases: List[str], config: str) -> str:
+    """rules/notes.yaml > names: who the PM is and the project's names and terms, to correct garbled words."""
+    out = []
+    if aliases:
+        out.append("The PM is " + " / ".join(aliases) + ' ("Я", "Me" or any of these names in the transcript).')
+    if config and Path(config).exists():
+        t = Path(config).read_text(encoding="utf-8", errors="replace")
+        keep = [l for l in t.splitlines() if re.search(r"\|.*\||alias|Whisper|name|term|глосар|glossary|team|команд", l, re.I)]
+        txt = "\n".join(keep)[:8000]
+        if txt:
+            out.append("Names and terms of the project (from its config): use them to correct garbled words; write the real "
+                       "name with what was heard in brackets, e.g. Sentry (heard \"Send Trends\").\n" + txt)
+    return "\n".join(out)
+
+
+def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str] = None, config: str = "") -> dict:
     from .oneshot import provider_from_env
     from .cost import cost_usd
     prov = provider or provider_from_env()
@@ -142,7 +159,8 @@ def make_notes(md: Path, model: str, lang: str, provider=None) -> dict:
     L = LANGS.get(lang, "Ukrainian")
     title = re.sub(r"^\d{4}-\d\d-\d\d-\d{4}-", "", md.stem.split(".")[0]).replace("-", " ")
     ps = parts(text)
-    part_notes = [ask(PART_SYS.format(LANG=L), f"Call file: {md.name}. Part {i + 1} of {len(ps)}.\n\n{p}", 6000)
+    names = names_block(aliases or [], config)
+    part_notes = [ask(PART_SYS.format(LANG=L, NAMES=names), f"Call file: {md.name}. Part {i + 1} of {len(ps)}.\n\n{p}", 6000)
                   for i, p in enumerate(ps)]
     notes = part_notes[0] if len(ps) == 1 else ask(
         MERGE_SYS.format(LANG=L, TITLE=title),
@@ -168,9 +186,12 @@ def main(argv=None) -> int:
     ap.add_argument("--md", required=True)
     ap.add_argument("--model", default="claude-sonnet-5-5")
     ap.add_argument("--lang", default="uk")
+    ap.add_argument("--aliases", default="", help="the PM's names, comma separated")
+    ap.add_argument("--project-config", default="")
     a = ap.parse_args(argv)
     try:
-        res = make_notes(Path(a.md), a.model, a.lang)
+        res = make_notes(Path(a.md), a.model, a.lang, aliases=[x.strip() for x in a.aliases.split(",") if x.strip()],
+                         config=a.project_config)
     except Exception as e:  # noqa: BLE001
         res = {"ok": False, "path": None, "coverage": None, "cost_usd": None, "error": f"{type(e).__name__}: {e}"[:400]}
     print(json.dumps(res, ensure_ascii=False))

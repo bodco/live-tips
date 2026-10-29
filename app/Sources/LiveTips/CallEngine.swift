@@ -372,6 +372,28 @@ final class CallEngine {
         return true
     }
 
+    /// rules/notes.yaml: full notes of the call (<stem>.notes.md) right after the meeting page, once per call; later
+    /// preparations read them instead of the older transcripts. On the "After the call" way; Sonnet on Claude.
+    func writeCallNotes(file: String, config c: AppConfig, hasConfig: Bool) {
+        let notes = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
+        guard !FileManager.default.fileExists(atPath: notes), AIRoute.canRun(job: "after", config: c),
+              !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
+        p.arguments = ["-m", "livetips_m0.callnotes", "--md", file, "--model", "claude-sonnet-5-5",
+                       "--lang", c.uiLanguage == "en" ? "en" : "uk", "--aliases", c.nameAliases.joined(separator: ",")]
+            + (hasConfig ? ["--project-config", projectConfig] : [])
+        p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
+        var env = AIRoute.env(job: "after", config: c)
+        env["LT_AI_STAGE"] = "after_notes"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        p.environment = env
+        let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notes.log"))
+        p.standardOutput = log
+        p.standardError = log
+        try? p.run()
+    }
+
     func writeToNotion(file: String) {
         let c = config
         guard c.notionWriteSummary else { return }
@@ -429,6 +451,7 @@ final class CallEngine {
             }
         }
         do { try p.run() } catch { notionResult = "Notion: could not start (\(error.localizedDescription))" }
+        writeCallNotes(file: file, config: c, hasConfig: hasConfig)
     }
 
     /// After the call: the blind judge (Sonnet, at most 25 tips) rates the app's and the skill's tips in the

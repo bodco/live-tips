@@ -546,7 +546,15 @@ final class PrepRunner: ObservableObject {
             if picked.count == 3 { break }
         }
         guard !picked.isEmpty else { return "Previous calls of this meeting: none found by title in \(live); use the Meetings rows of the Notion copy and the digest." }
-        return "Previous calls of this meeting (read each fully, newest first): " + picked.joined(separator: "; ")
+        // rules/notes.yaml > preparation: the newest call in full, the older ones from their full notes when they exist
+        let list = picked.enumerated().map { (i, path) -> String in
+            guard i > 0 else { return path }
+            var stem = path.hasSuffix(".named.md") ? String(path.dropLast(9)) : String(path.dropLast(3))
+            if stem.hasSuffix(".named") { stem = String(stem.dropLast(6)) }
+            let notes = stem + ".notes.md"
+            return fm.fileExists(atPath: notes) ? notes + " (its full notes, they keep every detail)" : path
+        }
+        return "Previous calls of this meeting (read each fully, newest first; the newest is its transcript): " + list.joined(separator: "; ")
     }
 
     /// Hosts of the http(s) links the PM wrote in the call context, plus docs.google.com for Google Docs exports.

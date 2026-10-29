@@ -306,6 +306,13 @@ def main(argv=None) -> int:
         notes = []
         prev = previous_calls(r["live"], r["title"]) if r.get("use_project_folder", True) else []
         for i, p in enumerate(prev):
+            # rules/notes.yaml > preparation: an older call with full notes is read from them (no notes pass)
+            stem = re.sub(r"(\.named)?\.md$", "", p)
+            saved = stem + ".notes.md"
+            if i > 0 and os.path.exists(saved):
+                notes.append(f"### Notes: {os.path.basename(saved)}\n{read_text(saved, 40_000)}")
+                res["sources"].append("Call notes: " + os.path.basename(saved))
+                continue
             say(stage="model", pass_="notes", n=i + 1, of=len(prev))
             n = ask("notes", NOTES_SYS.format(BRIEF_LANG=brief_lang),
                     f"{call}\n\nTranscript {os.path.basename(p)}:\n{read_text(p, 60_000)}")

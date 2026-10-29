@@ -170,3 +170,16 @@ def test_opus_gets_adaptive_low_thinking():
     AnthropicProvider.thinking_form.pop("o-test", None)
     c = P().complete(model="o-test", system=[], user="x", max_tokens=10, cache_ttl=None, extra={"thinking": {"type": "between_tools"}})
     assert c.error is None and seen[-1] == ("adaptive", "low")
+
+
+def test_callnotes_coverage_and_names(tmp_path):
+    """rules/notes.yaml: the coverage check finds what the notes lost; the PM's names and the config's terms go in."""
+    from livetips_m0.callnotes import details, covered, names_block
+    t = "[10:00:01] Emily C. [S1] (en): The domain orbit-demo.pro expires on 07.11, ticket ORB-2530, about 63 hours?\n"
+    d = details(t)
+    c = covered("Domain orbit-demo.pro, ORB-2530, expires 07.11. Emily asks whether the domain expires and the ticket", d)
+    assert c["keys"][:2] == (1, 1) and c["addresses"][:2] == (1, 1) and c["numbers"][0] == 2 and c["numbers"][1] == 3
+    cfg = tmp_path / "p.md"
+    cfg.write_text("| Name | Role |\n| Ann Lee | QA |\nSentry: error tracking\n")
+    b = names_block(["Mike", "Michael"], str(cfg))
+    assert "Mike / Michael" in b and "Ann Lee" in b

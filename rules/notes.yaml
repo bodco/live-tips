@@ -1,0 +1,23 @@
+# Call notes (Pacenote 0.8.5, owner: "summaries that never drop details, so the context is not lost"). Shared by the
+# app and the skill: what a later preparation reads instead of an older call's whole transcript.
+schema_version: 1
+file: <stem>.notes.md next to the transcript (livetips_m0.callnotes)
+when: after every recorded call, right after the meeting page, on the "After the call" way (model claude-sonnet-5-5,
+  or the model on this Mac when that way is On this Mac); a call of the Transcript type too
+content: |
+  Header (date and time, length, participants with sides), Summary (5-8 lines), Topics (who said what by name,
+  numbers, dates, decisions, 1-3 short quotes in the original language), Questions (who asked whom, answered
+  fully / partly / not, and what), Decisions, Action items (owner, what, by when), Promises (ours and theirs),
+  Concerns and mood, Open after the call, Facts and numbers (every number, date, ticket key, address said).
+names: the PM's name aliases and the project config's names and terms are given, so a garbled word is written as the
+  real name with what was heard in brackets ("Sentry (heard \"Send Trends\")")
+lossless:
+  parts: a long transcript is read in parts of about 25,000 characters, then merged by topic without shortening
+  coverage: every number, date, time, ticket key, domain or address and every question of the transcript is looked
+    up in the notes; the missing ones go back to the model with their lines once; the notes end with the coverage
+    line ("Coverage: numbers 41/42, keys 6/6, questions 14/15")
+preparation: |
+  The last 3 calls of the meeting: the newest is read in full (its transcript), the older ones from their notes
+  when the notes exist (they keep every detail and cost far fewer steps), else from their transcripts. The skill's
+  sweep.md 3b and the app's preparation (Claude Code and the local model) follow the same rule.
+cost: about $0.19 per 15-minute call with Sonnet; free on this Mac

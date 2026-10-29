@@ -107,8 +107,9 @@ is older than 3 days -> say so in the sources line (item 4) as
 3b. **Previous meetings, read in depth (mandatory, 2026-10-28).** Find the last 3 meetings of this
    series (the same title or calendar series; else the last 3 of this type with these people): their
    transcripts in `live/` (`<stem>.md`, or `<stem>.named.md` when present; never only the tips) and
-   their Meetings DB pages (summary, decisions, action items). Read the transcripts in full, not only
-   the summaries. For each meeting extract: what was discussed (topics, 1-2 lines each, with numbers
+   their Meetings DB pages (summary, decisions, action items). Read the newest transcript in full; for
+   the older ones read `<stem>.notes.md` when it exists (full call notes that keep every detail,
+   rules/notes.yaml), else their transcripts in full, not only the summaries. For each meeting extract: what was discussed (topics, 1-2 lines each, with numbers
    and names); every question asked to us or by us and whether it was answered fully, partly or not
    at all (the answer and who gave it); open items (raised, not closed); action items (owner, due date,
    done / not done / unknown, checked against newer sources: the tracker, threads, later meetings);

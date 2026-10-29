@@ -99,6 +99,10 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Speakers in the transcript:** the top of the Transcript tab lists every voice of the call, as in 0.7: named or
   not, what an unnamed one said last, Team or Client in one click, and one-click names. An unknown voice is grey
   like Speaker N (it was purple, as if a client); a line given to a person takes that person's colour.
+- **Full call notes for the next preparation:** after every call the app writes <stem>.notes.md (topics with quotes,
+  every question and its answer, decisions, action items, promises, facts and numbers), checked for lost numbers,
+  keys, addresses and questions, with the PM's names and the project's terms to correct garbled words. The next
+  preparation reads the newest call in full and the older ones from their notes (rules/notes.yaml).
 - **Bluetooth headsets:** with AirPods or another Bluetooth headset as the default input, Pacenote records you
   from the Mac's built-in microphone and leaves the headset to the call app (a second app on a Bluetooth mic, and
   every restart of it, made the headset cut in and out for the call too). A chosen input in the Mic menu still wins.

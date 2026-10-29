@@ -92,6 +92,7 @@ struct OnboardingView: View {
     @ObservedObject var settings: SettingsModel
     @ObservedObject var setup: SetupModel
     @ObservedObject var cal = CalendarService.shared
+    @ObservedObject var sig = AppSignature.shared
     var close: () -> Void
 
     init(m: OnboardingModel, close: @escaping () -> Void) {
@@ -181,7 +182,7 @@ struct OnboardingView: View {
         guard !setup.busy else { return }
         Task {
             await setup.checkAll()
-            if !setup.allRequiredOK { await setup.installMissing(includeOptional: true) }
+            if !setup.allRequiredOK { await setup.installMissing(includeOptional: false) }   // Claude Code: only on Install
         }
     }
 
@@ -234,7 +235,19 @@ struct OnboardingView: View {
     @ViewBuilder var content: some View {
         switch m.step {
         case .splash:
-            EmptyView()
+            // 2026-10-29 (owner): while the beta is not notarized, say why macOS asked for "Open Anyway" and that an
+            // update may ask again. Shown only when this copy is not notarized.
+            if sig.kind == .developer || sig.kind == .unsigned {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "checkmark.shield").foregroundStyle(PN.C.onMe)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L("onboarding.unsigned.title")).font(PN.Font.body.weight(.semibold))
+                        Text(L("onboarding.unsigned.body")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(12).frame(maxWidth: 440, alignment: .leading)
+                .background(PN.C.onMe.opacity(0.10), in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            }
         case .permissions:
             VStack(spacing: 10) {
                 permissionRow("mic", L("onboarding.permissions.mic"), ok: m.micState == .authorized,
@@ -293,6 +306,20 @@ struct OnboardingView: View {
             .onChange(of: settings.config.workRoot) { m.applyFolders() }
         case .claude:
             VStack(spacing: 8) {
+                // 2026-10-29 (owner): preparing calls always needs Claude Code, whichever way pays (plan or API key).
+                if let cc = setup.steps.first(where: { $0.id == "claude" }) {
+                    HStack(spacing: 10) {
+                        Image(systemName: cc.state == .ok ? "checkmark.circle.fill" : "terminal").foregroundStyle(cc.state == .ok ? PN.C.turn : PN.C.text3)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(L("setup.step.claude.title")).font(PN.Font.body)
+                            Text(cc.state == .ok ? cc.detail : L("setup.step.claude.why")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
+                        }
+                        Spacer()
+                        if cc.state == .installing { ProgressView().controlSize(.small) }
+                        else if cc.state != .ok { Button(L("onboarding.claude.install")) { Task { await setup.installOne("claude") } }.buttonStyle(.pnSecondary).disabled(setup.busy) }
+                    }
+                    .padding(10).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+                }
                 HStack {
                     SecureField("", text: $m.apiKey, prompt: Text(settings.isSet(.claudeAPIKey) ? L("onboarding.claude.saved") : "sk-ant-…"))
                         .textFieldStyle(.roundedBorder)

@@ -116,5 +116,19 @@ PY
     fi
     echo "Speaker identification ready" ;;
 
-  *) echo "usage: setup.sh check|install python|core|venv|recorder|tips|whisper|localai|voices"; exit 2 ;;
+  # 2026-10-29 (owner): every preparation runs through Claude Code (the claude program), whatever pays for it
+  # (the PM's Claude plan or the API key in Settings > AI). The official native installer puts it into
+  # ~/.local/bin without admin rights (https://code.claude.com/docs/en/setup). Not needed to record a call.
+  check:claude)
+    for c in "$HOME/.local/bin/claude" "$HOME/.claude/local/claude" /opt/homebrew/bin/claude /usr/local/bin/claude; do
+      if [ -x "$c" ]; then v=$("$c" --version 2>/dev/null | head -1); echo "OK ${v:-installed} ($c)"; exit 0; fi
+    done
+    echo "MISSING needed for preparing calls" ;;
+  install:claude)
+    echo "Installing Claude Code with the official installer (claude.ai/install.sh)..."
+    curl -fsSL --retry 3 --connect-timeout 20 https://claude.ai/install.sh | bash 2>&1 | tail -5
+    [ -x "$HOME/.local/bin/claude" ] || { echo "Claude Code was not installed. See https://code.claude.com/docs/en/troubleshoot-install"; exit 1; }
+    echo "Claude Code ready. Sign in once in Settings > AI (Claude account), or add an API key there." ;;
+
+  *) echo "usage: setup.sh check|install python|core|venv|recorder|tips|whisper|localai|voices|claude"; exit 2 ;;
 esac

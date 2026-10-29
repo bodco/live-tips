@@ -17,11 +17,23 @@ Pacenote готує короткий бриф перед дзвінком, да�
 | | Застосунок | Скіл |
 |---|---|---|
 | Що це | Нативний застосунок macOS у рядку меню | Скіл для Claude Cowork |
-| Потрібно | Mac на Apple Silicon, macOS 14.4+, API-ключ Claude або план Claude з Claude Code | Claude Cowork з підʼєднаним компʼютером, рекордер з цього репо |
+| Потрібно | Mac на Apple Silicon, macOS 14.4+; для підготовки Claude Code (застосунок встановлює його сам) з планом Claude або API-ключем | Claude Cowork з підʼєднаним компʼютером, рекордер з цього репо |
 | Підказки дає | Claude API, за подіями | Claude у твоєму чаті Cowork |
 | Завантажити | [Pacenote.dmg](https://github.com/bodco/live-tips/releases/latest/download/Pacenote.dmg) | [live-tips.skill](https://github.com/bodco/live-tips/releases/latest/download/live-tips.skill) |
 
 Обидва мають ті самі правила (`rules/`) і той самий рекордер, тож підказки поводяться однаково.
+
+### Перед встановленням застосунку
+
+- **Перший запуск.** Бета-версія підписана розробником, але ще не нотаризована Apple. macOS блокує перший запуск:
+  двічі клацніть Pacenote, закрийте попередження, далі System Settings > Privacy & Security > **Open Anyway**. Нова
+  завантажена версія може спитати ще раз. У DMG ті самі кроки є у файлі «Read me first».
+- **Claude.** Запис, транскрипт і голоси працюють на Mac без Claude. Підготовка дзвінків (бриф, картки, факти)
+  потребує **Claude Code**, який застосунок встановлює сам (онбординг або Settings > About > Components), і одного
+  способу оплати: план Claude Pro, Max, Team чи Enterprise або API-ключ у Settings > AI. Безкоштовний план Claude не
+  містить Claude Code. Claude Cowork для застосунку не потрібен.
+- **Ваші документи.** Достатньо звичайних папок проєкту: підготовка читає Markdown, текст, Word і PDF; пошук під час
+  дзвінка охоплює Markdown, текст, CSV і JSON.
 
 ## Що робить
 

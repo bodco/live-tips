@@ -1315,6 +1315,20 @@ struct AboutView: View {
                         }
                     }
                 }
+                // 2026-10-29 (owner): the app's own signature, so "Open Anyway" reads as expected, not as a fault.
+                if !AppSignature.shared.line.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: AppSignature.shared.kind == .notarized ? "checkmark.seal.fill" : "checkmark.shield")
+                            .foregroundStyle(AppSignature.shared.kind == .notarized ? PN.C.turn : PN.C.onMe).accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(L("sign.title"))
+                            Text(AppSignature.shared.line).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                if let cc = setup.steps.first(where: { $0.id == "claude" }), cc.state != .ok, cc.state != .unknown {
+                    Button(L("onboarding.claude.install")) { Task { await setup.installOne("claude") } }.buttonStyle(.pnSecondary).disabled(setup.busy)
+                }
                 HStack {
                     Button(L("about.components.check")) { Task { await setup.checkAll() } }.buttonStyle(.pnTertiary).disabled(setup.busy)
                     Button(L("about.components.open")) { SetupWindow.show() }.buttonStyle(.pnTertiary)
@@ -1325,7 +1339,7 @@ struct AboutView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { if setup.steps.allSatisfy({ $0.state == .unknown }) { Task { await setup.checkAll() } } }
+        .onAppear { AppSignature.shared.check(); if setup.steps.allSatisfy({ $0.state == .unknown }) { Task { await setup.checkAll() } } }
     }
 
     func isOK(_ k: SecretStore.Key) -> Bool {

@@ -36,6 +36,11 @@ ENG="$APP/Contents/Resources/engine"; mkdir -p "$ENG/spikes/m0"
 rsync -a --exclude __pycache__ --exclude generated "$HERE/../rules/" "$ENG/rules/"
 rsync -a --exclude __pycache__ "$HERE/../spikes/m0/livetips_m0" "$ENG/spikes/m0/"
 cp "$HERE/Resources/setup.sh" "$APP/Contents/Resources/setup.sh"
+# 2026-10-29 (owner): the live-tips skill's instructions travel with the app (SKILL.md and references/), so a
+# colleague without Cowork or the skill can prepare calls; a newer copy elsewhere (~/.claude/skills) still wins.
+mkdir -p "$APP/Contents/Resources/skill/references"
+cp "$HERE/../skill/SKILL.md" "$APP/Contents/Resources/skill/"
+cp "$HERE/../skill/references/"*.md "$APP/Contents/Resources/skill/references/"
 # Notion mirror (Settings > General > Set up sync copies it into <work>/Tools/notion-mirror)
 mkdir -p "$APP/Contents/Resources/notion-mirror"
 cp "$HERE/../notion-mirror/"{mirror.py,run.sh,install.sh,README.md,README.uk.md,mirror.config.example.json} "$APP/Contents/Resources/notion-mirror/"

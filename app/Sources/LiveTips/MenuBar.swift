@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated { AppSignature.shared.check() }     // 2026-10-29: onboarding and About show it
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
         installMainMenu()
         NSApp.setActivationPolicy(config.showInDock ? .regular : .accessory)

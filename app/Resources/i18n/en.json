@@ -1163,5 +1163,14 @@
  "set.mergeInto": "Merge into",
  "set.mergeHelp": "The same person under another name: {name}'s voice prints join the chosen person, and {name} becomes another spelling of that name (typing or picking it names the kept person).",
  "set.aliases": "Other spellings: {list}",
- "again.keepBrief": "The brief is written again from the newest sources. The current one is kept as the previous version."
+ "again.keepBrief": "The brief is written again from the newest sources. The current one is kept as the previous version.",
+ "setup.step.claude.title": "Claude Code",
+ "setup.step.claude.why": "Prepares your calls (brief, cards, facts). Needed whichever way you pay: your Claude plan or an API key. Recording works without it.",
+ "onboarding.claude.install": "Install Claude Code",
+ "onboarding.unsigned.title": "Why macOS asked you to press Open Anyway",
+ "onboarding.unsigned.body": "This beta is signed by its developer but not notarized by Apple yet, so macOS asks once before the first launch. The app is not changed; Apple just has not reviewed it. A new version you download may ask again: System Settings > Privacy & Security > Open Anyway.",
+ "sign.title": "Signature",
+ "sign.notarized": "Signed and notarized by Apple",
+ "sign.developer": "Signed by the developer, not notarized by Apple (beta). macOS asks for Open Anyway on the first launch of each downloaded version.",
+ "sign.unsigned": "Not signed (a development build)"
 }

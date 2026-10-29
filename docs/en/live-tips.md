@@ -1691,3 +1691,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    moves the old person's lines back; the voice library merges two entries of one person and keeps the other
    spelling as an alias (rules/voices.yaml). A preparation finished before a held call of its series ended is that
    call's, not the next one's.
+104. **A colleague's Mac (0.8.5).** Claude Code is a component: preparation always runs through it (a Claude plan or
+   an API key pays), the app installs it on request. The skill's instructions travel inside the app. Until the app
+   is notarized, the first launch of each downloaded version needs Open Anyway; the DMG, the README, onboarding and
+   About say so.

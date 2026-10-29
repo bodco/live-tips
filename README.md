@@ -17,11 +17,23 @@ permissions carry over. What "live tips" means inside the code: [DEVELOPMENT.md]
 | | The app | The skill |
 |---|---|---|
 | What | A native macOS menu bar app | A Claude Cowork skill |
-| You need | Apple Silicon Mac, macOS 14.4+, a Claude API key or a Claude plan with Claude Code | Claude Cowork with a computer linked, the recorder from this repo |
+| You need | Apple Silicon Mac, macOS 14.4+; for preparation Claude Code (the app installs it) with a Claude plan or an API key | Claude Cowork with a computer linked, the recorder from this repo |
 | Tips come from | Claude API, called on events | Claude in your Cowork chat |
 | Download | [Pacenote.dmg](https://github.com/bodco/live-tips/releases/latest/download/Pacenote.dmg) | [live-tips.skill](https://github.com/bodco/live-tips/releases/latest/download/live-tips.skill) |
 
 Both share the same rules (`rules/`) and the same recorder, so tips behave the same way.
+
+### Before you install the app
+
+- **First open.** This beta is signed by its developer but not notarized by Apple yet. macOS blocks the first launch:
+  double-click Pacenote, close the warning, then System Settings > Privacy & Security > **Open Anyway**. A new version
+  you download may ask again. The DMG has the same steps in "Read me first".
+- **Claude.** Recording, the transcript and the voices work on the Mac without Claude. Preparing calls (the brief,
+  cards and facts) needs **Claude Code**, which the app installs for you (onboarding, or Settings > About >
+  Components), and one way to pay: a Claude Pro, Max, Team or Enterprise plan, or an API key in Settings > AI. The
+  free Claude plan does not include Claude Code. Claude Cowork is not needed for the app.
+- **Your documents.** Plain project folders are enough: preparation reads Markdown, text, Word and PDF files; the
+  search during the call covers Markdown, text, CSV and JSON.
 
 ## What it does
 

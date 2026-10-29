@@ -25,6 +25,8 @@ final class SetupModel: ObservableObject {
         Step(id: "whisper", optional: false),
         Step(id: "localai", optional: false),
         Step(id: "voices", optional: false),
+        // 2026-10-29 (owner): installed like the rest, but optional: recording works without it, preparing does not.
+        Step(id: "claude", optional: true),
     ]
     @Published var log: [String] = []
     @Published var busy = false
@@ -74,6 +76,20 @@ final class SetupModel: ObservableObject {
             steps[i].detail = String(out.split(separator: " ", maxSplits: 1).dropFirst().first ?? "")
         }
         if allRequiredOK { applyEngineSettings() }
+    }
+
+    /// One component on request (Claude Code is installed only when the PM presses Install).
+    func installOne(_ id: String) async {
+        guard let i = steps.firstIndex(where: { $0.id == id }), !busy else { return }
+        busy = true
+        defer { busy = false }
+        steps[i].state = .installing
+        log.append("> " + steps[i].title)
+        _ = await run("install", id) { [weak self] l in self?.log.append(l) }
+        var out = ""
+        _ = await run("check", id) { out = $0 }
+        steps[i].state = out.hasPrefix("OK") ? .ok : .failed
+        steps[i].detail = String(out.split(separator: " ", maxSplits: 1).dropFirst().first ?? "")
     }
 
     func installMissing(includeOptional: Bool) async {
@@ -206,5 +222,37 @@ final class SetupWindow {
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+
+/// 2026-10-29 (owner): how this copy of the app is signed. A beta signed by its developer but not notarized by Apple
+/// opens only after "Open Anyway" (System Settings > Privacy & Security); onboarding and About say so.
+@MainActor
+final class AppSignature: ObservableObject {
+    static let shared = AppSignature()
+    enum Kind { case unknown, notarized, developer, unsigned }
+    @Published var kind: Kind = .unknown
+
+    func check() {
+        let path = Bundle.main.bundlePath
+        DispatchQueue.global().async {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/sbin/spctl")
+            p.arguments = ["--assess", "--type", "execute", "-vv", path]
+            let o = Pipe(); p.standardOutput = o; p.standardError = o
+            var text = ""
+            if (try? p.run()) != nil { p.waitUntilExit(); text = String(data: o.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "" }
+            let k: Kind = text.contains("Notarized") ? .notarized : text.contains("no usable signature") || text.contains("not signed") ? .unsigned : .developer
+            DispatchQueue.main.async { self.kind = k }
+        }
+    }
+    var line: String {
+        switch kind {
+        case .notarized: return L("sign.notarized")
+        case .developer: return L("sign.developer")
+        case .unsigned: return L("sign.unsigned")
+        case .unknown: return ""
+        }
     }
 }

@@ -113,6 +113,7 @@ final class PrepRunner: ObservableObject {
         var c: [String] = []
         if let d = UserDefaults.standard.string(forKey: "prepSkillDir"), !d.isEmpty { c.append((d as NSString).expandingTildeInPath) }
         c += [home + "/.claude/skills/live-tips", w + "/Skills/src/live-tips", w + "/live-tips/skill", w + "/Control Tower/plugin/skills/live-tips"]
+        if let r = Bundle.main.resourcePath { c.append((r as NSString).appendingPathComponent("skill")) }   // 2026-10-29: the copy inside the app
         return c.first { FileManager.default.fileExists(atPath: ($0 as NSString).appendingPathComponent("SKILL.md")) }
     }
 

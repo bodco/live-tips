@@ -1,0 +1,39 @@
+Pacenote {VERSION} (beta)
+
+1. Drag Pacenote to Applications.
+
+2. First open. This beta is signed by its developer but not notarized by Apple yet, so macOS blocks
+   the first launch. Double-click Pacenote, close the warning, then open System Settings > Privacy &
+   Security, scroll down and press "Open Anyway" next to Pacenote. A new version you download may ask
+   again in the same way.
+
+3. The Setup window installs what is missing on this Mac: the recorder and speech recognition
+   (Python 3.10 or newer is needed: python.org or Homebrew), the Whisper model and the local AI model
+   (about 2.5 GB together).
+
+4. Claude. Recording and the transcript work without it. To prepare calls you need Claude Code
+   (the onboarding and Settings > About > Components install it) and one way to pay: a Claude Pro,
+   Max, Team or Enterprise plan (sign in once), or an API key in Settings > AI. The free Claude plan
+   does not include Claude Code.
+
+https://tower.bodco.pm/pacenote/
+
+------------------------------------------------------------------------------------------------
+
+Pacenote {VERSION} (бета)
+
+1. Перетягніть Pacenote в Applications.
+
+2. Перший запуск. Бета-версія підписана розробником, але ще не нотаризована Apple, тому macOS
+   блокує перший запуск. Двічі клацніть Pacenote, закрийте попередження, відкрийте System Settings >
+   Privacy & Security, прокрутіть униз і натисніть «Open Anyway» біля Pacenote. Нова завантажена
+   версія може спитати так само ще раз.
+
+3. Вікно Setup встановить, чого бракує на цьому Mac: запис і розпізнавання мовлення (потрібен
+   Python 3.10 або новіший: python.org або Homebrew), модель Whisper і локальну модель AI (разом
+   близько 2,5 ГБ).
+
+4. Claude. Запис і транскрипт працюють без нього. Щоб готувати дзвінки, потрібен Claude Code
+   (його встановлюють онбординг і Settings > About > Components) і один спосіб оплати: план Claude
+   Pro, Max, Team чи Enterprise (один раз увійти) або API-ключ у Settings > AI. Безкоштовний план
+   Claude не містить Claude Code.

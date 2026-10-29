@@ -48,6 +48,10 @@ Pacenote. Earlier versions are described in the commit messages and in
   the merged spelling then names the kept person everywhere (rules/voices.yaml).
 - **Prepare again for every call:** once the brief is ready, Prepare first becomes Prepare again (asks first, keeps the
   previous brief); a presentation opens Your talk with Keep my edits. Home's Up next card has it too.
+- **Ready for a colleague's Mac:** Claude Code is a component like Python (checked in Settings > About > Components,
+  installed by one button in onboarding or there; preparing calls needs it whichever way pays), the skill's
+  preparation instructions travel inside the app, onboarding and About explain the "Open Anyway" of a beta that
+  is not notarized yet, and the DMG's "Read me first" says it all in English and Ukrainian.
 - **One preparation, one call:** a preparation finished before a held call of its series ended belongs to that
   call; the next call of the series is not shown as prepared by it. Home's Later badges and actions line up.
 - **Skill and app behave the same:** the time line, the advice and "Move to slide N?" are computed once by the

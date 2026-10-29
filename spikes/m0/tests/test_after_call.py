@@ -79,3 +79,10 @@ def test_risk_notion_needs_a_database_and_dry_runs(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert out["db"] == "abc123" and LD not in out["title"]
     assert risk_notion.main(["--title", "x"]) == 1
+
+
+def test_wrapup_json_with_a_quote_inside_a_value():
+    """0.8.5 (owner): "Expecting ',' delimiter" stopped the meeting page; a quote inside a value is repaired."""
+    from livetips_m0.wrapup_notion import parse_object
+    out = parse_object('{"name": "Access", "summary": "Ann said "we hand it over" tomorrow", "risks": []}')
+    assert out["summary"] == 'Ann said "we hand it over" tomorrow' and out["risks"] == []

@@ -187,7 +187,8 @@ Compress into the **Live Brief**, max ~2500 words (detailed: the PM reads it bef
 5. Names and aliases (how Whisper may spell people), including the PM's own
    `settings.user.name_aliases`.
 6. **My update**: the speech from Step 2a, kept in the file so it survives a long session,
-   with a ready opening sentence. This is what "Your turn" tips reuse, so they are instant.
+   with a ready opening sentence and the full text under each point (`>` lines, see `speech.md`).
+   This is what "Your turn" tips reuse, so they are instant.
 7. **Insight Bank**: the list above, so a long session keeps it after context is trimmed.
 
 **Instant cards (`<transcript name>.cards.json`).** Written together with the brief (by the

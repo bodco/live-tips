@@ -11,7 +11,8 @@ Read once early in the call (in a quiet poll after the speech), and again when a
   `{"t":"HH:MM:SS","kind":"tip","level":"red","gist":"🔴 Нова вимога. Не погоджуй зараз.","phrase":"Good idea. I will write it down.","items":["..."],"note":"рішення від 30.09"}`
   - `kind`: `tip` | `answer` (reply to a window question, add `"q":"<the question>"`) |
     `checklist` | `speech` (the PM's theses, Step 2a; `phrase` = the opening sentence,
-    `items` = the theses, group names go in the items as plain lines) | `status` | `wrapup` |
+    `items` = the theses, group names go in the items as plain lines; a thesis with its full
+    text is `{"text":"<short line>","full":"<the full text to read aloud>"}`, see `speech.md`) | `status` | `wrapup` |
     `agenda` (see below); the recorder itself writes `card` items (instant cards);
   - **`src` is required on every tip and answer**: the `HH:MM:SS` of the transcript line that
     triggered it (for an answer: the time of the question). `read_delta` stamps `at` (when it
@@ -116,7 +117,9 @@ Read once early in the call (in a quiet poll after the speech), and again when a
   `interview`), `@@SET hiring_role=`, `@@SET audience=` (`auto` | `team` | `client` |
   `boss`), `@@SET proactive=` (`on` | `off`), `@@SET comment_rate_seconds=N` (only matters
   with proactive on; overrides `settings.tips.comment_rate_seconds`, `0` = off),
-  `@@SET call_lang=` (`uk` | `en` | `mix`) and `@@SET mic_device=` (`default` | `builtin`).
+  `@@SET call_lang=` (`uk` | `en` | `mix`, or a set like `de+en`; 0.8.5, owner: `uk` and `en` mean that
+  language only, as at the start of a call, `mix` is Ukrainian with English) and `@@SET mic_device=`
+  (`default` | `builtin`).
   Since Pacenote 0.8 also `@@SET agenda_state=<index>|todo|now|done` (the PM's state of an
   agenda item wins: re-emit the strip), `@@SET onme_state=<id>|done|open` (a tick in On me: at
   the end that action is added to the register already closed) and `@@SET commitment_closed=<id>`

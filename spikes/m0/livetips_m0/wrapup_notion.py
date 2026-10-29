@@ -121,7 +121,8 @@ Write in {LANG}, plain and short, no long dashes. Return ONLY one JSON object:
  "decisions": ["..."], "commitments": ["what we (the PM's side) promised, with dates"],
  "new_requests": ["new asks from the other side that may change scope"],
  "open_questions": ["..."], "risks": ["..."]}
-Empty lists are fine. Do not repeat the same item in two lists."""
+Empty lists are fine. Do not repeat the same item in two lists. Valid JSON: inside a text value use « » for
+quotes, never a straight double quote."""
 
 
 def _correction(d: dict) -> str:
@@ -161,6 +162,34 @@ def pm_corrections(path: Path) -> str:
     return ("\n\nCORRECTIONS BY THE PM DURING THE CALL (true; they win over the transcript):\n" + "\n".join(out[-60:])) if out else ""
 
 
+def parse_object(text: str) -> dict:
+    """The first JSON object in a model reply; a straight quote inside a value is escaped when that is the only fault."""
+    i, j = text.find("{"), text.rfind("}")
+    if i < 0 or j <= i:
+        raise ValueError("no JSON object in the reply")
+    raw = text[i:j + 1]
+    try:
+        return json.loads(raw)
+    except ValueError:
+        pass
+    # A '"' that neither opens nor closes a string (the next non-space is not one of , : } ]) is part of the text.
+    out, in_str, k = [], False, 0
+    while k < len(raw):
+        ch = raw[k]
+        if ch == "\\" and in_str:
+            out.append(raw[k:k + 2]); k += 2; continue
+        if ch == '"':
+            if not in_str:
+                in_str = True
+            else:
+                nxt = raw[k + 1:].lstrip()[:1]
+                if nxt and nxt not in ",:}]":
+                    out.append('\\"'); k += 1; continue
+                in_str = False
+        out.append(ch); k += 1
+    return json.loads("".join(out))
+
+
 def claude_wrapup(transcript: str, brief: str, model: str, lang: str = "uk", provider=None) -> dict:
     """0.8.2: through the app's "After the call" route: the key, or Claude Code on the PM's Claude account."""
     from .routing import provider_from_env
@@ -170,9 +199,16 @@ def claude_wrapup(transcript: str, brief: str, model: str, lang: str = "uk", pro
                       max_tokens=2500, cache_ttl=None)
     if c.error:
         raise RuntimeError("summary request failed: " + str(c.error)[:200])
-    text = c.text
-    i, j = text.find("{"), text.rfind("}")
-    out = json.loads(text[i:j + 1])
+    try:
+        out = parse_object(c.text)
+    except ValueError as e:
+        # 0.8.5 (owner): a quote inside a value broke the JSON and the meeting page was not written. One repair turn.
+        fix = prov.complete(model=model, system=[{"text": "Return the same content as ONE valid JSON object, nothing else. "
+                                                          "Inside text values use « » for quotes, never a straight double quote."}],
+                            user=f"JSON error: {e}\n\n{c.text[:20000]}", max_tokens=3000, cache_ttl=None)
+        if fix.error:
+            raise RuntimeError("summary JSON was invalid and the repair failed: " + str(fix.error)[:200])
+        out = parse_object(fix.text)
     try:   # 2026-10-26 (owner): the menu shows what the last call cost, the wrap-up included (Claude Code: 0, the plan)
         from .cost import cost_usd
         out["_cost"] = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)

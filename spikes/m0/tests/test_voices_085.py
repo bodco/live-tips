@@ -87,3 +87,31 @@ def test_typed_alias_names_the_kept_person(T, tmp_path):
     a = sp.observe("10:00:01", 0, 3, vec(0), 3.0, "hello")
     sp.apply_setting("speaker_name", f"{a}|Maria H.")
     assert sp.clusters[a]["name"] == "Mariia H."
+
+
+def test_library_learns_only_a_clean_named_voice(T, tmp_path):
+    """rules/voices.yaml > learning: a mixed speaker teaches the library nothing; a clean one is learned."""
+    L = lib(T, tmp_path, {"Mariia H.": vec(0)})
+    sp = tracker(T, tmp_path, L)
+    T.DEFAULTS["speaker_join"] = -1.0             # two voices in one cluster, as on the call
+    try:
+        a = sp.observe("10:00:01", 0, 3, vec(2), 3.0, "one")
+        for i, v in enumerate([vec(2, 3, 0.1), vec(3), vec(3, 2, 0.1)]):
+            sp.observe(f"10:00:1{i}", 10 + i * 4, 13 + i * 4, v, 3.0, "x")
+    finally:
+        T.DEFAULTS["speaker_join"] = 0.45
+    sp.apply_setting("speaker_name", f"{a}|Olena S.")
+    assert "Olena S." not in L.people                     # sounds like more than one voice
+    (tmp_path / "x").mkdir()
+    L2 = lib(T, tmp_path / "x", {"Mariia H.": vec(0)})
+    sp2 = tracker(T, tmp_path / "x", L2)
+    b = sp2.observe("10:00:01", 0, 3, vec(4), 3.0, "one")
+    sp2.observe("10:00:05", 4, 7, vec(4, 5, 0.1), 3.0, "two")
+    sp2.apply_setting("speaker_name", f"{b}|Olena S.")
+    assert "Olena S." in L2.people and len(L2.people["Mariia H."]["embeddings"]) == 3
+
+
+def test_window_language_uk_means_ukrainian_only(T):
+    src = SRC.read_text(encoding="utf-8")
+    assert 'LANG_SETS = {"uk": ("uk", [], ["uk"]), "en": ("en", [], ["en"]),' in src
+    assert T.NOT_ENGLISH.search("Dostup do Wołewski w Tobie jest") and not T.NOT_ENGLISH.search("I'll hold that.")

@@ -21,7 +21,7 @@
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk' },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
-      saidIt: 'Said it', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
+      saidIt: 'Said it', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
       unverified: 'Not verified against documents',
       next: (t, m) => `${t} in ${m} min`, notPrepared: 'not prepared', ready: 'brief ready', preparing: 'preparing', prepare: 'Prepare', open: 'Open',
       ask: 'Ask about this project', help: 'Help',
@@ -73,7 +73,7 @@
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик' },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
-      saidIt: 'Сказав', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
+      saidIt: 'Сказав', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
       unverified: 'Не звірено з документами',
       next: (t, m) => `${t} за ${m} хв`, notPrepared: 'не підготовлено', ready: 'бриф готовий', preparing: 'готується', prepare: 'Підготувати', open: 'Відкрити',
       ask: 'Запитай про проєкт', help: 'Допоможи',
@@ -126,7 +126,7 @@
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
-    ui: { lineWho: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
+    ui: { lineWho: {}, lineDel: {}, delArm: null, openPts: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
   };
   const T = () => STR[S.lang] || STR.en;
@@ -318,6 +318,14 @@
     return T().kinds[c.kind] || T().kinds.neutral;
   }
 
+  // 0.8.5 (owner): a speech point with its full text is a toggle; it stays open across renders.
+  function itemsHtml(c) {
+    const f = c.fulls || [];
+    if (!f.some(Boolean)) return `<ul class="items">${c.items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    return `<ul class="items pts" data-card="${esc(c.id)}">${c.items.map((x, i) => f[i]
+      ? `<li><details data-pt="${esc(c.id + ':' + i)}"${S.ui.openPts[c.id + ':' + i] ? ' open' : ''}><summary>${esc(x)}</summary><p>${esc(f[i])}</p></details></li>`
+      : /^\d/.test(x) || x.split(/\s+/).length > 3 ? `<li class="pt">${esc(x)}</li>` : `<li class="grp">${esc(x)}</li>`).join('')}</ul>`;
+  }
   function renderHero(c) {
     const el = $('hero'), t = T();
     if (!c) { el.hidden = true; el.dataset.id = ''; return; }
@@ -327,11 +335,12 @@
     el.classList.toggle('finish', c.kind === 'finish');
     const meta = [c.meta || (c.who ? t.asked(c.who) : ''), rel(c.at)].filter(Boolean).join(' · ');
     const editing = S.ui.editing === c.id;
+    const ptsEl = el.querySelector('.items.pts'), ptsTop = ptsEl && ptsEl.dataset.card === c.id ? ptsEl.scrollTop : 0;
     el.innerHTML = `
-      <div class="head"><span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>${c.kind === 'finish' ? '' : `<span class="meta"${c.unverified ? ` title="${esc(t.unverified)}"` : ''}>${esc(meta)}</span>`}</div>
+      <div class="head"><span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>${c.kind === 'finish' ? '' : `<span class="meta"${c.unverified ? ` title="${esc(t.unverified)}"` : ''}>${esc(meta)}</span>`}${S.ui.heroOverride === c.id ? `<button class="ghost backauto" type="button" data-act="hero-auto" title="Esc">${esc(t.backAuto)}</button>` : ''}</div>
       ${(c.commit ? t.doneQ : c.question) ? `<div class="q">${esc(c.commit ? t.doneQ : c.question)}</div>` : ''}
       ${c.say ? `<div class="say"${editing ? ' contenteditable="true" spellcheck="false"' : ''}>${esc(c.say)}</div>` : ''}
-      ${(c.items || []).length && c.kind !== 'finish' ? `<ul class="items">${c.items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${(c.items || []).length && c.kind !== 'finish' ? itemsHtml(c) : ''}
       ${c.source ? `<div class="src">${ICON.doc}<span>${esc(c.source)}</span></div>` : ''}
       ${c.commit ? `<div class="acts">${c.state === 'done' ? `<span class="meta">${esc(t.closed)}</span>` : `<button class="btn1" type="button" data-act="commit-done" data-id="${esc(c.id)}">${esc(t.markDone)}</button>`}
         <button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></div>` : c.kind === 'finish' ? '' : editing ? `<div class="acts">
@@ -343,6 +352,7 @@
         <button class="ghost" type="button" data-act="edit" data-id="${esc(c.id)}">${esc(t.edit)}</button>
         <button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button>
       </div>`}`;
+    if (ptsTop) { const p = el.querySelector('.items.pts'); if (p) p.scrollTop = ptsTop; }
     if (editing) { const s = el.querySelector('.say'); if (s) { s.focus(); document.getSelection().selectAllChildren(s); } }
   }
 
@@ -599,7 +609,12 @@
           const btn = named ? `<button class="who ${cls}" type="button" data-act="name" data-sid="${esc(l.speakerId)}">${who}</button>`
             : l.speakerId === 'me' ? `<span class="who ${cls}">${who}</span>`
             : `<button class="who ${fixed ? 'client' : cls}" type="button" data-act="line-who" data-i="${i}" title="${esc(t.lineWhoTip)}">${who}</button>`;
-          return `<div class="tl">${btn}<span>${esc(l.text)}</span></div>`;
+          // 0.8.5 (owner, back from 0.7): any line can be deleted (two clicks) and restored; applied after the stop.
+          const k = lineKey(l), gone = !!S.ui.lineDel[k];
+          const del = !l.t ? '' : gone
+            ? `<button class="ghost" type="button" data-act="line-undel" data-i="${i}">${esc(t.restore)}</button>`
+            : `<button class="ghost${S.ui.delArm === k ? ' armed' : ''}" type="button" data-act="line-del" data-i="${i}" title="${esc(t.delTip)}">${esc(S.ui.delArm === k ? t.delConfirm : t.del)}</button>`;
+          return `<div class="tl${gone ? ' gone' : ''}">${btn}<span class="tx">${esc(l.text)}</span><span class="hover-acts">${del}</span></div>`;
         }).join('');
     } else if (tab === 'onme') {
       body = S.onMe.length ? S.onMe.map((o) => S.ui.onmeEdit === o.id
@@ -663,17 +678,23 @@
   // ---------- Speaker naming popover ----------
   function lineKey(l) { return (l.t || '') + '|' + String(l.text || '').slice(0, 40); }
   /** A line nobody's voice was matched to: say who said it. Applied to the transcript file after the call. */
+  /** 0.8.5 (owner): under the anchor, or above it when the window has no room below (a name near the bottom). */
+  function placePop(pop, r) {
+    const h = pop.offsetHeight, room = window.innerHeight - 8;
+    let top = r.bottom + 6;
+    if (top + h > room) top = r.top - h - 6 >= 8 ? r.top - h - 6 : Math.max(8, room - h);
+    pop.style.top = top + 'px';
+  }
   function openLinePopover(i, anchor) {
     const t = T(), l = S.transcript[+i], pop = $('pop');
     if (!l || !l.t) return;
     const r = anchor.getBoundingClientRect();
     pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 270)) + 'px';
-    pop.style.top = (r.bottom + 6) + 'px';
     const names = Array.from(new Set(Object.values(S.speakers).map((s) => s && s.name).filter((n) => n && n !== t.me && n !== t.them)));
     pop.innerHTML = `<label class="meta" for="lnName">${esc(t.name)}</label><input id="lnName" type="text" list="lnNames" value="${esc(S.ui.lineWho[lineKey(l)] || '')}">
       <datalist id="lnNames">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
       <button class="btn1" type="button" id="lnSave">${esc(t.save)}</button>`;
-    pop.hidden = false;
+    pop.hidden = false; placePop(pop, r);
     const input = pop.querySelector('#lnName'); input.focus();
     const save = () => {
       const name = input.value.replace(/\s+/g, ' ').replace(/\|/g, ' ').trim().slice(0, 60); if (!name) return;
@@ -689,7 +710,6 @@
     const t = T(), sp = S.speakers[sid] || {}, pop = $('pop');
     const r = anchor.getBoundingClientRect();
     pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 270)) + 'px';
-    pop.style.top = (r.bottom + 6) + 'px';
     let side = sp.side || 'client';
     const sug = (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-pick="${esc(x.name)}">${esc(x.name)} <span class="m">${Math.round(x.score * 100)}%</span></button>`).join('');
     const known = (S.knownNames || []).filter((n) => !(sp.suggestions || []).some((x) => x.name === n));
@@ -697,7 +717,7 @@
       <datalist id="spKnown">${known.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
       <div class="seg2"><button type="button" data-side="client" aria-pressed="${side === 'client'}">${esc(t.client)}</button><button type="button" data-side="team" aria-pressed="${side === 'team'}">${esc(t.team)}</button></div>
       <button class="btn1" type="button" id="spSave">${esc(t.save)}</button>`;
-    pop.hidden = false;
+    pop.hidden = false; placePop(pop, r);
     const input = pop.querySelector('#spName'); input.focus();
     pop.querySelectorAll('[data-side]').forEach((b) => b.onclick = () => { side = b.dataset.side; pop.querySelectorAll('[data-side]').forEach((x) => x.setAttribute('aria-pressed', x === b)); });
     const save = () => {
@@ -748,10 +768,15 @@
   function openTab(tab) { if (isWide()) S.ui.paneTab = tab; else S.ui.sheet = tab; render(); }
   function cardKey(c) { return (c.card || '') + '|' + (c.t || '') + '|' + String((c.raw && c.raw.gist) || '').slice(0, 60); }
 
+  document.addEventListener('toggle', (e) => {
+    const d = e.target; if (!d || !d.dataset || !d.dataset.pt) return;
+    if (d.open) S.ui.openPts[d.dataset.pt] = true; else delete S.ui.openPts[d.dataset.pt];
+  }, true);
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('#moreBtn')) { S.ui.menuOpen = false; renderMenu(); }
     if (!$('pop').hidden && !e.target.closest('#pop') && !(b && (b.dataset.act === 'name' || b.dataset.act === 'line-who'))) $('pop').hidden = true;
+    if (S.ui.delArm && !(b && b.dataset.act === 'line-del')) { S.ui.delArm = null; if (!b) render(); }
     if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
     const card = id && S.cards.find((c) => c.id === id);
@@ -781,7 +806,14 @@
         }
         break;
       }
-      case 'promote': S.ui.heroOverride = id; break;
+      case 'promote': {
+        // 0.8.5 (owner): picking the card the window would show anyway (the newest) returns to the automatic order.
+        const keep = S.ui.heroOverride; S.ui.heroOverride = null;
+        const auto = pickHero(visibleCards());
+        S.ui.heroOverride = auto && auto.id === id ? null : (id || keep);
+        break;
+      }
+      case 'hero-auto': S.ui.heroOverride = null; break;
       case 'after': post('after', Object.assign({ item: b.dataset.item }, draftNow())); return;
       case 'commit-done': {
         if (!card || !card.commit) return;
@@ -810,6 +842,14 @@
         render(); return;
       }
       case 'line-who': openLinePopover(b.dataset.i, b); return;
+      case 'line-del': case 'line-undel': {
+        const l = S.transcript[+b.dataset.i]; if (!l || !l.t) return;
+        const k = lineKey(l), v = l.t + '|' + String(l.text || '').slice(0, 40).replace(/\|/g, ' ');
+        if (act === 'line-undel') { delete S.ui.lineDel[k]; post('setting', { key: 'line_undelete', value: v }); }
+        else if (S.ui.delArm !== k) { S.ui.delArm = k; render(); return; }
+        else { S.ui.lineDel[k] = true; S.ui.delArm = null; post('setting', { key: 'line_delete', value: v }); showToast({ text: T().lineDeleted, kind: 'ok', at: Date.now() }); }
+        render(); return;
+      }
       case 'onme-edit': S.ui.onmeEdit = id; render(); { const i = $('onmeEditInput'); if (i) { i.focus(); i.select(); i.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); i.parentNode.querySelector('[data-act=onme-save]').click(); } if (e.key === 'Escape') { S.ui.onmeEdit = null; render(); } e.stopPropagation(); }; } } return;
       case 'onme-cancel': S.ui.onmeEdit = null; render(); return;
       case 'onme-save': case 'onme-notmine': {

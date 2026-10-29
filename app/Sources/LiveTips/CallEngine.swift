@@ -347,6 +347,30 @@ final class CallEngine {
     /// After the call: wrap-up by Claude and the Meetings DB page in Notion (existing page of this meeting
     /// first, a new one otherwise), with the transcript attached as a .md file. Same result as the skill's
     /// wrap-up Step 5. Needs the Notion token (Settings > Keys) and a project with a config.
+    /// 0.8.5 (owner): Send last call to Notion works after an app restart too (an update, a failed page):
+    /// the call's file, project config, title and time are kept in state/last-call.json.
+    var lastCallPath: String { (appRoot as NSString).appendingPathComponent("state/last-call.json") }
+    func rememberLastCall(file: String) {
+        var d: [String: Any] = ["file": file, "config": projectConfig]
+        if let v = callRequest["project_dir"] as? String { d["project_dir"] = v }
+        if let v = callRequest["scheduled_at"] as? String { d["scheduled_at"] = v }
+        if let v = renamed { d["title"] = v }
+        if let data = try? JSONSerialization.data(withJSONObject: d) { try? data.write(to: URL(fileURLWithPath: lastCallPath)) }
+    }
+    /// Restores the last call for Send last call to Notion when nothing is in memory (not during a call).
+    @discardableResult func restoreLastCall() -> Bool {
+        if lastFile != nil { return true }
+        guard !isRunning, let data = FileManager.default.contents(atPath: lastCallPath),
+              let d = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let f = d["file"] as? String, FileManager.default.fileExists(atPath: f) else { return false }
+        lastFile = f
+        projectConfig = (d["config"] as? String) ?? ""
+        if let v = d["project_dir"] as? String { callRequest["project_dir"] = v }
+        if let v = d["scheduled_at"] as? String { callRequest["scheduled_at"] = v }
+        renamed = d["title"] as? String
+        return true
+    }
+
     func writeToNotion(file: String) {
         let c = config
         guard c.notionWriteSummary else { return }
@@ -359,6 +383,7 @@ final class CallEngine {
             notionResult = "Notion: choose where meeting pages go (Settings > Notion). Then use Send last call to Notion in the menu."; notify(notionResult, settingsTab: "notion"); return
         }
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
+        rememberLastCall(file: file)
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
         let projectName = ((callRequest["project_dir"] as? String).map { ($0 as NSString).lastPathComponent }) ?? ""

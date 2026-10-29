@@ -273,5 +273,15 @@ test('brief: numbered points, paragraphs, wrapped lines and tables are kept (eac
   assert.strictEqual(get().agenda[0].title, 'Confirm the date');
 });
 
+test('speech: a point keeps its full text; a "> " line under a brief point joins it', () => {
+  const { f, get } = make();
+  f.addItems([{ kind: 'speech', t: '10:00:00', at: '10:00:00', gist: 'Your speech', phrase: 'Short update.', items: ['Done', { text: '1. Release on Tuesday', full: 'The release goes out on Tuesday after the smoke test.' }] }]);
+  const c = get().cards.find((x) => x.kind === 'turn');
+  assert.deepStrictEqual(c.items, ['Done', '1. Release on Tuesday']);
+  assert.deepStrictEqual(c.fulls, ['', 'The release goes out on Tuesday after the smoke test.']);
+  f.setPrepDoc({ text: '## My update\n1. Release on Tuesday\n   > After the smoke test.\n', at: '09:40' });
+  assert.deepStrictEqual(get().brief.sections[0].items, ['Release on Tuesday After the smoke test.']);
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

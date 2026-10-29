@@ -280,3 +280,22 @@ button{font:inherit;color:inherit;cursor:pointer}
 .after.full{flex-wrap:nowrap;min-height:0}
 .after.full .meta{flex:none}
 .after.full>*{flex:none}
+/* 0.8.5 (owner): a speech point opens to its full text; the way back to the newest card is visible */
+.hero .items.pts{list-style:none;padding-left:0;gap:2px;max-height:48vh;overflow:auto}
+.hero .items.pts li.grp{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);margin-top:6px}
+.hero .items.pts details{border-radius:var(--radius-s)}
+.hero .items.pts summary{list-style:none;cursor:pointer;display:flex;gap:8px;align-items:baseline;padding:2px 4px;border-radius:var(--radius-s)}
+.hero .items.pts summary::-webkit-details-marker{display:none}
+.hero .items.pts summary::before{content:"";flex:none;width:6px;height:6px;border-right:1.5px solid var(--text-3);border-bottom:1.5px solid var(--text-3);transform:rotate(-45deg);transition:transform .12s;position:relative;top:-1px}
+.hero .items.pts details[open]>summary::before{transform:rotate(45deg)}
+.hero .items.pts summary:hover{background:var(--accent-soft)}
+.hero .items.pts details p{margin:4px 0 8px 18px;font-size:15px;line-height:1.45;color:var(--text);user-select:text}
+.hero .head .backauto{margin-left:auto;height:24px;padding:0 8px;font-size:12px}
+.tl .tx{flex:1;min-width:0}
+.tl .hover-acts{opacity:0;flex:none;align-self:flex-start}
+.tl:hover .hover-acts,.tl:focus-within .hover-acts,.tl .hover-acts:has(.armed){opacity:1}
+.tl .hover-acts .ghost{height:22px;padding:0 6px;font-size:12px}
+.tl .hover-acts .armed{color:var(--danger-text)}
+.tl.gone .tx{text-decoration:line-through;color:var(--text-3)}
+.tl.gone .hover-acts{opacity:1}
+.hero .items.pts li.pt{padding:2px 4px 2px 18px}

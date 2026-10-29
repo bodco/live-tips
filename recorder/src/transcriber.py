@@ -93,6 +93,7 @@ DEFAULTS = {
     "speaker_automerge": 0.6,   # two clusters whose centroids are this close are the same person
     "speaker_lib_min": 0.55,    # 0.8.5: a line is another library person's only from this cosine to their voice
     "speaker_lib_margin": 0.08, # 0.8.5: ... and only when it is this much closer to them than to the cluster's own name
+    "speaker_lib_learn": 0.5,   # 0.8.5: the library learns only lines this close (mean cosine) to the speaker's other lines
     "speaker_suggest": 0.5,     # library people with cosine >= this are offered as suggestions
     "speaker_auto": 0.72,       # 2026-10-26: a voice this close to a name used on this meeting series is named by itself
     "speaker_prompt_s": 15.0,   # 2026-10-26 (was 8: short exclamations were asked about); s of speech of an unnamed cluster before the window asks "Who is speaking?"
@@ -198,6 +199,7 @@ def clean_text(text: str, prompt_words: set[str]) -> str:
 
 
 CYRILLIC_LANGS = ("uk", "ru", "be", "bg")
+NOT_ENGLISH = re.compile(r"[ąćęłńśźżčřšžěůőűßäöüåøæñçãõ]", re.I)   # Latin letters an English line never has
 
 
 def fix_lang_by_script(text: str, lang: str, langs: list[str]) -> str:
@@ -564,7 +566,12 @@ class Whisper:
                 continue   # low confidence or a repetition loop
             parts.append(s.get("text", "").strip())
         text = " ".join(p for p in parts if p).strip()
-        return text, fix_lang_by_script(text, lang, self.langs)
+        lang = fix_lang_by_script(text, lang, self.langs)
+        if language != self.langs[0] and (lang not in self.langs or (lang == "en" and NOT_ENGLISH.search(text))):
+            # 0.8.5 (owner): Ukrainian heard as another language came out as Polish ("Dostup do ... w Tobie jest"):
+            # a line outside the allowed set, or "English" with letters English never has, is redone in the main one.
+            return self.transcribe(audio, self.langs[0], prompt)
+        return text, lang
 
 
 class FakeWhisper:
@@ -3478,6 +3485,7 @@ class SpeakerTracker:
                     sid = other
                 else:
                     self.clusters[sid]["name"] = name or None
+                    self.auto.discard(sid)                 # the PM named it: the library may learn it now
                     self._recompute(sid)
                     if old and name:
                         self._split_on_rename(sid, old, name)
@@ -3554,11 +3562,22 @@ class SpeakerTracker:
         if self.lib is None or not self.lib.remember:
             return                         # a public call: nothing is written to the voice library
         desired: dict[str, list] = {}
-        for c in self.clusters.values():
+        for sid, c in self.clusters.items():
             if not c["name"] or not c["members"]:
                 continue
+            if sid in self.auto:
+                continue                           # 0.8.5 (rules/voices.yaml > learning): named by the roster, not by the PM
             good = [m for m in c["members"] if m["emb"] is not None and m["dur"] >= self._f("speaker_new_min_s")]
             good = good or [m for m in c["members"] if m["emb"] is not None]
+            if len(good) >= 2:
+                # only the core of the voice: a line unlike the speaker's other lines may be someone else's
+                E = np.array([unit(m["emb"]) for m in good])
+                sim = (E @ E.T - np.eye(len(good))).sum(axis=1) / (len(good) - 1)
+                core = [m for m, x in zip(good, sim) if float(x) >= self._f("speaker_lib_learn")]
+                if len(core) < max(1, len(good) // 2):
+                    log(f"voices: {sid} ({c['name']}) sounds like more than one voice, not learned")
+                    continue
+                good = core
             desired.setdefault(c["name"], []).extend(_round_emb(m["emb"]) for m in good[-10:])
         sides = {c["name"]: c.get("side") for c in self.clusters.values() if c["name"] and c.get("side")}
         if desired == self.lib_added and sides == getattr(self, "lib_sides", {}):
@@ -4227,7 +4246,9 @@ def main() -> int:
 
     # Settings chosen in the tips window after a fast start (⚙︎): the window appends them to
     # the inbox; language and mic are applied here at once, type and role are for the skill.
-    LANG_SETS = {"uk": ("uk", ["uk", "en"], ["uk", "en"]), "en": ("en", ["en", "uk"], ["en", "uk"]),
+    # 0.8.5 (owner): "uk" and "en" from the window mean that language only, like at the start of a call (picking
+    # Ukrainian mid-call let English in: "I'll hold that.", Polish lines); "mix" is Ukrainian with English.
+    LANG_SETS = {"uk": ("uk", [], ["uk"]), "en": ("en", [], ["en"]),
                  "mix": ("uk", ["uk", "en"], ["uk", "en"])}
     inbox_pos = [0]
 

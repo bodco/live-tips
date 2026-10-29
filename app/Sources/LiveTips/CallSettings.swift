@@ -155,11 +155,13 @@ struct CallSettingsView: View {
             }
             .formStyle(.grouped)
             .frame(minHeight: 520, idealHeight: 640)       // 0.8 (owner): a Form has no height of its own; without this the window was empty
+            // 0.8.5 (owner): the Done bar sits apart from the scrolled form: a divider and its own padding.
+            Divider()
             HStack {
                 Spacer()
                 Button(L("callSettings.done"), action: close).buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
             }
-            .padding(.horizontal, 20).padding(.bottom, 16)
+            .padding(.horizontal, 20).padding(.vertical, 14)
         }
         .frame(width: 480)
     }

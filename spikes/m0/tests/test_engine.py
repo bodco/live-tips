@@ -531,3 +531,17 @@ def test_final_wrapup_and_red_only_for_the_pm(tmp_path):
     # the same phrase in other words is noise at any level
     eng.tips.append({"phrase": "We can only speak to the gateway logs today", "_at": 36000.0, "level": "red", "gist": "x"})
     assert eng._diet({"level": "red", "gist": "y", "phrase": "We can only speak to the gateway logs here"}, 36010.0) == "phrase_repeat"
+
+
+def test_speech_points_keep_their_full_text(tmp_path):
+    """0.8.5 (owner): a speech point opens to its full text; "> " lines under a point in the brief carry it."""
+    from livetips_m0.engine import speech_section, speech_out, speech_point, point_text
+    brief = ('# Live Brief\n\n## 6. My speech\n**🟢 Your speech**\n"Short: release on Tuesday."\nDone\n'
+             '1. Release on Tuesday\n   > The release goes out on Tuesday after the smoke test.\n   > Ann signs it off.\n2. Export in QA\n')
+    sec = speech_section(brief, "x")
+    assert sec["items"][0] == "Done"
+    assert sec["items"][1] == {"text": "1. Release on Tuesday", "full": "The release goes out on Tuesday after the smoke test. Ann signs it off."}
+    assert sec["items"][2] == "2. Export in QA"
+    out = speech_out(sec, 10.0, "g", "")
+    assert out["items"][1]["full"].startswith("The release") and out["items"][2] == "2. Export in QA"
+    assert speech_point({"text": "a", "full": "a"}) == "a" and point_text({"text": "b", "full": "c"}) == "b"

@@ -54,6 +54,19 @@ Pacenote. Earlier versions are described in the commit messages and in
   is not notarized yet, and the DMG's "Read me first" says it all in English and Ukrainian.
 - **One preparation, one call:** a preparation finished before a held call of its series ended belongs to that
   call; the next call of the series is not shown as prepared by it. Home's Later badges and actions line up.
+- **Your speech, point by point:** each point of the speech is a line that opens to its full text, ready to read
+  aloud (the brief keeps it as "> " lines under the point; the skill and the window use the same format).
+- **Tips window:** a card picked from Earlier shows Back to latest (or pick the newest card again) to return to the
+  automatic order; the speaker name popover opens upward near the bottom of the window. Call settings: the Done
+  bar is separated from the form.
+- **Transcript:** any line can be deleted again (two clicks, Restore undoes it), as in 0.7; applied after the call.
+- **Languages:** choosing Ukrainian or English during a call means that language only, as at the start (English
+  and Polish lines no longer slip into a Ukrainian call); a line that comes out in a language outside the call's
+  set is recognised again in the main language.
+- **Voices:** the voice library learns only from a speaker you named and only from the lines that sound like
+  that speaker, so one mixed-up call no longer blurs a person's voice for the next calls.
+- **Meeting page:** a quote inside the summary no longer stops the Notion page (the JSON is repaired or asked
+  again), and Send last call to Notion in the menu works after the app restarts.
 - **Skill and app behave the same:** the time line, the advice and "Move to slide N?" are computed once by the
   recorder (rules/presentation.yaml, a shared fixture checked in Python and in the window); slide sync from
   Keynote or PowerPoint is marked app only.

@@ -90,6 +90,21 @@ period, the opening sentence, then the theses in short groups. All in the langua
 > 4. Тікет на продовження домену
 > Потрібне рішення: другий апрув у безпеці дашборду
 
+**The full text of each point** (0.8.5, owner: "if I open a point I want the whole text, so I can
+just read it"). Every thesis has two layers: the short line on screen (max 8 words) and the full
+text the PM can read aloud word for word (1-4 sentences, the facts, numbers and names of that
+point, in the language of the call, no new facts beyond the sources). In the window a point is a
+collapsed line; opening it shows the full text. Group names (Було, Далі) have no full text.
+- In the window item: `items` entries are objects `{"text": "<short line>", "full": "<full text>"}`;
+  a plain string is a point without full text (older items stay valid).
+- In the brief's speech section ("My update"): the full text goes on the lines right under its
+  point, each starting with `>`:
+  ```
+  1. Закрили звіт по залишках на проді
+     > Звіт по залишках на проді закрили у вівторок, цифри збігаються з банком.
+  ```
+- A ready `## speech.json` item in the brief uses the same objects.
+
 **"Your turn" tip** (up to 7 lines): gist line, then a ready opening
 sentence in quotes, then the theses not used yet in the order to say them, numbered, max 8
 words each, all in the language of the call. If the question was about one topic, answer that

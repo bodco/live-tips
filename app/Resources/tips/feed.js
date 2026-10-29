@@ -103,7 +103,9 @@
   Feed.prototype.toCard = function (it) {
     const kind = this.kindOf(it);
     const gist = clean(it.gist), phrase = clean(it.phrase);
-    const items = (it.items || []).map((x) => clean(itemText(x))).filter(Boolean);
+    // 0.8.5 (owner): a speech point may carry its full text ({text, full}, speech.md); it opens under the line.
+    const pts = (it.items || []).map((x) => ({ t: clean(itemText(x)), f: x && typeof x === 'object' ? clean(x.full) : '' })).filter((p) => p.t);
+    const items = pts.map((p) => p.t);
     let who = '', question = '', say = '', meta = '', source = '', unverified = false;
     if ((it.kind === 'answer' || it.kind === 'fact') && it.q != null) {
       const q = clean(it.q).replace(/^(find|знайди|пошук)\s*:\s*/i, '');
@@ -127,6 +129,7 @@
     const c = {
       id, kind, who, question, say, source, meta, unverified,
       items: kind === 'turn' ? items : items.slice(source === items[0] ? 1 : 0, 4),
+      fulls: kind === 'turn' ? pts.map((p) => p.f) : [],
       at: hmsToMs(it.at || it.t, this.now()),
       state: 'active', pinned: false, partial: !!it.partial, late: !!it.late, card: it.card || '', t: it.t || '',
       raw: { kind: it.kind || 'tip', gist: it.gist || '', phrase: it.phrase || '', items: it.items || [] }
@@ -445,8 +448,8 @@
       if (/^\|?\s*:?-{3,}/.test(line)) continue;                   // a table's separator row
       if (line.startsWith('|')) { add(line.replace(/^\||\|$/g, '').split('|').map((x) => x.trim()).filter(Boolean).join(' · ')); continue; }
       if ((m = /^(?:[-*•]|\d+[.)])\s+(.+)$/.exec(line))) { add(m[1]); continue; }
-      if (lastItem && /^\s{2,}/.test(raw) && sec && sec.items.length) { sec.items[sec.items.length - 1] += ' ' + clean(line.replace(/\*\*/g, '')); continue; }
-      add(line);
+      if (lastItem && (/^\s{2,}/.test(raw) || line.startsWith('>')) && sec && sec.items.length) { sec.items[sec.items.length - 1] += ' ' + clean(line.replace(/^>\s*/, '').replace(/\*\*/g, '')); continue; }
+      add(line.replace(/^>\s*/, ''));
     }
     b.sections = b.sections.filter((s) => s.items.length);
     this.brief = b;

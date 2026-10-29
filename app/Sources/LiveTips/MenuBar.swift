@@ -195,7 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.lastCallLine = [ce.lastCallLine, judge].filter { !$0.isEmpty }.joined(separator: " · ")
         m.lastCallDetail = ce.lastCallDetail
         m.thisCallSpend = st.callSpentUSD
-        m.canSendNotion = !m.isLive && ce.lastFile != nil
+        m.canSendNotion = !m.isLive && (ce.lastFile != nil || (!ce.isRunning && ce.restoreLastCall()))
         m.notionResult = ce.notionResult
         m.micMissing = AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
         m.helpKey = HotKeys.shared.combo(.help).display
@@ -207,7 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
     @objc func openHome() { MainActor.assumeIsolated { HomeWindow.show(delegate: self) } }
     @objc func sendToNotion() {
-        guard let f = CallEngine.shared.lastFile, !CallEngine.shared.isRunning else { return }
+        guard !CallEngine.shared.isRunning, CallEngine.shared.restoreLastCall(), let f = CallEngine.shared.lastFile else { return }
         CallEngine.shared.writeToNotion(file: f)
     }
     @objc func openSetup() { MainActor.assumeIsolated { SetupWindow.show() } }

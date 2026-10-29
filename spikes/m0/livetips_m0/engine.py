@@ -247,6 +247,7 @@ def speech_json(brief_text: str):
 
 
 def speech_section(brief_text: str, default_gist: str) -> Optional[dict]:
+    """The speech section of the brief. A "> " line right under a point is that point's full text (speech.md)."""
     m = SPEECH_SECTION.search(brief_text)
     if not m:
         return None
@@ -254,8 +255,31 @@ def speech_section(brief_text: str, default_gist: str) -> Optional[dict]:
     quoted = lambda l: l.startswith('"') or l.startswith("“")  # noqa: E731
     gist = next((l.strip("* ") for l in body if l.startswith("**")), default_gist)
     phrase = next((l.strip('"“” ') for l in body if quoted(l)), "")
-    items = [l.lstrip("-* ") for l in body if not l.startswith("**") and not quoted(l)]
+    items: list = []
+    for l in body:
+        if l.startswith(">"):
+            full = l.lstrip("> ").strip()
+            if items and full:
+                last = items[-1] if isinstance(items[-1], dict) else {"text": items[-1], "full": ""}
+                last["full"] = (last["full"] + " " + full).strip()
+                items[-1] = last
+            continue
+        if not l.startswith("**") and not quoted(l):
+            items.append(l.lstrip("-* "))
     return {"gist": gist, "phrase": phrase, "items": items[:12]}
+
+
+def speech_point(x):
+    """A speech point as the window takes it: a plain string, or {"text", "full"} when it has a full text."""
+    if isinstance(x, dict):
+        text, full = str(x.get("text") or "").strip(), str(x.get("full") or "").strip()
+        return {"text": text, "full": full} if full and full != text else text
+    return str(x)
+
+
+def point_text(x) -> str:
+    """The short line of a speech point."""
+    return str(x.get("text") or "") if isinstance(x, dict) else str(x)
 
 
 def similar_topic(topic: str, topics: List[str], sim: float) -> bool:
@@ -312,7 +336,7 @@ def numbers_said(obj: Optional[dict], after: List[Line]) -> Optional[str]:
     if not (obj and obj.get("topic")):
         return None
     said = " ".join(h.text for h in after).lower()
-    nums = re.findall(r"\d[\d.,]*", " ".join([obj.get("phrase", "")] + list(obj.get("items") or [])))
+    nums = re.findall(r"\d[\d.,]*", " ".join([obj.get("phrase", "")] + [point_text(x) for x in (obj.get("items") or [])]))
     return "numbers_already_said" if nums and all(n in said for n in nums) else None
 
 
@@ -457,7 +481,7 @@ def numbers_seen(text: str, corpus: str) -> bool:
 
 
 def check_numbers(obj: dict, corpus: str) -> dict:
-    items = [i for i in (obj.get("items") or []) if numbers_seen(i, corpus)]
+    items = [i for i in (obj.get("items") or []) if numbers_seen(point_text(i) + " " + (i.get("full", "") if isinstance(i, dict) else ""), corpus)]
     dropped = len(obj.get("items") or []) - len(items)
     obj["items"] = items
     if dropped:
@@ -484,7 +508,7 @@ def speech_out(item: dict, now: float, default_gist: str, note: str) -> dict:
     """The speech card as the window shows it."""
     out = {"schema_version": 1, "engine": "app", "uid": "speech", "t": s_to_hms(now), "src": s_to_hms(now), "kind": "speech",
            "level": "info", "gist": item.get("gist") or default_gist, "phrase": item.get("phrase", ""),
-           "items": [str(x) for x in (item.get("items") or [])][:14], "note": note, "at": s_to_hms(now)}
+           "items": [p for p in (speech_point(x) for x in (item.get("items") or [])) if point_text(p)][:14], "note": note, "at": s_to_hms(now)}
     return {k: v for k, v in out.items() if v not in ("", [], None)}
 
 
@@ -761,7 +785,7 @@ class Engine:
             recent = [t for t in self.tips if not t.get("partial")][-10:]
         given = []
         for t in recent:
-            nums = sorted(set(re.findall(r"\d[\d.,:%]*", " ".join([t.get("phrase", "")] + list(t.get("items") or [])))))
+            nums = sorted(set(re.findall(r"\d[\d.,:%]*", " ".join([t.get("phrase", "")] + [point_text(x) for x in (t.get("items") or [])]))))
             given.append(t["gist"] + ((" [" + ", ".join(nums[:6]) + "]") if nums else ""))
         st = {"tips_given": given, "now": s_to_hms(self.clock())}
         sit = self.situation
@@ -1287,7 +1311,7 @@ class Engine:
 
     def _remember_speech(self, it: dict) -> None:
         self.speech_phrase = it.get("phrase", "")
-        self.speech_items = list(it.get("items") or [])
+        self.speech_items = [point_text(x) for x in (it.get("items") or [])]
         self.speech_item = it
 
     def _restore_speech(self) -> bool:
@@ -1387,7 +1411,7 @@ class Engine:
 
     def _emit_speech(self, obj: dict, note: str = "") -> dict:
         out = speech_out(obj, self.clock(), "🟢 Твій спіч" if self._ui_uk() else "🟢 Your speech", note or obj.get("note", ""))
-        changed = list(out.get("items") or []) != self.speech_items
+        changed = [point_text(x) for x in (out.get("items") or [])] != self.speech_items
         self._remember_speech(out)
         if changed and self.situation:
             with self.lock:
@@ -1406,7 +1430,8 @@ class Engine:
         event = ("The PM asks about the speech (the PM's own update for this call): " + text + ". CURRENT SPEECH: " +
                  json.dumps({"gist": cur.get("gist", ""), "phrase": cur.get("phrase", ""), "items": cur.get("items", [])},
                             ensure_ascii=False) + ". Return the FULL updated speech as JSON {\"gist\": \"🟢 ...\", "
-                 "\"phrase\": \"<opening sentence>\", \"items\": [\"<point>\", ...up to 12], \"note\": \"<what changed>\"}: "
+                 "\"phrase\": \"<opening sentence>\", \"items\": [{\"text\": \"<point, max 8 words>\", \"full\": \"<the full text to read aloud, "
+                 "1-4 sentences>\"}, ...up to 12; a group name is a plain string], \"note\": \"<what changed>\"}: "
                  "apply the request, keep every point that was not asked to change, use only the brief, the fact book, "
                  "the cards, the project current state and the call. With no speech yet, build it from the brief.")
         c = self._call("tip", line, event)

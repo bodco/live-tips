@@ -1292,7 +1292,9 @@ from a clean start (the previous files were moved out of the project, rules/ai.y
 | API key | Opus | 5.7 min | $2.57 | 47 | 35.6K | 4.25M | 2,486 | 7 of 7 | 23 | 64 |
 | Claude account | Sonnet | 4.3 min | $1.16 (plan) | 35 | 30.4K | 1.96M | 2,770 | 9 of 9 | 20 | 51 |
 | Claude account | Opus | 5.5 min | $2.38 (plan) | 39 | 28.1K | 2.87M | 2,367 | 8 of 8 | 18 | 48 |
-| This Mac (Ollama) | Gemma 4 26B | 6.1 min | free | 1 request | 6.9K | (35K in) | 312 | 0 | 15 | 40 |
+| This Mac (Ollama) | Gemma 4 26B, one pass | 6.1 min | free | 1 request | 6.9K | (35K in) | 312 | 0 | 15 | 40 |
+| This Mac (Ollama) | Gemma 4 26B, three passes | 4.7 min | free | 7 requests | 7.0K | (44K in) | 1,262 | 7 of 7 | 15 | 24 |
+| API key, with the app's digest | Sonnet | 3.5 min | $0.99 | 37 | 29.8K | 1.89M | 2,679 | 9 of 9 | 19 | 50 |
 
 "(plan)" is what the same work would cost through the API; on a Claude plan it comes out of the plan's limits.
 
@@ -1301,8 +1303,14 @@ calls read in depth (what was asked, what was answered, what is still open, with
 the names as speech recognition spells them, and a speech whose every point opens to a full text. Opus noticed a
 little more (a person still in the invitation who had left the project, a support request with no agreed
 channel, a microphone problem on the last call); one Opus run got a weekday wrong. The local model wrote a correct
-but thin skeleton: one earlier call in "Previous meetings", no speech (a placeholder), the brief in the call's
-language instead of the brief language, generic cards.
+but thin skeleton in one pass: one earlier call in "Previous meetings", no speech (a placeholder), the brief in the
+call's language instead of the brief language, generic cards. In three passes (notes of each earlier call, then the
+brief, then the speech, the cards and the facts, with thinking off: Gemma 4 thinks by default and the thinking ate
+the output) it reached every section, all three earlier calls and a speech with full texts in under 5 minutes:
+about two thirds of a Sonnet brief. It still misses what Sonnet finds between the lines (open questions to the
+other side, a participant who left), its phrases are plainer and some names stay garbled, and it wrote the brief
+in the call's language. The app's digest made the Sonnet run a little longer and dearer ($0.99) without a visible
+gain in this test.
 
 **Where the money goes.** A preparation is a chain of steps (read a file, read another, write), and every step
 sends the growing context again. Cache reads (1-4 million tokens) and cache writes make most of the price; the

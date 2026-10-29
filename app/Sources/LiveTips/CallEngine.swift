@@ -372,7 +372,7 @@ final class CallEngine {
         return true
     }
 
-    /// rules/notes.yaml: full notes of the call (<stem>.notes.md) right after the meeting page, once per call; later
+    /// rules/notes.yaml: full notes of the call (<stem>.notes.md) after every call, with or without Notion, once per call; later
     /// preparations read them instead of the older transcripts. On the "After the call" way; Sonnet on Claude.
     func writeCallNotes(file: String, config c: AppConfig, hasConfig: Bool) {
         let notes = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
@@ -396,6 +396,9 @@ final class CallEngine {
 
     func writeToNotion(file: String) {
         let c = config
+        // 0.8.5: the call notes do not depend on Notion; they are written even when no meeting page is (once per call).
+        writeCallNotes(file: file, config: c,
+                       hasConfig: !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig))
         guard c.notionWriteSummary else { return }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         guard AIRoute.canRun(job: "after", config: c), let notionToken = store.get(.notionToken) else {
@@ -451,7 +454,6 @@ final class CallEngine {
             }
         }
         do { try p.run() } catch { notionResult = "Notion: could not start (\(error.localizedDescription))" }
-        writeCallNotes(file: file, config: c, hasConfig: hasConfig)
     }
 
     /// After the call: the blind judge (Sonnet, at most 25 tips) rates the app's and the skill's tips in the

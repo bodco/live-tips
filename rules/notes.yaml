@@ -2,7 +2,7 @@
 # app and the skill: what a later preparation reads instead of an older call's whole transcript.
 schema_version: 1
 file: <stem>.notes.md next to the transcript (livetips_m0.callnotes)
-when: after every recorded call, right after the meeting page, on the "After the call" way (model claude-sonnet-5-5,
+when: after every recorded call, whether or not Notion is set up (with the meeting page when it is), on the "After the call" way (model claude-sonnet-5-5,
   or the model on this Mac when that way is On this Mac); a call of the Transcript type too
 content: |
   Header (date and time, length, participants with sides), Summary (5-8 lines), Topics (who said what by name,

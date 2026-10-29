@@ -134,6 +134,9 @@ struct HomeView: View {
                 Button(L("home.startCall")) { StartCallWindow.show(delegate: app) }
                     .buttonStyle(.pnPrimary).keyboardShortcut("n", modifiers: .command)
             }
+            // 0.8.5: Settings straight from Home (the gear at the right end of the toolbar).
+            Button { SettingsWindow.show() } label: { Image(systemName: "gearshape") }
+                .buttonStyle(.pnTertiary).help(L("home.settings")).accessibilityLabel(L("home.settings"))
         }
     }
 

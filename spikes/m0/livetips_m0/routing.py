@@ -395,7 +395,17 @@ class RoutedProvider(Provider):
             if not c2.error:
                 c2.switched_from = r
                 return c2
+        # 0.8.5 (owner, rules/ai.yaml > fallback): neither Claude way answers, so the model on this Mac takes the job
+        # (the preparation and after-the-call jobs only; never the tips during a call)
+        if self.local_fallback() and r != "local":
+            c3 = self._run("local", **kw)
+            if not c3.error:
+                c3.switched_from = r
+                return c3
         return c
+
+    def local_fallback(self) -> bool:
+        return os.environ.get("LT_LOCAL_FALLBACK") == "1" and self.legs.get("local") is not None and not self.background
 
 
 CODE_TIMEOUT = {True: 60.0, False: 300.0}    # during the call / any other job

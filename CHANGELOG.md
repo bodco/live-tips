@@ -81,6 +81,9 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **What a preparation costs, measured:** five runs of one real preparation (docs 14.1g): Sonnet through the API
   key $0.77 in 3 minutes, Opus $2.57 in 6, the Claude account the same work from the plan, the local Gemma 4 26B
   free but thin. Sonnet through the key is the recommended default.
+- **Plan B when Claude is down:** with "Use it when Claude does not answer" (on by default) the preparation and the
+  after-the-call jobs run on the model on this Mac when neither the Claude account nor the API key can run. Tips
+  during a call stay on Claude. Settings: "Instant search in your materials" (was Local AI) says what bge-m3 does.
 - **Local models everywhere a job can use them:** Settings > AI shows Ollama's state with one action (Get Ollama,
   Start Ollama, Install Gemma 4 26B with progress); the installed models appear in the model lists of Preparation
   and After the call, both of which can now run On this Mac.

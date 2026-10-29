@@ -439,7 +439,7 @@
  "set.localAiDefaultFor": "Instant search (default for new calls)",
  "set.theTipsWindowMenu": "The tips window menu can switch it for one call only. Local models on this Mac: facts and cards by meaning, material for HELP NOW, project search. Off: keywords only.",
  "set.engine": "Search model runs in",
- "set.builtInRecommended": "Built-in bge-m3 (recommended)",
+ "set.builtInRecommended": "In Pacenote: bge-m3 (recommended)",
  "set.builtInNothingElse": "Built-in: nothing else to install. Ollama: your local Ollama server, shared with the Cowork skill.",
  "set.ollamaUrl": "Ollama URL",
  "set.anEmbeddingModelPulled": "An embedding model pulled in Ollama. Another model needs a project reindex (lt index --rebuild) and its own thresholds.",
@@ -1205,5 +1205,8 @@
  "local.model.search": "{name}: search in documents (Local AI), cannot write text",
  "ai.route.local.model": "On this Mac ({model})",
  "search.textModel": "{name} is also on this Mac: it writes text (preparation, after the call), but cannot search (Ollama makes no search vectors for it).",
- "search.what": "During a call, every line is matched against your facts, cards and project documents in about a second, so the right fact shows up without waiting for Claude. bge-m3 is a search model: it finds, it does not write."
+ "search.what": "During a call, every line is matched against your facts, cards and project documents in about a second, so the right fact shows up without waiting for Claude. bge-m3 is a search model: it finds, it does not write.",
+ "local.fallback": "Use it when Claude does not answer",
+ "local.fallback.help": "When neither the Claude account nor the API key can run, the preparation and the after-the-call jobs run on this model. Tips during a call stay on Claude.",
+ "search.inOllama": "In Ollama: {model}"
 }

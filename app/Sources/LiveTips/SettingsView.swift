@@ -757,6 +757,7 @@ struct SettingsView: View {
             .onAppear { runner.refreshAuth() }
             Section {
                 LocalStatus(local: LocalLLM.shared)
+                Toggle(L("local.fallback"), isOn: $model.config.ai.localFallback).help(L("local.fallback.help"))
             } header: { Text(L("local.section")) } footer: {
                 Text(L("local.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
@@ -846,7 +847,7 @@ struct SettingsView: View {
                     .help(L("set.theTipsWindowMenu"))
                 Picker(L("set.engine"), selection: $model.config.localAI.engine) {
                     Text(L("set.builtInRecommended")).tag("embedded")
-                    Text("Ollama").tag("ollama")
+                    Text(L("search.inOllama", ["model": model.config.localAI.ollamaModel.isEmpty ? "bge-m3" : model.config.localAI.ollamaModel])).tag("ollama")
                 }
                 .disabled(!model.config.localAI.enabled)
                 .help(L("set.builtInNothingElse"))

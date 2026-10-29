@@ -23,6 +23,13 @@ routes:
   claude_tools: |
     0.8.5: Claude Code was refused `lt digest` and `lt prep-check` in every run; the app now makes <base>.digest.md
     right before Claude starts and runs `lt prep-check --fix` after it; Claude reads the digest with Read.
+fallback: |
+  0.8.5 (owner: plan B when Claude is down): with "Use it when Claude does not answer" on (default), a preparation or
+  an after-the-call job whose Claude ways are both out (no credit, plan limit, signed out, not installed) runs on the
+  model on this Mac (Settings > AI > Model on this Mac). Measured quality is about 60% of Sonnet (docs 14.1g), so
+  what it writes is read before use. Tips during a call never fall back: the local model answers in 19-59 s and
+  bge-m3 is a search model that cannot write; when Claude is out during a call the instant cards and facts (bge-m3
+  and keywords) still show.
 prep_runs:
   rule: |
     0.8.5 (owner: compare preparations by time, price and quality): a full preparation (not a refresh) moves the

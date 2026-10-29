@@ -183,3 +183,31 @@ def test_callnotes_coverage_and_names(tmp_path):
     cfg.write_text("| Name | Role |\n| Ann Lee | QA |\nSentry: error tracking\n")
     b = names_block(["Mike", "Michael"], str(cfg))
     assert "Mike / Michael" in b and "Ann Lee" in b
+
+
+def test_local_model_takes_the_job_when_claude_is_out(monkeypatch, tmp_path):
+    """rules/ai.yaml > fallback: both Claude ways out -> the model on this Mac (not during a call)."""
+    from livetips_m0 import routing
+    from livetips_m0.providers import Completion
+
+    class Leg:
+        def __init__(self, err):
+            self.err = err
+
+        def complete(self, **kw):
+            c = Completion(model=kw["model"], t_start=0)
+            c.error = self.err
+            c.text = "" if self.err else "ok from " + kw["model"]
+            return c
+
+    monkeypatch.setenv("LT_LOCAL_FALLBACK", "1")
+    monkeypatch.setenv("LT_LOCAL_MODEL", "local-test")
+    st = routing.RouteState(str(tmp_path / "r1.json"))
+    legs = {"api": Leg("Your credit balance is too low"), "code": Leg("You've hit your limit"), "local": Leg(None)}
+    p = routing.RoutedProvider("after", "api", legs, auto=True, state=st)
+    c = p.complete(model="claude-sonnet-5-5", system=[], user="x", max_tokens=5, cache_ttl=None)
+    assert c.error is None and c.text == "ok from local-test" and c.route == "local"
+    monkeypatch.setenv("LT_LOCAL_FALLBACK", "0")
+    st2 = routing.RouteState(str(tmp_path / "r2.json"))
+    c2 = routing.RoutedProvider("after", "api", legs, auto=True, state=st2).complete(model="m", system=[], user="x", max_tokens=5, cache_ttl=None)
+    assert c2.error

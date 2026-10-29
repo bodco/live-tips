@@ -42,6 +42,9 @@ public struct AppConfig: Codable, Equatable {
         public var tips = "api"
         public var after = "code"
         public var autoSwitch = true
+        /// 0.8.5 (owner): when neither Claude way answers, the preparation and the after-the-call jobs use the model
+        /// on this Mac (rules/ai.yaml > fallback); never the tips during a call.
+        public var localFallback = true
         public init() {}
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -50,6 +53,7 @@ public struct AppConfig: Codable, Equatable {
             tips = (try? c.decodeIfPresent(String.self, forKey: .tips)) ?? d.tips
             after = (try? c.decodeIfPresent(String.self, forKey: .after)) ?? d.after
             autoSwitch = (try? c.decodeIfPresent(Bool.self, forKey: .autoSwitch)) ?? d.autoSwitch
+            localFallback = (try? c.decodeIfPresent(Bool.self, forKey: .localFallback)) ?? d.localFallback
         }
         public func route(_ job: String) -> String { job == "prep" ? prep : job == "tips" ? tips : after }
     }

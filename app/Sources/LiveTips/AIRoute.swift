@@ -68,7 +68,7 @@ enum AIRoute {
     /// A job on this way can run: the way itself, or with auto-switch the other one.
     static func canRun(job: String, config c: AppConfig) -> Bool {
         let r = c.ai.route(job)
-        return available(r) || (c.ai.autoSwitch && available(other(r)))
+        return available(r) || (c.ai.autoSwitch && available(other(r))) || (job != "tips" && c.ai.localFallback)
     }
 
     /// The environment of an engine child process for one job: the way, the switch, the shared state, the key
@@ -81,6 +81,7 @@ enum AIRoute {
         env["LT_AI_JOB"] = job
         env["LT_AI_ROUTE"] = c.ai.route(job)
         env["LT_LOCAL_MODEL"] = UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"   // rules/ai.yaml > local
+        env["LT_LOCAL_FALLBACK"] = (job != "tips" && c.ai.localFallback) ? "1" : "0"                      // rules/ai.yaml > fallback
         env["LT_AI_AUTO"] = c.ai.autoSwitch ? "1" : "0"
         env["LT_AI_STATE"] = statePath
         if let cl = PrepRunner.claudePath { env["LT_CLAUDE_CLI"] = cl }

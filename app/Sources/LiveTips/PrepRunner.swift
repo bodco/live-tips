@@ -36,6 +36,7 @@ final class PrepRunner: ObservableObject {
     var useAPI: Bool { AppConfig.load(from: AppPaths.config).ai.prep == AIRoute.api }
     @Published var runRoute = AIRoute.code
     var switchedOnce = false
+    var localTried = false          // 0.8.5: the fallback to the model on this Mac ran for this preparation
     /// Claude Code model alias (always the newest of the family). Sonnet by default: it reads and
     /// extracts well, is quicker, and uses the account's limits several times slower than Opus.
     @Published var model = UserDefaults.standard.string(forKey: "prepModel") ?? "sonnet" {
@@ -264,7 +265,7 @@ final class PrepRunner: ObservableObject {
     /// Starts the prep. Returns an error line, or nil when it started.
     func start(_ r: Request, route forced: String? = nil) -> String? {
         if running { return L("prep.err.running") }
-        if forced == nil { switchedOnce = false }
+        if forced == nil { switchedOnce = false; localTried = false }
         let wantsLocal = (forced ?? AppConfig.load(from: AppPaths.config).ai.prep) == AIRoute.local
         guard let claude = Self.claudePath ?? (wantsLocal ? "/usr/bin/true" : nil) else { return L("prep.err.noClaude") }
         let c = AppConfig.load(from: AppPaths.config)
@@ -357,6 +358,8 @@ final class PrepRunner: ObservableObject {
         var route = forced ?? routes.prep
         let usable: (String) -> Bool = { $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
         if forced == nil && routes.autoSwitch && !usable(route) && usable(AIRoute.other(route)) { route = AIRoute.other(route) }
+        // rules/ai.yaml > fallback: no Claude way can run at all -> the model on this Mac
+        if forced == nil && routes.localFallback && route != AIRoute.local && !usable(route) && !usable(AIRoute.other(route)) { route = AIRoute.local }
         if route == AIRoute.api && !hasAPIKey { return L("prep.err.noKey") }
         if route == AIRoute.code && loggedIn == false { return L("prep.err.notSigned") }
         let useAPI = route == AIRoute.api
@@ -460,6 +463,18 @@ final class PrepRunner: ObservableObject {
                 // more on the other way (the next preparation tries the chosen way first again).
                 let logText = (try? String(contentsOfFile: (logs as NSString).appendingPathComponent("prep-claude.log"), encoding: .utf8))
                     .map { String(($0.components(separatedBy: "\n==== ").last ?? "").suffix(1500)) } ?? ""   // this run only
+                // rules/ai.yaml > fallback: both Claude ways are out (or the other one cannot run) -> the model on this Mac
+                let claudeOut = !ok && !isLocal && AIRoute.outReason(route, logText) != nil
+                if claudeOut, routes.localFallback, (self.switchedOnce || !usable(AIRoute.other(route)) || !routes.autoSwitch), !self.localTried {
+                    AIRoute.markDown(route, AIRoute.outReason(route, logText) ?? "out")
+                    self.localTried = true
+                    self.running = false
+                    self.process = nil
+                    if self.start(r, route: AIRoute.local) == nil {
+                        self.detail = L("prep.switched", ["route": AIRoute.name(AIRoute.local)])
+                        return
+                    }
+                }
                 if ok { AIRoute.markUp(route) } else if let why = AIRoute.outReason(route, logText) {
                     AIRoute.markDown(route, why)
                     let alt = AIRoute.other(route)

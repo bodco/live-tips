@@ -185,7 +185,8 @@ Compress into the **Live Brief**, max ~2500 words (detailed: the PM reads it bef
 3. Commitments in flight: who promised what by when.
 4. Red lines: decided items not to reopen, out-of-scope areas, decision rights.
 5. Names and aliases (how Whisper may spell people), including the PM's own
-   `settings.user.name_aliases`.
+   `settings.user.name_aliases`. Compare the invitation with the config's team and the recent notes: a person
+   in the invitation who has left the project is named as "not expected" (0.8.5, owner).
 6. **My update**: the speech from Step 2a, kept in the file so it survives a long session,
    with a ready opening sentence and the full text under each point (`>` lines, see `speech.md`).
    This is what "Your turn" tips reuse, so they are instant.

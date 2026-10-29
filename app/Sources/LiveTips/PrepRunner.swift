@@ -65,7 +65,7 @@ final class PrepRunner: ObservableObject {
         return (((c.effectiveAppRoot(appSupport: AppPaths.support.path) as NSString).appendingPathComponent("prep-runs") as NSString)
             .appendingPathComponent((base as NSString).lastPathComponent))
     }
-    static let runFiles = ["brief.md", "cards.json", "facts.json", "prep.json", "brief.orig.md", "brief.prev.md"]
+    static let runFiles = ["brief.md", "cards.json", "facts.json", "prep.json", "brief.orig.md", "brief.prev.md", "digest.md"]
     static func stamp() -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmmss"; return f.string(from: Date()) }
 
     /// Before a full preparation: the previous one's files leave the live folder (kept in prep-runs), so the new one
@@ -308,7 +308,7 @@ final class PrepRunner: ObservableObject {
         Sources, in this order: the folders and documents named in the call context (read them fully; .docx with \
         `textutil -convert txt -stdout <file>`), the project config, the Current State and other rows of the local \
         Notion mirror (\(notion.joined(separator: ", "))), the recent calls in \(live) (transcripts *.md and their \
-        *.tips.jsonl, newest first; `"\(c.engine.python)" "\(lt)" digest "\(r.root)" --days 14` gives a digest), then other \
+        *.tips.jsonl, newest first; the digest of the last 14 days is in \(base).digest.md, made by the app), then other \
         project files found with Grep and Glob. Newer facts win; say in the brief which sources were used and what is old.
         """ : """
         The PM EXCLUDED the project folder for this call: do not read, list or search anything in \(r.root) or the \
@@ -329,7 +329,9 @@ final class PrepRunner: ObservableObject {
         - \(base).brief.md, first line: "# Live Brief: \(r.title) (prep, \(h.string(from: r.date)))"
         - \(base).cards.json
         - \(base).facts.json\(r.callType == "presentation" ? "\n- \(base).outline.json" : "")
-        Then run `"\(c.engine.python)" "\(lt)" prep-check "\(base).md"` and fix the files until it prints verdict: OK.
+        The app checks the files with `lt prep-check` when you finish (cards and facts must be valid JSON lists with the \
+        fields of the formats). Participants: compare the invitation with the project config and the recent notes; a \
+        person in the invitation who has left the project is named as not expected (sweep.md, Names).
         End with one line: the sources used.
         """
         let refreshPrompt = """
@@ -345,8 +347,8 @@ final class PrepRunner: ObservableObject {
         Read first: \(skill)/SKILL.md (section "Agenda, commitments, brief freshness") and \(skill)/references/sweep.md \
         (section "Refresh"). Rewrite only the sections of the brief these files change; keep the checklist order, every \
         ticked item and the PM's lines. Update the facts and cards only for the same topics. Put one line at the top of the \
-        brief: "Updated <time>: <N> files, sections: ...". Then run `"\(c.engine.python)" "\(lt)" prep-check "\(base).md"` \
-        and fix the files until it prints verdict: OK. End with one line: what changed.
+        brief: "Updated <time>: <N> files, sections: ...". The app checks the files with `lt prep-check` when you finish. \
+        End with one line: what changed.
         """
         // 0.8.5 (rules/presentation.yaml > prepare_again): one previous version is kept; the deck goes to <base>.deck.json.
         let deckTexts = TalkFiles.before(base: base, deck: r.deck)
@@ -392,13 +394,21 @@ final class PrepRunner: ObservableObject {
                 "config": r.config, "audience": r.audience, "call_type": r.callType, "languages": r.languages, "context": r.context,
                 "files": r.folders.filter { !StartCallModel.isDir($0) }, "folders": r.folders.filter { StartCallModel.isDir($0) },
                 "live": live, "notion": notion, "skill": skill, "base": base, "lt": [c.engine.python, lt], "model": localModel,
-                "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder]
+                "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder, "brief_lang": L10n.lang]
             let reqPath = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("localprep-request.json")
             if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
             p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
             p.arguments = ["-m", "livetips_m0.localprep", "--request", reqPath]
         }
         p.currentDirectoryURL = URL(fileURLWithPath: isLocal ? c.engine.sidecarDir : (r.useProjectFolder ? r.root : live))
+        // 0.8.5 (owner: "lt digest" and "lt prep-check" were refused to Claude in every run): the app makes the digest
+        // right before Claude starts (a one-line shell that then becomes Claude) and checks the files after it.
+        var digestEnv: [String: String] = [:]
+        if !isLocal, r.useProjectFolder, let exe = p.executableURL?.path {
+            p.arguments = ["-c", "\"$LT_PY\" \"$LT_BIN\" digest \"$LT_ROOT\" --days 14 > \"$LT_DIGEST\" 2>/dev/null; exec \"$LT_EXE\" \"$@\"", "sh"] + (p.arguments ?? [])
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            digestEnv = ["LT_PY": c.engine.python, "LT_BIN": lt, "LT_ROOT": r.root, "LT_DIGEST": base + ".digest.md", "LT_EXE": exe]
+        }
         var env = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         env["PATH"] = [home + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", env["PATH"] ?? ""].joined(separator: ":")
@@ -411,6 +421,7 @@ final class PrepRunner: ObservableObject {
             env["ANTHROPIC_API_KEY"] = key
             if let ws = store.get(.claudeWorkspaceID), !ws.isEmpty { env["ANTHROPIC_CUSTOM_HEADERS"] = "anthropic-workspace-id: " + ws }
         }
+        for (k, v) in digestEnv { env[k] = v }
         p.environment = env
         let logs = (appRoot as NSString).appendingPathComponent("logs")
         try? FileManager.default.createDirectory(atPath: logs, withIntermediateDirectories: true)
@@ -427,7 +438,20 @@ final class PrepRunner: ObservableObject {
             Self.logSafe(d, to: log)
             Task { @MainActor in self?.consume(d, skill: skill, base: base) }
         }
+        let checkPy = c.engine.python
         p.terminationHandler = { [weak self] proc in
+            // the app's own check (the skill's prep-check); --fix derives the cards from the facts when they are missing
+            var checkLine = ""
+            if !isLocal, FileManager.default.fileExists(atPath: base + ".brief.md") {
+                let chk = Process(); let o = Pipe()
+                chk.executableURL = URL(fileURLWithPath: checkPy); chk.arguments = [lt, "prep-check", base + ".md", "--fix"]
+                chk.standardOutput = o; chk.standardError = FileHandle.nullDevice
+                if (try? chk.run()) != nil {
+                    chk.waitUntilExit()
+                    let text = String(data: o.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                    checkLine = text.range(of: "\"verdict\"[^,}]*", options: .regularExpression).map { String(text[$0]) } ?? ""
+                }
+            }
             let ok = proc.terminationStatus == 0 && FileManager.default.fileExists(atPath: base + ".brief.md")
                 && FileManager.default.fileExists(atPath: base + ".facts.json")
             Task { @MainActor in
@@ -455,6 +479,7 @@ final class PrepRunner: ObservableObject {
                 let routeName = useAPI ? "api" : isLocal ? "local" : "plan"
                 var meta = self.resultMeta
                 meta["model"] = runModel
+                if !checkLine.isEmpty { meta["check"] = checkLine }
                 Self.ledger(job: r.refreshOf == nil ? "prep" : "prep_refresh", route: routeName, usd: self.costUSD, meta: meta, ok: ok)
                 if r.refreshBase == nil {
                     var run = meta

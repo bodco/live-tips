@@ -6,7 +6,7 @@ audience:
   effects: [language_default, restricted_marker_strictness, culture_lens]
 call_type:
   values: [auto, presentation, interview, coach]
-  presentation: {requires: outline.json}
+  presentation: {requires: outline.json or slides.json, rules: rules/presentation.yaml}
   interview: {roles: [interviewer, observer]}
   coach:
     # Coach mode: someone is supported while another person (or the PM) speaks.
@@ -20,3 +20,8 @@ mode:
   window_s: 120
 timers:
   checkpoints: [two_thirds, five_minutes_left]
+tips_language:
+  # 0.8.5 (owner): tips, cards and labels in the meeting's main language; the window's switch (setting tips_lang)
+  # changes it to the interface language and back when the two differ. The phrase to say follows answer_lang as before.
+  default: the call's main language (me_lang)
+  switch: setting tips_lang = uk | en, shown only when the interface language differs

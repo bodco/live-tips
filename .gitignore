@@ -13,3 +13,6 @@ models/
 .metrics/
 target/
 .coverage
+
+# the owner's private working folder
+Claude outputs/

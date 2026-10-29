@@ -46,6 +46,7 @@
     this.cardSeen = {};
     this.sit = null;
     this.onMeDone = {};
+    this.onMeFix = {};          // 0.8.5: id -> the PM's own wording, or '' for "not mine"
     this.agendaEngine = null;   // from the engine's "agenda" item (wins over the brief's checklist)
     this.agendaBrief = [];
     this.agendaManual = {};     // id -> state, set by a click on a segment
@@ -53,6 +54,12 @@
     this.slides = null;
     this.outline = null;
     this.outlinePos = null;
+    // 0.8.5 (rules/presentation.yaml): the recorder's time line, the current slide and "Move to slide N?"
+    this.timeline = null;
+    this.slideN = null;
+    this.slideRx = 0;
+    this.follow = null;
+    this.moveAsk = null;
     this.recap = '';
     this.status = {};
     this.heard = false;
@@ -210,13 +217,35 @@
         return true;
       case 'facts': this.facts = it.facts || []; return false;
       case 'outline': this.outline = it.sections || []; return true;
-      case 'outline_pos': this.outlinePos = it.cur; return true;
-      case 'timeline': return false;
+      case 'outline_pos':
+        this.outlinePos = it.cur;
+        // The recorder moved (a new slide): an open "Move to slide N?" is over, as in the recorder (_move clears it).
+        if (it.slide != null && +it.slide !== this.slideN) { this.slideN = +it.slide; this.slideRx = this.now(); this.moveAsk = null; }
+        this.follow = it.follow || null;
+        if (this.moveAsk && it.slide != null && +it.slide === this.moveAsk.n) this.moveAsk = null;
+        return true;
+      case 'timeline':
+        // Shown under Now, one line updated in place; the advice text comes ready from the recorder (both windows show it verbatim).
+        this.timeline = { plan: +it.plan || 0, elapsed: +it.elapsed || 0, behind: it.behind == null ? null : +it.behind, slide: it.slide == null ? null : +it.slide,
+                          slideEl: it.slide_el == null ? null : +it.slide_el, slideSec: it.slide_sec == null ? null : +it.slide_sec,
+                          advice: it.advice && it.advice.text ? { text: clean(it.advice.text), kind: it.advice.kind || '', slides: it.advice.slides || [] } : null,
+                          text: clean(it.text), at: it.at || '', rx: this.now() };
+        if (this.timeline.slide != null && this.timeline.slide !== this.slideN) { this.slideN = this.timeline.slide; this.slideRx = this.now(); }
+        if (this.timeline.slideEl != null) this.slideRx = this.now() - this.timeline.slideEl * 1000;
+        return true;
+      case 'move_ask':
+        if (it.n == null) return false;
+        this.moveAsk = { n: +it.n, topic: clean(it.topic), section: it.section || '' };
+        return true;
       case 'slides': this.slides = it; return true;
       case 'situation': this.situation(it); return true;
       case 'speaker_ask': {
         const sid = it.sid; if (!sid) return false;
         if (!this.speakers[sid]) this.speakers[sid] = { name: '', side: '', label: this.tr('speakerN', { n: String(sid).replace(/^S/i, '') }) };
+        // 0.8.5 fix: the recorder's suggestions from the voice library (best first) are offered as one-click names again.
+        const sug = (it.suggestions || []).filter((x) => x && x.name && (+x.score || 0) >= 0.5).slice(0, 3).map((x) => ({ name: clean(x.name), score: +x.score || 0 }));
+        this.speakers[sid] = Object.assign({}, this.speakers[sid], { suggestions: sug, quote: clean(it.quote || '') });
+        if (Array.isArray(it.known)) this.known = it.known.map(clean).filter((x) => x && !/^[a-z]+\.[a-z]+$/.test(x)).slice(0, 40);
         return true;
       }
       case 'speaker_auto': if (it.sid) { this.speakers[it.sid] = Object.assign({}, this.speakers[it.sid], { name: clean(it.name) }); } return true;
@@ -272,7 +301,8 @@
       const id = 'm:' + an;
       out.push({ id, text: clean(a.what), due: clean(a.due), done: !!this.onMeDone[id] });
     }
-    return out;
+    // 0.8.5 (owner): the PM's corrections win: "not mine" lines go, reworded ones show his words.
+    return out.filter((o) => this.onMeFix[o.id] !== '').map((o) => this.onMeFix[o.id] ? Object.assign({}, o, { text: this.onMeFix[o.id], edited: true }) : o);
   };
 
   Feed.prototype.agenda = function () {
@@ -287,17 +317,26 @@
 
   Feed.prototype.presentation = function () {
     if (this.slides && Array.isArray(this.slides.slides) && this.slides.slides.length) {
-      return this.slides.slides.map((sl) => {
+      return this.slides.slides.map((sl, i) => {
         const body = sl.body || [];
-        return { title: clean(sl.title), say: body.filter((b) => b.k === 'p').map((b) => clean(b.t)).join(' '),
-                 secs: +sl.sec || 0, canSkip: body.some((b) => b.k === 's') };
+        const who = ['me', 'shared', 'other'].includes(sl.who) ? sl.who : 'me';
+        return { n: +sl.n || i + 1, title: clean(sl.title), say: body.filter((b) => (typeof b === 'string') || b.k === 'p').map((b) => clean(typeof b === 'string' ? b : b.t)).filter(Boolean),
+                 secs: +sl.sec || 0, canSkip: sl.skip === true || body.some((b) => b.k === 's'), who, speaker: clean(sl.speaker),
+                 numbers: (sl.numbers || []).map(clean).filter(Boolean), short: clean(sl.short),
+                 qa: (sl.qa || []).filter((x) => x && x.q).map((x) => ({ q: clean(x.q), a: clean(x.a) })) };
       });
     }
     if (this.outline && this.outline.length) {
-      return this.outline.map((s) => ({ title: clean(s.title), say: (s.points || []).slice(0, 3).map(clean).join('. '), secs: +s.sec || 0, canSkip: false }));
+      return this.outline.map((s, i) => ({ n: i + 1, title: clean(s.title), say: (s.points || []).slice(0, 3).map(clean), secs: +s.sec || 0, canSkip: false,
+                                           who: s.who === 'other' ? 'other' : 'me', speaker: '', numbers: (s.numbers || []).map(clean), short: '', qa: [] }));
     }
     return [];
   };
+
+  /** The PM answered "Move to slide N?" (Enter yes, Esc no). */
+  Feed.prototype.answerMove = function (yes) { const a = this.moveAsk; this.moveAsk = null; if (yes && a) { this.slideN = a.n; this.slideRx = this.now(); } this.emit(); return a; };
+  /** Previous / Next or a shortcut: the window moves at once, the recorder confirms with outline_pos. */
+  Feed.prototype.setSlide = function (n) { if (n !== this.slideN) { this.slideN = n; this.slideRx = this.now(); this.moveAsk = null; this.emit(); } };
 
   // ---------- status, transcript, speakers, brief, Up next ----------
 
@@ -311,6 +350,22 @@
     this.emit();
   };
 
+  /** 0.8.5 (rules/recording.yaml): a recording problem is a system state, not a tip. Clears by itself. */
+  Feed.prototype.sysState = function () {
+    const s = this.status;
+    if (s.state !== 'recording' || this.ending) return null;
+    const mic = s.mic_silent_s, call = s.call_silent_s, lvl = { mic: +s.mic_level || 0, call: +s.call_level || 0 };
+    const since = (sec) => { const d = new Date(this.now() - sec * 1000); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+    if (mic != null && call != null) {
+      if (mic >= 30 && call >= 30) return Object.assign({ kind: 'notRecording', at: since(Math.min(mic, call)) }, lvl);
+      if (call >= 30 && this.heard) return Object.assign({ kind: 'cantHear', at: since(call) }, lvl);
+      return null;
+    }
+    // An older recorder without the levels: the system audio silent for 30 s after it was heard.
+    if (this.heard && this.silentSince && this.now() - this.silentSince >= 30000) return Object.assign({ kind: 'cantHear', at: '' }, lvl);
+    return null;
+  };
+
   Feed.prototype.alert = function () {
     const s = this.status, rec = s.state === 'recording', tr = this.tr;
     if (this.ending || s.state === 'stopping') return { text: tr('ending'), level: 'info' };
@@ -318,7 +373,7 @@
     if (s.state === 'loading_model' || this.starting) return { text: tr('starting'), level: 'info' };
     const streak = +s.mic_stall_streak || 0;
     if (rec && s.mic !== 'muted' && (s.mic === 'stalled' || streak >= 3)) return { text: tr('micStalled'), level: 'warn' };
-    if (rec && this.heard && this.silentSince && this.now() - this.silentSince > 15000) return { text: tr('cantHear'), level: 'warn' };
+    if (this.sysState()) return null;      // the system state screen says it (P8), not the status line
     if (rec && s.asr_lag_s != null && s.asr_lag_s > 4) return { text: tr('asrBehind', { n: s.asr_lag_s }), level: 'warn' };
     if (rec && s.listener_age_s != null && s.listener_age_s > 75) return { text: tr('engineDeaf'), level: 'warn' };
     return null;
@@ -354,6 +409,9 @@
       this.speakers[sid] = Object.assign({ label: this.tr('speakerN', { n: sid.replace(/^S/i, '') }) }, this.speakers[sid],
                                          { name: c.name ? clean(c.name) : '', side: c.side || (this.speakers[sid] || {}).side || '' });
     }
+    // The roster's sides, so a suggested name keeps its side (team or client) when picked with one click.
+    this.rosterSide = {};
+    for (const r of d.roster || []) if (r && r.name && r.side) this.rosterSide[clean(r.name)] = r.side;
     for (const a of Object.keys(d.merged || {})) {
       const to = d.merged[a]; if (this.speakers[to]) this.speakers[a] = Object.assign({}, this.speakers[to]);
     }
@@ -367,18 +425,28 @@
     this.briefAt = p.at || '';
     const b = { goal: '', sections: [] };
     let sec = null, checklist = [];
+    // 0.8.5 (owner): the whole brief, not only bullet lines: numbered items, paragraphs, a wrapped line joined to
+    // its item and table rows as "a · b · c", so each point keeps its sentences.
+    let lastItem = false;
+    const add = (t) => { if (!sec) { sec = { title: '', items: [] }; b.sections.push(sec); } sec.items.push(clean(t.replace(/\*\*/g, ''))); lastItem = true; };
     for (const raw of this.briefText.split('\n')) {
       const line = raw.trim();
       let m;
-      if ((m = /^\*\*(?:goal|мета|ціль)\s*:?\*\*\s*:?\s*(.+)$/i.exec(line))) { b.goal = clean(m[1].replace(/\*\*/g, '')); continue; }
-      if ((m = /^#{2,3}\s+(.+)$/.exec(line))) { sec = { title: clean(m[1]), items: [] }; b.sections.push(sec); continue; }
+      if (!line) { lastItem = false; continue; }
+      if (/^#\s/.test(line)) { lastItem = false; continue; }      // the document title
+      if ((m = /^\*\*(?:goal|мета|ціль)\s*:?\*\*\s*:?\s*(.+)$/i.exec(line))) { b.goal = clean(m[1].replace(/\*\*/g, '')); lastItem = false; continue; }
+      if ((m = /^#{2,4}\s+(.+)$/.exec(line))) { sec = { title: clean(m[1].replace(/\*\*/g, '')), items: [] }; b.sections.push(sec); lastItem = false; continue; }
       if ((m = /^[-*]\s+\[( |x|X)\]\s+(.+)$/.exec(line))) {
         const text = clean(m[2].replace(/\*\*/g, ''));
         checklist.push({ id: 'b' + checklist.length, title: text, done: m[1] !== ' ', cur: false });
-        if (sec) sec.items.push(text);
+        add(m[2]);
         continue;
       }
-      if ((m = /^[-*]\s+(.+)$/.exec(line)) && sec) sec.items.push(clean(m[1].replace(/\*\*/g, '')));
+      if (/^\|?\s*:?-{3,}/.test(line)) continue;                   // a table's separator row
+      if (line.startsWith('|')) { add(line.replace(/^\||\|$/g, '').split('|').map((x) => x.trim()).filter(Boolean).join(' · ')); continue; }
+      if ((m = /^(?:[-*•]|\d+[.)])\s+(.+)$/.exec(line))) { add(m[1]); continue; }
+      if (lastItem && /^\s{2,}/.test(raw) && sec && sec.items.length) { sec.items[sec.items.length - 1] += ' ' + clean(line.replace(/\*\*/g, '')); continue; }
+      add(line);
     }
     b.sections = b.sections.filter((s) => s.items.length);
     this.brief = b;
@@ -408,6 +476,8 @@
     this.emit();
   };
   Feed.prototype.toggleOnMe = function (id, done) { this.onMeDone[id] = !!done; this.emit(); };
+  /** 0.8.5: Edit ('new words') or Not mine ('') on an On me line. */
+  Feed.prototype.fixOnMe = function (id, text) { this.onMeFix[id] = String(text == null ? '' : text).trim(); this.emit(); };
   Feed.prototype.setAgendaState = function (id, state) { this.agendaManual[id] = state; this.emit(); };
   /** The PM pressed Mark done on a commitment card. */
   Feed.prototype.commitDone = function (cardId) { const c = this.byId[cardId]; if (c) { c.state = 'done'; this.local[cardId] = Object.assign({}, this.local[cardId], { state: 'done' }); this.emit(); } };
@@ -430,7 +500,8 @@
     const s = this.status, st = s.state || '';
     const ready = st === 'standby' && !this.starting;
     const steps = this.presentation();
-    const presenting = String(s.call_type || '') === 'presentation' && steps.length > 0;
+    const presType = String(s.call_type || '') === 'presentation';
+    const presenting = presType && steps.length > 0;
     const briefLine = this.prep === 'ready' ? this.tr('briefReady', { at: this.briefAt })
       : this.prep === 'running' ? this.tr('briefPreparing') : this.prep === 'failed' ? this.tr('briefFailed') : this.tr('noBrief');
     return {
@@ -440,13 +511,16 @@
         paused: s.tips_paused === true || s.tips_paused === 'on' || s.tips_paused === 'true',
         proactive: s.proactive == null ? null : (s.proactive === true || s.proactive === 'on' || s.proactive === 'true' || s.proactive === '1'),
         micOff: s.mic === 'muted', minutesLeft: s.minutes_left != null ? +s.minutes_left : null,
-        recap: this.recap, briefLine, alert: this.alert(), presentable: steps.length > 0, presenting
+        recap: this.recap, briefLine, alert: this.alert(), presentable: steps.length > 0 || presType, presenting, presType
       },
+      sys: this.sysState(),
+      pres: { slide: this.slideN, slideRx: this.slideRx, timeline: this.timeline, moveAsk: this.moveAsk, follow: this.follow },
       agenda: this.agenda(),
       cards: this.cards.map((c) => Object.assign({}, c)),
       onMe: this.onMe(),
       next: this.next,
       speakers: Object.assign({ me: { name: this.tr('me'), side: 'team' }, other: { name: this.tr('them'), side: 'client' } }, this.speakers),
+      rosterSide: this.rosterSide || {}, knownNames: this.known || [],
       transcript: this.transcript.slice(-400),
       brief: this.brief, briefText: this.briefText,
       steps,

@@ -1,0 +1,24 @@
+# Learning from the PM's corrections (Pacenote 0.8.5). Shared by the skill and the app.
+# Every correction is logged (Application Support/LiveTips/edits.jsonl, one JSON object per line; see
+# skill/references/sweep.md 3c). Learning is a search for patterns: a correction made once may be specific to that
+# call, the same correction made on different calls is a standing preference.
+schema_version: 1
+logged:
+  brief_edit: the preparation edited (lines removed and added)
+  talk_edit: a slide of Your talk edited (say, title, budget, can skip, numbers, Q&A, short)
+  rehearsal_apply: changes from a rehearsal saved to the talk
+  followup_instruction: an instruction the PM gave to rewrite the follow-up draft ("drop the pricing line", "shorter")
+  followup_edit: the follow-up text edited by hand (lines removed and added)
+  cards: card and On me corrections in the tips window (kinds as before)
+signals:
+  followup_instruction: the instruction text
+  brief_edit: each removed line ("removed" = do not write this kind of line again)
+  followup_edit: each removed line
+  talk_edit: the slide text the PM wrote instead (say_after), as an example of his wording
+  card_onme_remove: an On me line the PM marked "Not mine" in the tips window (do not put such lines on him again)
+  card_onme_edit: an On me line the PM reworded (the line before; the "after" is his wording)
+similar: two signals of the same kind are the same pattern when their word sets overlap by half or more (Jaccard >= 0.5, words of 3+ letters)
+standing: a pattern seen in 2 or more different calls (different files) is applied to every new preparation or draft of that kind
+single: a pattern seen in one call only is applied only to the same meeting (same series) and the same project, as the newest corrections are now
+prompt: >-
+  Recurring corrections (the PM made each of them on two or more different calls; apply them always, without being asked):

@@ -14,17 +14,20 @@
 
   --brand:#0A6CFF;       /* Pacenote Blue, graphics */
   --ink:#1C1D21;
-  --accent:#0058B0;      /* Blue Deep: accent text and links, 7.0:1 on white */
+  --accent:#0062E6;      /* links and accent text: 5.4:1 on white, 5.0:1 on #F5F5F7 (v1.1, brighter) */
   --accent-fill:#0A6CFF; /* Pacenote Blue: buttons, progress, mark. White text 4.6:1 */
-  --accent-soft:#E5F0FF;
-  --rec:#FF3B30;
-  --danger-text:#C4000F; --danger-soft:#FFE5E3;
+  --accent-soft:#E0EDFF;
+  --rec:#FF5F57;             /* macOS close-button red: recording dot, both themes */
+  --danger-text:#D70015; --danger-soft:#FFE5E3;
 
   /* card kinds: label text color + soft background */
-  --k-answer:#0058B0;  --k-answer-soft:#E5F0FF;
-  --k-turn:#1A7431;    --k-turn-soft:#E3F5E7;
-  --k-onme:#9A4600;    --k-onme-soft:#FFF1DE;
-  --k-docs:#7D3C9E;    --k-docs-soft:#F3E8FA;
+  --k-answer:#0062E6;  --k-answer-soft:#E0EDFF;
+  --k-turn:#15803D;    --k-turn-soft:#DCFCE7;
+  --k-onme:#B04A00;    --k-onme-soft:#FFE8CC;   /* text 4.6:1 on the soft fill */
+  --k-onme-graphic:#E8590C;   /* v1.2 orange for shapes, both themes: dots, the (!) icon, the On me count (white digit, 3.6:1, bold) */
+  --ok-dot:#28C840;          /* macOS zoom-button green: status dots next to a text label, both themes */
+  --on-graphic:#FFFFFF;
+  --k-docs:#9333EA;    --k-docs-soft:#F3E8FF;
   --k-neutral:#3A3A3C; --k-neutral-soft:#EEEEF1;
 
   --radius-s:6px; --radius-m:10px; --radius-l:14px;
@@ -39,10 +42,10 @@
     --bg:#1E1E20; --surface:#2C2C2E; --surface-2:#3A3A3C; --border:rgba(255,255,255,.12); --separator:rgba(255,255,255,.07);
     --text:#F5F5F7; --text-2:#C7C7CC; --text-3:#98989D;
     --accent:#4D9DFF; --accent-fill:#0A6CFF; --accent-soft:rgba(10,132,255,.16);
-    --rec:#FF453A; --danger-text:#FF6961; --danger-soft:rgba(255,69,58,.18);
+    --rec:#FF5F57; --danger-text:#FF6961; --danger-soft:rgba(255,69,58,.18);
     --k-answer:#64B5FF; --k-answer-soft:rgba(10,132,255,.16);
     --k-turn:#4CD964;   --k-turn-soft:rgba(48,209,88,.14);
-    --k-onme:#FFB340;   --k-onme-soft:rgba(255,159,10,.14);
+    --k-onme:#FFB340;   --k-onme-soft:rgba(255,159,10,.14); --k-onme-graphic:#E8590C; --ok-dot:#28C840; --on-graphic:#FFFFFF;
     --k-docs:#D29BF5;   --k-docs-soft:rgba(191,90,242,.16);
     --k-neutral:#C7C7CC;--k-neutral-soft:rgba(255,255,255,.06);
     --shadow-card:0 1px 0 rgba(255,255,255,.06) inset;
@@ -53,10 +56,10 @@
   --bg:#1E1E20; --surface:#2C2C2E; --surface-2:#3A3A3C; --border:rgba(255,255,255,.12); --separator:rgba(255,255,255,.07);
   --text:#F5F5F7; --text-2:#C7C7CC; --text-3:#98989D;
   --accent:#4D9DFF; --accent-fill:#0A6CFF; --accent-soft:rgba(10,132,255,.16);
-  --rec:#FF453A; --danger-text:#FF6961; --danger-soft:rgba(255,69,58,.18);
+  --rec:#FF5F57; --danger-text:#FF6961; --danger-soft:rgba(255,69,58,.18);
   --k-answer:#64B5FF; --k-answer-soft:rgba(10,132,255,.16);
   --k-turn:#4CD964;   --k-turn-soft:rgba(48,209,88,.14);
-  --k-onme:#FFB340;   --k-onme-soft:rgba(255,159,10,.14);
+  --k-onme:#FFB340;   --k-onme-soft:rgba(255,159,10,.14); --k-onme-graphic:#E8590C; --ok-dot:#28C840; --on-graphic:#FFFFFF;
   --k-docs:#D29BF5;   --k-docs-soft:rgba(191,90,242,.16);
   --k-neutral:#C7C7CC;--k-neutral-soft:rgba(255,255,255,.06);
   --shadow-card:0 1px 0 rgba(255,255,255,.06) inset;

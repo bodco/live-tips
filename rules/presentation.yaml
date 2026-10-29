@@ -1,0 +1,67 @@
+# Presentation mode (Pacenote 0.8.5). Shared by the skill (live-tips + its recorder window) and the app.
+# The recorder computes the time line, the time advice and the "Move to slide N?" question once and writes
+# them into the tips file; both windows only show them, so the skill and the app give the same advice.
+schema_version: 1
+
+slides_json:
+  # <transcript stem>.slides.json. Old files stay valid: every field below "new" is optional.
+  fields: [n, title, who, speaker, sec, body, numbers, qa]
+  who:
+    me: the PM presents
+    shared: '"All" in the app: tips show and nobody gets a handoff card'
+    other: a colleague (speaker = the name)
+  new:
+    skip: true when the slide may be skipped if the PM runs behind ("Can skip"). Prepare sets it on 1-3 PM slides that matter least for the goal of the call; the PM changes it.
+    short: one sentence the slide can be reduced to when the PM runs behind.
+    edited: true once the PM edited the slide in "Your talk"; Prepare again with "Keep my edits" leaves such slides as they are.
+  top_level_new:
+    talk_min: talk time = call duration minus Q&A; Prepare fits the slide budgets to it.
+    qa_min: minutes of Q&A at the end (0 when none).
+    speakers: names of the people who present, the PM first.
+
+time_line:
+  every_s: 60                  # one line under Now: Plan, Elapsed, Behind or Ahead
+  plan: sum of the slide budgets (sec, plus every +30 s the PM added)
+  elapsed: seconds since the PM's first slide started
+  behind: how late the current slide started (its actual start minus its planned start) plus the time spent on it past its budget; negative = ahead. Time still inside the slide's budget is not behind.
+  show_from_s: 30              # "on plan" below this
+
+time_advice:
+  # One advice line, updated in place, never new cards.
+  when:
+    - the slide changes and behind >= 60 s
+    - two thirds of the plan and 5 minutes before its end (the skill's checkpoints)
+  never: [about a colleague's slides, during a colleague's block (current slide who = other)]
+  skip: among the PM's slides not reached yet with skip = true, the fewest slides whose budgets cover the time behind (largest budgets first)
+  shorten: when the skip slides do not cover it, among the PM's slides not reached yet, the largest budgets, as many as needed (a shortened slide is planned at short_s); at most 2 named in the line
+  short_s: 20
+  text:
+    skip_en: "Skip slide {n} to catch up. It is marked as can skip."
+    skip_uk: "Пропустіть слайд {n}, щоб наздогнати. Його позначено «можна пропустити»."
+    skip_many_en: "Skip slides {list} to catch up."
+    skip_many_uk: "Пропустіть слайди {list}, щоб наздогнати."
+    shorten_en: "Shorten slide {n} to one sentence to catch up."
+    shorten_uk: "Скоротіть слайд {n} до однієї фрази, щоб наздогнати."
+    say_only_en: "Slide {n}: say only \"{short}\""
+    say_only_uk: "Слайд {n}: скажіть лише «{short}»"
+
+slide_sync:
+  # How the current slide is known.
+  B:
+    who: skill and app
+    how: the local tracker follows the PM's words; it never moves on its own to one of the PM's slides, it asks "Move to slide N?" (Enter yes, Esc no). A colleague's block is followed from the other side's lines without asking.
+    item: '{"kind": "move_ask", "n": <slide>, "section": "<id>", "topic": "<title>"}'
+    answer: 'inbox setting slide_move = "yes|<n>" or "no|<n>"; after "no" the same slide is not asked again for 60 s'
+  A:
+    who: app only
+    how: the app reads the current slide number from Keynote or PowerPoint (Automation permission, asked when the deck is attached) and sends it; the tracker does not ask while it follows. Falls back to B for PDF, Google Slides or without Automation access.
+  manual: Previous / Next and the shortcuts always work (inbox setting slide = <n>).
+  add30: 'inbox setting slide_add30 = <n>: +30 s to that slide'
+
+prepare_again:
+  default: keep_my_edits        # slides with edited = true stay; the rest is rewritten
+  other: rewrite_everything
+  versions_kept: 1              # <base>.slides.prev.json (and .outline.prev.json): "Restore previous version"
+  replace_deck: the sheet lets the PM pick a new deck file (the slides changed); it is read first, then the talk is rewritten. Slides whose text changed in the deck are rewritten even with "Keep my edits"; their old edits stay in the previous version.
+
+handoff: a colleague's last slide before the PM's slide shows one "Your turn next" card with the first sentence of the PM's slide (existing rule, presentation.md 10).

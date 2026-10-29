@@ -41,10 +41,11 @@ struct CallSetupView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     header
                     if live { liveBanner }
-                    projectRow
-                    titleRow
-                    timeRow
-                    contextBox
+                    // 0.8.5 (P1): block 1 and block 2 never move; the type section is always last, so switching
+                    // the type changes only that section, below everything already filled.
+                    block(1) { titleRow; timeRow; typeRow }
+                    block(2, title: L("start.context")) { projectRow; contextBox }
+                    block(3) { typeSection }
                     briefLine
                     if let h = problemHint { Label(h, systemImage: "info.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
                     options
@@ -55,7 +56,7 @@ struct CallSetupView: View {
             buttons.padding(.horizontal, 24).padding(.vertical, 14)
         }
         .background(PN.C.bg)
-        .frame(width: 600, height: 760)
+        .frame(width: 640, height: 820)
         .onAppear { model.refreshTemplate(); model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
         .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false; if !model.target.isEmpty { model.note = "" } }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
@@ -168,13 +169,20 @@ struct CallSetupView: View {
         let tf = DateFormatter(); tf.dateFormat = "HH:mm"
         let from = model.calEventID.flatMap { id in cal.events.first { $0.id == id } }
         return VStack(alignment: .leading, spacing: 6) {
-            fieldLabel(L("call.when"))
-            HStack(spacing: 10) {
-                DatePicker("", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute]).labelsHidden().fixedSize()
-                    .onChange(of: model.callDate) { copied = false }
+            HStack(alignment: .bottom, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    fieldLabel(L("start.date"))
+                    DatePicker("", selection: $model.callDate, displayedComponents: [.date]).labelsHidden().fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    fieldLabel(L("start.time"))
+                    DatePicker("", selection: $model.callDate, displayedComponents: [.hourAndMinute]).labelsHidden().fixedSize()
+                }
+                .onChange(of: model.callDate) { copied = false }
                 Spacer()
                 if let e = from {
-                    Text(L("call.fromCalendar", ["title": e.title, "time": tf.string(from: e.start)])).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
+                    Text(L("start.fromCalendar", ["app": model.calendarApp ?? e.calendar])).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
+                        .help(L("call.fromCalendar", ["title": e.title, "time": tf.string(from: e.start)]))
                 }
                 if !evs.isEmpty {
                     Menu {
@@ -188,6 +196,76 @@ struct CallSetupView: View {
                 }
             }
             if let a = model.appliedFrom { Text(a).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+        }
+    }
+
+    // MARK: 0.8.5 blocks (P1)
+
+    private func block<C: View>(_ n: Int, title: String? = nil, @ViewBuilder _ content: () -> C) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("\(n)").font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3)
+                .frame(width: 20, height: 20).background(Circle().fill(PN.C.surface2)).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 14) {
+                if let t = title { Text(t).font(PN.Font.section).foregroundStyle(PN.C.text) }
+                content()
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Call type, Audience and Language next to the title and the time (P1 block 1).
+    private var typeRow: some View {
+        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+            GridRow {
+                fieldLabel(L("start.callType"))
+                Picker("", selection: $model.callType) {
+                    Text(L("start.type.regular")).tag("auto")
+                    Text(L("start.type.presentation")).tag("presentation")
+                    Text(L("callSettings.type.interview")).tag("interview")
+                }.labelsHidden().pickerStyle(.segmented).fixedSize()
+            }
+            GridRow {
+                fieldLabel(L("start.audience"))
+                Picker("", selection: $model.audience) {
+                    Text(L("callSettings.audience.auto")).tag("auto")
+                    Text(L("callSettings.audience.client")).tag("client")
+                    Text(L("callSettings.audience.team")).tag("team")
+                }.labelsHidden().pickerStyle(.segmented).fixedSize()
+            }
+            GridRow {
+                fieldLabel(L("start.language"))
+                Button(Languages.label(model.language.split(separator: "+").map(String.init))) { langs = true }
+                    .buttonStyle(.pnSecondary)
+                    .popover(isPresented: $langs, arrowEdge: .bottom) {
+                        LanguagePicker(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
+                                                      set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
+                    }
+            }
+        }
+    }
+
+    /// The type section (P1 block 3): Regular hint, the Presentation block, or the interview role.
+    @ViewBuilder private var typeSection: some View {
+        switch model.callType {
+        case "presentation":
+            DeckBlock(model: model)
+        case "interview":
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("callSettings.type.interview")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Picker(L("callSettings.role"), selection: $model.hiringRole) {
+                    Text(L("callSettings.role.observer")).tag("observer")
+                    Text(L("callSettings.role.interviewer")).tag("interviewer")
+                    Text(L("callSettings.role.coach")).tag("coach")
+                }.fixedSize()
+            }
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+        default:
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("start.type.regular")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("start.regularHint")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
         }
     }
 
@@ -282,7 +360,11 @@ struct CallSetupView: View {
                 Spacer()
                 if let path = PrepDocWindow.path(for: model) { Button(L("common.open")) { PrepDocWindow.show(path: path, title: model.effectiveTitle) }.buttonStyle(.pnTertiary) }
                 if model.callType == "presentation", let path = PrepDocWindow.path(for: model) {
-                    Button(L("rehearse.button")) { RehearsalWindow.show(base: String(path.dropLast(9)), title: model.effectiveTitle) }.buttonStyle(.pnTertiary)
+                    let base = String(path.dropLast(9))
+                    if TalkWindow.available(base: base) {
+                        Button(L("talk.open")) { TalkWindow.show(base: base, title: model.effectiveTitle, call: model) }.buttonStyle(.pnTertiary)
+                    }
+                    Button(L("rehearse.button")) { RehearsalWindow.show(base: base, title: model.effectiveTitle, call: model) }.buttonStyle(.pnTertiary)
                 }
             } else {
                 Image(systemName: "doc.badge.clock").foregroundStyle(PN.C.onMe)
@@ -337,31 +419,6 @@ struct CallSetupView: View {
     private var options: some View {
         DisclosureGroup(isExpanded: $showOptions) {
             Form {
-                Picker(L("callSettings.audience"), selection: $model.audience) {
-                    Text(L("callSettings.audience.auto")).tag("auto")
-                    Text(L("callSettings.audience.client")).tag("client")
-                    Text(L("callSettings.audience.team")).tag("team")
-                }
-                Picker(L("callSettings.type"), selection: $model.callType) {
-                    Text(L("callSettings.type.regular")).tag("auto")
-                    Text(L("callSettings.type.presentation")).tag("presentation")
-                    Text(L("callSettings.type.interview")).tag("interview")
-                }
-                if model.callType == "interview" {
-                    Picker(L("callSettings.role"), selection: $model.hiringRole) {
-                        Text(L("callSettings.role.observer")).tag("observer")
-                        Text(L("callSettings.role.interviewer")).tag("interviewer")
-                        Text(L("callSettings.role.coach")).tag("coach")
-                    }
-                }
-                LabeledContent(L("callSettings.language")) {
-                    Button(Languages.label(model.language.split(separator: "+").map(String.init))) { langs = true }
-                        .buttonStyle(.pnSecondary)
-                        .popover(isPresented: $langs, arrowEdge: .bottom) {
-                            LanguagePicker(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
-                                                          set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
-                        }
-                }
                 Picker(L("callSettings.mic"), selection: $model.micDevice) {
                     Text(L("callSettings.mic.default") + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
                     Text(L("callSettings.mic.builtin")).tag("builtin")
@@ -422,6 +479,10 @@ struct CallSetupView: View {
                 Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 Button(L("call.prepareFirst")) { if !needProject() { prepareNow() } }.buttonStyle(.pnSecondary)
                     .disabled(!canPrepare || model.prep?.matches == true || (runner.running && runner.callID == model.id))
+                // 0.8.5 (P6, entry 1): Rehearse next to Start call as soon as the talk exists.
+                if model.callType == "presentation", let path = PrepDocWindow.path(for: model), TalkWindow.available(base: String(path.dropLast(9))) {
+                    Button(L("rehearse.button")) { RehearsalWindow.show(base: String(path.dropLast(9)), title: model.effectiveTitle, call: model) }.buttonStyle(.pnSecondary)
+                }
                 Button(L("home.startCall")) { if !needProject() { onStart() } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
             case .plan:
                 if saved { Button(L("home.removeUpNext"), action: onRemove).buttonStyle(.pnTertiary) }
@@ -482,7 +543,7 @@ final class StartCallWindow {
         let w = window ?? NSWindow(contentViewController: host)
         w.contentViewController = host
         w.styleMask.insert(.resizable)
-        w.setContentSize(NSSize(width: 600, height: 760))
+        w.setContentSize(NSSize(width: 640, height: 820))
         w.title = mode == .prepare ? L("call.title.prepare") : mode == .plan ? L("call.title.plan") : L("call.title.start")
         w.isReleasedWhenClosed = false
         window = w

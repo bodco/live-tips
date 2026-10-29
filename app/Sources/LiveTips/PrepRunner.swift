@@ -24,6 +24,8 @@ final class PrepRunner: ObservableObject {
     @Published var stage = ""
     @Published var detail = ""
     private var filesRead = 0
+    /// 0.8.5: the last Prepare of a talk: slides rewritten and the ones kept with the PM's edits (P4 done).
+    @Published var lastTalk: (rewritten: Int, kept: [Int])?
     @Published var costUSD: Double?          // from the stream's final "result" event (API key; the plan shows the equivalent)
     private var lineBuf = Data()
     private var process: Process?
@@ -134,12 +136,31 @@ final class PrepRunner: ObservableObject {
         var refreshBase: String? = nil
         var refreshOf: Date? = nil
         var changed: [String] = []
+        var deck: DeckSetup? = nil          // 0.8.5: a Presentation call with a deck (P2)
     }
 
     /// A preparation joins the live call only when it was made for that very call (Up next, 2026-10-27).
     nonisolated static func joinsLiveCall(prepFor: UUID?, liveCall: UUID?) -> Bool {
         guard let a = prepFor, let b = liveCall else { return prepFor == nil && liveCall == nil }
         return a == b
+    }
+
+    /// 0.8.5 fix (owner, 29.10): a call started from the calendar or Home is a new form, so its id differs from the
+    /// Up next item the preparation was made for. The same call is also recognised by its title and day, so the
+    /// preparation's progress shows in the tips window and its files join the call when they are ready.
+    @Published var forTitle = ""
+    @Published var forDate: Date?
+    static func sameCall(prepTitle: String, prepDate: Date?, liveTitle: String, liveDate: Date?) -> Bool {
+        let a = StartCallModel.slugify(prepTitle), b = StartCallModel.slugify(liveTitle)
+        guard !a.isEmpty, a == b, let d1 = prepDate else { return false }
+        return Calendar.current.isDate(d1, inSameDayAs: liveDate ?? Date())
+    }
+    /// The running (or last) preparation belongs to the live call: by id, else by title and day.
+    var joinsCurrentCall: Bool {
+        if Self.joinsLiveCall(prepFor: callID, liveCall: CallEngine.shared.currentCallID) { return true }
+        let r = CallEngine.shared.callRequest
+        let when = (r["scheduled_at"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) }
+        return Self.sameCall(prepTitle: forTitle, prepDate: forDate, liveTitle: r["title"] as? String ?? "", liveDate: when)
     }
 
     func cancel() {
@@ -236,7 +257,10 @@ final class PrepRunner: ObservableObject {
         brief: "Updated <time>: <N> files, sections: ...". Then run `"\(c.engine.python)" "\(lt)" prep-check "\(base).md"` \
         and fix the files until it prints verdict: OK. End with one line: what changed.
         """
-        let prompt = r.refreshBase == nil ? fullPrompt : refreshPrompt
+        // 0.8.5 (rules/presentation.yaml > prepare_again): one previous version is kept; the deck goes to <base>.deck.json.
+        let deckTexts = TalkFiles.before(base: base, deck: r.deck)
+        let deckLines = r.deck.map { TalkFiles.prompt(base: base, deck: $0) } ?? ""
+        let prompt = (r.refreshBase == nil ? fullPrompt : refreshPrompt) + (deckLines.isEmpty ? "" : "\n\n" + deckLines)
         // 0.8.2: the way from Settings > AI; with auto-switch the other one when this one cannot run at all.
         let routes = c.ai
         var route = forced ?? routes.prep
@@ -267,6 +291,7 @@ final class PrepRunner: ObservableObject {
                        "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}",
                        "--add-dir", skill, "--add-dir", live] + (r.workspaceRoot.isEmpty ? [] : ["--add-dir", r.workspaceRoot])
                        + Array(Set(r.folders.map { StartCallModel.isDir($0) ? $0 : ($0 as NSString).deletingLastPathComponent })).flatMap { ["--add-dir", $0] }
+        if let dir = r.deck?.info?.dir { p.arguments! += ["--add-dir", dir] }
         p.currentDirectoryURL = URL(fileURLWithPath: r.useProjectFolder ? r.root : live)
         var env = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -323,10 +348,11 @@ final class PrepRunner: ObservableObject {
                 if useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
                 if ok {
                     Freshness.writeSnapshot(base: base, refreshOf: r.refreshOf)      // rules/freshness.json > snapshot
+                    if let res = TalkFiles.after(base: base, deck: r.deck, oldTexts: deckTexts) { self.lastTalk = res }
                     self.progress = 1; self.stage = L("prep.st.done")
                     // QA 26.10: the call may have started while the prep was written: pick up the rest now.
                     // 2026-10-27 (Up next): only into the call it was made for.
-                    if Self.joinsLiveCall(prepFor: forID, liveCall: CallEngine.shared.currentCallID),
+                    if Self.joinsLiveCall(prepFor: forID, liveCall: CallEngine.shared.currentCallID) || self.joinsCurrentCall,
                        CallEngine.shared.isRunning, let f = CallEngine.shared.lastFile { CallEngine.shared.adoptLatePrep(base: base, file: f) }
                 }
                 self.running = false
@@ -353,6 +379,7 @@ final class PrepRunner: ObservableObject {
         startedAt = Date()
         target = (base as NSString).lastPathComponent
         callID = r.callID
+        forTitle = r.title; forDate = r.date
         result = ""
         progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil
         return nil

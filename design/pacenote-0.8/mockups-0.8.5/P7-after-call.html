@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P7 After the call</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.cv{box-sizing:border-box;padding:24px;background:#E8EAEE;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;display:flex;gap:32px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.ann{font-size:13px;color:#3A3A3C;font-weight:600}
+.lt{--bg:#F5F5F7;--sf:#FFFFFF;--bd:#D2D2D7;--ln:#E5E5EA;--tb:#ECECEF;--tx:#1D1D1F;--t2:#3A3A3C;--t3:#6E6E73;--ac:#0062E6;--acs:#E0EDFF;--fill:#0A6CFF;--on:#B04A00;--ons:#FFE8CC;--og:#E8590C;--ok:#15803D;--oks:#DCFCE7;--b2bg:#FFFFFF;color-scheme:light}
+.dk{--bg:#1E1E20;--sf:#2C2C2E;--bd:#48484A;--ln:#3A3A3C;--tb:#2A2A2C;--tx:#F5F5F7;--t2:#C7C7CC;--t3:#98989D;--ac:#64B5FF;--acs:rgba(77,157,255,.16);--fill:#0A6CFF;--on:#FFB340;--ons:rgba(255,159,10,.14);--og:#E8590C;--ok:#4CD964;--oks:rgba(76,217,100,.14);--b2bg:#3A3A3C;color-scheme:dark}
+.win{box-sizing:border-box;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);border-radius:12px;overflow:hidden;border:1px solid var(--bd);box-shadow:0 8px 28px rgba(0,0,0,.12)}
+.tbar{height:38px;flex:none;display:flex;align-items:center;padding:0 12px;background:var(--tb);border-bottom:1px solid var(--ln);position:relative}
+.tbar .ttl{position:absolute;left:0;right:0;text-align:center;font-size:13px;font-weight:600;color:var(--t2)}
+.dots{display:flex;gap:8px}.dots span{width:12px;height:12px;border-radius:50%}
+.dots span:nth-child(1){background:#FF5F57}.dots span:nth-child(2){background:#FEBC2E}.dots span:nth-child(3){background:#28C840}
+button{font:inherit;cursor:pointer}
+.b1{height:32px;padding:0 14px;border-radius:7px;border:0;background:var(--fill);color:#fff;font-size:13px;font-weight:600}
+.b2{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--bd);background:var(--b2bg);color:var(--tx);font-size:13px}
+.b3{height:28px;padding:0 6px;border:0;background:transparent;color:var(--ac);font-size:13px;font-weight:500}
+.cap{font-size:12px;color:var(--t3);line-height:1.45}
+.row{display:flex;align-items:center;gap:10px}
+.sec{font-size:13px;font-weight:600;margin:0}
+.card{background:var(--sf);border-radius:10px;box-shadow:0 0 0 1px var(--ln);padding:14px 16px}
+.li{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--ln);font-size:14px;line-height:1.45}
+.ic{flex:none;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-top:1px}
+.box{flex:none;width:16px;height:16px;border-radius:4px;border:1.5px solid var(--bd);margin-top:2px}
+.mail{border-radius:8px;border:1px solid var(--ln);padding:12px;font-size:13px;line-height:1.55;color:var(--t2);background:var(--bg)}
+.rr{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px}
+.rr.hv{background:var(--ln)}
+.nm{font-size:14px;font-weight:600}
+.pill{font-size:11px;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--acs);color:var(--ac)}
+</style>
+</helmet>
+<div class="cv" style="width:1640px;height:980px">
+
+<div class="col">
+<span class="ann">Right after End call · light · EN · opens in the tips window</span>
+<div class="win lt" style="width:860px;height:910px">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Call ended</div></div>
+<div style="flex:1;min-height:0;padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+<div><div style="font-size:22px;font-weight:700;letter-spacing:-.01em">Orbit weekly with the client</div><div class="cap" style="font-size:13px">Today 10:00 · 32 min · Emily Clark, David Kim · summary saved to Notion</div></div>
+
+<div class="row" style="padding:10px 12px;border-radius:9px;background:var(--acs);align-items:flex-start">
+<div style="flex:1;font-size:13px;line-height:1.5"><b>Part of a series: Orbit weekly, call 4.</b> Calls in this project with the same title are linked. Open items and agenda points not raised go into the next brief, Fri 10:00.</div>
+<button class="b3">Show series</button>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+<div class="card"><p class="sec" style="margin-bottom:4px">Decisions · 2</p>
+<div class="li"><span class="ic" style="background:var(--oks);color:var(--ok)" aria-hidden="true">✓</span>Pilot starts 4 Nov with 3 teams</div>
+<div class="li"><span class="ic" style="background:var(--oks);color:var(--ok)" aria-hidden="true">✓</span>Support joins after SSO</div>
+</div>
+<div class="card"><p class="sec" style="margin-bottom:4px">On you · 1 · open questions · 1</p>
+<div class="li"><span class="box" aria-hidden="true"></span><div>Send the test account list<div class="cap" style="color:var(--on)">by Fri · you promised</div></div></div>
+<div class="li"><span class="ic" style="background:var(--ln);color:var(--t2)" aria-hidden="true">?</span>Who signs off the security review</div>
+</div>
+</div>
+
+<div class="card" style="display:flex;flex-direction:column;gap:10px">
+<div class="row"><p class="sec" style="flex:1">Follow-up draft</p><span class="cap">To Emily Clark, David Kim · not sent</span></div>
+<div class="mail">Hi Emily, David,<br>Thanks for today. We agreed the pilot starts on 4 Nov with three teams, and support joins once SSO is ready. I will send the test account list by Friday. One open point: who signs off the security review on your side?<br>Best, Bohdan</div>
+<div class="row"><button class="b2">Copy</button><button class="b2">Open in Mail</button><button class="b3">Edit</button><span style="flex:1"></span><span class="cap">Pacenote never sends it for you</span></div>
+</div>
+
+<div style="flex:1"></div>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:12px 24px 16px;border-top:1px solid var(--ln)">
+<button class="b3">Open in Notion</button><span style="flex:1"></span><button class="b2">Open call page</button><button class="b1">Done</button>
+</div>
+</div>
+</div>
+
+<div class="col">
+<span class="ann">Later, from Home · Recent row on hover · dark · UK</span>
+<div class="win dk" lang="uk" style="width:700px;height:460px">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Сьогодні</div></div>
+<div style="padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+<div class="row" style="padding:0 12px 6px"><span class="sec" style="flex:1">Нещодавні</span><button class="b3">Усі дзвінки</button></div>
+<div class="rr hv">
+<div style="flex:1;min-width:0"><div class="row" style="gap:8px"><span class="nm">Orbit weekly with the client</span><span class="pill">Серія · 4</span></div><div class="cap">Сьогодні 10:00 · 2 рішення · 1 на вас</div></div>
+<button class="b3">Підсумок</button><button class="b3">Лист-підсумок</button><button class="b3">Серія</button>
+</div>
+<div class="rr"><div style="flex:1"><div class="nm">Release checklist review</div><div class="cap">27 жовт. · 1 рішення · 1 відкрите питання</div></div></div>
+<div class="rr"><div style="flex:1"><div class="row" style="gap:8px"><span class="nm">Orbit weekly with the client</span><span class="pill">Серія · 3</span></div><div class="cap">23 жовт. · 3 рішення</div></div></div>
+<div class="cap" style="padding:10px 12px 0">Дії видно при наведенні і з клавіатури (Tab). Без наведення рядок лишається спокійним.</div>
+</div>
+</div>
+
+<span class="ann" style="margin-top:16px">Series explained · popover from the Серія pill · dark · UK</span>
+<div class="dk" lang="uk" style="width:420px;background:var(--sf);border-radius:10px;box-shadow:0 0 0 1px var(--ln),0 12px 28px rgba(0,0,0,.3);padding:14px 16px;display:flex;flex-direction:column;gap:8px;color:var(--tx)" role="dialog" aria-label="Серія дзвінків">
+<span style="font-size:14px;font-weight:600">Чому це серія</span>
+<span style="font-size:13px;line-height:1.5;color:var(--t2)">Той самий проєкт і та сама назва дзвінка. Pacenote звʼязує такі дзвінки: відкриті обіцянки і пункти порядку денного, до яких не дійшли, потрапляють у бриф наступного. Щоб почати нову серію, змініть назву дзвінка.</span>
+<div class="row"><button class="b2">Показати серію</button></div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1640,"height":980}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

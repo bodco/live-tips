@@ -1,0 +1,21 @@
+# Recording problems (Pacenote 0.8.5, P8). A system state, not a tip: no tip actions, one action, it clears by itself.
+schema_version: 1
+status_fields:
+  # written by the recorder into status.json every 2 s (recorder audio_levels)
+  mic_level: 0..1, the microphone's recent peak
+  call_level: 0..1, the call's (system audio) recent peak
+  mic_silent_s: seconds since the microphone last had sound (a muted microphone counts as sound)
+  call_silent_s: seconds since the call audio last had sound
+threshold_s: 30
+states:
+  not_recording:
+    when: recording and mic_silent_s >= 30 and call_silent_s >= 30, or the recorder stopped by itself
+    action: End and restart
+    tips: off until audio comes back; what was said before is saved
+  cant_hear:
+    when: recording and call_silent_s >= 30 while the microphone has sound
+    action: Check audio (System Settings > Sound)
+    tips: about the other side off until their audio comes back; the PM's words are still recorded
+clears: by itself as soon as the silent side has sound again
+show: a red strip under the window title, the tips area replaced by the state, the Mic and Call levels
+who: the app window; the skill's window shows the same status line it always had (no change there)

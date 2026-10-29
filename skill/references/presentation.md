@@ -39,18 +39,29 @@ part, not to interrupt.
 4. **No interrupting tips** while the PM speaks: no comment, initiative or answer-check
    tips. Allowed: 📌 facts and cards on audience questions (local), a 🟠 `answer` with one
    phrase to a direct question, the time check at 2/3 and 5 minutes before the end
-   ("Лишилось {N} хв, ще {K} розділів: {які пропустити}").
+   (since 0.8.5 the recorder writes it, see 7; do not write your own time tips).
 5. If the PM leaves the outline and improvises, do not force it back; the tracker catches
    up when the PM returns to a section's words.
 6. **Quiet local layer during the PM's block** (recorder since 2026-10-23, `call_type=presentation`):
    no keyword 📌 facts and no "❓" cards unless a line has "?" (and the PM's name for "❓");
    semantic facts only on questions. On the real presentation 28 keyword facts fired during
    the colleague's talk and 71% scored 1-2.
-7. **One time line, about the PM's own slides only.** The time check (2/3 and 5 minutes before
-   the end) is ONE pinned line "⏱ {N} хв лишилось, {K} слайдів: пропусти {які}" that is
-   updated in place, never five red cards, never advice about a colleague's slides while the
-   colleague speaks. The recorder writes it itself every 60 s when `slides.json` has `sec`
-   budgets (`kind: timeline`, "⏱ 12:30 з 40:00 · відстаєте 3 хв", shown under Now).
+7. **One time line, about the PM's own slides only** (`rules/presentation.yaml` > time_line,
+   time_advice; the app follows the same rule). The recorder writes it itself every 60 s when
+   `slides.json` has `sec` budgets (`kind: timeline`, "⏱ 9:40 з 25:00 · відстаєте 1 хв", with the
+   fields `plan`, `elapsed`, `behind`, `slide`, `advice`), shown under Now. Behind = how late the
+   current slide started plus its overrun. The advice is added to the same line, updated in place,
+   never as new cards: when the slide changes and the PM is 1 min or more behind, and at two thirds
+   of the plan and 5 minutes before its end. It names the fewest not yet reached PM slides with
+   `"skip": true` whose budgets cover the time behind ("Пропустіть слайд 10, щоб наздогнати"); when
+   they do not cover it, the longest not yet reached PM slides, at most 2 named ("Слайд 6: скажіть
+   лише «{short}»"). Never about a colleague's slides, never during a colleague's block. Do not
+   choose slides to skip yourself: the line already carries the advice.
+7a. **Moving between slides (sync B).** The tracker never moves on its own to one of the PM's
+   slides: it writes `kind: move_ask` ("Перейти до слайда N?") and the window answers with Enter
+   (yes) or Esc (no) through the inbox (`slide_move`). A colleague's block is followed from the
+   other side's lines without asking. Previous / Next in the window send `slide = <n>`, "+30 s"
+   sends `slide_add30 = <n>`. The app can also follow Keynote or PowerPoint (sync A, app only).
 8. **Numbers on the slides.** `slides.json` carries, per slide, the numbers the PM will say
    (`"numbers": ["840 680 UAH", "63 h"]`) and the 1-2 questions this slide usually raises with
    the answer (`"qa": [{"q": "...", "a": "...", "keywords": ["...", "..."]}]`, the answer with
@@ -59,10 +70,23 @@ part, not to interrupt.
    keywords match (or 1 of 6+ letters), the recorder shows a local 🟠 "❓ {q}" card with the
    answer at once (each entry at most once per 2 min). The PM garbled a number from his own slide and skipped the hours figure on the
    real call: the slide text alone does not help, the numbers must be on the Now card.
+8a. **Slides that can go.** When you write `slides.json`, set `"skip": true` on 1-3 of the PM's
+   slides that matter least for the goal of the call, and `"short"`: one sentence each PM slide can
+   be reduced to. Keep `"edited": true` on slides the PM changed: on a new preparation leave them
+   as they are unless the PM asks to rewrite everything (one previous version is kept as
+   `<stem>.slides.prev.json`). Old files without these fields stay valid.
 9. **Rehearsal results go back into the files.** After a rehearsal wrap-up ("+3.5 min",
    "slide 38 not reached", a decision not to ask for decisions today) rewrite `slides.json`
    and the brief at once, in the same session: the real call on 22.10 ran on an unchanged
    plan although the rehearsal had found both problems.
+8b. **An attached deck (app: Start call > Presentation; skill: a deck file the PM names).** Read the slide
+   texts (the app gives `<base>.deck.json`: `slides[{n, title, text}]`), write one `slides.json` entry per deck
+   slide with the deck's numbering, keep `who`/`speaker` exactly as the PM set them (`me`, `shared` for "All", `other`
+   with the colleague's name), and fit all `sec` budgets into the talk time (call length minus Q&A; top-level
+   `talk_min`, `qa_min`, `speakers`). Prepare again keeps one previous version (`<base>.slides.prev.json`) and, with
+   "Keep my edits", leaves slides with `"edited": true` as they are unless their deck text changed
+   (rules/presentation.yaml > prepare_again).
+
 10. **Handoffs between two presenters** come from `slides.json` `who`: when the position
    moves to a slide whose `who` is `me` after a colleague's block, pin the PM's entry
    sentence as a 🔴 card BEFORE the handoff (the colleague's last slide), not on hearing

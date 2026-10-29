@@ -1,15 +1,25 @@
 # Rehearsal of a presentation (Pacenote 0.8, idea 10). App only (the skill needs a live call).
 schema_version: 1
 start: Home or the call form, "Rehearse" for a call of type Presentation with a preparation (outline or slides).
-recording: none. The steps run with their timers; nothing is written to the project folder.
+recording: none. The steps run with their timers; no audio and no transcript, nothing is written to the project folder by the rehearsal itself.
+entry_points: >-
+  (0.8.5) Rehearse next to Start call once the talk exists; a row in Up next on Home (presentation calls only); a row in the Presentation block with the last result.
+steps: [intro, run_through, questions, result]   # run-through: the PM's slides only, a timer per slide, a colleague's slides skipped
+last_result: >-
+  kept in the app's support folder (rehearsals/<prep base>.json: date, score, seconds per slide), shown as "Last rehearsal"; marked "before update" after Prepare again.
+apply_to_talk: >-
+  the result offers to shorten the slides that ran over and to add the better answers to their Q&A; the PM reviews the change in Your talk and only then it is saved to slides.json (presentation.md 9).
 questions: 4
 answers: written (typed), one per question
 questions_prompt: >-
-  You play the client at the end of a presentation. From the preparation below (brief, outline, slides, facts),
-  ask {N} hard but fair questions a client would really ask: about scope, dates, cost, risks and what is not
-  covered. Write in {LANG}, one sentence each. Return JSON only: {{"questions": ["...", "..."]}}
+  You play {WHO}, the client, at the end of a presentation. From the preparation below (brief, outline, slides, facts),
+  ask {N} hard but fair questions {WHO} would really ask: about scope, dates, cost, risks and what is not
+  covered. Write in {LANG}, one sentence each, and for each one short reason why this audience is likely to ask it
+  (what in the brief or earlier calls points to it). Return JSON only:
+  {{"questions": [{{"q": "...", "why": "...", "slide": 3}}]}} ("slide" = the slide number the question is about, or null).
 score_prompt: >-
   You coach a project manager after a rehearsal. For each written answer give a score from 1 to 5 (5 = clear,
   correct against the preparation, answers the question, commits to nothing the team did not agree), one line of
-  feedback and one better first sentence. Then one line overall. Write in {LANG}, plain words, no long dashes.
-  Return JSON only: {{"answers": [{{"score": 4, "feedback": "...", "better": "..."}}], "overall": "..."}}
+  feedback, one better first sentence and the slide number the question belongs to (or null). Then one line
+  overall (what was strong, what was weak). Write in {LANG}, plain words, no long dashes.
+  Return JSON only: {{"answers": [{{"score": 4, "feedback": "...", "better": "...", "slide": 3}}], "overall": "..."}}

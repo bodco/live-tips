@@ -125,6 +125,10 @@ is older than 3 days -> say so in the sources line (item 4) as
    removes, do not write again; what he rewrites, use his wording and level of detail; what he adds,
    cover it this time; names and facts he fixes, use the fixed ones. A correction that contradicts a
    newer source loses. Say in the brief's sources line how many corrections were used.
+   Patterns first (rules/learning.yaml, 0.8.5): a correction seen on two or more different calls (the same
+   instruction to the follow-up, the same kind of line removed from briefs) is a standing preference: apply it to
+   every brief and draft without being asked (`python -m livetips_m0.learning --prompt` prints them). A correction
+   seen once applies only to the same meeting.
 3a. **Topic documents rule (mandatory).** For EVERY item of the checklist and every topic
    expected on the call (the user's words, the prep report, the open threads), find the project
    documents that touch it, created or changed in the last 3 days (Project docs `DESIGN-`,

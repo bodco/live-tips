@@ -46,7 +46,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 @keyframes in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .kind{font-size:var(--fs-label);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
 .k-risk{color:var(--k-onme)}
-.after{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}
+.after{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 12px 12px;padding:0 4px}
 .after .meta{flex:1 1 100%}
 .k-answer{color:var(--k-answer)} .k-turn{color:var(--k-turn)} .k-onme{color:var(--k-onme)} .k-docs{color:var(--k-docs)} .k-neutral{color:var(--k-neutral)}
 .hero .head{display:flex;align-items:center;gap:8px}
@@ -184,3 +184,99 @@ button{font:inherit;color:inherit;cursor:pointer}
 .toast.show{opacity:1}
 .toast.warn{color:var(--k-onme)}
 @media (prefers-reduced-motion: reduce){.hero{animation:none}.toast{transition:none}}
+/* 0.8.5 presentation mode (P5): rail, countdown, Plan/Elapsed/Behind, one advice line, Q&A card, handoff */
+.btn3{height:28px;padding:0 10px;border-radius:7px;border:0;background:transparent;color:var(--accent);font-size:13px;font-weight:500}
+.btn3:hover{background:var(--accent-soft)}
+.present.pm{padding:14px;gap:0}
+.present.pm.wide{display:grid;grid-template-columns:minmax(150px,30%) 1fr;gap:14px;align-items:start}
+.pm-main{display:flex;flex-direction:column;gap:9px;min-width:0}
+.pm-rail{display:flex;flex-direction:column;gap:2px;max-height:62vh;overflow:auto;border-right:1px solid var(--separator);padding-right:8px}
+.pm-rail .cap{font-size:var(--fs-label);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:4px}
+.pm-rail .r{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;column-gap:6px;align-items:center;text-align:left;border:0;background:transparent;border-radius:var(--radius-s);padding:5px 6px;font-size:12px;color:var(--text-2)}
+.pm-rail .r img{grid-column:1/4;width:100%;max-height:54px;object-fit:cover;border-radius:4px;margin-bottom:3px}
+.pm-rail .r .n{font-variant-numeric:tabular-nums;color:var(--text-3);min-width:16px}
+.pm-rail .r .tt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm-rail .r .d{font-variant-numeric:tabular-nums;color:var(--text-3)}
+.pm-rail .r.done{opacity:.55}
+.pm-rail .r.now{background:var(--accent-soft);color:var(--text);font-weight:600}
+.pm-rail .r.other .tt{font-style:italic}
+.pm-rail .r:hover{background:var(--surface-2)}
+.pm .step{font-size:20px;font-weight:600;line-height:1.25}
+.pm-clock{display:flex;align-items:baseline;gap:8px}
+.pm-clock .clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums}
+.pm-clock .clock.over{color:var(--danger-text)}
+.pm-clock .m{font-size:12px;color:var(--text-3);flex:1}
+.pm-time{font-size:13px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.pm-adv{font-size:14px;color:var(--k-onme);background:var(--k-onme-soft);border-radius:var(--radius-s);padding:6px 9px}
+.pm-adv .m{color:var(--text-3);font-size:12px}
+.pm .say{font-size:16px;line-height:1.45;color:var(--text)}
+.pm .say p{margin:0 0 6px}
+.pm .say b,.pm-qa b,.pm-adv b{font-weight:700;color:var(--text)}
+.pm-qa{border-left:3px solid var(--k-answer);background:var(--k-answer-soft);border-radius:var(--radius-s);padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.pm-qa .top{display:flex;justify-content:space-between;align-items:center}
+.pm-qa .q{font-size:13px;color:var(--text-2)}
+.pm-qa .a{font-size:15px;line-height:1.4}
+.pm-ask{display:flex;flex-direction:column;gap:6px;background:var(--surface-2);border-radius:var(--radius-m);padding:9px 11px;font-size:14px}
+.pm-ask .ctl{display:flex;gap:8px;align-items:center}
+.pm-ask .m,.pm .ctl kbd{font-size:11px;color:var(--text-3)}
+.pm .ctl{display:flex;gap:8px;align-items:center}
+.pm-nx{display:flex;gap:14px;font-size:12px;color:var(--text-3)}
+.pm-sync{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-3)}
+.pm-handoff{border:1px solid var(--k-turn);border-radius:var(--radius-m);padding:10px;display:flex;flex-direction:column;gap:4px}
+.pm-empty .step{font-size:17px;font-weight:600}
+.app.compact .present.pm{margin:0 8px 8px;padding:10px 12px}
+.app.compact .pm-clock .clock{font-size:26px}
+.app.compact .pm .step{font-size:16px}
+.app.compact .pm .say{font-size:14px}
+.app.compact .pm-sync{display:none}
+/* 0.8.5 after the call (P7) */
+.app.afterview .hero,.app.afterview .earlier,.app.afterview .empty,.app.afterview .present,.app.afterview .agenda,.app.afterview .next,.app.afterview .ask{display:none!important}
+.after.full{display:flex;flex-direction:column;align-items:stretch;gap:8px;margin:0 12px 12px;background:var(--surface);border-radius:var(--radius-l);padding:16px;box-shadow:var(--shadow-card);overflow:auto}
+.after.full h2{font-size:18px;margin:0}
+.after.full h3{font-size:13px;margin:6px 0 0;color:var(--text-2)}
+.after.full ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.after.full li .mk{display:inline-block;width:18px;color:var(--text-3)}
+.after.full .series{display:flex;gap:8px;align-items:baseline;font-size:13px;color:var(--text-2);background:var(--surface-2);border-radius:var(--radius-m);padding:8px 10px}
+.after.full .draft{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--separator);padding-top:8px}
+.after.full .dh{display:flex;gap:10px;align-items:baseline}
+.after.full input,.after.full textarea{font:inherit;font-size:14px;border:1px solid var(--border);border-radius:var(--radius-s);padding:6px 8px;background:var(--bg);color:var(--text)}
+.after.full textarea{resize:vertical;line-height:1.45}
+.after.full .instr{display:flex;gap:6px}
+.after.full .instr input{flex:1}
+.after.full .ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.after.full .foot .spacer{flex:1}
+.after.full .err{color:var(--danger-text)}
+/* 0.8.5 recording problems (P8): a system state, not a tip */
+.app.sysview .hero,.app.sysview .earlier,.app.sysview .empty,.app.sysview .present,.app.sysview .agenda{display:none!important}
+.sys{margin:0 0 10px}
+.sys[hidden]{display:none}
+.sys .strip{background:var(--danger-text);color:#fff;font-size:12px;font-weight:600;padding:5px 14px}
+.sys .body{margin:10px 12px 0;background:var(--surface);border-radius:var(--radius-l);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-card)}
+.sys .step{font-size:18px;font-weight:600}
+.sys .say{font-size:14px;line-height:1.45;color:var(--text-2)}
+.sys .levels{display:flex;flex-direction:column;gap:6px}
+.sys .lv{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px;font-size:12px;color:var(--text-3)}
+.sys .lv .bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.sys .lv .bar i{display:block;height:100%;background:var(--accent-fill)}
+.sys .ctl{display:flex;gap:8px}
+/* 0.8.5 fix: suggested names from the voice library */
+.newvoice .sug,.popover .sug{border:1px solid var(--border);background:var(--surface);color:var(--accent);border-radius:999px;font-size:12px;padding:2px 9px;margin-left:4px}
+.newvoice .sug:hover,.popover .sug:hover{background:var(--accent-soft)}
+.popover .sugs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.popover .sug .m{color:var(--text-3);font-size:11px}
+/* 0.8.5: On me lines can be reworded or marked Not mine (logged, learned) */
+.onme-item label{display:flex;gap:10px;align-items:flex-start;flex:1}
+.onme-item .hover-acts{opacity:0;display:flex;gap:2px}
+.onme-item:hover .hover-acts,.onme-item:focus-within .hover-acts{opacity:1}
+.onme-item.editing input[type=text]{flex:1;font:inherit;font-size:14px;border:1px solid var(--border);border-radius:var(--radius-s);padding:4px 6px;background:var(--bg);color:var(--text)}
+.langbtn{height:24px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:11px;font-weight:600;letter-spacing:.04em}
+.langbtn[hidden]{display:none}
+
+/* 0.8.5 fix: a card's points show under its phrase again (an answer was only its first line) */
+.hero .items{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.4;color:var(--text-2)}
+.app.compact .hero .items{display:none}
+.brief h3:empty{display:none}
+.pm-k{font-size:12px;font-weight:600;color:var(--k-turn)}
+.after.full{flex-wrap:nowrap;min-height:0}
+.after.full .meta{flex:none}
+.after.full>*{flex:none}

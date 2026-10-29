@@ -65,7 +65,7 @@ def test_secrets(tmp_path, monkeypatch):
 
 
 def test_rehearsal_scored():
-    assert rehearse.scored({"q": "Q"}, {"score": "9", "feedback": "a" + chr(0x2014) + "b"}) == {"q": "Q", "score": 5, "feedback": "a-b", "better": ""}
+    assert rehearse.scored({"q": "Q"}, {"score": "9", "feedback": "a" + chr(0x2014) + "b"}) == {"q": "Q", "score": 5, "feedback": "a-b", "better": "", "slide": None}   # 0.8.5: + slide
     assert rehearse.scored({}, {"score": "x"})["score"] == 0 and rehearse.scored({}, {"score": -3})["score"] == 1
 
 
@@ -125,7 +125,7 @@ def test_upload_md_refuses_a_foreign_host(monkeypatch):
 
 def test_cli_entry_points(tmp_path, monkeypatch, capsys):
     from livetips_m0 import followup, memory
-    monkeypatch.setattr(rehearse, "questions", lambda base, lang, model: {"ok": True, "questions": ["Q1"]})
+    monkeypatch.setattr(rehearse, "questions", lambda base, lang, model, **k: {"ok": True, "questions": ["Q1"]})
     monkeypatch.setattr(rehearse, "score", lambda base, answers, lang, model: {"ok": True, "n": len(answers)})
     ans = tmp_path / "a.json"
     ans.write_text('[{"q": "Q1", "a": "A"}]')
@@ -138,7 +138,7 @@ def test_cli_entry_points(tmp_path, monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out) == {"ok": True, "q": "csv", "lt": ["py", "lt"]}
     monkeypatch.setattr(memory, "ask", lambda *a: (_ for _ in ()).throw(RuntimeError("no index")))
     assert memory.main(["--root", str(tmp_path), "--q", "csv"]) == 1 and "no index" in capsys.readouterr().out
-    monkeypatch.setattr(followup, "draft", lambda md, lang, model: {"subject": "S"})
+    monkeypatch.setattr(followup, "draft", lambda md, lang, model, **k: {"subject": "S"})
     assert followup.main(["--md", "x.md"]) == 0 and json.loads(capsys.readouterr().out) == {"subject": "S", "ok": True}
 
 

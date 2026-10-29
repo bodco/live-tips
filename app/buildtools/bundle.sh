@@ -61,6 +61,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>NSCalendarsFullAccessUsageDescription</key><string>Pacenote reads your calendars to suggest and prepare the right call. It never changes them.</string>
 <key>NSCalendarsUsageDescription</key><string>Pacenote reads your calendars to suggest and prepare the right call. It never changes them.</string>
 <key>NSMicrophoneUsageDescription</key><string>Pacenote transcribes your voice on this Mac. Audio never leaves it.</string>
+<key>NSAppleEventsUsageDescription</key><string>Pacenote reads the current slide number from Keynote or PowerPoint during a presentation. It never changes your slides.</string>
 <key>NSAudioCaptureUsageDescription</key><string>Pacenote transcribes the other side of the call on this Mac.</string>
 </dict></plist>
 PLIST

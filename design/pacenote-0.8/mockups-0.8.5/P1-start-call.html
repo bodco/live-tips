@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P1 Start call field order</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.cv{box-sizing:border-box;padding:24px;background:#E8EAEE;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;display:flex;gap:32px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.ann{font-size:13px;color:#3A3A3C;font-weight:600}
+.lt{--bg:#F5F5F7;--sf:#FFFFFF;--bd:#D2D2D7;--ln:#E5E5EA;--tb:#ECECEF;--tx:#1D1D1F;--t2:#3A3A3C;--t3:#6E6E73;--ac:#0062E6;--acs:#E0EDFF;--fill:#0A6CFF;--on:#B04A00;--ons:#FFE8CC;--og:#E8590C;--b2bg:#FFFFFF;color-scheme:light}
+.dk{--bg:#1E1E20;--sf:#2C2C2E;--bd:#48484A;--ln:#3A3A3C;--tb:#2A2A2C;--tx:#F5F5F7;--t2:#C7C7CC;--t3:#98989D;--ac:#64B5FF;--acs:rgba(77,157,255,.16);--fill:#0A6CFF;--on:#FFB340;--ons:rgba(255,159,10,.14);--og:#E8590C;--b2bg:#3A3A3C;color-scheme:dark}
+.win{box-sizing:border-box;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);border-radius:12px;overflow:hidden;border:1px solid var(--bd);box-shadow:0 8px 28px rgba(0,0,0,.12)}
+.tbar{height:38px;flex:none;display:flex;align-items:center;padding:0 12px;background:var(--tb);border-bottom:1px solid var(--ln);position:relative}
+.tbar .ttl{position:absolute;left:0;right:0;text-align:center;font-size:13px;font-weight:600;color:var(--t2)}
+.dots{display:flex;gap:8px}.dots span{width:12px;height:12px;border-radius:50%}
+.dots span:nth-child(1){background:#FF5F57}.dots span:nth-child(2){background:#FEBC2E}.dots span:nth-child(3){background:#28C840}
+button{font:inherit;cursor:pointer}
+.b1{height:32px;padding:0 14px;border-radius:7px;border:0;background:var(--fill);color:#fff;font-size:13px;font-weight:600}
+.b2{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--bd);background:var(--b2bg);color:var(--tx);font-size:13px}
+.b3{height:28px;padding:0 6px;border:0;background:transparent;color:var(--ac);font-size:13px;font-weight:500}
+.lab{display:block;font-size:12px;font-weight:600;color:var(--t2);margin-bottom:5px}
+.in{box-sizing:border-box;width:100%;height:30px;border-radius:6px;border:1px solid var(--bd);background:var(--sf);color:var(--tx);font:inherit;font-size:13px;padding:0 9px}
+textarea.in{height:62px;padding:7px 9px;resize:none;line-height:1.4}
+.cap{font-size:12px;color:var(--t3);line-height:1.45}
+.card{background:var(--sf);border-radius:10px;box-shadow:0 0 0 1px var(--ln);padding:16px}
+.core{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.sec{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--t3);margin:0 0 10px}
+.chip{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:12px;background:var(--acs);color:var(--ac);font-size:12px;font-weight:500}
+.file{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--ln)}
+.thumb{width:44px;height:28px;border-radius:4px;background:linear-gradient(135deg,#0A6CFF,#64B5FF);flex:none}
+.row{display:flex;align-items:center;gap:10px}
+.mark{position:absolute;right:-8px;top:-9px;width:20px;height:20px;border-radius:50%;background:#E8590C;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.rel{position:relative}
+</style>
+</helmet>
+<div class="cv" style="width:1640px;height:1060px">
+
+<div class="col">
+<span class="ann">Regular call · light · EN · fixed core block, type section last</span>
+<div class="win lt" style="width:780px;height:980px">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Start call</div></div>
+<div style="flex:1;min-height:0;padding:20px 24px;display:flex;flex-direction:column;gap:16px">
+
+<div class="card rel" style="display:flex;flex-direction:column;gap:12px">
+<span class="mark" aria-hidden="true">1</span>
+<div><label class="lab" for="t1">Title</label><input class="in" id="t1" value="Orbit weekly with the client" style="height:34px;font-size:15px;font-weight:600"></div>
+<div class="core">
+<div><label class="lab" for="d1">Date</label><input class="in" id="d1" value="Wed, 28 Oct"></div>
+<div><label class="lab" for="h1">Time</label><input class="in" id="h1" value="12:18-12:48"></div>
+<div style="display:flex;align-items:flex-end"><span class="cap">From calendar · Google Meet</span></div>
+<div><label class="lab" for="c1">Call type</label><select class="in" id="c1"><option>Regular</option><option>Presentation</option></select></div>
+<div><label class="lab" for="a1">Audience</label><select class="in" id="a1"><option>Client</option><option>Team</option></select></div>
+<div><label class="lab" for="l1">Language</label><select class="in" id="l1"><option>English</option><option>Ukrainian</option></select></div>
+</div>
+</div>
+
+<div class="card rel" style="display:flex;flex-direction:column;gap:12px">
+<span class="mark" aria-hidden="true">2</span>
+<p class="sec">Context</p>
+<div><label class="lab" for="p1">Project</label><select class="in" id="p1"><option>Orbit SaaS Launch</option></select></div>
+<div><span class="lab">People</span><div class="row"><span class="chip">Emily Clark</span><span class="chip">David Kim</span><button class="b3">Add</button></div></div>
+<div><label class="lab" for="w1">What matters on this call</label><textarea class="in" id="w1">Agree who tests the pilot. Get the test accounts.</textarea></div>
+<div><span class="lab">Files and links</span><div class="row"><span class="cap" style="flex:1">Nothing attached. Pacenote also reads the project notes and last calls.</span><button class="b2">Attach</button></div></div>
+</div>
+
+<div class="card rel" style="display:flex;flex-direction:column;gap:6px;border:1px dashed var(--bd);box-shadow:none;background:transparent">
+<span class="mark" aria-hidden="true">3</span>
+<p class="sec" style="margin:0">Regular call</p>
+<span class="cap">Tips follow the agenda, open questions and what is on you. Pick Presentation to attach a deck.</span>
+</div>
+
+<div style="flex:1"></div>
+<div class="cap" style="padding:10px 12px;border-radius:8px;background:var(--acs);color:var(--t2)"><b style="color:var(--tx)">Layout rule.</b> Blocks 1 and 2 never move. The type section is always the last block, so switching type changes only its content and height, below everything you already filled.</div>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:14px 24px 18px;border-top:1px solid var(--ln)">
+<span class="cap" style="flex:1">Brief not prepared</span>
+<button class="b3">Cancel</button><button class="b2">Prepare</button><button class="b1">Start call</button>
+</div>
+</div>
+</div>
+
+<div class="col">
+<span class="ann">Presentation · dark · UK · same order, deck block in the type section</span>
+<div class="win dk" style="width:780px;height:980px" lang="uk">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Почати дзвінок</div></div>
+<div style="flex:1;min-height:0;padding:20px 24px;display:flex;flex-direction:column;gap:16px">
+
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<div><label class="lab" for="t2">Назва</label><input class="in" id="t2" value="Orbit pilot review" style="height:34px;font-size:15px;font-weight:600"></div>
+<div class="core">
+<div><label class="lab" for="d2">Дата</label><input class="in" id="d2" value="Чт, 29 жовт."></div>
+<div><label class="lab" for="h2">Час</label><input class="in" id="h2" value="13:00-13:30"></div>
+<div style="display:flex;align-items:flex-end"><span class="cap">З календаря · Zoom</span></div>
+<div><label class="lab" for="c2">Тип дзвінка</label><select class="in" id="c2"><option>Презентація</option><option>Звичайний</option></select></div>
+<div><label class="lab" for="a2">Аудиторія</label><select class="in" id="a2"><option>Клієнт</option></select></div>
+<div><label class="lab" for="l2">Мова</label><select class="in" id="l2"><option>Англійська</option></select></div>
+</div>
+</div>
+
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<p class="sec">Контекст</p>
+<div><label class="lab" for="p2">Проєкт</label><select class="in" id="p2"><option>Orbit SaaS Launch</option></select></div>
+<div><span class="lab">Учасники</span><div class="row"><span class="chip">Emily Clark</span><span class="chip">David Kim</span><button class="b3">Додати</button></div></div>
+<div><label class="lab" for="w2">Що важливо на цьому дзвінку</label><textarea class="in" id="w2" style="height:46px">Погодити дату запуску пілота.</textarea></div>
+</div>
+
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<div class="row"><p class="sec" style="margin:0;flex:1">Презентація</p><span class="cap">Готово до підготовки</span></div>
+<div class="file"><span class="thumb" aria-hidden="true"></span><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">Orbit-pilot-review.key</div><div class="cap">14 слайдів · Keynote</div></div><button class="b3">Замінити</button></div>
+<span class="cap">Prepare прочитає презентацію, напише ваш виступ слайд за слайдом, розрахує час кожного слайда і питання, які може поставити аудиторія.</span>
+<div class="core" style="grid-template-columns:1fr 1fr 1fr">
+<div><span class="lab">Доповідачі</span><div style="font-size:13px">Я, Ann</div></div>
+<div><span class="lab">Тривалість</span><div style="font-size:13px">30 хв · з календаря</div></div>
+<div><span class="lab">Питання</span><div style="font-size:13px">5 хв наприкінці</div></div>
+</div>
+<div class="row"><span class="cap" style="flex:1">Усі: 1, 14 · Я: 2-4, 10-13 · Ann: 5-9</span><button class="b2">Налаштувати</button></div>
+</div>
+
+<div style="flex:1"></div>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:14px 24px 18px;border-top:1px solid var(--ln)">
+<span class="cap" style="flex:1">Бриф не підготовлено</span>
+<button class="b3">Скасувати</button><button class="b2">Підготувати</button><button class="b1">Почати дзвінок</button>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1640,"height":1060}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

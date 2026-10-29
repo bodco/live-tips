@@ -127,6 +127,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         for theme in ["dark", "light"] {
             steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
             if env["LT_SHOTS_ONLY"] == "ai" { steps.append { [unowned self] in self.settings("ai", theme) }; continue }   // Settings > AI only
+            if env["LT_SHOTS_ONLY"] == "p085" { p085(theme); continue }    // 0.8.5: the boards P1-P8 next to the mockups
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
@@ -300,8 +301,8 @@ final class ShotMode: NSObject, NSApplicationDelegate {
     }
 
     /// The tips window in a given state and size (Pacenote 0.8: 380, 560, 1000 px, ready, compact, menu, brief).
-    func tipsExtra(_ theme: String, js: String, name: String, size: NSSize = NSSize(width: 1040, height: 680)) {
-        var pa = prompterArgs(["LiveTips", "--prompter-demo"])
+    func tipsExtra(_ theme: String, js: String, name: String, size: NSSize = NSSize(width: 1040, height: 680), presentation: Bool = false) {
+        var pa = prompterArgs(["LiveTips", presentation ? "--prompter-demo-presentation" : "--prompter-demo"])
         pa.title = "Orbit weekly with the client"
         let c = PrompterController(args: pa)
         c.show()
@@ -468,5 +469,100 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                 save()
             }
         }
+    }
+
+    // MARK: 0.8.5 boards (LT_SHOTS_ONLY=p085)
+
+    static var talkBase: String { demoRoot + "/work/Northwind Studio/Orbit SaaS Launch/live/prep-" + day() + "-1400-orbit-pilot-demo" }
+
+    func demoPresentationModel(_ phase: DeckSetup.Phase) -> StartCallModel {
+        let m = StartCallModel()
+        m.target = "project:orbit-saas-launch"
+        m.language = "en"
+        m.title = "Orbit pilot review"
+        m.callType = "presentation"
+        m.audience = "client"
+        m.context = "Goal: agree the pilot launch date.\nParticipants: Emily Clark, David Kim."
+        var d = DeckSetup()
+        d.path = "/Users/Shared/LiveTipsDemo/Orbit-pilot-review.key"
+        if phase == .ready {
+            let sl = DemoTalk.slides.map { DeckSlide(n: $0["n"] as? Int ?? 0, title: $0["title"] as? String ?? "", text: "") }
+            d.info = DeckInfo(file: d.path!, format: "Keynote", slides: sl, readAt: Date().addingTimeInterval(-120), dir: Self.demoRoot + "/decks/none")
+            d.speakers = ["Ann Lee"]
+            for n in [1, 14] { d.owners[n] = DeckOwners.all }
+            for n in 5...9 { d.owners[n] = "Ann Lee" }
+            d.durationFromCalendar = false
+        }
+        if phase == .none { d.path = nil }
+        d.phase = phase
+        m.deck = d
+        return m
+    }
+
+    func p085(_ theme: String) {
+        // P1: Regular and Presentation (blocks 1 and 2 fixed, the type section last); P2: the four deck states.
+        steps.append { [unowned self] in self.startCall(theme) }
+        for (phase, name) in [(DeckSetup.Phase.ready, "p1-start-presentation"), (.none, "p2-deck-not-attached"),
+                              (.reading(6, 14), "p2-deck-reading"), (.failed(L("deck.err.keynote")), "p2-deck-error")] {
+            steps.append { [unowned self] in
+                StartCallWindow.show(delegate: AppDelegate(), prepared: self.demoPresentationModel(phase))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
+                    if let w = StartCallWindow.window {
+                        if let sv = (w.contentView?.subviews.first?.subviews.first as? NSScrollView) ?? nil { sv.contentView.scroll(to: NSPoint(x: 0, y: 360)) }
+                        capture(w, "\(name)-\(theme)"); w.close()
+                    }
+                    next()
+                }
+            }
+        }
+        // P3: the talk; P4: Prepare again (the sheet in its own window for the picture).
+        steps.append { [unowned self] in
+            var o = (try? JSONSerialization.jsonObject(with: Data(DemoTalk.json.utf8))) as? [String: Any] ?? [:]
+            var sl = DemoTalk.slides
+            if sl.count > 2 { sl[2]["edited"] = true }
+            o["slides"] = sl
+            TalkFiles.save(o, Self.talkBase + ".slides.json")
+            self.window("p3-talk-\(theme)") { TalkWindow.show(base: Self.talkBase, title: "Orbit pilot review", call: self.demoPresentationModel(.ready)) }
+        }
+        steps.append { [unowned self] in
+            TalkWindow.windows[Self.talkBase] = nil; TalkWindow.models[Self.talkBase] = nil
+            let tm = TalkModel(base: Self.talkBase, title: "Orbit pilot review", call: self.demoPresentationModel(.ready))
+            self.keep.append(tm)
+            self.window("p4-prepare-again-\(theme)") {
+                let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { PrepareAgainSheet(model: tm, onStart: {}) }))
+                w.isReleasedWhenClosed = false; w.center(); w.makeKeyAndOrderFront(nil)
+            }
+        }
+        // P5: presentation mode (wide with the rail, Move to slide?, a colleague's block, the handoff, compact, empty, menu).
+        let st = "window.setStatus({state:'recording',call_type:'presentation',title:'Orbit pilot review',system_audio:'ok',mic:'ok',started_at:new Date(Date.now()-580000).toISOString()});"
+        steps.append { [unowned self] in self.tipsExtra(theme, js: st, name: "p5-presentation", size: NSSize(width: 1040, height: 700), presentation: true) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: st + "window.addItems([{kind:'move_ask',n:5,topic:'Support rollout',section:'sl5'}]);", name: "p5-move-ask", size: NSSize(width: 560, height: 700), presentation: true) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: st + "window.addItems([{kind:'outline_pos',cur:'sl7',slide:7},{kind:'timeline',plan:1500,elapsed:860,slide:7,slide_el:30,slide_sec:90,behind:40,advice:null}]);", name: "p5-colleague", size: NSSize(width: 560, height: 640), presentation: true) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: st + "window.addItems([{kind:'outline_pos',cur:'sl9',slide:9}]);", name: "p5-handoff", size: NSSize(width: 560, height: 700), presentation: true) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: st + "LiveTips.setMode('compact');", name: "p5-compact-380", size: NSSize(width: 380, height: 360), presentation: true) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setStatus({state:'recording',call_type:'presentation',title:'Orbit pilot review',system_audio:'ok',mic:'ok',started_at:new Date(Date.now()-40000).toISOString()});document.getElementById('moreBtn').click();", name: "p5-empty-menu", size: NSSize(width: 560, height: 560)) }
+        // P6: rehearsal (intro).
+        steps.append { [unowned self] in self.window("p6-rehearsal-\(theme)") { RehearsalWindow.show(base: Self.talkBase, title: "Orbit pilot review") } }
+        // P7: right after End call.
+        let after = "window.setStatus({state:'stopped',title:'Orbit weekly with the client'});LiveTips.setAfter({title:'Orbit weekly with the client',when:'Today 10:00',dur:'32 min',people:'Emily Clark, David Kim',notion:'https://www.notion.so/demo',series:{name:'Orbit weekly with the client',n:4,next:'Fri 10:00'},decisions:['Pilot starts 4 Nov with 3 teams','Support joins after SSO'],onMe:['Send the test account list by Fri'],open:['Who signs off the security review'],draft:{subject:'Orbit weekly, 29 Oct: summary',body:'Hi Emily, David,\\n\\nThanks for today. We agreed the pilot starts on 4 Nov with three teams, and support joins once SSO is ready. I will send the test account list by Friday. One open point: who signs off the security review on your side?\\n\\nBest, Mike',busy:false,error:'',instructions:[]},lessons:2});"
+        steps.append { [unowned self] in self.tipsExtra(theme, js: after, name: "p7-after-call", size: NSSize(width: 560, height: 900)) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: after.replacingOccurrences(of: "draft:{subject", with: "draftX:{subject"), name: "p7-write-draft", size: NSSize(width: 560, height: 700)) }
+        // The title bar: End call, then Ended + New call (the window's own button height, line and inset).
+        steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "titlebar-live", size: NSSize(width: 560, height: 300)) }
+        steps.append { [unowned self] in
+            var pa = prompterArgs(["LiveTips", "--prompter-demo"]); pa.title = "Orbit weekly with the client"
+            let c = PrompterController(args: pa); c.show(); self.keep.append(c)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [self] in
+                c.showCallEnded(["saved": true, "file": "/tmp/demo.md", "lines": 42])
+                c.window.setContentSize(NSSize(width: 560, height: 300))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [self] in
+                    capture(c.window, "titlebar-ended-\(theme)", web: c.web) { [self] in c.window.close(); next() }
+                }
+            }
+        }
+        // P8: recording problems.
+        let rec = "window.setStatus({state:'recording',title:'Orbit weekly with the client',system_audio:'ok',mic:'ok',started_at:new Date(Date.now()-900000).toISOString()});"
+        steps.append { [unowned self] in self.tipsExtra(theme, js: rec + "window.setStatus({state:'recording',title:'Orbit weekly with the client',system_audio:'silent',mic:'ok',mic_silent_s:1,call_silent_s:42,mic_level:0.45,call_level:0,started_at:new Date(Date.now()-900000).toISOString()});", name: "p8-cant-hear", size: NSSize(width: 560, height: 620)) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: rec + "window.setStatus({state:'recording',title:'Orbit weekly with the client',system_audio:'silent',mic:'silent',mic_silent_s:38,call_silent_s:41,mic_level:0,call_level:0,started_at:new Date(Date.now()-900000).toISOString()});", name: "p8-not-recording", size: NSSize(width: 560, height: 620)) }
     }
 }

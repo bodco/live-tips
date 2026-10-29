@@ -468,6 +468,20 @@ class Segmenter:
         return max(self.peak_window) if self.peak_window else 0.0
 
 
+def audio_levels(segs: dict, heard_at: dict, t: float) -> dict:
+    """0.8.5 (rules/recording.yaml): the Mic and Call levels (0..1) and how long each side has been silent, for the
+    recording problems state (30 s). A muted microphone is not silence."""
+    out = {}
+    for ch, key, thr in (("me", "mic", 0.001), ("them", "call", 0.0005)):
+        sg = segs.get(ch)
+        peak = sg.recent_peak() if sg is not None else 0.0
+        if peak > thr or (sg is not None and getattr(sg, "muted", False)):
+            heard_at[ch] = t
+        out[key + "_level"] = round(min(1.0, peak * 20), 2)
+        out[key + "_silent_s"] = int(max(0.0, t - heard_at.get(ch, t)))
+    return out
+
+
 # --------------------------------------------------------------------------- Whisper (MLX)
 
 class Whisper:
@@ -777,7 +791,9 @@ def parse_slides(data) -> list[dict]:
                     "who": who if who in ("me", "shared", "other") else "other",
                     "speaker": _s(x.get("speaker")), "sec": sec, "body": body,
                     "numbers": _strs(x.get("numbers"))[:6],      # 2026-10-23: the figures of this slide, shown on the card
-                    "qa": parse_qa(x.get("qa"))})
+                    "qa": parse_qa(x.get("qa")),
+                    # 0.8.5 (rules/presentation.yaml): optional, old files stay valid
+                    "skip": x.get("skip") is True, "short": _s(x.get("short"))[:200], "edited": x.get("edited") is True})
     return out
 
 
@@ -1181,6 +1197,90 @@ def timeline_text(t_plan: float, total: float, span: tuple[int, int] | None) -> 
     return f"⏱ {fmt_mmss(t_plan)} {L('з', 'of')} {fmt_mmss(total)} · {tail}"
 
 
+def timeline_line(elapsed: float, total: float, behind: float | None) -> str:
+    """0.8.5: "⏱ 9:40 з 25:00 · відстаєте 1 хв", from the same Behind the window shows (rules/presentation.yaml)."""
+    tail = L("за планом", "on plan")
+    if behind is not None and behind >= 60:
+        tail = L(f"відстаєте {round(behind / 60)} хв", f"{round(behind / 60)} min behind")
+    elif behind is not None and behind <= -60:
+        tail = L(f"випереджаєте {round(-behind / 60)} хв", f"{round(-behind / 60)} min ahead")
+    return f"⏱ {fmt_mmss(elapsed)} {L('з', 'of')} {fmt_mmss(total)} · {tail}"
+
+
+# 0.8.5 (rules/presentation.yaml > time_line, time_advice): computed here once, shown by the skill's window
+# and by the app's window alike.
+ADVICE_SHORT_S = 20
+
+
+def slide_plan(slides: list[dict], extra: dict | None = None) -> dict[int, tuple[int, int]]:
+    """n -> (planned start s, budget s) on the cumulative timeline; +30 s additions included."""
+    extra = extra or {}
+    out, acc = {}, 0
+    for sl in sorted((x for x in slides if isinstance(x.get("n"), int)), key=lambda x: x["n"]):
+        sec = int(sl.get("sec") or 0) + int(extra.get(sl["n"], 0))
+        out[sl["n"]] = (acc, sec)
+        acc += sec
+    return out
+
+
+def behind_s(plan: dict, cur_n: int | None, slide_start: float | None, elapsed: float) -> float | None:
+    """How late the PM is: late at the start of the current slide plus the overrun on it. Negative = ahead."""
+    if cur_n not in plan or slide_start is None:
+        return None
+    start, sec = plan[cur_n]
+    return (slide_start - start) + max(0.0, (elapsed - slide_start) - sec)
+
+
+def time_advice(slides: list[dict], cur_n: int | None, behind: float | None, extra: dict | None = None,
+                short_s: int = ADVICE_SHORT_S) -> dict | None:
+    """One advice for the PM's slides not reached yet: skip the fewest "can skip" slides that cover the time
+    behind, else shorten the longest ones (as many as needed, at most 2 named). Never about a colleague."""
+    if behind is None or behind < 60 or cur_n is None:
+        return None
+    by_n = {s["n"]: s for s in slides if isinstance(s.get("n"), int)}
+    if by_n.get(cur_n, {}).get("who") == "other":
+        return None
+    sec = lambda x: int(x.get("sec") or 0) + int((extra or {}).get(x["n"], 0))  # noqa: E731
+    future = [x for x in by_n.values() if x["n"] > cur_n and x.get("who", "me") == "me"]
+    pick, acc = [], 0
+    for x in sorted((x for x in future if x.get("skip")), key=lambda x: (-sec(x), x["n"])):
+        pick.append(x["n"])
+        acc += sec(x)
+        if acc >= behind:
+            return {"kind": "skip", "slides": sorted(pick)}
+    pick, acc = [], 0
+    for x in sorted(future, key=lambda x: (-sec(x), x["n"])):
+        save = sec(x) - short_s
+        if save <= 0:
+            continue
+        pick.append(x["n"])
+        acc += save
+        if acc >= behind:
+            break
+    if not pick:
+        return None
+    named = sorted(pick[:2])
+    return {"kind": "shorten", "slides": named, "short": {n: _s(by_n[n].get("short")) for n in named}}
+
+
+def advice_text(adv: dict | None) -> str:
+    if not adv:
+        return ""
+    ns = adv.get("slides") or []
+    if adv["kind"] == "skip":
+        if len(ns) == 1:
+            return L(f"Пропустіть слайд {ns[0]}, щоб наздогнати. Його позначено «можна пропустити».",
+                     f"Skip slide {ns[0]} to catch up. It is marked as can skip.")
+        lst = ", ".join(str(n) for n in ns)
+        return L(f"Пропустіть слайди {lst}, щоб наздогнати.", f"Skip slides {lst} to catch up.")
+    out = []
+    for n in ns:
+        sh = (adv.get("short") or {}).get(n) or ""
+        out.append(L(f"Слайд {n}: скажіть лише «{sh}»", f'Slide {n}: say only "{sh}"') if sh else
+                   L(f"Скоротіть слайд {n} до однієї фрази, щоб наздогнати.", f"Shorten slide {n} to one sentence to catch up."))
+    return " ".join(out)
+
+
 QA_CUE = re.compile(r"\?|питан|вопрос|question|чому|почему|why|what|how|як\b|що\b|чи\b", re.I)
 
 
@@ -1238,12 +1338,22 @@ class Outline:
         self.t0_plan = 0.0
         self.last_timeline = 0.0
         self.handoffs_done: set = set()
+        # 0.8.5 (rules/presentation.yaml): the current slide, +30 s additions, B asks, A following, advice
+        self.slide_n: int | None = None
+        self.slide_t: float | None = None       # when the current slide started (wall clock)
+        self.extra: dict[int, int] = {}
+        self.ask: tuple | None = None            # (section index, slide n) waiting for the PM's answer
+        self.declined: dict[int, float] = {}     # section index -> when "no" was answered
+        self.follow = ""                         # "keynote" | "powerpoint" while the app follows the deck (A)
+        self.checkpoints: set = set()
+        self.last_advice = None
 
     def refresh(self) -> None:
         """Same contract as FactBook.refresh: never raises, mtime only after a good parse."""
         try:
             m = self.path.stat().st_mtime
         except OSError:
+            self._from_slides()
             return
         if m == self.mtime:
             return
@@ -1266,6 +1376,25 @@ class Outline:
     def _slides(self) -> list[dict]:
         return self.slides_src.slides if self.slides_src is not None else []
 
+    def _from_slides(self) -> None:
+        """0.8.5: no outline.json (a deck attached during the call, or a talk without one): one section per slide,
+        its keywords from the slide's own words, so Previous / Next, the time line and the advice still work."""
+        src = self.slides_src
+        if src is None or not src.slides or self.mtime == ("slides", src.mtime):
+            return
+        secs = []
+        for x in src.slides:
+            words = tokens(x["title"] + " " + " ".join(b["t"] for b in x.get("body", [])))
+            kw = sorted(set(words), key=lambda w: (-len(w), w))[:8]
+            secs.append({"id": f"sl{x['n']}", "title": x["title"], "keywords": kw, "slides": [x["n"], x["n"]],
+                         "who": x.get("who") if x.get("who") == "other" else "me"})
+        self.sections = parse_outline(secs)
+        self.weights = keyword_weights([set(tokens(" ".join(x["keywords"]))) for x in self.sections])
+        self.mtime, self.plan_key = ("slides", src.mtime), None
+        if self.cur >= len(self.sections):
+            self.cur = len(self.sections) - 1
+        log(f"outline: {len(self.sections)} sections from the slides (no outline.json)")
+
     def _plan(self) -> None:
         key = (self.mtime, self.slides_src.mtime if self.slides_src is not None else None)
         if key == self.plan_key:
@@ -1281,21 +1410,27 @@ class Outline:
         cur = min(self.cur, len(self.sections) - 1)
         _append_json(self.tips, {"kind": "outline_pos", "at": hhmmss(now()),
                                  "cur": self.sections[cur].get("id") if cur >= 0 else None,
-                                 "next": self.sections[cur + 1].get("id") if cur + 1 < len(self.sections) else None})
+                                 "next": self.sections[cur + 1].get("id") if cur + 1 < len(self.sections) else None,
+                                 "slide": self.slide_n, "follow": self.follow or None})
 
     def _t_plan(self, t: float) -> float | None:
         return None if self.t0 is None else self.t0_plan + (t - self.t0)
 
-    def _move(self, i: int, t: float, paused: bool) -> None:
+    def _move(self, i: int, t: float, paused: bool, slide: int | None = None) -> None:
         if self.t0 is None and self.who[i] == "me":
             self.t0 = t
             sp = self.spans[i] if i < len(self.spans) else None
             self.t0_plan = float(sp[0]) if sp else 0.0
-        self.cur, self.back_cand = i, None
+        self.cur, self.back_cand, self.ask = i, None, None
         self.recent, self.recent_them = [], []
+        r = section_slide_range(self.sections[i])
+        new_n = slide if slide is not None else (r[0] if r else None)
+        if new_n != self.slide_n:
+            self.slide_n, self.slide_t = new_n, t
         self._emit()
         if paused or not presenting_quiet():
             return
+        self._timeline(t, advise=True)
         nxt = handoff_slide(self.sections[i], self._slides()) if self.who[i] == "other" else None
         if nxt and nxt.get("n") not in self.handoffs_done:
             self.handoffs_done.add(nxt.get("n"))
@@ -1326,25 +1461,108 @@ class Outline:
             if self.back_cand != i:
                 self.back_cand = i
                 return
+        if self.cur >= 0 and self.who[i] != "other":
+            self._ask(i, line.t)                # 0.8.5, sync B: the PM confirms a move to one of the PM's slides
+            return
         self._move(i, line.t, paused)
 
-    def tick(self, t: float) -> None:
-        """Every 60 s in presentation mode: one time line under Now (kind "timeline")."""
-        if not presenting_quiet() or self.t0 is None or not self.sections or t - self.last_timeline < 60:
+    def _first_slide(self, i: int) -> int | None:
+        r = section_slide_range(self.sections[i])
+        return r[0] if r else i + 1
+
+    def _ask(self, i: int, t: float) -> None:
+        """'Move to slide N?' once per candidate; not while the app follows the deck; 60 s quiet after a no."""
+        if self.follow or (self.ask and self.ask[0] == i) or now() - self.declined.get(i, -1e9) < 60:
+            return
+        n = self._first_slide(i)
+        self.ask = (i, n)
+        _append_json(self.tips, {"kind": "move_ask", "at": hhmmss(now()), "n": n,
+                                 "section": self.sections[i].get("id"), "topic": _s(self.sections[i].get("title"))})
+
+    def _section_of(self, n: int) -> int | None:
+        for i, x in enumerate(self.sections):
+            r = section_slide_range(x)
+            if r and r[0] <= n <= r[1]:
+                return i
+        return n - 1 if 0 < n <= len(self.sections) and not any(section_slide_range(x) for x in self.sections) else None
+
+    def set_slide(self, n: int, source: str = "manual", paused: bool = False) -> None:
+        """The window moved to slide n (Previous / Next, a shortcut, or the app following Keynote or PowerPoint)."""
+        if source in ("keynote", "powerpoint"):
+            self.follow = source
+        elif source == "speech":
+            self.follow = ""
+        if not self.sections:
             return
         self._plan()
-        if not any(self.spans):
+        i = self._section_of(n)
+        if i is None:
+            return
+        self._move(i, now(), paused, slide=n)
+
+    def answer_move(self, value: str, paused: bool = False) -> None:
+        """inbox slide_move = "yes|<n>" or "no|<n>"."""
+        yes, _, n = _s(value).partition("|")
+        if not self.ask:
+            return
+        i, asked = self.ask
+        if n.strip().isdigit() and int(n) != asked:
+            return
+        if yes.lower() == "yes":
+            self._move(i, now(), paused, slide=asked)
+        else:
+            self.declined[i] = now()
+            self.ask = None
+
+    def add30(self, n: int) -> None:
+        self.extra[n] = self.extra.get(n, 0) + 30
+        self._timeline(now(), advise=False, force=True)
+
+    def tick(self, t: float) -> None:
+        """Every 60 s in presentation mode: one time line under Now (kind "timeline"); the advice also at the
+        checkpoints (two thirds of the plan, 5 minutes before its end)."""
+        if not presenting_quiet() or self.t0 is None or not self.sections:
+            return
+        plan = slide_plan(self._slides(), self.extra)
+        total = sum(v[1] for v in plan.values())
+        el = self._t_plan(t) or 0.0
+        cps = [c for c, at in (("two_thirds", total * 2 / 3), ("five_min", total - 300)) if total and el >= at > 0]
+        new_cp = [c for c in cps if c not in self.checkpoints]
+        self.checkpoints.update(new_cp)
+        if t - self.last_timeline < 60 and not new_cp:
+            return
+        self._timeline(t, advise=bool(new_cp))
+
+    def _timeline(self, t: float, advise: bool, force: bool = False) -> None:
+        if not presenting_quiet() or self.t0 is None or not self.sections:
+            return
+        self._plan()
+        if not any(self.spans) and not self._slides():
             return
         self.last_timeline = t
         meta_total = self.slides_src.total_min if self.slides_src is not None else None
+        plan = slide_plan(self._slides(), self.extra)
         try:
             total = float(meta_total) * 60 if meta_total else 0.0
         except (TypeError, ValueError):
             total = 0.0
-        total = total or float(sum(int(s.get("sec") or 0) for s in self._slides()))
-        sp = self.spans[self.cur] if 0 <= self.cur < len(self.spans) else None
-        _append_json(self.tips, {"kind": "timeline", "at": hhmmss(now()),
-                                 "text": timeline_text(self._t_plan(t) or 0.0, total, sp)})
+        total = float(sum(v[1] for v in plan.values())) or total
+        el = self._t_plan(t) or 0.0
+        start_pl = self._t_plan(self.slide_t) if self.slide_t is not None else None
+        behind = behind_s(plan, self.slide_n, start_pl, el)
+        if advise:
+            self.last_advice = time_advice(self._slides(), self.slide_n, behind, self.extra)
+        elif behind is None or behind < 60 or (self.who and 0 <= self.cur < len(self.who) and self.who[self.cur] == "other"):
+            self.last_advice = None             # caught up, or a colleague speaks: the line goes away
+        text = timeline_line(el, total, behind)
+        adv = advice_text(self.last_advice)
+        _append_json(self.tips, {"kind": "timeline", "at": hhmmss(now()), "text": text + (" · " + adv if adv else ""),
+                                 "plan": int(total), "elapsed": int(el), "slide": self.slide_n,
+                                 # 0.8.5: the slide's own countdown in both windows (seconds on it, its budget with +30 s)
+                                 "slide_el": None if start_pl is None else max(0, int(el - start_pl)),
+                                 "slide_sec": int(plan[self.slide_n][1]) if self.slide_n in plan else None,
+                                 "behind": None if behind is None else int(behind),
+                                 "advice": dict(self.last_advice, text=adv) if self.last_advice else None})
 
 
 class Slides:
@@ -3933,6 +4151,19 @@ def main() -> int:
             if key == "go":
                 go_live("Start pressed in the window")
                 continue
+            if key in ("slide", "slide_move", "slide_add30"):
+                # 0.8.5 (rules/presentation.yaml > slide_sync): the current slide from the window or the deck app,
+                # the answer to "Move to slide N?", +30 s for a slide.
+                v = _s(val)
+                if key == "slide":
+                    n, _, src = v.partition("|")
+                    if n.strip().isdigit():
+                        outline.set_slide(int(n), src.strip() or "manual", flags["tips_paused"])
+                elif key == "slide_move":
+                    outline.answer_move(v, flags["tips_paused"])
+                elif v.strip().isdigit():
+                    outline.add30(int(v))
+                continue
             if key == "call_lang" and isinstance(val, str) and val not in LANG_SETS and re.fullmatch(r"[a-z]{2,3}(\+[a-z]{2,3}){0,4}", val):
                 # 2026-10-27: any Whisper language or a set of them ("es", "de+en"); the first is the main one.
                 codes = val.split("+")
@@ -4143,6 +4374,7 @@ def main() -> int:
             threading.Thread(target=answer, daemon=True).start()
 
     last_status = 0.0
+    heard_at = {"me": now(), "them": now()}     # 0.8.5 (rules/recording.yaml): when each side last had sound
     while not stop_ev.is_set():
         time.sleep(0.5)
         writer.tick()
@@ -4224,6 +4456,7 @@ def main() -> int:
                           mic_auto_switched=caps[0].auto_switched,
                           mic_inputs=MIC_INPUTS[0],
                           system_audio="ok" if segs["them"].recent_peak() > 0.0005 else "silent",
+                          **audio_levels(segs, heard_at, now()),
                           listener_age_s=listener_age(),
                           noise_dropped={k: v.noise_dropped for k, v in segs.items()},
                           talk_me_pct=(round(100 * talk["me"] / (talk["me"] + talk["them"]))

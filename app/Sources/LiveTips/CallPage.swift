@@ -268,51 +268,43 @@ enum FollowUpWindow {
 
 struct FollowUpView: View {
     let file: String
-    @State private var subject = ""
-    @State private var bodyText = ""
-    @State private var busy = false
-    @State private var error = ""
+    @ObservedObject var model: FollowUpModel
+    @State private var instruction = ""
+
+    init(file: String) { self.file = file; self.model = FollowUpModel.of(file) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L("followup.note")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-            if busy {
+            if model.busy {
                 HStack(spacing: 8) { ProgressView().controlSize(.small); Text(L("followup.writing")).foregroundStyle(PN.C.text2) }
             }
-            if !error.isEmpty { Text(error).font(PN.Font.caption).foregroundStyle(PN.C.danger) }
-            TextField(L("followup.subject"), text: $subject).textFieldStyle(.roundedBorder)
-            TextEditor(text: $bodyText).font(PN.Font.body).frame(minHeight: 280)
-                .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(PN.C.text3.opacity(0.3)))
-            HStack(spacing: 8) {
-                Button(L("followup.copy")) {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString((subject.isEmpty ? "" : subject + "\n\n") + bodyText, forType: .string)
-                }.buttonStyle(.pnPrimary).disabled(bodyText.isEmpty)
-                Button(L("followup.mail")) { openMail() }.buttonStyle(.pnSecondary).disabled(bodyText.isEmpty)
-                Spacer()
-                Button(L("followup.again")) { generate() }.buttonStyle(.pnTertiary).disabled(busy)
+            if !model.error.isEmpty { Text(model.error).font(PN.Font.caption).foregroundStyle(PN.C.danger) }
+            if model.body.isEmpty && !model.busy {
+                Button(L("after.write")) { model.write() }.buttonStyle(.pnPrimary)
+                let n = Learning.standing(EditLog.all(), kinds: ["followup_instruction", "followup_edit"]).count
+                if n > 0 { Text(L("after.lessons", ["n": "\(n)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+            } else {
+                TextField(L("followup.subject"), text: $model.subject).textFieldStyle(.roundedBorder)
+                TextEditor(text: $model.body).font(PN.Font.body).frame(minHeight: 260)
+                    .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(PN.C.text3.opacity(0.3)))
+                HStack(spacing: 8) {
+                    TextField("", text: $instruction, prompt: Text(L("after.instruct"))).textFieldStyle(.roundedBorder)
+                        .onSubmit { model.revise(instruction); instruction = "" }
+                    Button(L("after.rewrite")) { model.revise(instruction); instruction = "" }.buttonStyle(.pnSecondary)
+                        .disabled(instruction.trimmingCharacters(in: .whitespaces).isEmpty || model.busy)
+                }
+                HStack(spacing: 8) {
+                    Button(L("after.copy")) { model.copy() }.buttonStyle(.pnPrimary).disabled(model.body.isEmpty)
+                    Button(L("after.openMail")) { model.openMail() }.buttonStyle(.pnSecondary).disabled(model.body.isEmpty)
+                    Text(L("after.neverSends")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Spacer()
+                    Button(L("followup.again")) { model.write() }.buttonStyle(.pnTertiary).disabled(model.busy)
+                }
             }
         }
         .padding(20)
         .background(PN.C.bg)
-        .onAppear { if bodyText.isEmpty { generate() } }
-    }
-
-    private func generate() {
-        busy = true; error = ""
-        let c = AppConfig.load(from: AppPaths.config)
-        PyTool.run("followup", ["--md", file, "--lang", FollowUpWindow.language(of: file), "--model", c.models.tip]) { r in
-            busy = false
-            if (r["ok"] as? Bool) == true {
-                subject = r["subject"] as? String ?? ""; bodyText = r["body"] as? String ?? ""
-            } else { error = L("followup.failed", ["err": r["error"] as? String ?? ""]) }
-        }
-    }
-
-    /// A mailto link: Mail opens a new message with the text; the PM adds the people and sends it.
-    private func openMail() {
-        var u = URLComponents(); u.scheme = "mailto"; u.path = ""
-        u.queryItems = [URLQueryItem(name: "subject", value: subject), URLQueryItem(name: "body", value: bodyText)]
-        if let url = u.url { NSWorkspace.shared.open(url) }
+        .onDisappear { model.logHandEdits() }
     }
 }

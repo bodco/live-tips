@@ -1073,6 +1073,10 @@ struct SettingsView: View {
                 ShortcutRow(action: .mute)
                 ShortcutRow(action: .compact)
                 ShortcutRow(action: .proactive)
+                ShortcutRow(action: .presentation)
+                ShortcutRow(action: .prevSlide)
+                ShortcutRow(action: .nextSlide)
+                ShortcutRow(action: .add30)
             } header: { Text(L("set.shortcuts")) } footer: {
                 Text(L("set.theyWorkFromAny"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)

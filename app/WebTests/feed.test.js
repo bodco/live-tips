@@ -193,5 +193,85 @@ test('a risk is one quiet card without the label in its text', () => {
   assert.strictEqual(rs[0].say, 'if the API slips, the pilot moves a week');
 });
 
+// 0.8.5 (rules/presentation.yaml): the recorder writes the time line and the advice once; the window shows the advice
+// text verbatim. The cases are the shared fixture the recorder's tests use (rules/fixtures/presentation-advice.json).
+const FIX = require(path.join(__dirname, '../../rules/fixtures/presentation-advice.json'));
+test('presentation: the advice from the shared fixture is shown verbatim, steps keep who, skip and short', () => {
+  for (const c of FIX.cases.filter((x) => x.expect)) {
+    for (const lang of ['en', 'uk']) {
+      const { f, get } = make();
+      f.addItems([{ kind: 'slides', slides: FIX.slides }]);
+      const text = c.expect[lang];
+      f.addItems([{ kind: 'timeline', t: '10:40:00', at: '10:40:00', text: '12:30 of 25:00 · ' + text, plan: 1500, elapsed: 750, behind: c.behind, slide: c.cur,
+                    slide_el: 20, slide_sec: 120, advice: { kind: c.expect.kind, slides: c.expect.slides, text } }]);
+      const st = get();
+      assert.strictEqual(st.pres.timeline.advice.text, text, `case cur ${c.cur} behind ${c.behind} ${lang}`);
+      assert.strictEqual(st.pres.slide, c.cur);
+      assert.strictEqual(st.pres.slideRx, NOW - 20000);
+    }
+  }
+  const { f, get } = make();
+  f.addItems([{ kind: 'slides', slides: FIX.slides }]);
+  const steps = get().steps;
+  assert.strictEqual(steps.length, FIX.slides.length);
+  const five = steps.find((x) => x.n === 5), six = steps.find((x) => x.n === 6);
+  assert.strictEqual(five.who, 'other'); assert.ok(five.speaker);
+  assert.strictEqual(six.canSkip, true);
+  assert.ok(steps.find((x) => x.n === 3).short);
+});
+
+test('presentation: Move to slide N? is kept until answered or the slide moves', () => {
+  const { f, get } = make();
+  f.addItems([{ kind: 'slides', slides: FIX.slides }, { kind: 'move_ask', n: 3, topic: 'Results', section: 's3' }]);
+  assert.deepStrictEqual(get().pres.moveAsk, { n: 3, topic: 'Results', section: 's3' });
+  f.addItems([{ kind: 'outline_pos', cur: 's2', slide: 2 }]);
+  assert.ok(get().pres.moveAsk === null);
+  f.addItems([{ kind: 'move_ask', n: 3, topic: 'Results' }]);
+  const a = f.answerMove(true);
+  assert.strictEqual(a.n, 3); assert.strictEqual(get().pres.slide, 3); assert.strictEqual(get().pres.moveAsk, null);
+  f.addItems([{ kind: 'outline_pos', cur: 's3', slide: 3, follow: 'keynote' }]);
+  assert.strictEqual(get().pres.follow, 'keynote');
+});
+
+test('presentation: a Presentation call without a deck is still presentable (empty state)', () => {
+  const { f, get } = make();
+  f.setStatus({ state: 'recording', call_type: 'presentation' });
+  assert.strictEqual(get().call.presType, true);
+  assert.strictEqual(get().call.presenting, false);
+  assert.strictEqual(get().call.presentable, true);
+});
+
+test('recording problems: a system state after 30 s, cleared by itself (rules/recording.yaml)', () => {
+  const { f, get } = make();
+  f.setStatus({ state: 'recording', system_audio: 'ok', mic_silent_s: 2, call_silent_s: 29, mic_level: 0.3, call_level: 0 });
+  assert.strictEqual(get().sys, null);
+  f.setStatus({ state: 'recording', system_audio: 'silent', mic_silent_s: 2, call_silent_s: 31, mic_level: 0.3, call_level: 0 });
+  assert.strictEqual(get().sys.kind, 'cantHear'); assert.strictEqual(get().call.alert, null);
+  f.setStatus({ state: 'recording', system_audio: 'silent', mic_silent_s: 40, call_silent_s: 45, mic_level: 0, call_level: 0 });
+  assert.strictEqual(get().sys.kind, 'notRecording'); assert.ok(/^\d\d:\d\d$/.test(get().sys.at));
+  f.setStatus({ state: 'recording', system_audio: 'ok', mic_silent_s: 0, call_silent_s: 0, mic_level: 0.2, call_level: 0.1 });
+  assert.strictEqual(get().sys, null);
+});
+
+test('speakers: the voice library suggestions of a speaker_ask are kept for one-click naming', () => {
+  const { f, get } = make();
+  f.setSpeakers({ clusters: { S4: { name: null, seconds: 19 } }, roster: [{ name: 'Anton S.', side: 'team' }] });
+  f.addItems([{ kind: 'speaker_ask', sid: 'S4', quote: 'hello', suggestions: [{ name: 'Anton S.', score: 0.85 }, { name: 'Low', score: 0.3 }], known: ['Anton S.', 'a.sorokin', 'Olena S.'] }]);
+  const st = get();
+  assert.deepStrictEqual(st.speakers.S4.suggestions, [{ name: 'Anton S.', score: 0.85 }]);
+  assert.strictEqual(st.rosterSide['Anton S.'], 'team');
+  assert.deepStrictEqual(st.knownNames, ['Anton S.', 'Olena S.']);
+});
+
+test('brief: numbered points, paragraphs, wrapped lines and tables are kept (each point keeps its sentences)', () => {
+  const { f, get } = make();
+  f.setPrepDoc({ text: '# Live Brief: X\n\n**Goal:** agree the plan.\n\n## Previous meetings\n1. Export scope agreed. Emily asked\n   for test accounts.\nA paragraph about risks.\n\n## Table\n| Who | What |\n|---|---|\n| Ann | Deck |\n\n## Checklist\n- [ ] Confirm the date\n', at: '09:40' });
+  const b = get().brief;
+  assert.strictEqual(b.goal, 'agree the plan.');
+  assert.deepStrictEqual(b.sections[0].items, ['Export scope agreed. Emily asked for test accounts.', 'A paragraph about risks.']);
+  assert.deepStrictEqual(b.sections[1].items, ['Who · What', 'Ann · Deck']);
+  assert.strictEqual(get().agenda[0].title, 'Confirm the date');
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

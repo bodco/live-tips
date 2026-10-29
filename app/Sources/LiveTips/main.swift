@@ -148,7 +148,8 @@ func prompterArgs(_ args: [String]) -> PrompterArgs {
             #"{"t":"10:40:00","kind":"wrapup","uid":"call-picture","level":"info","gist":"📋 Call summary","items":["Decision: export goes to production on Tuesday","On me: send the test account list (today)","Not said from the speech: Blocker: test accounts from the client"],"note":"from the call picture, unchecked","engine":"app"}"#,
         ]
         if a.demoPresentation {
-            demo.insert(#"{"t":"10:29:00","kind":"slides","title":"Pilot plan","total_min":6,"slides":[{"n":1,"title":"Why a pilot","sec":90,"who":"me","body":[{"k":"p","t":"Five users for two weeks show whether the export saves the team an hour a day."},{"k":"s","t":"Skip if short on time: the history of the request."}]},{"n":2,"title":"Plan and dates","sec":120,"who":"me","body":[{"k":"p","t":"Monday kick-off, daily check-ins, results on the 14th."}]},{"n":3,"title":"What we need from you","sec":90,"who":"me","body":[{"k":"p","t":"The list of five users and test accounts by Friday."}]}]}"#, at: 0)
+            // 0.8.5: the 14-slide demo talk, slide 4 now, 1:10 behind with one advice (P5).
+            demo.insert(contentsOf: DemoTalk.items(), at: 0)
         }
         // 0.8.1: the demo times move to now (the last item at now), so the cards read "2m", not "460m".
         let shift = Int(Date().timeIntervalSince(Calendar.current.startOfDay(for: Date()))) - (10 * 3600 + 40 * 60)

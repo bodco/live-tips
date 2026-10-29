@@ -313,13 +313,26 @@ struct HomeView: View {
                     else { PNBadge(text: L("home.ready.mostly", ["n": "\(todo)"]), kind: .stale) }
                 }
                 ForEach(checks) { c in checkRow(c) }
+                // 0.8.5 (P6, entry 2): a rehearsal row for presentation calls only.
+                if let m = r.model, m.callType == "presentation", let p = PrepDocWindow.path(for: m), TalkWindow.available(base: String(p.dropLast(9))) {
+                    let e = RehearsalWindow.entryLine(base: String(p.dropLast(9)))
+                    HStack(spacing: 10) {
+                        Image(systemName: "questionmark.circle").foregroundStyle(PN.C.text3)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(e.title).font(PN.Font.body).foregroundStyle(PN.C.text)
+                            if !e.sub.isEmpty { Text(e.sub).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                        }
+                        Spacer()
+                        Button(L("rehearse.button")) { RehearsalWindow.show(base: String(p.dropLast(9)), title: m.effectiveTitle, call: m) }.buttonStyle(.pnTertiary)
+                    }
+                }
             }
             HStack(spacing: 8) {
                 Button(L("home.startTips")) { start(r) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                 Button(L("home.editSetup")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) }.buttonStyle(.pnSecondary)
                 // Pacenote 0.8: the series page (idea 06) and a rehearsal of a presentation (idea 10).
-                if let m = r.model, m.callType == "presentation", let p = PrepDocWindow.path(for: m) {
-                    Button(L("rehearse.button")) { RehearsalWindow.show(base: String(p.dropLast(9)), title: m.effectiveTitle) }.buttonStyle(.pnTertiary)
+                if let m = r.model, m.callType == "presentation", let p = PrepDocWindow.path(for: m), TalkWindow.available(base: String(p.dropLast(9))) {
+                    Button(L("talk.open")) { TalkWindow.show(base: String(p.dropLast(9)), title: m.effectiveTitle, call: m) }.buttonStyle(.pnTertiary)
                 }
                 if let last = lastOfSeries(r), CallPageView.series(of: last).count > 0 {
                     Button(L("call.page.series", ["n": "\(CallPageView.series(of: last).count)"])) { SeriesWindow.show(record: last) }.buttonStyle(.pnTertiary)
@@ -687,26 +700,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(rs.enumerated()), id: \.element.id) { i, r in
                         if i > 0 { Divider() }
-                        let outcome = OutcomeCache.shared.outcome(r.file)?.line ?? ""
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1)
-                            Text([f.string(from: r.start), r.project].filter { !$0.isEmpty }.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
-                            if !outcome.isEmpty { Text(outcome).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(1) }
-                        }
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .onTapGesture { CallPageWindow.show(file: r.file) }       // 0.8: the call page (spec 4.4)
-                        .contextMenu {
-                            if let u = r.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
-                            Button(L("home.recent.transcript")) { TranscriptWindow.show(file: r.file) }
-                            Button(L("call.page.followup")) { FollowUpWindow.show(file: r.file) }
-                            if CallPageView.series(of: r).count > 1 { Button(L("call.page.series", ["n": "\(CallPageView.series(of: r).count)"])) { SeriesWindow.show(record: r) } }
-                            Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.file)]) }
-                            Divider()
-                            Button(L("home.recent.hide")) { history.hide(r) }
-                        }
-                        .help(L("home.recent.help.page"))
+                        RecentRow(r: r, when: f.string(from: r.start), outcome: OutcomeCache.shared.outcome(r.file)?.line ?? "") { history.hide(r) }
                     }
                 }
             }
@@ -747,5 +741,71 @@ struct HomeView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+
+/// 0.8.5 (P7, Home): a Recent row. Summary, Follow-up and Series show on hover and when the row's buttons get the
+/// keyboard focus (Tab); without them the row stays quiet. The Series pill explains the series rule.
+struct RecentRow: View {
+    let r: CallHistory.Record
+    let when: String
+    let outcome: String
+    var onHide: () -> Void
+    @State private var hover = false
+    @State private var why = false
+    @FocusState private var focus: Int?
+
+    var body: some View {
+        let series = CallPageView.series(of: r).count
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1)
+                    if series > 1 {
+                        Button { why = true } label: {
+                            Text(L("recent.seriesPill", ["n": "\(series)"])).font(PN.Font.caption).foregroundStyle(PN.C.accent)
+                                .padding(.horizontal, 6).padding(.vertical, 1).background(Capsule().fill(PN.C.accent.opacity(0.12)))
+                        }
+                        .buttonStyle(.plain).focused($focus, equals: 9)
+                        .popover(isPresented: $why, arrowEdge: .bottom) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(L("series.why")).font(PN.Font.section)
+                                Text(L("series.whyText")).font(PN.Font.body).fixedSize(horizontal: false, vertical: true)
+                                Button(L("series.open")) { why = false; SeriesWindow.show(record: r) }.buttonStyle(.pnSecondary)
+                            }
+                            .padding(14).frame(width: 320)
+                        }
+                    }
+                }
+                Text([when, r.project].filter { !$0.isEmpty }.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
+                if !outcome.isEmpty { Text(outcome).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(1) }
+            }
+            Spacer()
+            HStack(spacing: 4) {
+                Button(L("recent.summary")) {
+                    if let u = r.notionURL.flatMap({ URL(string: $0) }) { NSWorkspace.shared.open(u) } else { CallPageWindow.show(file: r.file) }
+                }.focused($focus, equals: 1)
+                Button(L("recent.followup")) { FollowUpWindow.show(file: r.file) }.focused($focus, equals: 2)
+                if series > 1 { Button(L("recent.series")) { SeriesWindow.show(record: r) }.focused($focus, equals: 3) }
+            }
+            .buttonStyle(.pnTertiary)
+            .opacity(hover || (focus != nil && focus != 9) ? 1 : 0)
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
+        .onTapGesture { CallPageWindow.show(file: r.file) }       // 0.8: the call page (spec 4.4)
+        .contextMenu {
+            if let u = r.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
+            Button(L("home.recent.transcript")) { TranscriptWindow.show(file: r.file) }
+            Button(L("call.page.followup")) { FollowUpWindow.show(file: r.file) }
+            if series > 1 { Button(L("call.page.series", ["n": "\(series)"])) { SeriesWindow.show(record: r) } }
+            Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.file)]) }
+            Divider()
+            Button(L("home.recent.hide"), action: onHide)
+        }
+        .help(L("home.recent.help.page"))
     }
 }

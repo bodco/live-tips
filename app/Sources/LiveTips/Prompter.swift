@@ -104,6 +104,11 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     var lastPrep = ""
     var ticker: Timer?               // stopped when the window closes (QA: closed windows kept reading files)
     var compactFrame: NSRect?        // the full window's frame while the compact strip is shown
+    // 0.8.5 (P5): presentation mode, sync A and the slide thumbnails
+    var presentingNow = false
+    var slideSync = SlideSync()
+    var thumbsFor = ""
+    var afterShown = false           // 0.8.5 (P7): the after-call screen is up; refreshed while the wrap-up finishes
 
     init(args: PrompterArgs) { self.args = args }
 
@@ -117,7 +122,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         prefs["ui_lang"] = MainActor.assumeIsolated { AppConfig.load(from: AppPaths.config).uiLanguage == "uk" ? "uk" : "en" }
         prefs["keys"] = ["help": HotKeys.shared.combo(.help).display, "pause": HotKeys.shared.combo(.pause).display,
                          "mute": HotKeys.shared.combo(.mute).display, "compact": HotKeys.shared.combo(.compact).display,
-                         "proactive": HotKeys.shared.combo(.proactive).display]
+                         "proactive": HotKeys.shared.combo(.proactive).display, "present": HotKeys.shared.combo(.presentation).display,
+                         "prev": HotKeys.shared.combo(.prevSlide).display, "next": HotKeys.shared.combo(.nextSlide).display,
+                         "add30": HotKeys.shared.combo(.add30).display]
         if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
             uc.addUserScript(WKUserScript(source: "window.LT_PREFS = " + js + ";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -170,6 +177,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async { [weak self] in self?.layoutTitleButtons() }   // the window buttons have their frames now
+        NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.layoutTitleButtons() }
+        }
 
         if !args.tips.isEmpty { tips = TailReader(path: args.tips) }
         ticker = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(tick),
@@ -182,6 +193,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             if !lines.isEmpty { push("window.addItems([" + lines.joined(separator: ",") + "])") }
         }
         ticks += 1
+        if presentingNow && ticks % 4 == 0 { pollSlides() }
+        if afterShown && ticks % 20 == 0 { pushAfter() }
         // 2026-10-27 (owner): the status every 0.5 s (was 2 s), so the dot turns red as soon as the recording runs.
         // Pacenote 0.8: the minutes left (the calendar event's end) ride along for the "N min left" card.
         if !args.status.isEmpty,
@@ -193,6 +206,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 lastStatus = s
                 push("window.setStatus(" + s + ")")
                 if let f = d["file"] as? String, !f.isEmpty, f != transcriptPath {
+                    // 0.8.5 (rules/meeting.yaml > tips_language): the window learns the meeting's language for its switch.
+                    let meeting: String = MainActor.assumeIsolated { CallEngine.tipsLang(CallEngine.shared.callRequest, ui: AppConfig.load(from: AppPaths.config).uiLanguage) }
+                    push("window.LiveTips && LiveTips.setTipsLang({meeting: '\(meeting)'})")
                     transcriptPath = f
                     transcript = TailReader(path: f)
                     speakersMtime = nil
@@ -205,7 +221,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 let r = PrepRunner.shared
                 var d: [String: Any] = ["state": "none"]
                 // Up next (2026-10-27): only the preparation of this call; an upcoming call's shows in Up next.
-                let mine = PrepRunner.joinsLiveCall(prepFor: r.callID, liveCall: CallEngine.shared.currentCallID)
+                let mine = r.joinsCurrentCall
                 if r.running && mine {
                     d = ["state": "running", "stage": r.stage, "detail": r.detail, "progress": r.progress]
                 } else if !transcriptPath.isEmpty, FileManager.default.fileExists(atPath: String(transcriptPath.dropLast(3)) + ".brief.md") {
@@ -524,14 +540,24 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         guard let h = titleHolder else { return }
         let views: [NSView] = [pinButton, startButton, endButton].compactMap { $0 }.filter { !$0.isHidden }
         let gap: CGFloat = 8
-        // 0.8 (owner): End call keeps ~20 pt from the right edge of the window.
-        let right: CGFloat = 20
+        // 0.8.5 (owner, 29.10): the call buttons match the window's own buttons (close, minimise, zoom): the same
+        // height, centred on the same line, and the same inset from the right edge as theirs from the left.
+        var right: CGFloat = 20, height: CGFloat = 22, centerY = h.frame.height / 2
+        if let close = window?.standardWindowButton(.closeButton), let sv = close.superview, close.frame.height > 0 {
+            right = close.frame.minX
+            height = max(14, close.frame.height)
+            centerY = h.convert(NSPoint(x: 0, y: close.frame.midY), from: sv).y
+        }
         let need = views.reduce(CGFloat(0)) { $0 + $1.frame.width } + gap * CGFloat(max(0, views.count - 1)) + 6 + right
         if abs(h.frame.width - need) > 0.5 { h.setFrameSize(NSSize(width: need, height: h.frame.height)) }
         var x = h.frame.width - right
         for v in views.reversed() {
+            if v !== pinButton, abs(v.frame.height - height) > 0.5 {
+                v.frame.size.height = height
+                v.layer?.cornerRadius = height / 2
+            }
             x -= v.frame.width
-            v.frame.origin = NSPoint(x: x, y: (h.frame.height - v.frame.height) / 2)
+            v.frame.origin = NSPoint(x: x, y: (centerY - v.frame.height / 2).rounded())
             x -= gap
         }
     }
@@ -664,6 +690,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     /// (2026-10-23: "I was afraid to close the app before it finished the call").
     func showCallEnded(_ info: [AnyHashable: Any]) {
         let saved = info["saved"] as? Bool ?? false
+        afterShown = saved
+        if saved { pushAfter() }
         if let b = endButton {                  // 2026-10-27: same pill style, green when saved (sizeToFit broke the shape)
             restylePill(b, saved ? L("tw.endedSaved") : L("tw.ended"), color: saved ? .systemGreen : .systemOrange)
             b.isEnabled = true                  // a click now closes the window
@@ -725,6 +753,14 @@ extension PrompterController {
                                 "after": ["text": d["text"] as? String ?? ""]] as [String: Any])
             // Pacenote 0.8: the engine adds a ticked action to the register already closed (rules/commitments.yaml).
             if let id = d["id"] as? String, id.hasPrefix("m:"), let t = d["text"] as? String, !t.isEmpty { sendSetting("onme_state", t + "|" + (done ? "done" : "open")) }
+        case "onme-fix":
+            // 0.8.5 (owner): an On me line reworded or "not mine": kept next to the transcript (the wrap-up takes it as true),
+            // logged for learning (EditLog card_onme_edit / card_onme_remove) and sent to the tips engine (onme_fix).
+            let text = d["text"] as? String ?? "", new = (d["newText"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+            guard !text.isEmpty else { return }
+            handle("cardedit", ["action": new.isEmpty ? "onme_remove" : "onme_edit", "kind": "onme", "key": d["id"] ?? "",
+                                "before": ["text": text], "after": ["text": new]] as [String: Any])
+            sendSetting("onme_fix", text + "|" + new)
         case "agenda":
             handle("cardedit", ["action": "agenda", "kind": "agenda", "key": d["id"] ?? "",
                                 "after": ["text": d["title"] as? String ?? "", "state": d["state"] as? String ?? ""]] as [String: Any])
@@ -732,9 +768,12 @@ extension PrompterController {
             if let id = d["id"] as? String, let st = d["state"] as? String { sendSetting("agenda_state", id + "|" + st) }
         case "after":
             // Pacenote 0.8: after the call, the call page or the follow-up email draft (nothing is sent).
+            // 0.8.5 (P7): the after-call screen in this window (Write draft, instruction edits, Copy, Open in Mail).
             let file = stem + ".md"
+            let item = d["item"] as? String ?? ""
+            if ["write", "revise", "edited", "copy", "mail", "notion", "series", "callpage", "done"].contains(item) { handleAfter(d); return }
             MainActor.assumeIsolated {
-                if (d["item"] as? String) == "followup" { FollowUpWindow.show(file: file) } else { CallPageWindow.show(file: file) }
+                if item == "followup" { FollowUpWindow.show(file: file) } else { CallPageWindow.show(file: file) }
             }
         case "commitment-done":
             // Pacenote 0.8: Mark done on a "Done?" card closes the open commitment in the register (source detected).
@@ -767,6 +806,21 @@ extension PrompterController {
                     PrepDocWindow.show(path: p, title: m.effectiveTitle)
                 }
             }
+        case "presenting":
+            presentingNow = d["on"] as? Bool ?? false
+            HotKeys.shared.setPresenting(presentingNow)
+            if presentingNow { pushThumbs() }
+        case "stop-follow":
+            slideSync.stopped = true
+            if let n = slideSync.last { sendSetting("slide", "\(n)|speech") }
+            push("window.LiveTips && LiveTips.setFollow(null)")
+        case "attach-deck":
+            attachDeckLive()
+        case "sys":
+            // 0.8.5 (P8; rules/recording.yaml): one action per state.
+            if (d["item"] as? String) == "check" {
+                if let u = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") { NSWorkspace.shared.open(u) }
+            } else { restartCall() }
         case "menu":
             switch d["item"] as? String ?? "" {
             case "clear-speakers": sendSetting("speakers_clear", true)
@@ -801,7 +855,8 @@ extension PrompterController {
         if on, compactFrame == nil {
             compactFrame = w.frame
             var f = w.frame
-            let size = NSSize(width: 560, height: 150)
+            // 0.8.5 (P5 states): compact presentation is a 380 px column (slide, countdown, behind, advice, one line).
+            let size = presentingNow ? NSSize(width: 380, height: 330) : NSSize(width: 560, height: 150)
             f.origin.y = f.maxY - size.height
             f.size = size
             w.minSize = NSSize(width: 360, height: 90)
@@ -839,5 +894,25 @@ extension PrompterController {
     }
     func setLanguage(_ l: String) {
         push("window.LiveTips && LiveTips.setLang('" + (l == "uk" ? "uk" : "en") + "')")
+    }
+}
+
+
+extension PrompterController {
+    /// End and restart (P8): the same call starts again with the same settings (a new recording; what was said is kept).
+    func restartCall() {
+        guard let app = NSApp.delegate as? AppDelegate else { return }
+        let id = CallEngine.shared.currentCallID
+        if let m = UpNext.shared.items.first(where: { $0.id == id }) ?? StartCallWindow.model.flatMap({ $0.id == id ? $0 : nil }) {
+            app.performSwitch(to: m)
+            return
+        }
+        let r = CallEngine.shared.callRequest
+        let m = StartCallModel()
+        m.title = r["title"] as? String ?? ""
+        if let slug = r["slug"] as? String, !slug.isEmpty { m.target = m.registry.projects.contains { $0.slug == slug } ? "project:" + slug : "workspace:" + (r["workspace"] as? String ?? "") }
+        m.callType = r["call_type"] as? String ?? "auto"
+        m.audience = r["audience"] as? String ?? "auto"
+        app.performSwitch(to: m)
     }
 }

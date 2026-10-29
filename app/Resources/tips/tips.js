@@ -34,9 +34,30 @@
         compact: 'Compact mode', full: 'Full window', present: 'Presentation mode', stopPresent: 'Stop presenting',
         transcript: 'Transcript', brief: 'Brief', settings: 'Call settings…', switchCall: 'Switch to next call…', clearSpeakers: 'Forget speaker names' },
       recap: 'Recap:',
+      after: { window: 'Call ended', meta: (o) => [o.when, o.dur, o.people].filter(Boolean).join(' · ') + (o.notion ? ' · summary saved to Notion' : ''),
+        series: (o) => `Part of a series: ${o.name}, call ${o.n}. Calls in this project with the same title are linked. Open items and agenda points not raised go into the next brief${o.next ? ', ' + o.next : ''}.`,
+        showSeries: 'Show series', decisions: (o) => `Decisions · ${o.n}`, onYou: (o) => `On you · ${o.n} · open questions · ${o.k}`,
+        draft: 'Follow-up draft', draftTo: (o) => `To ${o.people} · not sent`, write: 'Write draft', writing: 'Writing the draft…', instruct: 'What to change: "drop the pricing line", "shorter"',
+        rewrite: 'Rewrite', copy: 'Copy', openMail: 'Open in Mail', edit: 'Edit', neverSends: 'Pacenote never sends it for you', openNotion: 'Open in Notion', openCall: 'Open call page', done: 'Done',
+        lessons: (o) => `Uses ${o.n} of your recurring corrections`, copied: 'Copied' },
+      sys: { notRecording: 'Not recording', noAudio: 'No audio is captured', noAudioWhy: 'No sound from the microphone or the call for 30 s. Usually another app took the microphone, or macOS revoked access after an update.',
+        restart: 'End and restart', noAudioFoot: (o) => `Tips are off until audio comes back. What was said before ${o.t} is saved.`,
+        noOther: "Can't hear the other side", noOtherTitle: 'No call audio is coming in', noOtherWhy: 'Your microphone works, but there is no system audio from the call for 30 s. Most often the call plays through another device, or Pacenote lost access to system audio.',
+        check: 'Check audio', noOtherFoot: 'Your words are recorded. Tips about the other side are off until their audio comes back.', mic: 'Mic', call: 'Call' },
+      // 0.8.5 presentation mode (PRESENTATION-SPEC 2, keys pm.*)
+      pm: { slides: 'Slides', slideOf: (o) => `Slide ${o.i} of ${o.n}`, you: 'You', all: 'All', left: 'left on this slide', overSlide: 'over slide time', add30: '+30 s',
+        plan: (o) => `Plan ${o.t}`, elapsed: (o) => `Elapsed ${o.t}`, behind: (o) => `Behind ${o.t}`, ahead: (o) => `Ahead ${o.t}`,
+        updated: (o) => `updated ${o.t}`, asked: (o) => `${o.name} asked`, hide: 'Hide', now: (o) => `Now · ${o.n}`, next: (o) => `Next · ${o.n} · ${o.owner}`,
+        nextColleague: (o) => `After this slide ${o.name} presents ${o.range}. Tips go quiet until slide ${o.n}.`, prev: 'Previous', nextBtn: 'Next',
+        syncA: (o) => `Following ${o.app} · slide ${o.n}`, stopFollowing: 'Stop following', askMove: (o) => `Move to slide ${o.n}?`, why: (o) => `You are already talking about ${o.topic}.`,
+        go: 'Move', no: 'No', syncB: 'Slides follow your speech · asks before moving', colleague: (o) => `${o.name} is presenting`,
+        colleagueHint: (o) => `Tips stay quiet while ${o.name} speaks. Questions to you still get an answer card.`, turnIn: (o) => `Your turn in about ${o.t}`,
+        turnNext: (o) => `Your turn next · slide ${o.n}`, startWith: (o) => `Start with: "${o.line}"`, mode: 'Presentation mode', compactView: 'Compact view',
+        emptyTitle: 'No presentation attached', emptyText: 'Attach a file and Pacenote shows the slides, the time for each and answers to questions. Until then, tips work as on a regular call.',
+        attach: 'Attach presentation', slidesN: (o) => `${o.n} slides`, ofShort: (o) => `${o.i} of ${o.n}` },
       present: { next: 'Next', prev: 'Back', start: 'Start', nextUp: (t, s) => `Next: ${t} (${s})`, canSkip: 'Can skip if short on time' },
       doneQ: 'Done?', markDone: 'Mark done', onThem: 'On them', closed: 'Closed',
-      noItems: 'Nothing on you yet', close: 'Close', noBriefYet: 'No brief for this call yet.',
+      noItems: 'Nothing on you yet', notMine: 'Not mine', tipsIn: (o) => `Tips in ${o.l}, click for ${o.o}`, close: 'Close', noBriefYet: 'No brief for this call yet.',
       readyStatus: 'Ready', readyTitle: 'Ready when you are', startListening: 'Start listening', openBrief: 'Open brief',
       listeningTitle: 'Listening', listeningSub: (k) => `Tips show up here when they matter. Stuck? Press ${k}.`, onDevice: 'Audio stays on this Mac',
       searched: (o) => `You searched: ${o.q}`, shorterMeta: 'Shorter', applied: 'Settings applied', prepReady: 'The brief is ready',
@@ -66,8 +87,28 @@
         transcript: 'Транскрипт', brief: 'Бриф', settings: 'Налаштування дзвінка…', switchCall: 'Перейти до наступного дзвінка…', clearSpeakers: 'Забути імена спікерів' },
       recap: 'Підсумок:',
       doneQ: 'Зроблено?', markDone: 'Позначити зробленим', onThem: 'На них', closed: 'Закрито',
+      after: { window: 'Дзвінок завершено', meta: (o) => [o.when, o.dur, o.people].filter(Boolean).join(' · ') + (o.notion ? ' · підсумок збережено в Notion' : ''),
+        series: (o) => `Частина серії: ${o.name}, дзвінок ${o.n}. Дзвінки цього проєкту з тією самою назвою звʼязані. Відкриті обіцянки і пункти, до яких не дійшли, переходять у бриф наступного${o.next ? ', ' + o.next : ''}.`,
+        showSeries: 'Показати серію', decisions: (o) => `Рішення · ${o.n}`, onYou: (o) => `На вас · ${o.n} · відкриті питання · ${o.k}`,
+        draft: 'Чернетка листа-підсумку', draftTo: (o) => `Кому: ${o.people} · не надіслано`, write: 'Написати чернетку', writing: 'Пишу чернетку…', instruct: 'Що змінити: «прибери рядок про ціну», «коротше»',
+        rewrite: 'Переписати', copy: 'Копіювати', openMail: 'Відкрити в Mail', edit: 'Редагувати', neverSends: 'Pacenote ніколи не надсилає його за вас', openNotion: 'Відкрити в Notion', openCall: 'Сторінка дзвінка', done: 'Готово',
+        lessons: (o) => `Враховує ваші повторювані правки: ${o.n}`, copied: 'Скопійовано' },
+      sys: { notRecording: 'Запис не йде', noAudio: 'Звук не записується', noAudioWhy: '30 с немає звуку ні з мікрофона, ні з дзвінка. Найчастіше мікрофон зайняв інший застосунок або macOS забрав доступ після оновлення.',
+        restart: 'Завершити і почати знову', noAudioFoot: (o) => `Підказки вимкнені, поки звук не повернеться. Сказане до ${o.t} збережено.`,
+        noOther: 'Не чую співрозмовника', noOtherTitle: 'Звук дзвінка не надходить', noOtherWhy: 'Ваш мікрофон працює, але системного звуку дзвінка немає 30 с. Найчастіше дзвінок іде через інший пристрій або Pacenote втратив доступ до системного звуку.',
+        check: 'Перевірити звук', noOtherFoot: 'Ваші слова записуються. Підказки про співрозмовника вимкнені, поки звук не повернеться.', mic: 'Мікр.', call: 'Дзвінок' },
+      pm: { slides: 'Слайди', slideOf: (o) => `Слайд ${o.i} з ${o.n}`, you: 'Ви', all: 'Усі', left: 'лишилось на слайді', overSlide: 'понад час слайда', add30: '+30 с',
+        plan: (o) => `План ${o.t}`, elapsed: (o) => `Минуло ${o.t}`, behind: (o) => `Відставання ${o.t}`, ahead: (o) => `Випереджаєте на ${o.t}`,
+        updated: (o) => `оновлено ${o.t}`, asked: (o) => `${o.name} питає`, hide: 'Сховати', now: (o) => `Зараз · ${o.n}`, next: (o) => `Далі · ${o.n} · ${o.owner}`,
+        nextColleague: (o) => `Після цього слайда ${o.name} презентує ${o.range}. Підказки мовчать до слайда ${o.n}.`, prev: 'Назад', nextBtn: 'Далі',
+        syncA: (o) => `Слідую за ${o.app} · слайд ${o.n}`, stopFollowing: 'Не слідувати', askMove: (o) => `Перейти до слайда ${o.n}?`, why: (o) => `Ви вже говорите про ${o.topic}.`,
+        go: 'Перейти', no: 'Ні', syncB: 'Слайди за вашою мовою · питаю перед переходом', colleague: (o) => `Презентує ${o.name}`,
+        colleagueHint: (o) => `Поки говорить ${o.name}, підказки мовчать. На питання до вас картка з відповіддю все одно зʼявиться.`, turnIn: (o) => `Ваша черга приблизно через ${o.t}`,
+        turnNext: (o) => `Далі ви · слайд ${o.n}`, startWith: (o) => `Почніть з: «${o.line}»`, mode: 'Режим презентації', compactView: 'Компактний вигляд',
+        emptyTitle: 'Презентацію не додано', emptyText: 'Додайте файл, і Pacenote покаже слайди, час кожного слайда і відповіді на питання. Поки файлу немає, підказки працюють як на звичайному дзвінку.',
+        attach: 'Додати презентацію', slidesN: (o) => `${o.n} слайдів`, ofShort: (o) => `${o.i} з ${o.n}` },
       present: { next: 'Далі', prev: 'Назад', start: 'Почати', nextUp: (t, s) => `Далі: ${t} (${s})`, canSkip: 'Можна пропустити, якщо бракує часу' },
-      noItems: 'Поки нічого на тобі', close: 'Закрити', noBriefYet: 'Брифу для цього дзвінка ще немає.',
+      noItems: 'Поки нічого на тобі', notMine: 'Не моє', tipsIn: (o) => `Підказки: ${o.l}, клацніть для ${o.o}`, close: 'Закрити', noBriefYet: 'Брифу для цього дзвінка ще немає.',
       readyStatus: 'Готово', readyTitle: 'Можна починати', startListening: 'Почати слухати', openBrief: 'Відкрити бриф',
       listeningTitle: 'Слухаю', listeningSub: (k) => `Підказки зʼявляться тут, коли будуть потрібні. Застряг? Натисни ${k}.`, onDevice: 'Аудіо лишається на цьому Mac',
       searched: (o) => `Ви шукали: ${o.q}`, shorterMeta: 'Коротше', applied: 'Налаштування застосовано', prepReady: 'Бриф готовий',
@@ -83,7 +124,8 @@
     call: { title: '', state: 'live', startedAt: null, paused: false, micOff: false, minutesLeft: null, mode: 'normal', recap: '', briefLine: '', alert: null },
     agenda: [], cards: [], onMe: [], next: null,
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
-    keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T' },
+    keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
+    pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
     ui: { lineWho: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
   };
@@ -104,9 +146,11 @@
   // ---------- Derivations ----------
   const ACTION_KINDS = ['answer', 'turn', 'finish'];
   function presenting() {
-    if (!S.steps.length) return false;
-    return S.ui.presentForced != null ? S.ui.presentForced : !!S.call.presenting;
+    // 0.8.5: a Presentation call is always in presentation mode (empty state until a deck is attached).
+    if (!S.steps.length && !S.call.presType) return false;
+    return S.ui.presentForced != null ? S.ui.presentForced : !!(S.call.presenting || S.call.presType);
   }
+  function withSlides() { return presenting() && S.steps.length > 0; }
   function finishCard() {
     const left = S.call.minutesLeft;
     if (left == null || left > 5 || left < 0) return null;
@@ -193,7 +237,7 @@
 
     // agenda
     const ag = $('agenda');
-    ag.hidden = !S.agenda.length || presenting() || isReady;
+    ag.hidden = !S.agenda.length || withSlides() || isReady;
     if (S.agenda.length) {
       $('segs').innerHTML = S.agenda.map((a) => `<button type="button" class="seg ${a.state}" data-act="agenda" data-id="${esc(a.id)}" title="${esc(a.title)}" aria-label="${esc(a.title)}"></button>`).join('');
       const now = S.agenda.find((a) => a.state === 'now');
@@ -207,16 +251,27 @@
     // Pacenote 0.8: after the call, the call page and the follow-up email draft (nothing is sent).
     const af = $('after');
     af.hidden = !ended;
-    if (ended) af.innerHTML = `<span class="meta">${esc(t.afterCall)}</span>
+    app.classList.toggle('afterview', ended && !!S.after);
+    if (ended && S.after) renderAfter(af);
+    else if (ended) { af.className = 'after'; af.innerHTML = `<span class="meta">${esc(t.afterCall)}</span>
       <button class="btn1" type="button" data-act="after" data-item="followup">${esc(t.followup)}</button>
-      <button class="ghost" type="button" data-act="after" data-item="callpage">${esc(t.callPage)}</button>`;
+      <button class="ghost" type="button" data-act="after" data-item="callpage">${esc(t.callPage)}</button>`; }
+
+    // 0.8.5 (owner): tips follow the meeting's language; a switch when it differs from the interface language.
+    renderLangSwitch();
+
+    // 0.8.5 (P8): a recording problem replaces the tips area: red strip, the state, the levels, one action.
+    const sysOn = !!(S.sys && !ended);
+    app.classList.toggle('sysview', sysOn);
+    renderSys(sysOn);
 
     const list = visibleCards();
-    const hero = presenting() ? null : pickHero(list);
+    const hero = withSlides() ? null : pickHero(list);
     renderPresentation();
+    reportPresenting();
     const showEmpty = renderEmpty(list);
     renderHero(showEmpty ? null : hero);
-    renderEarlier(showEmpty ? [] : list.filter((c) => (!hero || c.id !== hero.id) && (!presenting() || c.kind === 'answer')));
+    renderEarlier(showEmpty ? [] : list.filter((c) => (!hero || c.id !== hero.id) && (!withSlides() || c.kind === 'answer')));
 
     // next call, only within 10 minutes
     const nx = $('next');
@@ -276,6 +331,7 @@
       <div class="head"><span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>${c.kind === 'finish' ? '' : `<span class="meta"${c.unverified ? ` title="${esc(t.unverified)}"` : ''}>${esc(meta)}</span>`}</div>
       ${(c.commit ? t.doneQ : c.question) ? `<div class="q">${esc(c.commit ? t.doneQ : c.question)}</div>` : ''}
       ${c.say ? `<div class="say"${editing ? ' contenteditable="true" spellcheck="false"' : ''}>${esc(c.say)}</div>` : ''}
+      ${(c.items || []).length && c.kind !== 'finish' ? `<ul class="items">${c.items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
       ${c.source ? `<div class="src">${ICON.doc}<span>${esc(c.source)}</span></div>` : ''}
       ${c.commit ? `<div class="acts">${c.state === 'done' ? `<span class="meta">${esc(t.closed)}</span>` : `<button class="btn1" type="button" data-act="commit-done" data-id="${esc(c.id)}">${esc(t.markDone)}</button>`}
         <button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></div>` : c.kind === 'finish' ? '' : editing ? `<div class="acts">
@@ -307,22 +363,207 @@
 
   function stepElapsed() { const p = S.ui.present; return p.running ? Math.floor((Date.now() - p.stepStart) / 1000) : 0; }
   function fmtSecs(s) { return `${s < 0 ? '+' : ''}${Math.floor(Math.abs(s) / 60)}:${String(Math.abs(s) % 60).padStart(2, '0')}`; }
-  function renderPresentation() {
-    const el = $('present'), t = T(), p = S.ui.present;
-    if (!presenting()) { el.hidden = true; return; }
-    el.hidden = false;
-    if (p.index >= S.steps.length) p.index = S.steps.length - 1;
-    const st = S.steps[p.index] || S.steps[0];
-    const left = (st.secs || 0) - stepElapsed();
-    const nx = S.steps[p.index + 1];
-    el.innerHTML = `
-      <div class="top"><span class="kind k-turn">${p.index + 1} / ${S.steps.length}</span><span class="clock ${left < 0 ? 'over' : ''}" id="pclock">${fmtSecs(left)}</span></div>
-      <div class="step">${esc(st.title)}</div>
-      <div class="say">${esc(st.say || '')}</div>
-      ${st.canSkip ? `<div class="meta">${esc(t.present.canSkip)}</div>` : ''}
-      ${nx ? `<div class="nx">${esc(t.present.nextUp(nx.title, fmtSecs(nx.secs || 0)))}</div>` : ''}
-      <div class="ctl"><button class="btn2" type="button" data-act="present-prev">${esc(t.present.prev)}</button><button class="btn1" type="button" data-act="present-next">${esc(p.running ? t.present.next : t.present.start)}</button></div>`;
+  function clock(s) { s = Math.max(0, Math.round(Math.abs(s))); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+
+  // ---------- 0.8.5 presentation mode (P5; rules/presentation.yaml) ----------
+  // The current slide comes from the recorder (outline_pos / timeline), or from Previous / Next at once.
+  function curIdx() {
+    const n = S.pres && S.pres.slide;
+    if (n != null) { const i = S.steps.findIndex((x) => x.n === n); if (i >= 0) return i; }
+    return Math.min(S.ui.present.index, Math.max(0, S.steps.length - 1));
   }
+  function budget(st) { return (st.secs || 0) + (S.extra[st.n] || 0); }
+  function onSlide() {
+    if (S.pres && S.pres.slideRx && S.pres.slide != null) return Math.max(0, Math.floor((Date.now() - S.pres.slideRx) / 1000));
+    return stepElapsed();
+  }
+  function ownerName(st) { const t = T().pm; return st.who === 'other' ? (st.speaker || '?') : st.who === 'shared' ? t.all : t.you; }
+  function runOf(i) {   // a colleague's run of slides around i: [from, to] indexes
+    let a = i, b = i; const sp = S.steps[i].speaker;
+    while (a > 0 && S.steps[a - 1].who === 'other' && S.steps[a - 1].speaker === sp) a--;
+    while (b < S.steps.length - 1 && S.steps[b + 1].who === 'other' && S.steps[b + 1].speaker === sp) b++;
+    return [a, b];
+  }
+  /** Numbers in bold: the slide's own numbers and any figure in the text (P5). */
+  function bold(text, nums) {
+    let h = esc(text);
+    const list = (nums || []).filter((x) => x && x.length > 1).sort((x, y) => y.length - x.length);
+    for (const x of list) { const e = esc(x); if (h.includes(e)) h = h.split(e).join('\u0000' + e + '\u0001'); }
+    h = h.replace(/(^|[^\u0000\w])(\d[\d.,:]*\s?(%|k|K|m|M|x|×)?)/g, (m, p, d) => p + '\u0000' + d + '\u0001');
+    return h.replace(/\u0000/g, '<b>').replace(/\u0001/g, '</b>').replace(/<b>([^<]*)<b>/g, '<b>$1').replace(/<\/b>([^<]*)<\/b>/g, '$1</b>');
+  }
+  function timeLine() {
+    const tl = S.pres && S.pres.timeline, t = T().pm;
+    if (!tl || !tl.plan) return '';
+    const el = tl.elapsed + Math.floor((Date.now() - (tl.rx || Date.now())) / 1000);
+    const parts = [t.plan({ t: clock(tl.plan) }), t.elapsed({ t: clock(el) })];
+    if (tl.behind != null && Math.abs(tl.behind) >= 30) parts.push(tl.behind > 0 ? t.behind({ t: clock(tl.behind) }) : t.ahead({ t: clock(-tl.behind) }));
+    return `<div class="pm-time" id="pmTime">${esc(parts.join(' · '))}</div>`;
+  }
+  function adviceLine() {
+    const tl = S.pres && S.pres.timeline;
+    if (!tl || !tl.advice || !tl.advice.text) return '';
+    return `<div class="pm-adv" role="status">${bold(tl.advice.text, [])} <span class="m">${esc(T().pm.updated({ t: clock(tl.elapsed) }))}</span></div>`;
+  }
+  function moveAskBlock() {
+    const a = S.pres && S.pres.moveAsk, t = T().pm;
+    if (!a) return '';
+    return `<div class="pm-ask" role="alertdialog" aria-label="${esc(t.askMove({ n: a.n }))}"><div><b>${esc(t.askMove({ n: a.n }))}</b> ${a.topic ? esc(t.why({ topic: a.topic.toLowerCase() })) : ''}</div>
+      <div class="ctl"><button class="btn1" type="button" data-act="move-yes">${esc(t.go)}</button><button class="btn3" type="button" data-act="move-no">${esc(t.no)}</button><span class="m">↩ esc</span></div></div>`;
+  }
+  function qaCard() {
+    const t = T().pm;
+    const c = S.cards.find((x) => x.kind === 'answer' && x.state === 'active' && Date.now() - x.at < 90000);
+    if (!c) return '';
+    return `<div class="pm-qa"><div class="top"><span class="kind k-answer">${esc(t.asked({ name: c.who || T().them }))}</span><button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></div>
+      ${c.question ? `<div class="q">${esc(c.question)}</div>` : ''}<div class="a">${bold(c.say || '', [])}</div></div>`;
+  }
+  function rail(i) {
+    const t = T().pm, out = [];
+    for (let k = 0; k < S.steps.length; k++) {
+      const st = S.steps[k];
+      const state = k < i ? 'done' : k === i ? 'now' : 'todo';
+      if (st.who === 'other') {
+        const [a, b] = runOf(k);
+        const inRun = i >= a && i <= b;
+        const secs = S.steps.slice(a, b + 1).reduce((x, y) => x + budget(y), 0);
+        const label = a === b ? `${st.n}` : `${S.steps[a].n}-${S.steps[b].n}`;
+        out.push(`<button type="button" class="r ${inRun ? 'now' : b < i ? 'done' : 'todo'} other" data-act="slide-go" data-n="${S.steps[a].n}"><span class="n">${label}</span><span class="tt">${esc(st.speaker)} · ${esc(a === b ? st.title : t.slidesN({ n: b - a + 1 }))}</span><span class="d">${b < i ? '' : clock(secs)}</span></button>`);
+        k = b; continue;
+      }
+      const th = S.thumbs[st.n];
+      out.push(`<button type="button" class="r ${state}" data-act="slide-go" data-n="${st.n}" aria-current="${state === 'now'}">${th ? `<img alt="" src="${th}">` : ''}<span class="n">${st.n}</span><span class="tt">${esc(st.title)}</span><span class="d">${state === 'done' ? '' : clock(budget(st))}</span></button>`);
+    }
+    return `<nav class="pm-rail" aria-label="${esc(t.slides)}"><div class="cap">${esc(t.slides)}</div>${out.join('')}</nav>`;
+  }
+  function footer() {
+    const t = T().pm, k = S.keys;
+    const sync = S.syncA ? `<div class="pm-sync"><span>${esc(t.syncA({ app: S.syncA.app, n: S.syncA.n }))}</span><button class="link" type="button" data-act="stop-follow">${esc(t.stopFollowing)}</button></div>`
+      : `<div class="pm-sync"><span>${esc(t.syncB)}</span></div>`;
+    return `<div class="ctl"><button class="btn2" type="button" data-act="present-prev">${esc(t.prev)}</button><button class="btn1" type="button" data-act="present-next">${esc(t.nextBtn)}</button><kbd>${esc(k.prev)} ${esc(k.next)}</kbd></div>${sync}`;
+  }
+  function renderPresentation() {
+    const el = $('present'), t = T(), pm = t.pm;
+    if (!presenting()) { el.hidden = true; el.className = 'present'; return; }
+    el.hidden = false;
+    if (!S.steps.length) {   // P5 states: no deck yet
+      el.className = 'present pm-empty';
+      el.innerHTML = `<div class="step">${esc(pm.emptyTitle)}</div><div class="say">${esc(pm.emptyText)}</div><div class="ctl"><button class="btn2" type="button" data-act="attach-deck">${esc(pm.attach)}</button></div>`;
+      return;
+    }
+    const i = curIdx(), st = S.steps[i], n = S.steps.length, nx = S.steps[i + 1];
+    const compact = S.call.mode === 'compact', wide = !compact && $('app').clientWidth >= 560;
+    el.className = 'present pm' + (wide ? ' wide' : '') + (compact ? ' compact' : '');
+    let main = moveAskBlock();
+    if (st.who === 'other') {   // a colleague's block: no tips, then the handoff card
+      const [a, b] = runOf(i), mineNext = S.steps[b + 1];
+      const left = S.steps.slice(i, b + 1).reduce((x, y) => x + budget(y), 0) - onSlide();
+      const tl = S.pres && S.pres.timeline;
+      main += `<div class="top"><span class="pm-k">${esc(pm.slideOf({ i: i + 1, n }))}</span></div>
+        <div class="step">${esc(pm.colleague({ name: st.speaker }))}</div>
+        <div class="meta">${esc(`${a === b ? st.n : S.steps[a].n + '-' + S.steps[b].n} · ${st.title}`)}</div>
+        <div class="say">${esc(pm.colleagueHint({ name: st.speaker }))}</div>
+        ${mineNext ? `<div class="meta">${esc(pm.turnIn({ t: clock(left) }))}${tl && tl.behind >= 30 ? ' · ' + esc(pm.behind({ t: clock(tl.behind) })) : ''}</div>` : ''}
+        ${mineNext && i === b ? `<div class="pm-handoff"><span class="pm-k">${esc(pm.turnNext({ n: mineNext.n }))}</span><div class="step">${esc(mineNext.title)}</div>${(Array.isArray(mineNext.say) ? mineNext.say : [mineNext.say])[0] ? `<div class="say">${esc(pm.startWith({ line: (Array.isArray(mineNext.say) ? mineNext.say : [mineNext.say])[0] }))}</div>` : ''}<div class="meta">${clock(budget(mineNext))}</div></div>` : ''}
+        ${qaCard()}`;
+    } else {
+      const left = budget(st) - onSlide();
+      const say = Array.isArray(st.say) ? st.say : (st.say ? [String(st.say)] : []);
+      const lines = compact ? say.slice(0, 1) : say;
+      main += `<div class="top"><span class="pm-k">${esc(compact ? pm.ofShort({ i: i + 1, n }) : pm.slideOf({ i: i + 1, n }))} · ${esc(ownerName(st))}</span></div>
+        <div class="step">${esc(st.title)}</div>
+        <div class="pm-clock"><span class="clock ${left < 0 ? 'over' : ''}" id="pclock">${clock(left)}</span><span class="m" id="pclockLbl">${esc(left < 0 ? pm.overSlide : pm.left)}</span><button class="btn3" type="button" data-act="add30" data-n="${st.n}">${esc(pm.add30)}</button></div>
+        ${timeLine()}${adviceLine()}
+        <div class="say">${lines.map((x) => `<p>${bold(x, st.numbers)}</p>`).join('')}</div>
+        ${compact ? '' : qaCard()}`;
+    }
+    if (!compact) {
+      main += `<div class="pm-nx"><span>${esc(pm.now({ n: st.n }))}</span>${nx ? `<span>${esc(pm.next({ n: nx.n, owner: ownerName(nx) }))}</span>` : ''}</div>`;
+      if (nx && nx.who === 'other' && st.who !== 'other') { const [a2, b2] = runOf(i + 1); const back = S.steps[b2 + 1]; main += `<div class="meta">${esc(pm.nextColleague({ name: nx.speaker, range: a2 === b2 ? `${nx.n}` : `${S.steps[a2].n}-${S.steps[b2].n}`, n: back ? back.n : '' }))}</div>`; }
+    } else if (nx) main += `<div class="meta">${esc(pm.next({ n: nx.n, owner: ownerName(nx) }))}</div>`;
+    main += footer();
+    el.innerHTML = wide ? `${rail(i)}<div class="pm-main">${main}</div>` : `<div class="pm-main">${main}</div>`;
+  }
+  /** Previous / Next, a click on the rail or a shortcut: the window moves now, the recorder follows (inbox slide = n|manual). */
+  function goSlide(n, source) {
+    const i = S.steps.findIndex((x) => x.n === n); if (i < 0) return;
+    S.ui.present.index = i; S.ui.present.running = true; S.ui.present.stepStart = Date.now();
+    S.pres = Object.assign({}, S.pres, { slide: n, slideRx: Date.now(), moveAsk: null });
+    if (feed) feed.setSlide(n);
+    post('setting', { key: 'slide', value: n + '|' + (source || 'manual') });
+    render();
+  }
+  function stepBy(d) { if (!S.steps.length) return; const i = Math.max(0, Math.min(S.steps.length - 1, curIdx() + d)); goSlide(S.steps[i].n, 'manual'); }
+  function answerMove(yes) {
+    const a = S.pres && S.pres.moveAsk; if (!a) return;
+    if (feed) feed.answerMove(yes); else S.pres.moveAsk = null;
+    post('setting', { key: 'slide_move', value: (yes ? 'yes|' : 'no|') + a.n });
+    if (yes) { S.ui.present.stepStart = Date.now(); }
+    render();
+  }
+  function add30(n) { S.extra[n] = (S.extra[n] || 0) + 30; post('setting', { key: 'slide_add30', value: String(n) }); render(); }
+  let lastPresenting = null;
+  function reportPresenting() { const p = presenting() && S.steps.length > 0; if (p !== lastPresenting) { lastPresenting = p; post('presenting', { on: p }); } }
+
+  function renderLangSwitch() {
+    let b = $('langBtn');
+    const tl = S.tipsLang, show = !!(tl && tl.meeting && tl.meeting !== S.lang);
+    if (!b) { b = document.createElement('button'); b.id = 'langBtn'; b.type = 'button'; b.className = 'langbtn'; b.dataset.act = 'tips-lang'; const more = $('moreBtn'); more.parentNode.insertBefore(b, more); }
+    b.hidden = !show;
+    if (!show) return;
+    const cur = tl.current || tl.meeting, other = cur === 'uk' ? 'en' : 'uk', name = (l) => l === 'uk' ? 'УК' : 'EN';
+    b.textContent = name(cur);
+    b.title = T().tipsIn({ l: name(cur), o: name(other) });
+    b.setAttribute('aria-label', b.title);
+  }
+
+  // ---------- 0.8.5 recording problems (P8; rules/recording.yaml) ----------
+  function renderSys(on) {
+    let el = $('sys');
+    if (!el) { el = document.createElement('section'); el.id = 'sys'; el.className = 'sys'; el.setAttribute('role', 'alert'); const bar = document.querySelector('header.bar'); bar.parentNode.insertBefore(el, bar.nextSibling); }
+    el.hidden = !on;
+    if (!on) return;
+    const t = T().sys, s = S.sys, no = s.kind === 'notRecording';
+    const meter = (label, v) => `<div class="lv"><span>${esc(label)}</span><span class="bar"><i style="width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%"></i></span></div>`;
+    el.innerHTML = `<div class="strip">${esc(no ? t.notRecording : t.noOther)}</div>
+      <div class="body"><div class="step">${esc(no ? t.noAudio : t.noOtherTitle)}</div><div class="say">${esc(no ? t.noAudioWhy : t.noOtherWhy)}</div>
+      <div class="levels">${meter(t.mic, s.mic)}${meter(t.call, s.call)}</div>
+      <div class="ctl"><button class="btn1" type="button" data-act="${no ? 'sys-restart' : 'sys-check'}">${esc(no ? t.restart : t.check)}</button></div>
+      <div class="meta">${esc(no ? t.noAudioFoot({ t: s.at || '' }) : t.noOtherFoot)}</div></div>`;
+  }
+
+  // ---------- 0.8.5 after the call (P7) ----------
+  function renderAfter(af) {
+    const a = S.after, t = T().after, dr = a.draft || {};
+    if (document.activeElement && af.contains(document.activeElement) && /^(TEXTAREA|INPUT)$/.test(document.activeElement.tagName) && !dr.busy && af.dataset.body === (dr.body || '')) return;   // the PM is typing
+    af.className = 'after full';
+    af.dataset.body = dr.body || '';
+    const list = (xs, mark) => xs.map((x) => `<li><span class="mk">${mark}</span>${esc(x)}</li>`).join('');
+    const people = a.people || '';
+    af.innerHTML = `
+      <div class="kind">${esc(t.window)}</div>
+      <h2>${esc(a.title || '')}</h2>
+      <div class="meta">${esc(t.meta({ when: a.when, dur: a.dur, people, notion: !!a.notion }))}</div>
+      ${a.series ? `<div class="series"><span>${esc(t.series(a.series))}</span><button class="link" type="button" data-act="after" data-item="series">${esc(t.showSeries)}</button></div>` : ''}
+      ${(a.decisions || []).length ? `<h3>${esc(t.decisions({ n: a.decisions.length }))}</h3><ul>${list(a.decisions, '✓')}</ul>` : ''}
+      ${((a.onMe || []).length || (a.open || []).length) ? `<h3>${esc(t.onYou({ n: (a.onMe || []).length, k: (a.open || []).length }))}</h3><ul>${list(a.onMe || [], '•')}${list(a.open || [], '?')}</ul>` : ''}
+      <div class="draft">
+        <div class="dh"><b>${esc(t.draft)}</b>${people ? `<span class="meta">${esc(t.draftTo({ people }))}</span>` : ''}</div>
+        ${dr.busy ? `<div class="meta">${esc(t.writing)}</div>` : ''}
+        ${dr.error ? `<div class="meta err">${esc(dr.error)}</div>` : ''}
+        ${dr.body ? `<input id="afSubject" type="text" value="${esc(dr.subject || '')}" aria-label="Subject">
+          <textarea id="afBody" spellcheck="true" rows="9">${esc(dr.body)}</textarea>
+          <form class="instr" id="afInstr"><input id="afInstruction" type="text" placeholder="${esc(t.instruct)}" aria-label="${esc(t.instruct)}"><button class="btn2" type="submit" ${dr.busy ? 'disabled' : ''}>${esc(t.rewrite)}</button></form>
+          <div class="ctl"><button class="btn1" type="button" data-act="after" data-item="copy">${esc(t.copy)}</button><button class="btn2" type="button" data-act="after" data-item="mail">${esc(t.openMail)}</button><span class="meta">${esc(t.neverSends)}</span></div>`
+        : dr.busy ? '' : `<div class="ctl"><button class="btn1" type="button" data-act="after" data-item="write">${esc(t.write)}</button>${a.lessons ? `<span class="meta">${esc(t.lessons({ n: a.lessons }))}</span>` : ''}</div>`}
+      </div>
+      <div class="ctl foot">${a.notion ? `<button class="btn3" type="button" data-act="after" data-item="notion">${esc(t.openNotion)}</button>` : ''}<button class="btn3" type="button" data-act="after" data-item="callpage">${esc(t.openCall)}</button><span class="spacer"></span><button class="btn2" type="button" data-act="after" data-item="done">${esc(t.done)}</button></div>`;
+    const form = $('afInstr');
+    if (form) form.onsubmit = (e) => { e.preventDefault(); const v = $('afInstruction').value.trim(); if (!v) return; post('after', Object.assign({ item: 'revise', instruction: v }, draftNow())); };
+    const body = $('afBody');
+    if (body) body.onblur = () => post('after', Object.assign({ item: 'edited' }, draftNow()));
+  }
+  function draftNow() { const s = $('afSubject'), b = $('afBody'); return b ? { subject: s ? s.value : '', body: b.value } : {}; }
 
   function renderBrief() {
     const t = T(), b = S.brief;
@@ -340,12 +581,14 @@
     const openN = S.onMe.filter((o) => !o.done).length;
     const tabs = ['transcript', 'onme', 'brief'];
     if (tab === 'brief' && S.ui.briefEdit && root.querySelector('#briefEdit')) return;   // the PM is typing
+    if (tab === 'onme' && S.ui.onmeEdit && root.querySelector('#onmeEditInput')) return;   // 0.8.5: an On me line being reworded
     const old = root.querySelector('.panebody');
     const top = old ? old.scrollTop : 0;
     let body = '';
     if (tab === 'transcript') {
       const unknown = Object.entries(S.speakers).find(([sid, s]) => /^S\d+$/i.test(sid) && !s.name);
-      body = (unknown ? `<div class="newvoice">${ICON.person}<span class="t">${esc(t.newVoice)} <b>${esc(unknown[1].label || unknown[0])}</b></span><button class="link" type="button" data-act="name" data-sid="${esc(unknown[0])}">${esc(t.name)}</button></div>` : '') +
+      const sugBtns = (sid, sp) => (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-act="name-pick" data-sid="${esc(sid)}" data-name="${esc(x.name)}" title="${Math.round(x.score * 100)}%">${esc(x.name)}</button>`).join('');
+      body = (unknown ? `<div class="newvoice">${ICON.person}<span class="t">${esc(t.newVoice)} <b>${esc(unknown[1].label || unknown[0])}</b></span>${sugBtns(unknown[0], unknown[1])}<button class="link" type="button" data-act="name" data-sid="${esc(unknown[0])}">${esc(t.name)}</button></div>` : '') +
         S.transcript.map((l, i) => {
           const sp = S.speakers[l.speakerId] || {};
           const cls = sp.side === 'client' ? 'client' : sp.side === 'team' ? 'team' : 'unknown';
@@ -359,7 +602,10 @@
           return `<div class="tl">${btn}<span>${esc(l.text)}</span></div>`;
         }).join('');
     } else if (tab === 'onme') {
-      body = S.onMe.length ? S.onMe.map((o) => `<label class="onme-item"><input type="checkbox" data-act="onme-toggle" data-id="${esc(o.id)}" ${o.done ? 'checked' : ''}><span><span class="${o.done ? 'struck' : ''}">${esc(o.text)}</span>${o.due ? `<br><span class="meta">${esc(o.due)}</span>` : ''}</span></label>`).join('') : `<p class="meta">${esc(t.noItems)}</p>`;
+      body = S.onMe.length ? S.onMe.map((o) => S.ui.onmeEdit === o.id
+        ? `<div class="onme-item editing"><input id="onmeEditInput" type="text" value="${esc(o.text)}" aria-label="${esc(t.edit)}"><button class="btn1" type="button" data-act="onme-save" data-id="${esc(o.id)}">${esc(t.save)}</button><button class="ghost" type="button" data-act="onme-cancel">${esc(t.cancel)}</button></div>`
+        : `<div class="onme-item"><label><input type="checkbox" data-act="onme-toggle" data-id="${esc(o.id)}" ${o.done ? 'checked' : ''}><span><span class="${o.done ? 'struck' : ''}">${esc(o.text)}</span>${o.due ? `<br><span class="meta">${esc(o.due)}</span>` : ''}</span></label>
+          <span class="hover-acts"><button class="ghost" type="button" data-act="onme-edit" data-id="${esc(o.id)}">${esc(t.edit)}</button><button class="ghost" type="button" data-act="onme-notmine" data-id="${esc(o.id)}">${esc(t.notMine)}</button></span></div>`).join('') : `<p class="meta">${esc(t.noItems)}</p>`;
     } else if (tab === 'brief') {
       body = renderBrief();
     }
@@ -378,8 +624,8 @@
     if (!S.ui.menuOpen) return;
     // 0.8 (spec 3.7): pause and the microphone live in the top bar, not repeated here.
     const items = [
+      (S.steps.length || S.call.presType) ? ['present', presenting() ? t.stopPresent : t.present, k.present] : null,
       ['compact', S.call.mode === 'compact' ? t.full : t.compact, k.compact],
-      S.steps.length ? ['present', presenting() ? t.stopPresent : t.present, ''] : null,
       ['transcript', t.transcript, ''], ['brief', t.brief, ''],
       '-',
       ['clear-speakers', t.clearSpeakers, ''],
@@ -395,9 +641,14 @@
       const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
       $('timer').textContent = (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(sec).padStart(2, '0');
     }
-    if (presenting()) {
-      const c = $('pclock'), st = S.steps[S.ui.present.index];
-      if (c && st) { const left = (st.secs || 0) - stepElapsed(); c.textContent = fmtSecs(left); c.classList.toggle('over', left < 0); }
+    if (presenting() && S.steps.length) {
+      const c = $('pclock'), st = S.steps[curIdx()];
+      if (c && st) {
+        const left = budget(st) - onSlide(); c.textContent = clock(left); c.classList.toggle('over', left < 0);
+        const l = $('pclockLbl'); if (l) l.textContent = left < 0 ? T().pm.overSlide : T().pm.left;
+      }
+      const tl = S.pres && S.pres.timeline, te = $('pmTime');
+      if (te && tl) { const h = timeLine(); const d = document.createElement('div'); d.innerHTML = h; if (d.firstChild) te.textContent = d.firstChild.textContent; }
     }
   }
 
@@ -440,7 +691,10 @@
     pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 270)) + 'px';
     pop.style.top = (r.bottom + 6) + 'px';
     let side = sp.side || 'client';
-    pop.innerHTML = `<label class="meta" for="spName">${esc(t.name)}</label><input id="spName" type="text" value="${esc(sp.name || '')}">
+    const sug = (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-pick="${esc(x.name)}">${esc(x.name)} <span class="m">${Math.round(x.score * 100)}%</span></button>`).join('');
+    const known = (S.knownNames || []).filter((n) => !(sp.suggestions || []).some((x) => x.name === n));
+    pop.innerHTML = `${sug ? `<div class="sugs">${sug}</div>` : ''}<label class="meta" for="spName">${esc(t.name)}</label><input id="spName" type="text" list="spKnown" value="${esc(sp.name || '')}">
+      <datalist id="spKnown">${known.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
       <div class="seg2"><button type="button" data-side="client" aria-pressed="${side === 'client'}">${esc(t.client)}</button><button type="button" data-side="team" aria-pressed="${side === 'team'}">${esc(t.team)}</button></div>
       <button class="btn1" type="button" id="spSave">${esc(t.save)}</button>`;
     pop.hidden = false;
@@ -454,6 +708,7 @@
       pop.hidden = true; render();
     };
     pop.querySelector('#spSave').onclick = save;
+    pop.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { input.value = b.dataset.pick; if (S.rosterSide && S.rosterSide[b.dataset.pick]) side = S.rosterSide[b.dataset.pick]; save(); });
     input.onkeydown = (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') pop.hidden = true; e.stopPropagation(); };
   }
 
@@ -487,7 +742,9 @@
   }
   function isWide() { return $('app').clientWidth >= 760; }
   // A window made wide with a sheet open: the sheet becomes the side pane (render() moves it).
-  window.addEventListener('resize', () => { if (S.ui.sheet && isWide()) render(); });
+  // 0.8.5: the presentation rail shows from 560 px, so a resize redraws it.
+  let resizeT = null;
+  window.addEventListener('resize', () => { if (S.ui.sheet && isWide()) { render(); return; } if (presenting()) { clearTimeout(resizeT); resizeT = setTimeout(render, 80); } });
   function openTab(tab) { if (isWide()) S.ui.paneTab = tab; else S.ui.sheet = tab; render(); }
   function cardKey(c) { return (c.card || '') + '|' + (c.t || '') + '|' + String((c.raw && c.raw.gist) || '').slice(0, 60); }
 
@@ -525,7 +782,7 @@
         break;
       }
       case 'promote': S.ui.heroOverride = id; break;
-      case 'after': post('after', { item: b.dataset.item }); return;
+      case 'after': post('after', Object.assign({ item: b.dataset.item }, draftNow())); return;
       case 'commit-done': {
         if (!card || !card.commit) return;
         card.state = 'done'; if (feed) feed.commitDone(id);
@@ -544,7 +801,26 @@
       case 'close-sheet': S.ui.sheet = null; S.ui.briefEdit = false; break;
       case 'follow': S.ui.follow = true; break;
       case 'name': openNamePopover(b.dataset.sid, b); return;
+      case 'name-pick': {   // 0.8.5 fix: one click on a suggested name from the voice library
+        const sid = b.dataset.sid, name = b.dataset.name, sp = S.speakers[sid] || {};
+        const side = (S.rosterSide && S.rosterSide[name]) || sp.side || 'team';
+        S.speakers[sid] = Object.assign({}, sp, { name, side, suggestions: [] });
+        if (feed) feed.speakers[sid] = Object.assign({}, feed.speakers[sid], { name, side, suggestions: [] });
+        post('name-speaker', { speakerId: sid, name, side });
+        render(); return;
+      }
       case 'line-who': openLinePopover(b.dataset.i, b); return;
+      case 'onme-edit': S.ui.onmeEdit = id; render(); { const i = $('onmeEditInput'); if (i) { i.focus(); i.select(); i.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); i.parentNode.querySelector('[data-act=onme-save]').click(); } if (e.key === 'Escape') { S.ui.onmeEdit = null; render(); } e.stopPropagation(); }; } } return;
+      case 'onme-cancel': S.ui.onmeEdit = null; render(); return;
+      case 'onme-save': case 'onme-notmine': {
+        const o = S.onMe.find((x) => x.id === id); if (!o) return;
+        const v = act === 'onme-notmine' ? '' : (($('onmeEditInput') || {}).value || '').replace(/\s+/g, ' ').trim();
+        if (act === 'onme-save' && (!v || v === o.text)) { S.ui.onmeEdit = null; render(); return; }
+        S.ui.onmeEdit = null;
+        if (feed) feed.fixOnMe(id, v); else S.onMe = S.onMe.filter((x) => x.id !== id);
+        post('onme-fix', { id, text: o.text, newText: v });
+        render(); return;
+      }
       case 'onme-toggle': {
         const o = S.onMe.find((x) => x.id === id);
         if (o) { o.done = b.checked; if (feed) feed.toggleOnMe(id, o.done); post('onme-toggle', { id, done: o.done, text: o.text }); }
@@ -564,16 +840,23 @@
       case 'open-next': post('open-next', { id: S.next && S.next.id }); return;
       case 'present-next': {
         const p = S.ui.present;
-        if (!p.running) { p.running = true; p.stepStart = Date.now(); }
-        else if (p.index < S.steps.length - 1) { p.index++; p.stepStart = Date.now(); }
-        post('present', { index: p.index, running: p.running });
-        break;
+        if (!p.running && S.pres.slide == null) { p.running = true; p.stepStart = Date.now(); goSlide(S.steps[curIdx()].n, 'manual'); return; }
+        stepBy(1); return;
       }
-      case 'present-prev': {
-        const p = S.ui.present; if (p.index > 0) { p.index--; p.stepStart = Date.now(); }
-        post('present', { index: p.index, running: p.running });
-        break;
+      case 'present-prev': stepBy(-1); return;
+      case 'slide-go': goSlide(+b.dataset.n, 'manual'); return;
+      case 'move-yes': answerMove(true); return;
+      case 'move-no': answerMove(false); return;
+      case 'add30': add30(+b.dataset.n); return;
+      case 'stop-follow': S.syncA = null; post('stop-follow'); render(); return;
+      case 'attach-deck': post('attach-deck'); return;
+      case 'tips-lang': {
+        const tl = S.tipsLang; if (!tl) return;
+        const cur = tl.current || tl.meeting; tl.current = cur === 'uk' ? 'en' : 'uk';
+        post('setting', { key: 'tips_lang', value: tl.current }); render(); return;
       }
+      case 'sys-restart': post('sys', { item: 'restart' }); return;
+      case 'sys-check': post('sys', { item: 'check' }); return;
       case 'menu': {
         const item = b.dataset.item; S.ui.menuOpen = false;
         if (item === 'compact') { S.call.mode = S.call.mode === 'compact' ? 'normal' : 'compact'; post('compact', { on: S.call.mode === 'compact' }); }
@@ -592,6 +875,8 @@
     if (e.target.classList && e.target.classList.contains('row') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.target.click(); }
     if (e.metaKey && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) { e.preventDefault(); post('zoom', { step: e.key === '-' ? -1 : e.key === '0' ? 0 : 1 }); return; }
     if (e.metaKey && e.key === ',') { e.preventDefault(); post('menu', { item: 'settings' }); return; }
+    const typing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
+    if (!typing && S.pres && S.pres.moveAsk && presenting() && (e.key === 'Enter' || e.key === 'Escape')) { e.preventDefault(); answerMove(e.key === 'Enter'); return; }
     if (e.key === 'Escape') {
       if (S.ui.editing) { S.ui.editing = null; render(); return; }
       S.ui.menuOpen = false; S.ui.sheet = null; S.ui.heroOverride = null; $('pop').hidden = true; render();
@@ -641,6 +926,19 @@
     setMode,
     setKeys(k) { S.keys = Object.assign({}, S.keys, k); render(); },
     togglePause, toggleMute, toggleProactive, openTab,
+    /** 0.8.5 shortcuts: 'prev' | 'next' | 'add30' | 'mode'. */
+    presentKey(k) {
+      if (k === 'mode') { S.ui.presentForced = !presenting(); render(); return; }
+      if (!presenting() || !S.steps.length) return;
+      if (k === 'prev') stepBy(-1); else if (k === 'next') stepBy(1); else if (k === 'add30') add30(S.steps[curIdx()].n);
+    },
+    /** Sync A (app only): the slide number read from Keynote or PowerPoint; null when not following. */
+    setFollow(f) { S.syncA = f && f.n ? { app: String(f.app || ''), n: +f.n } : null; if (S.syncA) goSlide(S.syncA.n, String(f.app || '').toLowerCase().includes('power') ? 'powerpoint' : 'keynote'); else render(); },
+    setThumbs(t) { S.thumbs = t || {}; render(); },
+    /** 0.8.5 (P7): the after-call screen: outcome, series, the follow-up draft. */
+    setAfter(a) { S.after = a || null; render(); },
+    /** 0.8.5: {meeting: 'uk', current: 'uk'}: the tips language and the meeting's. */
+    setTipsLang(t) { S.tipsLang = t && t.meeting ? { meeting: t.meeting, current: t.current || t.meeting } : null; render(); },
     help() { post('help'); },
     rename(title) { if (feed) feed.rename(title); },
     _state: S, _feed: feed

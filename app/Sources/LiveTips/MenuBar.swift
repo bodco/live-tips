@@ -54,7 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() },
                                mute: { [weak self] in self?.toggleMute() }, compact: { [weak self] in self?.toggleCompact() },
-                               proactive: { [weak self] in self?.pushTips("window.LiveTips && LiveTips.toggleProactive()") })
+                               proactive: { [weak self] in self?.pushTips("window.LiveTips && LiveTips.toggleProactive()") },
+                               present: { [weak self] k in self?.pushTips("window.LiveTips && LiveTips.presentKey('\(k)')") })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         // 2026-10-26: new users get the onboarding (permissions, folders, Claude, install, Notion optional).
         if !UserDefaults.standard.bool(forKey: "onboardingDone") && !UserDefaults.standard.bool(forKey: "onboarded") {
@@ -349,6 +350,8 @@ final class StartCallModel: ObservableObject {
     @Published var title = ""
     @Published var audience = "auto"
     @Published var callType = "auto"
+    /// 0.8.5 (P2): the deck of a Presentation call, its speakers, slide owners and timing.
+    @Published var deck = DeckSetup()
     @Published var publicCall = false            // D3: a webinar or an event with strangers: new voices are not saved
     @Published var hiringRole = "observer"      // interview: observer | interviewer | coach (as in the skill)
     @Published var tipModel = ""                // "" = the model from Settings > AI
@@ -561,7 +564,8 @@ final class StartCallModel: ObservableObject {
                                   config: project?.config ?? "", audience: audience, callType: callType, hiringRole: hiringRole,
                                   languages: language.split(separator: "+").map(String.init), context: cleanContext,
                                   workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""), folders: folders,
-                                  useProjectFolder: useProjectFolder, callID: id)
+                                  useProjectFolder: useProjectFolder, callID: id,
+                                  deck: callType == "presentation" && deck.info != nil ? deck : nil)
     }
 
     /// Phrase to paste into Cowork to make a prep for this call.

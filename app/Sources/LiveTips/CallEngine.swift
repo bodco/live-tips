@@ -228,7 +228,7 @@ final class CallEngine {
     func adoptLatePrep(base: String, file: String) {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         let fm = FileManager.default
-        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json"] where fm.fileExists(atPath: base + ext) {
+        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json"] where fm.fileExists(atPath: base + ext) {
             let tmp = stem + ext + ".tmp"
             try? fm.removeItem(atPath: tmp)
             if (try? fm.copyItem(atPath: base + ext, toPath: tmp)) != nil {
@@ -245,7 +245,7 @@ final class CallEngine {
         guard FileManager.default.fileExists(atPath: lt) else { return }
         // A preparation still being written: wait for it (adoptLatePrep) instead of picking an older one.
         let chosenNow = (callRequest["prep_file"] as? String).map { !$0.isEmpty } ?? false
-        if !chosenNow, MainActor.assumeIsolated({ PrepRunner.shared.running && PrepRunner.joinsLiveCall(prepFor: PrepRunner.shared.callID, liveCall: currentCallID) }) { return }
+        if !chosenNow, MainActor.assumeIsolated({ PrepRunner.shared.running && PrepRunner.shared.joinsCurrentCall }) { return }
         // A prep chosen by hand in the Start call window: copy its files next to this call's transcript,
         // and do not let the automatic pick add files of another prep (QA 26.10).
         var auto = true
@@ -253,7 +253,7 @@ final class CallEngine {
             auto = false
             let base = String(chosen.dropLast(".brief.md".count))
             let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-            for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json"] {
+            for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json"] {
                 let dst = stem + ext
                 if FileManager.default.fileExists(atPath: base + ext), !FileManager.default.fileExists(atPath: dst) {
                     try? FileManager.default.copyItem(atPath: base + ext, toPath: dst)
@@ -270,6 +270,13 @@ final class CallEngine {
         p.waitUntilExit()
     }
 
+    /// 0.8.5 (rules/meeting.yaml > tips_language): tips and cards in the meeting's main language, not the window's.
+    nonisolated static func tipsLang(_ req: [String: Any], ui: String) -> String {
+        if let m = req["me_lang"] as? String, ["uk", "en"].contains(m) { return m }
+        if let l = (req["langs"] as? [String])?.first, ["uk", "en"].contains(l) { return l }
+        return ui == "uk" ? "uk" : "en"
+    }
+
     func startSidecar(file: String, status: EngineStatus, fromStart: Bool = true) {
         let c = config
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
@@ -284,7 +291,7 @@ final class CallEngine {
             "periodic_classify_s": 20, "max_parallel_calls": 4, "max_tokens": ["classify": 60, "tip": 700],
             "request_extra": ["classify": ["thinking": ["type": "disabled"]], "tip": ["thinking": ["type": "between_tools"]]],
             "me_label": core["me_label"] ?? "Me", "them_label": core["them_label"] ?? "Other",
-            "name_aliases": c.nameAliases, "langs": core["langs"] ?? ["en"], "tips_lang": c.uiLanguage == "uk" ? "uk" : "en",      // 2026-10-27 (owner): the window language, always
+            "name_aliases": c.nameAliases, "langs": core["langs"] ?? ["en"], "tips_lang": Self.tipsLang(callRequest, ui: c.uiLanguage),      // 0.8.5 (owner): the meeting's language
             "budget": ["ledger": SpendLedger.defaultPath, "call_soft_usd": c.budget.callSoftUSD,
                        "call_hard_usd": c.budget.callHardUSD, "monthly_hard_usd": c.budget.monthlyHardUSD]]
         // Call context: the PM's note, the project's current state and local files found for it (lt search).

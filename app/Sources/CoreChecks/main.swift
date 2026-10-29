@@ -224,7 +224,49 @@ func enginePathsFollowTheApp() {
     expect(custom.resolved(defaultPython: "/v/bin/python", bundleEngine: "/New.app/e", exists: { _ in true }) == nil, "the PM's own engine is kept")
 }
 
+/// Pacenote 0.8.5: slide owners, talk time and Prepare again (rules/presentation.yaml).
+func presentationCore() {
+    let sp = ["Ann Lee", "Bob"]
+    let a = DeckOwners.parse("slides 5-9 Ann", speakers: sp, count: 14)
+    expect(a?.slides == [5, 6, 7, 8, 9] && a?.owner == "Ann Lee", "bulk assign by first name")
+    expect(DeckOwners.parse("1, 14 all", speakers: sp, count: 14)?.owner == "all", "all")
+    expect(DeckOwners.parse("10-13 me", speakers: sp, count: 14)?.slides == [10, 11, 12, 13], "range to me")
+    expect(DeckOwners.parse("1, 14 усі", speakers: sp, count: 14)?.owner == "all", "uk all")
+    expect(DeckOwners.parse("слайди 10-13 я", speakers: sp, count: 14)?.owner == "me", "uk me")
+    expect(DeckOwners.parse("12-20 Bob", speakers: sp, count: 14)?.slides == [12, 13, 14], "clipped to the deck")
+    expect(DeckOwners.parse("Ann", speakers: sp, count: 14) == nil && DeckOwners.parse("5-9", speakers: sp, count: 14) == nil, "not understood")
+    expect(DeckOwners.who("Ann Lee") == ("other", "Ann Lee") && DeckOwners.who("all") == ("shared", ""), "who")
+    let runs = DeckOwners.runs([5: "Ann", 6: "Ann", 1: "all"], count: 7)
+    expect(runs.count == 4 && runs[2].from == 5 && runs[2].to == 6, "runs")
+    expect(TalkTime.talkMinutes(duration: 30, qa: 5, qaOn: true) == 25 && TalkTime.talkMinutes(duration: 30, qa: 5, qaOn: false) == 30)
+    expect(TalkTime.clock(1590) == "26:30" && TalkTime.clock(3900) == "1:05:00", "clock")
+    let old: [[String: Any]] = [["n": 1, "title": "Old", "edited": true, "sec": 90], ["n": 2, "title": "Two"], ["n": 3, "title": "Mine", "edited": true]]
+    let new: [[String: Any]] = [["n": 1, "title": "New", "sec": 60], ["n": 2, "title": "Two new"], ["n": 3, "title": "Deck changed"]]
+    let m = TalkMerge.merge(old: old, new: new, keepEdits: true, deckChanged: [3])
+    expect(m.kept == [1] && m.slides[0]["title"] as? String == "Old" && m.slides[0]["sec"] as? Int == 90, "keep my edits")
+    expect(m.slides[2]["title"] as? String == "Deck changed", "a changed deck slide is rewritten")
+    expect(TalkMerge.merge(old: old, new: new, keepEdits: false).kept.isEmpty, "rewrite everything")
+    expect(TalkMerge.list([3, 6, 7, 8, 10]) == "3, 6-8, 10" && TalkMerge.list([4, 5]) == "4, 5", "list")
+    expect(TalkMerge.deckChanges(old: [1: "A  b", 2: "c"], new: [1: "a b", 2: "d"]) == [2], "deck changes")
+}
+
+/// rules/learning.yaml: the shared fixture gives the same standing patterns as livetips_m0/learning.py.
+func learningPatterns() {
+    let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("rules/fixtures/learning-patterns.json")
+    guard let d = try? Data(contentsOf: url), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+          let rec = o["records"] as? [[String: Any]], let exp = o["expect"] as? [[String: Any]] else { expect(false, "learning fixture"); return }
+    let got = Learning.standing(rec)
+    expect(got.count == exp.count, "learning: \(got.count) patterns")
+    for (g, e) in zip(got, exp) {
+        expect(g.kind == e["kind"] as? String && g.text == e["text"] as? String && g.calls == e["calls"] as? Int, "learning: \(g.text)")
+    }
+    expect(Learning.standing([["kind": "followup_instruction", "file": "a", "text": "Drop pricing"], ["kind": "followup_instruction", "file": "a", "text": "drop the pricing"]]).isEmpty, "one call is not a pattern")
+}
+
 interfaceStrings()
+presentationCore()
+learningPatterns()
 enginePathsFollowTheApp()
 versions()
 commitmentsRegister()

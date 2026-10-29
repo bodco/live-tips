@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P2 Presentation block states</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.cv{box-sizing:border-box;padding:24px;background:#E8EAEE;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;display:flex;gap:32px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.ann{font-size:13px;color:#3A3A3C;font-weight:600}
+.lt{--bg:#F5F5F7;--sf:#FFFFFF;--bd:#D2D2D7;--ln:#E5E5EA;--tx:#1D1D1F;--t2:#3A3A3C;--t3:#6E6E73;--ac:#0062E6;--acs:#E0EDFF;--fill:#0A6CFF;--on:#B04A00;--ons:#FFE8CC;--dng:#D70015;--dngs:#FFE5E3;--b2bg:#FFFFFF;color:#1D1D1F;color-scheme:light}
+button{font:inherit;cursor:pointer}
+.b1{height:32px;padding:0 14px;border-radius:7px;border:0;background:var(--fill);color:#fff;font-size:13px;font-weight:600}
+.b2{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--bd);background:var(--b2bg);color:var(--tx);font-size:13px}
+.b3{height:28px;padding:0 6px;border:0;background:transparent;color:var(--ac);font-size:13px;font-weight:500}
+.lab{display:block;font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px}
+.in{box-sizing:border-box;height:30px;border-radius:6px;border:1px solid var(--bd);background:var(--sf);color:var(--tx);font:inherit;font-size:13px;padding:0 9px}
+.cap{font-size:12px;color:var(--t3);line-height:1.45}
+.card{background:var(--sf);border-radius:10px;box-shadow:0 0 0 1px var(--ln);padding:16px;display:flex;flex-direction:column;gap:12px}
+.sec{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--t3);margin:0}
+.row{display:flex;align-items:center;gap:10px}
+.file{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--ln)}
+.thumb{width:44px;height:28px;border-radius:4px;background:linear-gradient(135deg,#0A6CFF,#64B5FF);flex:none}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;background:var(--acs);color:var(--ac);font-size:12px;font-weight:500}
+.chip.ann2{background:#F3E8FF;color:#9333EA}
+.sl{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.st{border-radius:6px;border:1px solid var(--ln);overflow:hidden;font-size:11px}
+.st .im{height:36px;background:#EEF3FB}
+.st .ow{display:flex;justify-content:space-between;padding:3px 6px;color:var(--t2)}
+.st.me .ow b{color:var(--ac)}.st.an .im{background:#F6EEFD}.st.an .ow b{color:#9333EA}.st.all .ow b{color:var(--t2)}
+.st.sel{outline:2px solid var(--fill);outline-offset:-1px}
+.seg{display:inline-flex;border:1px solid var(--bd);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-right:1px solid var(--bd);background:var(--sf);color:var(--tx);height:28px;padding:0 10px;font-size:12px}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--acs);color:var(--ac);font-weight:600}
+.bar{height:6px;border-radius:3px;background:#E5E5EA;overflow:hidden}
+.sw{width:30px;height:18px;border-radius:9px;background:#34C759;position:relative;flex:none}
+.sw::after{content:"";position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff}
+</style>
+</helmet>
+<div class="cv lt" style="width:1640px;height:860px">
+
+<div class="col" style="width:640px;gap:14px">
+<span class="ann">A. Not attached</span>
+<div class="card">
+<div class="row"><p class="sec" style="flex:1">Presentation</p></div>
+<div style="border:1.5px dashed var(--bd);border-radius:10px;padding:22px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+<button class="b2">Attach presentation</button>
+<span class="cap">PDF, PowerPoint, Keynote or a text outline. You can also drop the file here.</span>
+</div>
+<span class="cap">Prepare reads the deck, writes your talk slide by slide, times each slide and the questions the audience may ask.</span>
+</div>
+
+<span class="ann" style="margin-top:6px">C. Reading</span>
+<div class="card">
+<div class="row"><p class="sec" style="flex:1">Presentation</p></div>
+<div class="file"><span class="thumb" aria-hidden="true" style="opacity:.5"></span><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">Orbit-pilot-review.key</div><div class="cap">Reading slide 6 of 14</div></div><button class="b3">Cancel</button></div>
+<div class="bar" role="progressbar" aria-valuenow="6" aria-valuemin="0" aria-valuemax="14" aria-label="Reading slides"><div style="width:43%;height:100%;background:var(--fill)"></div></div>
+<span class="cap">Keep filling the form. Slide owners and timing unlock when reading is done.</span>
+</div>
+
+<span class="ann" style="margin-top:6px">D. Error</span>
+<div class="card">
+<div class="row"><p class="sec" style="flex:1">Presentation</p></div>
+<div style="display:flex;gap:10px;padding:10px 12px;border-radius:8px;background:var(--dngs)">
+<span style="flex:none;width:18px;height:18px;border-radius:50%;background:var(--dng);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center" aria-hidden="true">!</span>
+<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dng)">Can't read Orbit-pilot-review.key</div><div class="cap" style="color:var(--t2)">Keynote isn't installed on this Mac, so the slides can't be opened. Export the deck as PDF and attach it.</div></div>
+</div>
+<div class="row"><button class="b2">Choose another file</button><button class="b3">Paste the talk as text</button></div>
+</div>
+</div>
+
+<div class="col" style="flex:1">
+<span class="ann">B. Attached · speakers, slide owners, bulk assign, duration, Q&amp;A</span>
+<div class="card" style="gap:16px">
+<div class="row"><p class="sec" style="flex:1">Presentation</p><span class="cap">Ready to prepare</span></div>
+<div class="file"><span class="thumb" aria-hidden="true"></span><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">Orbit-pilot-review.key</div><div class="cap">14 slides · Keynote · read 2 min ago</div></div><button class="b3">Replace</button><button class="b3">Remove</button></div>
+<span class="cap">Prepare reads the deck, writes your talk slide by slide, times each slide and the questions the audience may ask.</span>
+
+<div><span class="lab">Speakers</span>
+<div class="row"><span class="chip">Me</span><span class="chip ann2">Ann Lee</span><button class="b3">Add speaker</button></div></div>
+
+<div>
+<div class="row" style="margin-bottom:6px"><span class="lab" style="margin:0;flex:1">Who presents each slide</span><span class="cap">Click a slide to change, or assign a range</span></div>
+<div class="sl">
+<div class="st all"><div class="im"></div><div class="ow"><span>1</span><b>All</b></div></div>
+<div class="st me"><div class="im"></div><div class="ow"><span>2</span><b>Me</b></div></div>
+<div class="st me"><div class="im"></div><div class="ow"><span>3</span><b>Me</b></div></div>
+<div class="st me"><div class="im"></div><div class="ow"><span>4</span><b>Me</b></div></div>
+<div class="st an sel"><div class="im"></div><div class="ow"><span>5</span><b>Ann</b></div></div>
+<div class="st an sel"><div class="im"></div><div class="ow"><span>6</span><b>Ann</b></div></div>
+<div class="st an sel"><div class="im"></div><div class="ow"><span>7</span><b>Ann</b></div></div>
+<div class="st an sel"><div class="im"></div><div class="ow"><span>8</span><b>Ann</b></div></div>
+<div class="st an sel"><div class="im"></div><div class="ow"><span>9</span><b>Ann</b></div></div>
+<div class="st me"><div class="im"></div><div class="ow"><span>10</span><b>Me</b></div></div>
+<div class="st me"><div class="im"></div><div class="ow"><span>11</span><b>Me</b></div></div>
+<div class="st me"><div class="im"></div><div class="ow"><span>12</span><b>Me</b></div></div>
+<div class="st me"><div class="im"></div><div class="ow"><span>13</span><b>Me</b></div></div>
+<div class="st all"><div class="im"></div><div class="ow"><span>14</span><b>All</b></div></div>
+</div>
+<div class="row" style="margin-top:10px">
+<label class="cap" for="bulk" style="color:var(--t2)">Assign</label>
+<input class="in" id="bulk" value="slides 5-9 Ann" style="width:220px">
+<button class="b2">Apply</button>
+<span class="cap">Also works: "1, 14 all", "10-13 me"</span>
+</div>
+<span class="cap" style="display:block;margin-top:6px">"All" means a shared slide: tips show, nobody gets a handoff card. On Ann's slides the tips window stays quiet and tells you when your turn comes.</span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<div><span class="lab">Duration</span>
+<div class="row"><div class="seg" role="group" aria-label="Duration source"><button aria-pressed="true">From calendar</button><button aria-pressed="false">Custom</button></div><span style="font-size:13px">30 min</span></div></div>
+<div><span class="lab">Questions</span>
+<div class="row"><span class="sw" role="switch" aria-checked="true" aria-label="Q and A at the end"></span><span style="font-size:13px;flex:1">Q&amp;A at the end</span><input class="in" value="5 min" style="width:70px" aria-label="Q and A length"></div></div>
+</div>
+<div class="cap" style="padding:8px 10px;border-radius:8px;background:var(--acs);color:var(--t2)">Talk time is <b style="color:var(--tx)">25 min</b>: 30 min call minus 5 min Q&amp;A. Prepare times the slides to fit it.</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1640,"height":860}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

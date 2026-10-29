@@ -629,6 +629,8 @@ class Engine:
         self.register_dir = cfg.get("register_dir") or ""
         self.commit_proposed: set = set()
         self.onme_ticked: Dict[str, bool] = {}
+        # 0.8.5 (owner): an On me line the PM marked "not mine" or reworded in the window; norm text -> new text ("" = drop)
+        self.onme_fixed: Dict[str, str] = {}
         self.risks_shown: set = set()
         self.open_commitments = self._load_commitments(cfg, rules)
         raise_tip_tokens(cfg)
@@ -1595,7 +1597,23 @@ class Engine:
             "\n".join(fmt(h) for h in new[-60:]))
         return self._situation_extra_input() + user
 
+    def fix_onme(self, sit: dict) -> dict:
+        """The PM's On me corrections win over the model: "not mine" lines go, reworded ones keep his words."""
+        if not self.onme_fixed or not sit.get("actions"):
+            return sit
+        from .commitments import norm_text
+        out = []
+        for a in sit.get("actions") or []:
+            k = norm_text(a.get("what", ""))
+            if k in self.onme_fixed:
+                if not self.onme_fixed[k]:
+                    continue
+                a = dict(a, what=self.onme_fixed[k])
+            out.append(a)
+        return dict(sit, actions=out)
+
     def _publish_situation(self, sit: dict, line_id: int) -> None:
+        sit = self.fix_onme(sit)
         with self.lock:
             self.sit_last_line = line_id
             changed = sit != self.situation
@@ -1656,6 +1674,9 @@ class Engine:
             parts.append("OPEN COMMITMENTS (from earlier calls; id | owner | what):\n" + "\n".join(
                 "{} | {} | {}{}".format(c["id"], c.get("owner") or "me", c.get("text", ""), " | due " + c["due"] if c.get("due") else "")
                 for c in left))
+        if self.onme_fixed:          # 0.8.5: the PM's own On me corrections in this call
+            parts.append("THE PM CORRECTED HIS ON-ME LIST (never put lines like the removed ones on him again; use his wording):\n" + "\n".join(
+                ("removed: " + k) if not v else ("reworded: {} -> {}".format(k, v)) for k, v in list(self.onme_fixed.items())[-12:]))
         return "\n\n".join(parts) + ("\n\n" if parts else "")
 
     def set_agenda_items(self, brief_text: str) -> None:
@@ -1742,7 +1763,7 @@ class Engine:
     def write_register(self) -> List[dict]:
         if not (self.cfg.get("commitments", True) and self.register_dir and self.cfg.get("call_file")):
             return []
-        sit = self.situation or {}
+        sit = self.fix_onme(self.situation or {})
         m = self.meta()
         return register.record_call(self.register_dir, call=self.cfg["call_file"], project=m.get("project", ""),
                                     title=self.cfg.get("title") or m.get("title", ""), actions=sit.get("actions") or [],

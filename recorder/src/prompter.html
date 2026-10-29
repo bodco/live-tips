@@ -172,6 +172,8 @@
   #nowbox.has { display: block; }
   #nowbox .now { font-weight: 700; }
   #nowbox ul { margin: 2px 0 0; padding-left: 1.2em; }
+  #nowbox .moveask { margin-bottom: 6px; }
+  #nowbox .moveask button { font: inherit; margin-left: 4px; }
   #nowbox .tline { font-variant-numeric: tabular-nums; color: var(--muted); margin-top: 2px; }
   #nowbox .nxt { color: var(--muted); margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); }
 
@@ -843,6 +845,7 @@
       fr_hint: 'Enter asks Claude · Esc clears',
       now_now: 'Now:',
       now_next: 'Next:',
+      move_ask: 'Move to slide {n}?', move_why: 'You are already talking about {topic}.', move_yes: 'Move', move_no: 'No',
       sit_turn: 'Your turn', sit_listen: 'Topic:', sit_mine: 'yours', sit_not: 'not yours',
       // status and diagnostics
       st_loading_model: 'Loading the model...',
@@ -1131,6 +1134,7 @@
       fr_hint: 'Enter питає Claude · Esc очищає',
       now_now: 'Зараз:',
       now_next: 'Далі:',
+      move_ask: 'Перейти до слайда {n}?', move_why: 'Ви вже говорите про {topic}.', move_yes: 'Перейти', move_no: 'Ні',
       sit_turn: 'Ваша черга', sit_listen: 'Тема:', sit_mine: 'ваша', sit_not: 'не ваша',
       st_loading_model: 'Завантажую модель...',
       st_recording: 'Запис',
@@ -2196,15 +2200,33 @@
   function pts(sec) { return (sec.points || []).slice(0, 4).map(function (p) { return '<li>' + inline(p) + '</li>'; }).join(''); }
   function nums(sec) { return sec.numbers && sec.numbers.length ? '<div class="nums">' + sec.numbers.map(esc).join('  ·  ') + '</div>' : ''; }
   var timeLine = '';
+  // 0.8.5 (rules/presentation.yaml > slide_sync B): the tracker asks before moving to one of your slides.
+  var moveAsk = null;
+  function answerMove(yes) {
+    if (!moveAsk) return;
+    send('setting', { key: 'slide_move', value: (yes ? 'yes|' : 'no|') + moveAsk.n });
+    moveAsk = null; renderNow();
+  }
+  document.addEventListener('keydown', function (e) {
+    if (!moveAsk || /^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '') || (e.target && e.target.isContentEditable)) return;
+    if (e.key === 'Enter') { e.preventDefault(); answerMove(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); answerMove(false); }
+  });
   function renderNow() {
     if (!outline.length) { nowbox.className = ''; nowbox.innerHTML = ''; return; }
     var c = secById(posCur), n = secById(posNext) || (posCur == null ? outline[0] : null);
     var html = '';
+    if (moveAsk) html += '<div class="moveask"><b>' + esc(t('move_ask').replace('{n}', moveAsk.n)) + '</b> ' +
+      esc(t('move_why').replace('{topic}', moveAsk.topic || '')) +
+      ' <button type="button" id="moveYes">' + esc(t('move_yes')) + ' (Enter)</button> <button type="button" id="moveNo">' + esc(t('move_no')) + ' (Esc)</button></div>';
     if (c) html += '<div class="now">' + esc(t('now_now')) + ' ' + inline(c.title) + '</div>' + nums(c) + '<ul>' + pts(c) + '</ul>';
     var st = $('s_type');   // 2026-10-23: one time line under Now, presentation only
     if (c && timeLine && st && st.value === 'presentation') html += '<div class="tline">' + esc(timeLine) + '</div>';
     if (n) html += '<div class="nxt">' + esc(t('now_next')) + ' <b>' + inline(n.title) + '</b>' + nums(n) + '<ul>' + pts(n) + '</ul></div>';
     nowbox.innerHTML = html; nowbox.className = html ? 'has' : '';
+    var my = $('moveYes'), mn = $('moveNo');
+    if (my) my.onclick = function () { answerMove(true); };
+    if (mn) mn.onclick = function () { answerMove(false); };
   }
   // Call picture (v49): topic, whose it is, "your turn"; speech points said are struck through.
   function renderSituation(s) {
@@ -2228,7 +2250,8 @@
       if (it.kind === 'agenda') { renderAgenda(it); return; }
       if (it.kind === 'facts') { facts = it.facts || []; indexFacts(); searchFacts(); return; }
       if (it.kind === 'outline') { outline = it.sections || []; renderNow(); return; }
-      if (it.kind === 'outline_pos') { posCur = it.cur; posNext = it.next; renderNow(); return; }
+      if (it.kind === 'outline_pos') { posCur = it.cur; posNext = it.next; moveAsk = null; renderNow(); return; }
+      if (it.kind === 'move_ask') { moveAsk = { n: it.n, topic: it.topic }; renderNow(); return; }
       if (it.kind === 'timeline') { timeLine = it.text || ''; renderNow(); return; }
       if (it.kind === 'tip' || it.kind === 'card' || it.kind === 'answer') {
         var l = lagOf(it); if (l != null) { lags.push(l); lags = lags.slice(-5); }

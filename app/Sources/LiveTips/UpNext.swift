@@ -24,6 +24,8 @@ final class UpNext: ObservableObject {
     // MARK: list
 
     func contains(_ m: StartCallModel) -> Bool { items.contains { $0 === m } }
+    /// 0.8.5: a saved call changed in place (its deck was read): write the list again.
+    func touch(_ m: StartCallModel) { if contains(m) { persist() } }
     func item(_ id: String) -> StartCallModel? { items.first { $0.id.uuidString == id } }
     /// 2026-10-28 (owner): "no duplicate meetings". The call being recorded is not shown as the next one.
     var first: StartCallModel? { visible.first }
@@ -172,6 +174,7 @@ final class UpNext: ObservableObject {
         var context: String; var folders: [String]; var useProjectFolder: Bool; var callDate: Date
         var chosenPrep: String?; var prepBase: String?; var prepFailed: Bool
         var calEventID: String?; var seriesKey: String?
+        var deck: DeckSetup?              // 0.8.5; older files have none
     }
 
     private func persist() {
@@ -180,7 +183,7 @@ final class UpNext: ObservableObject {
                   publicCall: m.publicCall, hiringRole: m.hiringRole, tipModel: m.tipModel, language: m.language,
                   context: m.context, folders: m.folders, useProjectFolder: m.useProjectFolder, callDate: m.callDate,
                   chosenPrep: m.chosenPrep, prepBase: m.prepBase, prepFailed: m.prepFailed,
-                  calEventID: m.calEventID, seriesKey: m.seriesKey)
+                  calEventID: m.calEventID, seriesKey: m.seriesKey, deck: m.deck.phase == .none ? nil : m.deck)
         }
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; enc.outputFormatting = [.prettyPrinted]
         if let d = try? enc.encode(list) {
@@ -200,6 +203,7 @@ final class UpNext: ObservableObject {
             m.language = s.language; m.languageTouched = true; m.context = s.context; m.folders = s.folders
             m.useProjectFolder = s.useProjectFolder; m.callDate = s.callDate; m.chosenPrep = s.chosenPrep
             m.prepBase = s.prepBase; m.prepFailed = s.prepFailed; m.calEventID = s.calEventID; m.seriesKey = s.seriesKey
+            if var dk = s.deck { if case .reading = dk.phase { dk.phase = dk.info == nil ? .none : .ready }; m.deck = dk }
             return m
         }
     }

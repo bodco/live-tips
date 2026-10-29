@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P8 Recording problems</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.cv{box-sizing:border-box;padding:24px;background:#E8EAEE;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;display:flex;gap:32px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.ann{font-size:13px;color:#3A3A3C;font-weight:600}
+.lt{--bg:#F5F5F7;--sf:#FFFFFF;--bd:#D2D2D7;--ln:#E5E5EA;--tb:#ECECEF;--tx:#1D1D1F;--t2:#3A3A3C;--t3:#6E6E73;--ac:#0062E6;--fill:#0A6CFF;--dng:#D70015;--dngs:#FFE5E3;--b2bg:#FFFFFF;color-scheme:light}
+.dk{--bg:#1E1E20;--sf:#2C2C2E;--bd:#48484A;--ln:#3A3A3C;--tb:#2A2A2C;--tx:#F5F5F7;--t2:#C7C7CC;--t3:#98989D;--ac:#64B5FF;--fill:#0A6CFF;--dng:#FF6961;--dngs:rgba(255,105,97,.14);--b2bg:#3A3A3C;color-scheme:dark}
+.win{box-sizing:border-box;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);border-radius:12px;overflow:hidden;border:1px solid var(--bd);box-shadow:0 8px 28px rgba(0,0,0,.14);width:460px;height:560px}
+.hdr{height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--tb);border-bottom:1px solid var(--ln)}
+.dots{display:flex;gap:8px}.dots span{width:12px;height:12px;border-radius:50%}
+.dots span:nth-child(1){background:#FF5F57}.dots span:nth-child(2){background:#FEBC2E}.dots span:nth-child(3){background:#28C840}
+button{font:inherit;cursor:pointer}
+.b1{height:32px;padding:0 14px;border-radius:7px;border:0;background:var(--fill);color:#fff;font-size:13px;font-weight:600}
+.b3{height:28px;padding:0 6px;border:0;background:transparent;color:var(--ac);font-size:13px;font-weight:500}
+.cap{font-size:12px;color:var(--t3);line-height:1.45}
+.row{display:flex;align-items:center;gap:10px}
+.bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--dngs);color:var(--dng);font-size:12px;font-weight:600;border-bottom:1px solid var(--ln)}
+.sys{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:28px 32px;text-align:center}
+.ring{width:52px;height:52px;border-radius:50%;border:2px solid var(--dng);display:flex;align-items:center;justify-content:center;color:var(--dng)}
+.why{width:100%;box-sizing:border-box;text-align:left;border-radius:9px;background:var(--sf);box-shadow:0 0 0 1px var(--ln);padding:12px 14px;font-size:13px;line-height:1.5;color:var(--t2)}
+.lvl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t3);width:100%}
+.lvl .m{flex:1;height:6px;border-radius:3px;background:var(--ln);overflow:hidden}
+.note{width:420px;font-size:12px;color:#3A3A3C;line-height:1.5}
+</style>
+</helmet>
+<div class="cv" style="width:1000px;height:700px">
+
+<div class="col">
+<span class="ann">Not recording · light · EN</span>
+<div class="win lt">
+<div class="hdr"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><span style="font-size:13px;font-weight:600;margin-left:6px">Orbit weekly</span><span style="flex:1"></span><span class="row cap" style="gap:6px"><span style="width:8px;height:8px;border-radius:50%;border:1.5px solid var(--t3);box-sizing:border-box" aria-hidden="true"></span>12:40</span></div>
+<div class="bar" role="alert"><span style="width:8px;height:8px;border-radius:50%;background:var(--dng)" aria-hidden="true"></span>Not recording</div>
+<div class="sys">
+<div class="ring" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2M2 2l12 12"/></svg></div>
+<div style="font-size:18px;font-weight:700">No audio is captured</div>
+<div class="why">No sound from the microphone or the call for 30 s. Usually another app took the microphone, or macOS revoked access after an update.</div>
+<div class="lvl"><span>Mic</span><span class="m"></span><span>Call</span><span class="m"></span></div>
+<button class="b1">End and restart</button>
+<span class="cap">Tips are off until audio comes back. What was said before 12:10 is saved.</span>
+</div>
+</div>
+<div class="note">Not a tip: own red strip under the header, the timer dot goes hollow, the tip area is replaced. No Hide, Copy or Pin. Clears by itself when audio returns.</div>
+</div>
+
+<div class="col">
+<span class="ann">Can't hear the other side · dark · UK</span>
+<div class="win dk" lang="uk">
+<div class="hdr"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><span style="font-size:13px;font-weight:600;margin-left:6px">Orbit weekly</span><span style="flex:1"></span><span class="row cap" style="gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#FF5F57" aria-hidden="true"></span>4:05</span></div>
+<div class="bar" role="alert"><span style="width:8px;height:8px;border-radius:50%;background:var(--dng)" aria-hidden="true"></span>Не чую співрозмовника</div>
+<div class="sys">
+<div class="ring" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6h3l4-3v10l-4-3H2zM11.5 5.5l3 5M14.5 5.5l-3 5"/></svg></div>
+<div style="font-size:18px;font-weight:700">Звук дзвінка не надходить</div>
+<div class="why">Ваш мікрофон працює, але системного звуку дзвінка немає 30 с. Найчастіше дзвінок іде в навушники через інший пристрій або Pacenote втратив доступ до системного звуку.</div>
+<div class="lvl"><span>Мікр.</span><span class="m"><span style="display:block;width:55%;height:100%;background:#28C840"></span></span><span>Дзвінок</span><span class="m"></span></div>
+<button class="b1">Перевірити звук</button>
+<span class="cap">Ваші слова записуються. Підказки про співрозмовника вимкнені, поки звук не повернеться.</span>
+</div>
+</div>
+<div class="note">Перевірити звук відкриває System Settings на потрібній панелі. Один стан і одна дія, жодних дій підказок.</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1000,"height":700}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

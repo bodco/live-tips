@@ -1,0 +1,24 @@
+{
+  "about": "rules/presentation.yaml > time_advice. The recorder computes the advice; the skill's window and the app's window show its text. Tests: spikes/m0/tests/test_presentation_rules.py (recorder) and app/WebTests/feed.test.js (app window).",
+  "slides": [
+    {"n": 1, "title": "Hello", "who": "shared", "sec": 45},
+    {"n": 2, "title": "Where the pilot is", "who": "me", "sec": 120},
+    {"n": 3, "title": "Results", "who": "me", "sec": 210, "short": "Onboarding went from 6 days to 2."},
+    {"n": 4, "title": "Risks", "who": "me", "sec": 90},
+    {"n": 5, "title": "Rollout", "who": "other", "speaker": "Ann Lee", "sec": 300},
+    {"n": 6, "title": "Roadmap", "who": "me", "sec": 120, "skip": true},
+    {"n": 7, "title": "Pricing", "who": "me", "sec": 150, "short": "2,400 EUR a month for 120 users."},
+    {"n": 8, "title": "Next steps", "who": "me", "sec": 135, "skip": true}
+  ],
+  "cases": [
+    {"cur": 2, "behind": 59, "expect": null},
+    {"cur": 2, "behind": 70, "expect": {"kind": "skip", "slides": [8], "en": "Skip slide 8 to catch up. It is marked as can skip.", "uk": "Пропустіть слайд 8, щоб наздогнати. Його позначено «можна пропустити»."}},
+    {"cur": 2, "behind": 200, "expect": {"kind": "skip", "slides": [6, 8], "en": "Skip slides 6, 8 to catch up.", "uk": "Пропустіть слайди 6, 8, щоб наздогнати."}},
+    {"cur": 2, "behind": 400, "expect": {"kind": "shorten", "slides": [3, 7], "en": "Slide 3: say only \"Onboarding went from 6 days to 2.\" Slide 7: say only \"2,400 EUR a month for 120 users.\"", "uk": "Слайд 3: скажіть лише «Onboarding went from 6 days to 2.» Слайд 7: скажіть лише «2,400 EUR a month for 120 users.»"}},
+    {"cur": 4, "behind": 100, "expect": {"kind": "skip", "slides": [8], "en": "Skip slide 8 to catch up. It is marked as can skip.", "uk": "Пропустіть слайд 8, щоб наздогнати. Його позначено «можна пропустити»."}},
+    {"cur": 5, "behind": 300, "expect": null},
+    {"cur": 7, "behind": 90, "expect": {"kind": "skip", "slides": [8], "en": "Skip slide 8 to catch up. It is marked as can skip.", "uk": "Пропустіть слайд 8, щоб наздогнати. Його позначено «можна пропустити»."}},
+    {"cur": 7, "behind": 200, "expect": {"kind": "shorten", "slides": [8], "en": "Shorten slide 8 to one sentence to catch up.", "uk": "Скоротіть слайд 8 до однієї фрази, щоб наздогнати."}},
+    {"cur": 8, "behind": 200, "expect": null}
+  ]
+}

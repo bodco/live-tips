@@ -14,3 +14,11 @@ model_prompt: >-
   when)" for both sides; "Open questions" when there are any. At most about 150 words, plain sentences, no long
   dashes, no internal notes. Return JSON only: {{"subject": "<meeting name and date>", "body": "<the email text,
   with line breaks, ending with the PM's sign-off placeholder [Name]>"}}
+revise: >-
+  (0.8.5) "Write draft" makes the draft; the PM can then ask for changes in his own words ("drop the pricing line",
+  "rephrase the second point", "shorter"). Each instruction and each hand edit is logged (rules/learning.yaml);
+  instructions the PM gave on two or more different calls are applied to every new draft without being asked.
+revise_prompt: >-
+  You revise a follow-up email draft for the project manager. Apply the PM's instruction exactly and change nothing
+  else; keep the language ({LANG}), the facts and the sign-off. Never invent dates, numbers or promises. No long
+  dashes. Return JSON only: {{"subject": "...", "body": "..."}}

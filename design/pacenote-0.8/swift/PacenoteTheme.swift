@@ -26,18 +26,27 @@ enum PN {
         static let text      = Color.pn(0x1D1D1F, 0xF5F5F7)
         static let text2     = Color.pn(0x3A3A3C, 0xC7C7CC)
         static let text3     = Color.pn(0x6E6E73, 0x98989D) // captions, never lighter
-        static let accent    = Color.pn(0x0058B0, 0x4D9DFF) // Blue Deep / Blue Light: links, accent text (AA)
+        static let accent    = Color.pn(0x0062E6, 0x4D9DFF) // Blue Deep / Blue Light: links, accent text (AA)
         static let accentFill = Color(red: 0x0A/255, green: 0x6C/255, blue: 0xFF/255) // Pacenote Blue: buttons, white text 4.6:1
         static let brand     = Color.pn(0x0A6CFF, 0x4D9DFF) // the mark's start dot, progress, selection
         static let ink       = Color(red: 0x1C/255, green: 0x1D/255, blue: 0x21/255)
-        static let rec       = Color.pn(0xFF3B30, 0xFF453A)
+        static let rec       = Color(red: 0xFF/255, green: 0x5F/255, blue: 0x57/255) // macOS close-button red, both themes
 
         // Status / card kinds (text color). Soft backgrounds: same hue at 14-16% opacity in dark.
-        static let answer    = Color.pn(0x0058B0, 0x64B5FF)
-        static let turn      = Color.pn(0x1A7431, 0x4CD964)
-        static let onMe      = Color.pn(0x9A4600, 0xFFB340)
-        static let docs      = Color.pn(0x7D3C9E, 0xD29BF5)
-        static let danger    = Color.pn(0xC4000F, 0xFF6961)
+        static let answer    = Color.pn(0x0062E6, 0x64B5FF)
+        static let turn      = Color.pn(0x15803D, 0x4CD964)
+        static let onMe      = Color.pn(0xB04A00, 0xFFB340)
+        static let docs      = Color.pn(0x9333EA, 0xD29BF5)
+        static let danger    = Color.pn(0xD70015, 0xFF6961)
+
+        // v1.1 (2026-10-29): brighter light theme. True colours go to shapes, AA-safe shades to text.
+        static let onMeGraphic = Color(red: 0xE8/255, green: 0x59/255, blue: 0x0C/255)  // v1.2: dots, (!) icon, On me count (white digit), both themes
+        static let okDot       = Color(red: 0x28/255, green: 0xC8/255, blue: 0x40/255)  // macOS zoom-button green, both themes
+        static let info        = Color.pn(0x0062E6, 0x64B5FF)  // (i) icons
+        // Soft fills for badges and pills (light: solid tint, dark: hue at 14-16%).
+        static let onMeSoft    = Color.pn(0xFFE8CC, 0xFF9F0A, darkAlpha: 0.14)
+        static let turnSoft    = Color.pn(0xDCFCE7, 0x30D158, darkAlpha: 0.14)
+        static let answerSoft  = Color.pn(0xE0EDFF, 0x0A84FF, darkAlpha: 0.16)
     }
 
     enum Radius { static let s: CGFloat = 6; static let m: CGFloat = 10; static let l: CGFloat = 14 }
@@ -103,14 +112,18 @@ struct PNBadge: View {
     var body: some View {
         let (fg, bg): (Color, Color) = {
             switch kind {
-            case .ready:       return (PN.C.turn, PN.C.turn.opacity(0.14))
-            case .notPrepared: return (PN.C.onMe, PN.C.onMe.opacity(0.14))
+            case .ready:       return (PN.C.turn, PN.C.turnSoft)
+            case .notPrepared: return (PN.C.onMe, PN.C.onMeSoft)
             case .stale:       return (PN.C.text2, PN.C.surface2)
             case .live:        return (PN.C.danger, PN.C.danger.opacity(0.14))
-            case .neutral:     return (PN.C.answer, PN.C.answer.opacity(0.14))
+            case .neutral:     return (PN.C.answer, PN.C.answerSoft)
             }
         }()
-        Text(text).font(.system(size: 12, weight: .semibold))
+        HStack(spacing: 5) {
+            if kind == .notPrepared { Circle().fill(PN.C.onMeGraphic).frame(width: 6, height: 6) }  // true orange as a shape
+            Text(text)
+        }
+            .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(fg).padding(.horizontal, 8).padding(.vertical, 3)
             .background(bg).clipShape(RoundedRectangle(cornerRadius: 6))
     }

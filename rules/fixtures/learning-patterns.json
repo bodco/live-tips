@@ -1,0 +1,90 @@
+{
+ "about": "rules/learning.yaml: the same input gives the same standing patterns in Python (livetips_m0.learning) and Swift (LiveTipsCore.Learning).",
+ "records": [
+  {
+   "kind": "followup_instruction",
+   "file": "call-1.md",
+   "series": "orbitweekly",
+   "text": "Drop the pricing line"
+  },
+  {
+   "kind": "followup_instruction",
+   "file": "call-2.md",
+   "series": "releasereview",
+   "text": "drop the line about pricing"
+  },
+  {
+   "kind": "followup_instruction",
+   "file": "call-2.md",
+   "series": "releasereview",
+   "text": "Make it shorter"
+  },
+  {
+   "kind": "followup_instruction",
+   "file": "call-3.md",
+   "series": "orbitweekly",
+   "text": "Add the date of the next call"
+  },
+  {
+   "kind": "brief_edit",
+   "file": "prep-1.brief.md",
+   "series": "orbitweekly",
+   "removed": [
+    "Small talk: ask about the weekend",
+    "Risks: none"
+   ]
+  },
+  {
+   "kind": "brief_edit",
+   "file": "prep-2.brief.md",
+   "series": "releasereview",
+   "removed": [
+    "Small talk: ask about their weekend"
+   ]
+  },
+  {
+   "kind": "followup_instruction",
+   "file": "call-4.md",
+   "series": "orbitweekly",
+   "text": "shorter please, make it short"
+  },
+  {
+   "kind": "card_onme_remove",
+   "file": "call-5.md",
+   "series": "pmstandup",
+   "before": {
+    "text": "Review the QA report"
+   }
+  },
+  {
+   "kind": "card_onme_remove",
+   "file": "call-6.md",
+   "series": "pmstandup",
+   "before": {
+    "text": "review the QA report today"
+   }
+  }
+ ],
+ "expect": [
+  {
+   "kind": "card_onme_remove",
+   "text": "review the QA report today",
+   "calls": 2
+  },
+  {
+   "kind": "followup_instruction",
+   "text": "shorter please, make it short",
+   "calls": 2
+  },
+  {
+   "kind": "brief_edit",
+   "text": "Small talk: ask about their weekend",
+   "calls": 2
+  },
+  {
+   "kind": "followup_instruction",
+   "text": "drop the line about pricing",
+   "calls": 2
+  }
+ ]
+}

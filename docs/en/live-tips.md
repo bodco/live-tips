@@ -1676,3 +1676,14 @@ address", `references/sweep.md`, `references/presentation.md`).
    key), then per job the way and the models (preparation, during the call, after the call), and an automatic
    switch when a way is out (no credit, plan limit, signed out) that returns as soon as the chosen way answers
    (14.1f). The call form lost its own tip model.
+100. **Presentations end to end (0.8.5).** Start call keeps block 1 and block 2 in place and puts the type section
+   last; a Presentation call takes a deck (PDF, PowerPoint, Keynote, text outline or pasted talk), speakers, slide
+   owners, the duration and Q&A. Prepare writes the talk slide by slide into `slides.json` (new optional fields
+   `skip`, `short`, `edited`, top-level `talk_min`, `qa_min`, `speakers`); Your talk edits it, Prepare again keeps
+   your edits and one previous version. The recorder writes the time line, one advice and "Move to slide N?" once
+   for both windows (rules/presentation.yaml); the app can also follow Keynote or PowerPoint (app only).
+101. **Learning is patterns (0.8.5).** Every correction is logged; the same correction on two or more different
+   calls is applied to every next preparation or follow-up by itself, a single one stays with its meeting
+   (rules/learning.yaml). The follow-up is written with Write draft and changed with plain instructions.
+102. **Recording problems are a system state (0.8.5).** After 30 s without audio (or without the call's audio) the
+   tips area becomes the state with Mic and Call levels and one action; it clears by itself (rules/recording.yaml).

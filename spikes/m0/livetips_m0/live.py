@@ -50,7 +50,7 @@ class Tail:
         return lines
 
 
-ACK_KEYS = {"call_type", "hiring_role", "audience", "comment_rate_seconds", "proactive", "ui_lang", "tips_paused"}
+ACK_KEYS = {"call_type", "hiring_role", "audience", "comment_rate_seconds", "proactive", "ui_lang", "tips_paused", "tips_lang"}
 
 
 def _on(value) -> bool:
@@ -91,6 +91,22 @@ def _onme(eng, value) -> None:
         eng.onme_ticked[norm_text(text)] = st == "done"
 
 
+def _onme_fix(eng, value) -> None:
+    """0.8.5: "<line>|" = not on the PM; "<line>|<new text>" = reworded (the window's On me Edit / Not mine)."""
+    text, _, new = str(value or "").partition("|")
+    if text.strip():
+        eng.onme_fixed[norm_text(text)] = new.strip()
+
+
+def _tips_lang(eng, value) -> None:
+    """0.8.5 (rules/meeting.yaml > tips_language): the window's language switch for tips and cards."""
+    v = str(value or "").strip().lower()
+    if v in ("uk", "en"):
+        eng.cfg["tips_lang"] = v
+        if getattr(eng, "prompt", None) is not None and hasattr(eng.prompt, "fmt"):
+            eng.prompt.fmt["tips_lang"] = v
+
+
 SETTINGS = {
     "tips_paused": _paused,
     "proactive": _proactive,
@@ -98,6 +114,8 @@ SETTINGS = {
     "call_lang": _call_lang,
     "agenda_state": lambda eng, v: eng.set_agenda_state(str(v or "")),        # an agenda item's state set in the window
     "onme_state": _onme,
+    "onme_fix": _onme_fix,
+    "tips_lang": _tips_lang,
     "commitment_closed": lambda eng, v: eng.commitment_closed(str(v or "")),  # the app wrote the register
 }
 

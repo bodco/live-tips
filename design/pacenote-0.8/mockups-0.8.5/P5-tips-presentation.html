@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P5 Tips window presentation mode</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.cv{box-sizing:border-box;padding:24px;background:#E8EAEE;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;display:flex;gap:32px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.ann{font-size:13px;color:#3A3A3C;font-weight:600}
+.lt{--bg:#F5F5F7;--sf:#FFFFFF;--bd:#D2D2D7;--ln:#E5E5EA;--tb:#ECECEF;--tx:#1D1D1F;--t2:#3A3A3C;--t3:#6E6E73;--ac:#0062E6;--acs:#E0EDFF;--fill:#0A6CFF;--on:#B04A00;--ons:#FFE8CC;--og:#E8590C;--ok:#15803D;--oks:#DCFCE7;--dc:#9333EA;--dcs:#F3E8FF;--b2bg:#FFFFFF;--im:#EEF3FB;color-scheme:light}
+.dk{--bg:#1E1E20;--sf:#2C2C2E;--bd:#48484A;--ln:#3A3A3C;--tb:#2A2A2C;--tx:#F5F5F7;--t2:#C7C7CC;--t3:#98989D;--ac:#64B5FF;--acs:rgba(77,157,255,.16);--fill:#0A6CFF;--on:#FFB340;--ons:rgba(255,159,10,.14);--og:#E8590C;--ok:#4CD964;--oks:rgba(76,217,100,.14);--dc:#D29BF5;--dcs:rgba(210,155,245,.14);--b2bg:#3A3A3C;--im:#3A3F4A;color-scheme:dark}
+.win{box-sizing:border-box;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);border-radius:12px;overflow:hidden;border:1px solid var(--bd);box-shadow:0 8px 28px rgba(0,0,0,.14)}
+.hdr{height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--tb);border-bottom:1px solid var(--ln)}
+.dots{display:flex;gap:8px}.dots span{width:12px;height:12px;border-radius:50%}
+.dots span:nth-child(1){background:#FF5F57}.dots span:nth-child(2){background:#FEBC2E}.dots span:nth-child(3){background:#28C840}
+button{font:inherit;cursor:pointer}
+.b1{height:30px;padding:0 12px;border-radius:7px;border:0;background:var(--fill);color:#fff;font-size:13px;font-weight:600}
+.b2{height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--bd);background:var(--b2bg);color:var(--tx);font-size:13px}
+.b3{height:28px;padding:0 6px;border:0;background:transparent;color:var(--ac);font-size:13px;font-weight:500}
+.ib{width:28px;height:28px;border-radius:7px;border:0;background:transparent;color:var(--t2);display:inline-flex;align-items:center;justify-content:center;padding:0}
+.ib[aria-pressed=true]{background:var(--acs);color:var(--ac)}
+.cap{font-size:12px;color:var(--t3);line-height:1.45}
+.row{display:flex;align-items:center;gap:10px}
+.sec{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--t3);margin:0}
+.kbd{font-size:11px;padding:1px 5px;border-radius:4px;border:1px solid var(--bd);color:var(--t3);font-family:inherit}
+.rail{width:200px;flex:none;border-right:1px solid var(--ln);padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.ri{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:6px;align-items:center;padding:6px 8px;border-radius:7px;font-size:12px;color:var(--t2)}
+.ri .n{font-weight:600;color:var(--t3);font-variant-numeric:tabular-nums}
+.ri.done{color:var(--t3)}.ri.done .t{text-decoration:line-through;text-decoration-color:var(--bd)}
+.ri.now{background:var(--acs);color:var(--tx);font-weight:600}.ri.now .n{color:var(--ac)}
+.ri .w{font-size:11px;color:var(--t3);font-variant-numeric:tabular-nums}
+.ri.an .t{color:var(--dc)}
+.ck{width:12px;height:12px;border-radius:50%;background:var(--ok);display:inline-block}
+.main{flex:1;min-width:0;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.side{width:250px;flex:none;border-left:1px solid var(--ln);padding:16px;display:flex;flex-direction:column;gap:12px}
+.thm{width:100%;aspect-ratio:16/9;border-radius:6px;background:var(--im);position:relative;box-shadow:0 0 0 1px var(--ln)}
+.thm::after{content:"";position:absolute;left:10%;top:16%;width:46%;height:7%;border-radius:3px;background:rgba(10,108,255,.35);box-shadow:0 18px 0 0 rgba(10,108,255,.16),0 34px 0 0 rgba(10,108,255,.16)}
+.cd{font-size:40px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+.pt{font-size:16px;line-height:1.5;margin:0;padding-left:16px;position:relative}
+.pt::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;border-radius:50%;background:var(--ac)}
+.adv{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:var(--ons);color:var(--on);font-size:13px}
+.qa{border-radius:10px;background:var(--sf);box-shadow:0 0 0 1px var(--ln);padding:12px;display:flex;flex-direction:column;gap:6px}
+.ftr{height:52px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-top:1px solid var(--ln)}
+.own{font-size:11px;font-weight:600;padding:2px 6px;border-radius:5px;background:var(--acs);color:var(--ac)}
+.own.an{background:var(--dcs);color:var(--dc)}
+.rec{width:8px;height:8px;border-radius:50%;background:#FF5F57}
+</style>
+</helmet>
+<div class="cv" style="width:2140px;height:800px">
+
+<div class="col">
+<span class="ann">App · sync A: follows the Keynote or PowerPoint slide number · light · EN</span>
+<div class="win lt" style="width:1030px;height:720px">
+<div class="hdr">
+<div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+<span style="font-size:13px;font-weight:600;margin-left:6px">Orbit pilot review</span>
+<span class="row" style="gap:6px;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums"><span class="rec" aria-hidden="true"></span>9:40</span>
+<span style="flex:1"></span>
+<button class="ib" aria-label="Mute microphone" aria-pressed="false" title="Mute microphone ⌃⌥M"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2"/></svg></button>
+<button class="ib" aria-label="Pause tips" aria-pressed="false" title="Pause tips ⌃⌥P"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="4" y="3" width="2.5" height="10" rx="1"/><rect x="9.5" y="3" width="2.5" height="10" rx="1"/></svg></button>
+<button class="ib" aria-label="Proactive tips" aria-pressed="true" title="Proactive tips ⌃⌥T"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5.5 11.5h5M6.5 14h3M8 1.5a4.5 4.5 0 0 0-2.5 8.2v1.8h5V9.7A4.5 4.5 0 0 0 8 1.5z"/></svg></button>
+<button class="ib" aria-label="More" title="More"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></button>
+</div>
+<div style="flex:1;min-height:0;display:flex">
+<nav class="rail" aria-label="Slides">
+<p class="sec" style="padding:0 8px 6px">Slides</p>
+<div class="ri done"><span class="n">1</span><span class="t">Hello and agenda</span><span class="ck" aria-label="done"></span></div>
+<div class="ri done"><span class="n">2</span><span class="t">Where the pilot is</span><span class="ck" aria-label="done"></span></div>
+<div class="ri done"><span class="n">3</span><span class="t">Results so far</span><span class="ck" aria-label="done"></span></div>
+<div class="ri now" aria-current="step"><span class="n">4</span><span class="t">Risks</span><span class="w">1:30</span></div>
+<div class="ri an"><span class="n">5</span><span class="t">Ann · Support</span><span class="w">1:30</span></div>
+<div class="ri an"><span class="n">6</span><span class="t">Ann · Rollout</span><span class="w">2:00</span></div>
+<div class="ri an"><span class="n">7-9</span><span class="t">Ann · 3 slides</span><span class="w">4:30</span></div>
+<div class="ri"><span class="n">10</span><span class="t">Roadmap</span><span class="w">2:00</span></div>
+<div class="ri"><span class="n">11</span><span class="t">Pricing</span><span class="w">2:30</span></div>
+<div class="ri"><span class="n">12</span><span class="t">What we need</span><span class="w">2:00</span></div>
+<div class="ri"><span class="n">13</span><span class="t">Next steps</span><span class="w">2:15</span></div>
+<div class="ri"><span class="n">14</span><span class="t">Questions</span><span class="w">5:00</span></div>
+</nav>
+<main class="main">
+<div class="row" style="align-items:flex-end">
+<div style="flex:1"><div class="cap">Slide 4 of 14 · <span class="own">You</span></div><div style="font-size:22px;font-weight:700;letter-spacing:-.01em;margin-top:4px">Risks</div></div>
+<div style="text-align:right"><div class="cd" aria-label="48 seconds left on this slide">0:48</div><div class="cap">left on this slide</div></div>
+<button class="b2" aria-label="Add 30 seconds to this slide" title="Add 30 s ⌃⌥=">+30 s</button>
+</div>
+<div class="row cap" style="font-variant-numeric:tabular-nums;color:var(--t2)"><span>Plan 25:00</span><span>·</span><span>Elapsed 9:40</span><span>·</span><b style="color:var(--on)">Behind 1:10</b></div>
+<div class="adv" role="status"><span style="width:8px;height:8px;border-radius:50%;background:var(--og);flex:none" aria-hidden="true"></span><span style="flex:1">Skip slide 10 to catch up. It is marked as can skip.</span><span class="cap">updated 9:40</span></div>
+<div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+<p class="pt">Two things could slow the launch: <b>SSO for support</b> and the <b>export</b>.</p>
+<p class="pt">SSO is done by <b>4 Nov</b>. The export lands in the build on <b>12 Nov</b>.</p>
+<p class="pt">We need the test accounts from you by <b>1 Nov</b> to keep the date.</p>
+</div>
+<div style="flex:1"></div>
+<div class="qa" role="region" aria-label="Answer to a question">
+<div class="row"><span class="sec" style="flex:1">Emily asked</span><button class="b3">Hide</button></div>
+<div style="font-size:14px;font-weight:600">What happens if SSO slips?</div>
+<div style="font-size:14px;line-height:1.5">Support starts with password login for <b>one week</b>, then moves to SSO. No data moves twice.</div>
+</div>
+</main>
+<aside class="side">
+<div><p class="sec" style="margin-bottom:6px">Now · 4</p><div class="thm" role="img" aria-label="Current slide"></div></div>
+<div><p class="sec" style="margin-bottom:6px">Next · 5 · Ann Lee</p><div class="thm" role="img" aria-label="Next slide" style="opacity:.7"></div></div>
+<div class="cap" style="padding:8px 10px;border-radius:8px;background:var(--dcs);color:var(--t2)">After this slide Ann presents 5-9. Tips go quiet until slide 10.</div>
+</aside>
+</div>
+<div class="ftr">
+<button class="b2" aria-label="Previous slide">Previous</button><button class="b2" aria-label="Next slide">Next</button>
+<span class="cap"><span class="kbd">⌃⌥←</span> <span class="kbd">⌃⌥→</span></span>
+<span style="flex:1"></span>
+<span class="row cap"><span style="width:6px;height:6px;border-radius:50%;background:#28C840" aria-hidden="true"></span>Following Keynote · slide 4</span>
+<button class="b3">Stop following</button>
+</div>
+</div>
+</div>
+
+<div class="col">
+<span class="ann">Skill, and app fallback for PDF or no Automation access · sync B: suggests a move from your speech, you confirm · dark · UK</span>
+<div class="win dk" lang="uk" style="width:1030px;height:720px">
+<div class="hdr">
+<div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+<span style="font-size:13px;font-weight:600;margin-left:6px">Orbit pilot review</span>
+<span class="row" style="gap:6px;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums"><span class="rec" aria-hidden="true"></span>7:05</span>
+<span style="flex:1"></span>
+<button class="ib" aria-label="Вимкнути мікрофон" aria-pressed="false" title="Вимкнути мікрофон ⌃⌥M"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2"/></svg></button>
+<button class="ib" aria-label="Пауза підказок" aria-pressed="false" title="Пауза підказок ⌃⌥P"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="4" y="3" width="2.5" height="10" rx="1"/><rect x="9.5" y="3" width="2.5" height="10" rx="1"/></svg></button>
+<button class="ib" aria-label="Проактивні підказки" aria-pressed="true" title="Проактивні підказки ⌃⌥T"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5.5 11.5h5M6.5 14h3M8 1.5a4.5 4.5 0 0 0-2.5 8.2v1.8h5V9.7A4.5 4.5 0 0 0 8 1.5z"/></svg></button>
+<button class="ib" aria-label="Більше" title="Більше"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></button>
+</div>
+<div style="flex:1;min-height:0;display:flex">
+<nav class="rail" aria-label="Слайди">
+<p class="sec" style="padding:0 8px 6px">Слайди</p>
+<div class="ri done"><span class="n">1</span><span class="t">Hello and agenda</span><span class="ck" aria-label="готово"></span></div>
+<div class="ri done"><span class="n">2</span><span class="t">Where the pilot is</span><span class="ck" aria-label="готово"></span></div>
+<div class="ri now" aria-current="step"><span class="n">3</span><span class="t">Results so far</span><span class="w">3:30</span></div>
+<div class="ri"><span class="n">4</span><span class="t">Risks</span><span class="w">1:30</span></div>
+<div class="ri an"><span class="n">5-9</span><span class="t">Ann · 5 слайдів</span><span class="w">8:00</span></div>
+<div class="ri"><span class="n">10</span><span class="t">Roadmap</span><span class="w">2:00</span></div>
+<div class="ri"><span class="n">11</span><span class="t">Pricing</span><span class="w">2:30</span></div>
+<div class="ri"><span class="n">12</span><span class="t">What we need</span><span class="w">2:00</span></div>
+<div class="ri"><span class="n">13</span><span class="t">Next steps</span><span class="w">2:15</span></div>
+<div class="ri"><span class="n">14</span><span class="t">Questions</span><span class="w">5:00</span></div>
+</nav>
+<main class="main">
+<div class="row" style="padding:10px 12px;border-radius:9px;background:var(--acs)" role="alert">
+<span style="font-size:14px;flex:1"><b>Перейти до слайда 4?</b> <span class="cap" style="color:var(--t2)">Ви вже говорите про ризики.</span></span>
+<button class="b1">Перейти</button><button class="b3">Ні</button>
+<span class="cap"><span class="kbd">↩</span> <span class="kbd">esc</span></span>
+</div>
+<div class="row" style="align-items:flex-end">
+<div style="flex:1"><div class="cap">Слайд 3 з 14 · <span class="own">Ви</span></div><div style="font-size:22px;font-weight:700;letter-spacing:-.01em;margin-top:4px">Results so far</div></div>
+<div style="text-align:right"><div class="cd" aria-label="Минуло на 10 секунд більше">-0:10</div><div class="cap" style="color:var(--on)">понад час слайда</div></div>
+<button class="b2" aria-label="Додати 30 секунд до слайда" title="Додати 30 с ⌃⌥=">+30 с</button>
+</div>
+<div class="row cap" style="font-variant-numeric:tabular-nums;color:var(--t2)"><span>План 25:00</span><span>·</span><span>Минуло 7:05</span><span>·</span><b style="color:var(--on)">Відставання 0:50</b></div>
+<div class="adv" role="status"><span style="width:8px;height:8px;border-radius:50%;background:var(--og);flex:none" aria-hidden="true"></span><span style="flex:1">Скоротіть слайд 4 до однієї фрази, щоб наздогнати.</span><span class="cap">оновлено 7:00</span></div>
+<div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+<p class="pt">Onboarding time went from <b>6 days to 2</b>.</p>
+<p class="pt">Tickets per user dropped by <b>a third</b>.</p>
+<p class="pt"><b>Two teams</b> asked to add more users.</p>
+</div>
+<div style="flex:1"></div>
+</main>
+<aside class="side">
+<div><p class="sec" style="margin-bottom:6px">Зараз · 3</p><div class="thm" role="img" aria-label="Поточний слайд"></div></div>
+<div><p class="sec" style="margin-bottom:6px">Далі · 4 · Ви</p><div class="thm" role="img" aria-label="Наступний слайд" style="opacity:.7"></div></div>
+</aside>
+</div>
+<div class="ftr">
+<button class="b2" aria-label="Попередній слайд">Назад</button><button class="b2" aria-label="Наступний слайд">Далі</button>
+<span class="cap"><span class="kbd">⌃⌥←</span> <span class="kbd">⌃⌥→</span></span>
+<span style="flex:1"></span>
+<span class="cap">Слайди за вашою мовою · питаю перед переходом</span>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2140,"height":800}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -57,8 +57,10 @@ enum EditLog {
 
     /// For the preparation prompt: what the PM corrected before, to learn from.
     static func promptBlock(title: String, project: String) -> String {
+        // 0.8.5 (rules/learning.yaml): the corrections made on two or more different calls first, for every call.
+        let standing = Learning.prompt(Learning.standing(all(), kinds: ["brief_edit", "talk_edit", "card_onme_remove", "card_onme_edit"]))
         let list = recent(title: title, project: project)
-        guard !list.isEmpty else { return "" }
+        guard !list.isEmpty else { return standing }
         var lines: [String] = []
         for o in list {
             var r = o; r.removeValue(forKey: "series")
@@ -73,6 +75,7 @@ enum EditLog {
         names and facts he fixes (use the fixed ones). Say in the brief's sources line how many corrections were used. \
         A correction that contradicts a newer source loses.
         \(lines.joined(separator: "\n"))
+        \(standing)
         """
     }
 

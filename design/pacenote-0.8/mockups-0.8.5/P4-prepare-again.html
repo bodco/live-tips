@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P4 Prepare again</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.cv{box-sizing:border-box;padding:24px;background:#E8EAEE;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;display:flex;gap:32px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px;width:477px}
+.ann{font-size:13px;color:#3A3A3C;font-weight:600}
+.lt{--bg:#F5F5F7;--sf:#FFFFFF;--bd:#D2D2D7;--ln:#E5E5EA;--tb:#ECECEF;--tx:#1D1D1F;--t2:#3A3A3C;--t3:#6E6E73;--ac:#0062E6;--acs:#E0EDFF;--fill:#0A6CFF;--on:#B04A00;--ons:#FFE8CC;--og:#E8590C;--ok:#15803D;--oks:#DCFCE7;--b2bg:#FFFFFF;color-scheme:light}
+.dk{--bg:#1E1E20;--sf:#2C2C2E;--bd:#48484A;--ln:#3A3A3C;--tb:#2A2A2C;--tx:#F5F5F7;--t2:#C7C7CC;--t3:#98989D;--ac:#64B5FF;--acs:rgba(77,157,255,.16);--fill:#0A6CFF;--on:#FFB340;--ons:rgba(255,159,10,.14);--og:#E8590C;--ok:#4CD964;--oks:rgba(76,217,100,.14);--b2bg:#3A3A3C;color-scheme:dark}
+.win{box-sizing:border-box;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);border-radius:12px;overflow:hidden;border:1px solid var(--bd);box-shadow:0 8px 28px rgba(0,0,0,.12);height:680px}
+.tbar{height:38px;flex:none;display:flex;align-items:center;padding:0 12px;background:var(--tb);border-bottom:1px solid var(--ln);position:relative}
+.tbar .ttl{position:absolute;left:0;right:0;text-align:center;font-size:13px;font-weight:600;color:var(--t2)}
+.dots{display:flex;gap:8px}.dots span{width:12px;height:12px;border-radius:50%}
+.dots span:nth-child(1){background:#FF5F57}.dots span:nth-child(2){background:#FEBC2E}.dots span:nth-child(3){background:#28C840}
+button{font:inherit;cursor:pointer}
+.b1{height:32px;padding:0 14px;border-radius:7px;border:0;background:var(--fill);color:#fff;font-size:13px;font-weight:600}
+.b2{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--bd);background:var(--b2bg);color:var(--tx);font-size:13px}
+.b3{height:28px;padding:0 6px;border:0;background:transparent;color:var(--ac);font-size:13px;font-weight:500}
+.cap{font-size:12px;color:var(--t3);line-height:1.45}
+.row{display:flex;align-items:center;gap:10px}
+.sec{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--t3);margin:0}
+.ch{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--ln);font-size:13px;line-height:1.4}
+.ch .d{flex:none;width:6px;height:6px;border-radius:50%;background:var(--ac);margin-top:6px}
+.opt{display:flex;gap:10px;padding:12px;border-radius:9px;border:1px solid var(--ln);background:var(--sf)}
+.opt.sel{border-color:var(--fill);box-shadow:0 0 0 1px var(--fill)}
+.opt input{margin:2px 0 0}
+.mini{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--sf);border-radius:9px;box-shadow:0 0 0 1px var(--ln);padding:9px 12px;font-size:13px}
+.mini .n{font-weight:700}
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 7px;border-radius:5px;white-space:nowrap}
+.bar{height:6px;border-radius:3px;background:var(--ln);overflow:hidden}
+.sheet{margin:0 18px;background:var(--sf);border-radius:0 0 12px 12px;box-shadow:0 12px 30px rgba(0,0,0,.18);padding:18px;display:flex;flex-direction:column;gap:12px}
+</style>
+</helmet>
+<div class="cv" style="width:1560px;height:760px">
+
+<div class="col">
+<span class="ann">1. Ask · light · EN · sheet over the talk</span>
+<div class="win lt">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Orbit pilot review · Your talk</div></div>
+<div class="sheet" role="dialog" aria-labelledby="pa-h">
+<div><div id="pa-h" style="font-size:16px;font-weight:700">Prepare again?</div><div class="cap">Brief is 2 days old · 3 changes since</div></div>
+<div>
+<div class="ch"><span class="d" aria-hidden="true"></span><div>The deck file changed<div class="cap">Slides 6 and 11 are new or different</div></div></div>
+<div class="ch"><span class="d" aria-hidden="true"></span><div>The call is now 45 min<div class="cap">Was 30 min in the calendar</div></div></div>
+<div class="ch"><span class="d" aria-hidden="true"></span><div>New decision on the project<div class="cap">Pricing approved on 27 Oct</div></div></div>
+</div>
+<div class="opt sel"><input type="radio" name="m" id="m1" checked><label for="m1" style="font-size:13px;line-height:1.4"><b>Keep my edits</b><div class="cap">Slides you edited (3 and 10) stay as they are. The rest is rewritten.</div></label></div>
+<div class="opt"><input type="radio" name="m" id="m2"><label for="m2" style="font-size:13px;line-height:1.4"><b>Rewrite everything</b><div class="cap">Your edits on 2 slides are replaced. You can restore them after.</div></label></div>
+<div class="row" style="justify-content:flex-end"><button class="b3">Cancel</button><button class="b1">Prepare again</button></div>
+</div>
+<div style="flex:1"></div>
+</div>
+</div>
+
+<div class="col">
+<span class="ann">2. Working · dark · UK · talk stays readable</span>
+<div class="win dk" lang="uk">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Orbit pilot review · Ваш виступ</div></div>
+<div style="padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+<div style="padding:12px;border-radius:9px;background:var(--acs);display:flex;flex-direction:column;gap:8px" role="status">
+<div class="row"><span style="font-size:13px;font-weight:600;flex:1">Оновлюю виступ · слайд 6 з 14</span><button class="b3">Зупинити</button></div>
+<div class="bar" role="progressbar" aria-valuenow="6" aria-valuemax="14" aria-label="Підготовка"><div style="width:43%;height:100%;background:var(--fill)"></div></div>
+<span class="cap" style="color:var(--t2)">Ваші правки на слайдах 3 і 10 лишаються. Поки йде оновлення, ці слайди можна читати, але не редагувати.</span>
+</div>
+<div class="mini"><span class="n">2</span><span>Where the pilot is</span><span class="badge" style="background:var(--oks);color:var(--ok)">Оновлено</span></div>
+<div class="mini"><span class="n">3</span><span>Results so far</span><span class="badge" style="background:var(--ln);color:var(--t2)">Ваші правки</span></div>
+<div class="mini"><span class="n">4</span><span>Risks</span><span class="badge" style="background:var(--oks);color:var(--ok)">Оновлено</span></div>
+<div class="mini" style="box-shadow:0 0 0 2px var(--fill)"><span class="n">6</span><span>Support rollout</span><span class="badge" style="background:var(--acs);color:var(--ac)">Пишу…</span></div>
+<div class="mini" style="opacity:.55"><span class="n">10</span><span>Roadmap after the pilot</span><span class="badge" style="background:var(--ln);color:var(--t2)">Ваші правки</span></div>
+<div class="mini" style="opacity:.55"><span class="n">11</span><span>Pricing for the full launch</span><span class="badge" style="background:var(--ln);color:var(--t2)">У черзі</span></div>
+</div>
+</div>
+</div>
+
+<div class="col">
+<span class="ann">3. Done · light · EN · what changed, with a way back</span>
+<div class="win lt">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Orbit pilot review · Your talk</div></div>
+<div style="padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+<div style="padding:12px;border-radius:9px;background:var(--oks);display:flex;flex-direction:column;gap:6px" role="status">
+<span style="font-size:13px;font-weight:600;color:var(--ok)">Talk updated · 10 slides rewritten, 2 kept with your edits</span>
+<span class="cap" style="color:var(--t2)">Now 39:30 of 40:00 talk time. Fits.</span>
+<div class="row"><button class="b2">Review changes</button><button class="b3">Restore previous version</button></div>
+</div>
+<div class="mini"><span class="n">3</span><span>Results so far</span><span class="badge" style="background:var(--ln);color:var(--t2)">Your edits kept</span></div>
+<div class="mini"><span class="n">6</span><span>Support rollout <span class="cap">· slide changed in the deck</span></span><span class="badge" style="background:var(--acs);color:var(--ac)">New text</span></div>
+<div class="mini"><span class="n">10</span><span>Roadmap after the pilot</span><span class="badge" style="background:var(--ln);color:var(--t2)">Your edits kept</span></div>
+<div class="mini"><span class="n">11</span><span>Pricing for the full launch <span class="cap">· uses the 27 Oct decision</span></span><span class="badge" style="background:var(--acs);color:var(--ac)">New text</span></div>
+<div class="cap" style="padding:8px 2px">Old briefs stay in the call history. Rehearsal results from before still show, marked "before update".</div>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1560,"height":760}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

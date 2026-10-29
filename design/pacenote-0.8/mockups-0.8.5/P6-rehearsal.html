@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>P6 Rehearsal</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.cv{box-sizing:border-box;padding:24px;background:#E8EAEE;font-family:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;display:flex;flex-direction:column;gap:24px}
+.col{display:flex;flex-direction:column;gap:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.ann{font-size:13px;color:#3A3A3C;font-weight:600}
+.lt{--bg:#F5F5F7;--sf:#FFFFFF;--bd:#D2D2D7;--ln:#E5E5EA;--tb:#ECECEF;--tx:#1D1D1F;--t2:#3A3A3C;--t3:#6E6E73;--ac:#0062E6;--acs:#E0EDFF;--fill:#0A6CFF;--on:#B04A00;--ons:#FFE8CC;--og:#E8590C;--ok:#15803D;--oks:#DCFCE7;--b2bg:#FFFFFF;--im:#EEF3FB;color-scheme:light}
+.dk{--bg:#1E1E20;--sf:#2C2C2E;--bd:#48484A;--ln:#3A3A3C;--tb:#2A2A2C;--tx:#F5F5F7;--t2:#C7C7CC;--t3:#98989D;--ac:#64B5FF;--acs:rgba(77,157,255,.16);--fill:#0A6CFF;--on:#FFB340;--ons:rgba(255,159,10,.14);--og:#E8590C;--ok:#4CD964;--oks:rgba(76,217,100,.14);--b2bg:#3A3A3C;--im:#3A3F4A;color-scheme:dark}
+.win{box-sizing:border-box;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);border-radius:12px;overflow:hidden;border:1px solid var(--bd);box-shadow:0 8px 28px rgba(0,0,0,.12);height:560px}
+.tbar{height:38px;flex:none;display:flex;align-items:center;padding:0 12px;background:var(--tb);border-bottom:1px solid var(--ln);position:relative}
+.tbar .ttl{position:absolute;left:0;right:0;text-align:center;font-size:13px;font-weight:600;color:var(--t2)}
+.tbar .st{margin-left:auto;font-size:12px;color:var(--t3);position:relative}
+.dots{display:flex;gap:8px}.dots span{width:12px;height:12px;border-radius:50%}
+.dots span:nth-child(1){background:#FF5F57}.dots span:nth-child(2){background:#FEBC2E}.dots span:nth-child(3){background:#28C840}
+button{font:inherit;cursor:pointer}
+.b1{height:32px;padding:0 14px;border-radius:7px;border:0;background:var(--fill);color:#fff;font-size:13px;font-weight:600}
+.b2{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--bd);background:var(--b2bg);color:var(--tx);font-size:13px}
+.b3{height:28px;padding:0 6px;border:0;background:transparent;color:var(--ac);font-size:13px;font-weight:500}
+.cap{font-size:12px;color:var(--t3);line-height:1.45}
+.row{display:flex;align-items:center;gap:10px}
+.sec{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--t3);margin:0}
+.card{background:var(--sf);border-radius:10px;box-shadow:0 0 0 1px var(--ln);padding:14px}
+.body{flex:1;min-height:0;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.ftr{flex:none;display:flex;align-items:center;gap:10px;padding:12px 24px 16px;border-top:1px solid var(--ln)}
+.st3{display:flex;gap:10px;font-size:14px;line-height:1.45}
+.st3 .n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--acs);color:var(--ac);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.thm{aspect-ratio:16/9;border-radius:6px;background:var(--im);box-shadow:0 0 0 1px var(--ln)}
+.cd{font-size:44px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+.ta{box-sizing:border-box;width:100%;border:1px solid var(--bd);border-radius:8px;padding:10px 12px;font:inherit;font-size:14px;line-height:1.5;color:var(--tx);background:var(--sf);resize:none}
+.sc{display:inline-flex;align-items:center;justify-content:center;width:34px;height:24px;border-radius:6px;font-size:13px;font-weight:700}
+.ep{background:#fff;border-radius:10px;box-shadow:0 0 0 1px #E5E5EA;padding:14px;display:flex;flex-direction:column;gap:8px;color:#1D1D1F}
+.pips{display:flex;gap:4px}.pips span{flex:1;height:4px;border-radius:2px;background:var(--ln)}.pips span.on{background:var(--fill)}
+</style>
+</helmet>
+<div class="cv lt" style="width:1360px;height:1480px">
+
+<div class="col">
+<span class="ann">Where you find it · three visible entry points</span>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px">
+<div class="ep"><span class="sec">1 · Start call, after Prepare</span>
+<div class="row" style="padding-top:6px;border-top:1px solid #E5E5EA"><span class="cap" style="flex:1">Talk ready · 14 slides</span><button class="b3">Cancel</button><button class="b2">Rehearse</button><button class="b1">Start call</button></div>
+<span class="cap">Rehearse sits next to Start call as soon as the talk exists.</span></div>
+<div class="ep"><span class="sec">2 · Up next card on Home</span>
+<div class="row" style="padding:8px 0;border-top:1px solid #E5E5EA"><span style="width:20px;height:20px;border-radius:50%;background:#EEEEF1;color:#3A3A3C;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center" aria-hidden="true">?</span><div style="flex:1;font-size:14px">Not rehearsed yet<div class="cap">About 15 min · slides and 4 questions</div></div><button class="b3">Rehearse</button></div>
+<span class="cap">A row in "Are you ready?" for presentation calls only.</span></div>
+<div class="ep"><span class="sec">3 · Presentation block</span>
+<div class="row" style="padding-top:6px;border-top:1px solid #E5E5EA"><span class="cap" style="flex:1">Last rehearsal: 27 Oct · score 3.5 of 5</span><button class="b3">Rehearse again</button></div>
+<span class="cap">Shows the last result, so the PM sees if it is worth one more run.</span></div>
+</div>
+</div>
+
+<div class="grid">
+<div class="col">
+<span class="ann">A. Intro · light · EN</span>
+<div class="win">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Rehearsal · Orbit pilot review</div></div>
+<div class="body">
+<div style="font-size:22px;font-weight:700;letter-spacing:-.01em">Rehearse your talk</div>
+<div class="cap" style="font-size:13px">About 15 min. Nothing is recorded: no audio, no transcript.</div>
+<div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
+<div class="st3"><span class="n">1</span><div><b>Run through your slides out loud.</b><div class="cap">Each slide has a timer. Press Next when you finish. You present 7 slides, Ann's are skipped.</div></div></div>
+<div class="st3"><span class="n">2</span><div><b>Answer 4 hard questions.</b><div class="cap">Claude plays the client, Emily Clark, and asks what this audience is likely to ask.</div></div></div>
+<div class="st3"><span class="n">3</span><div><b>Type your answers.</b><div class="cap">Short is fine. You get a score for each and a better first sentence.</div></div></div>
+<div class="st3"><span class="n">4</span><div><b>See a short result.</b><div class="cap">Overall score, timing per slide and what to change in the talk.</div></div></div>
+</div>
+</div>
+<div class="ftr"><span class="cap" style="flex:1">You can stop at any step</span><button class="b3">Not now</button><button class="b1">Start rehearsal</button></div>
+</div>
+</div>
+
+<div class="col">
+<span class="ann">B. Run-through · light · EN · slide timer</span>
+<div class="win">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Rehearsal · Orbit pilot review</div><span class="st">Step 1 of 4</span></div>
+<div class="body">
+<div class="pips" aria-hidden="true"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span><span></span><span></span></div>
+<div class="row" style="align-items:flex-start;gap:16px">
+<div class="thm" style="width:220px;flex:none" role="img" aria-label="Slide 3"></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:6px">
+<span class="cap">Slide 3 · your 3rd of 7</span>
+<span style="font-size:18px;font-weight:700">Results so far</span>
+<div class="row" style="align-items:baseline;gap:8px"><span class="cd" style="color:var(--on)">3:52</span><span class="cap">of 3:30 · 0:22 over</span></div>
+</div>
+</div>
+<div class="card" style="font-size:14px;line-height:1.55;color:var(--t2)">Onboarding time went from <b style="color:var(--tx)">6 days to 2</b>. Tickets per user dropped by <b style="color:var(--tx)">a third</b>. Two teams asked to add more users...</div>
+<span class="cap">Say it out loud. Pacenote only counts the time on each slide.</span>
+</div>
+<div class="ftr"><button class="b3">Stop</button><span style="flex:1"></span><span class="cap">Total 6:40 of 7:30 so far</span><button class="b2">Previous</button><button class="b1">Next slide</button></div>
+</div>
+</div>
+
+<div class="col">
+<span class="ann">C. Question and written answer · dark · UK</span>
+<div class="win dk" lang="uk">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Репетиція · Orbit pilot review</div><span class="st">Питання 2 з 4</span></div>
+<div class="body">
+<div class="card" style="display:flex;flex-direction:column;gap:6px">
+<span class="sec">Emily Clark питає</span>
+<span style="font-size:16px;font-weight:600;line-height:1.45">You said onboarding is 2 days. Our IT needs a security review first. Does the 2 days still hold for us?</span>
+<span class="cap">Чому це питання: у брифі є ризик щодо SSO, а клієнт уже питав про безпеку 21 жовт.</span>
+</div>
+<label class="sec" for="ans">Ваша відповідь</label>
+<textarea class="ta" id="ans" rows="5">Yes, after the review. The review usually takes a week, we can start it now in parallel so the pilot date holds.</textarea>
+<span class="cap">Пишіть коротко, як сказали б уголос. Оцінка після всіх 4 питань.</span>
+</div>
+<div class="ftr"><button class="b3">Пропустити</button><span style="flex:1"></span><button class="b1">Далі</button></div>
+</div>
+</div>
+
+<div class="col">
+<span class="ann">D. Result · light · EN · changes offered to the talk</span>
+<div class="win">
+<div class="tbar"><div class="dots" aria-hidden="true"><span></span><span></span><span></span></div><div class="ttl">Rehearsal · Orbit pilot review</div><span class="st">Done · 14 min</span></div>
+<div class="body" style="gap:12px">
+<div class="row" style="align-items:flex-end"><div style="flex:1"><div style="font-size:22px;font-weight:700">3.5 of 5</div><div class="cap">Clear on results, weak on the security question</div></div></div>
+<div class="row" style="padding:10px 12px;border-radius:8px;background:var(--ons)">
+<span style="font-size:13px;color:var(--on);flex:1"><b>+3.5 min over talk time.</b> Shorten slides 3 and 6.</span>
+<button class="b2">Apply to talk</button>
+</div>
+<div class="card" style="display:flex;flex-direction:column;gap:9px;padding:12px 14px">
+<div class="row"><span class="sc" style="background:var(--oks);color:var(--ok)">4</span><span style="font-size:13px;flex:1">When is the export ready?</span></div>
+<div class="row"><span class="sc" style="background:var(--ons);color:var(--on)">2</span><span style="font-size:13px;flex:1">Does 2 days hold with our security review?</span><button class="b3">Better first sentence</button></div>
+<div class="cap" style="padding-left:44px;color:var(--t2)">"It holds once the review is done, and we start the review this week."</div>
+<div class="row"><span class="sc" style="background:var(--oks);color:var(--ok)">4</span><span style="font-size:13px;flex:1">Why is support not live yet?</span></div>
+<div class="row"><span class="sc" style="background:var(--ln);color:var(--t2)">3</span><span style="font-size:13px;flex:1">What does the full launch cost?</span></div>
+</div>
+<span class="cap">Apply to talk shortens slides 3 and 6 and adds the better answers to their Q&amp;A. You review it in Your talk before it is saved.</span>
+</div>
+<div class="ftr"><button class="b3">Rehearse again</button><span style="flex:1"></span><button class="b2">Open talk</button><button class="b1">Done</button></div>
+</div>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":1480}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

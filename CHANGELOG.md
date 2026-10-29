@@ -3,6 +3,49 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.5
+
+- **Start call, the same order for every call:** block 1 (title, date, time, call type, audience, language) and
+  block 2 (project and context) never move; the type section is always last, so switching the type changes only it.
+- **Presentation block:** attach a PDF, PowerPoint, Keynote file or a text outline (or paste the talk as text, or
+  drop the file). The deck is read once (text and a thumbnail per slide) with a progress line; speakers, who
+  presents each slide (click a slide or type "5-9 Ann", "1, 14 all", "10-13 me"), the duration from the calendar or
+  your own, Q&A at the end and the talk time it leaves. Errors say why and give one action.
+- **Your talk, slide by slide:** after Prepare every slide is a card you edit in place (what to say, numbers, Q&A,
+  can skip, a one-sentence short version, the time budget). A colleague's slides are one quiet group. A banner
+  says whether the talk fits its time. Edits save as you type.
+- **Prepare again:** Keep my edits (default) or Rewrite everything; the deck file can be replaced first. One
+  previous version is kept (Restore previous version) and Review changes shows what was rewritten or kept.
+- **Presentation mode in the tips window:** a slide rail with thumbnails, a countdown per slide with +30 s, one
+  line Plan · Elapsed · Behind, one quiet advice that updates in place (skip a "can skip" slide, or say only the
+  short version of the longest ones), numbers in bold, the audience's question as one card, Previous and Next.
+  The slide follows Keynote or PowerPoint (app only, Automation permission) or your speech: it asks "Move to slide
+  N?" (Enter yes, Esc no) before moving. No tips during a colleague's slides, then one "your turn" card. A
+  Presentation call always has Presentation mode in the ⋯ menu, with an empty state to attach a deck. Compact
+  presentation is a 380 px column.
+- **Shortcuts:** Control-Option-S presentation mode; Control-Option-Left and Right and Control-Option-= (+30 s)
+  only while presenting, so they never take keys from a window manager. Compact (Control-Option-T) and proactive
+  tips (Control-Option-L) keep their keys. All can be changed in Settings.
+- **Rehearsal:** three entry points (next to Start call, in Home's Are you ready, in the Presentation block with
+  the last result), an intro, a run-through of your own slides with a timer each, 4 questions from Claude playing
+  the client with the reason for each, one at a time, and a result. Apply to talk proposes shorter text and better
+  answers; you review them in Your talk before they are saved. Nothing is recorded.
+- **After the call:** right after End call the tips window shows the decisions, what is on you, the open
+  questions, the series and the follow-up. Write draft, then change it in your own words ("drop the pricing
+  line", "shorter") or by hand; Copy or Open in Mail, never sent for you. Home's Recent rows show Summary,
+  Follow-up and Series on hover and with Tab; the Series pill explains why calls are linked.
+- **Learning from your corrections:** every instruction and edit (follow-up, talk, rehearsal changes, brief) is
+  logged; a correction you made on two or more different calls is applied to every next preparation or draft by
+  itself, a single one stays with its meeting (rules/learning.yaml, the same rule in the skill).
+- **Recording problems are a state, not a tip:** after 30 s without any audio, or without the call's audio, a red
+  strip, the reason, Mic and Call levels and one action (End and restart, or Check audio). It clears by itself.
+- **Fixes:** the tips window offers the voice library's suggested names again (one click, the side kept); a
+  preparation still running when the call starts is recognised by the call's title and day, so its progress shows
+  and its files join the call when ready; a deck attached during the call gives a basic talk at once.
+- **Skill and app behave the same:** the time line, the advice and "Move to slide N?" are computed once by the
+  recorder (rules/presentation.yaml, a shared fixture checked in Python and in the window); slide sync from
+  Keynote or PowerPoint is marked app only.
+
 ## 0.8.4
 
 - **Engine quality (ub-mode), nothing changes on screen:** the tips engine, live mode, the AI providers, the

@@ -31,13 +31,30 @@ def material(base: str) -> str:
     return "\n\n".join(parts) or "(no preparation)"
 
 
-def questions(base: str, lang: str = "en", model: str = "claude-sonnet-5-5", provider=None) -> dict:
+def _slide(v):
+    try:
+        n = int(v)
+        return n if n > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def questions(base: str, lang: str = "en", model: str = "claude-sonnet-5-5", provider=None, who: str = "") -> dict:
+    """0.8.5: each question comes with why it is likely and the slide it is about ("items"); "questions" stays the
+    plain list for older callers."""
     r = rules()
     n = int(r.get("questions", 4))
-    system = r.get("questions_prompt", "Ask {N} hard client questions about this presentation.").format(N=n, LANG=LANGS.get(lang, "English"))
-    obj, usd = ask_json(system, material(base), model, 1200, provider)
-    qs = [str(q.get("q") if isinstance(q, dict) else q).strip() for q in (obj or {}).get("questions") or []]
-    return {"ok": True, "questions": [q.replace(chr(0x2014), "-") for q in qs if q][:n], "cost_usd": usd}
+    system = r.get("questions_prompt", "Ask {N} hard client questions about this presentation.").format(
+        N=n, LANG=LANGS.get(lang, "English"), WHO=who or "the client")
+    obj, usd = ask_json(system, material(base), model, 1400, provider)
+    items = []
+    for q in (obj or {}).get("questions") or []:
+        d = q if isinstance(q, dict) else {"q": q}
+        text = nodash(d.get("q")).strip()
+        if text:
+            items.append({"q": text, "why": nodash(d.get("why")).strip(), "slide": _slide(d.get("slide"))})
+    items = items[:n]
+    return {"ok": True, "questions": [x["q"] for x in items], "items": items, "who": who, "cost_usd": usd}
 
 
 def score(base: str, answers: list, lang: str = "en", model: str = "claude-sonnet-5-5", provider=None) -> dict:
@@ -62,7 +79,8 @@ def scored(a: dict, s: dict) -> dict:
         sc = max(1, min(5, int(s.get("score", 0))))
     except (TypeError, ValueError):
         sc = 0
-    return {"q": a.get("q", ""), "score": sc, "feedback": nodash(s.get("feedback")), "better": nodash(s.get("better"))}
+    return {"q": a.get("q", ""), "score": sc, "feedback": nodash(s.get("feedback")), "better": nodash(s.get("better")),
+            "slide": _slide(s.get("slide")) or _slide(a.get("slide"))}
 
 
 def main(argv=None) -> int:
@@ -72,10 +90,11 @@ def main(argv=None) -> int:
     ap.add_argument("--answers", type=Path)
     ap.add_argument("--lang", default="en")
     ap.add_argument("--model", default="claude-sonnet-5-5")
+    ap.add_argument("--who", default="")
     a = ap.parse_args(argv)
     try:
         if a.cmd == "questions":
-            emit(questions(a.base, a.lang, a.model))
+            emit(questions(a.base, a.lang, a.model, who=a.who))
         else:
             emit(score(a.base, json.loads(a.answers.read_text(encoding="utf-8")), a.lang, a.model))
     except Exception as e:  # noqa: BLE001

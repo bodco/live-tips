@@ -363,9 +363,11 @@ Generated from `rules/risks.yaml` and `rules/followup.yaml`; do not edit here.
 One JSON line per item: `{"t":"HH:MM:SS","src":"<HH:MM:SS of the trigger line>","kind":"tip","level":"red|orange|info","gist":"🔴 ...","phrase":"...","items":["..."],"note":"<source, date>"}`.
 `src` is required on every tip and answer (the window shows the delay). Kinds: `tip`, `answer`
 (add `"q"`), `fact`, `speech`, `checklist`, `agenda`, `status`, `wrapup`, `ack`, `info`.
-1. **Gist**: emoji + what is happening, max 7 words, in the **tips language**: Ukrainian when the
-   window language (`@@SET ui_lang`, echoed in status as `ui_lang`; default `en`) is `uk` OR the
-   call's main language is Ukrainian; otherwise English. Notes follow the same language.
+1. **Gist**: emoji + what is happening, max 7 words, in the **tips language**: the call's main
+   language (0.8.5, owner: a Ukrainian meeting gets Ukrainian tips and cards whatever the window
+   language). When the window language (`@@SET ui_lang`) differs, the window offers a switch and the
+   PM's choice arrives as `@@SET tips_lang` (`uk` or `en`), echoed in status as `tips_lang`; it wins
+   until the call ends. Notes follow the same language.
 2. **Phrase**: a ready sentence to read aloud, in `answer_lang` (the language the PM is
    expected to speak now; switches when someone asks the PM to say it in another language,
    details in `window.md`). One sentence, two very short ones at most. English: simple

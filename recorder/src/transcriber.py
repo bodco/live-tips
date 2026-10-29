@@ -90,7 +90,10 @@ DEFAULTS = {
     "voices_dir": "voices",     # voice library <tool root>/voices/voices.json (never in a repo)
     "speaker_join": 0.45,       # cosine to a cluster centroid needed to join it (tuned on real speech, see README)
     "speaker_new_min_s": 1.5,   # only segments this long may open a new cluster (shorter ones are too noisy)
-    "speaker_automerge": 0.6,   # two clusters whose centroids are this close are the same person
+    "speaker_automerge": 0.6,   # two clusters whose centroids are this close are the same person (a floor, see below)
+    "speaker_same_rho": 0.5,    # 0.8.5: cosine of two lines of one person (measured on the voice library: 0.44-0.79)
+    "speaker_join_k": 0.85,     # 0.8.5: a line joins a speaker from this share of the cosine expected for the same person
+    "speaker_merge_k": 0.9,     # 0.8.5: two speakers merge from this share of the cosine expected for the same person
     "speaker_lib_min": 0.55,    # 0.8.5: a line is another library person's only from this cosine to their voice
     "speaker_lib_margin": 0.08, # 0.8.5: ... and only when it is this much closer to them than to the cluster's own name
     "speaker_lib_learn": 0.5,   # 0.8.5: the library learns only lines this close (mean cosine) to the speaker's other lines
@@ -3106,8 +3109,40 @@ class SpeakerTracker:
                 sigs = {_sig(p) for p in self.participants} - {None}
                 c["suggestions"] = [x for x in c["suggestions"] if x["name"].casefold() in allowed or _sig(x["name"]) in sigs]
             c["suggestions"] = c["suggestions"][:3]
+            if not c["suggestions"]:
+                # 0.8.5 (owner: "again no speaker suggestions"): no voice match is close enough, so the people of this
+                # meeting series and of the calendar event who have no speaker yet are offered (no score: not by voice).
+                used = {(x["name"] or "").casefold() for x in self.clusters.values()}
+                pool = (self.rosters.names() if self.rosters is not None else []) + [short_name(p) for p in (self.participants or [])]
+                seen, out = set(), []
+                for n in pool:
+                    n = _s(n).strip()
+                    if n and n.casefold() not in used and n.casefold() not in seen and not self._is_pm(n):
+                        seen.add(n.casefold()); out.append({"name": n, "score": None})
+                c["suggestions"] = out[:4]
         elif c["name"]:
             c["suggestions"] = []
+
+    # 0.8.5 (rules/voices.yaml > thresholds): one line's voice print is noisy (two lines of one person agree at
+    # about speaker_same_rho), so how close a voice must be grows with how many lines stand behind each side.
+    # A fixed 0.45 / 0.6 let a similar second voice join the first speaker before it could form its own.
+    def _same_exp(self, n: int, m: int) -> float:
+        r = self._f("speaker_same_rho")
+        return r / float(np.sqrt((r + (1 - r) / max(1, n)) * (r + (1 - r) / max(1, m))))
+
+    def _n(self, sid: str) -> int:
+        return sum(1 for m in (self.clusters.get(sid) or {}).get("members", []) if m["emb"] is not None)
+
+    def _join_thr(self, sid: str) -> float:
+        return max(self._f("speaker_join"), self._f("speaker_join_k") * self._same_exp(1, self._n(sid)))
+
+    def _merge_thr(self, a: str, b: str) -> float:
+        return max(self._f("speaker_automerge"), self._f("speaker_merge_k") * self._same_exp(self._n(a), self._n(b)))
+
+    def _is_pm(self, name: str) -> bool:
+        al = {_s(x).strip().casefold() for x in (self.cfg.get("name_aliases") or []) if _s(x).strip()}
+        n = name.casefold()
+        return n in al or (n.split(" ")[0] in al if " " in n else False)
 
     def _best(self, emb) -> tuple[str | None, float]:
         best, score = None, -2.0
@@ -3187,7 +3222,8 @@ class SpeakerTracker:
             if emb is not None:
                 emb = unit(emb)
                 best, score = self._best(emb)
-                other = self._lib_other(best, emb) if best is not None and score >= self._f("speaker_join") else None
+                joins = best is not None and score >= self._join_thr(best)
+                other = self._lib_other(best, emb) if joins else None
                 if other is not None:
                     # 0.8.5 (rules/voices.yaml): the voice is clearly another known person, not the cluster's name
                     tgt = self.by_name(other)
@@ -3196,7 +3232,7 @@ class SpeakerTracker:
                     elif dur >= self._f("speaker_new_min_s"):
                         sid, member = self._new_cluster(), True
                     log(f"speakers: a line of {best} goes to {sid or 'nobody'} (the voice is {other}'s)")
-                elif best is not None and score >= self._f("speaker_join"):
+                elif joins:
                     sid, member = best, True
                 elif dur >= self._f("speaker_new_min_s"):
                     sid, member = self._new_cluster(), True
@@ -3283,7 +3319,7 @@ class SpeakerTracker:
                 named, plain = (sid, o) if c["name"] else (other, c)
                 if self._lib_other(named, plain["centroid"]):
                     continue
-            if float(np.dot(c["centroid"], o["centroid"])) >= self._f("speaker_automerge"):
+            if float(np.dot(c["centroid"], o["centroid"])) >= self._merge_thr(sid, other):
                 keep, drop = sorted((sid, other), key=lambda s: int(s[1:]))   # the older label stays
                 log(f"speakers: {drop} merged into {keep} (same voice)")
                 self._merge(drop, keep)

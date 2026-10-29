@@ -21,7 +21,7 @@
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk' },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
-      saidIt: 'Said it', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
+      saidIt: 'Said it', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
       unverified: 'Not verified against documents',
       next: (t, m) => `${t} in ${m} min`, notPrepared: 'not prepared', ready: 'brief ready', preparing: 'preparing', prepare: 'Prepare', open: 'Open',
       ask: 'Ask about this project', help: 'Help',
@@ -73,7 +73,7 @@
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик' },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
-      saidIt: 'Сказав', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
+      saidIt: 'Сказав', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
       unverified: 'Не звірено з документами',
       next: (t, m) => `${t} за ${m} хв`, notPrepared: 'не підготовлено', ready: 'бриф готовий', preparing: 'готується', prepare: 'Підготувати', open: 'Відкрити',
       ask: 'Запитай про проєкт', help: 'Допоможи',
@@ -597,7 +597,7 @@
     let body = '';
     if (tab === 'transcript') {
       const unknown = Object.entries(S.speakers).find(([sid, s]) => /^S\d+$/i.test(sid) && !s.name);
-      const sugBtns = (sid, sp) => (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-act="name-pick" data-sid="${esc(sid)}" data-name="${esc(x.name)}" title="${Math.round(x.score * 100)}%">${esc(x.name)}</button>`).join('');
+      const sugBtns = (sid, sp) => (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-act="name-pick" data-sid="${esc(sid)}" data-name="${esc(x.name)}" title="${x.score == null ? esc(T().notByVoice) : Math.round(x.score * 100) + '%'}">${esc(x.name)}</button>`).join('');
       body = (unknown ? `<div class="newvoice">${ICON.person}<span class="t">${esc(t.newVoice)} <b>${esc(unknown[1].label || unknown[0])}</b></span>${sugBtns(unknown[0], unknown[1])}<button class="link" type="button" data-act="name" data-sid="${esc(unknown[0])}">${esc(t.name)}</button></div>` : '') +
         S.transcript.map((l, i) => {
           const sp = S.speakers[l.speakerId] || {};
@@ -711,7 +711,7 @@
     const r = anchor.getBoundingClientRect();
     pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 270)) + 'px';
     let side = sp.side || 'client';
-    const sug = (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-pick="${esc(x.name)}">${esc(x.name)} <span class="m">${Math.round(x.score * 100)}%</span></button>`).join('');
+    const sug = (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-pick="${esc(x.name)}">${esc(x.name)}${x.score == null ? '' : ` <span class="m">${Math.round(x.score * 100)}%</span>`}</button>`).join('');
     const known = (S.knownNames || []).filter((n) => !(sp.suggestions || []).some((x) => x.name === n));
     pop.innerHTML = `${sug ? `<div class="sugs">${sug}</div>` : ''}<label class="meta" for="spName">${esc(t.name)}</label><input id="spName" type="text" list="spKnown" value="${esc(sp.name || '')}">
       <datalist id="spKnown">${known.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>

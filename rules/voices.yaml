@@ -16,4 +16,10 @@ learning:
   rule: the library learns a voice only from a speaker the PM named (a name given by the meeting series roster is not learned until the PM confirms or renames it), and only from the lines that sound like that speaker's other lines
   core: speaker_lib_learn (0.5, mean cosine of a line to the speaker's other lines)
   mixed: when fewer than half of the lines are in the core, the speaker sounds like more than one voice and nothing is learned
-suggestions: the window shows up to 3 library names (score 0.5 and more, participants first) as one-click names
+thresholds:
+  rule: one line's voice print is noisy (two lines of one person agree at about speaker_same_rho, 0.5, measured on the voice library), so the closeness needed grows with the number of lines behind each side; a fixed threshold let a similar second voice join the first speaker before it formed its own
+  expected_same: rho / sqrt((rho + (1 - rho) / n) * (rho + (1 - rho) / m)) for n and m lines
+  join: a line joins a speaker from speaker_join_k (0.85) x expected_same(1, lines of the speaker), never below speaker_join (0.45)
+  automerge: two speakers merge from speaker_merge_k (0.9) x expected_same(their lines), never below speaker_automerge (0.6)
+  check: a replay of two similar voices (cross 0.78 of rho) kept 0.92 of lines with the right speaker (0.59 with the fixed thresholds); more small speakers are the price, and naming two of them with one name joins them
+suggestions: the window shows up to 3 library names (score 0.5 and more, participants first) as one-click names; with no voice match, up to 4 people of the meeting series and the calendar event who have no speaker yet (the PM excluded), marked as not matched by voice. Every speakers update carries them, not only the "Who is speaking?" ask

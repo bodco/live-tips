@@ -94,12 +94,14 @@ def test_library_learns_only_a_clean_named_voice(T, tmp_path):
     L = lib(T, tmp_path, {"Mariia H.": vec(0)})
     sp = tracker(T, tmp_path, L)
     T.DEFAULTS["speaker_join"] = -1.0             # two voices in one cluster, as on the call
+    T.DEFAULTS["speaker_join_k"] = 0.0
     try:
         a = sp.observe("10:00:01", 0, 3, vec(2), 3.0, "one")
         for i, v in enumerate([vec(2, 3, 0.1), vec(3), vec(3, 2, 0.1)]):
             sp.observe(f"10:00:1{i}", 10 + i * 4, 13 + i * 4, v, 3.0, "x")
     finally:
         T.DEFAULTS["speaker_join"] = 0.45
+        T.DEFAULTS["speaker_join_k"] = 0.85
     sp.apply_setting("speaker_name", f"{a}|Olena S.")
     assert "Olena S." not in L.people                     # sounds like more than one voice
     (tmp_path / "x").mkdir()
@@ -115,3 +117,36 @@ def test_window_language_uk_means_ukrainian_only(T):
     src = SRC.read_text(encoding="utf-8")
     assert 'LANG_SETS = {"uk": ("uk", [], ["uk"]), "en": ("en", [], ["en"]),' in src
     assert T.NOT_ENGLISH.search("Dostup do Wołewski w Tobie jest") and not T.NOT_ENGLISH.search("I'll hold that.")
+
+
+def test_similar_voices_stay_apart(T, tmp_path):
+    """rules/voices.yaml > thresholds: two similar voices (like two colleagues on one call) are not one speaker."""
+    from collections import Counter
+    pur = []
+    for seed in range(8):
+        rng = np.random.default_rng(seed)
+        base = rng.normal(size=128); base /= np.linalg.norm(base)
+        P = []
+        for _ in range(2):
+            r = rng.normal(size=128); r -= r.dot(base) * base; r /= np.linalg.norm(r)
+            P.append(np.sqrt(0.78) * base + np.sqrt(0.22) * r)
+        d = tmp_path / str(seed); d.mkdir()
+        sp = T.SpeakerTracker({"participants": []}, d / "s.speakers.json", library=None)
+        truth, ts, who = [], [], 0
+        for k in range(80):
+            if rng.random() < 0.35:
+                who = int(rng.integers(2))
+            z = rng.normal(size=128); z /= np.linalg.norm(z)
+            t = "10:%02d:%02d" % (k // 60, k % 60)
+            sp.observe(t, k * 5, k * 5 + 3, list(np.sqrt(0.5) * P[who] + np.sqrt(0.5) * z), 3.0, "x")
+            truth.append(who); ts.append(t)
+        lab = [sp.resolve(sp.overrides.get(t) or sp.segs[t]["sid"]) for t in ts]
+        pur.append(sum(max(Counter(w for w, l in zip(truth, lab) if l == c).values()) for c in set(lab)) / 80)
+    assert np.mean(pur) >= 0.85
+
+
+def test_people_of_the_meeting_are_offered_without_a_voice_match(T, tmp_path):
+    L = lib(T, tmp_path, {"Mariia H.": vec(0)})
+    sp = T.SpeakerTracker({"participants": ["Ann Lee", "Mike Johnson"], "name_aliases": ["Mike"]}, tmp_path / "s.speakers.json", library=L)
+    a = sp.observe("10:00:01", 0, 3, vec(5), 3.0, "hello")
+    assert [x["name"] for x in sp.clusters[a]["suggestions"]] == ["Ann L."] and sp.clusters[a]["suggestions"][0]["score"] is None

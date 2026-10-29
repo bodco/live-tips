@@ -246,7 +246,7 @@
         const sid = it.sid; if (!sid) return false;
         if (!this.speakers[sid]) this.speakers[sid] = { name: '', side: '', label: this.tr('speakerN', { n: String(sid).replace(/^S/i, '') }) };
         // 0.8.5 fix: the recorder's suggestions from the voice library (best first) are offered as one-click names again.
-        const sug = (it.suggestions || []).filter((x) => x && x.name && (+x.score || 0) >= 0.5).slice(0, 3).map((x) => ({ name: clean(x.name), score: +x.score || 0 }));
+        const sug = pickSug(it.suggestions);
         this.speakers[sid] = Object.assign({}, this.speakers[sid], { suggestions: sug, quote: clean(it.quote || '') });
         if (Array.isArray(it.known)) this.known = it.known.map(clean).filter((x) => x && !/^[a-z]+\.[a-z]+$/.test(x)).slice(0, 40);
         return true;
@@ -404,13 +404,20 @@
     this.emit();
   };
 
+  /** Voice matches (score 0.5+) or, with none, the people of the series and the event (score null, 0.8.5 owner). */
+  function pickSug(list) {
+    return (list || []).filter((x) => x && x.name && (x.score == null || (+x.score || 0) >= 0.5)).slice(0, 4)
+      .map((x) => ({ name: clean(x.name), score: x.score == null ? null : +x.score || 0 }));
+  }
   Feed.prototype.setSpeakers = function (d) {
     if (!d || typeof d !== 'object') return;
     const cl = d.clusters || {};
     for (const sid of Object.keys(cl)) {
       const c = cl[sid] || {};
       this.speakers[sid] = Object.assign({ label: this.tr('speakerN', { n: sid.replace(/^S/i, '') }) }, this.speakers[sid],
-                                         { name: c.name ? clean(c.name) : '', side: c.side || (this.speakers[sid] || {}).side || '' });
+                                         { name: c.name ? clean(c.name) : '', side: c.side || (this.speakers[sid] || {}).side || '' },
+                                         // 0.8.5 (owner): the suggestions of every update, not only of the "Who is speaking?" ask
+                                         c.name ? { suggestions: [] } : (Array.isArray(c.suggestions) ? { suggestions: pickSug(c.suggestions) } : {}));
     }
     // The roster's sides, so a suggested name keeps its side (team or client) when picked with one click.
     this.rosterSide = {};

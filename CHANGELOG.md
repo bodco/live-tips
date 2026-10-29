@@ -65,6 +65,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   set is recognised again in the main language.
 - **Voices:** the voice library learns only from a speaker you named and only from the lines that sound like
   that speaker, so one mixed-up call no longer blurs a person's voice for the next calls.
+  How close a voice must be to join a speaker or to merge two speakers now grows with the number of lines behind
+  them (one line's voice print is noisy), so two similar colleagues stay apart. With no voice match, the name
+  popover offers the people of the meeting series and the calendar event.
 - **Meeting page:** a quote inside the summary no longer stops the Notion page (the JSON is repaired or asked
   again), and Send last call to Notion in the menu works after the app restarts.
 - **Skill and app behave the same:** the time line, the advice and "Move to slide N?" are computed once by the

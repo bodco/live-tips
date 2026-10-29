@@ -75,6 +75,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   it Ukrainian and names came out worse.
 - **Meeting page:** a quote inside the summary no longer stops the Notion page (the JSON is repaired or asked
   again), and Send last call to Notion in the menu works after the app restarts.
+- **Bluetooth headsets:** with AirPods or another Bluetooth headset as the default input, Pacenote records you
+  from the Mac's built-in microphone and leaves the headset to the call app (a second app on a Bluetooth mic, and
+  every restart of it, made the headset cut in and out for the call too). A chosen input in the Mic menu still wins.
 - **What each stage costs:** every model request (live tips, the meeting page, the after-call drafts, the judge)
   and every preparation adds one line to `state/spend-ledger.jsonl` (stage, route, model, tokens, price; never
   the text), and `<stem>.prep.json` keeps the preparation's price, time and tokens.

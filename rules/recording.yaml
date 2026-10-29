@@ -19,3 +19,8 @@ states:
 clears: by itself as soon as the silent side has sound again
 show: a red strip under the window title, the tips area replaced by the state, the Mic and Call levels
 who: the app window; the skill's window shows the same status line it always had (no change there)
+microphone:
+  # 0.8.5 (owner, 29.10: the headset cut in and out on the call, the others heard it too, until the built-in pair was used)
+  bluetooth_default: when the mic setting is "default" and the system default input is a Bluetooth headset (AirPods and the like), Pacenote records the PM from the Mac's built-in microphone and leaves the headset to the call app; a second app on a Bluetooth mic and every restart of it renegotiate the link, and the call hears the gaps
+  restarts: a default-input change that leaves the chosen device the same restarts nothing
+  override: the mic menu (a chosen input) still records from any device, the headset included

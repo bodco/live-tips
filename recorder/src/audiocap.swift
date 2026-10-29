@@ -390,7 +390,26 @@ func targetMicDevice() -> AudioDeviceID? {
             log("chosen input \(micUID) not found, using the default input")
         }
     }
+    // rules/recording.yaml > microphone.bluetooth_default: a Bluetooth headset stays with the call app.
+    if let d = defaultDevice(kAudioHardwarePropertyDefaultInputDevice), isBluetooth(d),
+       let b = allDevices().first(where: { hasInputChannels($0) && isBuiltIn($0) }) {
+        if lastBluetoothNote != d {
+            lastBluetoothNote = d
+            log("default input is a Bluetooth headset (\(deviceName(d))): recording from the built-in microphone, the headset stays with the call")
+        }
+        return b
+    }
     return defaultDevice(kAudioHardwarePropertyDefaultInputDevice)
+}
+
+var lastBluetoothNote = AudioDeviceID(kAudioObjectUnknown)
+
+func isBluetooth(_ dev: AudioDeviceID) -> Bool {
+    var addr = systemAddress(kAudioDevicePropertyTransportType)
+    var t: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    guard AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, &t) == noErr else { return false }
+    return t == UInt32(kAudioDeviceTransportTypeBluetooth) || t == UInt32(kAudioDeviceTransportTypeBluetoothLE)
 }
 
 /// JSON list of every input device the Mac sees now (for the window's Mic menu): uid, name, builtin, default.
@@ -628,6 +647,7 @@ final class DirectMic {
         var addr = systemAddress(kAudioHardwarePropertyDefaultInputDevice)
         AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, .main) { [weak self] _, _ in
             guard let self, micMode == "default" else { return }
+            if let t = targetMicDevice(), t == self.dev { return }      // recording.yaml > microphone.restarts
             self.scheduleRestart("default input changed")
         }
     }

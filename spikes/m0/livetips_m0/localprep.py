@@ -142,7 +142,8 @@ Open after the call: what is still unanswered or undecided."""
 BRIEF_SYS = """You prepare the PM for a work call: a Live Brief the PM reads before the call and keeps open during it.
 Use only the material given (notes of earlier calls, project config, Current State, digest, the PM's context and
 files). Never invent facts, names, numbers or dates; when something is unknown or may be old, say so and what to
-check. Newer facts win. Write the brief in {BRIEF_LANG}; quotes and ready phrases in the call language ({CALL_LANG}).
+check. Newer facts win. Write the brief in the language the project config asks for the brief, else in {BRIEF_LANG}; quotes and ready
+phrases in the call language ({CALL_LANG}).
 No long dashes. Be concrete and detailed (1500-2500 words): dates, numbers, ticket keys, who said what.
 
 Start with exactly this first line: {HEAD}
@@ -184,20 +185,22 @@ Opening: "<one ready sentence>"
 6-9 points: what changed since the last call, open questions to the other side, what comes next. Every point has its
 "> " full text."""
 
-CARDS_SYS = """From the brief, write the instant cards and the fact book of the call, following the skill's rules below.
-Answer with exactly two parts and nothing else:
-===CARDS===
-<a JSON list of 15-30 cards: {{"id","triggers","on","level","gist","phrase","note","cooldown_s"}}; triggers are
-lowercase distinctive phrases in every call language ({LANGS}), never one common word; gist in {BRIEF_LANG} with an
-emoji; phrase in {CALL_LANG}, ready to say>
-===FACTS===
-<a JSON list of 40-80 facts: {{"id","title","text","keywords","source"}}; text with the numbers and dates; keywords in
-every call language; source = the call date or the document>"""
+CARDS_SYS = """From the brief, write the instant cards of the call, following the skill's rules below. Answer with
+one JSON list and nothing else: 15-25 cards {{"id","triggers","on","level","gist","phrase","note","cooldown_s"}};
+triggers are lowercase distinctive phrases in every call language ({LANGS}), never one common word; gist in
+{BRIEF_LANG} with an emoji; phrase in {CALL_LANG}, ready to say. Keep each card short."""
+
+FACTS_SYS = """From the brief and the notes, write the fact book of the call, following the skill's rules below.
+Answer with one JSON list and nothing else: 40-70 facts {{"id","title","text","keywords","source"}}; text with the
+numbers, dates and names (one or two sentences); keywords in every call language ({LANGS}); source = the call date
+or the document. Never invent a fact."""
 
 
 def ollama_chat(url: str, model: str, system: str, user: str, on_tokens, max_out: int = 6000) -> dict:
     # 0.8.5: a cap on every pass and a repeat penalty: one pass looped for 25 minutes without them
-    body = json.dumps({"model": model, "stream": True, "keep_alive": "5m",
+    # 0.8.5: "think": false. Gemma 4 thinks by default and the thinking ate each pass's output cap (empty notes and
+    # speech in the second test); the brief needs the answer, not the reasoning.
+    body = json.dumps({"model": model, "stream": True, "keep_alive": "5m", "think": False,
                        "options": {"num_ctx": NUM_CTX, "temperature": 0.3, "num_predict": max_out, "repeat_penalty": 1.1},
                        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}).encode()
     req = urllib.request.Request(url.rstrip("/") + "/api/chat", data=body, headers={"Content-Type": "application/json"})
@@ -222,13 +225,26 @@ def ollama_chat(url: str, model: str, system: str, user: str, on_tokens, max_out
 
 
 def as_list(s: str) -> list:
+    """A JSON list from a model reply; a list cut off by the output cap keeps its complete objects."""
     s = re.sub(r"^```(?:json)?\s*|\s*```$", "", (s or "").strip())
-    i, j = s.find("["), s.rfind("]")
+    i = s.find("[")
+    if i < 0:
+        return []
+    j = s.rfind("]")
     try:
-        v = json.loads(s[i:j + 1]) if i >= 0 and j > i else []
+        v = json.loads(s[i:j + 1]) if j > i else None
+        if isinstance(v, list):
+            return v
     except ValueError:
-        v = []
-    return v if isinstance(v, list) else []
+        pass
+    k = s.rfind("},")
+    while k > i:
+        try:
+            v = json.loads(s[i:k + 1] + "]")
+            return v if isinstance(v, list) else []
+        except ValueError:
+            k = s.rfind("},", i, k)
+    return []
 
 
 def split_parts(text: str) -> tuple:
@@ -265,7 +281,7 @@ def main(argv=None) -> int:
            "sources": [], "passes": []}
     url, model = r.get("url") or "http://127.0.0.1:11434", r["model"]
 
-    caps = {"notes": 1500, "brief": 6000, "speech": 1800, "cards": 7000}
+    caps = {"notes": 2500, "brief": 7000, "speech": 3000, "cards": 5000, "facts": 8000}
 
     def ask(name: str, system: str, user: str) -> str:
         t = time.time()
@@ -314,9 +330,12 @@ def main(argv=None) -> int:
         say(stage="model", pass_="cards")
         rules = read_text(os.path.join(r["skill"], "references/sweep.md"), 40_000)
         m = re.search(r"\*\*Instant cards.*?(?=^## Refresh)", rules, re.S | re.M)
-        cf = ask("cards", CARDS_SYS.format(BRIEF_LANG=brief_lang, CALL_LANG=call_lang, LANGS=langs),
-                 f"{call}\n\n## The skill's rules for cards and facts\n{m.group(0) if m else rules[:15000]}\n\n## The brief\n{brief}")
-        _, cards, facts = split_parts("===BRIEF===\nx\n" + cf)
+        cr = m.group(0) if m else rules[:15000]
+        cards = as_list(ask("cards", CARDS_SYS.format(BRIEF_LANG=brief_lang, CALL_LANG=call_lang, LANGS=langs),
+                            f"{call}\n\n## The skill's rules for cards and facts\n{cr}\n\n## The brief\n{brief}"))
+        say(stage="model", pass_="facts")
+        facts = as_list(ask("facts", FACTS_SYS.format(LANGS=langs),
+                            f"{call}\n\n## The skill's rules for cards and facts\n{cr}\n\n## The brief\n{brief}\n\n## Notes of the earlier calls\n{notes_txt}"))
 
         base = r["base"]
         Path(base + ".brief.md").write_text(brief.rstrip() + "\n\nSources (local model): " + "; ".join(res["sources"]) + "\n",

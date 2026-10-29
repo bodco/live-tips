@@ -253,7 +253,7 @@ class OllamaProvider(Provider):
 
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         c = Completion(model=model, t_start=time.monotonic())
-        body = {"model": model, "stream": True, "keep_alive": "5m",
+        body = {"model": model, "stream": True, "keep_alive": "5m", "think": False,   # Gemma 4 thinks by default
                 "options": {"num_ctx": self.num_ctx, "num_predict": max(256, int(max_tokens) * 2), "temperature": 0.2},
                 "messages": [{"role": "system", "content": "\n\n".join(b["text"] for b in system)},
                              {"role": "user", "content": user_text(user)}]}

@@ -119,3 +119,9 @@ def test_localprep_reads_the_three_parts():
                                       '===FACTS===\n[{"id": "f1", "title": "t", "text": "x", "keywords": ["k"]}]')
     assert brief.startswith("# Live Brief") and cards[0]["id"] == "c1" and facts[0]["id"] == "f1"
     assert split_parts("nothing")[0] == ""
+
+
+def test_localprep_keeps_the_complete_objects_of_a_cut_list():
+    from livetips_m0.localprep import as_list
+    assert as_list('[{"id": "a"}, {"id": "b"}, {"id": "c", "te') == [{"id": "a"}, {"id": "b"}]
+    assert as_list('```json\n[{"id": "a"}]\n```') == [{"id": "a"}]

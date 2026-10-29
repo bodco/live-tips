@@ -299,3 +299,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .tl.gone .tx{text-decoration:line-through;color:var(--text-3)}
 .tl.gone .hover-acts{opacity:1}
 .hero .items.pts li.pt{padding:2px 4px 2px 18px}
+.brief li.pt{list-style:none;margin-left:-14px}
+.brief li.pt summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:baseline}
+.brief li.pt summary::-webkit-details-marker{display:none}
+.brief li.pt summary::before{content:"";flex:none;width:6px;height:6px;border-right:1.5px solid var(--text-3);border-bottom:1.5px solid var(--text-3);transform:rotate(-45deg);transition:transform .12s;position:relative;top:-1px}
+.brief li.pt details[open]>summary::before{transform:rotate(45deg)}
+.brief li.pt details p{margin:4px 0 8px 14px;color:var(--text);user-select:text}

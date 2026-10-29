@@ -111,10 +111,22 @@ final class PrepRunner: ObservableObject {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let w = (workRoot as NSString).expandingTildeInPath
         var c: [String] = []
-        if let d = UserDefaults.standard.string(forKey: "prepSkillDir"), !d.isEmpty { c.append((d as NSString).expandingTildeInPath) }
+        let fm = FileManager.default
+        let has = { (d: String) in fm.fileExists(atPath: (d as NSString).appendingPathComponent("SKILL.md")) }
+        if let d = UserDefaults.standard.string(forKey: "prepSkillDir"), !d.isEmpty, has((d as NSString).expandingTildeInPath) {
+            return (d as NSString).expandingTildeInPath           // chosen by hand: always wins
+        }
         c += [home + "/.claude/skills/live-tips", w + "/Skills/src/live-tips", w + "/live-tips/skill", w + "/Control Tower/plugin/skills/live-tips"]
         if let r = Bundle.main.resourcePath { c.append((r as NSString).appendingPathComponent("skill")) }   // 2026-10-29: the copy inside the app
-        return c.first { FileManager.default.fileExists(atPath: ($0 as NSString).appendingPathComponent("SKILL.md")) }
+        // 0.8.5 (owner: the speech points had no full text): an older copy of the skill was found first and the
+        // preparation followed its old rules. The newest copy wins (by its newest file among SKILL.md and references).
+        func newest(_ d: String) -> Date {
+            var files = [(d as NSString).appendingPathComponent("SKILL.md")]
+            let refs = (d as NSString).appendingPathComponent("references")
+            files += ((try? fm.contentsOfDirectory(atPath: refs)) ?? []).map { (refs as NSString).appendingPathComponent($0) }
+            return files.compactMap { (try? fm.attributesOfItem(atPath: $0))?[.modificationDate] as? Date }.max() ?? .distantPast
+        }
+        return c.filter(has).max { newest($0) < newest($1) }
     }
 
     struct Request {

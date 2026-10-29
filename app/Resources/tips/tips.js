@@ -582,7 +582,9 @@
         <div class="ctl"><button class="btn1" type="button" data-act="brief-save">${esc(t.save)}</button><button class="btn2" type="button" data-act="brief-cancel">${esc(t.cancel)}</button></div>`;
     }
     if (!b) return `<p class="meta">${esc(t.noBriefYet)}</p>`;
-    return `<div class="brief">${b.goal ? `<p><b>${esc(b.goal)}</b></p>` : ''}${(b.sections || []).map((s) => `<h3>${esc(s.title)}</h3><ul>${s.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`).join('')}</div>
+    return `<div class="brief">${b.goal ? `<p><b>${esc(b.goal)}</b></p>` : ''}${(b.sections || []).map((s) => `<h3>${esc(s.title)}</h3><ul>${s.items.map((i, k) => (s.fulls || [])[k]
+      ? `<li class="pt"><details data-pt="${esc('brief:' + s.title + ':' + k)}"${S.ui.openPts['brief:' + s.title + ':' + k] ? ' open' : ''}><summary>${esc(i)}</summary><p>${esc(s.fulls[k])}</p></details></li>`
+      : `<li>${esc(i)}</li>`).join('')}</ul>`).join('')}</div>
       ${S.briefText ? `<div><button class="link" type="button" data-act="brief-edit">${esc(t.edit)}</button></div>` : ''}`;
   }
 

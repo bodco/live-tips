@@ -438,14 +438,14 @@
     // 0.8.5 (owner): the whole brief, not only bullet lines: numbered items, paragraphs, a wrapped line joined to
     // its item and table rows as "a · b · c", so each point keeps its sentences.
     let lastItem = false;
-    const add = (t) => { if (!sec) { sec = { title: '', items: [] }; b.sections.push(sec); } sec.items.push(clean(t.replace(/\*\*/g, ''))); lastItem = true; };
+    const add = (t) => { if (!sec) { sec = { title: '', items: [], fulls: [] }; b.sections.push(sec); } sec.items.push(clean(t.replace(/\*\*/g, ''))); sec.fulls.push(''); lastItem = true; };
     for (const raw of this.briefText.split('\n')) {
       const line = raw.trim();
       let m;
       if (!line) { lastItem = false; continue; }
       if (/^#\s/.test(line)) { lastItem = false; continue; }      // the document title
       if ((m = /^\*\*(?:goal|мета|ціль)\s*:?\*\*\s*:?\s*(.+)$/i.exec(line))) { b.goal = clean(m[1].replace(/\*\*/g, '')); lastItem = false; continue; }
-      if ((m = /^#{2,4}\s+(.+)$/.exec(line))) { sec = { title: clean(m[1].replace(/\*\*/g, '')), items: [] }; b.sections.push(sec); lastItem = false; continue; }
+      if ((m = /^#{2,4}\s+(.+)$/.exec(line))) { sec = { title: clean(m[1].replace(/\*\*/g, '')), items: [], fulls: [] }; b.sections.push(sec); lastItem = false; continue; }
       if ((m = /^[-*]\s+\[( |x|X)\]\s+(.+)$/.exec(line))) {
         const text = clean(m[2].replace(/\*\*/g, ''));
         checklist.push({ id: 'b' + checklist.length, title: text, done: m[1] !== ' ', cur: false });
@@ -455,7 +455,9 @@
       if (/^\|?\s*:?-{3,}/.test(line)) continue;                   // a table's separator row
       if (line.startsWith('|')) { add(line.replace(/^\||\|$/g, '').split('|').map((x) => x.trim()).filter(Boolean).join(' · ')); continue; }
       if ((m = /^(?:[-*•]|\d+[.)])\s+(.+)$/.exec(line))) { add(m[1]); continue; }
-      if (lastItem && (/^\s{2,}/.test(raw) || line.startsWith('>')) && sec && sec.items.length) { sec.items[sec.items.length - 1] += ' ' + clean(line.replace(/^>\s*/, '').replace(/\*\*/g, '')); continue; }
+      // 0.8.5 (owner): "> " lines under a point are its full text (speech.md); the Brief tab opens them like the card.
+      if (lastItem && line.startsWith('>') && sec && sec.items.length) { const k = sec.items.length - 1; sec.fulls[k] = clean((sec.fulls[k] + ' ' + line.replace(/^>\s*/, '')).replace(/\*\*/g, '')); continue; }
+      if (lastItem && /^\s{2,}/.test(raw) && sec && sec.items.length) { sec.items[sec.items.length - 1] += ' ' + clean(line.replace(/\*\*/g, '')); continue; }
       add(line.replace(/^>\s*/, ''));
     }
     b.sections = b.sections.filter((s) => s.items.length);

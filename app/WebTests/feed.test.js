@@ -280,7 +280,8 @@ test('speech: a point keeps its full text; a "> " line under a brief point joins
   assert.deepStrictEqual(c.items, ['Done', '1. Release on Tuesday']);
   assert.deepStrictEqual(c.fulls, ['', 'The release goes out on Tuesday after the smoke test.']);
   f.setPrepDoc({ text: '## My update\n1. Release on Tuesday\n   > After the smoke test.\n', at: '09:40' });
-  assert.deepStrictEqual(get().brief.sections[0].items, ['Release on Tuesday After the smoke test.']);
+  assert.deepStrictEqual(get().brief.sections[0].items, ['Release on Tuesday']);
+  assert.deepStrictEqual(get().brief.sections[0].fulls, ['After the smoke test.']);
 });
 
 console.log(`feed tests: ${passed} passed, ${failures} failed`);

@@ -55,7 +55,9 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **One preparation, one call:** a preparation finished before a held call of its series ended belongs to that
   call; the next call of the series is not shown as prepared by it. Home's Later badges and actions line up.
 - **Your speech, point by point:** each point of the speech is a line that opens to its full text, ready to read
-  aloud (the brief keeps it as "> " lines under the point; the skill and the window use the same format).
+  aloud (the brief keeps it as "> " lines under the point; the skill and the window use the same format). The Brief tab
+  opens those points the same way. Preparing a call uses the newest copy of the skill's instructions (an older copy
+  was found first, so the full texts were never written).
 - **Tips window:** a card picked from Earlier shows Back to latest (or pick the newest card again) to return to the
   automatic order; the speaker name popover opens upward near the bottom of the window. Call settings: the Done
   bar is separated from the form.

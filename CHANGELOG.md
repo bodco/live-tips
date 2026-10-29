@@ -75,6 +75,8 @@ Pacenote. Earlier versions are described in the commit messages and in
   it Ukrainian and names came out worse.
 - **Meeting page:** a quote inside the summary no longer stops the Notion page (the JSON is repaired or asked
   again), and Send last call to Notion in the menu works after the app restarts.
+- **Write draft works on every model:** a model that refuses thinking "disabled" (a 400 on the follow-up draft)
+  gets "between_tools", the form it asks for, and keeps it for the rest of the session.
 - **Speakers in the transcript:** the top of the Transcript tab lists every voice of the call, as in 0.7: named or
   not, what an unnamed one said last, Team or Client in one click, and one-click names. An unknown voice is grey
   like Speaker N (it was purple, as if a client); a line given to a person takes that person's colour.

@@ -86,3 +86,27 @@ def test_wrapup_json_with_a_quote_inside_a_value():
     from livetips_m0.wrapup_notion import parse_object
     out = parse_object('{"name": "Access", "summary": "Ann said "we hand it over" tomorrow", "risks": []}')
     assert out["summary"] == 'Ann said "we hand it over" tomorrow' and out["risks"] == []
+
+
+def test_thinking_disabled_becomes_between_tools_when_the_model_asks():
+    """0.8.5 (owner): "Write draft" failed: the model refuses thinking "disabled" and asks for "between_tools"."""
+    from livetips_m0.providers import AnthropicProvider
+    seen = []
+
+    class P(AnthropicProvider):
+        def __init__(self):
+            pass
+
+        def _complete(self, **kw):
+            from livetips_m0.providers import Completion
+            seen.append(kw["extra"])
+            c = Completion(model=kw["model"], t_start=0)
+            if kw["extra"]["thinking"]["type"] == "disabled":
+                c.error = 'BadRequestError: 400 to turn thinking off on this model, send "thinking": {"type": "between_tools"}'
+            return c
+
+    AnthropicProvider.no_disabled.discard("m-test")
+    c = P().complete(model="m-test", system=[], user="x", max_tokens=10, cache_ttl=None, extra={"thinking": {"type": "disabled"}})
+    assert c.error is None and seen[-1]["thinking"]["type"] == "between_tools"
+    P().complete(model="m-test", system=[], user="x", max_tokens=10, cache_ttl=None, extra={"thinking": {"type": "disabled"}})
+    assert seen[-1]["thinking"]["type"] == "between_tools" and len(seen) == 3

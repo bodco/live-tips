@@ -161,7 +161,34 @@ class AnthropicProvider(Provider):
         headers = {"anthropic-workspace-id": workspace_id} if workspace_id else None
         self.client = anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=1, default_headers=headers)
 
+    # 0.8.5 (owner: "Write draft" failed with 400): some models refuse thinking "disabled" and ask for
+    # "between_tools" instead. Such a model is remembered and gets "between_tools" from then on.
+    no_disabled: set = set()
+
+    @staticmethod
+    def _thinking_off(extra, use_between: bool):
+        if not extra or not use_between:
+            return extra
+        def fix(d):
+            t = d.get("thinking") if isinstance(d, dict) else None
+            if isinstance(t, dict) and t.get("type") == "disabled":
+                d = dict(d, thinking={"type": "between_tools"})
+            return d
+        out = fix(dict(extra))
+        if isinstance(out.get("extra_body"), dict):
+            out["extra_body"] = fix(out["extra_body"])
+        return out
+
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
+        c = self._complete(model=model, system=system, user=user, max_tokens=max_tokens, cache_ttl=cache_ttl, on_text=on_text,
+                           extra=self._thinking_off(extra, model in self.no_disabled))
+        if c.error and "between_tools" in str(c.error) and model not in self.no_disabled and c.text == "":
+            AnthropicProvider.no_disabled.add(model)
+            c = self._complete(model=model, system=system, user=user, max_tokens=max_tokens, cache_ttl=cache_ttl,
+                               on_text=on_text, extra=self._thinking_off(extra, True))
+        return c
+
+    def _complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         c = Completion(model=model, t_start=time.monotonic())
         try:
             with self.client.messages.stream(

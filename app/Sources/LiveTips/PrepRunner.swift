@@ -669,7 +669,7 @@ enum PrepBench {
         guard next < runs.count else { finish(); return }
         let want = (d["title"] as? String ?? "").lowercased()
         guard !want.isEmpty, let ev = CalendarService.shared.upcoming().filter({ $0.title.lowercased().contains(want) && $0.start > Date() })
-                .min(by: { $0.start < $1.start }) else { results.append("no upcoming event with \"\(want)\""); finish(); return }
+                .min(by: { $0.start < $1.start }) ?? CalendarService.shared.next(titleContains: want) else { results.append("no upcoming event with \"\(want)\""); finish(); return }
         let m = StartCallModel()
         m.applyEvent(ev)
         guard let r = m.prepRequest() else { results.append("no project for \(ev.title)"); finish(); return }

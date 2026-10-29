@@ -108,7 +108,21 @@ final class CalendarService: ObservableObject {
         let use = calendars.filter { !excluded.contains($0.calendarIdentifier) }
         guard !use.isEmpty else { events = []; return }
         let now = Date()
-        let pred = store.predicateForEvents(withStart: now.addingTimeInterval(-3 * 3600), end: now.addingTimeInterval(36 * 3600), calendars: use)
+        events = fetch(from: now.addingTimeInterval(-3 * 3600), to: now.addingTimeInterval(36 * 3600), calendars: use)
+    }
+
+    /// 0.8.5: the next event whose title contains a text within `days` (a comparison of preparations, PrepBench).
+    func next(titleContains want: String, days: Double = 14) -> CalEvent? {
+        guard demo == nil, access == .granted else { return nil }
+        let use = calendars.filter { !excluded.contains($0.calendarIdentifier) }
+        guard !use.isEmpty else { return nil }
+        let now = Date()
+        return fetch(from: now, to: now.addingTimeInterval(days * 86400), calendars: use)
+            .first { $0.title.lowercased().contains(want.lowercased()) && $0.start > now }
+    }
+
+    private func fetch(from: Date, to: Date, calendars use: [EKCalendar]) -> [CalEvent] {
+        let pred = store.predicateForEvents(withStart: from, end: to, calendars: use)
         var out: [CalEvent] = []
         for e in store.events(matching: pred) where !e.isAllDay {
             if let me = e.attendees?.first(where: { $0.isCurrentUser }), me.participantStatus == .declined { continue }
@@ -131,7 +145,7 @@ final class CalendarService: ObservableObject {
                                 color: e.calendar.color ?? .systemBlue, attendees: names, link: Self.meetingLink(in: text),
                                 recurring: e.hasRecurrenceRules))
         }
-        events = out.sorted { $0.start < $1.start }
+        return out.sorted { $0.start < $1.start }
     }
 
     nonisolated static func meetingLink(in text: String) -> String? {

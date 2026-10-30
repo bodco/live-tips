@@ -3970,7 +3970,24 @@ def main() -> int:
     ap.add_argument("--fake-whisper", action="store_true", help="test mode without MLX")
     ap.add_argument("--voices-check", action="store_true",
                     help="load the speaker model, run a self-test, print one line and exit (install-voices.sh)")
+    # 0.8.6 (rules/transcribe.yaml): transcribe a recording instead of a live call
+    ap.add_argument("--from-file", dest="from_file", help="a WAV (16 kHz mono) to transcribe; see src/fromfile.py")
+    ap.add_argument("--out")
+    ap.add_argument("--speakers", type=int, default=0, help="--from-file: how many people speak (0 = find out)")
+    ap.add_argument("--source", choices=["file", "link"])
+    ap.add_argument("--source-ref", dest="source_ref")
+    ap.add_argument("--people")
+    ap.add_argument("--workspace")
+    ap.add_argument("--when")
+    ap.add_argument("--ui-lang", dest="ui_lang")
+    ap.add_argument("--no-speakers", dest="no_speakers", action="store_true")
     args = ap.parse_args()
+    if args.from_file:
+        if not args.out:
+            sys.exit("--from-file needs --out")
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import fromfile
+        return fromfile.run(args, sys.modules[__name__])
     if args.voices_check:
         vcfg = dict(DEFAULTS)
         try:

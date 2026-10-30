@@ -79,7 +79,7 @@ final class CallEngine {
         let fm = FileManager.default
         guard fm.fileExists(atPath: (core as NSString).appendingPathComponent("VERSION")) else { return }   // dev build
         var restored: [String] = []
-        for rel in ["src/transcriber.py", "src/semantic.py", "bin/lt", "bin/read_delta.py", "bin/audiocap"] {
+        for rel in ["src/transcriber.py", "src/semantic.py", "src/fromfile.py", "src/fetchlink.py", "bin/lt", "bin/read_delta.py", "bin/audiocap"] {
             let src = (core as NSString).appendingPathComponent(rel), dst = (appRoot as NSString).appendingPathComponent(rel)
             guard let a = fm.contents(atPath: src) else { continue }
             if fm.contents(atPath: dst) == a { continue }
@@ -215,6 +215,7 @@ final class CallEngine {
                 if let file = st.file ?? self.lastFile, apiAllowed {
                     self.writeToNotion(file: file)
                     self.runJudge(file: file)          // background, optional: never blocks the UI or the call
+                    self.notionTasksAfterCall(file: file)
                 }
             }
         }
@@ -405,7 +406,10 @@ final class CallEngine {
             notionResult = "Notion: add the Notion token in Settings > Notion"; notify(notionResult, settingsTab: "notion"); return
         }
         let hasConfig = !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig)
-        guard hasConfig || !c.notionMeetingsDB.isEmpty else {
+        // 0.8.6 (C): a project without a config may send its pages to its own database (Settings > Notion)
+        let slug = (callRequest["slug"] as? String) ?? ""
+        let meetingsDB = c.notionMeetingsDBByProject[slug].flatMap { $0.isEmpty ? nil : $0 } ?? c.notionMeetingsDB
+        guard hasConfig || !meetingsDB.isEmpty else {
             notionResult = "Notion: choose where meeting pages go (Settings > Notion). Then use Send last call to Notion in the menu."; notify(notionResult, settingsTab: "notion"); return
         }
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
@@ -417,7 +421,7 @@ final class CallEngine {
                        "--lt", c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt"),
                        "--model", c.models.analysis, "--project-name", projectName]   // 0.8.2: the "After the call" model
             + (hasConfig ? ["--project-config", projectConfig] : [])
-            + (c.notionMeetingsDB.isEmpty ? [] : ["--meetings-db", c.notionMeetingsDB])
+            + (meetingsDB.isEmpty ? [] : ["--meetings-db", meetingsDB])
             + (renamed.map { ["--title", $0] } ?? [])
             + ((callRequest["scheduled_at"] as? String).map { ["--when", $0] } ?? [])   // the date and time set in Start call
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
@@ -454,6 +458,14 @@ final class CallEngine {
             }
         }
         do { try p.run() } catch { notionResult = "Notion: could not start (\(error.localizedDescription))" }
+    }
+
+    /// 0.8.6 (rules/notion-tasks.yaml > after_call): the PM's open commitments of this call go to his Notion tasks when
+    /// he turned that on. The tips engine writes the register when it stops, so this waits for it.
+    func notionTasksAfterCall(file: String) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 40) {
+            MainActor.assumeIsolated { NotionTasks.shared.afterCall(file: file) }
+        }
     }
 
     /// After the call: the blind judge (Sonnet, at most 25 tips) rates the app's and the skill's tips in the
@@ -548,6 +560,7 @@ final class CallEngine {
             if saved && api {
                 self.writeToNotion(file: file)
                 self.runJudge(file: file)
+                self.notionTasksAfterCall(file: file)
             }
             onDone(file, saved)
         }

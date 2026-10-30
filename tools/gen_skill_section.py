@@ -54,7 +54,7 @@ def render_register(rules_dir: Path = RULES) -> str:
     for k, v in cm["events"].items():
         out.append("- `{}`: `{}`".format(k, v))
     out.append("- id: `{}`; series: `{}`.".format(cm["id"], cm["series_key"]))
-    for k in ("owner", "duplicates", "write_when", "open_on_call", "model_rule_theirs", "model_rule_done", "closing", "export", "order"):
+    for k in ("owner", "duplicates", "write_when", "open_on_call", "model_rule_theirs", "model_rule_done", "closing", "export", "mine", "order"):
         out.append("- {}: {}".format(k.replace("_", " ").capitalize(), cm[k]))
     out.append("")
     out.append("**Brief freshness.** " + fr["about"])

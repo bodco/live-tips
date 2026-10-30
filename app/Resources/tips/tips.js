@@ -27,6 +27,11 @@
       ask: 'Ask about this project', help: 'Help',
       tabs: { transcript: 'Transcript', onme: (n) => `On me · ${n}`, brief: 'Brief' },
       newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team', speakersH: 'Speakers', namedOf: (o) => `${o.n} of ${o.m} named`, notNamed: 'not named yet',
+      toName: 'to name', mins: (o) => o.m < 1 ? '<1 min' : `${o.m} min`, secsSpoken: (o) => `${o.s} s of speech`, soundsLike: (o) => `${o.name} · sounds like ${o.p}%`,
+      typeName: 'Type a name', more: 'More:', samePerson: 'Same person as…', notNow: 'Not now', lastSaid: 'Last said:',
+      mine: 'Mine', mineTip: 'Put this on me', addOnMe: 'Add to On me', fromThisCall: 'From this call', openBefore: 'Open before the call',
+      notionGroup: (o) => `Notion · ${o.p}`, removeItem: 'Remove', removeTip: 'Remove from On you and move to the Notion trash', fromACall: 'from a call',
+      onThem: (o) => `on ${o.w}`, notionRemoved: 'Notion page was removed',
       legend: 'Client in purple, team in blue', following: 'Following live', jump: 'Jump to latest',
       ariaMic: 'Mute microphone', ariaPause: 'Pause listening', ariaProactive: 'Proactive tips',
       proactiveOn: 'Proactive tips: on', proactiveOff: 'Proactive tips: off', resumeShort: 'Resume',
@@ -79,6 +84,11 @@
       ask: 'Запитай про проєкт', help: 'Допоможи',
       tabs: { transcript: 'Транскрипт', onme: (n) => `На мені · ${n}`, brief: 'Бриф' },
       newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда', speakersH: 'Спікери', namedOf: (o) => `названо ${o.n} з ${o.m}`, notNamed: 'ще без імені',
+      toName: 'назвати', mins: (o) => o.m < 1 ? '<1 хв' : `${o.m} хв`, secsSpoken: (o) => `${o.s} с мовлення`, soundsLike: (o) => `${o.name} · схоже на ${o.p}%`,
+      typeName: 'Введіть імʼя', more: 'Ще:', samePerson: 'Та сама людина, що…', notNow: 'Не зараз', lastSaid: 'Останнє:',
+      mine: 'Моє', mineTip: 'Записати на мене', addOnMe: 'Додати в На мені', fromThisCall: 'З цього дзвінка', openBefore: 'Відкриті до дзвінка',
+      notionGroup: (o) => `Notion · ${o.p}`, removeItem: 'Прибрати', removeTip: 'Прибрати з На вас і перенести в кошик Notion', fromACall: 'з дзвінка',
+      onThem: (o) => `на ${o.w}`, notionRemoved: 'Сторінку в Notion видалено',
       legend: 'Клієнт фіолетовим, команда синім', following: 'Слідкую наживо', jump: 'До останнього',
       ariaMic: 'Вимкнути мікрофон', ariaPause: 'Пауза прослуховування', ariaProactive: 'Проактивні підказки',
       proactiveOn: 'Проактивні підказки: увімкнено', proactiveOff: 'Проактивні підказки: вимкнено', resumeShort: 'Продовжити',
@@ -126,7 +136,8 @@
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
-    ui: { spkOpen: null, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
+    openItems: [], notionItems: [], notionProject: '', minePending: [], mineN: 0, spkPrompt: 15,
+    ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
   };
   const T = () => STR[S.lang] || STR.en;
@@ -206,7 +217,7 @@
     const st = $('status');
     st.textContent = al ? al.text : isReady ? t.readyStatus : ended ? t.ended : S.call.paused ? t.paused : (S.call.micOff ? t.muted : t.listening);
     st.classList.toggle('warn', !!(al && al.level === 'warn'));
-    const openOnMe = S.onMe.filter((o) => !o.done).length;
+    const openOnMe = openOnMeCount();
     $('onmeLbl').textContent = t.onMe; $('onmeN').textContent = openOnMe;
     $('onmeBtn').hidden = openOnMe === 0;
     $('onmeBtn').setAttribute('aria-label', t.onMe + ': ' + openOnMe);   // below 460 px only the count is visible
@@ -595,43 +606,26 @@
     const side = (sp && sp.side) || (S.rosterSide && S.rosterSide[n]) || '';
     return side === 'client' ? 'client' : side === 'team' ? 'team' : 'unknown';
   }
-  /** 0.8.5 (owner, back from 0.7): every voice of the call at the top of the transcript: named or not, what it
-   *  said last, Team or Client in one click, and one-click names for the ones still unnamed. */
-  function speakersSummary(sugBtns, unknown) {
-    const t = T();
-    const list = Object.entries(S.speakers).filter(([sid, sp]) => /^S\d+$/i.test(sid) && sp && (sp.name || (sp.seconds || 0) >= 2))
-      .sort((a, b) => (+a[0].slice(1)) - (+b[0].slice(1)));
-    const names = new Set(), rows = [];
-    for (const [sid, sp] of list) {
-      if (sp.name && names.has(sp.name)) continue;        // merged speakers show once
-      if (sp.name) names.add(sp.name);
-      const side = sp.side === 'client' ? 'client' : sp.side === 'team' ? 'team' : 'unknown';
-      rows.push(`<div class="spk-row${sp.name ? '' : ' open'}">
-        <button class="who ${side}" type="button" data-act="name" data-sid="${esc(sid)}">${esc(sp.name || sp.label || sid)}</button>
-        <span class="q" title="${esc(sp.lastQuote || '')}">${sp.name ? '' : esc(t.notNamed) + (sp.lastQuote ? ': ' : '')}${sp.lastQuote ? '\u201c' + esc(sp.lastQuote) + '\u201d' : ''}</span>
-        <span class="seg2 sm"><button type="button" data-act="spk-side" data-sid="${esc(sid)}" data-side="team" aria-pressed="${side === 'team'}">${esc(t.team)}</button><button type="button" data-act="spk-side" data-sid="${esc(sid)}" data-side="client" aria-pressed="${side === 'client'}">${esc(t.client)}</button></span>
-        ${sp.name ? '' : `<div class="sugs">${sugBtns(sid, sp)}</div>`}
-      </div>`);
-    }
-    if (!rows.length) return '';
-    const unnamed = list.filter(([, sp]) => !sp.name).length;
-    const open = S.ui.spkOpen == null ? !!unnamed : S.ui.spkOpen;
-    return `<div class="spks"><button class="spks-h" type="button" data-act="spk-toggle" aria-expanded="${open}"><b>${esc(t.speakersH)}</b><span class="meta">${esc(t.namedOf({ n: rows.length - unnamed, m: rows.length }))}</span></button>${open ? rows.join('') : ''}</div>`;
-  }
+  // 0.8.6 (F): the speakers block lives in speakers.js (shared with the tests).
+  const SPK = window.PacenoteSpeakers;
+  const speakerList = () => SPK.list(S);
+  const cardVoice = (list) => SPK.cardVoice(S, list);
+  const speakersBlock = () => SPK.block(S, T(), esc);
   function renderPane(root, tab, isSheet) {
     const t = T();
-    const openN = S.onMe.filter((o) => !o.done).length;
+    const openN = openOnMeCount();
     const tabs = ['transcript', 'onme', 'brief'];
     if (tab === 'brief' && S.ui.briefEdit && root.querySelector('#briefEdit')) return;   // the PM is typing
     if (tab === 'onme' && S.ui.onmeEdit && root.querySelector('#onmeEditInput')) return;   // 0.8.5: an On me line being reworded
+    const typing = document.activeElement && (document.activeElement.id === 'spkCardName' || document.activeElement.id === 'onmeAdd') && root.contains(document.activeElement);
+    if (typing) return;                                                                         // 0.8.6: the PM is typing a name or a task
     const old = root.querySelector('.panebody');
     const top = old ? old.scrollTop : 0;
     let body = '';
     if (tab === 'transcript') {
       const unknown = Object.entries(S.speakers).find(([sid, s]) => /^S\d+$/i.test(sid) && !s.name);
       const sugBtns = (sid, sp) => (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-act="name-pick" data-sid="${esc(sid)}" data-name="${esc(x.name)}" title="${x.score == null ? esc(T().notByVoice) : Math.round(x.score * 100) + '%'}">${esc(x.name)}</button>`).join('');
-      body = speakersSummary(sugBtns, unknown) +
-        S.transcript.map((l, i) => {
+      body = S.transcript.map((l, i) => {
           const sp = S.speakers[l.speakerId] || {};
           const cls = sp.side === 'client' ? 'client' : sp.side === 'team' ? 'team' : 'unknown';
           const named = /^S\d+$/i.test(l.speakerId);
@@ -646,23 +640,51 @@
           const del = !l.t ? '' : gone
             ? `<button class="ghost" type="button" data-act="line-undel" data-i="${i}">${esc(t.restore)}</button>`
             : `<button class="ghost${S.ui.delArm === k ? ' armed' : ''}" type="button" data-act="line-del" data-i="${i}" title="${esc(t.delTip)}">${esc(S.ui.delArm === k ? t.delConfirm : t.del)}</button>`;
-          return `<div class="tl${gone ? ' gone' : ''}">${btn}<span class="tx">${esc(l.text)}</span><span class="hover-acts">${del}</span></div>`;
+          const mine = !l.t || l.speakerId === 'me' ? '' : `<button class="ghost" type="button" data-act="line-mine" data-i="${i}" title="${esc(t.mineTip)}">${esc(t.mine)}</button>`;
+          return `<div class="tl${gone ? ' gone' : ''}">${btn}<span class="tx">${esc(l.text)}</span><span class="hover-acts">${mine}${del}</span></div>`;
         }).join('');
     } else if (tab === 'onme') {
-      body = S.onMe.length ? S.onMe.map((o) => S.ui.onmeEdit === o.id
+      const item = (o) => S.ui.onmeEdit === o.id
         ? `<div class="onme-item editing"><input id="onmeEditInput" type="text" value="${esc(o.text)}" aria-label="${esc(t.edit)}"><button class="btn1" type="button" data-act="onme-save" data-id="${esc(o.id)}">${esc(t.save)}</button><button class="ghost" type="button" data-act="onme-cancel">${esc(t.cancel)}</button></div>`
         : `<div class="onme-item"><label><input type="checkbox" data-act="onme-toggle" data-id="${esc(o.id)}" ${o.done ? 'checked' : ''}><span><span class="${o.done ? 'struck' : ''}">${esc(o.text)}</span>${o.due ? `<br><span class="meta">${esc(o.due)}</span>` : ''}</span></label>
-          <span class="hover-acts"><button class="ghost" type="button" data-act="onme-edit" data-id="${esc(o.id)}">${esc(t.edit)}</button><button class="ghost" type="button" data-act="onme-notmine" data-id="${esc(o.id)}">${esc(t.notMine)}</button></span></div>`).join('') : `<p class="meta">${esc(t.noItems)}</p>`;
+          <span class="hover-acts"><button class="ghost" type="button" data-act="onme-edit" data-id="${esc(o.id)}">${esc(t.edit)}</button><button class="ghost" type="button" data-act="onme-notmine" data-id="${esc(o.id)}">${esc(t.notMine)}</button></span></div>`;
+      // 0.8.6 (D4): items of the register opened before this call and the PM's Notion tasks of this call's project
+      const ext = (o) => {
+        const sub = [o.badge === 'N' && o.fromCall ? t.fromACall : '', o.mine === false ? t.onThem({ w: o.owner }) : '', o.status || '', o.due || '', o.note === 'removed' ? t.notionRemoved : ''].filter(Boolean).join(' · ');
+        return `<div class="onme-item ext" data-id="${esc(o.id)}"><label><input type="checkbox" data-act="ext-toggle" data-id="${esc(o.id)}" ${o.done ? 'checked' : ''}${o.mine === false ? ' disabled' : ''}><span><span class="badge-src">${esc(o.badge || 'CALL')}</span> <span class="${o.done ? 'struck' : ''}">${esc(o.text)}</span>${sub ? `<br><span class="meta">${esc(sub)}</span>` : ''}</span></label>
+          <span class="hover-acts">${o.mine === false ? `<button class="ghost" type="button" data-act="ext-mine" data-id="${esc(o.id)}">${esc(t.mine)}</button>` : ''}<button class="ghost" type="button" data-act="ext-remove" data-id="${esc(o.id)}" title="${esc(t.removeTip)}" aria-label="${esc(t.removeTip)}">${TRASH}</button></span></div>`;
+      };
+      const pend = S.minePending.filter((p) => !S.onMe.some((o) => o.from === p.tag)).map((p) => ({ id: 'p:' + p.tag, text: p.text, due: '', done: false }));
+      const here = S.onMe.concat(pend);
+      const groups = [[t.fromThisCall, here.map(item)], [t.openBefore, (S.openItems || []).map(ext)]];
+      if ((S.notionItems || []).length) groups.push([t.notionGroup({ p: S.notionProject || '' }), S.notionItems.map(ext)]);
+      body = groups.filter(([, rows]) => rows.length).map(([h, rows]) => `<h4 class="grp">${esc(h)}</h4>${rows.join('')}`).join('') || `<p class="meta">${esc(t.noItems)}</p>`;
+      body += `<div class="onme-add"><input id="onmeAdd" type="text" placeholder="${esc(t.addOnMe)}" aria-label="${esc(t.addOnMe)}"></div>`;
     } else if (tab === 'brief') {
       body = renderBrief();
     }
     root.innerHTML = `
       ${isSheet ? `<button class="icon-btn close" type="button" data-act="close-sheet" aria-label="${esc(t.close)}">${ICON.x}</button>` : ''}
+      ${speakersBlock()}
       <div class="tabs" role="tablist" ${isSheet ? 'style="margin-right:48px"' : ''}>${tabs.map((k) => `<button class="tab" role="tab" type="button" aria-selected="${k === tab}" data-act="${isSheet ? 'sheet-tab' : 'pane-tab'}" data-tab="${k}">${esc(k === 'onme' ? t.tabs.onme(openN) : t.tabs[k])}</button>`).join('')}</div>
       <div class="panebody">${body}</div>
       ${tab === 'transcript' ? `<div class="panefoot"><span>${esc(t.legend)}</span>${S.ui.follow ? `<span>${esc(t.following)}</span>` : `<button class="link" type="button" data-act="follow">${esc(t.jump)}</button>`}</div>` : ''}`;
     const pb = root.querySelector('.panebody');
     if (tab === 'transcript' && S.ui.follow) pb.scrollTop = pb.scrollHeight; else pb.scrollTop = top;
+  }
+
+  function openOnMeCount() {
+    const pend = S.minePending.filter((p) => !S.onMe.some((o) => o.from === p.tag)).length;
+    return S.onMe.filter((o) => !o.done).length + pend + (S.openItems || []).filter((o) => !o.done && o.mine !== false).length
+      + (S.notionItems || []).filter((o) => !o.done).length;
+  }
+  const TRASH = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4"/></svg>';
+  function mine(text, fromId, fromText) {
+    S.mineN += 1;
+    const tag = 'mine' + S.mineN;
+    S.minePending.push({ tag, text: String(text || '').slice(0, 160) });
+    post('onme-mine', { text: String(text || ''), fromId: fromId || '', fromText: fromText || '' });
+    render();
   }
 
   function renderMenu() {
@@ -875,9 +897,20 @@
       }
       case 'line-who': openLinePopover(b.dataset.i, b); return;
       case 'spk-toggle': {
-        const unnamed = Object.entries(S.speakers).some(([sid, sp]) => /^S\d+$/i.test(sid) && sp && !sp.name && (sp.seconds || 0) >= 2);
-        S.ui.spkOpen = !(S.ui.spkOpen == null ? unnamed : S.ui.spkOpen); render(); return;
+        const vis = !!document.querySelector('.spk-card');
+        S.ui.spkOpen = !vis;
+        if (S.ui.spkOpen && !cardVoice(speakerList())) { const u = speakerList().find(([, sp]) => !sp.name); if (u) { S.ui.spkCard = u[0]; delete S.ui.spkSnooze[u[0]]; } }
+        render(); return;
       }
+      case 'spk-card': S.ui.spkCard = b.dataset.sid; S.ui.spkOpen = true; delete S.ui.spkSnooze[b.dataset.sid]; render(); { const i = $('spkCardName'); if (i) i.focus(); } return;
+      case 'spk-notnow': {   // 0.8.6 (F3): the card of this voice waits for its next 60 s of speech
+        const sid = b.dataset.sid; S.ui.spkSnooze[sid] = (S.speakers[sid] || {}).seconds || 0;
+        if (S.ui.spkCard === sid) S.ui.spkCard = null;
+        render(); return;
+      }
+      case 'line-mine': { const l = S.transcript[+b.dataset.i]; if (l) mine(l.text, '', ''); return; }
+      case 'ext-mine': { const o = (S.openItems || []).find((x) => x.id === b.dataset.id); if (o) mine(o.text, o.id, o.text); return; }
+      case 'ext-remove': post('onme-remove', { id: b.dataset.id }); S.openItems = (S.openItems || []).filter((x) => x.id !== b.dataset.id); S.notionItems = (S.notionItems || []).filter((x) => x.id !== b.dataset.id); render(); return;
       case 'spk-side': {
         const sid = b.dataset.sid, side = b.dataset.side, sp = S.speakers[sid] || {};
         S.speakers[sid] = Object.assign({}, sp, { side });
@@ -954,7 +987,41 @@
     }
     render();
   });
+  // 0.8.6: ticks on register and Notion items, "Same person as", the card's name field and "Add to On me"
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+    if (el.dataset && el.dataset.act === 'ext-toggle') {
+      const id = el.dataset.id, done = el.checked;
+      for (const k of ['openItems', 'notionItems']) S[k] = (S[k] || []).map((x) => x.id === id ? Object.assign({}, x, { done }) : x);
+      post('ext-tick', { id, done }); render();
+    } else if (el.classList && el.classList.contains('spk-same') && el.value) {
+      post('setting', { key: 'speaker_merge', value: el.dataset.sid + '|' + el.value });
+      const to = S.speakers[el.value] || {};
+      S.speakers[el.dataset.sid] = Object.assign({}, S.speakers[el.dataset.sid], { name: to.name, side: to.side });
+      if (S.ui.spkCard === el.dataset.sid) S.ui.spkCard = null;
+      render();
+    }
+  });
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target && e.target.id === 'spkCardName') {
+      const sid = e.target.dataset.sid, name = e.target.value.replace(/\s+/g, ' ').trim().slice(0, 60);
+      if (!name) return;
+      e.preventDefault();
+      const sp = S.speakers[sid] || {}, side = sp.side || (S.rosterSide && S.rosterSide[name]) || 'client';
+      S.speakers[sid] = Object.assign({}, sp, { name, side, suggestions: [] });
+      if (feed) feed.speakers[sid] = Object.assign({}, feed.speakers[sid], { name, side, suggestions: [] });
+      post('name-speaker', { speakerId: sid, name, side });
+      e.target.blur(); if (S.ui.spkCard === sid) S.ui.spkCard = null; render(); return;
+    }
+    if (e.key === 'Enter' && e.target && e.target.id === 'onmeAdd') {
+      const v = e.target.value.replace(/\s+/g, ' ').trim();
+      if (!v) return;
+      e.preventDefault(); e.target.value = ''; e.target.blur();
+      S.mineN += 1; const tag = 'mine' + S.mineN;
+      S.minePending.push({ tag, text: v.slice(0, 160) });
+      post('onme-mine', { text: v, fromId: '', fromText: '', typed: true });
+      render(); return;
+    }
     if (e.target.classList && e.target.classList.contains('row') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.target.click(); }
     if (e.metaKey && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) { e.preventDefault(); post('zoom', { step: e.key === '-' ? -1 : e.key === '0' ? 0 : 1 }); return; }
     if (e.metaKey && e.key === ',') { e.preventDefault(); post('menu', { item: 'settings' }); return; }
@@ -1021,6 +1088,10 @@
     /** 0.8.5 (P7): the after-call screen: outcome, series, the follow-up draft. */
     setAfter(a) { S.after = a || null; render(); },
     /** 0.8.5: {meeting: 'uk', current: 'uk'}: the tips language and the meeting's. */
+    /** 0.8.6 (D4): open register items of this project from earlier calls and the PM's Notion tasks:
+     *  [{id, text, due, done, mine, owner, badge: 'CALL'|'N', status, fromCall, note}]; project = the group's name. */
+    setOnYou(d) { S.openItems = (d && d.open) || []; S.notionItems = (d && d.notion) || []; S.notionProject = (d && d.project) || ''; render(); },
+    setSpeakerPrompt(sec) { S.spkPrompt = +sec || 15; render(); },
     setTipsLang(t) { S.tipsLang = t && t.meeting ? { meeting: t.meeting, current: t.current || t.meeting } : null; render(); },
     help() { post('help'); },
     rename(title) { if (feed) feed.rename(title); },

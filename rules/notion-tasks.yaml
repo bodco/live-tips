@@ -1,0 +1,62 @@
+# The PM's Notion tasks in On you (Pacenote 0.8.6, block D). Off by default; nothing is written to Notion without
+# the PM's action (a tick, Remove, Add to Notion tasks, or the after-call switch the PM turned on).
+schema_version: 1
+settings:
+  enabled: false by default
+  database: the tasks database (data source), picked like the meetings database
+  on_me: >-
+    A person property (the first person property, such as Assignee, is chosen by itself) and a person from the
+    workspace's users. An integration token does not know who "me" is, so the person is chosen explicitly.
+  show_only_when: >-
+    One property (status, select, multi-select or checkbox) with one or more of its values (chips; by default every
+    value except the Complete group of a status). "+ Add a condition" adds more, joined with AND.
+  tick_sets: a property and a value (by default Status = the first value of the Complete group, such as Done)
+  due: a date property (chosen by itself)
+  project_by: >-
+    A relation, select or multi-select property, and a table "Pacenote project -> Notion value": matched by name
+    first, the rest picked by hand. A workspace means all its projects (Project.workspace). When the database has a
+    Workspace relation and the workspace has a value, tasks with that Workspace are added too.
+  auto_add: >-
+    "Add my commitments from each call to Notion tasks": on by default once the settings above are complete.
+  status_line: '"N tasks match now, synced X ago" with Refresh, from a live query: it tests the settings.'
+sync:
+  query: POST /v1/data_sources/{id}/query with the person, conditions and projects as the filter, all pages
+  when: on opening Home, every 5 minutes while Home or the call window is open, and before a call starts
+  cache: state/notion-tasks.json (shown offline)
+  errors: one line in the settings section and under On you, never a modal
+on_you: >-
+  One list on Home: commitments of the register and Notion tasks together, in the commitments order (overdue, due,
+  new). A small source badge "CALL" or "N". A project filter above ("All projects", the default). A Notion task's
+  second line: project, current status, due.
+tick: >-
+  PATCH /v1/pages/{id} with the tick value at once; a toast "<title> set to Done in Notion" with Undo for 8 s (Undo
+  writes the previous value back). When Notion refuses, the row comes back with the reason. A tick made offline
+  waits in a queue and is sent when Notion answers.
+open: Double click opens the page in Notion. Menu: Copy, Open, Open the call (items from a call), Hide here, Remove.
+remove: >-
+  Remove takes the item out of On you and moves its Notion page to the Notion trash (PATCH in_trash true; Notion keeps
+  it 30 days). A call item gets drop in the register. A task made by hand in Notion asks once: Move "<title>" to the
+  Notion trash? Toast "Removed, and moved to the Notion trash" with Undo for 8 s (in_trash false and reopen). When
+  Notion refuses, the item leaves On you and the toast says the page stayed in Notion, with Open. Hide here hides it
+  only in Pacenote.
+call_window: >-
+  The On me tab has three groups: From this call, Open before the call, Notion <project>. A call of a project shows
+  that project's tasks, a workspace call all its projects' tasks, a call without a project none. The tab counter
+  counts every open item. Home readiness adds "N Notion tasks on you for <project>" to the onyou check.
+link: >-
+  "Add to Notion tasks" (shown once the settings are complete) creates a page: title = the text, the person = me,
+  project = the mapped value, due = the item's due, status = the first value of "Show only when". A rich text or url
+  property for the source, when there is one, gets the call title and date; the page body gets "From the call
+  <title>, <date>" and the transcript quote. The register gets op link. A linked item is shown once, as the Notion
+  task with "from a call".
+both_ways: >-
+  A tick in Pacenote sets the tick value in Notion and writes done. A task closed in Notion (its value left "Show only
+  when" or equals the tick value) writes done with source notion at the next sync; reopen the same way. A page removed
+  or trashed in Notion: the item stays open without the link (op unlink) with one line "Notion page was removed".
+  Titles and dates are not synced after creation: Notion is the source.
+after_call: >-
+  When auto_add is on, at the end of the call (state stopped, with the register write) every open item owned by me of
+  that call is created in Notion. A project without a mapped value keeps its items in Pacenote and Home shows once
+  "Map <project> to send its tasks to Notion". A task with the same project and at least 60% of the words (the
+  duplicates rule of rules/commitments.yaml) is linked instead of created. Home shows once "N commitments added to
+  Notion" with Undo (the pages go to the Notion trash). Items owned by someone else never go to Notion.

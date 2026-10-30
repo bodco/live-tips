@@ -135,7 +135,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             steps.append { [unowned self] in self.home(theme) }
             steps.append { [unowned self] in self.menuPanel(theme, live: false) }
             steps.append { [unowned self] in self.menuPanel(theme, live: true) }
-            for tab in ["general", "calendars", "keys", "notion", "ai", "about", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
+            for tab in ["general", "calendars", "notion", "ai", "about", "projects"] { steps.append { [unowned self] in self.settings(tab, theme) } }
             steps.append { [unowned self] in self.howItWorks(theme) }     // F4: its own window from the Help menu
             // F6: the call page, the series, the call memory and the rehearsal (no model call in shot mode).
             steps.append { [unowned self] in self.window("call-page-\(theme)") { if let r = self.demoCall { CallPageWindow.show(file: r.file) } } }

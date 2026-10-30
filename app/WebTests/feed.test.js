@@ -273,6 +273,59 @@ test('brief: numbered points, paragraphs, wrapped lines and tables are kept (eac
   assert.strictEqual(get().agenda[0].title, 'Confirm the date');
 });
 
+
+// ---------- 0.8.6 (F): the speakers block above the tabs ----------
+const SPK = require(path.join(__dirname, '../Resources/tips/speakers.js'));
+const escT = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const tS = { speakersH: 'Speakers', mins: (o) => o.m < 1 ? '<1 min' : `${o.m} min`, toName: 'to name', secsSpoken: (o) => `${o.s} s`,
+  soundsLike: (o) => `${o.name} · sounds like ${o.p}%`, notByVoice: 'not by voice', lastSaid: 'Last said:', typeName: 'Type a name',
+  team: 'Team', client: 'Client', more: 'More:', samePerson: 'Same person as…', notNow: 'Not now' };
+function spkState(over) {
+  return Object.assign({ speakers: {}, spkPrompt: 15, ui: { spkOpen: null, spkCard: null, spkSnooze: {} } }, over || {});
+}
+
+test('speakers block: chips for every voice, an unnamed one says "to name" and opens its card', () => {
+  const S = spkState({ speakers: { S1: { name: 'Emily Clark', side: 'client', seconds: 130 }, S2: { name: '', label: 'Speaker 2', seconds: 20, lastQuote: 'the Orbit launch', suggestions: [{ name: 'Ann Lee', score: 0.78 }] } } });
+  const html = SPK.block(S, tS, escT);
+  assert.ok(html.includes('Emily Clark') && html.includes('2 min'));
+  assert.ok(/spk-chip unnamed[\s\S]*to name/.test(html), 'the unnamed chip is tinted and says to name');
+  assert.ok(html.includes('class="spk-card"') && html.includes('Ann Lee · sounds like 78%') && html.includes('the Orbit launch'));
+});
+
+test('speakers block: opens by itself only after speaker_prompt_s, collapses when all are named', () => {
+  const S = spkState({ speakers: { S1: { name: '', label: 'Speaker 1', seconds: 8 } } });
+  assert.ok(!SPK.block(S, tS, escT).includes('class="spk-card"'), 'short speech: chips only');
+  S.speakers.S1.seconds = 16;
+  assert.ok(SPK.block(S, tS, escT).includes('class="spk-card"'), 'past the threshold the card opens');
+  S.speakers.S1.name = 'Mike Johnson';
+  const h = SPK.block(S, tS, escT);
+  assert.ok(!h.includes('class="spk-card"') && h.includes('Mike Johnson'), 'all named: one row of chips');
+});
+
+test('speakers block: Not now hides a voice for its next 60 s; a manual close is remembered', () => {
+  const S = spkState({ speakers: { S1: { name: '', label: 'Speaker 1', seconds: 30 } } });
+  S.ui.spkSnooze.S1 = 30;
+  assert.ok(!SPK.block(S, tS, escT).includes('class="spk-card"'));
+  S.speakers.S1.seconds = 91;
+  assert.ok(SPK.block(S, tS, escT).includes('class="spk-card"'), 'back after 60 s more of speech');
+  S.ui.spkOpen = false;
+  assert.ok(!SPK.block(S, tS, escT).includes('class="spk-card"'), 'closed by the PM stays closed');
+});
+
+test('speakers block: the same markup on every tab (rendered above the tabs, not inside Transcript)', () => {
+  const fs = require('fs');
+  const src = fs.readFileSync(path.join(__dirname, '../Resources/tips/tips.js'), 'utf8');
+  assert.ok(/\$\{speakersBlock\(\)\}\s*<div class="tabs"/.test(src), 'the block sits above the tab row of every pane');
+  assert.ok(!/speakersSummary\(/.test(src), 'no second copy inside the Transcript tab');
+});
+
+test('On me: a "Mine" line keeps the raw text until the call picture words it (from = mine<n>)', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:31:10', kind: 'situation', topic: 'x', actions: [{ what: 'Send the Orbit invoice', due: '', from: 'mine1' }] }]);
+  const s = get();
+  assert.strictEqual(s.onMe[0].from, 'mine1');
+});
+
 test('speech: a point keeps its full text; a "> " line under a brief point joins it', () => {
   const { f, get } = make();
   f.addItems([{ kind: 'speech', t: '10:00:00', at: '10:00:00', gist: 'Your speech', phrase: 'Short update.', items: ['Done', { text: '1. Release on Tuesday', full: 'The release goes out on Tuesday after the smoke test.' }] }]);

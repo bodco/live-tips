@@ -98,6 +98,13 @@ def _onme_fix(eng, value) -> None:
         eng.onme_fixed[norm_text(text)] = new.strip()
 
 
+def _onme_mine(eng, value) -> None:
+    """0.8.6: "<raw text>|<id of the on-them item or empty>|<its text or empty>": "Mine" in the window."""
+    raw, _, rest = str(value or "").partition("|")
+    fid, _, ftext = rest.partition("|")
+    eng.add_mine(raw, fid.strip(), ftext.strip())
+
+
 def _tips_lang(eng, value) -> None:
     """0.8.5 (rules/meeting.yaml > tips_language): the window's language switch for tips and cards."""
     v = str(value or "").strip().lower()
@@ -126,6 +133,7 @@ SETTINGS = {
     "agenda_state": lambda eng, v: eng.set_agenda_state(str(v or "")),        # an agenda item's state set in the window
     "onme_state": _onme,
     "onme_fix": _onme_fix,
+    "onme_mine": _onme_mine,
     "tips_lang": _tips_lang,
     "commitment_closed": lambda eng, v: eng.commitment_closed(str(v or "")),  # the app wrote the register
 }

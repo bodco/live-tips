@@ -13,7 +13,7 @@ cp "$SCRATCH/release/LiveTips" "$APP/Contents/MacOS/LiveTips"
 # The tips window (Pacenote 0.8, F2): Resources/tips (index.html, tokens.css, tips.css, feed.js, tips.js).
 # The skill's live-transcriber keeps its own window (recorder/src/prompter.html).
 mkdir -p "$APP/Contents/Resources/tips"
-cp "$HERE/Resources/tips/"{index.html,tokens.css,tips.css,feed.js,tips.js} "$APP/Contents/Resources/tips/"
+cp "$HERE/Resources/tips/"{index.html,tokens.css,tips.css,feed.js,speakers.js,tips.js} "$APP/Contents/Resources/tips/"
 # Interface strings (en, uk) and the macOS names and permission texts per language (Pacenote 0.8)
 mkdir -p "$APP/Contents/Resources/i18n"
 cp "$HERE/Resources/i18n/"*.json "$APP/Contents/Resources/i18n/"
@@ -25,7 +25,7 @@ xcrun swift "$HERE/buildtools/make_icon.swift" "$ICONSET" >/dev/null && iconutil
 # the Setup window copies the core into the app folder and installs Python modules and models.
 LT="$HERE/../recorder"
 CORE="$APP/Contents/Resources/core"; mkdir -p "$CORE/src" "$CORE/bin"
-cp "$LT/src/transcriber.py" "$LT/src/semantic.py" "$CORE/src/"
+cp "$LT/src/transcriber.py" "$LT/src/semantic.py" "$LT/src/fromfile.py" "$LT/src/fetchlink.py" "$CORE/src/"
 cp "$LT/bin/lt" "$LT/bin/read_delta.py" "$CORE/bin/"
 cp "$LT/config.json" "$CORE/config.json"
 xcrun swiftc -O -o "$CORE/bin/audiocap" "$LT/src/audiocap.swift" \
@@ -68,6 +68,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>NSMicrophoneUsageDescription</key><string>Pacenote transcribes your voice on this Mac. Audio never leaves it.</string>
 <key>NSAppleEventsUsageDescription</key><string>Pacenote reads the current slide number from Keynote or PowerPoint during a presentation. It never changes your slides.</string>
 <key>NSAudioCaptureUsageDescription</key><string>Pacenote transcribes the other side of the call on this Mac.</string>
+<key>CFBundleDocumentTypes</key><array><dict>
+<key>CFBundleTypeName</key><string>Audio or video recording</string>
+<key>CFBundleTypeRole</key><string>Viewer</string>
+<key>LSHandlerRank</key><string>Alternate</string>
+<key>LSItemContentTypes</key><array><string>public.audio</string><string>public.movie</string><string>org.webmproject.webm</string><string>org.matroska.mkv</string></array>
+</dict></array>
 </dict></plist>
 PLIST
 codesign --force --sign "$IDENT" --identifier "$BUNDLE_ID" "$APP"

@@ -56,6 +56,18 @@ final class Register: ObservableObject {
         version += 1
     }
 
+    /// 0.8.6: the file changed outside mark() (link, unlink): read it again.
+    func touch(_ folder: String) {
+        cache[folder] = nil
+        version += 1
+    }
+
+    /// 0.8.6: the call's title for "From the call <title>" (the history's title, else the file name).
+    func callTitle(_ c: Commitment) -> String? {
+        let key = CommitmentRegister.callKey(c.call)
+        return CallHistory.shared.visible.first { CommitmentRegister.callKey($0.file) == key }?.title
+    }
+
     /// The project's display name for a register item.
     func projectName(_ c: Commitment) -> String {
         let reg = ProjectRegistry.load(from: AppPaths.projects)

@@ -19,6 +19,9 @@ public struct Commitment: Equatable, Identifiable {
     public var doneAt = ""
     public var doneSource = ""
     public var folder = ""              // the live folder of the register (set by the reader)
+    public var from = ""                // 0.8.6: the id this item replaces ("Mine" on an "on them" item)
+    public var notionPage = ""          // 0.8.6 (op link): the Notion task this item is
+    public var notionNote = ""          // "removed" when the linked page was removed in Notion
 
     public var mine: Bool { owner.isEmpty || owner.lowercased() == "me" }
     public var createdDate: Date? { CommitmentRegister.iso(created) }
@@ -79,6 +82,7 @@ public enum CommitmentRegister {
                 }
                 items[cid] = Commitment(id: cid, text: s(e, "text"), owner: owner, project: s(e, "project"), series: s(e, "series"),
                                         call: s(e, "call"), t: s(e, "t"), created: s(e, "created"), due: s(e, "due"), by: s(e, "by"))
+                items[cid]?.from = s(e, "from")
                 order.append(cid)
                 continue
             }
@@ -87,6 +91,8 @@ public enum CommitmentRegister {
             case "done": it.status = "done"; it.doneAt = s(e, "at"); it.doneSource = s(e, "source").isEmpty ? "manual" : s(e, "source")
             case "reopen": it.status = "open"; it.doneAt = ""; it.doneSource = ""
             case "drop": it.status = "dropped"
+            case "link": it.notionPage = s(e, "notion_page"); it.notionNote = ""
+            case "unlink": it.notionPage = ""; it.notionNote = (s(e, "reason").isEmpty || s(e, "reason") == "removed") ? "removed" : ""
             default: break
             }
             items[it.id] = it
@@ -132,9 +138,12 @@ public enum CommitmentRegister {
         return f.date(from: s)
     }
 
-    public static func mark(folder: String, id: String, op: String = "done", source: String = "manual", call: String = "") {
+    public static func mark(folder: String, id: String, op: String = "done", source: String = "manual", call: String = "",
+                            notionPage: String = "") {
         var e: [String: Any] = ["op": op, "id": id, "at": nowISO()]
         if op == "done" { e["source"] = source; if !call.isEmpty { e["call"] = (call as NSString).lastPathComponent } }
+        if op == "link" { e["notion_page"] = notionPage }
+        if op == "unlink" { e["reason"] = ["removed", "undo"].contains(source) ? source : "removed" }
         append(folder: folder, [e])
     }
 

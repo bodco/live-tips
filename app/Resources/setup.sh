@@ -130,5 +130,11 @@ PY
     [ -x "$HOME/.local/bin/claude" ] || { echo "Claude Code was not installed. See https://code.claude.com/docs/en/troubleshoot-install"; exit 1; }
     echo "Claude Code ready. Sign in once in Settings > AI (Claude account), or add an API key there." ;;
 
-  *) echo "usage: setup.sh check|install python|core|venv|recorder|tips|whisper|localai|voices|claude"; exit 2 ;;
+  # 0.8.6 (rules/components.yaml): the optional Link downloader for Transcribe a recording (Google Drive, YouTube, Vimeo).
+  check:linkdl)
+    if vimport "import yt_dlp"; then echo "OK $("$VPY" -c 'import yt_dlp.version as v;print(v.__version__)' 2>/dev/null)"; else echo "MISSING optional"; fi ;;
+  install:linkdl)
+    pip_in --upgrade "yt-dlp>=2025.1.1" && echo "Link downloader ready" ;;
+
+  *) echo "usage: setup.sh check|install python|core|venv|recorder|tips|whisper|localai|voices|claude|linkdl"; exit 2 ;;
 esac

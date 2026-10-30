@@ -92,3 +92,38 @@ def test_notion_wrapup_has_the_agenda_section(tmp_path):
     b = wrapup_blocks({"decisions": ["ship"]}, {}, md, False, "en")
     text = json.dumps(b)
     assert "Agenda" in text and "Release date: discussed" in text and "Export: raised" in text and "Budget: not raised" in text
+
+
+def test_register_link_unlink_and_from(tmp_path):
+    """0.8.6 (rules/commitments.yaml): link to a Notion task, unlink when the page is removed, from for "Mine"."""
+    reg.append(tmp_path, [{"op": "add", "id": "c-a", "text": "Send the Orbit plan", "owner": "me", "call": "x.md", "from": "c-b"}])
+    reg.mark(tmp_path, "c-a", "link", notion_page="p-1")
+    it = reg.load(tmp_path)[0]
+    assert it["notion_page"] == "p-1" and it["from"] == "c-b"
+    reg.mark(tmp_path, "c-a", "unlink", source="removed")
+    it = reg.load(tmp_path)[0]
+    assert it["notion_page"] == "" and it["notion_note"] == "removed" and it["status"] == "open"
+    reg.mark(tmp_path, "c-a", "done", source="notion")
+    assert reg.load(tmp_path)[0]["done_source"] == "notion"
+
+
+def test_mine_makes_a_line_the_pms(tmp_path):
+    """0.8.6 > mine: the raw line shows at once; the call picture's wording (from = mine<n>) replaces it; an earlier
+    "on them" item gets a drop and the new add carries from."""
+    from types import SimpleNamespace
+    from livetips_m0.engine import Engine
+    eng = SimpleNamespace(onme_mine=[], onme_fixed={})
+    eng.add_mine = Engine.add_mine.__get__(eng)
+    eng.fix_onme = Engine.fix_onme.__get__(eng)
+    eng.add_mine("Emily Clark: we still need the Orbit invoice sent", "c-old", "Send the Orbit invoice")
+    sit = eng.fix_onme({"actions": [], "theirs": [{"who": "Ann Lee", "what": "Send the Orbit invoice"}]})
+    assert sit["actions"][0]["what"].startswith("Emily Clark") and sit["theirs"] == []
+    sit = eng.fix_onme({"actions": [{"id": "m1", "what": "Send the Orbit invoice", "from": "mine1"}], "theirs": []})
+    assert [a["what"] for a in sit["actions"]] == ["Send the Orbit invoice"]
+    reg.append(tmp_path, [{"op": "add", "id": "c-old", "text": "Send the Orbit invoice", "owner": "Ann Lee", "call": "a.md"}])
+    reg.record_call(tmp_path, call="b.md", project="orbit", title="Sync", actions=sit["actions"], theirs=[],
+                    replaces={"mine1": "c-old"})
+    items = {i["id"]: i for i in reg.load(tmp_path)}
+    assert items["c-old"]["status"] == "dropped"
+    mine = [i for i in items.values() if i["owner"] == "me"][0]
+    assert mine["from"] == "c-old"

@@ -7,10 +7,12 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - After the call: The call summary gets an "Agenda" section: each item with Discussed, Raised or Not raised. Items not raised go into the "What matters" text of the next call of the same series, as one line "Not raised last time: <item>; <item>".
 
 **Commitments register.** File: `<call folder>/commitments.jsonl`. JSON lines, append only. Each line is an event; the register is the events folded by id. Never rewrite or delete lines: a later event wins.
-- `add`: `{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill"}`
-- `done`: `{"v":1,"op":"done","id":"<id>","at":"<ISO time>","source":"manual|detected","call":"<transcript file name, when closed on a call>"}`
+- `add`: `{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill","from":"<id of the item this one replaces, optional>"}`
+- `done`: `{"v":1,"op":"done","id":"<id>","at":"<ISO time>","source":"manual|detected|notion","call":"<transcript file name, when closed on a call>"}`
 - `reopen`: `{"v":1,"op":"reopen","id":"<id>","at":"<ISO time>"}`
 - `drop`: `{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}`
+- `link`: `{"v":1,"op":"link","id":"<id>","notion_page":"<Notion page id>","at":"<ISO time>"}`
+- `unlink`: `{"v":1,"op":"unlink","id":"<id>","at":"<ISO time>","reason":"removed|undo"}`
 - id: `c-<first 10 hex characters of sha1 of: call file name without .app, owner, text in lower case>`; series: `<project slug>|<call title in lower case, letters and digits only>`.
 - Owner: me = what the PM took on (the call picture's actions). A name = what someone else promised the PM or the PM's team on this call ("on them"). General team to-dos and other people's updates about their own work are not commitments.
 - Duplicates: The app and the skill may record the same call. An add whose call (without .app) is the same and whose text shares at least 60% of its words with an open item is the same commitment: keep the first.
@@ -19,7 +21,8 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - Model rule theirs: theirs = promises other people made to the PM or the PM's team on this call: who and what, with the due date when named ("I will send the list by Friday" said by the client). Never the PM's own tasks, never a task for a third person, never someone's update about their own work.
 - Model rule done: done_commitments = ids of OPEN COMMITMENTS that someone said on this call are done, sent or finished ("done", "sent", "зроблено", "надіслав"), about that same item.
 - Closing: A detected close is only a proposal: the window shows a quiet card "Done? <item>" with Mark done; only the PM's click closes it (done, source detected). Nothing closes by itself.
-- Export: Copy as text only. No tracker integration (no Jira in the app).
+- Export: Copy as text. Since Pacenote 0.8.6 an item owned by me can also become a task in the PM's Notion tasks database (rules/notion-tasks.yaml): by hand ("Add to Notion tasks") or after each call when that switch is on. A linked item (op link) is shown once, as the Notion task, and its done or reopen follows Notion both ways. Items owned by someone else never go to Notion. No other tracker (no Jira in the app).
+- Mine: 0.8.6: "Mine" on a transcript line, a tip or an "on them" item makes it the PM's: an add with owner me and the short action as text (the call picture words it; the raw line shows meanwhile). For an "on them" item the old id gets a drop and the new add carries from = the old id. The PM can also type an item in the On me tab.
 - Order: overdue first, then items with a due date (soonest first), then the rest (newest first)
 
 **Brief freshness.** Brief freshness (Pacenote 0.8, idea 03). Shared by the skill and the app. Nothing runs by itself: the PM presses Refresh.

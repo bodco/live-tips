@@ -207,6 +207,16 @@ func commitmentsRegister() {
     CommitmentRegister.append(folder: dir, [["op": "add", "id": "c-1", "text": "One", "owner": "me", "call": "x.md"]])
     CommitmentRegister.mark(folder: dir, id: "c-1", op: "done")
     expect(CommitmentRegister.load(folder: dir).first?.status == "done", "append and mark")
+    // 0.8.6 (rules/commitments.yaml > link, unlink, from)
+    CommitmentRegister.append(folder: dir, [["op": "add", "id": "c-2", "text": "Two", "owner": "me", "call": "x.md", "from": "c-them"]])
+    CommitmentRegister.mark(folder: dir, id: "c-2", op: "link", notionPage: "page-1")
+    expect(CommitmentRegister.load(folder: dir).first { $0.id == "c-2" }?.notionPage == "page-1", "link")
+    expect(CommitmentRegister.load(folder: dir).first { $0.id == "c-2" }?.from == "c-them", "from")
+    CommitmentRegister.mark(folder: dir, id: "c-2", op: "unlink", source: "removed")
+    let c2 = CommitmentRegister.load(folder: dir).first { $0.id == "c-2" }
+    expect(c2?.notionPage == "" && c2?.notionNote == "removed" && c2?.status == "open", "unlink keeps it open")
+    CommitmentRegister.mark(folder: dir, id: "c-2", op: "done", source: "notion")
+    expect(CommitmentRegister.load(folder: dir).first { $0.id == "c-2" }?.doneSource == "notion", "done from Notion")
     try? FileManager.default.removeItem(atPath: dir)
 }
 
@@ -275,6 +285,54 @@ func prepOwnership() {
     expect(!PrepOwnership.belongsToHeld(prepDate: d("2026-10-29T09:00:00Z"), made: nil, held: held, before: d("2026-10-29T09:30:00Z")), "the held call itself is not 'before'")
 }
 
+/// 0.8.6 (D, rules/notion-tasks.yaml): the filter, a task read from a page, project mapping, closing from Notion.
+func notionTasksCore() {
+    var st = NotionTasksSettings()
+    st.enabled = true; st.database = "ds-1"; st.personProperty = "Assignee"; st.personId = "u-1"
+    var c = NotionTasksSettings.Condition(); c.property = "Status"; c.type = "status"; c.values = ["To Do", "In progress"]
+    st.conditions = [c]
+    st.tickProperty = "Status"; st.tickType = "status"; st.tickValue = "Done"
+    st.dueProperty = "Due"; st.projectProperty = "Project"; st.projectType = "relation"
+    st.projectMap = ["orbit": ["p-orbit"], "playbook": ["p-play"]]
+    st.workspaceProperty = "Workspace"; st.workspaceMap = ["Northwind": "w-nw"]
+    expect(st.ready, "settings ready")
+    let f = NotionTasksCore.filter(st)
+    let and = f["and"] as? [[String: Any]] ?? []
+    expect(and.count == 2 && ((and[1]["or"] as? [[String: Any]])?.count == 2), "person and the status values")
+    let f2 = NotionTasksCore.filter(st, scope: ["p-orbit"], workspace: "Northwind")
+    expect(((f2["and"] as? [[String: Any]])?.last?["or"] as? [[String: Any]])?.count == 2, "project or its workspace")
+    func page(_ id: String, _ status: String, _ proj: String) -> [String: Any] {
+        ["id": id, "url": "https://notion.so/" + id, "created_time": "2026-10-30T10:00:00.000Z", "properties": [
+            "Name": ["type": "title", "title": [["plain_text": "Send the Orbit plan"]]],
+            "Status": ["type": "status", "status": ["name": status]],
+            "Due": ["type": "date", "date": ["start": "2026-11-03"]],
+            "Project": ["type": "relation", "relation": [["id": proj]]],
+            "Workspace": ["type": "relation", "relation": [[String: Any]]()]]]
+    }
+    let t = NotionTasksCore.task(page("t1", "To Do", "p-orbit"), st)!
+    expect(t.title == "Send the Orbit plan" && t.due == "2026-11-03" && t.open && t.status == "To Do", "a task from a page")
+    expect(!NotionTasksCore.task(page("t2", "Done", "p-orbit"), st)!.open, "closed in Notion: the tick value")
+    expect(!NotionTasksCore.task(page("t3", "Archived", "p-orbit"), st)!.open, "closed in Notion: out of Show only when")
+    expect(NotionTasksCore.targets(t, st) == ["orbit"], "mapped back to the project")
+    let t4 = NotionTasksCore.task(page("t4", "To Do", "p-play"), st)!
+    expect(NotionTasksCore.forCall([t, t4], st, project: "orbit").map { $0.id } == ["t1"], "a project's call shows its tasks")
+    expect(NotionTasksCore.forCall([t, t4], st, project: nil, workspaceProjects: ["orbit", "playbook"], workspace: "Northwind").count == 2, "a workspace call: all its projects")
+    expect(NotionTasksCore.forCall([t, t4], st, project: nil).isEmpty, "no project: none")
+    expect(((NotionTasksCore.tickPatch(st, value: "Done")["Status"] as? [String: Any])?["status"] as? [String: Any])?["name"] as? String == "Done", "tick patch")
+    let g = NotionTasksCore.statusGroups(["status": ["options": [["id": "a", "name": "To Do"], ["id": "b", "name": "Done"]],
+                                                     "groups": [["name": "Complete", "option_ids": ["b"]]]]])
+    expect(g.open == ["To Do"] && g.complete == ["Done"], "status groups")
+    let np = NotionTasksCore.newPage(st, title: "Send the Orbit plan", projectValues: ["p-orbit"], due: "2026-11-03",
+                                     source: "From the call Orbit sync, 2026-10-30", quote: "I will send it", titleProperty: "Name")
+    let props = np["properties"] as? [String: Any] ?? [:]
+    expect(props["Assignee"] != nil && props["Project"] != nil && props["Due"] != nil && props["Status"] != nil, "a new task page")
+    expect(NotionTasksCore.autoMatch(projects: [("orbit", "Orbit SaaS Launch")], options: [("p-orbit", "Orbit SaaS Launch")]) == ["orbit": ["p-orbit"]], "match by name")
+    let d = try? JSONEncoder().encode(st)
+    let back = d.flatMap { try? JSONDecoder().decode(NotionTasksSettings.self, from: $0) }
+    expect(back == st, "settings round trip")
+}
+
+notionTasksCore()
 interfaceStrings()
 presentationCore()
 prepOwnership()

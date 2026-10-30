@@ -107,6 +107,7 @@ final class AutoStart: NSObject, ObservableObject, UNUserNotificationCenterDeleg
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 NSApp.activate(ignoringOtherApps: true)
+                if id == TranscribeWindow.notificationId { TranscribeWindow.show(); return }   // 0.8.6 (B): a transcript is ready
                 guard id.hasPrefix(AutoStart.idPrefix), let app = NSApp.delegate as? AppDelegate else { return }
                 let eid = String(id.dropFirst(AutoStart.idPrefix.count))
                 if let e = CalendarService.shared.upcoming().first(where: { $0.id == eid }) {

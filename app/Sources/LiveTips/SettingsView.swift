@@ -92,7 +92,7 @@ final class SettingsModel: ObservableObject {
     @Published var masks: [SecretStore.Key: String] = [:]
     @Published var mirror = MirrorStatus(result: "", lastRunUTC: nil, pages: nil, mode: "")
     @Published var note = ""
-    @Published var tab = "general"
+    @Published var tab = "general" { didSet { if tab == "keys" { tab = "notion" } } }   // 0.8.6 (C): no Keys tab
     @Published var aliasesText = ""
     @Published var mirrorNote = ""
 
@@ -503,9 +503,7 @@ struct LocalStatus: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 if !local.installed {
-                    Text(L("local.noOllama")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    Spacer()
-                    Button(L("local.getOllama")) { NSWorkspace.shared.open(URL(string: "https://ollama.com/download")!) }.buttonStyle(.pnTertiary)
+                    EmptyView()                              // 0.8.6 (E): the Ollama component row offers Install
                 } else if !local.running {
                     Text(L("local.notRunning")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     Spacer()
@@ -515,8 +513,6 @@ struct LocalStatus: View {
                     Text(p + " · " + local.note).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if !local.hasSuggested {
                     Text(local.models.isEmpty ? L("local.noModels") : L("local.ready")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    Spacer()
-                    Button(L("local.install", ["name": LocalLLM.suggestedLabel])) { local.install() }.buttonStyle(.pnTertiary)
                 } else {
                     Text(local.note.isEmpty ? L("local.ready") : local.note).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
@@ -565,11 +561,19 @@ struct RoutePicker: View {
     var recommended: String
     var discouraged: String? = nil
     var withLocal = false          // 0.8.5: the preparation can also run on this Mac (Ollama)
+    @ObservedObject var oc = OptionalComponents.shared
+    @ObservedObject var llm = LocalLLM.shared
     var body: some View {
-        Picker(L("ai.route"), selection: $selection) {
-            ForEach([AIRoute.code, AIRoute.api] + (withLocal ? [AIRoute.local] : []), id: \.self) { r in
-                Text(AIRoute.name(r) + (r == recommended ? L("ai.route.recommended") : r == discouraged ? L("ai.route.notRecommended") : "")).tag(r)
+        // 0.8.6 (E > dependants): "On this Mac" needs Ollama and the model; without them it is disabled, with Install next to it
+        let localOK = oc.isInstalled("ollama") && oc.isInstalled("local_model")
+        VStack(alignment: .trailing, spacing: 2) {
+            Picker(L("ai.route"), selection: $selection) {
+                ForEach([AIRoute.code, AIRoute.api] + (withLocal ? [AIRoute.local] : []), id: \.self) { r in
+                    Text(AIRoute.name(r) + (r == recommended ? L("ai.route.recommended") : r == discouraged ? L("ai.route.notRecommended") : "")).tag(r)
+                        .selectionDisabled(r == AIRoute.local && !localOK)
+                }
             }
+            if withLocal && !localOK { NeedsComponent(id: oc.isInstalled("ollama") ? "local_model" : "ollama") }
         }
     }
 }
@@ -662,7 +666,6 @@ struct SettingsView: View {
     struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
     static var panes: [Pane] { [   // titles follow the interface language
         Pane(id: "general", title: "General", symbol: "gearshape", subtitle: "Your name on calls, folders, Notion and how the app behaves."),
-        Pane(id: "keys", title: "Keys", symbol: "key", subtitle: "The Claude API key and the Notion token, kept in the macOS Keychain."),
         Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
         Pane(id: "calendars", title: "Calendars", symbol: "calendar", subtitle: "Your Google, Microsoft and iCloud calendars: pick the calls to prepare and start."),
         Pane(id: "notion", title: "Notion", symbol: "doc.text", subtitle: "Meeting pages after each call and the optional local copy of Notion."),
@@ -706,7 +709,6 @@ struct SettingsView: View {
 
     @ViewBuilder var pane: some View {
         switch model.tab {
-        case "keys": keys
         case "projects": projects
         case "ai": ai
         case "notion": notion
@@ -717,17 +719,6 @@ struct SettingsView: View {
         }
     }
 
-    var keys: some View {
-        Form {
-            Section {
-                KeyRow(title: L("keys.notion.title"), hint: L("keys.notion.hintShort"), key: .notionToken, model: model)
-            } footer: {
-                Text(L("set.pasteWithVAnd"))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-            }
-        }
-        .formStyle(.grouped)
-    }
 
     var ai: some View {
         Form {
@@ -756,6 +747,8 @@ struct SettingsView: View {
             }
             .onAppear { runner.refreshAuth() }
             Section {
+                // 0.8.6 (E, rules/components.yaml): Ollama and the model as optional components
+                ForEach(OptionalComponents.shared.all.filter { $0.id != "link_downloader" }) { c in ComponentRow(comp: c) }
                 LocalStatus(local: LocalLLM.shared)
                 Toggle(L("local.fallback"), isOn: $model.config.ai.localFallback).help(L("local.fallback.help"))
             } header: { Text(L("local.section")) } footer: {
@@ -1088,27 +1081,38 @@ struct SettingsView: View {
     }
 
     // 2026-10-27 (owner): everything about Notion in one place (it was hidden under General > Behaviour).
+    /// 0.8.6 (C): everything about Notion on one tab: Connection, Meeting pages, My tasks in On you, Local copy.
     var notion: some View {
         Form {
             Section {
-                Toggle(L("set.writeAMeetingPage"), isOn: $model.config.notionWriteSummary)
                 KeyRow(title: L("keys.notion.title"), hint: L("keys.notion.hint"), key: .notionToken, model: model)
+                if model.isSet(.notionToken) { NotionSeesLine() }
+            } header: { Text(L("set.connection")) }
+            Section {
+                Toggle(L("set.writeAMeetingPage"), isOn: $model.config.notionWriteSummary)
+                if !model.isSet(.notionToken) {
+                    Text(L("ntset.connectFirst")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
                 NotionDestinationView()
+                ForEach(model.registry.projects.filter { $0.status != "archived" }, id: \.slug) { p in
+                    if !p.config.isEmpty {
+                        LabeledContent(p.name) { Text(L("set.itsProjectConfig")).foregroundStyle(PN.C.text3) }
+                    } else {
+                        Picker(p.name, selection: Binding(get: { model.config.notionMeetingsDBByProject[p.slug] ?? "" }, set: {
+                            model.config.notionMeetingsDBByProject[p.slug] = $0.isEmpty ? nil : $0 })) {
+                            Text(L("set.defaultDb", ["name": model.config.notionMeetingsName.isEmpty ? "-" : model.config.notionMeetingsName])).tag("")
+                            if let cur = model.config.notionMeetingsDBByProject[p.slug], !NotionDestinationModel.shared.items.contains(where: { $0.id == cur }) {
+                                Text(cur).tag(cur)
+                            }
+                            ForEach(NotionDestinationModel.shared.items.filter { $0.kind == "data_source" }) { it in Text(it.title).tag(it.id) }
+                        }
+                    }
+                }
             } header: { Text(L("set.meetingPages")) } footer: {
                 Text(L("set.afterTheCallA"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            let withConfig = model.registry.projects.filter { !$0.config.isEmpty }
-            if !withConfig.isEmpty {
-                Section {
-                    ForEach(withConfig, id: \.slug) { p in
-                        LabeledContent(p.name) { Text(L("set.itsOwnMeetingsDatabase")).foregroundStyle(PN.C.text3) }
-                    }
-                } header: { Text(L("set.projectsSetUpWith")) } footer: {
-                    Text(L("set.theseProjectsHaveA"))
-                        .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                }
-            }
+            NotionTasksSection(model: model)
             Section {
                 LabeledContent {
                     VStack(alignment: .leading, spacing: 4) {
@@ -1209,6 +1213,11 @@ struct SettingsView: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
+                ForEach(OptionalComponents.shared.all.filter { $0.id == "link_downloader" }) { c in ComponentRow(comp: c) }
+            } header: { Text(L("comp.addons")) } footer: {
+                Text(L("comp.addonsFoot")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
+            Section {
                 ShortcutRow(action: .help)
                 ShortcutRow(action: .pause)
                 ShortcutRow(action: .mute)
@@ -1218,6 +1227,8 @@ struct SettingsView: View {
                 ShortcutRow(action: .prevSlide)
                 ShortcutRow(action: .nextSlide)
                 ShortcutRow(action: .add30)
+                // 0.8.6 (A3): a key of the call window itself (works while that window is in front), so it is not editable.
+                LabeledContent(L("set.onTopShortcut")) { Text("⌥⌘T").font(.callout.monospaced()).foregroundStyle(PN.C.text3) }
             } header: { Text(L("set.shortcuts")) } footer: {
                 Text(L("set.theyWorkFromAny"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -1411,6 +1422,8 @@ struct AboutView: View {
                         }
                     }
                 }
+                // 0.8.6 (E): optional components at the end, never red or orange, never part of readiness
+                ForEach(OptionalComponents.shared.all) { c in ComponentRow(comp: c, markOptional: true) }
                 // 2026-10-29 (owner): the app's own signature, so "Open Anyway" reads as expected, not as a fault.
                 if !AppSignature.shared.line.isEmpty {
                     HStack(spacing: 8) {
@@ -1468,6 +1481,7 @@ final class SettingsWindow {
     }
 
     static func show(tab: String = "general") {
+        let tab = tab == "keys" ? "notion" : tab          // 0.8.6 (C): the Keys tab is part of Notion now
         model.tab = tab
         window?.title = title(for: tab)
         if window == nil {
@@ -1496,5 +1510,23 @@ enum HowItWorksWindow {
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+
+/// 0.8.6 (C): "sees N databases and M pages": what the token can reach, as a test of the connection.
+struct NotionSeesLine: View {
+    @ObservedObject var m = NotionDestinationModel.shared
+    var body: some View {
+        HStack {
+            if m.searched {
+                Text(L("set.notionSees", ["db": "\(m.items.filter { $0.kind == "data_source" }.count)", "pages": "\(m.items.filter { $0.kind == "page" }.count)"]))
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
+            Spacer()
+            if m.busy { ProgressView().controlSize(.small) }
+            Button(L("set.check")) { m.find() }.disabled(m.busy)
+        }
+        .onAppear { if !m.searched && !m.busy { m.find() } }
     }
 }

@@ -105,6 +105,7 @@ struct MenuBarPanel: View {
             } else {
                 row(L("menubar.home"), "⌘0") { $0.openHome() }.keyboardShortcut("0")
                 row(L("menubar.startCall"), "⌘N") { $0.startCall() }.keyboardShortcut("n")
+                row(L("tr.window"), "") { $0.openTranscribe() }
                 Divider()
                 spend
             }

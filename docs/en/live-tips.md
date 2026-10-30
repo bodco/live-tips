@@ -1321,6 +1321,54 @@ per token and takes more steps.
 that matter most; a preparation on this Mac (Settings > AI > Preparation > On this Mac) only when neither the key
 nor the Claude account can run. To compare on your own calls: `tools/prep_compare.py <app folder>/prep-runs/<call>`.
 
+### 14.1h Pacenote 0.8.6: transcribe a recording, your Notion tasks, optional add-ons
+
+**A. The call window's title bar.** A pin next to End call keeps the window above other windows (Always on top,
+remembered between calls); Option-Command-T does the same while the call window is in front. The title bar is about
+36 pt high and every button in it is 24 pt, centred on the line of the window's own buttons; in a narrow window the
+title shortens first.
+
+**B. Transcribe a recording** (rules/transcribe.yaml). Home > Transcribe a recording, the menu bar menu, or drop an
+audio or video file on Home or on the Dock icon. A file (mp3, m4a, wav, aac, flac, ogg, mp4, mov, m4v, webm, mkv, up
+to 4 hours) or a link (Google Drive, YouTube, Vimeo, Dropbox, a direct link; links need the optional Link
+downloader). The audio is transcribed on your Mac with the same speech model, Whisper prompt and voices library as a
+call; the voices are told apart after the whole pass. While a call is live it waits for the call to end. The result
+shows the transcript with a player (click a time to play from there), a Speakers card (rename, Same person as,
+Another speaker on a line, Remember this voice, a 5 s sample) and a Save card: Title, Date and time, Project (the
+transcript joins the project's live/ folder like a call, so the next preparation reads it, and call notes run), Add
+to Notion, Save as Markdown, Save as Word. Nothing is sent without a click. Home's Recent marks these with File or
+Link.
+
+**C. Settings > Notion.** The Keys tab is gone: the token, its status ("sees N databases and M pages"), meeting
+pages (a project without a Control Tower config can send its pages to its own database), your tasks and the local
+copy of Notion are on one tab.
+
+**D. Your Notion tasks in On you** (rules/notion-tasks.yaml, off by default). Choose the tasks database, who "me" is
+(a person property and a person), Show only when (one or more conditions), what a tick sets, the due date property
+and which property tells the project, with a mapping table (matched by name, the rest by hand; a workspace means all
+its projects). Home's On you shows commitments and Notion tasks in one list with a CALL or N badge and a project
+filter; the call window's On me shows From this call, Open before the call and Notion for the call's project. A tick
+sets the value in Notion at once (Undo for 8 s). Remove moves the page to the Notion trash (30 days) and drops the
+item; Hide here hides it in Pacenote only. Mine on a transcript line, a tip or an item on someone else makes it
+yours; you can also type an item in On me, or say "that's on me". Your commitments can become Notion tasks (Add to
+Notion tasks, or by themselves after each call when that switch is on); a linked item shows once, and done or reopen
+follows Notion both ways.
+
+**E. Optional add-ons** (rules/components.yaml): Ollama, the local model (about 16 GB) and the Link downloader
+(yt-dlp). Each has one row with its size, purpose, state and Install, in Settings (AI for the first two, General >
+Optional add-ons for the downloader), at the end of About > Components marked optional, and in an optional
+onboarding step. They never change readiness, Install or repair never installs them, and nothing installs during a
+call. A control that needs a missing one is disabled with a small Install link.
+
+**F. Speakers above the tabs.** A row of chips (colour, name or Speaker N, minutes; an unnamed voice is tinted and
+says "to name") sits above Transcript, On me and Brief. When a voice has spoken long enough a card opens with its
+last words, suggestions from the voices library with how alike they sound, a name field, Team or Client, Same
+person as and Not now (the card waits for the next 60 s of that voice). Once everyone is named it folds into the
+chips.
+
+**Recording.** When the call plays in a browser and Pacenote hears only silence, switching the sound output to
+another device and back makes the browser reconnect its audio; the "Can't hear the other side" state says so.
+
 ### 14.2 After the call: the meeting page in Notion
 
 With **Settings > General > Write the call summary to Notion** on, the app writes the wrap-up

@@ -302,7 +302,7 @@
       if (an && askN.some((q) => q === an || (an.length > 12 && (q.includes(an) || an.includes(q))))) continue;
       if (a.from && a.from !== 'PM' && a.mine === false) continue;
       const id = 'm:' + an;
-      out.push({ id, text: clean(a.what), due: clean(a.due), done: !!this.onMeDone[id] });
+      out.push({ id, text: clean(a.what), due: clean(a.due), done: !!this.onMeDone[id], from: String(a.from || '') });
     }
     // 0.8.5 (owner): the PM's corrections win: "not mine" lines go, reworded ones show his words.
     return out.filter((o) => this.onMeFix[o.id] !== '').map((o) => this.onMeFix[o.id] ? Object.assign({}, o, { text: this.onMeFix[o.id], edited: true }) : o);

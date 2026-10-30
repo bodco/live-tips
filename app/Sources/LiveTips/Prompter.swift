@@ -152,7 +152,11 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         window.delegate = self
         window.isReleasedWhenClosed = false
         _ = window.setFrameAutosaveName("LiveTipsAppPrompter")   // remembers position and size
+        // 0.8.6 (A5): a taller title bar (about 36 pt) from an empty compact toolbar; the traffic lights stay centred.
+        window.toolbar = NSToolbar(identifier: "PacenoteCallWindow")
+        window.toolbarStyle = .unifiedCompact
         addEndCallButton()
+        installOnTopKey()
 
         // 2026-10-23: the title bar (close, minimise, End call) stays solid at any opacity setting.
         if let tb = window.standardWindowButton(.closeButton)?.superview {
@@ -195,6 +199,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         ticks += 1
         if presentingNow && ticks % 4 == 0 { pollSlides() }
         if afterShown && ticks % 20 == 0 { pushAfter() }
+        if ticks % 20 == 2 { pushOnYou() }
         // 2026-10-27 (owner): the status every 0.5 s (was 2 s), so the dot turns red as soon as the recording runs.
         // Pacenote 0.8: the minutes left (the calendar event's end) ride along for the "N min left" card.
         if !args.status.isEmpty,
@@ -516,12 +521,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let b = NSButton(title: title, target: self, action: action)
         b.isBordered = false
         b.wantsLayer = true
-        b.layer?.cornerRadius = 9
+        b.layer?.cornerRadius = Self.pillH / 2
         b.layer?.backgroundColor = (filled ? color : color.withAlphaComponent(0.18)).cgColor
         b.attributedTitle = NSAttributedString(string: title, attributes: [
             .foregroundColor: filled ? NSColor.white : color, .font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
         let size = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
-        b.frame = NSRect(x: 0, y: 0, width: ceil(size.width) + 24, height: 22)
+        b.frame = NSRect(x: 0, y: 0, width: ceil(size.width) + Self.pillPad * 2, height: Self.pillH)
         return b
     }
 
@@ -529,33 +534,32 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
         b.attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: color, .font: font])
         b.layer?.backgroundColor = color.withAlphaComponent(0.18).cgColor
-        let w = ceil((title as NSString).size(withAttributes: [.font: font]).width) + 24
-        b.frame.size = NSSize(width: w, height: 22)
+        let w = ceil((title as NSString).size(withAttributes: [.font: font]).width) + Self.pillPad * 2
+        b.frame.size = NSSize(width: w, height: Self.pillH)
         layoutTitleButtons()
     }
 
     /// 2026-10-28 (owner): pin, Start and End always 8 pt apart, whatever their labels ("Start next", "Ended ✓").
+    /// 0.8.6 (A5): all of them 24 pt high (radius 12, 12 pt side padding), centred on the traffic lights' line; the
+    /// right inset equals the traffic lights' left inset. The title shortens first in a narrow window; buttons never shrink.
+    static let pillH: CGFloat = 24
+    static let pillPad: CGFloat = 12
     var titleHolder: NSView?
     func layoutTitleButtons() {
         guard let h = titleHolder else { return }
         let views: [NSView] = [pinButton, startButton, endButton].compactMap { $0 }.filter { !$0.isHidden }
         let gap: CGFloat = 8
-        // 0.8.5 (owner, 29.10): the call buttons match the window's own buttons (close, minimise, zoom): the same
-        // height, centred on the same line, and the same inset from the right edge as theirs from the left.
-        var right: CGFloat = 20, height: CGFloat = 22, centerY = h.frame.height / 2
+        var right: CGFloat = 20, centerY = h.frame.height / 2
         if let close = window?.standardWindowButton(.closeButton), let sv = close.superview, close.frame.height > 0 {
             right = close.frame.minX
-            height = max(14, close.frame.height)
             centerY = h.convert(NSPoint(x: 0, y: close.frame.midY), from: sv).y
         }
         let need = views.reduce(CGFloat(0)) { $0 + $1.frame.width } + gap * CGFloat(max(0, views.count - 1)) + 6 + right
         if abs(h.frame.width - need) > 0.5 { h.setFrameSize(NSSize(width: need, height: h.frame.height)) }
         var x = h.frame.width - right
         for v in views.reversed() {
-            if v !== pinButton, abs(v.frame.height - height) > 0.5 {
-                v.frame.size.height = height
-                v.layer?.cornerRadius = height / 2
-            }
+            if abs(v.frame.height - Self.pillH) > 0.5 { v.frame.size.height = Self.pillH }
+            v.layer?.cornerRadius = Self.pillH / 2
             x -= v.frame.width
             v.frame.origin = NSPoint(x: x, y: (centerY - v.frame.height / 2).rounded())
             x -= gap
@@ -580,11 +584,58 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         guard let p = pinButton else { return }
         let on = Self.onTop
         p.image = NSImage(systemSymbolName: on ? "pin.fill" : "pin.slash", accessibilityDescription: L("tw.onTop"))
-        p.contentTintColor = on ? .controlAccentColor : .secondaryLabelColor
+        p.contentTintColor = on ? Self.pacenoteBlue : .secondaryLabelColor
+        p.layer?.backgroundColor = (on ? Self.pacenoteBlue.withAlphaComponent(0.18) : NSColor.white).cgColor
+        p.layer?.borderWidth = on ? 0 : 1
+        p.layer?.borderColor = NSColor.separatorColor.cgColor
         p.toolTip = on ? L("tw.onTopOn") : L("tw.onTopOff")
+        p.setAccessibilityLabel(L("tw.onTop"))
     }
 
     @objc func pinClicked() { setOnTop(!Self.onTop) }
+
+    /// 0.8.6 (D4): the call's project as a target ("<slug>" or "workspace:<name>"), nil for a call without a project.
+    static func callTarget() -> String? {
+        MainActor.assumeIsolated {
+            let r = CallEngine.shared.callRequest
+            let slug = (r["slug"] as? String) ?? "", ws = (r["workspace"] as? String) ?? ""
+            let reg = ProjectRegistry.load(from: AppPaths.projects)
+            if reg.projects.contains(where: { $0.slug == slug }) { return slug }
+            if !ws.isEmpty && slug == ws.lowercased() { return "workspace:" + ws }
+            return nil
+        }
+    }
+    var onYouSent = ""
+    /// The On me tab's outside groups (open register items of earlier calls and the PM's Notion tasks), every 10 s.
+    func pushOnYou() {
+        guard !transcriptPath.isEmpty else { return }
+        let folder = (transcriptPath as NSString).deletingLastPathComponent, file = transcriptPath
+        let target = Self.callTarget()
+        let payload: [String: Any] = MainActor.assumeIsolated {
+            NotionTasks.shared.keepFresh()
+            return NotionTasks.shared.callPayload(folder: folder, target: target, callFile: file)
+        }
+        guard let d = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]), let js = String(data: d, encoding: .utf8),
+              js != onYouSent else { return }
+        onYouSent = js
+        push("window.LiveTips && LiveTips.setOnYou(" + js + ")")
+        let root: String = MainActor.assumeIsolated { CallEngine.shared.appRoot }
+        let cfg = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: (root as NSString).appendingPathComponent("config.json"))))) as? [String: Any]
+        if let sec = cfg?["speaker_prompt_s"] as? Double { push("window.LiveTips && LiveTips.setSpeakerPrompt(\(sec))") }
+    }
+
+    static let pacenoteBlue = NSColor(srgbRed: 0x0A / 255, green: 0x6C / 255, blue: 0xFF / 255, alpha: 1)
+    var onTopMonitor: Any?
+    /// 0.8.6 (A3): Option-Command-T toggles Always on top while the call window is the key window (not a global key).
+    func installOnTopKey() {
+        onTopMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+            guard let self = self, self.window.isKeyWindow,
+                  e.modifierFlags.intersection(.deviceIndependentFlagsMask) == [.option, .command],
+                  e.charactersIgnoringModifiers?.lowercased() == "t" || e.keyCode == 17 else { return e }
+            self.setOnTop(!Self.onTop)
+            return nil
+        }
+    }
 
     func addEndCallButton() {
         let b = pillButton(L("menubar.endCall"), color: .systemRed, filled: false, action: #selector(endCallClicked))
@@ -593,11 +644,19 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let g = pillButton(L("home.startCall"), color: .controlAccentColor, filled: true, action: #selector(startClicked))
         g.toolTip = L("tw.startNowTip")
         g.isHidden = true
-        // Pacenote 0.8 (F2): no pin in the title bar (Always on top is in Call settings); the brand symbol on the left.
-        let w = g.frame.width + b.frame.width + 34      // 0.8: End call keeps ~24 pt from the right edge (owner)
-        let holder = NSView(frame: NSRect(x: 0, y: 0, width: w, height: 28))
-        g.frame.origin = NSPoint(x: 4, y: (28 - g.frame.height) / 2)
-        b.frame.origin = NSPoint(x: g.frame.maxX + 6, y: (28 - b.frame.height) / 2)
+        // 0.8.6 (A1): the pin is back in the title bar in every state, next to Start and End (right to left: End, Start, pin).
+        let pin = NSButton(title: "", target: self, action: #selector(pinClicked))
+        pin.isBordered = false
+        pin.wantsLayer = true
+        pin.imagePosition = .imageOnly
+        pin.frame = NSRect(x: 0, y: 0, width: Self.pillH, height: Self.pillH)
+        pin.layer?.cornerRadius = Self.pillH / 2
+        pinButton = pin
+        styleOnTop()
+        let w = pin.frame.width + g.frame.width + b.frame.width + 50
+        let holder = NSView(frame: NSRect(x: 0, y: 0, width: w, height: 36))
+        holder.autoresizingMask = [.height]
+        holder.addSubview(pin)
         holder.addSubview(g)
         holder.addSubview(b)
         startButton = g
@@ -609,7 +668,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         titleHolder = holder
         layoutTitleButtons()
         let mark = NSHostingView(rootView: PacenoteSymbol(height: 14).padding(.horizontal, 6))
-        mark.frame = NSRect(x: 0, y: 0, width: 26, height: 28)
+        mark.frame = NSRect(x: 0, y: 0, width: 26, height: 36)
         let lead = NSTitlebarAccessoryViewController()
         lead.view = mark
         lead.layoutAttribute = .leading
@@ -641,7 +700,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     /// Up next switch: the call is being ended by the app, not by this window's button.
     func markEnding() {
-        if let b = endButton { restylePill(b, "Ending...", color: .systemRed); b.isEnabled = false }
+        if let b = endButton { restylePill(b, L("tw.ending"), color: .systemRed); b.isEnabled = false }
         push("window.setEnding && window.setEnding()")
     }
 
@@ -675,7 +734,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             MainActor.assumeIsolated {
                 let owned = CallEngine.shared.isRunning
                 CallEngine.shared.stop()
-                if let b = self?.endButton { self?.restylePill(b, "Ending...", color: .systemRed) }
+                if let b = self?.endButton { self?.restylePill(b, L("tw.ending"), color: .systemRed) }
                 self?.endButton?.isEnabled = false
                 if !owned {
                     CallEngine.shared.finishOrphan { file, saved in
@@ -781,6 +840,20 @@ extension PrompterController {
             let file = stem + ".md"
             MainActor.assumeIsolated { Register.shared.markDone(id: id, callFile: file) }
             sendSetting("commitment_closed", id)
+        case "onme-mine":
+            // 0.8.6 (rules/commitments.yaml > mine): a transcript line, a tip or an "on them" item made the PM's
+            let text = (d["text"] as? String ?? "").replacingOccurrences(of: "|", with: " ")
+            guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+            let fromId = d["fromId"] as? String ?? "", fromText = (d["fromText"] as? String ?? "").replacingOccurrences(of: "|", with: " ")
+            sendSetting("onme_mine", text + "|" + fromId + "|" + ((d["typed"] as? Bool) == true ? "@typed" : fromText))
+        case "ext-tick", "onme-remove":
+            // 0.8.6 (D4): a register item of an earlier call or a Notion task, ticked or removed in the On me tab
+            guard let id = d["id"] as? String, !id.isEmpty else { return }
+            let folder = (transcriptPath as NSString).deletingLastPathComponent
+            let done = d["done"] as? Bool ?? true
+            let op = act == "onme-remove" ? "remove" : "tick"
+            MainActor.assumeIsolated { NotionTasks.shared.callAction(id: id, folder: folder, op: op, done: done) }
+            onYouSent = ""
         case "name-speaker":
             let sid = d["speakerId"] as? String ?? "", name = d["name"] as? String ?? "", side = d["side"] as? String ?? ""
             guard sid.range(of: "^S[0-9]+$", options: .regularExpression) != nil, !name.isEmpty else { return }

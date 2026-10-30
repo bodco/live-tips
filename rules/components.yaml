@@ -1,0 +1,41 @@
+# Optional components (Pacenote 0.8.6, block E): one pattern for the local model, the link downloader and later
+# add-ons. Optional components never count against readiness and are never installed during a live call.
+schema_version: 1
+components:
+  ollama:
+    title: Ollama
+    size: about 200 MB
+    for: the model on this Mac (plan B for the preparation and the after-call work)
+    where: Settings > AI, About > Components
+  local_model:
+    title: Local model (<LocalLLM.model>)
+    size: about 16 GB
+    for: preparation and after-call work without Claude
+    needs: ollama
+    where: Settings > AI, About > Components
+  link_downloader:
+    title: Link downloader (yt-dlp)
+    size: about 10 MB
+    for: transcribing a link (Google Drive, YouTube, Vimeo)
+    install: pip install yt-dlp into the core's private venv; updated with the core
+    where: Settings > General > Optional add-ons, About > Components
+word_export: >-
+  Save as Word needs no add-on: macOS writes .docx (NSAttributedString officeOpenXML). If that is ever not enough, a
+  library becomes a fourth optional component and Save as Word is disabled until it is installed.
+states:
+  installed: green, with the version
+  missing: grey "Not installed, optional" with Install (secondary button)
+  installing: progress and Cancel
+  failed: one line with Retry
+about: >-
+  The same rows at the end of About > Components, marked "(optional)". They are never red or orange and never change
+  the overall readiness. "Install or repair" installs only the required components, never the optional ones.
+onboarding: >-
+  An optional "Optional add-ons" step after the main setup: one row per component with a checkbox and its size,
+  nothing ticked by default, "Install selected" and "Skip". The 16 GB model shows a size warning with the free disk
+  space.
+dependants: >-
+  A control that needs a missing component is disabled, with a small "Install" link next to it that installs at once:
+  the Link field of Transcribe a recording without the link downloader; "On this Mac" in the AI route pickers without
+  Ollama and the model.
+during_a_call: Install never starts during a live call; the button says "After the call".

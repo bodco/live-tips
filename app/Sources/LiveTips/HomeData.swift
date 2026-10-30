@@ -265,6 +265,7 @@ final class CallHistory: ObservableObject {
         var hidden = false
         var minutes: Double?       // from the first to the last line of the transcript
         var prepared: Bool?        // a preparation (<stem>.brief.md) was there
+        var source: String?        // 0.8.6 (B): "file" or "link" for a transcribed recording, nil for a call
     }
 
     @Published private(set) var records: [Record] = []
@@ -403,15 +404,17 @@ final class CallHistory: ObservableObject {
                 // The skill and the app can record the same call: keep one (the app's).
                 if !n.hasSuffix(".app.md"), names.contains(String(n.dropLast(3)) + ".app.md") { continue }
                 var title = String(n.dropFirst(16).dropLast(n.hasSuffix(".app.md") ? 7 : 3)).replacingOccurrences(of: "-", with: " ")
+                var source: String?
                 if let h = try? FileHandle(forReadingFrom: URL(fileURLWithPath: file)) {
-                    let head = String(data: h.readData(ofLength: 400), encoding: .utf8) ?? ""
+                    let head = String(data: h.readData(ofLength: 800), encoding: .utf8) ?? ""
+                    if head.contains("\n- source: link") { source = "link" } else if head.contains("\n- source: file") { source = "file" }
                     try? h.close()
                     if let first = head.split(separator: "\n").first, first.hasPrefix("#"), let c = first.firstIndex(of: ":") {
                         let t = first[first.index(after: c)...].trimmingCharacters(in: .whitespaces)
                         if !t.isEmpty { title = t }
                     }
                 }
-                records.append(Record(file: file, title: title, project: name, start: start))
+                records.append(Record(file: file, title: title, project: name, start: start, source: source))
                 known.insert(file)
                 added = true
             }

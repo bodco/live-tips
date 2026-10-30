@@ -1,0 +1,54 @@
+# Transcribe a recording (Pacenote 0.8.6, block B). Shared by the app and the core: a file or a link becomes the
+# same transcript as a call, with the same voices library and the same Whisper prompt.
+schema_version: 1
+entry: >-
+  Home "Transcribe a recording" (next to Plan a call), the menu bar menu, or an audio or video file dropped on the
+  Home window or on the Dock icon (the window opens with the file chosen).
+input:
+  file_types: [mp3, m4a, wav, aac, flac, ogg, mp4, mov, m4v, webm, mkv]
+  max_hours: 4
+  link_sources: >-
+    Recognised by the URL and shown as a chip: Google Drive, YouTube, Vimeo, Dropbox, Direct link.
+  fields: >-
+    Language (the Start call choices, the PM's languages by default), People speaking (Find out by itself, 2, 3, 4,
+    5+), Project (optional: None, the projects and workspaces of the registry).
+  privacy: The audio is transcribed on this Mac; nothing leaves it until the PM clicks Add to Notion.
+decode: >-
+  A local file is decoded by the app with AVFoundation (AVAssetReader) to WAV 16 kHz mono, no ffmpeg. A format it
+  cannot read gives a plain error.
+link: >-
+  Downloaded with the optional Link downloader (yt-dlp in the core's private venv, rules/components.yaml), audio
+  only (-f bestaudio, no re-encoding when possible). Google Drive through yt-dlp, else
+  https://drive.google.com/uc?export=download&id=<id> with the confirm token. YouTube and Vimeo through yt-dlp. The
+  video title and upload date fill Title and Date. A link that needs a sign-in gives: "This link needs a sign-in. Set
+  sharing to Anyone with the link, or download the file and drop it here."
+engine: >-
+  transcriber.py --from-file <wav> --out <md> --langs <codes> [--project-dir <dir>] [--speakers N]: the same Whisper
+  model, voices library and Whisper prompt (project terms) as on calls; one channel (no "Me" from the microphone);
+  faster than real time, in batches; the voices are told apart after the full pass. Progress is JSON lines on stdout
+  ({"stage":"...","done_s":..,"total_s":..,"line":"..."}). The .md has the call format with source: file|link and
+  source_ref: <file name or URL> in the header.
+during_a_call: >-
+  Never competes with a call for Whisper: while status.json says recording, standby or loading_model the window shows
+  "Starts after your call ends" and Start now is disabled; it starts by itself when the call ends.
+steps: [Getting the file, Preparing the audio, Transcribing, Telling the voices apart]
+background: The window can be closed; a system notification says when it is done and opens the result.
+files: >-
+  The downloaded video and the WAV are deleted after success. The audio for the player is kept as .m4a next to the
+  transcript when it is added to a project, else in the cache for 7 days.
+speakers: >-
+  Per voice: colour, name or Speaker N, minutes, how it was named ("named by voice (91%)", "named by you"), a 5 s
+  sample. An unnamed voice shows its first line, suggestions from the voices library ("Ann Lee, sounds like 78%"),
+  the project's team names and a name field. Also Same person as (merge), Split (lines marked as another speaker from
+  the line's menu) and Remember this voice (on by default for named voices). A rename rewrites the transcript at
+  once, the same way as the call's speakers popover and .named.md.
+save: >-
+  Title (file name without the extension, or the video title), Date and time (optional: the file's creation date or
+  the upload date), Project (optional). With a project the transcript goes to that project's live/ folder named like a
+  call (YYYY-MM-DD-HHMM-<slug>.md) so the next preparation reads it, and call notes run when they are on.
+  Add to Notion: a page in the meetings database (the project's meetings_db when it has a config, else the default of
+  Settings > Notion) with title, date, project, speakers and the transcript in blocks of at most 2000 characters, 100
+  blocks per request; then "Open in Notion". Save as Markdown (the same .md). Save as Word (.docx written by macOS,
+  NSAttributedString officeOpenXML): title, a line with date and people, then "00:12:04 Emily Clark: text" paragraphs
+  with the name in bold. Nothing is sent without a click.
+recent: Recent on Home shows these transcripts with a "File" or "Link" mark.

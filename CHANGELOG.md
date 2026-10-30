@@ -3,6 +3,24 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.6
+
+- **Call window title bar (A):** the pin is back (Always on top, remembered; Option-Command-T); a taller title bar
+  with 24 pt buttons on the traffic lights' line; "Ending…" is translated.
+- **Transcribe a recording (B):** a file or a link (Google Drive, YouTube, Vimeo, Dropbox, direct) becomes a
+  call-format transcript on this Mac, with the voices told apart after the pass; Speakers card, a player, Save to a
+  project, Add to Notion, Markdown and Word. Waits while a call is live. Recent marks File or Link.
+- **Settings > Notion (C):** the Keys tab is folded into Notion: connection, meeting pages (per project for projects
+  without a config), your tasks, the local copy.
+- **Notion tasks in On you (D):** off by default; one list with commitments on Home and in the call window's On me,
+  ticks and Remove (Notion trash, Undo) both ways, Mine on any line, items typed in On me, commitments sent to Notion
+  by hand or after each call, linked items synced (register ops link and unlink).
+- **Optional add-ons (E):** Ollama, the local model and the Link downloader in one pattern: Settings, About and an
+  optional onboarding step; never part of readiness, never installed during a call.
+- **Speakers above the tabs (F):** chips and an open card for an unnamed voice on Transcript, On me and Brief.
+- **Recording:** "Can't hear the other side" now says to switch the sound output and back when the call is in a
+  browser (it reconnects its audio).
+
 ## 0.8.5
 
 - **Start call, the same order for every call:** block 1 (title, date, time, call type, audience, language) and

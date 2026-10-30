@@ -85,7 +85,7 @@ def same_slot(item: dict, call: str, owner: str, text: str) -> bool:
             and similar(item["text"], text))
 
 
-ITEM_KEYS = ("id", "text", "owner", "project", "series", "call", "t", "created", "due", "by")
+ITEM_KEYS = ("id", "text", "owner", "project", "series", "call", "t", "created", "due", "by", "from")
 NOT_DONE = dict(done_at="", done_source="", done_call="")
 
 
@@ -96,6 +96,10 @@ def _apply(it: dict, op: str, e: dict) -> None:
         it.update(status="open", **NOT_DONE)
     elif op == "drop":
         it["status"] = "dropped"
+    elif op == "link":          # 0.8.6 (rules/notion-tasks.yaml): the item is a task in the PM's Notion
+        it.update(notion_page=e.get("notion_page", ""), notion_note="")
+    elif op == "unlink":
+        it.update(notion_page="", notion_note="removed" if e.get("reason", "removed") == "removed" else "")
 
 
 def _add(items: Dict[str, dict], alias: Dict[str, str], e: dict) -> None:
@@ -106,7 +110,7 @@ def _add(items: Dict[str, dict], alias: Dict[str, str], e: dict) -> None:
     if twin:
         alias[cid] = twin["id"]
         return
-    items[cid] = dict({k: e.get(k, "") for k in ITEM_KEYS}, status="open", **NOT_DONE)
+    items[cid] = dict({k: e.get(k, "") for k in ITEM_KEYS}, status="open", notion_page="", notion_note="", **NOT_DONE)
 
 
 def fold(events: List[dict]) -> List[dict]:
@@ -155,7 +159,7 @@ class _CallRecord:
         self.have, self.call, self.project, self.series, self.created, self.by = have, call, project, series, created, by
         self.events: List[dict] = []
 
-    def add(self, text, owner: str, due, t, done: bool) -> None:
+    def add(self, text, owner: str, due, t, done: bool, replaces: str = "") -> None:
         text = re.sub(r"\s+", " ", str(text or "")).strip()[:120]
         if not text:
             return
@@ -165,6 +169,9 @@ class _CallRecord:
         name = Path(self.call).name
         e = {"op": "add", "id": cid, "text": text, "owner": owner, "project": self.project, "series": self.series,
              "call": name, "t": t or "", "created": self.created, "due": str(due or "")[:40], "by": self.by}
+        if replaces:                    # 0.8.6 > mine: an "on them" item of an earlier call became the PM's
+            e["from"] = replaces
+            self.events.append({"op": "drop", "id": replaces, "at": self.created})
         self.events.append(e)
         self.have.append(dict(e, status="open"))
         if done:
@@ -183,13 +190,14 @@ def promiser(a: dict) -> str:
 
 
 def record_call(folder, *, call: str, project: str, title: str, actions: List[dict], theirs: List[dict],
-                ticked: Optional[Dict[str, bool]] = None, by: str = "app") -> List[dict]:
+                ticked: Optional[Dict[str, bool]] = None, by: str = "app", replaces: Optional[Dict[str, str]] = None) -> List[dict]:
     """End of a call (rules/commitments.yaml > write_when): the PM's actions (owner me) and promises to the PM's
     side (owner = name). `ticked` = the window's On me ticks, by action id. Returns the events written."""
     ticked = ticked or {}       # by action id or by norm_text(what)
     rec = _CallRecord(load(folder), call, project, series_key(project, title), now_iso(), by)
     for a in actions or []:
-        rec.add(a.get("what"), "me", a.get("due"), a.get("t"), is_ticked(a, ticked))
+        rec.add(a.get("what"), "me", a.get("due"), a.get("t"), is_ticked(a, ticked),
+                (replaces or {}).get(str(a.get("from") or "")) or "")
     for a in theirs or []:
         if promiser(a):
             rec.add(a.get("what"), promiser(a), a.get("due"), a.get("t"), False)
@@ -197,8 +205,12 @@ def record_call(folder, *, call: str, project: str, title: str, actions: List[di
     return rec.events
 
 
-def mark(folder, cid: str, op: str = "done", source: str = "manual", call: str = "") -> dict:
+def mark(folder, cid: str, op: str = "done", source: str = "manual", call: str = "", notion_page: str = "") -> dict:
     e = {"op": op, "id": cid, "at": now_iso()}
+    if op == "link":
+        e["notion_page"] = notion_page
+    if op == "unlink":
+        e["reason"] = source if source in ("removed", "undo") else "removed"
     if op == "done":
         e["source"] = source
         if call:
@@ -209,7 +221,8 @@ def mark(folder, cid: str, op: str = "done", source: str = "manual", call: str =
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["list", "done", "reopen", "drop"])
+    ap.add_argument("cmd", choices=["list", "done", "reopen", "drop", "link", "unlink"])
+    ap.add_argument("--page", default="")
     ap.add_argument("folder", type=Path)
     ap.add_argument("id", nargs="?")
     ap.add_argument("--all", action="store_true")
@@ -221,7 +234,7 @@ def main(argv=None) -> int:
         return 0
     if not a.id:
         ap.error("id is required")
-    print(json.dumps(mark(a.folder, a.id, a.cmd), ensure_ascii=False))
+    print(json.dumps(mark(a.folder, a.id, a.cmd, notion_page=a.page), ensure_ascii=False))
     return 0
 
 

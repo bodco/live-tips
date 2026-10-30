@@ -133,6 +133,12 @@ struct CallPageView: View {
                         Spacer()
                         Button(L("reg.copy")) { register.copyText(c) }.buttonStyle(.pnTertiary)
                     }
+                    .contextMenu {          // 0.8.6 (D5): an item of mine can become a Notion task
+                        Button(L("reg.copy")) { register.copyText(c) }
+                        if c.mine && c.notionPage.isEmpty && NotionTasks.shared.settings.ready {
+                            Button(L("ntask.addToNotion")) { Task { await NotionTasks.shared.add(c) } }
+                        }
+                    }
                 }
             }
         }

@@ -15,6 +15,10 @@ states:
   cant_hear:
     when: recording and call_silent_s >= 30 while the microphone has sound
     action: Check audio (System Settings > Sound)
+    browser: >-
+      0.8.6 (owner, 30.10: a Zoom call in Chrome came back after a 30 min break, the PM heard it, Pacenote got only
+      silence): a browser tab can keep playing to the speakers while its stream no longer reaches the system audio tap.
+      Switching the sound output to another device and back makes the browser reopen its audio. The state's text says so.
     tips: about the other side off until their audio comes back; the PM's words are still recorded
 clears: by itself as soon as the silent side has sound again
 show: a red strip under the window title, the tips area replaced by the state, the Mic and Call levels

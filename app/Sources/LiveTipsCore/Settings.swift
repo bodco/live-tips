@@ -90,6 +90,11 @@ public struct AppConfig: Codable, Equatable {
     /// chosen or created in Settings or the welcome tour) and its name for the UI.
     public var notionMeetingsDB = ""
     public var notionMeetingsName = ""
+    /// 0.8.6 (C): a project without a Control Tower config may write its meeting pages to another database
+    /// (project slug -> data source id); empty = the default above.
+    public var notionMeetingsDBByProject: [String: String] = [:]
+    /// 0.8.6 (D, rules/notion-tasks.yaml): the PM's Notion tasks in On you.
+    public var notionTasks = NotionTasksSettings()
     /// Speaker identification on the other side's audio (local voice prints, as in the skill).
     public var speakersEnabled = true
     /// M2: a second request when Claude is slow to start answering (the first good answer wins).
@@ -133,6 +138,8 @@ public struct AppConfig: Codable, Equatable {
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
         notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB
         notionMeetingsName = (try? c.decode(String.self, forKey: .notionMeetingsName)) ?? d.notionMeetingsName
+        notionMeetingsDBByProject = (try? c.decode([String: String].self, forKey: .notionMeetingsDBByProject)) ?? d.notionMeetingsDBByProject
+        notionTasks = (try? c.decode(NotionTasksSettings.self, forKey: .notionTasks)) ?? d.notionTasks
         speakersEnabled = (try? c.decode(Bool.self, forKey: .speakersEnabled)) ?? d.speakersEnabled
         hedgeEnabled = (try? c.decode(Bool.self, forKey: .hedgeEnabled)) ?? d.hedgeEnabled
         judgeAfterCall = (try? c.decode(Bool.self, forKey: .judgeAfterCall)) ?? d.judgeAfterCall
@@ -168,6 +175,63 @@ public struct AppConfig: Codable, Equatable {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try enc.encode(self).write(to: url, options: .atomic)
+    }
+}
+
+/// 0.8.6 (D, rules/notion-tasks.yaml > settings). Off by default; ids are Notion ids, never written to git.
+public struct NotionTasksSettings: Codable, Equatable {
+    public struct Condition: Codable, Equatable, Identifiable {
+        public var id = UUID().uuidString
+        public var property = ""
+        public var type = ""                // status | select | multi_select | checkbox
+        public var values: [String] = []    // option names (checkbox: "true" or "false")
+        public init() {}
+    }
+    public var enabled = false
+    public var database = ""                // data source id
+    public var databaseName = ""
+    public var personProperty = ""
+    public var personId = ""
+    public var personName = ""
+    public var conditions: [Condition] = []
+    public var tickProperty = ""
+    public var tickType = ""                // status | select | checkbox
+    public var tickValue = ""
+    public var dueProperty = ""
+    public var projectProperty = ""
+    public var projectType = ""             // relation | select | multi_select
+    /// Pacenote project slug or "workspace:<name>" -> the Notion values (option names or page ids)
+    public var projectMap: [String: [String]] = [:]
+    public var workspaceProperty = ""       // a Workspace relation, when the database has one
+    public var workspaceMap: [String: String] = [:]   // workspace name -> page id
+    public var sourceProperty = ""          // rich text or url for "From the call ..."
+    public var autoAdd = true               // after each call (rules/notion-tasks.yaml > after_call)
+    public init() {}
+
+    /// Complete enough to query and to add tasks.
+    public var ready: Bool { enabled && !database.isEmpty && !personProperty.isEmpty && !personId.isEmpty }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = NotionTasksSettings()
+        enabled = (try? c.decode(Bool.self, forKey: .enabled)) ?? d.enabled
+        database = (try? c.decode(String.self, forKey: .database)) ?? d.database
+        databaseName = (try? c.decode(String.self, forKey: .databaseName)) ?? d.databaseName
+        personProperty = (try? c.decode(String.self, forKey: .personProperty)) ?? d.personProperty
+        personId = (try? c.decode(String.self, forKey: .personId)) ?? d.personId
+        personName = (try? c.decode(String.self, forKey: .personName)) ?? d.personName
+        conditions = (try? c.decode([Condition].self, forKey: .conditions)) ?? d.conditions
+        tickProperty = (try? c.decode(String.self, forKey: .tickProperty)) ?? d.tickProperty
+        tickType = (try? c.decode(String.self, forKey: .tickType)) ?? d.tickType
+        tickValue = (try? c.decode(String.self, forKey: .tickValue)) ?? d.tickValue
+        dueProperty = (try? c.decode(String.self, forKey: .dueProperty)) ?? d.dueProperty
+        projectProperty = (try? c.decode(String.self, forKey: .projectProperty)) ?? d.projectProperty
+        projectType = (try? c.decode(String.self, forKey: .projectType)) ?? d.projectType
+        projectMap = (try? c.decode([String: [String]].self, forKey: .projectMap)) ?? d.projectMap
+        workspaceProperty = (try? c.decode(String.self, forKey: .workspaceProperty)) ?? d.workspaceProperty
+        workspaceMap = (try? c.decode([String: String].self, forKey: .workspaceMap)) ?? d.workspaceMap
+        sourceProperty = (try? c.decode(String.self, forKey: .sourceProperty)) ?? d.sourceProperty
+        autoAdd = (try? c.decode(Bool.self, forKey: .autoAdd)) ?? d.autoAdd
     }
 }
 

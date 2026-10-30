@@ -10,7 +10,7 @@ import SwiftUI
 final class OnboardingModel: ObservableObject {
     // Pacenote 0.8 (F4, REDESIGN-SPEC 7): the splash, then four steps. Speech recognition installs in the background
     // from the first step; your name, Notion and calendars (if skipped) become Finish setup cards on Home.
-    enum Step: Int, CaseIterable { case splash, permissions, folder, claude, done }
+    enum Step: Int, CaseIterable { case splash, permissions, folder, claude, addons, done }   // 0.8.6 (E): optional add-ons
     @Published var step: Step = .splash
     @Published var micState = AVCaptureDevice.authorizationStatus(for: .audio)
     /// true granted, false denied, nil not asked yet (or macOS does not say).
@@ -159,8 +159,10 @@ struct OnboardingView: View {
                     if m.step == .done {
                         Button(L("onboarding.done.secondary")) { finish(); (NSApp.delegate as? AppDelegate)?.openHome() }.buttonStyle(.pnSecondary)
                     }
-                    Button { primary() } label: { Text(primaryLabel).frame(minWidth: 180) }
-                        .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                    if m.step != .addons {          // the add-ons step has its own Install selected and Skip
+                        Button { primary() } label: { Text(primaryLabel).frame(minWidth: 180) }
+                            .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                    }
                 }
                 installFooter
             }
@@ -218,6 +220,7 @@ struct OnboardingView: View {
         case .permissions: return L("onboarding.permissions.title")
         case .folder: return L("onboarding.folder.title")
         case .claude: return L("onboarding.claude.title")
+        case .addons: return L("comp.onb.title")
         case .done: return L("onboarding.done.title")
         }
     }
@@ -228,6 +231,7 @@ struct OnboardingView: View {
         case .permissions: return L("onboarding.permissions.body")
         case .folder: return L("onboarding.folder.body")
         case .claude: return L("onboarding.claude.body")
+        case .addons: return L("comp.onb.body")
         case .done: return L("onboarding.done.body", ["help": HotKeys.shared.combo(.help).display])
         }
     }
@@ -328,6 +332,8 @@ struct OnboardingView: View {
                 keyState(settings.keyState[.claudeAPIKey], fallback: m.keyNote)
                 Link(L("onboarding.claude.getKey"), destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(PN.Font.caption)
             }
+        case .addons:
+            OptionalAddonsStep(showHeader: false) { m.next() }
         case .done:
             HStack(spacing: 10) {
                 Image(nsImage: Brand.menuBarImage(recording: false))

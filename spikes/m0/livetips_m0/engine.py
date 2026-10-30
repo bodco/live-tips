@@ -127,7 +127,7 @@ Return JSON only, no prose:
 Rules:
 - mine = the topic is about the PM's projects or work, or the PM is asked or assigned something in it. Someone else's update about their own project is not mine.
 - asks = OPEN questions or requests TO THE PM: by name, by "you" after the PM spoke, or about the PM's projects; also a request said in the third person ("Alex will check"). type update = the PM is asked for their status or given the floor for their update (also by a nickname or short form of the PM's name, "давай", "твоя черга", "over to you", or the host moving to the PM's projects). Remove an ask once the PM answered it or did it. Questions to other people, and questions the PM asked others, are not asks.
-- actions = only what the PM personally took on in the PM's own lines ("{me}": "I will...", "я зроблю...") or what someone explicitly assigned to the PM by name or "you" in reply to the PM (keep them until the call ends, update the due date when it changes). NEVER an item from someone else's update about their own work, even in the first person ("I will prepare the report for Brian" said by another speaker is THEIR task), never a task for another named person, never a general to-do of the team. When unsure who owns it, leave it out.
+- actions = only what the PM personally took on in the PM's own lines ("{me}": "I will...", "я зроблю...") or what someone explicitly assigned to the PM by name or "you" in reply to the PM (keep them until the call ends, update the due date when it changes). The PM taking an item over counts too: "це на мені", "я беру", "беру на себе", "I'll take it", "that's on me" said by the PM after an item makes that item the PM's action. NEVER an item from someone else's update about their own work, even in the first person ("I will prepare the report for Brian" said by another speaker is THEIR task), never a task for another named person, never a general to-do of the team. When unsure who owns it, leave it out.
 - decisions = only decisions actually agreed aloud, keep them all.
 - speech_done = only points the PM said aloud in the PM's own lines ("{me}"); nobody else's update counts. Empty until the PM gives the update.
 - Keep the ids of items you keep; new items get new ids. Never invent: only what was said."""
@@ -656,6 +656,8 @@ class Engine:
         self.onme_ticked: Dict[str, bool] = {}
         # 0.8.5 (owner): an On me line the PM marked "not mine" or reworded in the window; norm text -> new text ("" = drop)
         self.onme_fixed: Dict[str, str] = {}
+        # 0.8.6 (rules/commitments.yaml > mine): lines the PM made his with "Mine" in the window
+        self.onme_mine: List[dict] = []
         self.risks_shown: set = set()
         self.open_commitments = self._load_commitments(cfg, rules)
         raise_tip_tokens(cfg)
@@ -1629,8 +1631,28 @@ class Engine:
             "\n".join(fmt(h) for h in new[-60:]))
         return self._situation_extra_input() + user
 
+    def add_mine(self, raw: str, from_id: str = "", from_text: str = "") -> None:
+        """0.8.6: "Mine" on a transcript line, a tip or an "on them" item. Shown at once with the raw text; the call
+        picture words it as a short action and marks it from = "mine<n>"."""
+        raw = re.sub(r"\s+", " ", str(raw or "")).strip()[:240]
+        if raw:
+            typed = from_text == "@typed"         # typed by the PM in the On me tab: his words stay as they are
+            self.onme_mine.append({"n": len(self.onme_mine) + 1, "raw": raw, "from_id": from_id,
+                                   "from_text": "" if typed else from_text, "typed": typed})
+
     def fix_onme(self, sit: dict) -> dict:
         """The PM's On me corrections win over the model: "not mine" lines go, reworded ones keep his words."""
+        mine = getattr(self, "onme_mine", None) or []
+        if mine:
+            acts = list(sit.get("actions") or [])
+            for m in mine:
+                if m.get("typed"):
+                    acts = [a for a in acts if str(a.get("from", "")).strip().lower() != "mine{}".format(m["n"])]
+                if m.get("typed") or not any(str(a.get("from", "")).strip().lower() == "mine{}".format(m["n"]) for a in acts):
+                    acts.append({"id": "mine{}".format(m["n"]), "what": m["raw"][:120], "due": "", "from": "mine{}".format(m["n"])})
+            gone = {re.sub(r"\W+", " ", m["from_text"]).strip().lower() for m in mine if m.get("from_text")}
+            theirs = [t for t in (sit.get("theirs") or []) if re.sub(r"\W+", " ", str(t.get("what", ""))).strip().lower() not in gone]
+            sit = dict(sit, actions=acts, theirs=theirs)
         if not self.onme_fixed or not sit.get("actions"):
             return sit
         from .commitments import norm_text
@@ -1709,6 +1731,10 @@ class Engine:
         if self.onme_fixed:          # 0.8.5: the PM's own On me corrections in this call
             parts.append("THE PM CORRECTED HIS ON-ME LIST (never put lines like the removed ones on him again; use his wording):\n" + "\n".join(
                 ("removed: " + k) if not v else ("reworded: {} -> {}".format(k, v)) for k, v in list(self.onme_fixed.items())[-12:]))
+        if getattr(self, "onme_mine", None):           # 0.8.6: the PM made these his ("Mine"): add each to actions, worded short
+            parts.append("THE PM MADE THESE HIS (add each to actions as a short action in the call language, with the due date "
+                         "when one was said, and set its from to the given tag):\n" + "\n".join(
+                             "mine{} | {}".format(m["n"], m["raw"]) for m in self.onme_mine[-12:] if not m.get("typed")))
         return "\n\n".join(parts) + ("\n\n" if parts else "")
 
     def set_agenda_items(self, brief_text: str) -> None:
@@ -1799,7 +1825,8 @@ class Engine:
         m = self.meta()
         return register.record_call(self.register_dir, call=self.cfg["call_file"], project=m.get("project", ""),
                                     title=self.cfg.get("title") or m.get("title", ""), actions=sit.get("actions") or [],
-                                    theirs=sit.get("theirs") or [], ticked=self.onme_ticked, by="app")
+                                    theirs=sit.get("theirs") or [], ticked=self.onme_ticked, by="app",
+                                    replaces={"mine{}".format(m["n"]): m["from_id"] for m in getattr(self, "onme_mine", []) if m.get("from_id")})
 
     def final_wrapup(self) -> Optional[dict]:
         """P2 (26.10): at the end, the window gets what the call picture holds: decisions, what is on the PM,

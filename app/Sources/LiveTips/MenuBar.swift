@@ -87,6 +87,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try? p.run()
     }
 
+    /// 0.8.6 (B): an audio or video file dropped on the Dock icon (or opened with Pacenote) opens Transcribe a recording.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let u = urls.first(where: { TranscribeWindow.accepts($0) }) else { return }
+        MainActor.assumeIsolated { TranscribeWindow.show(file: u) }
+    }
+    @objc func openTranscribe() { MainActor.assumeIsolated { TranscribeWindow.show() } }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // Dock icon: a call in progress (also while waiting for the other side) opens its tips window.
         if !flag { if CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(lastStatus.state) { showTips() } else { openHome() } }

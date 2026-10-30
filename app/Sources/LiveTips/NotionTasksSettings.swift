@@ -224,7 +224,7 @@ struct NotionTasksSection: View {
             HStack {
                 propPicker(s.personProperty, types: ["people"])
                 Picker("", selection: s.personId) {
-                    Text(L("ntset.choosePerson")).tag("")
+                    Text(L("ntset.anyone")).tag("")
                     ForEach(m.users, id: \.id) { u in Text(u.name).tag(u.id) }
                 }
                 .labelsHidden().fixedSize()

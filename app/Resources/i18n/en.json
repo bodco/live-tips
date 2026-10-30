@@ -1193,7 +1193,7 @@
  "local.footer": "Free and private, slower and simpler than Claude. Used where a job's \"Runs on\" is On this Mac (preparation, after the call); not for tips during a call (too slow, and the call needs the memory).",
  "local.noOllama": "Ollama is not installed.",
  "local.getOllama": "Get Ollama",
- "local.notRunning": "Ollama is installed but not running.",
+ "local.notRunning": "Ollama is not running now; Pacenote starts it by itself when a job needs the model.",
  "local.start": "Start Ollama",
  "local.noModels": "Ollama is running, no model yet.",
  "local.ready": "Ollama is running.",
@@ -1347,12 +1347,12 @@
  "tr.addedToProject": "Added to the project's live folder; the next preparation reads it.",
  "tr.mark.file": "File",
  "tr.mark.link": "Link",
- "comp.startToUse": "downloaded; start Ollama to use it",
+ "comp.startToUse": "downloaded; Ollama starts by itself when a job needs it",
  "ntask.showAll": "Show all {n}",
  "ntask.showLess": "Show less",
  "ntset.enable.i": "Your open Notion tasks appear in On you on Home and in the call window's On me, next to the commitments from calls.",
  "ntset.database.i": "The Notion database with your tasks. It must be shared with the Pacenote integration (••• > Connections in Notion).",
- "ntset.onMeMeans.i": "Which person property marks a task as yours (Assignee, Owner) and which person you are. Only tasks with you there are shown.",
+ "ntset.onMeMeans.i": "Optional. Which person property marks a task as yours (Assignee, Owner) and which person you are. Leave Anyone when you keep the database alone: every task (within the conditions) is shown.",
  "ntset.showOnlyWhen.i": "Only tasks with one of the highlighted values are shown. Click a value to add or remove it. Several conditions must all hold.",
  "ntset.tickSets.i": "What a check mark in Pacenote writes to Notion, for example Status = Done. Undo puts the old value back.",
  "ntset.due.i": "The date property used for the due date and for sorting (overdue first).",
@@ -1373,5 +1373,6 @@
  "ntset.projectBy.i": "The property that tells which project a task belongs to (a relation to your projects, or a select). Pacenote matches the names; set the rest below.",
  "ntset.projectsHeader": "Projects in Notion",
  "ntset.projectsFooter": "Which Notion project each Pacenote project is. One Pacenote project can have several Notion values. A call shows the tasks of its project; a workspace call shows all its projects.",
- "ntset.workspaceRel.i": "Tasks whose {prop} is this value are added to the workspace's calls."
+ "ntset.workspaceRel.i": "Tasks whose {prop} is this value are added to the workspace's calls.",
+ "ntset.anyone": "Anyone (every task)"
 }

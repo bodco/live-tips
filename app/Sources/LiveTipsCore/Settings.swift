@@ -211,7 +211,10 @@ public struct NotionTasksSettings: Codable, Equatable {
     public init() {}
 
     /// Complete enough to query and to add tasks.
-    public var ready: Bool { enabled && !database.isEmpty && !personProperty.isEmpty && !personId.isEmpty }
+    /// 0.8.6 (owner: "I use Notion alone, Assignee is always empty"): the person is optional; without it every task
+    /// of the database (within the conditions) is shown.
+    public var ready: Bool { enabled && !database.isEmpty }
+    public var byPerson: Bool { !personProperty.isEmpty && !personId.isEmpty }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -242,8 +245,6 @@ public struct NotionTasksSettings: Codable, Equatable {
         guard enabled else { return [] }
         var m: [String] = []
         if database.isEmpty { m.append("database") }
-        if personProperty.isEmpty { m.append("personProperty") }
-        if personId.isEmpty { m.append("person") }
         return m
     }
 }

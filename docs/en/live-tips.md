@@ -1343,8 +1343,8 @@ Link.
 pages (a project without a Control Tower config can send its pages to its own database), your tasks and the local
 copy of Notion are on one tab.
 
-**D. Your Notion tasks in On you** (rules/notion-tasks.yaml, off by default). Choose the tasks database, who "me" is
-(a person property and a person), Show only when (one or more conditions), what a tick sets, the due date property
+**D. Your Notion tasks in On you** (rules/notion-tasks.yaml, off by default). Choose the tasks database, optionally who "me" is
+(a person property and a person; leave Anyone when you keep the database alone and every task is shown), Show only when (one or more conditions), what a tick sets, the due date property
 and the project property, with a separate "Projects in Notion" table (matched by name, the rest by hand, several
 Notion values per project allowed; a workspace shows once and means all its projects). "Show tasks edited in" limits
 the list to a period (a day, a week, 2 weeks, a month or all time); every setting has an (i) that explains it. Home's On you shows commitments and Notion tasks in one list with a CALL or N badge and a project
@@ -1359,7 +1359,8 @@ follows Notion both ways.
 (yt-dlp). Each has one row with its size, purpose, state and Install, in Settings (AI for the first two, General >
 Optional add-ons for the downloader), at the end of About > Components marked optional, and in an optional
 onboarding step. They never change readiness, Install or repair never installs them, and nothing installs during a
-call. A control that needs a missing one is disabled with a small Install link.
+call. Ollama does not have to be running: a job that needs the local model starts it by itself, and a model already
+downloaded counts as installed. A control that needs a missing one is disabled with a small Install link.
 
 **F. Speakers above the tabs.** A row of chips (colour, name or Speaker N, minutes; an unnamed voice is tinted and
 says "to name") sits above Transcript, On me and Brief. When a voice has spoken long enough a card opens with its

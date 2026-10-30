@@ -38,7 +38,7 @@ public enum NotionTasksCore {
     /// The query filter: the person, every condition (AND), and when `scope` is given the projects' values (OR, plus
     /// the workspace relation when the scope is a workspace with a mapped page).
     public static func filter(_ s: NotionTasksSettings, scope: [String]? = nil, workspace: String? = nil) -> [String: Any] {
-        var and: [[String: Any]] = [["property": s.personProperty, "people": ["contains": s.personId]]]
+        var and: [[String: Any]] = s.byPerson ? [["property": s.personProperty, "people": ["contains": s.personId]]] : []
         for c in s.conditions { if let f = condition(c) { and.append(f) } }
         if let days = Int(s.periodDays), days > 0 {          // only tasks edited in the chosen period
             let since = Date().addingTimeInterval(-Double(days) * 86400)
@@ -58,7 +58,7 @@ public enum NotionTasksCore {
             }
             if !any.isEmpty { and.append(any.count == 1 ? any[0] : ["or": any]) }
         }
-        return and.count == 1 ? and[0] : ["and": and]
+        return and.isEmpty ? [:] : and.count == 1 ? and[0] : ["and": and]
     }
 
     static func plain(_ rich: Any?) -> String {
@@ -142,8 +142,8 @@ public enum NotionTasksCore {
     /// A new task page (rules/notion-tasks.yaml > link) for a commitment.
     public static func newPage(_ s: NotionTasksSettings, title: String, projectValues: [String], due: String, source: String,
                                quote: String, titleProperty: String) -> [String: Any] {
-        var props: [String: Any] = [titleProperty: ["title": [["type": "text", "text": ["content": String(title.prefix(200))]]]],
-                                    s.personProperty: ["people": [["id": s.personId]]]]
+        var props: [String: Any] = [titleProperty: ["title": [["type": "text", "text": ["content": String(title.prefix(200))]]]]]
+        if s.byPerson { props[s.personProperty] = ["people": [["id": s.personId]]] }
         if !s.projectProperty.isEmpty, !projectValues.isEmpty {
             switch s.projectType {
             case "relation": props[s.projectProperty] = ["relation": projectValues.map { ["id": $0] }]

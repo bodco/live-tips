@@ -7,6 +7,10 @@ components:
     size: about 200 MB
     for: the model on this Mac (plan B for the preparation and the after-call work)
     where: Settings > AI, About > Components
+    on_demand: >-
+      The models are served only by a running Ollama. A job on this Mac starts it by itself (the Ollama app in the
+      background, else `ollama serve`) and waits up to 40 s; a model already downloaded counts as installed while
+      Ollama is stopped, so Install never downloads it again.
   local_model:
     title: Local model (<LocalLLM.model>)
     size: about 16 GB

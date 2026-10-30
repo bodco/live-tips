@@ -5,6 +5,7 @@ on a vendor SDK directly, so a local model (OpenAI-compatible server such as lla
 Ollama) or another vendor can be plugged in.
 """
 import json
+import os
 import queue
 import threading
 import time
@@ -270,6 +271,51 @@ class OpenAICompatProvider(Provider):
                                                **({"Authorization": "Bearer " + self.api_key} if self.api_key else {})})
 
 
+_OLLAMA_UP: dict = {}
+
+
+def ensure_ollama(base_url: str = "http://127.0.0.1:11434", wait_s: float = 40.0) -> bool:
+    """0.8.6 (owner: "can Gemma work while Ollama is not running?"): the models are served only by a running Ollama, so
+    a job on this Mac starts it by itself (the Ollama app in the background, else `ollama serve`) and waits for it.
+    Only for Ollama on this Mac; True when it answers."""
+    import shutil
+    import subprocess
+    url = base_url.rstrip("/")
+
+    def up() -> bool:
+        try:
+            with urllib.request.urlopen(url + "/api/tags", timeout=2) as r:
+                return r.status == 200
+        except Exception:  # noqa: BLE001
+            return False
+    if _OLLAMA_UP.get(url) and up():
+        return True
+    if up():
+        _OLLAMA_UP[url] = True
+        return True
+    if "127.0.0.1" not in url and "localhost" not in url:
+        return False
+    started = False
+    for app in ("/Applications/Ollama.app", os.path.expanduser("~/Applications/Ollama.app")):
+        if os.path.isdir(app):
+            started = subprocess.run(["open", "-g", "-j", app], capture_output=True).returncode == 0
+            break
+    if not started:
+        exe = shutil.which("ollama") or next((p for p in ("/opt/homebrew/bin/ollama", "/usr/local/bin/ollama") if os.path.exists(p)), None)
+        if exe:
+            subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            started = True
+    if not started:
+        return False
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < wait_s:
+        if up():
+            _OLLAMA_UP[url] = True
+            return True
+        time.sleep(1)
+    return False
+
+
 class OllamaProvider(Provider):
     """0.8.5 (rules/ai.yaml > routes.local): a model on this Mac through Ollama's own /api/chat, so the context
     length can be set (the OpenAI-compatible endpoint keeps Ollama's small default). Free; usage from the last chunk."""
@@ -282,6 +328,7 @@ class OllamaProvider(Provider):
 
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         c = Completion(model=model, t_start=time.monotonic())
+        ensure_ollama(self.base_url)       # 0.8.6: starts Ollama when it is not running
         body = {"model": model, "stream": True, "keep_alive": "5m", "think": False,   # Gemma 4 thinks by default
                 "options": {"num_ctx": self.num_ctx, "num_predict": max(256, int(max_tokens) * 2), "temperature": 0.2},
                 "messages": [{"role": "system", "content": "\n\n".join(b["text"] for b in system)},

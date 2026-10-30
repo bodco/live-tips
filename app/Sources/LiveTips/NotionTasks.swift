@@ -60,7 +60,9 @@ final class NotionTasks: ObservableObject {
                 var out: [NotionTask] = []
                 var cursor: String?
                 repeat {
-                    var body: [String: Any] = ["page_size": 100, "filter": NotionTasksCore.filter(s)]
+                    var body: [String: Any] = ["page_size": 100]
+                    let f = NotionTasksCore.filter(s)
+                    if !f.isEmpty { body["filter"] = f }
                     if let c = cursor { body["start_cursor"] = c }
                     let r = try await NotionAPI.call(t, "POST", "/data_sources/\(s.database)/query", body)
                     out += ((r["results"] as? [[String: Any]]) ?? []).compactMap { NotionTasksCore.task($0, s) }

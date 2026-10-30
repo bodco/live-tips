@@ -5,8 +5,10 @@ settings:
   enabled: false by default
   database: the tasks database (data source), picked like the meetings database
   on_me: >-
-    A person property (the first person property, such as Assignee, is chosen by itself) and a person from the
-    workspace's users. An integration token does not know who "me" is, so the person is chosen explicitly.
+    Optional. A person property (the first person property, such as Assignee, is chosen by itself) and a person from
+    the workspace's users (or the people of the database when the integration cannot list users). An integration token
+    does not know who "me" is, so the person is chosen explicitly. Without a person ("Anyone", for a PM who keeps the
+    database alone and leaves Assignee empty) every task within the conditions is shown, and new tasks get no person.
   show_only_when: >-
     One property (status, select, multi-select or checkbox) with one or more of its values (chips; by default every
     value except the Complete group of a status). "+ Add a condition" adds more, joined with AND.
@@ -20,7 +22,8 @@ settings:
     "Add my commitments from each call to Notion tasks": on by default once the settings above are complete.
   status_line: '"N tasks match now, synced X ago" with Refresh, from a live query: it tests the settings.'
 sync:
-  query: POST /v1/data_sources/{id}/query with the person, conditions and projects as the filter, all pages
+  query: POST /v1/data_sources/{id}/query with the person (when set), conditions and projects as the filter, all pages
+  ollama: not used here; for the model on this Mac see rules/components.yaml (Ollama starts by itself when a job needs it)
   when: on opening Home, every 5 minutes while Home or the call window is open, and before a call starts
   cache: state/notion-tasks.json (shown offline)
   errors: one line in the settings section and under On you, never a modal

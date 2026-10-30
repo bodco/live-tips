@@ -330,7 +330,14 @@ func notionTasksCore() {
     var sp = st; sp.periodDays = "7"
     expect(((NotionTasksCore.filter(sp)["and"] as? [[String: Any]])?.last?["timestamp"] as? String) == "last_edited_time", "period filter")
     var miss = NotionTasksSettings(); miss.enabled = true
-    expect(miss.missing == ["database", "personProperty", "person"], "what is missing")
+    expect(miss.missing == ["database"], "what is missing")
+    var nobody = st; nobody.personId = ""
+    expect(nobody.ready && !nobody.byPerson, "the person is optional")
+    let fn = NotionTasksCore.filter(nobody)
+    expect(fn["and"] == nil && fn["or"] != nil, "no person: only the conditions")
+    var bare = nobody; bare.conditions = []
+    expect(NotionTasksCore.filter(bare).isEmpty, "nothing set: every task")
+    expect(((NotionTasksCore.newPage(nobody, title: "x", projectValues: [], due: "", source: "s", quote: "", titleProperty: "Name")["properties"] as? [String: Any])?["Assignee"]) == nil, "no person on a new page")
     let d = try? JSONEncoder().encode(st)
     let back = d.flatMap { try? JSONDecoder().decode(NotionTasksSettings.self, from: $0) }
     expect(back == st, "settings round trip")

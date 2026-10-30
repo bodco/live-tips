@@ -224,6 +224,8 @@ def ollama_chat(url: str, model: str, system: str, user: str, on_tokens, max_out
     body = json.dumps({"model": model, "stream": True, "keep_alive": "5m", "think": False,
                        "options": {"num_ctx": NUM_CTX, "temperature": 0.3, "num_predict": max_out, "repeat_penalty": 1.1},
                        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}).encode()
+    from .providers import ensure_ollama
+    ensure_ollama(url)                  # 0.8.6: starts Ollama when it is not running
     req = urllib.request.Request(url.rstrip("/") + "/api/chat", data=body, headers={"Content-Type": "application/json"})
     text, last, n = [], {}, 0
     with urllib.request.urlopen(req, timeout=3600) as resp:

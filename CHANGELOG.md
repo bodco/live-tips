@@ -19,6 +19,10 @@ Pacenote. Earlier versions are described in the commit messages and in
   an (i) on every setting; several Notion values per project; a workspace shows once; a period filter (edited in the
   last day, week, 2 weeks, month or all time); a new condition starts on an unused property; Refresh says what is
   missing; people come from the database when the integration cannot list users; On you has Show all.
+- **Notion tasks without a person (30.10):** "On me means" is optional (Anyone): a PM who keeps the database alone
+  sees every task within the conditions; new tasks get no person.
+- **Ollama on demand (30.10):** a job on this Mac starts Ollama by itself and waits for it; downloaded models show
+  and can be chosen while Ollama is stopped.
 - **Fixes (30.10):** a model already downloaded counts as installed while Ollama is stopped (no second 16 GB); one
   green for every status check; a gap and a line under the Settings header.
 - **Optional add-ons (E):** Ollama, the local model and the Link downloader in one pattern: Settings, About and an

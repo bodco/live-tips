@@ -41,7 +41,8 @@ final class LocalLLM: ObservableObject {
                 .compactMap { $0["name"] as? String }.map { $0.hasSuffix(":latest") ? String($0.dropLast(7)) : $0 }
             DispatchQueue.main.async { MainActor.assumeIsolated {
                 self.running = e == nil
-                let all = names ?? []
+                // 0.8.6: while Ollama is stopped, the models already downloaded still count (it starts on demand)
+                let all = names ?? LocalLLM.downloaded()
                 let isSearch = { (n: String) in n.contains("embed") || n.hasPrefix("bge") }
                 self.models = all.filter { !isSearch($0) }.sorted()
                 self.searchModels = all.filter(isSearch).sorted()
@@ -51,9 +52,22 @@ final class LocalLLM: ObservableObject {
 
     var hasSuggested: Bool { models.contains(Self.suggested) }
 
+    /// Every model downloaded into Ollama's folder ("name:tag", ":latest" dropped), read from its manifests.
+    nonisolated static func downloaded() -> [String] {
+        let base = (ProcessInfo.processInfo.environment["OLLAMA_MODELS"] ?? (NSHomeDirectory() + "/.ollama/models")) + "/manifests/registry.ollama.ai/library"
+        let fm = FileManager.default
+        var out: [String] = []
+        for m in (try? fm.contentsOfDirectory(atPath: base)) ?? [] where !m.hasPrefix(".") {
+            for t in (try? fm.contentsOfDirectory(atPath: base + "/" + m)) ?? [] where !t.hasPrefix(".") {
+                out.append(t == "latest" ? m : m + ":" + t)
+            }
+        }
+        return out.sorted()
+    }
+
     /// 0.8.6 (owner: "I installed Gemma yesterday"): a model already downloaded counts even while Ollama is not running
     /// (its manifest under ~/.ollama/models), so Install never downloads 16 GB a second time.
-    static func onDisk(_ name: String) -> Bool {
+    nonisolated static func onDisk(_ name: String) -> Bool {
         let parts = name.split(separator: ":", maxSplits: 1).map(String.init)
         let model = parts.first ?? name, tag = parts.count > 1 ? parts[1] : "latest"
         let base = ProcessInfo.processInfo.environment["OLLAMA_MODELS"] ?? (NSHomeDirectory() + "/.ollama/models")

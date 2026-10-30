@@ -23,6 +23,8 @@ Pacenote. Earlier versions are described in the commit messages and in
   sees every task within the conditions; new tasks get no person.
 - **Ollama on demand (30.10):** a job on this Mac starts Ollama by itself and waits for it; downloaded models show
   and can be chosen while Ollama is stopped.
+- **Agenda line opens (30.10):** a click on "Agenda N of M" shows every item with its state; a click on an item
+  moves it on (not raised, now, done).
 - **Fixes (30.10):** a model already downloaded counts as installed while Ollama is stopped (no second 16 GB); one
   green for every status check; a gap and a line under the Settings header.
 - **Optional add-ons (E):** Ollama, the local model and the Link downloader in one pattern: Settings, About and an

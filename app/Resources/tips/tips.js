@@ -18,6 +18,8 @@
       engineDeaf: 'Tips are not coming: end the call and start again',
       onMe: 'On me', more: 'More', earlier: 'Earlier',
       agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised yet:', allRaised: 'All agenda items raised',
+      agendaOpen: 'Show the whole agenda', agendaClose: 'Hide the agenda', agendaHint: 'Click an item: not raised, now, done.',
+      agState: { todo: 'not raised', now: 'now', done: 'done' },
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk' },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
@@ -75,6 +77,8 @@
       engineDeaf: 'Підказки не надходять: заверши дзвінок і почни знову',
       onMe: 'На мені', more: 'Більше', earlier: 'Раніше',
       agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', allRaised: 'Усі пункти агенди підняті',
+      agendaOpen: 'Показати всю агенду', agendaClose: 'Сховати агенду', agendaHint: 'Клік по пункту: не піднято, зараз, зроблено.',
+      agState: { todo: 'не піднято', now: 'зараз', done: 'зроблено' },
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик' },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
@@ -257,6 +261,15 @@
       $('agendaNow').innerHTML = `${esc(t.agenda(pos, S.agenda.length))}${now ? ` · <b>${esc(now.title)}</b>` : ''}`;
       const missing = S.agenda.filter((a) => a.state === 'todo').map((a) => a.title);
       $('agendaMissing').textContent = missing.length ? `${t.notRaised} ${missing[0]}${missing.length > 1 ? ` +${missing.length - 1}` : ''}` : '';
+      // 0.8.6 (owner): the line opens the whole agenda, each item with its state; a click moves it on
+      const cap = $('agendaCap'), list = $('agendaList'), open = !!S.ui.agendaOpen;
+      cap.setAttribute('aria-expanded', String(open));
+      cap.title = open ? t.agendaClose : t.agendaOpen;
+      list.hidden = !open;
+      if (open) {
+        list.innerHTML = S.agenda.map((a) => `<li class="${esc(a.state)}"><button type="button" data-act="agenda" data-id="${esc(a.id)}" aria-label="${esc(a.title + ', ' + (t.agState[a.state] || a.state))}"><span class="st ${esc(a.state)}"></span><span class="tt">${esc(a.title)}</span></button></li>`).join('')
+          + `<li class="hint">${esc(t.agendaHint)}</li>`;
+      }
     }
 
     // Pacenote 0.8: after the call, the call page and the follow-up email draft (nothing is sent).
@@ -875,6 +888,7 @@
         post('commitment-done', { id: card.commit.id, text: card.commit.text });
         e.stopPropagation(); break;
       }
+      case 'agenda-toggle': S.ui.agendaOpen = !S.ui.agendaOpen; break;
       case 'agenda': {
         const a = S.agenda.find((x) => x.id === id); if (!a) return;
         const nextState = a.state === 'todo' ? 'now' : a.state === 'now' ? 'done' : 'todo';

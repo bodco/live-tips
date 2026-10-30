@@ -1368,6 +1368,9 @@ last words, suggestions from the voices library with how alike they sound, a nam
 person as and Not now (the card waits for the next 60 s of that voice). Once everyone is named it folds into the
 chips.
 
+**Agenda.** The line under the call bar ("Agenda 2 of 8 · ...") opens the whole agenda: every item with its state,
+and a click on an item moves it on (not raised, now, done).
+
 **Recording.** When the call plays in a browser and Pacenote hears only silence, switching the sound output to
 another device and back makes the browser reconnect its audio; the "Can't hear the other side" state says so.
 

@@ -28,7 +28,8 @@
 
     <section class="agenda" id="agenda" aria-label="Agenda">
       <div class="segs" id="segs" aria-hidden="true"></div>
-      <div class="cap"><span id="agendaNow"></span><span id="agendaMissing"></span></div>
+      <button class="cap" id="agendaCap" type="button" data-act="agenda-toggle" aria-expanded="false" aria-controls="agendaList"><span id="agendaNow"></span><span id="agendaMissing"></span><span class="chev" aria-hidden="true">▾</span></button>
+      <ol class="agenda-list" id="agendaList" hidden></ol>
     </section>
 
     <section class="empty" id="empty" hidden aria-live="polite"></section>

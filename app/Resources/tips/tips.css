@@ -39,6 +39,20 @@ button{font:inherit;color:inherit;cursor:pointer}
 .agenda .cap{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--text-3)}
 .agenda .cap b{font-weight:400;color:var(--text)}
 .agenda .cap span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 0.8.6 (owner, 30.10): the agenda line opens the whole agenda */
+.agenda .cap{border:0;background:transparent;padding:2px 0;text-align:left;cursor:pointer;width:100%;align-items:center}
+.agenda .cap:hover b,.agenda .cap:hover{color:var(--text)}
+.agenda .cap .chev{flex:none;transition:transform .15s}
+.agenda .cap[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.agenda-list{list-style:none;margin:0;padding:6px 0 0;display:flex;flex-direction:column;gap:2px;max-height:40vh;overflow:auto}
+.agenda-list[hidden]{display:none}
+.agenda-list li button{display:flex;gap:8px;align-items:flex-start;width:100%;border:0;background:transparent;padding:4px 6px;border-radius:var(--radius-s);text-align:left;font-size:13px;color:var(--text);cursor:pointer}
+.agenda-list li button:hover{background:var(--surface-2)}
+.agenda-list .st{flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px;background:var(--surface-2);border:1px solid var(--text-3)}
+.agenda-list .st.done{background:var(--k-turn);border-color:var(--k-turn)}
+.agenda-list .st.now{background:var(--accent-fill);border-color:var(--accent-fill)}
+.agenda-list .done .tt{color:var(--text-3)}
+.agenda-list .hint{font-size:11px;color:var(--text-3);padding:2px 6px}
 
 /* ---------- Hero ---------- */
 .hero{flex:none;margin:0 12px;background:var(--surface);border-radius:var(--radius-l);padding:18px 18px 10px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-card);animation:in .18s ease-out}

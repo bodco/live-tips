@@ -15,6 +15,12 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Notion tasks in On you (D):** off by default; one list with commitments on Home and in the call window's On me,
   ticks and Remove (Notion trash, Undo) both ways, Mine on any line, items typed in On me, commitments sent to Notion
   by hand or after each call, linked items synced (register ops link and unlink).
+- **Notion tasks, after the first look (30.10):** global settings and "Projects in Notion" are separate sections with
+  an (i) on every setting; several Notion values per project; a workspace shows once; a period filter (edited in the
+  last day, week, 2 weeks, month or all time); a new condition starts on an unused property; Refresh says what is
+  missing; people come from the database when the integration cannot list users; On you has Show all.
+- **Fixes (30.10):** a model already downloaded counts as installed while Ollama is stopped (no second 16 GB); one
+  green for every status check; a gap and a line under the Settings header.
 - **Optional add-ons (E):** Ollama, the local model and the Link downloader in one pattern: Settings, About and an
   optional onboarding step; never part of readiness, never installed during a call.
 - **Speakers above the tabs (F):** chips and an open card for an unnamed voice on Transcript, On me and Brief.

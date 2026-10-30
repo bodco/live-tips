@@ -1345,8 +1345,9 @@ copy of Notion are on one tab.
 
 **D. Your Notion tasks in On you** (rules/notion-tasks.yaml, off by default). Choose the tasks database, who "me" is
 (a person property and a person), Show only when (one or more conditions), what a tick sets, the due date property
-and which property tells the project, with a mapping table (matched by name, the rest by hand; a workspace means all
-its projects). Home's On you shows commitments and Notion tasks in one list with a CALL or N badge and a project
+and the project property, with a separate "Projects in Notion" table (matched by name, the rest by hand, several
+Notion values per project allowed; a workspace shows once and means all its projects). "Show tasks edited in" limits
+the list to a period (a day, a week, 2 weeks, a month or all time); every setting has an (i) that explains it. Home's On you shows commitments and Notion tasks in one list with a CALL or N badge and a project
 filter; the call window's On me shows From this call, Open before the call and Notion for the call's project. A tick
 sets the value in Notion at once (Undo for 8 s). Remove moves the page to the Notion trash (30 days) and drops the
 item; Hide here hides it in Pacenote only. Mine on a transcript line, a tip or an item on someone else makes it

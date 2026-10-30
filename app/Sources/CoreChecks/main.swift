@@ -327,6 +327,10 @@ func notionTasksCore() {
     let props = np["properties"] as? [String: Any] ?? [:]
     expect(props["Assignee"] != nil && props["Project"] != nil && props["Due"] != nil && props["Status"] != nil, "a new task page")
     expect(NotionTasksCore.autoMatch(projects: [("orbit", "Orbit SaaS Launch")], options: [("p-orbit", "Orbit SaaS Launch")]) == ["orbit": ["p-orbit"]], "match by name")
+    var sp = st; sp.periodDays = "7"
+    expect(((NotionTasksCore.filter(sp)["and"] as? [[String: Any]])?.last?["timestamp"] as? String) == "last_edited_time", "period filter")
+    var miss = NotionTasksSettings(); miss.enabled = true
+    expect(miss.missing == ["database", "personProperty", "person"], "what is missing")
     let d = try? JSONEncoder().encode(st)
     let back = d.flatMap { try? JSONDecoder().decode(NotionTasksSettings.self, from: $0) }
     expect(back == st, "settings round trip")

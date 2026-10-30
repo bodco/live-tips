@@ -40,6 +40,11 @@ public enum NotionTasksCore {
     public static func filter(_ s: NotionTasksSettings, scope: [String]? = nil, workspace: String? = nil) -> [String: Any] {
         var and: [[String: Any]] = [["property": s.personProperty, "people": ["contains": s.personId]]]
         for c in s.conditions { if let f = condition(c) { and.append(f) } }
+        if let days = Int(s.periodDays), days > 0 {          // only tasks edited in the chosen period
+            let since = Date().addingTimeInterval(-Double(days) * 86400)
+            let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]
+            and.append(["timestamp": "last_edited_time", "last_edited_time": ["on_or_after": f.string(from: since)]])
+        }
         if let scope = scope {
             var any: [[String: Any]] = scope.map { v in
                 switch s.projectType {

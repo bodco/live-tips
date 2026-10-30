@@ -206,6 +206,8 @@ public struct NotionTasksSettings: Codable, Equatable {
     public var workspaceMap: [String: String] = [:]   // workspace name -> page id
     public var sourceProperty = ""          // rich text or url for "From the call ..."
     public var autoAdd = true               // after each call (rules/notion-tasks.yaml > after_call)
+    /// 0.8.6 (owner, 30.10): only tasks edited in the last N days ("all", "1", "7", "14", "30")
+    public var periodDays = "all"
     public init() {}
 
     /// Complete enough to query and to add tasks.
@@ -232,6 +234,17 @@ public struct NotionTasksSettings: Codable, Equatable {
         workspaceMap = (try? c.decode([String: String].self, forKey: .workspaceMap)) ?? d.workspaceMap
         sourceProperty = (try? c.decode(String.self, forKey: .sourceProperty)) ?? d.sourceProperty
         autoAdd = (try? c.decode(Bool.self, forKey: .autoAdd)) ?? d.autoAdd
+        periodDays = (try? c.decode(String.self, forKey: .periodDays)) ?? d.periodDays
+    }
+
+    /// What is still missing before tasks can be read (for the settings' hint), empty when ready.
+    public var missing: [String] {
+        guard enabled else { return [] }
+        var m: [String] = []
+        if database.isEmpty { m.append("database") }
+        if personProperty.isEmpty { m.append("personProperty") }
+        if personId.isEmpty { m.append("person") }
+        return m
     }
 }
 

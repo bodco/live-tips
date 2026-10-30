@@ -67,6 +67,7 @@ struct HomeView: View {
     @ObservedObject var ntasks = NotionTasks.shared       // 0.8.6 (D): the PM's Notion tasks in On you
     @AppStorage("onYouFilter") private var onYouFilter = ""         // "" = All projects, else "<slug>" or "workspace:<name>"
     @AppStorage("onYouHidden") private var onYouHidden = ""         // Hide here (local only), ids joined by ","
+    @State private var onYouAll = false                              // 0.8.6 (owner): Show all instead of the first 8
     @ObservedObject var auto = AutoStart.shared            // Pacenote 0.8: "Start tips for ...?" when a call begins
     @State private var now = Date()
     @State private var status = EngineStatus()
@@ -715,8 +716,12 @@ struct HomeView: View {
                 Text(L("home.onYou.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
             } else {
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(items.prefix(8)) { r in onYouRow(r, df) }
-                    if items.count > 8 { Text(L("home.check.more", ["n": "\(items.count - 8)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                    ForEach(onYouAll ? items : Array(items.prefix(8))) { r in onYouRow(r, df) }
+                    // 0.8.6 (owner): the whole list opens in place (the column scrolls), never a scroll inside the card
+                    if items.count > 8 {
+                        Button(onYouAll ? L("ntask.showLess") : L("ntask.showAll", ["n": "\(items.count)"])) { onYouAll.toggle() }
+                            .buttonStyle(.pnTertiary).padding(.top, 4)
+                    }
                 }
                 .id("\(register.version)-\(ntasks.version)")
             }

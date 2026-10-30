@@ -698,9 +698,11 @@ struct SettingsView: View {
             Divider()
             VStack(spacing: 0) {
                 let p = Self.panes.first { $0.id == model.tab } ?? Self.panes[0]
+                // 0.8.6 (owner, 30.10): a clear gap and a line between the header and what scrolls under it
                 WindowHeader(symbol: p.symbol, title: p.title, subtitle: p.subtitle)
-                    .padding(.horizontal, 28).padding(.top, 20).padding(.bottom, 2)
-                pane.scrollContentBackground(.hidden)
+                    .padding(.horizontal, 28).padding(.top, 20).padding(.bottom, 14)
+                Divider().padding(.horizontal, 20)
+                pane.scrollContentBackground(.hidden).clipped().padding(.top, 4)
             }
         }
         .frame(minWidth: 900, minHeight: 600)
@@ -879,7 +881,7 @@ struct SettingsView: View {
                     let st = LocalAIService.shared.speakersLine()
                     HStack(spacing: 6) {
                         Image(systemName: st.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
-                            .foregroundStyle(st.ok ? .green : (model.config.speakersEnabled ? .orange : .secondary))
+                            .foregroundStyle(st.ok ? PN.C.turn : (model.config.speakersEnabled ? PN.C.onMe : PN.C.text3))
                         Text(st.text).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         Spacer()
                         Button(L("set.voiceLibrary")) {

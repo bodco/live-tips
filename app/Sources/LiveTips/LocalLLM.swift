@@ -51,6 +51,16 @@ final class LocalLLM: ObservableObject {
 
     var hasSuggested: Bool { models.contains(Self.suggested) }
 
+    /// 0.8.6 (owner: "I installed Gemma yesterday"): a model already downloaded counts even while Ollama is not running
+    /// (its manifest under ~/.ollama/models), so Install never downloads 16 GB a second time.
+    static func onDisk(_ name: String) -> Bool {
+        let parts = name.split(separator: ":", maxSplits: 1).map(String.init)
+        let model = parts.first ?? name, tag = parts.count > 1 ? parts[1] : "latest"
+        let base = ProcessInfo.processInfo.environment["OLLAMA_MODELS"] ?? (NSHomeDirectory() + "/.ollama/models")
+        let lib = model.contains("/") ? model : "library/" + model
+        return FileManager.default.fileExists(atPath: base + "/manifests/registry.ollama.ai/" + lib + "/" + tag)
+    }
+
     /// Opens the Ollama app in the background (it serves on 127.0.0.1:11434), then refreshes.
     func start() {
         guard let p = Self.appPath else { NSWorkspace.shared.open(URL(string: "https://ollama.com/download")!); return }

@@ -3,6 +3,26 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.7.1
+
+- **No freeze after an update (Keychain):** after a new build macOS asks "allow access" for each saved key, and the
+  app read the keys on the main thread from Home, so the whole app (Home included) hung until the prompt was answered.
+  Presence checks now read only the Keychain item's attributes (no prompt), the keys are read once off the main
+  thread at start and kept in memory, the Settings key tests run in the background, and Home opens when that is done.
+- **Call page to Notion, one sync at a time:** an edit made while a sync was running started a second one on the same
+  page, which could write the bullets twice; the running sync now starts the next one when it ends. A page Notion
+  cannot find (not shared with the integration) or a refused token is said in words, not as the raw API reply.
+- **Update HubSpot:** Apply is off after a successful write (a second click wrote the note and the task twice) and
+  comes back after Undo; an Undo that fails says how many changes are still in HubSpot instead of "Undone".
+- **Home starts at Home:** Home from the menu, the Dock or Command-0 on a closed window opens Home itself, not the
+  call page or series left open last time (screenshots of Home showed a series for the same reason).
+- **Call window tabs in one row:** with the Deal tab the side pane had four tabs and the fourth went to a second row;
+  the tab row now holds any number of tabs. The tip card's actions wrap in a narrow window ("Hide" was cut in
+  Ukrainian at 380 px).
+- **Start call footer in Ukrainian:** "Start call" and "Save for later" no longer break or cut; the Rehearse caption
+  wraps instead and is shorter ("Лише для презентацій"), "Save for later" is "Відкласти".
+- **Settings > Projects in Ukrainian:** the scan result and "folders inside" were English only.
+
 ## 0.8.7
 
 - **Windows without tabs (A):** no window ever joins a tab group, whatever "Prefer tabs" says. The call page, a

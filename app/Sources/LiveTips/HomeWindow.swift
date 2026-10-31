@@ -970,7 +970,7 @@ struct HomeView: View {
         let cfg = AppConfig.load(from: AppPaths.config)
         let demo = ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"] != nil      // shot mode: no real key or mirror
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        let hasKey = demo || !(store.get(.claudeAPIKey) ?? "").isEmpty || PrepRunner.claudePath != nil   // 0.8.2: either way to Claude
+        let hasKey = demo || store.has(.claudeAPIKey) || PrepRunner.claudePath != nil   // 0.8.7.1: presence only, no Keychain prompt in a view body
         let mirror = demo ? "ok" : (cfg.workRoot.isEmpty ? "" : MirrorStatus.load(workRoot: cfg.workRoot).health())
         let calCount = demo ? 3 : cal.calendars.filter { !cal.excluded.contains($0.calendarIdentifier) }.count
         let month = demo ? 4.20 : SpendLedger.monthSpent()

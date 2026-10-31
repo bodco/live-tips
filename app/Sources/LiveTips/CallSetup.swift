@@ -530,6 +530,7 @@ struct CallSetupView: View {
                     .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(!canPrepare && !model.target.isEmpty)
             case .start:
                 Button(saved ? L("common.save") : L("call.saveForLater"), action: onSave).buttonStyle(.pnTertiary).disabled(model.target.isEmpty)
+                    .fixedSize()     // 0.8.7.1: never "Зберегти на..."
                 if saved { Button(L("home.removeUpNext"), action: onRemove).buttonStyle(.pnTertiary) }
                 Spacer()
                 Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
@@ -553,10 +554,12 @@ struct CallSetupView: View {
                         Button(L("rehearse.button")) { if model.callType == "presentation" { if !needProject() { prepareNow() } } else { model.callType = "presentation" } }
                             .buttonStyle(.pnSecondary).opacity(0.5)
                         Text(model.callType == "presentation" ? L("rehearse.needPrep") : L("rehearse.onlyPresentation")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                            .multilineTextAlignment(.center).frame(maxWidth: 120)     // 0.8.7.1: the caption wraps, not Start call
                     }
                     .help(model.callType == "presentation" ? L("rehearse.needPrep") : L("rehearse.onlyPresentation"))
                 }
                 Button(L("home.startCall")) { if !needProject() { onStart() } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                    .fixedSize()     // 0.8.7.1: "Почати дзвінок" broke into two lines in Ukrainian
             case .plan:
                 if saved { Button(L("home.removeUpNext"), action: onRemove).buttonStyle(.pnTertiary) }
                 Spacer()

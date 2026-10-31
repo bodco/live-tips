@@ -154,6 +154,7 @@ struct CRMUpdateView: View {
     @State private var status = ""
     @State private var undo: [(String, String, [String: String])] = []    // (type, id, old fields)
     @State private var undoUntil: Date? = nil
+    @State private var applied = false     // 0.8.7.1: a second Apply wrote the note and the task twice
 
     var base: String { file.hasSuffix(".md") ? String(file.dropLast(3)) : file }
 
@@ -182,7 +183,7 @@ struct CRMUpdateView: View {
                 Text(status).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
                 Spacer()
                 if let u = undoUntil, u > Date() { Button(L("crm.undo")) { runUndo() }.buttonStyle(.pnSecondary) }
-                Button(L("crm.apply")) { apply() }.buttonStyle(.pnPrimary).disabled(busy || plan == nil || link == nil)
+                Button(L("crm.apply")) { apply() }.buttonStyle(.pnPrimary).disabled(busy || applied || plan == nil || link == nil)
             }
         }
         .padding(18)
@@ -232,7 +233,7 @@ struct CRMUpdateView: View {
                     let id = try await c.createTask(subject: t.subject, due: t.due, associations: refs); done.append(("tasks", id, [:]))
                 }
                 UsageLog.log("update_crm", ["fields": fields])
-                undo = done; undoUntil = Date().addingTimeInterval(8)
+                undo = done; undoUntil = Date().addingTimeInterval(8); applied = true
                 status = L("crm.updated", ["crm": c.providerName])
                 DispatchQueue.main.asyncAfter(deadline: .now() + 8.2) { undoUntil = nil }
             } catch {
@@ -248,10 +249,14 @@ struct CRMUpdateView: View {
         guard let c = crm.connector() else { return }
         let items = undo; undo = []; undoUntil = nil
         Task {
+            var failed = 0      // 0.8.7.1: a failed undo is said, not hidden behind "Undone"
             for (type, id, old) in items.reversed() {
-                if type == "deals" { _ = try? await c.updateDeal(id: id, fields: old) } else { try? await c.delete(type: type, id: id) }
+                do {
+                    if type == "deals" { _ = try await c.updateDeal(id: id, fields: old) } else { try await c.delete(type: type, id: id) }
+                } catch { failed += 1 }
             }
-            status = L("crm.undone")
+            status = failed == 0 ? L("crm.undone") : L("crm.undoFailed", ["n": "\(failed)", "crm": c.providerName])
+            if failed == 0 { applied = false }
         }
     }
 }

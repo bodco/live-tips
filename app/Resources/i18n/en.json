@@ -1649,5 +1649,10 @@
  "setup.python.how": "The python.org page opens. Under Python 3.13 click \"Download macOS installer\", open the downloaded file and click Continue, Agree and Install. Then come back and press Check again.",
  "setup.python.missing": "Python is not on this Mac yet",
  "home.finish.claude": "Connect Claude: sign in to Claude Code or add an API key, to prepare calls and write follow-ups",
- "memory.afterFirst": "After your first call"
+ "memory.afterFirst": "After your first call",
+ "callEdit.err.noAccess": "the Notion page was not found or is not shared with your integration (in Notion: ⋯ > Connections)",
+ "callEdit.err.token": "Notion did not accept the token (Settings > Integrations > Notion)",
+ "crm.undoFailed": "Undo did not finish: {n} change(s) are still in {crm}, remove them there",
+ "set.scanNote": "Workspaces: {ws}, new projects: {new}",
+ "set.foldersInside": "Folders inside: {n}"
 }

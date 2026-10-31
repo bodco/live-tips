@@ -111,7 +111,7 @@ final class PrepRunner: ObservableObject {
 
     var hasAPIKey: Bool {
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        return !(store.get(.claudeAPIKey) ?? "").isEmpty
+        return store.has(.claudeAPIKey)     // 0.8.7.1: presence only, no Keychain prompt
     }
 
     /// Checks the Claude Code sign-in in the background (it can expire: the window shows it and offers Log in).

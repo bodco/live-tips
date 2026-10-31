@@ -118,6 +118,7 @@ final class CallPageSync: ObservableObject {
     @Published var appended: [String] = []
     private var dirty = Set<String>()
     private var work: DispatchWorkItem?
+    private var inFlight = false     // 0.8.7.1: one sync per page at a time; two at once wrote the bullets twice
 
     init(file: String) { self.file = file }
 
@@ -142,22 +143,35 @@ final class CallPageSync: ObservableObject {
         work?.cancel(); work = nil
         guard let url = notionURL else { state = .idle; return }
         guard !dirty.isEmpty else { return }
+        if inFlight { state = .pending; return }      // 0.8.7.1: the running sync starts the next one when it ends
         let ids = dirty
         dirty = []
+        inFlight = true
         state = .syncing
         PyTool.run("notion_sections", ["--page", url, "--sections", CallPageEdit.sectionsJSON(CallPageEdit.sections(file: file, ids: ids)),
                                        "--todo", "actions", "--lang", L10n.lang, "--call-md", file], notion: true) { [weak self] r in
             guard let self else { return }
+            self.inFlight = false
             if (r["ok"] as? Bool) == true {
                 self.at = Date()
                 let added = (r["appended"] as? [String]) ?? []
                 if !added.isEmpty { self.appended = added }
                 self.state = self.dirty.isEmpty ? .ok : .pending
+                if !self.dirty.isEmpty { self.run() }      // 0.8.7.1: edits made while it was syncing
             } else {
                 self.dirty.formUnion(ids)
-                self.state = .failed((r["error"] as? String) ?? L("py.failed"))
+                self.state = .failed(Self.reason((r["error"] as? String) ?? L("py.failed")))
             }
         }
+    }
+}
+
+extension CallPageSync {
+    /// 0.8.7.1: Notion's raw error (an URL and a JSON body) said in words for the two common cases.
+    static func reason(_ e: String) -> String {
+        if e.contains("object_not_found") || e.contains("-> 404") { return L("callEdit.err.noAccess") }
+        if e.contains("unauthorized") || e.contains("-> 401") { return L("callEdit.err.token") }
+        return e
     }
 }
 

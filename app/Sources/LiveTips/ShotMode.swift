@@ -240,6 +240,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         UpNext.shared.save(planned)
         CallHistory.shared.scan()
         if let r = CallHistory.shared.visible.first { CallHistory.shared.setNotion(file: r.file, url: "https://www.notion.so/demo") }
+        HomeNav.shared.path = []      // 0.8.7.1: the pictures of Home showed the series left open by an earlier step
         HomeWindow.show(delegate: AppDelegate())
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
             if let w = HomeWindow.window { w.setContentSize(NSSize(width: 820, height: 1080)) }

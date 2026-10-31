@@ -112,7 +112,7 @@ final class CRMService: ObservableObject {
     @Published var state: State = .idle
     var store: SecretStore { SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips") }
 
-    var connected: Bool { store.get(.hubspotKey) != nil }
+    var connected: Bool { store.has(.hubspotKey) }     // 0.8.7.1: presence only, no Keychain prompt
 
     /// A connector built for one job; nil without a key.
     func connector() -> CRMConnector? {

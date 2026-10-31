@@ -59,7 +59,7 @@ enum AIRoute {
     }
 
     static var hasKey: Bool {
-        !(SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.claudeAPIKey) ?? "").isEmpty
+        SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").has(.claudeAPIKey)     // 0.8.7.1: presence only
     }
 
     /// The way can be tried at all: a key for the API, the Claude Code tool for the account.

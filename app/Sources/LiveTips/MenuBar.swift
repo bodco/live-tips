@@ -67,7 +67,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(true, forKey: "onboarded")
             MainActor.assumeIsolated { OnboardingWindow.show() }
         } else if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
-        else if !callIsLive { openHome() }       // 2026-10-27 (owner): Home is the app's main window
+        else if !callIsLive {
+            // 0.8.7.1: Home opens once the saved keys are read off the main thread (an "allow access" prompt after an
+            // update froze the whole app while Home read them); the menu bar item works meanwhile.
+            SecretStore.warm(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips") { [weak self] in self?.openHome() }
+        }       // 2026-10-27 (owner): Home is the app's main window
         MainActor.assumeIsolated { _ = CalendarService.shared }
     }
 
@@ -220,7 +224,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
-    @objc func openHome() { MainActor.assumeIsolated { HomeWindow.show(delegate: self) } }
+    @objc func openHome() {
+        MainActor.assumeIsolated {
+            // 0.8.7.1: Home (menu, Dock, Command-0) on a closed window starts at Home, not on the call page left open
+            if HomeWindow.window?.isVisible != true { HomeNav.shared.path = []; HomeNav.shared.followUp = nil }
+            HomeWindow.show(delegate: self)
+        }
+    }
     @objc func sendToNotion() {
         guard !CallEngine.shared.isRunning, CallEngine.shared.restoreLastCall(), let f = CallEngine.shared.lastFile else { return }
         CallEngine.shared.writeToNotion(file: f)

@@ -250,13 +250,14 @@ final class SettingsModel: ObservableObject {
     let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
 
     init() {
+        // 0.8.7.1: presence only at start; the masks are read when a key row is shown (KeyRow.onAppear). Reading every
+        // secret here froze Home on the Keychain's "allow access" prompt for a key another tool had saved (HubSpot).
         for k in [SecretStore.Key.claudeAPIKey, .notionToken] {
-            keyState[k] = store.get(k) == nil ? .notSet : .untested
+            keyState[k] = store.has(k) ? .untested : .notSet
         }
-        refreshMasks()
         refreshMirror()
         aliasesText = config.nameAliases.joined(separator: ", ")
-        for k in [SecretStore.Key.claudeAPIKey, .notionToken] where store.get(k) != nil { test(k) }
+        for k in [SecretStore.Key.claudeAPIKey, .notionToken] where store.has(k) { test(k) }
     }
 
     func saveAliases() {
@@ -289,7 +290,8 @@ final class SettingsModel: ObservableObject {
     }
 
     func refreshMasks() { for k in SecretStore.Key.allCases { masks[k] = maskedSecret(store.get(k)) } }
-    func isSet(_ k: SecretStore.Key) -> Bool { store.get(k) != nil }
+    func refreshMask(_ k: SecretStore.Key) { if masks[k] == nil { masks[k] = maskedSecret(store.get(k)) } }     // 0.8.7.1
+    func isSet(_ k: SecretStore.Key) -> Bool { store.has(k) }     // 0.8.7.1: presence only
 
     func refreshMirror() {
         mirror = config.workRoot.isEmpty ? MirrorStatus(result: "", lastRunUTC: nil, pages: nil, mode: "") : MirrorStatus.load(workRoot: config.workRoot)
@@ -310,9 +312,15 @@ final class SettingsModel: ObservableObject {
     }
 
     func test(_ key: SecretStore.Key) {
-        guard let v = store.get(key) else { keyState[key] = .notSet; return }
         keyState[key] = .testing
+        let svc = store.service, raw = key.rawValue
         Task {
+            // 0.8.7.1: the Keychain read runs off the main thread; on a new build macOS asks "allow access" and the
+            // app froze on that prompt at start (Home never appeared until it was answered).
+            let got = await Task.detached(priority: .userInitiated) { () -> String? in
+                SecretStore.Key(rawValue: raw).flatMap { SecretStore(service: svc).get($0) }
+            }.value
+            guard let v = got else { keyState[key] = .notSet; return }
             if key == .hubspotKey {
                 keyState[key] = .ok("")
                 CRMService.shared.test()
@@ -361,7 +369,7 @@ final class SettingsModel: ObservableObject {
         let r = WorkspaceScanner.scanFolders(workRoot: config.workRoot, extra: registry.extraWorkspaces, excluded: registry.excluded)
         registry.merge(folders: r.projects)
         rescanWorkspaces()
-        note = "\(r.workspaces.count) workspace(s), \(registry.projects.count - before) new project(s)"
+        note = L("set.scanNote", ["ws": "\(r.workspaces.count)", "new": "\(registry.projects.count - before)"])     // 0.8.7.1: translated
         IndexService.shared.configure(projects: registry.projects, appRoot: CallEngine.shared.appRoot,
                                       python: config.engine.python, enabled: config.localAI.enabled)
     }
@@ -603,6 +611,7 @@ struct KeyRow: View {
                     HStack(spacing: 8) {
                         status
                         Text(model.masks[key] ?? "").font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3)
+                            .onAppear { model.refreshMask(key) }      // 0.8.7.1: read when shown, not at app start
                         Menu {
                             Button(L("keys.replace")) { replacing = true }
                             Button(L("keys.test")) { model.test(key) }
@@ -993,7 +1002,7 @@ struct SettingsView: View {
                             Image(systemName: "folder.badge.questionmark").foregroundStyle(PN.C.text3)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text((c.dir as NSString).lastPathComponent)
-                                Text("\(c.projects) folder\(c.projects == 1 ? "" : "s") inside").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                                Text(L("set.foldersInside", ["n": "\(c.projects)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                             }
                             Spacer()
                             Button(L("set.addAsWorkspace")) { model.addWorkspace(c.dir) }

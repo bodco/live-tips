@@ -367,7 +367,7 @@
  "call.copyCowork": "Скопіювати запит для Cowork",
  "call.prepSettings": "Налаштування підготовки…",
  "call.options": "Параметри",
- "call.saveForLater": "Зберегти на потім",
+ "call.saveForLater": "Відкласти",
  "call.prepareFirst": "Спершу підготувати",
  "call.switch": "Перейти на цей дзвінок…",
  "call.needProject": "Спершу виберіть проєкт або workspace цього дзвінка: у його папку йдуть транскрипт і нотатки.",
@@ -1450,7 +1450,7 @@
  "sales.method.about": "Про метод",
  "call.prepare": "Підготувати",
  "rehearse.needPrep": "Спершу підготуйте виступ",
- "rehearse.onlyPresentation": "Лише для дзвінків-презентацій",
+ "rehearse.onlyPresentation": "Лише для презентацій",
  "usage.privacy": "Приватність",
  "usage.toggle": "Вести локальний журнал того, якими функціями ви користуєтесь",
  "usage.toggle.sub": "Лише назви подій і числа, ніколи слова дзвінка. Лишається на цьому Mac, доки ви самі не вирішите надіслати.",
@@ -1649,5 +1649,10 @@
  "setup.python.how": "Відкриється сторінка python.org. Під Python 3.13 натисніть \"Download macOS installer\", відкрийте завантажений файл і натисніть Continue, Agree та Install. Потім поверніться і натисніть Перевірити знову.",
  "setup.python.missing": "На цьому Маку ще немає Python",
  "home.finish.claude": "Підключіть Claude: увійдіть у Claude Code або додайте API-ключ, щоб готувати дзвінки й писати follow-up",
- "memory.afterFirst": "Після першого дзвінка"
+ "memory.afterFirst": "Після першого дзвінка",
+ "callEdit.err.noAccess": "сторінку Notion не знайдено або її не відкрито для вашої інтеграції (у Notion: ⋯ > Connections)",
+ "callEdit.err.token": "Notion не прийняв токен (Налаштування > Інтеграції > Notion)",
+ "crm.undoFailed": "Скасування не завершилось: змін у {crm} лишилось {n}, приберіть їх там",
+ "set.scanNote": "Workspace: {ws}, нових проєктів: {new}",
+ "set.foldersInside": "Папок усередині: {n}"
 }

@@ -27,8 +27,44 @@ public struct Project: Codable, Equatable {
     /// D5b: may this project's call text go to the model API? Off = local layer only.
     public var apiAllowed: Bool = true
     public var index = IndexSettings()
+    /// 0.8.7 (F3): the value of the Meetings and Risks "project" property for this project (option name or page id).
+    public var notionValue = ""
+    /// 0.8.7 (H): Sales mode on by default for this project's calls, and the method (rules/sales.yaml > methods).
+    public var salesEnabled = false
+    public var salesMethod = ""
+    /// 0.8.7 (I): the CRM company this project is linked to (id and name; never a key).
+    public var crmCompanyId = ""
+    public var crmCompanyName = ""
 
     public init(name: String, slug: String, root: String) { self.name = name; self.slug = slug; self.root = root }
+
+    enum CodingKeys: String, CodingKey {
+        case name, slug, root, config, status, workspace, defaultLanguage, clientLanguage, audienceDefault, people, aliases,
+             apiAllowed, index, notionValue, salesEnabled, salesMethod, crmCompanyId, crmCompanyName
+    }
+
+    /// 0.8.7: every field but the name is optional in the file, so new fields never drop a saved project.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        slug = (try? c.decode(String.self, forKey: .slug)) ?? name.lowercased()
+        root = (try? c.decode(String.self, forKey: .root)) ?? ""
+        config = (try? c.decode(String.self, forKey: .config)) ?? ""
+        status = (try? c.decode(String.self, forKey: .status)) ?? "active"
+        workspace = (try? c.decode(String.self, forKey: .workspace)) ?? ""
+        defaultLanguage = (try? c.decode(String.self, forKey: .defaultLanguage)) ?? ""
+        clientLanguage = (try? c.decode(String.self, forKey: .clientLanguage)) ?? ""
+        audienceDefault = (try? c.decode(String.self, forKey: .audienceDefault)) ?? "auto"
+        people = (try? c.decode([Person].self, forKey: .people)) ?? []
+        aliases = (try? c.decode([String: String].self, forKey: .aliases)) ?? [:]
+        apiAllowed = (try? c.decode(Bool.self, forKey: .apiAllowed)) ?? true
+        index = (try? c.decode(IndexSettings.self, forKey: .index)) ?? IndexSettings()
+        notionValue = (try? c.decode(String.self, forKey: .notionValue)) ?? ""
+        salesEnabled = (try? c.decode(Bool.self, forKey: .salesEnabled)) ?? false
+        salesMethod = (try? c.decode(String.self, forKey: .salesMethod)) ?? ""
+        crmCompanyId = (try? c.decode(String.self, forKey: .crmCompanyId)) ?? ""
+        crmCompanyName = (try? c.decode(String.self, forKey: .crmCompanyName)) ?? ""
+    }
 }
 
 public struct ProjectRegistry: Codable, Equatable {
@@ -115,6 +151,8 @@ public struct ProjectRegistry: Codable, Equatable {
                 p.apiAllowed = old.apiAllowed
                 p.index = old.index
                 p.audienceDefault = old.audienceDefault
+                p.notionValue = old.notionValue; p.salesEnabled = old.salesEnabled; p.salesMethod = old.salesMethod
+                p.crmCompanyId = old.crmCompanyId; p.crmCompanyName = old.crmCompanyName
                 if !old.workspace.isEmpty { p.workspace = old.workspace }
                 if p.root.isEmpty { p.root = old.root }
                 projects[i] = p

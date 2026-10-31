@@ -337,5 +337,32 @@ test('speech: a point keeps its full text; a "> " line under a brief point joins
   assert.deepStrictEqual(get().brief.sections[0].fulls, ['After the smoke test.']);
 });
 
+test('0.8.7 Sales: a deal item gives the Deal state with the chip numbers; without Sales there is none', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:00:00', kind: 'situation', topic: 'x' }]);
+  assert.strictEqual(get().deal, null, 'no Deal without Sales mode');
+  f.addItems([{ kind: 'deal', method: 'bant', name: 'BANT', chip: true, known: 2, total: 4,
+    criteria: [{ key: 'budget', name: 'Budget', state: 'known', what: 'Northwind has a budget', quote: 'we set aside money', t: '10:04' },
+               { key: 'authority', name: 'Authority', state: 'weird' }],
+    objections: [{ what: 'Price is high' }], next_step: { what: 'Demo on Friday' }, signals: ['Asked about onboarding'] }]);
+  const d = get().deal;
+  assert.strictEqual(d.name, 'BANT'); assert.strictEqual(d.known, 2); assert.strictEqual(d.total, 4); assert.ok(d.chip);
+  assert.strictEqual(d.criteria[1].state, 'unknown', 'an unknown state falls back to unknown');
+  assert.deepStrictEqual(d.objections, ['Price is high']); assert.strictEqual(d.nextStep, 'Demo on Friday');
+  const src = require('fs').readFileSync(path.join(__dirname, '../Resources/tips/tips.js'), 'utf8');
+  assert.ok(/S\.deal \? \['transcript', 'onme', 'deal', 'brief'\]/.test(src), 'the Deal tab only when there is a deal');
+  assert.ok(/deal_fix/.test(src), 'a criterion edit goes to the engine');
+  f.addItems([{ t: '10:05:00', kind: 'tip', sales: 'objection', uid: 'sales-objection-price', level: 'orange', gist: 'Price is high', phrase: 'Compare with the cost of the delay.' }]);
+  assert.ok(get().cards.some((c) => c.kind === 'objection'), 'a sales tip keeps its kind for the label');
+});
+
+test('0.8.7 first-call banner: once, not in the demo, remembered through a pref', () => {
+  const src = require('fs').readFileSync(path.join(__dirname, '../Resources/tips/tips.js'), 'utf8');
+  const fn = src.slice(src.indexOf('function firstCallHint'), src.indexOf('function showToast'));
+  assert.ok(/PREFS\.firstCallHintShown === '1'/.test(fn) && /PREFS\.demo === '1'/.test(fn), 'skipped when shown before and in the demo');
+  assert.ok(/PREFS\.firstCallHintShown = '1'/.test(fn) && /post\('pref', \{ k: 'firstCallHintShown'/.test(fn), 'marked at once and remembered');
+  assert.ok(/20000/.test(fn), '20 seconds');
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

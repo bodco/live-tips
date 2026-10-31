@@ -51,6 +51,13 @@ struct DeckSetup: Codable, Equatable {
         }
         return order.map { "\(Self.label($0)): \(TalkMerge.list(by[$0]!))" }.joined(separator: " · ")
     }
+    /// 0.8.7 (G5): the first 2-3 words of a slide (its title, else its text).
+    static func firstWords(_ s: DeckSlide?, _ n: Int = 3) -> String {
+        guard let s else { return "" }
+        let src = s.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? s.text : s.title
+        let words = src.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).prefix(n)
+        return words.joined(separator: " ")
+    }
     static func label(_ o: String) -> String { o == DeckOwners.me ? L("deck.me") : o == DeckOwners.all ? L("deck.all") : o }
 
     /// The slides.json top level and per-slide owners (rules/presentation.yaml > slides_json).
@@ -245,6 +252,7 @@ extension StartCallModel {
 
 struct DeckBlock: View {
     @ObservedObject var model: StartCallModel
+    var onNeedPrep: (() -> Void)? = nil      // 0.8.7 (L2): a click on the greyed Rehearse starts the preparation
     @State private var newSpeaker = ""
     @State private var adding = false
     @State private var assign = ""
@@ -363,6 +371,14 @@ struct DeckBlock: View {
                     RehearsalWindow.show(base: base, title: model.effectiveTitle, call: model)
                 }.buttonStyle(.pnTertiary)
             }
+        } else {
+            // 0.8.7 (L2): visible, greyed, with the condition; a click leads to where it is met (Prepare)
+            HStack(spacing: 10) {
+                Text(L("rehearse.needPrep")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                Spacer()
+                Button(L("rehearse.button")) { onNeedPrep?() }.buttonStyle(.pnTertiary).opacity(0.5)
+                    .help(L("rehearse.needPrep"))
+            }
         }
     }
 
@@ -452,6 +468,9 @@ struct DeckBlock: View {
                     Text("\(n)").font(.system(size: 10, weight: .semibold)).padding(.horizontal, 4).background(PN.C.bg.opacity(0.85), in: RoundedRectangle(cornerRadius: 3)).padding(2)
                 }
                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(tint, lineWidth: 1.5))
+                // 0.8.7 (G5): the first words of the slide, so a tile is recognisable without the thumbnail
+                Text(DeckSetup.firstWords(d.info?.slides.first { $0.n == n })).font(.system(size: 10)).foregroundStyle(PN.C.text2)
+                    .lineLimit(2).multilineTextAlignment(.center).frame(width: 64, height: 26, alignment: .top)
                 Text(DeckSetup.label(o).split(separator: " ").first.map(String.init) ?? "").font(.system(size: 10, weight: .medium)).foregroundStyle(tint).lineLimit(1)
             }
             .frame(width: 66)

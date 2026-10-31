@@ -423,6 +423,22 @@ def skip_file(path: Path, rel_parts: tuple[str, ...]) -> bool:
     return False
 
 
+# 0.8.7 (H5, rules/index.yaml > answer_cards): the answer cards are always a document source of the index
+ANSWER_CARDS = ("pacenote", "answer-cards.md")
+
+
+def answer_card_files(roots: list[tuple[Path, str]]):
+    """(abs path str, display rel, stat) of the answer cards file of each root that has one."""
+    for base, prefix in roots:
+        p = Path(base).joinpath(*ANSWER_CARDS)
+        try:
+            st = p.stat()
+        except OSError:
+            continue
+        if p.is_file() and 0 < st.st_size <= MAX_BYTES:
+            yield str(p), (prefix + "/" if prefix else "") + "/".join(ANSWER_CARDS), st
+
+
 def iter_files(roots: list[tuple[Path, str]], exclude: set[str] | None = None):
     """Yield (abs path str, display rel, stat) for every indexable file under the roots.
     roots: [(dir, display prefix)], the prefix is "" for the project root."""
@@ -454,6 +470,10 @@ def iter_files(roots: list[tuple[Path, str]], exclude: set[str] | None = None):
                     continue
                 seen.add(ap)
                 yield ap, (prefix + "/" if prefix else "") + str(rel), st
+    for ap, rel, st in answer_card_files(roots):      # 0.8.7 (H5): even when its folder is skipped or excluded
+        if ap not in seen:
+            seen.add(ap)
+            yield ap, rel, st
 
 
 def front_date(text: str) -> str | None:

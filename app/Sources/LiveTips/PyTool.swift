@@ -6,14 +6,14 @@ import LiveTipsCore
 /// module prints one JSON object.
 @MainActor
 enum PyTool {
-    static func run(_ module: String, _ args: [String], notion: Bool = false, done: @escaping ([String: Any]) -> Void) {
+    static func run(_ module: String, _ args: [String], notion: Bool = false, needsAI: Bool = true, done: @escaping ([String: Any]) -> Void) {
         let c = AppConfig.load(from: AppPaths.config)
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else {
             done(["ok": false, "error": L("py.noEngine")]); return
         }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         // 0.8.2: the "After the call" way from Settings > AI (the key or Claude Code, with auto-switch).
-        if !notion && !AIRoute.canRun(job: "after", config: c) { done(["ok": false, "error": L("prep.err.noKey")]); return }
+        if needsAI && !notion && !AIRoute.canRun(job: "after", config: c) { done(["ok": false, "error": L("prep.err.noKey")]); return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
         p.arguments = ["-m", "livetips_m0." + module] + args

@@ -135,6 +135,13 @@ func mirrorAndWorkspaces() {
     let ws = WorkspaceScanner.scan(workRoot: tmp, projects: [Project(name: "Alpha", slug: "alpha", root: tmp + "/Acme/Alpha"),
                                                              Project(name: "Beta", slug: "beta", root: tmp + "/Other/Beta")])
     expect(ws.count == 1 && ws[0].name == "Acme" && ws[0].projects == ["alpha"], "workspace scan")
+    // 0.8.7 (F7): "Found in your work folder" skips git repositories and ignored folders
+    try? fm.createDirectory(atPath: tmp + "/Code/app", withIntermediateDirectories: true)
+    try? fm.createDirectory(atPath: tmp + "/Code/.git", withIntermediateDirectories: true)
+    try? fm.createDirectory(atPath: tmp + "/Clients/Orbit", withIntermediateDirectories: true)
+    try? fm.createDirectory(atPath: tmp + "/Old/Orbit", withIntermediateDirectories: true)
+    let cands = WorkspaceScanner.candidates(workRoot: tmp, known: [], excluded: [tmp + "/Old"]).map { ($0.dir as NSString).lastPathComponent }
+    expect(cands.contains("Clients") && !cands.contains("Code") && !cands.contains("Old"), "found folders skip git and ignored")
     try? fm.removeItem(atPath: tmp)
     var c = AppConfig()
     expect(c.effectiveAppRoot(appSupport: "/AS") == "/AS", "app root default")
@@ -215,8 +222,18 @@ func commitmentsRegister() {
     CommitmentRegister.mark(folder: dir, id: "c-2", op: "unlink", source: "removed")
     let c2 = CommitmentRegister.load(folder: dir).first { $0.id == "c-2" }
     expect(c2?.notionPage == "" && c2?.notionNote == "removed" && c2?.status == "open", "unlink keeps it open")
+    CommitmentRegister.append(folder: dir, [["op": "edit", "id": "c-2", "text": "Two, edited", "owner": "Ann Lee", "due": "2026-11-03"]])
+    let c2e = CommitmentRegister.load(folder: dir).first { $0.id == "c-2" }
+    expect(c2e?.text == "Two, edited" && c2e?.owner == "Ann Lee" && c2e?.due == "2026-11-03", "op edit (0.8.7)")
     CommitmentRegister.mark(folder: dir, id: "c-2", op: "done", source: "notion")
     expect(CommitmentRegister.load(folder: dir).first { $0.id == "c-2" }?.doneSource == "notion", "done from Notion")
+    // 0.8.7 (E2): "+ Add" on the call page, then a move to On you
+    let nid = CommitmentRegister.add(folder: dir, text: "  Send the access list ", owner: "Ann Lee", project: "orbit", title: "Orbit sync", call: "/x/y.md")
+    let na = CommitmentRegister.load(folder: dir).first { $0.id == nid }
+    expect(na?.text == "Send the access list" && na?.owner == "Ann Lee" && na?.call == "y.md" && na?.series == "orbit|orbitsync", "op add from the call page")
+    expect(CommitmentRegister.add(folder: dir, text: "  ", project: "orbit", title: "t", call: "y.md") == nil, "empty add is ignored")
+    CommitmentRegister.edit(folder: dir, id: nid ?? "", owner: "me")
+    expect(CommitmentRegister.load(folder: dir).first { $0.id == nid }?.mine == true, "move to On you")
     try? FileManager.default.removeItem(atPath: dir)
 }
 
@@ -343,10 +360,151 @@ func notionTasksCore() {
     expect(back == st, "settings round trip")
 }
 
+/// 0.8.7 (B2): one key per project for the counts (Bink/bink, Volya/volya, Orbit-2/orbit 2).
+func projectKeys() {
+    let ps: [(slug: String, name: String)] = [("orbit", "Orbit SaaS Launch"), ("orbit-2", "Orbit-2"), ("playbook", "Internal Delivery Playbook")]
+    let ws = ["Northwind Studio"]
+    expect(ProjectKey.key("orbit", projects: ps, workspaces: ws) == "orbit", "exact slug")
+    expect(ProjectKey.key("Orbit SaaS Launch", projects: ps, workspaces: ws) == "orbit", "name")
+    expect(ProjectKey.key("ORBIT-2", projects: ps, workspaces: ws) == "orbit-2" && ProjectKey.key("orbit 2", projects: ps, workspaces: ws) == "orbit-2", "case and dashes")
+    expect(ProjectKey.key("northwind-studio", projects: ps, workspaces: ws) == "workspace:Northwind Studio", "workspace")
+    expect(ProjectKey.key("Gone Project", projects: ps, workspaces: ws) == ProjectKey.key("gone-project", projects: ps, workspaces: ws), "unknown names fold too")
+    expect(ProjectKey.name("orbit", projects: ps, fallback: "x") == "Orbit SaaS Launch", "the registry name is shown")
+}
+
+projectKeys()
 notionTasksCore()
 interfaceStrings()
 presentationCore()
 prepOwnership()
+
+// 0.8.7: migration, project decode, usage log, work tree, CRM on fixtures (no network, demo data only)
+func settings087() {
+    var c = AppConfig()
+    c.notionMeetingsDB = "db-default"
+    c.notionMeetingsDBByProject = ["orbit": "db-b", "northwind": "db-b", "beta": "db-b", "pilot": "db-default", "x": ""]
+    let note = c.migrateMeetingsDBs()
+    expect(c.notionMeetingsDB == "db-b", "the most used meetings database wins")
+    expect(c.notionMeetingsDBByProject.isEmpty, "per-project overrides are gone")
+    expect(note == "pilot", "the note names the project that wrote elsewhere: \(note)")
+    var d = AppConfig(); d.notionMeetingsDB = "a"; d.notionMeetingsDBByProject = ["p": "b"]
+    d.migrateMeetingsDBs()
+    expect(d.notionMeetingsDB == "a", "a tie keeps the default")
+    let old = #"{"notionMeetingsDB":"z","notionMeetingsDBByProject":{"orbit":"z"}}"#
+    let e = try? JSONDecoder().decode(AppConfig.self, from: Data(old.utf8))
+    expect(e?.notionMeetingsDB == "z" && e?.notionMigrationNote == "all", "an old config migrates silently on load")
+    expect(AppConfig().models.tip.contains("haiku"), "Haiku is the default tip model")
+    expect(AppConfig().salesWebSearch && AppConfig().usageLog && !AppConfig().crm.transcriptInNote, "0.8.7 defaults")
+    // a project saved before 0.8.7 (no new keys) still decodes
+    let pj = #"{"name":"Orbit","slug":"orbit","root":"/tmp/orbit"}"#
+    let p = try? JSONDecoder().decode(Project.self, from: Data(pj.utf8))
+    expect(p?.name == "Orbit" && p?.salesEnabled == false && p?.apiAllowed == true, "an old project decodes with defaults")
+}
+
+func usage087() {
+    expect(UsageLog.line("tip_shown", ["kind": "risk"]) != nil, "a known event")
+    expect(UsageLog.line("tip_shown", ["kind": String(repeating: "x", count: 81)]) == nil, "no text over 80 characters")
+    expect(UsageLog.line("tip_shown", ["text": "Emily said"]) == nil, "no parameter outside the list")
+    expect(UsageLog.line("nope") == nil, "no unknown event")
+    let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pn-usage-\(UUID().uuidString)")
+    let sink = LocalFileSink(dir: dir)
+    sink.write(UsageLog.line("help_now")!)
+    expect(UsageLog.counts(dir: dir)["help_now"] == 1, "counted")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    FileManager.default.createFile(atPath: dir.appendingPathComponent("2020-01.jsonl").path, contents: Data())
+    sink.prune(now: Date())
+    expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("2020-01.jsonl").path), "older than 12 months is deleted")
+    let rootT = NSTemporaryDirectory() + "pn-tree-\(UUID().uuidString)"
+    let t = try? WorkTree.create(root: rootT)
+    var isDir: ObjCBool = false
+    expect(t?.count == 3 && FileManager.default.fileExists(atPath: rootT + "/My workspace/First project", isDirectory: &isDir) && isDir.boolValue, "the tree is made")
+}
+
+final class FakeHubSpot: CRMTransport {
+    var calls: [String] = []
+    var replies: [(Int, [String: Any], [String: String])]
+    init(_ r: [(Int, [String: Any], [String: String])]) { replies = r }
+    func send(_ method: String, _ path: String, _ body: [String: Any]?) async throws -> (Int, [String: Any], [String: String]) {
+        calls.append(method + " " + path)
+        return replies.isEmpty ? (200, [:], [:]) : replies.removeFirst()
+    }
+}
+
+func crm087() async {
+    // 429 then success: retried after the Retry-After wait
+    var waited: [Double] = []
+    let t1 = FakeHubSpot([(429, [:], ["retry-after": "2"]), (200, ["results": [["id": "11", "properties": ["name": "Northwind", "domain": "northwind.example"]]]], [:])])
+    let c1 = HubSpotConnector(transport: t1, sleep: { waited.append($0) })
+    let co = try? await c1.findCompany(domain: "northwind.example", name: "")
+    expect(co?.name == "Northwind" && waited == [2] && t1.calls.count == 2, "429 is retried after Retry-After")
+    // 401: one plain line, no retry
+    let t2 = FakeHubSpot([(401, ["message": "bad"], [:])])
+    do { _ = try await HubSpotConnector(transport: t2, sleep: { _ in }).testConnection(); expect(false, "401 throws") }
+    catch { expect((error as? CRMError)?.code == 401 && t2.calls.count == 1, "401 is one error, no retry") }
+    // 403 names the missing scope
+    let t3 = FakeHubSpot([(403, ["message": "This app hasn't been granted all required scopes: crm.objects.deals.read"], [:])])
+    do { _ = try await HubSpotConnector(transport: t3, sleep: { _ in }).deal(id: "1"); expect(false, "403 throws") }
+    catch { expect((error as? CRMError)?.scope == "crm.objects.deals.read", "403 names the scope") }
+    // snapshot and the update plan
+    let md = CRMSnapshot.render(provider: "HubSpot", company: CRMCompany(id: "1", name: "Northwind", domain: "northwind.example"),
+                                deal: nil, contacts: [CRMContact(id: "2", name: "Emily Clark", email: "emily@northwind.example", role: "CTO")],
+                                activity: [CRMActivity(kind: "note", when: "2026-10-01", text: "Intro call")], taken: Date())
+    expect(md.contains("Company: Northwind") && md.contains("Emily Clark, CTO") && md.contains("Deal: none linked") && CRMSnapshot.taken(md) != nil, "snapshot")
+    expect(!md.contains("\u{2014}"), "no long dash in the snapshot")
+    expect(CRMSnapshot.clientDomains(emails: ["ann@orbit.example", "me@volya.example", "x@gmail.com"], ownDomains: ["volya.example"]) == ["orbit.example"], "client domains")
+    let plan = CRMUpdatePlan.build(title: "Orbit renewal", date: "31 Oct", summary: ["a"], decisions: ["b"], nextSteps: ["c"], notionURL: "",
+                                   transcript: nil, nextStep: "Demo on Friday", closeDate: "", stage: nil,
+                                   qualification: ["budget": "Set aside"], mapping: ["budget": "budget_note", "authority": ""], followUp: ("Send the demo link", nil))
+    expect(plan.dealFields["hs_next_step"] == "Demo on Friday" && plan.dealFields["budget_note"] == "Set aside" && plan.dealFields["dealstage"] == nil, "deal fields; the stage only when chosen")
+    expect(plan.rows.first { $0.id == "transcript" }?.on == false, "the transcript is off by default")
+}
+
+func part2_087() async {
+    // H5: the answer cards file as a list; the text above the first card and hand edits stay
+    let txt = "# Answer cards\nOne card per question.\n\n## Price is too high\nOrbit pays back in 4 months.\nTags: price, objection\nUse when: budget comes up\n\n## Security\nSOC 2 on request.\n"
+    let doc = AnswerCardsDoc.parse(txt)
+    expect(doc.preamble == "# Answer cards\nOne card per question." && doc.cards.count == 2, "cards parse")
+    expect(doc.cards[0].tags == "price, objection" && doc.cards[0].useWhen == "budget comes up" && doc.cards[1].answer == "SOC 2 on request.", "card fields")
+    expect(AnswerCardsDoc.parse(AnswerCardsDoc.render(preamble: doc.preamble, cards: doc.cards)).cards == doc.cards, "render round trip")
+    let added = AnswerCardsDoc.append(AnswerCard(title: "Timeline", answer: "Two weeks \u{2014} to start"), to: txt)
+    expect(added.hasPrefix(txt.trimmingCharacters(in: .whitespacesAndNewlines)) && AnswerCardsDoc.parse(added).cards.count == 3, "append keeps the file")
+    expect(!added.contains("\u{2014}"), "no long dash in a saved card")
+    expect(AnswerCardsDoc.append(AnswerCard(title: "A", answer: "B"), to: "").hasPrefix("# Answer cards"), "a new file gets a title")
+    // I6.2: owners with paging, the owner by the user's email, notes and tasks carry the owner
+    let t = FakeHubSpot([(200, ["results": [["id": "7", "firstName": "Ann", "lastName": "Lee", "email": "ann@orbit.example"]],
+                                "paging": ["next": ["after": "7"]]], [:]),
+                         (200, ["results": [["id": 9, "firstName": "Emily", "lastName": "Clark", "email": "Emily@Northwind.example"]]], [:])])
+    let hs = HubSpotConnector(transport: t, sleep: { _ in })
+    let owners = (try? await hs.owners()) ?? []
+    expect(owners.map(\.name) == ["Ann Lee", "Emily Clark"] && owners[1].id == "9" && t.calls.count == 2 && t.calls[1].contains("after=7"), "owners with paging")
+    expect(CRMOwner.pick(owners, emails: ["emily@northwind.example"])?.id == "9" && CRMOwner.pick(owners, emails: ["x@y.example"]) == nil, "owner by email")
+    let tb = BodyFake()
+    let hs2 = HubSpotConnector(transport: tb, ownerId: "9", sleep: { _ in })
+    _ = try? await hs2.createTask(subject: "Send the demo link", due: nil, associations: [])
+    expect(((tb.bodies.last?["properties"] as? [String: Any])?["hubspot_owner_id"] as? String) == "9", "the task has the owner")
+    // I6.4, I6.5: the write defaults set the ticks; qualification goes through the mapping
+    let plan = CRMUpdatePlan.build(title: "Orbit renewal", date: "31 Oct", summary: [], decisions: [], nextSteps: [], notionURL: "",
+                                   transcript: nil, nextStep: "Demo", closeDate: "", stage: nil,
+                                   qualification: ["budget": "40k approved", "need": "Manual reports"], mapping: ["budget": "budget_note", "need": ""],
+                                   followUp: ("Demo", nil), writeNote: false, writeDeal: true, writeTask: false)
+    expect(plan.rows.first { $0.id == "note" }?.on == false && plan.rows.first { $0.id == "task" }?.on == false && plan.rows.first { $0.id == "deal" }?.on == true, "write defaults")
+    expect(plan.dealFields["budget_note"] == "40k approved" && plan.dealFields.count == 2, "Don't write skips the criterion")
+    // CRMSettings: old files get the new keys with defaults
+    let old = try? JSONDecoder().decode(CRMSettings.self, from: Data("{\"provider\":\"hubspot\",\"account\":\"Northwind\"}".utf8))
+    expect(old?.matchByDomain == true && old?.ownerAuto == true && old?.writeNote == true && old?.qualification.isEmpty == true, "CRM settings defaults")
+}
+
+final class BodyFake: CRMTransport {
+    var bodies: [[String: Any]] = []
+    func send(_ method: String, _ path: String, _ body: [String: Any]?) async throws -> (Int, [String: Any], [String: String]) {
+        bodies.append(body ?? [:]); return (200, ["id": "1"], [:])
+    }
+}
+
+settings087()
+await part2_087()
+usage087()
+await crm087()
 learningPatterns()
 enginePathsFollowTheApp()
 versions()

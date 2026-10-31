@@ -37,6 +37,7 @@ final class FollowUpModel: ObservableObject {
     }
 
     func write() {
+        UsageLog.log("followup_written")
         busy = true; error = ""; onChange?()
         let c = AppConfig.load(from: AppPaths.config)
         var args = ["--md", file, "--lang", lang, "--model", c.models.tip]
@@ -90,6 +91,7 @@ final class FollowUpModel: ObservableObject {
     }
 
     func copy() {
+        UsageLog.log("followup_copied")
         logHandEdits()
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString((subject.isEmpty ? "" : subject + "\n\n") + body, forType: .string)
@@ -97,6 +99,7 @@ final class FollowUpModel: ObservableObject {
 
     /// A mailto link: Mail opens a new message with the text; the PM adds the people and sends it.
     func openMail() {
+        UsageLog.log("followup_open_mail")
         logHandEdits()
         var u = URLComponents(); u.scheme = "mailto"; u.path = ""
         u.queryItems = [URLQueryItem(name: "subject", value: subject), URLQueryItem(name: "body", value: body)]

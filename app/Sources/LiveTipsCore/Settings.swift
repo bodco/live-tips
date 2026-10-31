@@ -5,7 +5,7 @@ import Foundation
 public struct AppConfig: Codable, Equatable {
     public struct Models: Codable, Equatable {
         public var classify = "claude-haiku-5-5"
-        public var tip = "claude-sonnet-5-5"
+        public var tip = "claude-haiku-5-5"      // 0.8.7: Haiku for live tips (owner, 29.10: fast and cheap enough; Sonnet if tips run late)
         public var analysis = "claude-opus-5-5"
         public init() {}
     }
@@ -92,7 +92,21 @@ public struct AppConfig: Codable, Equatable {
     public var notionMeetingsName = ""
     /// 0.8.6 (C): a project without a Control Tower config may write its meeting pages to another database
     /// (project slug -> data source id); empty = the default above.
-    public var notionMeetingsDBByProject: [String: String] = [:]
+    public var notionMeetingsDBByProject: [String: String] = [:]   // 0.8.7 (F3): read once for the migration, then empty
+    /// 0.8.7 (F3): one Meetings database for all projects; the project is a property of the page. The property's name
+    /// (select, multi_select, relation or text) and the risks database live here too; ids never go to git.
+    public var notionMeetingsProp = ""
+    public var notionRisksDB = ""
+    public var notionRisksName = ""
+    public var notionRisksProp = ""
+    /// Shown once in Settings > Integrations > Notion after the migration; empty when there is nothing to say.
+    public var notionMigrationNote = ""
+    /// 0.8.7 (I, rules/crm.yaml): the CRM connection. The key itself is only in the Keychain.
+    public var crm = CRMSettings()
+    /// 0.8.7 (H, rules/sales.yaml > prep.sections.company): company web search during sales preparation.
+    public var salesWebSearch = true
+    /// 0.8.7 (M, rules/usage.yaml): the local log of which features are used (Settings > General > Privacy).
+    public var usageLog = true
     /// 0.8.6 (D, rules/notion-tasks.yaml): the PM's Notion tasks in On you.
     public var notionTasks = NotionTasksSettings()
     /// Speaker identification on the other side's audio (local voice prints, as in the skill).
@@ -139,6 +153,15 @@ public struct AppConfig: Codable, Equatable {
         notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB
         notionMeetingsName = (try? c.decode(String.self, forKey: .notionMeetingsName)) ?? d.notionMeetingsName
         notionMeetingsDBByProject = (try? c.decode([String: String].self, forKey: .notionMeetingsDBByProject)) ?? d.notionMeetingsDBByProject
+        notionMeetingsProp = (try? c.decode(String.self, forKey: .notionMeetingsProp)) ?? d.notionMeetingsProp
+        notionRisksDB = (try? c.decode(String.self, forKey: .notionRisksDB)) ?? d.notionRisksDB
+        notionRisksName = (try? c.decode(String.self, forKey: .notionRisksName)) ?? d.notionRisksName
+        notionRisksProp = (try? c.decode(String.self, forKey: .notionRisksProp)) ?? d.notionRisksProp
+        notionMigrationNote = (try? c.decode(String.self, forKey: .notionMigrationNote)) ?? d.notionMigrationNote
+        crm = (try? c.decode(CRMSettings.self, forKey: .crm)) ?? d.crm
+        salesWebSearch = (try? c.decode(Bool.self, forKey: .salesWebSearch)) ?? d.salesWebSearch
+        usageLog = (try? c.decode(Bool.self, forKey: .usageLog)) ?? d.usageLog
+        migrateMeetingsDBs()
         notionTasks = (try? c.decode(NotionTasksSettings.self, forKey: .notionTasks)) ?? d.notionTasks
         speakersEnabled = (try? c.decode(Bool.self, forKey: .speakersEnabled)) ?? d.speakersEnabled
         hedgeEnabled = (try? c.decode(Bool.self, forKey: .hedgeEnabled)) ?? d.hedgeEnabled
@@ -151,6 +174,23 @@ public struct AppConfig: Codable, Equatable {
         workRoot = (try? c.decode(String.self, forKey: .workRoot)) ?? d.workRoot
         appRoot = (try? c.decode(String.self, forKey: .appRoot)) ?? d.appRoot
         knownModels = (try? c.decode([String].self, forKey: .knownModels)) ?? d.knownModels
+    }
+
+    /// 0.8.7 (F3): per-project meeting databases become one. The most used database wins (the old default counts
+    /// once, ties go to the default); a one-time note names the projects that wrote elsewhere. Returns the note.
+    @discardableResult
+    public mutating func migrateMeetingsDBs() -> String {
+        let per = notionMeetingsDBByProject.filter { !$0.value.isEmpty }
+        notionMeetingsDBByProject = [:]
+        guard !per.isEmpty else { return "" }
+        var count: [String: Int] = [:]
+        if !notionMeetingsDB.isEmpty { count[notionMeetingsDB, default: 0] += 1 }
+        for v in per.values { count[v, default: 0] += 1 }
+        let best = count.max { a, b in a.value != b.value ? a.value < b.value : (b.key == notionMeetingsDB) } ?? (notionMeetingsDB, 0)
+        if best.key != notionMeetingsDB { notionMeetingsDB = best.key; notionMeetingsName = "" }
+        let moved = per.filter { $0.value != best.key }.keys.sorted()
+        notionMigrationNote = moved.isEmpty ? "all" : moved.joined(separator: ", ")
+        return notionMigrationNote
     }
 
     /// Where control/ and state/ live. Inside the work folder by default, so the Cowork skill sees the status.
@@ -175,6 +215,41 @@ public struct AppConfig: Codable, Equatable {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try enc.encode(self).write(to: url, options: .atomic)
+    }
+}
+
+/// 0.8.7 (I, rules/crm.yaml). No secret here: the service key is in the Keychain (SecretStore.Key.hubspotKey).
+public struct CRMSettings: Codable, Equatable {
+    public var provider = "hubspot"
+    public var account = ""            // the portal's name from the last good test, for the card
+    public var lastTest = ""           // ISO 8601
+    public var missingScopes: [String] = []
+    public var transcriptInNote = false
+    // 0.8.7 (I6.2-I6.5): matching, owner, write defaults, qualification fields (new keys with defaults)
+    public var matchByDomain = true
+    public var ownerAuto = true            // pick the owner by the user's email until the PM chooses one
+    public var ownerId = ""
+    public var ownerName = ""
+    public var writeNote = true
+    public var writeDeal = true
+    public var writeTask = true
+    public var qualification: [String: [String: String]] = [:]   // method -> criterion -> deal property name ("" = don't write)
+    public init() {}
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        provider = (try? c.decode(String.self, forKey: .provider)) ?? "hubspot"
+        account = (try? c.decode(String.self, forKey: .account)) ?? ""
+        lastTest = (try? c.decode(String.self, forKey: .lastTest)) ?? ""
+        missingScopes = (try? c.decode([String].self, forKey: .missingScopes)) ?? []
+        transcriptInNote = (try? c.decode(Bool.self, forKey: .transcriptInNote)) ?? false
+        matchByDomain = (try? c.decode(Bool.self, forKey: .matchByDomain)) ?? true
+        ownerAuto = (try? c.decode(Bool.self, forKey: .ownerAuto)) ?? true
+        ownerId = (try? c.decode(String.self, forKey: .ownerId)) ?? ""
+        ownerName = (try? c.decode(String.self, forKey: .ownerName)) ?? ""
+        writeNote = (try? c.decode(Bool.self, forKey: .writeNote)) ?? true
+        writeDeal = (try? c.decode(Bool.self, forKey: .writeDeal)) ?? true
+        writeTask = (try? c.decode(Bool.self, forKey: .writeTask)) ?? true
+        qualification = (try? c.decode([String: [String: String]].self, forKey: .qualification)) ?? [:]
     }
 }
 

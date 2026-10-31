@@ -150,3 +150,13 @@ def test_rehearsal_material_and_questions(tmp_path):
     assert rehearse.material(base) == "BRIEF.MD:\nB\n\nSLIDES.JSON:\n[]"
     out = rehearse.questions(base, "en", "m", Prov('{"questions": [{"q": "Why?"}, "How" , "", {"q": " "}]}'))
     assert out["questions"] == ["Why?", "How"]
+
+
+def test_link_value_writes_every_page_id_of_the_project():
+    """0.8.7: Settings > Projects > In Notion may hold several pages ("id1, id2"); all go into the relation."""
+    from livetips_m0.wrapup_notion import link_value, page_ids
+    assert page_ids("aaa, bbb,aaa,, ccc") == ["aaa", "bbb", "ccc"]
+    assert link_value("Project", "relation", "aaa, bbb", "Orbit") == {"Project": {"relation": [{"id": "aaa"}, {"id": "bbb"}]}}
+    assert link_value("Project", "relation", "aaa", "") == {"Project": {"relation": [{"id": "aaa"}]}}
+    assert link_value("Project", "relation", "", "Orbit") == {}
+    assert link_value("Project", "multi_select", "", "Orbit, Northwind") == {"Project": {"multi_select": [{"name": "Orbit"}, {"name": "Northwind"}]}}

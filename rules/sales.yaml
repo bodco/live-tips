@@ -1,0 +1,165 @@
+# Sales mode (Pacenote 0.8.7, block H). An option on top of any call type (Regular, Presentation, Interview), never a
+# type of its own. Off: nothing of this file is used and nothing changes. Shared by the app and the skill; a new
+# method is added here as data, without code.
+schema_version: 1
+default_method: general
+methods:
+  general:
+    name: {en: General sales, uk: Загальний продаж}
+    desc:
+      en: No formal qualification. Pacenote follows the client's pain, the value for them, objections, and whether there is a next step with a date.
+      uk: Без формальної кваліфікації. Pacenote стежить за болем клієнта, цінністю для нього, запереченнями і тим, чи є наступний крок з датою.
+    chip: false
+    criteria:
+      - key: pain
+        name: {en: Pain, uk: Біль}
+        explain: {en: What hurts the client now and how much it costs them., uk: Що зараз болить клієнту і скільки це йому коштує.}
+        ask: {en: ["What happens if nothing changes?"], uk: ["Що буде, якщо нічого не змінювати?"]}
+      - key: value
+        name: {en: Value, uk: Цінність}
+        explain: {en: What the client gets from us in their own words., uk: Що клієнт отримує від нас, його словами.}
+        ask: {en: ["What would a good result look like for you?"], uk: ["Який результат був би для вас хорошим?"]}
+      - key: objections
+        name: {en: Objections, uk: Заперечення}
+        explain: {en: Doubts raised and whether they were answered., uk: Сумніви, які прозвучали, і чи на них відповіли.}
+        ask: {en: ["What would stop you from going ahead?"], uk: ["Що могло б вас зупинити?"]}
+      - key: next_step
+        name: {en: Next step, uk: Наступний крок}
+        explain: {en: An agreed next step with a date and an owner., uk: Узгоджений наступний крок з датою і відповідальним.}
+        ask: {en: ["Shall we put the next call in the calendar now?"], uk: ["Поставимо наступну зустріч у календар зараз?"]}
+  bant:
+    name: {en: BANT, uk: BANT}
+    desc:
+      en: "Budget, Authority, Need, Timeline: is there money, the person who decides, a real need and a time frame."
+      uk: "Budget, Authority, Need, Timeline: чи є гроші, людина, що вирішує, реальна потреба і терміни."
+    chip: true
+    criteria:
+      - key: budget
+        name: {en: Budget, uk: Бюджет}
+        explain: {en: Money is set aside or can be found, and roughly how much., uk: Гроші виділені або їх можна знайти, і приблизно скільки.}
+        ask: {en: ["Is there a budget for this already?"], uk: ["Чи є вже бюджет на це?"]}
+      - key: authority
+        name: {en: Authority, uk: Повноваження}
+        explain: {en: Who decides and who else takes part in the decision., uk: Хто вирішує і хто ще бере участь у рішенні.}
+        ask: {en: ["Who else will be part of this decision?"], uk: ["Хто ще братиме участь у рішенні?"]}
+      - key: need
+        name: {en: Need, uk: Потреба}
+        explain: {en: The problem is real and important for them., uk: Проблема реальна і важлива для них.}
+        ask: {en: ["Why is this a priority now?"], uk: ["Чому це пріоритет саме зараз?"]}
+      - key: timeline
+        name: {en: Timeline, uk: Терміни}
+        explain: {en: When they want to decide and to start., uk: Коли вони хочуть вирішити і почати.}
+        ask: {en: ["When would you like this to be live?"], uk: ["Коли ви хочете це запустити?"]}
+  spiced:
+    name: {en: SPICED, uk: SPICED}
+    desc:
+      en: "Situation, Pain, Impact, Critical event, Decision: the client's context, what hurts, what it costs, the deadline that forces a decision and how they decide."
+      uk: "Situation, Pain, Impact, Critical event, Decision: контекст клієнта, що болить, скільки коштує, подія, що змушує вирішити, і як вони вирішують."
+    chip: true
+    criteria:
+      - key: situation
+        name: {en: Situation, uk: Ситуація}
+        explain: {en: Facts about the client today (team, tools, process)., uk: Факти про клієнта зараз (команда, інструменти, процес).}
+        ask: {en: ["How do you handle this today?"], uk: ["Як ви робите це зараз?"]}
+      - key: pain
+        name: {en: Pain, uk: Біль}
+        explain: {en: What does not work and why it matters., uk: Що не працює і чому це важливо.}
+        ask: {en: ["What is the hardest part of it?"], uk: ["Що в цьому найважче?"]}
+      - key: impact
+        name: {en: Impact, uk: Вплив}
+        explain: {en: The cost of the pain or the gain of solving it, ideally in numbers., uk: Ціна болю або виграш від рішення, краще в цифрах.}
+        ask: {en: ["What would solving it be worth to you?"], uk: ["Скільки для вас вартує вирішити це?"]}
+      - key: critical_event
+        name: {en: Critical event, uk: Критична подія}
+        explain: {en: A date or event that forces a decision., uk: Дата або подія, що змушує прийняти рішення.}
+        ask: {en: ["Is there a date this has to be done by?"], uk: ["Чи є дата, до якої це треба зробити?"]}
+      - key: decision
+        name: {en: Decision, uk: Рішення}
+        explain: {en: Who decides, how, and on what criteria., uk: Хто вирішує, як і за якими критеріями.}
+        ask: {en: ["How do you usually make decisions like this?"], uk: ["Як ви зазвичай ухвалюєте такі рішення?"]}
+  meddic:
+    name: {en: MEDDIC, uk: MEDDIC}
+    desc:
+      en: "Metrics, Economic buyer, Decision criteria, Decision process, Identify pain, Champion: for larger deals with several people involved."
+      uk: "Metrics, Economic buyer, Decision criteria, Decision process, Identify pain, Champion: для більших угод, де бере участь кілька людей."
+    chip: true
+    criteria:
+      - key: metrics
+        name: {en: Metrics, uk: Метрики}
+        explain: {en: The measurable result the client expects., uk: Вимірюваний результат, якого чекає клієнт.}
+        ask: {en: ["How will you measure success?"], uk: ["Як ви виміряєте успіх?"]}
+      - key: economic_buyer
+        name: {en: Economic buyer, uk: Той, хто платить}
+        explain: {en: The person who controls the budget and gives the final yes., uk: Людина, що керує бюджетом і дає остаточне так.}
+        ask: {en: ["Who signs off on the budget?"], uk: ["Хто погоджує бюджет?"]}
+      - key: decision_criteria
+        name: {en: Decision criteria, uk: Критерії рішення}
+        explain: {en: What they will compare vendors on., uk: За чим вони порівнюватимуть постачальників.}
+        ask: {en: ["What matters most when you choose?"], uk: ["Що найважливіше при виборі?"]}
+      - key: decision_process
+        name: {en: Decision process, uk: Процес рішення}
+        explain: {en: The steps, people and dates from here to a signature., uk: Кроки, люди і дати від сьогодні до підпису.}
+        ask: {en: ["What are the steps from here to a signed contract?"], uk: ["Які кроки звідси до підписаного договору?"]}
+      - key: identify_pain
+        name: {en: Identify pain, uk: Біль}
+        explain: {en: The business pain behind the project., uk: Бізнес-біль за проєктом.}
+        ask: {en: ["What made you look for a solution now?"], uk: ["Що змусило шукати рішення зараз?"]}
+      - key: champion
+        name: {en: Champion, uk: Чемпіон}
+        explain: {en: Someone inside who wants this to happen and will push for it., uk: Людина всередині, яка хоче цього і проштовхуватиме.}
+        ask: {en: ["Who on your side would benefit most from this?"], uk: ["Кому з вашого боку це найбільше допоможе?"]}
+states: [unknown, partial, known]
+call_picture:
+  key: '"deal": [{"criterion": "<criterion key>", "state": "unknown|partial|known", "what": "<what is known, max 14 words, call language>", "quote": "<the line, max 20 words>", "t": "<HH:MM:SS>"}], "objections": [{"what": "<the doubt, max 12 words>", "answer": "<how it was answered, or empty>", "t": "<HH:MM:SS>"}], "next_step": {"what": "<agreed next step or empty>", "due": "<date or empty>", "owner": "<name or me>"}, "signals": [{"what": "<buying signal, max 12 words>", "t": "<HH:MM:SS>"}]'
+  rule: >-
+    deal = the qualification CRITERIA (given with their keys) as heard on this call and before it: known when the client
+    said it clearly, partial when only part of it, unknown otherwise; keep the strongest state reached and the line it
+    came from. Only the client's words count, never the PM's guesses. objections = doubts of the client and how the PM
+    answered. next_step = only a step agreed by both sides; due when a date was said. signals = clear buying signals
+    (asking about price, start date, contract, onboarding).
+tips:
+  objection: the doubt in one line and 1-2 sentences of answer; from an answer card when one matches
+  qualify:
+    when: a criterion is still unknown after 40% of the planned length or 10 minutes before the end, whichever comes first
+    say: what is not clear yet and one question (from the criterion's ask)
+  pain: the client named a pain without its size or consequence; ask about the scale or what happens if nothing changes
+  next_step:
+    when: 5 minutes before the end and next_step is empty or has no date
+    say: propose a concrete next step with a date
+  competitor: a competitor was named; the answer card about it when there is one
+  signal: a buying signal; how to lock it in (the step to propose now)
+priority: >-
+  The PM triggers stay. In sales mode a sales tip wins over another tip of the same importance. The overall rate does
+  not grow: the same limits apply.
+ask_order: answer cards first, then the brief and the project memory
+coach: >-
+  With Coach mode, tips address the person being observed (the seller): when the PM watches someone else sell
+  (interview role observer, or a coach call with role mentor) every sales tip starts with "Seller:" / "Продавцю:" and
+  its phrase is what the seller can say; when the PM is the one supported (role coach, "I am interviewed") the PM is
+  the seller and tips stay as they are.
+coach_prefix: {en: "Seller: ", uk: "Продавцю: "}
+prep:
+  sections:
+    company: >-
+      Company: what they do, size, news of the last 90 days, with links. Web search only in a sales preparation and
+      only the company name or domain goes to the search, never the content of the project's files. Under it the line
+      "Searched the web for: <name or domain>. Nothing from your files was sent." Settings > AI switch "Research the
+      company on the web before sales calls", on by default.
+    from_crm: "From CRM: the snapshot <stem>.crm.md (rules/crm.yaml > snapshot) with its age."
+    where_we_are: "Where we are: the qualification from earlier calls of the series and the CRM: known, unknown, who said what."
+    objections: "Likely objections: 3-5 with short answers, from the answer cards and past calls."
+    questions: "Questions to ask: the questions that close the gaps."
+    goal: "Goal of this call: one desired next step."
+after_call:
+  section: >-
+    The call page and the Notion meeting page get a Sales section: the criteria (state, what is known, quote), the
+    objections and how they were answered, the next step with its date, and a suggested deal stage (a suggestion only).
+  scorecard: >-
+    For the PM only: criteria known, the PM's share of talk, open questions, whether there is a next step with a date.
+    Facts of the call only, never a rating of people. Kept with the call (<stem>.sales.json); Statistics can filter
+    sales calls.
+  followup: a recap of the pain, the value, what was agreed and the next step
+answer_cards:
+  file: "<project or workspace root>/pacenote/answer-cards.md"
+  format: '"## <question or topic>" then the answer; optional lines "Tags: a, b" and "Use when: ..."'
+  index: indexed by the project's local index (.livetips-index/, a new document source, same format)

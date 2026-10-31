@@ -125,6 +125,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .menu button:hover{background:var(--accent-fill);color:#fff}
 .menu .sep{height:1px;background:var(--separator);margin:4px 6px}
 .menu kbd{font:inherit;opacity:.6}
+.menu button.off>span{opacity:.55}
+.menu button.off small{display:block;font-size:12px;opacity:.9}
 
 .popover{position:fixed;z-index:40;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-m);box-shadow:0 12px 30px rgba(0,0,0,.25);padding:12px;display:flex;flex-direction:column;gap:10px;width:260px}
 .popover[hidden]{display:none}
@@ -354,3 +356,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .badge-src{display:inline-block;font-size:10px;font-weight:700;line-height:14px;padding:0 4px;border-radius:4px;background:var(--surface-2);color:var(--text-2)}
 .onme-add{padding:10px 0}
 .onme-add input{width:100%;height:28px;border:1px solid var(--border);border-radius:var(--radius-s);padding:0 8px;background:var(--surface);color:var(--text);font-size:13px}
+
+/* 0.8.7 (H4): the Deal tab and its header chip */
+.deal-row { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; }
+.deal-row .seg { flex: 0 0 auto; width: 14px; height: 14px; margin-top: 3px; border-radius: 4px; cursor: pointer; }
+#dealBtn { font-variant-numeric: tabular-nums; }
+.k-objection,.k-qualify,.k-pain,.k-next_step,.k-competitor,.k-signal{color:var(--k-onme)}

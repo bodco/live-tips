@@ -2395,6 +2395,25 @@ def mic_watchdog(*, now_t: float, alive: bool, switching: bool, stalled: bool, m
     return None, silent_s, zero_for
 
 
+def tap_recovery(*, now_t: float, live: bool, zero_since: float, output_playing, done: bool,
+                 zero_s: float = 45.0) -> bool:
+    """0.8.7 (rules/recording.yaml > tap_recovery): rebuild the system audio tap once per call when the call is live,
+    the call audio has been exact zeros for zero_s and the default output device is playing. output_playing may be
+    a callable, asked only when everything else holds (it starts a short audiocap query)."""
+    if not live or done or now_t - zero_since < zero_s:
+        return False
+    return bool(output_playing() if callable(output_playing) else output_playing)
+
+
+def output_playing(timeout: float = 3.0) -> bool:
+    """The default output device is running (audiocap --output-running prints 1 or 0). False when unknown."""
+    try:
+        r = subprocess.run([str(BIN), "--output-running"], capture_output=True, text=True, timeout=timeout)
+        return r.stdout.strip() == "1"
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 # --------------------------------------------------------------------------- Speaker identification (v37)
 # The system channel mixes everybody on the other side. Every `them` segment with >= 1 s of speech
 # gets a voice embedding (sherpa-onnx, wespeaker ResNet34, 256 floats) in a worker thread; an
@@ -4619,6 +4638,7 @@ def main() -> int:
 
     last_status = 0.0
     heard_at = {"me": now(), "them": now()}     # 0.8.5 (rules/recording.yaml): when each side last had sound
+    tap_fix = {"done": False, "checked": 0.0, "live_since": 0.0}    # 0.8.7: tap_recovery, once per call
     while not stop_ev.is_set():
         time.sleep(0.5)
         writer.tick()
@@ -4673,6 +4693,21 @@ def main() -> int:
             writer.marker(L(f"мікрофон відновився після {mic_cap.stall_streak} перезапуск(ів)", f"microphone back after {mic_cap.stall_streak} restart(s)"))
             log(f"audiocap mic recovered after {mic_cap.stall_streak} stall restart(s)")
             mic_cap.stall_streak = 0
+        # 0.8.7 (rules/recording.yaml > tap_recovery): the call side gets only zeros while the speakers play
+        # (Zoom in Chrome after a break): rebuild the tap once; the output device is never touched.
+        sys_cap = caps[1]
+        if not tap_fix["done"] and now() - tap_fix["checked"] >= 10:
+            live = not standby["on"] and sys_cap.proc is not None and sys_cap.proc.poll() is None
+            zero_since = max(segs["them"].last_nonzero or 0.0, sys_cap.started_at or now(), tap_fix["live_since"] or now())
+            if not live:
+                tap_fix["live_since"] = 0.0
+            elif not tap_fix["live_since"]:
+                tap_fix["live_since"] = now()
+            elif tap_recovery(now_t=now(), live=live, zero_since=zero_since, output_playing=output_playing,
+                              done=tap_fix["done"], zero_s=float(cfg.get("tap_zero_s", 45))):
+                tap_fix["done"] = True
+                sys_cap.restart_stalled(now() - zero_since, "call audio all zeros while the output device plays: rebuilding the tap once")
+            tap_fix["checked"] = now()
         muted = mute_file.exists()
         if muted != segs["me"].muted:
             segs["me"].set_muted(muted)

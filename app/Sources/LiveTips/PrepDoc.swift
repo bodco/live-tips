@@ -11,6 +11,7 @@ final class PrepDocWindow {
     static func show(path: String, title: String) {
         if let w = windows[path] { w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
         let w = NSWindow(contentViewController: NSHostingController(rootView: PrepDocView(path: path, title: title)))
+        w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
         w.title = L("prep.windowTitle", ["title": title])
         w.styleMask.insert(.resizable)
         w.setContentSize(NSSize(width: 640, height: 760))

@@ -96,6 +96,10 @@ def _apply(it: dict, op: str, e: dict) -> None:
         it.update(status="open", **NOT_DONE)
     elif op == "drop":
         it["status"] = "dropped"
+    elif op == "edit":          # 0.8.7 (rules/commitments.yaml > edit): the PM changed text, owner or due on the call page
+        for k in ("text", "owner", "due"):
+            if k in e and e[k] is not None:
+                it[k] = str(e[k])
     elif op == "link":          # 0.8.6 (rules/notion-tasks.yaml): the item is a task in the PM's Notion
         it.update(notion_page=e.get("notion_page", ""), notion_note="")
     elif op == "unlink":

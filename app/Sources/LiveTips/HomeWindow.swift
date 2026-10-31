@@ -17,6 +17,7 @@ final class HomeWindow {
             return
         }
         let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { HomeView(app: delegate) }))
+        w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
         w.title = L("home.window.title")
         w.styleMask.insert(.resizable)
         w.setContentSize(NSSize(width: 1120, height: 760))
@@ -33,18 +34,7 @@ final class HomeWindow {
 @MainActor
 enum InsightsWindow {
     static var window: NSWindow?
-    static func show() {
-        if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { ScrollView { WeekStats().padding(20) }.frame(minWidth: 620, minHeight: 520) }))
-            w.styleMask.insert(.resizable)
-            w.isReleasedWhenClosed = false
-            window = w
-        }
-        window?.title = L("home.week.detailsTitle")
-        window?.center()
-        window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
+    static func show() { HomeNav.shared.open(.stats) }     // 0.8.7 (A2): pushed into Home
 }
 
 /// One call ahead: a calendar event (with its Up next setup, if any) or an Up next call without an event.
@@ -63,6 +53,7 @@ struct HomeView: View {
     @ObservedObject var upnext = UpNext.shared
     @ObservedObject var history = CallHistory.shared
     @ObservedObject var runner = PrepRunner.shared
+    @State private var featuresCard = FeaturesWindow.showOnHome
     @ObservedObject var register = Register.shared        // Pacenote 0.8: the commitments register
     @ObservedObject var ntasks = NotionTasks.shared       // 0.8.6 (D): the PM's Notion tasks in On you
     @AppStorage("onYouFilter") private var onYouFilter = ""         // "" = All projects, else "<slug>" or "workspace:<name>"
@@ -78,7 +69,15 @@ struct HomeView: View {
 
     private var live: Bool { CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(status.state) }
 
+    @ObservedObject var nav = HomeNav.shared               // 0.8.7 (A2): call page, series, Statistics push here
+
     var body: some View {
+        NavigationStack(path: $nav.path) {
+            homeBody.navigationDestination(for: HomeNav.Route.self) { r in HomeRouteView(route: r) }
+        }
+    }
+
+    private var homeBody: some View {
         VStack(spacing: 0) {
             toolbar.padding(.horizontal, 24).padding(.vertical, 14)
             Divider()
@@ -102,7 +101,8 @@ struct HomeView: View {
         }
         .background(PN.C.bg)
         .frame(minWidth: 680, minHeight: 560)
-        .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents(); register.importOnce(); ntasks.keepFresh() }
+        .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents(); register.importOnce(); ntasks.keepFresh()
+                    runner.refreshAuth() }     // 0.8.7 (L3.3): the Connect Claude card needs the sign-in state
         .onDrop(of: [.fileURL], isTargeted: nil) { items in          // 0.8.6 (B): drop a recording on Home
             _ = items.first?.loadObject(ofClass: URL.self) { u, _ in
                 if let u = u, TranscribeWindow.accepts(u) { DispatchQueue.main.async { MainActor.assumeIsolated { TranscribeWindow.show(file: u) } } }
@@ -135,8 +135,18 @@ struct HomeView: View {
             }
             Spacer()
             // Pacenote 0.8 (idea 05): ask about past calls of a project (Command-F).
-            Button { MemoryWindow.show() } label: { Label(L("memory.button"), systemImage: "magnifyingglass") }
-                .buttonStyle(.pnTertiary).keyboardShortcut("f", modifiers: .command).help(L("memory.help"))
+            if history.records.isEmpty {
+                // 0.8.7 (L2): no transcripts in any project yet: greyed with the condition; a click opens Start call
+                VStack(spacing: 1) {
+                    Button { StartCallWindow.show(delegate: app) } label: { Label(L("memory.button"), systemImage: "magnifyingglass") }
+                        .buttonStyle(.pnTertiary).opacity(0.5)
+                    Text(L("memory.afterFirst")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
+                .help(L("memory.afterFirst"))
+            } else {
+                Button { MemoryWindow.show() } label: { Label(L("memory.button"), systemImage: "magnifyingglass") }
+                    .buttonStyle(.pnTertiary).keyboardShortcut("f", modifiers: .command).help(L("memory.help"))
+            }
             // 0.8.6 (B): a recording or a link becomes a transcript like a call
             Button(L("tr.window")) { TranscribeWindow.show() }.buttonStyle(.pnTertiary).help(L("tr.subtitle"))
             Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
@@ -182,12 +192,17 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 20) {
             if let e = auto.suggestion, !live { autoBanner(e) }
             finishSetup
+            if featuresCard {        // 0.8.7 (L1): the first 14 days, until closed
+                FeaturesView(compact: true, onClose: { UserDefaults.standard.set(true, forKey: "featuresCardClosed"); featuresCard = false })
+                    .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.l))
+            }
             if !note.isEmpty { Text(note).font(PN.Font.body).foregroundStyle(PN.C.onMe) }
             // Up next: the call being recorded, or the nearest one; an event that began more than 5 minutes ago without
             // being recorded stays in Later (with its Live badge).
             let first = live ? nil : rows.first { $0.event == nil || $0.start > now.addingTimeInterval(-5 * 60) }
-            if live { liveCard } else if let first = first { upNextCard(first, overlaps: overlaps(first, rows)) } else { emptyCard }
-            laterSection(rows.filter { $0.id != first?.id })
+            if live { liveCard } else if let first = first { upNextCard(first, overlaps: overlaps(first, rows)) } else { adaptiveHero }
+            // 0.8.7 (C): an empty Later is hidden
+            if !rows.filter({ $0.id != first?.id }).isEmpty { laterSection(rows.filter { $0.id != first?.id }) }
         }
     }
 
@@ -209,6 +224,10 @@ struct HomeView: View {
         }
         if cal.access != .granted {
             out.append(Todo(id: "calendars", text: L("home.finish.calendars"), action: L("onboarding.permissions.calendarsButton"), run: { cal.connect() }))
+        }
+        // 0.8.7 (L3.3): no API key and Claude Code not signed in: nothing can prepare a call or write the follow-up
+        if !demo && !runner.hasAPIKey && (runner.loggedIn == false || (runner.loggedIn == nil && PrepRunner.claudePath == nil)) {
+            out.append(Todo(id: "claude", text: L("home.finish.claude"), action: L("home.finish.connect"), run: { SettingsWindow.show(tab: "ai") }))
         }
         if !demo && !settings.isSet(.notionToken) {
             out.append(Todo(id: "notion", text: L("home.finish.notion"), action: L("home.finish.connect"), run: { SettingsWindow.show(tab: "notion") }))
@@ -242,6 +261,55 @@ struct HomeView: View {
     private func overlaps(_ r: Ahead, _ rows: [Ahead]) -> [CalendarService.CalEvent] {
         guard let e = r.event else { return [] }
         return rows.compactMap(\.event).filter { e.overlaps($0) }
+    }
+
+    /// 0.8.7 (C): with no call ahead the hero is what matters now: due or overdue items on you, else the last call of
+    /// the past 3 days, else one small line.
+    @ViewBuilder private var adaptiveHero: some View {
+        let endOfToday = Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: now) ?? now
+        let due = register.open(mine: true).filter { c in
+            guard let d = CommitmentRegister.dueDate(c.due, from: now) else { return false }
+            return d <= endOfToday
+        }.sorted { (CommitmentRegister.dueDate($0.due, from: now) ?? now) < (CommitmentRegister.dueDate($1.due, from: now) ?? now) }
+        let last = history.visible.filter { $0.start > now.addingTimeInterval(-3 * 86400) && $0.start < now }.max { $0.start < $1.start }
+        if !due.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L("home.hero.todayOnYou")).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                ForEach(due.prefix(3)) { c in
+                    HStack(alignment: .top, spacing: 8) {
+                        Toggle("", isOn: Binding(get: { c.status == "done" }, set: { register.mark(c, $0 ? "done" : "reopen") }))
+                            .toggleStyle(.checkbox).labelsHidden()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(c.text).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+                            Text(L("reg.due", ["due": Register.dueText(c.due)])).font(PN.Font.caption)
+                                .foregroundStyle((CommitmentRegister.dueDate(c.due, from: now) ?? now) < Calendar.current.startOfDay(for: now) ? PN.C.danger : PN.C.text3)
+                        }
+                    }
+                }
+                let n = register.open(mine: true).count
+                if n > 3 { Text(L("home.hero.allOnYou", ["n": "\(n)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+            }
+            .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.l))
+        } else if let r = last {
+            let o = CallOutcome.read(transcript: r.file) ?? CallOutcome()
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L("home.hero.lastCall")).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                Text(r.title).font(.system(size: 17, weight: .semibold)).foregroundStyle(PN.C.text)
+                Text(CallPageView.fmt("EEEEdMMMMHHmm").string(from: r.start)).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                ForEach(o.decisions.prefix(3), id: \.self) { d in Text("• " + d).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true) }
+                if !o.onMe.isEmpty { Text(L("home.outcome.onYou", ["n": "\(o.onMe.count)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                Button(L("home.hero.openCall")) { CallPageWindow.show(file: r.file) }.buttonStyle(.pnSecondary)
+            }
+            .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.l))
+        } else {
+            HStack(spacing: 8) {
+                Text(cal.access == .granted ? L("home.nothingAhead") : L("home.connectCalendars")).font(PN.Font.body).foregroundStyle(PN.C.text3)
+                if cal.access != .granted { Button(L("onboarding.permissions.calendarsButton")) { cal.connect() }.buttonStyle(.pnTertiary) }
+                Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }.buttonStyle(.pnTertiary)
+            }
+        }
     }
 
     private var emptyCard: some View {
@@ -339,6 +407,15 @@ struct HomeView: View {
                         }
                         Spacer()
                         Button(L("rehearse.button")) { RehearsalWindow.show(base: String(p.dropLast(9)), title: m.effectiveTitle, call: m) }.buttonStyle(.pnTertiary)
+                    }
+                } else if let m = r.model, m.callType == "presentation" {
+                    // 0.8.7 (L2): greyed with the condition; a click opens Start call, where Prepare makes the talk
+                    HStack(spacing: 10) {
+                        Image(systemName: "questionmark.circle").foregroundStyle(PN.C.text3)
+                        Text(L("rehearse.needPrep")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                        Spacer()
+                        Button(L("rehearse.button")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) }
+                            .buttonStyle(.pnTertiary).opacity(0.5).help(L("rehearse.needPrep"))
                     }
                 }
             }
@@ -668,14 +745,12 @@ struct HomeView: View {
         let reg = ProjectRegistry.load(from: AppPaths.projects)
         let label = onYouFilter.isEmpty ? L("ntask.allProjects")
             : onYouFilter.hasPrefix("workspace:") ? String(onYouFilter.dropFirst(10)) : (reg.projects.first { $0.slug == onYouFilter }?.name ?? onYouFilter)
-        return Menu(label) {
-            Button(L("ntask.allProjects")) { onYouFilter = "" }
-            Divider()
-            ForEach(reg.projects.filter { $0.status != "archived" }, id: \.slug) { p in Button(p.name) { onYouFilter = p.slug } }
-            if !reg.workspaces.isEmpty { Divider() }
-            ForEach(reg.workspaces, id: \.name) { w in Button(w.name) { onYouFilter = "workspace:" + w.name } }
+        return Picker(L("home.filter.project"), selection: Binding(get: { onYouFilter }, set: { onYouFilter = $0 })) {   // 0.8.7 (J4)
+            Text(L("ntask.allProjects")).tag("")
+            ForEach(reg.projects.filter { $0.status != "archived" }, id: \.slug) { p in Text(p.name).tag(p.slug) }
+            ForEach(reg.workspaces, id: \.name) { w in Text(w.name).tag("workspace:" + w.name) }
         }
-        .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
+        .pickerStyle(.menu).fixedSize().font(PN.Font.caption).help(label)
     }
 
     private func badge(_ text: String) -> some View {
@@ -736,10 +811,12 @@ struct HomeView: View {
         case .commit(let c):
             let overdue = CommitmentRegister.isOverdue(c)
             let when = c.createdDate.map { df.string(from: $0) } ?? ""
-            let sub = [register.projectName(c), when.isEmpty ? "" : L("reg.promised", ["date": when]),
-                       c.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": Register.dueText(c.due)]) : L("reg.due", ["due": Register.dueText(c.due)])),
+            // 0.8.7 (J4): the project once (not when the text names it), only the due date red
+            let pn = register.projectName(c)
+            let sub = [c.text.lowercased().contains(pn.lowercased()) ? "" : pn, when.isEmpty ? "" : L("reg.promised", ["date": when]),
                        c.notionNote == "removed" ? L("ntask.pageRemoved") : ""]
                 .filter { !$0.isEmpty }.joined(separator: " · ")
+            let dueS = c.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": Register.dueText(c.due)]) : L("reg.due", ["due": Register.dueText(c.due)]))
             HStack(alignment: .top, spacing: 8) {
                 Toggle("", isOn: Binding(get: { false }, set: { _ in register.mark(c) }))
                     .toggleStyle(.checkbox).labelsHidden()
@@ -749,7 +826,8 @@ struct HomeView: View {
                         badge(L("ntask.badgeCall"))
                         Text(c.text).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
                     }
-                    Text(sub).font(PN.Font.caption).foregroundStyle(overdue ? PN.C.danger : PN.C.text3)
+                    (Text(sub).foregroundColor(PN.C.text3) + Text((sub.isEmpty || dueS.isEmpty ? "" : " · ") + dueS).foregroundColor(overdue ? PN.C.danger : PN.C.text3))
+                        .font(PN.Font.caption)
                 }
                 Spacer(minLength: 0)
                 RemoveButton { register.mark(c, "drop") }
@@ -769,8 +847,10 @@ struct HomeView: View {
         case .task(let t, let c):
             let dueD = CommitmentRegister.dueDate(t.due, from: Date())
             let overdue = dueD.map { $0 < Calendar.current.startOfDay(for: Date()) } ?? false
-            let sub = [ntasks.projectName(t), t.status, t.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": Register.dueText(t.due)]) : L("reg.due", ["due": Register.dueText(t.due)])),
+            let tpn = ntasks.projectName(t)
+            let sub = [t.title.lowercased().contains(tpn.lowercased()) ? "" : tpn, t.status,
                        c != nil ? L("ntask.fromACall") : ""].filter { !$0.isEmpty }.joined(separator: " · ")
+            let dueS = t.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": Register.dueText(t.due)]) : L("reg.due", ["due": Register.dueText(t.due)]))
             HStack(alignment: .top, spacing: 8) {
                 Toggle("", isOn: Binding(get: { false }, set: { _ in ntasks.tick(t) }))
                     .toggleStyle(.checkbox).labelsHidden()
@@ -780,7 +860,8 @@ struct HomeView: View {
                         badge(L("ntask.badgeNotion"))
                         Text(t.title).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
                     }
-                    Text(sub).font(PN.Font.caption).foregroundStyle(overdue ? PN.C.danger : PN.C.text3)
+                    (Text(sub).foregroundColor(PN.C.text3) + Text((sub.isEmpty || dueS.isEmpty ? "" : " · ") + dueS).foregroundColor(overdue ? PN.C.danger : PN.C.text3))
+                        .font(PN.Font.caption)
                 }
                 Spacer(minLength: 0)
                 RemoveButton { confirmRemove(t, c) }
@@ -813,12 +894,14 @@ struct HomeView: View {
     }
 
     private var weekSection: some View {
-        let cal0 = Calendar.current
-        let ws = cal0.dateInterval(of: .weekOfYear, for: now)?.start ?? cal0.startOfDay(for: now)
-        let recs = history.records.filter { !$0.hidden && $0.start >= ws && $0.start <= now }
+        let cal0 = CallStats.calendar
+        let ws = CallStats.weekStart(now)
+        let recs = CallStats.calls(from: ws, to: now.addingTimeInterval(1))      // 0.8.7 (B1): the same numbers as Statistics
         let mins = recs.reduce(0) { $0 + ($1.minutes ?? 0) }
         let prepared = recs.filter { $0.prepared == true }.count
-        let days: [(String, Double)] = (0..<5).map { i in
+        // 0.8.7 (B3): Monday to Sunday; the weekend shows when it has calls or today is a weekend day
+        let weekend = recs.contains { cal0.isDateInWeekend($0.start) } || cal0.isDateInWeekend(now)
+        let days: [(String, Double)] = (0..<(weekend ? 7 : 5)).map { i in
             let d = cal0.date(byAdding: .day, value: i, to: ws) ?? ws
             let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate("EEEEE")
             return (f.string(from: d), recs.filter { cal0.isDate($0.start, inSameDayAs: d) }.reduce(0) { $0 + ($1.minutes ?? 0) })
@@ -930,34 +1013,39 @@ struct RecentRow: View {
 
     var body: some View {
         let series = CallPageView.series(of: r).count
-        HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1)
-                    if let src = r.source {          // 0.8.6 (B): a transcribed recording, not a call
-                        Text(L(src == "link" ? "tr.mark.link" : "tr.mark.file")).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.text2)
-                            .padding(.horizontal, 4).padding(.vertical, 1).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 4))
+        // 0.8.7 (J3): the title takes the full width; "Series · N" is a pill in the subline; the actions float on hover
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1)
+                if let src = r.source {          // 0.8.6 (B): a transcribed recording, not a call
+                    Text(L(src == "link" ? "tr.mark.link" : "tr.mark.file")).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.text2)
+                        .padding(.horizontal, 4).padding(.vertical, 1).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 4))
+                }
+            }
+            HStack(spacing: 6) {
+                Text([when, r.project].filter { !$0.isEmpty }.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
+                if series > 1 {
+                    Text("·").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Button { why = true } label: {
+                        Text(L("recent.seriesPill", ["n": "\(series)"])).font(PN.Font.caption).foregroundStyle(PN.C.accent)
+                            .padding(.horizontal, 6).padding(.vertical, 1).background(Capsule().fill(PN.C.accent.opacity(0.12)))
                     }
-                    if series > 1 {
-                        Button { why = true } label: {
-                            Text(L("recent.seriesPill", ["n": "\(series)"])).font(PN.Font.caption).foregroundStyle(PN.C.accent)
-                                .padding(.horizontal, 6).padding(.vertical, 1).background(Capsule().fill(PN.C.accent.opacity(0.12)))
+                    .buttonStyle(.plain).focused($focus, equals: 9)
+                    .popover(isPresented: $why, arrowEdge: .bottom) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(L("series.why")).font(PN.Font.section)
+                            Text(L("series.whyText")).font(PN.Font.body).fixedSize(horizontal: false, vertical: true)
+                            Button(L("series.open")) { why = false; SeriesWindow.show(record: r) }.buttonStyle(.pnSecondary)
                         }
-                        .buttonStyle(.plain).focused($focus, equals: 9)
-                        .popover(isPresented: $why, arrowEdge: .bottom) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(L("series.why")).font(PN.Font.section)
-                                Text(L("series.whyText")).font(PN.Font.body).fixedSize(horizontal: false, vertical: true)
-                                Button(L("series.open")) { why = false; SeriesWindow.show(record: r) }.buttonStyle(.pnSecondary)
-                            }
-                            .padding(14).frame(width: 320)
-                        }
+                        .padding(14).frame(width: 320)
                     }
                 }
-                Text([when, r.project].filter { !$0.isEmpty }.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
-                if !outcome.isEmpty { Text(outcome).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(1) }
             }
-            Spacer()
+            if !outcome.isEmpty { Text(outcome).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(1) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .trailing) {
+            let shown = hover || (focus != nil && focus != 9)
             HStack(spacing: 4) {
                 Button(L("recent.summary")) {
                     if let u = r.notionURL.flatMap({ URL(string: $0) }) { NSWorkspace.shared.open(u) } else { CallPageWindow.show(file: r.file) }
@@ -966,7 +1054,9 @@ struct RecentRow: View {
                 if series > 1 { Button(L("recent.series")) { SeriesWindow.show(record: r) }.focused($focus, equals: 3) }
             }
             .buttonStyle(.pnTertiary)
-            .opacity(hover || (focus != nil && focus != 9) ? 1 : 0)
+            .padding(.leading, 8)
+            .background(PN.C.bg.opacity(shown ? 0.95 : 0))
+            .opacity(shown ? 1 : 0)
         }
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)

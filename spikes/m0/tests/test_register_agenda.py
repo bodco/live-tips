@@ -127,3 +127,28 @@ def test_mine_makes_a_line_the_pms(tmp_path):
     assert items["c-old"]["status"] == "dropped"
     mine = [i for i in items.values() if i["owner"] == "me"][0]
     assert mine["from"] == "c-old"
+
+
+def test_register_edit_op(tmp_path):
+    """0.8.7 (rules/commitments.yaml > edit): text, owner and due change; other fields stay."""
+    reg.append(tmp_path, [{"op": "add", "id": "c-e", "text": "Send the plan", "owner": "me", "call": "x.md", "due": "Friday"}])
+    reg.append(tmp_path, [{"op": "edit", "id": "c-e", "text": "Send the Orbit plan", "owner": "Ann Lee"}])
+    it = reg.load(tmp_path)[0]
+    assert it["text"] == "Send the Orbit plan" and it["owner"] == "Ann Lee" and it["due"] == "Friday"
+
+
+def test_rule_reports_are_not_commitments():
+    """0.8.7: the call picture rule carries the negative examples (UK and EN) and the positive one."""
+    from livetips_m0.rules import Rules
+    r = Rules().commitments["model_rule_not_commitments"]
+    for s in ("Налаштував тестового суперюзера", "Створив документацію", "I set", "Завтра закінчу на проді"):
+        assert s in r
+
+
+def test_situation_rules_include_not_commitments():
+    from types import SimpleNamespace
+    from livetips_m0.engine import Engine
+    from livetips_m0.rules import Rules
+    eng = SimpleNamespace(rules=Rules(), agenda_items=[], open_commitments=[], sales=None)
+    text = Engine._situation_extra_rules(eng)
+    assert "Налаштував тестового суперюзера" in text and "done_commitments" in text

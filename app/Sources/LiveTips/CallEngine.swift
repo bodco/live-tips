@@ -132,7 +132,12 @@ final class CallEngine {
     }
 
     /// Starts recording. `request` goes to control/start.json (project_dir, title, slug, langs, call_type, audience).
+    private var usageStart: Date?        // 0.8.7 (M): for call_ended minutes
     func start(request: [String: Any], apiAllowed: Bool, onReady: @escaping (EngineStatus) -> Void) -> String? {
+        UsageLog.log("call_started", ["type": String(((request["call_type"] as? String) ?? "auto").prefix(20)),
+                                      "sales": ((request["sales"] as? [String: Any])?["enabled"] as? Bool) ?? false,
+                                      "has_brief": !((request["brief"] as? String) ?? "").isEmpty])
+        usageStart = Date()
         if isRunning { return "A call is already running" }
         if let first = problems().first { return first }
         verifyCore()
@@ -305,6 +310,9 @@ final class CallEngine {
         // 2026-10-26: the running call picture needs who the PM is on this call.
         for k in ["participants", "pm_projects"] { if let v = callRequest[k] as? [String], !v.isEmpty { sc[k] = v } }
         sc["situation"] = true
+        // 0.8.7 (H): Sales mode and what the tracker needs (the planned length for the qualify and next step tips)
+        if let s = callRequest["sales"] as? [String: Any], (s["enabled"] as? Bool) == true { sc["sales"] = s }
+        if let p = callRequest["project_dir"] as? String { sc["project_dir"] = p }
         sc["proactive"] = ((UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:])["proactive"] as? String) == "1"   // remembered in the tips window
         sc["project_root"] = projectRoot
         // lt search: by meaning with Local AI on, plain text search otherwise (2026-10-26: "Search the project" works either way).
@@ -338,6 +346,7 @@ final class CallEngine {
         env["LT_AI_STAGE"] = "live"              // spend-ledger.jsonl: what each stage costs
         env["LT_PM_NAMES"] = c.nameAliases.joined(separator: ",")   // lt digest: questions addressed to the PM
         env["PYTHONDONTWRITEBYTECODE"] = "1"     // the engine may live inside the signed app bundle; the key goes to the child only, never written or logged
+        if c.usageLog { env["LT_USAGE_DIR"] = FeatureRegistry.usageDir.path }     // 0.8.7 (M): event names only
         p.environment = env
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/tips-engine.log"))
         p.standardOutput = log
@@ -408,7 +417,8 @@ final class CallEngine {
         let hasConfig = !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig)
         // 0.8.6 (C): a project without a config may send its pages to its own database (Settings > Notion)
         let slug = (callRequest["slug"] as? String) ?? ""
-        let meetingsDB = c.notionMeetingsDBByProject[slug].flatMap { $0.isEmpty ? nil : $0 } ?? c.notionMeetingsDB
+        let proj = ProjectRegistry.load(from: AppPaths.projects).projects.first { $0.slug == slug }
+        let meetingsDB = c.notionMeetingsDB      // 0.8.7 (F3): one Meetings database; the project is a property
         guard hasConfig || !meetingsDB.isEmpty else {
             notionResult = "Notion: choose where meeting pages go (Settings > Notion). Then use Send last call to Notion in the menu."; notify(notionResult, settingsTab: "notion"); return
         }
@@ -417,13 +427,19 @@ final class CallEngine {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
         let projectName = ((callRequest["project_dir"] as? String).map { ($0 as NSString).lastPathComponent }) ?? ""
-        p.arguments = ["-m", "livetips_m0.wrapup_notion", "--md", file,
-                       "--lt", c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt"),
-                       "--model", c.models.analysis, "--project-name", projectName]   // 0.8.2: the "After the call" model
-            + (hasConfig ? ["--project-config", projectConfig] : [])
-            + (meetingsDB.isEmpty ? [] : ["--meetings-db", meetingsDB])
-            + (renamed.map { ["--title", $0] } ?? [])
-            + ((callRequest["scheduled_at"] as? String).map { ["--when", $0] } ?? [])   // the date and time set in Start call
+        var args: [String] = ["-m", "livetips_m0.wrapup_notion", "--md", file,
+                              "--lt", c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt"),
+                              "--model", c.models.analysis]   // 0.8.2: the "After the call" model
+        if proj != nil {
+            args += NotionTargets.projectArgs(c, proj)
+        } else {
+            args += ["--project-name", projectName]
+            if hasConfig { args += ["--project-config", projectConfig] }
+        }
+        if !meetingsDB.isEmpty { args += ["--meetings-db", meetingsDB] }
+        if let r = renamed { args += ["--title", r] }
+        if let w = callRequest["scheduled_at"] as? String { args += ["--when", w] }   // the date and time set in Start call
+        p.arguments = args
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = AIRoute.env(job: "after", config: c)
         env["LT_AI_STAGE"] = "after_notion"
@@ -448,7 +464,7 @@ final class CallEngine {
                     MainActor.assumeIsolated { CallHistory.shared.addCost(file: file, c) }
                 }
                 if (d["ok"] as? Bool) == true, let url = d["url"] as? String {
-                    self.notionResult = url
+                    self.notionResult = url; UsageLog.log("notion_page_written")
                     MainActor.assumeIsolated { CallHistory.shared.setNotion(file: file, url: url) }
                     self.notify(((d["created"] as? Bool) == true ? L("eng.notionCreated") : L("eng.notionAdded")), url: url)
                 } else {
@@ -591,6 +607,7 @@ final class CallEngine {
     }
 
     func stop() {
+        if let s = usageStart { UsageLog.log("call_ended", ["minutes": Int(Date().timeIntervalSince(s) / 60)]); usageStart = nil }
         lastCallSummary = ""
         let control = (appRoot as NSString).appendingPathComponent("control")
         FileManager.default.createFile(atPath: (control as NSString).appendingPathComponent("stop"), contents: Data())

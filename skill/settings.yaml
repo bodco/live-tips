@@ -65,8 +65,8 @@ tips:
   hard_cap_minutes: 120
 
 model_hint: >
-  Pick the session model before "live tips". Everyday calls: Sonnet class (Sonnet 5.5),
-  low or medium effort: fast enough for the loop, good judgement for the answer check.
-  Interviews, escalations, steering and other high-stakes calls: Opus class (Opus 5.5)
-  if a tip delay of 10-30 s is fine. Not Haiku class: too shallow for the answer check
-  and multilingual nuance.
+  Pick the session model before "live tips". Default and recommended: Haiku class
+  (Haiku 5.5). Measured on a 14-minute recording (29.10.2026): Haiku $0.05, median 1.6 s,
+  40% of tips on time; Sonnet $0.27, 2.0 s, 100% on time; Opus $0.71, 3.5 s, 20% on time.
+  If late tips bother you, use Sonnet class (Sonnet 5.5). Opus class is for the
+  preparation before an important call, not for live tips.

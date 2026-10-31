@@ -9,7 +9,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .wrapup_notion import config_ids, link_prop, link_value, notion, para, rt
+from .wrapup_notion import PROJECT_PROP, config_ids, link_prop, link_value, notion, page_ids, para, rt
 
 
 def risk_schema(ds: str) -> dict:
@@ -28,7 +28,7 @@ def risk_props(sc: dict, title: str, ids: dict, project_name: str) -> dict:
 def risk_db(a, ids: dict) -> str:
     db = (a.db or ids.get("risks_db") or "").replace("collection://", "").strip()
     if not db:
-        raise RuntimeError("no risk database: add risks_db to the project config")
+        raise RuntimeError("no risk database: choose one in Settings > Integrations > Notion")
     return db
 
 
@@ -39,11 +39,16 @@ def main(argv=None) -> int:
     ap.add_argument("--title", required=True)
     ap.add_argument("--call", default="")
     ap.add_argument("--project-name", default="")
+    ap.add_argument("--project-page", default="", help="0.8.7: the project's page id for a Project relation")
+    ap.add_argument("--project-prop", default="", help="0.8.7: the name of the project property (Settings > Integrations > Notion)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
     res = {"ok": False, "url": None, "error": None}
     try:
         ids = config_ids(a.project_config) if a.project_config and a.project_config.exists() else {}
+        PROJECT_PROP["name"] = a.project_prop
+        if a.project_page and not ids.get("project_page_id"):
+            ids["project_page_id"] = ",".join(page_ids(a.project_page))
         db = risk_db(a, ids)
         title = a.title.replace(chr(0x2014), "-").strip()[:200]
         if a.dry_run:

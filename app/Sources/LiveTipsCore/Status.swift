@@ -153,7 +153,9 @@ public enum WorkspaceScanner {
             var isDir: ObjCBool = false
             guard !n.hasPrefix("."), !n.hasPrefix("_"), !skipNames.contains(n.lowercased()), !known.contains(dir), !excluded.contains(dir),
                   fm.fileExists(atPath: dir, isDirectory: &isDir), isDir.boolValue,
-                  !fm.fileExists(atPath: (dir as NSString).appendingPathComponent("_notion/workspace.md")) else { return nil }
+                  !fm.fileExists(atPath: (dir as NSString).appendingPathComponent("_notion/workspace.md")),
+                  // 0.8.7 (F7): a git repository is code, not a workspace of projects
+                  !fm.fileExists(atPath: (dir as NSString).appendingPathComponent(".git")) else { return nil }
             let k = projectDirs(dir, excluded: excluded).count
             return k > 0 ? (dir, k) : nil
         }

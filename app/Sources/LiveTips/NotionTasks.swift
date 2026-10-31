@@ -165,6 +165,7 @@ final class NotionTasks: ObservableObject {
 
     /// A tick on a Notion task (or on a linked commitment): the tick value at once, Undo for 8 s.
     func tick(_ t: NotionTask, done: Bool = true) {
+        UsageLog.log("notion_task_ticked")
         let s = settings
         guard let tok = token else { return }
         let before = t.tickBefore

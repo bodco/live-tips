@@ -125,6 +125,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                          "proactive": HotKeys.shared.combo(.proactive).display, "present": HotKeys.shared.combo(.presentation).display,
                          "prev": HotKeys.shared.combo(.prevSlide).display, "next": HotKeys.shared.combo(.nextSlide).display,
                          "add30": HotKeys.shared.combo(.add30).display]
+        if args.demo { prefs["demo"] = "1" }      // 0.8.7 (L3): the first-call banner waits for a real call
         if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
             uc.addUserScript(WKUserScript(source: "window.LT_PREFS = " + js + ";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -138,6 +139,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
         window.title = args.title                   // the call's name; the brand symbol sits next to it
+        window.tabbingMode = .disallowed
         window.titlebarAppearsTransparent = true   // the title bar blends with the page background
         window.level = Self.onTop ? .floating : .normal      // 2026-10-28: "Always on top" is remembered
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -326,6 +328,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                                      "phrase": L("tw.demoA")]),
                            to: args.tips)
             }
+        case "usage":       // 0.8.7 (M): checked against rules/usage.yaml; anything else is dropped
+            if let d = message.body as? [String: Any], let e = d["e"] as? String { UsageLog.log(e, (d["p"] as? [String: Any]) ?? [:]) }
         case "pin":
             setOnTop((message.body as? Bool) ?? true)
         case "stealth":
@@ -885,7 +889,7 @@ extension PrompterController {
             if presentingNow { pushThumbs() }
         case "stop-follow":
             slideSync.stopped = true
-            if let n = slideSync.last { sendSetting("slide", "\(n)|speech") }
+            if let n = slideSync.last { sendSetting("slide", "\(n)|speech"); UsageLog.log("slide_sync", ["variant": "a"]) }
             push("window.LiveTips && LiveTips.setFollow(null)")
         case "attach-deck":
             attachDeckLive()

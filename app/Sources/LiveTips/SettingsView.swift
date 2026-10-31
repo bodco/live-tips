@@ -92,7 +92,13 @@ final class SettingsModel: ObservableObject {
     @Published var masks: [SecretStore.Key: String] = [:]
     @Published var mirror = MirrorStatus(result: "", lastRunUTC: nil, pages: nil, mode: "")
     @Published var note = ""
-    @Published var tab = "general" { didSet { if tab == "keys" { tab = "notion" } } }   // 0.8.6 (C): no Keys tab
+    // 0.8.7 (F1): Notion, Calendars and the keys live under Integrations; old names open the matching page there
+    @Published var tab = "general" {
+        didSet {
+            if ["notion", "keys", "calendars", "hubspot"].contains(tab) { integration = tab == "keys" ? "notion" : tab; tab = "integrations" }
+        }
+    }
+    @Published var integration: String? = nil
     @Published var aliasesText = ""
     @Published var mirrorNote = ""
 
@@ -307,7 +313,10 @@ final class SettingsModel: ObservableObject {
         guard let v = store.get(key) else { keyState[key] = .notSet; return }
         keyState[key] = .testing
         Task {
-            if key == .claudeAPIKey {
+            if key == .hubspotKey {
+                keyState[key] = .ok("")
+                CRMService.shared.test()
+            } else if key == .claudeAPIKey {
                 let (ok, msg, ids) = await KeyTester.claude(key: v, workspace: nil)
                 keyState[key] = ok ? .ok(msg) : .failed(SettingsModel.friendly(msg))
                 if ok, !ids.isEmpty { config.knownModels = ids }
@@ -438,9 +447,10 @@ struct ModelPicker: View {
     var body: some View {
         Picker(title, selection: $selection) {
             ForEach(choices, id: \.self) { id in
-                (Text(prettyModel(id)) + Text("  " + id).font(PN.Font.caption).foregroundColor(.secondary)).tag(id)
+                Text(prettyModel(id)).tag(id)          // 0.8.7 (F6): the model id only in the tooltip
             }
         }
+        .help(selection)
     }
 }
 
@@ -662,13 +672,13 @@ struct SettingsView: View {
     @State private var aiChecking = false     // 0.8.2: Check now on the ways that are out
     @State private var aiTick = 0
     @AppStorage("homeShowStats") private var showStats = true      // Home: this week's numbers (2026-10-27)
+    @ObservedObject var dest = NotionDestinationModel.shared
 
     struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
     static var panes: [Pane] { [   // titles follow the interface language
         Pane(id: "general", title: "General", symbol: "gearshape", subtitle: "Your name on calls, folders, Notion and how the app behaves."),
         Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
-        Pane(id: "calendars", title: "Calendars", symbol: "calendar", subtitle: "Your Google, Microsoft and iCloud calendars: pick the calls to prepare and start."),
-        Pane(id: "notion", title: "Notion", symbol: "doc.text", subtitle: "Meeting pages after each call and the optional local copy of Notion."),
+        Pane(id: "integrations", title: "Integrations", symbol: "point.3.connected.trianglepath.dotted", subtitle: "Notion, calendars and your CRM."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
         Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
     ].map { Pane(id: $0.id, title: L("settings.tab." + $0.id), symbol: $0.symbol, subtitle: L("settings.pane." + $0.id)) } }
@@ -713,8 +723,7 @@ struct SettingsView: View {
         switch model.tab {
         case "projects": projects
         case "ai": ai
-        case "notion": notion
-        case "calendars": CalendarsPane()
+        case "integrations": IntegrationsPane(model: model) { notion }
         case "how": HowItWorksView()
         case "about": AboutView(model: model)
         default: general
@@ -748,6 +757,15 @@ struct SettingsView: View {
                 Text(L("ai.access.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             .onAppear { runner.refreshAuth() }
+            // 0.8.7 (H3): company research for sales preparations, on by default, with what goes out
+            Section {
+                Toggle(isOn: $model.config.salesWebSearch) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("ai.salesWeb"))
+                        Text(L("ai.salesWeb.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } header: { Text(L("ai.salesWeb.header")) }
             Section {
                 // 0.8.6 (E, rules/components.yaml): Ollama and the model as optional components
                 ForEach(OptionalComponents.shared.all.filter { $0.id != "link_downloader" }) { c in ComponentRow(comp: c) }
@@ -998,6 +1016,10 @@ struct SettingsView: View {
                         if model.workspaceHasNotion(w) { Text("Notion").font(PN.Font.caption).padding(.horizontal, 5).background(Capsule().fill(Color.secondary.opacity(0.15))) }
                         Spacer()
                         Text(L("set.calls") + (w.root as NSString).lastPathComponent).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                        // 0.8.7 (F7): what the "calls: <name>" caption means
+                        Image(systemName: "info.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                            .help(L("set.calls.help", ["name": (w.root as NSString).lastPathComponent]))
+                            .accessibilityLabel(L("set.calls.help", ["name": (w.root as NSString).lastPathComponent]))
                         Menu {
                             Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: w.root)]) }
                             Button(L("set.removeWorkspaceFromPacenote"), role: .destructive) { model.removeWorkspace(w) }
@@ -1070,6 +1092,27 @@ struct SettingsView: View {
                         }
                     }
                     Text(p.root.isEmpty ? L("set.noFolder") : p.root).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
+                    // 0.8.7 (F4): the project's value in Notion, Sales mode and the answer cards
+                    if p.status != "archived" {
+                        HStack(spacing: 10) {
+                            HStack(spacing: 4) {
+                                Text(L("proj.inNotion")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                                // 0.8.7 (F7): option names or page titles of the project property, never an id
+                                NotionValuePicker(value: $model.registry.projects[i].notionValue, fallback: p.name, model: model)
+                                    .help(L("proj.inNotion.help"))
+                                    .disabled(!model.isSet(.notionToken))
+                            }
+                            Toggle(L("proj.sales"), isOn: $model.registry.projects[i].salesEnabled).toggleStyle(.checkbox).controlSize(.small)
+                                .help(L("proj.sales.help"))
+                            if p.salesEnabled {
+                                SalesMethodPicker(selection: $model.registry.projects[i].salesMethod).labelsHidden().controlSize(.small).frame(width: 130)
+                            }
+                            Button(L("proj.cards", ["n": "\(AnswerCards.count(root: p.root))"])) { AnswerCards.show(project: p) }
+                                .buttonStyle(.pnTertiary).controlSize(.small).disabled(p.root.isEmpty)
+                                .help(L("proj.cards.help"))
+                        }
+                        .padding(.top, 2)
+                    }
                 }
                 Spacer()
                 projectMenu(i)
@@ -1090,31 +1133,45 @@ struct SettingsView: View {
                 KeyRow(title: L("keys.notion.title"), hint: L("keys.notion.hint"), key: .notionToken, model: model)
                 if model.isSet(.notionToken) { NotionSeesLine() }
             } header: { Text(L("set.connection")) }
-            Section {
-                Toggle(L("set.writeAMeetingPage"), isOn: $model.config.notionWriteSummary)
-                if !model.isSet(.notionToken) {
-                    Text(L("ntset.connectFirst")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                }
-                NotionDestinationView()
-                ForEach(model.registry.projects.filter { $0.status != "archived" }, id: \.slug) { p in
-                    if !p.config.isEmpty {
-                        LabeledContent(p.name) { Text(L("set.itsProjectConfig")).foregroundStyle(PN.C.text3) }
-                    } else {
-                        Picker(p.name, selection: Binding(get: { model.config.notionMeetingsDBByProject[p.slug] ?? "" }, set: {
-                            model.config.notionMeetingsDBByProject[p.slug] = $0.isEmpty ? nil : $0 })) {
-                            Text(L("set.defaultDb", ["name": model.config.notionMeetingsName.isEmpty ? "-" : model.config.notionMeetingsName])).tag("")
-                            if let cur = model.config.notionMeetingsDBByProject[p.slug], !NotionDestinationModel.shared.items.contains(where: { $0.id == cur }) {
-                                Text(cur).tag(cur)
-                            }
-                            ForEach(NotionDestinationModel.shared.items.filter { $0.kind == "data_source" }) { it in Text(it.title).tag(it.id) }
-                        }
+            if !model.config.notionMigrationNote.isEmpty {
+                Section {
+                    HStack(alignment: .top) {
+                        Image(systemName: "info.circle").foregroundStyle(Color.accentColor)
+                        Text(model.config.notionMigrationNote == "all" ? L("ntset.migrated.all", ["name": model.config.notionMeetingsName.isEmpty ? "-" : model.config.notionMeetingsName])
+                             : L("ntset.migrated", ["name": model.config.notionMeetingsName.isEmpty ? "-" : model.config.notionMeetingsName, "projects": model.config.notionMigrationNote]))
+                            .font(PN.Font.caption).fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button(L("common.ok")) { model.config.notionMigrationNote = "" }.buttonStyle(.pnTertiary)
                     }
                 }
+            }
+            // 0.8.7 (F3): one database per kind for all projects; the project is a property of each page
+            Section {
+                NotionDBRow(kind: "meetings", model: model)
+                NotionDBRow(kind: "tasks", model: model)
+                NotionDBRow(kind: "risks", model: model)
+                NotionFillChoices(model: model)
+                HStack {
+                    if dest.busy { ProgressView().controlSize(.small) }
+                    Text(dest.note).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
+                    Spacer()
+                    Button(L("ntset.fillFromConfigs")) { fillFromConfigs() }.buttonStyle(.pnTertiary)
+                        .help(L("ntset.fillFromConfigs.help"))
+                    Button(dest.searched ? L("nset.findAgain") : L("nset.find")) { dest.find() }.buttonStyle(.pnSecondary).disabled(dest.busy)
+                }
+            } header: { Text(L("ntset.databases")) } footer: {
+                Text(L("ntset.databases.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
+            .disabled(!model.isSet(.notionToken))
+            Section {
+                Toggle(L("set.writeAMeetingPage"), isOn: $model.config.notionWriteSummary)
+                if model.config.notionMeetingsDB.isEmpty { NotionDestinationView(compact: true) }
             } header: { Text(L("set.meetingPages")) } footer: {
                 Text(L("set.afterTheCallA"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            NotionTasksSection(model: model)
+            .disabled(!model.isSet(.notionToken))
+            NotionTasksSection(model: model).disabled(!model.isSet(.notionToken))
             Section {
                 LabeledContent {
                     VStack(alignment: .leading, spacing: 4) {
@@ -1145,6 +1202,44 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// 0.8.7 (F3): fills empty database choices from the project configs (meetings_db, tasks_db, risks_db). One
+    /// database named by all configs is set at once; different ones are listed for the PM to pick (NotionFillChoices).
+    func fillFromConfigs() {
+        let ps = model.registry.projects.filter { $0.status != "archived" && !$0.config.isEmpty }
+        func named(_ key: String) -> [NotionSchema.Choice] {
+            var by: [String: [String]] = [:], order: [String] = []
+            for p in ps {
+                let id = NotionTargets.configId(key, p)
+                guard !id.isEmpty else { continue }
+                let k = NotionSchema.norm(id)
+                if by[k] == nil { order.append(k) }
+                by[k, default: []].append(p.name)
+            }
+            return order.map { NotionSchema.Choice(id: $0, projects: by[$0] ?? []) }.sorted { $0.projects.count > $1.projects.count }
+        }
+        var filled = 0, differ = 0
+        let schema = NotionSchema.shared
+        for (kind, key) in [("meetings", "meetings_db"), ("tasks", "tasks_db"), ("risks", "risks_db")] {
+            let current = kind == "meetings" ? model.config.notionMeetingsDB : kind == "risks" ? model.config.notionRisksDB : model.config.notionTasks.database
+            guard current.isEmpty else { continue }
+            let cs = named(key)
+            if cs.count == 1 {
+                switch kind {
+                case "meetings": model.config.notionMeetingsDB = cs[0].id
+                case "risks": model.config.notionRisksDB = cs[0].id
+                default: model.config.notionTasks.database = cs[0].id
+                }
+                schema.load(cs[0].id)
+                filled += 1
+            } else if cs.count > 1 {
+                schema.fillChoices[kind] = cs
+                differ += 1
+            }
+        }
+        dest.note = differ > 0 ? L("ntset.fill.choose") : (filled == 0 ? L("ntset.fill.none") : L("ntset.fill.done", ["n": "\(filled)"]))
+        if (filled > 0 || differ > 0) && dest.items.isEmpty { dest.find() }
     }
 
     var general: some View {
@@ -1214,6 +1309,24 @@ struct SettingsView: View {
                 Text(L("set.offByDefaultThe"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
+            // 0.8.7 (M, rules/usage.yaml): the local usage log
+            Section {
+                Toggle(isOn: $model.config.usageLog) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("usage.toggle"))
+                        Text(L("usage.toggle.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .onChange(of: model.config.usageLog) { UsageLog.enabled = model.config.usageLog }
+                HStack {
+                    Spacer()
+                    Button(L("set.showLog")) {
+                        let d = FeatureRegistry.usageDir
+                        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+                        NSWorkspace.shared.activateFileViewerSelecting([d])
+                    }.buttonStyle(.pnTertiary)
+                }
+            } header: { Text(L("usage.privacy")) }
             Section {
                 ForEach(OptionalComponents.shared.all.filter { $0.id == "link_downloader" }) { c in ComponentRow(comp: c) }
             } header: { Text(L("comp.addons")) } footer: {
@@ -1266,6 +1379,14 @@ struct SettingsView: View {
 struct HowItWorksView: View {
     var body: some View {
         Form {
+            // 0.8.7 (L4): this page is the architecture; what the app can do has its own page
+            Section {
+                HStack(spacing: 4) {
+                    Text(L("how.lookingFor"))
+                    Button(L("feat.title")) { FeaturesWindow.show() }.buttonStyle(.link)
+                }
+                .font(PN.Font.body)
+            }
             Section {
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
@@ -1477,23 +1598,25 @@ final class SettingsWindow {
         switch tab {
         case "how": return L("settings.how.title")
         case "about": return L("settings.about.windowTitle")
-        case "general", "calendars", "keys", "projects", "ai", "notion": return L("settings.tab." + tab)
+        case "general", "projects", "ai", "integrations": return L("settings.tab." + tab)
         default: return L("settings.windowTitle")
         }
     }
 
     static func show(tab: String = "general") {
-        let tab = tab == "keys" ? "notion" : tab          // 0.8.6 (C): the Keys tab is part of Notion now
-        model.tab = tab
-        window?.title = title(for: tab)
+        model.integration = nil
+        model.tab = tab                                   // 0.8.7 (F1): notion, keys, calendars open under Integrations
+        window?.title = title(for: model.tab)
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { SettingsView(model: model) }))
-            w.title = title(for: tab)
+            w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
+            w.title = title(for: model.tab)
             w.setContentSize(NSSize(width: 960, height: 660))
             w.isReleasedWhenClosed = false
             window = w
         }
         window?.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.async { window?.makeFirstResponder(nil) }   // 0.8.7 (F6): no field is focused on open
         NSApp.activate(ignoringOtherApps: true)
     }
 }
@@ -1505,6 +1628,7 @@ enum HowItWorksWindow {
     static func show() {
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { HowItWorksView().frame(width: 680, height: 620) }))
+            w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
             w.isReleasedWhenClosed = false
             window = w
         }

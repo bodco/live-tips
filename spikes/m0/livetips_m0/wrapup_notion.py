@@ -98,14 +98,16 @@ TXT = {
            "tips": "Підказки: показано {shown}, карток {cards}, фактів {facts}, запізнілих {late}; затримка медіана {med} с, макс {mx} с",
            "prep": "Підготовка: ", "prep_yes": "використана", "prep_no": "не було",
            "tr": "Транскрипт: {n} рядків, мови {langs}, локальний файл {f}", "summary": "Підсумок", "transcript": "Транскрипт",
-           "append": "Pacenote: підсумок ({hhmm})", "tr_app": "Транскрипт (Pacenote)", "write": "Ukrainian",
+           "append": "Pacenote: підсумок ({hhmm})", "tr_app": "Транскрипт (Pacenote)", "write": "Ukrainian", "sales": "Sales",
+           "next": "Наступний крок", "objection": "Заперечення",
            "footer": "Нотатки Pacenote · транскрибовано на пристрої"},
     "en": {"actions": "Action items", "decisions": "Decisions", "agenda": "Agenda", "commit": "Our commitments",
            "new": "New requests (possible scope changes)", "open": "Open questions", "risks": "Risks",
            "tips": "Tips: shown {shown}, cards {cards}, facts {facts}, late {late}; delay median {med} s, max {mx} s",
            "prep": "Preparation: ", "prep_yes": "used", "prep_no": "none",
            "tr": "Transcript: {n} lines, languages {langs}, local file {f}", "summary": "Summary", "transcript": "Transcript",
-           "append": "Pacenote: summary ({hhmm})", "tr_app": "Transcript (Pacenote)", "write": "English",
+           "append": "Pacenote: summary ({hhmm})", "tr_app": "Transcript (Pacenote)", "write": "English", "sales": "Sales",
+           "next": "Next step", "objection": "Objection",
            "footer": "Notes by Pacenote · transcribed on device"},
 }
 
@@ -256,6 +258,9 @@ def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "
     agenda = agenda_lines(md, lang)
     if agenda:
         sections.insert(1, (T["agenda"], agenda, bullet))
+    sales = sales_lines(md, T)
+    if sales:
+        sections.append((T["sales"], sales, bullet))
     b = []
     for title, items, kind in sections:
         items = [i for i in items if str(i).strip(" :")]
@@ -263,6 +268,23 @@ def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "
             b.append(h(3, title))
             b += [kind(str(i)) for i in items]
     return b + pacenote_blocks(stats, md, prep_used, T)
+
+
+def sales_lines(md: Path, T: dict) -> list:
+    """0.8.7 (rules/sales.yaml > after_call): the Sales section from <stem>.sales.json, when the call was a sales call."""
+    p = Path(str(md)[:-3] + ".sales.json" if str(md).endswith(".md") else str(md) + ".sales.json")
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = ["{}: {}{}".format(c.get("criterion", ""), c.get("state", ""), (" · " + c["what"]) if c.get("what") else "")
+           for c in d.get("criteria") or []]
+    out += ["{}: {}{}".format(T["objection"], o.get("what", ""), (" -> " + o["answer"]) if o.get("answer") else "")
+            for o in d.get("objections") or []]
+    ns = d.get("next_step") or {}
+    if ns.get("what"):
+        out.append("{}: {}{}".format(T["next"], ns["what"], (" (" + ns["due"] + ")") if ns.get("due") else ""))
+    return out
 
 
 def action_line(a: dict) -> str:
@@ -360,10 +382,16 @@ def schema(ds: str) -> dict:
             "project": link_prop(props, "Project"), "workspace": link_prop(props, "Workspace")}
 
 
+PROJECT_PROP = {"name": ""}   # 0.8.7 (F3): Settings > Integrations > Notion > Databases > project property
+
+
 def link_prop(props: dict, name: str):
-    """(name, type) when the property can carry a link (relation, select or text), else None."""
+    """(name, type) when the property can carry a link (relation, select, multi_select or text), else None.
+    For "Project" the property chosen in Settings wins when the database has it."""
+    if name == "Project" and PROJECT_PROP["name"] and PROJECT_PROP["name"] in props:
+        name = PROJECT_PROP["name"]
     t = (props.get(name) or {}).get("type")
-    return (name, t) if t in ("relation", "select", "rich_text") else None
+    return (name, t) if t in ("relation", "select", "multi_select", "rich_text") else None
 
 
 def find_page(ds: str, start: dt.datetime, date_prop: str | None = "Date") -> dict | None:
@@ -397,6 +425,8 @@ def parse_args(argv=None):
     ap.add_argument("--project-config", type=Path, default=None, help="Control Tower config (meetings_db, page ids)")
     ap.add_argument("--meetings-db", default="", help="data source id of the Meetings database (used without a config)")
     ap.add_argument("--project-name", default="", help="written to a Project select or text property")
+    ap.add_argument("--project-page", default="", help="0.8.7: the project's page id(s) for a Project relation (Settings > Projects > In Notion)")
+    ap.add_argument("--project-prop", default="", help="0.8.7: the name of the project property (Settings > Integrations > Notion)")
     ap.add_argument("--title", default="", help="the call's name when it was renamed during the call")
     ap.add_argument("--lt", nargs=2, required=True)
     ap.add_argument("--model", default="claude-sonnet-5-5")
@@ -407,11 +437,14 @@ def parse_args(argv=None):
 
 
 def meeting_ids(a) -> dict:
+    PROJECT_PROP["name"] = getattr(a, "project_prop", "") or ""
     ids = config_ids(a.project_config) if a.project_config and a.project_config.exists() else {}
-    if not ids.get("meetings_db") and a.meetings_db:
+    if a.meetings_db:       # 0.8.7 (F3): one Meetings database for all projects, chosen in Settings, wins over the config
         ids["meetings_db"] = a.meetings_db.replace("collection://", "").strip()
+    if getattr(a, "project_page", "") and not ids.get("project_page_id"):
+        ids["project_page_id"] = ",".join(page_ids(a.project_page))
     if not ids.get("meetings_db"):
-        raise RuntimeError("no Meetings database: choose one in Settings > General > Notion")
+        raise RuntimeError("no Meetings database: choose one in Settings > Integrations > Notion")
     return ids
 
 
@@ -464,11 +497,24 @@ def link_props(sc: dict, ids: dict, existing: dict, project_name: str) -> dict:
     return upd
 
 
+def page_ids(v) -> list:
+    """0.8.7: one or several page ids ("id1, id2" or a list), in order, without repeats."""
+    parts = v if isinstance(v, (list, tuple)) else str(v or "").split(",")
+    out = []
+    for x in parts:
+        x = str(x).strip()
+        if x and x not in out:
+            out.append(x)
+    return out
+
+
 def link_value(name: str, t: str, page_id, val: str) -> dict:
-    if t == "relation" and page_id:
-        return {name: {"relation": [{"id": page_id}]}}
+    if t == "relation" and page_ids(page_id):      # 0.8.7: every page id of the project goes into the relation
+        return {name: {"relation": [{"id": x} for x in page_ids(page_id)]}}
     if t == "select" and val:
         return {name: {"select": {"name": val[:100]}}}
+    if t == "multi_select" and val:
+        return {name: {"multi_select": [{"name": v.strip()[:100]} for v in val.split(",") if v.strip()]}}
     if t == "rich_text" and val:
         return {name: {"rich_text": rt(val)}}
     return {}
@@ -507,7 +553,7 @@ def write_to_page(page: dict, sc, ids, a, w, blocks, plain, info, lang) -> dict:
            + [h(3, TXT[lang]["tr_app"])])
     transcript_page(page["id"], TXT[lang]["tr_app"] + " · " + info["title"], plain)
     add_footer(page["id"], lang)
-    return {"ok": True, "url": page.get("url")}
+    return {"ok": True, "url": page.get("url"), "page_id": page.get("id")}
 
 
 def create_page(sc, ids, a, w, blocks, plain, info, lang) -> dict:
@@ -520,7 +566,7 @@ def create_page(sc, ids, a, w, blocks, plain, info, lang) -> dict:
                                   "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])]})
     transcript_page(p["id"], TXT[lang]["transcript"] + " · " + name, plain)
     add_footer(p["id"], lang)
-    return {"ok": True, "url": p.get("url"), "created": True}
+    return {"ok": True, "url": p.get("url"), "created": True, "page_id": p.get("id")}
 
 
 def run(a, res: dict) -> int:

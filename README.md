@@ -6,7 +6,7 @@ Pacenote prepares a short brief before the call, gives quiet, precise tips durin
 the notes after. You keep the wheel. It listens to your call on your Mac and speaks up only when a fact or a phrase is needed:
 a question to you, your turn, a new request, a date you are about to promise. Audio is transcribed
 on the Mac and never leaves it; only text goes to Claude. After the call the summary, decisions and
-action items land in Notion, and the transcript stays in your project folder.
+action items are written to your project folder next to the transcript, and to Notion when you connect it.
 
 Beta, built by one project manager for his own calls. The new name changes what you see; the repository,
 the `live-tips` skill, the `LiveTips.app` file, folders and settings keep their names, so calls, folders and
@@ -42,7 +42,7 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 - **Home and your calendars:** the calls ahead from several Google and Microsoft calendars (through macOS, nothing to install), overlaps marked so you pick the one you join; regular meetings start from their last setup; recent calls with Notion, transcript and folder.
 - **Back-to-back calls (Up next):** plan and prepare the next calls while one is live, then switch with one question: the current call ends properly and the next starts with its preparation.
 - **Any language in, one language out:** set the call to one language and every speaker is written in it (Ukrainian on an English call comes out in English).
-- **After the call:** a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page.
+- **After the call:** full call notes in the project folder after every call, with or without Notion; with Notion connected, also a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page. A follow-up email is only a draft: nothing is sent to clients by itself.
 
 How it compares with Fireflies and Fathom (price, recording, live help, preparation, summary, CRM, data): [Pacenote vs Fireflies vs Fathom](https://tower.bodco.pm/pacenote/compare/).
 

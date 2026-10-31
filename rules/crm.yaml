@@ -1,0 +1,42 @@
+# CRM (Pacenote 0.8.7, block I). HubSpot first; any CRM plugs in through the same connector (CRMConnector) without
+# changes to the preparation or the call page. Nothing is written to a CRM without the PM's click and a review of the
+# changes. The key lives in the macOS Keychain only.
+schema_version: 1
+providers:
+  hubspot:
+    name: HubSpot
+    auth: >-
+      A Service key (HubSpot Settings > Development > Keys > Service Keys), sent as "Authorization: Bearer <key>".
+      Legacy private apps are no longer offered to new accounts.
+    base_url: https://api.hubapi.com
+    scopes: [crm.objects.companies.read, crm.objects.companies.write, crm.objects.contacts.read,
+             crm.objects.contacts.write, crm.objects.deals.read, crm.objects.deals.write, crm.objects.owners.read,
+             crm.schemas.companies.read, crm.schemas.contacts.read, crm.schemas.deals.read]
+    api: v3 objects and search, associations v4, cursor pagination; 429 waits (Retry-After or 1, 2, 4 s) and retries 3 times
+connector:
+  read: [testConnection, findCompany(domain, name), findContacts(emails), deals(companyId), deal(id), recentActivity(refs, limit), pipelines, properties(objectType)]
+  write: [createNote(text, associations), updateDeal(id, fields), createTask(subject, due, associations)]
+  errors: one line where the action was, never a modal
+link:
+  auto: >-
+    The participants' emails from the calendar find contacts, their domains the company, and the company's open deal
+    updated last is the deal. The Start call row "CRM: <company> · Deal: <deal>" changes it or sets No deal; the choice
+    is kept for the series.
+  meta: 'call metadata crm: {"provider", "companyId", "dealId", "contactIds"}'
+snapshot:
+  file: "<stem>.crm.md next to the brief"
+  when: before a preparation, before a call starts and on Refresh; kept for offline use
+  content: >-
+    Company; deal (stage by name, amount, close date, owner, next step); contacts with roles; the last 10 activities
+    in one line each; open tasks; the time it was taken.
+write:
+  where: '"Update HubSpot" in the call page''s ⋯ and on the end-of-call screen'
+  review: >-
+    Checkboxes: a note on the deal, the company and the contacts (summary, decisions, next steps, the Notion link when
+    there is one; "Attach the transcript" off by default); deal fields (next step, close date when one was said, stage
+    only when the PM picked one); qualification fields by the mapping; a follow-up task with a date. Texts come from
+    the call page as the PM edited it.
+  after: '"Updated in HubSpot · Open" and Undo for 8 s for what can be undone (deal fields back, the note and task deleted)'
+  never: automatic writes
+mapping:
+  qualification: for each criterion of the method, a deal property chosen by name in Settings > Integrations > HubSpot, or "Don't write"

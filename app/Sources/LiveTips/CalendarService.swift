@@ -26,6 +26,7 @@ final class CalendarService: ObservableObject {
         var attendees: [String]      // names, the PM left out
         var link: String?            // Meet, Zoom or Teams link
         var recurring: Bool
+        var emails: [String] = []    // 0.8.7 (I3): attendee emails for the CRM match (the PM left out); never written to files
 
         static func == (a: CalEvent, b: CalEvent) -> Bool { a.id == b.id }
         func hash(into h: inout Hasher) { h.combine(id) }
@@ -138,12 +139,14 @@ final class CalendarService: ObservableObject {
                     let parts = local.split(whereSeparator: { ".-_".contains($0) }).map { $0.prefix(1).uppercased() + $0.dropFirst() }
                     return parts.isEmpty ? nil : parts.enumerated().map { $0.offset < parts.count - 1 && $0.element.count == 1 ? $0.element + "." : $0.element }.joined(separator: " ")
                 }
+            let emails = (e.attendees ?? []).filter { !$0.isCurrentUser && $0.participantType != .room && $0.participantType != .resource }
+                .map { $0.url.absoluteString.replacingOccurrences(of: "mailto:", with: "").lowercased() }.filter { $0.contains("@") }
             let text = [e.url?.absoluteString, e.location, e.notes].compactMap { $0 }.joined(separator: " ")
             out.append(CalEvent(id: (e.eventIdentifier ?? e.calendarItemIdentifier) + "@" + String(Int(e.startDate.timeIntervalSince1970)),
                                 seriesKey: key, title: (e.title ?? "").isEmpty ? L("cal.untitled") : e.title!,
                                 start: e.startDate, end: e.endDate, calendar: e.calendar.title, account: e.calendar.source.title,
                                 color: e.calendar.color ?? .systemBlue, attendees: names, link: Self.meetingLink(in: text),
-                                recurring: e.hasRecurrenceRules))
+                                recurring: e.hasRecurrenceRules, emails: emails))
         }
         return out.sorted { $0.start < $1.start }
     }

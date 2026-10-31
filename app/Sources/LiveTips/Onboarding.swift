@@ -25,7 +25,8 @@ final class OnboardingModel: ObservableObject {
 
     var progress: Double { Double(step.rawValue) / Double(Step.allCases.count - 1) }
 
-    func next() { if let s = Step(rawValue: step.rawValue + 1) { step = s } }
+    func next() { UsageLog.log("onboarding_step", ["step": "\(step)", "skipped": false]); if let s = Step(rawValue: step.rawValue + 1) { step = s } }
+    func skip() { UsageLog.log("onboarding_step", ["step": "\(step)", "skipped": true]); if let s = Step(rawValue: step.rawValue + 1) { step = s } }
     func back() { if let s = Step(rawValue: step.rawValue - 1) { step = s } }
 
     func askMic() {
@@ -89,6 +90,8 @@ final class OnboardingModel: ObservableObject {
 
 struct OnboardingView: View {
     @ObservedObject var m: OnboardingModel
+    @State private var tree: [String] = []      // 0.8.7 (L3): the tree made by "Create the structure for me"
+    @State private var keyOpen = false
     @ObservedObject var settings: SettingsModel
     @ObservedObject var setup: SetupModel
     @ObservedObject var cal = CalendarService.shared
@@ -193,7 +196,18 @@ struct OnboardingView: View {
         let total = setup.steps.filter { !$0.optional }.count
         let done = setup.steps.filter { !$0.optional && $0.state == .ok }.count
         let failed = setup.steps.contains { $0.state == .failed }
-        if failed {
+        if setup.pythonMissing && !setup.busy {
+            // 0.8.7 (L3.5): without Python nothing else installs; say how to get it
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle").foregroundStyle(PN.C.onMe)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("setup.python.missing")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text)
+                    PythonInstallHint()
+                    Button(L("about.components.check")) { installInBackground() }.buttonStyle(.pnTertiary)
+                }
+            }
+            .frame(maxWidth: 520, alignment: .leading)
+        } else if failed {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(PN.C.onMe)
                 Text(L("onboarding.install.failed")).font(PN.Font.caption).foregroundStyle(PN.C.onMe)
@@ -265,6 +279,15 @@ struct OnboardingView: View {
                               note: m.sysAudio == false ? L("onboarding.permissions.systemNote") : "") {
                     m.askSystemAudio()
                 }
+                // 0.8.7 (L3.1): where macOS keeps the switch, and why it says "screen" when Pacenote takes only sound
+                if m.sysAudio != true {
+                    VStack(alignment: .leading, spacing: 6) {
+                        SystemAudioSettingsPicture()
+                        Text(L("onboarding.permissions.screenNote")).font(PN.Font.caption).foregroundStyle(PN.C.text2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 12)
+                }
                 permissionRow("calendar", L("onboarding.permissions.calendars"), ok: cal.access == .granted,
                               button: cal.access == .denied ? L("common.openSettings") : L("onboarding.permissions.calendarsButton"),
                               note: L("onboarding.permissions.calendarsNote")) {
@@ -304,6 +327,15 @@ struct OnboardingView: View {
                     .frame(maxHeight: 170)
                 } else if !settings.config.workRoot.isEmpty {
                     Text(L("onboarding.folder.empty")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    // 0.8.7 (L3): one click makes work / workspace / project
+                    HStack(alignment: .top, spacing: 14) {
+                        Button(L("onb.tree.create")) {
+                            if let t = try? WorkTree.create(root: settings.config.workRoot) { tree = t; settings.rescanWorkspaces(); m.applyFolders() }
+                        }.buttonStyle(.pnSecondary)
+                        Text((tree.isEmpty ? ["work/", "  My workspace/", "    First project/"] : tree).joined(separator: "\n"))
+                            .font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3)
+                    }
+                    Text(L("onb.tree.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
             .onAppear { if !settings.config.workRoot.isEmpty { m.applyFolders() } }
@@ -324,6 +356,8 @@ struct OnboardingView: View {
                     }
                     .padding(10).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
                 }
+                // 0.8.7 (L3): 1) sign in (above), 2) an API key behind a disclosure, 3) continue without Claude, said honestly
+                DisclosureGroup(L("onb.claude.haveKey"), isExpanded: $keyOpen) {
                 HStack {
                     SecureField("", text: $m.apiKey, prompt: Text(settings.isSet(.claudeAPIKey) ? L("onboarding.claude.saved") : "sk-ant-…"))
                         .textFieldStyle(.roundedBorder)
@@ -331,6 +365,10 @@ struct OnboardingView: View {
                 }
                 keyState(settings.keyState[.claudeAPIKey], fallback: m.keyNote)
                 Link(L("onboarding.claude.getKey"), destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(PN.Font.caption)
+                }
+                if !settings.isSet(.claudeAPIKey) && setup.steps.first(where: { $0.id == "claude" })?.state != .ok {
+                    Text(L("onb.claude.without")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                }
             }
         case .addons:
             OptionalAddonsStep(showHeader: false) { m.next() }
@@ -340,6 +378,13 @@ struct OnboardingView: View {
                     .padding(6).background(RoundedRectangle(cornerRadius: 6).fill(PN.C.surface2))
                 Text(L("onboarding.done.menubarHint")).font(PN.Font.body).foregroundStyle(PN.C.text2)
             }
+            // 0.8.7 (L3): the three shortcuts, shown again on the first call
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("onb.done.keys", ["h": HotKeys.shared.combo(.help).display, "t": HotKeys.shared.combo(.compact).display, "l": HotKeys.shared.combo(.proactive).display]))
+                    .font(PN.Font.body.monospacedDigit()).foregroundStyle(PN.C.text)
+                Text(L("onb.done.keysAgain")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
+            .padding(.top, 8)
         }
     }
 
@@ -411,6 +456,7 @@ final class OnboardingWindow {
     static func show() {
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { OnboardingView(m: model, close: { window?.close() }) }))
+            w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
             w.title = L("onboarding.window.title")
             w.styleMask.remove(.resizable)
             w.isReleasedWhenClosed = false
@@ -421,5 +467,69 @@ final class OnboardingWindow {
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+/// 0.8.7 (L3.1): a small static drawing of System Settings > Privacy & Security > Screen & System Audio Recording with
+/// Pacenote's switch highlighted. Drawn in SwiftUI with the app's colours, so it follows light and dark by itself.
+struct SystemAudioSettingsPicture: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 5) {
+                ForEach(0..<3, id: \.self) { _ in Circle().fill(PN.C.text3.opacity(0.45)).frame(width: 7, height: 7) }
+                Spacer()
+            }
+            .padding(.horizontal, 8).padding(.vertical, 6)
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 3) {
+                    sidebarRow("gearshape", L("onboarding.pic.general"), selected: false)
+                    sidebarRow("hand.raised.fill", L("onboarding.pic.privacy"), selected: true)
+                    sidebarRow("speaker.wave.2", L("onboarding.pic.sound"), selected: false)
+                }
+                .padding(6).frame(width: 150, alignment: .leading)
+                .background(PN.C.surface2.opacity(0.6))
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L("onboarding.pic.pane")).font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.text)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        RoundedRectangle(cornerRadius: 4).fill(PN.C.accent).frame(width: 16, height: 16)
+                            .overlay(Image(systemName: "waveform").font(.system(size: 9, weight: .bold)).foregroundStyle(.white))
+                        Text("Pacenote").font(.system(size: 11)).foregroundStyle(PN.C.text)
+                        Spacer()
+                        // the switch, on, with a highlight ring
+                        Capsule().fill(PN.C.accent).frame(width: 26, height: 15)
+                            .overlay(Circle().fill(.white).frame(width: 12, height: 12).offset(x: 5.5))
+                            .padding(3)
+                            .overlay(Capsule().stroke(PN.C.onMe, lineWidth: 2))
+                    }
+                    .padding(6).background(PN.C.surface, in: RoundedRectangle(cornerRadius: 6))
+                    HStack(spacing: 8) {
+                        RoundedRectangle(cornerRadius: 4).fill(PN.C.text3.opacity(0.35)).frame(width: 16, height: 16)
+                        RoundedRectangle(cornerRadius: 2).fill(PN.C.text3.opacity(0.25)).frame(width: 60, height: 6)
+                        Spacer()
+                        Capsule().fill(PN.C.text3.opacity(0.3)).frame(width: 26, height: 15)
+                            .overlay(Circle().fill(.white).frame(width: 12, height: 12).offset(x: -5.5)).padding(3)
+                    }
+                    .padding(6).background(PN.C.surface, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(width: 400)
+        .background(PN.C.bg, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(PN.C.text3.opacity(0.25), lineWidth: 1))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L("onboarding.pic.a11y"))
+    }
+
+    private func sidebarRow(_ icon: String, _ t: String, selected: Bool) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon).font(.system(size: 9)).frame(width: 12)
+            Text(t).font(.system(size: 10)).lineLimit(1)
+        }
+        .foregroundStyle(selected ? Color.white : PN.C.text2)
+        .padding(.horizontal, 5).padding(.vertical, 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(selected ? PN.C.accent : Color.clear, in: RoundedRectangle(cornerRadius: 4))
     }
 }

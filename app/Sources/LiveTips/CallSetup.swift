@@ -26,11 +26,12 @@ struct CallSetupView: View {
     var onPrepare: () -> Void = {}
 
     @AppStorage("callSetupOptions") private var showOptions = false
+    @State private var showMethod = false
     @State private var picking = false
     @State private var search = ""
     @State private var copied = false
     @State private var info = false
-    @State private var langs = false
+    @State private var datePop = false
     @State private var confirmAgain = false
     @FocusState private var titleFocus: Bool
 
@@ -53,11 +54,17 @@ struct CallSetupView: View {
                 }
                 .padding(24)
             }
-            Divider()
-            buttons.padding(.horizontal, 24).padding(.vertical, 14)
+            // 0.8.7 (G6): one scroll view for the whole form; the footer is pinned and the content ends above it
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+                    buttons.padding(.horizontal, 24).padding(.vertical, 14)
+                }
+                .background(PN.C.bg)
+            }
         }
         .background(PN.C.bg)
-        .frame(width: 640, height: 820)
+        .frame(minWidth: 600, idealWidth: 640, maxWidth: .infinity, minHeight: 480, idealHeight: 820, maxHeight: .infinity)
         .onAppear { model.refreshTemplate(); model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
         .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false; if !model.target.isEmpty { model.note = "" } }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
@@ -171,13 +178,25 @@ struct CallSetupView: View {
         let from = model.calEventID.flatMap { id in cal.events.first { $0.id == id } }
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .bottom, spacing: 14) {
+                // 0.8.7 (G4): fields without steppers; the date opens a calendar on click
                 VStack(alignment: .leading, spacing: 6) {
                     fieldLabel(L("start.date"))
-                    DatePicker("", selection: $model.callDate, displayedComponents: [.date]).labelsHidden().fixedSize()
+                    HStack(spacing: 4) {
+                        DatePicker("", selection: $model.callDate, displayedComponents: [.date]).labelsHidden()
+                            .datePickerStyle(.field).fixedSize()
+                        Button { datePop = true } label: { Image(systemName: "calendar") }
+                            .buttonStyle(.borderless).help(L("start.pickDate")).accessibilityLabel(L("start.pickDate"))
+                            .popover(isPresented: $datePop, arrowEdge: .bottom) {
+                                DatePicker("", selection: $model.callDate, displayedComponents: [.date]).labelsHidden()
+                                    .datePickerStyle(.graphical).padding(10)
+                                    .onChange(of: model.callDate) { datePop = false }
+                            }
+                    }
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     fieldLabel(L("start.time"))
-                    DatePicker("", selection: $model.callDate, displayedComponents: [.hourAndMinute]).labelsHidden().fixedSize()
+                    DatePicker("", selection: $model.callDate, displayedComponents: [.hourAndMinute]).labelsHidden()
+                        .datePickerStyle(.field).fixedSize()
                 }
                 .onChange(of: model.callDate) { copied = false }
                 Spacer()
@@ -235,12 +254,9 @@ struct CallSetupView: View {
             }
             GridRow {
                 fieldLabel(L("start.language"))
-                Button(Languages.label(model.language.split(separator: "+").map(String.init))) { langs = true }
-                    .buttonStyle(.pnSecondary)
-                    .popover(isPresented: $langs, arrowEdge: .bottom) {
-                        LanguagePicker(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
-                                                      set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
-                    }
+                // 0.8.7 (G4): a pop-up (suggested languages, More… with search), not a chip
+                LanguageMenu(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
+                                            set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
             }
         }
     }
@@ -249,7 +265,7 @@ struct CallSetupView: View {
     @ViewBuilder private var typeSection: some View {
         switch model.callType {
         case "presentation":
-            DeckBlock(model: model)
+            DeckBlock(model: model, onNeedPrep: { if !needProject() { prepareNow() } })
         case "interview":
             VStack(alignment: .leading, spacing: 6) {
                 Text(L("callSettings.type.interview")).font(PN.Font.section).foregroundStyle(PN.C.text)
@@ -298,12 +314,18 @@ struct CallSetupView: View {
             }
             TextEditor(text: $model.context)
                 .font(PN.Font.body)
+                .overlay(alignment: .topLeading) {      // 0.8.7 (G1): an empty field with a hint, no template text
+                    if model.context.isEmpty {
+                        Text(L("call.whatMatters.placeholder")).font(PN.Font.body).foregroundStyle(PN.C.text3).padding(.horizontal, 5).padding(.vertical, 1).allowsHitTesting(false)
+                    }
+                }
                 .scrollContentBackground(.hidden)
                 .padding(6)
                 .frame(height: 110)
                 .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.s))
                 .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(Color.primary.opacity(0.12)))
             chips
+            CRMCallRow(model: model)        // 0.8.7 (G7): only when a CRM is connected
         }
     }
 
@@ -326,7 +348,8 @@ struct CallSetupView: View {
                 .buttonStyle(.pnTertiary).disabled(model.target.isEmpty)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    if let r = model.root {
+                    // 0.8.7 (G3): the folder of the project chosen above is not repeated; only when left out
+                    if let r = model.root, !model.useProjectFolder {
                         chip("folder", (r as NSString).lastPathComponent, on: model.useProjectFolder,
                              help: model.useProjectFolder ? L("call.projectFolder.on", ["path": r]) : L("call.projectFolder.off"),
                              toggle: { model.useProjectFolder.toggle() }, icon: model.useProjectFolder ? "xmark" : "plus")
@@ -340,7 +363,7 @@ struct CallSetupView: View {
         }
     }
 
-    // MARK: 5. the brief, in one line with one action
+    // MARK: 5. the brief, a status line (0.8.7 G2: "No brief yet" / "Brief ready · 09:40 · Open")
 
     @ViewBuilder private var briefLine: some View {
         let st = upnext.prepState(model)
@@ -362,7 +385,6 @@ struct CallSetupView: View {
                     .help(fr.changes.prefix(8).map { ($0 as NSString).lastPathComponent }.joined(separator: "\n"))
                 Spacer()
                 if let path = PrepDocWindow.path(for: model) { Button(L("common.open")) { PrepDocWindow.show(path: path, title: model.effectiveTitle) }.buttonStyle(.pnTertiary) }
-                if canPrepare { Button(L("fresh.refresh")) { refreshNow() }.buttonStyle(.pnTertiary) }
             } else if let p = model.prep, p.matches {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
                 Text(L("home.check.briefReady", ["at": p.made.formatted(date: Calendar.current.isDateInToday(p.made) ? .omitted : .abbreviated, time: .shortened)]))
@@ -383,18 +405,10 @@ struct CallSetupView: View {
                     Text(L("call.brief.other", ["heading": p.heading])).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                 }
                 Spacer()
-                if mode == .start && !model.target.isEmpty && canPrepare {
-                    Button(L("menubar.prepare")) { prepareNow() }.buttonStyle(.pnTertiary)
-                }
             }
         }
-        .padding(12)
-        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
-    }
-
-    private func refreshNow() {
-        model.note = upnext.refresh(model) ?? ""
-        if !saved && model.note.isEmpty { upnext.save(model) }
+        // 0.8.7 (G2): a status line, not a card; Prepare lives in the footer only
+        .padding(.horizontal, 4)
     }
 
     private var canPrepare: Bool {
@@ -442,6 +456,21 @@ struct CallSetupView: View {
     private var options: some View {
         DisclosureGroup(isExpanded: $showOptions) {
             Form {
+                // 0.8.7 (H2): Sales mode on top of any call type, with the method and its description
+                Toggle(isOn: Binding(get: { model.salesEnabled }, set: { model.salesEnabled = $0; model.salesTouched = true })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("sales.toggle"))
+                        Text(L("sales.toggle.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    }
+                }
+                if model.salesEnabled {
+                    HStack {
+                        SalesMethodPicker(selection: $model.salesMethod)
+                        Button { showMethod.toggle() } label: { Image(systemName: "info.circle") }.buttonStyle(.borderless)
+                            .accessibilityLabel(L("sales.method.about"))
+                            .popover(isPresented: $showMethod, arrowEdge: .trailing) { SalesMethodInfo(key: model.salesMethod) }
+                    }
+                }
                 Picker(L("callSettings.mic"), selection: $model.micDevice) {
                     Text(L("callSettings.mic.default") + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
                     Text(L("callSettings.mic.builtin")).tag("builtin")
@@ -462,6 +491,10 @@ struct CallSetupView: View {
                     Text(L("call.startRecording.now")).tag(false)
                 }
                 Toggle(L("call.publicCall"), isOn: $model.publicCall)
+                if let r = model.root {           // 0.8.7 (G3): the project folder in the preparation, here instead of a chip
+                    Toggle(L("call.useProjectFolder"), isOn: $model.useProjectFolder)
+                        .help(model.useProjectFolder ? L("call.projectFolder.on", ["path": r]) : L("call.projectFolder.off"))
+                }
                 if !model.prepList.isEmpty {
                     Picker(L("call.useBrief"), selection: Binding(get: { model.chosenPrep ?? "" },
                                                                  set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
@@ -501,7 +534,7 @@ struct CallSetupView: View {
                 Spacer()
                 Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 // 2026-10-29 (owner): once the brief is ready the same button prepares again (with one previous version kept).
-                Button(model.prep?.matches == true ? L("talk.prepareAgain") : L("call.prepareFirst")) {
+                Button(model.prep?.matches == true ? L("talk.prepareAgain") : L("call.prepare")) {
                     if needProject() { return }
                     if model.prep?.matches == true { againClicked() } else { prepareNow() }
                 }
@@ -512,8 +545,16 @@ struct CallSetupView: View {
                     Button(L("common.cancel"), role: .cancel) {}
                 } message: { Text(againMessage) }
                 // 0.8.5 (P6, entry 1): Rehearse next to Start call as soon as the talk exists.
-                if model.callType == "presentation", let path = PrepDocWindow.path(for: model), TalkWindow.available(base: String(path.dropLast(9))) {
+                // 0.8.7 (L2): Rehearse is always there; until the talk is prepared it is greyed out with the reason
+                if let path = PrepDocWindow.path(for: model), model.callType == "presentation", TalkWindow.available(base: String(path.dropLast(9))) {
                     Button(L("rehearse.button")) { RehearsalWindow.show(base: String(path.dropLast(9)), title: model.effectiveTitle, call: model) }.buttonStyle(.pnSecondary)
+                } else {
+                    VStack(spacing: 1) {
+                        Button(L("rehearse.button")) { if model.callType == "presentation" { if !needProject() { prepareNow() } } else { model.callType = "presentation" } }
+                            .buttonStyle(.pnSecondary).opacity(0.5)
+                        Text(model.callType == "presentation" ? L("rehearse.needPrep") : L("rehearse.onlyPresentation")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    }
+                    .help(model.callType == "presentation" ? L("rehearse.needPrep") : L("rehearse.onlyPresentation"))
                 }
                 Button(L("home.startCall")) { if !needProject() { onStart() } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
             case .plan:
@@ -573,6 +614,7 @@ final class StartCallWindow {
         })
         let host = NSHostingController(rootView: Localized { view })
         let w = window ?? NSWindow(contentViewController: host)
+        w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
         w.contentViewController = host
         w.styleMask.insert(.resizable)
         w.setContentSize(NSSize(width: 640, height: 820))

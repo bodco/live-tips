@@ -106,6 +106,7 @@ final class TranscribeModel: ObservableObject {
 
     private func run() {
         phase = .running; stage = 0; doneS = 0; totalS = 0; soFar = []; started = Date(); note = ""
+        UsageLog.log("transcribe_run", ["source": link.trimmingCharacters(in: .whitespaces).isEmpty ? "file" : "link"])
         work = Task {
             let job = workDir.appendingPathComponent(UUID().uuidString)
             try? FileManager.default.createDirectory(at: job, withIntermediateDirectories: true)
@@ -440,8 +441,8 @@ final class TranscribeModel: ObservableObject {
         guard let tok = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken) else { note = L("nset.saveToken"); return }
         let reg = ProjectRegistry.load(from: AppPaths.projects)
         let proj = reg.projects.first { "project:" + $0.slug == saveTarget }
-        var db = proj.flatMap { c.notionMeetingsDBByProject[$0.slug] } ?? c.notionMeetingsDB
-        if let p = proj, !p.config.isEmpty, let cfgText = try? String(contentsOfFile: p.config, encoding: .utf8),
+        var db = c.notionMeetingsDB      // 0.8.7 (F3): one Meetings database for all projects
+        if db.isEmpty, let p = proj, !p.config.isEmpty, let cfgText = try? String(contentsOfFile: p.config, encoding: .utf8),
            let m = cfgText.range(of: "meetings_db[^:\\n]*:\\s*\"?([0-9a-fA-F-]{32,36})", options: .regularExpression) {
             let s = String(cfgText[m]); if let id = s.range(of: "[0-9a-fA-F-]{32,36}", options: .regularExpression) { db = String(s[id]) }
         }
@@ -504,6 +505,7 @@ enum TranscribeWindow {
         else if m.langs.isEmpty { m.reset() }
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { TranscribeView() }))
+            w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
             w.styleMask.insert(.resizable)
             w.setContentSize(NSSize(width: 980, height: 680))
             w.isReleasedWhenClosed = false
@@ -568,7 +570,8 @@ struct TranscribeView: View {
             HStack { Spacer().frame(width: 118); NeedsComponent(id: "link_downloader") }
             HStack(spacing: 8) {
                 Text(L("tr.language")).frame(width: 110, alignment: .leading)
-                LanguagePicker(codes: $m.langs)
+                LanguageChips(codes: $m.langs)      // 0.8.7 (J2): chips and More…, not the list of 100
+                Spacer(minLength: 0)
             }
             Picker(L("tr.peopleSpeaking"), selection: $m.people) {
                 Text(L("tr.findOut")).tag(0)

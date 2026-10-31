@@ -4,6 +4,8 @@ schema_version: 1
 components:
   ollama:
     title: Ollama
+    human: Ollama, runs the local model (200 MB)      # 0.8.7 (L3.4): the name people read; tech in small grey
+    tech: ""
     size: about 200 MB
     for: the model on this Mac (plan B for the preparation and the after-call work)
     where: Settings > AI, About > Components
@@ -13,12 +15,16 @@ components:
       Ollama is stopped, so Install never downloads it again.
   local_model:
     title: Local model (<LocalLLM.model>)
+    human: Local AI model, works without Claude (16 GB)
+    tech: <LocalLLM.model>
     size: about 16 GB
     for: preparation and after-call work without Claude
     needs: ollama
     where: Settings > AI, About > Components
   link_downloader:
     title: Link downloader (yt-dlp)
+    human: Link downloader for YouTube, Drive and Vimeo (10 MB)
+    tech: yt-dlp
     size: about 10 MB
     for: transcribing a link (Google Drive, YouTube, Vimeo)
     install: pip install yt-dlp into the core's private venv; updated with the core
@@ -26,6 +32,9 @@ components:
 word_export: >-
   Save as Word needs no add-on: macOS writes .docx (NSAttributedString officeOpenXML). If that is ever not enough, a
   library becomes a fourth optional component and Save as Word is disabled until it is installed.
+names: >-
+  0.8.7 (L3.4): rows show the human name with the size first and the technical name small and grey under it (the
+  add-ons step of the onboarding, Settings, About > Components).
 states:
   installed: green, with the version
   missing: grey "Not installed, optional" with Install (secondary button)

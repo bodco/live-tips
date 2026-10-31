@@ -37,6 +37,7 @@
       card = `<div class="spk-card" data-sid="${esc(voice)}">
         <div class="spk-card-h"><b>${esc(sp.label || voice)}</b><span class="meta">${esc(t.secsSpoken({ s: Math.round(sp.seconds || 0) }))}</span></div>
         ${sp.lastQuote ? `<div class="q"><span class="meta">${esc(t.lastSaid)}</span> \u201c${esc(sp.lastQuote)}\u201d</div>` : ''}
+        ${t.noClip ? `<div class="meta spk-noclip">${esc(t.noClip)}</div>` : ''}
         ${sug ? `<div class="sugs">${sug}</div>` : ''}
         <div class="spk-name-row"><input id="spkCardName" type="text" placeholder="${esc(t.typeName)}" aria-label="${esc(t.typeName)}" data-sid="${esc(voice)}">
           <span class="seg2 sm"><button type="button" data-act="spk-side" data-sid="${esc(voice)}" data-side="team" aria-pressed="${side === 'team'}">${esc(t.team)}</button><button type="button" data-act="spk-side" data-sid="${esc(voice)}" data-side="client" aria-pressed="${side === 'client'}">${esc(t.client)}</button></span></div>

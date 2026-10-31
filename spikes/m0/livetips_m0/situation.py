@@ -68,4 +68,9 @@ def next_situation(obj: dict, prev: dict, pm_words: int, now_s: float, ask_ttl_s
             "speech_done": speech_done(prev, obj.get("speech_done"), pm_words),
             # promises made earlier stay until the end of the call
             "theirs": _dicts_with(obj.get("theirs"), "what", "who", limit=20) or list(prev.get("theirs") or []),
-            "risks": merge_risks(prev.get("risks"), obj.get("risks"))}
+            "risks": merge_risks(prev.get("risks"), obj.get("risks")),
+            # 0.8.7 (rules/sales.yaml > call_picture): only present in sales mode; the tracker keeps the strongest state
+            **({"deal": _dicts_with(obj.get("deal"), "criterion", limit=12)} if obj.get("deal") is not None else {}),
+            **({"objections": _dicts_with(obj.get("objections"), "what", limit=12)} if obj.get("objections") is not None else {}),
+            **({"next_step": obj["next_step"]} if isinstance(obj.get("next_step"), dict) else {}),
+            **({"signals": _dicts_with(obj.get("signals"), "what", limit=12)} if obj.get("signals") is not None else {})}

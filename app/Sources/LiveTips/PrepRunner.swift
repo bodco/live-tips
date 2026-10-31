@@ -226,6 +226,25 @@ final class PrepRunner: ObservableObject {
         var refreshOf: Date? = nil
         var changed: [String] = []
         var deck: DeckSetup? = nil          // 0.8.5: a Presentation call with a deck (P2)
+        var salesMethod: String? = nil      // 0.8.7 (H3): Sales mode on: the method key (rules/sales.yaml)
+        var company = ""                    // 0.8.7 (H3): the only thing that may go into a web search
+    }
+
+    /// 0.8.7 (H3, rules/sales.yaml > prep.sections): the sales part of the brief. The web search is the company's
+    /// name or domain only; nothing from the project files goes into a search.
+    static func salesPrompt(_ r: Request, base: String, web: Bool) -> String {
+        guard let m = r.salesMethod else { return "" }
+        // 0.8.7 (F4): without a CRM key there is no From CRM section, even when an old snapshot is still on disk
+        let crmLine = !CRMService.shared.connected ? "" : "## From CRM: " + (FileManager.default.fileExists(atPath: base + ".crm.md") ? "Read \(base).crm.md (a CRM snapshot; say how old it is from its Taken line)." : "There is no CRM snapshot.") + "\n"
+        return """
+
+        SALES CALL (method: \(m), see rules/sales.yaml in the skill for its criteria). Add these sections to the brief, in this order:
+        ## Company: \(web ? "what they do, size, news of the last 90 days, with links. Use WebSearch and WebFetch ONLY with the company's name or domain (\(r.company.isEmpty ? r.projectName : r.company)); never put anything from the project files, the context or people's names into a search. End the section with the line: \"Searched the web for: \(r.company.isEmpty ? r.projectName : r.company). Nothing from your files was sent.\"" : "from the project files only (web search is off in Settings > AI).")
+        \(crmLine)## Where we are: what is known and unknown for each criterion of the method, from earlier calls of this series\(crmLine.isEmpty ? "" : " and the CRM"), who said what.
+        ## Likely objections: 3 to 5, each with a short answer; use <project>/pacenote/answer-cards.md when it has a match.
+        ## Questions to ask: the questions that close the gaps.
+        ## Goal of this call: one wanted next step.
+        """
     }
 
     /// A preparation joins the live call only when it was made for that very call (Up next, 2026-10-27).
@@ -353,6 +372,8 @@ final class PrepRunner: ObservableObject {
         let deckTexts = TalkFiles.before(base: base, deck: r.deck)
         let deckLines = r.deck.map { TalkFiles.prompt(base: base, deck: $0) } ?? ""
         let prompt = (r.refreshBase == nil ? fullPrompt : refreshPrompt) + (deckLines.isEmpty ? "" : "\n\n" + deckLines)
+            + Self.salesPrompt(r, base: base, web: AppConfig.load(from: AppPaths.config).salesWebSearch)
+        if r.refreshBase != nil { UsageLog.log("prepare_again") }
         // 0.8.2: the way from Settings > AI; with auto-switch the other one when this one cannot run at all.
         let routes = c.ai
         var route = forced ?? routes.prep
@@ -379,8 +400,10 @@ final class PrepRunner: ObservableObject {
                        "Bash(\(py) \(lt) prep-check:*)", "Bash(\(py) \(lt) digest:*)",
                        "Bash(textutil -convert txt -stdout:*)", "Bash(ls:*)", "Bash(head:*)", "Bash(wc:*)"]
         allowed += Self.webHosts(in: r.context).map { "WebFetch(domain:\($0))" }
+        let salesWeb = r.salesMethod != nil && c.salesWebSearch      // 0.8.7 (H3): only for a sales preparation
+        if salesWeb { allowed += ["WebSearch", "WebFetch"] }
         let denied = (py.hasPrefix("/") ? ["Bash(python3:*)", "Bash(python:*)"] : []) + ["Bash(curl:*)", "Bash(wget:*)", "Bash(sh:*)", "Bash(bash:*)", "Bash(zsh:*)", "Bash(osascript:*)",
-                      "Bash(find:*)", "Bash(rm:*)", "Bash(open:*)", "WebSearch", "Task", "NotebookEdit",
+                      "Bash(find:*)", "Bash(rm:*)", "Bash(open:*)"] + (salesWeb ? [] : ["WebSearch"]) + ["Task", "NotebookEdit",
                       "Edit(/\(skill)/**)", "Write(/\(skill)/**)"]
         p.arguments = ["-p", prompt, "--model", model, "--output-format", "stream-json", "--verbose", "--permission-mode", "default",
                        "--allowedTools", allowed.joined(separator: ","),
@@ -529,6 +552,7 @@ final class PrepRunner: ObservableObject {
                 } else {
                     let cost = isLocal ? L("prep.local") : self.costUSD.map { String(format: " · $%.2f", $0) + (useAPI ? "" : L("prep.plan")) } ?? ""
                     self.result = ok ? L("prep.readyIn", ["min": "\(max(1, mins))"]) + cost : L("prep.failedExit", ["code": "\(proc.terminationStatus)"])
+                    if ok { UsageLog.log("prepare_run", ["type": isLocal ? "local" : (useAPI ? "api" : "code"), "source": "app", "seconds": mins * 60]) }
                 }
             }
         }

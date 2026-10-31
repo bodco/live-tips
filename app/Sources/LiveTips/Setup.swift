@@ -152,6 +152,7 @@ struct SetupView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(s.title)
                             Text(s.why).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                            if s.id == "python" && (s.state == .missing || s.state == .failed) { PythonInstallHint() }   // 0.8.7 (L3.5)
                         }
                         Spacer()
                         Text(s.detail).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
@@ -206,6 +207,24 @@ struct SetupView: View {
     }
 }
 
+/// 0.8.7 (L3.5): no Python on this Mac. One way out instead of a red line: the official python.org installer page and
+/// what to click there; Check again after it is installed.
+struct PythonInstallHint: View {
+    static let url = URL(string: "https://www.python.org/downloads/macos/")!
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button(L("setup.python.install")) { NSWorkspace.shared.open(Self.url) }
+                .buttonStyle(.pnSecondary)
+            Text(L("setup.python.how")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 4)
+    }
+}
+
+extension SetupModel {
+    var pythonMissing: Bool { steps.first { $0.id == "python" }.map { $0.state == .missing || $0.state == .failed } ?? false }
+}
+
 @MainActor
 final class SetupWindow {
     static var window: NSWindow?
@@ -214,6 +233,7 @@ final class SetupWindow {
     static func show() {
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { SetupView(model: model) }))
+            w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
             w.title = L("setup.window.title")
             w.isReleasedWhenClosed = false
             window = w

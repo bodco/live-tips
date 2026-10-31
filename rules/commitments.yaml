@@ -12,6 +12,7 @@ events:
   drop: '{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}'
   link: '{"v":1,"op":"link","id":"<id>","notion_page":"<Notion page id>","at":"<ISO time>"}'
   unlink: '{"v":1,"op":"unlink","id":"<id>","at":"<ISO time>","reason":"removed|undo"}'
+  edit: '{"v":1,"op":"edit","id":"<id>","at":"<ISO time>","text":"<new text, optional>","owner":"me|<name>, optional","due":"<new due, optional>"}'
 id: "c-<first 10 hex characters of sha1 of: call file name without .app, owner, text in lower case>"
 series_key: "<project slug>|<call title in lower case, letters and digits only>"
 owner: >-
@@ -31,6 +32,12 @@ model_rule_theirs: >-
   theirs = promises other people made to the PM or the PM's team on this call: who and what, with the due date
   when named ("I will send the list by Friday" said by the client). Never the PM's own tasks, never a task
   for a third person, never someone's update about their own work.
+model_rule_not_commitments: >-
+  A commitment is an action still to be done. A report of something already done is never a new commitment: "I set
+  up the test superuser", "Налаштував тестового суперюзера", "I created the documentation", "Створив документацію",
+  "I sent the list", "передав доступи", "did the release" are not actions or theirs; when such a report is about an
+  OPEN COMMITMENT, it goes to done_commitments instead. "I will finish it on prod tomorrow" / "Завтра закінчу на проді"
+  is a commitment with its due date.
 model_rule_done: >-
   done_commitments = ids of OPEN COMMITMENTS that someone said on this call are done, sent or finished
   ("done", "sent", "зроблено", "надіслав"), about that same item.
@@ -46,4 +53,9 @@ mine: >-
   0.8.6: "Mine" on a transcript line, a tip or an "on them" item makes it the PM's: an add with owner me and the
   short action as text (the call picture words it; the raw line shows meanwhile). For an "on them" item the old id
   gets a drop and the new add carries from = the old id. The PM can also type an item in the On me tab.
+call_page: >-
+  0.8.7 (E2): on the call page the PM edits an item in place (op edit: text, owner, due), moves it between On you and
+  On them (op edit with owner me or a name), deletes it (op drop) or adds one under "+ Add" (op add, by app, call =
+  this call's transcript, owner me for On you; for On them "Name: what" names the owner). Every change is the PM's
+  own action; nothing is guessed.
 order: overdue first, then items with a due date (soonest first), then the rest (newest first)

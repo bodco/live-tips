@@ -10,6 +10,8 @@ logged:
   followup_instruction: an instruction the PM gave to rewrite the follow-up draft ("drop the pricing line", "shorter")
   followup_edit: the follow-up text edited by hand (lines removed and added)
   cards: card and On me corrections in the tips window (kinds as before)
+  deal_edit: 0.8.6+ a qualification criterion of the Deal tab or the call page's Sales section changed by the PM (state, text)
+  call_page_edit: an item of the call page edited, moved, re-owned, re-dated, deleted or added (rules/commitments.yaml > edit)
 signals:
   followup_instruction: the instruction text
   brief_edit: each removed line ("removed" = do not write this kind of line again)
@@ -17,6 +19,8 @@ signals:
   talk_edit: the slide text the PM wrote instead (say_after), as an example of his wording
   card_onme_remove: an On me line the PM marked "Not mine" in the tips window (do not put such lines on him again)
   card_onme_edit: an On me line the PM reworded (the line before; the "after" is his wording)
+  deal_edit: the criterion and the PM's state and wording (the tracker learns what counts as known for this PM)
+  call_page_edit: the item before and after (the call picture learns the PM's wording and owners)
 similar: two signals of the same kind are the same pattern when their word sets overlap by half or more (Jaccard >= 0.5, words of 3+ letters)
 standing: a pattern seen in 2 or more different calls (different files) is applied to every new preparation or draft of that kind
 single: a pattern seen in one call only is applied only to the same meeting (same series) and the same project, as the newest corrections are now

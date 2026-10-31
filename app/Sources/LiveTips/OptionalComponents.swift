@@ -9,16 +9,17 @@ import SwiftUI
 final class OptionalComponents: ObservableObject {
     static let shared = OptionalComponents()
     enum State: Equatable { case unknown, installed(String), missing, installing(Double?), failed(String) }
-    struct Comp: Identifiable { let id: String; let title: String; let size: String; let purpose: String }
+    // 0.8.7 (L3.4, rules/components.yaml > names): `title` is the human name with the size; `tech` small and grey
+    struct Comp: Identifiable { let id: String; let title: String; let tech: String; let purpose: String }
 
     @Published var states: [String: State] = [:]
     @Published var linkLog = ""
     private var linkTask: Task<Void, Never>?
 
     var all: [Comp] {
-        [Comp(id: "ollama", title: "Ollama", size: L("comp.size.ollama"), purpose: L("comp.for.ollama")),
-         Comp(id: "local_model", title: L("comp.title.model", ["model": LocalLLM.model]), size: L("comp.size.model"), purpose: L("comp.for.model")),
-         Comp(id: "link_downloader", title: L("comp.title.link"), size: L("comp.size.link"), purpose: L("comp.for.link"))]
+        [Comp(id: "ollama", title: L("comp.human.ollama"), tech: "", purpose: L("comp.for.ollama")),
+         Comp(id: "local_model", title: L("comp.human.model"), tech: LocalLLM.model, purpose: L("comp.for.model")),
+         Comp(id: "link_downloader", title: L("comp.human.link"), tech: "yt-dlp", purpose: L("comp.for.link"))]
     }
 
     var duringCall: Bool {
@@ -85,7 +86,8 @@ struct ComponentRow: View {
                 .foregroundStyle({ if case .installed = st { return PN.C.turn }; return PN.C.text3 }())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(comp.title + (markOptional ? " " + L("comp.optionalMark") : "")) + Text("  " + comp.size).foregroundStyle(PN.C.text3)
+                Text(comp.title + (markOptional ? " " + L("comp.optionalMark") : ""))
+                if !comp.tech.isEmpty { Text(comp.tech).font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3) }
                 Text(comp.purpose).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 switch st {
                 case .installed(let v): Text(v.isEmpty ? L("comp.installed") : L("comp.installedV", ["v": v])).font(PN.Font.caption).foregroundStyle(PN.C.turn)
@@ -142,7 +144,8 @@ struct OptionalAddonsStep: View {
             ForEach(oc.all) { c in
                 Toggle(isOn: Binding(get: { picked.contains(c.id) }, set: { if $0 { picked.insert(c.id) } else { picked.remove(c.id) } })) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(c.title) + Text("  " + c.size).foregroundStyle(PN.C.text3)
+                        Text(c.title)
+                        if !c.tech.isEmpty { Text(c.tech).font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3) }
                         Text(c.purpose).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         if c.id == "local_model" && picked.contains(c.id) {
                             Text(L("comp.onb.space", ["free": String(format: "%.0f", freeGB)])).font(PN.Font.caption).foregroundStyle(freeGB < 25 ? PN.C.danger : PN.C.onMe)

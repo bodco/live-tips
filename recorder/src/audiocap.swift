@@ -723,8 +723,17 @@ while let a = argv.next() {
     case "--list-inputs":
         print(listInputsJSON())
         exit(0)
+    case "--output-running":
+        // 0.8.7 (rules/recording.yaml > tap_recovery): 1 when the default output device is playing; read only
+        var running: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        var addr = systemAddress(kAudioDevicePropertyDeviceIsRunningSomewhere)
+        if let out = defaultDevice(kAudioHardwarePropertyDefaultOutputDevice),
+           AudioObjectGetPropertyData(out, &addr, 0, nil, &size, &running) == noErr { print(running != 0 ? "1" : "0") }
+        else { print("0") }
+        exit(0)
     case "-h", "--help":
-        print("usage: audiocap --source system|mic [--device default|builtin|uid:<UID>] [--mic-backend auto|engine|direct] [--seconds N] | --list-inputs")
+        print("usage: audiocap --source system|mic [--device default|builtin|uid:<UID>] [--mic-backend auto|engine|direct] [--seconds N] | --list-inputs | --output-running")
         exit(0)
     default:
         log("unknown argument \(a)")

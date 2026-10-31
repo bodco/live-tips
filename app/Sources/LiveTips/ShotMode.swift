@@ -530,6 +530,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             self.keep.append(tm)
             self.window("p4-prepare-again-\(theme)") {
                 let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { PrepareAgainSheet(model: tm, onStart: {}) }))
+                w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
                 w.isReleasedWhenClosed = false; w.center(); w.makeKeyAndOrderFront(nil)
             }
         }

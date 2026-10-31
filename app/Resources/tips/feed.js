@@ -48,6 +48,7 @@
     this.onMeDone = {};
     this.onMeFix = {};          // 0.8.5: id -> the PM's own wording, or '' for "not mine"
     this.agendaEngine = null;   // from the engine's "agenda" item (wins over the brief's checklist)
+    this.deal = null;           // 0.8.7 (H4): the engine's "deal" item in Sales mode (rules/sales.yaml), else null
     this.agendaBrief = [];
     this.agendaManual = {};     // id -> state, set by a click on a segment
     this.facts = [];
@@ -92,6 +93,8 @@
     const k = it.kind || 'tip', g = String(it.gist || '');
     if (k === 'answer' || k === 'fact' || k === 'card') return 'docs';
     if (k === 'speech') return 'turn';
+    // 0.8.7 (H4): sales tips keep their own kind and label (rules/sales.yaml > tips)
+    if (['objection', 'qualify', 'pain', 'next_step', 'competitor', 'signal'].includes(it.sales)) return it.sales;
     if (k === 'status') return 'neutral';
     if (k === 'wrapup') return 'neutral';
     if (/^\s*\u{1F50E}/u.test(g)) return 'docs';
@@ -182,6 +185,18 @@
       case 'ask': return false;                           // echoes of what the PM typed: the field already shows it
       case 'ack': this.toast = { text: this.tr('applied'), kind: 'ok', at: this.now() }; return true;
       case 'notice': this.prep = 'ready'; this.toast = { text: this.tr('prepReady'), kind: 'ok', at: this.now() }; return true;
+      case 'deal':
+        // 0.8.7 (H4): the qualification tracker; criteria with state unknown | partial | known, a short what and a quote
+        this.deal = {
+          method: clean(it.method || ''), name: clean(it.method_name || it.name || it.method || ''), chip: !!it.chip,
+          known: +it.known || 0, total: +it.total || (it.criteria || []).length,
+          criteria: (it.criteria || []).map((c) => ({ key: clean(c.key), name: clean(c.name || c.key), state: ['known', 'partial'].includes(c.state) ? c.state : 'unknown',
+            what: clean(c.what || ''), quote: clean(c.quote || ''), t: clean(c.t || '') })),
+          objections: (it.objections || []).map((o) => clean(typeof o === 'string' ? o : (o.what || ''))).filter(Boolean),
+          nextStep: clean(typeof it.next_step === 'string' ? it.next_step : ((it.next_step || {}).what || '')),
+          signals: (it.signals || []).map((o) => clean(typeof o === 'string' ? o : (o.what || ''))).filter(Boolean)
+        };
+        return true;
       case 'agenda':
         this.agendaEngine = (it.items || []).map((x, i) => {
           const text = clean(itemText(x)).replace(/^\u2713\s*/, '');
@@ -530,6 +545,7 @@
       sys: this.sysState(),
       pres: { slide: this.slideN, slideRx: this.slideRx, timeline: this.timeline, moveAsk: this.moveAsk, follow: this.follow },
       agenda: this.agenda(),
+      deal: this.deal,
       cards: this.cards.map((c) => Object.assign({}, c)),
       onMe: this.onMe(),
       next: this.next,

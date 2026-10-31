@@ -48,6 +48,21 @@ final class Register: ObservableObject {
         version += 1
     }
 
+    /// 0.8.7 (E): the call page changed an item's text, owner or due date.
+    func edit(_ c: Commitment, text: String? = nil, owner: String? = nil, due: String? = nil) {
+        CommitmentRegister.edit(folder: c.folder, id: c.id, text: text == c.text ? nil : text,
+                                owner: owner == c.owner ? nil : owner, due: due == c.due ? nil : due)
+        cache[c.folder] = nil
+        version += 1
+    }
+
+    /// 0.8.7 (E2): "+ Add" on the call page.
+    func add(folder: String, text: String, owner: String, project: String, title: String, call: String) {
+        CommitmentRegister.add(folder: folder, text: text, owner: owner, project: project, title: title, call: call)
+        cache[folder] = nil
+        version += 1
+    }
+
     /// The register next to a call's transcript, for the tips window (Mark done on a "Done?" card).
     func markDone(id: String, callFile: String) {
         let folder = (callFile as NSString).deletingLastPathComponent

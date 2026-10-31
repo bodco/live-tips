@@ -20,7 +20,10 @@
       agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised yet:', allRaised: 'All agenda items raised',
       agendaOpen: 'Show the whole agenda', agendaClose: 'Hide the agenda', agendaHint: 'Click an item: not raised, now, done.',
       agState: { todo: 'not raised', now: 'now', done: 'done' },
-      kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk' },
+      kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk',
+        objection: 'Objection', qualify: 'Qualify', pain: 'Pain', next_step: 'Next step', competitor: 'Competitor', signal: 'Buying signal' },
+      firstHint: (k) => `Press ${k.h} when you need help · ${k.t} compact · ${k.l} proactive tips`,
+      deal: { tab: 'Deal', unknown: 'Unknown', partial: 'Partly', known: 'Known', objections: 'Objections', next: 'Next step', signals: 'Signals', noNext: 'No next step with a date yet', cycle: 'Click to change the state' },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
       saidIt: 'Said it', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
@@ -29,7 +32,7 @@
       ask: 'Ask about this project', help: 'Help',
       tabs: { transcript: 'Transcript', onme: (n) => `On me · ${n}`, brief: 'Brief' },
       newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team', speakersH: 'Speakers', namedOf: (o) => `${o.n} of ${o.m} named`, notNamed: 'not named yet',
-      toName: 'to name', mins: (o) => o.m < 1 ? '<1 min' : `${o.m} min`, secsSpoken: (o) => `${o.s} s of speech`, soundsLike: (o) => `${o.name} · sounds like ${o.p}%`,
+      toName: 'to name', mins: (o) => o.m < 1 ? '<1 min' : `${o.m} min`, secsSpoken: (o) => `${o.s} s of speech`, noClip: 'No clip to play: Pacenote never keeps the call audio. The last line helps tell who it is.', soundsLike: (o) => `${o.name} · sounds like ${o.p}%`,
       typeName: 'Type a name', more: 'More:', samePerson: 'Same person as…', notNow: 'Not now', lastSaid: 'Last said:',
       mine: 'Mine', mineTip: 'Put this on me', addOnMe: 'Add to On me', fromThisCall: 'From this call', openBefore: 'Open before the call',
       notionGroup: (o) => `Notion · ${o.p}`, removeItem: 'Remove', removeTip: 'Remove from On you and move to the Notion trash', fromACall: 'from a call',
@@ -38,7 +41,7 @@
       ariaMic: 'Mute microphone', ariaPause: 'Pause listening', ariaProactive: 'Proactive tips',
       proactiveOn: 'Proactive tips: on', proactiveOff: 'Proactive tips: off', resumeShort: 'Resume',
       menu: { pause: 'Pause listening', resume: 'Resume listening', mute: 'Turn mic off', unmute: 'Turn mic on',
-        compact: 'Compact mode', full: 'Full window', present: 'Presentation mode', stopPresent: 'Stop presenting',
+        compact: 'Compact mode', full: 'Full window', present: 'Presentation mode', stopPresent: 'Stop presenting', presentNeedDeck: 'Attach a deck in Start call',
         transcript: 'Transcript', brief: 'Brief', settings: 'Call settings…', switchCall: 'Switch to next call…', clearSpeakers: 'Forget speaker names' },
       recap: 'Recap:',
       after: { window: 'Call ended', meta: (o) => [o.when, o.dur, o.people].filter(Boolean).join(' · ') + (o.notion ? ' · summary saved to Notion' : ''),
@@ -79,7 +82,10 @@
       agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', allRaised: 'Усі пункти агенди підняті',
       agendaOpen: 'Показати всю агенду', agendaClose: 'Сховати агенду', agendaHint: 'Клік по пункту: не піднято, зараз, зроблено.',
       agState: { todo: 'не піднято', now: 'зараз', done: 'зроблено' },
-      kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик' },
+      kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик',
+        objection: 'Заперечення', qualify: 'Кваліфікація', pain: 'Біль', next_step: 'Наступний крок', competitor: 'Конкурент', signal: 'Сигнал купівлі' },
+      firstHint: (k) => `Натисніть ${k.h}, коли потрібна допомога · ${k.t} компактно · ${k.l} проактивні підказки`,
+      deal: { tab: 'Угода', unknown: 'Невідомо', partial: 'Частково', known: 'Відомо', objections: 'Заперечення', next: 'Наступний крок', signals: 'Сигнали', noNext: 'Ще немає наступного кроку з датою', cycle: 'Клік змінює стан' },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
       saidIt: 'Сказав', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
@@ -88,7 +94,7 @@
       ask: 'Запитай про проєкт', help: 'Допоможи',
       tabs: { transcript: 'Транскрипт', onme: (n) => `На мені · ${n}`, brief: 'Бриф' },
       newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда', speakersH: 'Спікери', namedOf: (o) => `названо ${o.n} з ${o.m}`, notNamed: 'ще без імені',
-      toName: 'назвати', mins: (o) => o.m < 1 ? '<1 хв' : `${o.m} хв`, secsSpoken: (o) => `${o.s} с мовлення`, soundsLike: (o) => `${o.name} · схоже на ${o.p}%`,
+      toName: 'назвати', mins: (o) => o.m < 1 ? '<1 хв' : `${o.m} хв`, secsSpoken: (o) => `${o.s} с мовлення`, noClip: 'Кліпу немає: Pacenote не зберігає звук дзвінка. Остання фраза допомагає зрозуміти, хто це.', soundsLike: (o) => `${o.name} · схоже на ${o.p}%`,
       typeName: 'Введіть імʼя', more: 'Ще:', samePerson: 'Та сама людина, що…', notNow: 'Не зараз', lastSaid: 'Останнє:',
       mine: 'Моє', mineTip: 'Записати на мене', addOnMe: 'Додати в На мені', fromThisCall: 'З цього дзвінка', openBefore: 'Відкриті до дзвінка',
       notionGroup: (o) => `Notion · ${o.p}`, removeItem: 'Прибрати', removeTip: 'Прибрати з На вас і перенести в кошик Notion', fromACall: 'з дзвінка',
@@ -97,7 +103,7 @@
       ariaMic: 'Вимкнути мікрофон', ariaPause: 'Пауза прослуховування', ariaProactive: 'Проактивні підказки',
       proactiveOn: 'Проактивні підказки: увімкнено', proactiveOff: 'Проактивні підказки: вимкнено', resumeShort: 'Продовжити',
       menu: { pause: 'Призупинити', resume: 'Продовжити', mute: 'Вимкнути мікрофон', unmute: 'Увімкнути мікрофон',
-        compact: 'Компактний режим', full: 'Повне вікно', present: 'Режим презентації', stopPresent: 'Завершити презентацію',
+        compact: 'Компактний режим', full: 'Повне вікно', present: 'Режим презентації', stopPresent: 'Завершити презентацію', presentNeedDeck: 'Додайте презентацію в Start call',
         transcript: 'Транскрипт', brief: 'Бриф', settings: 'Налаштування дзвінка…', switchCall: 'Перейти до наступного дзвінка…', clearSpeakers: 'Забути імена спікерів' },
       recap: 'Підсумок:',
       doneQ: 'Зроблено?', markDone: 'Позначити зробленим', onThem: 'На них', closed: 'Закрито',
@@ -136,7 +142,7 @@
   const S = {
     lang: PREFS.ui_lang === 'uk' ? 'uk' : 'en', theme: 'auto',
     call: { title: '', state: 'live', startedAt: null, paused: false, micOff: false, minutesLeft: null, mode: 'normal', recap: '', briefLine: '', alert: null },
-    agenda: [], cards: [], onMe: [], next: null,
+    agenda: [], cards: [], onMe: [], next: null, deal: null,
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
@@ -150,6 +156,8 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const inApp = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.liveTips);
 
+  // 0.8.7 (M, rules/usage.yaml): a tip action for the local usage log, the card's kind only, never its text
+  function usage(e, p) { post('usage', { e, p }); }
   function post(action, payload) {
     const msg = Object.assign({ action }, payload || {});
     try { window.webkit.messageHandlers.liveTips.postMessage(msg); }
@@ -224,6 +232,10 @@
     const openOnMe = openOnMeCount();
     $('onmeLbl').textContent = t.onMe; $('onmeN').textContent = openOnMe;
     $('onmeBtn').hidden = openOnMe === 0;
+    firstCallHint();
+    // 0.8.7 (H4): "BANT 2/4" in the header for methods with a chip; a click opens the Deal tab
+    const dealChip = S.deal && S.deal.chip ? `${S.deal.name} ${S.deal.known}/${S.deal.total}` : '';
+    $('dealBtn').hidden = !dealChip; $('dealBtn').textContent = dealChip;
     $('onmeBtn').setAttribute('aria-label', t.onMe + ': ' + openOnMe);   // below 460 px only the count is visible
     $('moreBtn').setAttribute('aria-label', t.more);
     // 0.8 (owner): the microphone switch is back in the top bar (a cafe: the meeting is muted, the transcript too).
@@ -627,7 +639,8 @@
   function renderPane(root, tab, isSheet) {
     const t = T();
     const openN = openOnMeCount();
-    const tabs = ['transcript', 'onme', 'brief'];
+    const tabs = S.deal ? ['transcript', 'onme', 'deal', 'brief'] : ['transcript', 'onme', 'brief'];   // 0.8.7 (H4): Deal only in Sales mode
+    if (tab === 'deal' && !S.deal) tab = 'transcript';
     if (tab === 'brief' && S.ui.briefEdit && root.querySelector('#briefEdit')) return;   // the PM is typing
     if (tab === 'onme' && S.ui.onmeEdit && root.querySelector('#onmeEditInput')) return;   // 0.8.5: an On me line being reworded
     const typing = document.activeElement && (document.activeElement.id === 'spkCardName' || document.activeElement.id === 'onmeAdd') && root.contains(document.activeElement);
@@ -673,17 +686,30 @@
       if ((S.notionItems || []).length) groups.push([t.notionGroup({ p: S.notionProject || '' }), S.notionItems.map(ext)]);
       body = groups.filter(([, rows]) => rows.length).map(([h, rows]) => `<h4 class="grp">${esc(h)}</h4>${rows.join('')}`).join('') || `<p class="meta">${esc(t.noItems)}</p>`;
       body += `<div class="onme-add"><input id="onmeAdd" type="text" placeholder="${esc(t.addOnMe)}" aria-label="${esc(t.addOnMe)}"></div>`;
+    } else if (tab === 'deal') {
+      body = renderDeal();
     } else if (tab === 'brief') {
       body = renderBrief();
     }
     root.innerHTML = `
       ${isSheet ? `<button class="icon-btn close" type="button" data-act="close-sheet" aria-label="${esc(t.close)}">${ICON.x}</button>` : ''}
       ${speakersBlock()}
-      <div class="tabs" role="tablist" ${isSheet ? 'style="margin-right:48px"' : ''}>${tabs.map((k) => `<button class="tab" role="tab" type="button" aria-selected="${k === tab}" data-act="${isSheet ? 'sheet-tab' : 'pane-tab'}" data-tab="${k}">${esc(k === 'onme' ? t.tabs.onme(openN) : t.tabs[k])}</button>`).join('')}</div>
+      <div class="tabs" role="tablist" ${isSheet ? 'style="margin-right:48px"' : ''}>${tabs.map((k) => `<button class="tab" role="tab" type="button" aria-selected="${k === tab}" data-act="${isSheet ? 'sheet-tab' : 'pane-tab'}" data-tab="${k}">${esc(k === 'onme' ? t.tabs.onme(openN) : k === 'deal' ? t.deal.tab : t.tabs[k])}</button>`).join('')}</div>
       <div class="panebody">${body}</div>
       ${tab === 'transcript' ? `<div class="panefoot"><span>${esc(t.legend)}</span>${S.ui.follow ? `<span>${esc(t.following)}</span>` : `<button class="link" type="button" data-act="follow">${esc(t.jump)}</button>`}</div>` : ''}`;
     const pb = root.querySelector('.panebody');
     if (tab === 'transcript' && S.ui.follow) pb.scrollTop = pb.scrollHeight; else pb.scrollTop = top;
+  }
+
+  // 0.8.7 (H4): the Deal tab, a row per criterion like the agenda; a click cycles the state (the PM's fix goes to
+  // the engine and to the learning log, rules/learning.yaml > deal_edit)
+  function renderDeal() {
+    const t = T(), d = S.deal;
+    if (!d) return '';
+    const rows = d.criteria.map((c) => `<div class="deal-row ${esc(c.state)}"><button class="seg ${c.state === 'known' ? 'done' : c.state === 'partial' ? 'now' : 'todo'}" type="button" data-act="deal-cycle" data-key="${esc(c.key)}" title="${esc(t.deal.cycle)}" aria-label="${esc(c.name + ': ' + t.deal[c.state])}"></button>
+      <span><b>${esc(c.name)}</b> <span class="meta">${esc(t.deal[c.state])}</span>${c.what ? `<br>${esc(c.what)}` : ''}${c.quote ? `<br><span class="meta">"${esc(c.quote)}"${c.t ? ' · ' + esc(c.t) : ''}</span>` : ''}</span></div>`).join('');
+    const list = (h, xs) => xs.length ? `<h4 class="grp">${esc(h)}</h4>${xs.map((x) => `<div class="onme-item">${esc(x)}</div>`).join('')}` : '';
+    return `<h4 class="grp">${esc(d.name)}</h4>${rows}${list(t.deal.objections, d.objections)}<h4 class="grp">${esc(t.deal.next)}</h4><div class="onme-item${d.nextStep ? '' : ' meta'}">${esc(d.nextStep || t.deal.noNext)}</div>${list(t.deal.signals, d.signals)}`;
   }
 
   function openOnMeCount() {
@@ -706,14 +732,17 @@
     if (!S.ui.menuOpen) return;
     // 0.8 (spec 3.7): pause and the microphone live in the top bar, not repeated here.
     const items = [
-      (S.steps.length || S.call.presType) ? ['present', presenting() ? t.stopPresent : t.present, k.present] : null,
+      // 0.8.7 (L2): without a deck the item stays, greyed, with the condition; a click attaches a deck
+      (S.steps.length || S.call.presType) ? ['present', presenting() ? t.stopPresent : t.present, k.present] : ['present-off', t.present, '', t.presentNeedDeck],
       ['compact', S.call.mode === 'compact' ? t.full : t.compact, k.compact],
       ['transcript', t.transcript, ''], ['brief', t.brief, ''],
       '-',
       ['clear-speakers', t.clearSpeakers, ''],
       ['switch-call', t.switchCall, ''], ['settings', t.settings, '⌘,']
     ].filter(Boolean);
-    m.innerHTML = items.map((i) => i === '-' ? '<div class="sep"></div>' : `<button type="button" role="menuitem" data-act="menu" data-item="${i[0]}"><span>${esc(i[1])}</span><kbd>${esc(i[2])}</kbd></button>`).join('');
+    m.innerHTML = items.map((i) => i === '-' ? '<div class="sep"></div>' : i[3]
+      ? `<button type="button" role="menuitem" class="off" aria-disabled="true" title="${esc(i[3])}" data-act="menu" data-item="${i[0]}"><span>${esc(i[1])}<small>${esc(i[3])}</small></span><kbd>${esc(i[2])}</kbd></button>`
+      : `<button type="button" role="menuitem" data-act="menu" data-item="${i[0]}"><span>${esc(i[1])}</span><kbd>${esc(i[2])}</kbd></button>`).join('');
   }
 
   function tick() {
@@ -735,6 +764,19 @@
   }
 
   let lastToast = 0, toastTimer = null;
+  // 0.8.7 (L3): once, on the first real call, the three shortcuts for 20 seconds; a click closes it
+  function firstCallHint() {
+    if (PREFS.firstCallHintShown === '1' || PREFS.demo === '1' || S.call.state !== 'live' || !S.call.startedAt) return;
+    PREFS.firstCallHintShown = '1';
+    post('pref', { k: 'firstCallHintShown', v: '1' });
+    const k = Object.assign({}, S.keys, PREFS.keys || {});
+    const el = $('toast');
+    el.textContent = T().firstHint({ h: k.help, t: k.compact, l: k.proactive || '⌃⌥L' });
+    el.className = 'toast show first';
+    el.onclick = () => { el.className = 'toast'; el.onclick = null; };
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.className = 'toast'; }, 20000);
+  }
+
   function showToast(tst) {
     if (!tst || tst.at === lastToast) return;
     lastToast = tst.at;
@@ -849,13 +891,13 @@
     const card = id && S.cards.find((c) => c.id === id);
     switch (act) {
       case 'said':
-        if (card) { card.state = 'done'; if (feed) feed.mark(id, { state: 'done' }); post('said', { id, key: cardKey(card) }); }
+        if (card) { card.state = 'done'; if (feed) feed.mark(id, { state: 'done' }); post('said', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'say' }); }
         S.ui.heroOverride = null; break;
       case 'hide':
-        if (card) { card.state = 'hidden'; if (feed) feed.mark(id, { state: 'hidden' }); post('hide', { id, key: cardKey(card) }); }
+        if (card) { card.state = 'hidden'; if (feed) feed.mark(id, { state: 'hidden' }); post('hide', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'hide' }); }
         S.ui.heroOverride = null; e.stopPropagation(); break;
       case 'pin':
-        if (card) { card.pinned = !card.pinned; if (feed) feed.mark(id, { pinned: card.pinned }); post('pin', { id, pinned: card.pinned }); }
+        if (card) { card.pinned = !card.pinned; if (feed) feed.mark(id, { pinned: card.pinned }); post('pin', { id, pinned: card.pinned }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'pin' }); }
         e.stopPropagation(); break;
       case 'shorter': if (card) post('shorter', { id, say: card.say, question: card.question || '' }); return;
       case 'edit': S.ui.editing = id; break;
@@ -897,6 +939,15 @@
         break;
       }
       case 'pane-tab': S.ui.paneTab = b.dataset.tab; S.ui.briefEdit = false; break;
+      case 'deal-cycle': {
+        const c = S.deal && S.deal.criteria.find((x) => x.key === b.dataset.key);
+        if (c) {
+          c.state = c.state === 'unknown' ? 'partial' : c.state === 'partial' ? 'known' : 'unknown';
+          S.deal.known = S.deal.criteria.filter((x) => x.state === 'known').length;
+          post('setting', { key: 'deal_fix', value: `${c.key}|${c.state}|${c.what || ''}` });
+        }
+        break;
+      }
       case 'sheet-tab': S.ui.sheet = b.dataset.tab; S.ui.briefEdit = false; break;
       case 'close-sheet': S.ui.sheet = null; S.ui.briefEdit = false; break;
       case 'follow': S.ui.follow = true; break;
@@ -990,6 +1041,7 @@
       case 'menu': {
         const item = b.dataset.item; S.ui.menuOpen = false;
         if (item === 'compact') { S.call.mode = S.call.mode === 'compact' ? 'normal' : 'compact'; post('compact', { on: S.call.mode === 'compact' }); }
+        else if (item === 'present-off') { post('attach-deck'); render(); return; }
         else if (item === 'present') { S.ui.presentForced = !presenting(); post('setting', { key: 'call_type', value: S.ui.presentForced ? 'presentation' : 'auto' }); }
         else if (item === 'transcript' || item === 'brief') { openTab(item); return; }
         else if (item === 'pause') { togglePause(); return; }
@@ -1050,6 +1102,7 @@
   $('micBtn').addEventListener('click', () => toggleMute());
   $('pauseBtn').addEventListener('click', () => togglePause());
   $('bulbBtn').addEventListener('click', () => toggleProactive());
+  $('dealBtn').addEventListener('click', () => openTab('deal'));
   $('onmeBtn').addEventListener('click', () => { if (isWide()) { S.ui.paneTab = 'onme'; } else { S.ui.sheet = S.ui.sheet === 'onme' ? null : 'onme'; } render(); });
   $('helpBtn').addEventListener('click', () => post('help'));
   $('ask').addEventListener('submit', (e) => {

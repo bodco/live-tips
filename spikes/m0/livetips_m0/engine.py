@@ -15,6 +15,7 @@ from typing import Callable, Dict, List, Optional
 
 import jsonschema
 
+from . import usage
 from . import agenda as agenda_mod
 from . import commitments as register
 from .cost import cost_usd
@@ -652,6 +653,15 @@ class Engine:
         self.agenda_manual: Dict[int, str] = {}
         self.agenda_sent: Optional[list] = None
         self.register_dir = cfg.get("register_dir") or ""
+        # 0.8.7 (rules/sales.yaml): sales mode on top of any call type; None = off, nothing changes
+        self.t_started = clock()
+        self.sales = None
+        sc = cfg.get("sales") or {}
+        if isinstance(sc, dict) and sc.get("enabled"):
+            from .sales import SalesTracker, load_cards
+            self.sales = SalesTracker(getattr(rules, "sales", {}) or {}, str(sc.get("method") or ""),
+                                      "en" if str(cfg.get("ui_lang") or "").startswith("en") else "uk",
+                                      load_cards(cfg.get("project_dir") or ""), float(cfg.get("planned_min") or 30) * 60)
         self.commit_proposed: set = set()
         self.onme_ticked: Dict[str, bool] = {}
         # 0.8.5 (owner): an On me line the PM marked "not mine" or reworded in the window; norm text -> new text ("" = drop)
@@ -1089,6 +1099,8 @@ class Engine:
         line, span, done = run.line, run.span, run.done
         seg_end = line.seg_end if line.seg_end is not None else line.t_s
         item = tip_item(run.obj, run.uid, line, run.trigger, done, late=(done - seg_end) > self.stale_s)
+        if not getattr(run, "partial", False):
+            usage.log("tip_shown", {"kind": str(item.get("kind", ""))[:40]})     # 0.8.7 (M): the kind only
         with self.lock:
             self.tips[:] = [t for t in self.tips if not (t.get("uid") == run.uid and t.get("partial"))]
             self.tips.append(dict(item, _at=done, _exempt=bool(span.get("rate_exempt"))))
@@ -1339,6 +1351,10 @@ class Engine:
     def on_request(self, kind: str, text: str = "") -> None:
         """kind: "ask" (a question typed in the window), "find" (search the project folder, then answer)
         or "sos" (HELP NOW). Never rate-limited."""
+        if kind == "sos":            # 0.8.7 (M): the event only, never the text
+            usage.log("help_now")
+        else:
+            usage.log("ask_typed")
         if self._budget_stops():
             return
         now = self.clock()
@@ -1468,6 +1484,7 @@ class Engine:
             self._run_find(text, line, span)
             return
         event = SOS_EVENT if kind == "sos" else self._ask_event(text)
+        event = self._sales_cards_first(kind, text) + event   # 0.8.7 (H4.5): answer cards first in sales mode
         span["tip_start"] = self.clock()
         c = self._call("tip", line, event)
         done = self.clock()
@@ -1480,6 +1497,19 @@ class Engine:
         self.out_tips.write(item)
         span.update({"outcome": "emitted", "emit_at": done, "tip_ms": c.ms(c.t_done), "error": c.error})
         self.out_timing.write(span)
+
+    def _sales_cards_first(self, kind: str, text: str) -> str:
+        """0.8.7 (H4.5, rules/sales.yaml > ask_order): in sales mode an ask or HELP NOW sees the matching answer
+        cards before the brief and the project memory; HELP NOW matches the last lines of the call."""
+        sales = getattr(self, "sales", None)
+        if sales is None or not sales.cards or kind not in ("ask", "sos"):
+            return ""
+        from .sales import cards_block
+        q = text
+        if kind == "sos" or not q.strip():
+            with self.lock:
+                q = " ".join(ln.text for ln in list(self.history)[-6:])
+        return cards_block(q, sales.cards)
 
     def _about_speech(self, text: str) -> bool:
         return bool(self.SPEECH_ASK.search(text) or (self.speech_item and self.SPEECH_SHOW.search(text)))
@@ -1675,6 +1705,27 @@ class Engine:
         if changed:
             now = self.clock()
             self.out_tips.write(dict(sit, schema_version=1, engine="app", kind="situation", t=s_to_hms(now), at=s_to_hms(now)))
+            if getattr(self, "sales", None) is not None:
+                self._sales_step(sit, now)
+
+    def _sales_step(self, sit: dict, now: float) -> None:
+        """0.8.7 (rules/sales.yaml): the Deal tab's state and the sales tips (each once; the same limits as other tips)."""
+        self.sales.update(sit)
+        from .sales import observed_seller
+        self.sales.observed = observed_seller(self.meta())   # 0.8.7 (H2): the role can change in the window
+        hms = s_to_hms(now)
+        self.out_tips.write(dict(self.sales.item(), schema_version=1, engine="app", t=hms, at=hms))
+        recent = " ".join(str(a.get("what", "")) for a in (sit.get("objections") or []))
+        for tip in self.sales.tips(sit, max(0.0, now - self.t_started), recent):
+            if self.paused or self.tips_off():
+                break
+            self.out_tips.write(dict(tip, schema_version=1, engine="app", t=hms, at=hms))
+
+    def sales_fix(self, key: str, state: str, what: str = "") -> None:
+        if getattr(self, "sales", None) is not None:
+            self.sales.fix(key, state, what)
+            hms = s_to_hms(self.clock())
+            self.out_tips.write(dict(self.sales.item(), schema_version=1, engine="app", t=hms, at=hms))
 
     def _asks_to_tips(self, sit: dict, hist: List[Line]) -> None:
         """A new open question or request to the PM that no tip covered yet (a third-person request, an
@@ -1708,6 +1759,13 @@ class Engine:
         ag, cm = getattr(self.rules, "agenda", {}) or {}, getattr(self.rules, "commitments", {}) or {}
         keys = ['"theirs": [{"who": "<name>", "what": "<what they promised, max 12 words, in the call\'s language>", "due": "<day or date, or empty>", "t": "<HH:MM:SS>"}]']
         rules = ["- " + cm.get("model_rule_theirs", "theirs = promises other people made to the PM's side on this call.")]
+        if cm.get("model_rule_not_commitments"):      # 0.8.7: reports of done work are not commitments
+            rules.append("- " + cm["model_rule_not_commitments"])
+        if getattr(self, "sales", None) is not None:  # 0.8.7: the qualification tracker (rules/sales.yaml > call_picture)
+            k, r = self.sales.extra()
+            if k:
+                keys.append(k)
+                rules.append("- " + r)
         rk = getattr(self.rules, "risks", {}) or {}
         keys.append('"risks": [{"what": "<what may go wrong and on what it depends, max 16 words, in the call\'s language>", "who": "<name>", "t": "<HH:MM:SS>"}]')
         rules.append("- " + rk.get("model_rule", "risks = conditional threats said on this call."))
@@ -1833,6 +1891,14 @@ class Engine:
         open asks and the speech points never said. No model call."""
         sit = self.situation or {}
         self._emit_agenda(final=True)
+        if getattr(self, "sales", None) is not None and self.cfg.get("call_md"):
+            try:                     # 0.8.7: the Sales section and the scorecard of the call page (<stem>.sales.json)
+                md = Path(self.cfg["call_md"])
+                asks = [a for a in (sit.get("asks") or []) if a.get("type") != "update"]
+                self.sales.write(md.with_name(md.name[:-3] + ".sales.json" if md.name.endswith(".md") else md.name + ".sales.json"),
+                                 open_questions=len(asks))
+            except Exception as e:  # noqa: BLE001
+                self.out_timing.write({"outcome": "sales_error", "error": repr(e)[:200]})
         try:
             self.write_register()
         except Exception as e:  # noqa: BLE001

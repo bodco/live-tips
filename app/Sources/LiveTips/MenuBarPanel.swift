@@ -240,14 +240,13 @@ struct MenuBarPanel: View {
             Menu(L("menubar.helpAbout")) {
                 Button(L("menubar.setup")) { model.run { $0.openSetup() } }
                 Button(L("menubar.welcomeTour")) { model.run { $0.openOnboarding() } }
+                Button(L("feat.title")) { model.run { _ in FeaturesWindow.show() } }
                 Button(L("settings.how.title")) { model.run { _ in HowItWorksWindow.show() } }
                 Divider()
                 Button(L("menubar.about")) { model.run { $0.openAbout() } }
-                if model.showDev {      // Option held while opening: the tips window on demo data
-                    Divider()
-                    Button(L("menubar.demo")) { model.run { $0.showDemo() } }
-                    Button(L("menubar.demoPresentation")) { model.run { $0.showDemoPresentation() } }
-                }
+                Divider()       // 0.8.7 (L1): the demo calls are always here, no Option key
+                Button(L("menubar.demo")) { model.run { $0.showDemo() } }
+                Button(L("menubar.demoPresentation")) { model.run { $0.showDemoPresentation() } }
             }
             .menuStyle(.borderlessButton).fixedSize()
             Spacer()

@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing = false      // 0.8.7 (A1): "Prefer tabs" never glues the windows together
+        // 0.8.7 (M): the local usage log, on unless Settings > General > Privacy turned it off
+        UsageLog.sink = LocalFileSink(dir: FeatureRegistry.usageDir)
+        UsageLog.enabled = AppConfig.load(from: AppPaths.config).usageLog
         MainActor.assumeIsolated { AppSignature.shared.check() }     // 2026-10-29: onboarding and About show it
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
         installMainMenu()
@@ -144,7 +148,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let helpItem = NSMenuItem()
         main.addItem(helpItem)
         let help = NSMenu(title: L("menu.help"))
+        help.addItem(withTitle: L("feat.title"), action: #selector(openFeatures), keyEquivalent: "").target = self   // 0.8.7 (L1): first
         help.addItem(withTitle: L("settings.how.title"), action: #selector(openHowItWorks), keyEquivalent: "").target = self
+        help.addItem(NSMenuItem.separator())
+        help.addItem(withTitle: L("menubar.demo"), action: #selector(showDemo), keyEquivalent: "").target = self
+        help.addItem(withTitle: L("menubar.demoPresentation"), action: #selector(showDemoPresentation), keyEquivalent: "").target = self
         helpItem.submenu = help
         NSApp.helpMenu = help
         NSApp.mainMenu = main
@@ -299,8 +307,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc func showDemo() { openDemo("--prompter-demo") }
-    @objc func showDemoPresentation() { openDemo("--prompter-demo-presentation") }
+    @objc func showDemo() { UsageLog.log("demo_opened", ["kind": "call"]); openDemo("--prompter-demo") }
+    @objc func showDemoPresentation() { UsageLog.log("demo_opened", ["kind": "presentation"]); openDemo("--prompter-demo-presentation") }
+    @objc func openFeatures() { MainActor.assumeIsolated { FeaturesWindow.show() } }
     func openDemo(_ flag: String) {
         MainActor.assumeIsolated {
             tips?.window?.close()
@@ -358,6 +367,10 @@ final class StartCallModel: ObservableObject {
     @Published var title = ""
     @Published var audience = "auto"
     @Published var callType = "auto"
+    // 0.8.7 (H2): Sales mode on top of any type, with the method (rules/sales.yaml); remembered for the series
+    @Published var salesEnabled = false
+    @Published var salesMethod = ""
+    @Published var salesTouched = false
     /// 0.8.5 (P2): the deck of a Presentation call, its speakers, slide owners and timing.
     @Published var deck = DeckSetup()
     @Published var publicCall = false            // D3: a webinar or an event with strangers: new voices are not saved
@@ -372,11 +385,11 @@ final class StartCallModel: ObservableObject {
     static var uiLang: String { AppConfig.load(from: AppPaths.config).uiLanguage == "uk" ? "uk" : "en" }
     static var contextTemplate: String { templates[uiLang]! }
     static let allTemplates = templates.values.joined(separator: "\n") + "\nДе дивитись (документи, посилання): \nДе дивитись (папки, документи, посилання): "
-    @Published var context = StartCallModel.contextTemplate
+    @Published var context = ""          // 0.8.7 (G1): empty; the hint is a placeholder
     /// An untouched template in the other language (or an older one) is replaced by this language's.
     func refreshTemplate() {
         let t = context.trimmingCharacters(in: .whitespacesAndNewlines)
-        if t.isEmpty || StartCallModel.allTemplates.contains(t) { context = StartCallModel.contextTemplate }
+        if t.isEmpty || StartCallModel.allTemplates.contains(t) { context = "" }
     }
     /// 2026-10-27 (owner): "Add folder" like in Cowork; the context then names only files or links.
     @Published var folders: [String] = []
@@ -573,7 +586,9 @@ final class StartCallModel: ObservableObject {
                                   languages: language.split(separator: "+").map(String.init), context: cleanContext,
                                   workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""), folders: folders,
                                   useProjectFolder: useProjectFolder, callID: id,
-                                  deck: callType == "presentation" && deck.info != nil ? deck : nil)
+                                  deck: callType == "presentation" && deck.info != nil ? deck : nil,
+                                  salesMethod: salesEnabled ? (salesMethod.isEmpty ? "general" : salesMethod) : nil,
+                                  company: project?.crmCompanyName ?? "")
     }
 
     /// Phrase to paste into Cowork to make a prep for this call.
@@ -620,6 +635,15 @@ final class StartCallModel: ObservableObject {
 
     var languageTouched = false               // the PM chose a language by hand: project changes keep it
     func applyProjectDefaults() {
+        // 0.8.7 (H2): Sales follows the series (last choice for this title), else the project's default
+        if !salesTouched {
+            let key = "sales." + EditLog.seriesKey(title)
+            if let saved = UserDefaults.standard.string(forKey: key), !title.isEmpty {
+                salesEnabled = saved != "off"; salesMethod = saved == "off" ? "" : saved
+            } else if let p = project {
+                salesEnabled = p.salesEnabled; salesMethod = p.salesMethod
+            }
+        }
         // QA 26.10: the language follows the project (English client -> English) until the PM picks one.
         guard !languageTouched else { return }
         language = (project?.clientLanguage.lowercased().hasPrefix("english") ?? false) ? "en" : "uk"
@@ -643,6 +667,9 @@ final class StartCallModel: ObservableObject {
                 "project_config": project?.config ?? "", "people": people, "people_team": peopleTeam,
                 "voices_remember": !publicCall, "prep_file": chosenPrepPath ?? "",
                 "folders": folders,
+                "sales": { () -> [String: Any] in
+                    if !title.isEmpty { UserDefaults.standard.set(salesEnabled ? (salesMethod.isEmpty ? "general" : salesMethod) : "off", forKey: "sales." + EditLog.seriesKey(title)) }
+                    return ["enabled": salesEnabled, "method": salesMethod.isEmpty ? "general" : salesMethod] }(),
                 "workspace_root": { let ws = workspace ?? registry.workspaces.first { w in w.projects.contains(project?.slug ?? "\u{0}") }; return (ws?.root == root) ? "" : (ws?.root ?? "") }()]
     }
 

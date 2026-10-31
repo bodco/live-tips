@@ -91,6 +91,10 @@ public enum CommitmentRegister {
             case "done": it.status = "done"; it.doneAt = s(e, "at"); it.doneSource = s(e, "source").isEmpty ? "manual" : s(e, "source")
             case "reopen": it.status = "open"; it.doneAt = ""; it.doneSource = ""
             case "drop": it.status = "dropped"
+            case "edit":          // 0.8.7: the PM changed text, owner or due on the call page
+                if let v = e["text"] as? String { it.text = v }
+                if let v = e["owner"] as? String, !v.isEmpty { it.owner = v }
+                if let v = e["due"] as? String { it.due = v }
             case "link": it.notionPage = s(e, "notion_page"); it.notionNote = ""
             case "unlink": it.notionPage = ""; it.notionNote = (s(e, "reason").isEmpty || s(e, "reason") == "removed") ? "removed" : ""
             default: break
@@ -145,6 +149,31 @@ public enum CommitmentRegister {
         if op == "link" { e["notion_page"] = notionPage }
         if op == "unlink" { e["reason"] = ["removed", "undo"].contains(source) ? source : "removed" }
         append(folder: folder, [e])
+    }
+
+    /// 0.8.7 (E): an edit of an item's text, owner or due date from the call page (op edit, rules/commitments.yaml).
+    public static func edit(folder: String, id: String, text: String? = nil, owner: String? = nil, due: String? = nil) {
+        var e: [String: Any] = ["op": "edit", "id": id, "at": nowISO()]
+        if let text { e["text"] = text }
+        if let owner { e["owner"] = owner }
+        if let due { e["due"] = due }
+        guard e.count > 3 else { return }
+        append(folder: folder, [e])
+    }
+
+    /// 0.8.7 (E2): the PM adds an item under "+ Add" on the call page (op add, by app; rules/commitments.yaml > call_page).
+    /// Returns the new id, or nil for empty text.
+    @discardableResult
+    public static func add(folder: String, text: String, owner: String = "me", project: String, title: String, call: String,
+                           due: String = "") -> String? {
+        let t = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
+        guard !t.isEmpty else { return nil }
+        let o = owner.trimmingCharacters(in: .whitespaces).isEmpty ? "me" : owner.trimmingCharacters(in: .whitespaces)
+        let id = makeID(call: call, owner: o, text: t)
+        append(folder: folder, [["op": "add", "id": id, "text": t, "owner": o, "project": project,
+                                 "series": seriesKey(project: project, title: title), "call": (call as NSString).lastPathComponent,
+                                 "t": "", "created": nowISO(), "due": due, "by": "app"]])
+        return id
     }
 
     /// A due date from free text: an ISO date, "31.10", "31.10.2026", "10/31", a weekday (English or Ukrainian,

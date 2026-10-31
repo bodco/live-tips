@@ -14,3 +14,5 @@ skip_hidden: true
 secret_name_regex: "(secret|credential|password|token|\\.env$|apikey|api_key)"
 call_artefacts: only transcripts (<stem>.md); never tips, state, timing, prep, named or clean copies
 during_call: incremental, changed files only, small batches, only while the ASR queue is empty
+# 0.8.7 (H5, rules/sales.yaml > answer_cards): a document source of its own, same format of the index
+answer_cards: {file: pacenote/answer-cards.md, where: "the project root and each extra folder", always: "indexed even when its folder is excluded; secrets and size rules still apply"}

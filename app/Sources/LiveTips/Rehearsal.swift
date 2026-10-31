@@ -149,6 +149,7 @@ struct RehearsalView: View {
 
     private func begin() {
         index = 0; actual = [:]; items = []; answers = []; scored = []; overall = ""; qi = 0
+        UsageLog.log("rehearsal_started")
         started = Date(); stepStart = Date()
         phase = steps.isEmpty ? .question : .run
         fetchQuestions()      // ready by the time the slides are done
@@ -253,6 +254,7 @@ struct RehearsalView: View {
             try? FileManager.default.removeItem(atPath: tmp)
             if (r["ok"] as? Bool) == true {
                 scored = (r["answers"] as? [[String: Any]]) ?? []; overall = r["overall"] as? String ?? ""
+                UsageLog.log("rehearsal_finished", ["score": avg])
                 RehearsalWindow.save(base: base, .init(date: Date(), score: avg, seconds: Dictionary(uniqueKeysWithValues: actual.map { ("\($0.key)", $0.value) }),
                                                      talkAt: RehearsalWindow.talkModified(base)))
                 phase = .result

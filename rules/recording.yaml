@@ -20,6 +20,12 @@ states:
       silence): a browser tab can keep playing to the speakers while its stream no longer reaches the system audio tap.
       Switching the sound output to another device and back makes the browser reopen its audio. The state's text says so.
     tips: about the other side off until their audio comes back; the PM's words are still recorded
+tap_recovery:
+  # 0.8.7 (owner, 30.10: Zoom in Chrome after a break played to the speakers, the tap delivered only zeros)
+  when: the call is live (not standby) and the call audio has been exact zeros for 45 s while the default output device is playing
+  action: rebuild the system audio tap once per call (a fresh audiocap --source system) and log it
+  never: switch, mute or change the user's output device; a second rebuild in the same call
+  zero_s: 45
 clears: by itself as soon as the silent side has sound again
 show: a red strip under the window title, the tips area replaced by the state, the Mic and Call levels
 who: the app window; the skill's window shows the same status line it always had (no change there)

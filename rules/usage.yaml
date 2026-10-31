@@ -1,0 +1,43 @@
+# Local feature usage log (Pacenote 0.8.7, block M). Shared by the app (UsageLog, Swift) and the engine (usage.py).
+# Purpose: know which features are used and which are not. Local only for now; a server sink comes later behind the
+# same interface (UsageSink) without changes at the call sites.
+schema_version: 1
+file: "<app_root>/usage/YYYY-MM.jsonl"     # one line {"t": ISO 8601, "e": "<event>", "p": {...}}
+keep_months: 12                          # older monthly files are deleted
+rule: >-
+  Never log the words of a call, names of people, projects, clients or files, titles, ids or any free text. Only the
+  event name, the time and the parameters listed below: small numbers, booleans and short fixed values. A string
+  parameter longer than 80 characters is rejected. No user id and no machine id.
+setting:
+  key: usageLog            # Settings > General > Privacy, on by default
+  text_en: "Only event names and numbers, never the words of a call. Stays on this Mac until you choose to send it."
+  text_uk: "Лише назви подій і числа, ніколи слова дзвінка. Лишається на цьому Mac, доки ви самі не вирішите надіслати."
+events:
+  call_started: [type, sales, has_brief]
+  call_ended: [minutes]
+  prepare_run: [type, source, seconds]
+  prepare_again: []
+  presentation_mode_on: []
+  slide_sync: [variant]
+  rehearsal_started: []
+  rehearsal_finished: [score]
+  transcribe_run: [source, minutes]
+  search_calls: []
+  followup_written: []
+  followup_copied: []
+  followup_open_mail: []
+  notion_page_written: []
+  notion_task_ticked: []
+  risk_added: []
+  series_opened: []
+  call_page_edited: [section]
+  tip_shown: [kind]
+  tip_action: [kind, action]
+  help_now: []
+  ask_typed: []
+  hotkey: [name]
+  update_crm: [fields]
+  answer_card_saved: []
+  feature_try_it: [feature]
+  demo_opened: [kind]
+  onboarding_step: [step, skipped]

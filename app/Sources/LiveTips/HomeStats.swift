@@ -10,7 +10,8 @@ struct WeekStats: View {
     @ObservedObject var history = CallHistory.shared
     var compact = false                                           // a narrow Home: lower chart, tiles in one row
     @AppStorage("statsPeriod") private var period = "week"
-    @AppStorage("statsScope") private var scope = ""            // "" = all, "p:<name>", "w:<name>"
+    @AppStorage("statsScope2") private var scope = ""           // 0.8.7: "" = all, "p:<project key>", "w:<workspace>"
+    @AppStorage("statsSales") private var salesOnly = false    // 0.8.7 (B4): Sales calls only
     @State private var from = Calendar.current.date(byAdding: .day, value: -13, to: Date()) ?? Date()
     @State private var to = Date()
     @State private var day: Date?                                 // a clicked bar
@@ -22,7 +23,7 @@ struct WeekStats: View {
 
     /// [start, end) of the chosen period.
     private func range(_ now: Date = Date()) -> (Date, Date) {
-        let cal = Calendar.current
+        let cal = CallStats.calendar          // 0.8.7 (B3): weeks start on Monday, as on Home
         let today = cal.startOfDay(for: now)
         let tomorrow = cal.date(byAdding: .day, value: 1, to: today) ?? now
         switch period {
@@ -39,22 +40,13 @@ struct WeekStats: View {
         }
     }
 
-    /// Project names a scope covers (a workspace: its projects and its own general calls).
-    private func inScope(_ r: CallHistory.Record) -> Bool {
-        if scope.isEmpty { return true }
-        if scope.hasPrefix("p:") { return r.project == String(scope.dropFirst(2)) }
-        let w = String(scope.dropFirst(2))
+    /// 0.8.7 (B2): projects by their registry key, shown by the registry's name; workspaces by name.
+    private var scopes: (projects: [(key: String, name: String)], workspaces: [String]) {
         let reg = ProjectRegistry.load(from: AppPaths.projects)
-        guard let ws = reg.workspaces.first(where: { $0.name == w }) else { return r.project == w }
-        let names = Set(reg.projects.filter { ws.projects.contains($0.slug) }.map(\.name) + [ws.name])
-        return names.contains(r.project)
-    }
-
-    private var scopes: (projects: [String], workspaces: [String]) {
-        let reg = ProjectRegistry.load(from: AppPaths.projects)
-        let seen = Set(history.records.map(\.project))
-        let ps = Set(reg.projects.filter { $0.status != "archived" }.map(\.name)).union(seen.subtracting(reg.workspaces.map(\.name)))
-        return (ps.sorted(), reg.workspaces.map(\.name).sorted())
+        var keys: [String: String] = [:]
+        for p in reg.projects where p.status != "archived" { keys[p.slug] = p.name }
+        for r in CallStats.calls() { let k = CallStats.key(r); if !k.hasPrefix("workspace:") && !k.isEmpty && keys[k] == nil { keys[k] = CallStats.name(ofKey: k, fallback: r.project) } }
+        return (keys.map { ($0.key, $0.value) }.sorted { $0.name.lowercased() < $1.name.lowercased() }, reg.workspaces.map(\.name).sorted())
     }
 
     var body: some View {
@@ -62,7 +54,7 @@ struct WeekStats: View {
         let (start, end) = day.map { (cal.startOfDay(for: $0), cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: $0)) ?? $0) } ?? range()
         let span = end.timeIntervalSince(start)
         let prevStart = start.addingTimeInterval(-span)
-        let recs = history.records.filter { inScope($0) }
+        let recs = CallStats.calls(scope: scope, salesOnly: salesOnly)      // 0.8.7 (B1): hidden calls never count
         let this = recs.filter { $0.start >= start && $0.start < end }.sorted { $0.start > $1.start }
         let prev = recs.filter { $0.start >= prevStart && $0.start < start }
         let mins = this.reduce(0) { $0 + ($1.minutes ?? 0) }
@@ -72,8 +64,8 @@ struct WeekStats: View {
         let prevSpend = scope.isEmpty ? SpendDays.total(from: prevStart, to: start) : prev.reduce(0) { $0 + ($1.costUSD ?? 0) }
         let prepared = this.filter { $0.prepared == true }.count
         let (rs, re) = range()
-        let bars: [Bar] = Dictionary(grouping: recs.filter { $0.start >= rs && $0.start < re }, by: { "\(cal.startOfDay(for: $0.start).timeIntervalSince1970)|" + $0.project })
-            .map { k, v in Bar(date: cal.startOfDay(for: v[0].start), project: v[0].project, minutes: v.reduce(0) { $0 + ($1.minutes ?? 0) }) }
+        let bars: [Bar] = Dictionary(grouping: recs.filter { $0.start >= rs && $0.start < re }, by: { "\(cal.startOfDay(for: $0.start).timeIntervalSince1970)|" + CallStats.key($0) })
+            .map { k, v in Bar(date: cal.startOfDay(for: v[0].start), project: CallStats.name(ofKey: CallStats.key(v[0]), fallback: v[0].project), minutes: v.reduce(0) { $0 + ($1.minutes ?? 0) }) }
             .sorted { ($0.date, $0.project) < ($1.date, $1.project) }      // QA: the same stack order every day
         let longest = this.max { ($0.minutes ?? 0) < ($1.minutes ?? 0) }
         let busiest = Dictionary(grouping: this, by: { cal.startOfDay(for: $0.start) }).mapValues { $0.reduce(0) { $0 + ($1.minutes ?? 0) } }.max { $0.value < $1.value }
@@ -195,7 +187,7 @@ struct WeekStats: View {
         if !this.isEmpty { fact(L("stats.average"), hm(mins / Double(this.count))) }
     }
 
-    @ViewBuilder private func pickers(_ sc: (projects: [String], workspaces: [String])) -> some View {
+    @ViewBuilder private func pickers(_ sc: (projects: [(key: String, name: String)], workspaces: [String])) -> some View {
         Picker("", selection: Binding(get: { period }, set: { period = $0; day = nil })) {
             ForEach(Self.periods, id: \.0) { Text($0.1).tag($0.0) }
         }
@@ -203,9 +195,10 @@ struct WeekStats: View {
         Picker("", selection: $scope) {
             Text(L("stats.allProjects")).tag("")
             if !sc.workspaces.isEmpty { Section(L("stats.workspaces")) { ForEach(sc.workspaces, id: \.self) { Text($0).tag("w:" + $0) } } }
-            Section(L("stats.projects")) { ForEach(sc.projects, id: \.self) { Text($0).tag("p:" + $0) } }
+            Section(L("stats.projects")) { ForEach(sc.projects, id: \.key) { Text($0.name).tag("p:" + $0.key) } }
         }
         .labelsHidden().fixedSize()
+        Toggle(L("stats.salesOnly"), isOn: $salesOnly).toggleStyle(.checkbox).fixedSize()
     }
 
     static let dayFmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "EEE d MMM"; return f }()

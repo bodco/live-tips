@@ -3,6 +3,56 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.7
+
+- **Windows without tabs (A):** no window ever joins a tab group, whatever "Prefer tabs" says. The call page, a
+  series, a transcript and Statistics open inside Home with Back and Command-[; the follow-up email is the call page's
+  right panel. Call memory is 640 by 520 with the last call's project chosen and the last three questions.
+- **One source for the numbers (B):** Home's week and Statistics count the same calls (hidden calls never count);
+  projects are matched by key, so "Orbit" and "orbit" are one; the week runs Monday to Sunday; a Sales calls filter.
+- **Home hero (C):** with no call ahead Home shows what is due on you today, else the last call of the past 3 days,
+  else one small line; an empty Later is hidden.
+- **Series and commitments (D):** "Since last time" shows only changes; open commitments are grouped by owner with a
+  "new" tag; a report of done work ("set up", "sent") is no longer a commitment (rules/commitments.yaml).
+- **Editable call page (E):** Edit on the call page changes decisions, items on you and on them (text and due date),
+  open questions and risks; the change is a new call picture line and an `edit` event in the register, and the call's
+  Notion page is updated at once with a status line and Retry. Risks go to the Risks database chosen in Settings.
+- **Settings > Integrations (F):** General, Projects, Integrations, AI, About. Integrations has a card each for
+  Notion, Calendars and HubSpot. Notion: one Meetings, Tasks and Risks database for all projects, the project as a
+  property, Fill from project configs; per-project meeting databases migrate to the most used one with a one-time
+  note. Projects get In Notion, Sales with a method and Answer cards. No field is focused when Settings opens; model
+  ids are in tooltips. Haiku is the default tip model for new installs.
+- **Start call (G):** an empty "What matters" with a hint, Prepare and Start call in the footer, Sales in Options with
+  the method and its description, a CRM line with Refresh.
+- **Sales mode (H):** an option on top of any call type, with General sales (default), BANT, SPICED or MEDDIC from
+  rules/sales.yaml. A Deal tab and a "BANT 2/4" chip in the call window, sales tips (objection, qualify, pain, next
+  step, competitor, buying signal), answer cards per project, a sales part of the brief with company web search (only
+  the company's name or domain), a Sales section and a scorecard on the call page and in Notion.
+- **HubSpot (I):** a service key in the Keychain, Test, the list of scopes with Copy list; a local snapshot of the
+  company, deal, contacts and activity next to the brief; Update HubSpot after a call with checkboxes, Apply and Undo
+  for 8 seconds. Nothing is written without a click; the transcript is off by default.
+- **Small things (J):** the follow-up is written when the panel opens; only the due date is red in On you, the
+  project is not repeated, the filter is a "Project" pop-up.
+- **What Pacenote can do (L):** a page in Help, the menu bar and on Home for the first 14 days, with Try it and how
+  often each feature was used; buttons that depend on a condition stay visible, greyed out with the reason (Rehearse,
+  Series, Add to risk register, Update CRM); the demo calls are always in Help; the welcome tour can create the
+  folder structure, offers to continue without Claude honestly and shows the three shortcuts, which come back once
+  on the first call; How Pacenote works links to the new page.
+- **Local usage log (M):** event names and numbers only (rules/usage.yaml), one file a month in the app's folder,
+  12 months kept, a switch in Settings > General > Privacy. A server sink can be added later behind the same interface.
+- **Finishing (31.10):** call page rows edit in place (double-click or Return, Esc cancels) with Edit, Copy text and a
+  menu (Move, Change owner, Set due date, Delete, Save as answer card), "+ Add" per section, agenda state chips, Notion
+  sync 2 s after the last change with "Synced to Notion · 5 s ago" or Retry; the follow-up panel on Option-Command-I
+  (a sheet in a narrow window); Integrations pages with Back and Command-[; database pickers with search, the project
+  property and In Notion values picked from Notion (no ids shown), several relation pages per project; Start call
+  in one scroll with a date field, a language pop-up, slide tiles with their first words and the brief as a status
+  line; Transcribe languages as chips with More; Series pill in Recent; answer cards as a list, indexed, used first
+  by Ask and HELP NOW in Sales mode; HubSpot page with matching, owner, what is read and written, qualification
+  fields; welcome tour with a picture of the audio permission, add-ons in plain words and an Install Python button;
+  Connect Claude on Home; conditional buttons explain themselves everywhere; the system-audio tap is rebuilt once
+  when it hears only silence for 45 s while the Mac is playing sound.
+- **Docs:** a review of the guides against the app (tip model, settings paths, hotkeys, Home, after-call notes).
+
 ## 0.8.6
 
 - **Call window title bar (A):** the pin is back (Always on top, remembered; Option-Command-T); a taller title bar

@@ -193,6 +193,7 @@ enum TalkWindow {
         model.askAgain = openAgain
         models[base] = model
         let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { TalkView(model: model).frame(minWidth: 720, minHeight: 640) }))
+        w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
         w.styleMask.insert(.resizable)
         w.isReleasedWhenClosed = false
         w.title = L("talk.window", ["call": title])

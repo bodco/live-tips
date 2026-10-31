@@ -1,3 +1,4 @@
+import LiveTipsCore
 import SwiftUI
 
 /// Languages the speech model (Whisper) knows, for the call's language choice (2026-10-27, owner:
@@ -132,5 +133,86 @@ struct OptionList: View {
             }
         }
         .padding(10).frame(width: 300)
+    }
+}
+
+// MARK: - 0.8.7 (G4, J2): short language choices
+
+extension Languages {
+    private static let recentKey = "recentCallLangs"
+
+    /// The languages to offer first: English and Ukrainian, the languages of the PM's projects, the last 3 used.
+    @MainActor
+    static func suggested(including current: [String] = []) -> [String] {
+        let reg = ProjectRegistry.load(from: AppPaths.projects)
+        let fromProjects = reg.projects.filter { $0.status != "archived" }.flatMap { $0.defaultLanguage.split(separator: "+").map(String.init) }
+        let recent = UserDefaults.standard.stringArray(forKey: recentKey) ?? []
+        var seen = Set<String>(), out: [String] = []
+        for c in top + fromProjects + recent + current where all.contains(where: { $0.code == c }) && seen.insert(c).inserted { out.append(c) }
+        return out
+    }
+
+    /// Keeps the last 3 languages chosen (newest first).
+    static func remember(_ codes: [String]) {
+        var r = UserDefaults.standard.stringArray(forKey: recentKey) ?? []
+        for c in codes.reversed() { r.removeAll { $0 == c }; r.insert(c, at: 0) }
+        UserDefaults.standard.set(Array(r.prefix(3)), forKey: recentKey)
+    }
+
+    static func toggle(_ code: String, in codes: [String]) -> [String] {
+        if codes.contains(code) { return codes.count > 1 ? codes.filter { $0 != code } : codes }
+        return codes + [code]
+    }
+}
+
+/// 0.8.7 (J2): the language as a row of chips (the suggested languages) plus "More…", a popover with search.
+struct LanguageChips: View {
+    @Binding var codes: [String]
+    @State private var more = false
+
+    var body: some View {
+        let list = Languages.suggested(including: codes)
+        HStack(spacing: 6) {
+            ForEach(list, id: \.self) { c in
+                let on = codes.contains(c)
+                Button { codes = Languages.toggle(c, in: codes); Languages.remember(codes) } label: {
+                    HStack(spacing: 4) {
+                        if on { Image(systemName: "checkmark").font(.caption2.weight(.bold)) }
+                        Text(Languages.name(c))
+                    }
+                    .font(PN.Font.caption.weight(on ? .semibold : .regular))
+                    .foregroundStyle(on ? PN.C.accent : PN.C.text2)
+                    .padding(.horizontal, 9).padding(.vertical, 4)
+                    .background(Capsule().fill(on ? PN.C.accent.opacity(0.14) : PN.C.surface2))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+            Button(L("lang.moreButton")) { more = true }.buttonStyle(.pnTertiary)
+                .popover(isPresented: $more, arrowEdge: .bottom) {
+                    LanguagePicker(codes: Binding(get: { codes }, set: { codes = $0; Languages.remember($0) }))
+                }
+        }
+    }
+}
+
+/// 0.8.7 (G4): the language as a pop-up: the suggested languages with ticks, then "More…" with search.
+struct LanguageMenu: View {
+    @Binding var codes: [String]
+    @State private var more = false
+
+    var body: some View {
+        Menu {
+            ForEach(Languages.suggested(including: codes), id: \.self) { c in
+                Toggle(Languages.name(c), isOn: Binding(get: { codes.contains(c) }, set: { _ in
+                    codes = Languages.toggle(c, in: codes); Languages.remember(codes) }))
+            }
+            Divider()
+            Button(L("lang.moreButton")) { more = true }
+        } label: { Text(Languages.label(codes)) }
+        .menuStyle(.borderlessButton).fixedSize()
+        .popover(isPresented: $more, arrowEdge: .bottom) {
+            LanguagePicker(codes: Binding(get: { codes }, set: { codes = $0; Languages.remember($0) }))
+        }
     }
 }

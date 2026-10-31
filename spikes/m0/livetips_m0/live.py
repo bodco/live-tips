@@ -105,6 +105,14 @@ def _onme_mine(eng, value) -> None:
     eng.add_mine(raw, fid.strip(), ftext.strip())
 
 
+def _deal_fix(eng, value) -> None:
+    """0.8.7: "<criterion>|<unknown|partial|known>|<what>": the PM's click in the Deal tab."""
+    k, _, rest = str(value or "").partition("|")
+    st, _, what = rest.partition("|")
+    if hasattr(eng, "sales_fix"):
+        eng.sales_fix(k.strip(), st.strip(), what.strip())
+
+
 def _tips_lang(eng, value) -> None:
     """0.8.5 (rules/meeting.yaml > tips_language): the window's language switch for tips and cards."""
     v = str(value or "").strip().lower()
@@ -134,6 +142,7 @@ SETTINGS = {
     "onme_state": _onme,
     "onme_fix": _onme_fix,
     "onme_mine": _onme_mine,
+    "deal_fix": _deal_fix,
     "tips_lang": _tips_lang,
     "commitment_closed": lambda eng, v: eng.commitment_closed(str(v or "")),  # the app wrote the register
 }
@@ -294,6 +303,7 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
     wait_for(md)
     if cfg.get("variant") == "app":           # Pacenote 0.8: the register next to the transcript
         cfg.setdefault("register_dir", str(md.parent))
+    cfg.setdefault("call_md", str(md))         # 0.8.7: the Sales summary goes next to the transcript
     eng, stem = build_engine(cfg, md, out, now_sod, provider)
     (out / (stem + ".app.run.json")).write_text(json.dumps({
         "md": md.name, "mode": "live", "variant": cfg.get("variant"), "models": cfg["models"],

@@ -18,8 +18,8 @@ goes into the Meetings DB: into the meeting's existing page (for example the one
 Meeting Notes created) or into a new one when there is none.
 
 There is also the **Pacenote app (beta)**: a native macOS menu bar app that runs the same loop
-without a Cowork chat, with your own Claude API key. It reads the same rules and shows the same
-tips window. See [section 14](#14-live-tips-app-beta).
+without a Cowork chat, with your own Claude API key or your Claude account. It reads the same rules
+and shows the same tips window. See [section 14](#14-live-tips-app-beta).
 
 This document is written for three situations:
 
@@ -290,13 +290,15 @@ action items), `<title>.polls.jsonl` (every poll), `<title>.tips.jsonl` and
 ### 5.0 Before the call: model and preparation
 
 **Which model to use for the session.** Every second of the model's thinking adds to the
-tip delay, so the choice depends on the call:
+tip delay, and a late tip is no use. Measured on a 14-minute recording (29.10.2026):
 
-| Call | Model | Why |
-|---|---|---|
-| Regular syncs, stand-ups, status calls | Sonnet 5.5, low or medium effort | Keeps up with the conversation and is careful enough for the answer check |
-| Client interview, escalation, steering, hard negotiation | Opus 5.5 | Sees contradictions and gaps better; a 10-30 s delay is acceptable on such calls |
-| Haiku | not recommended | Too shallow for the answer check and multilingual nuance |
+| Model | Role | Cost of the call | Median delay | Tips on time |
+|---|---|---|---|---|
+| Haiku 5.5 | Default and recommended for live tips | $0.05 | 1.6 s | 40% |
+| Sonnet 5.5 | Fallback when late tips bother you | $0.27 | 2.0 s | 100% |
+| Opus 5.5 | Not for live tips: the slowest and the dearest | $0.71 | 3.5 s | 20% |
+
+Opus (or Sonnet) belongs to the preparation before an important call, not to the tips during it.
 
 **Preparation in the same session.** Works best like this: open a session in the Cowork
 project, do the prep first, and write `live tips` right before the call.
@@ -997,10 +999,10 @@ The same list is on the website: [tower.bodco.pm/open-source](https://tower.bodc
 | sherpa-onnx (k2-fsa) | Computes speaker embeddings from audio | Apache-2.0 | [github.com/k2-fsa/sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) |
 | ONNX Runtime | Inference engine under sherpa-onnx | MIT | [github.com/microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) |
 | WeSpeaker ResNet34 (`wespeaker_en_voxceleb_resnet34_LM`) | The voice model that tells speakers apart | Apache-2.0 (WeSpeaker code); the pretrained model is trained on VoxCeleb, which is CC BY 4.0: see the model page | [WeSpeaker pretrained models](https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md), [VoxCeleb licence](https://www.robots.ox.ac.uk/~vgg/data/voxceleb/) |
-| Ollama | Local server for the text embedding model (optional) | MIT | [github.com/ollama/ollama](https://github.com/ollama/ollama) |
+| Ollama | Local server for the skill's text embedding model and for the app's optional local model (Gemma 4 26B, plan B for the preparation and the after-call notes) | MIT | [github.com/ollama/ollama](https://github.com/ollama/ollama) |
 | BAAI `bge-m3` | Multilingual text embeddings: facts by meaning, project index (optional) | MIT | [huggingface.co/BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3) |
 | Apple system frameworks: AVAudioEngine, Core Audio process taps, AppKit, WKWebView | Microphone and system audio capture, the tips window | Part of macOS, Apple SDK terms | [developer.apple.com](https://developer.apple.com/documentation/) |
-| Claude (Anthropic), in Claude Cowork | Reads the transcript and writes tips, the brief and the wrap-up | Commercial service under your Claude plan, not open source | [anthropic.com](https://www.anthropic.com/) |
+| Claude (Anthropic), in Claude Cowork or in the app (API key or Claude Code) | Reads the transcript and writes tips, the brief and the wrap-up | Commercial service under your Claude plan or API account, not open source | [anthropic.com](https://www.anthropic.com/) |
 | Notion API | Reads project context, writes the meeting page | Commercial service, Notion terms | [developers.notion.com](https://developers.notion.com/) |
 
 Licences change; the links above are the authority, this table is a snapshot of October 2026.
@@ -1072,7 +1074,7 @@ What it does:
 - in **Start call**: your role on an interview (observer, interviewer, or coach when you are
   the one being interviewed, as in the skill) and a line
   that confirms the project (people, Claude on or off, the last call, the Notion mirror);
-- the Notion mirror without a terminal: Settings > General > Notion mirror > **Set up sync**
+- the Notion mirror without a terminal: Settings > Integrations > Notion > Local copy of Notion > **Set up sync…**
   (details in [`notion-mirror`](../../notion-mirror/README.md)).
 
 **It is a beta.**
@@ -1175,18 +1177,18 @@ window reads the recorder's status every 0.5 s.
 
 | Part | What |
 |---|---|
-| Top | Start call (Plan an upcoming call during a call), Plan a call. Insights stand on top (lower in a narrow window); a wide window puts them next to the calls |
+| Top | Today with the date and today's calls; Search calls (Command-F), Transcribe a recording, Plan a call, Start call (Command-N; not shown during a call), the gear for Settings |
 | Live call | Title, timer, lines, tips, cost; Show tips, End call |
 | Ahead | The calls from the ticked calendars (from 3 h ago to 36 h ahead, declined ones left out) and the Up next calls, by time. Each: time, "in progress" or "in 5 min", repeat mark, project, account and calendar, preparation state, "Same time as ..." when calls overlap. Prepare (asks first: the project or workspace and "What matters on this call", filled from the last call of the series; then writes the preparation; does not start the call), Set up..., Start (Switch... during a call), × (hides the event here; the calendar is not changed) |
-| Insights | A period (today, this week, last week, this month, last 30 days or your own dates) and a project or workspace; click a day in the chart to see that day. Calls, time on calls, Claude spend (counted by day from 0.6.8 on; for one project, the cost of its calls) and how many calls were prepared, each against the period before; the calls of the selection (double-click opens the transcript); minutes per day by project; the longest call, the busiest day, the average call. Settings > General > "Show this week's numbers on Home" hides it and the monthly spend (for a demo) |
-| Recent calls | The last 40 calls (the app's and the skill's transcripts of the last 45 days): Notion, Transcript, Show in Finder, × (hides it from the list; files stay) |
-| Bottom | Claude API key, this month's spend against the limit, a link to the balance in the Anthropic Console (an API key cannot read it), Notion copy, local AI, calendars |
+| This week and Insights | Home shows this week's calls, time on calls and how many were prepared (no dollars); Details opens Insights: a period (today, this week, last week, this month, last 30 days or your own dates) and a project or workspace; click a day in the chart to see that day. Calls, time on calls, Claude spend (counted by day from 0.6.8 on; for one project, the cost of its calls) and how many calls were prepared, each against the period before; the calls of the selection (double-click opens the transcript); minutes per day by project; the longest call, the busiest day, the average call. Settings > General > "Show this week's numbers on Home" hides it and the monthly spend (for a demo) |
+| Recent | The last 5 calls (from the app's and the skill's transcripts of the last 45 days): Notion, Transcript, Show in Finder, × (hides it from the list; files stay) |
+| Bottom | A status line: Claude connected, Notion copy synced or stale, the number of calendars, and a warning when spending is close to the monthly limit; red only when something is not connected, a click opens Settings. The month's spend and the balance link are in Settings > AI |
 
-**Calendars (Settings > Calendars).** Pacenote reads calendars through macOS (EventKit), so several Google
+**Calendars (Settings > Integrations > Calendars).** Pacenote reads calendars through macOS (EventKit), so several Google
 and Microsoft accounts work at once and nothing has to be installed:
 1. System Settings > Internet Accounts > Add Account: Google, or Microsoft Exchange (work) / Outlook.com
    (personal); keep Calendars on. Repeat for every account.
-2. Settings > Calendars > Connect calendars (macOS asks once).
+2. Settings > Integrations > Calendars > Connect calendars (macOS asks once).
 3. Tick the calendars with your calls (All / None per account); the rest never shows.
 Read only: Pacenote never changes an event. A company that blocks Mail and Calendar on Macs blocks this too.
 An optional reminder before calendar calls is off by default (your calendar already reminds you).
@@ -1198,7 +1200,7 @@ time, the participants ("Participants:" line) and, for a regular meeting, everyt
 **Regular meetings.** When a call starts, its setup is remembered (`series.json` in the app folder): project,
 audience, type, languages, the "What matters on this call" text, folders, role and tip model, by the calendar
 series and by the title. The next call of the series starts from it ("Set up like the last ... call"), and
-a typed title that was used before offers "Use its settings". Settings > Calendars > Forget all clears it.
+a typed title that was used before offers "Use its settings". Settings > Integrations > Calendars > Forget all clears it.
 
 **Proactive tips in the top bar.** 💡 switches proactive tips on and off during the call. The top bar order:
 the status dot, the title, the timer; 💡 proactive, ⏸ pause (tips and transcript), 🎙 mic; transcript, ⚙.
@@ -1227,7 +1229,7 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
 - **Start tips when a call begins.** When Zoom, Microsoft Teams or a browser call (Google Meet: the microphone is in
   use by another app) is on and the calendar has a call now (within 5 minutes of its start), Pacenote offers once,
   as a notification and a banner on Home: "Start tips for Orbit weekly?" with the project of the series. It never
-  records by itself. Settings > Calendars > "Suggest starting tips when a call begins" (on by default).
+  records by itself. Settings > Integrations > Calendars > "Suggest starting tips when a call begins" (on by default).
 
 ### 14.1e After the call: call page, follow-up email, memory, series, statistics, risks, rehearsal (0.8)
 
@@ -1246,8 +1248,9 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
 - **Statistics.** Home > This week > Details adds "How the calls went": how much you spoke, questions to you left
   open, calls without a decision, and decisions per call with a brief and without. No dollars.
 - **Risks.** The call picture catches conditional threats ("if the API slips, the pilot moves a week"): a quiet Risk
-  card during the call, a Risks section after it. "Add to risk register" writes one page into the project's Notion
-  risk database (`risks_db` in the project config) only after you confirm.
+  card during the call, a Risks section after it. "Add to risk register" writes one page into the Notion
+  Risks database (Settings > Integrations > Notion > Databases, one for all projects; `risks_db` from the project
+  config when none is chosen) only after you confirm.
 - **Rehearsal.** For a presentation with a preparation (outline or slides): Rehearse on Home or in the call form.
   Nothing is recorded: the steps run with their timers, then Claude asks 4 client questions, you answer in writing
   and get a score and one better first sentence for each answer.
@@ -1267,6 +1270,13 @@ limits, no key) and the API key (billed per token). Then each job picks its way 
 | After the call | Claude account | Summary and Notion page, follow-up email, call memory, rehearsal, the tip judge: not time-critical |
 
 Models live only here: the call form no longer has its own tip model.
+
+**The tip model.** Haiku is the recommended model for tips during the call (owner decision of 29.10.2026,
+measured on a 14-minute recording: Haiku $0.05, median 1.6 s, 40% of tips on time; Sonnet $0.27, 2.0 s, 100% on
+time; Opus $0.71, 3.5 s, 20%). Choose Sonnet in **Tip** if late tips bother you. Since 0.8.7 Haiku is
+preselected in **During the call > Tip** for new installs. **Classify**
+(decides whether a tip is needed) is Haiku by default. A typical call, a Sonnet preparation through the API key and
+Haiku tips, costs about $1.05 for 30 minutes and $1.15 for an hour.
 
 **Switch automatically when one way is out** (on by default). When the chosen way stops working
 (the API credit is used up, the app's own monthly limit is reached, the plan limit is reached,
@@ -1339,9 +1349,9 @@ transcript joins the project's live/ folder like a call, so the next preparation
 to Notion, Save as Markdown, Save as Word. Nothing is sent without a click. Home's Recent marks these with File or
 Link.
 
-**C. Settings > Notion.** The Keys tab is gone: the token, its status ("sees N databases and M pages"), meeting
-pages (a project without a Control Tower config can send its pages to its own database), your tasks and the local
-copy of Notion are on one tab.
+**C. Notion settings in one place.** The Keys tab is gone: the token, its status, meeting pages, your tasks and the
+local copy of Notion are on one page. Since 0.8.7 it is **Settings > Integrations > Notion** (next to Calendars and
+HubSpot), with one Meetings database for all projects: the project is a property of each page.
 
 **D. Your Notion tasks in On you** (rules/notion-tasks.yaml, off by default). Choose the tasks database, optionally who "me" is
 (a person property and a person; leave Anyone when you keep the database alone and every task is shown), Show only when (one or more conditions), what a tick sets, the due date property
@@ -1374,28 +1384,80 @@ and a click on an item moves it on (not raised, now, done).
 **Recording.** When the call plays in a browser and Pacenote hears only silence, switching the sound output to
 another device and back makes the browser reconnect its audio; the "Can't hear the other side" state says so.
 
+### 14.1i Pacenote 0.8.7: Integrations, editable call page, Sales mode, HubSpot
+
+**Windows and navigation.** Pacenote windows never join a tab group. The call page, a series, a transcript and
+Statistics open inside Home; Back (or Command-[) returns. The follow-up email is the right panel of the call page.
+
+**Settings.** The sidebar is General, Projects, Integrations, AI, About. Integrations lists Notion, Calendars and
+HubSpot as cards with their state; a click opens the page. On the Notion page, Databases holds one Meetings, one
+Tasks and one Risks database for all projects. The project is a property of each page: write its name next to the
+database (Project if empty) and set each project's value in Settings > Projects > In Notion. Fill from project
+configs takes the databases most of your Control Tower configs name. Without a Notion token every section but the
+connection is greyed out.
+
+**Editing the call page.** Edit (Command-E) turns decisions, items on you and on them (text and due date), open
+questions and risks into fields; Save writes a new call picture and the register's `edit` events. When the call
+already has a Notion page, the same sections on that page are rewritten at once; a line under the title says
+"The Notion page is updated" or why not, with Retry. The rest of the page (your notes, comments) is not touched.
+
+**Sales methods.** Sales is an option on top of any call type (Start call > Options > Sales), remembered for the
+series; the default per project is in Settings > Projects. The methods live in `rules/sales.yaml`, a new one is data:
+
+| Method | What Pacenote follows |
+|---|---|
+| General sales (default) | the client's pain, the value for them, objections, a next step with a date |
+| BANT | Budget, Authority, Need, Timeline |
+| SPICED | Situation, Pain, Impact, Critical event, Decision |
+| MEDDIC | Metrics, Economic buyer, Decision criteria, Decision process, Identify pain, Champion |
+
+During the call the Deal tab shows each criterion as unknown, partly or known with what was said; a click changes
+the state. For BANT, SPICED and MEDDIC a chip like "BANT 2/4" sits in the header. Sales tips: objection, qualify,
+pain, next step (5 minutes before the end without a dated step), competitor, buying signal. Answer cards are short
+ready answers per project in `<project>/pacenote/answer-cards.md` ("## question", then the answer), edited in
+Settings > Projects. The preparation adds Company (a web search with the company's name or domain only; switch it off
+in Settings > AI), From CRM, Where we are, Likely objections, Questions to ask and Goal of this call. After the call
+the call page has a Sales section and a scorecard (criteria known, your talk share, open questions).
+
+**Connect HubSpot.** In HubSpot: the left navigation's More > Development, then Keys > Service Keys (or open
+app.hubspot.com/service-keys/ followed by your account id) > Create service key; name it Pacenote; Add new scope and choose the ten scopes listed on Settings > Integrations > HubSpot (Copy list copies them);
+Update, Create, confirm; copy the key. In Pacenote: Settings > Integrations > HubSpot, paste the key, Save, Test. The
+key stays in the Keychain. Pacenote reads the company (by the attendees' email domains, else the name), its freshest
+open deal, contacts, the last 10 activities and open tasks into `<brief>.crm.md` when you press Refresh in Start
+call. It writes only from the call page's menu, Update HubSpot: a note on the deal, company and contacts, deal fields
+(next step, the stage only if you type one), a follow-up task, each with a checkbox; Apply writes, Undo works for 8
+seconds. The transcript goes into the note only if you turn that on.
+
+**What Pacenote can do.** Help > What Pacenote can do lists every feature with Try it and how often you used it
+(from the local usage log, Settings > General > Privacy). For the first 14 days it is also a card on Home.
+
 ### 14.2 After the call: the meeting page in Notion
 
-With **Settings > General > Write the call summary to Notion** on, the app writes the wrap-up
-into Notion by itself when you end the call. You can also send the last call later from the
+After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the
+project's `live/` folder), with or without Notion; later preparations read them. With **Settings >
+Integrations > Notion > Meeting pages > Write a meeting page after each call** on, it also writes the
+wrap-up into Notion by itself when you end the call. You can also send the last call later from the
 menu bar: **Send last call to Notion**.
 
 1. One Claude call turns the transcript and the tips into a wrap-up: action items with owners
    and dates, decisions, your commitments, new requests (scope change candidates), open
    questions and risks.
-2. The app looks for this meeting's page in the project's Meetings DB: a page whose `Date` is
+2. The app looks for this meeting's page in the Meetings database (one for all projects, chosen in
+   Settings > Integrations > Notion > Databases): a page whose `Date` is
    within 20 minutes of the call start (a Notion AI Meeting Notes page created from the calendar
    counts).
 3. Found: it appends a **Pacenote** section to that page. Not found: it creates a new page with
-   the project and workspace relations and a real date mention in the title, like the skill.
+   the project set in the page's project property (a relation from the project config, or the
+   project's name as a select or text) and a real date mention in the title, like the skill.
 4. The transcript goes into a child page of the meeting page ("Transcript (Pacenote) · <call>"), one line per paragraph; the file stays in the project's `live/` folder.
 
 What it needs:
 
-- a Notion token in **Settings > Keys** (an internal integration from
-  [notion.so/my-integrations](https://www.notion.so/my-integrations)) that has access to the
-  Meetings DB;
-- the project config with `meetings_db` and `project_page_id` (section 4, step 7).
+- a Notion token in **Settings > Integrations > Notion** (an internal integration from
+  [notion.so/profile/integrations](https://www.notion.so/profile/integrations)) that has access to the
+  Meetings database;
+- the Meetings database chosen in **Settings > Integrations > Notion > Databases** (or, when none is
+  chosen there, `meetings_db` from the project config, section 4, step 7).
 
 Only the transcript text goes to Claude and Notion; audio never leaves the Mac. A finished
 write shows an alert with **Open in Notion**. If the skill already wrote a page for the same
@@ -1426,13 +1488,18 @@ that scores every tip of both sides 1 to 5 without knowing which side wrote it.
 - **Control-Option-M**: your microphone off or on (the app).
 - **Control-Option-T**: the compact tips window (the app).
 - **Control-Option-L**: proactive tips on or off (the app, since 0.8.1).
+- **Control-Option-S**: presentation mode on or off (the app, since 0.8.5).
+- **Control-Option-Left / Right**: the previous or the next slide, and **Control-Option-=**: +30 s on
+  the slide (the app, only while presenting, so they never take the keys from a window manager).
+- **Option-Command-T**: always on top, while the call window is in front (the app, since 0.8.6; fixed).
 
 In the app the tips window has three icon buttons in its top bar, after On me: the microphone
 (crossed out in red when it is off), pause (on pause it turns into a Resume button, and the
 recording dot and the timer turn grey) and a bulb for proactive tips (tinted blue when they are
 on). Each tooltip shows the shortcut; screen readers get the button's name and whether it is
 pressed. HELP and pause are also in the menu bar menu during a call, with the shortcut next to
-them, and **Settings > General > Shortcuts** lists all five and lets you change them. The skill's
+them, and **Settings > General > Shortcuts** lists them all and lets you change every one except
+Option-Command-T. The skill's
 tips window (live-transcriber) has HELP and pause since 2026-10-22; when both run, the one
 started first owns them.
 ### 14.5 How the tips engine decides (since 0.5.1)
@@ -1482,7 +1549,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    slide: a question in the Q&A gets the prepared answer locally in about a second. A red card
    with the PM's entry line appears before the PM's next slide, and one time line ("⏱ 18:00 з
    40:00 · behind 2 min") replaces the red timing cards.
-11. **Rated after every call.** With Settings > AI > "Rate tips after each call" on (default), the
+11. **Rated after every call.** With Settings > AI > "Rate tips after each call" on (off for new installs, see 44), the
    app runs a quick blind judge (Sonnet, up to 25 tips of the app and the skill, about $0.10) and
    shows "Last call: app 3.4/5, skill 2.9/5" in the menu; details in `<call>.judge/`.
 12. **The speech first.** When the prep has the PM's speech ("Your speech" in the brief), the app
@@ -1520,15 +1587,15 @@ address", `references/sweep.md`, `references/presentation.md`).
    series a voice that matches one of them well is named by itself. "Clear speakers" (in the
    transcript pane and the speaker popover, two clicks) removes the names of this call and forgets
    the series.
-22. **How it works.** Settings > How it works: what runs on the Mac, what Claude gets and when, and
-   what to expect.
+22. **How it works.** How Pacenote works (since 0.8 in the Help menu and in the menu bar's Help and
+   About, no longer in Settings): what runs on the Mac, what Claude gets and when, and what to expect.
 23. **Start call layout.** Project, Title, Date and time (today, the next full hour; it goes into
    the Cowork request), then the folder and team line. Call context starts as a template (goal,
    participants, open questions, where to look); empty template lines are not sent. Names after
    "Учасники:" / "Participants:" are the only names the speaker cards offer; anyone else is typed.
 24. **Fix a speaker from the transcript.** Click the speaker of a line in the transcript pane: give
    the line to another speaker or a typed name, or rename that speaker in every line.
-25. **Voice library scopes.** Settings > AI > Voice library: the menu next to each person moves the
+25. **Voice library scopes.** Settings > AI > Speakers: the menu next to each person moves the
    voice to the team (every project), a whole workspace (all its projects) or one project.
 26. **The call picture (0.5.4, after the 26.10 review).** A fast model keeps a running picture of the
    call every ~10 s: the topic and whose it is, open questions and requests to you (also "Alex will
@@ -1574,8 +1641,9 @@ address", `references/sweep.md`, `references/presentation.md`).
    a client's site, a Google Doc or Sheet shared with anyone (read through its text export), a public
    Notion page (often only partly, Notion renders with scripts). Pages behind a sign-in are skipped and
    named in the brief's sources.
-38. **Demo window.** Hold Option while opening the menu: "Demo Live Tips" and "Demo Live Tips:
-   presentation" show every element of the window with sample data, for checking the window without a call.
+38. **Demo window.** Help and About in the menu bar (and the Help menu): "Demo call" and "Demo call:
+   presentation" show every element of the window with sample data, for checking the window without a call
+   (since 0.8.7 always there, no Option key).
 39. **Recording consent.** Settings > General > Recording consent, both off by default: "Play an audio
    consent message" speaks a short notice when recording starts (in the call's language), "Copy a consent message
    for the meeting chat" puts it on the clipboard with a reminder to paste it into the call chat. Both texts are
@@ -1585,16 +1653,18 @@ address", `references/sweep.md`, `references/presentation.md`).
 41. **The skill shows the call picture.** The live-tips skill (v49) writes the same call picture as the app:
    a status line with the topic, whose topic it is and "Your turn", and speech points struck through once said.
    Red only when you are addressed, the same answer at most once in 10 minutes, tips in the call's language.
-42. **Notion without Control Tower.** Settings > General > Notion (and the welcome tour) walk through it:
+42. **Notion without Control Tower.** Settings > Integrations > Notion (and the welcome tour) walk through it:
    create an internal integration at notion.so/profile/integrations, paste its secret, share a page with it
    (••• > Connections), then pick where meeting pages go. "Use" on a database adds the missing Date, Summary
    and Project properties; "Create Meetings here" on a page creates the database. Any database works: the
-   title, date and summary properties are found by type, missing ones are skipped. A project with a Control
-   Tower config keeps writing to its own Meetings database.
+   title, date and summary properties are found by type, missing ones are skipped. Since 0.8.7 all projects
+   write to the one Meetings database chosen in Settings; a project config's `meetings_db` is used only when
+   none is chosen.
 43. **Active projects.** A tick next to each project (in the welcome tour and in Settings > Projects): only
    active projects are offered in Start call. ⋯ next to a workspace removes it from Live Tips; nothing on
    disk changes.
-44. **What the last call cost.** The menu shows "Last call: $0.26 (tips $0.21, Notion notes $0.05) · 5 tips".
+44. **What the last call cost.** The menu shows "Last call $0.26 · 5 tips"; the tooltip splits it ("Tips $0.21,
+   Notion notes $0.05").
    The Notion write-up counts toward the monthly limit too. The tip rating (a developer check, about $0.10
    a call) is off for new installs.
 45. **Permissions.** The welcome tour reads the System Audio Recording permission from macOS: a button
@@ -1635,9 +1705,9 @@ address", `references/sweep.md`, `references/presentation.md`).
    forced to that language, so other languages are translated as they are decoded. It keeps the meaning;
    names and numbers deserve a glance. With two languages (Ukrainian + English) each speaker stays in the
    language spoken. This is a real difference from note takers that write a foreign language in Latin letters.
-53. **Planned, not built yet.** A Google Calendar link (title, time, people for Start call); a prompt to start
-   recording when a call app takes the microphone; the summary in Google Docs or Drive, or as a document in
-   the project folder, for users without Notion. Until then each call starts by hand from the menu bar.
+53. **Planned at 0.5.8, built since.** Calendars (0.6.6, section 14.1c), the offer to start tips when a call
+   app takes the microphone (0.8, section 14.1d) and call notes in the project folder after every call, also
+   without Notion (0.8.5, section 14.2). Pacenote never starts recording by itself.
 54. **Comparison.** How Live Tips stands next to Fireflies, Fathom and Notion AI Meeting Notes (transcript,
    help during the call, summary, prices as of 27 October 2026): https://tower.bodco.pm/pacenote/compare/
 55. **Its own repository (0.6.0).** Live Tips moved out of PM Control Tower into
@@ -1656,7 +1726,7 @@ address", `references/sweep.md`, `references/presentation.md`).
 59. **The skill (v50).** The same window changes (design, microphone icon, Pause stops the transcript) and
    the same Notion title as the app: the meeting's name, then the topic, in the call's language, with the
    date the PM gave for the call.
-60. **Notion in its own place (0.6.1).** Settings > Notion holds everything about the meeting page: the
+60. **Notion in its own place (0.6.1; since 0.8.7 Settings > Integrations > Notion).** Settings > Notion holds everything about the meeting page: the
    switch, the Notion token, where the page goes (each destination row is clickable as a whole) and the
    local copy of Notion. An alert about Notion has an Open Settings button. Projects set up with PM Control
    Tower are listed there with their config file; other projects work without one.
@@ -1691,7 +1761,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    is readable in the light theme.
 69. **Speakers with a side (0.6.3).** Each person in the voice library has a side, Team (ours) or Client,
    and the calls they are suggested on: all projects, whole workspaces or several projects (Settings >
-   AI > Voice library, two menus). A person heard on another project's call gets that project added
+   AI > Speakers, two menus). A person heard on another project's call gets that project added
    instead of being moved to "all projects". The transcript tab shows who has spoken so far: name each
    voice (pick from this call's people, the project's people and the library, or type a new name) and
    set Team or Client; it is saved with the voice.
@@ -1707,7 +1777,8 @@ address", `references/sweep.md`, `references/presentation.md`).
 74. **Status dot (0.6.5).** Grey waiting or paused, blue starting or stopping, red recording, green stopped.
 75. **Home (0.6.6).** The app's main window: live call, calls ahead, recent calls, state (section 14.1c).
 76. **Calendars through macOS (0.6.6).** Several Google and Microsoft accounts, the relevant calendars ticked in
-   Settings > Calendars; the call is picked from chips around now, overlaps included.
+   Settings > Calendars (since 0.8.7 Settings > Integrations > Calendars); the call is picked from chips around
+   now, overlaps included.
 77. **Regular meetings remembered (0.6.6).** A call of a series starts from the setup of its last call.
 78. **💡 Proactive tips in the top bar (0.6.6)** and a clearer button order.
 79. **One interface language (0.6.7).** Settings > General > Interface language and the tips window switch are one

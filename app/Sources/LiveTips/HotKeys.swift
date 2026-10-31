@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import LiveTipsCore
 import Foundation
 import SwiftUI
 
@@ -106,7 +107,8 @@ final class HotKeys: @unchecked Sendable {
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                               nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
             let action = HotKeys.shared.actions[id.id]
-            DispatchQueue.main.async { action?() }
+            let name = Action(rawValue: id.id).map { "\($0)" } ?? "other"
+            DispatchQueue.main.async { UsageLog.log("hotkey", ["name": String(name.prefix(20))]); action?() }
             return noErr
         }, 1, &spec, nil, &handler)
         for a in Action.allCases where !a.onlyWhilePresenting { register(a) }
@@ -117,6 +119,7 @@ final class HotKeys: @unchecked Sendable {
     func setPresenting(_ on: Bool) {
         guard on != presenting else { return }
         presenting = on
+        if on { UsageLog.log("presentation_mode_on") }
         for a in Action.allCases where a.onlyWhilePresenting {
             if on { register(a) } else if let old = refs[a.rawValue] { UnregisterEventHotKey(old); refs[a.rawValue] = nil }
         }

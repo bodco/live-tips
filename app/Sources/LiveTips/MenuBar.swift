@@ -154,6 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let help = NSMenu(title: L("menu.help"))
         help.addItem(withTitle: L("feat.title"), action: #selector(openFeatures), keyEquivalent: "").target = self   // 0.8.7 (L1): first
         help.addItem(withTitle: L("settings.how.title"), action: #selector(openHowItWorks), keyEquivalent: "").target = self
+        help.addItem(withTitle: L("menubar.welcomeTour"), action: #selector(openOnboarding), keyEquivalent: "").target = self   // 0.8.7.1: also in Help
         help.addItem(NSMenuItem.separator())
         help.addItem(withTitle: L("menubar.demo"), action: #selector(showDemo), keyEquivalent: "").target = self
         help.addItem(withTitle: L("menubar.demoPresentation"), action: #selector(showDemoPresentation), keyEquivalent: "").target = self

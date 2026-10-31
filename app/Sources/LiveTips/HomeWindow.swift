@@ -21,6 +21,7 @@ final class HomeWindow {
         w.title = L("home.window.title")
         w.styleMask.insert(.resizable)
         w.setContentSize(NSSize(width: 1120, height: 760))
+        w.contentMinSize = NSSize(width: 640, height: 480)     // 0.8.7.1: narrower, the call page was cut on the right
         w.isReleasedWhenClosed = false
         _ = w.setFrameAutosaveName("LiveTipsHome")
         window = w
@@ -134,6 +135,14 @@ struct HomeView: View {
                 Text(sub).font(PN.Font.body).foregroundStyle(PN.C.text3)
             }
             Spacer()
+            // 0.8.7.1: in a narrow window (Ukrainian above all) Search and Transcribe become icons and the buttons
+            // keep one line; they were cut to "Пошук по..." and "Почати / дзвінок"
+            ViewThatFits(in: .horizontal) { headerButtons(icons: false); headerButtons(icons: true) }
+        }
+    }
+
+    @ViewBuilder private func headerButtons(icons: Bool) -> some View {
+        HStack(spacing: 12) {
             // Pacenote 0.8 (idea 05): ask about past calls of a project (Command-F).
             if history.records.isEmpty {
                 // 0.8.7 (L2): no transcripts in any project yet: greyed with the condition; a click opens Start call
@@ -143,18 +152,26 @@ struct HomeView: View {
                     Text(L("memory.afterFirst")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
                 .help(L("memory.afterFirst"))
+            } else if icons {
+                Button { MemoryWindow.show() } label: { Image(systemName: "magnifyingglass") }
+                    .buttonStyle(.pnTertiary).keyboardShortcut("f", modifiers: .command).help(L("memory.help")).accessibilityLabel(L("memory.button"))
             } else {
                 Button { MemoryWindow.show() } label: { Label(L("memory.button"), systemImage: "magnifyingglass") }
-                    .buttonStyle(.pnTertiary).keyboardShortcut("f", modifiers: .command).help(L("memory.help"))
+                    .buttonStyle(.pnTertiary).keyboardShortcut("f", modifiers: .command).help(L("memory.help")).fixedSize()
             }
             // 0.8.6 (B): a recording or a link becomes a transcript like a call
-            Button(L("tr.window")) { TranscribeWindow.show() }.buttonStyle(.pnTertiary).help(L("tr.subtitle"))
+            if icons {
+                Button { TranscribeWindow.show() } label: { Image(systemName: "waveform") }.buttonStyle(.pnTertiary)
+                    .help(L("tr.window")).accessibilityLabel(L("tr.window"))
+            } else {
+                Button(L("tr.window")) { TranscribeWindow.show() }.buttonStyle(.pnTertiary).help(L("tr.subtitle")).fixedSize()
+            }
             Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
-                .buttonStyle(.pnSecondary)
+                .buttonStyle(.pnSecondary).fixedSize()
                 .help(L("home.planCall.help"))
             if !live {
                 Button(L("home.startCall")) { StartCallWindow.show(delegate: app) }
-                    .buttonStyle(.pnPrimary).keyboardShortcut("n", modifiers: .command)
+                    .buttonStyle(.pnPrimary).keyboardShortcut("n", modifiers: .command).fixedSize()
             }
             // 0.8.5: Settings straight from Home (the gear at the right end of the toolbar).
             Button { SettingsWindow.show() } label: { Image(systemName: "gearshape") }

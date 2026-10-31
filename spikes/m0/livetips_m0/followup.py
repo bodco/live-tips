@@ -26,7 +26,9 @@ def build_user(md: Path) -> str:
     head = callinfo.header(md)
     parts = ["CALL: {} ({})".format(head["title"], head["start"])]
     if sit:
-        parts.append("CALL PICTURE (decisions, the PM's actions, promises of the other side, open questions):\n" +
+        # 0.8.7.1: the PM's edits on the call page win over the transcript (rules/followup.yaml > model_prompt)
+        note = " (as the PM corrected it on the call page; it wins over the transcript)" if sit.get("edited") else ""
+        parts.append("CALL PICTURE (decisions, the PM's actions, promises of the other side, open questions)" + note + ":\n" +
                      "\n".join(picture_lines(sit)))
     parts.append("TRANSCRIPT:\n" + callinfo.transcript_text(md, 60000))
     return "\n\n".join(parts)

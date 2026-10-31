@@ -489,13 +489,14 @@ struct FollowUpView: View {
                     Button(L("after.rewrite")) { model.revise(instruction); instruction = "" }.buttonStyle(.pnSecondary)
                         .disabled(instruction.trimmingCharacters(in: .whitespaces).isEmpty || model.busy)
                 }
+                // 0.8.7.1: in the 380 pt panel the caption squeezed the buttons ("Write ag...", "Open in Mail" on two lines)
                 HStack(spacing: 8) {
-                    Button(L("after.copy")) { model.copy() }.buttonStyle(.pnPrimary).disabled(model.body.isEmpty)
-                    Button(L("after.openMail")) { model.openMail() }.buttonStyle(.pnSecondary).disabled(model.body.isEmpty)
-                    Text(L("after.neverSends")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Button(L("after.copy")) { model.copy() }.buttonStyle(.pnPrimary).disabled(model.body.isEmpty).fixedSize()
+                    Button(L("after.openMail")) { model.openMail() }.buttonStyle(.pnSecondary).disabled(model.body.isEmpty).fixedSize()
                     Spacer()
-                    Button(L("followup.again")) { model.write() }.buttonStyle(.pnTertiary).disabled(model.busy)
+                    Button(L("followup.again")) { model.write() }.buttonStyle(.pnTertiary).disabled(model.busy).fixedSize()
                 }
+                Text(L("after.neverSends")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
         .padding(20)

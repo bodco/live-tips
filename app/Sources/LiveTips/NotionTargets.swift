@@ -140,7 +140,8 @@ final class NotionSchema: ObservableObject {
 
 /// A database pop-up with a search field over the databases the integration sees.
 struct NotionDBSearchPopover: View {
-    let items: [NotionAPI.Item]
+    @ObservedObject var dest: NotionDestinationModel     // 0.8.7.1: the list fills in while the popover is open
+    var items: [NotionAPI.Item] { dest.items.filter { $0.kind == "data_source" } }
     let pick: (NotionAPI.Item?) -> Void
     @State private var q = ""
     @FocusState private var focus: Bool
@@ -159,7 +160,8 @@ struct NotionDBSearchPopover: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    if list.isEmpty { Text(L("ntset.noDbMatch")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.vertical, 4) }
+                    if list.isEmpty && dest.busy { ProgressView().controlSize(.small).padding(.vertical, 4) }   // 0.8.7.1: not "No database" while looking
+                    else if list.isEmpty { Text(L("ntset.noDbMatch")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.vertical, 4) }
                 }
             }
             .frame(height: 220)
@@ -223,7 +225,7 @@ struct NotionDBRow: View {
                     }
                     .buttonStyle(.pnSecondary)
                     .popover(isPresented: $pop, arrowEdge: .bottom) {
-                        NotionDBSearchPopover(items: dest.items.filter { $0.kind == "data_source" }) { it in
+                        NotionDBSearchPopover(dest: dest) { it in
                             if let it { id.wrappedValue = it.id } else { id.wrappedValue = "" }
                             pop = false
                         }

@@ -56,6 +56,7 @@ extension CRMService {
             link.companyId = company?.id ?? ""; link.companyName = company?.name ?? ""
             if link.dealId != "none" { link.dealId = deal?.id ?? ""; link.dealName = deal?.name ?? "" }
             link.contactIds = contacts.map(\.id)
+            try? FileManager.default.createDirectory(atPath: (base as NSString).deletingLastPathComponent, withIntermediateDirectories: true)   // 0.8.7.1
             let md = CRMSnapshot.render(provider: c.providerName, company: company, deal: deal, contacts: contacts, activity: acts, taken: Date())
             try? md.replacingOccurrences(of: "\u{2014}", with: "-").write(toFile: base + ".crm.md", atomically: true, encoding: .utf8)
             link.save(base: base)
@@ -75,7 +76,16 @@ struct CRMCallRow: View {
     @State private var busy = false
     @State private var err = ""
 
-    var base: String? { PrepDocWindow.path(for: model).map { String($0.dropLast(9)) } ?? model.prepBase }
+    var base: String? {
+        if let p = PrepDocWindow.path(for: model) { return String(p.dropLast(9)) }
+        if let b = model.prepBase { return b }
+        // 0.8.7.1: before Prepare, the snapshot goes where Prepare will write the brief (PrepRunner's base), so the first
+        // brief already reads it; Refresh was greyed out until a brief existed
+        guard let root = model.root, !root.isEmpty else { return nil }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmm"
+        return ((root as NSString).appendingPathComponent("live") as NSString)
+            .appendingPathComponent("prep-\(f.string(from: model.callDate))-\(StartCallModel.slugify(model.effectiveTitle))")
+    }
     var emails: [String] { model.calEventID.flatMap { id in CalendarService.shared.events.first { $0.id == id }?.emails } ?? [] }
 
     var body: some View {
@@ -133,7 +143,9 @@ enum CRMUpdateWindow {
     static var window: NSWindow?
     static func show(file: String) {
         let w = window ?? NSWindow(contentViewController: NSHostingController(rootView: AnyView(EmptyView())))
-        w.contentViewController = NSHostingController(rootView: Localized { CRMUpdateView(file: file) })
+        let hc = NSHostingController(rootView: Localized { CRMUpdateView(file: file) })
+        hc.sizingOptions = []      // 0.8.7.1: the window grew to 1572 pt and Apply was below the screen
+        w.contentViewController = hc
         w.tabbingMode = .disallowed
         w.title = L("crm.update.title", ["crm": "HubSpot"])
         w.setContentSize(NSSize(width: 560, height: 520))
@@ -187,6 +199,7 @@ struct CRMUpdateView: View {
             }
         }
         .padding(18)
+        .frame(minWidth: 460, minHeight: 360)
         .onAppear { load() }
     }
 

@@ -17,6 +17,7 @@ public struct SecretStore {
     // again (after an app update each first read can wait on macOS's "allow access" prompt). warm() reads them at start
     // off the main thread; set() and remove() keep the cache right.
     private static var cache: [String: String] = [:]
+    private static var present: [String: Bool] = [:]     // 0.8.7.1: has() answers from here while warm() waits on a prompt
     private static let lock = NSLock()
     private func ck(_ key: Key) -> String { service + "|" + key.rawValue }
 
@@ -24,7 +25,8 @@ public struct SecretStore {
     public static func warm(service: String, done: @escaping () -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             let s = SecretStore(service: service)
-            for k in Key.allCases where s.has(k) { _ = s.get(k) }
+            let found = Key.allCases.filter { s.has($0) }      // attributes first: no prompt, fills `present`
+            for k in found { _ = s.get(k) }
             DispatchQueue.main.async(execute: done)
         }
     }
@@ -49,11 +51,15 @@ public struct SecretStore {
     /// on that prompt (a new build, or a key saved by another tool).
     public func has(_ key: Key) -> Bool {
         if ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"] != nil { return false }
+        Self.lock.lock(); let known = Self.present[ck(key)]; Self.lock.unlock()
+        if let known { return known }      // 0.8.7.1: the Keychain blocks every call while a prompt is open
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                 kSecAttrAccount as String: key.rawValue, kSecReturnAttributes as String: true,
                                 kSecMatchLimit as String: kSecMatchLimitOne]
         var out: AnyObject?
-        return SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess
+        let ok = SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess
+        Self.lock.lock(); Self.present[ck(key)] = ok; Self.lock.unlock()
+        return ok
     }
 
     @discardableResult
@@ -62,7 +68,7 @@ public struct SecretStore {
         let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                    kSecAttrAccount as String: key.rawValue]
         let data = Data(value.utf8)
-        Self.lock.lock(); Self.cache[ck(key)] = nil; Self.lock.unlock()     // 0.8.7.1: the next get reads the new value
+        Self.lock.lock(); Self.cache[ck(key)] = nil; Self.present[ck(key)] = nil; Self.lock.unlock()     // 0.8.7.1: the next get reads the new value
         if SecItemUpdate(base as CFDictionary, [kSecValueData as String: data] as CFDictionary) == errSecSuccess { return true }
         var add = base
         add[kSecValueData as String] = data
@@ -74,7 +80,7 @@ public struct SecretStore {
     public func remove(_ key: Key) -> Bool {
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                 kSecAttrAccount as String: key.rawValue]
-        Self.lock.lock(); Self.cache[ck(key)] = nil; Self.lock.unlock()     // 0.8.7.1
+        Self.lock.lock(); Self.cache[ck(key)] = nil; Self.present[ck(key)] = nil; Self.lock.unlock()     // 0.8.7.1
         let st = SecItemDelete(q as CFDictionary)
         return st == errSecSuccess || st == errSecItemNotFound
     }

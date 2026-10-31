@@ -137,8 +137,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .seg2 button[aria-pressed="true"]{background:var(--surface);font-weight:600}
 
 /* ---------- Presentation ---------- */
-.present{flex:none;margin:0 12px;background:var(--surface);border-radius:var(--radius-l);padding:18px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-card)}
+.present{flex:0 1 auto;min-height:0;overflow-y:auto;margin:0 12px;background:var(--surface);border-radius:var(--radius-l);padding:18px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-card)}
 .present[hidden]{display:none}
+/* 0.8.7.1: in a short window the slide card scrolls; it pushed Ask and Help out of the window */
 .present .top{display:flex;justify-content:space-between;align-items:baseline}
 .present .clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums}
 .present .over{color:var(--danger-text)}

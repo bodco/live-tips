@@ -1634,7 +1634,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    Notion mirror are optional extras: people, Notion pages, the current state.
 35. **Welcome tour.** A new install opens a short onboarding: permissions (microphone, system audio),
    the work folder and its workspaces, your name on calls, the Claude key, the local install and Notion
-   (optional). The menu has "Welcome tour" to run it again.
+   (optional). The menu bar panel and Help > Welcome tour run it again.
 36. **Notion page.** The meeting page title starts with the meeting's name ("Weekly sync: export
    plan"); the title and the summary are written in the call's language.
 37. **Links in Call context.** "Prepare now" also reads public web pages you list under "Where to look":

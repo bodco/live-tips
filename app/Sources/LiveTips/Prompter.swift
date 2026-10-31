@@ -302,6 +302,18 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             let st: [String: Any] = ["state": "recording", "title": args.title, "started_at": f.string(from: Date().addingTimeInterval(-32 * 60 - 14)),
                                      "call_type": args.demoPresentation ? "presentation" : "auto", "system_audio": "ok", "mic": "on", "minutes_left": 13]
             web.evaluateJavaScript("window.setStatus && window.setStatus(" + jsonLine(st) + ")", completionHandler: nil)
+            // 0.8.7.1: the demo shows the Speakers block and a transcript as a call does (the pane was empty)
+            if !args.demoPresentation {
+                web.evaluateJavaScript("""
+                  try { window.setSpeakers && window.setSpeakers({clusters:{S1:{name:'Emily C.',seconds:40,side:'client'},S2:{name:'David K.',seconds:22,side:'client'}},
+                    roster:[{name:'Emily C.',side:'client'},{name:'David K.',side:'client'}]});
+                  window.addTranscript && window.addTranscript(['- Channels: Me = microphone, Other = system audio',
+                    '[10:31:02] Emily C. [S1] (en): When is the export live for our users?',
+                    '[10:31:09] Me (en): It is on dev now, production on Tuesday after the review.',
+                    '[10:31:20] David K. [S2] (en): And who tests the pilot?',
+                    '[10:31:26] Me (en): Our QA covers the first week, then your team.']); } catch (e) {}
+                  """, completionHandler: nil)
+            }
         }
         let queued = pending
         pending.removeAll()

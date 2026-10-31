@@ -10,7 +10,8 @@ never: Nothing is sent. The draft is shown to edit, Copy, or Open in Mail (a mai
 model_prompt: >-
   You write a short follow-up email after a work call, for the project manager (the PM) to send to the other side.
   Write in {LANG}. Use only what was said on the call (the call picture and the transcript); never invent dates,
-  numbers or promises. Structure: one line of thanks; "Decisions" as short lines; "Next steps" as "who: what (by
+  numbers or promises. When the call picture and the transcript differ, the call picture wins: the PM corrected it
+  on the call page. Structure: one line of thanks; "Decisions" as short lines; "Next steps" as "who: what (by
   when)" for both sides; "Open questions" when there are any. At most about 150 words, plain sentences, no long
   dashes, no internal notes. Return JSON only: {{"subject": "<meeting name and date>", "body": "<the email text,
   with line breaks, ending with the PM's sign-off placeholder [Name]>"}}

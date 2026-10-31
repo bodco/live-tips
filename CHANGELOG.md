@@ -3,6 +3,25 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.7.2
+
+After hands-on testing on the Mac:
+
+- **Update HubSpot window:** it grew to 1572 pt and Apply and Undo were below the screen; it now opens at 560 by 520.
+- **CRM row in Start call:** Refresh worked only after a brief existed, so the first brief never had the CRM snapshot;
+  the snapshot now goes where Prepare will write the brief, before the first Prepare.
+- **Follow-up draft follows the call page:** when the PM corrected a decision on the call page, the draft still used the
+  transcript's version; the corrected call picture now wins (rules/followup.yaml).
+- **Follow-up panel buttons:** "Write again" was cut and "Open in Mail" broke into two lines in the 380 pt panel; the
+  "never sends" line is under the buttons now.
+- **Home window minimum size:** below about 640 pt the call page was cut on the right; the window keeps at least 640
+  by 480. In a narrow Home window Search and Transcribe become icons and the buttons keep one line (Ukrainian above all).
+- **Presentation mode in a short window:** the slide card pushed Ask and Help out of the window; the card scrolls now.
+- **Demo call:** shows the Speakers block and a short transcript, as a real call does (the pane was empty).
+- **Notion database picker:** while the list was still loading it said "No database with this name"; it shows progress
+  and fills in without reopening.
+- **Help > Welcome tour:** the onboarding can be run again from the Help menu too (it was only in the menu bar panel).
+
 ## 0.8.7.1
 
 - **No freeze after an update (Keychain):** after a new build macOS asks "allow access" for each saved key, and the

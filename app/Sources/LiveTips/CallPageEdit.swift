@@ -228,6 +228,7 @@ struct EditableRow<Leading: View, Trailing: View>: View {
     let text: String
     var sub: String = ""
     var subColor: Color = PN.C.text3
+    var subTail = ""        // 0.8.7 (J4): when set, only this part (the due date) takes subColor; sub stays grey
     var done = false
     var copy: String? = nil
     var hoverActions: [PageRowAction] = []
@@ -259,7 +260,11 @@ struct EditableRow<Leading: View, Trailing: View>: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(text).font(PN.Font.body).foregroundStyle(done ? PN.C.text3 : PN.C.text).strikethrough(done)
                         .fixedSize(horizontal: false, vertical: true)
-                    if !sub.isEmpty { Text(sub).font(PN.Font.caption).foregroundStyle(subColor) }
+                    if !sub.isEmpty || !subTail.isEmpty {
+                        (subTail.isEmpty ? Text(sub).foregroundColor(subColor)
+                         : Text(sub).foregroundColor(PN.C.text3) + Text((sub.isEmpty ? "" : " · ") + subTail).foregroundColor(subColor))
+                            .font(PN.Font.caption)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -366,10 +371,10 @@ struct EditableRow<Leading: View, Trailing: View>: View {
 }
 
 extension EditableRow where Trailing == EmptyView {
-    init(text: String, sub: String = "", subColor: Color = PN.C.text3, done: Bool = false, copy: String? = nil,
+    init(text: String, sub: String = "", subColor: Color = PN.C.text3, subTail: String = "", done: Bool = false, copy: String? = nil,
          hoverActions: [PageRowAction] = [], menu: [PageRowAction] = [], onSave: @escaping (String) -> Void,
          @ViewBuilder leading: @escaping () -> Leading) {
-        self.init(text: text, sub: sub, subColor: subColor, done: done, copy: copy, hoverActions: hoverActions, menu: menu,
+        self.init(text: text, sub: sub, subColor: subColor, subTail: subTail, done: done, copy: copy, hoverActions: hoverActions, menu: menu,
                   onSave: onSave, leading: leading, trailing: { EmptyView() })
     }
 }

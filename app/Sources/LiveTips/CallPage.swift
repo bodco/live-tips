@@ -237,8 +237,9 @@ struct CallPageView: View {
             heading(mine ? L("call.page.onYou") : L("call.page.onThem"))
             ForEach(list) { c in
                 let overdue = c.status == "open" && CommitmentRegister.isOverdue(c)
-                let sub = ([mine ? "" : c.owner, c.due.isEmpty ? "" : L("reg.due", ["due": Register.dueText(c.due)])]).filter { !$0.isEmpty }.joined(separator: " · ")
-                EditableRow(text: c.text, sub: sub, subColor: overdue ? PN.C.danger : PN.C.text3, done: c.status == "done",
+                // 0.8.7 (J4): only the due date is red when overdue, never the owner
+                EditableRow(text: c.text, sub: mine ? "" : c.owner, subColor: overdue ? PN.C.danger : PN.C.text3,
+                            subTail: c.due.isEmpty ? "" : L("reg.due", ["due": Register.dueText(c.due)]), done: c.status == "done",
                             copy: (c.mine ? "" : c.owner + ": ") + c.text + (c.due.isEmpty ? "" : " (" + Register.dueText(c.due) + ")"),
                             menu: commitmentMenu(c, section),
                             onSave: { v in register.edit(c, text: v); changed(section) }) {

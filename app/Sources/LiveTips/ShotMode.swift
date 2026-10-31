@@ -128,6 +128,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
             if env["LT_SHOTS_ONLY"] == "ai" { steps.append { [unowned self] in self.settings("ai", theme) }; continue }   // Settings > AI only
             if env["LT_SHOTS_ONLY"] == "p085" { p085(theme); continue }    // 0.8.5: the boards P1-P8 next to the mockups
+            if env["LT_SHOTS_ONLY"] == "p087" { p087(theme); continue }    // 0.8.7: the new screens
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
@@ -497,6 +498,34 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         d.phase = phase
         m.deck = d
         return m
+    }
+
+    /// 0.8.7 screens: Home, call page, series, Settings (General, Projects, Integrations, Notion, HubSpot, AI), What
+    /// Pacenote can do, Start call with Sales, the onboarding steps, the call window with the Deal tab.
+    func p087(_ theme: String) {
+        steps.append { [unowned self] in self.home(theme) }
+        steps.append { [unowned self] in self.startCall(theme) }
+        steps.append { [unowned self] in self.homePage("p087-call-page-\(theme)") { if let r = self.demoCall { CallPageWindow.show(file: r.file) } } }
+        steps.append { [unowned self] in self.homePage("p087-followup-\(theme)") { if let r = self.demoCall { FollowUpWindow.show(file: r.file) } } }
+        steps.append { [unowned self] in self.homePage("p087-series-\(theme)") { if let r = self.demoCall { SeriesWindow.show(record: r) } } }
+        steps.append { [unowned self] in self.window("p087-features-\(theme)") { FeaturesWindow.show() } }
+        for tab in ["general", "projects", "integrations", "notion", "hubspot", "ai"] { steps.append { [unowned self] in self.settings(tab, theme) } }
+        for st in OnboardingModel.Step.allCases where st != .splash { steps.append { [unowned self] in self.onboarding(st, theme) } }
+        let deal = "LiveTips.setState({deal:{name:'BANT',chip:true,known:2,total:4,criteria:[{key:'budget',name:'Budget',state:'known',what:'Northwind set aside a budget for Q1',quote:'we have money for this',t:'10:04'},{key:'authority',name:'Authority',state:'partial',what:'Emily Clark decides with the CFO',quote:'',t:''},{key:'need',name:'Need',state:'known',what:'Reports take two days a week',quote:'',t:''},{key:'timeline',name:'Timeline',state:'unknown',what:'',quote:'',t:''}],objections:['Price is high for a pilot'],nextStep:'Demo for the CFO on Friday',signals:['Asked about onboarding']}}); LiveTips.openTab('deal');"
+        steps.append { [unowned self] in self.tipsExtra(theme, js: deal, name: "p087-tips-deal") }
+    }
+
+    /// 0.8.7: pages pushed inside Home (call page, follow-up panel, series) are captured from the Home window.
+    func homePage(_ name: String, open: () -> Void) {
+        HomeNav.shared.path = []; HomeNav.shared.followUp = nil
+        if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }   // shot mode has no AppDelegate of its own
+        HomeWindow.window?.setContentSize(NSSize(width: 1440, height: 860))           // wide enough for the follow-up inspector
+        open()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
+            if let w = HomeWindow.window { capture(w, name) } else { log("no Home for " + name) }
+            HomeNav.shared.followUp = nil
+            next()
+        }
     }
 
     func p085(_ theme: String) {

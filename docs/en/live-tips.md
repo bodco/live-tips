@@ -1431,6 +1431,38 @@ seconds. The transcript goes into the note only if you turn that on.
 **What Pacenote can do.** Help > What Pacenote can do lists every feature with Try it and how often you used it
 (from the local usage log, Settings > General > Privacy). For the first 14 days it is also a card on Home.
 
+### 14.1j Pacenote 0.8.8: the decision register, automatic add, Workspace
+
+**Decisions go to the Control Tower Decisions database.** Settings > Integrations > Notion > Databases has a fourth
+row, Decisions, next to Meetings, Tasks and Risks. On the call page each decision has "Add to decision register"
+(hover or the row menu) and "Add all N" sits above the section. Pacenote writes Decision, Date, Area (one of the
+database's own options, chosen by the model, else empty), Context (one sentence from the transcript), Source (the
+meeting page, when there is one), Status Active, Stated by, Project and Workspace. Trade-off, Alternatives rejected,
+Review trigger and Door are written only when they were said on the call; Pacenote never invents them. After the
+write the row shows a grey "In register" with a link. Without Notion, a project or a Decisions database the action is
+greyed out with the reason and a link to Settings.
+
+**Replaces an earlier decision?** After a decision is added, Pacenote compares it with the project's active
+decisions. When it contradicts one, the page asks "Replaces <old decision, date>?". Only your click marks the old page
+Superseded and links Supersedes and Superseded By; without the click nothing changes.
+
+**Add automatically after each call.** Under Tasks, Risks and Decisions there is a switch, each off by default. When
+it is on, 40 seconds after a call ends the open commitments on you, the risks or the decisions of that call are
+written to that database once (the call file and the text are the key, kept next to the call in `<stem>.notion.json`),
+never for a hidden call. The 0.8.6 switch "Add my commitments to Notion tasks" moved under Tasks with its value.
+
+**Workspace next to Project.** Each database row has a Project property and a Workspace property (relation, select,
+multi-select or text; a property named Workspace is chosen by itself; None is allowed). Every page Pacenote writes
+(meeting, task, risk, decision) gets the project and its workspace. A workspace's value is set on its card in
+Settings > Projects > In Notion, like a project's; empty means the workspace's name.
+
+**During the call and in the preparation.** Before a preparation and before a call starts, Pacenote saves the
+project's active decisions to `<project>/pacenote/decisions.md`; the brief gets a section "Active decisions" (the
+last 10 with dates), the series view shows them next to the decisions of its calls, and the live engine reads only
+that file (never Notion during a call). When someone proposes what contradicts an active decision, a quiet card
+"12.10 decided: X (Emily Clark)" with one sentence to remind them appears in Earlier, like a risk card. The rules
+are in `rules/decisions.yaml`.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the

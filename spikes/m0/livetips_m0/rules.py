@@ -26,6 +26,7 @@ class Rules:
         self.commitments = self._y("commitments.yaml") if (self.root / "commitments.yaml").exists() else {}
         self.risks = self._y("risks.yaml") if (self.root / "risks.yaml").exists() else {}       # 0.8
         self.sales = self._y("sales.yaml") if (self.root / "sales.yaml").exists() else {}       # 0.8.7
+        self.decisions = self._y("decisions.yaml") if (self.root / "decisions.yaml").exists() else {}   # 0.8.8
 
     def _y(self, name):
         return yaml.safe_load((self.root / name).read_text(encoding="utf-8"))

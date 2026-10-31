@@ -318,7 +318,7 @@ Generated from `rules/risks.yaml` and `rules/followup.yaml`; do not edit here.
 
 **Risks.** Call picture: risks = conditional threats said on this call ("if X slips, Y moves", "we might not make the date", "depends on their approval"): what may go wrong and what it depends on, max 16 words each, with the time of the line and who said it. Keep earlier ones. Not every problem is a risk: a bug that is being fixed now is not.
 - During the call: A new risk becomes one quiet card `{"kind":"risk","level":"info","gist":"Risk: <what>","t":"HH:MM:SS","who":"<name>"}` in Earlier (the On me colour), never the main card, never red.
-- After the call: The call summary has a "Risks" section. "Add to risk register" writes one page into the project's Notion risk database (risks_db in the project config) only after the PM confirms it; nothing is added by itself.
+- After the call: The call summary has a "Risks" section. "Add to risk register" writes one page into the project's Notion risk database (Settings > Integrations > Notion > Databases > Risks, else risks_db in the project config) only after the PM confirms it, with the Project and Workspace properties chosen in Settings. 0.8.8: when the PM turned on "Add automatically after each call" under Risks, the call's risks are written once after the call, de-duplicated like decisions (rules/decisions.yaml > dedupe); otherwise nothing is added by itself.
 
 **Follow-up email.** After the call, only when the PM asks (the app's "Draft follow-up email"; the skill's wrap-up offers it in one line).
 - Language: The client's language from the project config (client_language), English when it is not set.
@@ -360,6 +360,21 @@ Generated from `rules/sales.yaml` and `rules/crm.yaml`; do not edit here.
 - Snapshot: `<stem>.crm.md next to the brief`, before a preparation, before a call starts and on Refresh; kept for offline use; Company; deal (stage by name, amount, close date, owner, next step); contacts with roles; the last 10 activities in one line each; open tasks; the time it was taken.
 - Write: Checkboxes: a note on the deal, the company and the contacts (summary, decisions, next steps, the Notion link when there is one; "Attach the transcript" off by default); deal fields (next step, close date when one was said, stage only when the PM picked one); qualification fields by the mapping; a follow-up task with a date. Texts come from the call page as the PM edited it.; "Updated in HubSpot · Open" and Undo for 8 s for what can be undone (deal fields back, the note and task deleted)
 - Never: automatic writes
+
+### Decision register
+
+Generated from `rules/decisions.yaml`; do not edit here.
+
+**Database.** Settings > Integrations > Notion > Databases > Decisions (one database for all projects). Properties written: Decision (title), Date, Area (select: one of the database's own options, chosen by the model, else empty), Context (one sentence from the transcript), Source (url of the meeting page, when there is one), Status = Active, Stated by (who said it, text), Project and Workspace (the properties chosen in Settings, any of relation, select, multi-select or text). Trade-off, Alternatives rejected, Review trigger and Door only when said outright on the call; never invented (projects/_standards.md section 9).
+- After call: The call page's Decisions section has "Add to decision register" (hover and the row menu) and "Add all N" above the section. Nothing is written without the PM's click unless he turned on the automatic add. After the write the row shows a grey "In register" with a link. Without Notion or without a Decisions database the action is greyed out with the reason and leads to Settings.
+- Supersede: After a decision is added, the active decisions of the same project are compared with it by the model. When it contradicts one, the page offers "Replaces <old decision, date>?" with a button. Only the PM's click sets the old page's Status to Superseded and links Supersedes (new) and Superseded By (old). No click, no change.
+- Auto add: Settings > Integrations > Notion > Databases: "Add automatically after each call" under Tasks, Risks and Decisions, each off by default (the 0.8.6 switch for tasks moved under Tasks with its value). When on, 40 s after the end of a call (after the call notes and the register write) every decision (or risk, or open commitment on the PM) of that call is written once. Never for a hidden call, never when the switch is off.
+- Dedupe: The same decision of the same call is never written twice: the key is the call file plus the normalized text (lower case, letters and digits only, single spaces). The page ids and urls live next to the call in <stem>.notion.json {"decisions": {key: {"id", "url"}}, "risks": {...}}; the page shows "In register" from it.
+- Brief: The brief has a section "Active decisions": the last 10 active decisions of the project from the snapshot, with their dates. No snapshot, no section.
+- Series: The series view shows the register's active decisions of the project next to the decisions of its calls.
+- Snapshot: `<project root>/pacenote/decisions.md`, before a preparation and before a call starts (when Notion and the Decisions database are set); kept offline; The project's active decisions, newest first, at most 30, one line each: "- YYYY-MM-DD | <decision> | <stated by> | <area>". The live engine reads only this file and never calls Notion during a call.
+- Call picture: conflicts = someone on this call proposes or assumes something that contradicts one of the ACTIVE DECISIONS of the project: the number of the decision, who said it, the time of the line, and one short sentence the PM can say to remind them (in the call's language). Only a real contradiction, not a related topic or a refinement.
+- During the call: A conflict becomes one quiet card `{"kind":"decision_conflict","level":"info","gist":"<DD.MM> decided: <decision> (<stated by>)","items":["<how to remind>"],"t":"HH:MM:SS","who":"<name>"}` in Earlier, with the priority and limits of a risk card: never the main card, never red, each decision once a call.
 
 ### Tip diet and rates (wins over any rule that allows more)
 

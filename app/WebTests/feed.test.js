@@ -193,6 +193,19 @@ test('a risk is one quiet card without the label in its text', () => {
   assert.strictEqual(rs[0].say, 'if the API slips, the pilot moves a week');
 });
 
+test('0.8.8: a decision conflict is one quiet card with the decision and one line to remind them', () => {
+  const { f, get } = make();
+  const it = { kind: 'decision_conflict', level: 'info', t: '10:32:00', who: 'Mike Johnson',
+    gist: '12.10 decided: Orbit pilot goes to Northwind first (Emily Clark)', items: ['We agreed on 12.10 that Northwind goes first.'] };
+  f.addItems([it]); f.addItems([it]);
+  const cs = get().cards.filter((c) => c.kind === 'decision_conflict');
+  assert.strictEqual(cs.length, 1);
+  assert.strictEqual(cs[0].quiet, true);
+  assert.strictEqual(cs[0].say, '12.10 decided: Orbit pilot goes to Northwind first (Emily Clark)');
+  assert.deepStrictEqual(cs[0].items, ['We agreed on 12.10 that Northwind goes first.']);
+  assert.strictEqual(cs[0].who, 'Mike Johnson');
+});
+
 // 0.8.5 (rules/presentation.yaml): the recorder writes the time line and the advice once; the window shows the advice
 // text verbatim. The cases are the shared fixture the recorder's tests use (rules/fixtures/presentation-advice.json).
 const FIX = require(path.join(__dirname, '../../rules/fixtures/presentation-advice.json'));

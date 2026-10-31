@@ -168,6 +168,11 @@ struct SeriesView: View {
                           + lingering.filter { $0.calls == 1 }.map { $0.text })
                 }
                 commitmentsByOwner(items.filter { $0.status == "open" }, newKey: latest.map { CommitmentRegister.callKey($0.file) } ?? "")
+                // 0.8.8 (rules/decisions.yaml > series): the register's active decisions of the project (the local snapshot)
+                let reg = NotionAutoAdd.active(PyTool.project(of: record.file).project)
+                if !reg.isEmpty {
+                    block(L("series.register"), reg.prefix(10).map { $0.date + " · " + $0.title + ($0.who.isEmpty ? "" : " (" + $0.who + ")") })
+                }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(L("series.timeline")).font(PN.Font.section).foregroundStyle(PN.C.text)
                     ForEach(calls) { c in

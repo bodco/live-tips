@@ -46,6 +46,7 @@ public enum UsageLog {
         "prepare_again": [], "presentation_mode_on": [], "slide_sync": ["variant"], "rehearsal_started": [],
         "rehearsal_finished": ["score"], "transcribe_run": ["source", "minutes"], "search_calls": [], "followup_written": [],
         "followup_copied": [], "followup_open_mail": [], "notion_page_written": [], "notion_task_ticked": [], "risk_added": [],
+        "decision_added": [], "decision_superseded": [], "auto_added": ["kind", "n"],
         "series_opened": [], "call_page_edited": ["section"], "tip_shown": ["kind"], "tip_action": ["kind", "action"],
         "help_now": [], "ask_typed": [], "hotkey": ["name"], "update_crm": ["fields"], "answer_card_saved": [],
         "feature_try_it": ["feature"], "demo_opened": ["kind"], "onboarding_step": ["step", "skipped"],

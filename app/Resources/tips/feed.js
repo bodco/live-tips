@@ -230,6 +230,19 @@
         });
         return true;
       }
+      case 'decision_conflict': {
+        // 0.8.8 (rules/decisions.yaml > during_call): someone contradicts an active decision of the project. A quiet
+        // card like a risk: "<DD.MM> decided: X (who)" and one sentence to remind them; each decision once.
+        const id = 'd:' + clean(it.gist).toLowerCase().slice(0, 60);
+        if (this.byId[id]) return false;
+        this.put({
+          id, kind: 'decision_conflict', quiet: true, who: clean(it.who), question: '', say: clean(it.gist),
+          source: '', meta: '', unverified: false, items: (it.items || []).map(clean).filter(Boolean).slice(0, 1),
+          at: hmsToMs(it.at || it.t, this.now()), state: 'active', pinned: false,
+          partial: false, late: false, card: '', t: it.t || '', raw: { kind: 'decision_conflict', gist: it.gist || '', phrase: '', items: it.items || [] }
+        });
+        return true;
+      }
       case 'checklist':
         if (!this.agendaEngine) this.agendaBrief = (it.items || []).map((x, i) => ({ id: 'b' + i, title: clean(itemText(x)), done: false, cur: false }));
         return true;

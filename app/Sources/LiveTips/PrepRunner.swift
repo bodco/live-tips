@@ -371,7 +371,20 @@ final class PrepRunner: ObservableObject {
         // 0.8.5 (rules/presentation.yaml > prepare_again): one previous version is kept; the deck goes to <base>.deck.json.
         let deckTexts = TalkFiles.before(base: base, deck: r.deck)
         let deckLines = r.deck.map { TalkFiles.prompt(base: base, deck: $0) } ?? ""
-        let prompt = (r.refreshBase == nil ? fullPrompt : refreshPrompt) + (deckLines.isEmpty ? "" : "\n\n" + deckLines)
+        // 0.8.8 (rules/decisions.yaml > brief, snapshot): the register's active decisions, refreshed from Notion now
+        let regProj = ProjectRegistry.load(from: AppPaths.projects).projects.first { $0.slug == r.slug }
+        let decFile = ((r.root as NSString).appendingPathComponent("pacenote") as NSString).appendingPathComponent("decisions.md")
+        let hasDecisions = FileManager.default.fileExists(atPath: decFile)
+            || (regProj.map { !NotionTargets.decisionsDB(c, $0).isEmpty } ?? false)
+        if r.refreshBase == nil { NotionAutoAdd.snapshot(regProj) }
+        let decLine = r.useProjectFolder && r.refreshBase == nil && hasDecisions ? """
+
+
+        ACTIVE DECISIONS: when \(decFile) exists (a snapshot of the project's Notion Decisions register, one line \
+        "- date | decision | who | area"), add the section "## Active decisions" to the brief: its newest 10 lines with \
+        their dates and who decided. Copy them; never change or invent a decision. No file, no section.
+        """ : ""
+        let prompt = (r.refreshBase == nil ? fullPrompt : refreshPrompt) + decLine + (deckLines.isEmpty ? "" : "\n\n" + deckLines)
             + Self.salesPrompt(r, base: base, web: AppConfig.load(from: AppPaths.config).salesWebSearch)
         if r.refreshBase != nil { UsageLog.log("prepare_again") }
         // 0.8.2: the way from Settings > AI; with auto-switch the other one when this one cannot run at all.

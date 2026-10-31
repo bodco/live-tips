@@ -26,6 +26,8 @@ OUT_AFTER = RULES / "generated" / "skill_after.md"
 AFTER_HEAD = "### Risks and the follow-up email"
 OUT_SALES = RULES / "generated" / "skill_sales.md"
 SALES_HEAD = "### Sales mode and CRM"
+OUT_DEC = RULES / "generated" / "skill_decisions.md"
+DEC_HEAD = "### Decision register"
 
 
 def render(rules_dir: Path = RULES) -> str:
@@ -111,6 +113,19 @@ def render_sales(rules_dir: Path = RULES) -> str:
     return "\n".join(out) + "\n"
 
 
+def render_decisions(rules_dir: Path = RULES) -> str:
+    """Pacenote 0.8.8: the decision register in the Control Tower Decisions database (rules/decisions.yaml)."""
+    dc = yaml.safe_load((rules_dir / "decisions.yaml").read_text(encoding="utf-8"))
+    out = ["Generated from `rules/decisions.yaml`; do not edit here.", ""]
+    out.append("**Database.** " + dc["database"])
+    for k in ("after_call", "supersede", "auto_add", "dedupe", "brief", "series"):
+        out.append("- {}: {}".format(k.replace("_", " ").capitalize(), dc[k]))
+    out.append("- Snapshot: `{}`, {}; {}".format(dc["snapshot"]["file"], dc["snapshot"]["when"], dc["snapshot"]["content"]))
+    out.append("- Call picture: " + dc["model_rule"])
+    out.append("- During the call: " + dc["during_call"])
+    return "\n".join(out) + "\n"
+
+
 def extract_section(skill_md: str, head: str) -> str:
     """The body of the SKILL.md section `head` up to the next heading, blank lines at the ends removed."""
     lines = skill_md.split("\n")
@@ -147,8 +162,9 @@ def compare(path: Path, text: str, sections) -> int:
     return bad
 
 
-def outputs(text, reg, after, sales=None):
-    return ((OUT, text), (OUT_REG, reg), (OUT_AFTER, after)) + (((OUT_SALES, sales),) if sales is not None else ())
+def outputs(text, reg, after, sales=None, dec=None):
+    return ((OUT, text), (OUT_REG, reg), (OUT_AFTER, after)) + (((OUT_SALES, sales),) if sales is not None else ()) \
+        + (((OUT_DEC, dec),) if dec is not None else ())
 
 
 def check(files) -> int:
@@ -174,9 +190,10 @@ def main(argv=None) -> int:
     ap.add_argument("--compare", type=Path)
     a = ap.parse_args(argv)
     text, reg, after, sales = render(RULES), render_register(RULES), render_after(RULES), render_sales(RULES)
+    dec = render_decisions(RULES)
     if a.compare:
-        return compare(a.compare, text, ((REG_HEAD, reg), (AFTER_HEAD, after), (SALES_HEAD, sales)))
-    return check(outputs(text, reg, after, sales)) if a.check else write(outputs(text, reg, after, sales))
+        return compare(a.compare, text, ((REG_HEAD, reg), (AFTER_HEAD, after), (SALES_HEAD, sales), (DEC_HEAD, dec)))
+    return check(outputs(text, reg, after, sales, dec)) if a.check else write(outputs(text, reg, after, sales, dec))
 
 
 if __name__ == "__main__":

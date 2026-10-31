@@ -53,7 +53,8 @@ public enum NotionTasksCore {
                 default: return ["property": s.projectProperty, "select": ["equals": v]]
                 }
             }
-            if let w = workspace, !s.workspaceProperty.isEmpty, let page = s.workspaceMap[w], !page.isEmpty {
+            if let w = workspace, !s.workspaceProperty.isEmpty, s.workspaceType.isEmpty || s.workspaceType == "relation",
+               let page = s.workspaceMap[w], !page.isEmpty {
                 any.append(["property": s.workspaceProperty, "relation": ["contains": page]])
             }
             if !any.isEmpty { and.append(any.count == 1 ? any[0] : ["or": any]) }
@@ -141,7 +142,7 @@ public enum NotionTasksCore {
 
     /// A new task page (rules/notion-tasks.yaml > link) for a commitment.
     public static func newPage(_ s: NotionTasksSettings, title: String, projectValues: [String], due: String, source: String,
-                               quote: String, titleProperty: String) -> [String: Any] {
+                               quote: String, titleProperty: String, workspaceValues: [String] = []) -> [String: Any] {
         var props: [String: Any] = [titleProperty: ["title": [["type": "text", "text": ["content": String(title.prefix(200))]]]]]
         if s.byPerson { props[s.personProperty] = ["people": [["id": s.personId]]] }
         if !s.projectProperty.isEmpty, !projectValues.isEmpty {
@@ -151,6 +152,8 @@ public enum NotionTasksCore {
             default: props[s.projectProperty] = ["select": ["name": projectValues[0]]]
             }
         }
+        // 0.8.8: the Workspace of the project's workspace (page ids for a relation, else names)
+        if !s.workspaceProperty.isEmpty, let props1 = workspaceProp(s, workspaceValues) { props[s.workspaceProperty] = props1 }
         if !s.dueProperty.isEmpty, due.range(of: "^\\d{4}-\\d{2}-\\d{2}$", options: .regularExpression) != nil {
             props[s.dueProperty] = ["date": ["start": due]]
         }
@@ -166,6 +169,19 @@ public enum NotionTasksCore {
             children.append(["object": "block", "type": "quote", "quote": ["rich_text": [["type": "text", "text": ["content": String(quote.prefix(1900))]]]]])
         }
         return ["parent": ["type": "data_source_id", "data_source_id": s.database], "properties": props, "children": children]
+    }
+
+    /// 0.8.8: a Workspace property value of a new task; nil when there is nothing that fits the property's type.
+    public static func workspaceProp(_ s: NotionTasksSettings, _ values: [String]) -> [String: Any]? {
+        let vs = values.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let ids = vs.filter { $0.range(of: "^[0-9a-fA-F-]{32,36}$", options: .regularExpression) != nil }
+        switch s.workspaceType {
+        case "", "relation": return ids.isEmpty ? nil : ["relation": ids.map { ["id": $0] }]
+        case "multi_select": return vs.isEmpty || ids.count == vs.count ? nil : ["multi_select": vs.filter { !ids.contains($0) }.map { ["name": $0] }]
+        case "select": return vs.first(where: { !ids.contains($0) }).map { ["select": ["name": $0]] }
+        case "rich_text": return vs.first(where: { !ids.contains($0) }).map { ["rich_text": [["type": "text", "text": ["content": $0]]]] }
+        default: return nil
+        }
     }
 
     /// Automatic match of Pacenote project names to Notion values by name (rules/notion-tasks.yaml > project_by).

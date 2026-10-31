@@ -20,21 +20,49 @@ enum NotionTargets {
 
     static func meetingsDB(_ c: AppConfig, _ p: Project?) -> String { c.notionMeetingsDB.isEmpty ? configId("meetings_db", p) : c.notionMeetingsDB }
     static func risksDB(_ c: AppConfig, _ p: Project?) -> String { c.notionRisksDB.isEmpty ? configId("risks_db", p) : c.notionRisksDB }
+    /// 0.8.8 (rules/decisions.yaml): the Decisions database chosen in Settings, else the config's decisions_db.
+    static func decisionsDB(_ c: AppConfig, _ p: Project?) -> String { c.notionDecisionsDB.isEmpty ? configId("decisions_db", p) : c.notionDecisionsDB }
+
+    /// 0.8.8: the Project and Workspace property names of one database kind (meetings | tasks | risks | decisions).
+    static func props(_ c: AppConfig, kind: String) -> (project: String, workspace: String) {
+        switch kind {
+        case "risks": return (c.notionRisksProp, c.notionRisksWsProp)
+        case "decisions": return (c.notionDecisionsProp, c.notionDecisionsWsProp)
+        case "tasks": return (c.notionTasks.projectProperty, c.notionTasks.workspaceProperty)
+        default: return (c.notionMeetingsProp, c.notionMeetingsWsProp)
+        }
+    }
+
+    /// Several values ("id1, id2"): page ids go as one relation argument, anything else as a name or text.
+    static func valueArgs(_ value: String, page: String, name: String) -> [String] {
+        let parts = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        if !parts.isEmpty, parts.allSatisfy(isPageId) { return [page, parts.joined(separator: ",")] }
+        return value.isEmpty ? [] : [name, value]
+    }
+
+    /// 0.8.8: the Workspace property and value of a workspace (the value on its card in Settings > Projects, else its name).
+    static func workspaceArgs(_ c: AppConfig, _ w: Workspace?, kind: String) -> [String] {
+        let prop = props(c, kind: kind).workspace
+        var a: [String] = prop.isEmpty ? [] : ["--workspace-prop", prop]
+        if let w { a += valueArgs(w.notionValue.isEmpty ? w.name : w.notionValue, page: "--workspace-page", name: "--workspace-value") }
+        return a
+    }
 
     /// A page id (32 hex digits, dashes allowed) means a relation; anything else is a select option or text.
     static func isPageId(_ v: String) -> Bool { v.range(of: "^[0-9a-fA-F-]{32,36}$", options: .regularExpression) != nil }
 
-    /// Arguments for wrapup_notion and risk_notion: the project property and its value.
-    static func projectArgs(_ c: AppConfig, _ p: Project?, risks: Bool = false) -> [String] {
-        let prop = risks ? c.notionRisksProp : c.notionMeetingsProp
+    /// Arguments for wrapup_notion, risk_notion and decision_notion: the project property and its value and (0.8.8) the
+    /// Workspace property with the value of the project's workspace from the registry.
+    static func projectArgs(_ c: AppConfig, _ p: Project?, risks: Bool = false, kind: String? = nil) -> [String] {
+        let k = kind ?? (risks ? "risks" : "meetings")
+        let prop = props(c, kind: k).project
         let value = p.map { $0.notionValue.isEmpty ? $0.name : $0.notionValue } ?? ""
         var a: [String] = []
         if !prop.isEmpty { a += ["--project-prop", prop] }
         if let p, !p.config.isEmpty, FileManager.default.fileExists(atPath: p.config) { a += ["--project-config", p.config] }
         // 0.8.7: several page ids ("id1, id2") go together when every part is a page id
-        let parts = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        if !parts.isEmpty, parts.allSatisfy(isPageId) { a += ["--project-page", parts.joined(separator: ",")] }
-        else if !value.isEmpty { a += ["--project-name", value] }
+        a += valueArgs(value, page: "--project-page", name: "--project-name")
+        if let p { a += workspaceArgs(c, ProjectRegistry.load(from: AppPaths.projects).workspace(of: p), kind: k) }
         return a
     }
 }
@@ -70,8 +98,11 @@ final class NotionSchema: ObservableObject {
     static func norm(_ id: String) -> String { id.replacingOccurrences(of: "-", with: "").lowercased() }
 
     /// The property named Project (any case), else the first one with "project" in its name.
-    static func autoProject(_ ps: [Prop]) -> String {
-        ps.first { $0.name.lowercased() == "project" }?.name ?? ps.first { $0.name.lowercased().contains("project") }?.name ?? ""
+    static func autoProject(_ ps: [Prop]) -> String { auto(ps, "project") }
+    /// 0.8.8: the same for the Workspace property.
+    static func autoWorkspace(_ ps: [Prop]) -> String { auto(ps, "workspace") }
+    static func auto(_ ps: [Prop], _ word: String) -> String {
+        ps.first { $0.name.lowercased() == word }?.name ?? ps.first { $0.name.lowercased().contains(word) }?.name ?? ""
     }
 
     func load(_ ds: String) {
@@ -172,22 +203,28 @@ struct NotionDBSearchPopover: View {
 }
 
 /// 0.8.7 (F3): one row of Settings > Integrations > Notion > Databases: the database (a pop-up with search), its
-/// project property and how many pages it has.
+/// project property and how many pages it has. 0.8.8: a fourth kind (decisions), the Workspace property next to the
+/// Project property, and "Add automatically after each call" under Tasks, Risks and Decisions (rules/decisions.yaml).
 struct NotionDBRow: View {
-    let kind: String          // meetings | tasks | risks
+    let kind: String          // meetings | tasks | risks | decisions
     @ObservedObject var model: SettingsModel
     @ObservedObject var dest = NotionDestinationModel.shared
     @ObservedObject var schema = NotionSchema.shared
     @State private var pop = false
 
+    private func title(_ v: String) -> String { dest.items.first { $0.id == v }?.title ?? NotionSchema.shared.titles[v] ?? "" }
+    private func type(_ prop: String) -> String { (schema.props[id.wrappedValue] ?? []).first { $0.name == prop }?.type ?? "" }
+
     var id: Binding<String> {
         switch kind {
         case "meetings": return Binding(get: { model.config.notionMeetingsDB }, set: { v in
-            model.config.notionMeetingsDB = v; model.config.notionMeetingsName = dest.items.first { $0.id == v }?.title ?? NotionSchema.shared.titles[v] ?? "" })
+            model.config.notionMeetingsDB = v; model.config.notionMeetingsName = title(v) })
         case "risks": return Binding(get: { model.config.notionRisksDB }, set: { v in
-            model.config.notionRisksDB = v; model.config.notionRisksName = dest.items.first { $0.id == v }?.title ?? NotionSchema.shared.titles[v] ?? "" })
+            model.config.notionRisksDB = v; model.config.notionRisksName = title(v) })
+        case "decisions": return Binding(get: { model.config.notionDecisionsDB }, set: { v in
+            model.config.notionDecisionsDB = v; model.config.notionDecisionsName = title(v) })
         default: return Binding(get: { model.config.notionTasks.database }, set: { v in
-            model.config.notionTasks.database = v; model.config.notionTasks.databaseName = dest.items.first { $0.id == v }?.title ?? NotionSchema.shared.titles[v] ?? "" })
+            model.config.notionTasks.database = v; model.config.notionTasks.databaseName = title(v) })
         }
     }
     var name: String {
@@ -195,17 +232,53 @@ struct NotionDBRow: View {
         switch kind {
         case "meetings": stored = model.config.notionMeetingsName
         case "risks": stored = model.config.notionRisksName
+        case "decisions": stored = model.config.notionDecisionsName
         default: stored = model.config.notionTasks.databaseName
         }
         let v = id.wrappedValue
         if v.isEmpty { return L("ntset.notSet") }
         return [dest.items.first { $0.id == v }?.title, schema.titles[v], stored].compactMap { $0 }.first { !$0.isEmpty } ?? L("ntset.unnamedDb")
     }
-    var prop: Binding<String>? {
+    var prop: Binding<String> {
         switch kind {
         case "meetings": return $model.config.notionMeetingsProp
         case "risks": return $model.config.notionRisksProp
-        default: return nil          // tasks: the person and conditions under My tasks
+        case "decisions": return $model.config.notionDecisionsProp
+        default: return Binding(get: { model.config.notionTasks.projectProperty }, set: { v in
+            model.config.notionTasks.projectProperty = v; model.config.notionTasks.projectType = type(v) })
+        }
+    }
+    var wsProp: Binding<String> {
+        switch kind {
+        case "meetings": return $model.config.notionMeetingsWsProp
+        case "risks": return $model.config.notionRisksWsProp
+        case "decisions": return $model.config.notionDecisionsWsProp
+        default: return Binding(get: { model.config.notionTasks.workspaceProperty }, set: { v in
+            model.config.notionTasks.workspaceProperty = v; model.config.notionTasks.workspaceType = type(v) })
+        }
+    }
+    /// 0.8.8: the Tasks switch is the 0.8.6 one (notionTasks.autoAdd), moved here with its value.
+    var autoAdd: Binding<Bool>? {
+        switch kind {
+        case "tasks": return $model.config.notionTasks.autoAdd
+        case "risks": return $model.config.notionRisksAutoAdd
+        case "decisions": return $model.config.notionDecisionsAutoAdd
+        default: return nil
+        }
+    }
+
+    @ViewBuilder private func propPicker(_ label: String, _ sel: Binding<String>, _ ps: [NotionSchema.Prop], help: String) -> some View {
+        HStack(spacing: 6) {
+            Text(label).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            Picker("", selection: sel) {
+                Text(L("ntset.propNone")).tag("")
+                if !sel.wrappedValue.isEmpty && !ps.contains(where: { $0.name == sel.wrappedValue }) {
+                    Text(sel.wrappedValue).tag(sel.wrappedValue)
+                }
+                ForEach(ps, id: \.self) { p in Text(p.name + " (" + L("ntset.propType." + p.type) + ")").tag(p.name) }
+            }
+            .labelsHidden().controlSize(.small).fixedSize()
+            .help(help)
         }
     }
 
@@ -231,20 +304,15 @@ struct NotionDBRow: View {
                         }
                     }
                 }
-                if let prop, !id.wrappedValue.isEmpty {
+                if !id.wrappedValue.isEmpty {
                     let ps = schema.props[id.wrappedValue] ?? []
-                    HStack(spacing: 6) {
-                        Text(L("ntset.projectProp")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                        Picker("", selection: prop) {
-                            Text(L("ntset.propNone")).tag("")
-                            if !prop.wrappedValue.isEmpty && !ps.contains(where: { $0.name == prop.wrappedValue }) {
-                                Text(prop.wrappedValue).tag(prop.wrappedValue)
-                            }
-                            ForEach(ps, id: \.self) { p in Text(p.name + " (" + L("ntset.propType." + p.type) + ")").tag(p.name) }
-                        }
-                        .labelsHidden().controlSize(.small).fixedSize()
-                        .help(L("ntset.projectProp.help"))
-                    }
+                    propPicker(L("ntset.projectProp"), prop, ps, help: L("ntset.projectProp.help"))
+                    propPicker(L("ntset.workspaceProp"), wsProp, ps, help: L("ntset.workspaceProp.help"))
+                }
+                if let autoAdd {
+                    Toggle(isOn: autoAdd) { InfoLabel(title: L("ntset.autoAddRow"), info: L("ntset.autoAddRow." + kind + ".i")) }
+                        .toggleStyle(.checkbox).controlSize(.small)
+                        .disabled(id.wrappedValue.isEmpty)
                 }
             }
         } label: {
@@ -256,7 +324,9 @@ struct NotionDBRow: View {
         .onAppear { schema.load(id.wrappedValue) }
         .onChange(of: id.wrappedValue) { schema.load(id.wrappedValue) }
         .onChange(of: schema.props[id.wrappedValue]) {
-            if let prop, prop.wrappedValue.isEmpty, let ps = schema.props[id.wrappedValue] { prop.wrappedValue = NotionSchema.autoProject(ps) }
+            guard let ps = schema.props[id.wrappedValue] else { return }
+            if prop.wrappedValue.isEmpty { prop.wrappedValue = NotionSchema.autoProject(ps) }
+            if wsProp.wrappedValue.isEmpty { wsProp.wrappedValue = NotionSchema.autoWorkspace(ps) }
         }
     }
 }
@@ -268,7 +338,7 @@ struct NotionFillChoices: View {
     @ObservedObject var dest = NotionDestinationModel.shared
 
     var body: some View {
-        ForEach(["meetings", "tasks", "risks"], id: \.self) { kind in
+        ForEach(["meetings", "tasks", "risks", "decisions"], id: \.self) { kind in
             if let cs = schema.fillChoices[kind], cs.count > 1 {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(L("ntset.fill.differ", ["kind": L("ntset.db." + kind)])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
@@ -294,6 +364,7 @@ struct NotionFillChoices: View {
         switch kind {
         case "meetings": model.config.notionMeetingsDB = id; model.config.notionMeetingsName = n
         case "risks": model.config.notionRisksDB = id; model.config.notionRisksName = n
+        case "decisions": model.config.notionDecisionsDB = id; model.config.notionDecisionsName = n
         default: model.config.notionTasks.database = id; model.config.notionTasks.databaseName = n
         }
         schema.fillChoices[kind] = nil
@@ -306,12 +377,14 @@ struct NotionValuePicker: View {
     @Binding var value: String
     let fallback: String               // the project name, used when nothing is chosen
     @ObservedObject var model: SettingsModel
+    var workspace = false              // 0.8.8: a workspace card: the meetings database's Workspace property
     @ObservedObject var schema = NotionSchema.shared
 
     private var ds: String { model.config.notionMeetingsDB }
     private var prop: NotionSchema.Prop? {
         let ps = schema.props[ds] ?? []
-        let name = model.config.notionMeetingsProp.isEmpty ? NotionSchema.autoProject(ps) : model.config.notionMeetingsProp
+        let chosen = workspace ? model.config.notionMeetingsWsProp : model.config.notionMeetingsProp
+        let name = !chosen.isEmpty ? chosen : workspace ? NotionSchema.autoWorkspace(ps) : NotionSchema.autoProject(ps)
         return ps.first { $0.name == name }
     }
     private var values: [String] { value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } }

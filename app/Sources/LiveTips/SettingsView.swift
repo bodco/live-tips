@@ -358,8 +358,8 @@ final class SettingsModel: ObservableObject {
 
     func rescanWorkspaces() {
         guard !config.workRoot.isEmpty else { return }
-        registry.workspaces = WorkspaceScanner.scan(workRoot: config.workRoot, projects: registry.projects,
-                                                    extra: registry.extraWorkspaces, excluded: registry.excluded)
+        registry.setWorkspaces(WorkspaceScanner.scan(workRoot: config.workRoot, projects: registry.projects,
+                                                     extra: registry.extraWorkspaces, excluded: registry.excluded))   // 0.8.8: keeps In Notion
     }
 
     // ---- folder projects (2026-10-26: Notion and configs are optional)
@@ -1015,6 +1015,15 @@ struct SettingsView: View {
             }
             ForEach(model.registry.workspaces, id: \.name) { w in
                 Section {
+                    // 0.8.8: the workspace's value in the Notion Workspace properties (as for a project, never an id)
+                    if let wi = model.registry.workspaces.firstIndex(where: { $0.name == w.name }) {
+                        HStack(spacing: 4) {
+                            Text(L("proj.inNotion")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                            NotionValuePicker(value: $model.registry.workspaces[wi].notionValue, fallback: w.name, model: model, workspace: true)
+                                .help(L("ws.inNotion.help"))
+                                .disabled(!model.isSet(.notionToken))
+                        }
+                    }
                     let members = model.registry.projects.filter { w.projects.contains($0.slug) }
                     if members.isEmpty { Text(L("set.noProjectsYetScan")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                     ForEach(members, id: \.slug) { p in projectRow(p.slug) }
@@ -1159,6 +1168,7 @@ struct SettingsView: View {
                 NotionDBRow(kind: "meetings", model: model)
                 NotionDBRow(kind: "tasks", model: model)
                 NotionDBRow(kind: "risks", model: model)
+                NotionDBRow(kind: "decisions", model: model)      // 0.8.8 (rules/decisions.yaml)
                 NotionFillChoices(model: model)
                 HStack {
                     if dest.busy { ProgressView().controlSize(.small) }

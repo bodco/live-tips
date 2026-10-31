@@ -19,7 +19,8 @@ settings:
     first, the rest picked by hand. A workspace means all its projects (Project.workspace). When the database has a
     Workspace relation and the workspace has a value, tasks with that Workspace are added too.
   auto_add: >-
-    "Add my commitments from each call to Notion tasks": on by default once the settings above are complete.
+    "Add automatically after each call" (0.8.8: under Tasks in Settings > Integrations > Notion > Databases, next to
+    Risks and Decisions, rules/decisions.yaml > auto_add). Off by default; a value saved by 0.8.6 is kept as it was.
   status_line: '"N tasks match now, synced X ago" with Refresh, from a live query: it tests the settings.'
 sync:
   query: POST /v1/data_sources/{id}/query with the person (when set), conditions and projects as the filter, all pages
@@ -35,7 +36,8 @@ tick: >-
   PATCH /v1/pages/{id} with the tick value at once; a toast "<title> set to Done in Notion" with Undo for 8 s (Undo
   writes the previous value back). When Notion refuses, the row comes back with the reason. A tick made offline
   waits in a queue and is sent when Notion answers.
-open: Double click opens the page in Notion. Menu: Copy, Open, Open the call (items from a call), Hide here, Remove.
+open: >-
+  Double click opens the page in Notion. Menu: Copy, Open, Open the call (items from a call), Hide here, Remove.
 remove: >-
   Remove takes the item out of On you and moves its Notion page to the Notion trash (PATCH in_trash true; Notion keeps
   it 30 days). A call item gets drop in the register. A task made by hand in Notion asks once: Move "<title>" to the

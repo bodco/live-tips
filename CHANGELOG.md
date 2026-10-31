@@ -3,6 +3,35 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.8.8.1
+
+- **Decision conflict tip:** the reminder sentence said "decision 1" (its number in the snapshot); the rule now asks
+  for the decision itself, never its number (rules/decisions.yaml).
+- **Add all on the call page:** the last decision of "Add all" still ran the "Replaces?" check; now none does.
+- **Ukrainian:** the reasons under Decisions and Risks and the HubSpot hints named the Settings path in English
+  ("Settings > Integrations"); they say "Налаштування > Інтеграції" now.
+
+## 0.8.8
+
+The decision register, automatic add after a call, and the Workspace property (rules/decisions.yaml):
+
+- **Decisions to Notion:** Settings > Integrations > Notion > Databases has a Decisions row (the Control Tower
+  Decisions database). The call page has "Add to decision register" on each decision and "Add all N"; Pacenote writes
+  Decision, Date, Area (from the database's options), Context, Source, Status Active, Stated by, Project and Workspace,
+  and the optional fields only when they were said. "In register" with a link after the write, also for risks.
+- **Replaces an earlier decision:** after an add, a contradiction with an active decision of the project is offered as
+  "Replaces <old, date>?"; only the click sets Superseded and the Supersedes / Superseded By links.
+- **Add automatically after each call:** one switch each under Tasks, Risks and Decisions, all off by default; the
+  0.8.6 tasks switch moved there with its value. Written once per call and text (`<stem>.notion.json`), never for a
+  hidden call.
+- **Workspace property:** next to the Project property of every database; meeting, task, risk and decision pages get
+  the project's workspace. A workspace's value is set on its card in Settings > Projects.
+- **Active decisions:** a local snapshot `<project>/pacenote/decisions.md` before a preparation and a call; the brief's
+  "Active decisions" section, the series view, and a new quiet tip `decision_conflict` when someone contradicts one.
+- **Usage log:** `decision_added`, `decision_superseded`, `auto_added {kind, n}`.
+- **Keychain:** all keys are kept in one Keychain item, so after an update macOS asks once, not once per key (the first
+  start of 0.8.8 still asks once for each key saved before, to move them).
+
 ## 0.8.7.2
 
 After hands-on testing on the Mac:

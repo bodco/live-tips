@@ -13,7 +13,8 @@ names: the PM's name aliases and the project config's names and terms are given,
   real name with what was heard in brackets ("Sentry (heard \"Send Trends\")")
 lossless:
   parts: a long transcript is read in parts of about 25,000 characters, then merged by topic without shortening
-  coverage: every number, date, time, ticket key, domain or address and every question of the transcript is looked
+  coverage: >-
+    every number, date, time, ticket key, domain or address and every question of the transcript is looked
     up in the notes; the missing ones go back to the model with their lines once; the notes end with the coverage
     line ("Coverage: numbers 41/42, keys 6/6, questions 14/15")
 preparation: |

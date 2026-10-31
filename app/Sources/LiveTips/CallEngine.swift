@@ -149,6 +149,9 @@ final class CallEngine {
         sidecarRestarts = 0
         projectRoot = (request["project_dir"] as? String) ?? ""
         projectConfig = (request["project_config"] as? String) ?? ""
+        // 0.8.8 (rules/decisions.yaml > snapshot): refresh the active decisions; the engine reads the file, never Notion
+        let slug0 = (request["slug"] as? String) ?? ""
+        MainActor.assumeIsolated { NotionAutoAdd.snapshot(ProjectRegistry.load(from: AppPaths.projects).projects.first { $0.slug == slug0 }) }
         let c = config
         let control = (appRoot as NSString).appendingPathComponent("control")
         let logs = (appRoot as NSString).appendingPathComponent("logs")
@@ -435,6 +438,9 @@ final class CallEngine {
         } else {
             args += ["--project-name", projectName]
             if hasConfig { args += ["--project-config", projectConfig] }
+            // 0.8.8: a workspace call: its Workspace value (the workspace whose call folder holds the transcript)
+            let wsDir = ((file as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent
+            args += NotionTargets.workspaceArgs(c, ProjectRegistry.load(from: AppPaths.projects).workspaces.first { $0.root == wsDir }, kind: "meetings")
         }
         if !meetingsDB.isEmpty { args += ["--meetings-db", meetingsDB] }
         if let r = renamed { args += ["--title", r] }
@@ -480,7 +486,8 @@ final class CallEngine {
     /// he turned that on. The tips engine writes the register when it stops, so this waits for it.
     func notionTasksAfterCall(file: String) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 40) {
-            MainActor.assumeIsolated { NotionTasks.shared.afterCall(file: file) }
+            // 0.8.8 (rules/decisions.yaml > auto_add): tasks, risks and decisions, each by its own switch
+            MainActor.assumeIsolated { NotionAutoAdd.afterCall(file: file) }
         }
     }
 

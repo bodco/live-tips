@@ -104,6 +104,28 @@ def first_json(text: str) -> Optional[dict]:
     return None
 
 
+
+def load_active_decisions(project_dir: str, limit: int = 30) -> list:
+    """0.8.8 (rules/decisions.yaml > snapshot): <project>/pacenote/decisions.md, written before the preparation."""
+    if not project_dir:
+        return []
+    try:
+        from .decision_notion import parse_snapshot
+        return parse_snapshot((Path(project_dir) / "pacenote" / "decisions.md").read_text(encoding="utf-8"))[:limit]
+    except (OSError, ValueError):
+        return []
+
+
+def decision_conflict_card(d: dict, c: dict, t: str, uk: bool) -> dict:
+    """The card of rules/decisions.yaml > during_call: "<DD.MM> decided: X (who)" and one sentence to remind them."""
+    date = str(d.get("date") or "")
+    dm = "{}.{}".format(date[8:10], date[5:7]) if len(date) >= 10 else date
+    who = " ({})".format(d["stated_by"]) if d.get("stated_by") else ""
+    gist = "{} {}: {}{}".format(dm, "вирішили" if uk else "decided", d.get("title", ""), who).strip()
+    remind = str(c.get("remind") or "").replace(chr(0x2014), "-").strip()
+    return {"schema_version": 1, "engine": "app", "kind": "decision_conflict", "level": "info", "t": t, "at": t,
+            "src": c.get("t") or t, "who": str(c.get("who") or ""), "gist": gist, "items": [remind] if remind else []}
+
 class JsonlWriter:
     def __init__(self, path: Path):
         self.path = path
@@ -670,6 +692,9 @@ class Engine:
         self.onme_mine: List[dict] = []
         self.risks_shown: set = set()
         self.open_commitments = self._load_commitments(cfg, rules)
+        # 0.8.8 (rules/decisions.yaml): the project's active decisions from the local snapshot, never from Notion live
+        self.active_decisions = load_active_decisions(cfg.get("project_dir") or "")
+        self.conflicts_shown: set = set()
         raise_tip_tokens(cfg)
 
     def _setup_hedging(self, provider, cfg: dict) -> None:
@@ -1631,6 +1656,7 @@ class Engine:
         self._agenda_from_model(obj)
         self._commitments_done(obj)
         self._risk_cards(sit)
+        self._conflict_cards(obj)
 
     def _situation_ask(self, ctx: List[Line], new: List[Line]):
         """One model call for the picture of the call; returns its JSON (or None) and logs what it cost."""
@@ -1766,6 +1792,11 @@ class Engine:
             if k:
                 keys.append(k)
                 rules.append("- " + r)
+        if getattr(self, "active_decisions", None):     # 0.8.8 (rules/decisions.yaml > model_rule)
+            dc = getattr(self.rules, "decisions", {}) or {}
+            keys.append('"conflicts": [{"n": <number of the ACTIVE DECISION>, "who": "<name>", "t": "<HH:MM:SS>", '
+                        '"remind": "<one short sentence the PM can say to remind them, in the call\'s language>"}]')
+            rules.append("- " + " ".join(str(dc.get("model_rule", "conflicts = someone contradicts an ACTIVE DECISION.")).split()))
         rk = getattr(self.rules, "risks", {}) or {}
         keys.append('"risks": [{"what": "<what may go wrong and on what it depends, max 16 words, in the call\'s language>", "who": "<name>", "t": "<HH:MM:SS>"}]')
         rules.append("- " + rk.get("model_rule", "risks = conditional threats said on this call."))
@@ -1786,6 +1817,10 @@ class Engine:
             parts.append("OPEN COMMITMENTS (from earlier calls; id | owner | what):\n" + "\n".join(
                 "{} | {} | {}{}".format(c["id"], c.get("owner") or "me", c.get("text", ""), " | due " + c["due"] if c.get("due") else "")
                 for c in left))
+        if getattr(self, "active_decisions", None):     # 0.8.8: the register's active decisions of this project (the snapshot)
+            parts.append("ACTIVE DECISIONS OF THE PROJECT (number | date | decision | stated by):\n" + "\n".join(
+                "{} | {} | {} | {}".format(i, d.get("date", ""), d.get("title", ""), d.get("stated_by", ""))
+                for i, d in enumerate(self.active_decisions)))
         if self.onme_fixed:          # 0.8.5: the PM's own On me corrections in this call
             parts.append("THE PM CORRECTED HIS ON-ME LIST (never put lines like the removed ones on him again; use his wording):\n" + "\n".join(
                 ("removed: " + k) if not v else ("reworded: {} -> {}".format(k, v)) for k, v in list(self.onme_fixed.items())[-12:]))
@@ -1872,6 +1907,23 @@ class Engine:
             self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "risk", "level": "info", "t": t, "at": t,
                                  "src": r.get("t") or t, "who": r.get("who", ""),
                                  "gist": ("Ризик: " if self._ui_uk() else "Risk: ") + r.get("what", "")})
+
+    def _conflict_cards(self, obj: dict) -> None:
+        """0.8.8 (rules/decisions.yaml > during_call): someone contradicts an active decision: one quiet card, each
+        decision once a call, never the main card, never red."""
+        for c in obj.get("conflicts") or [] if getattr(self, "active_decisions", None) else []:
+            if not isinstance(c, dict):
+                continue
+            try:
+                d = self.active_decisions[int(c.get("n"))]
+            except (TypeError, ValueError, IndexError):
+                continue
+            key = d.get("title", "")[:60].lower()
+            if not key or key in self.conflicts_shown:
+                continue
+            self.conflicts_shown.add(key)
+            t = s_to_hms(self.clock())
+            self.out_tips.write(decision_conflict_card(d, c, t, self._ui_uk()))
 
     def commitment_closed(self, cid: str) -> None:
         self.commit_proposed.add(str(cid))

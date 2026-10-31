@@ -9,4 +9,7 @@ during_call: >-
   in Earlier (the On me colour), never the main card, never red.
 after_call: >-
   The call summary has a "Risks" section. "Add to risk register" writes one page into the project's Notion risk
-  database (risks_db in the project config) only after the PM confirms it; nothing is added by itself.
+  database (Settings > Integrations > Notion > Databases > Risks, else risks_db in the project config) only after the PM
+  confirms it, with the Project and Workspace properties chosen in Settings. 0.8.8: when the PM turned on "Add
+  automatically after each call" under Risks, the call's risks are written once after the call, de-duplicated like
+  decisions (rules/decisions.yaml > dedupe); otherwise nothing is added by itself.

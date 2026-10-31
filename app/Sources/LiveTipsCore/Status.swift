@@ -107,7 +107,21 @@ public struct Workspace: Codable, Equatable {
     public var name: String
     public var root: String
     public var projects: [String]       // project slugs whose root is inside this folder
+    /// 0.8.8: the workspace's value in the Notion Workspace properties (option names or page ids, comma-separated);
+    /// "" = the workspace's name. Set in Settings > Projects on the workspace card.
+    public var notionValue = ""
     public init(name: String, root: String, projects: [String]) { self.name = name; self.root = root; self.projects = projects }
+
+    enum CodingKeys: String, CodingKey { case name, root, projects, notionValue }
+
+    /// 0.8.8: notionValue is optional in the file, so a registry saved by 0.8.7 loads as it was.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        root = (try? c.decode(String.self, forKey: .root)) ?? ""
+        projects = (try? c.decode([String].self, forKey: .projects)) ?? []
+        notionValue = (try? c.decode(String.self, forKey: .notionValue)) ?? ""
+    }
 }
 
 public enum WorkspaceScanner {

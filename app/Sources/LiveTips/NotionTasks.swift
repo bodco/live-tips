@@ -244,6 +244,19 @@ final class NotionTasks: ObservableObject {
         return nil
     }
 
+    /// 0.8.8: the Workspace values of a register item's project: the page the tasks settings map the workspace to, else
+    /// the value on the workspace card in Settings > Projects (else its name).
+    func workspaceValues(slug: String) -> [String] {
+        let s = settings
+        guard !s.workspaceProperty.isEmpty else { return [] }
+        let reg = ProjectRegistry.load(from: AppPaths.projects)
+        let w = reg.projects.first { $0.slug == slug }.flatMap { reg.workspace(of: $0) }
+            ?? reg.workspaces.first { $0.name == slug || "workspace:" + $0.name == slug }
+        guard let w else { return [] }
+        if let page = s.workspaceMap[w.name], !page.isEmpty { return [page] }
+        return (w.notionValue.isEmpty ? w.name : w.notionValue).split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
     /// "Add to Notion tasks" on a commitment (owner me): a page, then op link. Returns the page id.
     @discardableResult
     func add(_ c: Commitment, quote: String = "", silent: Bool = false) async -> String? {
@@ -267,7 +280,8 @@ final class NotionTasks: ObservableObject {
             let title = Register.shared.callTitle(c) ?? call
             let source = L("ntask.fromCall", ["title": title, "date": when])
             let body = NotionTasksCore.newPage(s, title: c.text, projectValues: pv, due: CommitmentRegister.dueDate(c.due, from: c.createdDate ?? Date()).map { Self.day($0) } ?? "",
-                                               source: source, quote: quote, titleProperty: titleProp)
+                                               source: source, quote: quote, titleProperty: titleProp,
+                                               workspaceValues: workspaceValues(slug: c.project))
             let r = try await NotionAPI.call(tok, "POST", "/pages", body)
             guard let id = r["id"] as? String else { return nil }
             CommitmentRegister.mark(folder: c.folder, id: c.id, op: "link", notionPage: id)

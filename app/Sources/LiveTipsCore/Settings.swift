@@ -99,6 +99,17 @@ public struct AppConfig: Codable, Equatable {
     public var notionRisksDB = ""
     public var notionRisksName = ""
     public var notionRisksProp = ""
+    /// 0.8.8 (rules/decisions.yaml): the Decisions database, its Project property, and the Workspace property of each
+    /// database (tasks keep theirs in notionTasks). "" = the property named Workspace, when there is one.
+    public var notionDecisionsDB = ""
+    public var notionDecisionsName = ""
+    public var notionDecisionsProp = ""
+    public var notionMeetingsWsProp = ""
+    public var notionRisksWsProp = ""
+    public var notionDecisionsWsProp = ""
+    /// 0.8.8: "Add automatically after each call" for Risks and Decisions, off by default (Tasks: notionTasks.autoAdd).
+    public var notionRisksAutoAdd = false
+    public var notionDecisionsAutoAdd = false
     /// Shown once in Settings > Integrations > Notion after the migration; empty when there is nothing to say.
     public var notionMigrationNote = ""
     /// 0.8.7 (I, rules/crm.yaml): the CRM connection. The key itself is only in the Keychain.
@@ -158,6 +169,14 @@ public struct AppConfig: Codable, Equatable {
         notionRisksName = (try? c.decode(String.self, forKey: .notionRisksName)) ?? d.notionRisksName
         notionRisksProp = (try? c.decode(String.self, forKey: .notionRisksProp)) ?? d.notionRisksProp
         notionMigrationNote = (try? c.decode(String.self, forKey: .notionMigrationNote)) ?? d.notionMigrationNote
+        notionDecisionsDB = (try? c.decode(String.self, forKey: .notionDecisionsDB)) ?? d.notionDecisionsDB
+        notionDecisionsName = (try? c.decode(String.self, forKey: .notionDecisionsName)) ?? d.notionDecisionsName
+        notionDecisionsProp = (try? c.decode(String.self, forKey: .notionDecisionsProp)) ?? d.notionDecisionsProp
+        notionMeetingsWsProp = (try? c.decode(String.self, forKey: .notionMeetingsWsProp)) ?? d.notionMeetingsWsProp
+        notionRisksWsProp = (try? c.decode(String.self, forKey: .notionRisksWsProp)) ?? d.notionRisksWsProp
+        notionDecisionsWsProp = (try? c.decode(String.self, forKey: .notionDecisionsWsProp)) ?? d.notionDecisionsWsProp
+        notionRisksAutoAdd = (try? c.decode(Bool.self, forKey: .notionRisksAutoAdd)) ?? d.notionRisksAutoAdd
+        notionDecisionsAutoAdd = (try? c.decode(Bool.self, forKey: .notionDecisionsAutoAdd)) ?? d.notionDecisionsAutoAdd
         crm = (try? c.decode(CRMSettings.self, forKey: .crm)) ?? d.crm
         salesWebSearch = (try? c.decode(Bool.self, forKey: .salesWebSearch)) ?? d.salesWebSearch
         usageLog = (try? c.decode(Bool.self, forKey: .usageLog)) ?? d.usageLog
@@ -278,9 +297,12 @@ public struct NotionTasksSettings: Codable, Equatable {
     /// Pacenote project slug or "workspace:<name>" -> the Notion values (option names or page ids)
     public var projectMap: [String: [String]] = [:]
     public var workspaceProperty = ""       // a Workspace relation, when the database has one
+    public var workspaceType = ""           // 0.8.8: relation (also when empty) | select | multi_select | rich_text
     public var workspaceMap: [String: String] = [:]   // workspace name -> page id
     public var sourceProperty = ""          // rich text or url for "From the call ..."
-    public var autoAdd = true               // after each call (rules/notion-tasks.yaml > after_call)
+    /// After each call (rules/notion-tasks.yaml > after_call). 0.8.8: off for a new install; a value saved by 0.8.6
+    /// is decoded as it was and shown as Tasks > "Add automatically after each call" (rules/decisions.yaml > auto_add).
+    public var autoAdd = false
     /// 0.8.6 (owner, 30.10): only tasks edited in the last N days ("all", "1", "7", "14", "30")
     public var periodDays = "all"
     public init() {}
@@ -310,6 +332,7 @@ public struct NotionTasksSettings: Codable, Equatable {
         projectMap = (try? c.decode([String: [String]].self, forKey: .projectMap)) ?? d.projectMap
         workspaceProperty = (try? c.decode(String.self, forKey: .workspaceProperty)) ?? d.workspaceProperty
         workspaceMap = (try? c.decode([String: String].self, forKey: .workspaceMap)) ?? d.workspaceMap
+        workspaceType = (try? c.decode(String.self, forKey: .workspaceType)) ?? d.workspaceType
         sourceProperty = (try? c.decode(String.self, forKey: .sourceProperty)) ?? d.sourceProperty
         autoAdd = (try? c.decode(Bool.self, forKey: .autoAdd)) ?? d.autoAdd
         periodDays = (try? c.decode(String.self, forKey: .periodDays)) ?? d.periodDays

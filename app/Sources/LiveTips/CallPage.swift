@@ -21,6 +21,9 @@ struct CallPageView: View {
     @State private var tick = 0
     @State private var cardDraft: AnswerCard? = nil     // 0.8.7 (H5): Save as answer card
     @ObservedObject private var sm = SalesMethods.shared
+    @ObservedObject private var links = NotionLinksVersion.shared   // 0.8.8: "In register" after an automatic add
+    @State private var supersede: [String: [String: String]] = [:]  // 0.8.8: decision -> the active one it may replace
+    @State private var adding = Set<String>()
 
     init(file: String) {
         self.file = file
@@ -72,7 +75,7 @@ struct CallPageView: View {
                     Text(L("call.page.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
                 }
                 // 0.8.7 (E1, E2): every row is edited in place; "+ Add" under each section
-                lines("decisions", L("call.page.decisions"), o.decisions, cardRoot: cardRoot(proj, ws)) { saveLists(o, decisions: $0, section: "decisions") }
+                decisionsSection(o, proj, ws)      // 0.8.8 (rules/decisions.yaml > after_call)
                 commitments(items.filter { $0.mine }, mine: true, legacy: items.isEmpty ? o.onMe : [], proj, ws)
                 commitments(items.filter { !$0.mine }, mine: false, legacy: [], proj, ws)
                 lines("open", L("call.page.open"), o.openQuestions) { saveLists(o, open: $0, section: "open") }
@@ -238,7 +241,8 @@ struct CallPageView: View {
             ForEach(list) { c in
                 let overdue = c.status == "open" && CommitmentRegister.isOverdue(c)
                 // 0.8.7 (J4): only the due date is red when overdue, never the owner
-                EditableRow(text: c.text, sub: mine ? "" : c.owner, subColor: overdue ? PN.C.danger : PN.C.text3,
+                // 0.8.8: an item sent to the Notion tasks (by a click or the automatic add) says so
+                EditableRow(text: c.text, sub: mine ? (c.notionPage.isEmpty ? "" : L("call.page.inNotionTasks")) : c.owner, subColor: overdue ? PN.C.danger : PN.C.text3,
                             subTail: c.due.isEmpty ? "" : L("reg.due", ["due": Register.dueText(c.due)]), done: c.status == "done",
                             copy: (c.mine ? "" : c.owner + ": ") + c.text + (c.due.isEmpty ? "" : " (" + Register.dueText(c.due) + ")"),
                             menu: commitmentMenu(c, section),
@@ -324,8 +328,10 @@ struct CallPageView: View {
         let hasDB = SettingsWindow.model.isSet(.notionToken) && !NotionTargets.risksDB(SettingsWindow.model.config, proj).isEmpty && proj != nil
         VStack(alignment: .leading, spacing: 2) {
             heading(L("call.page.risks"))
+            let _ = links.n
             ForEach(Array(o.risks.enumerated()), id: \.offset) { i, r in
-                let inRegister = added[r] != nil
+                let known = added[r] ?? NotionCallLinks.url(file, "risks", r)     // 0.8.8: kept next to the call
+                let inRegister = known != nil
                 let addAction = PageRowAction(title: L("risk.add"), icon: "exclamationmark.shield", enabled: hasDB, note: L("risk.noDB"),
                                               run: { _ in addRisk(r, proj) })
                 EditableRow(text: r, copy: r,
@@ -336,7 +342,7 @@ struct CallPageView: View {
                             leading: { Image(systemName: "exclamationmark.triangle").foregroundStyle(PN.C.onMe).accessibilityHidden(true) },
                             trailing: {
                                 if inRegister {
-                                    if let u = added[r].flatMap({ URL(string: $0) }), !(added[r] ?? "").isEmpty {
+                                    if let u = known.flatMap({ URL(string: $0) }), !(known ?? "").isEmpty {
                                         Button(L("risk.inRegister")) { NSWorkspace.shared.open(u) }.buttonStyle(.link)
                                             .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                                     } else {
@@ -346,6 +352,112 @@ struct CallPageView: View {
                             })
             }
             AddRowField(placeholder: L("callEdit.addPh")) { saveLists(o, risks: o.risks + [$0], section: "risks") }
+        }
+    }
+
+    /// 0.8.8 (rules/decisions.yaml > after_call): "Add to decision register" on a row and "Add all N" above the section.
+    /// Greyed out with the reason (and Settings) without Notion, a project or a Decisions database.
+    @ViewBuilder private func decisionsSection(_ o: CallOutcome, _ proj: Project?, _ ws: Workspace?) -> some View {
+        let c = SettingsWindow.model.config
+        let token = SettingsWindow.model.isSet(.notionToken)
+        let hasDB = token && proj != nil && !NotionTargets.decisionsDB(c, proj).isEmpty
+        let reason = !token ? L("dec.noNotion") : proj == nil ? L("dec.noProject") : L("dec.noDB")
+        let _ = links.n
+        let pending = o.decisions.filter { NotionCallLinks.url(file, "decisions", $0) == nil }
+        let set: ([String]) -> Void = { saveLists(o, decisions: $0, section: "decisions") }
+        let root = cardRoot(proj, ws)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                heading(L("call.page.decisions"))
+                Spacer()
+                if hasDB && pending.count > 1 {
+                    Button(L("dec.addAll", ["n": "\(pending.count)"])) { addDecisions(pending, proj) }
+                        .buttonStyle(.pnTertiary).disabled(!adding.isEmpty)
+                }
+            }
+            if !hasDB && !o.decisions.isEmpty {
+                HStack(spacing: 6) {
+                    Text(reason).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Button(L("common.openSettings")) { SettingsWindow.show(tab: "notion") }.buttonStyle(.link).font(PN.Font.caption)
+                }
+            }
+            ForEach(Array(o.decisions.enumerated()), id: \.offset) { i, d in
+                let url = NotionCallLinks.url(file, "decisions", d)
+                let add = PageRowAction(title: L("dec.add"), icon: "checkmark.seal", enabled: hasDB && !adding.contains(d), note: reason,
+                                        run: { _ in addDecisions([d], proj) })
+                EditableRow(text: d, copy: d,
+                            hoverActions: url == nil ? [add] : [],
+                            menu: (url == nil ? [add] : []) + [saveCardAction("", d, root: root), .separator,
+                                  PageRowAction(title: L("callEdit.delete"), destructive: true, run: { _ in
+                                      var l = o.decisions; if i < l.count { l.remove(at: i) }; set(l) })],
+                            onSave: { v in var l = o.decisions; if i < l.count { l[i] = v }; set(l) },
+                            leading: { bullet },
+                            trailing: {
+                                if let url {
+                                    if let u = URL(string: url), !url.isEmpty {
+                                        Button(L("dec.inRegister")) { NSWorkspace.shared.open(u) }.buttonStyle(.link)
+                                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                                    } else {
+                                        Text(L("dec.inRegister")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                                    }
+                                } else if adding.contains(d) {
+                                    ProgressView().controlSize(.small)
+                                }
+                            })
+                if let s = supersede[d] { supersedeRow(d, s) }
+            }
+            AddRowField(placeholder: L("callEdit.addPh")) { set(o.decisions + [$0]) }
+        }
+    }
+
+    /// "Replaces <old, date>?": only this click marks the old decision Superseded and links the two.
+    @ViewBuilder private func supersedeRow(_ d: String, _ s: [String: String]) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.triangle.swap").foregroundStyle(PN.C.text3).accessibilityHidden(true)
+            Text(L("dec.replaces", ["title": s["title"] ?? "", "date": s["date"] ?? ""])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button(L("dec.replaceYes")) { replace(d, s) }.buttonStyle(.pnSecondary).controlSize(.small)
+            Button(L("dec.replaceNo")) { supersede[d] = nil }.buttonStyle(.pnTertiary).controlSize(.small)
+        }
+        .padding(.leading, 20)
+    }
+
+    private func replace(_ d: String, _ s: [String: String]) {
+        let c = SettingsWindow.model.config
+        let p = PyTool.project(of: file).project
+        guard let old = s["id"], let new = NotionCallLinks.pageId(file, "decisions", d), !new.isEmpty else { return }
+        PyTool.run("decision_notion", ["--db", NotionTargets.decisionsDB(c, p), "--supersede", old, "--new", new], notion: true, needsAI: false) { r in
+            if (r["ok"] as? Bool) == true {
+                supersede[d] = nil; note = L("dec.superseded", ["title": s["title"] ?? ""]); UsageLog.log("decision_superseded")
+            } else { note = L("dec.failed", ["err": r["error"] as? String ?? ""]) }
+        }
+    }
+
+    /// One at a time, so <stem>.notion.json is written by one process; "Add all" skips the supersede check.
+    private func addDecisions(_ list: [String], _ proj: Project?, all: Bool? = nil) {
+        let all = all ?? (list.count > 1)     // 0.8.8.1: the last item of "Add all" ran the supersede check too
+        guard let p = proj, let d = list.first else { return }
+        adding.insert(d)
+        note = L("dec.adding")
+        let c = SettingsWindow.model.config
+        let when = record.map { DateFormatter.localizedString(from: $0.start, dateStyle: .medium, timeStyle: .short) } ?? ""
+        var args = ["--db", NotionTargets.decisionsDB(c, p), "--title", d, "--call-file", file, "--call", Self.title(file) + ", " + when]
+        if let u = record?.notionURL, !u.isEmpty { args += ["--source", u] }
+        if all { args.append("--no-supersede-check") }
+        PyTool.run("decision_notion", args + NotionTargets.projectArgs(c, p, kind: "decisions"), notion: true) { r in
+            adding.remove(d)
+            if (r["ok"] as? Bool) == true {
+                note = ""
+                if (r["existing"] as? Bool) != true { UsageLog.log("decision_added") }
+                if let s = r["supersede"] as? [String: Any], let id = s["id"] as? String {
+                    supersede[d] = ["id": id, "title": (s["title"] as? String) ?? "", "date": (s["date"] as? String) ?? ""]
+                }
+                links.bump()
+            } else {
+                note = L("dec.failed", ["err": r["error"] as? String ?? ""])
+            }
+            if list.count > 1 { addDecisions(Array(list.dropFirst()), proj, all: all) }
         }
     }
 
@@ -360,7 +472,7 @@ struct CallPageView: View {
         let when = record.map { DateFormatter.localizedString(from: $0.start, dateStyle: .medium, timeStyle: .short) } ?? ""
         note = L("risk.adding")
         let c = SettingsWindow.model.config
-        PyTool.run("risk_notion", ["--db", NotionTargets.risksDB(c, p), "--title", text, "--call", Self.title(file) + ", " + when]
+        PyTool.run("risk_notion", ["--db", NotionTargets.risksDB(c, p), "--title", text, "--call", Self.title(file) + ", " + when, "--call-file", file]
                    + NotionTargets.projectArgs(c, p, risks: true), notion: true) { r in
             if (r["ok"] as? Bool) == true { added[text] = (r["url"] as? String) ?? ""; note = ""; UsageLog.log("risk_added") } else { note = L("risk.failed", ["err": r["error"] as? String ?? ""]) }
         }

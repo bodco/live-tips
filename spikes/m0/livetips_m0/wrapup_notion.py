@@ -65,7 +65,7 @@ def config_ids(cfg_path: Path) -> dict:
     """meetings_db, project_page_id, workspace_page_id from the project config (projects/<slug>.md)."""
     t = cfg_path.read_text(encoding="utf-8")
     out = {}
-    for key in ("meetings_db", "project_page_id", "workspace_page_id", "risks_db"):
+    for key in ("meetings_db", "project_page_id", "workspace_page_id", "risks_db", "decisions_db"):
         m = re.search(r"\*\*" + key + r"\*\*\s*:\s*`?([^`\s]+)", t) or re.search(key + r"\s*:\s*`?([^`\s]+)", t)
         if m:
             out[key] = m.group(1).replace("collection://", "").strip()
@@ -383,15 +383,49 @@ def schema(ds: str) -> dict:
 
 
 PROJECT_PROP = {"name": ""}   # 0.8.7 (F3): Settings > Integrations > Notion > Databases > project property
+WORKSPACE_PROP = {"name": ""}  # 0.8.8: the Workspace property chosen next to it
 
 
 def link_prop(props: dict, name: str):
     """(name, type) when the property can carry a link (relation, select, multi_select or text), else None.
-    For "Project" the property chosen in Settings wins when the database has it."""
-    if name == "Project" and PROJECT_PROP["name"] and PROJECT_PROP["name"] in props:
-        name = PROJECT_PROP["name"]
+    For "Project" and "Workspace" the property chosen in Settings wins when the database has it."""
+    chosen = {"Project": PROJECT_PROP, "Workspace": WORKSPACE_PROP}.get(name)
+    if chosen and chosen["name"] and chosen["name"] in props:
+        name = chosen["name"]
     t = (props.get(name) or {}).get("type")
     return (name, t) if t in ("relation", "select", "multi_select", "rich_text") else None
+
+
+def add_link_args(ap) -> None:
+    """0.8.7 / 0.8.8: the Project and Workspace properties and their values, the same for every Notion write."""
+    ap.add_argument("--project-name", default="", help="written to a Project select, multi-select or text property")
+    ap.add_argument("--project-page", default="", help="0.8.7: the project's page id(s) for a Project relation")
+    ap.add_argument("--project-prop", default="", help="0.8.7: the name of the project property (Settings)")
+    ap.add_argument("--workspace-prop", default="", help="0.8.8: the name of the Workspace property (Settings)")
+    ap.add_argument("--workspace-value", default="", help="0.8.8: the workspace as an option name or text")
+    ap.add_argument("--workspace-page", default="", help="0.8.8: the workspace's page id(s) for a relation, comma-separated")
+
+
+def apply_link_args(a, ids: dict) -> dict:
+    """Sets the chosen property names and fills the page ids the config does not have. Returns ids."""
+    PROJECT_PROP["name"] = getattr(a, "project_prop", "") or ""
+    WORKSPACE_PROP["name"] = getattr(a, "workspace_prop", "") or ""
+    if getattr(a, "project_page", "") and not ids.get("project_page_id"):
+        ids["project_page_id"] = ",".join(page_ids(a.project_page))
+    if getattr(a, "workspace_page", ""):     # 0.8.8: the value chosen in Settings > Projects wins over the config
+        ids["workspace_page_id"] = ",".join(page_ids(a.workspace_page))
+    return ids
+
+
+def link_values(props: dict, ids: dict, project_name: str, workspace_value: str, existing: dict = None) -> dict:
+    """Project and Workspace values for a new or existing page of any database (meetings, risks, decisions)."""
+    out, existing = {}, existing or {}
+    for key, idkey, val in (("Project", "project_page_id", project_name), ("Workspace", "workspace_page_id", workspace_value)):
+        lp = link_prop(props, key)
+        if not lp or (existing.get(lp[0]) or {}).get(lp[1]):
+            continue
+        out.update(link_value(lp[0], lp[1], ids.get(idkey), val))
+    return out
 
 
 def find_page(ds: str, start: dt.datetime, date_prop: str | None = "Date") -> dict | None:
@@ -424,9 +458,7 @@ def parse_args(argv=None):
     ap.add_argument("--md", required=True, type=Path)
     ap.add_argument("--project-config", type=Path, default=None, help="Control Tower config (meetings_db, page ids)")
     ap.add_argument("--meetings-db", default="", help="data source id of the Meetings database (used without a config)")
-    ap.add_argument("--project-name", default="", help="written to a Project select or text property")
-    ap.add_argument("--project-page", default="", help="0.8.7: the project's page id(s) for a Project relation (Settings > Projects > In Notion)")
-    ap.add_argument("--project-prop", default="", help="0.8.7: the name of the project property (Settings > Integrations > Notion)")
+    add_link_args(ap)          # project and (0.8.8) workspace properties and values
     ap.add_argument("--title", default="", help="the call's name when it was renamed during the call")
     ap.add_argument("--lt", nargs=2, required=True)
     ap.add_argument("--model", default="claude-sonnet-5-5")
@@ -437,12 +469,10 @@ def parse_args(argv=None):
 
 
 def meeting_ids(a) -> dict:
-    PROJECT_PROP["name"] = getattr(a, "project_prop", "") or ""
     ids = config_ids(a.project_config) if a.project_config and a.project_config.exists() else {}
     if a.meetings_db:       # 0.8.7 (F3): one Meetings database for all projects, chosen in Settings, wins over the config
         ids["meetings_db"] = a.meetings_db.replace("collection://", "").strip()
-    if getattr(a, "project_page", "") and not ids.get("project_page_id"):
-        ids["project_page_id"] = ",".join(page_ids(a.project_page))
+    apply_link_args(a, ids)
     if not ids.get("meetings_db"):
         raise RuntimeError("no Meetings database: choose one in Settings > Integrations > Notion")
     return ids
@@ -485,10 +515,10 @@ def charge(cost) -> None:
         pass
 
 
-def link_props(sc: dict, ids: dict, existing: dict, project_name: str) -> dict:
-    """Project and Workspace: a relation from the config's page ids, or the project's name as a select or text."""
+def link_props(sc: dict, ids: dict, existing: dict, project_name: str, workspace_value: str = "") -> dict:
+    """Project and Workspace: a relation from the page ids, or the name as a select, multi-select or text."""
     upd = {}
-    for key, idkey, val in (("project", "project_page_id", project_name), ("workspace", "workspace_page_id", "")):
+    for key, idkey, val in (("project", "project_page_id", project_name), ("workspace", "workspace_page_id", workspace_value)):
         if not sc[key]:
             continue
         name, t = sc[key]
@@ -545,7 +575,7 @@ def add_footer(page_id: str, lang: str) -> None:
 
 def write_to_page(page: dict, sc, ids, a, w, blocks, plain, info, lang) -> dict:
     """Append a Pacenote section to the meeting's existing page."""
-    upd = link_props(sc, ids, page.get("properties", {}), a.project_name)
+    upd = link_props(sc, ids, page.get("properties", {}), a.project_name, getattr(a, "workspace_value", ""))
     if upd:
         notion("PATCH", f"/pages/{page['id']}", {"properties": upd})
     hhmm = dt.datetime.now().strftime("%H:%M")
@@ -560,7 +590,7 @@ def create_page(sc, ids, a, w, blocks, plain, info, lang) -> dict:
     """A new page in the Meetings database."""
     name = page_name(info["title"], w.get("name"))
     props = new_page_props(sc, name, info["start"], w.get("summary", ""))
-    props.update(link_props(sc, ids, {}, a.project_name))
+    props.update(link_props(sc, ids, {}, a.project_name, getattr(a, "workspace_value", "")))
     p = notion("POST", "/pages", {"parent": {"type": "data_source_id", "data_source_id": ids["meetings_db"]},
                                   "properties": props,
                                   "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])]})

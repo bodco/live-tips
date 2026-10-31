@@ -142,6 +142,24 @@ public struct ProjectRegistry: Codable, Equatable {
         try enc.encode(self).write(to: url, options: .atomic)
     }
 
+    /// 0.8.8: the workspace of a project (Project.workspace), by name.
+    public func workspace(of p: Project) -> Workspace? {
+        p.workspace.isEmpty ? workspaces.first { $0.projects.contains(p.slug) } : workspaces.first { $0.name == p.workspace }
+    }
+
+    /// 0.8.8 (rules/decisions.yaml > database): what a page of this project gets in a Workspace property: the value set
+    /// on its workspace card, else the workspace's name; "" when the project has no workspace.
+    public func notionWorkspaceValue(for p: Project) -> String {
+        guard let w = workspace(of: p) else { return p.workspace }
+        return w.notionValue.isEmpty ? w.name : w.notionValue
+    }
+
+    /// 0.8.8: a rescan builds the workspaces again; the values set by hand stay with the same name.
+    public mutating func setWorkspaces(_ found: [Workspace]) {
+        let old = Dictionary(workspaces.map { ($0.name, $0.notionValue) }, uniquingKeysWith: { a, _ in a })
+        workspaces = found.map { w in var w = w; if w.notionValue.isEmpty { w.notionValue = old[w.name] ?? "" }; return w }
+    }
+
     /// Adds or refreshes projects from imported configs. Fields the user sets in the app
     /// (apiAllowed, index, audienceDefault, workspace) survive a re-import.
     public mutating func merge(imported: [Project]) {

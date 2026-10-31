@@ -1,0 +1,48 @@
+# The decision register (Pacenote 0.8.8). Decisions heard on a call go to the Control Tower Decisions database
+# (docs/en/02-notion-control-tower.md), never to a register of Pacenote's own. Shared by the skill and the app.
+schema_version: 1
+database: >-
+  Settings > Integrations > Notion > Databases > Decisions (one database for all projects). Properties written:
+  Decision (title), Date, Area (select: one of the database's own options, chosen by the model, else empty),
+  Context (one sentence from the transcript), Source (url of the meeting page, when there is one), Status = Active,
+  Stated by (who said it, text), Project and Workspace (the properties chosen in Settings, any of relation, select,
+  multi-select or text). Trade-off, Alternatives rejected, Review trigger and Door only when said outright on the call;
+  never invented (projects/_standards.md section 9).
+after_call: >-
+  The call page's Decisions section has "Add to decision register" (hover and the row menu) and "Add all N" above the
+  section. Nothing is written without the PM's click unless he turned on the automatic add. After the write the row
+  shows a grey "In register" with a link. Without Notion or without a Decisions database the action is greyed out with
+  the reason and leads to Settings.
+supersede: >-
+  After a decision is added, the active decisions of the same project are compared with it by the model. When it
+  contradicts one, the page offers "Replaces <old decision, date>?" with a button. Only the PM's click sets the old
+  page's Status to Superseded and links Supersedes (new) and Superseded By (old). No click, no change.
+auto_add: >-
+  Settings > Integrations > Notion > Databases: "Add automatically after each call" under Tasks, Risks and Decisions,
+  each off by default (the 0.8.6 switch for tasks moved under Tasks with its value). When on, 40 s after the end of a
+  call (after the call notes and the register write) every decision (or risk, or open commitment on the PM) of that
+  call is written once. Never for a hidden call, never when the switch is off.
+dedupe: >-
+  The same decision of the same call is never written twice: the key is the call file plus the normalized text
+  (lower case, letters and digits only, single spaces). The page ids and urls live next to the call in
+  <stem>.notion.json {"decisions": {key: {"id", "url"}}, "risks": {...}}; the page shows "In register" from it.
+snapshot:
+  file: "<project root>/pacenote/decisions.md"
+  when: before a preparation and before a call starts (when Notion and the Decisions database are set); kept offline
+  content: >-
+    The project's active decisions, newest first, at most 30, one line each:
+    "- YYYY-MM-DD | <decision> | <stated by> | <area>". The live engine reads only this file and never calls Notion
+    during a call.
+brief: >-
+  The brief has a section "Active decisions": the last 10 active decisions of the project from the snapshot, with
+  their dates. No snapshot, no section.
+series: The series view shows the register's active decisions of the project next to the decisions of its calls.
+model_rule: >-
+  conflicts = someone on this call proposes or assumes something that contradicts one of the ACTIVE DECISIONS of the
+  project: the number of the decision, who said it, the time of the line, and one short sentence the PM can say to
+  remind them (in the call's language; say the decision itself, never its number in the list). Only a real
+  contradiction, not a related topic or a refinement.
+during_call: >-
+  A conflict becomes one quiet card
+  `{"kind":"decision_conflict","level":"info","gist":"<DD.MM> decided: <decision> (<stated by>)","items":["<how to remind>"],"t":"HH:MM:SS","who":"<name>"}`
+  in Earlier, with the priority and limits of a risk card: never the main card, never red, each decision once a call.

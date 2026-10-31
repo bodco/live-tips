@@ -302,6 +302,59 @@ func prepOwnership() {
     expect(!PrepOwnership.belongsToHeld(prepDate: d("2026-10-29T09:00:00Z"), made: nil, held: held, before: d("2026-10-29T09:30:00Z")), "the held call itself is not 'before'")
 }
 
+/// 0.8.8: all secrets in one Keychain item (one prompt after an update at most): pack, unpack, names, migration plan.
+func keychain088() {
+    let v = ["notion_token": "secret-n", "claude_api_key": "secret-c", "hubspot_service_key": ""]
+    let d = SecretStore.pack(v)
+    expect(SecretStore.unpack(d) == ["notion_token": "secret-n", "claude_api_key": "secret-c"], "round trip, empty left out")
+    expect(String(data: d, encoding: .utf8) == #"{"claude_api_key":"secret-c","notion_token":"secret-n"}"#, "sorted JSON object")
+    expect(SecretStore.unpack(Data("not json".utf8)) == nil && SecretStore.unpack(Data("[1]".utf8)) == nil, "garbage is nil")
+    expect(SecretStore.unpack(Data(#"{"a": 1, "b": "x"}"#.utf8)) == ["b": "x"], "only string values")
+    let names = SecretStore.namesAttribute(v)
+    expect(String(data: names, encoding: .utf8) == "claude_api_key,hubspot_service_key,notion_token", "names only")
+    expect(!(String(data: names, encoding: .utf8) ?? "").contains("secret"), "no value in the attribute")
+    expect(SecretStore.names(from: names).contains("notion_token") && SecretStore.names(from: nil).isEmpty, "names back")
+    expect(SecretStore.plan(combinedExists: true, oldPresent: ["notion_token"]) == .useCombined, "combined wins")
+    expect(SecretStore.plan(combinedExists: false, oldPresent: ["notion_token", "claude_api_key"]) == .migrate(["claude_api_key", "notion_token"]), "migrate the old items")
+    expect(SecretStore.plan(combinedExists: false, oldPresent: []) == .nothing, "nothing saved")
+    expect(SecretStore.combinedAccount == "pacenote_secrets", "account name")
+}
+
+/// 0.8.8 (rules/decisions.yaml): the 0.8.6 tasks switch keeps its value, new switches are off, the workspace value.
+func decisions088() {
+    func cfg(_ json: String) -> AppConfig? { try? JSONDecoder().decode(AppConfig.self, from: Data(json.utf8)) }
+    let fresh = AppConfig()
+    expect(!fresh.notionTasks.autoAdd && !fresh.notionRisksAutoAdd && !fresh.notionDecisionsAutoAdd, "all three off on a new install")
+    let on = cfg(#"{"notionTasks": {"enabled": true, "database": "ds-1", "autoAdd": true}}"#)
+    expect(on?.notionTasks.autoAdd == true && on?.notionTasks.database == "ds-1", "0.8.6 switch on stays on")
+    expect(on?.notionRisksAutoAdd == false && on?.notionDecisionsAutoAdd == false && on?.notionDecisionsDB == "", "new fields default")
+    let off = cfg(#"{"notionTasks": {"enabled": true, "autoAdd": false}}"#)
+    expect(off?.notionTasks.autoAdd == false, "0.8.6 switch off stays off")
+    let back = on.flatMap { try? JSONEncoder().encode($0) }.flatMap { try? JSONDecoder().decode(AppConfig.self, from: $0) }
+    expect(back?.notionTasks.autoAdd == true, "survives a save")
+    // the registry: workspaces saved by 0.8.7 load; a project's workspace value is its workspace's, else the name
+    let reg = try? JSONDecoder().decode(ProjectRegistry.self, from: Data(#"""
+    {"projects": [{"name": "Orbit", "slug": "orbit", "workspace": "Northwind Studio"}, {"name": "Solo", "slug": "solo"}],
+     "workspaces": [{"name": "Northwind Studio", "root": "/w/nw", "projects": ["orbit"]}]}
+    """#.utf8))
+    expect(reg?.workspaces.first?.notionValue == "", "0.8.7 workspace loads without a value")
+    if var r = reg {
+        expect(r.notionWorkspaceValue(for: r.projects[0]) == "Northwind Studio", "default: the workspace's name")
+        expect(r.notionWorkspaceValue(for: r.projects[1]) == "", "no workspace, no value")
+        r.workspaces[0].notionValue = "0123456789abcdef0123456789abcdef"
+        expect(r.notionWorkspaceValue(for: r.projects[0]) == "0123456789abcdef0123456789abcdef", "the card's value")
+        r.setWorkspaces([Workspace(name: "Northwind Studio", root: "/w/nw", projects: ["orbit"]), Workspace(name: "Acme", root: "/w/a", projects: [])])
+        expect(r.workspaces[0].notionValue == "0123456789abcdef0123456789abcdef" && r.workspaces[1].notionValue == "", "a rescan keeps it")
+    } else { expect(false, "registry decodes") }
+    // a new task gets the Workspace value its property can take
+    var st = NotionTasksSettings(); st.workspaceProperty = "Workspace"
+    expect((NotionTasksCore.workspaceProp(st, ["0123456789abcdef0123456789abcdef"])?["relation"] as? [[String: String]])?.first?["id"] == "0123456789abcdef0123456789abcdef", "relation by page id")
+    expect(NotionTasksCore.workspaceProp(st, ["Northwind Studio"]) == nil, "a name never goes into a relation")
+    st.workspaceType = "select"
+    expect((NotionTasksCore.workspaceProp(st, ["Northwind Studio"])?["select"] as? [String: String])?["name"] == "Northwind Studio", "select by name")
+    expect(UsageLog.events["auto_added"] == ["kind", "n"] && UsageLog.events["decision_added"] == [], "usage events")
+}
+
 /// 0.8.6 (D, rules/notion-tasks.yaml): the filter, a task read from a page, project mapping, closing from Notion.
 func notionTasksCore() {
     var st = NotionTasksSettings()
@@ -501,6 +554,8 @@ final class BodyFake: CRMTransport {
     }
 }
 
+decisions088()
+keychain088()
 settings087()
 await part2_087()
 usage087()

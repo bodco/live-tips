@@ -115,6 +115,7 @@ final class NotionTasksSettingsModel: ObservableObject {
         }
         if s.workspaceProperty.isEmpty {
             s.workspaceProperty = props.first { $0.type == "relation" && $0.name.lowercased().contains("workspace") }?.name ?? ""
+            s.workspaceType = s.workspaceProperty.isEmpty ? "" : "relation"
         }
         if s.sourceProperty.isEmpty {
             s.sourceProperty = props.first { ($0.type == "rich_text" || $0.type == "url") && ["source", "from", "call"].contains(where: $0.name.lowercased().contains) }?.name ?? ""
@@ -267,7 +268,7 @@ struct NotionTasksSection: View {
             .labelsHidden().fixedSize()
             .onChange(of: nt.periodDays) { tasks.refresh() }
         } label: { InfoLabel(title: L("ntset.period"), info: L("ntset.period.i")) }
-        Toggle(isOn: s.autoAdd) { InfoLabel(title: L("ntset.autoAdd"), info: L("ntset.autoAdd.i")) }
+        // 0.8.8: "Add automatically after each call" moved to Databases > Tasks (the same value)
         HStack {
             if nt.ready {
                 Text(L("ntset.status", ["n": "\(tasks.tasks.count)", "ago": tasks.syncedAt.map { RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date()) } ?? "-"]))

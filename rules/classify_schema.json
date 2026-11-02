@@ -22,6 +22,8 @@
         "pm_commitment",
         "contradicts_decision",
         "frustration",
+        "scope_pushback",
+        "value_doubt",
         "pm_factual_error",
         "fix_owner_date",
         "add_fact",

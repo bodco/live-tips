@@ -158,6 +158,18 @@
 
   // 0.8.7 (M, rules/usage.yaml): a tip action for the local usage log, the card's kind only, never its text
   function usage(e, p) { post('usage', { e, p }); }
+  /** 2026-11-02: one part of the window that throws does not stop the rest; the app logs it once (logs/window.log). */
+  const seenErr = new Set();
+  function guard(where, fn) {
+    try { return fn(); }
+    catch (e) {
+      const key = where + ':' + (e && e.message);
+      if (!seenErr.has(key)) { seenErr.add(key); post('jserror', { where, msg: String(e && e.message || e), stack: String(e && e.stack || '').slice(0, 800) }); }
+      return undefined;
+    }
+  }
+  window.addEventListener('error', (ev) => post('jserror', { where: 'window', msg: String(ev.message || ''), stack: String((ev.error && ev.error.stack) || '').slice(0, 800) }));
+
   function post(action, payload) {
     const msg = Object.assign({ action }, payload || {});
     try { window.webkit.messageHandlers.liveTips.postMessage(msg); }
@@ -301,13 +313,15 @@
     app.classList.toggle('sysview', sysOn);
     renderSys(sysOn);
 
-    const list = visibleCards();
-    const hero = withSlides() ? null : pickHero(list);
-    renderPresentation();
-    reportPresenting();
-    const showEmpty = renderEmpty(list);
-    renderHero(showEmpty ? null : hero);
-    renderEarlier(showEmpty ? [] : list.filter((c) => (!hero || c.id !== hero.id) && (!withSlides() || c.kind === 'answer')));
+    // 2026-11-02 (owner, live call): an error in one part stopped render() before the side pane, so the tabs
+    // did not switch and the transcript stayed empty. Each part now fails on its own and is reported to the app.
+    const list = guard('cards', visibleCards) || [];
+    const hero = withSlides() ? null : guard('pickHero', () => pickHero(list));
+    guard('presentation', renderPresentation);
+    guard('reportPresenting', reportPresenting);
+    const showEmpty = guard('empty', () => renderEmpty(list));
+    guard('hero', () => renderHero(showEmpty ? null : hero));
+    guard('earlier', () => renderEarlier(showEmpty ? [] : list.filter((c) => (!hero || c.id !== hero.id) && (!withSlides() || c.kind === 'answer'))));
 
     // next call, only within 10 minutes
     const nx = $('next');
@@ -321,10 +335,10 @@
     $('askLbl').textContent = t.ask; $('askInput').placeholder = t.ask;
     $('helpLbl').textContent = t.help; $('helpKey').textContent = S.keys.help;
 
-    renderPane($('pane'), S.ui.paneTab, false);
+    guard('pane', () => renderPane($('pane'), S.ui.paneTab, false));
     // A sheet opened in a narrow window becomes the side pane when the window gets wide (no double tabs).
     if (S.ui.sheet && isWide()) { S.ui.paneTab = S.ui.sheet; S.ui.sheet = null; }
-    if (S.ui.sheet) { $('sheet').hidden = false; renderPane($('sheet'), S.ui.sheet, true); } else $('sheet').hidden = true;
+    if (S.ui.sheet) { $('sheet').hidden = false; guard('sheet', () => renderPane($('sheet'), S.ui.sheet, true)); } else $('sheet').hidden = true;
     renderMenu();
     tick();
   }

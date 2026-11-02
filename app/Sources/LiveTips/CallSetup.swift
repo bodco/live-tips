@@ -33,6 +33,7 @@ struct CallSetupView: View {
     @State private var info = false
     @State private var datePop = false
     @State private var confirmAgain = false
+    @State private var rehearseInfo = false
     @FocusState private var titleFocus: Bool
 
     private var saved: Bool { upnext.contains(model) }
@@ -549,14 +550,18 @@ struct CallSetupView: View {
                 // 0.8.7 (L2): Rehearse is always there; until the talk is prepared it is greyed out with the reason
                 if let path = PrepDocWindow.path(for: model), model.callType == "presentation", TalkWindow.available(base: String(path.dropLast(9))) {
                     Button(L("rehearse.button")) { RehearsalWindow.show(base: String(path.dropLast(9)), title: model.effectiveTitle, call: model) }.buttonStyle(.pnSecondary)
-                } else {
-                    VStack(spacing: 1) {
-                        Button(L("rehearse.button")) { if model.callType == "presentation" { if !needProject() { prepareNow() } } else { model.callType = "presentation" } }
-                            .buttonStyle(.pnSecondary).opacity(0.5)
-                        Text(model.callType == "presentation" ? L("rehearse.needPrep") : L("rehearse.onlyPresentation")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                            .multilineTextAlignment(.center).frame(maxWidth: 120)     // 0.8.7.1: the caption wraps, not Start call
+                } else if model.callType == "presentation" {
+                    // 2026-11-01 (owner): Rehearse only exists for Presentation calls. Until the talk is prepared it is greyed,
+                    // and the (i) says how to get there: attach the deck, press Prepare.
+                    HStack(spacing: 4) {
+                        Button(L("rehearse.button")) {}.buttonStyle(.pnSecondary).disabled(true)
+                        Button { rehearseInfo.toggle() } label: { Image(systemName: "info.circle").foregroundStyle(PN.C.text3) }
+                            .buttonStyle(.borderless).accessibilityLabel(L("rehearse.needPrep"))
+                            .popover(isPresented: $rehearseInfo, arrowEdge: .top) {
+                                Text(L("rehearse.howTo")).font(PN.Font.body).padding(14).frame(width: 320).fixedSize(horizontal: false, vertical: true)
+                            }
                     }
-                    .help(model.callType == "presentation" ? L("rehearse.needPrep") : L("rehearse.onlyPresentation"))
+                    .help(L("rehearse.needPrep"))
                 }
                 Button(L("home.startCall")) { if !needProject() { onStart() } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                     .fixedSize()     // 0.8.7.1: "Почати дзвінок" broke into two lines in Ukrainian

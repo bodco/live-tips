@@ -74,7 +74,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .hero.finish{box-shadow:0 0 0 1px color-mix(in srgb,var(--k-onme) 45%,transparent) inset}
 
 /* ---------- Earlier ---------- */
-.earlier{flex:1;min-height:0;overflow-y:auto;margin-top:16px;display:flex;flex-direction:column}
+/* 2026-11-02 (owner): the hero and Earlier scroll together; before, only Earlier scrolled and a short window cut the hero */
+.stream{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding-bottom:8px}
+.earlier{flex:none;margin-top:16px;display:flex;flex-direction:column}
 .earlier .h{display:flex;justify-content:space-between;padding:0 16px 8px;font-size:12px;color:var(--text-3)}
 .earlier .h b{font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 .row{position:relative;display:flex;align-items:flex-start;gap:12px;padding:11px 16px;border-top:1px solid var(--separator);background:transparent;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%}

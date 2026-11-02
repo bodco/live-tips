@@ -28,6 +28,8 @@ class Signals:
     new_requirement: bool = False
     commitment: bool = False
     frustration: bool = False
+    scope_pushback: bool = False    # 2026-11-02: against an estimate, a term, a price, the scope
+    value_doubt: bool = False       # 2026-11-02: "why do we need this"
     tags: List[str] = field(default_factory=list)
 
     @property
@@ -36,7 +38,7 @@ class Signals:
         if self.direct:
             return "direct"
         # A name alone is often a mention while someone else speaks (judged as false "your turn").
-        if self.name_mention or self.question or self.frustration or self.update_request:
+        if self.name_mention or self.question or self.frustration or self.update_request or self.scope_pushback or self.value_doubt:
             return "classify"
         return None
 
@@ -57,6 +59,10 @@ class Signals:
             return "new_requirement"
         if self.name_mention and not self.third_person and (self.update_request or not self.question):
             return "your_turn"
+        if self.value_doubt:
+            return "value_doubt"
+        if self.scope_pushback:
+            return "scope_pushback"
         if self.question:
             return "direct_question"
         if self.frustration:
@@ -72,6 +78,8 @@ class Detector:
         self.req = rules.cues("new_requirement")
         self.units = rules.cues("commitment_units")
         self.frus = rules.cues("frustration")
+        self.push = rules.cues("scope_pushback")
+        self.vdoubt = rules.cues("value_doubt")
         self.aliases = [a.lower() for a in name_aliases if a]
         self.third = ["сказав", "казав", "каже", "розказав", "розповів", "говорив", "писав", "написав", "з ", "у ", "в ",
                       "said", "told", "says", "mentioned", "wrote", "with ", "from ", "asked", "попросив", "питав"]
@@ -103,6 +111,8 @@ class Detector:
         s.update_request = self._any(text_l, words, self.upd)
         s.new_requirement = self._any(text_l, words, self.req)
         s.frustration = self._any(text_l, words, self.frus)
+        s.scope_pushback = self._any(text_l, words, self.push)
+        s.value_doubt = self._any(text_l, words, self.vdoubt)
 
     def _third_person(self, text_l: str, words: List[str], vocative: bool) -> bool:
         """Review 2026-10-23: of 77 lines with the PM's name only 12 addressed the PM; the rest

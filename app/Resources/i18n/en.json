@@ -1449,6 +1449,7 @@
  "sales.toggle.hint": "Deal tab, sales tips and the qualification after the call",
  "sales.method.about": "About the method",
  "call.prepare": "Prepare",
+ "rehearse.howTo": "Rehearse works on a prepared talk. 1) Attach your deck in step 3 (PDF, PowerPoint, Keynote or a text outline), or paste the talk as text. 2) Press Prepare: it writes the talk slide by slide. 3) When it is ready, Rehearse turns on.",
  "rehearse.needPrep": "Prepare the talk first",
  "rehearse.onlyPresentation": "Only for Presentation calls",
  "usage.privacy": "Privacy",

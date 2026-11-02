@@ -67,7 +67,8 @@ Return JSON only, gist first."""
 
 
 # Triggers the skill switches off by meeting concept (hiring.md, SKILL.md "No corrections of the PM on team calls").
-INTERVIEW_OFF = {"new_requirement", "pm_commitment", "frustration", "contradicts_decision", "pm_factual_error"}
+INTERVIEW_OFF = {"new_requirement", "pm_commitment", "frustration", "contradicts_decision", "pm_factual_error",
+                 "scope_pushback", "value_doubt"}
 
 
 def disabled_triggers(meta: Optional[dict]) -> set:

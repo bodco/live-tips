@@ -3,6 +3,20 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased
+
+- **Pushbacks and "why do we need this":** two reactive tips in the PM mode, not only in sales calls
+  (rules/triggers.yaml). `scope_pushback`: the other side pushes back on an estimate, a term, a price or the scope; the
+  tip acknowledges, names what drives the estimate and offers the choices, never a number. `value_doubt`: the other
+  side doubts the work is needed or has forgotten why it is in the plan; the tip gives the reason from the Decision
+  register, the brief or the answer cards, the value in the client's terms, and for work the client cannot see what it
+  protects and what skipping it costs later. The preparation adds "Likely pushbacks and value questions" to the brief
+  (not in a sales call, which keeps "Likely objections"). Off for interviews. Docs 14.1k.
+- **Tips window:** the big card and the earlier cards scroll together; in a short window the bottom of the big card
+  and every card below it were cut off.
+- **Start call:** Rehearse shows only for Presentation calls; until the talk is prepared it is greyed with an (i) that
+  says how to prepare it (attach the deck, press Prepare).
+
 ## 0.8.8.1
 
 - **Decision conflict tip:** the reminder sentence said "decision 1" (its number in the snapshot); the rule now asks

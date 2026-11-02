@@ -36,9 +36,12 @@
     <section class="empty" id="empty" hidden aria-live="polite"></section>
     <section class="after" id="after" hidden aria-label="After the call"></section>
     <section class="present" id="present" hidden aria-live="polite"></section>
-    <article class="hero" id="hero" aria-live="polite" hidden></article>
+    <!-- 2026-11-02 (owner): one scroll for the whole feed; in a short window the big card and the cards below it were cut off -->
+    <div class="stream" id="stream">
+      <article class="hero" id="hero" aria-live="polite" hidden></article>
 
-    <section class="earlier" id="earlier" aria-label="Earlier"></section>
+      <section class="earlier" id="earlier" aria-label="Earlier"></section>
+    </div>
 
     <div class="next" id="next" hidden></div>
 

@@ -175,7 +175,8 @@ def context_windows(lines, end: float, span: float, bucket: float, tail_s: float
 
 # 2026-10-26 client call: 16 red tips in 33 min, most for questions to the room. Red is for the PM:
 # addressed by name or "you", a new request, the PM's commitment, or an open ask the call picture found.
-RED_TRIGGERS = ("new_requirement", "pm_commitment", "contradicts_decision", "pm_factual_error")
+RED_TRIGGERS = ("new_requirement", "pm_commitment", "contradicts_decision", "pm_factual_error",
+                "scope_pushback", "value_doubt")
 
 
 def demote_red(obj: dict, trigger: str, span: dict) -> None:

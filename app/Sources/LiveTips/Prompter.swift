@@ -807,6 +807,13 @@ extension PrompterController {
     func handleAction(_ d: [String: Any]) {
         let act = d["action"] as? String ?? ""
         switch act {
+        case "jserror":
+            // 2026-11-02: a part of the tips window failed; the rest keeps working. One line in <app>/logs/window.log.
+            let line = "\(nowHMS()) \(d["where"] as? String ?? "?"): \(d["msg"] as? String ?? "") | \((d["stack"] as? String ?? "").replacingOccurrences(of: "\n", with: " <- "))\n"
+            let root = MainActor.assumeIsolated { SettingsWindow.model.config.effectiveAppRoot(appSupport: AppPaths.support.path) }
+            let url = URL(fileURLWithPath: root).appendingPathComponent("logs/window.log")
+            if let h = try? FileHandle(forWritingTo: url) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
+            else { try? Data(line.utf8).write(to: url) }
         case "ask":
             if let t = d["text"] as? String { handle("ask", t) }
         case "help":

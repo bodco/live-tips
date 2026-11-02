@@ -56,6 +56,18 @@ triggers:
   route: classify
   skill_trigger: Frustration, escalation, "disappointed", "again", a threat to the timeline or contract
   skill_tip: '"Клієнт незадоволений: {що}" + a phrase that acknowledges, gives a plan and the date of the next update'
+- id: scope_pushback
+  level: red
+  level_label: 🔴
+  route: classify
+  skill_trigger: 'The other side pushes back on an estimate, a term, a price or the scope ("too long", "should be faster", "too expensive", "it should be simple", "cut it down"); 2026-11-02, owner: not only in sales calls'
+  skill_tip: '"Заперечення: {що}" + a phrase that acknowledges, names what drives the estimate (scope, risk, dependency) and offers the choices (cut the scope, move the date, add people, split into stages), never a number for an estimate; the answer from `pacenote/answer-cards.md` when a card matches ("Use when"), else from the brief and the fact book'
+- id: value_doubt
+  level: red
+  level_label: 🔴
+  route: classify
+  skill_trigger: 'The other side doubts that a feature or a piece of work is needed or worth its cost ("why do we need this", "what is the value", "who asked for this", "why are we paying for it"), or has forgotten why it is in the plan; 2026-11-02, owner'
+  skill_tip: '"Навіщо це: {робота}" + why it is there, from a Decision of the register (its date, context and the alternative that was rejected), the brief or the fact book, then the value in the client''s own terms; for work the client cannot see (technical, security, refactoring, test, monitoring) what it protects and what it costs later if it is skipped (the risk register, past incidents), with the choice left to the client, never a promise of a benefit nobody agreed'
 - id: pm_factual_error
   level: red
   level_label: 🔴
@@ -119,6 +131,14 @@ cues:
     uk: [годин, години, день, дні, днів, тиждень, тижні, тижнів, спринт, спринти, до понеділка, до вівторка, до середи, до четверга, до пʼятниці, до кінця тижня, завтра]
     en: [hours, hour, days, day, week, weeks, sprint, sprints, by monday, by tuesday, by wednesday, by thursday, by friday, end of week, tomorrow]
     es: [horas, días, semana, semanas, sprint, mañana, el lunes, el viernes]
+  scope_pushback:
+    uk: [занадто довго, надто довго, задовго, так довго, це довго, має бути швидше, мало бути швидше, треба швидше, чому так довго, занадто дорого, надто дорого, задорого, чому так дорого, це дорого, це ж просто, це має бути просто, не вкладаємося, не влізає, скоротити строк, скоротити скоуп, зменшити скоуп]
+    en: [too long, that long, should be faster, needs to be faster, why so long, too expensive, too much time, should be simple, should be quick, should not take, cut the scope, reduce the scope, cut it down, no way it takes]
+    es: [demasiado tiempo, tan largo, debería ser más rápido, demasiado caro, debería ser simple]
+  value_doubt:
+    uk: [навіщо це, навіщо нам, нащо це, нащо нам, для чого це, для чого нам, яка від цього користь, яка цінність, чому ми це робимо, не бачу сенсу, не бачу користі, не бачу цінності, не розумію навіщо, це взагалі потрібно, це взагалі треба, чи потрібно це, кому це потрібно, за що ми платимо, чому ми за це платимо, чому це в плані]
+    en: [why do we need, why are we doing, what is the point, what's the point, what is the value, what's the benefit, why is this needed, why is this in, do we really need, do not see the value, don't see the value, don't see why, why are we paying, who needs this, who asked for this]
+    es: [para qué lo necesitamos, cuál es el valor, no veo el valor, por qué pagamos]
   frustration:
     uk: [знову, незадоволен, розчарован, скільки можна, неприйнятно, затримк]
     en: [again, disappointed, frustrated, unacceptable, not happy, delay, escalate]

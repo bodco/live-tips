@@ -741,6 +741,13 @@ Examples on an English call with the Ukrainian interface (the English interface 
 > "Sorry, a small correction. The release date is October 15."
 > _рішення від 30.09_ (decision of 30.09)
 
+> **🔴 Заперечення: це занадто довго** (Pushback: too long)
+> "I understand, it is a long time. Most of it is the integration and the tests. We can cut the scope or ship it in two stages; which do you prefer?"
+
+> **🔴 Навіщо це: оновлення бібліотеки** (Why: the library update)
+> "It is invisible, but without it the login stops working in December. We decided it on 30.09 and the alternative was to do it later at twice the cost. It is your call."
+> _рішення від 30.09_ (decision of 30.09)
+
 On an internal Ukrainian call both the gist and the phrase are in Ukrainian.
 
 A 🔒 tip relies on an internal source and must never be repeated to the client. The skill
@@ -1462,6 +1469,29 @@ last 10 with dates), the series view shows them next to the decisions of its cal
 that file (never Notion during a call). When someone proposes what contradicts an active decision, a quiet card
 "12.10 decided: X (Emily Clark)" with one sentence to remind them appears in Earlier, like a risk card. The rules
 are in `rules/decisions.yaml`.
+
+### 14.1k Pushbacks and "why do we need this" (any call, not only sales)
+
+Two reactive tips in the PM mode (`rules/triggers.yaml`, rules/classify_schema.json), on by default, off for
+interviews:
+
+- **Pushback** (`scope_pushback`, 🔴): the other side says an estimate, a term, a price or the scope is wrong ("too
+  long", "should be faster", "it should be simple", "too expensive", "cut it down"). The tip is a phrase that
+  acknowledges, names what drives the estimate and offers the choices (cut the scope, move the date, add people,
+  stage it). Never a number for an estimate.
+- **Value doubt** (`value_doubt`, 🔴): the other side doubts that a piece of work is needed or worth its cost ("why
+  do we need this", "what is the value", "who asked for this"), or has forgotten why it is in the plan. The tip gives
+  the reason from the Decision register (its date, the context and the alternative that was rejected), the brief or
+  the fact book, then the value in the client's own terms. For work the client cannot see (technical, security,
+  refactoring, tests, monitoring) it says what the work protects and what skipping it costs later (the risk register,
+  past incidents), and leaves the choice to the client. No promise of a benefit nobody agreed.
+
+Answers come first from `<project>/pacenote/answer-cards.md` when a card matches (use "Use when" for these), then
+from the brief, the Decision register and the fact book. A local cue list finds the line (`cues.scope_pushback` and
+`cues.value_doubt`); the model decides whether a tip is needed, so a joke or a plain question gets none. The
+preparation adds the section **Likely pushbacks and value questions** to the brief (3-5 pushbacks and 2-4 value
+questions with short answers from the same sources, or "no answer yet"); in a sales call "Likely objections" does the
+same job.
 
 ### 14.2 After the call: the meeting page in Notion
 

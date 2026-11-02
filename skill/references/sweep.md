@@ -185,6 +185,17 @@ Compress into the **Live Brief**, max ~2500 words (detailed: the PM reads it bef
 2. Topic map: topic -> keywords (in every language of `langs`) and Jira keys -> 1-line status.
 3. Commitments in flight: who promised what by when.
 4. Red lines: decided items not to reopen, out-of-scope areas, decision rights.
+4a. **Likely pushbacks and value questions** (2026-11-02, owner; every call where an estimate, a term, the scope
+   or a piece of work is on the table: client, boss, steering; not in a sales call, where "Likely objections" does
+   the same). 3-5 pushbacks (too long, too expensive, "it should be simple", cut the scope) and 2-4 value questions
+   ("why do we need this", "what does it give us", "what if we skip it"), each with a short answer, only from the
+   sources: a card of `<project>/pacenote/answer-cards.md` that matches ("Use when"); the Decision register (why it
+   is in the plan: its date, the context, the alternative that was rejected, the trade-off); the brief's red lines;
+   past calls where the other side already asked. For work the client cannot see (technical, security, refactoring,
+   tests, monitoring) say what it protects, what skipping it costs later (the risk register, past incidents) and
+   leave the choice to the client; never promise a benefit nobody agreed. No source for a question: write "no
+   answer yet" under it, never an invented one. A pushback on an estimate gets the drivers and the choices (cut
+   the scope, move the date, add people, stage it), never a number.
 5. Names and aliases (how Whisper may spell people), including the PM's own
    `settings.user.name_aliases`. Compare the invitation with the config's team and the recent notes: a person
    in the invitation who has left the project is named as "not expected" (0.8.5, owner).

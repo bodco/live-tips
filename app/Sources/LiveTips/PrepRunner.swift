@@ -343,6 +343,8 @@ final class PrepRunner: ObservableObject {
         is detailed (up to ~2500 words) and has the "Previous meetings" section (sweep.md, item 1a); open items go into \
         that section; only those likely to come up on this call become checklist lines and cards (fewer, surer cards).
 
+        Likely pushbacks (2026-11-02, owner)\(r.salesMethod == nil ? ": add the brief's section \"Likely pushbacks and value questions\" (sweep.md, item 4a): 3 to 5 pushbacks on an estimate, a term, a price or the scope and 2 to 4 value questions (why this work, what it gives, what happens without it), each with a short answer taken only from <project>/pacenote/answer-cards.md, the Decision register, the red lines, the risk register and past calls; for work the client cannot see say what it protects and what skipping it costs later; no source: write \"no answer yet\"." : ": not here, a sales call has \"Likely objections\".")
+
         Write exactly these files and nothing else:
         - \(base).brief.md, first line: "# Live Brief: \(r.title) (prep, \(h.string(from: r.date)))"
         - \(base).cards.json

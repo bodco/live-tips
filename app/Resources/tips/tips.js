@@ -66,7 +66,7 @@
         emptyTitle: 'No presentation attached', emptyText: 'Attach a file and Pacenote shows the slides, the time for each and answers to questions. Until then, tips work as on a regular call.',
         attach: 'Attach presentation', slidesN: (o) => `${o.n} slides`, ofShort: (o) => `${o.i} of ${o.n}` },
       present: { next: 'Next', prev: 'Back', start: 'Start', nextUp: (t, s) => `Next: ${t} (${s})`, canSkip: 'Can skip if short on time' },
-      doneQ: 'Done?', markDone: 'Mark done', onThem: 'On them', closed: 'Closed',
+      doneQ: 'Done?', markDone: 'Mark done', onThemKind: 'On them', closed: 'Closed',
       noItems: 'Nothing on you yet', notMine: 'Not mine', tipsIn: (o) => `Tips in ${o.l}, click for ${o.o}`, close: 'Close', noBriefYet: 'No brief for this call yet.',
       readyStatus: 'Ready', readyTitle: 'Ready when you are', startListening: 'Start listening', openBrief: 'Open brief',
       listeningTitle: 'Listening', tipsOffTitle: 'Transcript only', tipsOffSub: 'Tips are off. The summary and the follow-up come after the call. Turn tips on in Call settings.', listeningSub: (k) => `Tips show up here when they matter. Stuck? Press ${k}.`, onDevice: 'Audio stays on this Mac',
@@ -106,7 +106,7 @@
         compact: 'Компактний режим', full: 'Повне вікно', present: 'Режим презентації', stopPresent: 'Завершити презентацію', presentNeedDeck: 'Додайте презентацію в Start call',
         transcript: 'Транскрипт', brief: 'Бриф', settings: 'Налаштування дзвінка…', switchCall: 'Перейти до наступного дзвінка…', clearSpeakers: 'Забути імена спікерів' },
       recap: 'Підсумок:',
-      doneQ: 'Зроблено?', markDone: 'Позначити зробленим', onThem: 'На них', closed: 'Закрито',
+      doneQ: 'Зроблено?', markDone: 'Позначити зробленим', onThemKind: 'На них', closed: 'Закрито',
       after: { window: 'Дзвінок завершено', meta: (o) => [o.when, o.dur, o.people].filter(Boolean).join(' · ') + (o.notion ? ' · підсумок збережено в Notion' : ''),
         series: (o) => `Частина серії: ${o.name}, дзвінок ${o.n}. Дзвінки цього проєкту з тією самою назвою звʼязані. Відкриті обіцянки і пункти, до яких не дійшли, переходять у бриф наступного${o.next ? ', ' + o.next : ''}.`,
         showSeries: 'Показати серію', decisions: (o) => `Рішення · ${o.n}`, onYou: (o) => `На вас · ${o.n} · відкриті питання · ${o.k}`,
@@ -364,7 +364,7 @@
 
   function kindLabel(c) {
     if (c.kind === 'finish') return c.label;
-    if (c.commit && !c.commit.mine) return T().onThem;
+    if (c.commit && !c.commit.mine) return T().onThemKind;   // 2026-11-02: was a second key 'onThem' that replaced the On me function
     if (c.state === 'done' && (c.kind === 'answer' || c.kind === 'turn')) return T().kinds.answered;
     return T().kinds[c.kind] || T().kinds.neutral;
   }

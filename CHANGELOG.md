@@ -12,6 +12,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   register, the brief or the answer cards, the value in the client's terms, and for work the client cannot see what it
   protects and what skipping it costs later. The preparation adds "Likely pushbacks and value questions" to the brief
   (not in a sales call, which keeps "Likely objections"). Off for interviews. Docs 14.1k.
+- **Tips window, On me:** the tab did not open when an open item from an earlier call was on someone else (two
+  interface strings had the same key); any failing part of the window no longer stops the rest and is logged in
+  `logs/window.log`.
 - **Tips window:** the big card and the earlier cards scroll together; in a short window the bottom of the big card
   and every card below it were cut off.
 - **Start call:** Rehearse shows only for Presentation calls; until the talk is prepared it is greyed with an (i) that

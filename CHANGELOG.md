@@ -5,6 +5,15 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **Two real calls reviewed (2026-11-02), docs 14.1l:** the agenda takes up to 20 checklist items with the full text
+  on a click and for the model, and skips brief lines that only point elsewhere; interview follow-ups no longer stop
+  after the PM's "mhm" and come again every 150 words of a long answer, as open questions for hiring and discovery
+  interviews alike; "Anything else?", "my list is closed" or a typed "what did I forget" give one red tip with what
+  the agenda and "Decisions to obtain" still miss, checked against the whole transcript; Proactive switched on during
+  a call now changes the model's rules; a card found by meaning no longer fires on the PM's own words and comes back
+  after 15 minutes at the earliest; HELP NOW shows a raw folder snippet only when nothing else matched, without
+  Notion page ids. Also fixed: rules/recording.yaml was not valid YAML.
+
 - **Pushbacks and "why do we need this":** two reactive tips in the PM mode, not only in sales calls
   (rules/triggers.yaml). `scope_pushback`: the other side pushes back on an estimate, a term, a price or the scope; the
   tip acknowledges, names what drives the estimate and offers the choices, never a number. `value_doubt`: the other
@@ -18,7 +27,8 @@ Pacenote. Earlier versions are described in the commit messages and in
   hides the brief, the agenda and the tips (a pause or a long monologue of the PM is not a broken call), and the list
   no longer jumps back to the top when the strip comes and goes.
 - **Tips window, the big card:** an answer stays big for 3 minutes, any other card for 5; older cards all go to the
-  list below instead of one old answer covering newer tips. Your speech stays until Said it.
+  list below instead of one old answer covering newer tips. Your speech too leaves the big place after 5 minutes and
+  has Collapse (docs 14.1l).
 - **Tips window, On me:** the tab did not open when an open item from an earlier call was on someone else (two
   interface strings had the same key); any failing part of the window no longer stops the rest and is logged in
   `logs/window.log`.

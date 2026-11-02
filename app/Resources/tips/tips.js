@@ -26,7 +26,7 @@
       deal: { tab: 'Deal', unknown: 'Unknown', partial: 'Partly', known: 'Known', objections: 'Objections', next: 'Next step', signals: 'Signals', noNext: 'No next step with a date yet', cycle: 'Click to change the state' },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
-      saidIt: 'Said it', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
+      saidIt: 'Said it', collapse: 'Collapse', expand: 'Expand', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
       unverified: 'Not verified against documents',
       next: (t, m) => `${t} in ${m} min`, notPrepared: 'not prepared', ready: 'brief ready', preparing: 'preparing', prepare: 'Prepare', open: 'Open',
       ask: 'Ask about this project', help: 'Help',
@@ -88,7 +88,7 @@
       deal: { tab: 'Угода', unknown: 'Невідомо', partial: 'Частково', known: 'Відомо', objections: 'Заперечення', next: 'Наступний крок', signals: 'Сигнали', noNext: 'Ще немає наступного кроку з датою', cycle: 'Клік змінює стан' },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
-      saidIt: 'Сказав', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
+      saidIt: 'Сказав', collapse: 'Згорнути', expand: 'Розгорнути', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
       unverified: 'Не звірено з документами',
       next: (t, m) => `${t} за ${m} хв`, notPrepared: 'не підготовлено', ready: 'бриф готовий', preparing: 'готується', prepare: 'Підготувати', open: 'Відкрити',
       ask: 'Запитай про проєкт', help: 'Допоможи',
@@ -147,7 +147,7 @@
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
     openItems: [], notionItems: [], notionProject: '', minePending: [], mineN: 0, spkPrompt: 15,
-    ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
+    ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
   };
   const T = () => STR[S.lang] || STR.en;
@@ -212,7 +212,9 @@
     // 2026-11-02 (owner): an answer from 14 minutes ago stayed big over newer tips. Your speech stays until "Said it";
     // an answer stays 3 min; then the newest card for 5 min; older ones all go to the list below.
     const age = (c) => Date.now() - c.at;
-    const action = list.find((c) => c.state === 'active' && ACTION_KINDS.includes(c.kind) && (c.kind !== 'answer' || age(c) < 180000));
+    // 2026-11-02 (owner): "Your speech" stayed big for 85 minutes; a speech or your-turn card leaves the big place after 5 min.
+    const action = list.find((c) => c.state === 'active' && ACTION_KINDS.includes(c.kind)
+      && (c.kind === 'answer' ? age(c) < 180000 : c.kind === 'turn' ? age(c) < 300000 : true));
     if (action) return action;
     const newest = list.find((c) => c.state === 'active');
     return newest && age(newest) < 300000 ? newest : null;
@@ -283,7 +285,7 @@
     const ag = $('agenda');
     ag.hidden = !S.agenda.length || withSlides() || isReady;
     if (S.agenda.length) {
-      $('segs').innerHTML = S.agenda.map((a) => `<button type="button" class="seg ${a.state}" data-act="agenda" data-id="${esc(a.id)}" title="${esc(a.title)}" aria-label="${esc(a.title)}"></button>`).join('');
+      $('segs').innerHTML = S.agenda.map((a) => `<button type="button" class="seg ${a.state}" data-act="agenda" data-id="${esc(a.id)}" title="${esc(a.full || a.title)}" aria-label="${esc(a.full || a.title)}"></button>`).join('');
       const now = S.agenda.find((a) => a.state === 'now');
       const doneN = S.agenda.filter((a) => a.state !== 'todo').length;
       const pos = now ? S.agenda.indexOf(now) + 1 : Math.max(doneN, 1);
@@ -296,7 +298,8 @@
       cap.title = open ? t.agendaClose : t.agendaOpen;
       list.hidden = !open;
       if (open) {
-        list.innerHTML = S.agenda.map((a) => `<li class="${esc(a.state)}"><button type="button" data-act="agenda" data-id="${esc(a.id)}" aria-label="${esc(a.title + ', ' + (t.agState[a.state] || a.state))}"><span class="st ${esc(a.state)}"></span><span class="tt">${esc(a.title)}</span></button></li>`).join('')
+        // 2026-11-02 (owner): the opened agenda shows each item in full (13 interview questions were cut to "…")
+        list.innerHTML = S.agenda.map((a) => `<li class="${esc(a.state)}"><button type="button" data-act="agenda" data-id="${esc(a.id)}" aria-label="${esc((a.full || a.title) + ', ' + (t.agState[a.state] || a.state))}"><span class="st ${esc(a.state)}"></span><span class="tt">${esc(a.full || a.title)}</span></button></li>`).join('')
           + `<li class="hint">${esc(t.agendaHint)}</li>`;
       }
     }
@@ -398,13 +401,14 @@
       <div class="head"><span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>${c.kind === 'finish' ? '' : `<span class="meta"${c.unverified ? ` title="${esc(t.unverified)}"` : ''}>${esc(meta)}</span>`}${S.ui.heroOverride === c.id ? `<button class="ghost backauto" type="button" data-act="hero-auto" title="Esc">${esc(t.backAuto)}</button>` : ''}</div>
       ${(c.commit ? t.doneQ : c.question) ? `<div class="q">${esc(c.commit ? t.doneQ : c.question)}</div>` : ''}
       ${c.say ? `<div class="say"${editing ? ' contenteditable="true" spellcheck="false"' : ''}>${esc(c.say)}</div>` : ''}
-      ${(c.items || []).length && c.kind !== 'finish' ? itemsHtml(c) : ''}
+      ${(c.items || []).length && c.kind !== 'finish' && !S.ui.heroMin[c.id] ? itemsHtml(c) : ''}
       ${c.source ? `<div class="src">${ICON.doc}<span>${esc(c.source)}</span></div>` : ''}
       ${c.commit ? `<div class="acts">${c.state === 'done' ? `<span class="meta">${esc(t.closed)}</span>` : `<button class="btn1" type="button" data-act="commit-done" data-id="${esc(c.id)}">${esc(t.markDone)}</button>`}
         <button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></div>` : c.kind === 'finish' ? '' : editing ? `<div class="acts">
         <button class="btn1" type="button" data-act="edit-save" data-id="${esc(c.id)}">${esc(t.save)}</button>
         <button class="ghost" type="button" data-act="edit-cancel">${esc(t.cancel)}</button></div>` : `<div class="acts">
         <button class="ghost" type="button" data-act="said" data-id="${esc(c.id)}">${esc(t.saidIt)}</button>
+        ${(c.items || []).length > 2 ? `<button class="ghost" type="button" data-act="hero-min" data-id="${esc(c.id)}">${esc(S.ui.heroMin[c.id] ? t.expand : t.collapse)}</button>` : ''}
         <button class="ghost" type="button" data-act="shorter" data-id="${esc(c.id)}">${esc(t.shorter)}</button>
         <button class="ghost" type="button" data-act="pin" data-id="${esc(c.id)}">${esc(c.pinned ? t.unpin : t.pin)}</button>
         <button class="ghost" type="button" data-act="edit" data-id="${esc(c.id)}">${esc(t.edit)}</button>
@@ -956,6 +960,7 @@
         e.stopPropagation(); break;
       }
       case 'agenda-toggle': S.ui.agendaOpen = !S.ui.agendaOpen; break;
+      case 'hero-min': S.ui.heroMin[id] = !S.ui.heroMin[id]; break;   // 2026-11-02: the speech card folds to its first line
       case 'agenda': {
         const a = S.agenda.find((x) => x.id === id); if (!a) return;
         const nextState = a.state === 'todo' ? 'now' : a.state === 'now' ? 'done' : 'todo';

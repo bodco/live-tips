@@ -920,7 +920,8 @@ class Cards:
             c = next((x for x in self.cards if self.cid(x) == cid), None)
             if c is None or c.get("off"):
                 return "gone"
-            if now() - self.last.get(cid, 0) < float(c.get("cooldown_s", 300)):
+            # 2026-11-02 (a client monthly review): the same card came back 5 and 15 min later; by meaning it shows again after 15 min
+            if now() - self.last.get(cid, 0) < max(float(c.get("cooldown_s", 300)), 900.0 if cid in self.last else 0.0):
                 return "cooldown"
             self.last[cid] = now()
             self._emit(c, cid, line, sem=score)
@@ -1778,8 +1779,11 @@ def sos_pick(recent_texts: list[str], facts: list[dict], cards: list[dict], limi
             scored.append((_rank(score, sem_s, sem), -i - 10000, item))
     scored.sort(key=lambda x: (-x[0], -x[1]))
     out = [x[2] for x in scored[:limit]]
-    for d in ((sem or {}).get("docs") or [])[:2]:
-        out.append(doc_item(d))
+    # 2026-11-02 (a client monthly review): 2 facts + 2 raw note snippets (with page ids and an interview debrief) at once on a
+    # client call. A project snippet comes only when no fact or card matched, and only one.
+    if not out:
+        for d in ((sem or {}).get("docs") or [])[:1]:
+            out.append(doc_item(d))
     for x in out:
         if not x.get("note"):
             x.pop("note", None)
@@ -1812,6 +1816,7 @@ def doc_item(d: dict) -> dict:
     title = SEM.doc_title(rel) if SEM else Path(rel).stem
     if d.get("heading"):
         title += " > " + str(d["heading"])
+    title = re.sub(r"\s*\[[0-9a-f]{32}\]", "", title).strip()      # Notion page ids are not for the screen
     date = SEM.hit_date(d) if SEM else ""
     return {"kind": "fact", "level": "red", "gist": "🆘 " + short_gist(title, 70), "items": [str(d.get("preview") or "")],
             "note": f"{Path(rel).name} · {date}".strip(" ·"), "doc": rel, "sem": round(float(d.get("score") or 0), 3)}
@@ -2183,6 +2188,8 @@ class SemanticLive(threading.Thread):
             on = self.card_on[k]
             if on != "any" and on != line.channel:
                 continue
+            if line.channel == "me" and on != "me":
+                continue        # 2026-11-02: "I will confirm the new candidate" fired "Panel feedback still owed" on the PM's own words
             if best[k] < cmin - 0.1 and over[k] < 0.75 * margin:
                 break
             cid = self.card_ids[k]

@@ -177,7 +177,9 @@ the brief around the subject the user named, not around the stand-up agenda.
 Compress into the **Live Brief**, max ~2500 words (detailed: the PM reads it before the call), saved next to the transcript as
 `<transcript name>.brief.md`:
 
-1. Checklist: what this meeting must cover + "Decisions to obtain".
+1. Checklist: what this meeting must cover + "Decisions to obtain". Each line is one concrete item (2026-11-02): never a line
+   that points to another part of the brief ("walk the open items below"); a rolling action list gets one line per
+   item; in an interview every planned question is its own line, in full (the agenda shows up to 20).
 1a. **Previous meetings** (from 3b, required): per meeting its date and 3-6 lines of what was
    discussed; then one combined list: open questions (who asked, answered partly or not, what is
    missing), action items (owner, due, status), promises in flight, the other side's concerns. With

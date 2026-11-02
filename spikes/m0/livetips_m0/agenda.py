@@ -7,8 +7,15 @@ from typing import List, Optional, Tuple
 CHECK = re.compile(r"^\s*[-*]\s+\[( |x|X)\]\s+(.+?)\s*$")
 
 
-def from_brief(text: str, max_items: int = 8, max_chars: int = 60) -> List[Tuple[str, bool]]:
-    """(item, already ticked) for each checklist line of the brief, in order; markdown and links removed."""
+# 2026-11-02 (owner, a client monthly review): "RAIL: walk the open items below" became an agenda item that pointed elsewhere.
+POINTER = re.compile(r"\b(below|above)\b|\b(нижче|вище)\b", re.I | re.U)
+OBTAIN = re.compile(r"(decisions? (and results )?to obtain|results? to get|рішення(?: і результати)?,? які треба отримати|треба отримати)\s*:?",
+                    re.I | re.U)
+
+
+def full_items(text: str, max_items: int = 20) -> List[Tuple[str, bool]]:
+    """(full item text, already ticked) for each checklist line of the brief, in order; markdown and links
+    removed; a line that only points to another part of the brief ("walk the open items below") is skipped."""
     out = []
     for ln in (text or "").splitlines():
         m = CHECK.match(ln)
@@ -16,14 +23,33 @@ def from_brief(text: str, max_items: int = 8, max_chars: int = 60) -> List[Tuple
             continue
         t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", m.group(2))
         t = re.sub(r"[*_`]+", "", t).strip()
-        if not t:
+        if not t or (POINTER.search(t) and len(t.split()) <= 8):
             continue
-        if len(t) > max_chars:
-            t = t[: max_chars - 1].rstrip() + "…"
         out.append((t, m.group(1) != " "))
         if len(out) >= max_items:
             break
     return out
+
+
+def shorten(t: str, max_chars: int = 60) -> str:
+    return t if len(t) <= max_chars else t[: max_chars - 1].rstrip() + "…"
+
+
+def from_brief(text: str, max_items: int = 20, max_chars: int = 60) -> List[Tuple[str, bool]]:
+    """(item, already ticked) for each checklist line of the brief, in order; long items shortened for the strip
+    (the full text is full_items, shown on a click and given to the model)."""
+    return [(shorten(t, max_chars), d) for t, d in full_items(text, max_items)]
+
+
+def to_obtain(text: str, max_chars: int = 700) -> str:
+    """The brief's "Decisions to obtain" / "Рішення і результати, які треба отримати" text (one line or paragraph), or ""."""
+    for ln in (text or "").splitlines():
+        m = OBTAIN.search(ln)
+        if m:
+            rest = re.sub(r"[*_`]+", "", ln[m.end():]).strip(" :-")
+            if rest:
+                return rest[:max_chars]
+    return ""
 
 
 def states(items: List[Tuple[str, bool]], done: set, now: int, manual: dict) -> List[str]:

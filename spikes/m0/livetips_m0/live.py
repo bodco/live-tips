@@ -64,6 +64,10 @@ def _paused(eng, value) -> None:
 def _proactive(eng, value) -> None:
     eng.proactive = _on(value)        # 2026-10-27: the window switch now really changes the engine
     eng.cfg["proactive"] = eng.proactive
+    try:                              # 2026-11-02: and the model's rules (add_fact, fix_owner_date were still off)
+        eng.prompt.set_meeting({"proactive": eng.proactive})
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _set_meeting(eng, change: dict) -> None:

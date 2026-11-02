@@ -48,7 +48,7 @@ def render_register(rules_dir: Path = RULES) -> str:
     cm = yaml.safe_load((rules_dir / "commitments.yaml").read_text(encoding="utf-8"))
     fr = json.loads((rules_dir / "freshness.json").read_text(encoding="utf-8"))
     out = ["Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshness.json`; do not edit here.", ""]
-    out.append("**Agenda.** Source: " + ag["source"] + " At most {} items, ~{} characters each.".format(ag["max_items"], ag["max_chars"]))
+    out.append("**Agenda.** Source: " + ag["source"] + " At most {} items; the strip shows ~{} characters of each, a click shows the full item, and the model sees the full text. A line that only points to another part of the brief (\"walk the open items below\") is not an item.".format(ag["max_items"], ag["max_chars"]))
     out.append("- States: " + "; ".join("`{}` {}".format(k, v) for k, v in ag["states"].items()) + ".")
     out.append("- Call picture: " + ag["model_rule"])
     out.append("- Window: " + ag["emit"])

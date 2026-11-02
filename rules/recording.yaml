@@ -9,11 +9,11 @@ status_fields:
 threshold_s: 30
 states:
   not_recording:
-    when: recording and mic_silent_s >= 60 and call_silent_s >= 60, or the recorder stopped by itself (2026-11-02: 30 s fired on a shared pause)
+    when: recording and mic_silent_s >= 60 and call_silent_s >= 60, or the recorder stopped by itself (2026-11-02, 30 s fired on a shared pause)
     action: End and restart
     tips: off until audio comes back; what was said before is saved
   cant_hear:
-    when: recording and call_silent_s >= 45 and mic_silent_s >= 15 (2026-11-02, owner: while the PM talks nobody interrupts, so a silent call is normal; it used to fire during the PM's own monologue)
+    when: recording and call_silent_s >= 45 and mic_silent_s >= 15 (2026-11-02, owner, while the PM talks nobody interrupts, so a silent call is normal; it used to fire during the PM's own monologue)
     action: Check audio (System Settings > Sound)
     browser: >-
       0.8.6 (owner, 30.10: a Zoom call in Chrome came back after a 30 min break, the PM heard it, Pacenote got only

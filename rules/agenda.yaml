@@ -3,7 +3,7 @@ schema_version: 1
 source: >-
   The checklist lines of the call's brief (`- [ ] item` and `- [x] item`, in the order of the brief).
   Hiring: the planned or likely questions; a stand-up the PM leads: the people to hear from.
-max_items: 8
+max_items: 20   # 2026-11-02 (owner): 13 interview questions, only 8 were shown
 max_chars: 60
 states:
   todo: not raised yet

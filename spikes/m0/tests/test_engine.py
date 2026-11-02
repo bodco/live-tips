@@ -290,7 +290,7 @@ def test_interviewer_one_clarify_per_long_answer_without_rate(tmp_path):
     def resp(model, user):
         if "ROLE classify" in user:
             return _no_tip_classify(model, user)
-        if "role interviewer: the candidate just gave" in user:
+        if "role interviewer: the other person" in user:
             return json.dumps({"gist": "🟠 Уточни: own role " + str(len(user)), "level": "orange", "topic": "clarify " + str(len(user)),
                                "phrase": "What exactly was your part?"})
         return json.dumps({"skip": True, "reason": "x"})

@@ -34,6 +34,7 @@ COACH_MONEY_CUES = ["price", "cost", "rate", "salary", "start date", "notice per
 COACH_MONEY_WORDS = {"ціна", "ціни", "ціну", "ціні", "ціною", "rate", "rates", "cost", "costs"}
 MEETING_EXEMPT_PER_MIN = 2           # hiring tips ignore the orange rate, max 2 per minute
 INTERVIEWER_ANSWER_WORDS = 40        # a them answer this long gets at most one "Уточни" tip
+INTERVIEWER_MORE_WORDS = 150        # 2026-11-02: and one more for every 150 words the same answer goes on
 TEAM_TIPS_PER_HOUR = 12              # team audience: non-red model tips per hour
 QA_SHARE_MAX = 0.40                  # presentation Q&A: the PM's share below this for QA_WINDOW_S
 QA_WINDOW_S = 60
@@ -44,10 +45,14 @@ OBSERVER_EVENT = ("Interview, role observer: the other side asked the candidate 
                   "the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not "
                   "apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = "
                   "'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.")
-INTERVIEWER_EVENT = ("Interview, role interviewer: the candidate just gave a long answer to the PM's question. If the answer "
-                     "is vague (no numbers, no own role, no result) give ONE orange tip: gist starting with '🟠 ' and 'Clarify: ' in the tips language, "
-                     "phrase = the follow-up question the PM can ask now. Never suggest answers for the candidate. If the "
-                     "answer is concrete, skip. trigger add_fact.")
+INTERVIEWER_EVENT = ("Interview, role interviewer: the other person (a candidate, or a colleague or user in a discovery or "
+                     "research interview) just gave a long answer to the PM's question. Give ONE orange tip: gist starting with "
+                     "'🟠 ' and 'Clarify: ' in the tips language, phrase = ONE open follow-up question the PM can ask now, in the "
+                     "interview language, that digs into what was just said: the last concrete case (when, who, what happened next), "
+                     "how often or how many, show it on screen, why it is done that way, what it costs or breaks; or the next "
+                     "checklist or card question the answer leads to (cards Q1-Qn, their follow-ups). Never a yes/no or leading "
+                     "question, never suggest answers. Skip only when the answer already gave a concrete case with numbers and "
+                     "the next checklist question was asked. trigger add_fact.")
 COACH_QUESTION_EVENT = ("Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, "
                         "phrase = a ready opening sentence, items = situation, action, result with a number, only from the "
                         "brief, the fact book or the cards. trigger direct_question.")
@@ -214,6 +219,30 @@ ASK_TAIL = (" Add \"answered\": true when the context really answers it, false o
                       "search of the project folder starts by itself.")
 
 
+# 2026-11-02 (owner, two calls): "Anything else you wanted to go over today?" got "Nope, my list is closed" while four
+# brief items were still open, and "що я там ще забув?" got "no question to you". The wrap check lists what is not
+# covered yet: agenda items and the brief's "Decisions to obtain", checked against the whole transcript.
+ANY_ELSE = re.compile(r"\b(anything else|any(thing)? other (questions?|items?|topics?|things?)|what else|something else|"
+                      r"anything (you wanted|we should|i('m| am) (missing|forgetting))|is that (all|everything)|"
+                      r"щось ще|що ще (є|в тебе|у вас|обговори|додати)|ще якісь (питання|теми)|є ще (питання|щось)|"
+                      r"чи все|це все\?)", re.I | re.U)
+WRAP_SAY = re.compile(r"\b(my list is|that'?s (all|it) from (me|my side)|nothing else from (me|my side)|i think we covered|"
+                      r"we covered (everything|it all)|по всьому пройшли|все пройшли|в мене все|у мене все|більше питань нема|"
+                      r"ми все покрили|покрили з того)", re.I | re.U)
+WRAP_ASK = re.compile(r"(забув|забула|пропустив|не спитав|не обговорили|що ще|що лишилось|що залишилось|forgot|forget|missed|"
+                      r"what else|not covered|what is left|what's left|anything left)", re.I | re.U)
+WRAP_GAP_S = 300
+WRAP_MIN_S = 480          # not in the first 8 minutes of the call
+WRAP_EVENT = ("WRAP CHECK: the call may be ending (someone asked whether there is anything else, the PM said he is done, "
+              "or the PM asked what he forgot). Compare the WHOLE CALL TRANSCRIPT below with the AGENDA and DECISIONS TO "
+              "OBTAIN. Give ONE red tip: gist like '🎯 Not covered yet: N' in the tips language; items = up to 5 items "
+              "that were NOT really talked about or NOT obtained (an item only named in passing counts as not covered; "
+              "the agenda states are a hint, the transcript decides), each a short line the PM can raise now; phrase = "
+              "one sentence in the call language to raise the first one (for example 'One more thing before we go: ...'). "
+              "When everything was covered: gist '✅ All covered' in the tips language, items = the 1-2 next steps with "
+              "owner and date heard on the call, or 'next step has no date' when none was said. Never skip.")
+
+
 def not_answered(obj: Optional[dict]) -> bool:
     return (not obj) or bool(obj.get("skip")) or obj.get("answered") is False
 
@@ -324,11 +353,27 @@ def mentions_money(text: str) -> bool:
                for c in COACH_MONEY_CUES if c not in ("rate", "cost"))
 
 
+# 2026-11-02 (a discovery interview): the PM's "Мхм", "Ну да", "Ok" were taken as his last question, so the
+# clarify tip stopped after the first answers. Short acknowledgements are skipped when looking for the question.
+BACKCHANNEL = set("""мхм мг ага ахам угу ну да так та ок окей ok okay yes yeah yep right sure got it i see понятно зрозуміло
+ясно добре норм нормально класно супер цікаво interesting cool nice great т е тобто 100 точно звісно ясне ага-ага""".split())
+
+
+def is_backchannel(text: str) -> bool:
+    t = (text or "").strip()
+    if "?" in t:
+        return False
+    words = re.findall(r"[\w'ʼ’-]+", t.lower())
+    return len(words) <= 1 or (len(words) <= 4 and all(w in BACKCHANNEL for w in words))
+
+
 def last_question_and_answer(hist: List[Line]):
-    """The PM's last line and the other side's lines after it (newest first)."""
+    """The PM's last real line (acknowledgements skipped) and the other side's lines after it (newest first)."""
     answer = []
     for h in reversed(hist):
         if h.speaker == "me":
+            if is_backchannel(h.text):
+                continue
             return h, answer
         answer.append(h)
     return None, answer
@@ -651,7 +696,7 @@ class Engine:
         self.diet_lock = threading.Lock()     # diet check + "shown" bookkeeping are one step
         # Names the PM gave to voices in the tips window (<stem>.speakers.json, written by the recorder).
         self.speakers = SpeakerNames(cfg.get("speakers_file"))
-        self.clarified_for = set()            # interviewer: PM question line ids that already got "Уточни"
+        self.clarified_for: Dict[int, int] = {}   # interviewer: PM question line id -> answer words at the last "Уточни"
         # 2026-10-23 PM sync review: a question to anyone on the call may be one the PM is expected to
         # answer or add to; the addressee is ignored (cfg "answer_any", on by default).
         self.answer_any = cfg.get("answer_any", True)
@@ -671,6 +716,8 @@ class Engine:
         # Pacenote 0.8 (F5): the agenda as a contract and the commitments register (rules/agenda.yaml,
         # rules/commitments.yaml). The register lives in the call's folder (<project>/live/commitments.jsonl).
         self.agenda_items: List[tuple] = []
+        self.agenda_full: List[str] = []       # 2026-11-02: the full text of each item (the strip shortens it)
+        self.agenda_obtain = ""                 # the brief's "Decisions to obtain" text (the wrap check)
         self.agenda_done: set = set()
         self.agenda_now = -1
         self.agenda_manual: Dict[int, str] = {}
@@ -733,6 +780,10 @@ class Engine:
         span = line_span(line, sig, now)
         if self.paused or self._budget_stops() or self.tips_off():
             return
+        if self._wrap_due(line):
+            with self.lock:
+                self.last_wrap_at = now
+            self.on_request("wrap")
         self._maybe_situation(line, sig, now)
         if self._meeting_route(line, sig, span, now):
             return
@@ -1257,12 +1308,17 @@ class Engine:
         with self.lock:
             hist = [h for h in self.history if h.line_id <= line.line_id]
         q, answer = last_question_and_answer(hist)
-        if q is None or not self._is_question(q) or q.line_id in self.clarified_for:
+        if q is None:
             return None
-        if sum(len(h.text.split()) for h in answer) < INTERVIEWER_ANSWER_WORDS:
+        if not (self._is_question(q) or len(re.findall(r"[\w'ʼ’]+", q.text)) >= 6):   # the PM asks; Whisper drops "?"
+            return None
+        words = sum(len(h.text.split()) for h in answer)
+        # one clarify per answer, and one more for every INTERVIEWER_MORE_WORDS the answer goes on (a 5-minute story)
+        need = self.clarified_for[q.line_id] + INTERVIEWER_MORE_WORDS if q.line_id in self.clarified_for else INTERVIEWER_ANSWER_WORDS
+        if words < need:
             return None
         with self.lock:
-            self.clarified_for.add(q.line_id)
+            self.clarified_for[q.line_id] = words
         return {"kind": "interviewer_clarify", "trigger": "add_fact", "event": INTERVIEWER_EVENT,
                 "level": "orange", "exempt": True}
 
@@ -1379,7 +1435,7 @@ class Engine:
         or "sos" (HELP NOW). Never rate-limited."""
         if kind == "sos":            # 0.8.7 (M): the event only, never the text
             usage.log("help_now")
-        else:
+        elif kind != "wrap":
             usage.log("ask_typed")
         if self._budget_stops():
             return
@@ -1509,6 +1565,11 @@ class Engine:
         if kind == "find":
             self._run_find(text, line, span)
             return
+        if kind == "ask" and WRAP_ASK.search(text) and (self.agenda_items or self.agenda_obtain):
+            kind = "wrap"
+        if kind == "wrap":
+            self._run_wrap(line, span)
+            return
         event = SOS_EVENT if kind == "sos" else self._ask_event(text)
         event = self._sales_cards_first(kind, text) + event   # 0.8.7 (H4.5): answer cards first in sales mode
         span["tip_start"] = self.clock()
@@ -1523,6 +1584,50 @@ class Engine:
         self.out_tips.write(item)
         span.update({"outcome": "emitted", "emit_at": done, "tip_ms": c.ms(c.t_done), "error": c.error})
         self.out_timing.write(span)
+
+    def wrap_event(self) -> str:
+        st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual)
+        full = self.agenda_full or [t for t, _ in self.agenda_items]
+        ag = "\n".join("{}. [{}] {}".format(i, s, t) for i, (t, s) in enumerate(zip(full, st))) or "(none)"
+        with self.lock:
+            hist = list(self.history)
+        lines = ["[{}] {}: {}".format(h.t, self.speakers.who(h), h.text) for h in hist if not is_backchannel(h.text)]
+        text, cap = "\n".join(lines), int(self.cfg.get("wrap_transcript_chars", 60000))
+        if len(text) > cap:
+            text = "…\n" + text[-cap:]
+        return (WRAP_EVENT + "\n\nAGENDA (number. [state] item):\n" + ag + "\n\nDECISIONS TO OBTAIN:\n"
+                + (self.agenda_obtain or "(none in the brief)") + "\n\nWHOLE CALL TRANSCRIPT:\n" + text)
+
+    def _run_wrap(self, line: Line, span: dict) -> None:
+        with self.lock:
+            self.last_wrap_at = self.clock()
+        span["tip_start"] = self.clock()
+        c = self._call("tip", line, self.wrap_event())
+        done = self.clock()
+        obj = first_json(c.text) if not c.error else None
+        if not obj or obj.get("skip") or not obj.get("gist"):
+            return
+        item = request_item(obj, "wrap", "", span["src"], done)
+        item.update(kind="tip", level="red", trigger="timer_checkpoint", uid="wrap" + span["src"].replace(":", ""))
+        with self.lock:
+            self.tips.append(item)
+        self.out_tips.write(item)
+        span.update({"outcome": "emitted", "emit_at": done, "route": "wrap", "error": c.error})
+        self.out_timing.write(span)
+
+    def _wrap_due(self, line: Line) -> bool:
+        """Someone asks whether there is anything else, or the PM says he is done (once per WRAP_GAP_S)."""
+        if not (self.agenda_items or self.agenda_obtain):
+            return False
+        rx = ANY_ELSE if line.speaker == "them" else WRAP_SAY
+        if not rx.search(line.text or ""):
+            return False
+        with self.lock:
+            first = self.history[0].t_s if self.history else line.t_s
+        if line.t_s - first < WRAP_MIN_S:        # "anything else I'm forgetting?" 4 min in is about the item, not the end
+            return False
+        last = getattr(self, "last_wrap_at", None)
+        return last is None or self.clock() - last >= WRAP_GAP_S
 
     def _sales_cards_first(self, kind: str, text: str) -> str:
         """0.8.7 (H4.5, rules/sales.yaml > ask_order): in sales mode an ask or HELP NOW sees the matching answer
@@ -1812,7 +1917,8 @@ class Engine:
     def _situation_extra_input(self) -> str:
         parts = []
         if self.agenda_items:
-            parts.append("AGENDA:\n" + "\n".join("{}. {}".format(i, t) for i, (t, _) in enumerate(self.agenda_items)))
+            full = getattr(self, "agenda_full", None) or [t for t, _ in self.agenda_items]
+            parts.append("AGENDA:\n" + "\n".join("{}. {}".format(i, t) for i, t in enumerate(full)))
         left = [c for c in self.open_commitments if c["id"] not in self.commit_proposed]
         if left:
             parts.append("OPEN COMMITMENTS (from earlier calls; id | owner | what):\n" + "\n".join(
@@ -1834,16 +1940,21 @@ class Engine:
     def set_agenda_items(self, brief_text: str) -> None:
         """The brief's checklist is the agenda (rules/agenda.yaml > source). A new brief starts the states again."""
         ag = getattr(self.rules, "agenda", {}) or {}
-        items = agenda_mod.from_brief(brief_text, int(ag.get("max_items", 8)), int(ag.get("max_chars", 60)))
+        full = agenda_mod.full_items(brief_text, int(ag.get("max_items", 20)))
+        items = [(agenda_mod.shorten(t, int(ag.get("max_chars", 60))), d) for t, d in full]
+        self.agenda_obtain = agenda_mod.to_obtain(brief_text)
         if [t for t, _ in items] == [t for t, _ in self.agenda_items]:
             return
         with self.lock:
             self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual = items, set(), -1, {}
+            self.agenda_full = [t for t, _ in full]
         self._emit_agenda()
 
     def agenda_strip(self) -> List[dict]:
         st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual)
-        return [{"text": t, "done": s == "done", "cur": s == "now", "state": s} for (t, _), s in zip(self.agenda_items, st)]
+        full = getattr(self, "agenda_full", None) or [t for t, _ in self.agenda_items]
+        return [dict({"text": t, "done": s == "done", "cur": s == "now", "state": s}, **({"full": f} if f != t else {}))
+                for (t, _), s, f in zip(self.agenda_items, st, full)]
 
     def _emit_agenda(self, final: bool = False) -> None:
         if not self.agenda_items:

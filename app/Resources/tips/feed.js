@@ -201,7 +201,8 @@
         this.agendaEngine = (it.items || []).map((x, i) => {
           const text = clean(itemText(x)).replace(/^\u2713\s*/, '');
           const done = typeof x === 'string' ? /^\s*\u2713/.test(x) : !!(x && x.done);
-          return { id: 'a' + i, title: text, done, cur: typeof x === 'object' && x && !!x.cur };
+          const full = typeof x === 'object' && x && x.full ? clean(String(x.full)) : text;   // 2026-11-02: the whole item on a click
+          return { id: 'a' + i, title: text, full, done, cur: typeof x === 'object' && x && !!x.cur };
         });
         return true;
       case 'commitment_done': {
@@ -342,7 +343,7 @@
     if (cur < 0) cur = src.findIndex((a) => !a.done);
     return src.map((a, i) => {
       const manual = this.agendaManual[a.id];
-      return { id: a.id, title: a.title, state: manual || (a.done ? 'done' : i === cur ? 'now' : 'todo') };
+      return { id: a.id, title: a.title, full: a.full || a.title, state: manual || (a.done ? 'done' : i === cur ? 'now' : 'todo') };
     });
   };
 

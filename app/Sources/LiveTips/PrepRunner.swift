@@ -341,7 +341,10 @@ final class PrepRunner: ObservableObject {
         step 3b says: what was discussed, every question and whether it was answered fully, partly or not, open items, \
         action items (owner, due, status checked against newer sources), promises, the other side's concerns. The brief \
         is detailed (up to ~2500 words) and has the "Previous meetings" section (sweep.md, item 1a); open items go into \
-        that section; only those likely to come up on this call become checklist lines and cards (fewer, surer cards).
+        that section; only those likely to come up on this call become checklist lines and cards (fewer, surer cards). \
+        Each checklist line is one concrete item the PM can raise or tick (2026-11-02, owner): never a line that points \
+        to another part of the brief (like "walk the open items below"); a rolling action list gets one line per item. \
+        For an interview every planned question is its own checklist line, written in full.
 
         Likely pushbacks (2026-11-02, owner)\(r.salesMethod == nil ? ": add the brief's section \"Likely pushbacks and value questions\" (sweep.md, item 4a): 3 to 5 pushbacks on an estimate, a term, a price or the scope and 2 to 4 value questions (why this work, what it gives, what happens without it), each with a short answer taken only from <project>/pacenote/answer-cards.md, the Decision register, the red lines, the risk register and past calls; for work the client cannot see say what it protects and what skipping it costs later; no source: write \"no answer yet\"." : ": not here, a sales call has \"Likely objections\".")
 

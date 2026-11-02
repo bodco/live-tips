@@ -1493,6 +1493,36 @@ preparation adds the section **Likely pushbacks and value questions** to the bri
 questions with short answers from the same sources, or "no answer yet"); in a sales call "Likely objections" does the
 same job.
 
+### 14.1l What two real calls changed (2026-11-02)
+
+A discovery interview (13 prepared questions) and a monthly client review showed where the window
+did not help. What changed:
+
+1. **The whole agenda.** Up to 20 checklist items (was 8). The strip still shortens each one to
+   about 60 characters, but the opened agenda and the hover text show the full item, and the model
+   tracks the full text. A brief line that only points elsewhere ("walk the open items below") is
+   not an agenda item any more.
+2. **Your speech folds and steps aside.** The speech card has Collapse (it keeps the title and the
+   ready sentence) and leaves the big place after 5 minutes like any other card; it stays in the
+   list below.
+3. **More follow-up questions in interviews.** An acknowledgement of yours ("mhm", "yeah", "ok")
+   is no longer taken as your question, so the follow-ups do not stop after the first answers. A
+   long answer gets one "Clarify" and one more for every 150 words it goes on. The follow-up is an
+   open question about what was just said: the last concrete case, how often, show it, why, what
+   happened next. It works for hiring and for discovery or research interviews.
+4. **"Anything else?" checks what is not covered.** When the other side asks whether there is
+   anything else, when you say you are done ("my list is closed", "ми все покрили"), or when you
+   type "what did I forget", one red tip lists up to 5 agenda items and "Decisions to obtain" that
+   were not really discussed, checked against the whole transcript (not against the agenda
+   marks), with a sentence to raise the first one. When everything is covered it says so and names
+   the next steps heard, or that the next step has no date. Not in the first 8 minutes, at most
+   once in 5 minutes.
+5. **Proactive tips switched on during a call** now really change what the model may suggest
+   (before, only the timing changed until the next call).
+6. **Less noise.** A card found by meaning never fires on your own words and comes back at the
+   earliest 15 minutes later. HELP NOW shows at most 2 facts or cards; a raw snippet from the
+   project folder comes only when nothing else matched, one at most, without Notion page ids.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the
@@ -1597,8 +1627,9 @@ address", `references/sweep.md`, `references/presentation.md`).
 **Since 0.5.2:**
 
 8. **Meeting types in code.** Interview: Observer gets each question verbatim with what a strong
-   answer holds and nothing after the answer; Interviewer gets at most one "Уточни" per long
-   answer; Coach gets a red answer to every question and "no numbers now" on money, dates and
+   answer holds and nothing after the answer; Interviewer gets one "Clarify" per long
+   answer and one more for every 150 words the answer goes on (short "mhm" lines do not count as
+   the question, see 14.1l); Coach gets a red answer to every question and "no numbers now" on money, dates and
    scope. Team calls: at most 12 tips an hour, no info level. Presentation: no pacing tips from
    the model; once the Q&A starts (the PM's share falls below 40%), questions go straight to a tip.
 9. **The last calls in the context.** `lt digest <project> --days 7` lists the questions asked to

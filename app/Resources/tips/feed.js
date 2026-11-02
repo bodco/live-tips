@@ -388,12 +388,14 @@
     const mic = s.mic_silent_s, call = s.call_silent_s, lvl = { mic: +s.mic_level || 0, call: +s.call_level || 0 };
     const since = (sec) => { const d = new Date(this.now() - sec * 1000); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
     if (mic != null && call != null) {
-      if (mic >= 30 && call >= 30) return Object.assign({ kind: 'notRecording', at: since(Math.min(mic, call)) }, lvl);
-      if (call >= 30 && this.heard) return Object.assign({ kind: 'cantHear', at: since(call) }, lvl);
+      // 2026-11-02 (owner): while the PM talks nobody interrupts, so a silent call then is normal; the warning waits
+      // until the PM has been quiet for 15 s and the call silent for 45 s. Nothing at all for 60 s = not recording.
+      if (mic >= 60 && call >= 60) return Object.assign({ kind: 'notRecording', at: since(Math.min(mic, call)) }, lvl);
+      if (call >= 45 && mic >= 15 && this.heard) return Object.assign({ kind: 'cantHear', at: since(call) }, lvl);
       return null;
     }
     // An older recorder without the levels: the system audio silent for 30 s after it was heard.
-    if (this.heard && this.silentSince && this.now() - this.silentSince >= 30000) return Object.assign({ kind: 'cantHear', at: '' }, lvl);
+    if (this.heard && this.silentSince && this.now() - this.silentSince >= 45000) return Object.assign({ kind: 'cantHear', at: '' }, lvl);
     return null;
   };
 

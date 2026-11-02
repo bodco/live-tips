@@ -267,10 +267,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 .after.full .foot .spacer{flex:1}
 .after.full .err{color:var(--danger-text)}
 /* 0.8.5 recording problems (P8): a system state, not a tip */
-.app.sysview .hero,.app.sysview .earlier,.app.sysview .empty,.app.sysview .present,.app.sysview .agenda{display:none!important}
+/* 2026-11-02 (owner): a recording problem no longer hides the brief and the tips; only the strip and its details show */
 .sys{margin:0 0 10px}
 .sys[hidden]{display:none}
-.sys .strip{background:var(--danger-text);color:#fff;font-size:12px;font-weight:600;padding:5px 14px}
+.sys .strip{background:var(--danger-text);color:#fff;font-size:12px;font-weight:600;padding:4px 8px 4px 14px;display:flex;align-items:center;gap:6px}
+.sys .strip .st{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sys .sbtn{border:0;border-radius:6px;background:rgba(255,255,255,.18);color:#fff;font:inherit;font-weight:600;padding:3px 9px;cursor:pointer;white-space:nowrap}
+.sys .sbtn:hover{background:rgba(255,255,255,.3)}
+.sys .sbtn.ghostish{background:transparent;font-weight:500}
 .sys .body{margin:10px 12px 0;background:var(--surface);border-radius:var(--radius-l);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-card)}
 .sys .step{font-size:18px;font-weight:600}
 .sys .say{font-size:14px;line-height:1.45;color:var(--text-2)}

@@ -50,9 +50,9 @@
         draft: 'Follow-up draft', draftTo: (o) => `To ${o.people} · not sent`, write: 'Write draft', writing: 'Writing the draft…', instruct: 'What to change: "drop the pricing line", "shorter"',
         rewrite: 'Rewrite', copy: 'Copy', openMail: 'Open in Mail', edit: 'Edit', neverSends: 'Pacenote never sends it for you', openNotion: 'Open in Notion', openCall: 'Open call page', done: 'Done',
         lessons: (o) => `Uses ${o.n} of your recurring corrections`, copied: 'Copied' },
-      sys: { notRecording: 'Not recording', noAudio: 'No audio is captured', noAudioWhy: 'No sound from the microphone or the call for 30 s. Usually another app took the microphone, or macOS revoked access after an update.',
+      sys: { details: 'Details', hideDetails: 'Hide', notRecording: 'Not recording', noAudio: 'No audio is captured', noAudioWhy: 'No sound from the microphone or the call for a minute. Usually another app took the microphone, or macOS revoked access after an update.',
         restart: 'End and restart', noAudioFoot: (o) => `Tips are off until audio comes back. What was said before ${o.t} is saved.`,
-        noOther: "Can't hear the other side", noOtherTitle: 'No call audio is coming in', noOtherWhy: 'Your microphone works, but there is no system audio from the call for 30 s. Most often the call plays through another device, or Pacenote lost access to system audio.',
+        noOther: "Can't hear the other side", noOtherTitle: 'No call audio is coming in', noOtherWhy: 'No call audio for 45 s while you were not speaking. Most often the call plays through another device, or Pacenote lost access to system audio.',
         check: 'Check audio', noOtherFoot: 'Your words are recorded. Tips about the other side are off until their audio comes back.', mic: 'Mic', call: 'Call' },
       // 0.8.5 presentation mode (PRESENTATION-SPEC 2, keys pm.*)
       pm: { slides: 'Slides', slideOf: (o) => `Slide ${o.i} of ${o.n}`, you: 'You', all: 'All', left: 'left on this slide', overSlide: 'over slide time', add30: '+30 s',
@@ -113,9 +113,9 @@
         draft: 'Чернетка листа-підсумку', draftTo: (o) => `Кому: ${o.people} · не надіслано`, write: 'Написати чернетку', writing: 'Пишу чернетку…', instruct: 'Що змінити: «прибери рядок про ціну», «коротше»',
         rewrite: 'Переписати', copy: 'Копіювати', openMail: 'Відкрити в Mail', edit: 'Редагувати', neverSends: 'Pacenote ніколи не надсилає його за вас', openNotion: 'Відкрити в Notion', openCall: 'Сторінка дзвінка', done: 'Готово',
         lessons: (o) => `Враховує ваші повторювані правки: ${o.n}`, copied: 'Скопійовано' },
-      sys: { notRecording: 'Запис не йде', noAudio: 'Звук не записується', noAudioWhy: '30 с немає звуку ні з мікрофона, ні з дзвінка. Найчастіше мікрофон зайняв інший застосунок або macOS забрав доступ після оновлення.',
+      sys: { details: 'Деталі', hideDetails: 'Сховати', notRecording: 'Запис не йде', noAudio: 'Звук не записується', noAudioWhy: 'Хвилину немає звуку ні з мікрофона, ні з дзвінка. Найчастіше мікрофон зайняв інший застосунок або macOS забрав доступ після оновлення.',
         restart: 'Завершити і почати знову', noAudioFoot: (o) => `Підказки вимкнені, поки звук не повернеться. Сказане до ${o.t} збережено.`,
-        noOther: 'Не чую співрозмовника', noOtherTitle: 'Звук дзвінка не надходить', noOtherWhy: 'Ваш мікрофон працює, але системного звуку дзвінка немає 30 с. Найчастіше дзвінок іде через інший пристрій або Pacenote втратив доступ до системного звуку.',
+        noOther: 'Не чую співрозмовника', noOtherTitle: 'Звук дзвінка не надходить', noOtherWhy: '45 с немає звуку дзвінка, поки ви мовчали. Найчастіше дзвінок іде через інший пристрій або Pacenote втратив доступ до системного звуку.',
         check: 'Перевірити звук', noOtherFoot: 'Ваші слова записуються. Підказки про співрозмовника вимкнені, поки звук не повернеться.', mic: 'Мікр.', call: 'Дзвінок' },
       pm: { slides: 'Слайди', slideOf: (o) => `Слайд ${o.i} з ${o.n}`, you: 'Ви', all: 'Усі', left: 'лишилось на слайді', overSlide: 'понад час слайда', add30: '+30 с',
         plan: (o) => `План ${o.t}`, elapsed: (o) => `Минуло ${o.t}`, behind: (o) => `Відставання ${o.t}`, ahead: (o) => `Випереджаєте на ${o.t}`,
@@ -209,8 +209,13 @@
     const pinned = list.find((c) => c.pinned && c.state === 'active'); if (pinned) return pinned;
     const fresh = list.find((c) => c.state === 'active' && (c.kind === 'answer' || c.kind === 'turn') && Date.now() - c.at < 90000); if (fresh) return fresh;
     const fin = list.find((c) => c.kind === 'finish'); if (fin) return fin;
-    const action = list.find((c) => c.state === 'active' && ACTION_KINDS.includes(c.kind)); if (action) return action;
-    return list.find((c) => c.state === 'active') || null;
+    // 2026-11-02 (owner): an answer from 14 minutes ago stayed big over newer tips. Your speech stays until "Said it";
+    // an answer stays 3 min; then the newest card for 5 min; older ones all go to the list below.
+    const age = (c) => Date.now() - c.at;
+    const action = list.find((c) => c.state === 'active' && ACTION_KINDS.includes(c.kind) && (c.kind !== 'answer' || age(c) < 180000));
+    if (action) return action;
+    const newest = list.find((c) => c.state === 'active');
+    return newest && age(newest) < 300000 ? newest : null;
   }
   function rel(at) { const m = Math.floor((Date.now() - at) / 60000); return m < 1 ? T().now : T().ago(m); }
 
@@ -315,6 +320,7 @@
 
     // 2026-11-02 (owner, live call): an error in one part stopped render() before the side pane, so the tabs
     // did not switch and the transcript stayed empty. Each part now fails on its own and is reported to the app.
+    const stream = $('stream'), streamTop = stream ? stream.scrollTop : 0;   // 2026-11-02: never jump back to the top
     const list = guard('cards', visibleCards) || [];
     const hero = withSlides() ? null : guard('pickHero', () => pickHero(list));
     guard('presentation', renderPresentation);
@@ -322,6 +328,7 @@
     const showEmpty = guard('empty', () => renderEmpty(list));
     guard('hero', () => renderHero(showEmpty ? null : hero));
     guard('earlier', () => renderEarlier(showEmpty ? [] : list.filter((c) => (!hero || c.id !== hero.id) && (!withSlides() || c.kind === 'answer'))));
+    if (stream && stream.scrollTop !== streamTop) stream.scrollTop = streamTop;
 
     // next call, only within 10 minutes
     const nx = $('next');
@@ -583,14 +590,18 @@
     let el = $('sys');
     if (!el) { el = document.createElement('section'); el.id = 'sys'; el.className = 'sys'; el.setAttribute('role', 'alert'); const bar = document.querySelector('header.bar'); bar.parentNode.insertBefore(el, bar.nextSibling); }
     el.hidden = !on;
-    if (!on) return;
+    if (!on) { S.ui.sysOpen = null; return; }
     const t = T().sys, s = S.sys, no = s.kind === 'notRecording';
+    // 2026-11-02 (owner): the red strip stays, but it no longer hides the brief and the tips: a pause or a long
+    // monologue of the PM is not a broken call. Details open on a click (open by default only when nothing records).
+    const open = S.ui.sysOpen == null ? no : S.ui.sysOpen;
     const meter = (label, v) => `<div class="lv"><span>${esc(label)}</span><span class="bar"><i style="width:${Math.round(Math.max(0, Math.min(1, v)) * 100)}%"></i></span></div>`;
-    el.innerHTML = `<div class="strip">${esc(no ? t.notRecording : t.noOther)}</div>
-      <div class="body"><div class="step">${esc(no ? t.noAudio : t.noOtherTitle)}</div><div class="say">${esc(no ? t.noAudioWhy : t.noOtherWhy)}</div>
+    el.innerHTML = `<div class="strip"><span class="st">${esc(no ? t.notRecording : t.noOther)}</span>
+        <button class="sbtn" type="button" data-act="${no ? 'sys-restart' : 'sys-check'}">${esc(no ? t.restart : t.check)}</button>
+        <button class="sbtn ghostish" type="button" data-act="sys-more" aria-expanded="${open}">${esc(open ? t.hideDetails : t.details)}</button></div>
+      ${open ? `<div class="body"><div class="step">${esc(no ? t.noAudio : t.noOtherTitle)}</div><div class="say">${esc(no ? t.noAudioWhy : t.noOtherWhy)}</div>
       <div class="levels">${meter(t.mic, s.mic)}${meter(t.call, s.call)}</div>
-      <div class="ctl"><button class="btn1" type="button" data-act="${no ? 'sys-restart' : 'sys-check'}">${esc(no ? t.restart : t.check)}</button></div>
-      <div class="meta">${esc(no ? t.noAudioFoot({ t: s.at || '' }) : t.noOtherFoot)}</div></div>`;
+      <div class="meta">${esc(no ? t.noAudioFoot({ t: s.at || '' }) : t.noOtherFoot)}</div></div>` : ''}`;
   }
 
   // ---------- 0.8.5 after the call (P7) ----------
@@ -1052,6 +1063,7 @@
       }
       case 'sys-restart': post('sys', { item: 'restart' }); return;
       case 'sys-check': post('sys', { item: 'check' }); return;
+      case 'sys-more': S.ui.sysOpen = !(S.ui.sysOpen == null ? (S.sys && S.sys.kind === 'notRecording') : S.ui.sysOpen); break;
       case 'menu': {
         const item = b.dataset.item; S.ui.menuOpen = false;
         if (item === 'compact') { S.call.mode = S.call.mode === 'compact' ? 'normal' : 'compact'; post('compact', { on: S.call.mode === 'compact' }); }

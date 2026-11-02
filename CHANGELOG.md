@@ -12,6 +12,13 @@ Pacenote. Earlier versions are described in the commit messages and in
   register, the brief or the answer cards, the value in the client's terms, and for work the client cannot see what it
   protects and what skipping it costs later. The preparation adds "Likely pushbacks and value questions" to the brief
   (not in a sales call, which keeps "Likely objections"). Off for interviews. Docs 14.1k.
+- **"Can't hear the other side" waits for your silence:** it shows only after you have been quiet for 15 s and no call
+  audio came for 45 s (never during your own talk); "Not recording" after 60 s with no sound at all (rules/recording.yaml).
+- **Tips window, "Can't hear the other side":** the red strip stays with Check audio and Details, but it no longer
+  hides the brief, the agenda and the tips (a pause or a long monologue of the PM is not a broken call), and the list
+  no longer jumps back to the top when the strip comes and goes.
+- **Tips window, the big card:** an answer stays big for 3 minutes, any other card for 5; older cards all go to the
+  list below instead of one old answer covering newer tips. Your speech stays until Said it.
 - **Tips window, On me:** the tab did not open when an open item from an earlier call was on someone else (two
   interface strings had the same key); any failing part of the window no longer stops the rest and is logged in
   `logs/window.log`.

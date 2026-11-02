@@ -258,9 +258,13 @@ test('recording problems: a system state after 30 s, cleared by itself (rules/re
   const { f, get } = make();
   f.setStatus({ state: 'recording', system_audio: 'ok', mic_silent_s: 2, call_silent_s: 29, mic_level: 0.3, call_level: 0 });
   assert.strictEqual(get().sys, null);
-  f.setStatus({ state: 'recording', system_audio: 'silent', mic_silent_s: 2, call_silent_s: 31, mic_level: 0.3, call_level: 0 });
+  f.setStatus({ state: 'recording', system_audio: 'silent', mic_silent_s: 2, call_silent_s: 90, mic_level: 0.3, call_level: 0 });
+  assert.strictEqual(get().sys, null);                       // 2026-11-02: the PM is talking, a silent call is normal
+  f.setStatus({ state: 'recording', system_audio: 'silent', mic_silent_s: 10, call_silent_s: 50, mic_level: 0, call_level: 0 });
+  assert.strictEqual(get().sys, null);                       // a short pause of the PM
+  f.setStatus({ state: 'recording', system_audio: 'silent', mic_silent_s: 16, call_silent_s: 46, mic_level: 0, call_level: 0 });
   assert.strictEqual(get().sys.kind, 'cantHear'); assert.strictEqual(get().call.alert, null);
-  f.setStatus({ state: 'recording', system_audio: 'silent', mic_silent_s: 40, call_silent_s: 45, mic_level: 0, call_level: 0 });
+  f.setStatus({ state: 'recording', system_audio: 'silent', mic_silent_s: 61, call_silent_s: 65, mic_level: 0, call_level: 0 });
   assert.strictEqual(get().sys.kind, 'notRecording'); assert.ok(/^\d\d:\d\d$/.test(get().sys.at));
   f.setStatus({ state: 'recording', system_audio: 'ok', mic_silent_s: 0, call_silent_s: 0, mic_level: 0.2, call_level: 0.1 });
   assert.strictEqual(get().sys, null);

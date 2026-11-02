@@ -1912,8 +1912,9 @@ address", `references/sweep.md`, `references/presentation.md`).
 101. **Learning is patterns (0.8.5).** Every correction is logged; the same correction on two or more different
    calls is applied to every next preparation or follow-up by itself, a single one stays with its meeting
    (rules/learning.yaml). The follow-up is written with Write draft and changed with plain instructions.
-102. **Recording problems are a system state (0.8.5).** After 30 s without audio (or without the call's audio) the
-   tips area becomes the state with Mic and Call levels and one action; it clears by itself (rules/recording.yaml).
+102. **Recording problems are a system state (0.8.5).** No audio at all for 60 s, or no call audio for 45 s while you
+   have been quiet for 15 s (never during your own talk), shows a red strip with one action and Details (Mic and Call
+   levels); the brief and the tips stay; it clears by itself (rules/recording.yaml, changed 02.11.2026).
 103. **Voices stay apart (0.8.5).** A named speaker takes only that person's voice; a rename to another known person
    moves the old person's lines back; the voice library merges two entries of one person and keeps the other
    spelling as an alias (rules/voices.yaml). A preparation finished before a held call of its series ended is that

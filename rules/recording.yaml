@@ -9,11 +9,11 @@ status_fields:
 threshold_s: 30
 states:
   not_recording:
-    when: recording and mic_silent_s >= 30 and call_silent_s >= 30, or the recorder stopped by itself
+    when: recording and mic_silent_s >= 60 and call_silent_s >= 60, or the recorder stopped by itself (2026-11-02: 30 s fired on a shared pause)
     action: End and restart
     tips: off until audio comes back; what was said before is saved
   cant_hear:
-    when: recording and call_silent_s >= 30 while the microphone has sound
+    when: recording and call_silent_s >= 45 and mic_silent_s >= 15 (2026-11-02, owner: while the PM talks nobody interrupts, so a silent call is normal; it used to fire during the PM's own monologue)
     action: Check audio (System Settings > Sound)
     browser: >-
       0.8.6 (owner, 30.10: a Zoom call in Chrome came back after a 30 min break, the PM heard it, Pacenote got only
@@ -27,7 +27,7 @@ tap_recovery:
   never: switch, mute or change the user's output device; a second rebuild in the same call
   zero_s: 45
 clears: by itself as soon as the silent side has sound again
-show: a red strip under the window title, the tips area replaced by the state, the Mic and Call levels
+show: a red strip under the window title with the action and Details (the levels and the reason); the brief and the tips stay (2026-11-02, owner)
 who: the app window; the skill's window shows the same status line it always had (no change there)
 microphone:
   # 0.8.5 (owner, 29.10: the headset cut in and out on the call, the others heard it too, until the built-in pair was used)

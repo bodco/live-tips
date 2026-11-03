@@ -5,6 +5,10 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **On me is yours only, and Home from the call window (2026-11-03):** other people's promises from earlier calls no
+  longer sit among yours with "on X" and a disabled tick: they are a folded "Waiting on others" group by person, can be
+  ticked when done (closes them in the register) or taken over with Mine, and never count in On me. A house button next
+  to More opens Home (also Command-0); it hides in a very narrow window.
 - **Agenda: Skipped, and the list keeps its scroll (2026-11-03):** a click now goes not raised, now (blue), done
   (green), skipped (crossed out, for an item that is not relevant); a skipped item is never reminded, never carried
   into the next call and shows as Skipped on the call page. The opened agenda shows a legend of the four states and

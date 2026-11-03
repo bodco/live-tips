@@ -36,7 +36,7 @@
       typeName: 'Type a name', more: 'More:', samePerson: 'Same person as…', notNow: 'Not now', lastSaid: 'Last said:',
       mine: 'Mine', mineTip: 'Put this on me', addOnMe: 'Add to On me', fromThisCall: 'From this call', openBefore: 'Open before the call',
       notionGroup: (o) => `Notion · ${o.p}`, removeItem: 'Remove', removeTip: 'Remove from On you and move to the Notion trash', fromACall: 'from a call',
-      onThem: (o) => `on ${o.w}`, notionRemoved: 'Notion page was removed',
+      onThem: (o) => `on ${o.w}`, notionRemoved: 'Notion page was removed', waitingOthers: (n) => `Waiting on others · ${n}`, waitingHint: 'What others promised: tick when it is done, Mine to take it over.', theyDid: 'Done by them', home: 'Home (⌘0)',
       legend: 'Client in purple, team in blue', following: 'Following live', jump: 'Jump to latest',
       ariaMic: 'Mute microphone', ariaPause: 'Pause listening', ariaProactive: 'Proactive tips',
       proactiveOn: 'Proactive tips: on', proactiveOff: 'Proactive tips: off', resumeShort: 'Resume',
@@ -98,7 +98,7 @@
       typeName: 'Введіть імʼя', more: 'Ще:', samePerson: 'Та сама людина, що…', notNow: 'Не зараз', lastSaid: 'Останнє:',
       mine: 'Моє', mineTip: 'Записати на мене', addOnMe: 'Додати в На мені', fromThisCall: 'З цього дзвінка', openBefore: 'Відкриті до дзвінка',
       notionGroup: (o) => `Notion · ${o.p}`, removeItem: 'Прибрати', removeTip: 'Прибрати з На вас і перенести в кошик Notion', fromACall: 'з дзвінка',
-      onThem: (o) => `на ${o.w}`, notionRemoved: 'Сторінку в Notion видалено',
+      onThem: (o) => `на ${o.w}`, notionRemoved: 'Сторінку в Notion видалено', waitingOthers: (n) => `Чекаю від інших · ${n}`, waitingHint: 'Що обіцяли інші: постав галочку, коли зроблено, Моє, щоб узяти на себе.', theyDid: 'Зроблено ними', home: 'Home (⌘0)',
       legend: 'Клієнт фіолетовим, команда синім', following: 'Слідкую наживо', jump: 'До останнього',
       ariaMic: 'Вимкнути мікрофон', ariaPause: 'Пауза прослуховування', ariaProactive: 'Проактивні підказки',
       proactiveOn: 'Проактивні підказки: увімкнено', proactiveOff: 'Проактивні підказки: вимкнено', resumeShort: 'Продовжити',
@@ -707,15 +707,27 @@
           <span class="hover-acts"><button class="ghost" type="button" data-act="onme-edit" data-id="${esc(o.id)}">${esc(t.edit)}</button><button class="ghost" type="button" data-act="onme-notmine" data-id="${esc(o.id)}">${esc(t.notMine)}</button></span></div>`;
       // 0.8.6 (D4): items of the register opened before this call and the PM's Notion tasks of this call's project
       const ext = (o) => {
-        const sub = [o.badge === 'N' && o.fromCall ? t.fromACall : '', o.mine === false ? t.onThem({ w: o.owner }) : '', o.status || '', o.due || '', o.note === 'removed' ? t.notionRemoved : ''].filter(Boolean).join(' · ');
-        return `<div class="onme-item ext" data-id="${esc(o.id)}"><label><input type="checkbox" data-act="ext-toggle" data-id="${esc(o.id)}" ${o.done ? 'checked' : ''}${o.mine === false ? ' disabled' : ''}><span><span class="badge-src">${esc(o.badge || 'CALL')}</span> <span class="${o.done ? 'struck' : ''}">${esc(o.text)}</span>${sub ? `<br><span class="meta">${esc(sub)}</span>` : ''}</span></label>
+        // 2026-11-03 (owner): items on others sit in their own group by person (no "on X" line), and can be ticked
+        const sub = [o.badge === 'N' && o.fromCall ? t.fromACall : '', o.status || '', o.due || '', o.note === 'removed' ? t.notionRemoved : ''].filter(Boolean).join(' · ');
+        return `<div class="onme-item ext${o.mine === false ? ' theirs' : ''}" data-id="${esc(o.id)}"><label${o.mine === false ? ` title="${esc(t.theyDid)}"` : ''}><input type="checkbox" data-act="ext-toggle" data-id="${esc(o.id)}" ${o.done ? 'checked' : ''}><span><span class="badge-src">${esc(o.badge || 'CALL')}</span> <span class="${o.done ? 'struck' : ''}">${esc(o.text)}</span>${sub ? `<br><span class="meta">${esc(sub)}</span>` : ''}</span></label>
           <span class="hover-acts">${o.mine === false ? `<button class="ghost" type="button" data-act="ext-mine" data-id="${esc(o.id)}">${esc(t.mine)}</button>` : ''}<button class="ghost" type="button" data-act="ext-remove" data-id="${esc(o.id)}" title="${esc(t.removeTip)}" aria-label="${esc(t.removeTip)}">${TRASH}</button></span></div>`;
       };
       const pend = S.minePending.filter((p) => !S.onMe.some((o) => o.from === p.tag)).map((p) => ({ id: 'p:' + p.tag, text: p.text, due: '', done: false }));
       const here = S.onMe.concat(pend);
-      const groups = [[t.fromThisCall, here.map(item)], [t.openBefore, (S.openItems || []).map(ext)]];
+      const open = S.openItems || [], theirs = open.filter((o) => o.mine === false);
+      const groups = [[t.fromThisCall, here.map(item)], [t.openBefore, open.filter((o) => o.mine !== false).map(ext)]];
       if ((S.notionItems || []).length) groups.push([t.notionGroup({ p: S.notionProject || '' }), S.notionItems.map(ext)]);
-      body = groups.filter(([, rows]) => rows.length).map(([h, rows]) => `<h4 class="grp">${esc(h)}</h4>${rows.join('')}`).join('') || `<p class="meta">${esc(t.noItems)}</p>`;
+      body = groups.filter(([, rows]) => rows.length).map(([h, rows]) => `<h4 class="grp">${esc(h)}</h4>${rows.join('')}`).join('');
+      // 2026-11-03 (owner): "On me · 11" listed other people's promises among mine. They are a separate, folded group
+      // by person: useful at a stand-up, never counted as mine.
+      if (theirs.length) {
+        const left = theirs.filter((o) => !o.done).length, by = {};
+        theirs.forEach((o) => { (by[o.owner || '?'] = by[o.owner || '?'] || []).push(o); });
+        const openW = S.ui.theirsOpen != null ? S.ui.theirsOpen : !groups.some(([, rows]) => rows.length);
+        body += `<button type="button" class="grp-toggle" data-act="theirs-toggle" aria-expanded="${openW}"><h4 class="grp">${esc(t.waitingOthers(left))}</h4><span class="chev">${openW ? '▾' : '▸'}</span></button>`
+          + (openW ? `<p class="meta grp-hint">${esc(t.waitingHint)}</p>` + Object.keys(by).map((w) => `<h5 class="who">${esc(w)}</h5>${by[w].map(ext).join('')}`).join('') : '');
+      }
+      if (!body) body = `<p class="meta">${esc(t.noItems)}</p>`;
       body += `<div class="onme-add"><input id="onmeAdd" type="text" placeholder="${esc(t.addOnMe)}" aria-label="${esc(t.addOnMe)}"></div>`;
     } else if (tab === 'deal') {
       body = renderDeal();
@@ -962,6 +974,8 @@
         e.stopPropagation(); break;
       }
       case 'agenda-toggle': S.ui.agendaOpen = !S.ui.agendaOpen; break;
+      case 'theirs-toggle': S.ui.theirsOpen = !(b.getAttribute('aria-expanded') === 'true'); break;
+      case 'home': post('menu', { item: 'home' }); return;
       case 'hero-min': S.ui.heroMin[id] = !S.ui.heroMin[id]; break;   // 2026-11-02: the speech card folds to its first line
       case 'agenda': {
         const a = S.agenda.find((x) => x.id === id); if (!a) return;

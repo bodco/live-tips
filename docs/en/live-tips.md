@@ -1522,7 +1522,11 @@ did not help. What changed:
    once in 5 minutes.
 5. **Proactive tips switched on during a call** now really change what the model may suggest
    (before, only the timing changed until the next call).
-6. **Less noise.** A card found by meaning never fires on your own words and comes back at the
+6. **On me is yours only; Home from the call window (2026-11-03).** The On me tab and its count
+   hold only your items. What others promised on earlier calls sits below in "Waiting on others",
+   folded, grouped by person: tick an item when they have done it, or take it over with Mine. The
+   call window has a Home button (a house, next to More; Command-0 works too).
+7. **Less noise.** A card found by meaning never fires on your own words and comes back at the
    earliest 15 minutes later. HELP NOW shows at most 2 facts or cards; a raw snippet from the
    project folder comes only when nothing else matched, one at most, without Notion page ids.
 

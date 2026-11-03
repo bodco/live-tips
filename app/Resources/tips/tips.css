@@ -182,6 +182,7 @@ button{font:inherit;color:inherit;cursor:pointer}
   .status{display:none}
   .row .kind{width:70px}
   .help .k{display:none}
+  #homeBtn{display:none}   /* ⌘0 still opens Home */
 }
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
@@ -376,3 +377,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .deal-row .seg { flex: 0 0 auto; width: 14px; height: 14px; margin-top: 3px; border-radius: 4px; cursor: pointer; }
 #dealBtn { font-variant-numeric: tabular-nums; }
 .k-objection,.k-qualify,.k-pain,.k-next_step,.k-competitor,.k-signal{color:var(--k-onme)}
+
+/* 2026-11-03 (owner): On me, others' promises in their own folded group by person */
+.grp-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:transparent;padding:0;cursor:pointer;color:inherit;text-align:left}
+.grp-toggle .chev{color:var(--text-3);font-size:12px}
+.grp-hint{margin:0 0 6px}
+h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(--text-3))}
+.onme-item.theirs .badge-src{opacity:.7}

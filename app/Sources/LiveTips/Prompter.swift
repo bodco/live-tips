@@ -920,6 +920,7 @@ extension PrompterController {
         case "menu":
             switch d["item"] as? String ?? "" {
             case "clear-speakers": sendSetting("speakers_clear", true)
+            case "home": MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.openHome() }   // 2026-11-03 (owner): Home from the call window
             case "settings": MainActor.assumeIsolated { CallSettingsWindow.show(for: self) }
             case "switch-call":
                 MainActor.assumeIsolated {

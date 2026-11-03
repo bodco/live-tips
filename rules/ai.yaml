@@ -3,6 +3,23 @@ schema_version: 1
 routes:
   code: the PM's Claude account through Claude Code (the plan's limits, no key)
   api: the Claude API key through Claude Code or the API (billed per token)
+  codex: |
+    ChatGPT account through the official Codex CLI (forced_login_method=chatgpt), never API-key credentials.
+    Available for prep, tips and after. The CLI handles browser login and token storage; Pacenote checks
+    login status but never reads or copies auth.json. Requests use an empty temporary working directory,
+    ephemeral sessions, ignored user config, read-only sandbox, no approvals, shell, web search, MCP,
+    plugins, hooks, memories or subagents. Prompts go through stdin; stderr and credentials are not logged.
+    The default Codex model is used (codex/default in the ledger); plan usage is not billed to an API key.
+    No automatic provider switching. For prep, livetips_m0.codexprep uses the localprep context pack and
+    prompt contracts; Pacenote writes and checks the output files itself and restores the previous prep
+    on failure. Live tips keep the local cards and search but do not start Claude Code deep folder lookup.
+  openai: |
+    OpenAI API key from macOS Keychain (OPENAI_API_KEY in the child process only), GPT-5.4 mini through the
+    streaming Responses API with reasoning effort none and store false. Available for tips and after-call jobs;
+    preparation still uses code, api or local. No automatic fallback from OpenAI to Claude or local. Live-call
+    spending limits apply; cached input tokens are counted separately from uncached input. Claude Code deep
+    folder lookup is disabled when tips use OpenAI; the local project search and prepared cards remain available.
+    Incomplete, refused, failed or unterminated streams are errors. No tools or saved sessions.
   local: |
     0.8.5 (owner): a preparation on this Mac through Ollama (Settings > AI > Preparation, model gemma4:26b by
     default). A local model reads files poorly by itself, so the engine (livetips_m0.localprep) builds one context

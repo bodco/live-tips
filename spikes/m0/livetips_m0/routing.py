@@ -1,8 +1,10 @@
 """AI routes (Pacenote 0.8.2): which way each job reaches Claude, and the automatic switch.
 
-Two routes:
+Available routes:
 - "api": the Claude API key (Settings > AI), billed per token, the fastest.
 - "code": the PM's Claude account through Claude Code (`claude -p`), from the plan's limits, no key.
+- "local": Ollama on this Mac for preparation and after-call jobs.
+- "openai": OpenAI API key, GPT-5.4 mini for tips and after-call jobs; no automatic provider switch.
 
 Three jobs: "prep" (the app runs Claude Code itself; here only the route state is shared), "tips" (during the
 call) and "after" (summary, follow-up email, call memory, rehearsal, the judge).
@@ -26,14 +28,14 @@ from typing import Callable, Dict, Optional
 
 from .providers import AnthropicProvider, Completion, Provider, gist_closed, user_text
 
-ROUTES = ("api", "code", "local")   # 0.8.5: "local" = a model on this Mac (rules/ai.yaml)
+ROUTES = ("api", "code", "local", "openai", "codex")   # 0.8.5: "local" = a model on this Mac (rules/ai.yaml)
 JOBS = ("prep", "tips", "after")
 PROBE_EVERY_S = 120
-PING_MODEL = {"api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}
+PING_MODEL = {"codex": "codex/default", "openai": "gpt-5.4-mini", "api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}
 
 
 def other(route: str) -> str:
-    return "code" if route == "api" else "api"
+    return route if route in ("openai", "codex") else "code" if route == "api" else "api"
 
 
 def spend_ledger(job: str, route: str, c, state_path) -> None:
@@ -43,7 +45,7 @@ def spend_ledger(job: str, route: str, c, state_path) -> None:
         from .cost import cost_usd
         g = lambda k: int(getattr(c, k, 0) or 0)  # noqa: E731
         usd = cost_usd(c.model, g("input_tokens"), g("cache_write_5m"), g("cache_write_1h"), g("cache_read"), g("output_tokens")) \
-            if route == "api" else (0.0 if route == "local" else getattr(c, "equiv_usd", None))
+            if route in ("api", "openai") else (0.0 if route == "local" else getattr(c, "equiv_usd", None))
         row = {"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "job": os.environ.get("LT_AI_STAGE") or job, "route": route,
                "model": c.model, "input": g("input_tokens"), "output": g("output_tokens"), "cache_read": g("cache_read"),
                "cache_write": g("cache_write_5m") + g("cache_write_1h"), "usd": round(usd, 6) if usd is not None else None,
@@ -81,6 +83,10 @@ def cc_model(model: str) -> str:
 
 # Why a route is out, by the words of its error. (route or None for both, reason, words); first match wins.
 OUT_REASONS = [
+    ("codex", "auth", ("not logged in",)),
+    ("codex", "limit", ("usage limit",)),
+    ("openai", "auth", ("http 401", "http 403")),
+    ("openai", "credit", ("insufficient_quota",)),
     (None, "no_key", ("no api key",)),
     (None, "missing", ("noroute", "not installed")),
     (None, "credit", ("credit balance", "billing", "insufficient")),
@@ -154,7 +160,7 @@ class RouteState:
             self._write(d)
 
 
-HIDDEN_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_API", "ANTHROPIC_CUSTOM_HEADERS")
+HIDDEN_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_API", "ANTHROPIC_CUSTOM_HEADERS", "OPENAI_API_KEY")
 
 
 def cc_args(cli: str, alias: str, system_file: str) -> list:
@@ -283,7 +289,7 @@ class RoutedProvider(Provider):
         self.job = job
         self.preferred = preferred if preferred in ROUTES else "api"
         self.legs = dict(legs)
-        self.auto = auto
+        self.auto = auto and self.preferred not in ("openai", "codex")
         self.state = state or RouteState()
         self.probe_every = probe_every
         self.background = background
@@ -299,11 +305,13 @@ class RoutedProvider(Provider):
     def usable(self, route: str) -> bool:
         if self.legs.get(route) is None:
             return False
-        return not (route == "api" and self.api_blocked and self.api_blocked())
+        return not (route in ("api", "openai") and self.api_blocked and self.api_blocked())
 
     def can_run_without_api(self) -> bool:
         """True when the app's own API limit does not stop this job (it goes, or may go, through Claude Code)."""
-        if self.legs.get("code") is None:
+        if self.preferred == "codex":
+            return self.legs.get("codex") is not None
+        if self.preferred == "openai" or self.legs.get("code") is None:
             return False
         return self.preferred == "code" or self.auto
 
@@ -333,7 +341,7 @@ class RoutedProvider(Provider):
         """A one-word request on the route: it answers, so the job may go back to it."""
         leg = self.legs.get(route)
         if leg is None:
-            self.state.mark_down(route, "no_key" if route == "api" else "missing")
+            self.state.mark_down(route, "no_key" if route in ("api", "openai") else "missing")
             return False
         self.state.touch(route)
         c = leg.complete(model=PING_MODEL[route], system=[{"text": "Reply with OK."}], user="OK?", max_tokens=5,
@@ -361,8 +369,9 @@ class RoutedProvider(Provider):
     def _run(self, route, **kw) -> Completion:
         leg = self.legs.get(route)
         if leg is None:
+            missing = {"api": "no API key", "openai": "no API key", "codex": "Codex CLI is not installed"}
             c = Completion(model=kw.get("model", ""), t_start=time.monotonic(), t_done=time.monotonic(),
-                           error="NoRoute: " + ("no API key" if route == "api" else "Claude Code is not installed"))
+                           error="NoRoute: " + missing.get(route, "Claude Code is not installed"))
         else:
             if route != "api":
                 kw = dict(kw, extra=None)
@@ -397,12 +406,15 @@ class RoutedProvider(Provider):
                 return c2
         # 0.8.5 (owner, rules/ai.yaml > fallback): neither Claude way answers, so the model on this Mac takes the job
         # (the preparation and after-the-call jobs only; never the tips during a call)
-        if self.local_fallback() and r != "local":
-            c3 = self._run("local", **kw)
-            if not c3.error:
-                c3.switched_from = r
-                return c3
-        return c
+        return self._fallback(r, c, kw)
+
+    def _fallback(self, route, completion, kw):
+        if self.local_fallback() and route not in ("local", "openai", "codex"):
+            local = self._run("local", **kw)
+            if not local.error:
+                local.switched_from = route
+                return local
+        return completion
 
     def local_fallback(self) -> bool:
         return os.environ.get("LT_LOCAL_FALLBACK") == "1" and self.legs.get("local") is not None and not self.background
@@ -412,9 +424,15 @@ CODE_TIMEOUT = {True: 60.0, False: 300.0}    # during the call / any other job
 
 
 def make_legs(key: str, workspace: str, cli: Optional[str], api_timeout: float, code_timeout: float) -> dict:
-    """The two ways to Claude; a way that cannot be used (no key, no Claude Code) is None."""
+    """Claude, OpenAI and local providers; a missing key or CLI leaves that route unavailable."""
     from .providers import OllamaProvider
-    return {"api": AnthropicProvider(key, timeout=api_timeout, workspace_id=workspace) if key else None,
+    from .codex_provider import CodexProvider, find_codex_cli
+    from .openai_provider import OpenAIProvider
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    codex = find_codex_cli()
+    return {"codex": CodexProvider(codex, timeout=code_timeout) if codex else None,
+            "openai": OpenAIProvider(openai_key, timeout=api_timeout) if openai_key else None,
+            "api": AnthropicProvider(key, timeout=api_timeout, workspace_id=workspace) if key else None,
             "code": ClaudeCodeProvider(cli, timeout=code_timeout) if cli else None,
             # 0.8.5 (rules/ai.yaml > routes.local): a model on this Mac, only when the PM chose it for the job
             "local": OllamaProvider(os.environ.get("LT_OLLAMA_URL", "http://127.0.0.1:11434"))}

@@ -5,6 +5,20 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **ChatGPT account through Codex, alongside Claude:** onboarding and Settings > AI offer browser sign-in through
+  the official Codex CLI and a separate account route for preparation, live tips and after-call jobs. API-key
+  login is rejected for this route; OAuth credentials stay with Codex. Preparation uses a context pack built
+  by Pacenote and writes the brief, speech, cards and facts without giving Codex file or tool access. Ephemeral,
+  read-only CLI jobs do not load user config or switch providers automatically. Contracts: rules/ai.yaml;
+  setup and account/API limits: README.md and README.uk.md.
+
+- **OpenAI API for live tips and after-call work:** Settings > AI accepts an OpenAI key in macOS Keychain and
+  offers OpenAI API for those two jobs, using GPT-5.4 mini with streaming Responses, no stored responses, token
+  accounting and the existing live-call spending limits. Preparation can use Claude Code, the local model or the
+  ChatGPT account route.
+  OpenAI does not auto-switch providers; Claude Code deep folder lookup is disabled for OpenAI live tips, while
+  local project search stays available. Contract: rules/ai.yaml; setup and limitations: README.md / README.uk.md.
+
 - **On me is yours only, and Home from the call window (2026-11-03):** other people's promises from earlier calls no
   longer sit among yours with "on X" and a disabled tick: they are a folded "Waiting on others" group by person, can be
   ticked when done (closes them in the register) or taken over with Mine, and never count in On me. A house button next

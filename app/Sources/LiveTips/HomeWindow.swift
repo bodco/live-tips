@@ -243,7 +243,7 @@ struct HomeView: View {
             out.append(Todo(id: "calendars", text: L("home.finish.calendars"), action: L("onboarding.permissions.calendarsButton"), run: { cal.connect() }))
         }
         // 0.8.7 (L3.3): no API key and Claude Code not signed in: nothing can prepare a call or write the follow-up
-        if !demo && !runner.hasAPIKey && (runner.loggedIn == false || (runner.loggedIn == nil && PrepRunner.claudePath == nil)) {
+        if !demo && settings.config.ai.prep != AIRoute.codex && !runner.hasAPIKey && (runner.loggedIn == false || (runner.loggedIn == nil && PrepRunner.claudePath == nil)) {
             out.append(Todo(id: "claude", text: L("home.finish.claude"), action: L("home.finish.connect"), run: { SettingsWindow.show(tab: "ai") }))
         }
         if !demo && !settings.isSet(.notionToken) {
@@ -987,13 +987,15 @@ struct HomeView: View {
         let cfg = AppConfig.load(from: AppPaths.config)
         let demo = ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"] != nil      // shot mode: no real key or mirror
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        let hasKey = demo || store.has(.claudeAPIKey) || PrepRunner.claudePath != nil   // 0.8.7.1: presence only, no Keychain prompt in a view body
+        let hasKey = demo || store.has(.claudeAPIKey) || PrepRunner.claudePath != nil
+            || ([cfg.ai.prep, cfg.ai.tips, cfg.ai.after].contains(AIRoute.codex) && CodexAccount.cliPath != nil)
+            || store.has(.openaiAPIKey)   // 0.8.7.1: presence only, no Keychain prompt in a view body
         let mirror = demo ? "ok" : (cfg.workRoot.isEmpty ? "" : MirrorStatus.load(workRoot: cfg.workRoot).health())
         let calCount = demo ? 3 : cal.calendars.filter { !cal.excluded.contains($0.calendarIdentifier) }.count
         let month = demo ? 4.20 : SpendLedger.monthSpent()
         let nearLimit = month >= cfg.budget.monthlyHardUSD * 0.9
         return HStack(spacing: 18) {
-            dot(hasKey, hasKey ? L("home.status.claude") : L("home.status.noClaude")) { SettingsWindow.show(tab: "ai") }
+            dot(hasKey, hasKey ? L("home.status.ai") : L("home.status.noAI")) { SettingsWindow.show(tab: "ai") }
             if !mirror.isEmpty { dot(mirror == "ok", mirror == "ok" ? L("home.status.notion") : L("home.status.notionStale")) { SettingsWindow.show(tab: "notion") } }
             dot(cal.access == .granted, cal.access == .granted ? L("home.status.calendars", ["n": "\(calCount)"]) : L("home.status.noCalendars")) { SettingsWindow.show(tab: "calendars") }
             if nearLimit {

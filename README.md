@@ -5,7 +5,7 @@
 Pacenote prepares a short brief before the call, gives quiet, precise tips during it, and writes
 the notes after. You keep the wheel. It listens to your call on your Mac and speaks up only when a fact or a phrase is needed:
 a question to you, your turn, a new request, a date you are about to promise. Audio is transcribed
-on the Mac and never leaves it; only text goes to Claude. After the call the summary, decisions and
+on the Mac and never leaves it; only text goes to your chosen AI provider. After the call the summary, decisions and
 action items are written to your project folder next to the transcript, and to Notion when you connect it.
 
 Beta, built by one project manager for his own calls. The new name changes what you see; the repository,
@@ -17,8 +17,8 @@ permissions carry over. What "live tips" means inside the code: [DEVELOPMENT.md]
 | | The app | The skill |
 |---|---|---|
 | What | A native macOS menu bar app | A Claude Cowork skill |
-| You need | Apple Silicon Mac, macOS 14.4+; for preparation Claude Code (the app installs it) with a Claude plan or an API key | Claude Cowork with a computer linked, the recorder from this repo |
-| Tips come from | Claude API, called on events | Claude in your Cowork chat |
+| You need | Apple Silicon Mac, macOS 14.4+; for preparation Claude Code with a Claude plan/API key, or Codex CLI with a ChatGPT account | Claude Cowork with a computer linked, the recorder from this repo |
+| Tips come from | Claude or OpenAI API, called on events | Claude in your Cowork chat |
 | Download | [Pacenote.dmg](https://github.com/bodco/live-tips/releases/latest/download/Pacenote.dmg) | [live-tips.skill](https://github.com/bodco/live-tips/releases/latest/download/live-tips.skill) |
 
 Both share the same rules (`rules/`) and the same recorder, so tips behave the same way.
@@ -29,7 +29,7 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
   double-click Pacenote, close the warning, then System Settings > Privacy & Security > **Open Anyway**. A new version
   you download may ask again. The DMG has the same steps in "Read me first".
 - **Claude.** Recording, the transcript and the voices work on the Mac without Claude. Preparing calls (the brief,
-  cards and facts) needs **Claude Code**, which the app installs for you (onboarding, or Settings > About >
+  cards and facts) can use a **ChatGPT account through Codex CLI** (see below), or **Claude Code**, which the app installs for you (onboarding, or Settings > About >
   Components), and one way to pay: a Claude Pro, Max, Team or Enterprise plan, or an API key in Settings > AI. The
   free Claude plan does not include Claude Code. Claude Cowork is not needed for the app.
 - **Your documents.** Plain project folders are enough: preparation reads Markdown, text, Word and PDF files; the
@@ -45,6 +45,26 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 - **After the call:** full call notes in the project folder after every call, with or without Notion; with Notion connected, also a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page. A follow-up email is only a draft: nothing is sent to clients by itself.
 
 How it compares with Fireflies and Fathom (price, recording, live help, preparation, summary, CRM, data): [Pacenote vs Fireflies vs Fathom](https://tower.bodco.pm/pacenote/compare/).
+
+## Claude or ChatGPT (unreleased)
+
+Settings > AI keeps Claude account and Claude API and adds two separate OpenAI options:
+
+- **ChatGPT account (Codex):** install the official [Codex CLI](https://learn.chatgpt.com/docs/cli), press
+  **Log in**, finish the browser sign-in, then return to Pacenote. The account row checks the sign-in again.
+  Select this route for preparation, live tips and/or after-call jobs. Onboarding also has **Use ChatGPT** for
+  all three jobs. Codex uses its default model and your account's Codex limits. API-key sign-in is rejected for
+  this route; Pacenote never reads or copies the CLI's OAuth credentials.
+- **OpenAI API:** save an API key in macOS Keychain and select it for live tips and/or after-call work. These
+  jobs use GPT-5.4 mini through streaming Responses with `store: false`. Tokens and estimated cost count toward
+  the existing ledger and live-call limits.
+
+Codex preparation uses a text context pack built by Pacenote (call context, added files, project config,
+local Notion mirror, earlier calls and digest), and Pacenote writes the brief, speech, cards and facts. The
+model has no shell, MCP, web search or subagents. Codex jobs are ephemeral and may start slower than direct
+API requests; API spending caps do not measure your account-plan usage. Plan-limit and sign-in failures are
+shown without switching providers. Prepared cards and local project search remain available, while Claude
+Code's deep folder lookup is disabled for OpenAI/Codex live tips. Failed or incomplete answers are errors.
 
 ## For teams (design)
 

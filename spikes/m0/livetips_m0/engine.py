@@ -247,9 +247,11 @@ def not_answered(obj: Optional[dict]) -> bool:
     return (not obj) or bool(obj.get("skip")) or obj.get("answered") is False
 
 
-def no_ready_answer(kind: str, uk: bool) -> dict:
+def no_ready_answer(kind: str, uk: bool, searching: bool = True) -> dict:
     gist = ("🆘 " if kind == "sos" else "") + ("Готової відповіді немає, шукаю в папці проєкту" if uk else
                                                    "No ready answer, searching the project folder")
+    if not searching:
+        gist = "Готової відповіді немає" if uk else "No ready answer"
     phrase = ("Дайте мені хвилину, я перевірю і скажу точно." if uk else "Give me a minute, I will check and tell you exactly.")
     return {"gist": gist, "phrase": phrase, "level": "info", "topic": kind}
 
@@ -1663,8 +1665,8 @@ class Engine:
         unanswered = not_answered(obj)
         uk = self._ui_uk()
         if not obj or obj.get("skip"):
-            obj = no_ready_answer(kind, uk)
-        if unanswered and kind in ("ask", "sos"):
+            obj = no_ready_answer(kind, uk, self.cfg.get("deep_lookup", True))
+        if unanswered and kind in ("ask", "sos") and self.cfg.get("deep_lookup", True):
             self._start_deep(text or (line.text if line else ""), kind)
             obj["note"] = with_deep_note(obj.get("note"), uk)
         return obj

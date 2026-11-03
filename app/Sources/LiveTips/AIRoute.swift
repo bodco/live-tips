@@ -5,11 +5,11 @@ import LiveTipsCore
 /// The tips engine and the one-off jobs (livetips_m0.routing) read and write the same file, state/ai-routes.json:
 /// {"api": {"down": true, "reason": "credit", "since": <unix time>, "checked": <unix time>}, "code": {...}}.
 enum AIRoute {
-    static let api = "api", code = "code"
+    static let api = "api", code = "code", openai = "openai", codex = "codex"
     /// 0.8.5 (owner): a preparation on this Mac (Ollama), chosen by hand; never an automatic switch target yet.
     static let local = "local"
 
-    static func other(_ r: String) -> String { r == api ? code : api }
+    static func other(_ r: String) -> String { [openai, codex].contains(r) ? r : r == api ? code : api }
 
     static var statePath: String {
         let c = AppConfig.load(from: AppPaths.config)
@@ -63,11 +63,16 @@ enum AIRoute {
     }
 
     /// The way can be tried at all: a key for the API, the Claude Code tool for the account.
-    static func available(_ r: String) -> Bool { r == api ? hasKey : r == local ? true : PrepRunner.claudePath != nil }
+    static func available(_ r: String) -> Bool {
+        if r == codex { return CodexAccount.cliPath != nil }
+        if r == openai { return SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").has(.openaiAPIKey) }
+        return r == api ? hasKey : r == local ? true : PrepRunner.claudePath != nil
+    }
 
     /// A job on this way can run: the way itself, or with auto-switch the other one.
     static func canRun(job: String, config c: AppConfig) -> Bool {
         let r = c.ai.route(job)
+        if [openai, codex].contains(r) { return available(r) }
         return available(r) || (c.ai.autoSwitch && available(other(r))) || (job != "tips" && c.ai.localFallback)
     }
 
@@ -77,6 +82,7 @@ enum AIRoute {
         var env = base
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         if let k = store.get(.claudeAPIKey), !k.isEmpty { env["CLAUDE_API"] = k } else { env.removeValue(forKey: "CLAUDE_API") }
+        if let k = store.get(.openaiAPIKey), !k.isEmpty { env["OPENAI_API_KEY"] = k } else { env.removeValue(forKey: "OPENAI_API_KEY") }
         if let ws = store.get(.claudeWorkspaceID), !ws.isEmpty { env["CLAUDE_WORKSPACE"] = ws }
         env["LT_AI_JOB"] = job
         env["LT_AI_ROUTE"] = c.ai.route(job)
@@ -85,6 +91,7 @@ enum AIRoute {
         env["LT_AI_AUTO"] = c.ai.autoSwitch ? "1" : "0"
         env["LT_AI_STATE"] = statePath
         if let cl = PrepRunner.claudePath { env["LT_CLAUDE_CLI"] = cl }
+        if let cli = CodexAccount.cliPath { env["LT_CODEX_CLI"] = cli }
         env.removeValue(forKey: "ANTHROPIC_API_KEY")
         return env
     }
@@ -96,7 +103,7 @@ enum AIRoute {
     }
 
     static func name(_ r: String) -> String {
-        r == local ? L("ai.route.local.model", ["model": UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"])
+        r == codex ? L("ai.codex.account") : r == openai ? L("ai.route.openai") : r == local ? L("ai.route.local.model", ["model": UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"])
             : L(r == api ? "ai.route.api" : "ai.route.code")
     }
 
@@ -104,7 +111,7 @@ enum AIRoute {
     static func statusLines() -> [String] {
         let o = read()
         let t = DateFormatter(); t.dateFormat = "HH:mm"
-        return [code, api].compactMap { r in
+        return [code, api, openai, codex].compactMap { r in
             guard let s = o[r] as? [String: Any], (s["down"] as? Bool) == true else { return nil }
             let since = (s["since"] as? Double).map { t.string(from: Date(timeIntervalSince1970: $0)) } ?? ""
             return L("ai.status.out", ["route": name(r), "reason": L("ai.reason." + ((s["reason"] as? String) ?? "error")), "time": since])
@@ -114,7 +121,7 @@ enum AIRoute {
     /// Checks the ways that are out now (a one-word request each, through the engine) and calls back.
     @MainActor static func checkNow(done: @escaping () -> Void) {
         let c = AppConfig.load(from: AppPaths.config)
-        let down = [code, api].filter { isDown($0) }
+        let down = [code, api, openai, codex].filter { isDown($0) }
         guard !down.isEmpty, !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { done(); return }
         DispatchQueue.global().async {
             for r in down {

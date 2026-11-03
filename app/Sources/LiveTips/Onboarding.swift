@@ -356,6 +356,12 @@ struct OnboardingView: View {
                     }
                     .padding(10).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
                 }
+                CodexAccountRow()
+                Button(L("ai.codex.use")) {
+                    settings.config.ai.prep = AIRoute.codex
+                    settings.config.ai.tips = AIRoute.codex
+                    settings.config.ai.after = AIRoute.codex
+                }.buttonStyle(.pnSecondary).disabled(CodexAccount.cliPath == nil)
                 // 0.8.7 (L3): 1) sign in (above), 2) an API key behind a disclosure, 3) continue without Claude, said honestly
                 DisclosureGroup(L("onb.claude.haveKey"), isExpanded: $keyOpen) {
                 HStack {
@@ -366,7 +372,7 @@ struct OnboardingView: View {
                 keyState(settings.keyState[.claudeAPIKey], fallback: m.keyNote)
                 Link(L("onboarding.claude.getKey"), destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(PN.Font.caption)
                 }
-                if !settings.isSet(.claudeAPIKey) && setup.steps.first(where: { $0.id == "claude" })?.state != .ok {
+                if settings.config.ai.prep != AIRoute.codex && !settings.isSet(.claudeAPIKey) && setup.steps.first(where: { $0.id == "claude" })?.state != .ok {
                     Text(L("onb.claude.without")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -391,7 +397,7 @@ struct OnboardingView: View {
     var primaryLabel: String {
         switch m.step {
         case .splash: return L("onboarding.splash.cta")
-        case .claude: return settings.isSet(.claudeAPIKey) ? L("common.continue") : L("onboarding.claude.continueNoKey")
+        case .claude: return (settings.isSet(.claudeAPIKey) || settings.config.ai.prep == AIRoute.codex) ? L("common.continue") : L("onboarding.claude.continueNoKey")
         case .done: return L("onboarding.done.primary")
         default: return L("common.continue")
         }

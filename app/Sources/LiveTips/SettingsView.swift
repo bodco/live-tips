@@ -40,6 +40,17 @@ enum KeyTester {
         }
     }
 
+    static func openai(key: String) async -> (Bool, String) {
+        var req = URLRequest(url: URL(string: "https://api.openai.com/v1/models/gpt-5.4-mini")!)
+        req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 15
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            return (code == 200, code == 200 ? "GPT-5.4 mini" : "HTTP \(code)")
+        } catch { return (false, error.localizedDescription) }
+    }
+
     static func notion(token: String) async -> (Bool, String) {
         var req = URLRequest(url: URL(string: "https://api.notion.com/v1/users/me")!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -252,12 +263,12 @@ final class SettingsModel: ObservableObject {
     init() {
         // 0.8.7.1: presence only at start; the masks are read when a key row is shown (KeyRow.onAppear). Reading every
         // secret here froze Home on the Keychain's "allow access" prompt for a key another tool had saved (HubSpot).
-        for k in [SecretStore.Key.claudeAPIKey, .notionToken] {
+        for k in [SecretStore.Key.claudeAPIKey, .openaiAPIKey, .notionToken] {
             keyState[k] = store.has(k) ? .untested : .notSet
         }
         refreshMirror()
         aliasesText = config.nameAliases.joined(separator: ", ")
-        for k in [SecretStore.Key.claudeAPIKey, .notionToken] where store.has(k) { test(k) }
+        for k in [SecretStore.Key.claudeAPIKey, .openaiAPIKey, .notionToken] where store.has(k) { test(k) }
     }
 
     func saveAliases() {
@@ -324,6 +335,9 @@ final class SettingsModel: ObservableObject {
             if key == .hubspotKey {
                 keyState[key] = .ok("")
                 CRMService.shared.test()
+            } else if key == .openaiAPIKey {
+                let (ok, msg) = await KeyTester.openai(key: v)
+                keyState[key] = ok ? .ok(msg) : .failed(msg)
             } else if key == .claudeAPIKey {
                 let (ok, msg, ids) = await KeyTester.claude(key: v, workspace: nil)
                 keyState[key] = ok ? .ok(msg) : .failed(SettingsModel.friendly(msg))
@@ -578,6 +592,7 @@ struct RoutePicker: View {
     @Binding var selection: String
     var recommended: String
     var discouraged: String? = nil
+    var withOpenAI = false
     var withLocal = false          // 0.8.5: the preparation can also run on this Mac (Ollama)
     @ObservedObject var oc = OptionalComponents.shared
     @ObservedObject var llm = LocalLLM.shared
@@ -586,7 +601,7 @@ struct RoutePicker: View {
         let localOK = oc.isInstalled("ollama") && oc.isInstalled("local_model")
         VStack(alignment: .trailing, spacing: 2) {
             Picker(L("ai.route"), selection: $selection) {
-                ForEach([AIRoute.code, AIRoute.api] + (withLocal ? [AIRoute.local] : []), id: \.self) { r in
+                ForEach([AIRoute.code, AIRoute.api, AIRoute.codex] + (withOpenAI ? [AIRoute.openai] : []) + (withLocal ? [AIRoute.local] : []), id: \.self) { r in
                     Text(AIRoute.name(r) + (r == recommended ? L("ai.route.recommended") : r == discouraged ? L("ai.route.notRecommended") : "")).tag(r)
                         .selectionDisabled(r == AIRoute.local && !localOK)
                 }
@@ -762,6 +777,8 @@ struct SettingsView: View {
                 }
                 .help(L("ai.access.accountHelp"))
                 KeyRow(title: L("keys.claude.title"), hint: L("keys.claude.hint"), key: .claudeAPIKey, model: model)
+                CodexAccountRow()
+                KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: model)
             } header: { Text(L("ai.access")) } footer: {
                 Text(L("ai.access.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
@@ -785,7 +802,9 @@ struct SettingsView: View {
             }
             Section {
                 RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withLocal: true)
-                if model.config.ai.prep == AIRoute.local {
+                if model.config.ai.prep == AIRoute.codex {
+                    Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                } else if model.config.ai.prep == AIRoute.local {
                     LocalModelRow()
                 } else {
                     Picker(L("set.model"), selection: $runner.model) {
@@ -797,25 +816,37 @@ struct SettingsView: View {
                 Text(L("set.cc.builds")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
-                RoutePicker(selection: $model.config.ai.tips, recommended: AIRoute.api, discouraged: AIRoute.code)
+                RoutePicker(selection: $model.config.ai.tips, recommended: AIRoute.api, discouraged: AIRoute.code, withOpenAI: true)
                     .help(L("ai.tips.codeWhy"))
                 if model.config.ai.tips == AIRoute.code {
                     Text(L("ai.tips.codeWhy")).font(PN.Font.caption).foregroundStyle(PN.C.onMe)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices).help(L("set.decidesIfATip"))
-                ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices).help(L("set.writesTheTipYou"))
+                if model.config.ai.tips == AIRoute.codex {
+                    Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                } else if model.config.ai.tips == AIRoute.openai {
+                    Text(L("ai.openai.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                } else {
+                    ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices).help(L("set.decidesIfATip"))
+                    ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices).help(L("set.writesTheTipYou"))
+                }
                 Toggle(L("set.answerQuestionsToAnyone"), isOn: $model.config.answerAny)
                     .help(L("set.aQuestionAskedTo"))
-                Toggle(L("set.secondRequestWhenClaude"), isOn: $model.config.hedgeEnabled)
-                    .help(L("set.ifClaudeShowsNo"))
+                if ![AIRoute.openai, AIRoute.codex].contains(model.config.ai.tips) {
+                    Toggle(L("set.secondRequestWhenClaude"), isOn: $model.config.hedgeEnabled)
+                        .help(L("set.ifClaudeShowsNo"))
+                }
             } header: { Text(L("ai.job.tips")) } footer: {
                 Text(model.config.knownModels.isEmpty ? L("set.modelsTest") : L("set.modelsKnown"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
-                RoutePicker(selection: $model.config.ai.after, recommended: AIRoute.code, withLocal: true)
-                if model.config.ai.after == AIRoute.local {
+                RoutePicker(selection: $model.config.ai.after, recommended: AIRoute.code, withOpenAI: true, withLocal: true)
+                if model.config.ai.after == AIRoute.codex {
+                    Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                } else if model.config.ai.after == AIRoute.openai {
+                    Text(L("ai.openai.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                } else if model.config.ai.after == AIRoute.local {
                     LocalModelRow()
                 } else {
                     ModelPicker(title: L("set.model"), selection: $model.config.models.analysis, choices: model.modelChoices).help(L("set.summaryAndAnalysisNot"))

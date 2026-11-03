@@ -36,6 +36,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .seg:focus-visible{outline:2px solid var(--accent-fill);outline-offset:2px}
 .seg.done{background:var(--k-turn)}
 .seg.now{background:var(--accent-fill)}
+.seg.skip{background:repeating-linear-gradient(135deg,var(--surface-2) 0 3px,var(--text-3) 3px 4px);opacity:.6}
 .agenda .cap{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--text-3)}
 .agenda .cap b{font-weight:400;color:var(--text)}
 .agenda .cap span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -52,6 +53,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 .agenda-list .st.done{background:var(--k-turn);border-color:var(--k-turn)}
 .agenda-list .st.now{background:var(--accent-fill);border-color:var(--accent-fill)}
 .agenda-list .done .tt{color:var(--text-3)}
+/* 2026-11-03 (owner): skipped = not relevant, crossed out */
+.agenda-list .st.skip{background:transparent;border-style:dashed}
+.agenda-list .skip .tt{color:var(--text-3);text-decoration:line-through}
+.agenda-list .hint .lg{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.agenda-list .hint .st{margin-top:0}
 .agenda-list .hint{font-size:11px;color:var(--text-3);padding:2px 6px}
 
 /* ---------- Hero ---------- */

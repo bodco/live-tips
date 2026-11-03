@@ -852,6 +852,7 @@
  "call.page.discussed": "обговорено",
  "call.page.raised": "піднято",
  "call.page.notRaised": "не піднято",
+ "call.page.skipped": "Пропущено",
  "followup.again": "Написати ще раз",
  "followup.copy": "Копіювати",
  "followup.failed": "Не вдалося написати чернетку: {err}",

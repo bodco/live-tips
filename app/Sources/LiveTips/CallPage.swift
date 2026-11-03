@@ -484,9 +484,9 @@ struct AgendaChip: View {
     let state: String
     let next: () -> Void
     var body: some View {
-        let c = state == "done" ? PN.C.turn : state == "now" ? PN.C.onMe : PN.C.text3
+        let c = state == "done" ? PN.C.turn : state == "now" ? PN.C.onMe : PN.C.text3   // skip (2026-11-03): grey, like not raised
         Button(action: next) {
-            Text(L(state == "done" ? "call.page.discussed" : state == "now" ? "call.page.raised" : "call.page.notRaised"))
+            Text(L(state == "done" ? "call.page.discussed" : state == "now" ? "call.page.raised" : state == "skip" ? "call.page.skipped" : "call.page.notRaised"))
                 .font(PN.Font.caption.weight(.semibold)).foregroundStyle(c)
                 .padding(.horizontal, 8).padding(.vertical, 2)
                 .background(Capsule().fill(c.opacity(0.14)))

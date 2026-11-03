@@ -5,6 +5,10 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **Agenda: Skipped, and the list keeps its scroll (2026-11-03):** a click now goes not raised, now (blue), done
+  (green), skipped (crossed out, for an item that is not relevant); a skipped item is never reminded, never carried
+  into the next call and shows as Skipped on the call page. The opened agenda shows a legend of the four states and
+  no longer jumps back to the top a second after you scroll (it was rebuilt on every update).
 - **Two real calls reviewed (2026-11-02), docs 14.1l:** the agenda takes up to 20 checklist items with the full text
   on a click and for the model, and skips brief lines that only point elsewhere; interview follow-ups no longer stop
   after the PM's "mhm" and come again every 150 words of a long answer, as open questions for hiring and discovery

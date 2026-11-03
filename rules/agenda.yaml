@@ -9,6 +9,7 @@ states:
   todo: not raised yet
   now: being discussed now (at most one item)
   done: discussed, decided or answered
+  skip: the PM dropped it as not relevant (only the PM sets it; never reminded, never carried into the next call)
 # Text for the model that keeps the call picture (the app's engine adds it to its prompt; the skill follows it).
 model_rule: >-
   agenda_now = the number of the AGENDA item being discussed in the new lines, or -1 when none is.
@@ -17,7 +18,7 @@ model_rule: >-
 emit: >-
   One item `{"kind":"agenda","items":[{"text":"<item>","done":true|false,"cur":true|false}]}` each time
   the state changes; it replaces the previous strip. The PM can change an item's state in the window
-  (`@@SET agenda_state=<index>|todo|now|done`, index from 0); the PM's state wins over the model's.
+  (`@@SET agenda_state=<index>|todo|now|done|skip`, index from 0); the PM's state wins over the model's.
 wrapup: >-
   The call summary gets an "Agenda" section: each item with Discussed, Raised or Not raised.
   Items not raised go into the "What matters" text of the next call of the same series,

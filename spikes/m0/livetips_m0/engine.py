@@ -237,7 +237,7 @@ WRAP_EVENT = ("WRAP CHECK: the call may be ending (someone asked whether there i
               "or the PM asked what he forgot). Compare the WHOLE CALL TRANSCRIPT below with the AGENDA and DECISIONS TO "
               "OBTAIN. Give ONE red tip: gist like '🎯 Not covered yet: N' in the tips language; items = up to 5 items "
               "that were NOT really talked about or NOT obtained (an item only named in passing counts as not covered; "
-              "the agenda states are a hint, the transcript decides), each a short line the PM can raise now; phrase = "
+              "the agenda states are a hint, the transcript decides; never list an item marked [skip], the PM dropped it), each a short line the PM can raise now; phrase = "
               "one sentence in the call language to raise the first one (for example 'One more thing before we go: ...'). "
               "When everything was covered: gist '✅ All covered' in the tips language, items = the 1-2 next steps with "
               "owner and date heard on the call, or 'next step has no date' when none was said. Never skip.")
@@ -1985,13 +1985,13 @@ class Engine:
         self._emit_agenda()
 
     def set_agenda_state(self, value: str) -> None:
-        """@@SET agenda_state=<index>|todo|now|done from the window (the PM's state wins)."""
+        """@@SET agenda_state=<index>|todo|now|done|skip from the window (the PM's state wins; skip = not relevant)."""
         try:
             idx, state = str(value).split("|", 1)
             i = int(str(idx).lstrip("ab"))
         except ValueError:
             return
-        if state in ("todo", "now", "done") and 0 <= i < len(self.agenda_items):
+        if state in ("todo", "now", "done", "skip") and 0 <= i < len(self.agenda_items):
             with self.lock:
                 if state == "now":
                     self.agenda_manual = {k: v for k, v in self.agenda_manual.items() if v != "now"}

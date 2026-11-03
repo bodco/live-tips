@@ -53,7 +53,8 @@ def to_obtain(text: str, max_chars: int = 700) -> str:
 
 
 def states(items: List[Tuple[str, bool]], done: set, now: int, manual: dict) -> List[str]:
-    """todo / now / done per item; the PM's state (manual, by index) wins, then done, then the model's now."""
+    """todo / now / done / skip per item; the PM's state (manual, by index; skip only from the PM) wins, then done,
+    then the model's now."""
     out = []
     for i, (_, ticked) in enumerate(items):
         s = "done" if (ticked or i in done) else ("now" if i == now else "todo")
@@ -85,6 +86,8 @@ def status_label(it: dict, uk: bool) -> str:
     st = it.get("state") or ("done" if it.get("done") else ("now" if it.get("cur") else "todo"))
     if st == "done":
         return "обговорено" if uk else "discussed"
+    if st == "skip":
+        return "пропущено" if uk else "skipped"
     if st == "now":
         return "піднято" if uk else "raised"
     return "не піднято" if uk else "not raised"

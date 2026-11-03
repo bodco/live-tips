@@ -51,8 +51,8 @@ enum CallPageEdit {
                                            "edited": ISO8601DateFormatter().string(from: Date())])
     }
 
-    /// The next agenda state on a click: not raised, raised, discussed, then not raised again.
-    static func nextAgendaState(_ s: String) -> String { s == "todo" ? "now" : s == "now" ? "done" : "todo" }
+    /// The next agenda state on a click: not raised, raised, discussed, skipped (not relevant), then not raised again.
+    static func nextAgendaState(_ s: String) -> String { s == "todo" ? "now" : s == "now" ? "done" : s == "done" ? "skip" : "todo" }
 
     static func appendLine(_ path: String, _ o: [String: Any]) -> Bool {
         guard JSONSerialization.isValidJSONObject(o), let d = try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]) else { return false }

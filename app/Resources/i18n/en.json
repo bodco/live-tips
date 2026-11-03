@@ -852,6 +852,7 @@
  "call.page.discussed": "discussed",
  "call.page.raised": "raised",
  "call.page.notRaised": "not raised",
+ "call.page.skipped": "Skipped",
  "followup.again": "Write again",
  "followup.copy": "Copy",
  "followup.failed": "The draft could not be written: {err}",

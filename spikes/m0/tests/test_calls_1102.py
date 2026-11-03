@@ -127,3 +127,14 @@ def test_sos_project_snippet_only_when_nothing_else_and_without_page_ids(T):
     assert [g["kind"] for g in got] == ["fact"]
     got = T.sos_pick(["nothing matches here"], facts, [], sem={"facts": {}, "cards": {}, "docs": docs})
     assert len(got) == 1 and "[ab12" not in got[0]["gist"]
+
+
+def test_agenda_skip_state_from_the_window(tmp_path):
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: json.dumps({"skip": True, "reason": "x"}))
+    eng.set_agenda_items(BRIEF)
+    eng.set_agenda_state("a2|skip")
+    eng._agenda_from_model({"agenda_done": [2], "agenda_now": 2})        # the model cannot undo the PM's skip
+    strip = eng.agenda_strip()
+    assert strip[2]["state"] == "skip" and not strip[2]["done"]
+    assert agenda.status_label(strip[2], True) == "пропущено"
+    assert "2. [skip]" in eng.wrap_event()

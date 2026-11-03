@@ -18,8 +18,8 @@
       engineDeaf: 'Tips are not coming: end the call and start again',
       onMe: 'On me', more: 'More', earlier: 'Earlier',
       agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised yet:', allRaised: 'All agenda items raised',
-      agendaOpen: 'Show the whole agenda', agendaClose: 'Hide the agenda', agendaHint: 'Click an item: not raised, now, done.',
-      agState: { todo: 'not raised', now: 'now', done: 'done' },
+      agendaOpen: 'Show the whole agenda', agendaClose: 'Hide the agenda', agendaHint: 'A click moves an item on:', agendaLegend: ['not raised', 'now', 'done', 'skipped, not relevant'],
+      agState: { todo: 'not raised', now: 'now', done: 'done', skip: 'skipped' },
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk', decision_conflict: 'Decided earlier',
         objection: 'Objection', qualify: 'Qualify', pain: 'Pain', next_step: 'Next step', competitor: 'Competitor', signal: 'Buying signal' },
       firstHint: (k) => `Press ${k.h} when you need help · ${k.t} compact · ${k.l} proactive tips`,
@@ -80,8 +80,8 @@
       engineDeaf: 'Підказки не надходять: заверши дзвінок і почни знову',
       onMe: 'На мені', more: 'Більше', earlier: 'Раніше',
       agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', allRaised: 'Усі пункти агенди підняті',
-      agendaOpen: 'Показати всю агенду', agendaClose: 'Сховати агенду', agendaHint: 'Клік по пункту: не піднято, зараз, зроблено.',
-      agState: { todo: 'не піднято', now: 'зараз', done: 'зроблено' },
+      agendaOpen: 'Показати всю агенду', agendaClose: 'Сховати агенду', agendaHint: 'Клік по пункту змінює його стан:', agendaLegend: ['не піднято', 'зараз', 'зроблено', 'пропущено, неактуально'],
+      agState: { todo: 'не піднято', now: 'зараз', done: 'зроблено', skip: 'пропущено' },
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик', decision_conflict: 'Вже вирішено',
         objection: 'Заперечення', qualify: 'Кваліфікація', pain: 'Біль', next_step: 'Наступний крок', competitor: 'Конкурент', signal: 'Сигнал купівлі' },
       firstHint: (k) => `Натисніть ${k.h}, коли потрібна допомога · ${k.t} компактно · ${k.l} проактивні підказки`,
@@ -299,8 +299,10 @@
       list.hidden = !open;
       if (open) {
         // 2026-11-02 (owner): the opened agenda shows each item in full (13 interview questions were cut to "…")
-        list.innerHTML = S.agenda.map((a) => `<li class="${esc(a.state)}"><button type="button" data-act="agenda" data-id="${esc(a.id)}" aria-label="${esc((a.full || a.title) + ', ' + (t.agState[a.state] || a.state))}"><span class="st ${esc(a.state)}"></span><span class="tt">${esc(a.full || a.title)}</span></button></li>`).join('')
-          + `<li class="hint">${esc(t.agendaHint)}</li>`;
+        const html = S.agenda.map((a) => `<li class="${esc(a.state)}"><button type="button" data-act="agenda" data-id="${esc(a.id)}" aria-label="${esc((a.full || a.title) + ', ' + (t.agState[a.state] || a.state))}"><span class="st ${esc(a.state)}"></span><span class="tt">${esc(a.full || a.title)}</span></button></li>`).join('')
+          + `<li class="hint">${esc(t.agendaHint)} ${['todo', 'now', 'done', 'skip'].map((s, i) => `<span class="lg"><span class="st ${s}"></span>${esc(t.agendaLegend[i])}</span>`).join(' → ')}</li>`;
+        // 2026-11-03 (owner): the list was rebuilt every second and jumped back to the top while scrolling
+        if (list.dataset.html !== html) { const top = list.scrollTop; list.innerHTML = html; list.dataset.html = html; list.scrollTop = top; }
       }
     }
 
@@ -963,7 +965,7 @@
       case 'hero-min': S.ui.heroMin[id] = !S.ui.heroMin[id]; break;   // 2026-11-02: the speech card folds to its first line
       case 'agenda': {
         const a = S.agenda.find((x) => x.id === id); if (!a) return;
-        const nextState = a.state === 'todo' ? 'now' : a.state === 'now' ? 'done' : 'todo';
+        const nextState = { todo: 'now', now: 'done', done: 'skip', skip: 'todo' }[a.state] || 'todo';   // 2026-11-03: skip = not relevant
         a.state = nextState; if (feed) feed.setAgendaState(id, nextState);
         post('agenda', { id, title: a.title, state: nextState });
         break;

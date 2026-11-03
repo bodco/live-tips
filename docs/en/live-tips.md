@@ -1501,7 +1501,10 @@ did not help. What changed:
 1. **The whole agenda.** Up to 20 checklist items (was 8). The strip still shortens each one to
    about 60 characters, but the opened agenda and the hover text show the full item, and the model
    tracks the full text. A brief line that only points elsewhere ("walk the open items below") is
-   not an agenda item any more.
+   not an agenda item any more. A click moves an item on: not raised (empty dot), now (blue),
+   done (green), skipped (dashed dot, crossed out) for an item that is not relevant any more. A
+   skipped item is never reminded and never carried into the next call; the call page shows it
+   as Skipped. The opened list keeps its scroll position (it used to jump back to the top).
 2. **Your speech folds and steps aside.** The speech card has Collapse (it keeps the title and the
    ready sentence) and leaves the big place after 5 minutes like any other card; it stays in the
    list below.

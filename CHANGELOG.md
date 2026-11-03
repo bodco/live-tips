@@ -5,6 +5,38 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **Call pages (0.9.0, 2026-11-03):** an upcoming call has its own page in Home (from its name on Home, on Coming up
+  or in the menu bar): Setup (what kind of call, what matters, files, the rest under More settings; changes apply
+  only on Save and leaving with unsaved changes asks), Brief, Tasks (on you, waiting on others, decided last time)
+  and Earlier calls, with Get ready or Start call on the right. A past call has tabs: Summary (in short, what was
+  discussed, for the next call, open questions, the agenda), Decisions, Tasks, Risks, Transcript and Sales for a
+  sales call. "Add to Tracker" replaces "Add to register"; nothing goes there without a click unless auto-add is on.
+- **Export (0.9.0):** a past call exports to Word (.docx), Markdown (.md) or a Notion page in the meetings database,
+  with the sections to include and the whole text editable before it goes out. Edits change only the export.
+- **Tracker (0.9.0):** one screen with the tasks, decisions and risks of every project, filtered by workspace, project,
+  call, owner, status and text, grouped (overdue, this week, later; waiting for your OK, confirmed; open). It reads
+  what is in Notion from the local Notion mirror and the call commitments kept on this Mac; no new register, no
+  schema change. Settings > Modules turns it off.
+- **Prepare now / Prepare again during a call (0.9.0):** a strip under the tips window header shows the brief and
+  remakes it in the background from what was said so far plus the project files. Recording and tips keep going; the
+  new brief replaces the old one at once and the old one is kept as the previous version. The skill does the same on
+  the PM's words. Contract: rules/live_prep.yaml.
+- **Menu bar panel (0.9.0):** the same soft Ready / Not ready pills and the same one main button as Home; the call name
+  opens its page.
+- **Claude and ChatGPT side by side (0.9.0, 2026-11-03):** Settings > AI and the onboarding have two tabs, Claude
+  (Claude Code sign-in, Claude API key) and ChatGPT (ChatGPT account through Codex, OpenAI API key). The OpenAI API can
+  now prepare calls too, not only give tips and write the notes after the call, so every job can run on either
+  provider. Contract: rules/ai.yaml.
+- **Not ready is orange (0.9.0):** a call that is not prepared shows a clear orange, not brown.
+- **New Home (0.9.0, 2026-11-03):** Home shows what is next and what already happened, nothing else. The
+  next call has one main button (Get ready, Start call, or Start call that only records without Claude) and one link
+  under it; the rest of today and tomorrow is a Coming up line with Ready / Not ready, a "..." menu and Undo for a hidden
+  call; Recent calls are three cards with one sentence from the notes and the number of decisions and tasks. Colours
+  follow the call's state, not the project. The status line and Finish setup became one pill in the header, shown only
+  when something needs you. This week's numbers moved to Settings > Usage, "What Pacenote can do" to Settings > Help,
+  On you to the Tracker screen. A call can start without a project: it goes to the app's own folder ("My calls").
+  Docs 14.1m.
+
 - **ChatGPT account through Codex, alongside Claude:** onboarding and Settings > AI offer browser sign-in through
   the official Codex CLI and a separate account route for preparation, live tips and after-call jobs. API-key
   login is rejected for this route; OAuth credentials stay with Codex. Preparation uses a context pack built

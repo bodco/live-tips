@@ -48,15 +48,15 @@ How it compares with Fireflies and Fathom (price, recording, live help, preparat
 
 ## Claude or ChatGPT (unreleased)
 
-Settings > AI keeps Claude account and Claude API and adds two separate OpenAI options:
+Settings > AI has two tabs, Claude (Claude account, Claude API) and ChatGPT, with two separate OpenAI options:
 
 - **ChatGPT account (Codex):** install the official [Codex CLI](https://learn.chatgpt.com/docs/cli), press
   **Log in**, finish the browser sign-in, then return to Pacenote. The account row checks the sign-in again.
   Select this route for preparation, live tips and/or after-call jobs. Onboarding also has **Use ChatGPT** for
   all three jobs. Codex uses its default model and your account's Codex limits. API-key sign-in is rejected for
   this route; Pacenote never reads or copies the CLI's OAuth credentials.
-- **OpenAI API:** save an API key in macOS Keychain and select it for live tips and/or after-call work. These
-  jobs use GPT-5.4 mini through streaming Responses with `store: false`. Tokens and estimated cost count toward
+- **OpenAI API:** save an API key in macOS Keychain and select it for preparation (0.9.0), live tips and/or
+  after-call work. These jobs use GPT-5.4 mini through streaming Responses with `store: false`. Tokens and estimated cost count toward
   the existing ledger and live-call limits.
 
 Codex preparation uses a text context pack built by Pacenote (call context, added files, project config,

@@ -129,10 +129,22 @@ public struct ProjectRegistry: Codable, Equatable {
 
     public static func load(from url: URL) -> ProjectRegistry {
         guard let d = try? Data(contentsOf: url), var r = try? JSONDecoder().decode(ProjectRegistry.self, from: d) else {
-            return ProjectRegistry()
+            var empty = ProjectRegistry()
+            empty.addDefaultWorkspace(support: url.deletingLastPathComponent().path)
+            return empty
         }
         r.dedupe()
+        r.addDefaultWorkspace(support: url.deletingLastPathComponent().path)
         return r
+    }
+
+    /// 0.9.0 (owner, 2026-11-03): a call can start without a project. It goes to the app's own folder
+    /// (<Application Support>/LiveTips/live), shown as the workspace "My calls". Added on load, never duplicated.
+    public static let defaultWorkspaceName = "My calls"
+
+    public mutating func addDefaultWorkspace(support: String) {
+        guard !support.isEmpty, !workspaces.contains(where: { $0.name == Self.defaultWorkspaceName }) else { return }
+        workspaces.append(Workspace(name: Self.defaultWorkspaceName, root: support, projects: []))
     }
 
     public func save(to url: URL) throws {

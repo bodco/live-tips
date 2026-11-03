@@ -1,0 +1,31 @@
+# Preparation during a call (Pacenote 0.9.0, owner 2026-11-03). Shared by the app and the skill: the PM can make or
+# remake the brief while the call runs, from what was said so far plus the usual preparation sources.
+schema_version: 1
+when: >-
+  Only on the PM's click or words: "Prepare now" when the call has no brief, "Prepare again" when it has one
+  (the app's brief strip under the tips window header; in the skill "підготуй зараз", "перепідготуй бриф",
+  "prepare now", "prepare again"). Never by itself, never on a schedule.
+sources: >-
+  The sources of a normal preparation for this call (project folder, the local Notion mirror, the last 3 calls of
+  this meeting, the files the PM added) plus the transcript of this call up to this minute, read as a source like the
+  others: what was asked, agreed and left open so far changes the brief, the agenda and the cards.
+route: >-
+  The way set for the Preparation job (Settings > AI: Claude Code, Claude API, ChatGPT account, OpenAI API or the
+  local model), with the same automatic switch rules as a preparation before the call (rules/ai.yaml).
+never_blocks: >-
+  The preparation runs as its own process in the background. Recording, speech recognition and the tips loop never
+  wait for it and never slow down; a tip being written finishes on the brief it started with.
+swap: >-
+  When it is ready the new brief, cards and facts replace the call's files in one rename each (<stem>.brief.md,
+  .cards.json, .facts.json), the brief in use before is kept as <stem>.brief.prev.md (one previous version is
+  enough), and the tips engine reloads them at once ("refresh context" in the inbox). A failed or cancelled run
+  leaves the current brief untouched.
+strip:
+  ready: "Brief · made {time}{, before the call} · Prepare again · Uses what was said so far, plus the project files"
+  none: "No brief · tips use only the call so far · Prepare now"
+  running: "Preparing in the background… · progress · Cancel · Recording and tips keep going. The new brief takes over when it is ready, about 1 min."
+skill: >-
+  The skill does the same: on the PM's words it runs the preparation of references/sweep.md in a subagent with the
+  transcript so far as one more source, writes the new files next to the call as <stem>.brief.new.md (and
+  .cards.new.json, .facts.new.json), then renames them over the current ones after copying <stem>.brief.md to
+  <stem>.brief.prev.md; the loop keeps running and reads the new brief on its next turn.

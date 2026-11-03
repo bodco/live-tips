@@ -13,6 +13,9 @@ final class HomeNav: ObservableObject {
         case series(String)                  // a record's file
         case transcript(String, String?)     // file, moment
         case stats
+        case pastCalls                       // 0.9.0: All past calls
+        case tracker                         // 0.9.0: the Tracker screen
+        case upcoming(String)                // 0.9.0: an upcoming call page (StartCallModel id)
     }
     @Published var path: [Route] = []
     @Published var followUp: String?         // the call page whose follow-up panel is open (A3)
@@ -31,11 +34,14 @@ final class HomeNav: ObservableObject {
         case .series(let f): return CallHistory.shared.records.first { $0.file == f }?.title ?? L("series.title", ["title": ""])
         case .transcript(let f, _): return L("call.page.transcript") + " · " + CallPageView.title(f)
         case .stats: return L("home.week.detailsTitle")
+        case .pastCalls: return L("home.allPast")
+        case .tracker: return L("home.nav.tracker")
+        case .upcoming(let id): return UpcomingPages.models[id]?.effectiveTitle ?? L("call.title.upcoming")
         }
     }
 
     /// The name on the Back bar of the screen at `index` in the path: the screen below it, or Home.
-    func backTitle(at index: Int) -> String { index == 0 ? L("home.window.title") : title(path[index - 1]) }
+    func backTitle(at index: Int) -> String { index == 0 ? L("home.nav.home") : title(path[index - 1]) }
 }
 
 /// The screen for a route, under a Back bar.
@@ -93,6 +99,10 @@ struct HomeRouteView: View {
             if let r = CallHistory.shared.records.first(where: { $0.file == f }) { SeriesView(record: r) } else { Text(L("call.page.empty")).padding() }
         case .transcript(let f, let at): TranscriptView(file: f, at: at)
         case .stats: ScrollView { WeekStats().padding(20) }
+        case .pastCalls: PastCallsView()
+        case .tracker: TrackerView()
+        case .upcoming(let id):
+            if let m = UpcomingPages.models[id] { UpcomingCallPage(model: m) } else { Text(L("call.page.empty")).padding() }
         }
     }
 }

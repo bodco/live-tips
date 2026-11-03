@@ -384,3 +384,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .grp-hint{margin:0 0 6px}
 h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(--text-3))}
 .onme-item.theirs .badge-src{opacity:.7}
+
+/* 0.9.0 (rules/live_prep.yaml): the brief strip under the header */
+.briefbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid var(--separator); }
+.briefbar[hidden] { display: none; }
+.briefbar .bb-main { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.briefbar .bb-t { font-size: 12px; font-weight: 600; color: var(--text); }
+.briefbar .bb-s { font-size: 11px; color: var(--text-3); }
+.briefbar .bb-prog { display: block; height: 3px; border-radius: 2px; background: var(--surface-2); margin-top: 3px; overflow: hidden; }
+.briefbar .bb-prog span { display: block; height: 100%; background: var(--brand); }
+.compact .briefbar { display: none; }

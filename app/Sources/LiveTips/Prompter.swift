@@ -232,7 +232,13 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 if r.running && mine {
                     d = ["state": "running", "stage": r.stage, "detail": r.detail, "progress": r.progress]
                 } else if !transcriptPath.isEmpty, FileManager.default.fileExists(atPath: String(transcriptPath.dropLast(3)) + ".brief.md") {
-                    d = ["state": "ready"]
+                    // 0.9.0: when the brief was made, and whether before the call (the brief strip)
+                    let bp = String(transcriptPath.dropLast(3)) + ".brief.md"
+                    let made = (try? FileManager.default.attributesOfItem(atPath: bp))?[.modificationDate] as? Date
+                    let started = EngineStatus.load(path: CallEngine.shared.statusPath).startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+                    let hf = DateFormatter(); hf.dateFormat = "HH:mm"
+                    d = ["state": "ready", "made": made.map { hf.string(from: $0) } ?? "",
+                         "before": (made != nil && started != nil && made! < started!)]
                 } else if mine, r.result.lowercased().contains("fail") {
                     d = ["state": "failed", "stage": r.result]
                 }
@@ -818,6 +824,12 @@ extension PrompterController {
             if let t = d["text"] as? String { handle("ask", t) }
         case "help":
             handle("ask", "sos")                                   // HELP NOW, as before
+        case "liveprep":
+            // 0.9.0 (rules/live_prep.yaml): Prepare now / Prepare again / Cancel from the brief strip
+            MainActor.assumeIsolated {
+                if (d["a"] as? String) == "cancel" { LivePrep.cancel() }
+                else if let e = LivePrep.start() { push("window.toastMsg && window.toastMsg(" + jsString(e) + ")") }
+            }
         case "shorter":
             // No engine change: a typed ask the tips engine answers as usual (the card says "Shorter").
             guard let say = d["say"] as? String, !say.isEmpty else { return }

@@ -329,3 +329,14 @@ the brief, write `<stem>.prep.json` (`prepared_at` now, `refresh_of` the previou
 `lt prep-check` as after a full sweep. Never start a refresh by yourself, never on a schedule.
 
 After every full sweep too: write `<stem>.prep.json` with `prepared_at` = now and `"by": "skill"`.
+
+## Prepare during the call (Pacenote 0.9.0, rules/live_prep.yaml)
+
+Only when the PM asks during the call ("підготуй зараз", "перепідготуй бриф", "prepare now", "prepare again").
+Run the full sweep above in a subagent, with one more source: the transcript of this call up to now (`<stem>.md`).
+What was asked, agreed and left open so far changes the brief, the agenda and the cards. The loop (SKILL.md Step 3)
+never waits: keep answering `@@` lines and giving tips on the current brief. Write the result as
+`<stem>.brief.new.md`, `<stem>.cards.new.json`, `<stem>.facts.new.json`; when all three are written, copy
+`<stem>.brief.md` to `<stem>.brief.prev.md` (one previous version), rename each `.new` file over the current one and
+read the new brief on the next turn of the loop. A failed run leaves the current brief as it was. Tell the PM one
+line when it is ready: "Brief updated with what was said so far".

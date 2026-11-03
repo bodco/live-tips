@@ -692,10 +692,11 @@ struct FolderRow: View {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var runner = PrepRunner.shared
+    @AppStorage("settingsAIProvider") private var aiProvider = "claude"
+    @AppStorage("moduleTracker") private var trackerModule = true      // 0.9.0: Settings > Modules > Tracker     // 0.9.0: the Claude / ChatGPT tab
     @State private var showProjectsInfo = false
     @State private var aiChecking = false     // 0.8.2: Check now on the ways that are out
     @State private var aiTick = 0
-    @AppStorage("homeShowStats") private var showStats = true      // Home: this week's numbers (2026-10-27)
     @ObservedObject var dest = NotionDestinationModel.shared
 
     struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
@@ -704,6 +705,9 @@ struct SettingsView: View {
         Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
         Pane(id: "integrations", title: "Integrations", symbol: "point.3.connected.trianglepath.dotted", subtitle: "Notion, calendars and your CRM."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
+        Pane(id: "modules", title: "Modules", symbol: "square.grid.2x2", subtitle: "Turn parts of Pacenote on or off."),       // 0.9.0
+        Pane(id: "usage", title: "Usage", symbol: "chart.bar", subtitle: "Calls this week and the full statistics."),       // 0.9.0: from Home
+        Pane(id: "help", title: "Help", symbol: "questionmark.circle", subtitle: "What Pacenote can do and what is new."),  // 0.9.0: from Home
         Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
     ].map { Pane(id: $0.id, title: L("settings.tab." + $0.id), symbol: $0.symbol, subtitle: L("settings.pane." + $0.id)) } }
 
@@ -749,6 +753,21 @@ struct SettingsView: View {
         case "ai": ai
         case "integrations": IntegrationsPane(model: model) { notion }
         case "how": HowItWorksView()
+        case "modules": Form {
+            Section {
+                Toggle(isOn: $trackerModule) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("modules.tracker"))
+                        Text(L("modules.tracker.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }.formStyle(.grouped)
+        case "usage": ScrollView { VStack(alignment: .leading, spacing: 16) { WeekSummaryView(); WeekStats() }.padding(20) }
+        case "help": ScrollView { VStack(alignment: .leading, spacing: 12) {
+            Button(L("settings.how.title")) { model.tab = "how" }.buttonStyle(.pnSecondary)
+            FeaturesView()
+        }.padding(20) }
         case "about": AboutView(model: model)
         default: general
         }
@@ -756,10 +775,21 @@ struct SettingsView: View {
 
 
     var ai: some View {
+        aiForm
+    }
+
+    var aiForm: some View {
         Form {
             // 0.8.2 (owner): everything about Claude in one tab. Access once for the whole app, then the way and the
             // models for each job, then the automatic switch between the two ways.
+            // 0.9.0 (owner): two providers, two tabs: Claude (account, API key) and ChatGPT (account, OpenAI API key).
             Section {
+                Picker("", selection: $aiProvider) {
+                    Text("Claude").tag("claude")
+                    Text("ChatGPT").tag("chatgpt")
+                }
+                .pickerStyle(.segmented).labelsHidden()
+                if aiProvider == "claude" {
                 LabeledContent(L("ai.access.account")) {
                     HStack(spacing: 8) {
                         if PrepRunner.claudePath == nil {
@@ -777,10 +807,13 @@ struct SettingsView: View {
                 }
                 .help(L("ai.access.accountHelp"))
                 KeyRow(title: L("keys.claude.title"), hint: L("keys.claude.hint"), key: .claudeAPIKey, model: model)
+                } else {
                 CodexAccountRow()
                 KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: model)
+                }
             } header: { Text(L("ai.access")) } footer: {
-                Text(L("ai.access.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                Text(L(aiProvider == "claude" ? "ai.access.footer.claude" : "ai.access.footer.chatgpt")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .onAppear { runner.refreshAuth() }
             // 0.8.7 (H3): company research for sales preparations, on by default, with what goes out
@@ -801,7 +834,7 @@ struct SettingsView: View {
                 Text(L("local.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             Section {
-                RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withLocal: true)
+                RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withOpenAI: true, withLocal: true)
                 if model.config.ai.prep == AIRoute.codex {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if model.config.ai.prep == AIRoute.local {
@@ -1313,13 +1346,6 @@ struct SettingsView: View {
                 }
                 Toggle(L("set.hideTheTipsWindow"), isOn: $model.config.stealthDefault)
                     .help(L("set.defaultForNewCalls"))
-                Toggle(isOn: $showStats) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L("set.showThisWeekS"))
-                        Text(L("set.callsTimeOnCalls"))
-                            .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    }
-                }
                 Toggle(L("settings.general.dock"), isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
             } header: { Text(L("set.behaviour")) } footer: {
@@ -1648,7 +1674,7 @@ final class SettingsWindow {
         switch tab {
         case "how": return L("settings.how.title")
         case "about": return L("settings.about.windowTitle")
-        case "general", "projects", "ai", "integrations": return L("settings.tab." + tab)
+        case "general", "projects", "ai", "integrations", "usage", "help", "modules": return L("settings.tab." + tab)
         default: return L("settings.windowTitle")
         }
     }

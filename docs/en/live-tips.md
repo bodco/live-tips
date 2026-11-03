@@ -1530,6 +1530,32 @@ did not help. What changed:
    earliest 15 minutes later. HELP NOW shows at most 2 facts or cards; a raw snippet from the
    project folder comes only when nothing else matched, one at most, without Notion page ids.
 
+### 14.1m Pacenote 0.9.0: Home, call pages, Tracker
+
+Home answers two questions: what is next and what already happened. Tasks, decisions and statistics are no longer on it.
+
+| Part | What it shows |
+|---|---|
+| Header | Home and Tracker, a pill only when something needs you (Claude, calendar, Notion copy, spending limit, speech model, your name on calls; a click opens the right Settings pane), Search calls (Command-F), Transcribe a recording, Start a call now (Command-N; its arrow has Plan a call), Settings |
+| The sentence on top | "Next call in 37 minutes", "Start a call whenever you are ready" without a calendar, "Welcome to Pacenote" on the first launch |
+| Next call | Time, platform, project, the call name (opens the call), "with Emily R., Jake T. and Sarah M." and the brief state. One main button and one link: no brief: Get ready and "Start without a brief"; a ready brief: Start call and "Prepare again"; no Claude: Start call (records only) and "Connect Claude for a brief and tips". A call that overlaps shows "Overlaps with ..." and Hide it |
+| Coming up | The rest of today and tomorrow on one line, with a TOMORROW mark. Each call: time and project, the name (opens the call), Ready or Not ready and a "..." menu (Get ready or Prepare again, "Not my call, hide it"). No Start buttons here. A hidden call can be brought back with Undo. "All N calls" opens the full list with the same menu |
+| Recent calls | The last 3 calls as cards: day, time and length, one sentence from the call notes, the number of decisions and tasks. A click opens the call page; right-click has Notion, the transcript, the follow-up email, the series, Finder and "Remove from this list". "All past calls" lists the rest |
+
+Colours follow the call's state, never the project: not ready (orange), ready (green), preparing (blue), live (red), recorded (dark blue), no transcript (grey). A call started without a project goes to the app's own folder (the workspace "My calls", `~/Library/Application Support/LiveTips/live`); its preparation never reads that folder. This week's numbers moved to Settings > Usage, the feature list to Settings > Help, On you to the Tracker screen. Not ready is orange.
+
+**Call pages.** An upcoming call opens as a page with Setup, Brief, Tasks and Earlier calls; its Setup changes
+apply only on Save. A past call has Summary, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this
+call, Follow-up and Export (Word, Markdown or a Notion page, editable before it goes out).
+
+**Tracker.** Tasks, decisions and risks of every project on one screen, from the local Notion mirror and the
+commitments kept on this Mac. Settings > Modules turns it off.
+
+**AI.** Settings > AI and the onboarding have a Claude tab and a ChatGPT tab; the OpenAI API can now prepare calls too.
+
+**During the call.** The brief strip under the tips window header: "Prepare now" or "Prepare again" remakes the brief
+in the background from the call so far (rules/live_prep.yaml); recording and tips never stop.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the

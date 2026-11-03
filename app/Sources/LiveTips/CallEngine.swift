@@ -237,6 +237,10 @@ final class CallEngine {
     func adoptLatePrep(base: String, file: String) {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         let fm = FileManager.default
+        // 0.9.0 (rules/live_prep.yaml): the brief in use is kept as the one previous version before it is replaced
+        if fm.fileExists(atPath: stem + ".brief.md"), fm.fileExists(atPath: base + ".brief.md") {
+            try? fm.removeItem(atPath: stem + ".brief.prev.md"); try? fm.copyItem(atPath: stem + ".brief.md", toPath: stem + ".brief.prev.md")
+        }
         for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json"] where fm.fileExists(atPath: base + ext) {
             let tmp = stem + ext + ".tmp"
             try? fm.removeItem(atPath: tmp)
@@ -246,6 +250,11 @@ final class CallEngine {
             }
         }
         notify(L("eng.prepLoaded"))
+        // the tips engine reloads now instead of at its next fifth line
+        if let inbox = EngineStatus.load(path: statusPath).inboxFile, let h = FileHandle(forWritingAtPath: inbox) {
+            let f = DateFormatter(); f.dateFormat = "HH:mm:ss"
+            h.seekToEndOfFile(); h.write(Data(("{\"t\": \"" + f.string(from: Date()) + "\", \"text\": \"refresh context\"}\n").utf8)); try? h.close()
+        }
     }
 
     func adoptPrep(file: String) {

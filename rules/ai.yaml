@@ -15,8 +15,9 @@ routes:
     on failure. Live tips keep the local cards and search but do not start Claude Code deep folder lookup.
   openai: |
     OpenAI API key from macOS Keychain (OPENAI_API_KEY in the child process only), GPT-5.4 mini through the
-    streaming Responses API with reasoning effort none and store false. Available for tips and after-call jobs;
-    preparation still uses code, api or local. No automatic fallback from OpenAI to Claude or local. Live-call
+    streaming Responses API with reasoning effort none and store false. Available for tips, after-call jobs and,
+    from 0.9.0, the preparation (livetips_m0.openaiprep: the same context pack and passes as the ChatGPT account
+    route, Pacenote writes and checks the files and restores the previous prep on failure). No automatic fallback from OpenAI to Claude or local. Live-call
     spending limits apply; cached input tokens are counted separately from uncached input. Claude Code deep
     folder lookup is disabled when tips use OpenAI; the local project search and prepared cards remain available.
     Incomplete, refused, failed or unterminated streams are errors. No tools or saved sessions.

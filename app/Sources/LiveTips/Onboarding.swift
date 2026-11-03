@@ -92,6 +92,7 @@ struct OnboardingView: View {
     @ObservedObject var m: OnboardingModel
     @State private var tree: [String] = []      // 0.8.7 (L3): the tree made by "Create the structure for me"
     @State private var keyOpen = false
+    @State private var provider = "claude"       // 0.9.0 (owner): Claude or ChatGPT, as in Settings > AI
     @ObservedObject var settings: SettingsModel
     @ObservedObject var setup: SetupModel
     @ObservedObject var cal = CalendarService.shared
@@ -342,6 +343,12 @@ struct OnboardingView: View {
             .onChange(of: settings.config.workRoot) { m.applyFolders() }
         case .claude:
             VStack(spacing: 8) {
+                Picker("", selection: $provider) {
+                    Text("Claude").tag("claude")
+                    Text("ChatGPT").tag("chatgpt")
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 280)
+                if provider == "claude" {
                 // 2026-10-29 (owner): preparing calls always needs Claude Code, whichever way pays (plan or API key).
                 if let cc = setup.steps.first(where: { $0.id == "claude" }) {
                     HStack(spacing: 10) {
@@ -356,12 +363,6 @@ struct OnboardingView: View {
                     }
                     .padding(10).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
                 }
-                CodexAccountRow()
-                Button(L("ai.codex.use")) {
-                    settings.config.ai.prep = AIRoute.codex
-                    settings.config.ai.tips = AIRoute.codex
-                    settings.config.ai.after = AIRoute.codex
-                }.buttonStyle(.pnSecondary).disabled(CodexAccount.cliPath == nil)
                 // 0.8.7 (L3): 1) sign in (above), 2) an API key behind a disclosure, 3) continue without Claude, said honestly
                 DisclosureGroup(L("onb.claude.haveKey"), isExpanded: $keyOpen) {
                 HStack {
@@ -372,7 +373,22 @@ struct OnboardingView: View {
                 keyState(settings.keyState[.claudeAPIKey], fallback: m.keyNote)
                 Link(L("onboarding.claude.getKey"), destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(PN.Font.caption)
                 }
-                if settings.config.ai.prep != AIRoute.codex && !settings.isSet(.claudeAPIKey) && setup.steps.first(where: { $0.id == "claude" })?.state != .ok {
+                } else {
+                // 0.9.0: ChatGPT: the account through Codex, or an OpenAI API key; one button sets every job to it
+                CodexAccountRow()
+                Button(L("ai.codex.use")) {
+                    settings.config.ai.prep = AIRoute.codex
+                    settings.config.ai.tips = AIRoute.codex
+                    settings.config.ai.after = AIRoute.codex
+                }.buttonStyle(.pnSecondary).disabled(CodexAccount.cliPath == nil)
+                KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: settings)
+                Button(L("ai.openai.use")) {
+                    settings.config.ai.prep = AIRoute.openai
+                    settings.config.ai.tips = AIRoute.openai
+                    settings.config.ai.after = AIRoute.openai
+                }.buttonStyle(.pnSecondary).disabled(!settings.isSet(.openaiAPIKey))
+                }
+                if ![AIRoute.codex, AIRoute.openai].contains(settings.config.ai.prep) && !settings.isSet(.claudeAPIKey) && !settings.isSet(.openaiAPIKey) && setup.steps.first(where: { $0.id == "claude" })?.state != .ok {
                     Text(L("onb.claude.without")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -397,7 +413,7 @@ struct OnboardingView: View {
     var primaryLabel: String {
         switch m.step {
         case .splash: return L("onboarding.splash.cta")
-        case .claude: return (settings.isSet(.claudeAPIKey) || settings.config.ai.prep == AIRoute.codex) ? L("common.continue") : L("onboarding.claude.continueNoKey")
+        case .claude: return (settings.isSet(.claudeAPIKey) || settings.isSet(.openaiAPIKey) || [AIRoute.codex, AIRoute.openai].contains(settings.config.ai.prep)) ? L("common.continue") : L("onboarding.claude.continueNoKey")
         case .done: return L("onboarding.done.primary")
         default: return L("common.continue")
         }

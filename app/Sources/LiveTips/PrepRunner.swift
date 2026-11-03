@@ -109,6 +109,9 @@ final class PrepRunner: ObservableObject {
     @Published var authInfo = ""
     private var checking = false
 
+    /// 0.9.0: an OpenAI key is in Keychain (presence only, no prompt).
+    var hasOpenAIKey: Bool { SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").has(.openaiAPIKey) }
+
     var hasAPIKey: Bool {
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         return store.has(.claudeAPIKey)     // 0.8.7.1: presence only, no Keychain prompt
@@ -285,7 +288,7 @@ final class PrepRunner: ObservableObject {
     func start(_ r: Request, route forced: String? = nil) -> String? {
         if running { return L("prep.err.running") }
         if forced == nil { switchedOnce = false; localTried = false }
-        let wantsLocal = [AIRoute.local, AIRoute.codex].contains(forced ?? AppConfig.load(from: AppPaths.config).ai.prep)
+        let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai].contains(forced ?? AppConfig.load(from: AppPaths.config).ai.prep)
         guard let claude = Self.claudePath ?? (wantsLocal ? "/usr/bin/true" : nil) else { return L("prep.err.noClaude") }
         let c = AppConfig.load(from: AppPaths.config)
         guard let skill = Self.skillDir(workRoot: c.workRoot) else { return L("prep.err.noSkill") }
@@ -395,18 +398,20 @@ final class PrepRunner: ObservableObject {
         // 0.8.2: the way from Settings > AI; with auto-switch the other one when this one cannot run at all.
         let routes = c.ai
         var route = forced ?? routes.prep
-        let usable: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
+        let usable: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.openai ? self.hasOpenAIKey : $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
         if forced == nil && routes.autoSwitch && !usable(route) && usable(AIRoute.other(route)) { route = AIRoute.other(route) }
         // rules/ai.yaml > fallback: no Claude way can run at all -> the model on this Mac
-        if forced == nil && routes.localFallback && ![AIRoute.local, AIRoute.codex].contains(route) && !usable(route) && !usable(AIRoute.other(route)) { route = AIRoute.local }
+        if forced == nil && routes.localFallback && ![AIRoute.local, AIRoute.codex, AIRoute.openai].contains(route) && !usable(route) && !usable(AIRoute.other(route)) { route = AIRoute.local }
         if route == AIRoute.api && !hasAPIKey { return L("prep.err.noKey") }
         if route == AIRoute.code && loggedIn == false { return L("prep.err.notSigned") }
         if route == AIRoute.codex && CodexAccount.cliPath == nil { return L("ai.codex.missing") }
+        if route == AIRoute.openai && !hasOpenAIKey { return L("prep.err.noOpenAIKey") }     // 0.9.0
         let isCodex = route == AIRoute.codex
         let useAPI = route == AIRoute.api
         let isLocal = route == AIRoute.local
-        let isPacked = isLocal || isCodex
-        let runModel = isCodex ? "codex/default" : isLocal ? localModel : model
+        let isOpenAI = route == AIRoute.openai      // 0.9.0 (owner): the preparation through the OpenAI API
+        let isPacked = isLocal || isCodex || isOpenAI
+        let runModel = isCodex ? "codex/default" : isOpenAI ? "gpt-5.4-mini" : isLocal ? localModel : model
         let aside = r.refreshBase == nil ? Self.moveAside(base: base) : nil      // a clean start, the old one kept
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
@@ -443,7 +448,7 @@ final class PrepRunner: ObservableObject {
             let reqPath = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("localprep-request.json")
             if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
             p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
-            p.arguments = ["-m", isCodex ? "livetips_m0.codexprep" : "livetips_m0.localprep", "--request", reqPath]
+            p.arguments = ["-m", isCodex ? "livetips_m0.codexprep" : isOpenAI ? "livetips_m0.openaiprep" : "livetips_m0.localprep", "--request", reqPath]
         }
         p.currentDirectoryURL = URL(fileURLWithPath: isPacked ? c.engine.sidecarDir : (r.useProjectFolder ? r.root : live))
         // 0.8.5 (owner: "lt digest" and "lt prep-check" were refused to Claude in every run): the app makes the digest
@@ -466,6 +471,8 @@ final class PrepRunner: ObservableObject {
             env["ANTHROPIC_API_KEY"] = key
             if let ws = store.get(.claudeWorkspaceID), !ws.isEmpty { env["ANTHROPIC_CUSTOM_HEADERS"] = "anthropic-workspace-id: " + ws }
         }
+        env.removeValue(forKey: "OPENAI_API_KEY")
+        if isOpenAI, let k = store.get(.openaiAPIKey), !k.isEmpty { env["OPENAI_API_KEY"] = k }    // to the child only
         if isCodex {
             env = CodexCLI.environment(env)
             env["LT_CODEX_CLI"] = CodexAccount.cliPath
@@ -523,7 +530,7 @@ final class PrepRunner: ObservableObject {
                         return
                     }
                 }
-                if ok { AIRoute.markUp(route) } else if !isCodex, let why = AIRoute.outReason(route, logText) {
+                if ok { AIRoute.markUp(route) } else if !isCodex && !isOpenAI, let why = AIRoute.outReason(route, logText) {
                     AIRoute.markDown(route, why)
                     let alt = AIRoute.other(route)
                     if routes.autoSwitch && !self.switchedOnce && usable(alt) {
@@ -537,7 +544,7 @@ final class PrepRunner: ObservableObject {
                     }
                 }
                 if useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
-                let routeName = isCodex ? "codex" : useAPI ? "api" : isLocal ? "local" : "plan"
+                let routeName = isCodex ? "codex" : isOpenAI ? "openai" : useAPI ? "api" : isLocal ? "local" : "plan"
                 var meta = self.resultMeta
                 meta["model"] = runModel
                 if !checkLine.isEmpty { meta["check"] = checkLine }
@@ -569,7 +576,7 @@ final class PrepRunner: ObservableObject {
                 let mins = Int((Date().timeIntervalSince(self.startedAt ?? Date())) / 60)
                 let tail = (try? String(contentsOfFile: (logs as NSString).appendingPathComponent("prep-claude.log"), encoding: .utf8))
                     .map { String($0.suffix(600)) } ?? ""
-                if !ok, isCodex, let error = self.resultMeta["error"] as? String {
+                if !ok, isCodex || isOpenAI, let error = self.resultMeta["error"] as? String {
                     self.result = error
                     CodexAccount.shared.refresh()
                 } else if !ok && (tail.contains("authenticate") || tail.contains("OAuth") || tail.contains("log in") || tail.contains("/login")) {
@@ -580,7 +587,7 @@ final class PrepRunner: ObservableObject {
                 } else {
                     let cost = isLocal ? L("prep.local") : self.costUSD.map { String(format: " · $%.2f", $0) + (useAPI ? "" : L("prep.plan")) } ?? ""
                     self.result = ok ? L("prep.readyIn", ["min": "\(max(1, mins))"]) + cost : L("prep.failedExit", ["code": "\(proc.terminationStatus)"])
-                    if ok { UsageLog.log("prepare_run", ["type": isLocal ? "local" : (isCodex ? "codex" : useAPI ? "api" : "code"), "source": "app", "seconds": mins * 60]) }
+                    if ok { UsageLog.log("prepare_run", ["type": isLocal ? "local" : (isCodex ? "codex" : isOpenAI ? "openai" : useAPI ? "api" : "code"), "source": "app", "seconds": mins * 60]) }
                 }
             }
         }

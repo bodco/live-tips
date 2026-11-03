@@ -9,6 +9,9 @@ from .codex_provider import CodexProvider, MODEL, find_codex_cli
 
 
 class Preparation:
+    label = "Codex"
+    head_route = "ChatGPT through Codex"
+
     def __init__(self, request, provider):
         self.request = request
         self.provider = provider
@@ -23,7 +26,7 @@ class Preparation:
         if result.error:
             raise RuntimeError(result.error)
         if not result.text.strip():
-            raise RuntimeError("Codex returned an empty " + name)
+            raise RuntimeError(self.label + " returned an empty " + name)
         return result.text
 
     def contents(self):
@@ -38,7 +41,7 @@ class Preparation:
             request["title"], request.get("when", ""), request.get("project_name", ""),
             request.get("audience", "auto"), request.get("call_type", "auto"), languages)
         pack = call + "\n\n" + pack
-        head = '# Live Brief: %s (prep, %s, ChatGPT through Codex)' % (request["title"], request.get("when", ""))
+        head = '# Live Brief: %s (prep, %s, %s)' % (request["title"], request.get("when", ""), self.head_route)
         brief = prep.clean_md(self.ask("brief", prep.BRIEF_SYS.format(
             BRIEF_LANG=brief_language, CALL_LANG=language, HEAD=head), pack, 7000))
         speech = self.ask("speech", prep.SPEECH_SYS.format(BRIEF_LANG=brief_language, CALL_LANG=language), brief, 3000)
@@ -48,7 +51,7 @@ class Preparation:
             BRIEF_LANG=brief_language, CALL_LANG=language, LANGS=languages), card_rules + "\n\n" + brief, 5000))
         facts = prep.as_list(self.ask("facts", prep.FACTS_SYS.format(LANGS=languages), brief + "\n\n" + pack, 8000))
         if not facts:
-            raise RuntimeError("Codex returned no usable facts; the previous preparation is kept")
+            raise RuntimeError(self.label + " returned no usable facts; the previous preparation is kept")
         return brief, cards, facts, sources
 
     def run(self):

@@ -500,7 +500,9 @@
     this.emit();
   };
 
-  Feed.prototype.setPrep = function (p) { if (p && p.state) { this.prep = p.state; this.emit(); } };
+  Feed.prototype.setPrep = function (p) {
+    if (p && p.state) { this.prep = p.state; this.prepInfo = { made: p.made || '', before: !!p.before, progress: +p.progress || 0 }; this.emit(); }
+  };
 
   Feed.prototype.setUpNext = function (list) {
     const u = (list || [])[0];
@@ -557,7 +559,7 @@
         tipsOff: s.tips === 'off' || s.call_type === 'transcript' && s.tips !== 'on',   // rules/meeting.yaml > tips
         proactive: s.proactive == null ? null : (s.proactive === true || s.proactive === 'on' || s.proactive === 'true' || s.proactive === '1'),
         micOff: s.mic === 'muted', minutesLeft: s.minutes_left != null ? +s.minutes_left : null,
-        recap: this.recap, briefLine, alert: this.alert(), presentable: steps.length > 0 || presType, presenting, presType
+        recap: this.recap, briefLine, prep: this.prep, prepInfo: this.prepInfo || { made: '', before: false, progress: 0 }, alert: this.alert(), presentable: steps.length > 0 || presType, presenting, presType
       },
       sys: this.sysState(),
       pres: { slide: this.slideN, slideRx: this.slideRx, timeline: this.timeline, moveAsk: this.moveAsk, follow: this.follow },

@@ -24,6 +24,8 @@ struct CallPageView: View {
     @ObservedObject private var links = NotionLinksVersion.shared   // 0.8.8: "In register" after an automatic add
     @State private var supersede: [String: [String: String]] = [:]  // 0.8.8: decision -> the active one it may replace
     @State private var adding = Set<String>()
+    @State private var tab = "summary"          // 0.9.0: Summary, Decisions, Tasks, Risks, Transcript (+ Sales)
+    @State private var exportOpen = false
 
     init(file: String) {
         self.file = file
@@ -43,6 +45,7 @@ struct CallPageView: View {
 
     private var record: CallHistory.Record? { history.records.first { $0.file == file } }
     private var folder: String { (file as NSString).deletingLastPathComponent }
+    private var folderRoot: String { (folder as NSString).deletingLastPathComponent }      // <root>/live -> <root>
     private var items: [Commitment] {
         register.items(in: folder).filter { CommitmentRegister.callKey($0.call) == CommitmentRegister.callKey(file) && $0.status != "dropped" }
     }
@@ -71,20 +74,41 @@ struct CallPageView: View {
                 }
                 actions(proj, o)
                 if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.onMe) }
-                if o.isEmpty && items.isEmpty && agenda.isEmpty {
-                    Text(L("call.page.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
+                if exportOpen {
+                    ExportPanel(file: file, title: Self.title(file), outcome: o, commitments: items) { exportOpen = false }
                 }
-                // 0.8.7 (E1, E2): every row is edited in place; "+ Add" under each section
-                decisionsSection(o, proj, ws)      // 0.8.8 (rules/decisions.yaml > after_call)
-                commitments(items.filter { $0.mine }, mine: true, legacy: items.isEmpty ? o.onMe : [], proj, ws)
-                commitments(items.filter { !$0.mine }, mine: false, legacy: [], proj, ws)
-                lines("open", L("call.page.open"), o.openQuestions) { saveLists(o, open: $0, section: "open") }
-                agendaSection(agenda)
-                risks(o, proj)
-                salesSection(cardRoot(proj, ws))
+                PageTabs(tabs: pageTabs(o), selection: $tab)
+                VStack(alignment: .leading, spacing: 16) {
+                    switch tab {
+                    case "decisions":
+                        trackerNote
+                        decisionsSection(o, proj, ws)      // 0.8.8 (rules/decisions.yaml > after_call)
+                    case "tasks":
+                        trackerNote
+                        commitments(items.filter { $0.mine }, mine: true, legacy: items.isEmpty ? o.onMe : [], proj, ws)
+                        commitments(items.filter { !$0.mine }, mine: false, legacy: [], proj, ws)
+                    case "risks":
+                        trackerNote
+                        risks(o, proj)
+                    case "transcript":
+                        TranscriptView(file: file, at: nil).frame(minHeight: 520)
+                        Text(L("page.transcript.local")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    case "sales":
+                        salesSection(cardRoot(proj, ws))
+                    default:
+                        summaryTab(o)
+                        if o.isEmpty && items.isEmpty && agenda.isEmpty {
+                            Text(L("call.page.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
+                        }
+                        lines("open", L("call.page.open"), o.openQuestions) { saveLists(o, open: $0, section: "open") }
+                        agendaSection(agenda)
+                    }
+                }
+                .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.l))
             }
             .id(tick)
-            .padding(24).frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)      // 0.9.0: centred
         }
         .background(PN.C.bg)
         .sheet(item: $cardDraft) { c in
@@ -164,27 +188,72 @@ struct CallPageView: View {
         }
     }
 
+    // MARK: 0.9.0 tabs
+
+    private var hasSales: Bool { FileManager.default.fileExists(atPath: (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".sales.json") }
+
+    private func pageTabs(_ o: CallOutcome) -> [(String, String)] {
+        let n: (Int) -> String = { $0 > 0 ? " \($0)" : "" }
+        return [("summary", L("page.tab.summary")), ("decisions", L("page.tab.decisions") + n(o.decisions.count)),
+                ("tasks", L("page.tab.tasks") + n(max(items.count, items.isEmpty ? o.onMe.count : 0))), ("risks", L("page.tab.risks") + n(o.risks.count)),
+                ("transcript", L("call.page.transcript"))] + (hasSales ? [("sales", L("sales.section"))] : [])
+    }
+
+    private var trackerNote: some View {
+        Text(L("page.trackerNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+    }
+
+    @ViewBuilder private func summaryTab(_ o: CallOutcome) -> some View {
+        let short = CallNotes.inShort(file), discussed = CallNotes.discussed(file), next = CallNotes.nextCall(file)
+        if short.isEmpty && discussed.isEmpty {
+            Text(o.line.isEmpty ? L("home.noNotes") : o.line).font(PN.Font.body).foregroundStyle(PN.C.text2)
+        }
+        if !short.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("page.sum.inShort").uppercased()).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                Text(short.joined(separator: " ")).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        if !discussed.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("page.sum.discussed").uppercased()).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                ForEach(discussed, id: \.self) { d in Text("• " + d).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true) }
+            }
+        }
+        if !next.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(nextCallLabel).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                ForEach(next, id: \.self) { d in Text("• " + d).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true) }
+            }
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+        }
+    }
+
+    /// "FOR THE NEXT CALL · WED 15:00" when the calendar has the next call of this series.
+    private var nextCallLabel: String {
+        let key = EditLog.seriesKey(Self.title(file))
+        let base = L("page.sum.next").uppercased()
+        guard let e = CalendarService.shared.events.first(where: { $0.start > Date() && EditLog.seriesKey($0.title) == key }) else { return base }
+        let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate("EEEHHmm")
+        return base + " · " + f.string(from: e.start).uppercased()
+    }
+
     @ViewBuilder private func actions(_ proj: Project?, _ o: CallOutcome) -> some View {
         HStack(spacing: 8) {
-            // 0.8.7 (E1): no Edit mode; rows are edited in place
-            // 0.8.7 (A3): Option-Command-I opens and closes the follow-up panel
+            // 0.9.0: Ask about this call, the follow-up email, Export; the rest in "..."
+            Button { MemoryWindow.show(project: proj?.root ?? folderRoot) } label: { Label(L("page.ask"), systemImage: "magnifyingglass") }
+                .buttonStyle(.pnSecondary)
             Button(L("call.page.followup")) {
                 if HomeNav.shared.followUp == file { HomeNav.shared.followUp = nil } else { FollowUpWindow.show(file: file) }
             }
-            .buttonStyle(.pnPrimary).keyboardShortcut("i", modifiers: [.command, .option]).help(L("call.page.followup.help"))
-            Button(L("call.page.transcript")) { TranscriptWindow.show(file: file) }.buttonStyle(.pnSecondary)
-            if let r = record, Self.series(of: r).count > 1 {
-                Button(L("call.page.series", ["n": "\(Self.series(of: r).count)"])) { SeriesWindow.show(record: r) }.buttonStyle(.pnSecondary)
-            } else {
-                // 0.8.7 (L2): visible, greyed out, with the condition
-                VStack(spacing: 1) {
-                    Button(L("recent.series")) {}.buttonStyle(.pnSecondary).disabled(true)
-                    Text(L("series.after2")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                }.help(L("series.after2"))
-            }
+            .buttonStyle(.pnSecondary).keyboardShortcut("i", modifiers: [.command, .option]).help(L("call.page.followup.help"))
+            Button(L("page.export")) { exportOpen.toggle() }.buttonStyle(.pnPrimary)
             Menu {
                 if let u = record?.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
                 Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }
+                Button(L("call.page.transcript")) { TranscriptWindow.show(file: file) }
+                if let r = record, Self.series(of: r).count > 1 { Button(L("call.page.series", ["n": "\(Self.series(of: r).count)"])) { SeriesWindow.show(record: r) } }
                 Divider()
                 // 0.8.7 (I5, L2): Update <CRM> is always listed; without a connection it leads to Settings
                 if CRMService.shared.connected {

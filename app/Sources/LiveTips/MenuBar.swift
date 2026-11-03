@@ -596,7 +596,7 @@ final class StartCallModel: ObservableObject {
                                   config: project?.config ?? "", audience: audience, callType: callType, hiringRole: hiringRole,
                                   languages: language.split(separator: "+").map(String.init), context: cleanContext,
                                   workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""), folders: folders,
-                                  useProjectFolder: useProjectFolder, callID: id,
+                                  useProjectFolder: useProjectFolder && workspace?.name != ProjectRegistry.defaultWorkspaceName, callID: id,   // 0.9.0: never read the app folder
                                   deck: callType == "presentation" && deck.info != nil ? deck : nil,
                                   salesMethod: salesEnabled ? (salesMethod.isEmpty ? "general" : salesMethod) : nil,
                                   company: project?.crmCompanyName ?? "")
@@ -614,6 +614,12 @@ final class StartCallModel: ObservableObject {
     var project: Project? { registry.projects.first { "project:" + $0.slug == target } }
     var workspace: Workspace? { registry.workspaces.first { "workspace:" + $0.name == target } }
     var root: String? { project?.root ?? workspace?.root }
+
+    /// 0.9.0 (owner): no project or workspace chosen: the call goes to the app's own live folder ("My calls").
+    func useDefaultTargetIfEmpty() {
+        guard target.isEmpty else { return }
+        target = "workspace:" + ProjectRegistry.defaultWorkspaceName
+    }
 
     /// Two seconds to see the right project is chosen: people from its config, Claude on or off,
     /// the last call with it and how fresh the Notion mirror is.
@@ -720,6 +726,7 @@ extension AppDelegate {
     /// being written joins the call when done. Returns an error line, or nil.
     @MainActor
     func launch(_ model: StartCallModel) -> String? {
+        model.useDefaultTargetIfEmpty()
         if model.chosenPrep == nil { model.adoptExistingPrep() }
         if model.chosenPrep == nil, let b = model.prepBase, let root = model.root {
             let name = (b as NSString).lastPathComponent + ".brief.md"

@@ -72,7 +72,10 @@
       listeningTitle: 'Listening', tipsOffTitle: 'Transcript only', tipsOffSub: 'Tips are off. The summary and the follow-up come after the call. Turn tips on in Call settings.', listeningSub: (k) => `Tips show up here when they matter. Stuck? Press ${k}.`, onDevice: 'Audio stays on this Mac',
       searched: (o) => `You searched: ${o.q}`, shorterMeta: 'Shorter', applied: 'Settings applied', prepReady: 'The brief is ready',
       speakerN: (o) => `Speaker ${o.n}`, yourTurn: 'Your turn: give your update', me: 'Me', them: 'Unknown voice', lineWhoTip: 'The voice was not recognised. Click to say who said this line.', lineWhoSaved: 'Saved: the transcript shows it after the call',
-      briefReady: (o) => o.at ? `Brief ready · ${o.at}` : 'Brief ready', briefPreparing: 'Preparing the brief…', briefFailed: 'The brief could not be prepared', noBrief: 'No brief yet'
+      briefReady: (o) => o.at ? `Brief ready · ${o.at}` : 'Brief ready', briefPreparing: 'Preparing the brief…', briefFailed: 'The brief could not be prepared', noBrief: 'No brief yet',
+      bbReady: (o) => o.made ? `Brief · made ${o.made}${o.before ? ', before the call' : ''}` : 'Brief', bbReadySub: 'Uses what was said so far, plus the project files',
+      bbAgain: 'Prepare again', bbNone: 'No brief · tips use only the call so far', bbNow: 'Prepare now', bbRunning: 'Preparing in the background…',
+      bbRunningSub: 'Recording and tips keep going. The new brief takes over when it is ready, about 1 min.', bbCancel: 'Cancel'
     },
     uk: {
       listening: 'Слухаю', paused: 'Пауза', muted: 'Мікрофон вимкнено', ended: 'Дзвінок завершено', ending: 'Завершую дзвінок…', starting: 'Запускаю…',
@@ -133,7 +136,10 @@
       listeningTitle: 'Слухаю', tipsOffTitle: 'Лише транскрипт', tipsOffSub: 'Підказки вимкнено. Підсумок і фоллоу-ап будуть після дзвінка. Увімкнути підказки можна в налаштуваннях дзвінка.', listeningSub: (k) => `Підказки зʼявляться тут, коли будуть потрібні. Застряг? Натисни ${k}.`, onDevice: 'Аудіо лишається на цьому Mac',
       searched: (o) => `Ви шукали: ${o.q}`, shorterMeta: 'Коротше', applied: 'Налаштування застосовано', prepReady: 'Бриф готовий',
       speakerN: (o) => `Спікер ${o.n}`, yourTurn: 'Твоя черга: розкажи свій апдейт', me: 'Я', them: 'Невідомий голос', lineWhoTip: 'Голос не розпізнано. Клацніть, щоб вказати, хто сказав цей рядок.', lineWhoSaved: 'Збережено: у транскрипті буде після дзвінка',
-      briefReady: (o) => o.at ? `Бриф готовий · ${o.at}` : 'Бриф готовий', briefPreparing: 'Готую бриф…', briefFailed: 'Бриф не вдалося підготувати', noBrief: 'Брифу ще немає'
+      briefReady: (o) => o.at ? `Бриф готовий · ${o.at}` : 'Бриф готовий', briefPreparing: 'Готую бриф…', briefFailed: 'Бриф не вдалося підготувати', noBrief: 'Брифу ще немає',
+      bbReady: (o) => o.made ? `Бриф · зроблено ${o.made}${o.before ? ', до дзвінка' : ''}` : 'Бриф', bbReadySub: 'Враховує сказане досі і файли проєкту',
+      bbAgain: 'Підготувати ще раз', bbNone: 'Брифу немає · підказки лише з того, що сказано', bbNow: 'Підготувати зараз', bbRunning: 'Готую у фоні…',
+      bbRunningSub: 'Запис і підказки не зупиняються. Новий бриф підхопиться, щойно буде готовий, приблизно за 1 хв.', bbCancel: 'Скасувати'
     }
   };
 
@@ -231,6 +237,28 @@
   const MARK = '<svg class="mark" viewBox="320 206 460 626" aria-hidden="true"><path d="M400 742V404C400 312 466 262 556 262C664 262 724 330 724 412C724 500 662 560 556 560H500" fill="none" stroke="currentColor" stroke-width="92" stroke-linecap="round" stroke-linejoin="round"/><circle cx="400" cy="752" r="70" fill="var(--brand)"/></svg>';
 
   // ---------- Render ----------
+  // 0.9.0 (rules/live_prep.yaml): the brief strip under the header, only while a call runs
+  function renderBriefBar(t) {
+    const bar = $('briefBar');
+    if (!bar) return;
+    const live = S.call.state === 'live' && !S.call.tipsOff && S.call.mode !== 'compact';
+    bar.hidden = !live;
+    if (!live) return;
+    const p = S.call.prep || 'none', info = S.call.prepInfo || {};
+    let html;
+    if (p === 'running') {
+      const pct = Math.round((info.progress || 0) * 100);
+      html = `<div class="bb-main"><span class="bb-t">${esc(t.bbRunning)}</span><span class="bb-s">${esc(t.bbRunningSub)}</span>`
+        + `<span class="bb-prog"><span style="width:${pct}%"></span></span></div><button class="ghost" type="button" data-act="liveprep-cancel">${esc(t.bbCancel)}</button>`;
+    } else if (p === 'ready') {
+      html = `<div class="bb-main"><span class="bb-t">${esc(t.bbReady(info))}</span><span class="bb-s">${esc(t.bbReadySub)}</span></div>`
+        + `<button class="ghost" type="button" data-act="liveprep">${esc(t.bbAgain)}</button>`;
+    } else {
+      html = `<div class="bb-main"><span class="bb-t">${esc(t.bbNone)}</span></div><button class="btn1" type="button" data-act="liveprep">${esc(t.bbNow)}</button>`;
+    }
+    if (bar.dataset.html !== html) { bar.innerHTML = html; bar.dataset.html = html; }
+  }
+
   function render() {
     const t = T();
     document.documentElement.lang = S.lang;
@@ -252,6 +280,7 @@
     $('onmeLbl').textContent = t.onMe; $('onmeN').textContent = openOnMe;
     $('onmeBtn').hidden = openOnMe === 0;
     firstCallHint();
+    renderBriefBar(t);
     // 0.8.7 (H4): "BANT 2/4" in the header for methods with a chip; a click opens the Deal tab
     const dealChip = S.deal && S.deal.chip ? `${S.deal.name} ${S.deal.known}/${S.deal.total}` : '';
     $('dealBtn').hidden = !dealChip; $('dealBtn').textContent = dealChip;
@@ -933,6 +962,8 @@
     const act = b.dataset.act, id = b.dataset.id;
     const card = id && S.cards.find((c) => c.id === id);
     switch (act) {
+      case 'liveprep': post('liveprep', { a: 'start' }); if (feed) feed.setPrep({ state: 'running', progress: 0 }); return;
+      case 'liveprep-cancel': post('liveprep', { a: 'cancel' }); return;
       case 'said':
         if (card) { card.state = 'done'; if (feed) feed.mark(id, { state: 'done' }); post('said', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'say' }); }
         S.ui.heroOverride = null; break;

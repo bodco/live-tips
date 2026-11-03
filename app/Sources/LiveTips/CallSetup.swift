@@ -7,7 +7,7 @@ import LiveTipsCore
 // with the added folders and files, and the brief in one line. The rest is under Options, with labels. Hints only
 // where something is wrong; longer explanations behind (i).
 
-enum CallSetupMode { case start, prepare, plan }
+enum CallSetupMode { case start, prepare, plan, page }     // 0.9.0: page = the Setup tab of a call page
 
 struct CallSetupView: View {
     @ObservedObject var model: StartCallModel
@@ -41,6 +41,7 @@ struct CallSetupView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
+                if mode == .page { pageForm.padding(20) } else {
                 VStack(alignment: .leading, spacing: 16) {
                     header
                     if live { liveBanner }
@@ -54,6 +55,7 @@ struct CallSetupView: View {
                     options
                 }
                 .padding(24)
+                }
             }
             // 0.8.7 (G6): one scroll view for the whole form; the footer is pinned and the content ends above it
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -305,7 +307,7 @@ struct CallSetupView: View {
     private var contextBox: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                fieldLabel(L("call.whatMatters"))
+                if mode != .page { fieldLabel(L("call.whatMatters")) }      // 0.9.0: the page asks it as a question above
                 Button { info.toggle() } label: { Image(systemName: "info.circle").foregroundStyle(PN.C.text3) }
                     .buttonStyle(.borderless).accessibilityLabel(L("call.about"))
                     .popover(isPresented: $info, arrowEdge: .trailing) {
@@ -519,11 +521,68 @@ struct CallSetupView: View {
         }
     }
 
+    // MARK: 0.9.0 page mode: three questions, the rest under More settings, Save applies
+
+    @State private var pageMore = false
+    @State private var useForSeries = false
+
+    private func question<C: View>(_ title: String, @ViewBuilder _ c: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+            c()
+        }
+    }
+
+    @ViewBuilder private var pageForm: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            question(L("page.q.kind")) {
+                Picker("", selection: $model.callType) {
+                    Text(L("start.type.regular")).tag("auto")
+                    Text(L("start.type.presentation")).tag("presentation")
+                    Text(L("callSettings.type.interview")).tag("interview")
+                    Text(L("callSettings.type.transcript")).tag("transcript")
+                }.labelsHidden().pickerStyle(.segmented).fixedSize()
+                Toggle(isOn: Binding(get: { model.salesEnabled }, set: { model.salesEnabled = $0; model.salesTouched = true })) {
+                    Text(L("page.salesMode")).font(PN.Font.body)
+                }
+                .toggleStyle(.checkbox)
+                if model.callType != "auto" { typeSection }
+            }
+            question(L("page.q.matters")) { contextBox }
+            Text(L("page.files.note")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            if let h = problemHint { Label(h, systemImage: "info.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
+            DisclosureGroup(isExpanded: $pageMore) {
+                VStack(alignment: .leading, spacing: 14) {
+                    projectRow
+                    titleRow
+                    timeRow
+                    typeRow
+                    options
+                }
+                .padding(.top, 8)
+            } label: { Text(L("page.more")).font(PN.Font.section).foregroundStyle(PN.C.text) }
+        }
+    }
+
+    @ViewBuilder private var pageButtons: some View {
+        Toggle(L("page.useForSeries", ["title": model.effectiveTitle]), isOn: $useForSeries).toggleStyle(.checkbox)
+            .help(L("page.useForSeries.help"))
+        Spacer()
+        Button(L("common.cancel"), action: onCancel).buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)
+        Button(L("common.save")) {
+            model.useDefaultTargetIfEmpty()
+            if useForSeries { SeriesMemory.shared.remember(model) }
+            onSave()
+        }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+    }
+
     // MARK: buttons by mode (spec 5)
 
     @ViewBuilder private var buttons: some View {
         HStack(spacing: 10) {
             switch mode {
+            case .page:
+                pageButtons
             case .prepare:
                 Spacer()
                 Button(L("common.cancel"), action: onCancel).buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)
@@ -563,13 +622,13 @@ struct CallSetupView: View {
                     }
                     .help(L("rehearse.needPrep"))
                 }
-                Button(L("home.startCall")) { if !needProject() { onStart() } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                Button(L("home.startCall")) { model.useDefaultTargetIfEmpty(); onStart() }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                     .fixedSize()     // 0.8.7.1: "Почати дзвінок" broke into two lines in Ukrainian
             case .plan:
                 if saved { Button(L("home.removeUpNext"), action: onRemove).buttonStyle(.pnTertiary) }
                 Spacer()
                 Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
-                Button(live ? L("call.switch") : L("home.startNow"), action: live ? onSwitch : onStart).buttonStyle(.pnSecondary).disabled(model.target.isEmpty)
+                Button(live ? L("call.switch") : L("home.startNow")) { model.useDefaultTargetIfEmpty(); (live ? onSwitch : onStart)() }.buttonStyle(.pnSecondary)
                 Button(L("common.save")) { if !needProject() { onSave() } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
             }
         }

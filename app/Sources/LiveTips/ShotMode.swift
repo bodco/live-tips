@@ -129,6 +129,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "ai" { steps.append { [unowned self] in self.settings("ai", theme) }; continue }   // Settings > AI only
             if env["LT_SHOTS_ONLY"] == "p085" { p085(theme); continue }    // 0.8.5: the boards P1-P8 next to the mockups
             if env["LT_SHOTS_ONLY"] == "p087" { p087(theme); continue }    // 0.8.7: the new screens
+            if env["LT_SHOTS_ONLY"] == "p090" { p090(theme); continue }    // 0.9.0: Home in its integration states
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
@@ -514,6 +515,36 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         for st in OnboardingModel.Step.allCases where st != .splash { steps.append { [unowned self] in self.onboarding(st, theme) } }
         let deal = "LiveTips.setState({deal:{name:'BANT',chip:true,known:2,total:4,criteria:[{key:'budget',name:'Budget',state:'known',what:'Northwind set aside a budget for Q1',quote:'we have money for this',t:'10:04'},{key:'authority',name:'Authority',state:'partial',what:'Emily Clark decides with the CFO',quote:'',t:''},{key:'need',name:'Need',state:'known',what:'Reports take two days a week',quote:'',t:''},{key:'timeline',name:'Timeline',state:'unknown',what:'',quote:'',t:''}],objections:['Price is high for a pilot'],nextStep:'Demo for the CFO on Friday',signals:['Asked about onboarding']}}); LiveTips.openTab('deal');"
         steps.append { [unowned self] in self.tipsExtra(theme, js: deal, name: "p087-tips-deal") }
+    }
+
+    /// 0.9.0: Home with everything connected, without a calendar, without Claude and on the first launch.
+    func p090(_ theme: String) {
+        for st in ["", "nocal", "noai", "first"] {
+            steps.append { [unowned self] in
+                HomeView.shotState = st
+                self.home(theme)
+            }
+            steps.append { [unowned self] in
+                // home() names its pictures home-<theme>; keep each state under its own name
+                let uk = L10n.lang == "uk" ? "-uk" : ""
+                for n0 in ["home-\(theme)", "home-wide-\(theme)"] {
+                    let n = n0 + uk
+                    let a = self.out.appendingPathComponent(n + ".png"), b = self.out.appendingPathComponent("p090-" + (st.isEmpty ? "all" : st) + "-" + n + ".png")
+                    try? FileManager.default.removeItem(at: b); try? FileManager.default.moveItem(at: a, to: b)
+                }
+                self.next(after: 0.2)
+            }
+        }
+        steps.append { [unowned self] in HomeView.shotState = ""; self.settings("usage", theme) }
+        steps.append { [unowned self] in self.settings("help", theme) }
+        steps.append { [unowned self] in self.settings("ai", theme) }
+        steps.append { [unowned self] in self.settings("modules", theme) }
+        steps.append { [unowned self] in self.homePage("p090-upcoming-\(theme)") { UpcomingPages.open(self.planned) } }
+        steps.append { [unowned self] in self.homePage("p090-call-page-\(theme)") { if let r = self.demoCall { CallPageWindow.show(file: r.file) } } }
+        steps.append { [unowned self] in self.homePage("p090-tracker-\(theme)") { HomeNav.shared.open(.tracker) } }
+        steps.append { [unowned self] in self.menuPanel(theme, live: false) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setPrep({state:'ready',made:'15:58',before:true});", name: "p090-tips-brief", size: NSSize(width: 560, height: 620)) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setPrep({state:'running',progress:0.4});", name: "p090-tips-preparing", size: NSSize(width: 560, height: 620)) }
     }
 
     /// 0.8.7: pages pushed inside Home (call page, follow-up panel, series) are captured from the Home window.

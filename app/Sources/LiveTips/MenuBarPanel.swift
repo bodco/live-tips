@@ -158,14 +158,25 @@ struct MenuBarPanel: View {
                     Spacer()
                     badge(n.state)
                 }
-                Text(n.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text).lineLimit(2)
+                Button { openPage(n) } label: {
+                    Text(n.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
+                }.buttonStyle(.plain).help(L("home.openCall.help"))
                 if !n.note.isEmpty { Text(n.note).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
-                HStack(spacing: 8) {
-                    Button(L("menubar.startTips")) { start(n) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
-                    if n.state == .ready, let m = n.ahead.model, PrepDocWindow.path(for: m) != nil {
-                        Button(L("menubar.openBrief")) { openBrief(n) }.buttonStyle(.pnSecondary)
-                    } else if n.state != .running && n.state != .queued {
-                        Button(L("menubar.prepare")) { prepare(n) }.buttonStyle(.pnSecondary)
+                // 0.9.0: the same rule as Home: one main button and one link under it
+                VStack(alignment: .leading, spacing: 5) {
+                    let st = CallState.of(n.state, ai: HomeView.aiReadyNow())
+                    switch st {
+                    case .noBrief:
+                        Button { start(n) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                        link(L("home.connectClaude")) { model.run { _ in SettingsWindow.show(tab: "ai") } }
+                    case .ready:
+                        Button { start(n) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                        link(L("talk.prepareAgain")) { prepare(n) }
+                    case .preparing, .queued:
+                        Button { start(n) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                    default:
+                        Button(L("home.getReady")) { prepare(n) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                        link(L("home.startWithout")) { start(n) }
                     }
                 }
                 .padding(.top, 6)
@@ -180,10 +191,11 @@ struct MenuBarPanel: View {
     private var laterList: some View {
         VStack(spacing: 2) {
             ForEach(model.later) { c in
-                Button { model.run { app in StartCallWindow.show(delegate: app, prepared: c.ahead.setup()) } } label: {
+                Button { openPage(c) } label: {
                     HStack(spacing: 10) {
+                        Circle().fill(CallState.of(c.state, ai: HomeView.aiReadyNow()).color).frame(width: 7, height: 7).accessibilityHidden(true)
                         Text(Self.time(c.startsAt)).font(PN.Font.caption).monospacedDigit().foregroundStyle(PN.C.text3)
-                            .frame(width: 42, alignment: .leading)
+                            .lineLimit(1).fixedSize()
                         Text(c.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1)
                         Spacer()
                         badge(c.state)
@@ -271,20 +283,21 @@ struct MenuBarPanel: View {
         .buttonStyle(.plain)
     }
 
-    @ViewBuilder private func badge(_ s: UpNext.PrepState) -> some View {
-        switch s {
-        case .ready: PNBadge(text: L("badge.ready"), kind: .ready)
-        case .running: PNBadge(text: L("badge.preparing"), kind: .stale)
-        case .queued: PNBadge(text: L("badge.queued"), kind: .stale)
-        case .failed: PNBadge(text: L("badge.failed"), kind: .live)
-        case .none: PNBadge(text: L("badge.notPrepared"), kind: .notPrepared)
-        }
+    /// 0.9.0: the soft pill of Home (Ready / Not ready), no loud fills.
+    private func badge(_ s: UpNext.PrepState) -> some View { StatePill(state: CallState.of(s, ai: HomeView.aiReadyNow())) }
+
+    private func link(_ t: String, run: @escaping () -> Void) -> some View {
+        Button(action: run) { Text(t).font(PN.Font.caption).foregroundStyle(PN.C.accent) }.buttonStyle(.plain)
+    }
+
+    /// The call's page in Home (Setup, Brief, Tasks, Earlier calls).
+    private func openPage(_ c: MenuBarModel.Call) {
+        model.run { app in HomeWindow.show(delegate: app); UpcomingPages.open(c.ahead.setup()) }
     }
 
     private func start(_ c: MenuBarModel.Call) {
         model.run { app in
             let m = c.ahead.setup()
-            guard !m.target.isEmpty else { StartCallWindow.show(delegate: app, prepared: m); return }
             if let e = app.launch(m) { CallEngine.shared.notify(e) }
         }
     }

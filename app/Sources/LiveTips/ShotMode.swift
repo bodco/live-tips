@@ -130,6 +130,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "p085" { p085(theme); continue }    // 0.8.5: the boards P1-P8 next to the mockups
             if env["LT_SHOTS_ONLY"] == "p087" { p087(theme); continue }    // 0.8.7: the new screens
             if env["LT_SHOTS_ONLY"] == "p090" { p090(theme); continue }    // 0.9.0: Home in its integration states
+            if env["LT_SHOTS_ONLY"] == "p092" { p092(theme); continue }    // 0.9.2: the site hero (Home + a live call)
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
@@ -546,6 +547,27 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setPrep({state:'ready',made:'15:58',before:true});", name: "p090-tips-brief", size: NSSize(width: 560, height: 620)) }
         steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setPrep({state:'running',progress:0.4});", name: "p090-tips-preparing", size: NSSize(width: 560, height: 620)) }
     }
+
+    /// 0.9.2 (owner): the site hero, Home and a live call with the agenda, a ready answer to a statement and the transcript.
+    func p092(_ theme: String) {
+        steps.append { [unowned self] in HomeView.shotState = ""; self.home(theme) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: Self.p092JS, name: "p092-live", size: NSSize(width: 1040, height: 640)) }
+    }
+
+    static let p092JS = """
+      var hm = function (s) { return new Date(Date.now() - s * 1000).toTimeString().slice(0, 8); };
+      window.setSpeakers({clusters:{S1:{name:'Emily C.',seconds:52,side:'client'},S2:{name:'David K.',seconds:30,side:'client'}},
+        roster:[{name:'Emily C.',side:'client'},{name:'David K.',side:'client'},{name:'Sarah L.',side:'team'}]});
+      window.addTranscript(['[10:32:40] Emily C. [S1] (en): Honestly, we still have no test accounts for the pilot.']);   // the demo window has the first lines
+      window.addItems([
+        {kind:'agenda', items:[{id:'g1',text:'Export release date',state:'done',done:true},{id:'g2',text:'Who tests the pilot',state:'done',done:true},
+          {id:'g3',text:'Test accounts from the client',state:'now',cur:true},{id:'g4',text:'Agree the pilot start date',state:'todo'},
+          {id:'g5',text:'Next review',state:'todo'}]},
+        {t:hm(12), src:hm(18), kind:'tip', level:'orange', trigger:'answer_in_primary', uid:'p092a', engine:'app',
+         gist:'🟠 No test accounts yet: there is a plan', phrase:'Your IT sends 5 accounts by Friday; we start Monday with ours.',
+         items:['Kick-off notes 21.10: 5 accounts by Friday'], note:'kickoff-notes.md'}]);
+      LiveTips.openTab('transcript');
+      """
 
     /// 0.8.7: pages pushed inside Home (call page, follow-up panel, series) are captured from the Home window.
     func homePage(_ name: String, open: () -> Void) {

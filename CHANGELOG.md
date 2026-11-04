@@ -5,6 +5,8 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+## 0.9.0 (2026-11-04)
+
 - **Live tips reliability:** suppress expired automatic requests before generation, streaming and final output;
   repeated transcript lines cannot trigger twice. Context corrections from the live window rebuild preparation,
   invalidate old model responses and clear the obsolete agenda. Preparation checks participant/goal/source conflicts

@@ -24,6 +24,7 @@ def main(argv=None):
     started = time.monotonic()
     model = job_model("prep", request.get("openai_model") or os.environ.get("LT_OPENAI_MODEL"))
     result = {"ok": False, "model": model, "tokens": {}, "sources": []}
+    preparation = None
     try:
         key = os.environ.get("OPENAI_API_KEY", "")
         if not key:
@@ -34,6 +35,8 @@ def main(argv=None):
         result["ok"] = True
     except Exception as error:  # noqa: BLE001  the app restores the previous files on failure
         result["error"] = str(error)[:200]
+    if preparation is not None:
+        result["cost_usd"] = round(preparation.usd, 6)     # 0.9.3: the app logs it in spend-ledger.jsonl (Usage)
     result["duration_s"] = int(time.monotonic() - started)
     prep.say(**result)
     return 0 if result["ok"] else 1

@@ -29,6 +29,25 @@ routes:
     reasoning tokens, the incomplete reason, the retry, the tail and the route of every request, and run.json names the
     route and the model each role really used (models, routes; observed and models_match after the call).
     No tools or saved sessions.
+  gemini: |
+    0.9.3 (owner, 2026-11-04): Gemini API key from macOS Keychain (GEMINI_API_KEY in the child process only), the job's
+    Gemini model (Settings > AI; defaults gemini-3.5-flash-lite for tips, gemini-3.8-flash for preparation and after
+    the call) through the classic streamGenerateContent endpoint (stateless: no stored interactions, no tools, no
+    files, no cached-content objects; the key goes in the x-goog-api-key header, never the URL). Paid tier only by
+    design: Google uses free-tier content to improve its products and not paid-tier content. Thinking cannot be off
+    for these models: the lowest level is sent (minimal for Flash-Lite, low for Flash and Argon) and billed as output.
+    maxOutputTokens counts the thinking too, so the answer limit gets room on top (128 for minimal, 512 for low).
+    Caching is implicit (a stable prefix of 4,096 tokens or more, no write charge). An answer cut by the output limit
+    follows the OpenAI rules (a whole JSON object at the start is kept, otherwise asked once more with three times
+    the limit). Errors name only the status and a string code, never the message. No automatic fallback from a
+    chosen Gemini to Claude, OpenAI or local. Available for tips, after-call jobs and the preparation
+    (livetips_m0.geminiprep). Claude Code deep folder lookup is disabled when tips use Gemini.
+  gemini_fallback: |
+    0.9.3 (owner): plan B, off by default (Settings > AI > Automatic switching). With it on and a Gemini key set, a job
+    whose chosen way is out (no credit, plan limit, bad key, not signed in; a plain rate limit or a timeout is not an
+    outage) goes to Gemini: after the other Claude way when auto-switch is on, before the model on this Mac. Tips
+    during a call switch too. The out way is checked again as before and the job goes back to it once it answers.
+    The text of the call then reaches Google, so the switch is the PM's explicit choice; it is never on by default.
   local: |
     0.8.5 (owner): a preparation on this Mac through Ollama (Settings > AI > Preparation, model gemma4:26b by
     default). A local model reads files poorly by itself, so the engine (livetips_m0.localprep) builds one context

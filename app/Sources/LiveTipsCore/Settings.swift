@@ -50,6 +50,14 @@ public struct AppConfig: Codable, Equatable {
         public var openaiPrep = "gpt-6.1-sol"
         public var openaiTips = "gpt-6-luna"
         public var openaiAfter = "gpt-6.1-sol"
+        /// 0.9.3 (owner, 2026-11-04): the Gemini model of each job when its way is the Gemini API (paid tier).
+        /// Tips on Flash-Lite (fast), the preparation and after the call on Flash (balanced).
+        public var geminiPrep = "gemini-3.8-flash"
+        public var geminiTips = "gemini-3.5-flash-lite"
+        public var geminiAfter = "gemini-3.8-flash"
+        /// 0.9.3 (owner): plan B, off by default. When the chosen way is out (no credit, the plan limit, a bad key) the
+        /// job goes to Gemini. The text of the call then reaches Google; that is why the PM turns it on.
+        public var geminiFallback = false
         public init() {}
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -62,8 +70,13 @@ public struct AppConfig: Codable, Equatable {
             openaiPrep = (try? c.decodeIfPresent(String.self, forKey: .openaiPrep)) ?? d.openaiPrep
             openaiTips = (try? c.decodeIfPresent(String.self, forKey: .openaiTips)) ?? d.openaiTips
             openaiAfter = (try? c.decodeIfPresent(String.self, forKey: .openaiAfter)) ?? d.openaiAfter
+            geminiPrep = (try? c.decodeIfPresent(String.self, forKey: .geminiPrep)) ?? d.geminiPrep
+            geminiTips = (try? c.decodeIfPresent(String.self, forKey: .geminiTips)) ?? d.geminiTips
+            geminiAfter = (try? c.decodeIfPresent(String.self, forKey: .geminiAfter)) ?? d.geminiAfter
+            geminiFallback = (try? c.decodeIfPresent(Bool.self, forKey: .geminiFallback)) ?? d.geminiFallback
         }
         public func openaiModel(_ job: String) -> String { job == "prep" ? openaiPrep : job == "tips" ? openaiTips : openaiAfter }
+        public func geminiModel(_ job: String) -> String { job == "prep" ? geminiPrep : job == "tips" ? geminiTips : geminiAfter }
         public func route(_ job: String) -> String { job == "prep" ? prep : job == "tips" ? tips : after }
     }
     /// Engine processes (M1-M2: Python core). Not shown in the UI; set by the installer.

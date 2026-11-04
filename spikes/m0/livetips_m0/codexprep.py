@@ -16,6 +16,7 @@ class Preparation:
         self.request = request
         self.provider = provider
         self.tokens = {"input": 0, "output": 0}
+        self.usd = 0.0       # 0.9.3: what the API passes cost (Settings > Usage); stays 0 for the ChatGPT account
 
     def ask(self, name, system, user, max_tokens):
         prep.say(stage="model", pass_=name)
@@ -23,6 +24,9 @@ class Preparation:
                                         max_tokens=max_tokens, cache_ttl=None)
         self.tokens["input"] += result.input_tokens + result.cache_read
         self.tokens["output"] += result.output_tokens
+        from .cost import cost_usd
+        self.usd += cost_usd(result.model or "", result.input_tokens, result.cache_write_5m, result.cache_write_1h,
+                             result.cache_read, result.output_tokens) or 0.0      # a failed pass is billed too
         if result.error:
             raise RuntimeError(result.error)
         if not result.text.strip():

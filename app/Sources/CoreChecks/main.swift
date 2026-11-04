@@ -669,5 +669,25 @@ expect(!CodexCLI.isChatGPT(status: 1, output: "Logged in using ChatGPT"), "Codex
 let codexEnv = CodexCLI.environment(["OPENAI_API_KEY": "dummy", "CODEX_ACCESS_TOKEN": "dummy", "PATH": "/bin", "CODEX_HOME": "/tmp/auth"])
 expect(codexEnv == ["PATH": "/bin", "CODEX_HOME": "/tmp/auth"], "Codex reuses login without API credentials")
 expect(CodexCLI.loginCommand(cli: "/tmp/O'Reilly/codex").contains("O'\\''Reilly"), "Codex login quotes executable path")
+// 0.9.3: Settings > Usage, AI through API keys (AIUsage, from state/spend-ledger.jsonl)
+let usageLedger = """
+{"at": "2026-11-03T10:00:00+0200", "job": "live", "route": "gemini", "model": "gemini-3.5-flash-lite", "input": 100, "output": 20, "cache_read": 40, "usd": 0.001, "error": false}
+{"at": "2026-11-04T09:00:00+02:00", "job": "prep", "route": "openai", "model": "gpt-6.1-sol", "input": 1000, "output": 300, "usd": 0.05, "error": false}
+{"at": "2026-11-04T11:00:00+0200", "job": "after_notes", "route": "api", "model": "claude-sonnet-5-5", "input": 500, "output": 100, "usd": 0.02}
+{"at": "2026-11-04T11:05:00+0200", "job": "after", "route": "code", "model": "claude-code/sonnet", "usd": 0.3}
+{"at": "2026-11-04T11:06:00+0200", "job": "ping", "route": "api", "model": "claude-haiku-5-5", "usd": 0.0001}
+not json
+"""
+let usageRows = AIUsage.parse(text: usageLedger)
+expect(usageRows.count == 3, "usage: only API routes, no route checks, bad lines skipped")
+expect(usageRows.map(\.provider) == ["gemini", "openai", "claude"], "usage: providers by route")
+expect(usageRows.map(\.stage) == ["live", "prep", "after"], "usage: stages by job")
+expect(usageRows[0].day == "2026-11-03" && usageRows[0].input == 100 && usageRows[0].cacheRead == 40, "usage: day and tokens")
+let usageDay = AIUsage.filter(usageRows, from: "2026-11-04", to: "2026-11-04")
+expect(usageDay.count == 2 && abs(AIUsage.total(usageDay).usd - 0.07) < 1e-9, "usage: a day and its total")
+let usageStage = AIUsage.byStage(usageRows)
+expect(usageStage["prep"]?["openai"]?.requests == 1 && usageStage["live"]?["claude"]?.requests == 0, "usage: every stage and provider present")
+expect(AIUsage.byModel(usageRows).map(\.provider) == ["claude", "openai", "gemini"], "usage: models in provider order")
+expect(AIUsage.stage(job: "prep_refresh") == "prep" && AIUsage.stage(job: "judge") == "after" && AIUsage.stage(job: "tips") == "live", "usage: job names")
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

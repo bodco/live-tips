@@ -5,6 +5,8 @@ Available routes:
 - "code": the PM's Claude account through Claude Code (`claude -p`), from the plan's limits, no key.
 - "local": Ollama on this Mac for preparation and after-call jobs.
 - "openai": OpenAI API key, GPT-5.4 mini for tips and after-call jobs; no automatic provider switch.
+- "gemini": Gemini API key (paid tier), a Gemini model per job. 0.9.3 (owner, 04.11): it is also the opt-in plan B
+  (LT_GEMINI_FALLBACK=1): when the chosen way is out (no credit, plan limit, bad key) the job goes to Gemini.
 
 Three jobs: "prep" (the app runs Claude Code itself; here only the route state is shared), "tips" (during the
 call) and "after" (summary, follow-up email, call memory, rehearsal, the judge).
@@ -28,14 +30,14 @@ from typing import Callable, Dict, Optional
 
 from .providers import AnthropicProvider, Completion, Provider, gist_closed, user_text
 
-ROUTES = ("api", "code", "local", "openai", "codex")   # 0.8.5: "local" = a model on this Mac (rules/ai.yaml)
+ROUTES = ("api", "code", "local", "openai", "codex", "gemini")   # 0.8.5: "local" = a model on this Mac (rules/ai.yaml)
 JOBS = ("prep", "tips", "after")
 PROBE_EVERY_S = 120
-PING_MODEL = {"codex": "codex/default", "openai": "gpt-6-luna", "api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}
+PING_MODEL = {"codex": "codex/default", "openai": "gpt-6-luna", "gemini": "gemini-3.5-flash-lite", "api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}
 
 
 def other(route: str) -> str:
-    return route if route in ("openai", "codex") else "code" if route == "api" else "api"
+    return route if route in ("openai", "codex", "gemini") else "code" if route == "api" else "api"
 
 
 def spend_ledger(job: str, route: str, c, state_path) -> None:
@@ -45,7 +47,7 @@ def spend_ledger(job: str, route: str, c, state_path) -> None:
         from .cost import cost_usd
         g = lambda k: int(getattr(c, k, 0) or 0)  # noqa: E731
         usd = cost_usd(c.model, g("input_tokens"), g("cache_write_5m"), g("cache_write_1h"), g("cache_read"), g("output_tokens")) \
-            if route in ("api", "openai") else (0.0 if route == "local" else getattr(c, "equiv_usd", None))
+            if route in ("api", "openai", "gemini") else (0.0 if route == "local" else getattr(c, "equiv_usd", None))
         row = {"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "job": os.environ.get("LT_AI_STAGE") or job, "route": route,
                "model": c.model, "input": g("input_tokens"), "output": g("output_tokens"), "cache_read": g("cache_read"),
                "cache_write": g("cache_write_5m") + g("cache_write_1h"), "usd": round(usd, 6) if usd is not None else None,
@@ -87,6 +89,10 @@ OUT_REASONS = [
     ("codex", "limit", ("usage limit",)),
     ("openai", "auth", ("http 401", "http 403")),
     ("openai", "credit", ("insufficient_quota",)),
+    # 0.9.3: Gemini: 401 a bad key, 403 no permission, 402 prepay credit gone, 429 quota_exceeded the day's quota,
+    # 400 failed_precondition billing off. A plain 429 (rate_limit_exceeded) is a passing error: not listed.
+    ("gemini", "auth", ("http 401", "http 403")),
+    ("gemini", "credit", ("http 402", "quota_exceeded", "failed_precondition")),
     (None, "no_key", ("no api key",)),
     (None, "missing", ("noroute", "not installed")),
     (None, "credit", ("credit balance", "billing", "insufficient")),
@@ -160,7 +166,8 @@ class RouteState:
             self._write(d)
 
 
-HIDDEN_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_API", "ANTHROPIC_CUSTOM_HEADERS", "OPENAI_API_KEY")
+HIDDEN_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_API", "ANTHROPIC_CUSTOM_HEADERS", "OPENAI_API_KEY",
+              "GEMINI_API_KEY", "GOOGLE_API_KEY")
 
 
 def cc_args(cli: str, alias: str, system_file: str) -> list:
@@ -285,11 +292,12 @@ class RoutedProvider(Provider):
 
     def __init__(self, job: str, preferred: str, legs: Dict[str, Optional[Provider]], auto: bool = True,
                  state: Optional[RouteState] = None, probe_every: float = PROBE_EVERY_S, background: bool = False,
-                 api_blocked: Optional[Callable[[], bool]] = None):
+                 api_blocked: Optional[Callable[[], bool]] = None, gemini_fallback: bool = False):
         self.job = job
         self.preferred = preferred if preferred in ROUTES else "api"
         self.legs = dict(legs)
-        self.auto = auto and self.preferred not in ("openai", "codex")
+        self.gemini_fb = gemini_fallback
+        self.auto = auto and self.preferred not in ("openai", "codex", "gemini")
         self.state = state or RouteState()
         self.probe_every = probe_every
         self.background = background
@@ -307,7 +315,7 @@ class RoutedProvider(Provider):
         run.json keeps what each request really used next to this)."""
         r = self.preferred
         leg = self.legs.get(r)
-        if r == "openai":
+        if r in ("openai", "gemini"):
             m = leg.describe(model)["model"] if leg is not None else None
         elif r == "code":
             m = cc_model(model)
@@ -322,19 +330,27 @@ class RoutedProvider(Provider):
     def usable(self, route: str) -> bool:
         if self.legs.get(route) is None:
             return False
-        return not (route in ("api", "openai") and self.api_blocked and self.api_blocked())
+        return not (route in ("api", "openai", "gemini") and self.api_blocked and self.api_blocked())
 
     def can_run_without_api(self) -> bool:
         """True when the app's own API limit does not stop this job (it goes, or may go, through Claude Code)."""
         if self.preferred == "codex":
             return self.legs.get("codex") is not None
-        if self.preferred == "openai" or self.legs.get("code") is None:
+        if self.preferred in ("openai", "gemini") or self.legs.get("code") is None:
             return False
         return self.preferred == "code" or self.auto
 
     def pick(self) -> str:
         """The chosen route while it answers; with auto-switch the other one while it is out."""
         p, o = self.preferred, other(self.preferred)
+        if self.gemini_fallback():
+            # 0.9.3 (owner): plan B. The chosen way while it answers (an out way is checked again as before), then the
+            # other Claude way when auto-switch is on, then Gemini while it answers.
+            if self._ready(p) or self._recheck(p):
+                return p
+            if self.auto and o != p and self._ready(o):
+                return o
+            return "gemini" if self._ready("gemini") else (p if self.usable(p) else o)
         if not self.auto or self._ready(p) or self._recheck(p):
             return p
         if self._ready(o):
@@ -386,7 +402,8 @@ class RoutedProvider(Provider):
     def _run(self, route, **kw) -> Completion:
         leg = self.legs.get(route)
         if leg is None:
-            missing = {"api": "no API key", "openai": "no API key", "codex": "Codex CLI is not installed"}
+            missing = {"api": "no API key", "openai": "no API key", "gemini": "no API key",
+                       "codex": "Codex CLI is not installed"}
             c = Completion(model=kw.get("model", ""), t_start=time.monotonic(), t_done=time.monotonic(),
                            error="NoRoute: " + missing.get(route, "Claude Code is not installed"))
         else:
@@ -406,6 +423,8 @@ class RoutedProvider(Provider):
                   on_text=on_text, extra=extra)
         r = self.pick()
         c = self._run(r, **kw)
+        if r == "gemini" and self.preferred != "gemini" and not c.error:
+            c.switched_from = self.preferred            # plan B: the chosen way was out, Gemini answered
         reason = out_reason(r, c.error)
         if not reason:
             if not c.error:
@@ -426,12 +445,25 @@ class RoutedProvider(Provider):
         return self._fallback(r, c, kw)
 
     def _fallback(self, route, completion, kw):
-        if self.local_fallback() and route not in ("local", "openai", "codex"):
+        if self.gemini_fallback() and route != "gemini" and self.usable("gemini") and not self.state.is_down("gemini"):
+            g = self._run("gemini", **kw)
+            why = out_reason("gemini", g.error)
+            if why:
+                self.state.mark_down("gemini", why)
+            if not g.error:
+                g.switched_from = route
+                return g
+        if self.local_fallback() and route != "local" and self.preferred not in ("local", "openai", "codex", "gemini"):
             local = self._run("local", **kw)
             if not local.error:
                 local.switched_from = route
                 return local
         return completion
+
+    def gemini_fallback(self) -> bool:
+        """0.9.3 (owner, opt-in in Settings > AI): Gemini takes the job when the chosen way is out. Off by default:
+        the text of the call goes to one more company only when the PM turned this on."""
+        return self.gemini_fb and self.legs.get("gemini") is not None and self.preferred != "gemini"
 
     def local_fallback(self) -> bool:
         return os.environ.get("LT_LOCAL_FALLBACK") == "1" and self.legs.get("local") is not None and not self.background
@@ -441,15 +473,18 @@ CODE_TIMEOUT = {True: 60.0, False: 300.0}    # during the call / any other job
 
 
 def make_legs(key: str, workspace: str, cli: Optional[str], api_timeout: float, code_timeout: float,
-              openai_model: Optional[str] = None) -> dict:
+              openai_model: Optional[str] = None, gemini_model: Optional[str] = None) -> dict:
     """Claude, OpenAI and local providers; a missing key or CLI leaves that route unavailable."""
     from .providers import OllamaProvider
     from .codex_provider import CodexProvider, find_codex_cli
     from .openai_provider import OpenAIProvider, MODEL as OPENAI_DEFAULT
+    from .gemini_provider import GeminiProvider, MODEL as GEMINI_DEFAULT
     openai_key = os.environ.get("OPENAI_API_KEY", "")
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
     codex = find_codex_cli()
     return {"codex": CodexProvider(codex, timeout=code_timeout) if codex else None,
             "openai": OpenAIProvider(openai_key, timeout=api_timeout, model=openai_model or OPENAI_DEFAULT) if openai_key else None,
+            "gemini": GeminiProvider(gemini_key, timeout=api_timeout, model=gemini_model or GEMINI_DEFAULT) if gemini_key else None,
             "api": AnthropicProvider(key, timeout=api_timeout, workspace_id=workspace) if key else None,
             "code": ClaudeCodeProvider(cli, timeout=code_timeout) if cli else None,
             # 0.8.5 (rules/ai.yaml > routes.local): a model on this Mac, only when the PM chose it for the job
@@ -470,11 +505,14 @@ def provider_from_env(job: Optional[str] = None, timeout: float = 120.0) -> Prov
     route = env.get("LT_AI_ROUTE", "")
     cli = find_claude_cli() if route else None
     from .openai_provider import job_model
+    from .gemini_provider import job_model as gemini_job_model
     j = job or env.get("LT_AI_JOB", "after")
     legs = make_legs(env.get("CLAUDE_API", ""), env.get("CLAUDE_WORKSPACE", ""), cli, timeout, max(timeout, 300.0),
-                     openai_model=job_model(j, env.get("LT_OPENAI_MODEL")))
+                     openai_model=job_model(j, env.get("LT_OPENAI_MODEL")),
+                     gemini_model=gemini_job_model(j, env.get("LT_GEMINI_MODEL")))
     return RoutedProvider(j, route, legs,
-                          auto=bool(route) and env.get("LT_AI_AUTO", "1") == "1", state=RouteState())
+                          auto=bool(route) and env.get("LT_AI_AUTO", "1") == "1", state=RouteState(),
+                          gemini_fallback=bool(route) and env.get("LT_GEMINI_FALLBACK") == "1")
 
 
 def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optional[str] = None) -> Provider:
@@ -486,10 +524,13 @@ def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optio
     key = _secret(secret_loader, cfg.get("api_key_env", "CLAUDE_API"))
     ws = cfg.get("workspace_id") or _secret(secret_loader, cfg.get("workspace_id_env", ""))
     from .openai_provider import job_model
+    from .gemini_provider import job_model as gemini_job_model
     legs = make_legs(key, ws, find_claude_cli(ai.get("claude_cli") or cfg.get("claude_cli")), 30.0, CODE_TIMEOUT[job == "tips"],
-                     openai_model=job_model(job, (ai.get("openai_models") or {}).get(job)))
+                     openai_model=job_model(job, (ai.get("openai_models") or {}).get(job)),
+                     gemini_model=gemini_job_model(job, (ai.get("gemini_models") or {}).get(job)))
     return RoutedProvider(job, route, legs, auto=bool(ai.get("auto", True)), state=RouteState(ai.get("state")),
-                          background=(job == "tips"))
+                          background=(job == "tips"),
+                          gemini_fallback=bool(ai.get("gemini_fallback", False)) or os.environ.get("LT_GEMINI_FALLBACK") == "1")
 
 
 def main(argv=None) -> int:

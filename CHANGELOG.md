@@ -3,6 +3,31 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.9.3 (unreleased)
+
+- **Gemini API (2026-11-04):** Settings > AI has a third tab, Gemini, with a key (aistudio.google.com/apikey, a project
+  with billing on: Google may use free-tier content to improve its products and does not use paid-tier content).
+  Gemini can run the preparation, the tips and the work after the call, with a model per job: Gemini 3.5 Flash-Lite
+  (fast, the default during the call), Gemini 3.8 Flash (balanced, the default for the preparation and after the
+  call), Gemini 4 Argon. The classic streaming API is used: no stored interactions, no tools, no files.
+  Spending counts Gemini prices, with the rises Google announced (Argon from 1 December 2026, Flash from 1 January
+  2027). livetips_m0/gemini_provider.py, geminiprep.py, rules/ai.yaml > gemini.
+- **Plan B through Gemini (2026-11-04, off by default):** Settings > AI > Automatic switching has "Use Gemini when
+  Claude or ChatGPT is out". When the chosen way has no credit, hits its plan limit or has a bad key, the job goes to
+  Gemini (tips, preparation and after the call), and goes back as soon as the chosen way answers. The text of the call
+  then reaches Google, which is why it is a switch you turn on. A chosen Gemini never falls back to another provider.
+- **Usage: AI through API keys (2026-11-04):** Settings > Usage shows every provider with an API key (Claude,
+  OpenAI, Gemini): spend by stage (call preparation, live tips, after the call, total) and by model with requests and
+  tokens, for today, the last 7 days (the default), this month or chosen dates. The preparation through the OpenAI or
+  Gemini API now counts its cost (it was logged as $0), and each preparation line in the spend ledger names its model.
+  The Claude and ChatGPT accounts are paid by their plans and are not counted.
+- **Developer: provider bench (2026-11-04):** `tools/provider_bench.py` replays 5 invented meetings
+  (Fixtures/bench, American names only) through Claude, OpenAI and Gemini variants and compares cost, latency and tips.
+- **OpenAI prompt caching (2026-11-04):** on the OpenAI API route the blocks Pacenote marks for caching (the call's
+  rules, brief and facts during the tips) now carry explicit cache breakpoints (30 minutes, renewed by every read), the way
+  Claude's `cache_control` works. Cache writes are billed apart from ordinary input and are shown in the cost; a model that
+  rejects the cache settings is asked once more without them. livetips_m0/openai_provider.py, cost.py (GPT-6 prices).
+
 ## 0.9.2 (2026-11-04)
 
 Includes the Google accounts work of 0.9.1 (never released on its own) and the fixes from the audit of a

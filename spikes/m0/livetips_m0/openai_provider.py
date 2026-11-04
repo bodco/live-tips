@@ -10,6 +10,35 @@ MODEL = "gpt-6-luna"                 # 0.9.0: the default when no job model is s
 # Per job when Settings > AI does not say otherwise: tips like Haiku, preparation and after the call like Sonnet.
 JOB_DEFAULTS = {"tips": "gpt-6-luna", "after": "gpt-6.1-sol", "prep": "gpt-6.1-sol"}
 
+# 0.9.3 (owner, 04.11: "set the cache up like it was with Claude"): GPT-5.6 and later (GPT-6, 6.1) cache only at
+# explicit breakpoints (prompt_cache_options.mode "explicit"). A write costs 1.25x the input rate for 30 minutes
+# (2.5x for 12 hours) and a read 0.1x, the same shape as Claude's cache_control. The blocks the engine marks "cache"
+# get a breakpoint (at most four a request, as with Claude); a request with no marked block, or no cache_ttl, stays
+# a plain instructions + input request: no caching, no write charge (checked 2026-11-04, prompt caching guide).
+CACHE_TTL = "30m"        # a read renews it to 30 minutes, so a call that keeps talking stays warm; 12h writes cost twice
+MAX_BREAKPOINTS = 4
+
+
+def cache_items(system, user):
+    """Responses API input items with explicit cache breakpoints, or None when no block is marked "cache".
+    Top-level `instructions` cannot carry a breakpoint, so the system blocks go in as a developer message."""
+    left = [MAX_BREAKPOINTS]
+
+    def blocks(items):
+        out = []
+        for b in items:
+            blk = {"type": "input_text", "text": b["text"]}
+            if b.get("cache") and left[0] > 0:
+                left[0] -= 1
+                blk["prompt_cache_breakpoint"] = {"mode": "explicit"}
+            out.append(blk)
+        return out
+    developer = blocks(system)
+    content = user if isinstance(user, str) else blocks(user)
+    if left[0] == MAX_BREAKPOINTS:
+        return None
+    return [{"role": "developer", "content": developer}, {"role": "user", "content": content}]
+
 
 def effort_for(model):
     """0.9.1: the lowest reasoning effort a model accepts. The Sol and Astra models reject "none" (HTTP 400,
@@ -59,10 +88,19 @@ def finish_event(c, event):
 
 
 def apply_usage(c, usage):
-    """Adds: a request asked again is billed for both answers."""
-    cached = int((usage.get("input_tokens_details") or {}).get("cached_tokens") or 0)
+    """Adds: a request asked again is billed for both answers. 0.9.3: input_tokens counts reads and writes too, so
+    the ordinary input is what is left; writes split by lifetime (30m in cache_write_5m, 12h in cache_write_1h,
+    the field names are Claude's)."""
+    d = usage.get("input_tokens_details") or {}
+    cached = int(d.get("cached_tokens") or 0)
+    w = d.get("cache_write_tokens_details") or {}
+    w30, w12 = int(w.get("ttl_30m_tokens") or 0), int(w.get("ttl_12h_tokens") or 0)
+    if not (w30 or w12):
+        w30 = int(d.get("cache_write_tokens") or 0)       # one total: the default lifetime
     c.cache_read += cached
-    c.input_tokens += max(0, int(usage.get("input_tokens") or 0) - cached)
+    c.cache_write_5m += w30
+    c.cache_write_1h += w12
+    c.input_tokens += max(0, int(usage.get("input_tokens") or 0) - cached - w30 - w12)
     c.output_tokens += int(usage.get("output_tokens") or 0)
     c.reasoning_tokens += int((usage.get("output_tokens_details") or {}).get("reasoning_tokens") or 0)
 
@@ -128,7 +166,13 @@ class OpenAIProvider(Provider):
         body = {"model": use, "instructions": "\n\n".join(b["text"] for b in system),
                 "input": user_text(user), "max_output_tokens": max(16, int(max_tokens)),
                 "reasoning": {"effort": effort_for(use)}, "stream": True, "store": False}
-        effort_retried = False
+        plain = {"instructions": body["instructions"], "input": body["input"]}
+        items = cache_items(system, user) if cache_ttl else None
+        if items:
+            del body["instructions"]
+            body["input"] = items
+            body["prompt_cache_options"] = {"mode": "explicit", "ttl": CACHE_TTL}
+        effort_retried = cache_retried = False
         while True:
             req = urllib.request.Request("https://api.openai.com/v1/responses", data=json.dumps(body).encode(),
                                          headers={"Content-Type": "application/json", "Authorization": "Bearer " + self.key})
@@ -143,6 +187,13 @@ class OpenAIProvider(Provider):
                 if not effort_retried and why.startswith("reasoning.effort") and body["reasoning"]["effort"] != "low":
                     effort_retried = True
                     body["reasoning"] = {"effort": "low"}
+                    c.error = None
+                    continue
+                # a model that does not know the cache settings: once more as a plain request
+                if not cache_retried and "prompt_cache_options" in body and "prompt_cache" in why:
+                    cache_retried = True
+                    body.pop("prompt_cache_options")
+                    body.update(plain)
                     c.error = None
                     continue
                 break

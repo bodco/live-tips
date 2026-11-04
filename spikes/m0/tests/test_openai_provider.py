@@ -43,8 +43,11 @@ def test_stream_request_usage_and_cost(monkeypatch):
     assert cost_usd(c.model, c.input_tokens, 0, 0, c.cache_read, c.output_tokens) == pytest.approx(0.0000164)  # gpt-6-luna: 60 x 0.10 + 40 x 0.01 + 20 x 0.50 per 1M
     assert seen["url"] == "https://api.openai.com/v1/responses" and seen["timeout"] == 7
     assert seen["headers"]["Authorization"] == "Bearer test-key"
-    assert seen["body"] == {"model": MODEL, "instructions": "rules", "input": "question", "max_output_tokens": 60,
-                            "reasoning": {"effort": "none"}, "stream": True, "store": False}
+    assert seen["body"] == {"model": MODEL, "max_output_tokens": 60, "reasoning": {"effort": "none"}, "stream": True,
+                            "store": False, "prompt_cache_options": {"mode": "explicit", "ttl": "30m"},
+                            "input": [{"role": "developer", "content": [{"type": "input_text", "text": "rules",
+                                                                         "prompt_cache_breakpoint": {"mode": "explicit"}}]},
+                                      {"role": "user", "content": [{"type": "input_text", "text": "question"}]}]}
 
 
 @pytest.mark.parametrize("events", [[], [{"type": "response.output_text.delta", "delta": "partial"}],
@@ -179,3 +182,56 @@ def test_effort_rejected_retries_once_with_low_and_says_why(monkeypatch):
     monkeypatch.setattr("urllib.request.urlopen", always)
     c = OpenAIProvider("test-key", model="gpt-6-luna").complete(model="claude", system=[{"text": "r"}], user="q", max_tokens=20, cache_ttl=None)
     assert c.error == "OpenAI: HTTP 400 (model model_not_found)" and "secret" not in c.error
+
+
+def test_cache_breakpoints_follow_the_marked_blocks_like_claude(monkeypatch):
+    """0.9.3: blocks marked "cache" get an explicit breakpoint (at most four); no marks or no cache_ttl: a plain request."""
+    from livetips_m0.openai_provider import cache_items
+    system = [{"text": "a", "cache": True}, {"text": "b", "cache": True}, {"text": "c"}]
+    user = [{"text": "earlier", "cache": "5m"}, {"text": "now"}]
+    items = cache_items(system, user)
+    marks = [("prompt_cache_breakpoint" in b) for m in items for b in m["content"]]
+    assert marks == [True, True, False, True, False]
+    many = cache_items([{"text": str(i), "cache": True} for i in range(6)], "q")
+    assert sum("prompt_cache_breakpoint" in b for b in many[0]["content"]) == 4 and many[1]["content"] == "q"
+    assert cache_items([{"text": "a"}], [{"text": "q"}]) is None and cache_items([{"text": "a"}], "q") is None
+    seen = []
+
+    def send(req, timeout=None):
+        seen.append(json.loads(req.data.decode()))
+        return stream({"type": "response.output_text.delta", "delta": "ok"}, terminal())
+    monkeypatch.setattr("urllib.request.urlopen", send)
+    OpenAIProvider("test-key").complete(model="claude", system=system, user=user, max_tokens=20, cache_ttl=None)
+    assert seen[0]["instructions"] == "a\n\nb\n\nc" and seen[0]["input"] == "earliernow" and "prompt_cache_options" not in seen[0]
+
+
+def test_cache_writes_are_billed_apart_from_ordinary_input():
+    from livetips_m0.openai_provider import apply_usage
+    c = Completion(model="gpt-6.1-sol")
+    apply_usage(c, {"input_tokens": 12000, "output_tokens": 100, "input_tokens_details": {
+        "cached_tokens": 4000, "cache_write_tokens": 7000,
+        "cache_write_tokens_details": {"ttl_30m_tokens": 3000, "ttl_12h_tokens": 4000}}})
+    assert (c.input_tokens, c.cache_read, c.cache_write_5m, c.cache_write_1h) == (1000, 4000, 3000, 4000)
+    usd = cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens)
+    assert usd == pytest.approx((1000 * 2.0 + 3000 * 2.5 + 4000 * 5.0 + 4000 * 0.10 + 100 * 10.0) / 1e6)
+    one = Completion(model="gpt-6-luna")
+    apply_usage(one, {"input_tokens": 100, "input_tokens_details": {"cached_tokens": 10, "cache_write_tokens": 30}})
+    assert (one.input_tokens, one.cache_read, one.cache_write_5m, one.cache_write_1h) == (60, 10, 30, 0)
+
+
+def test_a_model_that_rejects_the_cache_settings_is_asked_once_more_plain(monkeypatch):
+    sent = []
+
+    def send(req, timeout=None):
+        body = json.loads(req.data.decode())
+        sent.append(body)
+        if len(sent) == 1:
+            err = {"error": {"message": "secret prompt echo", "param": "prompt_cache_options", "code": "unknown_parameter"}}
+            raise urllib.error.HTTPError("https://api.openai.com", 400, "bad", {}, io.BytesIO(json.dumps(err).encode()))
+        return stream({"type": "response.output_text.delta", "delta": "ok"}, terminal())
+    monkeypatch.setattr("urllib.request.urlopen", send)
+    c = OpenAIProvider("test-key", model="gpt-5.4-mini").complete(
+        model="claude", system=[{"text": "r", "cache": True}], user="q", max_tokens=20, cache_ttl="1h")
+    assert c.error is None and c.text == "ok" and len(sent) == 2
+    assert "prompt_cache_options" in sent[0] and "instructions" not in sent[0]
+    assert "prompt_cache_options" not in sent[1] and sent[1]["instructions"] == "r" and sent[1]["input"] == "q"

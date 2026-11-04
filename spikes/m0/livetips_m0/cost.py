@@ -12,11 +12,21 @@ PRICES_CHECKED = "2026-10-21"
 # family substring -> (input, cache_write_5m, cache_write_1h, cache_read, output)
 PRICES = [
     # OpenAI standard pricing checked 2026-11-04: developers.openai.com/api/docs/pricing (cached input = cache read)
-    ("gpt-6-astra", (10.0, 0.0, 0.0, 1.0, 50.0)),
-    ("gpt-6.1-sol", (2.0, 0.0, 0.0, 0.10, 10.0)),
-    ("gpt-6.1-terra", (1.0, 0.0, 0.0, 0.05, 5.0)),
-    ("gpt-6-luna", (0.10, 0.0, 0.0, 0.01, 0.50)),
+    # 0.9.3: GPT-6 and 6.1 charge cache writes like Claude: 1.25x the input rate for 30 minutes (the 5m column), 2.5x
+    # for 12 hours (the 1h column); developers.openai.com/api/docs/pricing, checked 2026-11-04.
+    ("gpt-6-astra", (10.0, 12.5, 25.0, 1.0, 50.0)),
+    ("gpt-6.1-sol", (2.0, 2.5, 5.0, 0.10, 10.0)),
+    ("gpt-6.1-terra", (1.0, 1.25, 2.5, 0.05, 5.0)),
+    ("gpt-6-luna", (0.10, 0.125, 0.25, 0.01, 0.50)),
     ("gpt-5.4-mini", (0.75, 0.0, 0.0, 0.075, 4.50)),
+    # 0.9.3: Gemini paid tier, standard, checked 2026-11-04: ai.google.dev/gemini-api/docs/pricing. Caching is implicit:
+    # no write charge (the 5m and 1h columns stay 0), cache read in the fourth column. Output includes thinking.
+    # Google announced rises: see PRICE_CHANGES below.
+    ("gemini-4-argon", (2.0, 0.0, 0.0, 0.10, 10.0)),
+    ("gemini-3.8-flash", (0.75, 0.0, 0.0, 0.075, 3.75)),
+    ("gemini-3.6-flash", (0.75, 0.0, 0.0, 0.075, 3.75)),
+    ("gemini-3.5-flash-lite", (0.30, 0.0, 0.0, 0.03, 2.50)),
+    ("gemini-3.1-flash-lite", (0.25, 0.0, 0.0, 0.025, 1.50)),
     ("haiku-5-5", (0.10, 0.125, 0.20, 0.01, 0.50)),     # prompts up to 100K tokens
     ("sonnet-5-5", (2.0, 2.5, 4.0, 0.10, 10.0)),
     ("opus-5-5", (4.0, 5.0, 8.0, 0.20, 20.0)),
@@ -27,10 +37,23 @@ PRICES = [
 ]
 
 
-def price_for(model: str):
+# (family substring, first day of the new price, prices): announced rises, checked 2026-11-04 on the same page.
+PRICE_CHANGES = [
+    ("gemini-4-argon", "2026-12-01", (4.0, 0.0, 0.0, 0.20, 20.0)),
+    ("gemini-3.8-flash", "2027-01-01", (1.50, 0.0, 0.0, 0.15, 7.50)),
+    ("gemini-3.6-flash", "2027-01-01", (1.50, 0.0, 0.0, 0.15, 7.50)),
+]
+
+
+def price_for(model: str, today=None):
+    """The prices of a model on `today` (YYYY-MM-DD, default: today): an announced rise applies from its first day."""
     m = model.lower()
+    today = today or time.strftime("%Y-%m-%d")
     for key, p in PRICES:
         if key in m:
+            for fam, since, new in PRICE_CHANGES:
+                if fam == key and today >= since:
+                    return new
             return p
     return None
 

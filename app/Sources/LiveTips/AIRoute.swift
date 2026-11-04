@@ -5,11 +5,11 @@ import LiveTipsCore
 /// The tips engine and the one-off jobs (livetips_m0.routing) read and write the same file, state/ai-routes.json:
 /// {"api": {"down": true, "reason": "credit", "since": <unix time>, "checked": <unix time>}, "code": {...}}.
 enum AIRoute {
-    static let api = "api", code = "code", openai = "openai", codex = "codex"
+    static let api = "api", code = "code", openai = "openai", codex = "codex", gemini = "gemini"   // 0.9.3: gemini
     /// 0.8.5 (owner): a preparation on this Mac (Ollama), chosen by hand; never an automatic switch target yet.
     static let local = "local"
 
-    static func other(_ r: String) -> String { [openai, codex].contains(r) ? r : r == api ? code : api }
+    static func other(_ r: String) -> String { [openai, codex, gemini].contains(r) ? r : r == api ? code : api }
 
     static var statePath: String {
         let c = AppConfig.load(from: AppPaths.config)
@@ -52,6 +52,16 @@ enum AIRoute {
     static func outReason(_ r: String, _ text: String) -> String? {
         let e = text.lowercased()
         if e.contains("credit balance") || e.contains("billing") { return "credit" }
+        // 0.9.3: Gemini: 401 and 403 a bad key or no permission, 402 the prepaid credit is gone, quota_exceeded the day's quota,
+        // failed_precondition billing is off; a plain 429 (rate_limit_exceeded) passes. Same as livetips_m0.routing.
+        if r == gemini {
+            if e.contains("http 401") || e.contains("http 403") { return "auth" }
+            return e.contains("http 402") || e.contains("quota_exceeded") || e.contains("failed_precondition") ? "credit" : nil
+        }
+        if r == openai {      // 0.9.3: same as livetips_m0.routing: 401 and 403 a bad key, insufficient_quota no credit
+            if e.contains("http 401") || e.contains("http 403") { return "auth" }
+            return e.contains("insufficient_quota") ? "credit" : nil
+        }
         if r == api { return e.contains("invalid api key") || e.contains("x-api-key") || e.contains("authentication_error") ? "auth" : nil }
         if e.contains("usage limit") || e.contains("limit reached") || e.contains("hit your limit") || e.contains("limit will reset") { return "limit" }
         if e.contains("/login") || e.contains("not logged in") || e.contains("oauth") || e.contains("authenticate") { return "auth" }
@@ -66,14 +76,16 @@ enum AIRoute {
     static func available(_ r: String) -> Bool {
         if r == codex { return CodexAccount.cliPath != nil }
         if r == openai { return SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").has(.openaiAPIKey) }
+        if r == gemini { return SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").has(.geminiAPIKey) }
         return r == api ? hasKey : r == local ? true : PrepRunner.claudePath != nil
     }
 
     /// A job on this way can run: the way itself, or with auto-switch the other one.
     static func canRun(job: String, config c: AppConfig) -> Bool {
         let r = c.ai.route(job)
-        if [openai, codex].contains(r) { return available(r) }
+        if [openai, codex, gemini].contains(r) { return available(r) }
         return available(r) || (c.ai.autoSwitch && available(other(r))) || (job != "tips" && c.ai.localFallback)
+            || (c.ai.geminiFallback && available(gemini))
     }
 
     /// The environment of an engine child process for one job: the way, the switch, the shared state, the key
@@ -83,10 +95,13 @@ enum AIRoute {
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         if let k = store.get(.claudeAPIKey), !k.isEmpty { env["CLAUDE_API"] = k } else { env.removeValue(forKey: "CLAUDE_API") }
         if let k = store.get(.openaiAPIKey), !k.isEmpty { env["OPENAI_API_KEY"] = k } else { env.removeValue(forKey: "OPENAI_API_KEY") }
+        if let k = store.get(.geminiAPIKey), !k.isEmpty { env["GEMINI_API_KEY"] = k } else { env.removeValue(forKey: "GEMINI_API_KEY") }
         if let ws = store.get(.claudeWorkspaceID), !ws.isEmpty { env["CLAUDE_WORKSPACE"] = ws }
         env["LT_AI_JOB"] = job
         env["LT_AI_ROUTE"] = c.ai.route(job)
         env["LT_OPENAI_MODEL"] = c.ai.openaiModel(job)       // 0.9.0: the job's OpenAI model (Settings > AI)
+        env["LT_GEMINI_MODEL"] = c.ai.geminiModel(job)       // 0.9.3: the job's Gemini model (Settings > AI)
+        env["LT_GEMINI_FALLBACK"] = c.ai.geminiFallback ? "1" : "0"   // 0.9.3: plan B, opt-in (rules/ai.yaml > gemini)
         env["LT_LOCAL_MODEL"] = UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"   // rules/ai.yaml > local
         env["LT_LOCAL_FALLBACK"] = (job != "tips" && c.ai.localFallback) ? "1" : "0"                      // rules/ai.yaml > fallback
         env["LT_AI_AUTO"] = c.ai.autoSwitch ? "1" : "0"
@@ -101,11 +116,12 @@ enum AIRoute {
     static func sidecarBlock(config c: AppConfig) -> [String: Any] {
         ["routes": ["tips": c.ai.tips, "after": c.ai.after], "auto": c.ai.autoSwitch, "state": statePath,
          "openai_models": ["tips": c.ai.openaiTips, "after": c.ai.openaiAfter],
+         "gemini_models": ["tips": c.ai.geminiTips, "after": c.ai.geminiAfter], "gemini_fallback": c.ai.geminiFallback,
          "claude_cli": PrepRunner.claudePath ?? ""]
     }
 
     static func name(_ r: String) -> String {
-        r == codex ? L("ai.codex.account") : r == openai ? L("ai.route.openai") : r == local ? L("ai.route.local.model", ["model": UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"])
+        r == codex ? L("ai.codex.account") : r == openai ? L("ai.route.openai") : r == gemini ? L("ai.route.gemini") : r == local ? L("ai.route.local.model", ["model": UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"])
             : L(r == api ? "ai.route.api" : "ai.route.code")
     }
 
@@ -113,7 +129,7 @@ enum AIRoute {
     static func statusLines() -> [String] {
         let o = read()
         let t = DateFormatter(); t.dateFormat = "HH:mm"
-        return [code, api, openai, codex].compactMap { r in
+        return [code, api, openai, codex, gemini].compactMap { r in
             guard let s = o[r] as? [String: Any], (s["down"] as? Bool) == true else { return nil }
             let since = (s["since"] as? Double).map { t.string(from: Date(timeIntervalSince1970: $0)) } ?? ""
             return L("ai.status.out", ["route": name(r), "reason": L("ai.reason." + ((s["reason"] as? String) ?? "error")), "time": since])
@@ -123,7 +139,7 @@ enum AIRoute {
     /// Checks the ways that are out now (a one-word request each, through the engine) and calls back.
     @MainActor static func checkNow(done: @escaping () -> Void) {
         let c = AppConfig.load(from: AppPaths.config)
-        let down = [code, api, openai, codex].filter { isDown($0) }
+        let down = [code, api, openai, codex, gemini].filter { isDown($0) }
         guard !down.isEmpty, !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { done(); return }
         DispatchQueue.global().async {
             for r in down {

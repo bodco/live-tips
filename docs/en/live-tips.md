@@ -1605,6 +1605,29 @@ An audit of one recorded call changed how the local layer and the model decide:
   tips are dropped; run.json names the route and model each role really used.
 - **Developers:** `tools/replay_local.py` replays the local layer of a recorded call (DEVELOPMENT.md).
 
+### 14.1p Gemini API and plan B (0.9.3, beta)
+
+**Gemini as a third provider.** Settings > AI has a Gemini tab next to Claude and ChatGPT. Add a Gemini API key
+(aistudio.google.com/apikey) of a project with billing turned on: Google may use free-tier content to improve its
+products and does not use paid-tier content, so Pacenote is meant for the paid tier. Then choose Gemini as the way for
+the preparation, the tips or the work after the call, and a model for each: Gemini 3.5 Flash-Lite (fast, the
+default for tips), Gemini 3.8 Flash (balanced, the default for the preparation and after the call) or Gemini 4
+Argon. The classic streaming API is used, so nothing is stored as an interaction on Google's side. Prices
+per 1M tokens (input / output, 2026-11-04): $0.30 / $2.50, $0.75 / $3.75 and $2 / $10; Google announced rises
+(Argon to $4 / $20 from 1 December 2026, Flash to $1.50 / $7.50 from 1 January 2027), which Pacenote's spending counts
+from those days. A chosen Gemini never falls back to another provider by itself.
+
+**Plan B.** Automatic switching has "Use Gemini when Claude or ChatGPT is out", off by default. With it on, a job whose
+chosen way has no credit, has hit its plan limit or has a bad key goes to Gemini and goes back as soon as the chosen
+way answers again. The text of the call then reaches Google, which is why you turn it on yourself.
+
+**Usage.** Settings > Usage has "AI through API keys": every provider with a key (Claude, OpenAI, Gemini), spend
+by stage (call preparation, live tips, after the call, total) and by model with requests and tokens, for today, the
+last 7 days (the default), this month or chosen dates. The accounts paid by a plan are not counted.
+
+**Provider bench.** `tools/provider_bench.py` replays five invented meetings (Fixtures/bench) through Claude, OpenAI and
+Gemini variants and writes one table (cost, latency, tips, errors) and the tips side by side.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the

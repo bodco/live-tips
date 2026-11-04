@@ -521,6 +521,14 @@ def make_provider(cfg: dict, secret_loader: Callable[[str], str], job: Optional[
             except KeyError:
                 ws = ""
         return AnthropicProvider(secret_loader(cfg.get("api_key_env", "CLAUDE_API")), workspace_id=ws)
+    if kind == "fake":     # 0.9.3: tools/provider_bench.py --dry checks the plumbing with no key and no network
+        return FakeProvider(lambda model, user: "{}")
+    if kind == "openai":   # 0.9.3: for replays and benchmarks; the models of the roles name the OpenAI models (gpt-...)
+        from .openai_provider import OpenAIProvider
+        return OpenAIProvider(secret_loader(cfg.get("api_key_env", "OPENAI_API_KEY")), timeout=60.0)
+    if kind == "gemini":   # 0.9.3: the same for Gemini; the models of the roles name the Gemini models (gemini-...)
+        from .gemini_provider import GeminiProvider
+        return GeminiProvider(secret_loader(cfg.get("api_key_env", "GEMINI_API_KEY")), timeout=60.0)
     if kind == "ollama":   # 0.8.5: a model on this Mac (rules/ai.yaml > routes.local)
         return OllamaProvider(cfg.get("base_url", "http://127.0.0.1:11434"))
     if kind == "openai_compat":

@@ -331,7 +331,7 @@ final class CallEngine {
         sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")]
         sc["local_ai"] = c.localAI.enabled
         // 2026-10-27 (owner): a question with no ready answer starts a read-only Claude Code search of the project folder.
-        sc["deep_lookup"] = ![AIRoute.openai, AIRoute.codex].contains(c.ai.tips)
+        sc["deep_lookup"] = ![AIRoute.openai, AIRoute.codex, AIRoute.gemini].contains(c.ai.tips)
         if let cl = PrepRunner.claudePath { sc["claude_cli"] = cl }
         let ws: [String] = (callRequest["workspace_root"] as? String).flatMap { $0.isEmpty ? nil : [$0] } ?? []
         let added: [String] = (callRequest["folders"] as? [String]) ?? []

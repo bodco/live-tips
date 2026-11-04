@@ -6,6 +6,7 @@ public struct SecretStore {
     public enum Key: String, CaseIterable {
         case claudeAPIKey = "claude_api_key"
         case openaiAPIKey = "openai_api_key"
+        case geminiAPIKey = "gemini_api_key"        // 0.9.3: the Gemini API key (paid tier)
         case claudeWorkspaceID = "claude_workspace_id"
         case notionToken = "notion_token"
         case hubspotKey = "hubspot_service_key"     // 0.8.7 (I2): a HubSpot service key

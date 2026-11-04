@@ -51,6 +51,19 @@ enum KeyTester {
         } catch { return (false, error.localizedDescription) }
     }
 
+    /// 0.9.3: a free metadata read of one model with the key (no tokens billed). A key of a free-tier project answers
+    /// too: the PM is told in the hint to use a key of a project with billing on.
+    static func gemini(key: String) async -> (Bool, String) {
+        var req = URLRequest(url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite")!)
+        req.setValue(key, forHTTPHeaderField: "x-goog-api-key")
+        req.timeoutInterval = 15
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            return (code == 200, code == 200 ? "Gemini 3.5 Flash-Lite" : "HTTP \(code)")
+        } catch { return (false, error.localizedDescription) }
+    }
+
     static func notion(token: String) async -> (Bool, String) {
         var req = URLRequest(url: URL(string: "https://api.notion.com/v1/users/me")!)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -263,12 +276,12 @@ final class SettingsModel: ObservableObject {
     init() {
         // 0.8.7.1: presence only at start; the masks are read when a key row is shown (KeyRow.onAppear). Reading every
         // secret here froze Home on the Keychain's "allow access" prompt for a key another tool had saved (HubSpot).
-        for k in [SecretStore.Key.claudeAPIKey, .openaiAPIKey, .notionToken] {
+        for k in [SecretStore.Key.claudeAPIKey, .openaiAPIKey, .geminiAPIKey, .notionToken] {
             keyState[k] = store.has(k) ? .untested : .notSet
         }
         refreshMirror()
         aliasesText = config.nameAliases.joined(separator: ", ")
-        for k in [SecretStore.Key.claudeAPIKey, .openaiAPIKey, .notionToken] where store.has(k) { test(k) }
+        for k in [SecretStore.Key.claudeAPIKey, .openaiAPIKey, .geminiAPIKey, .notionToken] where store.has(k) { test(k) }
     }
 
     func saveAliases() {
@@ -337,6 +350,9 @@ final class SettingsModel: ObservableObject {
                 CRMService.shared.test()
             } else if key == .openaiAPIKey {
                 let (ok, msg) = await KeyTester.openai(key: v)
+                keyState[key] = ok ? .ok(msg) : .failed(msg)
+            } else if key == .geminiAPIKey {
+                let (ok, msg) = await KeyTester.gemini(key: v)
                 keyState[key] = ok ? .ok(msg) : .failed(msg)
             } else if key == .claudeAPIKey {
                 let (ok, msg, ids) = await KeyTester.claude(key: v, workspace: nil)
@@ -613,11 +629,36 @@ struct OpenAIModelPicker: View {
     static func recommended(_ job: String) -> String { job == "tips" ? "gpt-6-luna" : "gpt-6.1-sol" }
 }
 
+/// 0.9.3 (owner, 2026-11-04): the Gemini model of a job and its price per 1M input / output tokens (no Claude comparison)
+/// (ai.google.dev/gemini-api/docs/pricing, paid tier, checked 2026-11-04). Google announced rises: Gemini 4 Argon to
+/// $4 / $20 from 2026-12-01, Gemini 3.8 Flash to $1.50 / $7.50 from 2027-01-01 (livetips_m0.cost.PRICE_CHANGES).
+struct GeminiModelPicker: View {
+    @Binding var selection: String
+    let job: String
+    static let models: [(id: String, label: String)] = [
+        ("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite · fastest · $0.30 / $2.50"),
+        ("gemini-3.8-flash", "Gemini 3.8 Flash · balanced · $0.75 / $3.75"),
+        ("gemini-4-argon", "Gemini 4 Argon · most capable · $2 / $10"),
+    ]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker(L("set.model"), selection: $selection) {
+                ForEach(Self.models, id: \.id) { m in
+                    Text(m.label + (m.id == Self.recommended(job) ? L("ai.route.recommended") : "")).tag(m.id)
+                }
+            }
+            Text(L("ai.gemini.model2")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+    static func recommended(_ job: String) -> String { job == "tips" ? "gemini-3.5-flash-lite" : "gemini-3.8-flash" }
+}
+
 struct RoutePicker: View {
     @Binding var selection: String
     var recommended: String
     var discouraged: String? = nil
     var withOpenAI = false
+    var withGemini = true          // 0.9.3
     var withLocal = false          // 0.8.5: the preparation can also run on this Mac (Ollama)
     @ObservedObject var oc = OptionalComponents.shared
     @ObservedObject var llm = LocalLLM.shared
@@ -626,7 +667,7 @@ struct RoutePicker: View {
         let localOK = oc.isInstalled("ollama") && oc.isInstalled("local_model")
         VStack(alignment: .trailing, spacing: 2) {
             Picker(L("ai.route"), selection: $selection) {
-                ForEach([AIRoute.code, AIRoute.api, AIRoute.codex] + (withOpenAI ? [AIRoute.openai] : []) + (withLocal ? [AIRoute.local] : []), id: \.self) { r in
+                ForEach([AIRoute.code, AIRoute.api, AIRoute.codex] + (withOpenAI ? [AIRoute.openai] : []) + (withGemini ? [AIRoute.gemini] : []) + (withLocal ? [AIRoute.local] : []), id: \.self) { r in
                     Text(AIRoute.name(r) + (r == recommended ? L("ai.route.recommended") : r == discouraged ? L("ai.route.notRecommended") : "")).tag(r)
                         .selectionDisabled(r == AIRoute.local && !localOK)
                 }
@@ -788,7 +829,7 @@ struct SettingsView: View {
                 }
             }
         }.formStyle(.grouped)
-        case "usage": ScrollView { VStack(alignment: .leading, spacing: 16) { WeekSummaryView(); WeekStats() }.padding(20) }
+        case "usage": ScrollView { VStack(alignment: .leading, spacing: 16) { WeekSummaryView(); WeekStats(); AIUsageView() }.padding(20) }   // 0.9.3: AI through API keys
         case "help": ScrollView { VStack(alignment: .leading, spacing: 12) {
             Button(L("settings.how.title")) { model.tab = "how" }.buttonStyle(.pnSecondary)
             FeaturesView()
@@ -812,6 +853,7 @@ struct SettingsView: View {
                 Picker("", selection: $aiProvider) {
                     Text("Claude").tag("claude")
                     Text("ChatGPT").tag("chatgpt")
+                    Text("Gemini").tag("gemini")
                 }
                 .pickerStyle(.segmented).labelsHidden()
                 if aiProvider == "claude" {
@@ -832,12 +874,14 @@ struct SettingsView: View {
                 }
                 .help(L("ai.access.accountHelp"))
                 KeyRow(title: L("keys.claude.title"), hint: L("keys.claude.hint"), key: .claudeAPIKey, model: model)
-                } else {
+                } else if aiProvider == "chatgpt" {
                 CodexAccountRow()
                 KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: model)
+                } else {
+                KeyRow(title: L("keys.gemini.title"), hint: L("keys.gemini.hint"), key: .geminiAPIKey, model: model)
                 }
             } header: { Text(L("ai.access")) } footer: {
-                Text(L(aiProvider == "claude" ? "ai.access.footer.claude" : "ai.access.footer.chatgpt")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                Text(L(aiProvider == "claude" ? "ai.access.footer.claude" : aiProvider == "chatgpt" ? "ai.access.footer.chatgpt" : "ai.access.footer.gemini")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .onAppear { runner.refreshAuth() }
@@ -866,6 +910,8 @@ struct SettingsView: View {
                     LocalModelRow()
                 } else if model.config.ai.prep == AIRoute.openai {
                     OpenAIModelPicker(selection: $model.config.ai.openaiPrep, job: "prep")
+                } else if model.config.ai.prep == AIRoute.gemini {
+                    GeminiModelPicker(selection: $model.config.ai.geminiPrep, job: "prep")
                 } else {
                     Picker(L("set.model"), selection: $runner.model) {
                         ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
@@ -886,13 +932,15 @@ struct SettingsView: View {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if model.config.ai.tips == AIRoute.openai {
                     OpenAIModelPicker(selection: $model.config.ai.openaiTips, job: "tips")
+                } else if model.config.ai.tips == AIRoute.gemini {
+                    GeminiModelPicker(selection: $model.config.ai.geminiTips, job: "tips")
                 } else {
                     ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices).help(L("set.decidesIfATip"))
                     ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices).help(L("set.writesTheTipYou"))
                 }
                 Toggle(L("set.answerQuestionsToAnyone"), isOn: $model.config.answerAny)
                     .help(L("set.aQuestionAskedTo"))
-                if ![AIRoute.openai, AIRoute.codex].contains(model.config.ai.tips) {
+                if ![AIRoute.openai, AIRoute.codex, AIRoute.gemini].contains(model.config.ai.tips) {
                     Toggle(L("set.secondRequestWhenClaude"), isOn: $model.config.hedgeEnabled)
                         .help(L("set.ifClaudeShowsNo"))
                 }
@@ -906,6 +954,8 @@ struct SettingsView: View {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if model.config.ai.after == AIRoute.openai {
                     OpenAIModelPicker(selection: $model.config.ai.openaiAfter, job: "after")
+                } else if model.config.ai.after == AIRoute.gemini {
+                    GeminiModelPicker(selection: $model.config.ai.geminiAfter, job: "after")
                 } else if model.config.ai.after == AIRoute.local {
                     LocalModelRow()
                 } else {
@@ -922,6 +972,14 @@ struct SettingsView: View {
             Section {
                 Toggle(L("ai.auto"), isOn: $model.config.ai.autoSwitch)
                     .help(L("ai.auto.help"))
+                // 0.9.3 (owner): plan B, off by default; needs a Gemini key
+                Toggle(isOn: $model.config.ai.geminiFallback) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("ai.geminiFallback"))
+                        Text(L("ai.geminiFallback.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .disabled(!model.isSet(.geminiAPIKey))
                 let lines = AIRoute.statusLines()
                 if lines.isEmpty {
                     Text(L("ai.status.ok")).font(PN.Font.caption).foregroundStyle(PN.C.text3)

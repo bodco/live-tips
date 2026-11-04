@@ -1,0 +1,46 @@
+"""Prepare a call through the Gemini API (0.9.3, owner): the same context pack and passes as the OpenAI and ChatGPT
+account routes (codexprep), asked through the streaming Gemini API with the key from Settings > AI (GEMINI_API_KEY,
+given to this process only). Pacenote reads and writes the files itself; the model gets no file or tool access."""
+import argparse
+import json
+import os
+import time
+from pathlib import Path
+
+from . import localprep as prep
+from .codexprep import Preparation
+from .gemini_provider import GeminiProvider, job_model
+
+
+class GeminiPreparation(Preparation):
+    label = "Gemini"
+    head_route = "Gemini API"
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--request", required=True)
+    request = json.loads(Path(parser.parse_args(argv).request).read_text(encoding="utf-8"))
+    started = time.monotonic()
+    model = job_model("prep", request.get("gemini_model") or os.environ.get("LT_GEMINI_MODEL"))
+    result = {"ok": False, "model": model, "tokens": {}, "sources": []}
+    preparation = None
+    try:
+        key = os.environ.get("GEMINI_API_KEY", "")
+        if not key:
+            raise RuntimeError("No Gemini API key: add it in Settings > AI > Gemini")
+        preparation = GeminiPreparation(request, GeminiProvider(key, timeout=300, model=model))
+        result["sources"] = preparation.run()
+        result["tokens"] = preparation.tokens
+        result["ok"] = True
+    except Exception as error:  # noqa: BLE001  the app restores the previous files on failure
+        result["error"] = str(error)[:200]
+    if preparation is not None:
+        result["cost_usd"] = round(preparation.usd, 6)     # 0.9.3: the app logs it in spend-ledger.jsonl (Usage)
+    result["duration_s"] = int(time.monotonic() - started)
+    prep.say(**result)
+    return 0 if result["ok"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

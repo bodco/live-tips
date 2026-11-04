@@ -50,6 +50,7 @@ public enum UsageLog {
         "series_opened": [], "call_page_edited": ["section"], "tip_shown": ["kind"], "tip_action": ["kind", "action"],
         "help_now": [], "ask_typed": [], "hotkey": ["name"], "update_crm": ["fields"], "answer_card_saved": [],
         "feature_try_it": ["feature"], "demo_opened": ["kind"], "onboarding_step": ["step", "skipped"],
+        "google_connect": [], "google_links_read": ["n"], "google_export": [], "google_meet": ["transcript"],
     ]
     public static var sink: UsageSink?
     public static var enabled = true

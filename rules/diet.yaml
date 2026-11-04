@@ -17,6 +17,9 @@ limits:
   fact_words_max: 8
   line_chars_max: 45
   lines_max: 5
+answer_in_primary:              # 0.9.2 (audit 04.11): a statement the prepared material answers
+  per_10_min: 2                 # at most this many such tips in 10 minutes
+  once_per_topic: true          # never twice on the same topic (topic_similarity_min)
 long_kinds: [speech, agenda, sos, catch_up, your_turn]   # may exceed the length limits
 forbidden:
   - long_dash                 # never the em dash

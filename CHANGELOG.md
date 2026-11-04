@@ -5,6 +5,65 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **Google verification submitted (2026-11-04):** the Pacenote OAuth app passed Google's branding check and its data
+  access (5 sensitive scopes, none restricted) was submitted for review. Until Google approves it, the sign-in still
+  shows "Google hasn't verified this app" (Advanced, then Go to Pacenote) and the 100-user cap applies. The privacy
+  page has a Google user data section with the Limited Use statement. No app behaviour changed.
+- **Fewer lost and wrong tips with OpenAI (2026-11-04):** an answer that ran past the output limit after a complete
+  JSON is kept (the rest is cut) instead of being thrown away; without a complete JSON it is asked once more with a
+  larger limit. A tip with stray tokens in another script is dropped. run.json now names the route and the model each
+  role really used (it showed the Claude ids while the tips ran on OpenAI), and the request log keeps the reasoning
+  tokens, the cut and the retry. rules/ai.yaml.
+- **Card hygiene (2026-11-04):** a "your turn" card is no longer shown by its trigger (the PM decides when to speak);
+  a card with only regex triggers no longer fires by the meaning of its text; a card shows by meaning once per call;
+  `lt prep-check` warns about one-word triggers the recorder ignores and `--fix` moves them to `words`.
+  rules/semantic.yaml.
+- **Facts follow the topic, not one line (2026-11-04):** a fact card also matches the last minute of what the other side
+  said, so a point made over several lines gets its fact; it is not shown when you just said it yourself, when the
+  last minute is about something else, or a second time on the same topic (a question still gets it).
+  rules/semantic.yaml > fact_window.
+- **A ready answer to a statement (2026-11-04):** when the other side states something (a claim, a doubt, a pain)
+  that the prepared material answers with a ready answer, proof or caveat nobody said yet, a 🟠 tip gives it, at most
+  2 in 10 minutes and once per topic; off in interviews. rules/triggers.yaml > answer_in_primary, rules/diet.yaml.
+- **The main document in the preparation (2026-11-04):** the files you add to a call are named to the preparation as
+  the primary document: each of its sections gives a fact or card marked primary, its "what is missing" points and
+  ready answers stay whole sentences, and "Needs confirmation" keeps only conflicts it does not resolve. The run of a
+  preparation keeps the names of the files it read and searched (never their content). An agenda item to agree or
+  decide is no longer ticked done without a clear yes from the person who decides. rules/agenda.yaml, sweep.md.
+- **Google calendars folded (2026-11-04):** Settings > Integrations > Google shows each account's calendar list
+  folded, with how many are on; click to open it.
+- **Developer: local layer replay (2026-11-04):** `tools/replay_local.py` replays the recorder's facts and cards on a
+  recorded call with the same thresholds and model; on the Mac it reproduces a live call item by item.
+
+- **Call notes in the call's language (2026-11-04):** the notes after a call (and the call page Summary made from
+  them) are written in the language the call was held in, taken from the transcript, not in the app's interface
+  language. rules/notes.yaml.
+- **Start a call now (2026-11-04):** the arrow with Plan a call is part of the blue button now, not a loose chevron.
+- **Fix: preparation through the OpenAI API (2026-11-04):** with GPT-6.1 Sol (the default for the preparation and after
+  the call) every request failed at once with "OpenAI: HTTP 400": Sol and Astra do not accept the lowest reasoning
+  setting the app sent. They now get the lowest one they accept, a model that still refuses it is retried once, and the
+  error line says which setting was refused (never the request text).
+- **Google accounts (2026-11-04):** Settings > Integrations > Google connects one or more Google accounts, like Notion
+  workspaces (sign-in in your browser; tokens in the Keychain; Remove revokes them). Their calendars show on Home and in
+  Coming up next to the macOS ones, without doubles (the same event from Internet Accounts shows once); the main calendar
+  of each account is on, the others can be ticked. A Google Docs, Sheets or Slides link in a call's setup, or a document
+  attached to the invitation, is read through your account before the brief is made, also when the document is private.
+  Export has Google Docs (a new doc in the chosen account). A past call's "..." menu has Google Meet record: the
+  participants and, when transcription was on in Meet, the Meet transcript, saved next to the call. Rules: google.yaml.
+- **Resizable tips window (2026-11-04):** drag the border between the tips and the side panel (Transcript, On me,
+  Brief) to make either wider; drag the bottom edge of the open agenda to show more or fewer items. Both are kept;
+  double-click goes back to the default.
+
+- **OpenAI model per job (2026-11-04):** Settings > AI has an OpenAI model for the preparation, the call and after the
+  call, each with its Claude counterpart and price: GPT-6 Luna (fast, like Haiku, the default during the call), GPT-6.1
+  Terra, GPT-6.1 Sol (like Sonnet, the default for preparation and after the call), GPT-6 Astra, and the older GPT-5.4
+  mini. The preparation no longer shows Claude models when it runs on the OpenAI API. Spending counts the GPT-6 prices.
+
+- **Home call cards like the mockup (2026-11-04):** the live call and the next call are big white cards: what the
+  call is on the left (live timer, lines and tips so far, project, people, the brief state in green or orange), one
+  big action on the right (Show tips, Get ready, Start call) with one link under it; the live card also has Prepare
+  again / Prepare now and End call. Coming up sits in a white card too.
+
 ## 0.9.0 (2026-11-04)
 
 - Live agenda: stable same-call identities survive rewording and reordering; all manual states and the current

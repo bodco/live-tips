@@ -35,7 +35,7 @@ final class AutoStart: NSObject, ObservableObject, UNUserNotificationCenterDeleg
     }
 
     func check() {
-        guard enabled, CalendarService.shared.access == .granted, !live else {
+        guard enabled, CalendarService.shared.hasSource, !live else {
             if suggestion != nil && (live || !enabled) { suggestion = nil }
             return
         }

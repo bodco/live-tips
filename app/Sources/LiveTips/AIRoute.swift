@@ -86,6 +86,7 @@ enum AIRoute {
         if let ws = store.get(.claudeWorkspaceID), !ws.isEmpty { env["CLAUDE_WORKSPACE"] = ws }
         env["LT_AI_JOB"] = job
         env["LT_AI_ROUTE"] = c.ai.route(job)
+        env["LT_OPENAI_MODEL"] = c.ai.openaiModel(job)       // 0.9.0: the job's OpenAI model (Settings > AI)
         env["LT_LOCAL_MODEL"] = UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"   // rules/ai.yaml > local
         env["LT_LOCAL_FALLBACK"] = (job != "tips" && c.ai.localFallback) ? "1" : "0"                      // rules/ai.yaml > fallback
         env["LT_AI_AUTO"] = c.ai.autoSwitch ? "1" : "0"
@@ -99,6 +100,7 @@ enum AIRoute {
     /// For sidecar-config.json (the tips engine and the judge).
     static func sidecarBlock(config c: AppConfig) -> [String: Any] {
         ["routes": ["tips": c.ai.tips, "after": c.ai.after], "auto": c.ai.autoSwitch, "state": statePath,
+         "openai_models": ["tips": c.ai.openaiTips, "after": c.ai.openaiAfter],
          "claude_cli": PrepRunner.claudePath ?? ""]
     }
 

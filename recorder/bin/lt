@@ -482,6 +482,35 @@ def derive_cards(facts):
     return cards
 
 
+def dead_trigger(t):
+    """The recorder ignores a plain trigger of one word shorter than 8 letters without a digit (transcriber.py
+    Cards._hit, review 2026-10-23: first names and word stems fired half of all cards). Keep the two in step."""
+    t = str(t).strip()
+    if not t or t.startswith("re:"):
+        return False
+    words = re.sub(r"[^\w\s]", "", t.lower()).strip().split()
+    return len(words) == 1 and len(words[0]) < 8 and not re.search(r"\d", words[0])
+
+
+def dead_triggers(cards):
+    return [(str(c.get("id") or c.get("gist") or "?"), str(t)) for c in cards
+            for t in (c.get("triggers") if isinstance(c.get("triggers"), list) else [c.get("triggers")]) if dead_trigger(t)]
+
+
+def fix_dead_triggers(cards):
+    """0.9.2: moves ignored one-word triggers to the card's `words` (still used to match by meaning). Returns how many."""
+    n = 0
+    for c in cards:
+        trig = c.get("triggers") if isinstance(c.get("triggers"), list) else [c.get("triggers")] if c.get("triggers") else []
+        dead = [t for t in trig if dead_trigger(t)]
+        if not dead:
+            continue
+        c["triggers"] = [t for t in trig if not dead_trigger(t)]
+        c["words"] = list(dict.fromkeys([str(w) for w in (c.get("words") or [])] + [str(t) for t in dead]))
+        n += len(dead)
+    return n
+
+
 def adopt_prep(s):
     """Copy each missing prep file from a prep-* file younger than 3 h whose title matches the
     call title (slugified). A prep of another call is never adopted: its brief and facts belong
@@ -537,6 +566,19 @@ def cmd_prep_check(args):
                 fixed.append(f"cards.json derived from {len(cards)} facts")
         else:
             fixed.append("cannot derive cards: facts.json missing or invalid")
+    if not is_problem(check_json_list(s + ".cards.json", ("id", "gist"), "cards")):
+        data = json.load(open(s + ".cards.json", encoding="utf-8"))
+        cards = load_list(s + ".cards.json", "cards")
+        if "--fix" in args and dead_triggers(cards):
+            n = fix_dead_triggers(cards)
+            tmp = s + f".cards.json.{os.getpid()}.tmp"
+            json.dump({"cards": cards} if isinstance(data, dict) else cards, open(tmp, "w", encoding="utf-8"),
+                      ensure_ascii=False, indent=1)
+            os.replace(tmp, s + ".cards.json")
+            fixed.append(f"{n} one-word triggers moved to words (the recorder ignores them; they still match by meaning)")
+        dead = dead_triggers(cards)
+    else:
+        dead = []
     res = {
         "brief": (f"{os.path.getsize(s + '.brief.md')} bytes" if os.path.exists(s + ".brief.md") else "MISSING"),
         "cards": check_json_list(s + ".cards.json", ("id", "triggers", "gist"), "cards"),
@@ -545,6 +587,10 @@ def cmd_prep_check(args):
         "slides": check_json_list(s + ".slides.json", ("title", "body"), "slides"),   # optional, presentation split view
         "adopted_from_prep": list(adopted), "adopted_sources": adopted,
     }
+    if dead:
+        res["warnings"] = [f"{len(dead)} triggers the recorder ignores (one word under 8 letters, no digit; use 2+ words "
+                           "or a regex, or --fix): " + "; ".join(f"{i}: {t}" for i, t in dead[:12])
+                           + ("; ..." if len(dead) > 12 else "")]
     if fixed:
         res["fixed"] = fixed
     keys = ["brief", "cards", "facts"] + (["outline"] if res["outline"] != "MISSING" else [])

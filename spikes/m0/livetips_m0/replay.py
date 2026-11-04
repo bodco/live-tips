@@ -68,6 +68,59 @@ def build_engine(cfg, md: Path, out: Path, clock, provider=None):
     return eng, stem
 
 
+def planned_models(provider, models: dict) -> dict:
+    """0.9.2 (audit 04.11: run.json said claude-haiku while every request went to gpt-6-luna): per role, the route
+    and the model the provider sends a request to, not the Claude ids in the config."""
+    out = {}
+    for role, mid in (models or {}).items():
+        if not mid:
+            continue
+        try:
+            out[role] = provider.describe(mid)
+        except Exception:  # noqa: BLE001  a test double without describe()
+            out[role] = {"route": getattr(provider, "name", None), "model": mid}
+    return out
+
+
+def observed_models(llm_path: Path) -> dict:
+    """Per role, {"<route> <model>": requests} from <stem>.app.llm.jsonl."""
+    out: dict = {}
+    try:
+        rows = [json.loads(x) for x in llm_path.read_text(encoding="utf-8").splitlines() if x.strip()]
+    except (OSError, ValueError):
+        return out
+    for r in rows:
+        role = r.get("role")
+        if not role or role == "hedge_extra":
+            continue
+        k = ((r.get("route") or "") + " " + str(r.get("model") or "")).strip()
+        out.setdefault(role, {})
+        out[role][k] = out[role].get(k, 0) + 1
+    return out
+
+
+def run_info(provider, cfg: dict, **extra) -> dict:
+    planned = planned_models(provider, cfg.get("models") or {})
+    return dict(extra, models={r: d["model"] for r, d in planned.items()}, routes={r: d["route"] for r, d in planned.items()},
+                config_models=cfg.get("models"))
+
+
+def finish_run_info(out: Path, stem: str) -> dict:
+    """Adds what really ran (from llm.jsonl) to run.json, and whether it matches the plan."""
+    p = out / (stem + ".app.run.json")
+    try:
+        info = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    seen = observed_models(out / (stem + ".app.llm.jsonl"))
+    info["observed"] = seen
+    planned = info.get("models") or {}
+    info["models_match"] = all(set(k.split(" ")[-1] for k in seen.get(role, {})) <= {m}
+                               for role, m in planned.items())
+    p.write_text(json.dumps(info, ensure_ascii=False, indent=1))
+    return info
+
+
 def _brief_text(base: Path) -> str:
     p = Path(str(base) + ".brief.md")
     return p.read_text(encoding="utf-8", errors="replace") if p.exists() else ""
@@ -107,12 +160,17 @@ def replay(cfg: dict, md: Path, out: Path, minutes=None, start_min=0.0, speed=1.
     def clock():
         return t0 + (time.monotonic() - mono0) * speed
 
-    eng, stem = build_engine(cfg, md, out, clock, provider)
     out.mkdir(parents=True, exist_ok=True)
-    (out / (stem + ".app.run.json")).write_text(json.dumps({
-        "md": md.name, "variant": cfg.get("variant"), "models": cfg["models"], "cache_ttl": cfg.get("cache_ttl"),
-        "direct_route": cfg.get("direct_route", True), "speed": speed, "start_min": start_min,
-        "minutes": minutes, "lines": len(sel), "started": time.strftime("%Y-%m-%d %H:%M:%S")}, ensure_ascii=False, indent=1))
+    # 0.9.2: a replay into a folder used before starts clean (the writers append; a rerun mixed with the old records)
+    for kind in ("tips", "llm", "timing"):
+        p = out / (md.name[:-3] + ".app." + kind + ".jsonl")
+        if p.exists():
+            p.write_text("", encoding="utf-8")
+    eng, stem = build_engine(cfg, md, out, clock, provider)
+    (out / (stem + ".app.run.json")).write_text(json.dumps(run_info(
+        eng.provider, cfg, md=md.name, variant=cfg.get("variant"), cache_ttl=cfg.get("cache_ttl"),
+        direct_route=cfg.get("direct_route", True), speed=speed, start_min=start_min,
+        minutes=minutes, lines=len(sel), started=time.strftime("%Y-%m-%d %H:%M:%S")), ensure_ascii=False, indent=1))
     for ln in sel:
         wait = (ln.written - t0) / speed - (time.monotonic() - mono0)
         if wait > 0:
@@ -123,6 +181,7 @@ def replay(cfg: dict, md: Path, out: Path, minutes=None, start_min=0.0, speed=1.
     summary = {"lines": len(sel), "call_span_s": round(span_s, 1), "tips": len(eng.tips),
                "spent_usd": round(eng.budget.call_spent, 4) if eng.budget else None}
     (out / (stem + ".app.summary.json")).write_text(json.dumps(summary, indent=1))
+    finish_run_info(out, stem)
     if verbose:
         print(json.dumps(summary))
     return eng

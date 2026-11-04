@@ -150,7 +150,7 @@ struct HomeView: View {
         if [s.config.ai.prep, s.config.ai.tips, s.config.ai.after].contains(AIRoute.openai) && runner.hasOpenAIKey { return true }
         return runner.loggedIn == true || (runner.loggedIn == nil && PrepRunner.claudePath != nil)
     }
-    private var calendarOn: Bool { demo ? !["nocal", "first"].contains(Self.shotState) : cal.access == .granted }
+    private var calendarOn: Bool { demo ? !["nocal", "first"].contains(Self.shotState) : cal.hasSource }
     private var firstLaunch: Bool { demo ? Self.shotState == "first" : (!aiReady && !calendarOn && history.records.isEmpty) }
 
     private var homeBody: some View {
@@ -228,15 +228,25 @@ struct HomeView: View {
             Button { TranscribeWindow.show() } label: { headerLabel(L("tr.window"), "waveform", icons) }
                 .buttonStyle(.pnTertiary).help(L("tr.subtitle")).fixedSize()
             if !live {
-                HStack(spacing: 2) {
-                    Button(L("home.startCallNow")) { StartCallWindow.show(delegate: app) }
-                        .buttonStyle(.pnPrimary).keyboardShortcut("n", modifiers: .command).fixedSize()
+                // 0.9.1 (owner): one split button, the arrow is part of the blue button, not a loose chevron
+                HStack(spacing: 0) {
+                    Button { StartCallWindow.show(delegate: app) } label: {
+                        Text(L("home.startCallNow")).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.leading, 14).padding(.trailing, 12).frame(height: 32).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain).keyboardShortcut("n", modifiers: .command)
+                    Rectangle().fill(Color.white.opacity(0.35)).frame(width: 1, height: 18)
                     Menu {
                         Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
-                    } label: { Image(systemName: "chevron.down") }
-                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                        .help(L("home.planCall.help")).accessibilityLabel(L("home.planCall"))
+                    } label: {
+                        Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                            .frame(width: 28, height: 32).contentShape(Rectangle())
+                    }
+                    .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
+                    .help(L("home.planCall.help")).accessibilityLabel(L("home.planCall"))
                 }
+                .background(PN.C.accentFill, in: RoundedRectangle(cornerRadius: 7))
+                .fixedSize()
             }
             Button { SettingsWindow.show() } label: { Image(systemName: "gearshape") }
                 .buttonStyle(.pnTertiary).help(L("home.settings")).accessibilityLabel(L("home.settings"))
@@ -355,9 +365,29 @@ struct HomeView: View {
         return rows.compactMap(\.event).filter { $0.id != e.id && e.overlaps($0) }
     }
 
+    /// 0.9.0 (mockup "Home"): a white card, 20 pt corners, a soft shadow, roomy padding.
     private func card<C: View>(@ViewBuilder _ c: () -> C) -> some View {
-        c().padding(20).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.l))
+        c().padding(.horizontal, 32).padding(.vertical, 28).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: 20))
+            .shadow(color: .black.opacity(0.05), radius: 12, y: 4)
+    }
+
+    /// The call card of the mockup: what the call is on the left, one big action and one link on the right;
+    /// in a narrow window the actions go under it.
+    private func heroCard<L: View, R: View>(@ViewBuilder left: () -> L, @ViewBuilder right: () -> R) -> some View {
+        let l = left(), r = right()
+        return card {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 24) {
+                    l.frame(minWidth: 320, maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .trailing, spacing: 8) { r }.fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 18) {
+                    l
+                    VStack(alignment: .leading, spacing: 8) { r }
+                }
+            }
+        }
     }
 
     /// No calendar: the day cannot be shown; a call can still be started or planned by hand.
@@ -419,23 +449,49 @@ struct HomeView: View {
 
     private var liveCard: some View {
         let ce = CallEngine.shared
-        let title = ce.renamed ?? (ce.callRequest["title"] as? String) ?? status.project ?? L("app.name")
+        let req = ce.callRequest
+        let title = ce.renamed ?? (req["title"] as? String) ?? status.project ?? L("app.name")
         let since = status.startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
-        return card {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    StatePill(state: .live, text: status.state == "standby" ? L("menubar.status.waiting") : L("home.live"))
+        let reg = ProjectRegistry.load(from: AppPaths.projects)
+        let slug = (req["slug"] as? String) ?? status.slug ?? ""
+        let project = reg.projects.first { $0.slug == slug }?.name ?? reg.workspaces.first { $0.name.lowercased() == slug.lowercased() }?.name ?? status.project ?? ""
+        let people = Self.peopleLine(((req["participants"] as? [String]) ?? []).filter { !$0.isEmpty })
+        let stem = (status.file ?? "").hasSuffix(".md") ? String((status.file ?? "").dropLast(3)) : (status.file ?? "")
+        let hasBrief = !stem.isEmpty && FileManager.default.fileExists(atPath: stem + ".brief.md")
+        let preparing = runner.running && runner.joinsCurrentCall
+        let briefText = preparing ? L("home.live.briefPreparing") : hasBrief ? L("home.brief.ready") : L("home.live.noBrief")
+        let waiting = status.state == "standby"
+        return heroCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Circle().fill(PN.C.danger).frame(width: 8, height: 8).accessibilityHidden(true)
+                    Text(waiting ? L("menubar.status.waiting") : L("home.live")).font(.system(size: 14, weight: .semibold)).foregroundStyle(PN.C.danger)
                     if let s = since, status.state == "recording" {
-                        Text(s, style: .timer).monospacedDigit().font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                        Text("·").foregroundStyle(PN.C.text3)
+                        Text(s, style: .timer).monospacedDigit().font(.system(size: 14, weight: .semibold)).foregroundStyle(PN.C.danger)
+                    }
+                    if status.lines > 0 {
+                        Text("·").foregroundStyle(PN.C.text3)
+                        Text(L("home.live.counts", ["lines": "\(status.lines)", "tips": "\(status.tips)"])).font(.system(size: 14)).foregroundStyle(PN.C.text3)
                     }
                 }
-                Text(title).font(.system(size: 20, weight: .semibold)).foregroundStyle(PN.C.text).lineLimit(2)
-                if let p = status.project { Text(p).font(PN.Font.body).foregroundStyle(PN.C.text2) }
-                HStack(spacing: 8) {
-                    Button(L("menubar.showTips")) { app.showTips() }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
-                    Button(L("menubar.endCall")) { app.endCall() }.buttonStyle(.pnSecondary)
+                Button { app.showTips() } label: {
+                    Text(title).font(.system(size: 30, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
-                .padding(.top, 4)
+                .buttonStyle(.plain).help(L("menubar.showTips"))
+                Text([project, people.isEmpty ? "" : L("home.card.with", ["people": people])].filter { !$0.isEmpty }.joined(separator: " · ") + " · ")
+                    .font(PN.Font.body).foregroundStyle(PN.C.text2)
+                    + Text(briefText).font(PN.Font.body).foregroundStyle(hasBrief || preparing ? PN.C.turn : PN.C.pending)
+            }
+        } right: {
+            Button(L("menubar.showTips")) { app.showTips() }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
+            HStack(spacing: 14) {
+                if !preparing {
+                    link(hasBrief ? L("talk.prepareAgain") : L("bb.prepareNow")) {
+                        if let e = LivePrep.start() { note = e }
+                    }
+                }
+                link(L("menubar.endCall")) { app.endCall() }
             }
         }
     }
@@ -486,48 +542,48 @@ struct HomeView: View {
             default: return L("home.brief.notReady")
             }
         }()
-        let meta2 = [people.isEmpty ? "" : L("home.card.with", ["people": people]), briefText].filter { !$0.isEmpty }.joined(separator: " · ")
-        return card {
-            VStack(alignment: .leading, spacing: 12) {
+        let briefOK = st == .ready && fresh?.stale != true
+        let withPeople = people.isEmpty ? "" : L("home.card.with", ["people": people]) + " · "
+        return heroCard {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text(meta1).font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.text3)
-                    Spacer()
+                    Text(meta1).font(.system(size: 14, weight: .semibold)).foregroundStyle(PN.C.accent)
                     StatePill(state: st)
                 }
                 Button { openCall(r) } label: {
-                    Text(r.title).font(.system(size: 22, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
+                    Text(r.title).font(.system(size: 30, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain).help(L("home.openCall.help"))
-                Text(meta2).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(2)
+                (Text(withPeople).foregroundStyle(PN.C.text2) + Text(briefText).foregroundStyle(briefOK ? PN.C.turn : PN.C.pending))
+                    .font(PN.Font.body).lineLimit(2)
                 ForEach(overlaps, id: \.id) { e in
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.circle").foregroundStyle(PN.C.pending).accessibilityHidden(true)
                         Text(L("home.check.overlaps", ["title": e.title])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
                         link(L("home.overlap.hide")) { hide(e.id) }
                     }
+                    .padding(.top, 2)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    mainAction(r, st)
-                }
-                .padding(.top, 4)
             }
+        } right: {
+            mainAction(r, st)
         }
     }
 
     @ViewBuilder private func mainAction(_ r: Ahead, _ st: CallState) -> some View {
         switch st {
         case .noBrief:
-            Button { start(r) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+            Button { start(r) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
             link(L("home.connectClaude")) { SettingsWindow.show(tab: "ai") }
         case .ready, .live:
-            Button { start(r) } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+            Button { start(r) } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
             if st == .ready { link(L("talk.prepareAgain")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) } }
             else { link(L("home.getReady")) { prepare(r) } }
         case .preparing, .queued:
-            Button { start(r) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+            Button { start(r) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
             link(L("common.cancel")) { if st == .preparing { runner.cancel() } else if let m = r.model { upnext.unqueue(m) } }
         default:
-            Button(L("home.getReady")) { prepare(r) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+            Button(L("home.getReady")) { prepare(r) }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
             link(L("home.startWithout")) { start(r) }
         }
     }
@@ -560,7 +616,7 @@ struct HomeView: View {
         let first = nextCall?.id
         let rest = ahead.filter { $0.id != first }
         let near = rest.filter { Calendar.current.isDateInToday($0.start) || Calendar.current.isDateInTomorrow($0.start) || $0.start < now }
-        return VStack(alignment: .leading, spacing: 12) {
+        return card { VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
                 Text(L("home.comingUp")).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text)
                 if !hiddenNow.isEmpty {
@@ -589,9 +645,9 @@ struct HomeView: View {
                     }
                 }
                 .padding(.horizontal, 6)
-                .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+                .background(PN.C.bg, in: RoundedRectangle(cornerRadius: PN.Radius.m))
             }
-        }
+        } }
     }
 
     private func timeline(_ rows: [Ahead]) -> some View {

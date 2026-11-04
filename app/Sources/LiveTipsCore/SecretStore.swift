@@ -9,6 +9,7 @@ public struct SecretStore {
         case claudeWorkspaceID = "claude_workspace_id"
         case notionToken = "notion_token"
         case hubspotKey = "hubspot_service_key"     // 0.8.7 (I2): a HubSpot service key
+        case googleAccounts = "google_accounts"     // 0.9.1: JSON list of the connected Google accounts (refresh tokens)
     }
 
     public let service: String

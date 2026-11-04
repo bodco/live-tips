@@ -415,6 +415,16 @@ internal facts cannot leak into the wrong meeting. Give the prep and the call th
 presentation, the outline are present and valid). On `FIX` the skill runs `--fix` (cards
 derived from the facts) and writes what is still missing between polls; until then
 `read_delta` keeps printing `@@DUE prep`.
+`prep-check` also warns about card triggers the recorder ignores (one word under 8 letters without
+a digit, such as "hubspot" or a first name); `--fix` moves them to the card's `words`, which still
+count when cards are matched by meaning. A card whose triggers are all regexes fires only by them,
+a card shows by meaning once per call, and a "your turn" card (`"address": true`) is never shown by
+the recorder itself: the PM decides when to speak (0.9.2). A fact also matches the last minute of
+the other side's talk, not one line; it is skipped when you just said it, when that minute is about
+something else, or a second time on the same topic.
+A statement the prepared material answers (a claim, a doubt, a pain nobody answered yet) gets a 🟠
+tip with the ready answer, at most 2 in 10 minutes and once per topic. Files you add to a call are the
+preparation's primary document: each section gives a fact or card marked `"primary": true`.
 
 ### 5.1 During the call
 
@@ -1555,6 +1565,27 @@ commitments kept on this Mac. Settings > Modules turns it off.
 
 **During the call.** The brief strip under the tips window header: "Prepare now" or "Prepare again" remakes the brief
 in the background from the call so far (rules/live_prep.yaml); recording and tips never stop.
+
+### 14.1n Google accounts and a resizable tips window (0.9.1, beta)
+
+**Connect.** Settings > Integrations > Google > Connect Google opens the sign-in in your browser; choose the account,
+tick the permissions and come back. Add another Google account adds the next one, the same way as several Notion
+workspaces. While the app is in Google's review, Google may show "Google hasn't verified this app": choose Advanced,
+then Go to Pacenote. Each account's row shows what it can do (Calendars, Docs links, Export, Meet), its calendars and
+Remove, which also revokes Pacenote's access at Google.
+
+| What | How it works |
+|---|---|
+| Calendars | The main calendar of each account is on; tick the others. Events from 3 hours ago to 36 hours ahead, refreshed every 5 minutes. The same event that macOS also shows (Internet Accounts) appears once. Outlook and other calendars still come through macOS |
+| Links for the brief | A Google Docs, Sheets or Slides link in What matters or the call context, and a document attached to the invitation, is read through the first account that can open it, also when it is private. A Markdown copy goes to `<project>/live/google/`; the brief reads the copy. Other Drive files (PDF, Word) are not read |
+| Export | Export on a past call has Google Docs: a new doc in the chosen account, opened in the browser |
+| Google Meet | On a past call, "..." > Google Meet record saves the participants and, if transcription was on in Meet, the Meet transcript as `<call>.meet.md` next to the call. Your own transcript does not change |
+
+Only reading, except the export you click. Rules: `rules/google.yaml`.
+
+**Tips window sizes.** Drag the border between the tips and the side panel (Transcript, On me, Brief) to make the
+panel wider or narrower; drag the handle under the open agenda to show more or fewer items. Pacenote keeps both;
+double-click a border to go back to the default. With the keyboard: focus the border and use the arrow keys.
 
 ### 14.2 After the call: the meeting page in Notion
 

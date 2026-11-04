@@ -80,6 +80,12 @@ triggers:
   route: classify
   skill_trigger: A decision, owner or date was discussed and not fixed
   skill_tip: 'log in the call picture (`decisions`, `on_me`); a tip "Зафіксуй: {що}" only with `proactive.md` on (phrase in the call''s language, never a number for an estimate)'
+- id: answer_in_primary
+  level: orange
+  level_label: 🟠
+  route: classify
+  skill_trigger: '`{them_label}` states something (a claim, a doubt, a pain, "there is no structure") that the prepared material answers with a ready answer, proof or caveat (the fact book, the cards, the brief, the main document), and nobody on the call has said it yet (0.9.2)'
+  skill_tip: 'gist "🟠 {тема}: є відповідь" + the answer as a ready phrase + the fact with its source. Not when the PM or anyone said it in the last lines; at most 2 in 10 minutes and one per topic (diet.yaml > answer_in_primary)'
 - id: add_fact
   level: orange
   level_label: silent

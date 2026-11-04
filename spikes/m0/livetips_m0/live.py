@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from .commitments import norm_text
-from .replay import build_engine
+from .replay import build_engine, finish_run_info, run_info
 from .transcript import hms_to_s, parse_line
 
 
@@ -321,9 +321,9 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
         cfg.setdefault("register_dir", str(md.parent))
     cfg.setdefault("call_md", str(md))         # 0.8.7: the Sales summary goes next to the transcript
     eng, stem = build_engine(cfg, md, out, now_sod, provider)
-    (out / (stem + ".app.run.json")).write_text(json.dumps({
-        "md": md.name, "mode": "live", "variant": cfg.get("variant"), "models": cfg["models"],
-        "cache_ttl": cfg.get("cache_ttl"), "started": time.strftime("%Y-%m-%d %H:%M:%S")}, ensure_ascii=False, indent=1))
+    (out / (stem + ".app.run.json")).write_text(json.dumps(run_info(
+        eng.provider, cfg, md=md.name, mode="live", variant=cfg.get("variant"),
+        cache_ttl=cfg.get("cache_ttl"), started=time.strftime("%Y-%m-%d %H:%M:%S")), ensure_ascii=False, indent=1))
     lr = LiveRun(cfg, eng, md, inbox, from_start)
     while True:
         lr.step()
@@ -337,6 +337,7 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
     except Exception as e:  # noqa: BLE001
         print("wrapup:", repr(e), flush=True)
     (out / (stem + ".app.summary.json")).write_text(json.dumps(lr.summary(), indent=1))
+    finish_run_info(out, stem)
     return eng
 
 

@@ -16,3 +16,6 @@ target/
 
 # the owner's private working folder
 Claude outputs/
+
+# 0.9.1: the Google OAuth client of a development build (rules/google.yaml)
+google_oauth.json

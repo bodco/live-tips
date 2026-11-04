@@ -31,7 +31,7 @@ from .providers import AnthropicProvider, Completion, Provider, gist_closed, use
 ROUTES = ("api", "code", "local", "openai", "codex")   # 0.8.5: "local" = a model on this Mac (rules/ai.yaml)
 JOBS = ("prep", "tips", "after")
 PROBE_EVERY_S = 120
-PING_MODEL = {"codex": "codex/default", "openai": "gpt-5.4-mini", "api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}
+PING_MODEL = {"codex": "codex/default", "openai": "gpt-6-luna", "api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}
 
 
 def other(route: str) -> str:
@@ -302,6 +302,23 @@ class RoutedProvider(Provider):
         if self.legs.get(route) is not None:
             self.legs[route] = fn(self.legs[route])
 
+    def describe(self, model: str) -> dict:
+        """The chosen route and the model it runs for `model` (auto-switch may change the route on an outage:
+        run.json keeps what each request really used next to this)."""
+        r = self.preferred
+        leg = self.legs.get(r)
+        if r == "openai":
+            m = leg.describe(model)["model"] if leg is not None else None
+        elif r == "code":
+            m = cc_model(model)
+        elif r == "local":
+            m = os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")
+        elif r == "codex":
+            m = "codex/default"
+        else:
+            m = model
+        return {"route": r, "model": m, "available": leg is not None}
+
     def usable(self, route: str) -> bool:
         if self.legs.get(route) is None:
             return False
@@ -423,15 +440,16 @@ class RoutedProvider(Provider):
 CODE_TIMEOUT = {True: 60.0, False: 300.0}    # during the call / any other job
 
 
-def make_legs(key: str, workspace: str, cli: Optional[str], api_timeout: float, code_timeout: float) -> dict:
+def make_legs(key: str, workspace: str, cli: Optional[str], api_timeout: float, code_timeout: float,
+              openai_model: Optional[str] = None) -> dict:
     """Claude, OpenAI and local providers; a missing key or CLI leaves that route unavailable."""
     from .providers import OllamaProvider
     from .codex_provider import CodexProvider, find_codex_cli
-    from .openai_provider import OpenAIProvider
+    from .openai_provider import OpenAIProvider, MODEL as OPENAI_DEFAULT
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     codex = find_codex_cli()
     return {"codex": CodexProvider(codex, timeout=code_timeout) if codex else None,
-            "openai": OpenAIProvider(openai_key, timeout=api_timeout) if openai_key else None,
+            "openai": OpenAIProvider(openai_key, timeout=api_timeout, model=openai_model or OPENAI_DEFAULT) if openai_key else None,
             "api": AnthropicProvider(key, timeout=api_timeout, workspace_id=workspace) if key else None,
             "code": ClaudeCodeProvider(cli, timeout=code_timeout) if cli else None,
             # 0.8.5 (rules/ai.yaml > routes.local): a model on this Mac, only when the PM chose it for the job
@@ -451,8 +469,11 @@ def provider_from_env(job: Optional[str] = None, timeout: float = 120.0) -> Prov
     env = os.environ
     route = env.get("LT_AI_ROUTE", "")
     cli = find_claude_cli() if route else None
-    legs = make_legs(env.get("CLAUDE_API", ""), env.get("CLAUDE_WORKSPACE", ""), cli, timeout, max(timeout, 300.0))
-    return RoutedProvider(job or env.get("LT_AI_JOB", "after"), route, legs,
+    from .openai_provider import job_model
+    j = job or env.get("LT_AI_JOB", "after")
+    legs = make_legs(env.get("CLAUDE_API", ""), env.get("CLAUDE_WORKSPACE", ""), cli, timeout, max(timeout, 300.0),
+                     openai_model=job_model(j, env.get("LT_OPENAI_MODEL")))
+    return RoutedProvider(j, route, legs,
                           auto=bool(route) and env.get("LT_AI_AUTO", "1") == "1", state=RouteState())
 
 
@@ -464,7 +485,9 @@ def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optio
     route = os.environ.get("LT_AI_ROUTE") or (ai.get("routes") or {}).get(job)
     key = _secret(secret_loader, cfg.get("api_key_env", "CLAUDE_API"))
     ws = cfg.get("workspace_id") or _secret(secret_loader, cfg.get("workspace_id_env", ""))
-    legs = make_legs(key, ws, find_claude_cli(ai.get("claude_cli") or cfg.get("claude_cli")), 30.0, CODE_TIMEOUT[job == "tips"])
+    from .openai_provider import job_model
+    legs = make_legs(key, ws, find_claude_cli(ai.get("claude_cli") or cfg.get("claude_cli")), 30.0, CODE_TIMEOUT[job == "tips"],
+                     openai_model=job_model(job, (ai.get("openai_models") or {}).get(job)))
     return RoutedProvider(job, route, legs, auto=bool(ai.get("auto", True)), state=RouteState(ai.get("state")),
                           background=(job == "tips"))
 

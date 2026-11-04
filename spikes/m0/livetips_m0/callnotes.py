@@ -1,7 +1,7 @@
 """Pacenote 0.8.5 (owner: "summaries that never drop details, so the context is not lost"): full notes of one call,
 written once after the call, which later preparations read instead of the whole transcript (rules/notes.yaml).
 
-  python -m livetips_m0.callnotes --md <transcript.md> [--model claude-sonnet-5-5] [--lang uk]
+  python -m livetips_m0.callnotes --md <transcript.md> [--model claude-sonnet-5-5] [--lang auto|uk|en]
 
 Writes <stem>.notes.md next to the transcript. Two guards against lost details:
 1. The transcript is read in parts (about 25,000 characters each, on line breaks), each part gets its notes, then
@@ -13,6 +13,7 @@ Prints one JSON line {"ok", "path", "coverage", "cost_usd", "error"}.
 """
 import argparse
 import json
+import collections
 import re
 import sys
 import time
@@ -20,7 +21,18 @@ from pathlib import Path
 from typing import List
 
 PART_CHARS = 25_000
-LANGS = {"uk": "Ukrainian", "en": "English"}
+LANGS = {"uk": "Ukrainian", "en": "English", "pl": "Polish", "de": "German", "es": "Spanish", "fr": "French",
+         "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "cs": "Czech", "sk": "Slovak", "hu": "Hungarian"}
+
+
+def call_lang(text: str, default: str = "uk") -> str:
+    """0.9.1 (owner): the notes are written in the language the call was held in, not the app's interface language.
+    The majority of the transcript lines' language tags ("[13:01:04] Я (uk): ..."), else the header's first language."""
+    tags = re.findall(r"^\[\d\d:\d\d:\d\d\][^\n(]*\(([a-z]{2})\):", text, re.M)
+    if tags:
+        return collections.Counter(tags).most_common(1)[0][0]
+    m = re.search(r"^- (?:Languages|Мови):[^\n=]*=\s*([a-z]{2})", text, re.M)
+    return m.group(1) if m else default
 
 PART_SYS = """You take notes of one part of a work call for the project manager (the PM, "Я" or "Me" in the transcript).
 These notes replace the transcript for later preparations, so nothing that matters may be lost. Write in {LANG};
@@ -156,6 +168,8 @@ def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str
     named = md.with_name(md.name[:-3] + ".named.md") if not md.name.endswith(".named.md") else md
     src = named if named.exists() else md
     text = src.read_text(encoding="utf-8", errors="replace")
+    if not lang or lang == "auto":
+        lang = call_lang(text)
     L = LANGS.get(lang, "Ukrainian")
     title = re.sub(r"^\d{4}-\d\d-\d\d-\d{4}-", "", md.stem.split(".")[0]).replace("-", " ")
     ps = parts(text)
@@ -185,7 +199,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--md", required=True)
     ap.add_argument("--model", default="claude-sonnet-5-5")
-    ap.add_argument("--lang", default="uk")
+    ap.add_argument("--lang", default="auto", help="auto: the language the call was held in")
     ap.add_argument("--aliases", default="", help="the PM's names, comma separated")
     ap.add_argument("--project-config", default="")
     a = ap.parse_args(argv)

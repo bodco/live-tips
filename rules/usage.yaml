@@ -44,3 +44,7 @@ events:
   feature_try_it: [feature]
   demo_opened: [kind]
   onboarding_step: [step, skipped]
+  google_connect: []
+  google_links_read: [n]
+  google_export: []
+  google_meet: [transcript]

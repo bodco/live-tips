@@ -216,7 +216,9 @@ triggers are lowercase distinctive phrases in every call language ({LANGS}), nev
 FACTS_SYS = """From the brief and the notes, write the fact book of the call, following the skill's rules below.
 Answer with one JSON list and nothing else: 40-70 facts {{"id","title","text","keywords","source"}}; text with the
 numbers, dates and names (one or two sentences); keywords in every call language ({LANGS}); source = the call date
-or the document. Never invent a fact."""
+or the document. Never invent a fact. A fact taken from a file the PM added (the primary document) gets
+"primary": true and a source naming the file and its section; its points on what is missing and its ready answers
+stay whole sentences, one fact per point (0.9.2)."""
 
 
 def ollama_chat(url: str, model: str, system: str, user: str, on_tokens, max_out: int = 6000) -> dict:

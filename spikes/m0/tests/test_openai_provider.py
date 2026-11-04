@@ -40,7 +40,7 @@ def test_stream_request_usage_and_cost(monkeypatch):
     assert c.error is None and c.text == '{"gist":"Ready"}' and c.model == MODEL
     assert chunks == ['{"gist":', '{"gist":"Ready"}'] and c.t_gist and c.t_first_token and c.t_done
     assert (c.input_tokens, c.cache_read, c.output_tokens) == (60, 40, 20)
-    assert cost_usd(c.model, c.input_tokens, 0, 0, c.cache_read, c.output_tokens) == pytest.approx(0.000138)
+    assert cost_usd(c.model, c.input_tokens, 0, 0, c.cache_read, c.output_tokens) == pytest.approx(0.0000164)  # gpt-6-luna: 60 x 0.10 + 40 x 0.01 + 20 x 0.50 per 1M
     assert seen["url"] == "https://api.openai.com/v1/responses" and seen["timeout"] == 7
     assert seen["headers"]["Authorization"] == "Bearer test-key"
     assert seen["body"] == {"model": MODEL, "instructions": "rules", "input": "question", "max_output_tokens": 60,
@@ -90,7 +90,7 @@ def test_success_written_to_spend_ledger(monkeypatch, tmp_path):
     rp = RoutedProvider("after", "openai", {"openai": OpenAIProvider("test-key")}, state=RouteState(str(tmp_path / "s.json")))
     assert complete(rp).error is None
     row = json.loads((tmp_path / "spend-ledger.jsonl").read_text())
-    assert row["route"] == "openai" and row["usd"] == pytest.approx(0.000138)
+    assert row["route"] == "openai" and row["usd"] == pytest.approx(0.0000164, abs=1e-6)  # the ledger keeps 6 decimals  # gpt-6-luna: 60 x 0.10 + 40 x 0.01 + 20 x 0.50 per 1M
 
 
 def test_transport_and_malformed_stream_errors(monkeypatch):
@@ -121,5 +121,61 @@ def test_openai_budget_hard_stop(tmp_path):
                                   state=RouteState(str(tmp_path / "s.json")))
     eng.budget = BudgetGuard(str(tmp_path / "spend.json"), 1, 0.0001, 100)
     assert not eng._budget_stops()
-    eng._bill(Completion(model=MODEL, input_tokens=60, cache_read=40, output_tokens=20))
+    eng._bill(Completion(model=MODEL, input_tokens=600, cache_read=40, output_tokens=200))
     assert eng._budget_stops()
+
+
+def test_job_models_follow_the_settings_and_default_like_claude():
+    from livetips_m0.openai_provider import job_model
+    assert job_model("tips") == "gpt-6-luna"          # Haiku-like during the call
+    assert job_model("after") == "gpt-6.1-sol"        # Sonnet-like after the call
+    assert job_model("prep") == "gpt-6.1-sol"
+    assert job_model("tips", "gpt-6.1-terra") == "gpt-6.1-terra"
+    assert job_model("after", "claude-sonnet-5-5") == "gpt-6.1-sol"   # a Claude id never reaches OpenAI
+
+
+def test_provider_uses_its_job_model_not_the_claude_id(monkeypatch):
+    import io, json
+    import livetips_m0.openai_provider as op
+    seen = {}
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake(req, timeout=0):
+        seen["body"] = json.loads(req.data)
+        return Resp(b'data: {"type":"response.completed","response":{"status":"completed","usage":{}}}\n\n')
+    monkeypatch.setattr(op.urllib.request, "urlopen", fake)
+    c = op.OpenAIProvider("k", model="gpt-6.1-sol").complete(model="claude-haiku-5-5", system=[{"text": "s"}], user="u",
+                                                              max_tokens=20, cache_ttl=None)
+    assert seen["body"]["model"] == "gpt-6.1-sol" and c.model == "gpt-6.1-sol"
+
+
+def test_sol_and_astra_never_get_effort_none():
+    """0.9.1: gpt-6.1-sol answered HTTP 400 (reasoning.effort unsupported_value) to "none"; the prep failed in 1 s."""
+    from livetips_m0.openai_provider import effort_for
+    assert effort_for("gpt-6.1-sol") == "low" and effort_for("gpt-6-astra") == "low" and effort_for("gpt-5.6-sol") == "low"
+    assert effort_for("gpt-6-luna") == "none" and effort_for("gpt-6.1-terra") == "none"
+
+
+def test_effort_rejected_retries_once_with_low_and_says_why(monkeypatch):
+    sent = []
+
+    def send(req, timeout=None):
+        body = json.loads(req.data.decode())
+        sent.append(body["reasoning"]["effort"])
+        if len(sent) == 1:
+            err = {"error": {"message": "secret prompt echo", "param": "reasoning.effort", "code": "unsupported_value"}}
+            raise urllib.error.HTTPError("https://api.openai.com", 400, "bad", {}, io.BytesIO(json.dumps(err).encode()))
+        return stream({"type": "response.output_text.delta", "delta": "ok"}, terminal())
+    monkeypatch.setattr("urllib.request.urlopen", send)
+    c = OpenAIProvider("test-key", model="gpt-6-luna").complete(model="claude", system=[{"text": "r"}], user="q", max_tokens=20, cache_ttl=None)
+    assert sent == ["none", "low"] and c.error is None and c.text == "ok"
+
+    def always(req, timeout=None):
+        err = {"error": {"message": "secret prompt echo", "param": "model", "code": "model_not_found"}}
+        raise urllib.error.HTTPError("https://api.openai.com", 400, "bad", {}, io.BytesIO(json.dumps(err).encode()))
+    monkeypatch.setattr("urllib.request.urlopen", always)
+    c = OpenAIProvider("test-key", model="gpt-6-luna").complete(model="claude", system=[{"text": "r"}], user="q", max_tokens=20, cache_ttl=None)
+    assert c.error == "OpenAI: HTTP 400 (model model_not_found)" and "secret" not in c.error

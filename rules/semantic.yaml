@@ -17,6 +17,25 @@ thresholds:
   sos_min: 0.45               # SOS picks by the live topic
   index_min: 0.40             # SOS and search: project index snippets
 fact_gate: question_or_topic_held   # a fact shows on an other-side line that is a question, or the topic held 2+ lines
+# 0.9.2 (audit 04.11: their argument ran 30-90 s over ~9 s ASR lines, 38 facts blocked as "not a question"). Every fact
+# (owner: primary is not only the attached file; the project context, recent calls and threads count too):
+fact_window:
+  text: their lines of the last topic_window_s joined (2+ lines), one extra embedding per other-side line
+  held: two windows in a row at window_min and window_margin above the floor, or one at window_strong
+  window_min: 0.60
+  window_margin: 0.12
+  window_strong: 0.18
+  another_topic: a two-line match is dropped when the window's cosine to the fact is under fact_min
+  said_by_pm: not shown when a PM line of the window reached fact_min - 0.05 to the fact (questions still get it)
+  once_per_call: by the topic a fact shows once per call; a question still gets it after the cooldown
+  one_a_minute: by the topic at most one fact per topic_window_s (they do not stack); questions are not limited
+# 0.9.2 (audit of a 04.11 call). Cards by meaning:
+card_text: gist_plus_plain_triggers_and_words   # a card whose triggers are all regexes is not matched by meaning, unless "semantic": true
+card_by_meaning: once_per_call      # a card shown once (by meaning or by a trigger) comes again only by its trigger
+address_cards: held                 # a "your turn" card ("address": true, or a trigger with a name alias) is never shown by the recorder;
+                                    # the model answers an update asked by name with what is new (prompt ADDRESS_ANY)
+one_word_triggers: ignored          # a plain trigger of one word under 8 letters without a digit never fires; lt prep-check warns,
+                                    # --fix moves it to the card's "words" (still matched by meaning)
 # Neutral small talk and call logistics; the highest cosine of an entry to these is its noise floor.
 neutral_anchors:
   - "Hello, can you hear me?"

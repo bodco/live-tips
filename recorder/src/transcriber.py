@@ -118,6 +118,12 @@ DEFAULTS = {
     "semantic_min_words": 3,    # shorter lines ("так", "ok") are not embedded
     "semantic_queue": 6,        # lines waiting for an embedding; when behind, the oldest is dropped
     "semantic_topic_s": 60,     # s of lines in the rolling "live topic" vector
+    # 0.9.2 (audit 04.11, rules/semantic.yaml > fact_window): the other side's argument runs 30-90 s over ~9 s ASR lines,
+    # so a fact is also matched against the last semantic_topic_s of their lines joined; two windows in a row above
+    # these values hold the topic (like 2 lines do).
+    "semantic_window_min": 0.60,
+    "semantic_window_margin": 0.12,
+    "semantic_window_strong": 0.18,   # one window this far above the noise floor holds the topic at once
     "index_enabled": True,      # keep <project>/.livetips-index fresh in the background during calls
     "index_extra": [],          # extra folders to index (e.g. a workspace _notion mirror)
     "index_live_max_chunks": 1500,  # at most this many chunks embedded per call (pre-index with `lt index`)
@@ -724,8 +730,8 @@ def parse_cards(data) -> list[dict]:
         if not isinstance(c, dict):
             continue
         trig = _strs(c.get("triggers"))
-        if not trig:
-            continue
+        if not trig and not _strs(c.get("words")):
+            continue                            # 0.9.2: a card with only `words` still fires by meaning
         g = dict(c)
         g["id"] = _s(c.get("id")) or _s(c.get("gist"))[:30] or f"c{i + 1}"
         g["triggers"] = trig
@@ -736,6 +742,8 @@ def parse_cards(data) -> list[dict]:
                 g[k] = _s(c.get(k))
         if "items" in c:
             g["items"] = _strs(c.get("items"))
+        if "words" in c:                        # 0.9.2: one-word triggers moved here by `lt prep-check --fix`
+            g["words"] = _strs(c.get("words"))
         try:
             g["cooldown_s"] = float(c.get("cooldown_s", 300))
         except (TypeError, ValueError):
@@ -830,6 +838,7 @@ class Cards:
         self.last: dict[str, float] = {}
         self.lock = threading.Lock()
         self.bad_mtime = None
+        self.names: list[str] = []          # 0.9.2: the PM's name aliases (config name_aliases), for address cards
 
     def _load(self) -> None:
         try:
@@ -857,6 +866,15 @@ class Cards:
             except Exception:  # noqa: BLE001
                 pass
             return list(self.cards)
+
+    def is_address(self, c: dict) -> bool:
+        """0.9.2 (audit 04.11, prompt.py ADDRESS_ANY): a card about the PM's turn ("Your turn: ...", triggered by the
+        PM's name) is never shown by a trigger: the PM decides when to speak and has the speech card; an update asked
+        by name is answered by the model with what is new. `"address": true`, or a trigger that holds a name alias."""
+        if c.get("address") is True:
+            return True
+        names = [n.strip().lower() for n in self.names if n and len(n.strip()) >= 3]
+        return any(n in str(t).lower() for t in c.get("triggers", []) for n in names)
 
     @staticmethod
     def _hit(trigger: str, low: str, plain: str) -> bool:
@@ -894,6 +912,9 @@ class Cards:
                 if not any(self._hit(t, low, plain) for t in c.get("triggers", [])):
                     continue
                 self.last[cid] = now()
+                if self.is_address(c):
+                    self._held(c, cid, line, "address")
+                    continue
                 self._emit(c, cid, line)
 
     @staticmethod
@@ -914,15 +935,27 @@ class Cards:
         except OSError:
             pass
 
+    def _held(self, c: dict, cid: str, line: "Line", why: str) -> None:
+        """A card that matched but is not shown: only <stem>.cards-fired.jsonl gets it (for the audit)."""
+        try:
+            with open(self.fired_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"id": cid, "t": hhmmss(line.t), "ch": line.channel, "line": line.text[:160],
+                                    "held": why}, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+
     def fire_semantic(self, cid: str, line: "Line", score: float) -> str | None:
         """Fire a card found by meaning (not by a trigger). None when shown, else why not."""
         with self.lock:
             c = next((x for x in self.cards if self.cid(x) == cid), None)
             if c is None or c.get("off"):
                 return "gone"
-            # 2026-11-02 (a client monthly review): the same card came back 5 and 15 min later; by meaning it shows again after 15 min
-            if now() - self.last.get(cid, 0) < max(float(c.get("cooldown_s", 300)), 900.0 if cid in self.last else 0.0):
-                return "cooldown"
+            if self.is_address(c):
+                return "address"
+            # 2026-11-02 (a client monthly review): the same card came back 5 and 15 min later. 0.9.2 (audit 04.11: the
+            # HubSpot card again after 21 min): by meaning a card shows once per call; again only by its trigger.
+            if cid in self.last:
+                return "shown before" if now() - self.last[cid] >= float(c.get("cooldown_s", 300)) else "cooldown"
             self.last[cid] = now()
             self._emit(c, cid, line, sem=score)
             return None
@@ -1830,9 +1863,13 @@ def fact_sem_text(f: dict) -> str:
 
 
 def card_sem_texts(c: dict) -> list[str]:
-    """What a card is about: its gist plus each plain (non-regex) trigger of 2+ words."""
+    """What a card is about: its gist plus each plain (non-regex) trigger of 2+ words.
+    0.9.2 (audit 04.11: "Date without an estimate", a regex-only card for the PM's own promise, fired by the meaning
+    of its gist): a card whose triggers are all regexes fires only by them, unless it says `"semantic": true`."""
     gist = re.sub(r"^\W+", "", _s(c.get("gist")))
-    trig = [t for t in _strs(c.get("triggers")) if not t.startswith("re:")]
+    trig = [t for t in _strs(c.get("triggers")) if not t.startswith("re:")] + _strs(c.get("words"))
+    if not trig and c.get("semantic") is not True:
+        return []
     out = []
     if gist or trig:
         out.append(". ".join([gist] + trig[:6]).strip(". "))
@@ -1877,6 +1914,10 @@ class SemanticLive(threading.Thread):
         self.fact_ref, self.fact_list, self.F, self.Ffloor = None, [], None, None
         self.card_ver, self.card_ids, self.card_on, self.C, self.C_owner, self.Cfloor = None, [], [], None, None, None
         self.hist: "collections.deque[tuple[float, int]]" = collections.deque()
+        self.them_win: "collections.deque[tuple[float, str]]" = collections.deque()   # 0.9.2: their recent lines
+        self.me_scores: "collections.deque[tuple[float, np.ndarray]]" = collections.deque()   # the PM's lines vs facts
+        self.win_prev: set = set()          # facts above the window bar on the previous `them` line
+        self.last_topic_fact = -1e9         # 0.9.2: when a fact last showed by the topic (not a question)
         self.n_lines = self.dropped = self.hits = self.skipped = 0
         self.fail_streak = 0
         self.line_ms: "collections.deque[float]" = collections.deque(maxlen=100)
@@ -2080,6 +2121,8 @@ class SemanticLive(threading.Thread):
                     self.F = self.Ffloor = None
                 self.fact_ref, self.fact_list = lst, list(lst)
                 self.hist.clear()
+                self.me_scores.clear()
+                self.win_prev = set()
             snap = self.cards.snapshot()
             ver = (self.cards.mtime, len(snap))
             if ver != self.card_ver:
@@ -2136,10 +2179,20 @@ class SemanticLive(threading.Thread):
             self.hist.append((line.t, int(i)))
         while self.hist and line.t - self.hist[0][0] > win:
             self.hist.popleft()
+        while self.me_scores and line.t - self.me_scores[0][0] > win:
+            self.me_scores.popleft()
+        while self.them_win and line.t - self.them_win[0][0] > win:
+            self.them_win.popleft()
         if line.channel != "them":
+            self.me_scores.append((line.t, s))
             return
+        self.them_win.append((line.t, line.text))
+        ws, win_held = self._window_facts()
         order = [int(i) for i in np.argsort(-s)[:4]]
         cands = [i for i in order if s[i] >= fmin and over[i] >= margin][:2]
+        for i in sorted(win_held, key=lambda j: -ws[j]):
+            if len(cands) < 2 and i not in cands:
+                cands.append(i)
         if not cands:
             b = order[0]
             if s[b] >= fmin - 0.1 or over[b] >= 0.75 * margin:
@@ -2152,19 +2205,31 @@ class SemanticLive(threading.Thread):
         for i in cands:
             f = self.fact_list[i]
             fid = str(f.get("id") or f.get("title"))
-            held = sum(1 for _, j in self.hist if j == i) >= 2
+            line_held = sum(1 for _, j in self.hist if j == i) >= 2
+            held = line_held or i in win_held
+            said = not is_q and any(float(m[i]) >= fmin - 0.05 for _, m in self.me_scores)
             why = None
             if not (is_q or (held and not presenting_quiet())):
                 why = "not a question, topic not held"
+            elif not is_q and i not in win_held and ws is not None and float(ws[i]) < fmin:
+                why = "window on another topic"   # 0.9.2: two lines matched, the last minute of their talk did not
+            elif said:
+                why = "said by the PM"            # 0.9.2: the PM just covered it (04.11: Fireflies credits at 13:21)
             elif self.flags.get("tips_paused") or self.flags.get("tips_off"):
                 why = "tips paused"
+            elif not is_q and fid in self.facts.last:
+                why = "shown before"              # 0.9.2: by the topic a fact shows once per call; a question still gets it
+            elif not is_q and line.t - self.last_topic_fact < self.f("semantic_topic_s"):
+                why = "another fact just shown"   # 0.9.2: by the topic at most one fact a minute, so they do not stack
             elif not self.facts.claim(fid):
                 why = "cooldown (or keyword hit)"
             self._log({"kind": "fact", "t": hhmmss(line.t), "id": fid, "score": round(float(s[i]), 4),
-                       "over": round(float(over[i]), 4), "question": is_q, "held": held, "shown": why is None,
-                       "why": why, "line": line.text[:160]})
+                       "over": round(float(over[i]), 4), "win": None if ws is None else round(float(ws[i]), 4),
+                       "question": is_q, "held": held, "shown": why is None, "why": why, "line": line.text[:160]})
             if why is None:
-                shown.append((f, float(s[i])))
+                if not is_q:
+                    self.last_topic_fact = line.t
+                shown.append((f, max(float(s[i]), float(ws[i]) if (ws is not None and i in win_held) else 0.0)))
         if not shown:
             return
         self.hits += 1
@@ -2176,6 +2241,22 @@ class SemanticLive(threading.Thread):
                                  "kind": "fact", "level": "orange", "gist": gist,
                                  "items": items, "sem": round(shown[0][1], 3),
                                  "note": " · ".join(str(f.get("source", "")) for f, _ in shown if f.get("source"))})
+
+    def _window_facts(self):
+        """(fact scores of the joined window of their last lines or None, facts above the window bar now and on the
+        previous `them` line). One extra embedding per `them` line once the window has 2+ lines."""
+        if len(self.them_win) < 2:
+            self.win_prev = set()
+            return None, set()
+        text = " ".join(t for _, t in self.them_win)[-2000:]
+        wv = self.client.embed([text], timeout=self.f("semantic_timeout_s"))[0]
+        ws = self.F @ wv
+        wo = ws - self.Ffloor
+        now_pass = {int(i) for i in np.nonzero((ws >= self.f("semantic_window_min")) & (wo >= self.f("semantic_window_margin")))[0]}
+        strong = {i for i in now_pass if float(wo[i]) >= self.f("semantic_window_strong")}
+        held = (now_pass & self.win_prev) | strong
+        self.win_prev = now_pass
+        return ws, held
 
     def _match_cards(self, line: "Line", v) -> None:
         raw = self.C @ v
@@ -4173,6 +4254,7 @@ def main() -> int:
     # The Whisper prompt biases the language: a Ukrainian prompt makes English speech come out
     # as Ukrainian gibberish. When the window switches the call language, the prompt follows.
     cards = Cards(out, tips_file)
+    cards.names = [str(n) for n in cfg.get("name_aliases") or []]
     facts = FactBook(out, tips_file)
     outline = Outline(out, tips_file)
     slides = Slides(out, tips_file)

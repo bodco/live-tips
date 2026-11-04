@@ -12,6 +12,7 @@ enum IntegrationRegistry {
     static var items: [Item] { [
         Item(id: "notion", title: "Notion", symbol: "doc.text", subtitle: L("int.notion.sub")),
         Item(id: "calendars", title: L("settings.tab.calendars"), symbol: "calendar", subtitle: L("int.calendars.sub")),
+        Item(id: "google", title: "Google", symbol: "globe", subtitle: L("int.google.sub")),
         Item(id: "hubspot", title: "HubSpot", symbol: "briefcase", subtitle: L("int.hubspot.sub")),
     ] }
 
@@ -26,6 +27,11 @@ enum IntegrationRegistry {
         case "calendars":
             let n = CalendarService.shared.calendars.count
             return n == 0 ? (L("int.notConnected"), nil) : (L("int.calendars.status", ["n": "\(n)"]), true)
+        case "google":
+            let g = GoogleService.shared
+            guard g.connected else { return (L("int.notConnected"), nil) }
+            if !g.lastError.isEmpty { return (L("google.err.signInAgain"), false) }
+            return (L("int.google.status", ["n": "\(g.accounts.count)"]), true)
         case "hubspot":
             guard m.isSet(.hubspotKey) else { return (L("int.notConnected"), nil) }
             if !m.config.crm.missingScopes.isEmpty { return (L("int.hubspot.scopes", ["n": "\(m.config.crm.missingScopes.count)"]), false) }
@@ -61,6 +67,7 @@ struct IntegrationsPane<NotionPage: View>: View {
                         switch id {
                         case "notion": notion()
                         case "calendars": CalendarsPane()
+                        case "google": GooglePage()
                         default: HubSpotPage(model: model)
                         }
                     }

@@ -199,6 +199,42 @@ if let i = args.firstIndex(of: "--capture-test") {
     captureTest(seconds: n)
     exit(0)
 }
+// 0.9.1 QA: `LiveTips --google-selftest [<link>] [--meet <ISO start> <minutes>]` signs in with the connected Google
+// accounts, lists calendars and events, reads the link into a temporary folder and prints only counts and sizes.
+if let i = args.firstIndex(of: "--google-selftest") {
+    let link = i + 1 < args.count && !args[i + 1].hasPrefix("--") ? args[i + 1] : ""
+    var meetStart: Date?, meetMin = 60.0
+    if let m = args.firstIndex(of: "--meet"), m + 1 < args.count {
+        meetStart = ISO8601DateFormatter().date(from: args[m + 1])
+        if m + 2 < args.count { meetMin = Double(args[m + 2]) ?? 60 }
+    }
+    MainActor.assumeIsolated {
+        Task { @MainActor in
+            let g = GoogleService.shared
+            g.reload()
+            await g.refreshAll()
+            var out: [String: Any] = ["accounts": g.accounts.count, "scopesOK": g.accounts.map { $0.has(GoogleScopes.all.filter { $0 != "openid" }) },
+                                      "calendars": g.calendars.count, "events": g.events.count, "errors": g.lastError.count]
+            if !link.isEmpty {
+                let dir = NSTemporaryDirectory() + "pacenote-google-selftest"
+                let r = await g.readLinks(in: link, folder: dir)
+                out["read"] = r.files.map { ["kind": $0.0.kind.rawValue, "bytes": ((try? FileManager.default.attributesOfItem(atPath: $0.1)[.size]) as? Int) ?? 0] }
+                out["problems"] = r.problems.map { String($0.split(separator: ":").last ?? "").trimmingCharacters(in: .whitespaces) }
+                for f in r.files { try? FileManager.default.removeItem(atPath: f.1) }
+            }
+            if let st = meetStart {
+                do {
+                    let m = try await g.meet(code: nil, start: st, end: st.addingTimeInterval(meetMin * 60))
+                    out["meet"] = m.map { ["participants": $0.participants.count, "transcriptLines": $0.transcript.split(separator: "\n").count] } ?? "none"
+                } catch { out["meet"] = "error: " + error.localizedDescription }
+            }
+            let d = (try? JSONSerialization.data(withJSONObject: out, options: [.sortedKeys])) ?? Data()
+            print(String(data: d, encoding: .utf8) ?? "{}")
+            exit(0)
+        }
+    }
+    RunLoop.main.run()
+}
 if args.contains("--probe") {
     probe(request: args.contains("--request"))
     exit(0)

@@ -27,6 +27,8 @@ final class PrepRunner: ObservableObject {
     /// 0.8.5: the last Prepare of a talk: slides rewritten and the ones kept with the PM's edits (P4 done).
     @Published var lastTalk: (rewritten: Int, kept: [Int])?
     var resultMeta: [String: Any] = [:]       // 0.8.5: duration, turns and tokens of the last preparation
+    /// 0.9.2 (audit 04.11): the names of what the preparation read or searched (never the content), for the audit.
+    private var readFiles: [String] = []
     @Published var costUSD: Double?          // from the stream's final "result" event (API key; the plan shows the equivalent)
     private var lineBuf = Data()
     private var process: Process?
@@ -231,6 +233,10 @@ final class PrepRunner: ObservableObject {
         var deck: DeckSetup? = nil          // 0.8.5: a Presentation call with a deck (P2)
         var salesMethod: String? = nil      // 0.8.7 (H3): Sales mode on: the method key (rules/sales.yaml)
         var company = ""                    // 0.8.7 (H3): the only thing that may go into a web search
+        // 0.9.1 (rules/google.yaml > links): the Google links read through the connected accounts before the prep
+        var googleDone = false
+        var googleRead: [String] = []       // "<link> -> <file>"
+        var googleProblems: [String] = []
     }
 
     /// 0.8.7 (H3, rules/sales.yaml > prep.sections): the sales part of the brief. The web search is the company's
@@ -287,6 +293,32 @@ final class PrepRunner: ObservableObject {
     /// Starts the prep. Returns an error line, or nil when it started.
     func start(_ r: Request, route forced: String? = nil) -> String? {
         if running { return L("prep.err.running") }
+        // 0.9.1 (rules/google.yaml > links): Google Docs, Sheets and Slides links of the context and the invitation's
+        // attachments are read through the PM's Google accounts first; the prep then gets local copies.
+        if !r.googleDone, r.refreshBase == nil, GoogleService.shared.connected {
+            let extra = CalendarService.shared.events.first {
+                abs($0.start.timeIntervalSince(r.date)) < 120 && StartCallModel.slugify($0.title) == StartCallModel.slugify(r.title)
+            }?.attachments ?? []
+            if !GoogleLink.find(in: ([r.context] + extra).joined(separator: "\n")).isEmpty {
+                running = true; set(0.02, L("prep.st.google"), "")
+                let folder = (((r.root as NSString).appendingPathComponent("live")) as NSString).appendingPathComponent("google")
+                Task { @MainActor in
+                    let res = await GoogleService.shared.readLinks(in: r.context, extra: extra, folder: folder)
+                    var r2 = r
+                    r2.googleDone = true
+                    r2.folders += res.files.map { $0.1 }.filter { !r.folders.contains($0) }
+                    r2.googleRead = res.files.map { $0.0.url + " -> " + $0.1 }
+                    r2.googleProblems = res.problems
+                    UsageLog.log("google_links_read", ["n": res.files.count])
+                    self.running = false
+                    if let err = self.start(r2, route: forced) {
+                        self.result = err
+                        UpNext.shared.prepFinished(id: r.callID, base: nil, ok: false, stopped: false)
+                    }
+                }
+                return nil
+            }
+        }
         if forced == nil { switchedOnce = false; localTried = false }
         let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai].contains(forced ?? AppConfig.load(from: AppPaths.config).ai.prep)
         guard let claude = Self.claudePath ?? (wantsLocal ? "/usr/bin/true" : nil) else { return L("prep.err.noClaude") }
@@ -321,6 +353,9 @@ final class PrepRunner: ObservableObject {
         \(r.context.isEmpty ? "(none)" : r.context)
         \(r.folders.filter { StartCallModel.isDir($0) }.isEmpty ? "" : "Folders the PM added (look through them first; read fully the files the context names): " + r.folders.filter { StartCallModel.isDir($0) }.joined(separator: "; "))
         \(r.folders.filter { !StartCallModel.isDir($0) }.isEmpty ? "" : "Files the PM added (read each fully; read nothing else in their folders): " + r.folders.filter { !StartCallModel.isDir($0) }.joined(separator: "; "))
+        \(Self.primaryBlock(r.folders.filter { !StartCallModel.isDir($0) }))
+        \(r.googleRead.isEmpty ? "" : "Google links already read through the PM's Google account (read the file, never fetch the link): " + r.googleRead.joined(separator: "; "))
+        \(r.googleProblems.isEmpty ? "" : "Google links no connected Google account could open (try the public export link; otherwise say so in the sources line): " + r.googleProblems.joined(separator: "; "))
 
         Read first: \(skill)/SKILL.md (the Start checklist, steps 5-6, and "prep ahead"), then \
         \(refs.map { skill + "/references/" + $0 }.joined(separator: ", ")). Follow their content rules and file formats \
@@ -413,7 +448,7 @@ final class PrepRunner: ObservableObject {
         let isLocal = route == AIRoute.local
         let isOpenAI = route == AIRoute.openai      // 0.9.0 (owner): the preparation through the OpenAI API
         let isPacked = isLocal || isCodex || isOpenAI
-        let runModel = isCodex ? "codex/default" : isOpenAI ? "gpt-5.4-mini" : isLocal ? localModel : model
+        let runModel = isCodex ? "codex/default" : isOpenAI ? c.ai.openaiPrep : isLocal ? localModel : model
         let aside = r.refreshBase == nil ? Self.moveAside(base: base) : nil      // a clean start, the old one kept
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
@@ -446,7 +481,8 @@ final class PrepRunner: ObservableObject {
                 "config": r.config, "audience": r.audience, "call_type": r.callType, "languages": r.languages, "context": r.context,
                 "files": r.folders.filter { !StartCallModel.isDir($0) }, "folders": r.folders.filter { StartCallModel.isDir($0) },
                 "live": live, "notion": notion, "skill": skill, "base": base, "lt": [c.engine.python, lt], "model": runModel,
-                "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder, "brief_lang": L10n.lang]
+                "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder, "brief_lang": L10n.lang,
+                "openai_model": c.ai.openaiPrep]
             let reqPath = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("localprep-request.json")
             if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
             p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
@@ -550,10 +586,13 @@ final class PrepRunner: ObservableObject {
                 var meta = self.resultMeta
                 meta["model"] = runModel
                 if !checkLine.isEmpty { meta["check"] = checkLine }
+                let readList = self.readFiles
+                if !readList.isEmpty { log?.write(("read: " + readList.joined(separator: ", ") + "\n").data(using: .utf8)!) }
                 Self.ledger(job: r.refreshOf == nil ? "prep" : "prep_refresh", route: routeName, usd: self.costUSD, meta: meta, ok: ok)
                 if r.refreshBase == nil {
                     var run = meta
                     run["route"] = routeName; run["ok"] = ok; run["title"] = r.title
+                    if !readList.isEmpty { run["read"] = readList }
                     run["started"] = ISO8601DateFormatter().string(from: self.startedAt ?? Date())
                     run["duration_s"] = run["duration_s"] ?? Int(Date().timeIntervalSince(self.startedAt ?? Date()))
                     if let c = self.costUSD { run["cost_usd"] = (c * 10000).rounded() / 10000 }
@@ -562,6 +601,7 @@ final class PrepRunner: ObservableObject {
                 if ok {
                     var extra = self.resultMeta
                     extra["route"] = routeName
+                    if !readList.isEmpty { extra["read"] = readList }
                     extra["model"] = runModel
                     if let c = self.costUSD { extra["cost_usd"] = (c * 10000).rounded() / 10000 }
                     Freshness.writeSnapshot(base: base, refreshOf: r.refreshOf, extra: extra)      // rules/freshness.json > snapshot
@@ -602,8 +642,19 @@ final class PrepRunner: ObservableObject {
         callID = r.callID
         forTitle = r.title; forDate = r.date
         result = ""
-        progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil; resultMeta = [:]
+        progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil; resultMeta = [:]; readFiles = []
         return nil
+    }
+
+    /// 0.9.2 (audit 04.11, sweep.md > Primary document): the files the PM added are the call's main source. Its
+    /// "what is missing" part was lost and its ready answer was split into words; the agenda ticked a decision nobody made.
+    nonisolated static func primaryBlock(_ files: [String]) -> String {
+        guard !files.isEmpty else { return "" }
+        return "Primary document(s): " + files.joined(separator: "; ") + ". They are this call's main source. Every section " +
+            "of a primary document gives at least one fact or card with \"primary\": true (its source names the file and the " +
+            "section). Sections on what is missing or not covered yet, and ready answers, are kept as whole sentences (one " +
+            "fact per point, the wording kept), never cut into keywords. \"Needs confirmation\" lists only conflicts the " +
+            "primary document does not resolve. The project context, recent calls and threads still give facts as usual."
     }
 
     /// The transcripts of the last 3 calls of the same meeting (same title) in the project's live folder, newest first.
@@ -708,20 +759,27 @@ final class PrepRunner: ObservableObject {
                     let cmd = input["command"] as? String ?? ""
                     if cmd.contains("prep-check") { set(max(progress, 0.93), L("prep.st.check"), "lt prep-check") }
                     else if cmd.contains("digest") { set(max(progress, 0.2), L("prep.st.recent"), "lt digest") }
-                    else if cmd.contains("textutil") { filesRead += 1; sources(file.isEmpty ? "a document" : file) }
+                    else if cmd.contains("textutil") { filesRead += 1; noteRead("textutil: " + ((cmd.components(separatedBy: " ").last ?? "") as NSString).lastPathComponent); sources(file.isEmpty ? "a document" : file) }
                     else { sources("") }
                 case "Read":
                     if path.hasPrefix(skill) { set(max(progress, 0.08), L("prep.st.instructions"), file) }
-                    else { filesRead += 1; sources(file) }
+                    else { filesRead += 1; noteRead(file); sources(file) }
                 case "WebFetch":
-                    filesRead += 1; sources("web: " + String(((input["url"] as? String) ?? "").prefix(60)))
+                    filesRead += 1; noteRead("web: " + (URL(string: (input["url"] as? String) ?? "")?.host ?? "?"))
+                    sources("web: " + String(((input["url"] as? String) ?? "").prefix(60)))
                 case "Grep", "Glob":
+                    noteRead(name.lowercased() + ": " + String(((input["pattern"] as? String) ?? "").prefix(40)))
                     sources("search: " + String(((input["pattern"] as? String) ?? "").prefix(40)))
                 default:
                     break
                 }
             }
         }
+    }
+
+    private func noteRead(_ what: String) {
+        let w = what.trimmingCharacters(in: .whitespaces)
+        if !w.isEmpty, !readFiles.contains(w), readFiles.count < 300 { readFiles.append(w) }
     }
 
     /// Sources: 15% to 65%, a step per file read (most preps read 10-30 files).

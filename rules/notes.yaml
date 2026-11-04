@@ -2,6 +2,7 @@
 # app and the skill: what a later preparation reads instead of an older call's whole transcript.
 schema_version: 1
 file: <stem>.notes.md next to the transcript (livetips_m0.callnotes)
+language: the language the call was held in (the majority of the transcript lines' language tags), not the app's interface language (0.9.1, owner)
 when: after every recorded call, whether or not Notion is set up (with the meeting page when it is), on the "After the call" way (model claude-sonnet-5-5,
   or the model on this Mac when that way is On this Mac); a call of the Transcript type too
 content: |

@@ -555,7 +555,94 @@ final class BodyFake: CRMTransport {
 }
 
 decisions088()
+
+/// 0.9.1 (rules/google.yaml): accounts, OAuth, links, Docs/Slides/Sheets text, calendar events, the merge, Meet.
+func google091() {
+    // client file: ours and Google's own download
+    expect(GoogleClient.parse(Data(#"{"client_id":"a","client_secret":"b"}"#.utf8)) == GoogleClient(clientID: "a", clientSecret: "b"), "client file")
+    expect(GoogleClient.parse(Data(#"{"installed":{"client_id":"x","client_secret":"y","redirect_uris":["http://localhost"]}}"#.utf8))?.clientID == "x", "Google download")
+    expect(GoogleClient.parse(Data("{}".utf8)) == nil, "no client")
+    // accounts: round trip, upsert keeps order and replaces by email
+    let a1 = GoogleAccount(email: "mike@example.com", refreshToken: "r1", scopes: GoogleScopes.all, added: Date(timeIntervalSince1970: 0))
+    let a2 = GoogleAccount(email: "emily@example.com", refreshToken: "r2", scopes: GoogleScopes.identity, added: Date(timeIntervalSince1970: 0))
+    let list = GoogleAccount.upsert(GoogleAccount.upsert([], a1), a2)
+    expect(GoogleAccount.decode(GoogleAccount.encode(list)) == list, "accounts round trip")
+    let again = GoogleAccount.upsert(list, GoogleAccount(email: "Mike@example.com", refreshToken: "r3", scopes: GoogleScopes.all, added: Date(timeIntervalSince1970: 0)))
+    expect(again.count == 2 && again[0].refreshToken == "r3", "same account again replaces in place")
+    expect(GoogleAccount.decode(nil).isEmpty && GoogleAccount.decode("garbage").isEmpty, "bad list is empty")
+    expect(a1.has(GoogleScopes.meet) && !a2.has(GoogleScopes.calendar), "scopes per account")
+    expect(!GoogleScopes.all.contains { $0.hasSuffix("/drive") || $0.hasSuffix("drive.readonly") || $0.contains("gmail") }, "no restricted scopes")
+    // PKCE (RFC 7636 appendix B) and the auth URL
+    expect(GoogleOAuth.challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk") == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", "S256 challenge")
+    let u = GoogleOAuth.authURL(client: "cid", redirect: "http://127.0.0.1:5000", scopes: ["openid", "email"], state: "st", challenge: "ch", hint: "mike@example.com").absoluteString
+    expect(u.contains("access_type=offline") && u.contains("code_challenge_method=S256") && u.contains("login_hint=mike@example.com") && u.contains("scope=openid%20email"), "auth URL")
+    expect(GoogleOAuth.callback("/?state=st&code=4/abc&scope=x", state: "st") == .code("4/abc"), "callback code")
+    expect(GoogleOAuth.callback("/?state=other&code=4/abc", state: "st") == .bad, "callback state mismatch")
+    expect(GoogleOAuth.callback("/?state=st&error=access_denied", state: "st") == .denied("access_denied"), "callback denied")
+    expect(String(data: GoogleOAuth.form(["b": "a b", "a": "x/y"]), encoding: .utf8) == "a=x%2Fy&b=a%20b", "form encoding")
+    let payload = GoogleOAuth.base64url(Data(#"{"email":"mike@example.com"}"#.utf8))
+    expect(GoogleOAuth.email(idToken: "h." + payload + ".s") == "mike@example.com", "email from id_token")
+    // links
+    let txt = "See https://docs.google.com/document/d/1AbcDEFghijkLMNOP_qrs/edit?tab=t.0 and https://docs.google.com/spreadsheets/d/1SheetIdABCDEFGHIJK/edit#gid=0, https://docs.google.com/presentation/d/1SlidesIdABCDEFGHIJ/edit. Also https://drive.google.com/file/d/1FileIdABCDEFGHIJKL/view and again https://docs.google.com/document/d/1AbcDEFghijkLMNOP_qrs/edit"
+    let ls = GoogleLink.find(in: txt)
+    expect(ls.map { $0.kind } == [.doc, .sheet, .slides, .file], "link kinds, no duplicates")
+    expect(ls.first?.id == "1AbcDEFghijkLMNOP_qrs" && ls[1].url.hasSuffix("gid=0"), "ids and trimmed urls")
+    expect(GoogleLink.find(in: "https://docs.google.com/forms/d/e/x/viewform").isEmpty, "a form is not a link we read")
+    // Docs text: title, heading, bullets, table, tabs
+    let para: (String, String, Bool) -> [String: Any] = { t, style, bullet in
+        var p: [String: Any] = ["elements": [["textRun": ["content": t + "\n"]]], "paragraphStyle": ["namedStyleType": style]]
+        if bullet { p["bullet"] = ["listId": "l"] }
+        return ["paragraph": p]
+    }
+    let table: [String: Any] = ["table": ["tableRows": [["tableCells": [["content": [para("Phase", "NORMAL_TEXT", false)]], ["content": [para("Cost", "NORMAL_TEXT", false)]]]]]]]
+    let doc: [String: Any] = ["title": "Pilot plan", "body": ["content": [para("Scope", "HEADING_1", false), para("Five users", "NORMAL_TEXT", true), table, para("  ", "NORMAL_TEXT", false)]]]
+    let dt = GoogleText.doc(doc)
+    expect(dt.hasPrefix("# Pilot plan\n") && dt.contains("## Scope") && dt.contains("- Five users") && dt.contains("| Phase | Cost |"), "doc text")
+    let tabbed: [String: Any] = ["title": "T", "tabs": [["tabProperties": ["title": "One"], "documentTab": ["body": ["content": [para("A", "NORMAL_TEXT", false)]]]],
+                                                       ["tabProperties": ["title": "Two"], "documentTab": ["body": ["content": [para("B", "NORMAL_TEXT", false)]]]]]]
+    let tt = GoogleText.doc(tabbed)
+    expect(tt.contains("# One") && tt.contains("# Two") && tt.contains("A\n") && tt.contains("B\n"), "doc tabs")
+    let shape: (String) -> [String: Any] = { ["shape": ["text": ["textElements": [["textRun": ["content": $0 + "\n"]]]]]] }
+    let deck: [String: Any] = ["title": "Deck", "slides": [["pageElements": [shape("Why a pilot")], "slideProperties": ["notesPage": ["pageElements": [shape("Say the hour a day")]]]]]]
+    let st = GoogleText.slides(deck)
+    expect(st.contains("## Slide 1") && st.contains("Why a pilot") && st.contains("Speaker notes: Say the hour a day"), "slides text")
+    let sh = GoogleText.sheet(title: "Budget", ranges: [["range": "'Plan A'!A1:Z1000", "values": [["Item", "Cost"], ["QA", 100]]]], maxRows: 1)
+    expect(sh.contains("## Plan A") && sh.contains("| Item | Cost |") && sh.contains("1 more rows"), "sheet text")
+    // calendar event
+    let item: [String: Any] = ["id": "e1", "iCalUID": "UID1@google.com", "summary": "Weekly sync", "status": "confirmed",
+        "start": ["dateTime": "2026-11-05T10:00:00+02:00"], "end": ["dateTime": "2026-11-05T10:30:00+02:00"],
+        "attendees": [["email": "me@example.com", "self": true, "responseStatus": "accepted"], ["email": "emily.clark@example.com", "displayName": "Emily Clark"], ["email": "room@resource.calendar.google.com", "resource": true]],
+        "hangoutLink": "https://meet.google.com/abc-defg-hij",
+        "conferenceData": ["conferenceId": "abc-defg-hij", "conferenceSolution": ["key": ["type": "hangoutsMeet"]]],
+        "attachments": [["fileUrl": "https://docs.google.com/document/d/1AttachedDocIdABCDEF/edit", "title": "Agenda"]]]
+    let ge = GoogleEvent.parse(item)
+    expect(ge?.uid == "UID1@google.com" && ge?.attendees.count == 1 && ge?.attendees.first?.name == "Emily Clark", "event people, no self, no room")
+    expect(ge?.meetCode == "abc-defg-hij" && ge?.attachments.first?.title == "Agenda" && ge?.allDay == false && ge?.declined == false, "event meet code and attachment")
+    var declined = item; declined["attendees"] = [["email": "me@example.com", "self": true, "responseStatus": "declined"]]
+    expect(GoogleEvent.parse(declined)?.declined == true, "declined by me")
+    var allDay = item; allDay["start"] = ["date": "2026-11-05"]; allDay["end"] = ["date": "2026-11-06"]
+    expect(GoogleEvent.parse(allDay)?.allDay == true, "all-day")
+    expect(GoogleEvent.meetCode("https://meet.google.com/xyz-abcd-efg?authuser=1") == "xyz-abcd-efg" && GoogleEvent.meetCode("https://zoom.us/j/1") == nil, "meet code")
+    // merge: EventKit row kept and enriched, the first account over the next
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    let plan = CalendarMerge.plan(eventKit: [("UID1@google.com", t0), ("other", t0), (nil, t0)],
+                                  google: [("uid1@google.com", t0), ("UID1@google.com", t0), ("UID1@google.com", t0.addingTimeInterval(604800))])
+    expect(plan.enrich == [0: 0] && plan.keepGoogle == [2], "merge plan: the EventKit row stays and takes the Google details")
+    // Meet
+    let names = ["conferenceRecords/c/participants/p1": "Mike", "conferenceRecords/c/participants/p2": "Emily"]
+    let start = ISO8601DateFormatter().date(from: "2026-11-05T08:00:00Z")!
+    let tr = GoogleMeetText.transcript(entries: [["participant": "conferenceRecords/c/participants/p2", "text": "Hi", "startTime": "2026-11-05T08:01:05.120Z"],
+                                                 ["participant": "x", "text": "Who?", "startTime": "2026-11-05T09:00:00Z"], ["text": ""]], names: names, start: start)
+    expect(tr == "[00:01:05] Emily: Hi\n[01:00:00] ?: Who?", "meet transcript lines")
+    expect(GoogleMeetText.name(["signedinUser": ["displayName": "Mike"]]) == "Mike" && GoogleMeetText.name(["phoneUser": ["displayName": "+1 555"]]) == "+1 555", "meet names")
+    // Drive upload body
+    let body = String(data: DriveUpload.body(name: "Notes", convertTo: "application/vnd.google-apps.document", media: Data("DOCX".utf8), mediaType: "application/x", boundary: "b1"), encoding: .utf8) ?? ""
+    expect(body.hasPrefix("--b1\r\n") && body.contains("google-apps.document") && body.contains("\"name\":\"Notes\""), "upload metadata")
+    expect(body.contains("\r\n\r\nDOCX\r\n--b1--"), "upload media")
+}
+
 keychain088()
+google091()
 settings087()
 await part2_087()
 usage087()

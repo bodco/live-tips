@@ -1329,4 +1329,59 @@
         { title: 'What we need from you', say: 'Names by Friday, test accounts by Thursday.', secs: 60, canSkip: true } ]
     });
   }
+
+  // 0.9.1 (owner): drag the border between the tips and the side panel (Transcript, On me, Brief). The width is kept
+  // in this window's storage (per Mac); double-click or Home key resets it. Arrows move it by 24 px.
+  (function paneSplit() {
+    const split = document.getElementById('split'), app = document.querySelector('.app');
+    if (!split || !app) return;
+    const KEY = 'pacenote.paneWidth', MIN = 260, MAIN_MIN = 360;
+    const clamp = w => Math.round(Math.max(MIN, Math.min(w, app.clientWidth - MAIN_MIN)));
+    const apply = w => { if (w) app.style.setProperty('--pane-w', clamp(w) + 'px'); else app.style.removeProperty('--pane-w'); };
+    const save = w => { try { if (w) localStorage.setItem(KEY, String(w)); else localStorage.removeItem(KEY); } catch (e) {} };
+    let saved = 0;
+    try { saved = parseInt(localStorage.getItem(KEY) || '0', 10) || 0; } catch (e) {}
+    if (saved) apply(saved);
+    const current = () => { const p = document.getElementById('pane'); return p ? p.getBoundingClientRect().width : 0; };
+    split.addEventListener('pointerdown', ev => {
+      ev.preventDefault(); split.setPointerCapture(ev.pointerId); app.classList.add('resizing');
+      const right = app.getBoundingClientRect().right;
+      const move = e => { saved = clamp(right - e.clientX); apply(saved); };
+      const up = () => { app.classList.remove('resizing'); split.removeEventListener('pointermove', move); split.removeEventListener('pointerup', up); split.removeEventListener('pointercancel', up); save(saved); };
+      split.addEventListener('pointermove', move); split.addEventListener('pointerup', up); split.addEventListener('pointercancel', up);
+    });
+    split.addEventListener('dblclick', () => { saved = 0; apply(0); save(0); });
+    split.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { saved = clamp(current() + (e.key === 'ArrowLeft' ? 24 : -24)); apply(saved); save(saved); e.preventDefault(); }
+      else if (e.key === 'Home') { saved = 0; apply(0); save(0); e.preventDefault(); }
+    });
+    // a narrower window keeps the tips readable: the saved width is clamped again
+    window.addEventListener('resize', () => { if (saved) apply(saved); });
+  })();
+
+  // 0.9.1 (owner): the open agenda's height. Drag its bottom edge; double-click or Home resets; arrows move by 24 px.
+  (function agendaGrip() {
+    const grip = document.getElementById('agendaGrip'), list = document.getElementById('agendaList'), app = document.querySelector('.app');
+    if (!grip || !list || !app) return;
+    const KEY = 'pacenote.agendaHeight', MIN = 60;
+    const clamp = h => Math.round(Math.max(MIN, Math.min(h, window.innerHeight - 220)));
+    const apply = h => { if (h) app.style.setProperty('--agenda-h', clamp(h) + 'px'); else app.style.removeProperty('--agenda-h'); };
+    const save = h => { try { if (h) localStorage.setItem(KEY, String(h)); else localStorage.removeItem(KEY); } catch (e) {} };
+    let saved = 0;
+    try { saved = parseInt(localStorage.getItem(KEY) || '0', 10) || 0; } catch (e) {}
+    if (saved) apply(saved);
+    grip.addEventListener('pointerdown', ev => {
+      ev.preventDefault(); grip.setPointerCapture(ev.pointerId); app.classList.add('resizing-v');
+      const y0 = ev.clientY, h0 = list.getBoundingClientRect().height;
+      const move = e => { saved = clamp(h0 + e.clientY - y0); apply(saved); };
+      const up = () => { app.classList.remove('resizing-v'); grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up); save(saved); };
+      grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+    });
+    grip.addEventListener('dblclick', () => { saved = 0; apply(0); save(0); });
+    grip.addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { saved = clamp(list.getBoundingClientRect().height + (e.key === 'ArrowDown' ? 24 : -24)); apply(saved); save(saved); e.preventDefault(); }
+      else if (e.key === 'Home') { saved = 0; apply(0); save(0); e.preventDefault(); }
+    });
+    window.addEventListener('resize', () => { if (saved) apply(saved); });
+  })();
 })();

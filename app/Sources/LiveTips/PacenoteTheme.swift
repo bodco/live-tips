@@ -128,3 +128,17 @@ struct PNBadge: View {
             .background(bg).clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
+
+
+/// 0.9.0 (mockup "Home"): the one big action of a call card: 48 pt high, Pacenote Blue, white text.
+struct PNHeroButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 26).frame(height: 48)
+            .background(PN.C.accentFill.opacity(enabled ? (configuration.isPressed ? 0.85 : 1) : 0.4), in: RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+    }
+}

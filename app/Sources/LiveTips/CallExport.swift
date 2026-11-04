@@ -49,6 +49,9 @@ struct ExportPanel: View {
     @State private var busy = false
 
     private var notionReady: Bool { SettingsWindow.model.isSet(.notionToken) }
+    @ObservedObject private var google = GoogleService.shared
+    @State private var googleAccount = ""
+    private var googleAccounts: [GoogleAccount] { google.accounts.filter { $0.has(GoogleScopes.export) } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -61,6 +64,7 @@ struct ExportPanel: View {
                 Text("Word (.docx)").tag("docx")
                 Text("Markdown (.md)").tag("md")
                 Text("Notion page").tag("notion")
+                Text("Google Docs").tag("gdoc")
             }
             .pickerStyle(.segmented).fixedSize()
             HStack(spacing: 14) {
@@ -76,6 +80,14 @@ struct ExportPanel: View {
                 Text(notionReady ? L("export.notionTo", ["db": L("export.meetings")]) : L("export.notionConnect"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
+            if format == "gdoc" {
+                if googleAccounts.isEmpty { Text(L("export.googleConnect")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                else if googleAccounts.count > 1 {
+                    Picker(L("export.googleAccount"), selection: $googleAccount) {
+                        ForEach(googleAccounts) { Text($0.email).tag($0.email) }
+                    }.fixedSize()
+                } else { Text(L("export.googleTo", ["email": googleAccounts[0].email])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+            }
             Text(L("export.edit")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
             TextEditor(text: Binding(get: { text }, set: { text = $0; touched = true }))
                 .font(.system(size: 12, design: .monospaced))
@@ -88,8 +100,10 @@ struct ExportPanel: View {
                 Button(L("common.cancel"), action: onClose).buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)
                 if format == "notion" && !notionReady {
                     Button(L("export.connectNotion")) { SettingsWindow.show(tab: "notion") }.buttonStyle(.pnPrimary)
+                } else if format == "gdoc" && googleAccounts.isEmpty {
+                    Button(L("export.connectGoogle")) { SettingsWindow.show(tab: "google") }.buttonStyle(.pnPrimary)
                 } else {
-                    Button(format == "docx" ? L("export.docx") : format == "md" ? L("export.md") : L("export.notion")) { run() }
+                    Button(format == "docx" ? L("export.docx") : format == "md" ? L("export.md") : format == "gdoc" ? L("export.gdoc") : L("export.notion")) { run() }
                         .buttonStyle(.pnPrimary).disabled(busy || text.isEmpty)
                 }
             }
@@ -144,6 +158,19 @@ struct ExportPanel: View {
                 let d = try doc.data(from: NSRange(location: 0, length: doc.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML])
                 try d.write(to: u); note = L("export.saved", ["name": u.lastPathComponent])
             } catch { note = error.localizedDescription }
+        case "gdoc":
+            let acct = googleAccounts.first { $0.email == googleAccount }?.email ?? googleAccounts.first?.email ?? ""
+            let doc = Self.attributed(text)
+            guard let d = try? doc.data(from: NSRange(location: 0, length: doc.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML]) else { return }
+            busy = true; note = L("nset.checking", ["name": "Google"])
+            Task {
+                do {
+                    let link = try await GoogleService.shared.exportDoc(d, title: title, account: acct)
+                    note = L("export.gdocDone", ["email": acct])
+                    if let u = URL(string: link) { NSWorkspace.shared.open(u) }
+                } catch { note = error.localizedDescription }
+                busy = false
+            }
         default:
             busy = true; note = L("nset.checking", ["name": "Notion"])
             Task { let r = await Self.toNotion(text, title: title, file: file); busy = false; note = r }

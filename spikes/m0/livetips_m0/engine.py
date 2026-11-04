@@ -8,6 +8,7 @@ import json
 import re
 import threading
 import time
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,6 +65,9 @@ def jaccard_sets(a: set, b: set) -> float:
 
 RED_LATE_FACTOR = 2                  # a red tip may land up to 2 x stale_after_s after its speech (shown as late)
 CORRECTION_MAX = 2000                # the PM's correction: who, goal, document; long text belongs in the prep
+ANSWER_IN_PRIMARY_NOTE = ("\nThe other side stated something (not a question) that the prepared material answers: give the ready "
+                          "answer, proof or caveat from the fact book, the cards or the brief, with fact_ids and the source. Skip only "
+                          "when it was said aloud already or nothing concrete answers it.")
 INTERVIEWER_ROLE_NOTE = ("\nThe PM is the interviewer (also in discovery interviews). When the other person asks the PM a question, "
                          "answer it for the PM from the brief and the facts. Otherwise never answer on behalf of the interviewee "
                          "or repeat their answer as a PM statement: give one open follow-up question, or nothing when it is "
@@ -117,6 +121,37 @@ def partial_head(buf: str) -> Optional[dict]:
     if out["level"] != "red" and "topic" not in out:
         return None
     return out
+
+
+# 0.9.2 (rules/ai.yaml > openai): a model running on after its answer writes stray tokens ("ેણ", "_REALTYPE").
+# Call languages are written in these scripts; letters of any other one in a tip mean the text is garbled.
+TIP_SCRIPTS = ("LATIN", "CYRILLIC", "GREEK")
+GARBLED_TOKEN = re.compile(r"(?<![\w/.])_[A-Z]{4,}\b")
+
+
+def garbled(obj: dict, keys=("gist", "phrase", "note", "items")) -> Optional[str]:
+    """Why a tip's text looks garbled ("foreign script", "token"), else None."""
+    parts = []
+    for k in keys:
+        v = obj.get(k)
+        parts += v if isinstance(v, list) else [v]
+    text = " ".join(str(x) for x in parts if x)
+    if sum(1 for ch in text if unicodedata.category(ch)[0] in "LM"
+           and not unicodedata.name(ch, "").startswith(TIP_SCRIPTS + ("COMBINING", "MODIFIER LETTER"))) >= 2:
+        return "foreign script"
+    if GARBLED_TOKEN.search(text):
+        return "token"
+    return None
+
+
+DECIDE_ITEM = re.compile(r"\b(agree|decide|approve|confirm|sign off)|погод|виріш|затверд|підтверд|узгод", re.I)
+
+
+def decided_on(item: str, decisions: List[str]) -> bool:
+    """A decision of the call shares 2+ word stems (5 letters) with the agenda item."""
+    stems = lambda t: {w[:5] for w in re.findall(r"[\w'’]{4,}", t.lower())}  # noqa: E731
+    want = stems(re.sub(DECIDE_ITEM, " ", item))
+    return any(len(want & stems(d)) >= 2 for d in decisions)
 
 
 def first_json(text: str) -> Optional[dict]:
@@ -1008,7 +1043,10 @@ class Engine:
                             "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
                             "usd": c.usd, "error": c.error,
                             "stop": c.stop_reason, "hedge": c.hedge,
-                            "text_head": None if c.error else c.text[:160],
+                            # 0.9.2: what a cut answer said is kept too (an audit needs it); model output, never the prompt
+                            "reasoning": c.reasoning_tokens or None, "incomplete": c.incomplete, "retried": c.retried,
+                            "tail": c.tail or None, "route": getattr(c, "route", None),
+                            "text_head": c.text[:160] if c.text else None,
                             "text": c.text if (self.cfg.get("debug_log_text") and not c.error) else None})
         return c
 
@@ -1055,11 +1093,32 @@ class Engine:
             gate["event"].set()
             span["outcome"] = "classify_for_parallel"
         elif obj.get("need_tip"):
+            if obj.get("trigger") == "answer_in_primary":
+                why = self._aip_blocked(obj)
+                if why:
+                    span["outcome"] = why
+                    self.out_timing.write(span)
+                    return
+                span["event"] = (span.get("event") or "answer_in_primary") + ANSWER_IN_PRIMARY_NOTE
             self._submit_tip(line, obj.get("trigger", "none"), span, level_hint=obj.get("level"))
             return
         else:
             span["outcome"] = "no_tip"
         self.out_timing.write(span)
+
+    def _aip_blocked(self, obj: dict) -> Optional[str]:
+        """0.9.2 (rules/diet.yaml > answer_in_primary): at most N such tips in 10 minutes, never twice on one topic."""
+        cfg = (self.rules.diet or {}).get("answer_in_primary") or {}
+        now = self.clock()
+        with self.lock:
+            shown = [t for t in self.tips if t.get("trigger") == "answer_in_primary" and not t.get("partial")]
+        if sum(1 for t in shown if t.get("_at", -1e9) >= now - 600) >= int(cfg.get("per_10_min", 2)):
+            return "aip_rate"
+        topic = str(obj.get("topic") or "")
+        if cfg.get("once_per_topic", True) and topic and any(jaccard(topic, str(t.get("topic") or "")) >= self.topic_sim
+                                                            for t in shown):
+            return "aip_same_topic"
+        return None
 
     def _classify_next(self) -> None:
         with self.lock:
@@ -1120,6 +1179,9 @@ class Engine:
             return
         if run.span.get("force_level"):
             part["level"] = run.span["force_level"]
+        if garbled(part):
+            run.shown = None                   # wait for the full tip: it is judged (and dropped) there
+            return
         if self.meeting_block(part, run.trigger, run.span):
             run.shown = None
             return
@@ -1180,7 +1242,8 @@ class Engine:
         if span.get("force_level"):
             obj["level"] = span["force_level"]
         run.obj = obj
-        for step in (self._tip_blocked, self._tip_vetoed, self._tip_stale, self._tip_unseen_number, self._tip_diet):
+        for step in (self._tip_blocked, self._tip_vetoed, self._tip_stale, self._tip_unseen_number, self._tip_aip_repeat,
+                     self._tip_diet):
             outcome = step(run)
             if outcome:
                 span["gist"] = obj.get("gist")
@@ -1197,6 +1260,11 @@ class Engine:
         if bad:
             span["error"] = bad
             return None, "tip_invalid"
+        if not obj.get("skip"):
+            g = garbled(obj)
+            if g:
+                span["error"] = "garbled: " + g
+                return None, "tip_invalid"
         if obj.get("skip"):
             span["reason"] = obj.get("reason")
             return None, "skip"
@@ -1208,6 +1276,17 @@ class Engine:
             return None
         best = jsonschema.exceptions.best_match(errs)
         return "{}: {}".format("/".join(str(p) for p in best.absolute_path), best.message[:160])
+
+    def _tip_aip_repeat(self, run: "TipRun") -> Optional[str]:
+        """0.9.2 (diet.yaml > answer_in_primary > once_per_topic): an answer to a statement built on a fact an earlier
+        such answer used is the same answer in other words (04.11: "no structure" twice in a minute)."""
+        if run.trigger != "answer_in_primary" and run.obj.get("trigger") != "answer_in_primary":
+            return None
+        ids = {str(x) for x in run.obj.get("fact_ids") or []}
+        with self.lock:
+            used = {str(x) for t in self.tips if t.get("trigger") == "answer_in_primary" and not t.get("partial")
+                    for x in t.get("fact_ids") or []}
+        return "aip_same_facts" if ids & used else None
 
     def _tip_blocked(self, run: "TipRun") -> Optional[str]:
         return self.meeting_block(run.obj, run.obj.get("trigger", run.trigger), run.span)
@@ -1924,7 +2003,8 @@ class Engine:
                                               extra=(self.cfg.get("request_extra") or {}).get("classify")))
         self.out_llm.write({"at": s_to_hms(self.clock()), "role": "situation", "model": c.model, "line_id": new[-1].line_id,
                             "total_ms": c.ms(c.t_done), "input": c.input_tokens, "output": c.output_tokens,
-                            "usd": c.usd, "error": c.error, "text_head": None if c.error else c.text[:160]})
+                            "usd": c.usd, "error": c.error, "route": getattr(c, "route", None),
+                            "incomplete": c.incomplete, "text_head": None if c.error else c.text[:160]})
         return first_json(c.text) if not c.error else None
 
     def _situation_system(self) -> str:
@@ -2158,6 +2238,12 @@ class Engine:
             return
         n = len(self.agenda_items)
         done = {int(i) for i in (obj.get("agenda_done") or []) if str(i).lstrip("-").isdigit() and 0 <= int(i) < n}
+        # 0.9.2 (rules/agenda.yaml > model_rule, audit 04.11: "agree the Sales priority" ticked with no yes from anyone):
+        # an item to agree or decide is done only when the call picture holds a decision on its subject.
+        decisions = [str(x) for x in (obj.get("decisions") or []) + list((self.situation or {}).get("decisions") or [])]
+        full = getattr(self, "agenda_full", None) or []
+        texts = [str(full[i]) if i < len(full) else str(self.agenda_items[i][0]) for i in range(n)]
+        done = {i for i in done if not DECIDE_ITEM.search(texts[i]) or decided_on(texts[i], decisions)}
         try:
             now = int(obj.get("agenda_now", -1))
         except (TypeError, ValueError):

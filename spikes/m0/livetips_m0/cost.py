@@ -11,7 +11,11 @@ from pathlib import Path
 PRICES_CHECKED = "2026-10-21"
 # family substring -> (input, cache_write_5m, cache_write_1h, cache_read, output)
 PRICES = [
-    # OpenAI standard pricing checked 2026-11-03: developers.openai.com/api/docs/models/gpt-5.4-mini
+    # OpenAI standard pricing checked 2026-11-04: developers.openai.com/api/docs/pricing (cached input = cache read)
+    ("gpt-6-astra", (10.0, 0.0, 0.0, 1.0, 50.0)),
+    ("gpt-6.1-sol", (2.0, 0.0, 0.0, 0.10, 10.0)),
+    ("gpt-6.1-terra", (1.0, 0.0, 0.0, 0.05, 5.0)),
+    ("gpt-6-luna", (0.10, 0.0, 0.0, 0.01, 0.50)),
     ("gpt-5.4-mini", (0.75, 0.0, 0.0, 0.075, 4.50)),
     ("haiku-5-5", (0.10, 0.125, 0.20, 0.01, 0.50)),     # prompts up to 100K tokens
     ("sonnet-5-5", (2.0, 2.5, 4.0, 0.10, 10.0)),

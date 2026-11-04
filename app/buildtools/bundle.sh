@@ -36,6 +36,13 @@ ENG="$APP/Contents/Resources/engine"; mkdir -p "$ENG/spikes/m0"
 rsync -a --exclude __pycache__ --exclude generated "$HERE/../rules/" "$ENG/rules/"
 rsync -a --exclude __pycache__ "$HERE/../spikes/m0/livetips_m0" "$ENG/spikes/m0/"
 cp "$HERE/Resources/setup.sh" "$APP/Contents/Resources/setup.sh"
+# 0.9.1 (rules/google.yaml > auth.client): the Google OAuth client comes from the build machine's environment, never git
+if [ -n "${PACENOTE_GOOGLE_CLIENT_ID:-}" ] && [ -n "${PACENOTE_GOOGLE_CLIENT_SECRET:-}" ]; then
+  python3 -c 'import json,os; print(json.dumps({"client_id": os.environ["PACENOTE_GOOGLE_CLIENT_ID"], "client_secret": os.environ["PACENOTE_GOOGLE_CLIENT_SECRET"]}))' \
+    > "$APP/Contents/Resources/google_oauth.json"
+else
+  echo "google: no OAuth client in the environment, Google sign-in is off in this build"
+fi
 # 2026-10-29 (owner): the live-tips skill's instructions travel with the app (SKILL.md and references/), so a
 # colleague without Cowork or the skill can prepare calls; a newer copy elsewhere (~/.claude/skills) still wins.
 mkdir -p "$APP/Contents/Resources/skill/references"

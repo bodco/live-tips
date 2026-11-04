@@ -37,6 +37,7 @@
       <div class="segs" id="segs" aria-hidden="true"></div>
       <button class="cap" id="agendaCap" type="button" data-act="agenda-toggle" aria-expanded="false" aria-controls="agendaList"><span id="agendaNow"></span><span id="agendaMissing"></span><span class="chev" aria-hidden="true">▾</span></button>
       <ol class="agenda-list" id="agendaList" hidden></ol>
+      <div class="agenda-grip" id="agendaGrip" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize the agenda" title="Drag to make the agenda taller or shorter. Double-click: default height"></div>
     </section>
 
     <section class="empty" id="empty" hidden aria-live="polite"></section>
@@ -61,6 +62,7 @@
     </form>
   </div>
 
+  <div class="split" id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize the side panel" title="Drag to resize. Double-click: default width"></div>
   <aside class="pane" id="pane" aria-label="Side panel"></aside>
 </div>
 

@@ -56,7 +56,7 @@ Settings > AI has two tabs, Claude (Claude account, Claude API) and ChatGPT, wit
   all three jobs. Codex uses its default model and your account's Codex limits. API-key sign-in is rejected for
   this route; Pacenote never reads or copies the CLI's OAuth credentials.
 - **OpenAI API:** save an API key in macOS Keychain and select it for preparation (0.9.0), live tips and/or
-  after-call work. These jobs use GPT-5.4 mini through streaming Responses with `store: false`. Tokens and estimated cost count toward
+  after-call work. Each job has its own OpenAI model in Settings > AI (defaults: GPT-6 Luna during the call, like Haiku; GPT-6.1 Sol for preparation and after the call, like Sonnet), through streaming Responses with `store: false`. Tokens and estimated cost count toward
   the existing ledger and live-call limits.
 
 Codex preparation uses a text context pack built by Pacenote (call context, added files, project config,

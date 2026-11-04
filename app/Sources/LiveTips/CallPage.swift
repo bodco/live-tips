@@ -25,6 +25,7 @@ struct CallPageView: View {
     @State private var supersede: [String: [String: String]] = [:]  // 0.8.8: decision -> the active one it may replace
     @State private var adding = Set<String>()
     @State private var tab = "summary"          // 0.9.0: Summary, Decisions, Tasks, Risks, Transcript (+ Sales)
+    @State private var meetNote = ""          // 0.9.1: the Google Meet record, one line
     @State private var exportOpen = false
 
     init(file: String) {
@@ -248,8 +249,14 @@ struct CallPageView: View {
                 if HomeNav.shared.followUp == file { HomeNav.shared.followUp = nil } else { FollowUpWindow.show(file: file) }
             }
             .buttonStyle(.pnSecondary).keyboardShortcut("i", modifiers: [.command, .option]).help(L("call.page.followup.help"))
+            if !meetNote.isEmpty { Text(meetNote).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2) }
             Button(L("page.export")) { exportOpen.toggle() }.buttonStyle(.pnPrimary)
             Menu {
+                // 0.9.1 (rules/google.yaml > meet): participants and, when Meet transcribed it, the Meet transcript
+                if GoogleService.shared.accounts.contains(where: { $0.has(GoogleScopes.meet) }), let r = record {
+                    Button(L("meet.get")) { getMeet(r) }
+                    Divider()
+                }
                 if let u = record?.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
                 Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }
                 Button(L("call.page.transcript")) { TranscriptWindow.show(file: file) }
@@ -263,6 +270,27 @@ struct CallPageView: View {
                 }
             } label: { Image(systemName: "ellipsis") }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().accessibilityLabel(L("home.more"))
+        }
+    }
+
+    /// <stem>.meet.md next to the transcript; the call's own transcript is not changed.
+    private func getMeet(_ r: CallHistory.Record) {
+        meetNote = L("meet.looking")
+        let end = r.end ?? r.start.addingTimeInterval((r.minutes ?? 60) * 60)
+        let code = CalendarService.shared.events.first { abs($0.start.timeIntervalSince(r.start)) < 1800 && $0.meetCode != nil }?.meetCode
+        let out = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".meet.md"
+        Task {
+            do {
+                guard let m = try await GoogleService.shared.meet(code: code, start: r.start, end: end) else { meetNote = L("meet.none"); return }
+                let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"
+                var md = "# Google Meet: " + r.title + "\n\n" + f.string(from: m.started) + " · " + m.account + "\n\n## " + L("meet.participants") + "\n\n"
+                md += m.participants.map { "- " + $0 }.joined(separator: "\n") + "\n"
+                md += "\n## " + L("meet.transcript") + "\n\n" + (m.transcript.isEmpty ? L("meet.noTranscript") : m.transcript) + "\n"
+                try md.write(toFile: out, atomically: true, encoding: .utf8)
+                UsageLog.log("google_meet", ["transcript": !m.transcript.isEmpty])
+                meetNote = m.transcript.isEmpty ? L("meet.savedNoTranscript", ["n": "\(m.participants.count)"]) : L("meet.saved")
+                NSWorkspace.shared.open(URL(fileURLWithPath: out))
+            } catch { meetNote = error.localizedDescription }
         }
     }
 

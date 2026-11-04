@@ -176,7 +176,7 @@ struct CallSetupView: View {
     }
 
     private var timeRow: some View {
-        let evs = cal.access == .granted ? cal.aroundNow() : []
+        let evs = cal.hasSource ? cal.aroundNow() : []
         let tf = DateFormatter(); tf.dateFormat = "HH:mm"
         let from = model.calEventID.flatMap { id in cal.events.first { $0.id == id } }
         return VStack(alignment: .leading, spacing: 6) {

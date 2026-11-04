@@ -41,13 +41,13 @@ enum KeyTester {
     }
 
     static func openai(key: String) async -> (Bool, String) {
-        var req = URLRequest(url: URL(string: "https://api.openai.com/v1/models/gpt-5.4-mini")!)
+        var req = URLRequest(url: URL(string: "https://api.openai.com/v1/models/gpt-6-luna")!)
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         req.timeoutInterval = 15
         do {
             let (_, resp) = try await URLSession.shared.data(for: req)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-            return (code == 200, code == 200 ? "GPT-5.4 mini" : "HTTP \(code)")
+            return (code == 200, code == 200 ? "GPT-6 Luna" : "HTTP \(code)")
         } catch { return (false, error.localizedDescription) }
     }
 
@@ -106,7 +106,7 @@ final class SettingsModel: ObservableObject {
     // 0.8.7 (F1): Notion, Calendars and the keys live under Integrations; old names open the matching page there
     @Published var tab = "general" {
         didSet {
-            if ["notion", "keys", "calendars", "hubspot"].contains(tab) { integration = tab == "keys" ? "notion" : tab; tab = "integrations" }
+            if ["notion", "keys", "calendars", "hubspot", "google"].contains(tab) { integration = tab == "keys" ? "notion" : tab; tab = "integrations" }
         }
     }
     @Published var integration: String? = nil
@@ -588,6 +588,31 @@ struct SearchModelRow: View {
     }
 }
 
+/// 0.9.0 (owner, 2026-11-04): the OpenAI model of a job, with its Claude counterpart and price
+/// (developers.openai.com/api/docs/pricing and platform.claude.com/docs/en/about-claude/pricing, checked 2026-11-04).
+struct OpenAIModelPicker: View {
+    @Binding var selection: String
+    let job: String
+    static let models: [(id: String, label: String)] = [
+        ("gpt-6-luna", "GPT-6 Luna · fastest, like Haiku · $0.10 / $0.50"),
+        ("gpt-6.1-terra", "GPT-6.1 Terra · fast, between Haiku and Sonnet · $1 / $5"),
+        ("gpt-6.1-sol", "GPT-6.1 Sol · balanced, like Sonnet · $2 / $10"),
+        ("gpt-6-astra", "GPT-6 Astra · most capable, above Opus in price · $10 / $50"),
+        ("gpt-5.4-mini", "GPT-5.4 mini · older · $0.75 / $4.50"),
+    ]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker(L("set.model"), selection: $selection) {
+                ForEach(Self.models, id: \.id) { m in
+                    Text(m.label + (m.id == Self.recommended(job) ? L("ai.route.recommended") : "")).tag(m.id)
+                }
+            }
+            Text(L("ai.openai.model2")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+    static func recommended(_ job: String) -> String { job == "tips" ? "gpt-6-luna" : "gpt-6.1-sol" }
+}
+
 struct RoutePicker: View {
     @Binding var selection: String
     var recommended: String
@@ -839,6 +864,8 @@ struct SettingsView: View {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if model.config.ai.prep == AIRoute.local {
                     LocalModelRow()
+                } else if model.config.ai.prep == AIRoute.openai {
+                    OpenAIModelPicker(selection: $model.config.ai.openaiPrep, job: "prep")
                 } else {
                     Picker(L("set.model"), selection: $runner.model) {
                         ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
@@ -858,7 +885,7 @@ struct SettingsView: View {
                 if model.config.ai.tips == AIRoute.codex {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if model.config.ai.tips == AIRoute.openai {
-                    Text(L("ai.openai.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    OpenAIModelPicker(selection: $model.config.ai.openaiTips, job: "tips")
                 } else {
                     ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices).help(L("set.decidesIfATip"))
                     ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices).help(L("set.writesTheTipYou"))
@@ -878,7 +905,7 @@ struct SettingsView: View {
                 if model.config.ai.after == AIRoute.codex {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if model.config.ai.after == AIRoute.openai {
-                    Text(L("ai.openai.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    OpenAIModelPicker(selection: $model.config.ai.openaiAfter, job: "after")
                 } else if model.config.ai.after == AIRoute.local {
                     LocalModelRow()
                 } else {

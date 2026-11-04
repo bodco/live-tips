@@ -173,6 +173,21 @@ The replay feeds each transcript line at the moment the recorder wrote it (from
 Outputs go to the run folder only: `<stem>.app.tips.jsonl`, `.app.llm.jsonl` (role, model,
 tokens, cache reads and writes, cost, timings), `.app.timing.jsonl` (spans per event).
 
+The local layer (keyword and semantic facts, cards, the "❓" items; `recorder/src/transcriber.py`) has its own replay,
+with the same classes, the thresholds from the app's `config.json` and the same embedding model:
+
+```
+<work>/Tools/LiveTips/.venv/bin/python tools/replay_local.py --md /path/to/<stem>.md --out /tmp/rl \
+    --config <work>/Tools/LiveTips/config.json --embed-url http://127.0.0.1:11435 --compare
+```
+
+The replay clock replaces the wall clock, so cooldowns and the topic window behave as live. `--compare` lists what
+showed live and not in the replay and the other way round, and the semantic decisions by reason
+(`below threshold`, `not a question, topic not held`, `cooldown`). Run it on the Mac against the running engine:
+`--model-dir` runs the int8 model in-process anywhere, but on another CPU its vectors differ slightly (cosine about
+0.985), which moves the cases near a threshold. The same holds for batching: the model quantizes each request as a whole, so lines are embedded one per request, as live. The live `<stem>.semantic.npz` seeds the fact and card vectors.
+The output holds call text: keep `--out` outside the repository.
+
 ### Pipeline
 
 1. Local cue detection on each final line (no model): name of the PM, question, second person,

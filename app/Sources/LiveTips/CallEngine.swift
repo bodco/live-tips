@@ -403,7 +403,7 @@ final class CallEngine {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
         p.arguments = ["-m", "livetips_m0.callnotes", "--md", file, "--model", "claude-sonnet-5-5",
-                       "--lang", c.uiLanguage == "en" ? "en" : "uk", "--aliases", c.nameAliases.joined(separator: ",")]
+                       "--lang", "auto", "--aliases", c.nameAliases.joined(separator: ",")]
             + (hasConfig ? ["--project-config", projectConfig] : [])
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = AIRoute.env(job: "after", config: c)

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import localprep as prep
 from .codexprep import Preparation
-from .openai_provider import MODEL, OpenAIProvider
+from .openai_provider import OpenAIProvider, job_model
 
 
 class OpenAIPreparation(Preparation):
@@ -22,12 +22,13 @@ def main(argv=None):
     parser.add_argument("--request", required=True)
     request = json.loads(Path(parser.parse_args(argv).request).read_text(encoding="utf-8"))
     started = time.monotonic()
-    result = {"ok": False, "model": MODEL, "tokens": {}, "sources": []}
+    model = job_model("prep", request.get("openai_model") or os.environ.get("LT_OPENAI_MODEL"))
+    result = {"ok": False, "model": model, "tokens": {}, "sources": []}
     try:
         key = os.environ.get("OPENAI_API_KEY", "")
         if not key:
             raise RuntimeError("No OpenAI API key: add it in Settings > AI > ChatGPT")
-        preparation = OpenAIPreparation(request, OpenAIProvider(key, timeout=300))
+        preparation = OpenAIPreparation(request, OpenAIProvider(key, timeout=300, model=model))
         result["sources"] = preparation.run()
         result["tokens"] = preparation.tokens
         result["ok"] = True

@@ -27,6 +27,10 @@ final class CalendarService: ObservableObject {
         var link: String?            // Meet, Zoom or Teams link
         var recurring: Bool
         var emails: [String] = []    // 0.8.7 (I3): attendee emails for the CRM match (the PM left out); never written to files
+        var uid: String? = nil       // 0.9.1: iCalendar UID, merges an EventKit copy with the same Google event
+        var attachments: [String] = []   // 0.9.1: Drive links attached to the invitation (Google only)
+        var meetCode: String? = nil  // 0.9.1: Google Meet code, finds the Meet record after the call
+        var fromGoogle: Bool { id.hasPrefix("g:") }
 
         static func == (a: CalEvent, b: CalEvent) -> Bool { a.id == b.id }
         func hash(into h: inout Hasher) { h.combine(id) }
@@ -101,15 +105,33 @@ final class CalendarService: ObservableObject {
     private var demo: [CalEvent]?
     func useDemo(_ evs: [CalEvent]) { demo = evs; access = .granted; events = evs }
 
+    /// 0.9.1: calendars come from macOS (EventKit) or from Google accounts connected in Pacenote, or both.
+    var hasSource: Bool { access == .granted || GoogleService.shared.connected }
+
     func refresh() {
         if let d = demo { events = d; access = .granted; return }
         updateAccess()
-        guard access == .granted else { events = []; calendars = []; return }
-        calendars = store.calendars(for: .event).sorted { ($0.source.title, $0.title) < ($1.source.title, $1.title) }
-        let use = calendars.filter { !excluded.contains($0.calendarIdentifier) }
-        guard !use.isEmpty else { events = []; return }
-        let now = Date()
-        events = fetch(from: now.addingTimeInterval(-3 * 3600), to: now.addingTimeInterval(36 * 3600), calendars: use)
+        var ek: [CalEvent] = []
+        if access == .granted {
+            calendars = store.calendars(for: .event).sorted { ($0.source.title, $0.title) < ($1.source.title, $1.title) }
+            let use = calendars.filter { !excluded.contains($0.calendarIdentifier) }
+            let now = Date()
+            if !use.isEmpty { ek = fetch(from: now.addingTimeInterval(-3 * 3600), to: now.addingTimeInterval(36 * 3600), calendars: use) }
+        } else { calendars = [] }
+        events = Self.merge(ek: ek, google: GoogleService.shared.events)
+    }
+
+    /// rules/google.yaml > calendar.merge: one row per occurrence; the EventKit row stays and takes the Google details.
+    nonisolated static func merge(ek: [CalEvent], google: [CalEvent]) -> [CalEvent] {
+        guard !google.isEmpty else { return ek }
+        let p = CalendarMerge.plan(eventKit: ek.map { ($0.uid, $0.start) }, google: google.map { ($0.uid ?? $0.id, $0.start) })
+        var rows = ek
+        for (i, g) in p.enrich {
+            rows[i].attachments = google[g].attachments
+            rows[i].meetCode = google[g].meetCode ?? rows[i].meetCode
+            if rows[i].link == nil { rows[i].link = google[g].link }
+        }
+        return (rows + p.keepGoogle.map { google[$0] }).sorted { $0.start < $1.start }
     }
 
     /// 0.8.5: the next event whose title contains a text within `days` (a comparison of preparations, PrepBench).
@@ -142,11 +164,14 @@ final class CalendarService: ObservableObject {
             let emails = (e.attendees ?? []).filter { !$0.isCurrentUser && $0.participantType != .room && $0.participantType != .resource }
                 .map { $0.url.absoluteString.replacingOccurrences(of: "mailto:", with: "").lowercased() }.filter { $0.contains("@") }
             let text = [e.url?.absoluteString, e.location, e.notes].compactMap { $0 }.joined(separator: " ")
-            out.append(CalEvent(id: (e.eventIdentifier ?? e.calendarItemIdentifier) + "@" + String(Int(e.startDate.timeIntervalSince1970)),
-                                seriesKey: key, title: (e.title ?? "").isEmpty ? L("cal.untitled") : e.title!,
-                                start: e.startDate, end: e.endDate, calendar: e.calendar.title, account: e.calendar.source.title,
-                                color: e.calendar.color ?? .systemBlue, attendees: names, link: Self.meetingLink(in: text),
-                                recurring: e.hasRecurrenceRules, emails: emails))
+            var ce = CalEvent(id: (e.eventIdentifier ?? e.calendarItemIdentifier) + "@" + String(Int(e.startDate.timeIntervalSince1970)),
+                              seriesKey: key, title: (e.title ?? "").isEmpty ? L("cal.untitled") : e.title!,
+                              start: e.startDate, end: e.endDate, calendar: e.calendar.title, account: e.calendar.source.title,
+                              color: e.calendar.color ?? .systemBlue, attendees: names, link: Self.meetingLink(in: text),
+                              recurring: e.hasRecurrenceRules, emails: emails)
+            ce.uid = e.calendarItemExternalIdentifier
+            ce.meetCode = ce.link.flatMap(GoogleEvent.meetCode)
+            out.append(ce)
         }
         return out.sorted { $0.start < $1.start }
     }

@@ -6,6 +6,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .app{height:100vh;display:flex;container-type:inline-size;container-name:app}
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
 .pane{display:none}
+.split{display:none}
 
 /* ---------- Header ---------- */
 .bar{height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 16px}
@@ -45,7 +46,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .agenda .cap:hover b,.agenda .cap:hover{color:var(--text)}
 .agenda .cap .chev{flex:none;transition:transform .15s}
 .agenda .cap[aria-expanded="true"] .chev{transform:rotate(180deg)}
-.agenda-list{list-style:none;margin:0;padding:6px 0 0;display:flex;flex-direction:column;gap:2px;max-height:40vh;overflow:auto}
+.agenda-list{list-style:none;margin:0;padding:6px 0 0;display:flex;flex-direction:column;gap:2px;max-height:var(--agenda-h,40vh);overflow:auto}
+/* 0.9.1 (owner): the open agenda is taller or shorter by dragging its bottom edge; the height is kept per Mac */
+.agenda-grip{height:9px;margin:-4px 0 -4px;cursor:row-resize;position:relative;outline:none;flex:none}
+.agenda-grip::after{content:"";position:absolute;left:50%;top:3px;width:36px;height:3px;margin-left:-18px;border-radius:2px;background:var(--separator);transition:background .12s}
+.agenda-grip:hover::after,.agenda-grip:focus-visible::after,.app.resizing-v .agenda-grip::after{background:var(--accent)}
+.agenda-list[hidden]+.agenda-grip{display:none}
+.app.resizing-v,.app.resizing-v *{cursor:row-resize!important;user-select:none!important}
 .agenda-list[hidden]{display:none}
 .agenda-list li button{display:flex;gap:8px;align-items:flex-start;width:100%;border:0;background:transparent;padding:4px 6px;border-radius:var(--radius-s);text-align:left;font-size:13px;color:var(--text);cursor:pointer}
 .agenda-list li button:hover{background:var(--surface-2)}
@@ -159,14 +166,20 @@ button{font:inherit;color:inherit;cursor:pointer}
 .btn1{height:32px;padding:0 14px;border-radius:7px;border:0;background:var(--accent-fill);color:#fff;font-size:13px;font-weight:600}
 
 /* ---------- Compact "glance" mode ---------- */
-.app.compact .agenda,.app.compact .earlier,.app.compact .next,.app.compact .ask,.app.compact .pane{display:none!important}
+.app.compact .agenda,.app.compact .earlier,.app.compact .next,.app.compact .ask,.app.compact .pane,.app.compact .split{display:none!important}
+.app.resizing,.app.resizing *{cursor:col-resize!important;user-select:none!important}
 .app.compact .hero{margin:0 8px 8px;padding:12px 14px;gap:6px}
 .app.compact .hero .q,.app.compact .hero .src,.app.compact .hero .acts{display:none}
 .app.compact .hero .say{font-size:19px}
 
 /* ---------- Wide: side pane ---------- */
 @container app (min-width: 760px){
-  .pane{display:flex;flex-direction:column;width:min(40%,420px);flex:none;background:var(--surface);border-left:1px solid var(--separator)}
+  .pane{display:flex;flex-direction:column;width:var(--pane-w,min(40%,420px));min-width:260px;max-width:calc(100% - 360px);flex:none;background:var(--surface);border-left:1px solid var(--separator)}
+  /* 0.9.1 (owner): the border between the tips and the side panel is draggable; the width is kept per Mac */
+  .split{display:block;flex:none;width:7px;margin:0 -3px;position:relative;z-index:2;cursor:col-resize;background:transparent;outline:none}
+  .split::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:1px;background:transparent;transition:background .12s}
+  .split:hover::after,.split:focus-visible::after,.app.resizing .split::after{background:var(--accent);width:2px;left:2.5px}
+  .app.compact .split{display:none}
   .hero .say{font-size:var(--fs-hero-wide)}
   .hero,.present{margin:0 16px}
   .row{padding:11px 20px}

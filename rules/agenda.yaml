@@ -21,6 +21,9 @@ model_rule: >-
   agenda_now = the number of the AGENDA item being discussed in the new lines, or -1 when none is.
   agenda_done = numbers of AGENDA items that were discussed, decided or answered on this call (keep earlier ones).
   An item counts only when its subject was really talked about, not when someone only names it in a list.
+  An item that asks to agree, approve, decide or confirm something (agree, decide, approve, confirm, sign off,
+  погодити, вирішити, затвердити, підтвердити) is done only when the person who decides said yes aloud on this call;
+  talking about it, showing it or the PM's own summary is not enough, then it stays now or todo (0.9.2, audit 04.11).
 emit: >-
   One item `{"kind":"agenda","items":[{"id":"<stable ID>","text":"<item>","state":"todo|now|done|skip","done":true|false,"cur":true|false}]}` each time
   the state changes; it replaces the previous strip. The PM can change an item's state in the window

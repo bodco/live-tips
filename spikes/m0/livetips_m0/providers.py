@@ -34,6 +34,10 @@ class Completion:
     equiv_usd: Optional[float] = None   # Claude Code: what the request would cost on the API (not billed to the key)
     switched_from: Optional[str] = None # auto-switch: the route that was out
     usd: Optional[float] = None   # what the engine counted against the budget (set by Engine._bill)
+    reasoning_tokens: int = 0     # 0.9.2: OpenAI output_tokens_details.reasoning_tokens (part of output_tokens)
+    incomplete: Optional[str] = None  # 0.9.2: why a stream stopped early (OpenAI incomplete_details.reason)
+    retried: Optional[str] = None     # 0.9.2: "longer" when an answer cut by the output limit was asked again
+    tail: int = 0                     # 0.9.2: characters after the first JSON object (the model ran on)
 
     def ms(self, t):
         return None if t is None else round((t - self.t_start) * 1000)
@@ -141,6 +145,11 @@ def take_chunk(c: "Completion", ch: dict, on_text) -> None:
 
 class Provider:
     name = "base"
+
+    def describe(self, model: str) -> dict:
+        """0.9.2: the route and the model a request for `model` goes to (run.json says what really ran)."""
+        route = {"anthropic": "api", "base": "api", "claude_code": "code", "ollama": "local"}.get(self.name, self.name)
+        return {"route": route, "model": model}
 
     def complete(self, *, model: str, system: List[dict], user: str, max_tokens: int,
                  cache_ttl: Optional[str], on_text: Optional[Callable[[str], None]] = None,
@@ -397,6 +406,9 @@ class HedgedProvider(Provider):
         self.default_after = default_after
         self.on_extra = on_extra
         self.stats = {"calls": 0, "hedged": 0, "hedge_won": 0}
+
+    def describe(self, model):
+        return self.inner.describe(model)
 
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         after = self.after_s.get(model, self.default_after)

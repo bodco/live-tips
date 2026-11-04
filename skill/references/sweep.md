@@ -222,6 +222,13 @@ adds what the card does not cover. A JSON list of 15-40 cards:
   turn" card needs a name alias AND a request in the same line, as a regex, for example
   `re:(іван\w*|ван[яьі]\w*|ivan)\W+.{0,40}(розкаж|що в тебе|апдейт|update|over to you|your turn)` (built from `settings.user.name_aliases`).
   A name alone never fires: people mention the PM in passing ("як Mike казав").
+  0.9.2: give it `"address": true`. The recorder never shows an address card itself (the PM decides when to speak
+  and has the speech card); it is logged as held, and the model answers an update asked by name with what is new.
+- A one-word trigger under 8 letters without a digit ("hubspot", "gdpr", a first name) never fires: the recorder
+  ignores it. Use 2+ words, a name of 8+ letters or a regex. `lt prep-check` lists such triggers; `--fix` moves them
+  to the card's `"words"`, which still count when cards are matched by meaning.
+- A card whose triggers are all regexes (the PM's own promise of a date) fires only by them, never by the meaning of
+  its gist, unless it has `"semantic": true`. By meaning a card shows once per call; again only by its trigger.
 - `on`: `them` (default for requests and questions), `me` (the PM's own risky phrases, e.g.
   a promised date), `any`.
 - What to turn into cards: the PM's name aliases with an update request ("Your turn" with
@@ -252,6 +259,13 @@ Questions like "how long will X take" are rare but costly when they come; most o
 book is the FRESH context of the project: what is happening now, what was decided, what the
 PM investigated lately, with the numbers. A JSON list, 40-200 items:
 `{"id": "AUTH-412", "title": "Audit logs in the admin panel", "text": "Estimate 16 h, To Do, assignee Dev A, sprint 42, no date yet", "keywords": ["logs", "логи", "audit", "аудит", "admin panel", "адмінка"], "source": "Jira, 14.10"}`
+- **Primary document (0.9.2).** A file the PM added for this call (the setup's files, a document named in the
+  context) is the call's main source. Name it in the brief's "Live essentials" and give every section of it at
+  least one fact or card with `"primary": true` and a `source` naming the file and the section. Its parts on what is
+  missing or not covered yet, and its ready answers, stay whole sentences (one fact per point, the wording kept),
+  never cut into keywords. "Needs confirmation" lists only conflicts the primary document does not resolve. Its
+  folder is not read as a source unless the PM added the folder. The project context, recent calls and threads still
+  give facts as usual (live, every fact follows the topic the same way).
 - **Where it comes from, freshest and local first** (device_bash, fast, no connector calls
   needed for most of it):
   1. The orientation sources the PM named, and for a deck or document review every number

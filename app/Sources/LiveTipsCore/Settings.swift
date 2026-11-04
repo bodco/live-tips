@@ -45,6 +45,11 @@ public struct AppConfig: Codable, Equatable {
         /// 0.8.5 (owner): when neither Claude way answers, the preparation and the after-the-call jobs use the model
         /// on this Mac (rules/ai.yaml > fallback); never the tips during a call.
         public var localFallback = true
+        /// 0.9.0 (owner, 2026-11-04): the OpenAI model of each job when its way is the OpenAI API.
+        /// Defaults follow the Claude choice per job: Haiku (tips) ~ gpt-6-luna, Sonnet (prep, after) ~ gpt-6.1-sol.
+        public var openaiPrep = "gpt-6.1-sol"
+        public var openaiTips = "gpt-6-luna"
+        public var openaiAfter = "gpt-6.1-sol"
         public init() {}
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -54,7 +59,11 @@ public struct AppConfig: Codable, Equatable {
             after = (try? c.decodeIfPresent(String.self, forKey: .after)) ?? d.after
             autoSwitch = (try? c.decodeIfPresent(Bool.self, forKey: .autoSwitch)) ?? d.autoSwitch
             localFallback = (try? c.decodeIfPresent(Bool.self, forKey: .localFallback)) ?? d.localFallback
+            openaiPrep = (try? c.decodeIfPresent(String.self, forKey: .openaiPrep)) ?? d.openaiPrep
+            openaiTips = (try? c.decodeIfPresent(String.self, forKey: .openaiTips)) ?? d.openaiTips
+            openaiAfter = (try? c.decodeIfPresent(String.self, forKey: .openaiAfter)) ?? d.openaiAfter
         }
+        public func openaiModel(_ job: String) -> String { job == "prep" ? openaiPrep : job == "tips" ? openaiTips : openaiAfter }
         public func route(_ job: String) -> String { job == "prep" ? prep : job == "tips" ? tips : after }
     }
     /// Engine processes (M1-M2: Python core). Not shown in the UI; set by the installer.

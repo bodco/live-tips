@@ -49,7 +49,10 @@ ADDRESS_ANY = """- Questions to anyone count: when anyone on the call asks a que
 - Never a tip about whose turn it is ("your turn", "your turn soon", "pause, you can start"), even with the speech in it: the PM decides when to speak and already has the speech card. When the PM is asked for an update by name, give only what is new versus the speech card (an answer to the exact question), or skip."""
 
 
-CLASSIFY_ANY = "A question to anyone counts when the context holds a concrete answer: the PM could give it. Who was addressed does not matter. A mention without a question is not a reason for a tip."
+CLASSIFY_ANY = ("A question to anyone counts when the context holds a concrete answer: the PM could give it. Who was addressed does not matter. "
+                "A mention without a question is not a reason for a tip, with one exception (0.9.2): answer_in_primary, when the other side "
+                "states something (a claim, a doubt, a pain) that the fact book, the cards or the brief answer with a ready answer, proof or "
+                "caveat, and nobody said it aloud yet; name the topic so the same one is not tipped twice.")
 CLASSIFY_STRICT = "A name in the third person is not an address."
 
 CLASSIFY_TASK = """ROLE classify. Do NOT write a tip. Only decide if the PM needs a tip right now for the newest line(s).
@@ -68,7 +71,7 @@ Return JSON only, gist first."""
 
 # Triggers the skill switches off by meeting concept (hiring.md, SKILL.md "No corrections of the PM on team calls").
 INTERVIEW_OFF = {"new_requirement", "pm_commitment", "frustration", "contradicts_decision", "pm_factual_error",
-                 "scope_pushback", "value_doubt"}
+                 "scope_pushback", "value_doubt", "answer_in_primary"}   # 0.9.2: the PM listens, no counter-answers
 
 
 def disabled_triggers(meta: Optional[dict]) -> set:

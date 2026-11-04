@@ -1,0 +1,50 @@
+# Google (Pacenote 0.9.1, owner 2026-11-04). Several Google accounts, like Notion workspaces. Read only, except the
+# export of notes to Google Docs, which happens only on the PM's click. Refresh tokens live in the macOS Keychain;
+# access tokens only in memory. Nothing from Google goes anywhere but this Mac and the model of the preparation.
+schema_version: 1
+auth:
+  flow: >-
+    OAuth for installed apps: the system browser, a one-shot listener on 127.0.0.1 (random port), PKCE S256,
+    access_type=offline, prompt="consent select_account". One consent screen per account with every scope below;
+    a scope the PM unticks turns off only what needs it, for that account.
+  client: >-
+    A Desktop OAuth client of the Pacenote Google Cloud project. The build writes Resources/google_oauth.json from the
+    build machine's environment (PACENOTE_GOOGLE_CLIENT_ID, PACENOTE_GOOGLE_CLIENT_SECRET); never in git. Google does
+    not treat a Desktop client secret as confidential.
+  remove: Forget here and revoke the token at Google (oauth2.googleapis.com/revoke).
+  expired: invalid_grant on refresh = the account row says "Sign in again"; nothing else stops.
+scopes:
+  identity: [openid, userinfo.email]
+  calendar: [calendar.calendarlist.readonly, calendar.events.readonly]
+  links: [documents.readonly, spreadsheets.readonly, presentations.readonly]
+  export: [drive.file]
+  meet: [meetings.space.readonly]
+  never: [drive, drive.readonly, gmail.*]   # restricted scopes need a security audit; links to other Drive files are not read
+calendar:
+  window: from 3 h ago to 36 h ahead, the same as EventKit; refreshed every 5 minutes and on sign-in
+  calendars: the primary calendar of each account is on; the others are off until ticked (Settings > Integrations > Google)
+  skip: all-day, cancelled, declined by me
+  merge: >-
+    Google and EventKit show one row per occurrence: the same iCalendar UID and start is one event. The EventKit row
+    stays (its id keeps the brief, the hidden state and the series) and takes the Google attachments and Meet code;
+    the first connected account wins over the next. Outlook and other accounts stay with EventKit.
+  extra: Drive attachments of the invitation are read for the preparation like links in the call context.
+links:
+  where: the call context and the attachments of the calendar event
+  kinds: {doc: Docs API with tabs, sheet: Sheets values of up to 20 sheets and 400 rows each, slides: slide text and speaker notes}
+  file: Other Drive files (PDF, docx) are not read (no restricted scope); the brief's sources line says so.
+  accounts: each link is tried with every connected account until one can open it
+  copy: <project>/live/google/google-<kind>-<id>.md, a Markdown copy with the link and time in the first line; kept on this Mac
+  prompt: >-
+    The preparation gets the copies as files the PM added and the line "Google links already read through the PM's
+    Google account: <link> -> <file>"; it never fetches those links. Links no account could open keep the old rule:
+    a public export link with WebFetch, or "needs a sign-in" in the sources line.
+export:
+  how: the export text as Word (.docx, the same as Download .docx), uploaded with conversion to a Google Doc
+  where: My Drive of the chosen account; the doc opens in the browser
+  scope: drive.file only (the app sees only the files it created)
+meet:
+  when: on the past call's page, on the PM's click (More > Google Meet record)
+  find: by the meeting code of the calendar event, otherwise the conference that started closest to the call (from 1 h before)
+  gives: the participants with their names; the transcript only when someone turned on transcription in Meet (Workspace)
+  file: <stem>.meet.md next to the transcript; the call's own transcript is not changed

@@ -705,7 +705,8 @@ class Engine:
         self.topic_sim = d["topic_similarity_min"]
         self.stale_s = d["stale_after_s"]
         self.history: List[Line] = []
-        self.lock = threading.Lock()
+        # Result application nests local state helpers; model requests stay outside this lock.
+        self.lock = threading.RLock()
         self.pool = ThreadPoolExecutor(max_workers=cfg.get("max_parallel_calls", 4))
         self.futures = []
         self.tips: List[dict] = []
@@ -748,6 +749,7 @@ class Engine:
         # Pacenote 0.8 (F5): the agenda as a contract and the commitments register (rules/agenda.yaml,
         # rules/commitments.yaml). The register lives in the call's folder (<project>/live/commitments.jsonl).
         self.agenda_items: List[tuple] = []
+        self.agenda_ids = []
         self.agenda_full: List[str] = []       # 2026-11-02: the full text of each item (the strip shortens it)
         self.agenda_obtain = ""                 # the brief's "Decisions to obtain" text (the wrap check)
         self.agenda_done: set = set()
@@ -1470,14 +1472,15 @@ class Engine:
             self.context_correction = text
             self.context_revision += 1
             self.situation = None
-            self._agenda_backup = (list(self.agenda_items), list(getattr(self, "agenda_full", [])), set(self.agenda_done),
-                                   self.agenda_now, dict(self.agenda_manual), self.agenda_obtain)
+            if not getattr(self, "_agenda_backup", None):
+                self._agenda_backup = self._agenda_snapshot()
+            self._agenda_previous = None
         self._apply_correction_to_prompt()
         try:
             self.correction_path.write_text(text, encoding="utf-8")
         except OSError:
             self.out_timing.write({"outcome": "correction_persistence_failed"})
-        self.set_agenda_items("")
+        self.set_agenda_items("", remember=False)
         self.out_tips.write({"kind": "context_reset"})
 
     def restore_agenda(self) -> None:
@@ -1486,7 +1489,7 @@ class Engine:
             b, self._agenda_backup = getattr(self, "_agenda_backup", None), None
             if not b:
                 return
-            self.agenda_items, self.agenda_full, self.agenda_done, self.agenda_now, self.agenda_manual, self.agenda_obtain = b
+            self.agenda_items, self.agenda_full, self.agenda_done, self.agenda_now, self.agenda_manual, self.agenda_obtain, self.agenda_ids = b
         self._emit_agenda()
 
     def _apply_correction_to_prompt(self) -> None:
@@ -1888,26 +1891,30 @@ class Engine:
         with self.lock:
             hist = list(self.history)
             last_done = self.sit_last_line
+            revision = self.context_revision
         new = [h for h in hist if h.line_id > last_done]
         if not new:
             return
-        revision = self.context_revision
         obj = self._situation_ask([h for h in hist if h.line_id <= last_done][-12:], new)
         if revision != self.context_revision:
             return
         if not isinstance(obj, dict):
             return
         pm_words = sum(len(h.text.split()) for h in new if h.speaker == "me")
+        self._apply_situation(obj, hist, new, pm_words, revision)
+
+    def _apply_situation(self, obj, hist, new, pm_words, revision):
+        # Revision check and every derived local write form one transaction. No model/network wait here.
         with self.lock:
             if revision != self.context_revision:
-                return                        # a correction landed while the model was answering
-        sit = next_situation(obj, self.situation or {}, pm_words, new[-1].t_s, self.cfg.get("ask_ttl_s", 360))
-        self._publish_situation(sit, new[-1].line_id)
-        self._asks_to_tips(sit, hist)
-        self._agenda_from_model(obj)
-        self._commitments_done(obj)
-        self._risk_cards(sit)
-        self._conflict_cards(obj)
+                return
+            sit = next_situation(obj, self.situation or {}, pm_words, new[-1].t_s, self.cfg.get("ask_ttl_s", 360))
+            self._publish_situation(sit, new[-1].line_id)
+            self._asks_to_tips(sit, hist)
+            self._agenda_from_model(obj)
+            self._commitments_done(obj)
+            self._risk_cards(sit)
+            self._conflict_cards(obj)
 
     def _situation_ask(self, ctx: List[Line], new: List[Line]):
         """One model call for the picture of the call; returns its JSON (or None) and logs what it cost."""
@@ -2082,41 +2089,69 @@ class Engine:
                              "mine{} | {}".format(m["n"], m["raw"]) for m in self.onme_mine[-12:] if not m.get("typed")))
         return "\n\n".join(parts) + ("\n\n" if parts else "")
 
-    def set_agenda_items(self, brief_text: str) -> None:
-        """The brief's checklist is the agenda (rules/agenda.yaml > source). Exact completed/skipped questions survive a refresh; corrections clear them first."""
+    def _agenda_snapshot(self):
+        return (list(self.agenda_items), list(self.agenda_full), set(self.agenda_done),
+                self.agenda_now, dict(self.agenda_manual), self.agenda_obtain, list(self.agenda_ids))
+
+    def undo_agenda_refresh(self) -> None:
+        with self.lock:
+            previous = getattr(self, "_agenda_previous", None)
+            if not previous:
+                return
+            self._agenda_previous = None
+            self.context_revision += 1
+            self.situation = None
+            self.agenda_items, self.agenda_full, self.agenda_done, self.agenda_now, self.agenda_manual, self.agenda_obtain, self.agenda_ids = previous
+        self.agenda_sent = None
+        self._emit_agenda()
+
+    def _inherit_agenda(self, previous, old_manual):
+        self.agenda_done = {i for i, old in previous.items() if old["state"] == "done"}
+        self.agenda_now = next((i for i, old in previous.items() if old["state"] == "now"), -1)
+        self.agenda_manual = {i: old_manual[old["id"]] for i, old in previous.items() if old["id"] in old_manual}
+
+    def set_agenda_items(self, brief_text: str, remember: bool = True) -> None:
+        """Retain same-call identities and states; ambiguous legacy matches stay open."""
         ag = getattr(self.rules, "agenda", {}) or {}
         full = agenda_mod.full_items(brief_text, int(ag.get("max_items", 20)))
-        items = [(agenda_mod.shorten(t, int(ag.get("max_chars", 60))), d) for t, d in full]
-        self.agenda_obtain = agenda_mod.to_obtain(brief_text)
-        if [t for t, _ in full] == getattr(self, "agenda_full", []):
-            return
         with self.lock:
-            previous = {x.get("full", x["text"]): x["state"] for x in self.agenda_strip()}
-            self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual = items, set(), -1, {}
+            if full == list(zip(self.agenda_full, [d for _, d in self.agenda_items])):
+                self.agenda_obtain = agenda_mod.to_obtain(brief_text)
+                return
+            if remember and self.agenda_items:
+                self._agenda_previous = self._agenda_snapshot()
+            old_strip = self.agenda_strip()
+            old_manual = {self.agenda_ids[i]: state for i, state in self.agenda_manual.items()}
+            previous = agenda_mod.match_identities(old_strip, brief_text, full)
+            self.agenda_ids = agenda_mod.assign_ids(previous, len(full))
+            self.agenda_items = [(agenda_mod.shorten(t, int(ag.get("max_chars", 60))), d) for t, d in full]
             self.agenda_full = [t for t, _ in full]
-            # Explicit states survive a refresh only for exactly matching full questions.
-            self.agenda_manual = {i: previous[t] for i, (t, _) in enumerate(full) if previous.get(t) in {"done", "skip"}}
+            self.agenda_obtain = agenda_mod.to_obtain(brief_text)
+            self._inherit_agenda(previous, old_manual)
         self._emit_agenda()
 
     def agenda_strip(self) -> List[dict]:
-        st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual)
-        full = getattr(self, "agenda_full", None) or [t for t, _ in self.agenda_items]
-        return [dict({"text": t, "done": s == "done", "cur": s == "now", "state": s}, **({"full": f} if f != t else {}))
-                for (t, _), s, f in zip(self.agenda_items, st, full)]
+        with self.lock:
+            st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual)
+            full = getattr(self, "agenda_full", None) or [t for t, _ in self.agenda_items]
+            return [dict({"id": identity, "text": t, "done": s == "done", "cur": s == "now", "state": s}, **({"full": f} if f != t else {}))
+                    for (t, _), s, f, identity in zip(self.agenda_items, st, full, self.agenda_ids)]
 
     def _emit_agenda(self, final: bool = False) -> None:
-        if not self.agenda_items and not self.agenda_sent:
-            return
-        strip = self.agenda_strip()
-        if strip == self.agenda_sent and not final:
-            return
-        self.agenda_sent = strip
-        t = s_to_hms(self.clock())
-        out = {"schema_version": 1, "engine": "app", "kind": "agenda", "t": t, "at": t,
-               "gist": "Агенда" if self._ui_uk() else "Agenda", "items": strip}
-        if final:
-            out["final"] = True
-        self.out_tips.write(out)
+        with self.lock:
+            if not self.agenda_items and not self.agenda_sent:
+                return
+            strip = self.agenda_strip()
+            if strip == self.agenda_sent and not final:
+                return
+            self.agenda_sent = strip
+            t = s_to_hms(self.clock())
+            out = {"schema_version": 1, "engine": "app", "kind": "agenda", "t": t, "at": t,
+                   "gist": "Агенда" if self._ui_uk() else "Agenda", "items": strip,
+                   "can_undo": bool(getattr(self, "_agenda_previous", None))}
+            if final:
+                out["final"] = True
+            self.out_tips.write(out)
 
     def _agenda_from_model(self, obj: dict) -> None:
         if not self.agenda_items:
@@ -2133,18 +2168,19 @@ class Engine:
         self._emit_agenda()
 
     def set_agenda_state(self, value: str) -> None:
-        """@@SET agenda_state=<index>|todo|now|done|skip from the window (the PM's state wins; skip = not relevant)."""
-        try:
-            idx, state = str(value).split("|", 1)
-            i = int(str(idx).lstrip("ab"))
-        except ValueError:
-            return
-        if state in ("todo", "now", "done", "skip") and 0 <= i < len(self.agenda_items):
-            with self.lock:
-                if state == "now":
-                    self.agenda_manual = {k: v for k, v in self.agenda_manual.items() if v != "now"}
-                self.agenda_manual[i] = state
-            self._emit_agenda()
+        """Stable ID (legacy index accepted) and state from the window; resolve under the refresh lock."""
+        with self.lock:
+            try:
+                idx, state = str(value).split("|", 1)
+                i = self.agenda_ids.index(idx) if idx in self.agenda_ids else int(str(idx).lstrip("ab"))
+            except ValueError:
+                return
+            if state not in ("todo", "now", "done", "skip") or not 0 <= i < len(self.agenda_items):
+                return
+            if state == "now":
+                self.agenda_manual = {k: v for k, v in self.agenda_manual.items() if v != "now"}
+            self.agenda_manual[i] = state
+        self._emit_agenda()
 
     def _commitments_done(self, obj: dict) -> None:
         """An open commitment said to be done: a quiet card "Done? <item>"; only the PM's click closes it."""

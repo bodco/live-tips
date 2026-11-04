@@ -43,6 +43,23 @@ enum LivePrep {
         if !correction.isEmpty {
             r.context = "Latest explicit correction from the PM for THIS call (overrides conflicting earlier prep):\n" + correction + "\n\nEarlier context:\n" + r.context
         }
+        if correction.isEmpty, let path = st.tipsFile,
+           let data = try? String(contentsOfFile: path, encoding: .utf8) {
+            let agendas = data.split(separator: "\n").compactMap { line -> [[String: Any]]? in
+                guard let d = line.data(using: .utf8),
+                      let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                      obj["kind"] as? String == "agenda" else { return nil }
+                return obj["items"] as? [[String: Any]]
+            }
+            if let items = agendas.last, !items.isEmpty {
+                let lines = items.compactMap { item -> String? in
+                    guard let id = item["id"] as? String, let text = (item["full"] ?? item["text"]) as? String else { return nil }
+                    return "- [ ] " + text + " <!-- agenda:" + id + " -->"
+                }
+                r.context += "\n\nCURRENT CALL AGENDA IDENTITIES:\n" + lines.joined(separator: "\n")
+                r.context += "\nRetain each agenda ID only for the same question, subject, owner and time scope, even when reworded or reordered. Put its <!-- agenda:ID --> marker at the end of the checklist line. New, split, merged or substantively changed questions get no old ID. Do not copy completion states from earlier calls."
+            }
+        }
         r.callID = m.id
         if !correction.isEmpty {
             // the newest correction replaces an older one in the call context (no pile of contradicting lines)

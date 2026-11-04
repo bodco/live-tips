@@ -202,7 +202,7 @@
         // only automatic tips go; answers, the speech card and the brief stay until the new prep replaces them
         this.cards.forEach((c) => { if (!c.pinned && c.raw.kind === 'tip') c.state = 'hidden'; });
         this.cardSeen = {};
-        this.agendaEngine = []; this.prep = 'running';
+        this.agendaEngine = []; this.agendaCanUndo = false; this.prep = 'running';
         return true;
       case 'question': return false;                      // heard-question lines are not shown (2026-10-26 review)
       case 'ask': return false;                           // echoes of what the PM typed: the field already shows it
@@ -221,12 +221,13 @@
         };
         return true;
       case 'agenda':
+        this.agendaCanUndo = !!it.can_undo;
         this.agendaEngine = (it.items || []).map((x, i) => {
           const text = clean(itemText(x)).replace(/^\u2713\s*/, '');
           const done = typeof x === 'string' ? /^\s*\u2713/.test(x) : !!(x && x.done);
           const full = typeof x === 'object' && x && x.full ? clean(String(x.full)) : text;   // 2026-11-02: the whole item on a click
           const skip = typeof x === 'object' && x && x.state === 'skip';
-          return { id: 'a' + i, title: text, full, done, skip, cur: typeof x === 'object' && x && !!x.cur };
+          return { id: (x && x.id) || 'a' + i, title: text, full, done, skip, cur: typeof x === 'object' && x && !!x.cur };
         });
         return true;
       case 'commitment_done': {
@@ -496,7 +497,7 @@
     let lastItem = false;
     const add = (t) => { if (!sec) { sec = { title: '', items: [], fulls: [] }; b.sections.push(sec); } sec.items.push(clean(t.replace(/\*\*/g, ''))); sec.fulls.push(''); lastItem = true; };
     for (const raw of this.briefText.split('\n')) {
-      const line = raw.trim();
+      const line = raw.replace(/<!--\s*agenda:[a-zA-Z0-9_-]{1,80}\s*-->/g, '').trim();
       let m;
       if (!line) { lastItem = false; continue; }
       if (/^#\s/.test(line)) { lastItem = false; continue; }      // the document title
@@ -586,7 +587,7 @@
       },
       sys: this.sysState(),
       pres: { slide: this.slideN, slideRx: this.slideRx, timeline: this.timeline, moveAsk: this.moveAsk, follow: this.follow },
-      agenda: this.agenda(),
+      agenda: this.agenda(), agendaCanUndo: !!this.agendaCanUndo,
       deal: this.deal,
       cards: this.cards.map((c) => Object.assign({}, c)),
       onMe: this.onMe(),

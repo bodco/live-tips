@@ -142,6 +142,7 @@ SETTINGS = {
     "proactive": _proactive,
     "title": _title,
     "call_lang": _call_lang,
+    "agenda_undo": lambda eng, v: eng.undo_agenda_refresh(),
     "agenda_state": lambda eng, v: eng.set_agenda_state(str(v or "")),        # an agenda item's state set in the window
     "onme_state": _onme,
     "onme_fix": _onme_fix,

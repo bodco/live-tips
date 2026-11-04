@@ -65,6 +65,15 @@ def brief_facts(path: Path):
     return out
 
 
+def fact_entries(path: Path, brief: Path):
+    """Prefer the actual fact book. A brief proxy is for old calls without one only."""
+    if not path.exists():
+        return brief_facts(brief)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    rows = data if isinstance(data, list) else data.get("facts", [])
+    return [dict(f, title=f.get("title", "")) for f in rows if isinstance(f, dict) and f.get("id") and f.get("text")]
+
+
 def word_count(t):
     return len(re.findall(r"\w+", t or ""))
 
@@ -101,7 +110,7 @@ def cmd_embed(a):
             cons.append(c.get("on", "any"))
             ctexts += tx
             owner += [k] * len(tx)
-        facts = brief_facts(md.parent / (stem + ".brief.md"))
+        facts = fact_entries(md.parent / (stem + ".facts.json"), md.parent / (stem + ".brief.md"))
         ftexts = [". ".join(x for x in (f["title"], f["text"]) if x) for f in facts]
         C = SEM.l2norm(client.embed(ctexts, timeout=60)) if ctexts else np.zeros((0, A.shape[1]), np.float32)
         F = SEM.l2norm(client.embed(ftexts, timeout=60)) if ftexts else np.zeros((0, A.shape[1]), np.float32)
@@ -213,7 +222,7 @@ def cmd_label(a):
         c = prov.complete(model=a.model, system=[{"text": LABEL_SYS, "cache": True}], user="\n\n".join(items),
                           max_tokens=2000, cache_ttl="5m", extra=extra)
         obj = first_json(c.text) or {}
-        lab = {int(x.get("n", 0)): bool(x.get("relevant")) for x in obj.get("labels", []) if isinstance(x, dict)}
+        lab = {int(x.get("n", 0)): x["relevant"] for x in obj.get("labels", []) if isinstance(x, dict) and isinstance(x.get("relevant"), bool)}
         for n, p in enumerate(chunk, 1):
             p["relevant"] = lab.get(n)
             res.append(p)

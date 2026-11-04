@@ -3,6 +3,12 @@ schema_version: 1
 source: >-
   The checklist lines of the call's brief (`- [ ] item` and `- [x] item`, in the order of the brief).
   Hiring: the planned or likely questions; a stand-up the PM leads: the people to hear from.
+  During this call, retain an existing <!-- agenda:ID --> marker when rewording or reordering the same question,
+  with the same subject, owner and time scope. New, split, merged or substantively changed questions get no old ID.
+  The window sends stable IDs with manual changes. Preserve todo, now, done and skip for matched same-call items;
+  ambiguous legacy matches stay open. Restore previous agenda undoes the last ordinary refresh in this session.
+  A context correction clears identities; a failed preparation restores the suspended agenda.
+  Completion never carries into a new call, even in the same series; carry only open questions and commitments.
 max_items: 20   # 2026-11-02 (owner): 13 interview questions, only 8 were shown
 max_chars: 60
 states:
@@ -16,9 +22,9 @@ model_rule: >-
   agenda_done = numbers of AGENDA items that were discussed, decided or answered on this call (keep earlier ones).
   An item counts only when its subject was really talked about, not when someone only names it in a list.
 emit: >-
-  One item `{"kind":"agenda","items":[{"text":"<item>","done":true|false,"cur":true|false}]}` each time
+  One item `{"kind":"agenda","items":[{"id":"<stable ID>","text":"<item>","state":"todo|now|done|skip","done":true|false,"cur":true|false}]}` each time
   the state changes; it replaces the previous strip. The PM can change an item's state in the window
-  (`@@SET agenda_state=<index>|todo|now|done|skip`, index from 0); the PM's state wins over the model's.
+  (`@@SET agenda_state=<stable ID>|todo|now|done|skip`; legacy indices start at 0); the PM's state wins over the model's.
 wrapup: >-
   The call summary gets an "Agenda" section: each item with Discussed, Raised or Not raised.
   Items not raised go into the "What matters" text of the next call of the same series,

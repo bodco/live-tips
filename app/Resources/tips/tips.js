@@ -313,12 +313,12 @@
 
     // agenda
     const ag = $('agenda');
-    ag.hidden = !S.agenda.length || withSlides() || isReady;
-    if (S.agenda.length) {
+    ag.hidden = (!S.agenda.length && !S.agendaCanUndo) || withSlides() || isReady;
+    if (S.agenda.length || S.agendaCanUndo) {
       $('segs').innerHTML = S.agenda.map((a) => `<button type="button" class="seg ${a.state}" data-act="agenda" data-id="${esc(a.id)}" title="${esc(a.full || a.title)}" aria-label="${esc(a.full || a.title)}"></button>`).join('');
       const now = S.agenda.find((a) => a.state === 'now');
       const doneN = S.agenda.filter((a) => a.state !== 'todo').length;
-      const pos = now ? S.agenda.indexOf(now) + 1 : Math.max(doneN, 1);
+      const pos = now ? S.agenda.indexOf(now) + 1 : Math.min(S.agenda.length, Math.max(doneN, 1));
       $('agendaNow').innerHTML = `${esc(t.agenda(pos, S.agenda.length))}${now ? ` · <b>${esc(now.title)}</b>` : ''}`;
       const missing = S.agenda.filter((a) => a.state === 'todo').map((a) => a.title);
       $('agendaMissing').textContent = missing.length ? `${t.notRaised} ${missing[0]}${missing.length > 1 ? ` +${missing.length - 1}` : ''}` : '';
@@ -330,7 +330,7 @@
       if (open) {
         // 2026-11-02 (owner): the opened agenda shows each item in full (13 interview questions were cut to "…")
         const html = S.agenda.map((a) => `<li class="${esc(a.state)}"><button type="button" data-act="agenda" data-id="${esc(a.id)}" aria-label="${esc((a.full || a.title) + ', ' + (t.agState[a.state] || a.state))}"><span class="st ${esc(a.state)}"></span><span class="tt">${esc(a.full || a.title)}</span></button></li>`).join('')
-          + `<li class="hint">${esc(t.agendaHint)} ${['todo', 'now', 'done', 'skip'].map((s, i) => `<span class="lg"><span class="st ${s}"></span>${esc(t.agendaLegend[i])}</span>`).join(' → ')}</li>`;
+          + `<li class="hint">${esc(t.agendaHint)} ${['todo', 'now', 'done', 'skip'].map((s, i) => `<span class="lg"><span class="st ${s}"></span>${esc(t.agendaLegend[i])}</span>`).join(' → ')}</li>` + (S.agendaCanUndo ? `<li><button type="button" data-act="agenda-undo">${S.lang === 'uk' ? 'Повернути попередню агенду' : 'Restore previous agenda'}</button></li>` : '');
         // 2026-11-03 (owner): the list was rebuilt every second and jumped back to the top while scrolling
         if (list.dataset.html !== html) { const top = list.scrollTop; list.innerHTML = html; list.dataset.html = html; list.scrollTop = top; }
       }
@@ -1018,6 +1018,7 @@
         post('commitment-done', { id: card.commit.id, text: card.commit.text });
         e.stopPropagation(); break;
       }
+      case 'agenda-undo': post('agenda-undo', {}); break;
       case 'agenda-toggle': S.ui.agendaOpen = !S.ui.agendaOpen; break;
       case 'theirs-toggle': S.ui.theirsOpen = !(b.getAttribute('aria-expanded') === 'true'); break;
       case 'home': post('menu', { item: 'home' }); return;

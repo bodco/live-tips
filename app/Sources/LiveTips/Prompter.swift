@@ -867,6 +867,8 @@ extension PrompterController {
             handle("cardedit", ["action": new.isEmpty ? "onme_remove" : "onme_edit", "kind": "onme", "key": d["id"] ?? "",
                                 "before": ["text": text], "after": ["text": new]] as [String: Any])
             sendSetting("onme_fix", text + "|" + new)
+        case "agenda-undo":
+            sendSetting("agenda_undo", "1")
         case "agenda":
             handle("cardedit", ["action": "agenda", "kind": "agenda", "key": d["id"] ?? "",
                                 "after": ["text": d["title"] as? String ?? "", "state": d["state"] as? String ?? ""]] as [String: Any])

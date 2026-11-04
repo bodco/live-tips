@@ -413,5 +413,15 @@ test('context correction removes obsolete automatic advice and agenda', () => {
   assert.deepStrictEqual(get().agenda, []);
 });
 
+test('agenda identity and restore availability survive feed conversion', () => {
+  const { f, get } = make();
+  f.addItems([{kind:'agenda', can_undo:true, items:[{id:'q_stable', text:'Deployment', state:'now', cur:true}]}]);
+  assert.strictEqual(get().agenda[0].id, 'q_stable');
+  assert.strictEqual(get().agendaCanUndo, true);
+  f.addItems([{kind:'agenda', can_undo:false, items:[{id:'q_stable', text:'Rollout', state:'done', done:true}]}]);
+  assert.strictEqual(get().agenda[0].id, 'q_stable');
+  assert.strictEqual(get().agendaCanUndo, false);
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

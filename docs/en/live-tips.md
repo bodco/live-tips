@@ -2010,3 +2010,19 @@ brings the old agenda back with its states. In an interview the interviewer stil
 other side asks them something; only an automatic statement that would answer for the interviewee is held back.
 A late red warning is still shown (up to 40 s after the speech, marked late). The same non-red tip within 5 minutes
 is shown once.
+
+### Agenda continuity and diagnostic audits
+
+Prepare again during the current call passes stable agenda identities to preparation. Rewording and reordering
+keep the states of the same question, including Now; changed dates, new questions and ambiguous legacy matches
+stay open. Expand the agenda and choose **Restore previous agenda** to undo the last ordinary refresh in this
+session. Correct context starts a new agenda; if preparation fails, the suspended agenda returns. Completion is
+specific to one call and is never inherited by tomorrow's call in a series.
+
+Offline developer checks (from `spikes/m0`): `python -m livetips_m0.fact_quality --corpus <private.json>
+--holdout-date YYYY-MM-DD` and `python -m livetips_m0.latency_audit <timing.jsonl> ...`. Keep recorded data private.
+The fact audit uses whole-call date splits, separates semantic facts from other cards, and reports useful facts
+lost alongside noise removed. Judge labels are provisional; check current relevance, whether it was already said,
+source freshness and audience against the original context before adding a human label. The shown-card sample
+cannot measure recall of unshown candidates. No threshold is changed automatically. Latency counts are per stage;
+first gist and final write are engine events, not proof of a screen paint.

@@ -3,7 +3,10 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## Unreleased
+## 0.9.2 (2026-11-04)
+
+Includes the Google accounts work of 0.9.1 (never released on its own) and the fixes from the audit of a
+live call.
 
 - **Google verification submitted (2026-11-04):** the Pacenote OAuth app passed Google's branding check and its data
   access (5 sensitive scopes, none restricted) was submitted for review. Until Google approves it, the sign-in still

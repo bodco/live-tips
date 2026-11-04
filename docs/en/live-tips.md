@@ -1587,6 +1587,24 @@ Only reading, except the export you click. Rules: `rules/google.yaml`.
 panel wider or narrower; drag the handle under the open agenda to show more or fewer items. Pacenote keeps both;
 double-click a border to go back to the default. With the keyboard: focus the border and use the arrow keys.
 
+### 14.1o Pacenote 0.9.2: lessons of a live call
+
+An audit of one recorded call changed how the local layer and the model decide:
+
+- **Facts follow the topic:** a fact matches the last minute of what the other side said, not one line; it is not
+  shown when you just said it, when that minute is about something else, a second time on the same topic, or more
+  than once a minute (a question still gets its fact).
+- **Cards:** a "your turn" card is never shown by its trigger; a card with only regex triggers does not fire by
+  meaning; by meaning a card shows once per call. `lt prep-check` warns about one-word triggers the recorder ignores.
+- **A ready answer to a statement:** when someone states something the prepared material answers and nobody said
+  yet, a 🟠 tip gives the answer, at most 2 in 10 minutes and once per topic (off in interviews).
+- **The primary document:** files you add to a call are the preparation's main source; each section gives a fact or
+  card marked primary, "what is missing" and ready answers stay whole sentences. An agenda item to agree or decide
+  is done only after a clear yes.
+- **OpenAI:** an answer cut by the output limit after a complete JSON is kept, otherwise asked once more; garbled
+  tips are dropped; run.json names the route and model each role really used.
+- **Developers:** `tools/replay_local.py` replays the local layer of a recorded call (DEVELOPMENT.md).
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the

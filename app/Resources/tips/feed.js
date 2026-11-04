@@ -192,16 +192,17 @@
 
   Feed.prototype.addItem = function (it) {
     const k = it.kind || 'tip';
-    if (k === 'tip' && it.late) {
+    if (k === 'tip' && it.late && it.level !== 'red') {      // a late red warning stays (marked late), the rest go
       if (it.uid) this.addItem({ kind: 'retract', uid: it.uid });
       return true;
     }
     switch (k) {
       case 'retract': { const id = 'u:' + it.uid, c = this.byId[id]; if (c) { this.cards.splice(this.cards.indexOf(c), 1); delete this.byId[id]; } return true; }
       case 'context_reset':
-        this.cards.forEach((c) => { if (!c.pinned && c.raw.kind !== 'answer') c.state = 'hidden'; });
-        this.facts = []; this.cardSeen = {};
-        this.agendaEngine = []; this.brief = null; this.briefText = ''; this.prep = 'running';
+        // only automatic tips go; answers, the speech card and the brief stay until the new prep replaces them
+        this.cards.forEach((c) => { if (!c.pinned && c.raw.kind === 'tip') c.state = 'hidden'; });
+        this.cardSeen = {};
+        this.agendaEngine = []; this.prep = 'running';
         return true;
       case 'question': return false;                      // heard-question lines are not shown (2026-10-26 review)
       case 'ask': return false;                           // echoes of what the PM typed: the field already shows it

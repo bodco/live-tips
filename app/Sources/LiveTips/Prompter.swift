@@ -827,10 +827,12 @@ extension PrompterController {
         case "correct-context":
             guard let text = d["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             MainActor.assumeIsolated {
+                // the correction always reaches the engine at once; the new prep is a second step that may not start
+                appendLine(jsonLine(["kind": "context_correction", "text": text, "t": nowHMS()]), to: args.inbox)
                 if let error = LivePrep.start(correction: text) {
-                    push("window.toastMsg && window.toastMsg(" + jsString(error) + ")")
+                    appendLine(jsonLine(["kind": "context_restore_agenda", "t": nowHMS()]), to: args.inbox)
+                    push("window.toastMsg && window.toastMsg(" + jsString(L("liveprep.correctedNoPrep", ["error": error])) + ")")
                 } else {
-                    appendLine(jsonLine(["kind": "context_correction", "text": text, "t": nowHMS()]), to: args.inbox)
                     push("window.setPrep && window.setPrep({state:'running',progress:0})")
                 }
             }

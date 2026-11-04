@@ -27,5 +27,9 @@ forbidden:
 # Reliability: automatic live hints only. Manual asks and HELP NOW remain available.
 # Re-read transcript lines with identical time, channel and text do not trigger twice.
 # Backchannels alone do not trigger a situation-model update; they remain in context.
+# A non-red tip whose gist shares 60% of its content words with a gist shown in the last 5 minutes is dropped
+# (review of the calls of 2026-11-02/03: 11 of 31 tips of a discovery interview were the same gist again).
+# Late red warnings: up to 2 x stale_after_s after their speech, marked late; other late tips are dropped.
+# An old line still counts for the agenda, the situation and the brief reload; it only starts no automatic tip.
 # In the UI, noncritical automatic tips with the exact same topic and trigger within 90 s
 # share one card. Pinned/edited cards and red warnings are never merged.

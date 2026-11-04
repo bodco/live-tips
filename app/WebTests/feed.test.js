@@ -381,11 +381,14 @@ test('0.8.7 first-call banner: once, not in the demo, remembered through a pref'
   assert.ok(/20000/.test(fn), '20 seconds');
 });
 
-test('late automatic tips retract their preview; manual answers remain visible', () => {
+test('late automatic tips retract their preview; manual answers and late red warnings remain visible', () => {
   const { f, get } = make();
-  f.addItems([{kind:'tip',uid:'old',partial:true,t:'10:31:00',level:'red',gist:'Old question'}]);
-  f.addItems([{kind:'tip',uid:'old',late:true,t:'10:31:01',level:'red',phrase:'Obsolete answer'}]);
+  f.addItems([{kind:'tip',uid:'old',partial:true,t:'10:31:00',level:'orange',gist:'Old question'}]);
+  f.addItems([{kind:'tip',uid:'old',late:true,t:'10:31:01',level:'orange',phrase:'Obsolete answer'}]);
   assert.strictEqual(get().cards.length, 0);
+  f.addItems([{kind:'tip',uid:'red',late:true,t:'10:31:01',level:'red',phrase:'Do not promise Friday'}]);
+  assert.strictEqual(get().cards.length, 1);
+  f.addItems([{kind:'retract',uid:'red'}]);
   f.addItems([{kind:'answer',late:true,t:'10:31:02',phrase:'Requested history',q:'What happened?'}]);
   assert.strictEqual(get().cards.length, 1);
 });
@@ -406,7 +409,7 @@ test('context correction removes obsolete automatic advice and agenda', () => {
   const { f, get } = make();
   f.addItems(DEMO);
   f.addItems([{kind:'context_reset'}]);
-  assert.ok(get().cards.filter(c => c.raw.kind !== 'answer').every(c => c.state === 'hidden'));
+  assert.ok(get().cards.filter(c => c.raw.kind === 'tip').every(c => c.state === 'hidden'));
   assert.deepStrictEqual(get().agenda, []);
 });
 

@@ -212,6 +212,7 @@ class PromptBuilder:
         self._brief_path = brief_path
         self._brief_key = (brief_path.stat().st_mtime if brief_path and Path(brief_path).exists() else None)
         self._extra = extra_context
+        self._correction = ""          # 0.9.x: the PM's live correction, in the cached brief block
         self._facts = (facts_path, cards_path)
         self.blocks = []
         self.set_meeting({})
@@ -264,10 +265,20 @@ class PromptBuilder:
             self._facts_key = files_key(*self._facts)
         self.blocks = [
             {"text": render_rules(self.rules, meta=call_meta), "cache": True},
-            {"text": header + "\n\nBRIEF:\n" + self._brief + ("\n\n" + self._extra if self._extra else ""), "cache": True},
+            {"text": header + "\n\nBRIEF:\n" + self._brief + ("\n\n" + self._extra if self._extra else "")
+                     + ("\n\n" + self._correction if self._correction else ""), "cache": True},
             facts,
         ]
         return True
+
+    def set_correction(self, text: str) -> None:
+        """The PM's correction during the call (rules/live_prep.yaml > correction): rebuilt into the cached brief block,
+        so every later request has it once, at the cost of one new cache prefix."""
+        if text == self._correction:
+            return
+        self._correction = text
+        self.blocks = []
+        self.set_meeting({})
 
     def user(self, role: str, event: str, tail_lines: List[str], state: dict, earlier_lines: List[str] = ()) -> str:
         if role == "classify":

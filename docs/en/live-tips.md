@@ -2005,3 +2005,8 @@ preserve completed/skipped questions only when their full text matches. A contex
 Automatic tips older than 20 seconds from their source audio are suppressed; manual questions and HELP NOW stay
 available. Identical transcript lines are processed once. Repeated noncritical tips with the exact same topic
 and trigger within 90 seconds share a card; pinned/edited cards and red warnings are kept separate.
+Corrections reach the tips at once, even when the new preparation cannot start; a failed or cancelled remake
+brings the old agenda back with its states. In an interview the interviewer still gets an answer tip when the
+other side asks them something; only an automatic statement that would answer for the interviewee is held back.
+A late red warning is still shown (up to 40 s after the speech, marked late). The same non-red tip within 5 minutes
+is shown once.

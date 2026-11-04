@@ -14,7 +14,9 @@ route: >-
   local model), with the same automatic switch rules as a preparation before the call (rules/ai.yaml).
 never_blocks: >-
   The preparation runs as its own process in the background. Recording, speech recognition and the tips loop never
-  wait for it and never slow down; responses started on an older context revision are discarded, including streamed previews.
+  wait for it and never slow down; responses started on an older context revision are discarded, including streamed
+  previews. Speech older than stale_after_s still counts for the agenda, the situation and the brief reload; it only
+  starts no automatic tip (rules/diet.yaml).
 swap: >-
   When it is ready the new brief, cards and facts replace the call's files in one rename each (<stem>.brief.md,
   .cards.json, .facts.json), the brief in use before is kept as <stem>.brief.prev.md (one previous version is
@@ -31,10 +33,12 @@ skill: >-
   <stem>.brief.prev.md; the loop keeps running and reads the new brief on its next turn.
 
 correction: >-
-  Correct context in the live window uses /context followed by the current participant, goal or source document.
-  Start preparation first; if it cannot start, show the error and keep the existing context. Once accepted, send
-  the correction to the engine, clear the obsolete agenda and unpinned automatic cards, and make the explicit
-  correction override conflicting old prep in all subsequent model requests. New prep replaces the agenda.
+  Correct context in the live window uses /context followed by the current participant, goal or source document
+  (at most 2000 characters). The correction reaches the engine at once, whether or not a new preparation can
+  start: it goes into the cached brief block of every later request (once, not per request), responses started
+  before it are discarded and unpinned automatic tips are hidden; answers, the speech card and the brief stay.
+  The old agenda is put aside while the new preparation runs: the new prep replaces it, and when the prep cannot
+  start, fails or is cancelled the old agenda comes back with its states (context_restore_agenda).
 identity: >-
   Before choosing a checklist, reconcile the current invitation, roles, goal and source document. A repeated
   title is not proof of the same interviewee. Put unresolved contradictions in Needs confirmation before the

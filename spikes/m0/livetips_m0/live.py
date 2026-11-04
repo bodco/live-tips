@@ -181,6 +181,9 @@ def handle_inbox(eng, raw: str) -> None:
     if d.get("kind") == "context_correction":
         eng.correct_context(str(d.get("text") or ""))
         return
+    if d.get("kind") == "context_restore_agenda":     # the prep after a correction failed: the old agenda comes back
+        eng.restore_agenda()
+        return
     if d.get("kind") == "setting":
         handle_setting(eng, d.get("key"), d.get("value"))
         return
@@ -240,7 +243,7 @@ class LiveRun:
         for raw in self.t_md.read():
             ln = parse_line(raw, self.n, self.cfg["me_label"])
             if ln:
-                identity = (ln.t, ln.speaker, ln.text)
+                identity = (ln.t, ln.label, ln.stag, ln.text)     # two people saying "Yes" in one second are two lines
                 if identity in self.seen_lines:
                     continue
                 self.seen_lines.add(identity)

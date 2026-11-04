@@ -12,6 +12,13 @@ Pacenote. Earlier versions are described in the commit messages and in
   Noncritical repeated topics share a card; manual answers and red warnings remain separate. Interviewer tips
   ask follow-up questions rather than answering for the interviewee. Backchannels alone no longer trigger the
   situation model. Rules: diet.yaml and live_prep.yaml. Use Correct context, type the correction, then Enter.
+- **Live tips reliability, review fixes (2026-11-04):** the interviewer gets answer tips to questions the other side
+  asks them again; only an automatic statement that would answer for the interviewee is held back. A correction
+  reaches the tips even when the brief cannot be remade, is sent once in the cached brief block instead of with every
+  request, and a failed or cancelled remake brings the old agenda back with its states; answers, the speech card and
+  the brief are no longer hidden by it. Old speech still moves the agenda and the brief reload, it only starts no
+  tip; a line without timing ages from when it arrived. A late red warning still shows (up to 40 s, marked late).
+  The same non-red gist within 5 minutes is dropped (9 of 31 tips of a recent discovery interview).
 
 - **Call pages (0.9.0, 2026-11-03):** an upcoming call has its own page in Home (from its name on Home, on Coming up
   or in the menu bar): Setup (what kind of call, what matters, files, the rest under More settings; changes apply

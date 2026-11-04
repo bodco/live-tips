@@ -45,6 +45,29 @@ OBSERVER_EVENT = ("Interview, role observer: the other side asked the candidate 
                   "the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not "
                   "apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = "
                   "'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.")
+# 0.9.x (owner, 2026-11-04): the interviewer gets answers to the other side's questions to them, and never a tip
+# that answers for the interviewee.
+GIST_REPEAT_S = 300                  # a non-red gist repeated within 5 minutes is dropped (rules/diet.yaml)
+GIST_REPEAT_MIN = 0.6                # token overlap of the gists' content words
+_GIST_LABELS = {"clarify", "уточни", "уточнити", "add", "додай", "fix", "зафіксуй", "ask", "спитай", "now", "зараз", "що"}
+
+
+def gist_core(gist: str) -> set:
+    """The content words of a gist: no emoji, no label words ("Clarify:", "Уточни"), no short words."""
+    words = re.findall(r"[\w'ʼ’]+", gist.lower())
+    return {w for w in words if len(w) > 2 and w not in _GIST_LABELS}
+
+
+def jaccard_sets(a: set, b: set) -> float:
+    return len(a & b) / len(a | b) if a and b else 0.0
+
+
+RED_LATE_FACTOR = 2                  # a red tip may land up to 2 x stale_after_s after its speech (shown as late)
+CORRECTION_MAX = 2000                # the PM's correction: who, goal, document; long text belongs in the prep
+INTERVIEWER_ROLE_NOTE = ("\nThe PM is the interviewer (also in discovery interviews). When the other person asks the PM a question, "
+                         "answer it for the PM from the brief and the facts. Otherwise never answer on behalf of the interviewee "
+                         "or repeat their answer as a PM statement: give one open follow-up question, or nothing when it is "
+                         "already answered. Address the current speaker, not the person named in an older brief.")
 INTERVIEWER_EVENT = ("Interview, role interviewer: the other person (a candidate, or a colleague or user in a discovery or "
                      "research interview) just gave a long answer to the PM's question. Give ONE orange tip: gist starting with "
                      "'🟠 ' and 'Clarify: ' in the tips language, phrase = ONE open follow-up question the PM can ask now, in the "
@@ -659,8 +682,9 @@ class Engine:
         self.cfg = cfg
         self.context_revision = 0
         self.correction_path = out_dir / (stem + ".context-correction.txt")
+        self._agenda_backup = None
         try:
-            self.context_correction = self.correction_path.read_text(encoding="utf-8")[:6000]
+            self.context_correction = self.correction_path.read_text(encoding="utf-8")[:CORRECTION_MAX]
         except OSError:
             self.context_correction = ""
         self.rules = rules
@@ -745,6 +769,8 @@ class Engine:
         # 0.8.8 (rules/decisions.yaml): the project's active decisions from the local snapshot, never from Notion live
         self.active_decisions = load_active_decisions(cfg.get("project_dir") or "")
         self.conflicts_shown: set = set()
+        if self.context_correction:
+            self._apply_correction_to_prompt()      # a restarted engine keeps the PM's correction of this call
         raise_tip_tokens(cfg)
 
     def _setup_sales(self, cfg, rules):
@@ -790,9 +816,6 @@ class Engine:
         now = self.clock()
         with self.lock:
             self.history.append(line)
-        if self._expired(line):
-            self.out_timing.write({"line_id": line.line_id, "src": line.t, "outcome": "historical_line"})
-            return
         self._every_fifth_line(line)
         sig = self.detector.detect(line)
         span = line_span(line, sig, now)
@@ -803,6 +826,11 @@ class Engine:
                 self.last_wrap_at = now
             self.on_request("wrap")
         self._maybe_situation(line, sig, now)
+        # rules/diet.yaml > stale_after_s: an old line still counts for the agenda, the situation and the brief
+        # reload above; it only never starts an automatic tip (no model call for speech nobody waits on now)
+        if self._expired(line):
+            self.out_timing.write({"line_id": line.line_id, "src": line.t, "outcome": "historical_line"})
+            return
         if self._meeting_route(line, sig, span, now):
             return
         if meeting_role(self.meta()) == "observer":
@@ -910,13 +938,14 @@ class Engine:
         with self.lock:
             return [h for h in self.history if h.line_id > line.line_id]
 
-    def _expired(self, line: Line) -> bool:
+    def _expired(self, line: Line, limit: Optional[float] = None) -> bool:
         """Age of the source audio, allowing calls to cross midnight."""
-        end = line.seg_end if line.seg_end is not None else line.t_s
+        # the end of speech; without a timing record the time the line arrived (a 28 s segment is not old when it lands)
+        end = line.seg_end if line.seg_end is not None else (line.written if line.written is not None else line.t_s)
         age = self.clock() - end
         if age < -43200:
             age += 86400
-        return age > self.stale_s
+        return age > (self.stale_s if limit is None else limit)
 
     def stale(self, line: Line, trigger: str, obj: Optional[dict] = None) -> Optional[str]:
         """Review 2026-10-23: in 38 of 52 late tips the trigger was already resolved when the tip came.
@@ -963,9 +992,8 @@ class Engine:
                             "usd": c.usd, "error": c.error})
 
     def _call(self, role: str, line: Line, event: str, on_text=None):
-        event += self.correction_block()
-        if meeting_role(self.meta()) == "interviewer":
-            event += "\nThe PM is the interviewer, including in discovery interviews. Never answer on behalf of the interviewee or repeat their answer as a PM statement. For automatic tips, propose one open follow-up question, or skip when already answered. Address the current speaker, never infer the addressee from yesterday's brief."
+        if role == "tip" and meeting_role(self.meta()) == "interviewer":
+            event += INTERVIEWER_ROLE_NOTE
         user = self.prompt.user(role, event, self._tail(line), self._state(), self._earlier(line))
         max_tokens = self.cfg.get("max_tokens", {}).get(role, 60 if role == "classify" else 300)
         extra = (self.cfg.get("request_extra") or {}).get(role)
@@ -1196,6 +1224,9 @@ class Engine:
     def _tip_stale(self, run: "TipRun") -> Optional[str]:
         demote_red(run.obj, run.trigger, run.span)
         why = self.stale(run.line, run.obj.get("trigger", run.trigger), run.obj)
+        # a red warning (a wrong number, a promise to stop) is worth showing late: up to twice the window, marked late
+        if why == "expired" and run.obj.get("level") == "red" and not self._expired(run.line, self.stale_s * RED_LATE_FACTOR):
+            why = None
         return "stale_" + why if why else None
 
     def _tip_unseen_number(self, run: "TipRun") -> Optional[str]:
@@ -1243,9 +1274,24 @@ class Engine:
             shown = [t.get("phrase", "") for t in self.tips if t.get("_at", -1e9) >= now - 600 and not t.get("partial")]
         return any(p and jaccard(ph, p) >= self.cfg.get("phrase_repeat_min", 0.42) for p in shown)
 
+    def _gist_repeat(self, obj: dict, now: float) -> bool:
+        """Review of the calls of 2026-11-02/03: in a discovery interview 11 of 31 tips repeated a gist shown
+        23-77 s before ("Deal stages from the first contact" three times), each with its own topic string, so the
+        topic diet and the window's exact-topic merge missed them. A non-red gist this close to one shown in the
+        last GIST_REPEAT_S is the same tip again."""
+        core = gist_core(obj.get("gist") or "")
+        if len(core) < 3:
+            return False
+        with self.lock:
+            shown = [t.get("gist", "") for t in self.tips if t.get("_at", -1e9) >= now - GIST_REPEAT_S
+                     and not t.get("partial") and t.get("level") != "red"]
+        return any(jaccard_sets(core, gist_core(g)) >= GIST_REPEAT_MIN for g in shown)
+
     def _diet(self, obj: dict, now: float, exempt: bool = False) -> Optional[str]:
         if self._phrase_repeat(obj, now):
             return "phrase_repeat"
+        if obj.get("level") != "red" and self._gist_repeat(obj, now):
+            return "gist_repeat"
         if obj.get("level") == "red":
             return self._red_diet(obj, now)
         if self.presenting(now):
@@ -1390,8 +1436,9 @@ class Engine:
     def _role_block(self, obj, trigger, span, meta):
         if meeting_role(meta) == "observer" and not span.get("meeting"):
             return "role_observer"            # after the answer: nothing (no add_fact, no fix_owner_date)
-        if meeting_role(meta) == "interviewer" and obj.get("phrase") and "?" not in obj["phrase"] and trigger in {"add_fact", "direct_question"}:
-            return "interviewer_answer"
+        if (meeting_role(meta) == "interviewer" and trigger == "add_fact" and not span.get("to_pm")
+                and obj.get("phrase") and "?" not in obj["phrase"]):
+            return "interviewer_answer"       # a statement for the PM would answer for the interviewee
         if meta.get("call_type") == "presentation" and pacing_tip(obj, trigger):
             return "presentation_timing"      # the recorder owns the time line
         return None
@@ -1413,20 +1460,38 @@ class Engine:
 
     # ---------- the PM's speech from the brief, at the start ----------
     def correct_context(self, text: str) -> None:
-        text = text.strip()[:6000]
+        """rules/live_prep.yaml > correction: the PM's correction wins over the old prep in every later request.
+        It goes into the cached brief block (not into each request), old in-flight answers are dropped, the old
+        agenda is put aside until the new prep lands (restore_agenda brings it back when the prep fails)."""
+        text = text.strip()[:CORRECTION_MAX]
         if not text:
             return
         with self.lock:
             self.context_correction = text
             self.context_revision += 1
-            self.clarified_for.clear()
             self.situation = None
+            self._agenda_backup = (list(self.agenda_items), list(getattr(self, "agenda_full", [])), set(self.agenda_done),
+                                   self.agenda_now, dict(self.agenda_manual), self.agenda_obtain)
+        self._apply_correction_to_prompt()
         try:
             self.correction_path.write_text(text, encoding="utf-8")
         except OSError:
             self.out_timing.write({"outcome": "correction_persistence_failed"})
         self.set_agenda_items("")
         self.out_tips.write({"kind": "context_reset"})
+
+    def restore_agenda(self) -> None:
+        """The prep after a correction failed or was cancelled: the agenda put aside comes back with its states."""
+        with self.lock:
+            b, self._agenda_backup = getattr(self, "_agenda_backup", None), None
+            if not b:
+                return
+            self.agenda_items, self.agenda_full, self.agenda_done, self.agenda_now, self.agenda_manual, self.agenda_obtain = b
+        self._emit_agenda()
+
+    def _apply_correction_to_prompt(self) -> None:
+        if hasattr(self.prompt, "set_correction"):
+            self.prompt.set_correction(self.correction_block().strip())
 
     def correction_block(self) -> str:
         if not self.context_correction:
@@ -1445,7 +1510,9 @@ class Engine:
             return False
         if not changed:
             return False
-        self.context_revision += 1
+        with self.lock:
+            self.context_revision += 1
+            self._agenda_backup = None        # the new brief owns the agenda now
         if hasattr(self.prompt, "refresh_facts"):
             self.prompt.refresh_facts()
         t = s_to_hms(self.clock())
@@ -1831,6 +1898,9 @@ class Engine:
         if not isinstance(obj, dict):
             return
         pm_words = sum(len(h.text.split()) for h in new if h.speaker == "me")
+        with self.lock:
+            if revision != self.context_revision:
+                return                        # a correction landed while the model was answering
         sit = next_situation(obj, self.situation or {}, pm_words, new[-1].t_s, self.cfg.get("ask_ttl_s", 360))
         self._publish_situation(sit, new[-1].line_id)
         self._asks_to_tips(sit, hist)

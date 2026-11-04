@@ -134,6 +134,7 @@ final class UpNext: ObservableObject {
     /// Called by PrepRunner when a preparation ends (done, failed or stopped): remember the result on its
     /// call and start the next one in line.
     func prepFinished(id: UUID?, base: String?, ok: Bool, stopped: Bool = false) {
+        LivePrep.prepFinished(id: id, ok: ok)         // 0.9.x: a correction's prep that failed restores the agenda
         if let id = id {
             let owners = items.filter { $0.id == id } + queue.filter { $0.id == id }
             for m in owners {

@@ -1833,5 +1833,6 @@
  "tracker.g.confirmed": "Confirmed",
  "tracker.g.open": "Open",
  "liveprep.context": "Prepared during the call: the transcript so far ({file}) is one of the sources; use what was asked, agreed and left open.",
- "liveprep.busy": "Another preparation is running; try again when it is done."
+ "liveprep.busy": "Another preparation is running; try again when it is done.",
+ "liveprep.correctedNoPrep": "Correction applied to the tips. The brief was not remade: {error}"
 }

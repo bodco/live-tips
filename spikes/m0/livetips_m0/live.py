@@ -178,6 +178,9 @@ def handle_inbox(eng, raw: str) -> None:
         d = json.loads(raw)
     except ValueError:
         return
+    if d.get("kind") == "context_correction":
+        eng.correct_context(str(d.get("text") or ""))
+        return
     if d.get("kind") == "setting":
         handle_setting(eng, d.get("key"), d.get("value"))
         return
@@ -212,6 +215,7 @@ class LiveRun:
         if not from_start:                           # join a running call: skip what is already there
             skip_existing(self.t_md, self.t_tm)
         self.timing, self.pending, self.n = {}, [], 0
+        self.seen_lines = set()
         self.last_new = self.t0 = time.monotonic()
         self.last_touch = 0.0
         self.first_written = self.last_written = None
@@ -236,6 +240,10 @@ class LiveRun:
         for raw in self.t_md.read():
             ln = parse_line(raw, self.n, self.cfg["me_label"])
             if ln:
+                identity = (ln.t, ln.speaker, ln.text)
+                if identity in self.seen_lines:
+                    continue
+                self.seen_lines.add(identity)
                 self.n += 1
                 self.pending.append((ln, time.monotonic()))
                 self.last_new = time.monotonic()

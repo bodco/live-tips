@@ -14,7 +14,7 @@ route: >-
   local model), with the same automatic switch rules as a preparation before the call (rules/ai.yaml).
 never_blocks: >-
   The preparation runs as its own process in the background. Recording, speech recognition and the tips loop never
-  wait for it and never slow down; a tip being written finishes on the brief it started with.
+  wait for it and never slow down; responses started on an older context revision are discarded, including streamed previews.
 swap: >-
   When it is ready the new brief, cards and facts replace the call's files in one rename each (<stem>.brief.md,
   .cards.json, .facts.json), the brief in use before is kept as <stem>.brief.prev.md (one previous version is
@@ -29,3 +29,14 @@ skill: >-
   transcript so far as one more source, writes the new files next to the call as <stem>.brief.new.md (and
   .cards.new.json, .facts.new.json), then renames them over the current ones after copying <stem>.brief.md to
   <stem>.brief.prev.md; the loop keeps running and reads the new brief on its next turn.
+
+correction: >-
+  Correct context in the live window uses /context followed by the current participant, goal or source document.
+  Start preparation first; if it cannot start, show the error and keep the existing context. Once accepted, send
+  the correction to the engine, clear the obsolete agenda and unpinned automatic cards, and make the explicit
+  correction override conflicting old prep in all subsequent model requests. New prep replaces the agenda.
+identity: >-
+  Before choosing a checklist, reconcile the current invitation, roles, goal and source document. A repeated
+  title is not proof of the same interviewee. Put unresolved contradictions in Needs confirmation before the
+  checklist. Never silently reuse the earlier interviewee's questions. Live essentials contains the goal,
+  participant/role, primary source, 3-5 key facts/red lines and open confirmations, under 180 words.

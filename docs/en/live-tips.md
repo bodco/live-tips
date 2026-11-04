@@ -1990,3 +1990,18 @@ address", `references/sweep.md`, `references/presentation.md`).
 105. **What a preparation costs (0.8.5).** Five runs of one preparation compared (14.1g): Sonnet through the API
    key $0.77 in 3 minutes, Opus $2.57, the local Gemma 4 26B free but thin. Every preparation keeps its files and
    run.json in prep-runs; a preparation can run on this Mac through Ollama (rules/ai.yaml).
+
+
+### Live context and freshness
+
+Use **Correct context** in the live brief strip, enter the current participant, goal and source document after
+`/context`, and press Enter. Preparation starts on the selected provider. When accepted, the correction overrides
+old context, clears the obsolete agenda and automatic cards, and invalidates responses still being generated.
+An error starting preparation keeps the existing context. A failed later preparation leaves the explicit
+correction active; retry Prepare again. Corrections are stored locally with this call's engine run.
+
+The brief opens in a short view; **Full brief and sources** reveals the complete preparation. Ordinary refreshes
+preserve completed/skipped questions only when their full text matches. A context correction clears those states.
+Automatic tips older than 20 seconds from their source audio are suppressed; manual questions and HELP NOW stay
+available. Identical transcript lines are processed once. Repeated noncritical tips with the exact same topic
+and trigger within 90 seconds share a card; pinned/edited cards and red warnings are kept separate.

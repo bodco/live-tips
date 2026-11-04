@@ -15,7 +15,7 @@ def _r(o):
     if isinstance(o, float):
         return round(o, 2)
     if isinstance(o, dict):
-        return {k: _r(v) for k, v in o.items()}
+        return {k: _r(v) for k, v in o.items() if k != "context_revision"}  # diagnostic version, not behavior
     if isinstance(o, list):
         return [_r(v) for v in o]
     return o

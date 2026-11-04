@@ -130,7 +130,7 @@
     source = note || (items.length && (kind === 'docs' || kind === 'answer') ? items[0] : '');
     const id = this.idOf(it);
     const c = {
-      id, kind, who, question, say, source, meta, unverified,
+      id, kind, who, question, say, source, meta, unverified, topic: clean(it.topic).toLowerCase(), level: it.level, trigger: it.trigger || '',
       items: kind === 'turn' ? items : items.slice(source === items[0] ? 1 : 0, 4),
       fulls: kind === 'turn' ? pts.map((p) => p.f) : [],
       at: hmsToMs(it.at || it.t, this.now()),
@@ -145,7 +145,12 @@
   };
 
   Feed.prototype.put = function (c) {
-    const old = this.byId[c.id];
+    let old = this.byId[c.id];
+    if (!old && c.raw.kind === 'tip' && !c.partial && c.level !== 'red' && c.topic) {
+      old = this.cards.find((x) => x.raw.kind === 'tip' && !x.partial && !x.pinned && !x.edited && x.state === 'active'
+        && x.level !== 'red' && x.topic === c.topic && x.trigger === c.trigger && c.at - x.at >= 0 && c.at - x.at < 90000);
+      if (old) delete this.byId[old.id];
+    }
     if (old) {
       // An update (the full tip after its gist, an edit) keeps the place, the pin and the state.
       c.at = Math.min(old.at, c.at);
@@ -156,6 +161,14 @@
       if (this.cards.length > 60) { const gone = this.cards.shift(); delete this.byId[gone.id]; }
     }
     this.byId[c.id] = c;
+    if (c.raw.kind === 'tip' && !c.partial && c.level !== 'red' && c.topic) {
+      this.cards = this.cards.filter((x) => {
+        const duplicate = x !== c && x.raw.kind === 'tip' && !x.partial && !x.pinned && !x.edited && x.state === 'active'
+          && x.level !== 'red' && x.topic === c.topic && x.trigger === c.trigger && c.at - x.at >= 0 && c.at - x.at < 90000;
+        if (duplicate) delete this.byId[x.id];
+        return !duplicate;
+      });
+    }
   };
 
   Feed.prototype.cardPasses = function (it) {
@@ -179,8 +192,17 @@
 
   Feed.prototype.addItem = function (it) {
     const k = it.kind || 'tip';
+    if (k === 'tip' && it.late) {
+      if (it.uid) this.addItem({ kind: 'retract', uid: it.uid });
+      return true;
+    }
     switch (k) {
       case 'retract': { const id = 'u:' + it.uid, c = this.byId[id]; if (c) { this.cards.splice(this.cards.indexOf(c), 1); delete this.byId[id]; } return true; }
+      case 'context_reset':
+        this.cards.forEach((c) => { if (!c.pinned && c.raw.kind !== 'answer') c.state = 'hidden'; });
+        this.facts = []; this.cardSeen = {};
+        this.agendaEngine = []; this.brief = null; this.briefText = ''; this.prep = 'running';
+        return true;
       case 'question': return false;                      // heard-question lines are not shown (2026-10-26 review)
       case 'ask': return false;                           // echoes of what the PM typed: the field already shows it
       case 'ack': this.toast = { text: this.tr('applied'), kind: 'ok', at: this.now() }; return true;

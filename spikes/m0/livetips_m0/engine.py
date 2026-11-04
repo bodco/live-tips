@@ -657,6 +657,12 @@ class Engine:
     def __init__(self, *, cfg: dict, rules, provider, prompt, out_dir: Path, stem: str,
                  clock: Callable[[], float], budget=None):
         self.cfg = cfg
+        self.context_revision = 0
+        self.correction_path = out_dir / (stem + ".context-correction.txt")
+        try:
+            self.context_correction = self.correction_path.read_text(encoding="utf-8")[:6000]
+        except OSError:
+            self.context_correction = ""
         self.rules = rules
         self.provider = provider
         self.prompt = prompt
@@ -727,13 +733,7 @@ class Engine:
         self.register_dir = cfg.get("register_dir") or ""
         # 0.8.7 (rules/sales.yaml): sales mode on top of any call type; None = off, nothing changes
         self.t_started = clock()
-        self.sales = None
-        sc = cfg.get("sales") or {}
-        if isinstance(sc, dict) and sc.get("enabled"):
-            from .sales import SalesTracker, load_cards
-            self.sales = SalesTracker(getattr(rules, "sales", {}) or {}, str(sc.get("method") or ""),
-                                      "en" if str(cfg.get("ui_lang") or "").startswith("en") else "uk",
-                                      load_cards(cfg.get("project_dir") or ""), float(cfg.get("planned_min") or 30) * 60)
+        self._setup_sales(cfg, rules)
         self.commit_proposed: set = set()
         self.onme_ticked: Dict[str, bool] = {}
         # 0.8.5 (owner): an On me line the PM marked "not mine" or reworded in the window; norm text -> new text ("" = drop)
@@ -746,6 +746,19 @@ class Engine:
         self.active_decisions = load_active_decisions(cfg.get("project_dir") or "")
         self.conflicts_shown: set = set()
         raise_tip_tokens(cfg)
+
+    def _setup_sales(self, cfg, rules):
+        self.sales = None
+        sc = cfg.get("sales") or {}
+        if isinstance(sc, dict) and sc.get("enabled"):
+            from .sales import SalesTracker, load_cards
+            self.sales = SalesTracker(*self._sales_config(cfg, rules, sc), load_cards(cfg.get("project_dir") or ""),
+                                      float(cfg.get("planned_min") or 30) * 60)
+
+    @staticmethod
+    def _sales_config(cfg, rules, sc):
+        language = "en" if str(cfg.get("ui_lang") or "").startswith("en") else "uk"
+        return getattr(rules, "sales", {}) or {}, str(sc.get("method") or ""), language
 
     def _setup_hedging(self, provider, cfg: dict) -> None:
         """M2 hedging: a second request when the first one is slow (cfg "hedge", on by default)."""
@@ -777,6 +790,9 @@ class Engine:
         now = self.clock()
         with self.lock:
             self.history.append(line)
+        if self._expired(line):
+            self.out_timing.write({"line_id": line.line_id, "src": line.t, "outcome": "historical_line"})
+            return
         self._every_fifth_line(line)
         sig = self.detector.detect(line)
         span = line_span(line, sig, now)
@@ -791,6 +807,9 @@ class Engine:
             return
         if meeting_role(self.meta()) == "observer":
             return                            # observer: only the question tips above, nothing after the answer
+        self._dispatch_line(line, sig, span, now)
+
+    def _dispatch_line(self, line, sig, span, now):
         route = self._route(line, sig, span)
         if route == "direct":
             span["route"] = "direct"
@@ -891,11 +910,21 @@ class Engine:
         with self.lock:
             return [h for h in self.history if h.line_id > line.line_id]
 
+    def _expired(self, line: Line) -> bool:
+        """Age of the source audio, allowing calls to cross midnight."""
+        end = line.seg_end if line.seg_end is not None else line.t_s
+        age = self.clock() - end
+        if age < -43200:
+            age += 86400
+        return age > self.stale_s
+
     def stale(self, line: Line, trigger: str, obj: Optional[dict] = None) -> Optional[str]:
         """Review 2026-10-23: in 38 of 52 late tips the trigger was already resolved when the tip came.
         A question to the PM or the PM's turn is closed once the PM has spoken after it (two or more
         of the PM's lines, or one long one), or once two other lines moved the talk on without it.
         "Fix owner/date" is closed when an owner or a date was named after the trigger."""
+        if self._expired(line):
+            return "expired"
         after = self._after(line)
         if not after:
             return None
@@ -934,6 +963,9 @@ class Engine:
                             "usd": c.usd, "error": c.error})
 
     def _call(self, role: str, line: Line, event: str, on_text=None):
+        event += self.correction_block()
+        if meeting_role(self.meta()) == "interviewer":
+            event += "\nThe PM is the interviewer, including in discovery interviews. Never answer on behalf of the interviewee or repeat their answer as a PM statement. For automatic tips, propose one open follow-up question, or skip when already answered. Address the current speaker, never infer the addressee from yesterday's brief."
         user = self.prompt.user(role, event, self._tail(line), self._state(), self._earlier(line))
         max_tokens = self.cfg.get("max_tokens", {}).get(role, 60 if role == "classify" else 300)
         extra = (self.cfg.get("request_extra") or {}).get(role)
@@ -1016,9 +1048,13 @@ class Engine:
                 self.out_timing.write(span)
                 return
             self.tipped_lines.add(line.line_id)
+        span["context_revision"] = self.context_revision
         self.futures.append(self.pool.submit(self._run_tip, line, trigger, span))
 
     def _run_tip(self, line: Line, trigger: str, span: dict) -> None:
+        if self._expired(line) or span.get("context_revision", self.context_revision) != self.context_revision:
+            self.out_timing.write(dict(span, outcome="obsolete_before_request"))
+            return
         span["tip_start"] = self.clock()
         run = TipRun(line, trigger, span, span.pop("gate", None),        # parallel route: classify's verdict arrives here
                      "a{}-{}".format(line.line_id, int(span["tip_start"] * 1000) % 1000000))
@@ -1067,6 +1103,8 @@ class Engine:
         self._show_early(run, part, now)
 
     def _early_hold(self, run: "TipRun") -> Optional[str]:
+        if run.span.get("context_revision", self.context_revision) != self.context_revision:
+            return "drop"
         if self.stale(run.line, run.trigger):
             return "drop"                      # the trigger is already resolved: no early card
         gate = run.gate
@@ -1104,6 +1142,8 @@ class Engine:
     def _judge_tip(self, run: "TipRun", c) -> Optional[str]:
         """None: the tip goes out. Otherwise the outcome that stopped it (span carries the details)."""
         span = run.span
+        if span.get("context_revision", self.context_revision) != self.context_revision:
+            return "context_changed"
         obj, why = self._parse_tip(c, span)
         if why:
             return why
@@ -1345,8 +1385,13 @@ class Engine:
             return "turn_tip"                 # 2026-10-23: the PM starts on their own, never on a "your turn" tip
         if repeats_speech(obj, getattr(self, "speech_phrase", "")):
             return "speech_repeat"            # the speech card is already on screen
+        return self._role_block(obj, trigger, span, meta)
+
+    def _role_block(self, obj, trigger, span, meta):
         if meeting_role(meta) == "observer" and not span.get("meeting"):
             return "role_observer"            # after the answer: nothing (no add_fact, no fix_owner_date)
+        if meeting_role(meta) == "interviewer" and obj.get("phrase") and "?" not in obj["phrase"] and trigger in {"add_fact", "direct_question"}:
+            return "interviewer_answer"
         if meta.get("call_type") == "presentation" and pacing_tip(obj, trigger):
             return "presentation_timing"      # the recorder owns the time line
         return None
@@ -1367,6 +1412,27 @@ class Engine:
         return self._presenting
 
     # ---------- the PM's speech from the brief, at the start ----------
+    def correct_context(self, text: str) -> None:
+        text = text.strip()[:6000]
+        if not text:
+            return
+        with self.lock:
+            self.context_correction = text
+            self.context_revision += 1
+            self.clarified_for.clear()
+            self.situation = None
+        try:
+            self.correction_path.write_text(text, encoding="utf-8")
+        except OSError:
+            self.out_timing.write({"outcome": "correction_persistence_failed"})
+        self.set_agenda_items("")
+        self.out_tips.write({"kind": "context_reset"})
+
+    def correction_block(self) -> str:
+        if not self.context_correction:
+            return ""
+        return "\nLATEST EXPLICIT PM CORRECTION FOR THIS CALL (supersedes conflicting earlier context; do not use obsolete participants or checklist):\n" + self.context_correction
+
     def reload_prep(self) -> bool:
         """A preparation that landed after the start: reload the brief and the facts, show the speech
         and a short notice in the window (2026-10-27, owner)."""
@@ -1379,6 +1445,7 @@ class Engine:
             return False
         if not changed:
             return False
+        self.context_revision += 1
         if hasattr(self.prompt, "refresh_facts"):
             self.prompt.refresh_facts()
         t = s_to_hms(self.clock())
@@ -1716,6 +1783,9 @@ class Engine:
     def _maybe_situation(self, line: Line, sig, now: float) -> None:
         if not self.sit_enabled:
             return
+        # Backchannels remain in history for the next substantive update. Never suppress yes/no decisions.
+        if line.text.strip().lower().strip(".,! …") in {"mhm", "mm-hmm", "uh-huh", "угу", "мгм", "ага"}:
+            return
         strong = strong_line(line, sig)
         since = None if self.sit_last_at is None else now - self.sit_last_at
         if not situation_due(since, self.sit_interval, strong):
@@ -1754,7 +1824,10 @@ class Engine:
         new = [h for h in hist if h.line_id > last_done]
         if not new:
             return
+        revision = self.context_revision
         obj = self._situation_ask([h for h in hist if h.line_id <= last_done][-12:], new)
+        if revision != self.context_revision:
+            return
         if not isinstance(obj, dict):
             return
         pm_words = sum(len(h.text.split()) for h in new if h.speaker == "me")
@@ -1785,7 +1858,7 @@ class Engine:
                                       projects=", ".join(meta.get("pm_projects") or [meta.get("project", "")]) or "-",
                                       people=", ".join(meta.get("participants") or []) or "unknown",
                                       today=_dt.date.today().strftime("%A %Y-%m-%d"), lang=lang)
-        return sysmsg + self._situation_extra_rules()
+        return sysmsg + self._situation_extra_rules() + self.correction_block()
 
     def _situation_user(self, ctx: List[Line], new: List[Line]) -> str:
         fmt = lambda h: "[{}] {}: {}".format(h.t, self.speakers.who(h), h.text[:400])  # noqa: E731
@@ -1940,16 +2013,19 @@ class Engine:
         return "\n\n".join(parts) + ("\n\n" if parts else "")
 
     def set_agenda_items(self, brief_text: str) -> None:
-        """The brief's checklist is the agenda (rules/agenda.yaml > source). A new brief starts the states again."""
+        """The brief's checklist is the agenda (rules/agenda.yaml > source). Exact completed/skipped questions survive a refresh; corrections clear them first."""
         ag = getattr(self.rules, "agenda", {}) or {}
         full = agenda_mod.full_items(brief_text, int(ag.get("max_items", 20)))
         items = [(agenda_mod.shorten(t, int(ag.get("max_chars", 60))), d) for t, d in full]
         self.agenda_obtain = agenda_mod.to_obtain(brief_text)
-        if [t for t, _ in items] == [t for t, _ in self.agenda_items]:
+        if [t for t, _ in full] == getattr(self, "agenda_full", []):
             return
         with self.lock:
+            previous = {x.get("full", x["text"]): x["state"] for x in self.agenda_strip()}
             self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual = items, set(), -1, {}
             self.agenda_full = [t for t, _ in full]
+            # Explicit states survive a refresh only for exactly matching full questions.
+            self.agenda_manual = {i: previous[t] for i, (t, _) in enumerate(full) if previous.get(t) in {"done", "skip"}}
         self._emit_agenda()
 
     def agenda_strip(self) -> List[dict]:
@@ -1959,7 +2035,7 @@ class Engine:
                 for (t, _), s, f in zip(self.agenda_items, st, full)]
 
     def _emit_agenda(self, final: bool = False) -> None:
-        if not self.agenda_items:
+        if not self.agenda_items and not self.agenda_sent:
             return
         strip = self.agenda_strip()
         if strip == self.agenda_sent and not final:

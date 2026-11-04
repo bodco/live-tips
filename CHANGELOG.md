@@ -5,6 +5,14 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **Live tips reliability:** suppress expired automatic requests before generation, streaming and final output;
+  repeated transcript lines cannot trigger twice. Context corrections from the live window rebuild preparation,
+  invalidate old model responses and clear the obsolete agenda. Preparation checks participant/goal/source conflicts
+  and includes live essentials. Exact completed/skipped agenda questions survive ordinary refreshes.
+  Noncritical repeated topics share a card; manual answers and red warnings remain separate. Interviewer tips
+  ask follow-up questions rather than answering for the interviewee. Backchannels alone no longer trigger the
+  situation model. Rules: diet.yaml and live_prep.yaml. Use Correct context, type the correction, then Enter.
+
 - **Call pages (0.9.0, 2026-11-03):** an upcoming call has its own page in Home (from its name on Home, on Coming up
   or in the menu bar): Setup (what kind of call, what matters, files, the rest under More settings; changes apply
   only on Save and leaving with unsaved changes asks), Brief, Tasks (on you, waiting on others, decided last time)

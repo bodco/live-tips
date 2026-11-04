@@ -5,8 +5,7 @@ import LiveTipsCore
 /// in the background like any other (PrepRunner, its own process, the way set for the Preparation job) with the
 /// transcript up to this minute added to its sources. Recording, ASR and the tips loop never wait for it. When it is
 /// ready, CallEngine.adoptLatePrep swaps the call's brief, cards and facts in one rename each (the brief before it
-/// is kept as <stem>.brief.prev.md, one previous version), and the engine reloads them; a tip already being
-/// written finishes on the old brief.
+/// is kept as <stem>.brief.prev.md, one previous version), and the engine reloads them; responses still being generated from the old context are discarded.
 @MainActor
 enum LivePrep {
     /// The Up next call being recorded, or one built from the running call's request.
@@ -22,22 +21,37 @@ enum LivePrep {
         m.title = ce.renamed ?? (ce.callRequest["title"] as? String) ?? ""
         if let slug = st.slug, m.registry.projects.contains(where: { $0.slug == slug }) { m.target = "project:" + slug }
         else if let p = st.project, let w = m.registry.workspaces.first(where: { $0.name == p }) { m.target = "workspace:" + w.name }
+        m.context = ce.callContext
+        m.callType = (ce.callRequest["call_type"] as? String) ?? m.callType
+        m.audience = (ce.callRequest["audience"] as? String) ?? m.audience
+        m.hiringRole = (ce.callRequest["hiring_role"] as? String) ?? m.hiringRole
+        m.language = (ce.callRequest["langs"] as? [String])?.first ?? m.language
         m.useDefaultTargetIfEmpty()
         if let id = ce.currentCallID { m.id = id } else { ce.currentCallID = m.id }
         return m
     }
 
     /// Starts the preparation; nil or the reason it cannot start.
-    static func start() -> String? {
+    static func start(correction: String = "") -> String? {
         guard let m = liveModel(), var r = m.prepRequest() else { return L("call.chooseProjectFirst") }
         let st = EngineStatus.load(path: CallEngine.shared.statusPath)
         if let f = st.file, FileManager.default.fileExists(atPath: f) {
             r.folders.append(f)
             r.context += (r.context.isEmpty ? "" : "\n\n") + L("liveprep.context", ["file": (f as NSString).lastPathComponent])
         }
+        let correction = correction.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !correction.isEmpty {
+            r.context = "Latest explicit correction from the PM for THIS call (overrides conflicting earlier prep):\n" + correction + "\n\nEarlier context:\n" + r.context
+        }
         r.callID = m.id
         if PrepRunner.shared.running { return L("liveprep.busy") }
-        return PrepRunner.shared.start(r)
+        let error = PrepRunner.shared.start(r)
+        if error == nil && !correction.isEmpty {
+            m.context = "Latest correction for this call: " + correction + "\n" + m.context
+            CallEngine.shared.callContext = m.context
+            CallEngine.shared.callRequest["context"] = m.context
+        }
+        return error
     }
 
     static func cancel() { if PrepRunner.shared.running && PrepRunner.shared.joinsCurrentCall { PrepRunner.shared.cancel() } }

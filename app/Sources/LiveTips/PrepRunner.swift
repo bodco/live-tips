@@ -315,6 +315,8 @@ final class PrepRunner: ObservableObject {
         Project config: \(r.config.isEmpty ? "none" : r.config). Audience: \(r.audience). Meeting type: \(r.callType)\
         \(r.callType == "interview" ? ", role " + r.hiringRole : ""). Call languages: \(r.languages.joined(separator: "+")).
 
+        Before choosing questions, reconcile THIS call's participants, their roles, goal and named source document with the latest PM context. A repeated title does not imply the same interviewee. Explicit current corrections override older calls and saved instructions. If sources conflict and no current correction resolves them, put a prominent "Needs confirmation" section before the checklist; state both alternatives and do not silently reuse either interviewee's questions. Start with a "Live essentials" section: the goal, interviewee and role, primary document, 3-5 key facts/red lines and unresolved confirmations. Keep that section below 180 words; preserve the detailed brief below it.
+
         The PM's call context (what matters, the folders and documents to read first):
         \(r.context.isEmpty ? "(none)" : r.context)
         \(r.folders.filter { StartCallModel.isDir($0) }.isEmpty ? "" : "Folders the PM added (look through them first; read fully the files the context names): " + r.folders.filter { StartCallModel.isDir($0) }.joined(separator: "; "))

@@ -7,7 +7,7 @@ pm_speaking_window_s: 5        # no non-red tip while the PM has a line in the l
 live_topic_window_s: 60        # a tip topic must match the talk of the last N seconds
 one_tip_per_topic: true
 topic_similarity_min: 0.5      # token Jaccard at or above this = same topic
-stale_after_s: 20              # a tip ready later than N s after the trigger's end of speech is shown dimmed ("late")
+stale_after_s: 20              # automatic tips older than N s are suppressed before streaming and final output; historical lines remain context
 proactive_default: off
 limits:
   gist_words_max: 7
@@ -23,3 +23,9 @@ forbidden:
   - abbreviations_in_tips
   - ticket_keys_in_tips
   - russian
+
+# Reliability: automatic live hints only. Manual asks and HELP NOW remain available.
+# Re-read transcript lines with identical time, channel and text do not trigger twice.
+# Backchannels alone do not trigger a situation-model update; they remain in context.
+# In the UI, noncritical automatic tips with the exact same topic and trigger within 90 s
+# share one card. Pinned/edited cards and red warnings are never merged.

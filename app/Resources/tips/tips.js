@@ -256,6 +256,7 @@
     } else {
       html = `<div class="bb-main"><span class="bb-t">${esc(t.bbNone)}</span></div><button class="btn1" type="button" data-act="liveprep">${esc(t.bbNow)}</button>`;
     }
+    if (p !== 'running') html += `<button class="ghost" type="button" data-act="correct-context">${S.lang === 'uk' ? 'Виправити контекст' : 'Correct context'}</button>`;
     if (bar.dataset.html !== html) { bar.innerHTML = html; bar.dataset.html = html; }
   }
 
@@ -679,7 +680,10 @@
         <div class="ctl"><button class="btn1" type="button" data-act="brief-save">${esc(t.save)}</button><button class="btn2" type="button" data-act="brief-cancel">${esc(t.cancel)}</button></div>`;
     }
     if (!b) return `<p class="meta">${esc(t.noBriefYet)}</p>`;
-    return `<div class="brief">${b.goal ? `<p><b>${esc(b.goal)}</b></p>` : ''}${(b.sections || []).map((s) => `<h3>${esc(s.title)}</h3><ul>${s.items.map((i, k) => (s.fulls || [])[k]
+    const sections = S.ui.briefFull ? b.sections : (b.sections || []).filter((s) => /live essentials|needs confirmation|увага|розбіжність|ключове|checklist|red lines|червон/i.test(s.title));
+    const selected = sections.length ? sections : (b.sections || []).slice(0, 2);
+    const toggle = `<button class="link" type="button" data-act="brief-full">${S.lang === 'uk' ? (S.ui.briefFull ? 'Короткий бриф' : 'Повний бриф і джерела') : (S.ui.briefFull ? 'Live essentials' : 'Full brief and sources')}</button>`;
+    return toggle + `<div class="brief">${b.goal ? `<p><b>${esc(b.goal)}</b></p>` : ''}${selected.map((s) => `<h3>${esc(s.title)}</h3><ul>${(S.ui.briefFull ? s.items : s.items.slice(0, 5)).map((i, k) => (s.fulls || [])[k]
       ? `<li class="pt"><details data-pt="${esc('brief:' + s.title + ':' + k)}"${S.ui.openPts['brief:' + s.title + ':' + k] ? ' open' : ''}><summary>${esc(i)}</summary><p>${esc(s.fulls[k])}</p></details></li>`
       : `<li>${esc(i)}</li>`).join('')}</ul>`).join('')}</div>
       ${S.briefText ? `<div><button class="link" type="button" data-act="brief-edit">${esc(t.edit)}</button></div>` : ''}`;
@@ -706,7 +710,10 @@
     const typing = document.activeElement && (document.activeElement.id === 'spkCardName' || document.activeElement.id === 'onmeAdd') && root.contains(document.activeElement);
     if (typing) return;                                                                         // 0.8.6: the PM is typing a name or a task
     const old = root.querySelector('.panebody');
-    const top = old ? old.scrollTop : 0;
+    S.ui.paneScroll = S.ui.paneScroll || {};
+    if (old && root.dataset.tab) S.ui.paneScroll[root.dataset.tab] = old.scrollTop;
+    const top = S.ui.paneScroll[tab] || 0;
+    root.dataset.tab = tab;
     let body = '';
     if (tab === 'transcript') {
       const unknown = Object.entries(S.speakers).find(([sid, s]) => /^S\d+$/i.test(sid) && !s.name);
@@ -763,12 +770,13 @@
     } else if (tab === 'brief') {
       body = renderBrief();
     }
-    root.innerHTML = `
+    const paneHTML = `
       ${isSheet ? `<button class="icon-btn close" type="button" data-act="close-sheet" aria-label="${esc(t.close)}">${ICON.x}</button>` : ''}
       ${speakersBlock()}
       <div class="tabs" role="tablist" ${isSheet ? 'style="margin-right:48px"' : ''}>${tabs.map((k) => `<button class="tab" role="tab" type="button" aria-selected="${k === tab}" data-act="${isSheet ? 'sheet-tab' : 'pane-tab'}" data-tab="${k}">${esc(k === 'onme' ? t.tabs.onme(openN) : k === 'deal' ? t.deal.tab : t.tabs[k])}</button>`).join('')}</div>
       <div class="panebody">${body}</div>
       ${tab === 'transcript' ? `<div class="panefoot"><span>${esc(t.legend)}</span>${S.ui.follow ? `<span>${esc(t.following)}</span>` : `<button class="link" type="button" data-act="follow">${esc(t.jump)}</button>`}</div>` : ''}`;
+    if (root.dataset.html !== paneHTML) { root.innerHTML = paneHTML; root.dataset.html = paneHTML; }
     const pb = root.querySelector('.panebody');
     if (tab === 'transcript' && S.ui.follow) pb.scrollTop = pb.scrollHeight; else pb.scrollTop = top;
   }
@@ -962,6 +970,12 @@
     const act = b.dataset.act, id = b.dataset.id;
     const card = id && S.cards.find((c) => c.id === id);
     switch (act) {
+      case 'correct-context':
+        $('askInput').value = '/context ' + $('askInput').value.replace(/^\/context\s*/i, '');
+        $('askInput').focus();
+        showToast({ text: S.lang === 'uk' ? 'Напиши, з ким дзвінок, його мету та потрібний документ. Enter оновить підготовку.' : 'Enter the participant, goal and source document. Press Enter to update preparation.', kind: 'info', at: Date.now() });
+        return;
+      case 'brief-full': S.ui.briefFull = !S.ui.briefFull; render(); return;
       case 'liveprep': post('liveprep', { a: 'start' }); if (feed) feed.setPrep({ state: 'running', progress: 0 }); return;
       case 'liveprep-cancel': post('liveprep', { a: 'cancel' }); return;
       case 'said':
@@ -1186,6 +1200,11 @@
   $('ask').addEventListener('submit', (e) => {
     e.preventDefault();
     const v = $('askInput').value.trim(); if (!v) return;
+    if (/^\/context\s+/i.test(v)) {
+      const text = v.replace(/^\/context\s+/i, '').trim();
+      if (text) { post('correct-context', { text }); $('askInput').value = ''; }
+      return;
+    }
     // Prepared facts answer at once; Claude's answer follows as its own card.
     if (feed) feed.searchFacts(v).forEach((f, i) => feed.addItems([{ kind: 'fact', q: v, gist: f.text, note: f.source, uid: 'local-' + Date.now() + '-' + i, t: new Date().toTimeString().slice(0, 8) }]));
     post('ask', { text: v }); $('askInput').value = '';

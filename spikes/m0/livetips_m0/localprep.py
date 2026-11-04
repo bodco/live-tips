@@ -170,6 +170,8 @@ Then a short header: audience, call language, the call time, participants from t
 material says has left the project as not expected), a freshness line (the newest source and what you cannot see),
 the update period (since the last call of this meeting) and what was already said there and must not be repeated.
 
+Before choosing questions, reconcile THIS call's participants, their roles, goal and named source document with the latest PM context. A repeated title does not imply the same interviewee. Explicit current corrections override older calls and saved instructions. If sources conflict and no current correction resolves them, put a prominent "Needs confirmation" section before the checklist; state both alternatives and do not silently reuse either interviewee's questions. Start with a "Live essentials" section: the goal, interviewee and role, primary document, 3-5 key facts/red lines and unresolved confirmations. Keep that section below 180 words; preserve the detailed brief below it.
+
 Then these sections, in this order, with these headings:
 ## 1. Checklist
 "- [ ] **topic:** what to cover and what to get" lines (6-10), then "**Decisions to obtain:**" (a), (b), (c)...

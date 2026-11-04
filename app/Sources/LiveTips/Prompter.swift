@@ -824,6 +824,16 @@ extension PrompterController {
             if let t = d["text"] as? String { handle("ask", t) }
         case "help":
             handle("ask", "sos")                                   // HELP NOW, as before
+        case "correct-context":
+            guard let text = d["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            MainActor.assumeIsolated {
+                if let error = LivePrep.start(correction: text) {
+                    push("window.toastMsg && window.toastMsg(" + jsString(error) + ")")
+                } else {
+                    appendLine(jsonLine(["kind": "context_correction", "text": text, "t": nowHMS()]), to: args.inbox)
+                    push("window.setPrep && window.setPrep({state:'running',progress:0})")
+                }
+            }
         case "liveprep":
             // 0.9.0 (rules/live_prep.yaml): Prepare now / Prepare again / Cancel from the brief strip
             MainActor.assumeIsolated {

@@ -381,5 +381,34 @@ test('0.8.7 first-call banner: once, not in the demo, remembered through a pref'
   assert.ok(/20000/.test(fn), '20 seconds');
 });
 
+test('late automatic tips retract their preview; manual answers remain visible', () => {
+  const { f, get } = make();
+  f.addItems([{kind:'tip',uid:'old',partial:true,t:'10:31:00',level:'red',gist:'Old question'}]);
+  f.addItems([{kind:'tip',uid:'old',late:true,t:'10:31:01',level:'red',phrase:'Obsolete answer'}]);
+  assert.strictEqual(get().cards.length, 0);
+  f.addItems([{kind:'answer',late:true,t:'10:31:02',phrase:'Requested history',q:'What happened?'}]);
+  assert.strictEqual(get().cards.length, 1);
+});
+
+test('repeated noncritical topic updates one card; red warnings stay separate', () => {
+  const { f, get } = make();
+  const tip = {kind:'tip',level:'orange',topic:'Request priority',trigger:'direct_question',phrase:'Confirm the order'};
+  f.addItems([{...tip,uid:'a',t:'10:31:00'}]);
+  f.addItems([{...tip,uid:'b',t:'10:31:20',partial:true,gist:'Priority'}]);
+  f.addItems([{...tip,uid:'b',t:'10:31:21',phrase:'The order has changed'}]);
+  assert.strictEqual(get().cards.length, 1);
+  assert.strictEqual(get().cards[0].say, 'The order has changed');
+  f.addItems([{...tip,uid:'c',t:'10:31:22',level:'red',phrase:'Do not promise a date'}]);
+  assert.strictEqual(get().cards.length, 2);
+});
+
+test('context correction removes obsolete automatic advice and agenda', () => {
+  const { f, get } = make();
+  f.addItems(DEMO);
+  f.addItems([{kind:'context_reset'}]);
+  assert.ok(get().cards.filter(c => c.raw.kind !== 'answer').every(c => c.state === 'hidden'));
+  assert.deepStrictEqual(get().agenda, []);
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

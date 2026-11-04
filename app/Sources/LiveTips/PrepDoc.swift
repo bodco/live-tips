@@ -180,7 +180,13 @@ struct MarkdownBlocks: View {
         .textSelection(.enabled)
     }
 
-    private func inline(_ s: String) -> Text {
+    /// 0.9.0 (rules/agenda.yaml): the <!-- agenda:ID --> markers on checklist lines stay in the file and never show.
+    static func hideMarkers(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\s*<!--\\s*agenda:[a-zA-Z0-9_-]{1,80}\\s*-->", with: "", options: .regularExpression)
+    }
+
+    private func inline(_ raw: String) -> Text {
+        let s = Self.hideMarkers(raw)
         if let a = try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) { return Text(a) }
         return Text(s)
     }

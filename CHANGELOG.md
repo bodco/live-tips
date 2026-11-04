@@ -5,6 +5,8 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+## 0.9.0 (2026-11-04)
+
 - Live agenda: stable same-call identities survive rewording and reordering; all manual states and the current
   item survive. Ambiguous legacy matches stay open. Restore the previous agenda after an ordinary refresh.
   Repeated context corrections no longer overwrite the suspended agenda with an empty one. Situation results
@@ -14,8 +16,7 @@ Pacenote. Earlier versions are described in the commit messages and in
   Runtime semantic thresholds are unchanged: increasing the cosine threshold discarded useful recorded facts.
 - Latency audit reports audio-to-transcript, first gist and final response separately; missing audio timing is
   excluded from audio latency and UI paint is explicitly unmeasured.
-
-## 0.9.0 (2026-11-04)
+- The agenda ID markers on checklist lines no longer show in the brief view on the call page and in the brief window.
 
 - **Live tips reliability:** suppress expired automatic requests before generation, streaming and final output;
   repeated transcript lines cannot trigger twice. Context corrections from the live window rebuild preparation,

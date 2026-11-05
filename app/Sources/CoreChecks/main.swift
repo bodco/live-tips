@@ -113,6 +113,7 @@ func secretsAndConfig() {
     var c = AppConfig()
     c.localAI.enabled = false
     c.budget.monthlyHardUSD = 50
+    c.floatingCallControls = false
     let url = URL(fileURLWithPath: NSTemporaryDirectory() + "livetips-check-config.json")
     try? c.save(to: url)
     expect(AppConfig.load(from: url) == c, "config round trip")
@@ -149,6 +150,15 @@ func mirrorAndWorkspaces() {
     expect(c.effectiveAppRoot(appSupport: "/AS") == "/w/Tools/LiveTips", "app root in work folder")
     let old = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"uiLanguage\":\"uk\"}".utf8))
     expect(old?.uiLanguage == "uk" && old?.showInDock == true, "config decodes older files")
+    expect(old?.floatingCallControls == true, "older config enables floating controls")
+    let statusPath = NSTemporaryDirectory() + "pacenote-floating-status.json"
+    for value in ["on", "off"] {
+        try? ("{\"state\":\"recording\",\"tips_paused\":\"" + value + "\"}").write(toFile: statusPath, atomically: true, encoding: .utf8)
+        expect(EngineStatus.load(path: statusPath).transcriptPaused == (value == "on"), "transcript pause follows recorder acknowledgement")
+    }
+    try? "{\"state\":\"recording\"}".write(toFile: statusPath, atomically: true, encoding: .utf8)
+    expect(!EngineStatus.load(path: statusPath).transcriptPaused, "older recorder status defaults to listening")
+    try? FileManager.default.removeItem(atPath: statusPath)
 }
 
 /// Pacenote 0.8: the interface catalog (Resources/i18n) has the same keys in en and uk, no empty values,

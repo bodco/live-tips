@@ -23,6 +23,11 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Recording consent names the recording (2026-11-05):** when the call is also recorded, Settings > General > Recording
   consent says or copies its second message ("transcribes and records this call"), also when the recording starts
   later in the call. PRIVACY updated.
+- **Floating call controls (2026-11-05):** a movable panel above other windows while a call is running, with the
+  transcription state, Home, Tips, pause/resume transcription and End call. Active sound or video recording has
+  separate pause/resume and Stop and save controls. On by default; turn it off in Settings > General or the panel menu.
+  Its position is remembered. With the panel on, the menu bar uses only the icon; the timer is in the panel.
+  macOS determines menu bar order; Settings explains how to move the icon with Command-drag.
 
 ## 0.9.4.1 (2026-11-05)
 

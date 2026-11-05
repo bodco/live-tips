@@ -1466,6 +1466,10 @@ struct SettingsView: View {
                 }
                 Toggle(L("set.hideTheTipsWindow"), isOn: $model.config.stealthDefault)
                     .help(L("set.defaultForNewCalls"))
+                Toggle(L("floating.setting"), isOn: $model.config.floatingCallControls)
+                    .help(L("floating.settingHelp"))
+                    .onChange(of: model.config.floatingCallControls) { (NSApp.delegate as? AppDelegate)?.refresh() }
+                Text(L("floating.menuHelp")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 Toggle(L("settings.general.dock"), isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
             } header: { Text(L("set.behaviour")) } footer: {

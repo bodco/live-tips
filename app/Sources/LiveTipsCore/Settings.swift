@@ -113,6 +113,7 @@ public struct AppConfig: Codable, Equatable {
     public var uiLanguage = "en"           // en | uk
     public var stealthDefault = true
     public var showInDock = true
+    public var floatingCallControls = true
     public var notionWriteSummary = false
     /// 2026-10-26: where meeting pages go when the project has no Control Tower config (a data source id
     /// chosen or created in Settings or the welcome tour) and its name for the UI.
@@ -196,6 +197,7 @@ public struct AppConfig: Codable, Equatable {
         uiLanguage = (try? c.decode(String.self, forKey: .uiLanguage)) ?? d.uiLanguage
         stealthDefault = (try? c.decode(Bool.self, forKey: .stealthDefault)) ?? d.stealthDefault
         showInDock = (try? c.decode(Bool.self, forKey: .showInDock)) ?? d.showInDock
+        floatingCallControls = (try? c.decode(Bool.self, forKey: .floatingCallControls)) ?? d.floatingCallControls
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
         notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB
         notionMeetingsName = (try? c.decode(String.self, forKey: .notionMeetingsName)) ?? d.notionMeetingsName

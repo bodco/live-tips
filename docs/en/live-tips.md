@@ -2209,3 +2209,8 @@ lost alongside noise removed. Judge labels are provisional; check current releva
 source freshness and audience against the original context before adding a human label. The shown-card sample
 cannot measure recall of unshown candidates. No threshold is changed automatically. Latency counts are per stage;
 first gist and final write are engine events, not proof of a screen paint.
+
+
+### Floating call controls
+
+During a call, a floating panel stays above other windows with the transcription state, Home, Tips, pause/resume transcription and End call. Active sound or video recording has separate pause/resume and Stop and save controls. Drag the panel to move it; its position is remembered. Disable it in Settings > General > Show floating call controls, or in its menu. When enabled, the menu bar shows only the icon, with the timer in the panel. macOS controls menu bar order; hold Command and drag the icon to the right to keep it within reach.

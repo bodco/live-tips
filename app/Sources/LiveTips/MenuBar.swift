@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var menuLang = L10n.lang
     var clock: Timer?               // the elapsed time next to the menu bar icon while recording
     var lastStatus = EngineStatus()
+    var floatingControls: FloatingCallController?
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
@@ -40,7 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         it.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         it.button?.setAccessibilityLabel(L("app.name"))
         item = it
-        MainActor.assumeIsolated { panel = MenuBarPanelController(app: self, button: it.button) }
+        MainActor.assumeIsolated {
+            panel = MenuBarPanelController(app: self, button: it.button)
+            floatingControls = FloatingCallController(app: self)
+        }
         refresh()
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
         NotionMirrorService.shared.startSchedule()
@@ -180,9 +184,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastStatus = st
         warnIfNoAudio(st)
         if menuLang != L10n.lang { menuLang = L10n.lang; installMainMenu() }     // the app menu follows the language
-        MainActor.assumeIsolated { fillPanel(st, month: month, cfg: cfg) }
+        MainActor.assumeIsolated {
+            fillPanel(st, month: month, cfg: cfg)
+            floatingControls?.refresh(st, config: cfg)
+        }
         item?.button?.image = Brand.menuBarImage(recording: st.state == "recording")
-        setClock(st.state == "recording")
+        setClock(st.state == "recording" && !cfg.floatingCallControls)
         // Orange near a spending limit; no red tint while recording: the filled dot and the clock say it.
         item?.button?.contentTintColor = (st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9) ? .systemOrange : nil
     }

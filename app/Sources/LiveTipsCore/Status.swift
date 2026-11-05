@@ -74,12 +74,14 @@ public struct EngineStatus {
     public var errors: [String] = []
     public var mic: String?
     public var systemAudio: String?
+    public var transcriptPaused = false
 
     public static func load(path: String) -> EngineStatus {
         var s = EngineStatus()
         guard let d = FileManager.default.contents(atPath: path),
               let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return s }
         s.state = o["state"] as? String ?? "idle"
+        s.transcriptPaused = (o["tips_paused"] as? String) == "on"
         s.startedAt = o["started_at"] as? String
         s.lines = (o["lines"] as? Int) ?? 0
         s.tips = (o["tips"] as? Int) ?? 0

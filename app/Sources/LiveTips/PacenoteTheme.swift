@@ -38,7 +38,7 @@ enum PN {
         static let answer    = Color.pn(0x0058B0, 0x64B5FF)
         static let turn      = Color.pn(0x1A7431, 0x4CD964)
         static let onMe      = Color.pn(0x9A4600, 0xFFB340)
-        static let pending   = Color.pn(0xC2410C, 0xFF9F45) // 0.9.0 (owner): a call not ready yet, orange (5.2:1 on white)
+        static let pending   = Color.pn(0xB45309, 0xFF9F45) // 0.9.0 (owner): a call not ready yet, orange. 2026-11-05 (owner): amber in light, C2410C read as pale red (5.0:1 on white)
         static let docs      = Color.pn(0x7D3C9E, 0xD29BF5)
         static let danger    = Color.pn(0xC4000F, 0xFF6961)
     }

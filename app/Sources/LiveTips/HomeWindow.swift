@@ -766,7 +766,8 @@ struct HomeView: View {
             if rs.isEmpty {
                 Text(L("home.recent.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 14)], alignment: .leading, spacing: 14) {
+                // 2026-11-05 (owner): three cards at most, so three equal columns across the full width of the blocks above
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3), alignment: .leading, spacing: 14) {
                     ForEach(rs) { r in RecentCard(r: r, aiReady: aiReady) { history.hide(r) } }
                 }
             }

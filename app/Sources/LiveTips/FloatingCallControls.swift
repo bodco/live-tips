@@ -95,11 +95,12 @@ struct FloatingCallControls: View {
                     Button(L("menubar.settings")) { model.app?.openSettings() }
                 }
             sep
-            control("home", "house", "menubar.home") {
+            // 2026-11-05 (owner): Home first but quiet; Tips is the one to find without looking (a filled blue tile)
+            control("home", "house", "menubar.home", size: 13, weight: .regular) {
                 HomeNav.shared.path = []; HomeNav.shared.followUp = nil
                 model.app?.openHome()
             }
-            control("tips", "text.bubble", "menubar.showTips") { model.app?.showTips() }
+            tipsButton
             control("pause", model.status.transcriptPaused ? "play.fill" : "pause.fill",
                     model.status.transcriptPaused ? "floating.resume" : "floating.pause",
                     tint: model.status.transcriptPaused ? PN.C.pending : nil) { model.pauseTranscript() }
@@ -124,11 +125,25 @@ struct FloatingCallControls: View {
         return model.status.state == "recording" ? Color(red: 0x16 / 255, green: 0xA3 / 255, blue: 0x4A / 255) : PN.C.text3
     }
 
+    private var tipsButton: some View {
+        Button { model.app?.showTips() } label: {
+            Image(systemName: "text.bubble.fill").font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(RoundedRectangle(cornerRadius: 11).fill(PN.C.accentFill.opacity(hover == "tips" ? 0.85 : 1)))
+                .shadow(color: PN.C.accentFill.opacity(0.35), radius: 4, y: 1)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).onHover { hover = $0 ? "tips" : (hover == "tips" ? nil : hover) }
+        .padding(.vertical, 2)
+        .help(L("menubar.showTips")).accessibilityLabel(L("menubar.showTips"))
+    }
+
     /// 2026-11-05 (owner): one button for the recording. Off: what to record. On: pause, another window, stop only the
-    /// recording, or end the whole call.
+    /// recording, or end the whole call. An AppKit menu at the pointer: a SwiftUI Menu drew no custom label in the strip.
     private var recordButton: some View {
         let on = ["recording", "paused", "starting"].contains(recording.state)
-        return Menu { RecordingMenu(app: model.app) } label: {
+        return Button { RecordingMenu.pop(app: model.app) } label: {
             ZStack {
                 Circle().stroke(on ? PN.C.rec : PN.C.text2, lineWidth: 1.8).frame(width: 15, height: 15)
                 Circle().fill(on ? PN.C.rec : PN.C.text2).frame(width: on ? 8 : 6, height: on ? 8 : 6)
@@ -138,9 +153,9 @@ struct FloatingCallControls: View {
             .background(RoundedRectangle(cornerRadius: 10).fill(on ? PN.C.rec.opacity(0.13) : (hover == "rec" ? Color.primary.opacity(0.07) : .clear)))
             .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .onHover { hover = $0 ? "rec" : nil }
-        .disabled(recording.state == "choosing")
+        .buttonStyle(.plain)
+        .onHover { hover = $0 ? "rec" : (hover == "rec" ? nil : hover) }
+        .disabled(recording.state == "choosing" || model.status.state != "recording" && !on)
         .help(on ? RecordingMenu.label(recording) : L("rec.menu.start"))
         .accessibilityLabel(on ? RecordingMenu.label(recording) : L("rec.menu.start"))
     }
@@ -155,9 +170,10 @@ struct FloatingCallControls: View {
         }
     }
 
-    private func control(_ id: String, _ symbol: String, _ label: String, tint: Color? = nil, action: @escaping () -> Void) -> some View {
+    private func control(_ id: String, _ symbol: String, _ label: String, tint: Color? = nil, size: CGFloat = 14,
+                         weight: Font.Weight = .medium, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 14, weight: .medium))
+            Image(systemName: symbol).font(.system(size: size, weight: weight))
                 .foregroundStyle(tint ?? PN.C.text2)
                 .frame(width: 36, height: 36)
                 .background(RoundedRectangle(cornerRadius: 10).fill(tint == PN.C.pending ? PN.C.pending.opacity(0.14) : (hover == id ? Color.primary.opacity(0.07) : .clear)))
@@ -183,6 +199,32 @@ struct RecordingMenu: View {
         }
     }
 
+    /// The same items as an AppKit menu at the pointer (the strip and the menu bar panel).
+    @MainActor static func pop(app: AppDelegate?) {
+        let r = CallRecorder.shared
+        let m = NSMenu(); m.autoenablesItems = false
+        func add(_ t: String, enabled: Bool = true, _ f: @escaping () -> Void) {
+            let i = NSMenuItem(title: t, action: #selector(MenuAction.run(_:)), keyEquivalent: "")
+            let a = MenuAction(f); i.target = a; i.representedObject = a; i.isEnabled = enabled; m.addItem(i)
+        }
+        if ["recording", "paused", "starting"].contains(r.state) {
+            let h = NSMenuItem(title: label(r), action: nil, keyEquivalent: ""); h.isEnabled = false; m.addItem(h)
+            m.addItem(.separator())
+            if r.state == "paused" { add(L("floating.recordingResume")) { r.resume() } }
+            else { add(L("floating.recordingPause"), enabled: r.state == "recording") { r.pause() } }
+            if r.kind == "video" { add(L("rec.menu.source"), enabled: r.state != "starting") { r.changeSource() } }
+            m.addItem(.separator())
+            add(L("rec.menu.stopOnly")) { r.stop() }
+            add(L("rec.menu.endCall")) { app?.endCall() }
+        } else {
+            add(L("rec.screen.now")) { r.beginLive(kind: "video") }
+            add(L("rec.sound.now")) { r.beginLive(kind: "audio") }
+            m.addItem(.separator())
+            add(L("rec.menu.settings")) { SettingsWindow.show(tab: "recording") }
+        }
+        m.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
     var body: some View {
         if ["recording", "paused", "starting"].contains(r.state) {
             Text(Self.label(r))
@@ -200,4 +242,11 @@ struct RecordingMenu: View {
             Button(L("rec.menu.settings")) { SettingsWindow.show(tab: "recording") }
         }
     }
+}
+
+/// A closure as an NSMenuItem target (kept alive by the item's representedObject).
+final class MenuAction: NSObject {
+    let f: () -> Void
+    init(_ f: @escaping () -> Void) { self.f = f }
+    @objc func run(_ sender: Any?) { f() }
 }

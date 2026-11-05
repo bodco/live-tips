@@ -3,6 +3,16 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.9.5.1 (2026-11-05)
+
+- **Fixed: the Record this call card (2026-11-05):** in the tips window's ready state, Off, Sound and Sound and screen
+  were drawn as a thin line with the labels over the text below (the card used the class name of the agenda bar). They
+  are a segmented control again. With no call window open yet, the card shows the screen from Settings instead of
+  "Choose what to record".
+- **Floating call controls (2026-11-05, owner):** Tips is the button to find without looking, a filled blue tile; Home
+  stays first but quieter. The Record button opens an AppKit menu at the pointer: the SwiftUI menu drew nothing in the
+  strip, so the button was missing (also in the menu bar panel).
+
 ## 0.9.5 (2026-11-05)
 
 - **Floating call controls as a vertical strip (2026-11-05):** the panel is a narrow strip with the Pacenote mark on

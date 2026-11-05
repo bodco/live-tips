@@ -191,7 +191,9 @@ final class CallRecorder: NSObject, ObservableObject {
                 self.setArm(.display(RecTargets.display(for: self.settings.display)), windows: []); return
             }
             let list = await RecTargets.windows()
-            if let w = RecTargets.meetingWindow(in: list) { self.setArm(.window(w.id), windows: list) }
+            if let w = RecTargets.meetingWindow(in: list) { self.setArm(.window(w.id), windows: list); return }
+            // 2026-11-05: no call window open yet: the screen from Settings, so the card always shows what is recorded
+            self.setArm(.display(RecTargets.display(for: self.settings.display)), windows: [])
         }
     }
 

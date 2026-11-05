@@ -244,7 +244,7 @@ struct MenuBarPanel: View {
             }
             HStack(spacing: 6) {
                 wide(L("menubar.showTips"), primary: true) { model.run { $0.showTips() } }.keyboardShortcut(.defaultAction)
-                Menu { RecordingMenu(app: model.app) } label: {
+                Button { RecordingMenu.pop(app: model.app) } label: {
                     HStack(spacing: 5) {
                         ZStack {
                             Circle().stroke(recOn ? PN.C.rec : PN.C.text2, lineWidth: 1.5).frame(width: 11, height: 11)
@@ -257,7 +257,7 @@ struct MenuBarPanel: View {
                     .background(RoundedRectangle(cornerRadius: 8).fill(recOn ? PN.C.rec.opacity(0.12) : PN.C.surface2))
                     .contentShape(Rectangle())
                 }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                .buttonStyle(.plain)
                 .disabled(recording.state == "choosing" || !model.isRecording && !recOn)
                 // End call asks for confirmation first (AppDelegate.endCall / the tips window).
                 wide(L("menubar.endCall"), danger: true) { model.run { $0.endCall() } }

@@ -445,8 +445,8 @@
         : `<div class="armsrc"><span class="ph"></span><span class="x"><b>${esc(tr2.armChoose)}</b></span><button type="button" class="lnk" data-act="rec-arm-pick">${esc(tr2.armChange)}</button></div>`;
     }
     const note = k === 'video' ? tr2.armStarts : k === 'audio' ? tr2.armSoundNote : '';
-    return `<div class="armcard"><div class="top"><span class="rdot${k === 'off' ? ' off' : ''}"><i></i></span>${esc(tr2.armTitle)}</div>
-      <div class="seg" role="group">${seg}</div>${src}${note ? `<div class="sub">${esc(note)}</div>` : ''}</div>`;
+    return `<div class="armcard"><div class="armtop"><span class="rdot${k === 'off' ? ' off' : ''}"><i></i></span>${esc(tr2.armTitle)}</div>
+      <div class="armseg" role="group">${seg}</div>${src}${note ? `<div class="armsub">${esc(note)}</div>` : ''}</div>`;
   }
 
   // Returns true when an empty state is shown instead of cards.

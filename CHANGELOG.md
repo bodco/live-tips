@@ -3,8 +3,12 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## Unreleased
+## 0.9.4.1 (2026-11-05)
 
+- **Fixed: tip rating (2026-11-05):** a click on the amber wave or the red cross opened "What was off?" and hid it at once,
+  and the rating was not counted. The window kept the rating only on a temporary copy of the card, and the next state
+  update replaced it. The rating now lives in the feed (it survives updates and a rebuild of the card, with the reasons
+  and the comment), so the box stays open until Save or Skip and the mark is kept.
 - **Documentation for 0.9.4 (2026-11-05):** README and the guide (English and Ukrainian) now cover the three ways to the
   AI (Claude, ChatGPT, Gemini), the Gemini account through Antigravity CLI with its warning, plan B, OpenAI prompt
   caching, Settings > Usage, the measured prices with a link to the pricing page, rating tips and learning from ratings

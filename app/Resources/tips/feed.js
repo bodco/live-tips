@@ -42,7 +42,7 @@
     this.cards = [];            // newest last
     this.byId = {};
     this.edits = {};            // id -> {say} corrected in the window
-    this.local = {};            // id -> {state, pinned} set in the window
+    this.local = {};            // id -> {state, pinned, rating} set in the window
     this.cardSeen = {};
     this.sit = null;
     this.onMeDone = {};
@@ -140,7 +140,7 @@
     const ed = this.edits[id];
     if (ed) { if (ed.removed) return null; if (ed.say != null) c.say = ed.say; c.edited = true; }
     const loc = this.local[id];
-    if (loc) { if (loc.state) c.state = loc.state; if (loc.pinned != null) c.pinned = loc.pinned; }
+    if (loc) { if (loc.state) c.state = loc.state; if (loc.pinned != null) c.pinned = loc.pinned; if (loc.rating) c.rating = loc.rating; }   // 0.9.4: a rating set in the window survives the rebuild
     return c;
   };
 
@@ -154,7 +154,7 @@
     if (old) {
       // An update (the full tip after its gist, an edit) keeps the place, the pin and the state.
       c.at = Math.min(old.at, c.at);
-      c.pinned = old.pinned; if (old.state !== 'active') c.state = old.state;
+      c.pinned = old.pinned; if (old.state !== 'active') c.state = old.state; if (old.rating && !c.rating) c.rating = old.rating;
       this.cards[this.cards.indexOf(old)] = c;
     } else {
       this.cards.push(c);

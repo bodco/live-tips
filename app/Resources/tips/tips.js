@@ -1007,13 +1007,14 @@
       case 'liveprep': post('liveprep', { a: 'start' }); if (feed) feed.setPrep({ state: 'running', progress: 0 }); return;
       case 'liveprep-cancel': post('liveprep', { a: 'cancel' }); return;
       case 'said':
-        if (card) { card.state = 'done'; card.rating = { v: 'used', reasons: [], comment: '' }; if (feed) feed.mark(id, { state: 'done' }); post('said', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'say' }); }
+        if (card) { card.state = 'done'; card.rating = { v: 'used', reasons: [], comment: '' }; if (feed) feed.mark(id, { state: 'done', rating: card.rating }); post('said', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'say' }); }
         S.ui.heroOverride = null; break;
       case 'rate': {
         if (!card) return;
         const v = b.dataset.v, prev = card.rating || {};
         card.rating = { v, reasons: v === prev.v ? (prev.reasons || []) : [], comment: v === prev.v ? (prev.comment || '') : '' };
         S.ui.rateOpen = v === 'used' ? null : id;
+        if (feed) feed.mark(id, { rating: card.rating });   // 0.9.4 fix: the feed hands out fresh card copies, a rating kept only on the copy vanished on the next update
         sendRate(card); e.stopPropagation(); break;
       }
       case 'rate-reason': {
@@ -1021,11 +1022,13 @@
         const r = b.dataset.r, list = card.rating.reasons || [];
         const box = $('hero').querySelector('.ratebox input'); if (box) card.rating.comment = box.value;
         card.rating.reasons = list.includes(r) ? list.filter((x) => x !== r) : list.concat(r);
+        if (feed) feed.mark(id, { rating: card.rating });
         e.stopPropagation(); break;
       }
       case 'rate-save': {
         if (!card || !card.rating) return;
         const box = $('hero').querySelector('.ratebox input'); if (box) card.rating.comment = box.value.trim();
+        if (feed) feed.mark(id, { rating: card.rating });
         S.ui.rateOpen = null; sendRate(card); showToast({ text: T().rateThanks, kind: 'info', at: Date.now() });
         e.stopPropagation(); break;
       }

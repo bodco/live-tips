@@ -85,6 +85,18 @@ test('said, hide and an edit survive an update of the same card', () => {
   assert.strictEqual(get().cards[0].say, 'A, corrected.');
 });
 
+test('a tip rating (check, wave, cross) survives updates and a rebuild of the card', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:40:00', kind: 'tip', level: 'red', uid: 'r1', gist: 'Q?', phrase: 'A.' }]);
+  f.mark('u:r1', { rating: { v: 'not_useful', reasons: [], comment: '' } });
+  f.emit();
+  assert.strictEqual(get().cards[0].rating.v, 'not_useful');          // the next state snapshot still carries it
+  f.mark('u:r1', { rating: { v: 'not_useful', reasons: ['late'], comment: 'x' } });
+  f.addItems([{ t: '10:40:05', kind: 'tip', level: 'red', uid: 'r1', gist: 'Q?', phrase: 'A again.' }]);   // same tip updated by the engine
+  assert.deepStrictEqual(get().cards[0].rating.reasons, ['late']);
+  assert.strictEqual(get().cards[0].rating.comment, 'x');
+});
+
 test('your turn: the speech card becomes the newest turn card', () => {
   const { f, get } = make();
   f.addItems([DEMO[0]]);

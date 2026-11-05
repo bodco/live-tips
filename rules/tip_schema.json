@@ -25,7 +25,8 @@
         "speaker_ask",
         "question",
         "outline",
-        "outline_pos", "situation",
+        "outline_pos",
+        "situation",
         "facts",
         "state",
         "retract"
@@ -33,7 +34,12 @@
     },
     "gist": {
       "type": "string",
-      "maxLength": 120
+      "maxLength": 160
+    },
+    "why": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "1-2 plain sentences of context the PM needs to build an answer (2026-11-05)."
     },
     "level": {
       "enum": [

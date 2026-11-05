@@ -129,7 +129,7 @@ TIP_SCRIPTS = ("LATIN", "CYRILLIC", "GREEK")
 GARBLED_TOKEN = re.compile(r"(?<![\w/.])_[A-Z]{4,}\b")
 
 
-def garbled(obj: dict, keys=("gist", "phrase", "note", "items")) -> Optional[str]:
+def garbled(obj: dict, keys=("gist", "why", "phrase", "note", "items")) -> Optional[str]:
     """Why a tip's text looks garbled ("foreign script", "token"), else None."""
     parts = []
     for k in keys:
@@ -261,7 +261,7 @@ def tip_timing(span: dict, c, done: float) -> None:
 
 def tip_item(obj: dict, uid: str, line: Line, trigger: str, done: float, late: bool) -> dict:
     item = {"schema_version": 1, "engine": "app", "uid": uid, "t": s_to_hms(done), "src": line.t, "kind": "tip",
-            "level": obj.get("level", "orange"), "gist": obj["gist"], "phrase": obj.get("phrase", ""),
+            "level": obj.get("level", "orange"), "gist": obj["gist"], "why": obj.get("why", ""), "phrase": obj.get("phrase", ""),
             "items": obj.get("items", []), "note": obj.get("note", ""), "topic": obj.get("topic", ""),
             "trigger": obj.get("trigger", trigger), "fact_ids": obj.get("fact_ids", []),
             "at": s_to_hms(done), "late": late}
@@ -317,7 +317,7 @@ def no_ready_answer(kind: str, uk: bool, searching: bool = True) -> dict:
 def request_item(obj: dict, kind: str, text: str, src: str, done: float) -> dict:
     item = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": src,
             "kind": "tip" if kind == "sos" else "answer", "level": "red" if kind == "sos" else obj.get("level", "info"),
-            "gist": obj.get("gist", ""), "phrase": obj.get("phrase", ""), "items": obj.get("items", []),
+            "gist": obj.get("gist", ""), "why": obj.get("why", ""), "phrase": obj.get("phrase", ""), "items": obj.get("items", []),
             "note": obj.get("note", ""), "at": s_to_hms(done)}
     if kind == "ask":
         item["q"] = text
@@ -481,8 +481,8 @@ def hedge_delays(models: dict, after_s: Optional[dict]) -> dict:
 
 def raise_tip_tokens(cfg: dict) -> None:
     mt = cfg.setdefault("max_tokens", {})
-    if isinstance(mt, dict) and mt.get("tip", 0) and mt["tip"] < 700:
-        mt["tip"] = 700                   # 300 cut the two best tips of the PM sync (long Ukrainian phrase)
+    if isinstance(mt, dict) and mt.get("tip", 0) and mt["tip"] < 900:
+        mt["tip"] = 900                   # 300 cut the two best tips of the PM sync (long Ukrainian phrase); 900 since the why line (2026-11-05)
 
 
 def _due(a: dict) -> str:

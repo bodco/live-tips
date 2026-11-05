@@ -3,6 +3,23 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.9.5.3 (2026-11-05)
+
+- **Tips read like a person talking (2026-11-05, owner):** tips were telegrams (a 7-word label, a 12-word phrase) and
+  had to be re-read. Now the first line is a plain sentence about what is happening ("Mike asks who signs off
+  security"), a new quieter line says why it matters and what the brief says, and the phrase is 1-3 natural sentences
+  you can say as is. Facts are full lines of up to 16 words. The compact window still shows only the phrase
+  (rules/diet.yaml limits, new `why` field in the tip schema).
+- **Long tips get a smaller font (2026-11-05, owner):** when the phrase and its context are long, the main card uses a
+  smaller font instead of filling the window.
+- **Hide the main card (2026-11-05, owner):** the window menu has Hide the main card. All tips then go to one feed,
+  newest on top, with the question above each; a click on a row still opens it big, and Show the main card in the
+  feed header brings it back. The choice is kept on this Mac; the compact window always keeps the main card.
+- **Recent calls fill the width (2026-11-05, owner):** the three cards on Home now share the full width of the blocks
+  above them instead of sitting at their minimum width on the left.
+- **"Not ready" is amber in the light theme (2026-11-05, owner):** the not-ready colour read as pale red on white; it
+  is now amber (B45309, 5.0:1 on white) on Home, the call pages and the call controls. The dark theme is unchanged.
+
 ## 0.9.5.2 (2026-11-05)
 
 - **No Risk card for your own words (2026-11-05, owner):** a risk you say yourself is no longer a card in the feed

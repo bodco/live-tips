@@ -10,7 +10,12 @@
         "gist": {
           "type": "string",
           "minLength": 2,
-          "maxLength": 120
+          "maxLength": 160
+        },
+        "why": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "1-2 plain sentences of context the PM needs to build an answer (2026-11-05)."
         },
         "level": {
           "enum": [

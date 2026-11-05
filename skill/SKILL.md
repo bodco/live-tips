@@ -390,7 +390,7 @@ Generated from `rules/decisions.yaml`; do not edit here.
 - **The call's language.** Phrase and fact lines in the language spoken on this call, never an
   English template on a Ukrainian call.
 
-- **Short.** One gist line plus at most ONE phrase or ONE fact line. Longer only: the speech,
+- **Short, but human.** One gist sentence, one short `why`, then at most ONE phrase or ONE fact line. Longer only: the speech,
   "Your turn", the agenda, `catch me up`, `@@SOS`. One tip per topic; never repeat a tip in
   `tips_given` unless the situation changed; never what a card or the fact book already showed.
 - **Live topic, not the plan.** Before a tip, check its topic against the last ~60 s. When the
@@ -420,26 +420,35 @@ Generated from `rules/decisions.yaml`; do not edit here.
 
 ### Tip format (a small window under the camera, read at a glance)
 
-One JSON line per item: `{"t":"HH:MM:SS","src":"<HH:MM:SS of the trigger line>","kind":"tip","level":"red|orange|info","gist":"🔴 ...","phrase":"...","items":["..."],"note":"<source, date>"}`.
+One JSON line per item: `{"t":"HH:MM:SS","src":"<HH:MM:SS of the trigger line>","kind":"tip","level":"red|orange|info","gist":"🔴 ...","why":"...","phrase":"...","items":["..."],"note":"<source, date>"}`.
 `src` is required on every tip and answer (the window shows the delay). Kinds: `tip`, `answer`
 (add `"q"`), `fact`, `speech`, `checklist`, `agenda`, `status`, `wrapup`, `ack`, `info`.
-1. **Gist**: emoji + what is happening, max 7 words, in the **tips language**: the call's main
+**How a tip sounds** (2026-11-05, owner: tips read like telegrams and had to be re-read): a
+colleague whispering to the PM, in full plain sentences with verbs, never a label or a pile of
+nouns. After one read the PM knows what is going on and can build his own answer, even without
+the phrase.
+
+1. **Gist**: emoji + one plain sentence, max 14 words: who says or asks what and what it means
+   for the PM ("Mike asks who signs off security", not "Security sign-off owner"). In the **tips language**: the call's main
    language (0.8.5, owner: a Ukrainian meeting gets Ukrainian tips and cards whatever the window
    language). When the window language (`@@SET ui_lang`) differs, the window offers a switch and the
    PM's choice arrives as `@@SET tips_lang` (`uk` or `en`), echoed in status as `tips_lang`; it wins
    until the call ends. Notes follow the same language.
-2. **Phrase**: a ready sentence to read aloud, in `answer_lang` (the language the PM is
+2. **Why** (`why`): 1-2 plain sentences, max 35 words, in the tips language: what exactly is
+   asked or claimed, what the brief or the fact book says, what to avoid (a trap, a promise the
+   PM does not own). Empty when the gist already says it all.
+3. **Phrase**: what the PM can say, in `answer_lang` (the language the PM is
    expected to speak now; switches when someone asks the PM to say it in another language,
-   details in `window.md`). One sentence, two very short ones at most. English: simple
-   sentences, max 12 words, everyday words, active voice, no idioms. Russian is never used.
-3. **Facts**: max 3 lines of max 8 words, with numbers. **Source**: one short `note`
+   details in `window.md`). 1-3 natural spoken sentences: the answer first, then one reason or
+   next step. English: simple everyday words, active voice, no idioms, max 40 words. Russian is never used.
+4. **Facts**: max 3 lines of max 16 words, full sentences with numbers. **Source**: one short `note`
    (`ліміти, 14.10`).
-Max ~45 characters per line, max 5 lines; no tables, headings, links, abbreviations or ticket
+Max ~70 characters per line, max 9 lines; no tables, headings, links, abbreviations or ticket
 keys (name the topic). Examples:
 
-> **🔴 Нова вимога. Не погоджуй зараз.** / "Good idea. I will write it down. We will check it and come back to you."
-> **🔴 Неточно: реліз 15.10, не 10.10** / "Sorry, a small correction. The release date is October 15." / _рішення від 30.09_
-> **🟠 Зафіксуй: хто і коли** / "So Mike checks the variable today. Is that right?"
+> **🔴 Emily просить додати експорт у PDF, цього немає в скоупі** / _Це нова вимога, а не уточнення. Не погоджуй і не називай строк: спершу оцінка від команди._ / "Good idea, I see why you need it. Let me write it down, we will estimate it and come back to you this week."
+> **🔴 Mike каже, що реліз 10.10, а за рішенням 15.10** / _Дату змістили 30.09 через рев'ю безпеки, він, схоже, не бачив оновлення._ / "Sorry, a small correction. The release moved to October 15, after the security review." / _рішення від 30.09_
+> **🟠 Домовились перевірити змінну, але не сказали, хто і коли** / _Без власника це повисне до наступного дзвінка._ / "So Mike checks the variable today. Is that right?"
 
 On a 5-minute quiet stretch with no tip, send one `SendUserMessage` line (what is discussed and
 why no tips), not more often than every 5 minutes.

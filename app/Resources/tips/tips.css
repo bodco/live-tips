@@ -79,6 +79,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .hero .head{display:flex;align-items:center;gap:8px}
 .meta{font-size:12px;color:var(--text-3)}
 .hero .q{font-size:15px;color:var(--text-2)}
+.hero .why{font-size:14px;line-height:1.45;color:var(--text-2);margin:2px 0 6px;text-wrap:pretty}
+/* 2026-11-05 (owner): a long phrase or context gets a smaller font, so the card does not fill the window */
+.hero.long .say{font-size:19px;line-height:1.36}
+.hero.xlong .say{font-size:17px;line-height:1.4;font-weight:560}
+.hero.long .why,.hero.xlong .why{font-size:13px}
+.earlier .row .rq{display:block;font-size:12px;color:var(--text-3);margin-bottom:2px}
+.earlier .h .showhero{margin-left:auto;margin-right:8px;font-size:12px;padding:0 6px;text-transform:none;letter-spacing:0}
 .hero .say{font-size:var(--fs-hero);line-height:1.32;font-weight:600;letter-spacing:-.01em;text-wrap:pretty}
 .hero .src{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-3)}
 .hero .acts{display:flex;flex-wrap:wrap;gap:2px;margin-left:-8px} /* 0.8.7.1: "Сховати" was cut at 380 px */
@@ -222,8 +229,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .app.compact .agenda,.app.compact .earlier,.app.compact .next,.app.compact .ask,.app.compact .pane,.app.compact .split{display:none!important}
 .app.resizing,.app.resizing *{cursor:col-resize!important;user-select:none!important}
 .app.compact .hero{margin:0 8px 8px;padding:12px 14px;gap:6px}
-.app.compact .hero .q,.app.compact .hero .src,.app.compact .hero .acts{display:none}
+.app.compact .hero .q,.app.compact .hero .why,.app.compact .hero .src,.app.compact .hero .acts{display:none}
 .app.compact .hero .say{font-size:19px}
+.app.compact .hero.long .say{font-size:17px}
+.app.compact .hero.xlong .say{font-size:15px}
 
 /* ---------- Wide: side pane ---------- */
 @container app (min-width: 760px){

@@ -105,7 +105,7 @@
 
   Feed.prototype.toCard = function (it) {
     const kind = this.kindOf(it);
-    const gist = clean(it.gist), phrase = clean(it.phrase);
+    const gist = clean(it.gist), phrase = clean(it.phrase), why = clean(it.why);   // 2026-11-05: why = the context line
     // 0.8.5 (owner): a speech point may carry its full text ({text, full}, speech.md); it opens under the line.
     const pts = (it.items || []).map((x) => ({ t: clean(itemText(x)), f: x && typeof x === 'object' ? clean(x.full) : '' })).filter((p) => p.t);
     const items = pts.map((p) => p.t);
@@ -130,12 +130,12 @@
     source = note || (items.length && (kind === 'docs' || kind === 'answer') ? items[0] : '');
     const id = this.idOf(it);
     const c = {
-      id, kind, who, question, say, source, meta, unverified, topic: clean(it.topic).toLowerCase(), level: it.level, trigger: it.trigger || '',
+      id, kind, who, question, why, say, source, meta, unverified, topic: clean(it.topic).toLowerCase(), level: it.level, trigger: it.trigger || '',
       items: kind === 'turn' ? items : items.slice(source === items[0] ? 1 : 0, 4),
       fulls: kind === 'turn' ? pts.map((p) => p.f) : [],
       at: hmsToMs(it.at || it.t, this.now()),
       state: 'active', pinned: false, partial: !!it.partial, late: !!it.late, card: it.card || '', t: it.t || '',
-      raw: { kind: it.kind || 'tip', gist: it.gist || '', phrase: it.phrase || '', items: it.items || [] }
+      raw: { kind: it.kind || 'tip', gist: it.gist || '', why: it.why || '', phrase: it.phrase || '', items: it.items || [] }
     };
     const ed = this.edits[id];
     if (ed) { if (ed.removed) return null; if (ed.say != null) c.say = ed.say; c.edited = true; }

@@ -22,7 +22,7 @@
         armStarts: 'Starts with Start listening. Pacenote\'s own windows are never recorded.', armSoundNote: 'The call\'s sound and your microphone, starts with Start listening.' },
       micStalled: 'The microphone stopped', cantHear: "Can't hear the other side", asrBehind: (o) => `Transcription is ${o.n} s behind`,
       engineDeaf: 'Tips are not coming: end the call and start again',
-      onMe: 'On me', more: 'More', earlier: 'Earlier',
+      onMe: 'On me', more: 'More', earlier: 'Earlier', allTips: 'Tips', showHero: 'Show the main card',
       agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised yet:', allRaised: 'All agenda items raised',
       agendaOpen: 'Show the whole agenda', agendaClose: 'Hide the agenda', agendaHint: 'A click moves an item on:', agendaLegend: ['not raised', 'now', 'done', 'skipped, not relevant'],
       agState: { todo: 'not raised', now: 'now', done: 'done', skip: 'skipped' },
@@ -51,6 +51,7 @@
       proactiveOn: 'Proactive tips: on', proactiveOff: 'Proactive tips: off', resumeShort: 'Resume',
       menu: { pause: 'Pause listening', resume: 'Resume listening', mute: 'Turn mic off', unmute: 'Turn mic on',
         compact: 'Compact mode', full: 'Full window', present: 'Presentation mode', stopPresent: 'Stop presenting', presentNeedDeck: 'Attach a deck in Start call',
+        heroHide: 'Hide the main card', heroShow: 'Show the main card',
         transcript: 'Transcript', brief: 'Brief', settings: 'Call settings…', switchCall: 'Switch to next call…', clearSpeakers: 'Forget speaker names' },
       recap: 'Recap:',
       after: { window: 'Call ended', meta: (o) => [o.when, o.dur, o.people].filter(Boolean).join(' · ') + (o.notion ? ' · summary saved to Notion' : ''),
@@ -96,7 +97,7 @@
         armStarts: 'Почнеться разом із «Почати слухати». Вікна Pacenote ніколи не записуються.', armSoundNote: 'Звук дзвінка і ваш мікрофон, почнеться разом із «Почати слухати».' },
       micStalled: 'Мікрофон зупинився', cantHear: 'Не чую іншу сторону', asrBehind: (o) => `Транскрипція відстає на ${o.n} с`,
       engineDeaf: 'Підказки не надходять: заверши дзвінок і почни знову',
-      onMe: 'На мені', more: 'Більше', earlier: 'Раніше',
+      onMe: 'На мені', more: 'Більше', earlier: 'Раніше', allTips: 'Підказки', showHero: 'Показати основну картку',
       agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', allRaised: 'Усі пункти агенди підняті',
       agendaOpen: 'Показати всю агенду', agendaClose: 'Сховати агенду', agendaHint: 'Клік по пункту змінює його стан:', agendaLegend: ['не піднято', 'зараз', 'зроблено', 'пропущено, неактуально'],
       agState: { todo: 'не піднято', now: 'зараз', done: 'зроблено', skip: 'пропущено' },
@@ -125,6 +126,7 @@
       proactiveOn: 'Проактивні підказки: увімкнено', proactiveOff: 'Проактивні підказки: вимкнено', resumeShort: 'Продовжити',
       menu: { pause: 'Призупинити', resume: 'Продовжити', mute: 'Вимкнути мікрофон', unmute: 'Увімкнути мікрофон',
         compact: 'Компактний режим', full: 'Повне вікно', present: 'Режим презентації', stopPresent: 'Завершити презентацію', presentNeedDeck: 'Додайте презентацію в Start call',
+        heroHide: 'Сховати основну картку', heroShow: 'Показати основну картку',
         transcript: 'Транскрипт', brief: 'Бриф', settings: 'Налаштування дзвінка…', switchCall: 'Перейти до наступного дзвінка…', clearSpeakers: 'Забути імена спікерів' },
       recap: 'Підсумок:',
       doneQ: 'Зроблено?', markDone: 'Позначити зробленим', onThemKind: 'На них', closed: 'Закрито',
@@ -222,6 +224,13 @@
       say: S.call.recap ? `${T().recap} ${S.call.recap}` : '', source: ''
     };
   }
+  // 2026-11-05 (owner): the main card can be hidden when the feed alone is easier to read; kept per Mac.
+  const HERO_KEY = 'pacenote.heroOff';
+  function heroOffSaved() { try { return localStorage.getItem(HERO_KEY) === '1'; } catch (e) { return false; } }
+  function setHeroOff(on) { S.ui.heroOff = !!on; try { if (on) localStorage.setItem(HERO_KEY, '1'); else localStorage.removeItem(HERO_KEY); } catch (e) {} }
+  // Compact mode shows only the main card, so hiding it applies to the full window only.
+  function heroOffNow() { if (S.ui.heroOff == null) S.ui.heroOff = heroOffSaved(); return S.ui.heroOff; }
+  function heroHidden() { return heroOffNow() && S.call.mode !== 'compact'; }
   function visibleCards() {
     const list = S.cards.filter((c) => c.state !== 'hidden').slice();
     const f = finishCard(); if (f) list.push(f);
@@ -230,6 +239,7 @@
   // Hero order (spec 3.2): pinned, a fresh answer or your turn (90 s), N min left, the newest action, the newest active.
   function pickHero(list) {
     if (S.ui.heroOverride) { const o = list.find((c) => c.id === S.ui.heroOverride); if (o) return o; }
+    if (heroHidden()) return null;   // a click on a row still opens that card big (heroOverride)
     list = list.filter((c) => !c.quiet || c.pinned);   // quiet cards (a commitment said to be done) stay in Earlier
     const pinned = list.find((c) => c.pinned && c.state === 'active'); if (pinned) return pinned;
     const fresh = list.find((c) => c.state === 'active' && (c.kind === 'answer' || c.kind === 'turn') && Date.now() - c.at < 90000); if (fresh) return fresh;
@@ -524,12 +534,17 @@
     if (el.dataset.id !== c.id) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
     el.hidden = false; el.dataset.id = c.id;
     el.classList.toggle('finish', c.kind === 'finish');
+    // 2026-11-05 (owner): a long phrase gets a smaller font so the card does not fill the window.
+    const len = String(c.say || '').length + String(c.why || '').length / 2;
+    el.classList.toggle('long', len > 130 && len <= 210);
+    el.classList.toggle('xlong', len > 210);
     const meta = [c.meta || (c.who ? t.asked(c.who) : ''), rel(c.at)].filter(Boolean).join(' · ');
     const editing = S.ui.editing === c.id;
     const ptsEl = el.querySelector('.items.pts'), ptsTop = ptsEl && ptsEl.dataset.card === c.id ? ptsEl.scrollTop : 0;
     el.innerHTML = `
       <div class="head"><span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>${c.kind === 'finish' ? '' : `<span class="meta"${c.unverified ? ` title="${esc(t.unverified)}"` : ''}>${esc(meta)}</span>`}${S.ui.heroOverride === c.id ? `<button class="ghost backauto" type="button" data-act="hero-auto" title="Esc">${esc(t.backAuto)}</button>` : ''}</div>
       ${(c.commit ? t.doneQ : c.question) ? `<div class="q">${esc(c.commit ? t.doneQ : c.question)}</div>` : ''}
+      ${c.why && !c.commit ? `<div class="why">${esc(c.why)}</div>` : ''}
       ${c.say ? `<div class="say"${editing ? ' contenteditable="true" spellcheck="false"' : ''}>${esc(c.say)}</div>` : ''}
       ${(c.items || []).length && c.kind !== 'finish' && !S.ui.heroMin[c.id] ? itemsHtml(c) : ''}
       ${c.source ? `<div class="src">${ICON.doc}<span>${esc(c.source)}</span></div>` : ''}
@@ -552,11 +567,12 @@
   function renderEarlier(list) {
     const t = T(), el = $('earlier');
     if (!list.length) { el.innerHTML = ''; return; }
-    el.innerHTML = `<div class="h"><b>${esc(t.earlier)}</b><span>${list.length}</span></div>` + list.map((c) => {
+    const off = heroHidden();
+    el.innerHTML = `<div class="h"><b>${esc(off ? t.allTips : t.earlier)}</b>${off ? `<button class="ghost showhero" type="button" data-act="hero-show">${esc(t.showHero)}</button>` : ''}<span>${list.length}</span></div>` + list.map((c) => {
       const text = c.commit ? `${t.doneQ} ${c.say}` : c.kind === 'decision_conflict' && (c.items || []).length ? `${c.say} · ${c.items[0]}` : c.state === 'done' && c.question ? `${c.question}${c.say ? ' · ' + c.say : ''}` : (c.say || c.question || '');
       return `<div class="row ${c.state === 'done' ? 'done' : ''}" role="button" tabindex="0" data-act="promote" data-id="${esc(c.id)}">
         <span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>
-        <span class="t">${esc(text)}</span>
+        <span class="t">${off && c.question && !c.commit && c.state !== 'done' ? `<span class="rq">${esc(c.question)}</span>` : ''}${esc(text)}</span>
         <span class="m">${esc(rel(c.at))}</span>
         ${c.commit && c.state !== 'done' ? `<button class="ghost" type="button" data-act="commit-done" data-id="${esc(c.id)}">${esc(t.markDone)}</button>` : ''}
         <span class="hover-acts"><button class="ghost" type="button" data-act="pin" data-id="${esc(c.id)}">${esc(c.pinned ? t.unpin : t.pin)}</button><button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></span>
@@ -914,6 +930,7 @@
       // 0.8.7 (L2): without a deck the item stays, greyed, with the condition; a click attaches a deck
       (S.steps.length || S.call.presType) ? ['present', presenting() ? t.stopPresent : t.present, k.present] : ['present-off', t.present, '', t.presentNeedDeck],
       ['compact', S.call.mode === 'compact' ? t.full : t.compact, k.compact],
+      S.call.mode === 'compact' ? null : ['hero', heroOffNow() ? t.heroShow : t.heroHide, ''],
       ['transcript', t.transcript, ''], ['brief', t.brief, ''],
       '-',
       ['clear-speakers', t.clearSpeakers, ''],
@@ -1184,6 +1201,7 @@
         break;
       }
       case 'hero-auto': S.ui.heroOverride = null; break;
+      case 'hero-show': setHeroOff(false); S.ui.heroOverride = null; break;
       case 'after': post('after', Object.assign({ item: b.dataset.item }, draftNow())); return;
       case 'commit-done': {
         if (!card || !card.commit) return;
@@ -1316,7 +1334,8 @@
       case 'sys-more': S.ui.sysOpen = !(S.ui.sysOpen == null ? (S.sys && S.sys.kind === 'notRecording') : S.ui.sysOpen); break;
       case 'menu': {
         const item = b.dataset.item; S.ui.menuOpen = false;
-        if (item === 'compact') { S.call.mode = S.call.mode === 'compact' ? 'normal' : 'compact'; post('compact', { on: S.call.mode === 'compact' }); }
+        if (item === 'hero') { setHeroOff(!heroOffNow()); S.ui.heroOverride = null; }
+        else if (item === 'compact') { S.call.mode = S.call.mode === 'compact' ? 'normal' : 'compact'; post('compact', { on: S.call.mode === 'compact' }); }
         else if (item === 'present-off') { post('attach-deck'); render(); return; }
         else if (item === 'present') { S.ui.presentForced = !presenting(); post('setting', { key: 'call_type', value: S.ui.presentForced ? 'presentation' : 'auto' }); }
         else if (item === 'transcript' || item === 'brief') { openTab(item); return; }

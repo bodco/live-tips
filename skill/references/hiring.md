@@ -83,8 +83,8 @@ poll); speed matters more than batching. Never deep lookups during an answer.
      VERBATIM (merge the interviewer's rephrasings and follow-ups into one question), `phrase`
      = a reference answer of 4-5 sentences in the interview language. Note: "для порівняння,
      не для озвучення". It is a benchmark for the PM to compare with what the candidate
-     really says, not a script for the candidate. For this tip the usual gist limits (7 words,
-     45 characters) and the 5-line limit do not apply.
+     really says, not a script for the candidate. For this tip the usual gist limits (14 words,
+     70 characters) and the 9-line limit do not apply.
   2. After the answer: nothing. No ✓ / ~ / ✗ lines, no gap remarks, no commentary on what the
      candidate said. Keep notes silently for the final analysis.
   3. No tips on small talk, introductions or company pitches; one 🔵 line at most when the

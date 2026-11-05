@@ -126,7 +126,7 @@ def test_hedge_delays_and_tip_tokens():
     assert hedge_delays({"classify": "a", "tip": "b"}, {"tip": 1.0}) == {"a": 2.0, "b": 1.0}
     cfg = {"max_tokens": {"tip": 300}}
     raise_tip_tokens(cfg)
-    assert cfg["max_tokens"]["tip"] == 700
+    assert cfg["max_tokens"]["tip"] == 900
     cfg = {}
     raise_tip_tokens(cfg)
     assert cfg == {"max_tokens": {}}

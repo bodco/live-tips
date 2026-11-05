@@ -727,18 +727,27 @@ Commands, thresholds and the index format: the tools README, "Semantic layer (Ol
 ### What a tip looks like
 
 Built for a small Cowork window at the top centre of the screen, under the camera, so the
-eyes do not wander. Every tip is 2-5 short lines (~45 characters), no tables, headings or
-links.
+eyes do not wander. Every tip is up to ~9 lines, no tables, headings or links. Since
+2026-11-05 a tip is written in plain human sentences, not a telegram: after one read you know
+what is going on and have enough to build your own answer.
 
-1. **Gist**, bold: emoji and what is happening, max 7 words. Always first, to get the point
-   in one second. Language: Ukrainian when the window interface or the call is Ukrainian,
+1. **Gist**, bold: emoji and one plain sentence about who says or asks what and what it means
+   for you, max 14 words ("Mike asks who signs off security", not "Security sign-off owner").
+   Always first. Language: Ukrainian when the window interface or the call is Ukrainian,
    otherwise English.
-2. **Phrase**, in quotes, in the language of the call. A ready speech to read aloud as is,
-   not bullet points. 1-2 sentences. In English: simple sentences up to 12 words,
-   everyday words, present or future simple, active voice, no idioms or long clauses.
-3. **Facts**: up to 3 lines of up to 8 words, with numbers. A tip carries one phrase or one
+2. **Why**, a quieter line: 1-2 sentences of context, max 35 words: what exactly is asked,
+   what the brief or the facts say, what to avoid. Hidden in the compact window.
+3. **Phrase**, in quotes, in the language of the call. What you can say, as people talk:
+   the answer first, then a reason or a next step, 1-3 sentences. In English: simple
+   everyday words, active voice, no idioms, up to 40 words.
+4. **Facts**: up to 3 full lines of up to 16 words, with numbers. A tip carries one phrase or one
    fact line; longer only for the speech, "your turn", the agenda, catch me up and 🆘.
-4. **Source**: one short italic line (topic and date).
+5. **Source**: one short italic line (topic and date).
+
+A long phrase gets a smaller font, so the main card does not fill the window. The window menu (⋯) has
+**Hide the main card**: all tips then go to one feed, newest on top, each with its question above it; a click
+on a row still opens that tip big, and **Show the main card** in the feed header brings it back. The choice is kept
+on this Mac; the compact window always shows the main card.
 
 **No abbreviations:** "a new request", not CR; "date", not ETA. No ticket keys either, the
 topic name instead. People and product names stay as they are.

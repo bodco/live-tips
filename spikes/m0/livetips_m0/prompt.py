@@ -37,7 +37,11 @@ Context discipline (most common failures, check every time):
 - Numbers, names and dates come only from the brief, the fact book, the cards or the transcript. Never a number you did not see there.
 - "tips_given" lists what the PM already saw, with the numbers shown: a tip that repeats a number or a gist from it is noise, even in other words.
 
-Tip diet: one gist line plus at most one phrase or up to {fact_lines} fact lines of max {fact_words} words. One tip per topic, never repeat a tip already given. The topic must be what is discussed in the last {live_topic}s.
+Tip diet: one gist sentence, one short why, then one phrase or up to {fact_lines} fact lines of max {fact_words} words. One tip per topic, never repeat a tip already given. The topic must be what is discussed in the last {live_topic}s.
+How a tip sounds (2026-11-05, owner: tips read like telegrams and had to be re-read): write as a colleague who whispers to the PM, in full plain sentences with verbs, never a label or a noun pile. The PM must understand the situation in one read and be able to build his own answer from the tip, even without the phrase.
+- gist: who does what and what it means for the PM ("Mike asks who signs off security", "Emily thinks the pilot starts Monday, it is the 10th"), never a topic title ("Security sign-off owner").
+- why: what the PM needs to know to answer: what exactly is asked or claimed, what the brief or the facts say, and what to watch for (a trap, a commitment to avoid). Plain words, no abbreviations.
+- phrase: what the PM can say, as people talk: a short answer first, then one sentence of reason or next step.
 
 Output formats are given in the task at the end of each request.
 """
@@ -63,7 +67,7 @@ TIP_TASK = """ROLE tip. Event: {event}. Write the tip for the newest line(s), or
 Before writing, decide what is NEW: a fact, number, owner, date or sentence that nobody has said aloud yet and that is not in tips_given. If nothing is new, or the PM already answered the question, skip. Skip is the normal outcome; a shown tip is the exception.
 Facts marked unverified, "(verify)", "to confirm" or similar are never stated as facts: at most "перевірити: ..." in items.
 Tip format (JSON, keys in this order, gist first):
-{{"gist": "<emoji + what is happening, max {gist_words} words, in the tips language>", "level": "red|orange|info", "topic": "<2-5 words>", "new": "<what in this tip was not said aloud yet, max 8 words>", "phrase": "<ready sentence the PM can say now, in the answer language; English: simple, max {phrase_words} words>", "items": ["<fact with number>"], "note": "<source, date>", "trigger": "<trigger id>", "fact_ids": ["<ids from the fact book used>"]}}
+{{"gist": "<emoji + one plain sentence: who says or asks what and what it means for the PM, max {gist_words} words, in the tips language>", "level": "red|orange|info", "topic": "<2-5 words>", "new": "<what in this tip was not said aloud yet, max 8 words>", "why": "<1-2 plain sentences in the tips language: the context the PM needs to answer (what exactly is asked, what the brief or facts say, what to avoid), max {why_words} words; empty when the gist says it all>", "phrase": "<what the PM can say now, in the answer language, 1-3 natural spoken sentences: the answer first, then a reason or next step; English: simple words, max {phrase_words} words>", "items": ["<fact with number>"], "note": "<source, date>", "trigger": "<trigger id>", "fact_ids": ["<ids from the fact book used>"]}}
 Emoji: red = 🔴 (direct question: 🎯), orange = 🟠, info = 🟢.
 Tips language: {tips_lang}. Answer language (phrase and items): the language the PM is expected to speak right now; on a call in one language only ({langs}) always that language, never English templates.
 Return JSON only, gist first."""
@@ -209,7 +213,7 @@ class PromptBuilder:
         self.rules = rules
         lim = rules.diet["limits"]
         self.fmt = {"tips_lang": call_meta.get("tips_lang", "uk"), "gist_words": lim["gist_words_max"],
-                    "phrase_words": lim["phrase_words_max_en"], "langs": "+".join(call_meta.get("langs", [])) or "uk"}
+                    "phrase_words": lim["phrase_words_max_en"], "why_words": lim.get("why_words_max", 35), "langs": "+".join(call_meta.get("langs", [])) or "uk"}
         self.meta = dict(call_meta)
         self._brief = _read(brief_path, 40000) or "(no brief)"
         self._brief_path = brief_path

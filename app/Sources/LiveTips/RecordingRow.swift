@@ -41,8 +41,9 @@ struct RecordingRow: View {
                     Button(L("rec.page.openDrive")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary)
                 }
             }
-            .padding(12)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            .padding(.horizontal, 24).padding(.vertical, 14)          // the call page's cards (PageCard), one line high
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PageStyle.radius))
             .onReceive(drive.objectWillChange) { _ in DispatchQueue.main.async { tick += 1 } }
         }
     }

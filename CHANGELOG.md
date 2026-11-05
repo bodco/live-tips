@@ -23,6 +23,12 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Recording consent names the recording (2026-11-05):** when the call is also recorded, Settings > General > Recording
   consent says or copies its second message ("transcribes and records this call"), also when the recording starts
   later in the call. PRIVACY updated.
+- **Call pages redesign (2026-11-05):** the pages of a held and an upcoming call are built from Home's cards: a header
+  card with the actions on the right, counts on the tabs, Summary in two columns (topics with times and quotes; the next
+  call, agenda progress, open questions), On you and On them side by side with others grouped by person, a transcript
+  grouped by speaker with speaker filters. Fixed: topic titles showed stray stars and were cut at 10; Decisions falls
+  back to the call notes.
+- **Menu bar while recording (2026-11-05):** during a call the P stays as it is and only its small dot turns red.
 - **Floating call controls (2026-11-05):** a movable panel above other windows while a call is running, with the
   transcription state, Home, Tips, pause/resume transcription and End call. Active sound or video recording has
   separate pause/resume and Stop and save controls. On by default; turn it off in Settings > General or the panel menu.

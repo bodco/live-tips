@@ -1563,6 +1563,16 @@ Colours follow the call's state, never the project: not ready (orange), ready (g
 apply only on Save. A past call has Summary, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this
 call, Follow-up and Export (Word, Markdown or a Notion page, editable before it goes out).
 
+**Call pages redesign (0.9.5).** Both pages are built from Home's cards. A header card shows the date and time, the
+project, the length (or the state of an upcoming call) and the title, with the actions on the right; the tabs show their
+counts. A past call's Summary has two columns: In short and the topics with their times and quotes on the left; For
+the next call, the agenda with its progress and the open questions on the right (one column in a narrow window).
+Tasks puts On you and On them side by side, with the others grouped by person; Decisions and Risks are full-width cards
+with an empty state; the transcript groups lines by speaker, with a search and speaker chips. A call recording (14.1s)
+sits right under the header. An upcoming call's Tasks has On you with Add, Waiting on others by person and Decided last
+time; Earlier calls lists the dates. Topic titles no longer show stray stars or stop at 10, and Decisions falls back to
+the call notes.
+
 **Tracker.** Tasks, decisions and risks of every project on one screen, from the local Notion mirror and the
 commitments kept on this Mac. Settings > Modules turns it off.
 
@@ -2213,4 +2223,4 @@ first gist and final write are engine events, not proof of a screen paint.
 
 ### Floating call controls
 
-During a call, a floating panel stays above other windows with the transcription state, Home, Tips, pause/resume transcription and End call. Active sound or video recording has separate pause/resume and Stop and save controls. Drag the panel to move it; its position is remembered. Disable it in Settings > General > Show floating call controls, or in its menu. When enabled, the menu bar shows only the icon, with the timer in the panel. macOS controls menu bar order; hold Command and drag the icon to the right to keep it within reach.
+During a call, a floating panel stays above other windows with the transcription state, Home, Tips, pause/resume transcription and End call. Active sound or video recording has separate pause/resume and Stop and save controls. Drag the panel to move it; its position is remembered. Disable it in Settings > General > Show floating call controls, or in its menu. When enabled, the menu bar shows only the icon, with the timer in the panel. During a call (while Pacenote listens) the P stays as it is and only its small dot turns red. macOS controls menu bar order; hold Command and drag the icon to the right to keep it within reach.

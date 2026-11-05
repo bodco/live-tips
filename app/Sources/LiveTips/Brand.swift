@@ -11,7 +11,8 @@ enum Brand {
     static let markStroke: CGFloat = 92
     static let dot = (center: CGPoint(x: 400, y: 752), radius: CGFloat(70))
 
-    // Menu bar template, 18 x 18 pt: idle (open dot) and recording (filled dot, slightly shorter line).
+    // Menu bar, 18 x 18 pt: idle (open dot, a template). Recording draws the same line with a red dot;
+    // barRecD (the shorter line) is kept for the brand files only.
     static let barIdleD = "M6 13.1V6.6C6 4.6 7.3 3 9.5 3C11.7 3 13.2 4.4 13.2 6.4C13.2 8.5 11.7 9.9 9.5 9.9H8.4"
     static let barRecD = "M6 12.9V6.6C6 4.6 7.3 3 9.5 3C11.7 3 13.2 4.4 13.2 6.4C13.2 8.5 11.7 9.9 9.5 9.9H8.4"
 
@@ -25,23 +26,33 @@ enum Brand {
     static let blueLight = Color(red: 0x4D / 255, green: 0x9D / 255, blue: 0xFF / 255)
 
     /// The menu bar image: a template (macOS tints it for the menu bar), drawn as vectors.
+    /// 2026-11-05 (owner): while recording the P stays the same and only its small dot turns red and filled. A red
+    /// dot cannot be a template, so that image draws the line in the menu bar's own text colour (light or dark bar).
     static func menuBarImage(recording: Bool) -> NSImage {
         let img = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-            ctx.setStrokeColor(NSColor.black.cgColor)
-            ctx.setFillColor(NSColor.black.cgColor)
+            let m = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua, .vibrantLight, .vibrantDark])
+            let dark = m == .darkAqua || m == .vibrantDark
+            let line = recording ? (dark ? NSColor.white : NSColor.black) : NSColor.black
+            ctx.setStrokeColor(line.cgColor)
             ctx.setLineCap(.round)
             ctx.setLineJoin(.round)
             ctx.setLineWidth(2)
-            ctx.addPath(SVGPath.cgPath(recording ? barRecD : barIdleD))
+            ctx.addPath(SVGPath.cgPath(barIdleD))
             ctx.strokePath()
-            let r: CGFloat = recording ? 2.1 : 1.75
-            let rect = CGRect(x: 6 - r, y: 15 - r, width: 2 * r, height: 2 * r)
-            if recording { ctx.fillEllipse(in: rect) } else { ctx.setLineWidth(1.4); ctx.strokeEllipse(in: rect) }
+            if recording {
+                let r: CGFloat = 2.3
+                ctx.setFillColor(NSColor(srgbRed: 1, green: 0x3B / 255, blue: 0x30 / 255, alpha: 1).cgColor)   // PN.C.rec
+                ctx.fillEllipse(in: CGRect(x: 6 - r, y: 15 - r, width: 2 * r, height: 2 * r))
+            } else {
+                let r: CGFloat = 1.75
+                ctx.setLineWidth(1.4)
+                ctx.strokeEllipse(in: CGRect(x: 6 - r, y: 15 - r, width: 2 * r, height: 2 * r))
+            }
             return true
         }
-        img.isTemplate = true
-        img.accessibilityDescription = "Pacenote"
+        img.isTemplate = !recording
+        img.accessibilityDescription = recording ? "Pacenote, recording" : "Pacenote"
         return img
     }
 

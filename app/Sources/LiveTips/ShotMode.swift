@@ -571,8 +571,24 @@ final class ShotMode: NSObject, NSApplicationDelegate {
       """
 
     /// 0.8.7: pages pushed inside Home (call page, follow-up panel, series) are captured from the Home window.
-    /// 2026-11-05 (call page redesign): the page of the demo call on every tab, wide and narrow, with demo notes.
+    /// 2026-11-05 (call page redesign): the page of the demo call on every tab, wide and narrow, with demo notes,
+    /// and the upcoming call page on its tabs.
     func callPageShots(_ theme: String) {
+        for (tab, w) in [("setup", 1280.0), ("brief", 1280.0), ("tasks", 1280.0), ("earlier", 1280.0), ("tasks", 900.0)] {
+            steps.append { [unowned self] in
+                UpcomingCallPage.shotTab = tab
+                HomeNav.shared.path = []; HomeNav.shared.followUp = nil
+                if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }
+                HomeWindow.window?.setContentSize(NSSize(width: w, height: 860))
+                UpcomingPages.open(self.planned)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
+                    let uk = L10n.lang == "uk" ? "-uk" : ""
+                    if let win = HomeWindow.window { capture(win, "upcoming-\(tab)-\(Int(w))-\(theme)\(uk)") }
+                    UpcomingCallPage.shotTab = nil
+                    next()
+                }
+            }
+        }
         steps.append { [unowned self] in
             if let r = self.demoCall { Self.writeDemoNotes(r.file) }
             self.next(after: 0.2)

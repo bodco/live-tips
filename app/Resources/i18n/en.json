@@ -1806,6 +1806,8 @@
  "page.empty.risks.body": "Risks raised on the call show up here. Add one if it was missed.",
  "transcript.everyone": "Everyone",
  "transcript.empty": "The transcript has no lines yet.",
+ "page.brief.none.body": "The brief is a page of what matters on this call: open items, facts and questions to ask. Pacenote writes it from the project files and earlier calls.",
+ "page.earlier.none": "No earlier calls of this meeting",
  "export.title": "Export notes",
  "export.format": "Format",
  "export.include": "Include",

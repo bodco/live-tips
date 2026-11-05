@@ -235,6 +235,28 @@ if let i = args.firstIndex(of: "--google-selftest") {
     }
     RunLoop.main.run()
 }
+if let i = args.firstIndex(of: "--rec-bench") {      // 0.9.5 QA: call recording sizes, see CallRecorder.swift
+    let out = i + 1 < args.count ? args[i + 1] : NSTemporaryDirectory() + "pacenote-rec-bench"
+    let sec = i + 2 < args.count ? Double(args[i + 2]) ?? 15 : 15
+    _ = NSApplication.shared
+    RecBench.run(out: out, seconds: sec)
+}
+if let i = args.firstIndex(of: "--rec-drive-test"), i + 1 < args.count {   // 0.9.5 QA: does Google Drive process this video?
+    let file = args[i + 1]
+    let outPath = i + 2 < args.count ? args[i + 2] : NSTemporaryDirectory() + "pacenote-drive-test.json"
+    MainActor.assumeIsolated {
+        Task { @MainActor in
+            let g = GoogleService.shared
+            g.reload()
+            await g.refreshAll()
+            let r = await DriveRecordings.shared.testUpload(path: file)
+            let d = (try? JSONSerialization.data(withJSONObject: r, options: [.sortedKeys, .prettyPrinted])) ?? Data()
+            try? d.write(to: URL(fileURLWithPath: outPath))
+            exit(0)
+        }
+    }
+    RunLoop.main.run()
+}
 if args.contains("--probe") {
     probe(request: args.contains("--request"))
     exit(0)

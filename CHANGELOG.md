@@ -3,6 +3,27 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.9.5 (unreleased)
+
+- **Call recording (2026-11-05, off by default):** save the call's sound, or the sound and the screen, on this Mac in
+  `<project>/video/`, to watch a call again (for example the other side's reactions). Start call > Record the call
+  (Off, Sound, Sound and screen) for one call; Settings > Call recording > Record every call for all. In the call the
+  tips window's top bar has Record, then the time with Pause and Stop; Stop and Record again make a second part. A whole
+  screen (the main one or another monitor) or one window (asked when the recording starts, or the call's window found
+  by itself), switchable during the call; Pacenote's own windows and sounds are never recorded. The call's sound and
+  your microphone in one track. Light (1280 px, the default), Standard (1920 px) and Sharp (2560 px), HEVC (the
+  default, about 200 MB an hour at most with Light; Google Drive plays it) or H.264, with the most an hour takes shown
+  in Settings. The file is written as it goes and saved when Pacenote quits. Never sent to an AI.
+- **Recordings to Google Drive (2026-11-05):** Upload to Google Drive on the call page, or every recording after the
+  call, into My Drive > Pacenote > <project> of the account you choose (`drive.file`, Pacenote sees only what it made);
+  resumable, it goes on after a dropped connection or a restart. The call page shows the recording: length, size,
+  Play, Show in Finder, Open in Drive.
+- **Screen recording permission in onboarding (2026-11-05):** asked together with the microphone and the system audio
+  (optional), so a recording never stops to ask; Settings > Call recording shows it and asks again.
+- **Recording consent names the recording (2026-11-05):** when the call is also recorded, Settings > General > Recording
+  consent says or copies its second message ("transcribes and records this call"), also when the recording starts
+  later in the call. PRIVACY updated.
+
 ## 0.9.4.1 (2026-11-05)
 
 - **Fixed: tip rating (2026-11-05):** a click on the amber wave or the red cross opened "What was off?" and hid it at once,

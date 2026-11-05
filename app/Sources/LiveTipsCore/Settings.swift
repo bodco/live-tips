@@ -167,6 +167,11 @@ public struct AppConfig: Codable, Equatable {
     public var consentChat = false
     public var consentTextEN = "Hi all, a note-taking assistant on my computer transcribes this call for my notes. Tell me if you would rather I turn it off."
     public var consentTextUK = "Привіт усім, помічник на моєму комп'ютері транскрибує цей дзвінок для моїх нотаток. Скажіть, якщо краще його вимкнути."
+    /// 0.9.5 (owner): the consent message when the call is also recorded (sound or screen), said or copied the same way.
+    public var consentRecTextEN = "Hi all, an assistant on my computer transcribes and records this call for my notes. Tell me if you would rather I turn it off."
+    public var consentRecTextUK = "Привіт усім, помічник на моєму комп'ютері транскрибує і записує цей дзвінок для моїх нотаток. Скажіть, якщо краще його вимкнути."
+    /// 0.9.5 (owner): Settings > Call recording (the sound, or the sound and the screen, in <project>/video/).
+    public var recording = RecordingSettings()
     /// The work folder connected to Cowork: project folders and the Notion mirror (_notion/) live here.
     public var workRoot = ""
     /// Advanced override; empty = <workRoot>/Tools/LiveTips (or Application Support without a work folder).
@@ -222,6 +227,9 @@ public struct AppConfig: Codable, Equatable {
         consentChat = (try? c.decode(Bool.self, forKey: .consentChat)) ?? d.consentChat
         consentTextEN = (try? c.decode(String.self, forKey: .consentTextEN)) ?? d.consentTextEN
         consentTextUK = (try? c.decode(String.self, forKey: .consentTextUK)) ?? d.consentTextUK
+        recording = (try? c.decode(RecordingSettings.self, forKey: .recording)) ?? d.recording
+        consentRecTextEN = (try? c.decode(String.self, forKey: .consentRecTextEN)) ?? d.consentRecTextEN
+        consentRecTextUK = (try? c.decode(String.self, forKey: .consentRecTextUK)) ?? d.consentRecTextUK
         workRoot = (try? c.decode(String.self, forKey: .workRoot)) ?? d.workRoot
         appRoot = (try? c.decode(String.self, forKey: .appRoot)) ?? d.appRoot
         knownModels = (try? c.decode([String].self, forKey: .knownModels)) ?? d.knownModels

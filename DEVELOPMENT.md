@@ -212,9 +212,26 @@ provider for tests.
 `budget` in the config: a soft and a hard limit per call and a hard monthly cap kept in a small
 local ledger. At the hard limit model tips stop and only the local layer runs.
 
+## Call recording (0.9.5)
+
+`LiveTipsCore/RecordingCore.swift`: the settings (`AppConfig.recording`), the quality presets and their size an hour,
+the file names (`<project>/video/<stem>.recording[-N].mp4|m4a`, `<stem>.recording.json`) and how the call's window is
+found (`MeetingWindow`); `CoreChecks` covers them. `LiveTips/CallRecorder.swift`: ScreenCaptureKit (a display without
+Pacenote's windows, or one window) and an AVCaptureSession for the microphone, both sounds mixed by their timestamps
+into one AAC track, AVAssetWriter with 10 s fragments; pause keeps one file, stop and start make parts. Started by
+`CallEngine.startCallRecording` (the request's `recording`) and by the tips window (`{"action": "rec"}`), stopped with
+the call and before the app quits. `RecordingPicker.swift` (the window list), `RecordingSettingsPane.swift` (Settings
+> Call recording), `RecordingRow.swift` (the call page), `DriveRecordings.swift` (resumable upload, `drive.file`, the
+queue in UserDefaults). The recorder (`recorder/`) is not involved: the transcript works as before.
+
+Sizes on this Mac: `"/Applications/Pacenote.app/Contents/MacOS/LiveTips" --rec-bench /tmp/rb 15` (better through
+`open -n Pacenote.app --args --rec-bench /tmp/rb 15`, so the app's Screen Recording permission applies) records the main
+screen with every preset and format and writes `bench.json`.
+
 ## Privacy
 
-Audio and voice prints never leave the Mac. Only text goes to the model API. Keys are read at
+Audio and voice prints never leave the Mac, and a call recording leaves it only to the PM's own Google Drive when the
+PM uploads it. Only text goes to the model API. Keys are read at
 runtime (Keychain in the app, an environment variable or a secrets file in the spike) and are
 never printed or logged.
 

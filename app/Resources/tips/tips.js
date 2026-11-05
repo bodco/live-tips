@@ -14,6 +14,10 @@
   const STR = {
     en: {
       listening: 'Listening', paused: 'Paused', muted: 'Mic off', ended: 'Call ended', ending: 'Ending the call…', starting: 'Starting…',
+      rec: { start: 'Record the call', sound: 'Record the sound', screen: 'Record the sound and the screen', rec: 'Rec', paused: 'Paused',
+        pause: 'Pause the recording', resume: 'Resume the recording', stop: 'Stop and save the recording', source: 'Record another window or screen',
+        settings: 'Recording settings', choosing: 'Choose what to record…', starting: 'Starting the recording…', menu: 'Recording',
+        hint: 'Saved on this Mac in the project\'s video folder' },
       micStalled: 'The microphone stopped', cantHear: "Can't hear the other side", asrBehind: (o) => `Transcription is ${o.n} s behind`,
       engineDeaf: 'Tips are not coming: end the call and start again',
       onMe: 'On me', more: 'More', earlier: 'Earlier',
@@ -79,6 +83,10 @@
     },
     uk: {
       listening: 'Слухаю', paused: 'Пауза', muted: 'Мікрофон вимкнено', ended: 'Дзвінок завершено', ending: 'Завершую дзвінок…', starting: 'Запускаю…',
+      rec: { start: 'Записати дзвінок', sound: 'Записати звук', screen: 'Записати звук і екран', rec: 'Запис', paused: 'Пауза',
+        pause: 'Призупинити запис', resume: 'Продовжити запис', stop: 'Зупинити і зберегти запис', source: 'Записувати інше вікно чи екран',
+        settings: 'Налаштування запису', choosing: 'Оберіть, що записувати…', starting: 'Запускаю запис…', menu: 'Запис',
+        hint: 'Зберігається на цьому Mac у папці video проєкту' },
       micStalled: 'Мікрофон зупинився', cantHear: 'Не чую іншу сторону', asrBehind: (o) => `Транскрипція відстає на ${o.n} с`,
       engineDeaf: 'Підказки не надходять: заверши дзвінок і почни знову',
       onMe: 'На мені', more: 'Більше', earlier: 'Раніше',
@@ -151,6 +159,7 @@
     agenda: [], cards: [], onMe: [], next: null, deal: null,
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
+    rec: { state: 'off', kind: 'video', elapsed: 0, source: '', note: '' },
     pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
     openItems: [], notionItems: [], notionProject: '', minePending: [], mineN: 0, spkPrompt: 15,
     ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, rateOpen: null, briefEdit: false,
@@ -260,6 +269,39 @@
     if (bar.dataset.html !== html) { bar.innerHTML = html; bar.dataset.html = html; }
   }
 
+  // 0.9.5: the call recording. Off: one button (a menu: sound, or sound and screen). On: the time, Pause, Stop.
+  function mmss(sec) { sec = Math.max(0, sec | 0); const h = (sec / 3600) | 0, m = ((sec % 3600) / 60) | 0, x = sec % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+  function renderRec(t, hide) {
+    const el = $('recCtl'), r = S.rec || {}, tr2 = t.rec || STR.en.rec;
+    el.hidden = hide;
+    if (hide) { S.ui.recMenu = false; el.innerHTML = ''; el.dataset.html = ''; return; }
+    const on = r.state === 'recording' || r.state === 'paused';
+    el.classList.toggle('paused', r.state === 'paused');
+    let html;
+    if (on) {
+      const p = r.state === 'paused';
+      html = `<button class="pill" type="button" data-act="rec-menu" title="${esc(r.source ? tr2.menu + ': ' + r.source : tr2.menu)}" aria-haspopup="menu"><span class="dot"></span><span class="lbl">${esc(p ? tr2.paused : tr2.rec)}</span><span>${mmss(r.elapsed)}</span></button>`
+        + `<button class="icon-btn tool" type="button" data-act="${p ? 'rec-resume' : 'rec-pause'}" title="${esc(p ? tr2.resume : tr2.pause)}" aria-label="${esc(p ? tr2.resume : tr2.pause)}">${p ? PLAY : PAUSE}</button>`
+        + `<button class="icon-btn tool" type="button" data-act="rec-stop" title="${esc(tr2.stop)}" aria-label="${esc(tr2.stop)}"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" fill="currentColor"/></svg></button>`;
+    } else {
+      const busy = r.state === 'choosing' || r.state === 'starting';
+      const tip = busy ? (r.state === 'choosing' ? tr2.choosing : tr2.starting) : tr2.start;
+      html = `<button class="icon-btn tool recstart" type="button" data-act="rec-menu" title="${esc(tip)}" aria-label="${esc(tip)}" aria-haspopup="menu"${busy ? ' disabled' : ''}><span class="ring"><i></i></span></button>`;
+    }
+    if (S.ui.recMenu) {
+      html += '<div class="recmenu" role="menu">';
+      if (on) {
+        if (r.kind === 'video') html += `<button type="button" role="menuitem" data-act="rec-source">${esc(tr2.source)}</button>`;
+        html += `<button type="button" role="menuitem" data-act="rec-stop">${esc(tr2.stop)}</button>`;
+      } else {
+        html += `<button type="button" role="menuitem" data-act="rec-start" data-kind="video">${esc(tr2.screen)}</button>`
+          + `<button type="button" role="menuitem" data-act="rec-start" data-kind="audio">${esc(tr2.sound)}</button>`;
+      }
+      html += `<button type="button" role="menuitem" data-act="rec-settings">${esc(tr2.settings)}</button><div class="sub">${esc(tr2.hint)}</div></div>`;
+    }
+    if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+  }
+
   function render() {
     const t = T();
     document.documentElement.lang = S.lang;
@@ -310,6 +352,7 @@
     bb.title = (pro ? t.proactiveOn : t.proactiveOff) + key('proactive');
     bb.setAttribute('aria-label', t.ariaProactive);
     bb.innerHTML = BULB;
+    guard('rec', () => renderRec(t, isReady || ended));
 
     // agenda
     const ag = $('agenda');
@@ -994,6 +1037,7 @@
     if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('#moreBtn')) { S.ui.menuOpen = false; renderMenu(); }
     if (!$('pop').hidden && !e.target.closest('#pop') && !(b && (b.dataset.act === 'name' || b.dataset.act === 'line-who'))) $('pop').hidden = true;
     if (S.ui.delArm && !(b && b.dataset.act === 'line-del')) { S.ui.delArm = null; if (!b) render(); }
+    if (S.ui.recMenu && !e.target.closest('#recCtl')) { S.ui.recMenu = false; if (!b) render(); }   // 0.9.5
     if (!b) return;
     const act = b.dataset.act, id = b.dataset.id;
     const card = id && S.cards.find((c) => c.id === id);
@@ -1152,6 +1196,13 @@
         break;
       }
       case 'start': S.call.state = 'live'; post('start'); break;
+      case 'rec-menu': S.ui.recMenu = !S.ui.recMenu; break;
+      case 'rec-start': S.ui.recMenu = false; S.rec = Object.assign({}, S.rec, { state: 'starting' }); post('rec', { a: 'start', kind: b.dataset.kind || 'video' }); break;
+      case 'rec-pause': S.ui.recMenu = false; post('rec', { a: 'pause' }); return;
+      case 'rec-resume': S.ui.recMenu = false; post('rec', { a: 'resume' }); return;
+      case 'rec-stop': S.ui.recMenu = false; post('rec', { a: 'stop' }); break;
+      case 'rec-source': S.ui.recMenu = false; post('rec', { a: 'source' }); break;
+      case 'rec-settings': S.ui.recMenu = false; post('rec', { a: 'settings' }); break;
       case 'open-brief': openTab('brief'); return;
       case 'brief-edit': S.ui.briefEdit = true; break;
       case 'brief-cancel': S.ui.briefEdit = false; break;
@@ -1245,7 +1296,7 @@
     if (!typing && S.pres && S.pres.moveAsk && presenting() && (e.key === 'Enter' || e.key === 'Escape')) { e.preventDefault(); answerMove(e.key === 'Enter'); return; }
     if (e.key === 'Escape') {
       if (S.ui.editing) { S.ui.editing = null; render(); return; }
-      S.ui.menuOpen = false; S.ui.sheet = null; S.ui.heroOverride = null; $('pop').hidden = true; render();
+      S.ui.menuOpen = false; S.ui.recMenu = false; S.ui.sheet = null; S.ui.heroOverride = null; $('pop').hidden = true; render();
     }
   });
   $('moreBtn').addEventListener('click', () => { S.ui.menuOpen = !S.ui.menuOpen; renderMenu(); });

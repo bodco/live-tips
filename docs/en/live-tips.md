@@ -965,8 +965,9 @@ The full texts: [privacy policy](https://pacenote.bodco.pm/privacy/) and [terms 
   account). A Gemini account runs through Google's Antigravity CLI, never for tips; its terms forbid use through
   third-party software and let Google use and review the conversations, so a red warning appears when you choose
   it. Plan B through Gemini is off by default (14.1p).
-- Audio is not stored: recognised phrases are appended to the `.md` immediately, audio
-  buffers live only in memory.
+- Audio is not stored for the transcript: recognised phrases are appended to the `.md` immediately, audio
+  buffers live only in memory. A call recording (14.1s, off by default) is the one exception: a file in
+  `<project>/video/` that you chose to make; it never goes to an AI, and to Google Drive only when you upload it.
 - Transcripts live in the project folder (`<project>/live/`). Do not add them to public
   repositories.
 - The Meetings DB page is internal. The skill never sends anything to the client.
@@ -1691,6 +1692,52 @@ linked there as "Also by bodco". The changelog is `CHANGELOG.md` in this reposit
 a section about the website itself (hosting on GitHub Pages, Google Analytics 4 only with your consent) that
 [PRIVACY.md](../../PRIVACY.md) does not repeat. The pages are built from the PM Control Tower site's source and
 published from github.com/bodco/pacenote.bodco.pm; how: [DEVELOPMENT.md](../../DEVELOPMENT.md), "The website".
+
+### 14.1s Call recording (0.9.5, beta)
+
+Watching a call again shows what a transcript cannot: how the other side reacted to the price, who hesitated, what
+was on the shared screen. Pacenote can save the call's sound, or the sound and the screen, as a file on your Mac.
+
+- **Per call, or every call.** Start call > Record the call: Off, Sound, or Sound and screen. Settings > Call
+  recording > Record every call makes your choice there the default. During the call the top bar of the tips window
+  has a record button (Sound and screen, or Sound); once it runs it shows the time with Pause and Stop. Pause leaves
+  the paused minutes out of the same file; Stop saves it, and a new start in the same call makes a second part
+  (`<stem>.recording-2.mp4`). End call stops and saves it too.
+- **What is in the picture.** A whole screen (Settings > Call recording > Screen: the main one or another monitor) or
+  one window. For one window, Which window: Ask when the recording starts (the default: a list of the windows on
+  screen, the call's window marked) or The call's window, found by itself (Zoom, Teams, Webex, FaceTime, a Slack
+  huddle or a browser tab with Meet, Zoom or Teams; when none is found, Pacenote asks). The tips window's recording
+  menu can switch to another window or screen without stopping. Pacenote's own windows (tips, brief) are never in the
+  recording, on a whole screen too, and its own sounds never in the track.
+- **Sound.** The call's system audio and your microphone (Settings: Your microphone in the recording) mixed into one
+  AAC track, so every player and Google Drive play both. The microphone is the call's: the one chosen in Start call;
+  with a Bluetooth headset as the default, the Mac's built-in one, as for the transcript. Turning the microphone off in
+  the tips window leaves it out of the recording too.
+- **Quality and size.** Meetings are mostly still, so the frame rate is low and the picture is scaled to a width that
+  keeps shared slides and text readable. Light (default): up to 1280 px, 10 frames a second. Standard: up to 1920 px,
+  12 frames a second. Sharp: up to 2560 px, 15 frames a second; the width is shown next to each in Settings. Format:
+  HEVC (default) is smaller at the same picture and plays on a Mac, an iPhone and in Google Drive; H.264 is bigger and
+  also plays on older Windows players. Settings show the most an hour can take (Light: about 200 MB with HEVC, about
+  300 MB with H.264); a still screen takes much less. Sound only: about 29 MB an hour. For a whole large screen with
+  small shared text, choose Standard or record the call's window.
+- **Where.** `<project>/video/<stem>.recording.mp4` (`.m4a` for sound only) and `<stem>.recording.json` with the parts
+  and their Drive copies, next to the call's `live/` folder; `<stem>` is the transcript's name, so the call page finds
+  the recording by itself: Play, Show in Finder, Upload to Google Drive, Open in Drive. The file is written as it goes
+  (fragments every 10 seconds): a crash loses at most the last seconds. Quitting Pacenote saves it first.
+- **Google Drive.** Upload by a click on the call page (the default), or Upload every recording after the call. It goes
+  to the account in Settings > Call recording (any account added in Integrations > Google that allows the export), into
+  My Drive > Pacenote > <project>, with the `drive.file` permission: Pacenote sees only the files and folders it made.
+  The upload goes in 8 MB pieces and goes on after a dropped connection or a restart. The recording stays on the Mac;
+  share the Drive copy from Drive.
+- **Permission.** macOS Screen & System Audio Recording, in the same set as the microphone during onboarding (or Settings
+  > Call recording > Allow). Recording needs it also for sound only, because the call's sound comes through the same
+  macOS service. macOS may ask you to quit and reopen Pacenote after allowing it.
+- **Consent.** Nothing is shown or played to the other participants. Settings > General > Recording consent can say or
+  copy a message when the recording starts; when the call is also recorded, its second message says so ("transcribes
+  and records this call"), also when you start recording later in the call. Check the rules of your company and of
+  your clients' countries.
+- **Never to an AI.** Tips, preparation and notes use the transcript as before; the recording is only for you and the
+  people you share it with.
 
 ### 14.2 After the call: the meeting page in Notion
 

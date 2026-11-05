@@ -15,6 +15,8 @@ final class OnboardingModel: ObservableObject {
     @Published var micState = AVCaptureDevice.authorizationStatus(for: .audio)
     /// true granted, false denied, nil not asked yet (or macOS does not say).
     @Published var sysAudio: Bool? = SystemAudioPermission.granted()
+    /// 0.9.5: Screen Recording, for call recordings with the screen (optional; asked here so a recording never asks mid-call)
+    @Published var screen = ScreenPermission.granted()
     @Published var apiKey = ""
     @Published var notionToken = ""
     @Published var keyNote = ""
@@ -38,6 +40,7 @@ final class OnboardingModel: ObservableObject {
     func refreshPermissions() {
         micState = AVCaptureDevice.authorizationStatus(for: .audio)
         sysAudio = SystemAudioPermission.granted()
+        screen = ScreenPermission.granted()
     }
 
     /// Asks macOS now (the same prompt as on the first call); when it was refused, opens System Settings.
@@ -288,6 +291,12 @@ struct OnboardingView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.horizontal, 12)
+                }
+                // 0.9.5 (owner): in the same set, so a call recording never stops to ask
+                permissionRow("record.circle", L("onboarding.permissions.screen"), ok: m.screen,
+                              button: L("onboarding.permissions.screenButton"), note: L("onboarding.permissions.screenOptional")) {
+                    if !ScreenPermission.request() { ScreenPermission.openSettings() }
+                    m.refreshPermissions()
                 }
                 permissionRow("calendar", L("onboarding.permissions.calendars"), ok: cal.access == .granted,
                               button: cal.access == .denied ? L("common.openSettings") : L("onboarding.permissions.calendarsButton"),

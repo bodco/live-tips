@@ -52,6 +52,10 @@ events:
   speakers_merged: [aliases]               # 0.9.4: Settings > Voice library > Merge, how many names the person has now
   meet_participants: [n, named]            # 0.9.4: Meet participants read after the call, speakers named from them
   telemetry_sent: [lines]                  # 0.9.4: a batch sent to the author (Help improve Pacenote, off by default)
+  rec_started: [kind, source]              # 0.9.5: call recording started (kind audio or video; source sound, display or chosen)
+  rec_paused: []                           # 0.9.5: call recording paused
+  rec_saved: [kind, minutes]               # 0.9.5: a part of a call recording saved in <project>/video/
+  rec_uploaded: [minutes, auto]            # 0.9.5: a call recording copied to the PM's Google Drive
 telemetry:                               # 0.9.4 (owner): Help improve Pacenote
   setting: shareUsage                    # Settings > General > Privacy, off by default; needs usageLog on
   endpoint: https://pacenote-telemetry.neymet-bogdan.workers.dev/v1/batch   # app/telemetry (Cloudflare Worker + D1)

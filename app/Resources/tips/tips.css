@@ -424,3 +424,20 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 .briefbar .bb-prog { display: block; height: 3px; border-radius: 2px; background: var(--surface-2); margin-top: 3px; overflow: hidden; }
 .briefbar .bb-prog span { display: block; height: 100%; background: var(--brand); }
 .compact .briefbar { display: none; }
+
+/* 0.9.5: the call recording in the top bar */
+.recc{display:flex;align-items:center;gap:2px;position:relative}
+.recc .pill{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:0;border-radius:var(--radius-s);background:var(--danger-soft);color:var(--danger-text);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.recc .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--rec);animation:recblink 1.6s ease-in-out infinite}
+.recc.paused .pill{background:var(--surface-2);color:var(--text-2)}
+.recc.paused .pill .dot{background:var(--text-3);animation:none}
+.recc .icon-btn.tool.recstart .ring{width:12px;height:12px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center}
+.recc .icon-btn.tool.recstart .ring i{width:6px;height:6px;border-radius:50%;background:var(--rec)}
+.recc .icon-btn.tool[disabled]{opacity:.5}
+.recmenu{position:absolute;top:32px;right:0;z-index:40;min-width:230px;padding:4px;border-radius:var(--radius-m,10px);background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.18),0 0 0 1px var(--border,rgba(0,0,0,.08))}
+.recmenu button{display:block;width:100%;text-align:left;padding:7px 10px;border:0;border-radius:var(--radius-s);background:transparent;color:var(--text);font-size:13px}
+.recmenu button:hover{background:var(--surface-2)}
+.recmenu .sub{padding:4px 10px 6px;color:var(--text-3);font-size:12px}
+.app.compact .recc .pill .lbl{display:none}
+@keyframes recblink{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.recc .pill .dot{animation:none}}

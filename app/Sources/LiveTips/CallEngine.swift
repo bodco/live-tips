@@ -178,6 +178,7 @@ final class CallEngine {
         IndexService.shared.pause()        // the indexer waits while Whisper and the tips engine run
         self.onReady = onReady
         liveSpent = 0; liveTips = 0; renamed = nil
+        consentGiven = false; consentRecGiven = false; consentWaits = false
         poll?.invalidate()
         var sidecarStarted = false
         var consentDone = false
@@ -196,6 +197,7 @@ final class CallEngine {
             }
             if !consentDone, st.state == "recording" {
                 consentDone = true
+                self.startCallRecording(file: st.file ?? self.lastFile)     // 0.9.5: before the consent, so it names the recording
                 self.consent()
             }
             // The tips engine must live as long as the recording: restart it if it ended (it reads on from now).
@@ -206,6 +208,7 @@ final class CallEngine {
             }
             if !(self.recorder?.isRunning ?? false) {
                 t.invalidate()
+                CallRecorder.shared.callEnded()       // 0.9.5: the recording ends with the call (and goes to Drive if set)
                 // The tips engine ends by itself a few seconds after the recorder and writes the call summary
                 // card; it is stopped only if it hangs (P2 26.10).
                 let sc = self.sidecar
@@ -600,12 +603,52 @@ final class CallEngine {
         }
     }
 
+    /// 0.9.5: the call recording chosen in Start call (or by Settings > Call recording > Record every call).
+    func startCallRecording(file: String?) {
+        let kind = (callRequest["recording"] as? String) ?? config.recording.defaultForCall
+        guard kind == "audio" || kind == "video", let f = file else { return }
+        CallRecorder.shared.begin(transcript: f, kind: kind, title: (callRequest["title"] as? String) ?? "", project: projectName)
+    }
+
+    /// The project's (or workspace's) name of the live call, for the Drive folder.
+    var projectName: String {
+        let slug = (callRequest["slug"] as? String) ?? ""
+        let reg = ProjectRegistry.load(from: AppPaths.projects)
+        return reg.projects.first { $0.slug == slug }?.name ?? ((callRequest["workspace"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? slug)
+    }
+
+    var consentGiven = false, consentRecGiven = false, consentWaits = false
+
     /// Consent when the recording starts (Settings > General > Recording consent; both off by default).
+    /// 0.9.5: when the call is also recorded, the message says so (consentRecText). While the recording is still
+    /// starting (or its window is being chosen) the message waits for it: "records" only once it really records.
     func consent() {
+        consentGiven = true
+        let st = CallRecorder.shared.state
+        if st == "choosing" || st == "starting" { consentWaits = true; return }
+        sayConsent(recorded: st == "recording" || st == "paused")
+    }
+
+    /// 0.9.5: the recording started (at the start of the call or later): the "records" message once, if consent is on.
+    func recordingConsent() {
+        guard consentGiven, !consentRecGiven else { return }
+        consentWaits = false
+        sayConsent(recorded: true)
+    }
+
+    /// 0.9.5: the recording was cancelled or did not start: the waiting message goes out without "records".
+    func recordingNotStarted() {
+        guard consentWaits else { return }
+        consentWaits = false
+        sayConsent(recorded: false)
+    }
+
+    private func sayConsent(recorded: Bool) {
         let c = config
         guard c.consentSay || c.consentChat else { return }
+        if recorded { consentRecGiven = true }
         let uk = ((callRequest["me_lang"] as? String) ?? "uk") == "uk"
-        let text = uk ? c.consentTextUK : c.consentTextEN
+        let text = recorded ? (uk ? c.consentRecTextUK : c.consentRecTextEN) : (uk ? c.consentTextUK : c.consentTextEN)
         guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         if c.consentChat {
             NSPasteboard.general.clearContents()

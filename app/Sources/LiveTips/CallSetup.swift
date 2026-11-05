@@ -494,6 +494,13 @@ struct CallSetupView: View {
                     Text(L("call.startRecording.now")).tag(false)
                 }
                 Toggle(L("call.publicCall"), isOn: $model.publicCall)
+                // 0.9.5 (owner): a recording of this call; Settings > Call recording has the default and the quality
+                Picker(L("call.record"), selection: $model.recording) {
+                    Text(L("call.record.off")).tag("off")
+                    Text(L("rec.kind.audio")).tag("audio")
+                    Text(L("rec.kind.video")).tag("video")
+                }
+                .help(L("call.record.help"))
                 if let r = model.root {           // 0.8.7 (G3): the project folder in the preparation, here instead of a chip
                     Toggle(L("call.useProjectFolder"), isOn: $model.useProjectFolder)
                         .help(model.useProjectFolder ? L("call.projectFolder.on", ["path": r]) : L("call.projectFolder.off"))

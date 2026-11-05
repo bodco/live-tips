@@ -651,6 +651,48 @@ learningPatterns()
 enginePathsFollowTheApp()
 versions()
 commitmentsRegister()
+/// 0.9.5: call recording: settings decode with defaults, presets and sizes, file names, the call window.
+func callRecording() {
+    let d = try? JSONDecoder().decode(RecordingSettings.self, from: Data("{\"kind\":\"bogus\",\"auto\":true,\"quality\":\"sharp\"}".utf8))
+    expect(d?.kind == "video" && d?.auto == true && d?.quality == "sharp" && d?.drive == "manual", "recording: unknown values fall back, known ones kept")
+    expect(d?.defaultForCall == "video" && RecordingSettings().defaultForCall == "off", "recording: off by default, auto records the kind")
+    let old = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"usageLog\":true}".utf8))
+    expect(old?.recording == RecordingSettings(), "recording: a config without it gets the defaults")
+    let std = RecordingPreset.find("standard")
+    expect(RecordingPreset.find("nope") == std, "recording: an unknown preset is Standard")
+    expect(std.mbPerHour("h264") == 569 && std.mbPerHour("hevc") == 366 && RecordingPreset.audioMBPerHour == 29, "recording: MB an hour \(std.mbPerHour("h264")) \(std.mbPerHour("hevc"))")
+    let (w, h) = std.outputSize(width: 1728, height: 1117, scale: 2)
+    expect(w == 1920 && h == 1240 && w % 2 == 0 && h % 2 == 0, "recording: scaled to the width, even \(w)x\(h)")
+    let (w2, h2) = std.outputSize(width: 801, height: 601, scale: 1)
+    expect(w2 == 800 && h2 == 600, "recording: small windows keep their size, even numbers")
+    let t = "/p/Orbit/live/2026-11-05-1430-weekly-sync.app.md"
+    expect(RecordingFiles.stem(transcript: t) == "2026-11-05-1430-weekly-sync", "recording: stem without .app and .md")
+    expect(RecordingFiles.folder(transcript: t) == "/p/Orbit/video", "recording: <project>/video")
+    expect(RecordingFiles.partPath(transcript: t, part: 1, audioOnly: false) == "/p/Orbit/video/2026-11-05-1430-weekly-sync.recording.mp4", "recording: first part")
+    expect(RecordingFiles.partPath(transcript: t, part: 2, audioOnly: true) == "/p/Orbit/video/2026-11-05-1430-weekly-sync.recording-2.m4a", "recording: second part, sound only")
+    expect(RecordingFiles.metaPath(transcript: t) == "/p/Orbit/video/2026-11-05-1430-weekly-sync.recording.json", "recording: meta")
+    var m = RecordingMeta(); m.title = "Weekly sync"
+    var p1 = RecordingMeta.Part(file: "a.recording.mp4", kind: "video", started: Date(timeIntervalSince1970: 1_800_000_000)); p1.seconds = 60; p1.bytes = 10
+    var p2 = p1; p2.file = "a.recording-2.mp4"; p2.driveID = "x"
+    m.parts = [p1, p2]
+    let mp = NSTemporaryDirectory() + "pn-rec-\(UUID().uuidString)/x.recording.json"
+    m.save(mp)
+    let back = RecordingMeta.load(mp)
+    expect(back == m && back?.notUploaded.map(\.file) == ["a.recording.mp4"] && back?.totalSeconds == 120, "recording: meta round trip, what is not uploaded")
+    try? FileManager.default.removeItem(atPath: (mp as NSString).deletingLastPathComponent)
+    typealias C = MeetingWindow.Candidate
+    let chrome = C(id: 1, bundle: "com.google.Chrome", app: "Chrome", title: "Meet - abc-defg-hij", width: 1400, height: 900)
+    let docs = C(id: 2, bundle: "com.google.Chrome", app: "Chrome", title: "Meeting notes - Google Docs", width: 1600, height: 1000)
+    let zoomHome = C(id: 3, bundle: "us.zoom.xos", app: "zoom.us", title: "Home", width: 900, height: 600)
+    let zoomMeet = C(id: 4, bundle: "us.zoom.xos", app: "zoom.us", title: "Zoom Meeting", width: 1200, height: 800)
+    let slack = C(id: 5, bundle: "com.tinyspeck.slackmacgap", app: "Slack", title: "general", width: 1200, height: 800)
+    let tiny = C(id: 6, bundle: "com.microsoft.teams2", app: "Teams", title: "", width: 300, height: 100)
+    expect(MeetingWindow.score(docs) == 0 && MeetingWindow.score(slack) == 0 && MeetingWindow.score(tiny) == 0, "recording: not calls")
+    expect(MeetingWindow.best([docs, chrome, zoomHome]) == chrome, "recording: the Meet tab, not the Docs tab or Zoom's home")
+    expect(MeetingWindow.best([chrome, zoomMeet, docs]) == zoomMeet, "recording: a Zoom meeting first")
+    expect(MeetingWindow.best([docs, slack]) == nil, "recording: no call window")
+}
+
 frameRoundTripAcrossChunks()
 frameResyncAfterGarbage()
 watchdogStartGraceThenStallTerminateKillRestart()
@@ -752,5 +794,6 @@ let tmE = tmB["events"] as? [[String: Any]] ?? []
 expect(tmE.count == 2 && tmE[0]["d"] as? String == "2026-11-18" && tmE[0]["t"] == nil, "telemetry: only allowed events of those days, days not times")
 expect(((tmE[1]["p"] as? [String: Any])?["minutes"] as? NSNumber)?.intValue == 1, "telemetry: numbers as written")
 try? FileManager.default.removeItem(at: tmDir)
+callRecording()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

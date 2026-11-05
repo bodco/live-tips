@@ -41,6 +41,7 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 - **During the call:** a small window with tips from your own facts, your update when it is your turn, a ready sentence on HELP NOW, a live transcript, a picture of the call (topic, what is on you).
 - **Home and your calendars:** the calls ahead from several Google and Microsoft calendars (through macOS, nothing to install), overlaps marked so you pick the one you join; regular meetings start from their last setup; recent calls with Notion, transcript and folder.
 - **Back-to-back calls (Up next):** plan and prepare the next calls while one is live, then switch with one question: the current call ends properly and the next starts with its preparation.
+- **Call recording (optional):** the sound, or the sound and the screen (a whole screen or the call's window), saved on your Mac for watching a call again, for example to read the other side's reactions; start, pause and stop it in the call window, or record every call. Upload to your own Google Drive by a click or after every call, to share it.
 - **Any language in, one language out:** set the call to one language and every speaker is written in it (Ukrainian on an English call comes out in English).
 - **After the call:** full call notes in the project folder after every call, with or without Notion; with Notion connected, also a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page. A follow-up email is only a draft: nothing is sent to clients by itself.
 
@@ -114,4 +115,4 @@ Pacenote works on its own. With [PM Control Tower](https://github.com/bodco/pm-c
 
 History: Pacenote grew inside PM Control Tower; releases up to 0.5.8 are [there](https://github.com/bodco/pm-control-tower/releases). This repository keeps that history.
 
-MIT License. [Privacy policy](PRIVACY.md) and [terms of use](TERMS.md): your audio stays on your Mac; nothing is sent to the author unless you turn on Help improve Pacenote (event names and numbers only).
+MIT License. [Privacy policy](PRIVACY.md) and [terms of use](TERMS.md): your audio stays on your Mac (a call recording, if you turn it on, too, unless you upload it to your own Google Drive); nothing is sent to the author unless you turn on Help improve Pacenote (event names and numbers only).

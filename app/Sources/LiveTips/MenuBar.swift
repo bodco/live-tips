@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UsageLog.enabled = AppConfig.load(from: AppPaths.config).usageLog
         MainActor.assumeIsolated { AppSignature.shared.check() }     // 2026-10-29: onboarding and About show it
         MainActor.assumeIsolated { TelemetrySender.start() }         // 0.9.4: Help improve Pacenote (off by default)
+        // 0.9.5: recordings that were on their way to Google Drive when the app quit go on (after the accounts load)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { MainActor.assumeIsolated { DriveRecordings.shared.resumeQueue() } }
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
         installMainMenu()
         NSApp.setActivationPolicy(config.showInDock ? .regular : .accessory)
@@ -291,6 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        CallRecorder.shared.stopAndWait()              // 0.9.5: a recording is saved before the app quits
         MainActor.assumeIsolated { LocalAIService.shared.stop() }
         tips?.setSplit(false, animate: false)          // keep the saved tips window at its normal width
     }
@@ -386,6 +389,8 @@ final class StartCallModel: ObservableObject {
     /// 0.8.5 (P2): the deck of a Presentation call, its speakers, slide owners and timing.
     @Published var deck = DeckSetup()
     @Published var publicCall = false            // D3: a webinar or an event with strangers: new voices are not saved
+    /// 0.9.5: record this call: "off", "audio" or "video" (Settings > Call recording gives the default)
+    @Published var recording = AppConfig.load(from: AppPaths.config).recording.defaultForCall
     @Published var hiringRole = "observer"      // interview: observer | interviewer | coach (as in the skill)
     @Published var tipModel = ""                // "" = the model from Settings > AI
     @Published var language = "uk"
@@ -684,6 +689,7 @@ final class StartCallModel: ObservableObject {
                 "scheduled_at": ISO8601DateFormatter().string(from: callDate), "mic_device": micDevice, "standby": standby,
                 "project_config": project?.config ?? "", "people": people, "people_team": peopleTeam,
                 "voices_remember": !publicCall, "prep_file": chosenPrepPath ?? "",
+                "recording": recording,
                 "folders": folders,
                 "sales": { () -> [String: Any] in
                     if !title.isEmpty { UserDefaults.standard.set(salesEnabled ? (salesMethod.isEmpty ? "general" : salesMethod) : "off", forKey: "sales." + EditLog.seriesKey(title)) }

@@ -75,6 +75,7 @@ struct CallPageView: View {
                 }
                 actions(proj, o)
                 if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.onMe) }
+                RecordingRow(file: file)       // 0.9.5: the call recording, if there is one
                 if exportOpen {
                     ExportPanel(file: file, title: Self.title(file), outcome: o, commitments: items) { exportOpen = false }
                 }

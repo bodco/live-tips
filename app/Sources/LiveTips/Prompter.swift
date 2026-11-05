@@ -170,6 +170,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in
             MainActor.assumeIsolated { self?.showCallEnded(n.userInfo ?? [:]) }
         }
+        // 0.9.5: the call recording's state in the top bar (record, pause, stop)
+        NotificationCenter.default.addObserver(forName: CallRecorder.changed, object: nil, queue: .main) { [weak self] _ in
+            self?.pushRecording()
+        }
 
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
         web.navigationDelegate = self
@@ -278,6 +282,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         }
     }
 
+    /// 0.9.5: LiveTips.setState({rec: {state, kind, elapsed, source, note}})
+    func pushRecording() {
+        guard !args.demo else { return }
+        push("window.LiveTips && LiveTips.setState({rec: " + jsonLine(CallRecorder.shared.windowState) + "})")
+    }
+
     func push(_ js: String) {
         if pageReady {
             web.evaluateJavaScript(js, completionHandler: nil)
@@ -300,6 +310,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         pageReady = true
+        pushRecording()        // 0.9.5
         if let o = (UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:])["opacity"] as? Double {
             web.evaluateJavaScript("window.LiveTips && LiveTips.setOpacity(\(o))", completionHandler: nil)
         }
@@ -359,6 +370,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         case "mute":
             // The recorder checks this file twice a second and stops transcribing the mic.
             let on = (message.body as? Bool) ?? false
+            CallRecorder.shared.micMuted = on         // 0.9.5: the recording leaves your microphone out too
             guard !args.control.isEmpty else { return }
             let path = (args.control as NSString).appendingPathComponent("mic_muted")
             if on {
@@ -940,6 +952,22 @@ extension PrompterController {
             zoom(d["step"] as? Int ?? 0)
         case "start":
             startClicked()
+        case "rec":
+            // 0.9.5: the recording controls of the top bar
+            let r = CallRecorder.shared
+            switch d["a"] as? String ?? "" {
+            case "start":
+                let kind = (d["kind"] as? String) ?? MainActor.assumeIsolated { SettingsWindow.model.config.recording.kind }
+                let file = transcriptPath.isEmpty ? (CallEngine.shared.lastFile ?? "") : transcriptPath
+                guard !file.isEmpty, !callEnded else { r.publish(); return }
+                r.begin(transcript: file, kind: kind, title: (CallEngine.shared.callRequest["title"] as? String) ?? args.title, project: CallEngine.shared.projectName)
+            case "pause": r.pause()
+            case "resume": r.resume()
+            case "stop": r.stop()
+            case "source": r.changeSource()
+            case "settings": MainActor.assumeIsolated { SettingsWindow.show(tab: "recording") }
+            default: break
+            }
         case "prepdoc":
             if let t = d["text"] as? String { handle("prepdoc", t) }
         case "prepare-next":

@@ -791,6 +791,7 @@ struct SettingsView: View {
         Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
         Pane(id: "integrations", title: "Integrations", symbol: "point.3.connected.trianglepath.dotted", subtitle: "Notion, calendars and your CRM."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
+        Pane(id: "recording", title: "Call recording", symbol: "record.circle", subtitle: "Record the sound or the screen of your calls."),   // 0.9.5
         Pane(id: "modules", title: "Modules", symbol: "square.grid.2x2", subtitle: "Turn parts of Pacenote on or off."),       // 0.9.0
         Pane(id: "usage", title: "Usage", symbol: "chart.bar", subtitle: "Calls this week and the full statistics."),       // 0.9.0: from Home
         Pane(id: "help", title: "Help", symbol: "questionmark.circle", subtitle: "What Pacenote can do and what is new."),  // 0.9.0: from Home
@@ -837,6 +838,7 @@ struct SettingsView: View {
         switch model.tab {
         case "projects": projects
         case "ai": ai
+        case "recording": RecordingSettingsPane(model: model)
         case "integrations": IntegrationsPane(model: model) { notion }
         case "how": HowItWorksView()
         case "modules": Form {
@@ -1498,6 +1500,10 @@ struct SettingsView: View {
                 if model.config.consentSay || model.config.consentChat {
                     TextField("English", text: $model.config.consentTextEN, axis: .vertical).lineLimit(2...4)
                     TextField("Українська", text: $model.config.consentTextUK, axis: .vertical).lineLimit(2...4)
+                    // 0.9.5: the same message when the call is also recorded (Settings > Call recording)
+                    Text(L("set.consentRecorded")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    TextField("English", text: $model.config.consentRecTextEN, axis: .vertical).lineLimit(2...4)
+                    TextField("Українська", text: $model.config.consentRecTextUK, axis: .vertical).lineLimit(2...4)
                 }
             } header: { Text(L("set.recordingConsent")) } footer: {
                 Text(L("set.offByDefaultThe"))
@@ -1810,7 +1816,7 @@ final class SettingsWindow {
         switch tab {
         case "how": return L("settings.how.title")
         case "about": return L("settings.about.windowTitle")
-        case "general", "projects", "ai", "integrations", "usage", "help", "modules": return L("settings.tab." + tab)
+        case "general", "projects", "ai", "recording", "integrations", "usage", "help", "modules": return L("settings.tab." + tab)
         default: return L("settings.windowTitle")
         }
     }

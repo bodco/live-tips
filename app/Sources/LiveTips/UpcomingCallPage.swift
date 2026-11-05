@@ -298,14 +298,26 @@ struct UpcomingCallPage: View {
 struct PageTabs: View {
     let tabs: [(String, String)]
     @Binding var selection: String
+    var counts: [String: Int] = [:]      // 2026-11-05 (call page redesign): a count badge next to the name
     var body: some View {
         HStack(spacing: 4) {
             ForEach(tabs, id: \.0) { t in
+                let on = selection == t.0
                 Button { selection = t.0 } label: {
-                    Text(t.1).font(PN.Font.body.weight(selection == t.0 ? .semibold : .regular))
-                        .foregroundStyle(selection == t.0 ? PN.C.text : PN.C.text2)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(selection == t.0 ? PN.C.surface : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                    HStack(spacing: 6) {
+                        Text(t.1).font(PN.Font.body.weight(on ? .semibold : .regular))
+                        if let n = counts[t.0], n > 0 {
+                            Text("\(n)").font(.system(size: 11, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(on ? PN.C.answer : PN.C.text2)
+                                .padding(.horizontal, 5).frame(minWidth: 18, minHeight: 18)
+                                .background(Capsule().fill(on ? PN.C.accent.opacity(0.14) : Color.primary.opacity(0.07)))
+                        }
+                    }
+                    .foregroundStyle(on ? PN.C.text : PN.C.text2)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(on ? PN.C.surface : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                    .shadow(color: .black.opacity(on ? 0.06 : 0), radius: 1, y: 1)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

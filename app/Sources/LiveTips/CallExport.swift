@@ -15,7 +15,8 @@ enum CallNotes {
             let l = raw.trimmingCharacters(in: .whitespaces)
             if l.hasPrefix("## ") { out.append((l.dropFirst(3).lowercased(), [])); continue }
             if l.hasPrefix("#") || l.isEmpty || out.isEmpty { continue }
-            out[out.count - 1].1.append(l.replacingOccurrences(of: "^[-*•]\\s*", with: "", options: .regularExpression))
+            // 2026-11-05: only a list marker followed by a space, so "**Topic**" keeps both of its stars (was "*Topic**")
+            out[out.count - 1].1.append(l.replacingOccurrences(of: "^[-*•]\\s+", with: "", options: .regularExpression))
         }
         return out
     }
@@ -27,6 +28,51 @@ enum CallNotes {
     static func inShort(_ t: String) -> [String] { Array(lines(t, ["summary", "підсумок", "коротко"]).prefix(3)) }
     static func discussed(_ t: String) -> [String] { Array(lines(t, ["topics", "теми", "discussed"]).prefix(10)) }
     static func nextCall(_ t: String) -> [String] { Array(lines(t, ["open after", "відкрите після", "next call"]).prefix(6)) }
+    static func decisions(_ t: String) -> [String] { lines(t, ["decisions", "рішення"]).map(plain).filter { !$0.isEmpty } }
+
+    /// Inline Markdown of a notes line (**bold**, *italic*, `code`) as styled text; plain text when it does not parse.
+    static func md(_ s: String) -> AttributedString {
+        (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
+    }
+
+    /// A line without Markdown stars, for places that take plain text (lists that are edited and saved back).
+    static func plain(_ s: String) -> String { s.replacingOccurrences(of: "**", with: "").trimmingCharacters(in: .whitespaces) }
+
+    /// 2026-11-05 (call page redesign): "## Topics" as topics. "- **Title**: text" starts a topic, a time at the end
+    /// of the title ("(15:01-15:04)") goes to the time column, indented quotes are its quotes, other lines its text.
+    struct Topic { var title = ""; var time = ""; var body: [String] = []; var quotes: [String] = [] }
+
+    static func topics(_ transcript: String) -> [Topic] {
+        guard let text = try? String(contentsOfFile: path(transcript), encoding: .utf8) else { return [] }
+        var inside = false
+        var out: [Topic] = []
+        let names = ["topics", "теми", "discussed"]
+        for raw in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            let s = String(raw)
+            let l = s.trimmingCharacters(in: .whitespaces)
+            if l.hasPrefix("## ") { let h = l.dropFirst(3).lowercased(); inside = names.contains { h.contains($0) }; continue }
+            guard inside, !l.isEmpty, !l.hasPrefix("#") else { continue }
+            let indent = s.prefix { $0 == " " || $0 == "\t" }.count
+            let c = l.replacingOccurrences(of: "^[-*•]\\s+", with: "", options: .regularExpression)
+            if c.hasPrefix("**"), let close = c.dropFirst(2).range(of: "**") {
+                var title = String(c[c.index(c.startIndex, offsetBy: 2)..<close.lowerBound]).trimmingCharacters(in: .whitespaces)
+                var rest = String(c[close.upperBound...]).trimmingCharacters(in: .whitespaces)
+                if rest.hasPrefix(":") { rest = String(rest.dropFirst()).trimmingCharacters(in: .whitespaces) }
+                if title.hasSuffix(":") { title = String(title.dropLast()) }
+                var time = ""
+                if let r = title.range(of: "\\s*\\(([0-9]{1,2}:[0-9]{2})[^)]*\\)\\s*$", options: .regularExpression) {
+                    time = String(title[r]).components(separatedBy: CharacterSet(charactersIn: "(-,) ")).first { $0.contains(":") } ?? ""
+                    title = String(title[..<r.lowerBound])
+                }
+                out.append(Topic(title: title, time: time, body: rest.isEmpty ? [] : [rest]))
+                continue
+            }
+            if out.isEmpty { out.append(Topic()) }
+            let quote = c.hasPrefix("\"") || c.hasPrefix("\u{201C}") || c.hasPrefix("\u{00AB}")
+            if indent >= 2 && quote { out[out.count - 1].quotes.append(c) } else { out[out.count - 1].body.append(c) }
+        }
+        return out
+    }
 }
 
 /// 0.9.0 (redesign 2.2): Export of a past call: Word, Markdown or a Notion page; the sections to include; the full

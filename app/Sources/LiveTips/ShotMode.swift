@@ -131,6 +131,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "p087" { p087(theme); continue }    // 0.8.7: the new screens
             if env["LT_SHOTS_ONLY"] == "p090" { p090(theme); continue }    // 0.9.0: Home in its integration states
             if env["LT_SHOTS_ONLY"] == "p092" { p092(theme); continue }    // 0.9.2: the site hero (Home + a live call)
+            if env["LT_SHOTS_ONLY"] == "callpage" { callPageShots(theme); continue }   // 2026-11-05: the call page redesign, every tab
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
@@ -570,6 +571,70 @@ final class ShotMode: NSObject, NSApplicationDelegate {
       """
 
     /// 0.8.7: pages pushed inside Home (call page, follow-up panel, series) are captured from the Home window.
+    /// 2026-11-05 (call page redesign): the page of the demo call on every tab, wide and narrow, with demo notes.
+    func callPageShots(_ theme: String) {
+        steps.append { [unowned self] in
+            if let r = self.demoCall { Self.writeDemoNotes(r.file) }
+            self.next(after: 0.2)
+        }
+        for (tab, w, h) in [("summary", 1280.0, 1180.0), ("summary", 900.0, 1180.0), ("decisions", 1280.0, 760.0), ("tasks", 1280.0, 760.0),
+                            ("risks", 1280.0, 760.0), ("transcript", 1280.0, 900.0)] {
+            steps.append { [unowned self] in
+                CallPageView.shotTab = tab
+                HomeNav.shared.path = []; HomeNav.shared.followUp = nil
+                if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }
+                HomeWindow.window?.setContentSize(NSSize(width: w, height: h))
+                if let r = self.demoCall { CallPageWindow.show(file: r.file) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
+                    let uk = L10n.lang == "uk" ? "-uk" : ""
+                    if let win = HomeWindow.window { capture(win, "callpage-\(tab)-\(Int(w))-\(theme)\(uk)") }
+                    CallPageView.shotTab = nil
+                    next()
+                }
+            }
+        }
+    }
+
+    /// Demo call notes in the after-call format (rules/notes.yaml) and a longer demo transcript. Demo names only.
+    static func writeDemoNotes(_ transcript: String) {
+        let notes = """
+        # Call notes: Orbit weekly with the client
+        ## Summary
+        The team reviewed the export screen, payment retries, the security checklist and pilot readiness. The pilot starts on November 10 with five users on staging; production follows on November 18. The finance team asked for a CSV download and scheduled emails, which would need a change request against the **42 hours** left in the pilot budget.
+        ## Topics
+        - **Export screen and payment retries (10:01-10:05)**: Mike said the export screen is merged to main. Failed card payments retry three times (after 1, 6 and 24 hours), then the subscription goes past due and the customer gets an email.
+          - "The export screen is done and merged to the main branch since Monday."
+          - "The subscription goes to past due and the customer gets an email. No automatic cancellation."
+        - **Pilot readiness and test accounts (10:06)**: David has not sent the test accounts: his manager wants one more approval because the accounts reach finance data.
+          - "My manager wants one more approval, because the accounts need access to the finance data."
+        - **Security checklist (10:11)**
+        - Five of seven items are done.
+        - Open: the penetration test summary from Redwood Security (promised by Friday) and the data retention statement.
+        - **New requests: CSV download and scheduled email (10:18)**: Emily brought both from the finance team. Sarah needs two more days of testing for CSV formats, encoding and big files.
+          - "They asked for a CSV download. They do not want to open the report in the browser."
+          - "If the CSV comes in, I need two more days of testing."
+        ## Decisions
+        - Export goes to production on Tuesday
+        ## Open after the call
+        - Approval of the pilot account template by David's manager.
+        - Legal approval of the data retention statement.
+        - Penetration test summary from Redwood Security.
+        - Change request options for the CSV download and scheduled emails.
+        """
+        try? notes.write(toFile: CallNotes.path(transcript), atomically: true, encoding: .utf8)
+        let talk = [("10:00:05", "Me", "Can everyone hear me? Good. Let's start with the export screen."),
+                    ("10:00:21", "Mike Johnson", "The export screen is done and merged to the main branch since Monday."),
+                    ("10:00:30", "Mike Johnson", "When a card payment fails, we retry three times. After one hour, after six hours, and after twenty four hours."),
+                    ("10:02:40", "David Kim", "And after the third failure?"),
+                    ("10:02:44", "Mike Johnson", "The subscription goes to past due and the customer gets an email. No automatic cancellation."),
+                    ("10:06:12", "Me", "David, where are we with the test accounts?"),
+                    ("10:06:18", "David Kim", "My manager wants one more approval, because the accounts need access to the finance data."),
+                    ("10:06:29", "David Kim", "If the permissions list comes today, then Friday."),
+                    ("10:18:02", "Emily Clark", "They asked for a CSV download. They do not want to open the report in the browser.")]
+        let body = "# Live Transcript: Orbit weekly with the client\n\n- Project: demo\n\n" + talk.map { "[\($0.0)] \($0.1) (en): \($0.2)" }.joined(separator: "\n") + "\n"
+        try? body.write(toFile: transcript, atomically: true, encoding: .utf8)
+    }
+
     func homePage(_ name: String, open: () -> Void) {
         HomeNav.shared.path = []; HomeNav.shared.followUp = nil
         if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }   // shot mode has no AppDelegate of its own

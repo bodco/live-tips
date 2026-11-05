@@ -28,9 +28,13 @@ struct CallPageView: View {
     @State private var meetNote = ""          // 0.9.1: the Google Meet record, one line
     @State private var exportOpen = false
 
+    /// Shot mode only: the tab the page opens on.
+    static var shotTab: String? = nil
+
     init(file: String) {
         self.file = file
         _sync = ObservedObject(wrappedValue: CallPageSync.of(file))
+        _tab = State(initialValue: Self.shotTab ?? "summary")
     }
 
     /// A date format in the interface language.
@@ -57,64 +61,110 @@ struct CallPageView: View {
         return CallHistory.shared.visible.filter { EditLog.seriesKey($0.title) == key && $0.project == r.project }
     }
 
+    @State private var width: CGFloat = 1000      // 2026-11-05 (redesign): two columns on a wide window
+    @State private var allQuotes = false
+    @State private var openQuotes = Set<Int>()
+
+    private var wide: Bool { width >= 860 }
+
     var body: some View {
         let o = CallOutcome.read(transcript: file) ?? CallOutcome()
         let agenda = StartCallModel.agenda(transcript: file)
-        let f = Self.fmt("EEEEdMMMMHHmm")
         let pw = PyTool.project(of: file)
         let proj = pw.project, ws = pw.workspace
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(Self.title(file)).font(PN.Font.title).foregroundStyle(PN.C.text)
-                    Text([record.map { f.string(from: $0.start) } ?? "", proj?.name ?? ws?.name ?? record?.project ?? "",
-                          record?.minutes.map { L("call.page.minutes", ["n": "\(Int($0.rounded()))"]) } ?? ""]
-                        .filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    CallPageSyncLine(sync: sync)       // 0.8.7 (E5)
-                }
-                actions(proj, o)
-                if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.onMe) }
+                header(proj, ws, o)
                 if exportOpen {
                     ExportPanel(file: file, title: Self.title(file), outcome: o, commitments: items) { exportOpen = false }
                 }
-                PageTabs(tabs: pageTabs(o), selection: $tab)
-                VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .center, spacing: 12) {
+                    PageTabs(tabs: pageTabs(o), selection: $tab, counts: tabCounts(o))
+                    Spacer(minLength: 0)
+                    if ["decisions", "tasks", "risks"].contains(tab) { trackerNote }
+                }
+                .padding(.top, 4)
+                Group {
                     switch tab {
                     case "decisions":
-                        trackerNote
                         decisionsSection(o, proj, ws)      // 0.8.8 (rules/decisions.yaml > after_call)
                     case "tasks":
-                        trackerNote
-                        commitments(items.filter { $0.mine }, mine: true, legacy: items.isEmpty ? o.onMe : [], proj, ws)
-                        commitments(items.filter { !$0.mine }, mine: false, legacy: [], proj, ws)
+                        tasksTab(o, proj, ws)
                     case "risks":
-                        trackerNote
                         risks(o, proj)
                     case "transcript":
-                        TranscriptView(file: file, at: nil).frame(minHeight: 520)
-                        Text(L("page.transcript.local")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    case "sales":
-                        salesSection(cardRoot(proj, ws))
-                    default:
-                        summaryTab(o)
-                        if o.isEmpty && items.isEmpty && agenda.isEmpty {
-                            Text(L("call.page.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
+                        VStack(alignment: .leading, spacing: 8) {
+                            TranscriptView(file: file, at: nil)
+                                .frame(minHeight: 560)
+                                .clipShape(RoundedRectangle(cornerRadius: PageStyle.radius))
+                            Text(L("page.transcript.local")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.leading, 4)
                         }
-                        lines("open", L("call.page.open"), o.openQuestions) { saveLists(o, open: $0, section: "open") }
-                        agendaSection(agenda)
+                    case "sales":
+                        PageCard { salesSection(cardRoot(proj, ws)) }
+                    default:
+                        summaryTab(o, agenda)
                     }
                 }
-                .padding(20).frame(maxWidth: .infinity, alignment: .leading)
-                .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.l))
             }
             .id(tick)
-            .padding(24).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)      // 0.9.0: centred
+            .padding(24).frame(maxWidth: 1100, alignment: .leading)
+            .background(GeometryReader { g in
+                Color.clear.onAppear { width = g.size.width }.onChange(of: g.size.width) { _, w in width = w }
+            })
+            .frame(maxWidth: .infinity)      // 0.9.0: centred
         }
         .background(PN.C.bg)
         .sheet(item: $cardDraft) { c in
             AnswerCardForm(card: c, title: L("cards.saveAs"), onSave: { saveCard($0, proj, ws) }, onCancel: { cardDraft = nil })
         }
+    }
+
+    // MARK: header (2026-11-05 redesign: a card like Home's next call)
+
+    /// "Mon, Nov 2 · 14:55-15:11"
+    private var whenText: String {
+        guard let r = record else { return "" }
+        let d = Self.fmt("EEEMMMd"), t = Self.fmt("HHmm")
+        let end = r.end ?? r.minutes.map { r.start.addingTimeInterval($0 * 60) }
+        return d.string(from: r.start) + " · " + t.string(from: r.start) + (end.map { "-" + t.string(from: $0) } ?? "")
+    }
+
+    @ViewBuilder private func header(_ proj: Project?, _ ws: Workspace?, _ o: CallOutcome) -> some View {
+        let projName = proj?.name ?? ws?.name ?? record?.project ?? ""
+        let series = record.map { Self.series(of: $0).count } ?? 0
+        let info = VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                if !whenText.isEmpty { Text(whenText).font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.accent) }
+                if !projName.isEmpty { PagePill(text: projName, color: PN.C.answer) }
+                if let m = record?.minutes {
+                    Text(L("call.page.minutes", ["n": "\(Int(m.rounded()))"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
+            }
+            Text(Self.title(file)).font(.system(size: 28, weight: .bold)).foregroundStyle(PN.C.text)
+                .fixedSize(horizontal: false, vertical: true)
+            if series > 1, let r = record {
+                Button { SeriesWindow.show(record: r) } label: {
+                    Text(L("page.seriesLink", ["n": "\(series)"])).font(PN.Font.body)
+                }
+                .buttonStyle(.plain).foregroundStyle(PN.C.accent)
+            }
+            CallPageSyncLine(sync: sync)       // 0.8.7 (E5)
+            if !meetNote.isEmpty { Text(meetNote).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
+            if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.onMe).fixedSize(horizontal: false, vertical: true) }
+        }
+        VStack(alignment: .leading, spacing: 0) {
+            if wide {
+                HStack(alignment: .top, spacing: 20) {
+                    info.frame(maxWidth: .infinity, alignment: .leading)
+                    actions(proj, o).padding(.top, 2)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 16) { info; actions(proj, o) }
+            }
+        }
+        .padding(.horizontal, 28).padding(.vertical, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: PageStyle.radius).fill(PN.C.surface))
     }
 
     /// 0.8.7 (H5): where a card from this call goes: the project's folder, else the workspace's.
@@ -193,51 +243,156 @@ struct CallPageView: View {
 
     private var hasSales: Bool { FileManager.default.fileExists(atPath: (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".sales.json") }
 
+    /// Decisions of the call: the call picture's, else the "## Decisions" of the notes (the follow-up email reads those too).
+    private func decisions(_ o: CallOutcome) -> [String] { o.decisions.isEmpty ? CallNotes.decisions(file) : o.decisions }
+
     private func pageTabs(_ o: CallOutcome) -> [(String, String)] {
-        let n: (Int) -> String = { $0 > 0 ? " \($0)" : "" }
-        return [("summary", L("page.tab.summary")), ("decisions", L("page.tab.decisions") + n(o.decisions.count)),
-                ("tasks", L("page.tab.tasks") + n(max(items.count, items.isEmpty ? o.onMe.count : 0))), ("risks", L("page.tab.risks") + n(o.risks.count)),
-                ("transcript", L("call.page.transcript"))] + (hasSales ? [("sales", L("sales.section"))] : [])
+        [("summary", L("page.tab.summary")), ("decisions", L("page.tab.decisions")), ("tasks", L("page.tab.tasks")),
+         ("risks", L("page.tab.risks")), ("transcript", L("call.page.transcript"))] + (hasSales ? [("sales", L("sales.section"))] : [])
+    }
+
+    /// 2026-11-05 (redesign): the counts are badges on the tabs, not part of the name.
+    private func tabCounts(_ o: CallOutcome) -> [String: Int] {
+        ["decisions": decisions(o).count, "tasks": max(items.count, items.isEmpty ? o.onMe.count : 0), "risks": o.risks.count]
     }
 
     private var trackerNote: some View {
         Text(L("page.trackerNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
     }
 
-    @ViewBuilder private func summaryTab(_ o: CallOutcome) -> some View {
-        let short = CallNotes.inShort(file), discussed = CallNotes.discussed(file), next = CallNotes.nextCall(file)
-        if short.isEmpty && discussed.isEmpty {
-            Text(o.line.isEmpty ? L("home.noNotes") : o.line).font(PN.Font.body).foregroundStyle(PN.C.text2)
+    // MARK: Summary (2026-11-05 redesign: the story on the left, what is next on the right)
+
+    @ViewBuilder private func summaryTab(_ o: CallOutcome, _ agenda: [(text: String, state: String)]) -> some View {
+        if wide {
+            HStack(alignment: .top, spacing: 16) {
+                summaryMain(o, agenda)
+                summarySide(o, agenda).frame(width: width >= 1000 ? 350 : 310)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 16) { summaryMain(o, agenda); summarySide(o, agenda) }
         }
-        if !short.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L("page.sum.inShort").uppercased()).font(PN.Font.label).foregroundStyle(PN.C.text3)
-                Text(short.joined(separator: " ")).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private func summaryMain(_ o: CallOutcome, _ agenda: [(text: String, state: String)]) -> some View {
+        let short = CallNotes.inShort(file), topics = CallNotes.topics(file)
+        PageCard(spacing: 0) {
+            if short.isEmpty && topics.isEmpty {
+                Text(o.line.isEmpty ? L("home.noNotes") : o.line).font(PN.Font.body).foregroundStyle(PN.C.text2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if o.isEmpty && items.isEmpty && agenda.isEmpty {
+                    Text(L("call.page.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3).padding(.top, 8)
+                }
+            }
+            if !short.isEmpty {
+                PageLabel(text: L("page.sum.inShort")).padding(.bottom, 10)
+                Text(CallNotes.md(short.joined(separator: " "))).font(.system(size: 15)).lineSpacing(3).foregroundStyle(PN.C.text)
+                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            }
+            if !short.isEmpty && !topics.isEmpty { Divider().padding(.vertical, 20) }
+            if !topics.isEmpty {
+                let hasQuotes = topics.contains { !$0.quotes.isEmpty }
+                PageLabel(text: L("page.sum.discussed")) {
+                    if hasQuotes {
+                        Button(allQuotes ? L("page.quotes.hideAll") : L("page.quotes.showAll")) { allQuotes.toggle(); openQuotes = [] }
+                            .buttonStyle(.plain).font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.accent)
+                    }
+                }
+                .padding(.bottom, 4)
+                ForEach(Array(topics.enumerated()), id: \.offset) { i, tp in
+                    if i > 0 { Divider() }
+                    topicRow(i, tp)
+                }
             }
         }
-        if !discussed.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L("page.sum.discussed").uppercased()).font(PN.Font.label).foregroundStyle(PN.C.text3)
-                ForEach(discussed, id: \.self) { d in Text("• " + d).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true) }
+    }
+
+    @ViewBuilder private func topicRow(_ i: Int, _ tp: CallNotes.Topic) -> some View {
+        let showQuotes = allQuotes || openQuotes.contains(i)
+        HStack(alignment: .top, spacing: 12) {
+            Text(tp.time.isEmpty ? "\(i + 1)" : tp.time).font(PN.Font.caption.monospacedDigit()).foregroundStyle(PN.C.text3)
+                .frame(width: 40, alignment: .leading).padding(.top, 1)
+            VStack(alignment: .leading, spacing: 4) {
+                if !tp.title.isEmpty {
+                    Text(CallNotes.md(tp.title)).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(Array(tp.body.enumerated()), id: \.offset) { _, b in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if tp.body.count > 1 { Circle().fill(PN.C.text3).frame(width: 4, height: 4).offset(y: -3) }
+                        Text(CallNotes.md(b)).font(PN.Font.body).lineSpacing(2).foregroundStyle(PN.C.text2)
+                            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if !tp.quotes.isEmpty {
+                    if showQuotes {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(Array(tp.quotes.enumerated()), id: \.offset) { _, q in
+                                Text(CallNotes.md(q)).font(PN.Font.caption).lineSpacing(2).foregroundStyle(PN.C.text3)
+                                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .padding(.leading, 10)
+                        .overlay(alignment: .leading) { Rectangle().fill(PN.C.surface2).frame(width: 2) }
+                        .padding(.top, 4)
+                    }
+                    if !allQuotes {
+                        Button(showQuotes ? L("page.quotes.hide") : L("page.quotes.n", ["n": "\(tp.quotes.count)"])) {
+                            if showQuotes { openQuotes.remove(i) } else { openQuotes.insert(i) }
+                        }
+                        .buttonStyle(.plain).font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.accent).padding(.top, 2)
+                    }
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        if !next.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(nextCallLabel).font(PN.Font.label).foregroundStyle(PN.C.text3)
-                ForEach(next, id: \.self) { d in Text("• " + d).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true) }
+        .padding(.vertical, 12)
+    }
+
+    @ViewBuilder private func summarySide(_ o: CallOutcome, _ agenda: [(text: String, state: String)]) -> some View {
+        let next = CallNotes.nextCall(file)
+        VStack(alignment: .leading, spacing: 16) {
+            if !next.isEmpty {
+                PageCard(tint: PN.C.accent) {
+                    PageLabel(text: nextCallLabel, color: PN.C.answer)
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(next, id: \.self) { d in
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Circle().fill(PN.C.accent).frame(width: 6, height: 6).offset(y: -2)
+                                Text(CallNotes.md(d)).font(PN.Font.body).foregroundStyle(PN.C.text).lineSpacing(2)
+                                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
             }
-            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            if !agenda.isEmpty {
+                PageCard { agendaSection(agenda) }
+            }
+            PageCard {
+                lines("open", L("call.page.open"), o.openQuestions) { saveLists(o, open: $0, section: "open") }
+            }
         }
     }
 
     /// "FOR THE NEXT CALL · WED 15:00" when the calendar has the next call of this series.
     private var nextCallLabel: String {
         let key = EditLog.seriesKey(Self.title(file))
-        let base = L("page.sum.next").uppercased()
+        let base = L("page.sum.next")
         guard let e = CalendarService.shared.events.first(where: { $0.start > Date() && EditLog.seriesKey($0.title) == key }) else { return base }
         let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate("EEEHHmm")
-        return base + " · " + f.string(from: e.start).uppercased()
+        return base + " · " + f.string(from: e.start)
+    }
+
+    // MARK: Tasks (2026-11-05 redesign: On you and On them side by side, theirs grouped by person)
+
+    @ViewBuilder private func tasksTab(_ o: CallOutcome, _ proj: Project?, _ ws: Workspace?) -> some View {
+        let mine = PageCard { commitments(items.filter { $0.mine }, mine: true, legacy: items.isEmpty ? o.onMe : [], proj, ws) }
+        let theirs = PageCard { commitments(items.filter { !$0.mine }, mine: false, legacy: [], proj, ws) }
+        if wide {
+            HStack(alignment: .top, spacing: 16) { mine; theirs }
+        } else {
+            VStack(alignment: .leading, spacing: 16) { mine; theirs }
+        }
     }
 
     @ViewBuilder private func actions(_ proj: Project?, _ o: CallOutcome) -> some View {
@@ -249,7 +404,6 @@ struct CallPageView: View {
                 if HomeNav.shared.followUp == file { HomeNav.shared.followUp = nil } else { FollowUpWindow.show(file: file) }
             }
             .buttonStyle(.pnSecondary).keyboardShortcut("i", modifiers: [.command, .option]).help(L("call.page.followup.help"))
-            if !meetNote.isEmpty { Text(meetNote).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2) }
             Button(L("page.export")) { exportOpen.toggle() }.buttonStyle(.pnPrimary)
             Menu {
                 // 0.9.1 (rules/google.yaml > meet): participants and, when Meet transcribed it, the Meet transcript
@@ -308,8 +462,10 @@ struct CallPageView: View {
 
     private var bullet: some View { Text("•").font(PN.Font.body).foregroundStyle(PN.C.text3) }
 
-    private func heading(_ t: String) -> some View {
-        Text(t).font(PN.Font.section).foregroundStyle(PN.C.text).padding(.bottom, 2)
+    /// 2026-11-05 (redesign): every block opens with the same small uppercase label as "In short".
+    private func heading(_ t: String, _ tail: String = "") -> some View {
+        PageLabel(text: t) { if !tail.isEmpty { Text(tail).font(PN.Font.caption).foregroundStyle(PN.C.text3) } }
+            .padding(.horizontal, 6).padding(.bottom, 6)
     }
 
     /// Decisions and open questions: a list of lines in the call picture.
@@ -328,22 +484,25 @@ struct CallPageView: View {
     }
 
     /// On you and On them: register items (ops edit, drop, add). `legacy`: an old call's picture without register items.
+    /// 2026-11-05 (redesign): On them is grouped by person, the name once with its initials.
     @ViewBuilder private func commitments(_ list: [Commitment], mine: Bool, legacy: [String], _ proj: Project?, _ ws: Workspace?) -> some View {
         let section = mine ? "onYou" : "onThem"
+        let open = list.filter { $0.status == "open" }.count + legacy.count
+        let owners: [String] = mine ? [""] : list.reduce(into: [String]()) { if !$0.contains($1.owner) { $0.append($1.owner) } }
         VStack(alignment: .leading, spacing: 2) {
-            heading(mine ? L("call.page.onYou") : L("call.page.onThem"))
-            ForEach(list) { c in
-                let overdue = c.status == "open" && CommitmentRegister.isOverdue(c)
-                // 0.8.7 (J4): only the due date is red when overdue, never the owner
-                // 0.8.8: an item sent to the Notion tasks (by a click or the automatic add) says so
-                EditableRow(text: c.text, sub: mine ? (c.notionPage.isEmpty ? "" : L("call.page.inNotionTasks")) : c.owner, subColor: overdue ? PN.C.danger : PN.C.text3,
-                            subTail: c.due.isEmpty ? "" : L("reg.due", ["due": Register.dueText(c.due)]), done: c.status == "done",
-                            copy: (c.mine ? "" : c.owner + ": ") + c.text + (c.due.isEmpty ? "" : " (" + Register.dueText(c.due) + ")"),
-                            menu: commitmentMenu(c, section),
-                            onSave: { v in register.edit(c, text: v); changed(section) }) {
-                    Toggle("", isOn: Binding(get: { c.status == "done" }, set: { register.mark(c, $0 ? "done" : "reopen") }))
-                        .toggleStyle(.checkbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
+            heading(mine ? L("call.page.onYou") : L("call.page.onThem"), list.isEmpty && legacy.isEmpty ? "" : L("page.tasks.open", ["n": "\(open)"]))
+            if list.isEmpty && legacy.isEmpty {
+                Text(L(mine ? "page.tasks.noneOnYou" : "page.tasks.noneOnThem")).font(PN.Font.body).foregroundStyle(PN.C.text3).padding(.horizontal, 6).padding(.vertical, 4)
+            }
+            ForEach(owners, id: \.self) { who in
+                if !mine {
+                    HStack(spacing: 8) {
+                        PageAvatar(name: who)
+                        Text(who).font(PN.Font.section).foregroundStyle(PN.C.text2)
+                    }
+                    .padding(.horizontal, 6).padding(.top, who == owners.first ? 2 : 12).padding(.bottom, 2)
                 }
+                ForEach(list.filter { mine || $0.owner == who }) { c in commitmentRow(c, section: section) }
             }
             ForEach(legacy, id: \.self) { t in
                 EditableRow(text: t, copy: t, onSave: { v in addItem(v, owner: "me", proj, ws); changed(section) }) { bullet }
@@ -356,7 +515,23 @@ struct CallPageView: View {
                 }
                 changed(section)
             }
+            .padding(.top, 4)
         }
+    }
+
+    @ViewBuilder private func commitmentRow(_ c: Commitment, section: String) -> some View {
+        let overdue = c.status == "open" && CommitmentRegister.isOverdue(c)
+        // 0.8.7 (J4): only the due date is red when overdue, never the owner
+        // 0.8.8: an item sent to the Notion tasks (by a click or the automatic add) says so
+        EditableRow(text: c.text, sub: c.mine && !c.notionPage.isEmpty ? L("call.page.inNotionTasks") : "", subColor: overdue ? PN.C.danger : PN.C.text3,
+                    subTail: c.due.isEmpty ? "" : L("reg.due", ["due": Register.dueText(c.due)]), done: c.status == "done",
+                    copy: (c.mine ? "" : c.owner + ": ") + c.text + (c.due.isEmpty ? "" : " (" + Register.dueText(c.due) + ")"),
+                    menu: commitmentMenu(c, section),
+                    onSave: { v in register.edit(c, text: v); changed(section) }) {
+            Toggle("", isOn: Binding(get: { c.status == "done" }, set: { register.mark(c, $0 ? "done" : "reopen") }))
+                .toggleStyle(.checkbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
+        }
+        .padding(.vertical, 3)
     }
 
     private func commitmentMenu(_ c: Commitment, _ section: String) -> [PageRowAction] {
@@ -387,7 +562,9 @@ struct CallPageView: View {
     @ViewBuilder private func agendaSection(_ agenda: [(text: String, state: String)]) -> some View {
         let save: ([(text: String, state: String)]) -> Void = { CallPageEdit.saveAgenda(file: file, items: $0); changed("agenda") }
         VStack(alignment: .leading, spacing: 2) {
-            heading(L("call.page.agenda"))
+            let done = agenda.filter { $0.state == "done" }.count
+            heading(L("call.page.agenda"), L("page.agenda.progress", ["done": "\(done)", "n": "\(agenda.count)"]))
+            PageProgress(value: agenda.isEmpty ? 0 : Double(done) / Double(agenda.count)).padding(.horizontal, 6).padding(.bottom, 8)
             ForEach(Array(agenda.enumerated()), id: \.offset) { i, a in
                 EditableRow(text: a.text, copy: a.text,
                             menu: [.separator, PageRowAction(title: L("callEdit.delete"), destructive: true, run: { _ in
@@ -420,9 +597,10 @@ struct CallPageView: View {
     /// Notion page after the PM confirms. Without a Risks database or Notion it is greyed out with the reason.
     @ViewBuilder private func risks(_ o: CallOutcome, _ proj: Project?) -> some View {
         let hasDB = SettingsWindow.model.isSet(.notionToken) && !NotionTargets.risksDB(SettingsWindow.model.config, proj).isEmpty && proj != nil
-        VStack(alignment: .leading, spacing: 2) {
+        PageCard(spacing: 2) {
             heading(L("call.page.risks"))
             let _ = links.n
+            if o.risks.isEmpty { PageEmpty(icon: "exclamationmark.triangle", title: L("page.empty.risks"), text: L("page.empty.risks.body")) }
             ForEach(Array(o.risks.enumerated()), id: \.offset) { i, r in
                 let known = added[r] ?? NotionCallLinks.url(file, "risks", r)     // 0.8.8: kept next to the call
                 let inRegister = known != nil
@@ -433,7 +611,7 @@ struct CallPageView: View {
                             menu: (inRegister ? [] : [addAction]) + [.separator, PageRowAction(title: L("callEdit.delete"), destructive: true, run: { _ in
                                 var l = o.risks; if i < l.count { l.remove(at: i) }; saveLists(o, risks: l, section: "risks") })],
                             onSave: { v in var l = o.risks; if i < l.count { l[i] = v }; saveLists(o, risks: l, section: "risks") },
-                            leading: { Image(systemName: "exclamationmark.triangle").foregroundStyle(PN.C.onMe).accessibilityHidden(true) },
+                            leading: { PageIconTile(icon: "exclamationmark.triangle", color: PN.C.onMe) },
                             trailing: {
                                 if inRegister {
                                     if let u = known.flatMap({ URL(string: $0) }), !(known ?? "").isEmpty {
@@ -445,8 +623,9 @@ struct CallPageView: View {
                                 }
                             })
             }
-            AddRowField(placeholder: L("callEdit.addPh")) { saveLists(o, risks: o.risks + [$0], section: "risks") }
+            AddRowField(placeholder: L("callEdit.addPh")) { saveLists(o, risks: o.risks + [$0], section: "risks") }.padding(.top, 4)
         }
+        // 2026-11-05 (owner): every block is as wide as the header card
     }
 
     /// 0.8.8 (rules/decisions.yaml > after_call): "Add to decision register" on a row and "Add all N" above the section.
@@ -457,10 +636,11 @@ struct CallPageView: View {
         let hasDB = token && proj != nil && !NotionTargets.decisionsDB(c, proj).isEmpty
         let reason = !token ? L("dec.noNotion") : proj == nil ? L("dec.noProject") : L("dec.noDB")
         let _ = links.n
-        let pending = o.decisions.filter { NotionCallLinks.url(file, "decisions", $0) == nil }
+        let decs = decisions(o)
+        let pending = decs.filter { NotionCallLinks.url(file, "decisions", $0) == nil }
         let set: ([String]) -> Void = { saveLists(o, decisions: $0, section: "decisions") }
         let root = cardRoot(proj, ws)
-        VStack(alignment: .leading, spacing: 2) {
+        PageCard(spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 heading(L("call.page.decisions"))
                 Spacer()
@@ -469,13 +649,14 @@ struct CallPageView: View {
                         .buttonStyle(.pnTertiary).disabled(!adding.isEmpty)
                 }
             }
-            if !hasDB && !o.decisions.isEmpty {
+            if decs.isEmpty { PageEmpty(icon: "checkmark.seal", title: L("page.empty.decisions"), text: L("page.empty.decisions.body")) }
+            if !hasDB && !decs.isEmpty {
                 HStack(spacing: 6) {
                     Text(reason).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     Button(L("common.openSettings")) { SettingsWindow.show(tab: "notion") }.buttonStyle(.link).font(PN.Font.caption)
                 }
             }
-            ForEach(Array(o.decisions.enumerated()), id: \.offset) { i, d in
+            ForEach(Array(decs.enumerated()), id: \.offset) { i, d in
                 let url = NotionCallLinks.url(file, "decisions", d)
                 let add = PageRowAction(title: L("dec.add"), icon: "checkmark.seal", enabled: hasDB && !adding.contains(d), note: reason,
                                         run: { _ in addDecisions([d], proj) })
@@ -483,9 +664,9 @@ struct CallPageView: View {
                             hoverActions: url == nil ? [add] : [],
                             menu: (url == nil ? [add] : []) + [saveCardAction("", d, root: root), .separator,
                                   PageRowAction(title: L("callEdit.delete"), destructive: true, run: { _ in
-                                      var l = o.decisions; if i < l.count { l.remove(at: i) }; set(l) })],
-                            onSave: { v in var l = o.decisions; if i < l.count { l[i] = v }; set(l) },
-                            leading: { bullet },
+                                      var l = decs; if i < l.count { l.remove(at: i) }; set(l) })],
+                            onSave: { v in var l = decs; if i < l.count { l[i] = v }; set(l) },
+                            leading: { PageIconTile(icon: "checkmark", color: PN.C.turn) },
                             trailing: {
                                 if let url {
                                     if let u = URL(string: url), !url.isEmpty {
@@ -500,8 +681,9 @@ struct CallPageView: View {
                             })
                 if let s = supersede[d] { supersedeRow(d, s) }
             }
-            AddRowField(placeholder: L("callEdit.addPh")) { set(o.decisions + [$0]) }
+            AddRowField(placeholder: L("callEdit.addPh")) { set(decs + [$0]) }.padding(.top, 4)
         }
+        // 2026-11-05 (owner): every block is as wide as the header card
     }
 
     /// "Replaces <old, date>?": only this click marks the old decision Superseded and links the two.
@@ -604,6 +786,7 @@ struct TranscriptView: View {
     let file: String
     let at: String?
     @State private var q = ""
+    @State private var who: String? = nil       // 2026-11-05 (redesign): one speaker only
     @State private var lines: [TranscriptLine] = []
 
     private var target: Int? {
@@ -611,31 +794,80 @@ struct TranscriptView: View {
         return lines.first { $0.t >= at }?.id ?? lines.last?.id
     }
 
+    /// The speakers with the most lines first (at most 6 chips).
+    private var speakers: [String] {
+        var n: [String: Int] = [:]
+        for l in lines { n[l.who, default: 0] += 1 }
+        return n.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(6).map(\.key)
+    }
+
+    /// Lines in a row from the same speaker are one turn: the name and the time once.
+    private var turns: [[TranscriptLine]] {
+        let shown = lines.filter { l in
+            (who == nil || l.who == who) && (q.isEmpty || l.text.localizedCaseInsensitiveContains(q) || l.who.localizedCaseInsensitiveContains(q))
+        }
+        var out: [[TranscriptLine]] = []
+        for l in shown {
+            if let last = out.last?.last, last.who == l.who, last.id + 1 == l.id { out[out.count - 1].append(l) } else { out.append([l]) }
+        }
+        return out
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                TextField("", text: $q, prompt: Text(L("transcript.find"))).textFieldStyle(.roundedBorder)
+            HStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(PN.C.text3).accessibilityHidden(true)
+                    TextField("", text: $q, prompt: Text(L("transcript.find"))).textFieldStyle(.plain).font(PN.Font.body)
+                    if !q.isEmpty {
+                        Button { q = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(PN.C.text3) }
+                            .buttonStyle(.plain).accessibilityLabel(L("common.close"))
+                    }
+                }
+                .padding(.horizontal, 10).frame(height: 30)
+                .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 8))
+                .frame(maxWidth: 360)
+                if speakers.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            chip(L("transcript.everyone"), on: who == nil) { who = nil }
+                            ForEach(speakers, id: \.self) { s in chip(s, on: who == s) { who = who == s ? nil : s } }
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
                 Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }.buttonStyle(.pnTertiary)
             }
-            .padding(12)
+            .padding(.horizontal, 16).padding(.vertical, 12)
             Divider()
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 6) {
-                        ForEach(lines.filter { q.isEmpty || $0.text.localizedCaseInsensitiveContains(q) || $0.who.localizedCaseInsensitiveContains(q) }) { l in
-                            HStack(alignment: .top, spacing: 8) {
-                                Text(l.t).font(PN.Font.caption.monospacedDigit()).foregroundStyle(PN.C.text3).frame(width: 64, alignment: .leading)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(l.who).font(PN.Font.caption.weight(.semibold)).foregroundStyle(l.me ? PN.C.accent : PN.C.text2)
-                                    Text(l.text).font(PN.Font.body).foregroundStyle(PN.C.text).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(turns, id: \.first!.id) { turn in
+                            let first = turn[0]
+                            HStack(alignment: .top, spacing: 14) {
+                                Text(first.t).font(PN.Font.caption.monospacedDigit()).foregroundStyle(PN.C.text3)
+                                    .frame(width: 62, alignment: .leading).padding(.top, 1)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(first.who).font(PN.Font.caption.weight(.semibold)).foregroundStyle(first.me ? PN.C.accent : PN.C.text2)
+                                    ForEach(turn) { l in
+                                        Text(l.text).font(PN.Font.body).lineSpacing(2).foregroundStyle(PN.C.text).textSelection(.enabled)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .padding(.horizontal, l.id == target ? 4 : 0)
+                                            .background(RoundedRectangle(cornerRadius: PN.Radius.s).fill(l.id == target ? PN.C.accent.opacity(0.14) : .clear))
+                                            .id(l.id)
+                                    }
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(6)
-                            .background(RoundedRectangle(cornerRadius: PN.Radius.s).fill(l.id == target ? PN.C.accent.opacity(0.12) : .clear))
-                            .id(l.id)
+                            .padding(.horizontal, 18).padding(.vertical, 10)
+                            .background(first.me ? PN.C.accent.opacity(0.05) : Color.clear)
+                        }
+                        if lines.isEmpty {
+                            Text(L("transcript.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3).padding(18)
                         }
                     }
-                    .padding(12)
+                    .padding(.vertical, 6)
                 }
                 .onAppear {
                     lines = TranscriptLine.read(file, me: PyTool.meLabel)
@@ -643,7 +875,17 @@ struct TranscriptView: View {
                 }
             }
         }
-        .background(PN.C.bg)
+        .background(PN.C.surface)
+    }
+
+    private func chip(_ t: String, on: Bool, _ tap: @escaping () -> Void) -> some View {
+        Button(action: tap) {
+            Text(t).font(PN.Font.caption.weight(on ? .semibold : .regular)).lineLimit(1)
+                .foregroundStyle(on ? PN.C.answer : PN.C.text2)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Capsule().fill(on ? PN.C.accent.opacity(0.14) : PN.C.surface2))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -709,5 +951,108 @@ struct FollowUpView: View {
         .background(PN.C.bg)
         .onAppear { if model.body.isEmpty && !model.busy && model.error.isEmpty { model.write() } }
         .onDisappear { model.logHandEdits() }
+    }
+}
+
+// MARK: - Call page building blocks (2026-11-05 redesign, in the style of Home)
+
+enum PageStyle { static let radius: CGFloat = 16 }
+
+/// A white block on the grey page, like Home's cards. `tint`: a soft accent wash and border (For the next call).
+struct PageCard<Content: View>: View {
+    var spacing: CGFloat = 10
+    var tint: Color? = nil
+    @ViewBuilder var content: () -> Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) { content() }
+            .padding(.horizontal, 24).padding(.vertical, 22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: PageStyle.radius).fill(PN.C.surface)
+                    if let tint { RoundedRectangle(cornerRadius: PageStyle.radius).fill(tint.opacity(0.06)) }
+                }
+            }
+            .overlay { if let tint { RoundedRectangle(cornerRadius: PageStyle.radius).stroke(tint.opacity(0.22)) } }
+    }
+}
+
+/// The small uppercase label of a block, with an optional note or action on the right.
+struct PageLabel<Trailing: View>: View {
+    let text: String
+    var color: Color = PN.C.text3
+    @ViewBuilder var trailing: () -> Trailing
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(text.uppercased()).font(PN.Font.label).kerning(0.4).foregroundStyle(color)
+            Spacer(minLength: 8)
+            trailing()
+        }
+    }
+}
+
+extension PageLabel where Trailing == EmptyView {
+    init(text: String, color: Color = PN.C.text3) { self.init(text: text, color: color, trailing: { EmptyView() }) }
+}
+
+struct PagePill: View {
+    let text: String
+    let color: Color
+    var body: some View {
+        Text(text).font(.system(size: 12, weight: .semibold)).foregroundStyle(color).lineLimit(1)
+            .padding(.horizontal, 8).padding(.vertical, 2)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// Initials in a circle, for the person a task is on.
+struct PageAvatar: View {
+    let name: String
+    var body: some View {
+        let parts = name.split(whereSeparator: { $0 == " " || $0 == "." }).prefix(2)
+        let ini = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
+        Text(ini.isEmpty ? "?" : ini).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.answer)
+            .frame(width: 22, height: 22).background(Circle().fill(PN.C.accent.opacity(0.13)))
+            .accessibilityHidden(true)
+    }
+}
+
+/// A row's kind as a small tinted square (a decision, a risk).
+struct PageIconTile: View {
+    let icon: String
+    let color: Color
+    var body: some View {
+        Image(systemName: icon).font(.system(size: 11, weight: .semibold)).foregroundStyle(color)
+            .frame(width: 22, height: 22).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+            .accessibilityHidden(true)
+    }
+}
+
+/// An empty block: what would be here and how it gets here.
+struct PageEmpty: View {
+    let icon: String
+    let title: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon).font(.system(size: 14, weight: .medium)).foregroundStyle(PN.C.text3)
+                .frame(width: 34, height: 34).background(Circle().fill(PN.C.surface2)).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                Text(text).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 6).padding(.vertical, 6)
+    }
+}
+
+struct PageProgress: View {
+    let value: Double
+    var body: some View {
+        Capsule().fill(PN.C.surface2).frame(height: 6)
+            .overlay(alignment: .leading) {
+                GeometryReader { g in Capsule().fill(PN.C.turn).frame(width: max(0, min(1, value)) * g.size.width) }
+            }
+            .accessibilityHidden(true)
     }
 }

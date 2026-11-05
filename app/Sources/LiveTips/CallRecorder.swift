@@ -419,7 +419,10 @@ final class RecSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureAud
     let micDevice: AVCaptureDevice?
     var onFailure: ((String) -> Void)?
     private let q = DispatchQueue(label: "pacenote.recording")
-    private var stream: SCStream?
+    private var stream: SCStream?              // the picture (a display or one window); nil for sound only
+    /// 2026-11-05 (owner, a real call: the voice was recorded, the call was not): ScreenCaptureKit gives no sound with a
+    /// one-window filter, so the call's sound always comes from its own stream on the main display (Pacenote excluded).
+    private var soundStream: SCStream?
     private var micSession: AVCaptureSession?
     private var writer: AVAssetWriter?
     private var vIn: AVAssetWriterInput?
@@ -483,24 +486,35 @@ final class RecSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureAud
                 self.size = audioOnly ? (2, 2) : preset.outputSize(width: w, height: h, scale: scaleFor(source))
                 try q.sync { try self.makeWriter() }
                 madeFile = true
-                let cfg = self.config()
-                let s = SCStream(filter: filter, configuration: cfg, delegate: self)
-                try s.addStreamOutput(self, type: .screen, sampleHandlerQueue: q)
-                try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: q)
-                try await s.startCapture()
+                // the sound: always its own display stream (2 x 2 px, one frame a second, frames ignored)
+                let (soundFilter, _, _) = try self.filter(for: .soundOnly, content: content)
+                let snd = SCStream(filter: soundFilter, configuration: self.config(sound: true), delegate: self)
+                try snd.addStreamOutput(self, type: .screen, sampleHandlerQueue: q)
+                try snd.addStreamOutput(self, type: .audio, sampleHandlerQueue: q)
+                q.sync { self.soundStream = snd }
+                try await snd.startCapture()
+                // the picture: a display or one window, without sound
+                var pic: SCStream?
+                if !audioOnly {
+                    let p = SCStream(filter: filter, configuration: self.config(sound: false), delegate: self)
+                    try p.addStreamOutput(self, type: .screen, sampleHandlerQueue: q)
+                    try await p.startCapture()
+                    pic = p
+                }
                 // Stop may have come while macOS was starting the capture: then stop it again here, nothing keeps running
                 let stopped: Bool = q.sync {
                     if self.finished { return true }
-                    self.stream = s
+                    self.stream = pic
                     self.t0 = Self.hostNow(); self.started = Date()
                     self.startMic()
                     self.startMixer()
                     return false
                 }
-                if stopped { try? await s.stopCapture(); done(L("rec.cancelled")); return }
+                if stopped { try? await pic?.stopCapture(); try? await snd.stopCapture(); done(L("rec.cancelled")); return }
                 done(nil)
             } catch {
-                q.sync { self.finished = true; self.writer?.cancelWriting() }
+                let snd: SCStream? = q.sync { self.finished = true; self.writer?.cancelWriting(); let x = self.soundStream; self.soundStream = nil; return x }
+                try? await snd?.stopCapture()
                 if madeFile { try? FileManager.default.removeItem(at: url) }      // only the file this part made
                 done(error.localizedDescription)
             }
@@ -533,16 +547,17 @@ final class RecSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureAud
         }
     }
 
-    private func config() -> SCStreamConfiguration {
+    /// `sound`: the sound stream (a 2 x 2 picture once a second, the system audio); otherwise the picture without sound.
+    private func config(sound: Bool) -> SCStreamConfiguration {
         let c = SCStreamConfiguration()
-        c.width = size.0; c.height = size.1
-        c.minimumFrameInterval = audioOnly ? CMTime(value: 1, timescale: 1) : CMTime(value: 1, timescale: CMTimeScale(preset.fps))
+        c.width = sound ? 2 : size.0; c.height = sound ? 2 : size.1
+        c.minimumFrameInterval = sound ? CMTime(value: 1, timescale: 1) : CMTime(value: 1, timescale: CMTimeScale(preset.fps))
         c.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         c.showsCursor = true
         c.queueDepth = 6
         c.scalesToFit = true
         c.preservesAspectRatio = true
-        c.capturesAudio = true
+        c.capturesAudio = sound
         c.sampleRate = 48000
         c.channelCount = 2
         c.excludesCurrentProcessAudio = true
@@ -609,7 +624,7 @@ final class RecSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureAud
     func stream(_ stream: SCStream, didOutputSampleBuffer sb: CMSampleBuffer, of type: SCStreamOutputType) {
         guard !finished, sb.isValid else { return }
         switch type {
-        case .screen: video(sb)
+        case .screen: if stream !== soundStream { video(sb) }      // the sound stream's 2 x 2 frames are not the picture
         case .audio: audio(sb, source: 0)
         default: break
         }
@@ -624,7 +639,7 @@ final class RecSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureAud
         // macOS stopped the capture (the recorded window was closed, the permission was taken back): what is written is kept
         q.async {
             guard !self.finished else { return }
-            if case .window = self.source { self.onFailure?(L("rec.err.windowGone")) } else { self.onFailure?(L("rec.err.stopped")) }
+            if stream !== self.soundStream, case .window = self.source { self.onFailure?(L("rec.err.windowGone")) } else { self.onFailure?(L("rec.err.stopped")) }
         }
     }
 
@@ -751,10 +766,10 @@ final class RecSession: NSObject, SCStreamOutput, SCStreamDelegate, AVCaptureAud
             let end = self.media(Self.hostNow())
             self.finished = true
             self.mixTimer?.cancel()
-            let st = self.stream, mic = self.micSession
-            self.stream = nil; self.micSession = nil
-            if mic != nil || st != nil {
-                Task.detached { mic?.stopRunning(); try? await st?.stopCapture() }
+            let st = self.stream, snd = self.soundStream, mic = self.micSession
+            self.stream = nil; self.soundStream = nil; self.micSession = nil
+            if mic != nil || st != nil || snd != nil {
+                Task.detached { mic?.stopRunning(); try? await st?.stopCapture(); try? await snd?.stopCapture() }
             }
             guard let w = self.writer, self.t0 > 0 else { self.writer?.cancelWriting(); done(nil); return }   // still starting: nothing recorded
             if let v = self.vIn, let ad = self.adaptor, let px = self.lastPixels, end > self.lastVideoT + 0.05, v.isReadyForMoreMediaData {
@@ -778,6 +793,11 @@ enum RecBench {
         var cases: [(String, RecSource, RecordingPreset, String)] = []
         for p in RecordingPreset.all { for c in ["h264", "hevc"] { cases.append((p.id + "-" + c, .display(CGMainDisplayID()), p, c)) } }
         cases.append(("sound", .soundOnly, RecordingPreset.find("standard"), "h264"))
+        // 2026-11-05: one window (the call's sound must still be there: it comes from its own stream)
+        let sem = DispatchSemaphore(value: 0); var win: RecTargets.Window?
+        Task { win = await RecTargets.windows().max { $0.width * $0.height < $1.width * $1.height }; sem.signal() }
+        _ = sem.wait(timeout: .now() + 5)
+        if let w = win { cases.append(("window-light-hevc", .window(w.id), RecordingPreset.find("light"), "hevc")) }
         var rows: [[String: Any]] = []
         func next(_ i: Int) {
             guard i < cases.count else {

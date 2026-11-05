@@ -3,6 +3,11 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.9.5.2 (unreleased)
+
+- **Tips window icons (2026-11-05, owner):** pause, play, stop and Home in the top bar are one family (16 px, rounded,
+  the same weight); Home has the size of the other tools and no longer sits apart.
+
 ## 0.9.5.1 (2026-11-05)
 
 - **Fixed: the Record this call card (2026-11-05):** in the tips window's ready state, Off, Sound and Sound and screen

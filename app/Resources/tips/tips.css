@@ -443,6 +443,8 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 
 /* 0.9.5: the call recording in the top bar */
 .recc{display:flex;align-items:center;gap:2px;position:relative}
+/* 2026-11-05: Home has the size of the other header tools and the same gap after the recording group */
+.icon-btn.tool.home{margin-left:2px}
 .recc .pill{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:0;border-radius:var(--radius-s);background:var(--danger-soft);color:var(--danger-text);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
 .recc .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--rec);animation:recblink 1.6s ease-in-out infinite}
 .recc.paused .pill{background:var(--surface-2);color:var(--text-2)}

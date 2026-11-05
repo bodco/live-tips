@@ -286,7 +286,7 @@
       const p = r.state === 'paused';
       html = `<button class="pill" type="button" data-act="rec-menu" title="${esc(r.source ? tr2.menu + ': ' + r.source : tr2.menu)}" aria-haspopup="menu"><span class="dot"></span><span class="lbl">${esc(p ? tr2.paused : tr2.rec)}</span><span>${mmss(r.elapsed)}</span></button>`
         + `<button class="icon-btn tool" type="button" data-act="${p ? 'rec-resume' : 'rec-pause'}" title="${esc(p ? tr2.resume : tr2.pause)}" aria-label="${esc(p ? tr2.resume : tr2.pause)}">${p ? PLAY : PAUSE}</button>`
-        + `<button class="icon-btn tool" type="button" data-act="rec-stop" title="${esc(tr2.stop)}" aria-label="${esc(tr2.stop)}"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" fill="currentColor"/></svg></button>`;
+        + `<button class="icon-btn tool" type="button" data-act="rec-stop" title="${esc(tr2.stop)}" aria-label="${esc(tr2.stop)}">${STOP}</button>`;
     } else {
       const busy = r.state === 'choosing' || r.state === 'starting';
       const tip = busy ? (r.state === 'choosing' ? tr2.choosing : tr2.starting) : tr2.start;
@@ -1023,8 +1023,10 @@
   }
   const MIC_ON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2"/></svg>';
   const MIC_OFF = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2M2 2l12 12"/></svg>';
-  const PAUSE = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5.5 3v10M10.5 3v10"/></svg>';
-  const PLAY = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4L13 8z" fill="currentColor"/></svg>';
+  // 2026-11-05 (owner): one family for pause, play, stop and Home: 16 px, rounded, the same weight
+  const PAUSE = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="3" width="2.8" height="10" rx="1.2" fill="currentColor"/><rect x="9.2" y="3" width="2.8" height="10" rx="1.2" fill="currentColor"/></svg>';
+  const PLAY = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.9c0-.9 1-1.4 1.7-.9l6 3.9c.7.5.7 1.6 0 2.1l-6 3.9c-.7.5-1.7 0-1.7-.9z" fill="currentColor"/></svg>';
+  const STOP = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="2.2" fill="currentColor"/></svg>';
   const BULB = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M5.6 11.5c0-1.6-2.1-2.6-2.1-5.1a4.5 4.5 0 0 1 9 0c0 2.5-2.1 3.5-2.1 5.1z"/><path d="M6 13.5h4M6.8 15h2.4"/></svg>';
   /** Proactive tips: the PM's click in this call, else the recorder status, else the remembered choice. */
   function proactiveOn() {

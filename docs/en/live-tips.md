@@ -1396,9 +1396,11 @@ downloaded counts as installed. A control that needs a missing one is disabled w
 
 **F. Speakers above the tabs.** A row of chips (colour, name or Speaker N, minutes; an unnamed voice is tinted and
 says "to name") sits above Transcript, On me and Brief. When a voice has spoken long enough a card opens with its
-last words, suggestions from the voices library with how alike they sound, a name field, Team or Client, Same
+last words, suggestions from the voices library with how alike they sound, Name this voice, Team or Client, Same
 person as and Not now (the card waits for the next 60 s of that voice). Once everyone is named it folds into the
-chips.
+chips. Name this voice, a click on a named chip or on "Unknown voice" in the transcript opens one sheet: the name,
+with the people of this meeting listed under it (their side next to each), and Team or Client as two clear choices.
+Picking a known person sets the side; a new name asks for one before Save. The names come in groups that say why: Sounds like (with the %), On this call, Invited to this call and Project people; the voice library opens with "N more from your voice library" or when you type.
 
 **Agenda.** The line under the call bar ("Agenda 2 of 8 · ...") opens the whole agenda: every item with its state,
 and a click on an item moves it on (not raised, now, done).

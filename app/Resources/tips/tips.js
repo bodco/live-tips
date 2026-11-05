@@ -39,6 +39,8 @@
       tabs: { transcript: 'Transcript', onme: (n) => `On me · ${n}`, brief: 'Brief' },
       newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team', speakersH: 'Speakers', namedOf: (o) => `${o.n} of ${o.m} named`, notNamed: 'not named yet',
       toName: 'to name', mins: (o) => o.m < 1 ? '<1 min' : `${o.m} min`, secsSpoken: (o) => `${o.s} s of speech`, noClip: 'No clip to play: Pacenote never keeps the call audio. The last line helps tell who it is.', soundsLike: (o) => `${o.name} · sounds like ${o.p}%`,
+      whoGroups: { voice: 'Sounds like', call: 'On this call', invited: 'Invited to this call', project: 'Project people', library: 'Voice library' }, whoMore: (o) => `${o.n} more from your voice library`, whoWhy: 'Why these names: the voice match, who is on this call, the invitation, then the project and your voice library.',
+      whoTitle: 'Who is speaking?', whoLine: 'Who said this?', sideH: 'Side', teamSub: 'your side', clientSub: 'the other side', newPerson: 'new', pickSide: 'Choose Team or Client', whoName: 'Name this voice',
       typeName: 'Type a name', more: 'More:', samePerson: 'Same person as…', notNow: 'Not now', lastSaid: 'Last said:',
       mine: 'Mine', mineTip: 'Put this on me', addOnMe: 'Add to On me', fromThisCall: 'From this call', openBefore: 'Open before the call',
       notionGroup: (o) => `Notion · ${o.p}`, removeItem: 'Remove', removeTip: 'Remove from On you and move to the Notion trash', fromACall: 'from a call',
@@ -110,6 +112,8 @@
       tabs: { transcript: 'Транскрипт', onme: (n) => `На мені · ${n}`, brief: 'Бриф' },
       newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда', speakersH: 'Спікери', namedOf: (o) => `названо ${o.n} з ${o.m}`, notNamed: 'ще без імені',
       toName: 'назвати', mins: (o) => o.m < 1 ? '<1 хв' : `${o.m} хв`, secsSpoken: (o) => `${o.s} с мовлення`, noClip: 'Кліпу немає: Pacenote не зберігає звук дзвінка. Остання фраза допомагає зрозуміти, хто це.', soundsLike: (o) => `${o.name} · схоже на ${o.p}%`,
+      whoGroups: { voice: 'Схожий голос', call: 'Уже на цьому дзвінку', invited: 'Запрошені на дзвінок', project: 'Люди проєкту', library: 'Бібліотека голосів' }, whoMore: (o) => `Ще ${o.n} з бібліотеки голосів`, whoWhy: 'Звідки ці імена: схожість голосу, хто вже на дзвінку, запрошення, потім проєкт і ваша бібліотека голосів.',
+      whoTitle: 'Хто говорить?', whoLine: 'Хто це сказав?', sideH: 'Сторона', teamSub: 'ваша сторона', clientSub: 'інша сторона', newPerson: 'нова', pickSide: 'Оберіть Команда або Клієнт', whoName: 'Назвати голос',
       typeName: 'Введіть імʼя', more: 'Ще:', samePerson: 'Та сама людина, що…', notNow: 'Не зараз', lastSaid: 'Останнє:',
       mine: 'Моє', mineTip: 'Записати на мене', addOnMe: 'Додати в На мені', fromThisCall: 'З цього дзвінка', openBefore: 'Відкриті до дзвінка',
       notionGroup: (o) => `Notion · ${o.p}`, removeItem: 'Прибрати', removeTip: 'Прибрати з На вас і перенести в кошик Notion', fromACall: 'з дзвінка',
@@ -164,7 +168,7 @@
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     rec: { state: 'off', kind: 'video', elapsed: 0, source: '', note: '' },
-    pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
+    pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], knownSrc: {}, tipsLang: null,
     openItems: [], notionItems: [], notionProject: '', minePending: [], mineN: 0, spkPrompt: 15,
     ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, rateOpen: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
@@ -968,51 +972,97 @@
     pop.style.top = top + 'px';
   }
   function openLinePopover(i, anchor) {
-    const t = T(), l = S.transcript[+i], pop = $('pop');
+    const l = S.transcript[+i];
     if (!l || !l.t) return;
-    const r = anchor.getBoundingClientRect();
-    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 270)) + 'px';
-    const names = Array.from(new Set(Object.values(S.speakers).map((s) => s && s.name).filter((n) => n && n !== t.me && n !== t.them)));
-    pop.innerHTML = `<label class="meta" for="lnName">${esc(t.name)}</label><input id="lnName" type="text" list="lnNames" value="${esc(S.ui.lineWho[lineKey(l)] || '')}">
-      <datalist id="lnNames">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
-      <button class="btn1" type="button" id="lnSave">${esc(t.save)}</button>`;
-    pop.hidden = false; placePop(pop, r);
-    const input = pop.querySelector('#lnName'); input.focus();
-    const save = () => {
-      const name = input.value.replace(/\s+/g, ' ').replace(/\|/g, ' ').trim().slice(0, 60); if (!name) return;
-      S.ui.lineWho[lineKey(l)] = name;
-      post('setting', { key: 'line_who', value: l.t + '|' + String(l.text || '').slice(0, 40).replace(/\|/g, ' ') + '|' + name });
-      pop.hidden = true; showToast({ text: t.lineWhoSaved, kind: 'ok', at: Date.now() }); render();
-    };
-    pop.querySelector('#lnSave').onclick = save;
-    input.onkeydown = (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') pop.hidden = true; e.stopPropagation(); };
+    openWhoSheet({ line: l, anchor });
   }
 
-  function openNamePopover(sid, anchor) {
-    const t = T(), sp = S.speakers[sid] || {}, pop = $('pop');
+  function openNamePopover(sid, anchor) { openWhoSheet({ sid, anchor }); }
+
+  /** 2026-11-05 (owner): one sheet for naming a voice or a line: the name with the people of this meeting as a list
+   *  inside the sheet (no system dropdown over the controls), and Team / Client always there, chosen on purpose. */
+  function openWhoSheet({ sid, line, anchor }) {
+    const t = T(), pop = $('pop'), sp = sid ? (S.speakers[sid] || {}) : {};
     const r = anchor.getBoundingClientRect();
-    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 270)) + 'px';
-    let side = sp.side || 'client';
-    const sug = (sp.suggestions || []).map((x) => `<button class="sug" type="button" data-pick="${esc(x.name)}">${esc(x.name)}${x.score == null ? '' : ` <span class="m">${Math.round(x.score * 100)}%</span>`}</button>`).join('');
-    const known = (S.knownNames || []).filter((n) => !(sp.suggestions || []).some((x) => x.name === n));
-    pop.innerHTML = `${sug ? `<div class="sugs">${sug}</div>` : ''}<label class="meta" for="spName">${esc(t.name)}</label><input id="spName" type="text" list="spKnown" value="${esc(sp.name || '')}">
-      <datalist id="spKnown">${known.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
-      <div class="seg2"><button type="button" data-side="client" aria-pressed="${side === 'client'}">${esc(t.client)}</button><button type="button" data-side="team" aria-pressed="${side === 'team'}">${esc(t.team)}</button></div>
-      <button class="btn1" type="button" id="spSave">${esc(t.save)}</button>`;
-    pop.hidden = false; placePop(pop, r);
-    const input = pop.querySelector('#spName'); input.focus();
-    pop.querySelectorAll('[data-side]').forEach((b) => b.onclick = () => { side = b.dataset.side; pop.querySelectorAll('[data-side]').forEach((x) => x.setAttribute('aria-pressed', x === b)); });
-    const save = () => {
-      const name = input.value.replace(/\s+/g, ' ').trim().slice(0, 60); if (!name) return;
-      S.speakers[sid] = Object.assign({}, sp, { name, side });
-      if (feed) feed.speakers[sid] = Object.assign({}, feed.speakers[sid], { name, side });
-      post('name-speaker', { speakerId: sid, name, side });
-      pop.hidden = true; render();
+    const sideOf = (n) => { const x = Object.values(S.speakers).find((v) => v && v.name === n); return (x && x.side) || (S.rosterSide && S.rosterSide[n]) || ''; };
+    // 2026-11-05 (owner): every name says why it is offered; an invitation of 3 people offers those 3 first, the voice
+    // library only on a click (or when typing).
+    const people = [];
+    const addP = (name, score, why) => { if (!name || name === t.me || name === t.them || people.some((p) => p.name === name)) return; people.push({ name, score, why }); };
+    (sp.suggestions || []).forEach((x) => addP(x.name, x.score, x.score == null ? ((S.knownSrc || {})[x.name] || 'invited') : 'voice'));
+    Object.entries(S.speakers).forEach(([k, v]) => v && k !== sid && addP(v.name, null, 'call'));
+    (S.knownNames || []).forEach((n) => addP(n, null, (S.knownSrc || {})[n] || 'project'));
+    let libOpen = false;
+    let name = sid ? (sp.name || '') : (S.ui.lineWho[lineKey(line)] || '');
+    let side = sid ? (sp.side === 'team' || sp.side === 'client' ? sp.side : (name ? sideOf(name) : '')) : (name ? sideOf(name) : '');
+    const quote = sid ? sp.lastQuote : line.text;
+    pop.classList.add('who');
+    pop.innerHTML = `<div class="who-h"><b>${esc(sid ? t.whoTitle : t.whoLine)}</b>${sid && (sp.label || sp.seconds) ? `<span class="meta">${esc(sp.label || '')}${sp.seconds ? ' · ' + esc(t.secsSpoken({ s: Math.round(sp.seconds) })) : ''}</span>` : ''}</div>
+      ${quote ? `<div class="who-q">“${esc(String(quote).slice(0, 140))}”</div>` : ''}
+      <input id="whoName" type="text" autocomplete="off" spellcheck="false" placeholder="${esc(t.typeName)}" aria-label="${esc(t.name)}" value="${esc(name)}">
+      <div class="who-list" role="listbox" id="whoList"></div>
+      <div class="who-sh meta">${esc(t.sideH)}</div>
+      <div class="who-side" role="radiogroup">
+        <button type="button" data-side="team" role="radio"><span class="dot team"></span><b>${esc(t.team)}</b><small>${esc(t.teamSub)}</small></button>
+        <button type="button" data-side="client" role="radio"><span class="dot client"></span><b>${esc(t.client)}</b><small>${esc(t.clientSub)}</small></button>
+      </div>
+      <div class="who-f"><span class="who-err meta" id="whoErr"></span><button class="btn2" type="button" id="whoCancel">${esc(t.cancel)}</button><button class="btn1" type="button" id="whoSave">${esc(t.save)}</button></div>`;
+    const input = pop.querySelector('#whoName'), list = pop.querySelector('#whoList'), err = pop.querySelector('#whoErr');
+    let typed = false;
+    const paintSide = () => pop.querySelectorAll('[data-side]').forEach((b) => { b.setAttribute('aria-checked', String(b.dataset.side === side)); b.classList.toggle('on', b.dataset.side === side); });
+    const chip = (p) => {
+      const sd = sideOf(p.name), on = p.name === input.value.trim();
+      return `<button type="button" class="who-chip${on ? ' on' : ''}" data-pick="${esc(p.name)}" title="${esc(t.whoGroups[p.why] || '')}"><span class="dot ${sd || 'unknown'}"></span>${esc(p.name)}${p.score == null ? '' : `<span class="pc">${Math.round(p.score * 100)}%</span>`}</button>`;
     };
-    pop.querySelector('#spSave').onclick = save;
-    pop.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { input.value = b.dataset.pick; if (S.rosterSide && S.rosterSide[b.dataset.pick]) side = S.rosterSide[b.dataset.pick]; save(); });
-    input.onkeydown = (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') pop.hidden = true; e.stopPropagation(); };
+    const paintList = () => {
+      const q = input.value.trim().toLowerCase();
+      const match = (p) => !typed || !q || p.name.toLowerCase().includes(q);
+      const exact = people.some((p) => p.name.toLowerCase() === q);
+      let html = '';
+      for (const g of ['voice', 'call', 'invited', 'project', 'library']) {
+        const rows = people.filter((p) => p.why === g && match(p));
+        if (!rows.length) continue;
+        if (g === 'library' && !libOpen && !(typed && q)) { html += `<button type="button" class="who-more" data-lib="1">${esc(t.whoMore({ n: rows.length }))}</button>`; continue; }
+        html += `<div class="who-g"><div class="who-gh">${esc(t.whoGroups[g])}</div><div class="who-chips">${rows.map(chip).join('')}</div></div>`;
+      }
+      if (typed && q && !exact) html += `<div class="who-g"><div class="who-chips"><span class="who-chip new"><span class="dot unknown"></span>${esc(input.value.trim())}<span class="pc">${esc(t.newPerson)}</span></span></div></div>`;
+      list.innerHTML = html; list.hidden = !html;
+      list.title = t.whoWhy;
+      const more = list.querySelector('[data-lib]'); if (more) more.onclick = () => { libOpen = true; paintList(); };
+      list.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => {
+        input.value = b.dataset.pick; const sd = sideOf(b.dataset.pick); if (sd) side = sd;
+        err.textContent = ''; paintSide(); paintList(); input.focus();
+      });
+    };
+    pop.querySelectorAll('[data-side]').forEach((b) => b.onclick = () => { side = b.dataset.side; err.textContent = ''; paintSide(); });
+    const close = () => { pop.hidden = true; pop.classList.remove('who'); };
+    const save = () => {
+      const nm = input.value.replace(/\s+/g, ' ').replace(/\|/g, ' ').trim().slice(0, 60);
+      if (!nm) { input.focus(); return; }
+      if (side !== 'team' && side !== 'client') { err.textContent = t.pickSide; return; }
+      S.rosterSide = Object.assign({}, S.rosterSide, { [nm]: side });
+      if (sid) {
+        S.speakers[sid] = Object.assign({}, sp, { name: nm, side, suggestions: [] });
+        if (feed) feed.speakers[sid] = Object.assign({}, feed.speakers[sid], { name: nm, side, suggestions: [] });
+        post('name-speaker', { speakerId: sid, name: nm, side });
+        if (S.ui.spkCard === sid) S.ui.spkCard = null;
+      } else {
+        S.ui.lineWho[lineKey(line)] = nm;
+        post('setting', { key: 'line_who', value: line.t + '|' + String(line.text || '').slice(0, 40).replace(/\|/g, ' ') + '|' + nm });
+        showToast({ text: t.lineWhoSaved, kind: 'ok', at: Date.now() });
+      }
+      close(); render();
+    };
+    pop.querySelector('#whoSave').onclick = save;
+    pop.querySelector('#whoCancel').onclick = close;
+    input.oninput = () => { typed = true; const sd = sideOf(input.value.trim()); if (sd) { side = sd; paintSide(); } paintList(); };
+    input.onkeydown = (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); e.stopPropagation(); };
+    paintSide(); paintList();
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 316)) + 'px';
+    pop.hidden = false; placePop(pop, r);
+    input.focus(); input.select();
   }
+
 
   // ---------- Actions ----------
   function setMode(mode) { S.call.mode = mode === 'compact' ? 'compact' : 'normal'; render(); }
@@ -1179,7 +1229,8 @@
         if (S.ui.spkOpen && !cardVoice(speakerList())) { const u = speakerList().find(([, sp]) => !sp.name); if (u) { S.ui.spkCard = u[0]; delete S.ui.spkSnooze[u[0]]; } }
         render(); return;
       }
-      case 'spk-card': S.ui.spkCard = b.dataset.sid; S.ui.spkOpen = true; delete S.ui.spkSnooze[b.dataset.sid]; render(); { const i = $('spkCardName'); if (i) i.focus(); } return;
+      case 'spk-card': S.ui.spkCard = b.dataset.sid; S.ui.spkOpen = true; delete S.ui.spkSnooze[b.dataset.sid]; render(); return;
+      case 'spk-who': openWhoSheet({ sid: b.dataset.sid, anchor: b }); return;      // 2026-11-05: the card's Name this voice
       case 'spk-notnow': {   // 0.8.6 (F3): the card of this voice waits for its next 60 s of speech
         const sid = b.dataset.sid; S.ui.spkSnooze[sid] = (S.speakers[sid] || {}).seconds || 0;
         if (S.ui.spkCard === sid) S.ui.spkCard = null;

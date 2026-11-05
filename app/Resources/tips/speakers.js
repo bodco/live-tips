@@ -39,8 +39,8 @@
         ${sp.lastQuote ? `<div class="q"><span class="meta">${esc(t.lastSaid)}</span> \u201c${esc(sp.lastQuote)}\u201d</div>` : ''}
         ${t.noClip ? `<div class="meta spk-noclip">${esc(t.noClip)}</div>` : ''}
         ${sug ? `<div class="sugs">${sug}</div>` : ''}
-        <div class="spk-name-row"><input id="spkCardName" type="text" placeholder="${esc(t.typeName)}" aria-label="${esc(t.typeName)}" data-sid="${esc(voice)}">
-          <span class="seg2 sm"><button type="button" data-act="spk-side" data-sid="${esc(voice)}" data-side="team" aria-pressed="${side === 'team'}">${esc(t.team)}</button><button type="button" data-act="spk-side" data-sid="${esc(voice)}" data-side="client" aria-pressed="${side === 'client'}">${esc(t.client)}</button></span></div>
+        <div class="spk-name-row"><!-- 2026-11-05: the name and Team / Client are chosen in one sheet --><button class="btn1 sm" type="button" data-act="spk-who" data-sid="${esc(voice)}">${esc(t.whoName || t.typeName)}</button>
+          </div>
         <div class="spk-more meta">${esc(t.more)} ${others ? `<select class="spk-same" data-sid="${esc(voice)}" aria-label="${esc(t.samePerson)}"><option value="">${esc(t.samePerson)}</option>${others}</select> · ` : ''}<button class="link" type="button" data-act="spk-notnow" data-sid="${esc(voice)}">${esc(t.notNow)}</button></div>
       </div>`;
     }

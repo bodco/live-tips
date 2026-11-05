@@ -5,6 +5,17 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.9.5.2 (unreleased)
 
+- **Fixed: a recording of one window had no call sound (2026-11-05):** macOS gives no sound with a one-window
+  capture, so only your microphone was in the file. The call's sound now always comes from its own stream (the whole
+  system sound, Pacenote's own sounds left out), whatever the picture is: a window, a screen or none.
+- **Naming a speaker, redesigned (2026-11-05, owner):** one sheet for the speaker card, a named chip and "Unknown voice"
+  in the transcript: the name with the people of this meeting listed inside the sheet (no system dropdown over the
+  controls), their side next to each, and Team or Client as two clear choices, now also when you give a line to
+  someone. Picking a known person sets the side; a new name asks for a side before Save.
+- **Where the offered names come from (2026-11-05, owner):** the names are chips in groups that say why each is there:
+  Sounds like (the voice match, with its %), On this call, Invited to this call, Project people. The voice library
+  stays behind "N more from your voice library" (or shows when you type), so an invitation of 3 people offers those 3,
+  not a crowd. The recorder now sends the source of each name (`known_src`, additive; older windows ignore it).
 - **Tips window icons (2026-11-05, owner):** pause, play, stop and Home in the top bar are one family (16 px, rounded,
   the same weight); Home has the size of the other tools and no longer sits apart.
 

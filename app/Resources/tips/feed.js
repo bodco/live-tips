@@ -303,6 +303,8 @@
         const sug = pickSug(it.suggestions);
         this.speakers[sid] = Object.assign({}, this.speakers[sid], { suggestions: sug, quote: clean(it.quote || '') });
         if (Array.isArray(it.known)) this.known = it.known.map(clean).filter((x) => x && !/^[a-z]+\.[a-z]+$/.test(x)).slice(0, 40);
+        // 2026-11-05: why each name is offered (invited, call, project, library), for the who-is-speaking sheet
+        if (it.known_src && typeof it.known_src === 'object') { this.knownSrc = {}; for (const [k, v] of Object.entries(it.known_src)) this.knownSrc[clean(k)] = String(v); }
         return true;
       }
       case 'speaker_auto': if (it.sid) { this.speakers[it.sid] = Object.assign({}, this.speakers[it.sid], { name: clean(it.name) }); } return true;
@@ -593,7 +595,7 @@
       onMe: this.onMe(),
       next: this.next,
       speakers: Object.assign({ me: { name: this.tr('me'), side: 'team' }, other: { name: this.tr('them'), side: '' } }, this.speakers),
-      rosterSide: this.rosterSide || {}, knownNames: this.known || [],
+      rosterSide: this.rosterSide || {}, knownNames: this.known || [], knownSrc: this.knownSrc || {},
       transcript: this.transcript.slice(-400),
       brief: this.brief, briefText: this.briefText,
       steps,

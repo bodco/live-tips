@@ -164,6 +164,42 @@ button{font:inherit;color:inherit;cursor:pointer}
 .popover{position:fixed;z-index:40;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-m);box-shadow:0 12px 30px rgba(0,0,0,.25);padding:12px;display:flex;flex-direction:column;gap:10px;width:260px}
 .popover[hidden]{display:none}
 .popover input[type=text]{height:30px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 8px;font:inherit}
+/* 2026-11-05 (owner): the who-is-speaking sheet: people listed inside the sheet, Team / Client as two clear cards */
+.popover.who{width:300px;gap:8px;padding:14px;border-radius:14px}
+.popover.who .who-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.popover.who .who-h b{font-size:14px}
+.popover.who .who-q{font-size:12px;line-height:1.4;color:var(--text-2);background:var(--bg);border-radius:8px;padding:6px 8px}
+.popover.who input[type=text]{height:34px;font-size:14px;border-radius:8px}
+.popover.who input[type=text]:focus{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:0;border-color:var(--accent)}
+.who-list{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow:auto;margin-top:-2px}
+.who-g{display:flex;flex-direction:column;gap:4px}
+.who-gh{font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--text-3)}
+.who-chips{display:flex;flex-wrap:wrap;gap:5px}
+.who-chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--border);border-radius:13px;background:var(--surface);color:var(--text);font-size:12.5px;max-width:100%}
+.who-chip:hover{background:var(--surface-2)}
+.who-chip.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--accent-soft,color-mix(in srgb,var(--accent) 10%,transparent))}
+.who-chip.new{border-style:dashed;color:var(--text-2);cursor:default}
+.who-chip .pc{font-size:11px;color:var(--text-3)}
+.who-chip .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--text-3)}
+.who-chip .dot.client{background:var(--k-docs)}.who-chip .dot.team{background:var(--k-answer)}
+.who-more{align-self:flex-start;border:0;background:none;padding:2px 0;color:var(--accent);font-size:12px;font-weight:500}
+.who-list[hidden]{display:none}
+.who-row{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--text);font-size:13px;text-align:left;width:100%}
+.who-row:hover{background:var(--surface-2)}
+.who-row.on{background:var(--accent-soft,color-mix(in srgb,var(--accent) 12%,transparent))}
+.who-row.new{color:var(--text-2);cursor:default}.who-row.new:hover{background:transparent}
+.who-row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who-row .hint{font-size:11px;color:var(--text-3)}
+.who-row .dot,.who-side .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--text-3)}
+.who-row .dot.client,.who-side .dot.client{background:var(--k-docs)}.who-row .dot.team,.who-side .dot.team{background:var(--k-answer)}
+.who-sh{margin-top:2px}
+.who-side{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.who-side button{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:6px;padding:7px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);text-align:left}
+.who-side button b{font-size:13px}
+.who-side button small{grid-column:2;font-size:11px;color:var(--text-3)}
+.who-side button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--accent-soft,color-mix(in srgb,var(--accent) 10%,transparent))}
+.who-f{display:flex;align-items:center;gap:8px;margin-top:4px}.who-f .who-err{flex:1;color:var(--danger-text)}
+.who-f .btn1,.who-f .btn2{height:30px}
+.spk-name-row .btn1.sm{height:26px;padding:0 10px;font-size:12px}
 .seg2{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:2px;border-radius:8px;background:var(--surface-2)}
 .seg2 button{border:0;border-radius:6px;padding:4px 0;background:transparent;font-size:13px}
 .seg2 button[aria-pressed="true"]{background:var(--surface);font-weight:600}

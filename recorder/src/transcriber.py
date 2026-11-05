@@ -3500,6 +3500,19 @@ class SpeakerTracker:
             add(name)
         return out[:n]
 
+    def known_sources(self, names: list[str]) -> dict:
+        """2026-11-05 (owner): why each offered name is there, for the window to say it: "invited" (this call's
+        invitation), "call" (already named in this call), "project" (the project's people) or "library" (voices
+        heard on earlier calls). Additive to "known"; older windows ignore it."""
+        invited = {p.casefold() for p in (self.participants or [])}
+        named = {c["name"].casefold() for c in self.clusters.values() if c["name"]}
+        project = {p.casefold() for p in (self.people or [])}
+        out = {}
+        for x in names:
+            k = x.casefold()
+            out[x] = "invited" if k in invited else "call" if k in named else "project" if k in project else "library"
+        return out
+
     def _name(self, raw) -> str | None:
         n = clean_name(raw)
         if n and self.lib is not None:
@@ -3573,7 +3586,7 @@ class SpeakerTracker:
         self.ask_open = sid
         self.emit({"kind": "speaker_ask", "sid": sid, "t": t, "at": hhmmss(now()), "quote": quote,
                    "seconds": round(c["seconds"], 1), "suggestions": list(c["suggestions"]),
-                   "known": self.known_names()})
+                   "known": (kn := self.known_names()), "known_src": self.known_sources(kn)})
 
     def _next_ask(self) -> None:
         if self.paused or self.ask_open:

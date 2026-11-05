@@ -64,7 +64,9 @@ def _call(tmp_path, timing=True):
 
 def _cfg(**kw):
     cfg = R.build_cfg(None, [])
-    cfg.update(semantic_fact_min=0.45, semantic_margin=0.1, semantic_card_min=0.95, name_aliases=["Bohdan"])
+    # semantic_line_strong off by default here: these tests pin the two-line and window gates (0.9.6 has its own test)
+    cfg.update(semantic_fact_min=0.45, semantic_margin=0.1, semantic_card_min=0.95, name_aliases=["Bohdan"],
+               semantic_line_strong=9.0)
     cfg.update(kw)
     return cfg
 
@@ -111,6 +113,18 @@ def test_semantic_fact_gate_and_reasons(tmp_path):
     assert why[("10:02:00", "PAY-2")] == "not a question, topic not held"      # a statement, the topic not yet held
     assert why[("10:02:15", "PAY-2")] is None                                 # the second line on it: held, shown
     assert R.rejections(paths["semantic"])[("fact", "not a question, topic not held")] >= 1
+
+
+def test_one_strong_line_holds_the_topic(tmp_path):
+    """0.9.6 (05.11 internal daily, 15:18): one statement far above the noise floor is shown without a second line."""
+    md = _call(tmp_path)
+    lines = R.load_lines(md, tmp_path / "call.md.timing.jsonl")
+    client = R.ReplayClient(fake_embed)
+    paths = R.run(lines, tmp_path / "call.facts.json", tmp_path / "call.cards.json", _cfg(semantic_line_strong=0.1),
+                  client, tmp_path / "out", "call")
+    log = [json.loads(x) for x in paths["semantic"].read_text(encoding="utf-8").splitlines() if x.strip()]
+    first = next(r for r in log if r.get("id") == "PAY-2" and r.get("why") != "below threshold")
+    assert first["t"] == "10:02:00" and first["why"] is None and first["held"] is True
 
 
 def test_question_items_and_report(tmp_path):

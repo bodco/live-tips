@@ -124,6 +124,9 @@ DEFAULTS = {
     "semantic_window_min": 0.60,
     "semantic_window_margin": 0.12,
     "semantic_window_strong": 0.18,   # one window this far above the noise floor holds the topic at once
+    # 0.9.6 (05.11 internal daily: a Spring line at 0.63, 0.19 over the floor, was dropped because the window was 0.592):
+    # one of their lines at fact_min and this far above the noise floor holds the topic at once, like a strong window.
+    "semantic_line_strong": 0.18,
     "index_enabled": True,      # keep <project>/.livetips-index fresh in the background during calls
     "index_extra": [],          # extra folders to index (e.g. a workspace _notion mirror)
     "index_live_max_chunks": 1500,  # at most this many chunks embedded per call (pre-index with `lt index`)
@@ -2206,7 +2209,8 @@ class SemanticLive(threading.Thread):
             f = self.fact_list[i]
             fid = str(f.get("id") or f.get("title"))
             line_held = sum(1 for _, j in self.hist if j == i) >= 2
-            held = line_held or i in win_held
+            line_strong = float(s[i]) >= fmin and float(over[i]) >= self.f("semantic_line_strong")
+            held = line_held or line_strong or i in win_held
             said = not is_q and any(float(m[i]) >= fmin - 0.05 for _, m in self.me_scores)
             why = None
             if not (is_q or (held and not presenting_quiet())):

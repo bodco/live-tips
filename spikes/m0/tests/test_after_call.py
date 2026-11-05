@@ -72,6 +72,24 @@ def test_risk_becomes_one_quiet_card_and_a_wrapup_line(tmp_path):
     assert any(i.startswith("Risk: ") for i in out["items"])
 
 
+def test_a_risk_the_pm_said_gets_no_card_but_stays_in_the_wrapup(tmp_path):
+    """0.9.6 (owner, 05.11): the PM does not need to see his own words in the feed."""
+    def resp(model, user):
+        if "PREVIOUS STATE" in user:
+            return ('{"topic": "release", "owner": "PM", "mine": true, "floor": "PM", "asks": [], "actions": [], "decisions": [], '
+                    '"speech_done": [], "theirs": [], "risks": [{"what": "if QA is late, the release moves", "who": "PM", "t": "10:00:05"}, '
+                    '{"what": "the upgrade may break the login", "who": "Mike", "t": "10:00:06"}, '
+                    '{"what": "if the API slips, the pilot moves a week", "who": "Dana", "t": "10:00:07"}]}')
+        return '{"need_tip": false, "level": "none", "trigger": "none", "topic": "x"}'
+    eng, clock = _meeting_engine(tmp_path, resp, situation=True, proactive=False, name_aliases=["Mike"])
+    _feed(eng, clock, "[10:00:05] Me (en): If QA is late, the release moves.", 1, 36005.0)
+    _feed(eng, clock, "[10:00:20] Other (en): Yes, and if the API slips we move it.", 2, 36020.0)
+    tips, _ = _out(tmp_path)
+    assert [t["who"] for t in tips if t.get("kind") == "risk"] == ["Dana"]
+    items = eng.final_wrapup()["items"]
+    assert sum(1 for i in items if i.startswith("Risk: ")) == 3
+
+
 def test_risk_notion_needs_a_database_and_dry_runs(tmp_path, capsys):
     cfg = tmp_path / "p.md"
     cfg.write_text("**risks_db**: `collection://abc123`\n")

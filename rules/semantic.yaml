@@ -21,10 +21,11 @@ fact_gate: question_or_topic_held   # a fact shows on an other-side line that is
 # (owner: primary is not only the attached file; the project context, recent calls and threads count too):
 fact_window:
   text: their lines of the last topic_window_s joined (2+ lines), one extra embedding per other-side line
-  held: two windows in a row at window_min and window_margin above the floor, or one at window_strong
+  held: two windows in a row at window_min and window_margin above the floor, or one at window_strong, or one line at line_strong (0.9.6)
   window_min: 0.60
   window_margin: 0.12
   window_strong: 0.18
+  line_strong: 0.18           # 0.9.6: one of their lines at fact_min and this far above the floor holds the topic at once
   another_topic: a two-line match is dropped when the window's cosine to the fact is under fact_min
   said_by_pm: not shown when a PM line of the window reached fact_min - 0.05 to the fact (questions still get it)
   once_per_call: by the topic a fact shows once per call; a question still gets it after the cooldown

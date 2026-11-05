@@ -2302,16 +2302,29 @@ class Engine:
             self.out_tips.write(commitment_card(c, s_to_hms(self.clock()), self._ui_uk()))
 
     def _risk_cards(self, sit: dict) -> None:
-        """A new risk: one quiet card in Earlier (rules/risks.yaml > during_call), never red."""
+        """A new risk: one quiet card in Earlier (rules/risks.yaml > during_call), never red. 0.9.6 (owner, 05.11):
+        a risk the PM said himself is not shown, he just said it; it stays in the call picture and the wrap-up."""
         for r in sit.get("risks") or []:
             key = r.get("what", "")[:60].lower()
             if key in self.risks_shown:
                 continue
             self.risks_shown.add(key)
+            if self._is_pm(r.get("who", "")):
+                continue
             t = s_to_hms(self.clock())
             self.out_tips.write({"schema_version": 1, "engine": "app", "kind": "risk", "level": "info", "t": t, "at": t,
                                  "src": r.get("t") or t, "who": r.get("who", ""),
                                  "gist": ("Ризик: " if self._ui_uk() else "Risk: ") + r.get("what", "")})
+
+    def _is_pm(self, who: str) -> bool:
+        """The call picture names the PM "PM", by the "me" label or by one of the PM's names."""
+        w = " ".join(str(who or "").lower().replace(".", " ").split())
+        if not w:
+            return False
+        meta = self.meta()
+        names = {"pm", "me", "я", str(meta.get("me_label", "")).lower()} | {str(a).lower() for a in (meta.get("name_aliases") or []) + list(self.cfg.get("name_aliases") or [])}
+        names = {" ".join(n.replace(".", " ").split()) for n in names if n.strip()}
+        return w in names
 
     def _conflict_cards(self, obj: dict) -> None:
         """0.8.8 (rules/decisions.yaml > during_call): someone contradicts an active decision: one quiet card, each

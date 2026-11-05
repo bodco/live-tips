@@ -3,6 +3,17 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased
+
+- **Documentation for 0.9.4 (2026-11-05):** README and the guide (English and Ukrainian) now cover the three ways to the
+  AI (Claude, ChatGPT, Gemini), the Gemini account through Antigravity CLI with its warning, plan B, OpenAI prompt
+  caching, Settings > Usage, the measured prices with a link to the pricing page, rating tips and learning from ratings
+  (edits.jsonl schema 2), one person with many names, Meet naming the voices and Help improve Pacenote. The guide has a
+  section about the new website (14.1r) and the privacy section names where text goes. PRIVACY and TERMS link to
+  pacenote.bodco.pm and TERMS covers the Gemini account and the website. DEVELOPMENT.md describes how the website is
+  built and published, the telemetry Worker (what it validates, deploy, looking at the data) and the shared learning
+  fixture.
+
 ## 0.9.4 (2026-11-05)
 
 Includes 0.9.3, which was not released on its own.

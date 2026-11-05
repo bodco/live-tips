@@ -1,6 +1,6 @@
 # Pacenote privacy policy
 
-Updated 5 November 2026. The full text is on the website: **[tower.bodco.pm/pacenote/privacy/](https://tower.bodco.pm/pacenote/privacy/)** ([українською](PRIVACY.uk.md)).
+Updated 5 November 2026. The full text is on the website: **[pacenote.bodco.pm/privacy/](https://pacenote.bodco.pm/privacy/)** ([українською](PRIVACY.uk.md)).
 
 In short:
 

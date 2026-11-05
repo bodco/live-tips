@@ -1,6 +1,6 @@
 # Pacenote
 
-**Your co-driver on calls.** [Українською](README.uk.md) · [Site](https://tower.bodco.pm/pacenote/)
+**Your co-driver on calls.** [Українською](README.uk.md) · [Site](https://pacenote.bodco.pm/)
 
 Pacenote prepares a short brief before the call, gives quiet, precise tips during it, and writes
 the notes after. You keep the wheel. It listens to your call on your Mac and speaks up only when a fact or a phrase is needed:
@@ -18,7 +18,7 @@ permissions carry over. What "live tips" means inside the code: [DEVELOPMENT.md]
 |---|---|---|
 | What | A native macOS menu bar app | A Claude Cowork skill |
 | You need | Apple Silicon Mac, macOS 14.4+; for preparation Claude Code with a Claude plan/API key, or Codex CLI with a ChatGPT account | Claude Cowork with a computer linked, the recorder from this repo |
-| Tips come from | Claude or OpenAI API, called on events | Claude in your Cowork chat |
+| Tips come from | Claude, OpenAI or Gemini API, called on events | Claude in your Cowork chat |
 | Download | [Pacenote.dmg](https://github.com/bodco/live-tips/releases/latest/download/Pacenote.dmg) | [live-tips.skill](https://github.com/bodco/live-tips/releases/latest/download/live-tips.skill) |
 
 Both share the same rules (`rules/`) and the same recorder, so tips behave the same way.
@@ -44,11 +44,11 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 - **Any language in, one language out:** set the call to one language and every speaker is written in it (Ukrainian on an English call comes out in English).
 - **After the call:** full call notes in the project folder after every call, with or without Notion; with Notion connected, also a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page. A follow-up email is only a draft: nothing is sent to clients by itself.
 
-How it compares with Fireflies and Fathom (price, recording, live help, preparation, summary, CRM, data): [Pacenote vs Fireflies vs Fathom](https://tower.bodco.pm/pacenote/compare/).
+How it compares with Fireflies and Fathom (price, recording, live help, preparation, summary, CRM, data): [Pacenote vs Fireflies vs Fathom](https://pacenote.bodco.pm/compare/).
 
-## Claude or ChatGPT (unreleased)
+## Claude, ChatGPT or Gemini
 
-Settings > AI has two tabs, Claude (Claude account, Claude API) and ChatGPT, with two separate OpenAI options:
+Settings > AI has three tabs: Claude (Claude account, Claude API), ChatGPT and Gemini. Each job (preparation, live tips, after the call) picks its own way and model. OpenAI has two separate options:
 
 - **ChatGPT account (Codex):** install the official [Codex CLI](https://learn.chatgpt.com/docs/cli), press
   **Log in**, finish the browser sign-in, then return to Pacenote. The account row checks the sign-in again.
@@ -65,6 +65,28 @@ model has no shell, MCP, web search or subagents. Codex jobs are ephemeral and m
 API requests; API spending caps do not measure your account-plan usage. Plan-limit and sign-in failures are
 shown without switching providers. Prepared cards and local project search remain available, while Claude
 Code's deep folder lookup is disabled for OpenAI/Codex live tips. Failed or incomplete answers are errors.
+
+**Gemini (0.9.3).** Two ways, both in Settings > AI > Gemini:
+
+- **Gemini API:** a key from aistudio.google.com/apikey of a project with billing turned on, because Google may use
+  free-tier content to improve its products and does not use paid-tier content. Three models, one per job:
+  Gemini 3.5 Flash-Lite (tips), Gemini 3.8 Flash (preparation and after the call) and Gemini 4 Argon. The classic
+  streaming API is used: no stored interactions, no tools, no files.
+- **Gemini account (Antigravity CLI, `agy`):** the preparation and the work after the call only, never tips during a
+  call (a request takes 20-30 seconds). Your Google plan pays, no API key. Each request runs in an empty folder with
+  no file, shell or write access, and Pacenote removes agy's own copy of the conversation afterwards. Choosing it
+  shows a red warning: Google's Antigravity terms forbid use through third-party software (the account may be
+  suspended) and let Google use and review the conversations, and turning the CLI's telemetry off does not stop
+  that storage.
+
+**Plan B.** Settings > AI > Automatic switching > "Use Gemini when Claude or ChatGPT is out" (off by default) sends a
+job to Gemini when the chosen way has no credit, hits its plan limit or has a bad key. The text of the call then
+reaches Google.
+
+**Cost.** Settings > Usage shows the spend by stage and by model for every provider with an API key. On the OpenAI API
+the blocks reused during a call carry explicit cache breakpoints. Measured prices and model quality (about $13 a
+month for 10 calls on Claude, about $7 on OpenAI or Gemini, prices as of 4 November 2026):
+[pacenote.bodco.pm/pricing](https://pacenote.bodco.pm/pricing/).
 
 ## For teams (design)
 
@@ -83,9 +105,10 @@ not built: [docs/team](docs/team/README.md).
 | `spikes/m0/` | The tips engine (Python) and its tests |
 | `rules/` | Shared rules for the app and the skill |
 | `notion-mirror/` | Optional local copy of Notion pages for facts and search |
+| `telemetry/` | The Cloudflare Worker behind the optional Help improve Pacenote (event names and numbers only) |
 | `keepalive/` | Optional Cowork plugin that keeps the skill listening during a call |
 | `docs/` | The full guide: [English](docs/en/live-tips.md), [українською](docs/uk/live-tips.md); the team design in [`docs/team/`](docs/team/README.md) |
-| `DEVELOPMENT.md` | Layout, build and the measurements behind the design |
+| `DEVELOPMENT.md` | Layout, build, the website, the telemetry endpoint and the measurements behind the design |
 
 Pacenote works on its own. With [PM Control Tower](https://github.com/bodco/pm-control-tower) it also reads your project configs (people, Notion pages, the current state).
 

@@ -958,9 +958,13 @@ layers are tuned there too: `speakers_enabled`, `speaker_join` (0.45), `speaker_
 
 ## 11. Privacy and etiquette
 
-The full texts: [privacy policy](https://tower.bodco.pm/pacenote/privacy/) and [terms of use](https://tower.bodco.pm/pacenote/terms/)
+The full texts: [privacy policy](https://pacenote.bodco.pm/privacy/) and [terms of use](https://pacenote.bodco.pm/terms/)
 (also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). Nothing is sent to the author unless you turn on Help improve Pacenote (0.9.4, Settings > General > Privacy, off by default): then the usage log's event names and numbers of whole days go once a week, with a random id of this Mac. No words of a call, comments or names.
 
+- Text goes only to the AI you chose for each job in Settings > AI (Claude, OpenAI or Gemini, with your key or
+  account). A Gemini account runs through Google's Antigravity CLI, never for tips; its terms forbid use through
+  third-party software and let Google use and review the conversations, so a red warning appears when you choose
+  it. Plan B through Gemini is off by default (14.1p).
 - Audio is not stored: recognised phrases are appended to the `.md` immediately, audio
   buffers live only in memory.
 - Transcripts live in the project folder (`<project>/live/`). Do not add them to public
@@ -1635,6 +1639,20 @@ not stop storage).
 by stage (call preparation, live tips, after the call, total) and by model with requests and tokens, for today, the
 last 7 days (the default), this month or chosen dates. The accounts paid by a plan are not counted.
 
+**OpenAI prompt caching.** On the OpenAI API route the blocks Pacenote reuses during a call (the call's rules, the
+brief and the facts, while the tips run) carry explicit cache breakpoints with a 30-minute life, renewed by every
+read, the way Claude's `cache_control` works. Cache writes are billed apart from ordinary input and are shown in the
+cost; a model that rejects the cache settings is asked once more without them. The preparation through the OpenAI or
+Gemini API counts its cost in Usage too (it was logged as $0 before), and each preparation line in the spend ledger
+names its model.
+
+**Measured prices and quality.** What a call costs and how the default models of each provider did, judged blind by
+two AI judges (Claude about $1.33 for a 30-minute call, OpenAI $0.74, Gemini $0.73; prices as of 4 November 2026),
+is on the website: [pacenote.bodco.pm/pricing](https://pacenote.bodco.pm/pricing/). Limits as measured: Gemini 4
+Argon stops at its output limit before it finishes a brief or notes; Gemini's automatic cache did not hit during
+live tips, so Flash-Lite costs more than Luna or Haiku and gave 3 tips in 30 minutes; GPT-6 Luna failed twice on a
+larger preparation. It is a small test (one invented call, two judges): read the scores as a direction.
+
 **Provider bench.** `tools/provider_bench.py` replays five invented meetings (Fixtures/bench) through Claude, OpenAI and
 Gemini variants and writes one table (cost, latency, tips, errors) and the tips side by side.
 
@@ -1648,7 +1666,8 @@ Gemini variants and writes one table (cost, latency, tips, errors) and the tips 
 - **Learning from ratings.** Every rating joins the corrections log (edits.jsonl). A tip rated down on two or more
   different calls is a standing lesson: every next call's tips and every preparation avoid it; a rating on one call
   stays with that call. Each line of the log now also says where it was made (live, preparation, after the call,
-  speakers), the call type, the way to the AI and the versions, so a pattern can be traced to its setup.
+  speakers), the call type, the way to the AI and the versions, so a pattern can be traced to its setup (edits.jsonl
+  schema 2: `surface`, `meeting_type`, `route`, `app_version`, `rules_version`).
 - **One person, many names.** Settings > Speakers > Voice library > Names: the name kept and the other spellings
   (initials, a nickname, the Meet display name). Merge into asks which name stays, either of the two or a fuller one
   ("M. T." and "Mike T." become "Mike Turner"); from then on every spelling names that person on every call.
@@ -1661,7 +1680,17 @@ Gemini variants and writes one table (cost, latency, tips, errors) and the tips 
 - **Help improve Pacenote (off by default).** Settings > General > Privacy. Once a week the usage log (event names
   and numbers of whole days since you turned it on, such as how many tips were rated and why) goes to the author,
   with a random id of this Mac that is forgotten when you turn it off. Never the words of a call, comments, names,
-  projects or files; the server keeps no IP address and refuses anything else. Show what is sent opens the next batch.
+  projects or files; the server keeps no IP address and refuses anything else. Show what is sent opens the next batch (`usage/next-batch.json`).
+
+### 14.1r The website: pacenote.bodco.pm (0.9.4)
+
+Pacenote has its own website, [pacenote.bodco.pm](https://pacenote.bodco.pm/), in English and Ukrainian: the overview,
+how it works, pricing with the measured costs, the comparison with Fireflies and Fathom, the privacy policy and the
+terms of use. It has its own header, footer and 404 page; PM Control Tower, the author's other project, is only
+linked there as "Also by bodco". The changelog is `CHANGELOG.md` in this repository. The privacy policy on the site has
+a section about the website itself (hosting on GitHub Pages, Google Analytics 4 only with your consent) that
+[PRIVACY.md](../../PRIVACY.md) does not repeat. The pages are built from the PM Control Tower site's source and
+published from github.com/bodco/pacenote.bodco.pm; how: [DEVELOPMENT.md](../../DEVELOPMENT.md), "The website".
 
 ### 14.2 After the call: the meeting page in Notion
 
@@ -1942,7 +1971,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    app takes the microphone (0.8, section 14.1d) and call notes in the project folder after every call, also
    without Notion (0.8.5, section 14.2). Pacenote never starts recording by itself.
 54. **Comparison.** How Live Tips stands next to Fireflies, Fathom and Notion AI Meeting Notes (transcript,
-   help during the call, summary, prices as of 27 October 2026): https://tower.bodco.pm/pacenote/compare/
+   help during the call, summary, prices as of 27 October 2026): https://pacenote.bodco.pm/compare/
 55. **Its own repository (0.6.0).** Live Tips moved out of PM Control Tower into
    github.com/bodco/live-tips with its history: the app (`app/`), the recorder (`recorder/`), the skill
    (`skill/`), the engine (`spikes/m0/`) and this guide. Downloads: `Pacenote.dmg` and `live-tips.skill`
@@ -2004,7 +2033,7 @@ address", `references/sweep.md`, `references/presentation.md`).
 71. **New call from the tips window (0.6.3).** When a call ends, "Ended ✓" keeps its shape and a "New call"
    button closes the window and opens Start call.
 72. **Privacy policy and terms of use (0.6.4).** Settings > About > Your data gives the short version and links to
-   the full [privacy policy](https://tower.bodco.pm/pacenote/privacy/) and [terms](https://tower.bodco.pm/pacenote/terms/).
+   the full [privacy policy](https://pacenote.bodco.pm/privacy/) and [terms](https://pacenote.bodco.pm/terms/).
 73. **Up next (0.6.5).** Plan and prepare any number of upcoming calls during a call and switch with one
    question (section 14.1b); a preparation joins only its own call.
 74. **Status dot (0.6.5).** Grey waiting or paused, blue starting or stopping, red recording, green stopped.

@@ -1,7 +1,7 @@
 # LiveTips.app (beta)
 
 Native macOS companion for the `live-tips` skill: records the call locally, transcribes it on
-the Mac and asks a model for tips on events instead of polling. Status: **beta 0.8.0** (Pacenote), a
+the Mac and asks a model for tips on events instead of polling. Status: **beta** (Pacenote; the current version is in [CHANGELOG.md](CHANGELOG.md)), a
 downloadable app (see Install below); the M0 spike that measured the approach is kept further down.
 
 The skill and the app are both supported and behave the same way. Behaviour lives in one
@@ -17,6 +17,8 @@ place, [`rules/`](rules/), which both read.
 | `tools/gen_skill_section.py` | regenerates the skill sections; `--check` fails when they are stale, `--compare SKILL.md` fails on drift |
 | `tools/check_anonymized.py` | fails on user paths, keys, IDs, long dashes and terms from a private deny list |
 | `Fixtures/` | synthetic demo call used by the tests |
+| `telemetry/` | the Cloudflare Worker and D1 schema behind the optional Help improve Pacenote (see Telemetry below) |
+| `docs/` | the guide in English and Ukrainian (`docs/en`, `docs/uk`, kept in step) and the team design |
 
 ## Names
 
@@ -230,6 +232,101 @@ Keychain, opens Start call, Start call in plan mode during a (faked) live call (
 presentation mode, and saves each as `<name>-dark.png` and `<name>-light.png` at 2x. Convert them to
 WebP and put them in the website's `public/live-tips/shots/`. Run it again after every visible change
 in the app, so the site always shows the current windows.
+
+## Learning from corrections (0.9.3, 0.9.4)
+
+The app and the skill learn from what you change and from how you rate tips. The rules are in `rules/learning.yaml`; they
+are implemented twice, in Python (`spikes/m0/livetips_m0/learning.py`) and in Swift (`LiveTipsCore/Learning.swift`), and
+the same input must give the same standing lessons in both. That is pinned by one shared fixture,
+`rules/fixtures/learning-patterns.json`:
+
+- `records`: the corrections log lines of several invented calls (`followup_instruction`, `brief_edit`,
+  `card_onme_remove`, `tip_rating` with `tip_partly` or `tip_not_useful` and a reason chip), each with a file and a series;
+- `expect`: the standing patterns that must come out (`kind`, `text`, `calls`). A pattern is standing when it repeats on
+  two or more different calls (`calls: 2`); a rating on one call stays with that call.
+
+Both suites read the fixture: `spikes/m0/tests/test_learning.py` (pytest) and the `CoreChecks` target of the Swift package
+(`app/`, `swift run CoreChecks`). To change a rule, change `learning.yaml`, both implementations and the fixture in one
+commit and run both suites. The log is `edits.jsonl`, schema 2: each line also carries `surface` (live, preparation,
+after the call, speakers), `meeting_type`, `route` (the way to the AI of the job), `app_version` and `rules_version`.
+The tips of a new call get the standing lessons as `tip_lessons` (`edits_log`), a preparation gets them through
+`EditLog.promptBlock`. Use invented American names in the fixture, as everywhere in the repository.
+
+## Telemetry (0.9.4, Help improve Pacenote)
+
+Off by default. When a person turns it on (Settings > General > Privacy, needs the usage log on), the app sends the lines of
+its usage log once a week (checked at launch and every 6 hours), complete days only, never days from before it was turned
+on, with one random install id per Mac (made when sharing is turned on, kept until it is turned off). Never call text,
+comments, names, projects, files, titles or emails. Show what is sent writes the next batch to `usage/next-batch.json`.
+
+| Where | What |
+|---|---|
+| `rules/usage.yaml > telemetry` | the setting, the endpoint, the schedule and the list of what is never sent; the events and their parameters are in the same file |
+| `LiveTipsCore/Telemetry.swift`, `LiveTips/TelemetrySender.swift`, `UsageLog.swift`, `SettingsView.swift` | building the batch, sending it, the usage log, the switch and Show what is sent (`CoreChecks` covers the batch) |
+| `telemetry/worker.js` | the Cloudflare Worker `pacenote-telemetry`: `POST /v1/batch`, `GET /v1/health` |
+| `telemetry/schema.sql` | the D1 tables: `batches` (one row per batch, the hour of arrival, the payload) and `event_counts` (the same events summed per day, event, parameters and version) |
+| `telemetry/README.md`, `telemetry/wrangler.toml` | the short description and the deploy config |
+
+**What `validate` in `worker.js` checks again on the server.** The header is schema 1 with an install id (hex digits and
+dashes, 8 to 40 characters); `app_version`, `rules_version` and `ui_lang` are short plain strings; `from` and `to` are days
+(`YYYY-MM-DD`); at most 20,000 events, each with a lower-case snake_case name of up to 40 characters, a day and flat
+parameters (strings up to 80 characters, numbers, booleans: anything nested or longer refuses the whole batch with 400);
+route names are checked the same way. A body over 256 KB gets 413, and an install may send 3 batches a day at most
+(429). The Worker stores the hour of arrival, never an IP address or a user agent. `validate` has no automated test yet:
+after changing it, try a good and a bad batch against a local `wrangler dev`.
+
+**Deploy.** From a Mac where `wrangler` is signed in: `npx wrangler deploy` with a config that has the real D1 id. The
+`wrangler.toml` in this repository carries a placeholder instead of the id on purpose: `tools/check_anonymized.py` rejects
+UUIDs, so the working config (a copy with the real `database_id` and `main` pointing at `telemetry/worker.js`) is kept
+outside git. A new database gets its tables from `schema.sql` (`wrangler d1 execute`). The endpoint address is in
+`rules/usage.yaml`; a custom domain instead of `workers.dev` would be a change there and in the Worker's routes.
+
+**Looking at the data.** Cloudflare dashboard > Storage and databases > D1 > `pacenote-telemetry` > Console, for example
+`SELECT event, params, SUM(n) FROM event_counts GROUP BY 1, 2`. One test row from the first check (install id of zeros,
+version `0.9.4-test`) is still there; delete it only with the owner's agreement.
+
+## The website (pacenote.bodco.pm)
+
+The site is separate from PM Control Tower, the author's other project, and has no source in this repository. Its pages
+are part of the PM Control Tower website source (github.com/bodco/tower.bodco.pm, Astro 5): the content in
+`src/content/pages/{en,uk}/pacenote*.md` (the product page, `-details`, `-pricing`, `-compare`, `-privacy`, `-terms`)
+and `changelog.md`, the routes in `src/pages/pacenote/` and `src/pages/uk/pacenote/`. One source gives two builds:
+
+| Build | What it makes |
+|---|---|
+| `npm run build` | the PM Control Tower site; `/pacenote/*` there are redirects to pacenote.bodco.pm (`scripts/pacenote-redirects.mjs`, `src/data/pacenote-domain.json` with `"live": true`) |
+| `npm run build:pacenote` | `PACENOTE_KEEP=1 astro build`, then `scripts/csp.mjs`, then `scripts/pacenote-site.mjs dist dist-pacenote`: the standalone Pacenote site |
+
+`dist-pacenote/` is the built site and nothing else. It is copied into github.com/bodco/pacenote.bodco.pm (built files
+only, never edited by hand) and served by GitHub Pages from `main` under the custom domain (`CNAME`, a DNS record
+`pacenote` pointing at `bodco.github.io`). Publishing happens only on the owner's command, together with a release.
+
+What makes it its own site:
+
+- `src/components/PacenoteHeader.astro` and `PacenoteFooter.astro`. `Base.astro` renders them for `brand="pacenote"` instead
+  of the PM Control Tower header and footer. The header has Overview, How it works, Pricing, Compare, the language and
+  theme switches, GitHub and Download. The footer has the product pages, the downloads, `CHANGELOG.md` and the guide on
+  GitHub, the privacy policy and terms of this site, Analytics settings, and "Also by bodco: PM Control Tower".
+- `Base.astro` with `brand="pacenote"` also sets the accent, the favicon, the title suffix, the share image and the
+  breadcrumbs and JSON-LD that point at Pacenote; `Feature.astro` makes the breadcrumbs "Pacenote / page".
+- `src/pages/pn404/[v].astro` is the 404 page. It is built only with `PACENOTE_KEEP=1`, so the PM Control Tower build
+  has no such page; `pacenote-site.mjs` writes it as `404.html`.
+- `scripts/pacenote-site.mjs` copies the six pages (`SUBS`: the home, `details`, `pricing`, `compare`, `privacy`,
+  `terms`) in both languages, the assets, Pacenote's own `favicon.svg`, `favicon-32.png` and `apple-touch-icon.png`, and
+  writes `site.webmanifest` for Pacenote. It rewrites the links (everything outside `/pacenote/` goes to
+  https://tower.bodco.pm, `/pacenote/x/` becomes `/x/`, also in canonical, hreflang and og:url), writes `sitemap.xml` with
+  hreflang, `robots.txt`, `CNAME`, `.nojekyll` and the README of the site repository (the text is in this script), and
+  `csp.mjs` recomputes the Content-Security-Policy.
+- The version lives in `src/data/pacenote-version.json`, the `v:` fact of the details and compare pages, the "Version"
+  fact of the product page and the "New in" list there; every release adds a row to `changelog.md` (English and Ukrainian).
+
+Before publishing: `npm run check:text` (fails on a long dash, on the numbers 11 to 22 written as words and on words
+from the local `.private-words`), `npm run build:pacenote`, a look at `dist-pacenote` (`python3 -m http.server 8765
+--directory dist-pacenote`, then http://127.0.0.1:8765/, English and Ukrainian, light and dark, a narrow window), and
+`npm run build` compared before and after: every file outside `/pacenote/` must stay the same, except `lastmod` in the
+sitemap. The privacy policy and terms of the app (`PRIVACY.md`, `TERMS.md` and the Ukrainian files) are the short
+versions of the site's pages and are compared with them at every release; the section about the website itself exists
+only on the site.
 
 ## Quality gates (ub-mode)
 

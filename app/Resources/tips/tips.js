@@ -40,6 +40,7 @@
       newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team', speakersH: 'Speakers', namedOf: (o) => `${o.n} of ${o.m} named`, notNamed: 'not named yet',
       toName: 'to name', mins: (o) => o.m < 1 ? '<1 min' : `${o.m} min`, secsSpoken: (o) => `${o.s} s of speech`, noClip: 'No clip to play: Pacenote never keeps the call audio. The last line helps tell who it is.', soundsLike: (o) => `${o.name} · sounds like ${o.p}%`,
       whoGroups: { voice: 'Sounds like', call: 'On this call', invited: 'Invited to this call', project: 'Project people', library: 'Voice library' }, whoMore: (o) => `${o.n} more from your voice library`, whoWhy: 'Why these names: the voice match, who is on this call, the invitation, then the project and your voice library.',
+      whoHint: 'Pick a person and a side: it saves at once.', whoNeedName: 'Pick or type a name first.',
       whoTitle: 'Who is speaking?', whoLine: 'Who said this?', sideH: 'Side', teamSub: 'your side', clientSub: 'the other side', newPerson: 'new', pickSide: 'Choose Team or Client', whoName: 'Name this voice',
       typeName: 'Type a name', more: 'More:', samePerson: 'Same person as…', notNow: 'Not now', lastSaid: 'Last said:',
       mine: 'Mine', mineTip: 'Put this on me', addOnMe: 'Add to On me', fromThisCall: 'From this call', openBefore: 'Open before the call',
@@ -113,6 +114,7 @@
       newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда', speakersH: 'Спікери', namedOf: (o) => `названо ${o.n} з ${o.m}`, notNamed: 'ще без імені',
       toName: 'назвати', mins: (o) => o.m < 1 ? '<1 хв' : `${o.m} хв`, secsSpoken: (o) => `${o.s} с мовлення`, noClip: 'Кліпу немає: Pacenote не зберігає звук дзвінка. Остання фраза допомагає зрозуміти, хто це.', soundsLike: (o) => `${o.name} · схоже на ${o.p}%`,
       whoGroups: { voice: 'Схожий голос', call: 'Уже на цьому дзвінку', invited: 'Запрошені на дзвінок', project: 'Люди проєкту', library: 'Бібліотека голосів' }, whoMore: (o) => `Ще ${o.n} з бібліотеки голосів`, whoWhy: 'Звідки ці імена: схожість голосу, хто вже на дзвінку, запрошення, потім проєкт і ваша бібліотека голосів.',
+      whoHint: 'Оберіть людину і сторону: зберігається одразу.', whoNeedName: 'Спершу оберіть або впишіть імʼя.',
       whoTitle: 'Хто говорить?', whoLine: 'Хто це сказав?', sideH: 'Сторона', teamSub: 'ваша сторона', clientSub: 'інша сторона', newPerson: 'нова', pickSide: 'Оберіть Команда або Клієнт', whoName: 'Назвати голос',
       typeName: 'Введіть імʼя', more: 'Ще:', samePerson: 'Та сама людина, що…', notNow: 'Не зараз', lastSaid: 'Останнє:',
       mine: 'Моє', mineTip: 'Записати на мене', addOnMe: 'Додати в На мені', fromThisCall: 'З цього дзвінка', openBefore: 'Відкриті до дзвінка',
@@ -1006,7 +1008,7 @@
         <button type="button" data-side="team" role="radio"><span class="dot team"></span><b>${esc(t.team)}</b><small>${esc(t.teamSub)}</small></button>
         <button type="button" data-side="client" role="radio"><span class="dot client"></span><b>${esc(t.client)}</b><small>${esc(t.clientSub)}</small></button>
       </div>
-      <div class="who-f"><span class="who-err meta" id="whoErr"></span><button class="btn2" type="button" id="whoCancel">${esc(t.cancel)}</button><button class="btn1" type="button" id="whoSave">${esc(t.save)}</button></div>`;
+      <div class="who-f"><span class="who-err meta" id="whoErr">${esc(t.whoHint)}</span></div>`;
     const input = pop.querySelector('#whoName'), list = pop.querySelector('#whoList'), err = pop.querySelector('#whoErr');
     let typed = false;
     const paintSide = () => pop.querySelectorAll('[data-side]').forEach((b) => { b.setAttribute('aria-checked', String(b.dataset.side === side)); b.classList.toggle('on', b.dataset.side === side); });
@@ -1031,15 +1033,17 @@
       const more = list.querySelector('[data-lib]'); if (more) more.onclick = () => { libOpen = true; paintList(); };
       list.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => {
         input.value = b.dataset.pick; const sd = sideOf(b.dataset.pick); if (sd) side = sd;
-        err.textContent = ''; paintSide(); paintList(); input.focus();
+        paintSide(); paintList();
+        save();          // a known side saves now; without one the sheet asks for Team or Client
       });
     };
-    pop.querySelectorAll('[data-side]').forEach((b) => b.onclick = () => { side = b.dataset.side; err.textContent = ''; paintSide(); });
+    // 2026-11-05 (owner): no Save: a person and a side are enough, the sheet saves at once (click again to change)
+    pop.querySelectorAll('[data-side]').forEach((b) => b.onclick = () => { side = b.dataset.side; paintSide(); if (input.value.trim()) save(); else { err.textContent = t.whoNeedName; input.focus(); } });
     const close = () => { pop.hidden = true; pop.classList.remove('who'); };
     const save = () => {
       const nm = input.value.replace(/\s+/g, ' ').replace(/\|/g, ' ').trim().slice(0, 60);
       if (!nm) { input.focus(); return; }
-      if (side !== 'team' && side !== 'client') { err.textContent = t.pickSide; return; }
+      if (side !== 'team' && side !== 'client') { err.textContent = t.pickSide; err.classList.add('ask'); return; }
       S.rosterSide = Object.assign({}, S.rosterSide, { [nm]: side });
       if (sid) {
         S.speakers[sid] = Object.assign({}, sp, { name: nm, side, suggestions: [] });
@@ -1053,8 +1057,6 @@
       }
       close(); render();
     };
-    pop.querySelector('#whoSave').onclick = save;
-    pop.querySelector('#whoCancel').onclick = close;
     input.oninput = () => { typed = true; const sd = sideOf(input.value.trim()); if (sd) { side = sd; paintSide(); } paintList(); };
     input.onkeydown = (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') close(); e.stopPropagation(); };
     paintSide(); paintList();
@@ -1109,7 +1111,8 @@
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('#moreBtn')) { S.ui.menuOpen = false; renderMenu(); }
-    if (!$('pop').hidden && !e.target.closest('#pop') && !(b && (b.dataset.act === 'name' || b.dataset.act === 'line-who'))) $('pop').hidden = true;
+    // 2026-11-05: composedPath, not closest: a chip re-drawn by its own click is detached and looked like a click outside
+    if (!$('pop').hidden && !e.composedPath().includes($('pop')) && !(b && (b.dataset.act === 'name' || b.dataset.act === 'line-who'))) $('pop').hidden = true;
     if (S.ui.delArm && !(b && b.dataset.act === 'line-del')) { S.ui.delArm = null; if (!b) render(); }
     if (S.ui.recMenu && !e.target.closest('#recCtl')) { S.ui.recMenu = false; if (!b) render(); }   // 0.9.5
     if (!b) return;

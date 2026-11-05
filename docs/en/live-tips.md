@@ -1400,7 +1400,7 @@ last words, suggestions from the voices library with how alike they sound, Name 
 person as and Not now (the card waits for the next 60 s of that voice). Once everyone is named it folds into the
 chips. Name this voice, a click on a named chip or on "Unknown voice" in the transcript opens one sheet: the name,
 with the people of this meeting listed under it (their side next to each), and Team or Client as two clear choices.
-Picking a known person sets the side; a new name asks for one before Save. The names come in groups that say why: Sounds like (with the %), On this call, Invited to this call and Project people; the voice library opens with "N more from your voice library" or when you type.
+Picking a known person sets the side; a new name asks for one. There is no Save button: a person with a known side saves at once, otherwise a click on Team or Client does; click the name again to change it. The names come in groups that say why: Sounds like (with the %), On this call, Invited to this call and Project people; the voice library opens with "N more from your voice library" or when you type.
 
 **Agenda.** The line under the call bar ("Agenda 2 of 8 · ...") opens the whole agenda: every item with its state,
 and a click on an item moves it on (not raised, now, done).

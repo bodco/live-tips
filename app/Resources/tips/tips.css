@@ -197,7 +197,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .who-side button b{font-size:13px}
 .who-side button small{grid-column:2;font-size:11px;color:var(--text-3)}
 .who-side button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--accent-soft,color-mix(in srgb,var(--accent) 10%,transparent))}
-.who-f{display:flex;align-items:center;gap:8px;margin-top:4px}.who-f .who-err{flex:1;color:var(--danger-text)}
+.who-f{display:flex;align-items:center;gap:8px;margin-top:2px}.who-f .who-err{flex:1;color:var(--text-3)}.who-f .who-err.ask{color:var(--danger-text);font-weight:600}
 .who-f .btn1,.who-f .btn2{height:30px}
 .spk-name-row .btn1.sm{height:26px;padding:0 10px;font-size:12px}
 .seg2{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:2px;border-radius:8px;background:var(--surface-2)}

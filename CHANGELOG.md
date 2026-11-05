@@ -12,6 +12,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   in the transcript: the name with the people of this meeting listed inside the sheet (no system dropdown over the
   controls), their side next to each, and Team or Client as two clear choices, now also when you give a line to
   someone. Picking a known person sets the side; a new name asks for a side before Save.
+- **The who-is-speaking sheet saves by itself (2026-11-05, owner):** no Save button: a click on a person whose side is
+  known saves at once; otherwise a click on Team or Client does. Click the name again to change it. Fixed: a click on a
+  name chip closed the sheet before anything was saved (the chip was redrawn and counted as a click outside).
 - **Where the offered names come from (2026-11-05, owner):** the names are chips in groups that say why each is there:
   Sounds like (the voice match, with its %), On this call, Invited to this call, Project people. The voice library
   stays behind "N more from your voice library" (or shows when you type), so an invitation of 3 people offers those 3,

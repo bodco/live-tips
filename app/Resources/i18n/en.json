@@ -1885,7 +1885,7 @@
  "ai.route.gemini": "Gemini API",
  "keys.gemini.title": "Gemini API key",
  "keys.gemini.hint": "From aistudio.google.com/apikey. Use a key of a project with billing turned on (paid tier): Google may use free-tier content to improve its products, paid-tier content is not used. Kept in macOS Keychain.",
- "ai.access.footer.gemini": "Gemini: add a Gemini API key (paid tier). It can prepare calls, give tips and write the notes after the call. It can also take over when Claude or ChatGPT runs out of plan or credit: turn that on under Automatic switching.",
+ "ai.access.footer.gemini": "Gemini: sign in to your Google account through Antigravity CLI (your plan pays; preparation and after the call) or add a Gemini API key (paid tier). It can prepare calls, give tips and write the notes after the call. It can also take over when Claude or ChatGPT runs out of plan or credit: turn that on under Automatic switching.",
  "ai.gemini.model2": "API billing per token, prices per 1M input / output tokens. During the call a fast model matters most (Flash-Lite); after the call and for the preparation quality matters (Flash). Google announced rises: Argon to $4 / $20 from 1 December 2026, Flash to $1.50 / $7.50 from 1 January 2027. A chosen Gemini does not switch to Claude by itself; Claude Code deep folder lookup is off with Gemini.",
  "prep.err.noGeminiKey": "No Gemini API key: add it in Settings > AI > Gemini",
  "ai.geminiFallback": "Use Gemini when Claude or ChatGPT is out",
@@ -1911,5 +1911,14 @@
  "aiusage.requests": "Requests",
  "aiusage.input": "Input",
  "aiusage.output": "Output",
- "aiusage.none": "No API use in this period."
+ "aiusage.none": "No API use in this period.",
+ "ai.agy.account": "Gemini account",
+ "ai.agy.connected": "Signed in through Antigravity CLI",
+ "ai.agy.notSignedIn": "Not signed in",
+ "ai.agy.missing": "Antigravity CLI is not installed",
+ "ai.agy.install": "How to install",
+ "ai.agy.help": "Your Google account through Google's Antigravity CLI (agy): your plan pays, no API key. For the preparation and after the call only; a request takes 20-30 seconds, too slow for tips during a call.",
+ "ai.agy.model": "Your Google plan pays, not an API key. Each request runs in an empty folder with no file, shell or write access, and Pacenote removes agy's own copy of the conversation afterwards.",
+ "ai.agy.warning": "Warning: Google's Antigravity terms forbid using the service through third-party software, and Pacenote is third-party software. Google may suspend or close your Antigravity and Gemini CLI accounts for it. Google also uses your conversations (call text included) to improve its research and products, people at Google may review them, and turning Telemetry off does not stop them being stored. Use the Gemini API key if this is not acceptable.",
+ "ai.agy.terms": "Read the Antigravity terms"
 }

@@ -5,11 +5,11 @@ import LiveTipsCore
 /// The tips engine and the one-off jobs (livetips_m0.routing) read and write the same file, state/ai-routes.json:
 /// {"api": {"down": true, "reason": "credit", "since": <unix time>, "checked": <unix time>}, "code": {...}}.
 enum AIRoute {
-    static let api = "api", code = "code", openai = "openai", codex = "codex", gemini = "gemini"   // 0.9.3: gemini
+    static let api = "api", code = "code", openai = "openai", codex = "codex", gemini = "gemini", agy = "agy"   // 0.9.3: gemini (API key), agy (account)
     /// 0.8.5 (owner): a preparation on this Mac (Ollama), chosen by hand; never an automatic switch target yet.
     static let local = "local"
 
-    static func other(_ r: String) -> String { [openai, codex, gemini].contains(r) ? r : r == api ? code : api }
+    static func other(_ r: String) -> String { [openai, codex, gemini, agy].contains(r) ? r : r == api ? code : api }
 
     static var statePath: String {
         let c = AppConfig.load(from: AppPaths.config)
@@ -58,6 +58,9 @@ enum AIRoute {
             if e.contains("http 401") || e.contains("http 403") { return "auth" }
             return e.contains("http 402") || e.contains("quota_exceeded") || e.contains("failed_precondition") ? "credit" : nil
         }
+        if r == agy {         // 0.9.3: livetips_m0.agy_provider names the kind only
+            return e.contains("not signed in") ? "auth" : e.contains("usage limit") ? "limit" : e.contains("not installed") ? "missing" : nil
+        }
         if r == openai {      // 0.9.3: same as livetips_m0.routing: 401 and 403 a bad key, insufficient_quota no credit
             if e.contains("http 401") || e.contains("http 403") { return "auth" }
             return e.contains("insufficient_quota") ? "credit" : nil
@@ -77,15 +80,17 @@ enum AIRoute {
         if r == codex { return CodexAccount.cliPath != nil }
         if r == openai { return SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").has(.openaiAPIKey) }
         if r == gemini { return SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").has(.geminiAPIKey) }
+        if r == agy { return AgyAccount.cliPath != nil }
         return r == api ? hasKey : r == local ? true : PrepRunner.claudePath != nil
     }
 
     /// A job on this way can run: the way itself, or with auto-switch the other one.
     static func canRun(job: String, config c: AppConfig) -> Bool {
         let r = c.ai.route(job)
+        if r == agy { return job != "tips" && available(r) }      // 0.9.3: never during a call (20-30 s a request)
         if [openai, codex, gemini].contains(r) { return available(r) }
         return available(r) || (c.ai.autoSwitch && available(other(r))) || (job != "tips" && c.ai.localFallback)
-            || (c.ai.geminiFallback && available(gemini))
+            || (c.ai.geminiFallback && (available(gemini) || (job != "tips" && available(agy))))
     }
 
     /// The environment of an engine child process for one job: the way, the switch, the shared state, the key
@@ -102,6 +107,8 @@ enum AIRoute {
         env["LT_OPENAI_MODEL"] = c.ai.openaiModel(job)       // 0.9.0: the job's OpenAI model (Settings > AI)
         env["LT_GEMINI_MODEL"] = c.ai.geminiModel(job)       // 0.9.3: the job's Gemini model (Settings > AI)
         env["LT_GEMINI_FALLBACK"] = c.ai.geminiFallback ? "1" : "0"   // 0.9.3: plan B, opt-in (rules/ai.yaml > gemini)
+        env["LT_AGY_MODEL"] = c.ai.agyModel(job)              // 0.9.3: the Gemini account model (prep, after)
+        if let cli = AgyAccount.cliPath { env["LT_AGY_CLI"] = cli }
         env["LT_LOCAL_MODEL"] = UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"   // rules/ai.yaml > local
         env["LT_LOCAL_FALLBACK"] = (job != "tips" && c.ai.localFallback) ? "1" : "0"                      // rules/ai.yaml > fallback
         env["LT_AI_AUTO"] = c.ai.autoSwitch ? "1" : "0"
@@ -117,11 +124,12 @@ enum AIRoute {
         ["routes": ["tips": c.ai.tips, "after": c.ai.after], "auto": c.ai.autoSwitch, "state": statePath,
          "openai_models": ["tips": c.ai.openaiTips, "after": c.ai.openaiAfter],
          "gemini_models": ["tips": c.ai.geminiTips, "after": c.ai.geminiAfter], "gemini_fallback": c.ai.geminiFallback,
+         "agy_models": ["after": c.ai.agyAfter],
          "claude_cli": PrepRunner.claudePath ?? ""]
     }
 
     static func name(_ r: String) -> String {
-        r == codex ? L("ai.codex.account") : r == openai ? L("ai.route.openai") : r == gemini ? L("ai.route.gemini") : r == local ? L("ai.route.local.model", ["model": UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"])
+        r == codex ? L("ai.codex.account") : r == openai ? L("ai.route.openai") : r == gemini ? L("ai.route.gemini") : r == agy ? L("ai.agy.account") : r == local ? L("ai.route.local.model", ["model": UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"])
             : L(r == api ? "ai.route.api" : "ai.route.code")
     }
 
@@ -129,7 +137,7 @@ enum AIRoute {
     static func statusLines() -> [String] {
         let o = read()
         let t = DateFormatter(); t.dateFormat = "HH:mm"
-        return [code, api, openai, codex, gemini].compactMap { r in
+        return [code, api, openai, codex, gemini, agy].compactMap { r in
             guard let s = o[r] as? [String: Any], (s["down"] as? Bool) == true else { return nil }
             let since = (s["since"] as? Double).map { t.string(from: Date(timeIntervalSince1970: $0)) } ?? ""
             return L("ai.status.out", ["route": name(r), "reason": L("ai.reason." + ((s["reason"] as? String) ?? "error")), "time": since])
@@ -139,7 +147,7 @@ enum AIRoute {
     /// Checks the ways that are out now (a one-word request each, through the engine) and calls back.
     @MainActor static func checkNow(done: @escaping () -> Void) {
         let c = AppConfig.load(from: AppPaths.config)
-        let down = [code, api, openai, codex, gemini].filter { isDown($0) }
+        let down = [code, api, openai, codex, gemini, agy].filter { isDown($0) }
         guard !down.isEmpty, !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { done(); return }
         DispatchQueue.global().async {
             for r in down {

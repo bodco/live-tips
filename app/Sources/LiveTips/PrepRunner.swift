@@ -324,7 +324,7 @@ final class PrepRunner: ObservableObject {
             }
         }
         if forced == nil { switchedOnce = false; localTried = false; geminiTried = false }
-        let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini].contains(forced ?? AppConfig.load(from: AppPaths.config).ai.prep)
+        let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini, AIRoute.agy].contains(forced ?? AppConfig.load(from: AppPaths.config).ai.prep)
         guard let claude = Self.claudePath ?? (wantsLocal ? "/usr/bin/true" : nil) else { return L("prep.err.noClaude") }
         let c = AppConfig.load(from: AppPaths.config)
         guard let skill = Self.skillDir(workRoot: c.workRoot) else { return L("prep.err.noSkill") }
@@ -439,24 +439,28 @@ final class PrepRunner: ObservableObject {
         // 0.8.2: the way from Settings > AI; with auto-switch the other one when this one cannot run at all.
         let routes = c.ai
         var route = forced ?? routes.prep
-        let usable: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.openai ? self.hasOpenAIKey : $0 == AIRoute.gemini ? self.hasGeminiKey : $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
+        let usable: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.openai ? self.hasOpenAIKey : $0 == AIRoute.gemini ? self.hasGeminiKey : $0 == AIRoute.agy ? (AgyAccount.cliPath != nil && AgyAccount.shared.signedIn != false) : $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
         if forced == nil && routes.autoSwitch && !usable(route) && usable(AIRoute.other(route)) { route = AIRoute.other(route) }
-        // 0.9.3 (owner): plan B, opt-in: the chosen way cannot run at all (no key, signed out) -> Gemini
-        if forced == nil && routes.geminiFallback && hasGeminiKey && ![AIRoute.local, AIRoute.gemini].contains(route) && !usable(route) { route = AIRoute.gemini }
+        // 0.9.3 (owner): plan B, opt-in: the chosen way cannot run at all (no key, signed out) -> Gemini, the API key
+        // first, then the Gemini account
+        let planB: String? = hasGeminiKey ? AIRoute.gemini : usable(AIRoute.agy) ? AIRoute.agy : nil
+        if forced == nil && routes.geminiFallback, let b = planB, ![AIRoute.local, AIRoute.gemini, AIRoute.agy].contains(route), !usable(route) { route = b }
         // rules/ai.yaml > fallback: no Claude way can run at all -> the model on this Mac
-        if forced == nil && routes.localFallback && ![AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini].contains(route) && !usable(route) && !usable(AIRoute.other(route)) { route = AIRoute.local }
+        if forced == nil && routes.localFallback && ![AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini, AIRoute.agy].contains(route) && !usable(route) && !usable(AIRoute.other(route)) { route = AIRoute.local }
         if route == AIRoute.api && !hasAPIKey { return L("prep.err.noKey") }
         if route == AIRoute.code && loggedIn == false { return L("prep.err.notSigned") }
         if route == AIRoute.codex && CodexAccount.cliPath == nil { return L("ai.codex.missing") }
         if route == AIRoute.openai && !hasOpenAIKey { return L("prep.err.noOpenAIKey") }     // 0.9.0
         if route == AIRoute.gemini && !hasGeminiKey { return L("prep.err.noGeminiKey") }     // 0.9.3
+        if route == AIRoute.agy && AgyAccount.cliPath == nil { return L("ai.agy.missing") }   // 0.9.3
         let isCodex = route == AIRoute.codex
         let useAPI = route == AIRoute.api
         let isLocal = route == AIRoute.local
         let isOpenAI = route == AIRoute.openai      // 0.9.0 (owner): the preparation through the OpenAI API
         let isGemini = route == AIRoute.gemini      // 0.9.3 (owner): the preparation through the Gemini API
-        let isPacked = isLocal || isCodex || isOpenAI || isGemini
-        let runModel = isCodex ? "codex/default" : isOpenAI ? c.ai.openaiPrep : isGemini ? c.ai.geminiPrep : isLocal ? localModel : model
+        let isAgy = route == AIRoute.agy            // 0.9.3 (owner): the preparation through the Gemini account
+        let isPacked = isLocal || isCodex || isOpenAI || isGemini || isAgy
+        let runModel = isCodex ? "codex/default" : isOpenAI ? c.ai.openaiPrep : isGemini ? c.ai.geminiPrep : isAgy ? "agy/" + c.ai.agyPrep : isLocal ? localModel : model
         let aside = r.refreshBase == nil ? Self.moveAside(base: base) : nil      // a clean start, the old one kept
         let p = Process()
         p.executableURL = URL(fileURLWithPath: claude)
@@ -490,11 +494,11 @@ final class PrepRunner: ObservableObject {
                 "files": r.folders.filter { !StartCallModel.isDir($0) }, "folders": r.folders.filter { StartCallModel.isDir($0) },
                 "live": live, "notion": notion, "skill": skill, "base": base, "lt": [c.engine.python, lt], "model": runModel,
                 "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder, "brief_lang": L10n.lang,
-                "openai_model": c.ai.openaiPrep, "gemini_model": c.ai.geminiPrep]
+                "openai_model": c.ai.openaiPrep, "gemini_model": c.ai.geminiPrep, "agy_model": c.ai.agyPrep]
             let reqPath = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("localprep-request.json")
             if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
             p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
-            p.arguments = ["-m", isCodex ? "livetips_m0.codexprep" : isOpenAI ? "livetips_m0.openaiprep" : isGemini ? "livetips_m0.geminiprep" : "livetips_m0.localprep", "--request", reqPath]
+            p.arguments = ["-m", isCodex ? "livetips_m0.codexprep" : isOpenAI ? "livetips_m0.openaiprep" : isGemini ? "livetips_m0.geminiprep" : isAgy ? "livetips_m0.agyprep" : "livetips_m0.localprep", "--request", reqPath]
         }
         p.currentDirectoryURL = URL(fileURLWithPath: isPacked ? c.engine.sidecarDir : (r.useProjectFolder ? r.root : live))
         // 0.8.5 (owner: "lt digest" and "lt prep-check" were refused to Claude in every run): the app makes the digest
@@ -521,6 +525,10 @@ final class PrepRunner: ObservableObject {
         if isOpenAI, let k = store.get(.openaiAPIKey), !k.isEmpty { env["OPENAI_API_KEY"] = k }    // to the child only
         env.removeValue(forKey: "GEMINI_API_KEY")
         if isGemini, let k = store.get(.geminiAPIKey), !k.isEmpty { env["GEMINI_API_KEY"] = k }    // to the child only
+        if isAgy {
+            env = AgyCLI.environment(env)          // no key reaches agy: the Google account answers
+            env["LT_AGY_CLI"] = AgyAccount.cliPath
+        }
         if isCodex {
             env = CodexCLI.environment(env)
             env["LT_CODEX_CLI"] = CodexAccount.cliPath
@@ -573,14 +581,14 @@ final class PrepRunner: ObservableObject {
                 // routes say their error in the result, not in the log.
                 let errText = (self.resultMeta["error"] as? String) ?? logText
                 let packedOut = !ok && (isOpenAI || isCodex) && AIRoute.outReason(route, errText) != nil
-                if claudeOut || packedOut, routes.geminiFallback, self.hasGeminiKey, !self.geminiTried,
+                if claudeOut || packedOut, routes.geminiFallback, let b = planB, !self.geminiTried,
                    (packedOut || self.switchedOnce || !usable(AIRoute.other(route)) || !routes.autoSwitch) {
                     AIRoute.markDown(route, AIRoute.outReason(route, packedOut ? errText : logText) ?? "out")
                     self.geminiTried = true
                     self.running = false
                     self.process = nil
-                    if self.start(r, route: AIRoute.gemini) == nil {
-                        self.detail = L("prep.switched", ["route": AIRoute.name(AIRoute.gemini)])
+                    if self.start(r, route: b) == nil {
+                        self.detail = L("prep.switched", ["route": AIRoute.name(b)])
                         return
                     }
                 }
@@ -594,9 +602,9 @@ final class PrepRunner: ObservableObject {
                         return
                     }
                 }
-                if ok { AIRoute.markUp(route) } else if isGemini, let why = AIRoute.outReason(route, errText) {
+                if ok { AIRoute.markUp(route) } else if isGemini || isAgy, let why = AIRoute.outReason(route, errText) {
                     AIRoute.markDown(route, why)      // 0.9.3: a chosen Gemini has no automatic switch
-                } else if !isCodex && !isOpenAI && !isGemini, let why = AIRoute.outReason(route, logText) {
+                } else if !isCodex && !isOpenAI && !isGemini && !isAgy, let why = AIRoute.outReason(route, logText) {
                     AIRoute.markDown(route, why)
                     let alt = AIRoute.other(route)
                     if routes.autoSwitch && !self.switchedOnce && usable(alt) {
@@ -610,7 +618,7 @@ final class PrepRunner: ObservableObject {
                     }
                 }
                 if useAPI, let c = self.costUSD { SpendDays.add(c) }     // Home's week (2026-10-27)
-                let routeName = isCodex ? "codex" : isOpenAI ? "openai" : isGemini ? "gemini" : useAPI ? "api" : isLocal ? "local" : "plan"
+                let routeName = isCodex ? "codex" : isOpenAI ? "openai" : isGemini ? "gemini" : isAgy ? "agy" : useAPI ? "api" : isLocal ? "local" : "plan"
                 var meta = self.resultMeta
                 meta["model"] = runModel
                 if !checkLine.isEmpty { meta["check"] = checkLine }
@@ -646,7 +654,7 @@ final class PrepRunner: ObservableObject {
                 let mins = Int((Date().timeIntervalSince(self.startedAt ?? Date())) / 60)
                 let tail = (try? String(contentsOfFile: (logs as NSString).appendingPathComponent("prep-claude.log"), encoding: .utf8))
                     .map { String($0.suffix(600)) } ?? ""
-                if !ok, isCodex || isOpenAI || isGemini, let error = self.resultMeta["error"] as? String {
+                if !ok, isCodex || isOpenAI || isGemini || isAgy, let error = self.resultMeta["error"] as? String {
                     self.result = error
                     CodexAccount.shared.refresh()
                 } else if !ok && (tail.contains("authenticate") || tail.contains("OAuth") || tail.contains("log in") || tail.contains("/login")) {
@@ -657,7 +665,7 @@ final class PrepRunner: ObservableObject {
                 } else {
                     let cost = isLocal ? L("prep.local") : self.costUSD.map { String(format: " · $%.2f", $0) + (useAPI ? "" : L("prep.plan")) } ?? ""
                     self.result = ok ? L("prep.readyIn", ["min": "\(max(1, mins))"]) + cost : L("prep.failedExit", ["code": "\(proc.terminationStatus)"])
-                    if ok { UsageLog.log("prepare_run", ["type": isLocal ? "local" : (isCodex ? "codex" : isOpenAI ? "openai" : isGemini ? "gemini" : useAPI ? "api" : "code"), "source": "app", "seconds": mins * 60]) }
+                    if ok { UsageLog.log("prepare_run", ["type": isLocal ? "local" : (isCodex ? "codex" : isOpenAI ? "openai" : isGemini ? "gemini" : isAgy ? "agy" : useAPI ? "api" : "code"), "source": "app", "seconds": mins * 60]) }
                 }
             }
         }

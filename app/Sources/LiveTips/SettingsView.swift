@@ -659,6 +659,20 @@ struct RoutePicker: View {
     var discouraged: String? = nil
     var withOpenAI = false
     var withGemini = true          // 0.9.3
+    var withAgy = false            // 0.9.3: the Gemini account, for the preparation and after the call only
+    /// 0.9.3: built step by step (one long expression was too much for the type checker)
+    private var routes: [String] {
+        var r: [String] = [AIRoute.code, AIRoute.api, AIRoute.codex]
+        if withOpenAI { r.append(AIRoute.openai) }
+        if withGemini { r.append(AIRoute.gemini) }
+        if withAgy { r.append(AIRoute.agy) }
+        if withLocal { r.append(AIRoute.local) }
+        return r
+    }
+    private func label(_ r: String) -> String {
+        let mark: String = r == recommended ? L("ai.route.recommended") : (r == discouraged ? L("ai.route.notRecommended") : "")
+        return AIRoute.name(r) + mark
+    }
     var withLocal = false          // 0.8.5: the preparation can also run on this Mac (Ollama)
     @ObservedObject var oc = OptionalComponents.shared
     @ObservedObject var llm = LocalLLM.shared
@@ -667,8 +681,8 @@ struct RoutePicker: View {
         let localOK = oc.isInstalled("ollama") && oc.isInstalled("local_model")
         VStack(alignment: .trailing, spacing: 2) {
             Picker(L("ai.route"), selection: $selection) {
-                ForEach([AIRoute.code, AIRoute.api, AIRoute.codex] + (withOpenAI ? [AIRoute.openai] : []) + (withGemini ? [AIRoute.gemini] : []) + (withLocal ? [AIRoute.local] : []), id: \.self) { r in
-                    Text(AIRoute.name(r) + (r == recommended ? L("ai.route.recommended") : r == discouraged ? L("ai.route.notRecommended") : "")).tag(r)
+                ForEach(routes, id: \.self) { r in
+                    Text(label(r)).tag(r)
                         .selectionDisabled(r == AIRoute.local && !localOK)
                 }
             }
@@ -878,6 +892,7 @@ struct SettingsView: View {
                 CodexAccountRow()
                 KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: model)
                 } else {
+                AgyAccountRow()
                 KeyRow(title: L("keys.gemini.title"), hint: L("keys.gemini.hint"), key: .geminiAPIKey, model: model)
                 }
             } header: { Text(L("ai.access")) } footer: {
@@ -903,7 +918,7 @@ struct SettingsView: View {
                 Text(L("local.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             Section {
-                RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withOpenAI: true, withLocal: true)
+                RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withOpenAI: true, withAgy: true, withLocal: true)
                 if model.config.ai.prep == AIRoute.codex {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if model.config.ai.prep == AIRoute.local {
@@ -912,6 +927,9 @@ struct SettingsView: View {
                     OpenAIModelPicker(selection: $model.config.ai.openaiPrep, job: "prep")
                 } else if model.config.ai.prep == AIRoute.gemini {
                     GeminiModelPicker(selection: $model.config.ai.geminiPrep, job: "prep")
+                } else if model.config.ai.prep == AIRoute.agy {
+                    AgyTermsWarning()
+                    AgyModelPicker(selection: $model.config.ai.agyPrep)
                 } else {
                     Picker(L("set.model"), selection: $runner.model) {
                         ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
@@ -949,13 +967,16 @@ struct SettingsView: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Section {
-                RoutePicker(selection: $model.config.ai.after, recommended: AIRoute.code, withOpenAI: true, withLocal: true)
+                RoutePicker(selection: $model.config.ai.after, recommended: AIRoute.code, withOpenAI: true, withAgy: true, withLocal: true)
                 if model.config.ai.after == AIRoute.codex {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else if model.config.ai.after == AIRoute.openai {
                     OpenAIModelPicker(selection: $model.config.ai.openaiAfter, job: "after")
                 } else if model.config.ai.after == AIRoute.gemini {
                     GeminiModelPicker(selection: $model.config.ai.geminiAfter, job: "after")
+                } else if model.config.ai.after == AIRoute.agy {
+                    AgyTermsWarning()
+                    AgyModelPicker(selection: $model.config.ai.agyAfter)
                 } else if model.config.ai.after == AIRoute.local {
                     LocalModelRow()
                 } else {

@@ -149,6 +149,7 @@ struct HomeView: View {
         if runner.hasAPIKey { return true }
         if [s.config.ai.prep, s.config.ai.tips, s.config.ai.after].contains(AIRoute.openai) && runner.hasOpenAIKey { return true }
         if [s.config.ai.prep, s.config.ai.tips, s.config.ai.after].contains(AIRoute.gemini) && runner.hasGeminiKey { return true }
+        if [s.config.ai.prep, s.config.ai.after].contains(AIRoute.agy) && AgyAccount.cliPath != nil { return true }
         return runner.loggedIn == true || (runner.loggedIn == nil && PrepRunner.claudePath != nil)
     }
     private var calendarOn: Bool { demo ? !["nocal", "first"].contains(Self.shotState) : cal.hasSource }

@@ -16,6 +16,13 @@ Pacenote. Earlier versions are described in the commit messages and in
   Claude or ChatGPT is out". When the chosen way has no credit, hits its plan limit or has a bad key, the job goes to
   Gemini (tips, preparation and after the call), and goes back as soon as the chosen way answers. The text of the call
   then reaches Google, which is why it is a switch you turn on. A chosen Gemini never falls back to another provider.
+- **Gemini account (2026-11-05):** the preparation and the work after the call can run on your Google account
+  through Google's Antigravity CLI (`agy`): your plan pays, no API key. Settings > AI > Gemini shows the sign-in and
+  the account's models (default Gemini 3.8 Flash, medium). Each request runs in an empty folder with no file, shell or
+  write access, and Pacenote removes agy's own copy of the conversation afterwards. Not for tips during a call: a
+  request takes 20-30 seconds. With plan B on and no Gemini key, the account takes over those jobs. When it is chosen,
+  a red warning says that Google's Antigravity terms forbid use through third-party software (the account may be
+  suspended) and let Google use and review the conversations, with a link to the terms.
 - **Usage: AI through API keys (2026-11-04):** Settings > Usage shows every provider with an API key (Claude,
   OpenAI, Gemini): spend by stage (call preparation, live tips, after the call, total) and by model with requests and
   tokens, for today, the last 7 days (the default), this month or chosen dates. The preparation through the OpenAI or

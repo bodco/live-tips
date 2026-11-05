@@ -1621,6 +1621,16 @@ from those days. A chosen Gemini never falls back to another provider by itself.
 chosen way has no credit, has hit its plan limit or has a bad key goes to Gemini and goes back as soon as the chosen
 way answers again. The text of the call then reaches Google, which is why you turn it on yourself.
 
+**Gemini account.** The preparation and the work after the call can also run on your Google account through
+Google's Antigravity CLI (`agy`, installed with `curl -fsSL https://antigravity.google/cli/install.sh | bash`, then
+one sign-in with `agy` in Terminal): your plan pays, no API key. Settings > AI > Gemini shows whether you are signed in
+and the account's models (default Gemini 3.8 Flash, medium). Each request runs in an empty folder with no file, shell
+or write access; Pacenote removes agy's own copy of the conversation afterwards. It is not offered for tips during a
+call: a request takes 20-30 seconds. With plan B on and no Gemini key, the account takes over those two jobs. When you
+choose it, a red warning says what Google's Antigravity terms say: use through third-party software such as Pacenote
+is forbidden and may get the account suspended, and Google uses and may review the conversations (Telemetry off does
+not stop storage).
+
 **Usage.** Settings > Usage has "AI through API keys": every provider with a key (Claude, OpenAI, Gemini), spend
 by stage (call preparation, live tips, after the call, total) and by model with requests and tokens, for today, the
 last 7 days (the default), this month or chosen dates. The accounts paid by a plan are not counted.

@@ -42,6 +42,19 @@ routes:
     the limit). Errors name only the status and a string code, never the message. No automatic fallback from a
     chosen Gemini to Claude, OpenAI or local. Available for tips, after-call jobs and the preparation
     (livetips_m0.geminiprep). Claude Code deep folder lookup is disabled when tips use Gemini.
+  agy: |
+    0.9.3 (owner, 2026-11-05): the Gemini account through Google's Antigravity CLI (agy), for the preparation and the
+    after-the-call jobs only: a request takes 20-30 s however small (measured 2026-11-05), too slow for tips. One
+    print-mode run per request (livetips_m0.agy_provider): the prompt on stdin, --output-format json, --sandbox,
+    --disable-slash-commands, --model <agy id, default gemini-3.8-flash-medium>, an empty temporary working folder (agy
+    reads files in its working folder without asking), no API key in the environment (the signed-in account pays).
+    Reading outside the folder, writing and shell commands are denied in print mode; a denied action with no answer
+    is an error, as is a status other than SUCCESS. agy keeps every conversation under ~/.gemini/antigravity-cli
+    (brain/<id>, annotations/<id>.pbtxt); Pacenote removes the ones it made, by id, and nothing else. No API price
+    (paid by the plan). No automatic switch from a chosen agy. Plan B for those jobs when no Gemini key is set.
+    Settings shows a red warning when it is chosen: Google's Antigravity terms (antigravity.google/terms, read
+    2026-11-05) forbid using the service through third-party software, with suspension of the account as the stated
+    consequence, and let Google use and review Interactions (Telemetry off does not stop storage).
   gemini_fallback: |
     0.9.3 (owner): plan B, off by default (Settings > AI > Automatic switching). With it on and a Gemini key set, a job
     whose chosen way is out (no credit, plan limit, bad key, not signed in; a plain rate limit or a timeout is not an

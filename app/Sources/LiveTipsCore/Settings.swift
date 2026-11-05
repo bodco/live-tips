@@ -58,6 +58,9 @@ public struct AppConfig: Codable, Equatable {
         /// 0.9.3 (owner): plan B, off by default. When the chosen way is out (no credit, the plan limit, a bad key) the
         /// job goes to Gemini. The text of the call then reaches Google; that is why the PM turns it on.
         public var geminiFallback = false
+        /// 0.9.3 (owner): the Gemini account (Antigravity CLI) model for the preparation and after the call.
+        public var agyPrep = "gemini-3.8-flash-medium"
+        public var agyAfter = "gemini-3.8-flash-medium"
         public init() {}
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -74,9 +77,12 @@ public struct AppConfig: Codable, Equatable {
             geminiTips = (try? c.decodeIfPresent(String.self, forKey: .geminiTips)) ?? d.geminiTips
             geminiAfter = (try? c.decodeIfPresent(String.self, forKey: .geminiAfter)) ?? d.geminiAfter
             geminiFallback = (try? c.decodeIfPresent(Bool.self, forKey: .geminiFallback)) ?? d.geminiFallback
+            agyPrep = (try? c.decodeIfPresent(String.self, forKey: .agyPrep)) ?? d.agyPrep
+            agyAfter = (try? c.decodeIfPresent(String.self, forKey: .agyAfter)) ?? d.agyAfter
         }
         public func openaiModel(_ job: String) -> String { job == "prep" ? openaiPrep : job == "tips" ? openaiTips : openaiAfter }
         public func geminiModel(_ job: String) -> String { job == "prep" ? geminiPrep : job == "tips" ? geminiTips : geminiAfter }
+        public func agyModel(_ job: String) -> String { job == "prep" ? agyPrep : agyAfter }
         public func route(_ job: String) -> String { job == "prep" ? prep : job == "tips" ? tips : after }
     }
     /// Engine processes (M1-M2: Python core). Not shown in the UI; set by the installer.

@@ -58,7 +58,12 @@ def price_for(model: str, today=None):
     return None
 
 
+PLAN_PAID = ("agy/", "codex/", "claude-code/")    # 0.9.3: accounts paid by their plans never get an API price
+
+
 def cost_usd(model, input_tokens, cache_write_5m, cache_write_1h, cache_read, output_tokens):
+    if str(model or "").startswith(PLAN_PAID):
+        return None
     p = price_for(model)
     if not p:
         return None

@@ -99,7 +99,7 @@ TXT = {
            "prep": "Підготовка: ", "prep_yes": "використана", "prep_no": "не було",
            "tr": "Транскрипт: {n} рядків, мови {langs}, локальний файл {f}", "summary": "Підсумок", "transcript": "Транскрипт",
            "append": "Pacenote: підсумок ({hhmm})", "tr_app": "Транскрипт (Pacenote)", "write": "Ukrainian", "sales": "Sales",
-           "next": "Наступний крок", "objection": "Заперечення",
+           "next": "Наступний крок", "objection": "Заперечення", "topics": "Теми", "unclear": "Під питанням",
            "footer": "Нотатки Pacenote · транскрибовано на пристрої"},
     "en": {"actions": "Action items", "decisions": "Decisions", "agenda": "Agenda", "commit": "Our commitments",
            "new": "New requests (possible scope changes)", "open": "Open questions", "risks": "Risks",
@@ -107,7 +107,7 @@ TXT = {
            "prep": "Preparation: ", "prep_yes": "used", "prep_no": "none",
            "tr": "Transcript: {n} lines, languages {langs}, local file {f}", "summary": "Summary", "transcript": "Transcript",
            "append": "Pacenote: summary ({hhmm})", "tr_app": "Transcript (Pacenote)", "write": "English", "sales": "Sales",
-           "next": "Next step", "objection": "Objection",
+           "next": "Next step", "objection": "Objection", "topics": "Topics", "unclear": "Unclear",
            "footer": "Notes by Pacenote · transcribed on device"},
 }
 
@@ -226,6 +226,18 @@ def rt(s: str) -> list:
     return [{"type": "text", "text": {"content": s[i:i + 1900]}} for i in range(0, len(s), 1900)] or [{"type": "text", "text": {"content": ""}}]
 
 
+def rt_md(s: str) -> list:
+    """0.9.5.2: inline **bold** of the meeting notes as Notion bold text, not as stars."""
+    out = []
+    for i, part in enumerate(re.split(r"\*\*(.+?)\*\*", s)):
+        if part:
+            for r in rt(part):
+                if i % 2:
+                    r["annotations"] = {"bold": True}
+                out.append(r)
+    return out or rt("")
+
+
 def h(level: int, s: str) -> dict:
     k = f"heading_{level}"
     return {"type": k, k: {"rich_text": rt(s)}}
@@ -247,6 +259,71 @@ def bullet(s: str) -> dict:
 
 def todo(s: str) -> dict:
     return {"type": "to_do", "to_do": {"rich_text": rt(s), "checked": False}}
+
+
+def timed(it: dict) -> list:
+    """"10:06 " in gray, then the text with its bold."""
+    t = it.get("t", "")
+    lead = [{"type": "text", "text": {"content": t[:5] + "  "}, "annotations": {"color": "gray"}}] if t else []
+    return lead + rt_md(it.get("text", ""))
+
+
+def meeting_blocks(m: dict, md: Path, stats: dict, prep_used: bool, lang: str = "uk") -> list:
+    """0.9.5.2 (owner): the meeting page carries the call's Meeting notes (rules/notes.yaml, schema 2): TL;DR, decisions,
+    action items as to-dos, open questions, the topics with their outcome and points; then the agenda, Sales, Pacenote."""
+    T = TXT[lang]
+    b = [para(m["tldr"])] if m.get("tldr") else []
+    for title, key, kind in ((T["decisions"], "decisions", "bulleted_list_item"), (T["actions"], "actions", "to_do"),
+                             (T["open"], "open", "bulleted_list_item")):
+        if m.get(key):
+            b.append(h(3, title))
+            for it in m[key]:
+                body = {"rich_text": timed(it)}
+                if kind == "to_do":
+                    body["checked"] = False
+                b.append({"type": kind, kind: body})
+    if m.get("topics"):
+        b.append(h(2, T["topics"]))
+        for tp in m["topics"]:
+            b.append(h(3, tp["title"] + (f"  {tp['t'][:5]}" if tp.get("t") else "")))
+            if tp.get("outcome"):
+                b.append({"type": "paragraph", "paragraph": {"rich_text": [dict(r, annotations={"italic": True, **r.get("annotations", {})})
+                                                                         for r in rt_md(tp["outcome"])]}})
+            b += [{"type": "bulleted_list_item", "bulleted_list_item": {"rich_text": timed(it)}} for it in tp.get("points", [])]
+    if m.get("unclear"):
+        b.append(h(3, T["unclear"]))
+        b += [bullet(it["text"]) for it in m["unclear"]]
+    return b + extra_blocks(md, stats, prep_used, T, lang)
+
+
+def extra_blocks(md: Path, stats: dict, prep_used: bool, T: dict, lang: str) -> list:
+    b = []
+    for title, items in ((T["agenda"], agenda_lines(md, lang)), (T["sales"], sales_lines(md, T))):
+        if items:
+            b.append(h(3, title))
+            b += [bullet(str(i)) for i in items]
+    return b + pacenote_blocks(stats, md, prep_used, T)
+
+
+def wait_meeting(md: Path, seconds: int, step: float = 5.0) -> dict:
+    """The Meeting notes once the call notes have them, or {} after `seconds` (then the page gets the short wrap-up)."""
+    end = time.time() + max(0, seconds)
+    while True:
+        m = call_meeting(md)
+        if m or time.time() >= end:
+            return m
+        time.sleep(step)
+
+
+def call_meeting(md: Path) -> dict:
+    """The parsed ## Meeting notes of <stem>.notes.md, {} when the notes or the section are not there."""
+    from .callnotes import meeting_text, parse_meeting
+    f = Path(str(md)[:-3] + ".notes.md" if str(md).endswith(".md") else str(md) + ".notes.md")
+    try:
+        t = f.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    return parse_meeting(t) if meeting_text(t) else {}
 
 
 def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "uk") -> list:
@@ -463,6 +540,8 @@ def parse_args(argv=None):
     ap.add_argument("--lt", nargs=2, required=True)
     ap.add_argument("--model", default="claude-sonnet-5-5")
     ap.add_argument("--when", default="", help="ISO date and time of the meeting set in Start call (title date)")
+    ap.add_argument("--wait-notes", type=int, default=0,
+                    help="0.9.5.2: seconds to wait for the call notes' Meeting notes being written (the app starts both)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--find-only", action="store_true", help="only look up this meeting's page in Notion")
     return ap.parse_args(argv)
@@ -579,7 +658,8 @@ def write_to_page(page: dict, sc, ids, a, w, blocks, plain, info, lang) -> dict:
     if upd:
         notion("PATCH", f"/pages/{page['id']}", {"properties": upd})
     hhmm = dt.datetime.now().strftime("%H:%M")
-    append(page["id"], [h(2, TXT[lang]["append"].format(hhmm=hhmm)), para(w.get("summary", ""))] + blocks
+    head = [] if blocks and blocks[0].get("type") == "paragraph" else [para(w.get("summary", ""))]   # Meeting notes start with TL;DR
+    append(page["id"], [h(2, TXT[lang]["append"].format(hhmm=hhmm))] + head + blocks
            + [h(3, TXT[lang]["tr_app"])])
     transcript_page(page["id"], TXT[lang]["tr_app"] + " · " + info["title"], plain)
     add_footer(page["id"], lang)
@@ -593,7 +673,10 @@ def create_page(sc, ids, a, w, blocks, plain, info, lang) -> dict:
     props.update(link_props(sc, ids, {}, a.project_name, getattr(a, "workspace_value", "")))
     p = notion("POST", "/pages", {"parent": {"type": "data_source_id", "data_source_id": ids["meetings_db"]},
                                   "properties": props,
-                                  "children": [h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])]})
+                                  "children": ([h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])])[:90]})
+    rest = ([h(2, TXT[lang]["summary"])] + blocks + [h(2, TXT[lang]["transcript"])])[90:]
+    if rest:      # 0.9.5.2: Notion takes at most 100 blocks with a new page; the Meeting notes can be longer
+        append(p["id"], rest)
     transcript_page(p["id"], TXT[lang]["transcript"] + " · " + name, plain)
     add_footer(p["id"], lang)
     return {"ok": True, "url": p.get("url"), "created": True, "page_id": p.get("id")}
@@ -610,7 +693,12 @@ def run(a, res: dict) -> int:
     info = call_info(a)
     lang = info.get("lang", "uk")
     w = claude_wrapup(plain, brief, a.model, lang)
-    blocks = wrapup_blocks(w, stats, a.md, bool(brief), lang)
+    m = wait_meeting(a.md, a.wait_notes)       # 0.9.5.2: the Meeting notes of the call notes
+    if m:
+        blocks = meeting_blocks(m, a.md, stats, bool(brief), lang)
+        w["summary"] = m.get("tldr") or w.get("summary", "")
+    else:
+        blocks = wrapup_blocks(w, stats, a.md, bool(brief), lang)
     if a.dry_run:
         print(json.dumps({"ok": True, "dry_run": True, "name": w.get("name"), "summary": w.get("summary"),
                           "blocks": len(blocks), "ids": ids}, ensure_ascii=False))

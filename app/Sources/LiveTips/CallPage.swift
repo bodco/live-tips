@@ -27,14 +27,20 @@ struct CallPageView: View {
     @State private var tab = "summary"          // 0.9.0: Summary, Decisions, Tasks, Risks, Transcript (+ Sales)
     @State private var meetNote = ""          // 0.9.1: the Google Meet record, one line
     @State private var exportOpen = false
+    @State private var transcriptAt: String? = nil     // 0.9.5.2: a time in the Meeting notes opens the transcript there
+    @State private var making = false
+    @State private var makeNote = ""
+    @State private var copied = false
 
     /// Shot mode only: the tab the page opens on.
     static var shotTab: String? = nil
+    static var shotExport = false        // shot mode only: the export panel open, in Preview
 
     init(file: String) {
         self.file = file
         _sync = ObservedObject(wrappedValue: CallPageSync.of(file))
         _tab = State(initialValue: Self.shotTab ?? "summary")
+        _exportOpen = State(initialValue: Self.shotExport)
     }
 
     /// A date format in the interface language.
@@ -95,17 +101,20 @@ struct CallPageView: View {
                         risks(o, proj)
                     case "transcript":
                         VStack(alignment: .leading, spacing: 8) {
-                            TranscriptView(file: file, at: nil)
+                            TranscriptView(file: file, at: transcriptAt)
                                 .frame(minHeight: 560)
                                 .clipShape(RoundedRectangle(cornerRadius: PageStyle.radius))
                             Text(L("page.transcript.local")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.leading, 4)
                         }
                     case "sales":
                         PageCard { salesSection(cardRoot(proj, ws)) }
+                    case "discussed":
+                        summaryTab(o, agenda)        // 0.9.5.2: the former Summary, as it was
                     default:
-                        summaryTab(o, agenda)
+                        meetingTab(o)
                     }
                 }
+                .onChange(of: tab) { _, t in if t != "transcript" { transcriptAt = nil } }
             }
             .id(tick)
             .padding(24).frame(maxWidth: 1100, alignment: .leading)
@@ -248,7 +257,7 @@ struct CallPageView: View {
     private func decisions(_ o: CallOutcome) -> [String] { o.decisions.isEmpty ? CallNotes.decisions(file) : o.decisions }
 
     private func pageTabs(_ o: CallOutcome) -> [(String, String)] {
-        [("summary", L("page.tab.summary")), ("decisions", L("page.tab.decisions")), ("tasks", L("page.tab.tasks")),
+        [("summary", L("page.tab.summary")), ("discussed", L("page.sum.discussed")), ("decisions", L("page.tab.decisions")), ("tasks", L("page.tab.tasks")),
          ("risks", L("page.tab.risks")), ("transcript", L("call.page.transcript"))] + (hasSales ? [("sales", L("sales.section"))] : [])
     }
 
@@ -261,7 +270,157 @@ struct CallPageView: View {
         Text(L("page.trackerNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
     }
 
-    // MARK: Summary (2026-11-05 redesign: the story on the left, what is next on the right)
+    // MARK: Summary = Meeting notes (0.9.5.2, owner: readable notes people will read, with Copy and Export)
+
+    @ViewBuilder private func meetingTab(_ o: CallOutcome) -> some View {
+        if let m = CallNotes.meeting(file), !m.isEmpty {
+            let side = !(m.decisions.isEmpty && m.actions.isEmpty && m.open.isEmpty)
+            if wide && side {
+                HStack(alignment: .top, spacing: 16) {
+                    meetingMain(m)
+                    meetingSide(m).frame(width: width >= 1000 ? 350 : 310)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 16) { meetingMain(m); if side { meetingSide(m) } }
+            }
+        } else {
+            makeMeetingCard(o)
+        }
+    }
+
+    /// A time of the notes: a click opens the transcript at that line.
+    @ViewBuilder private func timeLink(_ t: String, width w: CGFloat? = nil) -> some View {
+        if t.isEmpty {
+            if let w { Color.clear.frame(width: w, height: 1) }
+        } else {
+            Button { transcriptAt = t; tab = "transcript" } label: {
+                Text(String(t.prefix(5))).font(PN.Font.caption.monospacedDigit()).foregroundStyle(PN.C.accent)
+            }
+            .buttonStyle(.plain).help(L("page.mn.jump")).accessibilityLabel(L("page.mn.jumpTo", ["time": String(t.prefix(5))]))
+            .frame(width: w, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder private func itemRow(_ it: MeetingNotes.Item) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            timeLink(it.t, width: 38)
+            Text(CallNotes.md(it.text)).font(PN.Font.body).lineSpacing(2).foregroundStyle(PN.C.text)
+                .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder private func meetingMain(_ m: MeetingNotes.Notes) -> some View {
+        PageCard(spacing: 0) {
+            PageLabel(text: L("page.mn.label")) {
+                HStack(spacing: 14) {
+                    Button { copyMeeting() } label: {
+                        Label(copied ? L("page.mn.copied") : L("page.mn.copy"), systemImage: copied ? "checkmark" : "doc.on.doc")
+                    }
+                    .buttonStyle(.plain).font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.accent).help(L("page.mn.copyHelp"))
+                    Button { exportOpen = true } label: { Label(L("page.export"), systemImage: "square.and.arrow.up") }
+                        .buttonStyle(.plain).font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.accent)
+                }
+            }
+            .padding(.bottom, 10)
+            if !m.tldr.isEmpty {
+                Text(CallNotes.md(m.tldr)).font(.system(size: 15)).lineSpacing(3).foregroundStyle(PN.C.text)
+                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            }
+            if !m.topics.isEmpty {
+                if !m.tldr.isEmpty { Divider().padding(.vertical, 20) }
+                PageLabel(text: L("page.mn.topics")).padding(.bottom, 4)
+                ForEach(Array(m.topics.enumerated()), id: \.offset) { i, tp in
+                    if i > 0 { Divider() }
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        timeLink(tp.t, width: 40)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(CallNotes.md(tp.title)).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if !tp.outcome.isEmpty {
+                                Text(CallNotes.md(tp.outcome.prefix(1).uppercased() + tp.outcome.dropFirst())).font(PN.Font.body).lineSpacing(2).foregroundStyle(PN.C.text2)
+                                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                            }
+                            VStack(alignment: .leading, spacing: 5) {
+                                ForEach(Array(tp.points.enumerated()), id: \.offset) { _, pt in
+                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                        Circle().fill(PN.C.text3).frame(width: 4, height: 4).offset(y: -3)
+                                        Text(CallNotes.md(pt.text)).font(PN.Font.body).lineSpacing(2).foregroundStyle(PN.C.text)
+                                            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                                        timeLink(pt.t)
+                                        Spacer(minLength: 0)
+                                    }
+                                }
+                            }
+                            .padding(.top, 2)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.vertical, 12)
+                }
+            }
+            if !m.unclear.isEmpty {
+                Text(L("page.mn.unclear") + ": " + m.unclear.map { CallNotes.plain($0.text) }.joined(separator: "; "))
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true).padding(.top, 14)
+            }
+        }
+    }
+
+    @ViewBuilder private func meetingSide(_ m: MeetingNotes.Notes) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach([(L("page.tab.decisions"), m.decisions, PN.C.accent as Color?), (L("page.mn.actions"), m.actions, nil),
+                     (L("page.mn.open"), m.open, nil)].filter { !$0.1.isEmpty }, id: \.0) { title, items, tint in
+                PageCard(tint: tint) {
+                    PageLabel(text: title, color: tint == nil ? PN.C.text3 : PN.C.answer)
+                    VStack(alignment: .leading, spacing: 9) { ForEach(Array(items.enumerated()), id: \.offset) { _, it in itemRow(it) } }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func makeMeetingCard(_ o: CallOutcome) -> some View {
+        let hasNotes = FileManager.default.fileExists(atPath: CallNotes.path(file))
+        PageCard {
+            PageLabel(text: L("page.mn.label"))
+            Text(L(hasNotes ? "page.mn.none" : "page.mn.noneNoNotes")).font(PN.Font.body).foregroundStyle(PN.C.text2)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Button(making ? L("page.mn.making") : L("page.mn.make")) { makeMeeting() }
+                    .buttonStyle(.pnPrimary).disabled(making)
+                if making { ProgressView().controlSize(.small) }
+                Text(L(hasNotes ? "page.mn.cost" : "page.mn.costFull")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
+            .padding(.top, 4)
+            if !makeNote.isEmpty {
+                Text(makeNote).font(PN.Font.caption).foregroundStyle(PN.C.onMe).fixedSize(horizontal: false, vertical: true)
+            }
+            Button(L("page.mn.seeDiscussed")) { tab = "discussed" }.buttonStyle(.plain)
+                .font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.accent).padding(.top, 2)
+        }
+    }
+
+    private func makeMeeting() {
+        making = true; makeNote = ""
+        CallEngine.shared.makeMeetingNotes(file: file) { err in
+            making = false
+            if let err { makeNote = err } else { tick += 1 }
+        }
+    }
+
+    /// Copy: Markdown as text and the same as rich text (HTML), so a paste into Notion, Google Docs, Word, Mail or
+    /// Slack keeps the headings, lists and bold.
+    private func copyMeeting() {
+        guard let md = CallNotes.meetingMarkdown(file, title: Self.title(file)) else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.declareTypes([.html, .string], owner: nil)
+        pb.setString(DocMD.html(DocMD.parse(md)), forType: .html)
+        pb.setString(md, forType: .string)
+        copied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { copied = false }
+    }
+
+    // MARK: What was discussed (the Summary before 0.9.5.2; 2026-11-05 redesign: the story on the left, what is next on the right)
 
     @ViewBuilder private func summaryTab(_ o: CallOutcome, _ agenda: [(text: String, state: String)]) -> some View {
         if wide {

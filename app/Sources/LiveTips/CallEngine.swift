@@ -401,10 +401,11 @@ final class CallEngine {
 
     /// rules/notes.yaml: full notes of the call (<stem>.notes.md) after every call, with or without Notion, once per call; later
     /// preparations read them instead of the older transcripts. On the "After the call" way; Sonnet on Claude.
-    func writeCallNotes(file: String, config c: AppConfig, hasConfig: Bool) {
+    /// 0.9.5.2: true when the notes are being written (the meeting page then waits for their Meeting notes).
+    @discardableResult func writeCallNotes(file: String, config c: AppConfig, hasConfig: Bool) -> Bool {
         let notes = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
         guard !FileManager.default.fileExists(atPath: notes), AIRoute.canRun(job: "after", config: c),
-              !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
+              !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return false }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
         p.arguments = ["-m", "livetips_m0.callnotes", "--md", file, "--model", "claude-sonnet-5-5",
@@ -418,14 +419,54 @@ final class CallEngine {
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notes.log"))
         p.standardOutput = log
         p.standardError = log
-        try? p.run()
+        do { try p.run() } catch { return false }
+        return true
+    }
+
+    /// 0.9.5.2 (rules/notes.yaml, schema 2): Make meeting notes on an older call's page: only the ## Meeting notes
+    /// section when the notes exist (one request), else the full notes with it. On the "After the call" way.
+    @MainActor func makeMeetingNotes(file: String, done: @escaping @MainActor (String?) -> Void) {
+        let c = config
+        guard AIRoute.canRun(job: "after", config: c), !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else {
+            done(L("page.mn.noRoute")); return
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
+        var args = ["-m", "livetips_m0.callnotes", "--md", file, "--model", "claude-sonnet-5-5", "--lang", "auto", "--meeting",
+                    "--aliases", c.nameAliases.joined(separator: ",")]
+        if let cfg = PyTool.project(of: file).project?.config, !cfg.isEmpty, FileManager.default.fileExists(atPath: cfg) {
+            args += ["--project-config", cfg]
+        }
+        p.arguments = args
+        p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
+        var env = AIRoute.env(job: "after", config: c)
+        env["LT_AI_STAGE"] = "after_notes"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        p.environment = env
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notes.log"))
+        p.terminationHandler = { _ in
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            let line = String(data: data, encoding: .utf8)?.split(separator: "\n").last.map(String.init) ?? ""
+            let d = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] ?? [:]
+            DispatchQueue.main.async {
+                if let usd = d["cost_usd"] as? Double, usd > 0 {
+                    SpendDays.add(usd)
+                    MainActor.assumeIsolated { CallHistory.shared.addCost(file: file, usd) }
+                }
+                let err: String? = (d["ok"] as? Bool) == true ? nil : ((d["error"] as? String) ?? L("page.mn.failed"))
+                MainActor.assumeIsolated { done(err) }
+            }
+        }
+        do { try p.run() } catch { done(error.localizedDescription) }
     }
 
     func writeToNotion(file: String) {
         let c = config
         // 0.8.5: the call notes do not depend on Notion; they are written even when no meeting page is (once per call).
-        writeCallNotes(file: file, config: c,
-                       hasConfig: !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig))
+        let notesComing = writeCallNotes(file: file, config: c,
+                                         hasConfig: !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig))
         guard c.notionWriteSummary else { return }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         guard AIRoute.canRun(job: "after", config: c), let notionToken = store.get(.notionToken) else {
@@ -459,6 +500,7 @@ final class CallEngine {
         if !meetingsDB.isEmpty { args += ["--meetings-db", meetingsDB] }
         if let r = renamed { args += ["--title", r] }
         if let w = callRequest["scheduled_at"] as? String { args += ["--when", w] }   // the date and time set in Start call
+        if notesComing { args += ["--wait-notes", "600"] }   // 0.9.5.2: the page carries the Meeting notes being written
         p.arguments = args
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = AIRoute.env(job: "after", config: c)

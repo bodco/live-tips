@@ -421,7 +421,8 @@ count when cards are matched by meaning. A card whose triggers are all regexes f
 a card shows by meaning once per call, and a "your turn" card (`"address": true`) is never shown by
 the recorder itself: the PM decides when to speak (0.9.2). A fact also matches the last minute of
 the other side's talk, not one line; it is skipped when you just said it, when that minute is about
-something else, or a second time on the same topic.
+something else, or a second time on the same topic. One line of theirs that matches a fact very
+closely (0.18 above the small-talk floor) is enough on its own, without waiting for a second line (0.9.6).
 A statement the prepared material answers (a claim, a doubt, a pain nobody answered yet) gets a 🟠
 tip with the ready answer, at most 2 in 10 minutes and once per topic. Files you add to a call are the
 preparation's primary document: each section gives a fact or card marked `"primary": true`.
@@ -1270,7 +1271,7 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
 - **Statistics.** Home > This week > Details adds "How the calls went": how much you spoke, questions to you left
   open, calls without a decision, and decisions per call with a brief and without. No dollars.
 - **Risks.** The call picture catches conditional threats ("if the API slips, the pilot moves a week"): a quiet Risk
-  card during the call, a Risks section after it. "Add to risk register" writes one page into the Notion
+  card during the call (not for a risk you said yourself, since 0.9.6), a Risks section after it. "Add to risk register" writes one page into the Notion
   Risks database (Settings > Integrations > Notion > Databases, one for all projects; `risks_db` from the project
   config when none is chosen) only after you confirm.
 - **Rehearsal.** For a presentation with a preparation (outline or slides): Rehearse on Home or in the call form.
@@ -1562,7 +1563,7 @@ Home answers two questions: what is next and what already happened. Tasks, decis
 Colours follow the call's state, never the project: not ready (orange), ready (green), preparing (blue), live (red), recorded (dark blue), no transcript (grey). A call started without a project goes to the app's own folder (the workspace "My calls", `~/Library/Application Support/LiveTips/live`); its preparation never reads that folder. This week's numbers moved to Settings > Usage, the feature list to Settings > Help, On you to the Tracker screen. Not ready is orange.
 
 **Call pages.** An upcoming call opens as a page with Setup, Brief, Tasks and Earlier calls; its Setup changes
-apply only on Save. A past call has Summary, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this
+apply only on Save. A past call has Summary (Meeting notes since 0.9.5.2, 14.1t), What was discussed, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this
 call, Follow-up and Export (Word, Markdown or a Notion page, editable before it goes out).
 
 **Call pages redesign (0.9.5).** Both pages are built from Home's cards. A header card shows the date and time, the
@@ -1751,6 +1752,36 @@ was on the shared screen. Pacenote can save the call's sound, or the sound and t
 - **Never to an AI.** Tips, preparation and notes use the transcript as before; the recording is only for you and the
   people you share it with.
 
+### 14.1t Meeting notes on the call page (0.9.5.2, beta)
+
+The full call notes keep every detail for the next preparation, so they read like a retelling of the transcript.
+People need something else: short notes they can read in a minute and send on. Since 0.9.5.2 a past call's
+**Summary** tab is these **Meeting notes**:
+
+- **Summary** (TL;DR): two or three sentences on what the call was about and what came out of it.
+- **Decisions**, **Action items** (owner, what, by when as said) and **Open questions**, each item with its time.
+- **Topics**: four to eight, in the call's order, each with its time, a one-line outcome and two to four points (who,
+  numbers, dates). Doubtful names or facts go into one quiet **Unclear** line at the end, never "heard ..." in the text.
+- **A time is a link**: a click opens the Transcript tab at that line.
+- **Copy** copies the notes with their headings and lists (Markdown as text and the same as rich text), so a paste
+  into Notion, Google Docs, Word, Mail or Slack keeps them. **Export** opens the export (below).
+
+The notes are written in the call's language, with the people and terms of the project config to fix garbled names.
+They are one more request after the full notes, on the "After the call" way (about $0.05 to $0.10 a call with
+Sonnet; free on this Mac), and are kept as the `## Meeting notes` section at the top of `<call>.notes.md`
+(rules/notes.yaml, schema 2). A call held before 0.9.5.2 shows **Make meeting notes** (one request, about $0.05 to $0.10; a call
+without notes gets its full notes too). What used to be the Summary (In short, every topic with its quotes, For the next
+call, the agenda and the open questions) is the **What was discussed** tab, unchanged.
+
+**Export, as it will look.** Word, Google Docs and Notion now get real headings, lists with their indents, bold and
+italic, not `##` or `**`: the .docx has Word's Heading styles (Google Docs keeps them as headings), the Notion page has
+Notion headings, bold text and nested bullets. In **Edit before you export**, Preview shows the document as it will
+look; Edit Markdown changes the text (for Markdown the text is the file). With Meeting notes, Decisions, Tasks and
+Risks start unticked, as the notes already have them; What was discussed can be added.
+
+**The meeting page in Notion** (14.2) carries the Meeting notes too: the summary, decisions, action items as to-dos,
+open questions and the topics, then the agenda, Sales and the Pacenote lines.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the
@@ -1761,7 +1792,8 @@ menu bar: **Send last call to Notion**.
 
 1. One Claude call turns the transcript and the tips into a wrap-up: action items with owners
    and dates, decisions, your commitments, new requests (scope change candidates), open
-   questions and risks.
+   questions and risks. Since 0.9.5.2 the page carries the call's Meeting notes (14.1t) in their place when
+   the notes are ready: the app waits for them up to 10 minutes, else the page gets this wrap-up.
 2. The app looks for this meeting's page in the Meetings database (one for all projects, chosen in
    Settings > Integrations > Notion > Databases): a page whose `Date` is
    within 20 minutes of the call start (a Notion AI Meeting Notes page created from the calendar

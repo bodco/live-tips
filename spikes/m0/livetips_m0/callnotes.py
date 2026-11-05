@@ -9,6 +9,8 @@ Writes <stem>.notes.md next to the transcript. Two guards against lost details:
 2. A coverage check: every number, date, time, ticket key, domain or address, and every question of the call is
    looked up in the notes; the missing ones go back to the model with their transcript lines, and it adds them
    where they belong. The notes end with the coverage line ("Coverage: numbers 41/42, keys 6/6, questions 14/15").
+0.9.5.2: one more request writes ## Meeting notes (readable, grouped, every item with its time) at the top of the
+notes; --meeting writes only that section for an older call (rules/notes.yaml, schema 2).
 Prints one JSON line {"ok", "path", "coverage", "cost_usd", "error"}.
 """
 import argparse
@@ -68,6 +70,125 @@ Then these sections: ## Topics, ## Questions, ## Decisions, ## Action items, ## 
 FIX_SYS = """These details of the call are missing from its notes. Add each one where it belongs in the notes (the
 right topic, question, action item or the Facts and numbers list), with what it refers to, using the transcript
 lines given. Change nothing else. Answer with the full notes. Write in {LANG}. No long dashes."""
+
+
+MEETING_SYS = """You write the meeting notes of one work call that people will read (Pacenote 0.9.5.2, owner:
+"readable meeting notes, grouped by best practice, no important detail lost, not overloaded"). You get the call's full
+notes (they keep every detail) and its transcript with times. Write in {LANG}. No long dashes. Never invent.
+Rules:
+- Short, plain sentences. Group by topic, not by the order of speaking. Merge repeats.
+- Keep what a reader needs: who, numbers, dates, decisions, owners. Leave out small talk and filler.
+- Not overloaded: at most 8 action items (merge the small ones of one owner into one line), at most 5 open questions,
+  2-4 points per topic, one line each. A detail that does not change what a reader does or knows stays in the full notes.
+- Never write "heard", "unclear", "(heard ...)" or "inaudible" inside the notes. Speech recognition garbles names: write
+  the real name (use the names below and the full notes); what stays doubtful goes once into ### Unclear at the end.
+- Every item starts with the time of the transcript line where it was said, copied as [HH:MM:SS].
+- Use EXACTLY these headings in English (the app reads them), the text under them in {LANG}. Leave out a heading
+  that has nothing under it, except TL;DR and Topics.
+{NAMES}
+Format:
+## Meeting notes
+### TL;DR
+2-3 sentences: what the call was about and what came out of it.
+### Decisions
+- [HH:MM:SS] the decision
+### Action items
+- [HH:MM:SS] **Owner**: what (due: when, only if said)
+### Open questions
+- [HH:MM:SS] a question, risk or blocker left open
+### Topics
+4-8 topics in the call's order, each:
+#### Topic title [HH:MM:SS]
+Outcome: one line.
+- [HH:MM:SS] 2-4 points: who said what, numbers, dates
+### Unclear
+- one line per doubtful name or fact (leave the heading out when nothing is doubtful)
+Example of one topic:
+#### Pilot readiness [10:06:12]
+Outcome: the pilot starts November 10 if the test accounts come by Friday.
+- [10:06:18] David's manager needs one more approval, as the accounts reach finance data.
+- [10:06:29] David can send them Friday if the permissions list comes today.
+Answer with the section only, starting with "## Meeting notes"."""
+
+MEETING_HEAD = "## Meeting notes"
+TIME_RX = re.compile(r"^\[(\d{1,2}:\d\d(?::\d\d)?)\]\s*")
+
+
+def put_meeting(notes: str, section: str) -> str:
+    """rules/notes.yaml (schema 2): the ## Meeting notes section goes before the first "## " section of the full notes,
+    or replaces the one there. Everything else of the notes stays as it was."""
+    section = section.strip()
+    if not section.startswith(MEETING_HEAD):
+        section = MEETING_HEAD + "\n" + section
+    section = section.replace(chr(0x2014), "-")
+    lines = notes.split("\n")
+    start = next((i for i, l in enumerate(lines) if l.strip() == MEETING_HEAD), None)
+    if start is not None:
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ") or lines[i].startswith("Coverage: ")), len(lines))
+        rest = lines[:start] + lines[end:]
+    else:
+        rest, start = lines, next((i for i, l in enumerate(lines) if l.startswith("## ")), len(lines))
+    return "\n".join(rest[:start] + section.split("\n") + [""] + rest[start:]).rstrip() + "\n"
+
+
+def meeting_text(notes: str) -> str:
+    """The ## Meeting notes section of the notes, "" when there is none."""
+    lines = notes.split("\n")
+    start = next((i for i, l in enumerate(lines) if l.strip() == MEETING_HEAD), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ") or lines[i].startswith("Coverage: ")), len(lines))
+    return "\n".join(lines[start:end]).strip()
+
+
+def _item(s: str) -> dict:
+    m = TIME_RX.match(s)
+    return {"t": m.group(1) if m else "", "text": s[m.end():].strip() if m else s.strip()}
+
+
+def parse_meeting(notes: str) -> dict:
+    """The section as data: tldr, decisions, actions, open, topics [{title, t, outcome, points}], unclear.
+    The same reading as the app's MeetingNotes.parse (LiveTipsCore)."""
+    out = {"tldr": "", "decisions": [], "actions": [], "open": [], "topics": [], "unclear": []}
+    keys = {"tl;dr": "tldr", "decisions": "decisions", "action items": "actions", "open questions": "open",
+            "topics": "topics", "unclear": "unclear"}
+    cur = None
+    for raw in meeting_text(notes).split("\n")[1:]:
+        l = raw.strip()
+        if not l:
+            continue
+        if l.startswith("### "):
+            cur = keys.get(l[4:].strip().lower().rstrip(":"))
+            continue
+        if l.startswith("#### ") and cur == "topics":
+            title = l[5:].strip()
+            m = re.search(r"\s*\[(\d{1,2}:\d\d(?::\d\d)?)\]\s*$", title)
+            out["topics"].append({"title": title[:m.start()].strip() if m else title, "t": m.group(1) if m else "",
+                                  "outcome": "", "points": []})
+            continue
+        body = re.sub(r"^[-*•]\s+", "", l)
+        bullet = body != l
+        if cur == "tldr":
+            out["tldr"] = (out["tldr"] + " " + body).strip()
+        elif cur == "topics" and out["topics"]:
+            tp = out["topics"][-1]
+            m = re.match(r"^(?:\*\*)?(?:Outcome|Підсумок|Результат)(?:\*\*)?:\s*(?:\*\*)?\s*", body, re.I)
+            if m and not bullet:
+                tp["outcome"] = body[m.end():].strip()
+            else:
+                tp["points"].append(_item(body))
+        elif cur in ("decisions", "actions", "open", "unclear"):
+            out[cur].append(_item(body))
+    return out
+
+
+def make_meeting(md: Path, notes: str, transcript: str, lang: str, ask, names: str = "") -> str:
+    """One request: the readable ## Meeting notes from the full notes and the transcript with times."""
+    L = LANGS.get(lang, "Ukrainian")
+    sec = ask(MEETING_SYS.replace("{LANG}", L).replace("{NAMES}", names),
+              f"Call file: {md.name}.\n\n# FULL NOTES\n{notes[:60000]}\n\n# TRANSCRIPT\n{transcript[:150000]}", 5000)
+    i = sec.find(MEETING_HEAD)
+    return sec[i:] if i >= 0 else MEETING_HEAD + "\n" + sec
 
 
 def parts(text: str, size: int = PART_CHARS) -> List[str]:
@@ -151,6 +272,30 @@ def names_block(aliases: List[str], config: str) -> str:
     return "\n".join(out)
 
 
+def make_meeting_only(md: Path, model: str, lang: str, provider=None, aliases: List[str] = None, config: str = "") -> dict:
+    """0.9.5.2: Make meeting notes for a call whose notes have no ## Meeting notes section (one request, about $0.05)."""
+    from .oneshot import provider_from_env
+    from .cost import cost_usd
+    prov = provider or provider_from_env()
+    usd = [0.0]
+
+    def ask(system: str, user: str, max_tokens: int) -> str:
+        c = prov.complete(model=model, system=[{"text": system}], user=user, max_tokens=max_tokens, cache_ttl=None)
+        if c.error:
+            raise RuntimeError("model request failed: " + str(c.error)[:200])
+        usd[0] += cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens) or 0
+        return c.text.strip()
+
+    out = md.with_name(md.name[:-3].replace(".named", "") + ".notes.md")
+    named = md.with_name(md.name[:-3] + ".named.md") if not md.name.endswith(".named.md") else md
+    text = (named if named.exists() else md).read_text(encoding="utf-8", errors="replace")
+    if not lang or lang == "auto":
+        lang = call_lang(text)
+    notes = out.read_text(encoding="utf-8")
+    out.write_text(put_meeting(notes, make_meeting(md, notes, text, lang, ask, names_block(aliases or [], config))), encoding="utf-8")
+    return {"ok": True, "path": str(out), "coverage": None, "cost_usd": round(usd[0], 4), "parts": 0, "error": None}
+
+
 def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str] = None, config: str = "") -> dict:
     from .oneshot import provider_from_env
     from .cost import cost_usd
@@ -188,9 +333,13 @@ def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str
         uniq = list(dict.fromkeys(miss))[:120]
         notes = ask(FIX_SYS.format(LANG=L), "## Missing details (transcript lines)\n" + "\n".join(uniq) + "\n\n## The notes\n" + notes, 12000)
         c = covered(notes, d)
+    notes = notes.rstrip() + "\n\n" + coverage_line(c) + f". Made {time.strftime('%Y-%m-%d %H:%M')} by {model}.\n"
+    try:   # 0.9.5.2 (rules/notes.yaml schema 2): the readable meeting notes; the full notes are kept whatever happens
+        notes = put_meeting(notes, make_meeting(md, notes, text, lang, ask, names))
+    except Exception as e:  # noqa: BLE001
+        print("meeting notes: " + str(e)[:200], file=sys.stderr)
     out = md.with_name(md.name[:-3].replace(".named", "") + ".notes.md")
-    out.write_text(notes.rstrip() + "\n\n" + coverage_line(c) + f". Made {time.strftime('%Y-%m-%d %H:%M')} by {model}.\n",
-                   encoding="utf-8")
+    out.write_text(notes, encoding="utf-8")
     return {"ok": True, "path": str(out), "coverage": coverage_line(c), "cost_usd": round(usd[0], 4), "parts": len(ps),
             "error": None}
 
@@ -202,9 +351,13 @@ def main(argv=None) -> int:
     ap.add_argument("--lang", default="auto", help="auto: the language the call was held in")
     ap.add_argument("--aliases", default="", help="the PM's names, comma separated")
     ap.add_argument("--project-config", default="")
+    ap.add_argument("--meeting", action="store_true",
+                    help="0.9.5.2: only the ## Meeting notes section when the notes exist (else the full notes)")
     a = ap.parse_args(argv)
+    notes_file = Path(a.md).with_name(Path(a.md).name[:-3].replace(".named", "") + ".notes.md")
+    fn = make_meeting_only if a.meeting and notes_file.exists() else make_notes
     try:
-        res = make_notes(Path(a.md), a.model, a.lang, aliases=[x.strip() for x in a.aliases.split(",") if x.strip()],
+        res = fn(Path(a.md), a.model, a.lang, aliases=[x.strip() for x in a.aliases.split(",") if x.strip()],
                          config=a.project_config)
     except Exception as e:  # noqa: BLE001
         res = {"ok": False, "path": None, "coverage": None, "cost_usd": None, "error": f"{type(e).__name__}: {e}"[:400]}

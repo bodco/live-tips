@@ -3,8 +3,30 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.9.5.2 (unreleased)
+## 0.9.5.2 (2026-11-05)
 
+- **No Risk card for your own words (2026-11-05, owner):** a risk you say yourself is no longer a card in the feed
+  during the call; you just said it. It still goes to the call picture, the Risks section of the summary and the risk
+  register. Risks the others say still get their quiet card.
+- **A strong line holds the topic (2026-11-05):** one line of the other side that matches a fact very closely (0.18
+  above the small-talk floor, `semantic.yaml > fact_window > line_strong`) now shows the fact at once instead of waiting
+  for a second line or a matching minute. A replay of three recent calls added one fact (a long technical discussion
+  that was missed) and no new noise.
+- **Meeting notes on the call page (2026-11-05, owner):** a past call's Summary tab is now readable meeting notes:
+  a short summary, Decisions, Action items and Open questions, and 4-8 topics with a one-line outcome and a few points,
+  every item with its time; a click on a time opens the transcript there. Garbled names are fixed from the project's
+  names, doubtful ones go into one Unclear line instead of "heard ..." in the text. Copy puts the notes on the clipboard
+  with their headings and lists (Markdown and rich text), Export sends them to Word, Markdown, Notion or Google Docs.
+  They are one more request after the full notes (about $0.05 to $0.10 a call) and are kept as the
+  `## Meeting notes` section at the top of `<call>.notes.md` (rules/notes.yaml, schema 2). Older calls show Make
+  meeting notes. The former Summary is the What was discussed tab, unchanged.
+- **The meeting page in Notion carries the Meeting notes (2026-11-05, owner):** the summary, decisions, action items as
+  to-dos, open questions and topics, with bold names and times. The app starts the notes and the page together, and the
+  page waits for the notes (up to 10 minutes) instead of a separate short wrap-up.
+- **Export looks the same everywhere (2026-11-05, owner):** headings, lists with their indents, bold and italic now
+  reach Word, Google Docs and Notion as real headings and lists, not `##` or `**` (Word's Heading styles in the .docx,
+  which Google Docs keeps; Notion headings, bold text and nested bullets). Edit before you export has Preview, the
+  document as it will look, and Edit Markdown. With Meeting notes, Decisions, Tasks and Risks start unticked.
 - **Fixed: a recording of one window had no call sound (2026-11-05):** macOS gives no sound with a one-window
   capture, so only your microphone was in the file. The call's sound now always comes from its own stream (the whole
   system sound, Pacenote's own sounds left out), whatever the picture is: a window, a screen or none.

@@ -30,6 +30,29 @@ enum CallNotes {
     static func nextCall(_ t: String) -> [String] { Array(lines(t, ["open after", "відкрите після", "next call"]).prefix(6)) }
     static func decisions(_ t: String) -> [String] { lines(t, ["decisions", "рішення"]).map(plain).filter { !$0.isEmpty } }
 
+    /// 0.9.5.2 (rules/notes.yaml, schema 2): the readable ## Meeting notes of the call, nil for older notes.
+    static func meeting(_ transcript: String) -> MeetingNotes.Notes? {
+        guard let text = try? String(contentsOfFile: path(transcript), encoding: .utf8) else { return nil }
+        return MeetingNotes.parse(text)
+    }
+
+    static var meetingLabels: MeetingNotes.Labels {
+        MeetingNotes.Labels(title: "", tldr: L("page.mn.tldr"), decisions: L("page.tab.decisions"), actions: L("page.mn.actions"),
+                            open: L("page.mn.open"), topics: L("page.mn.topics"), unclear: L("page.mn.unclear"))
+    }
+
+    /// The Meeting notes as Markdown for Copy: the call's name, when and project, then the sections.
+    @MainActor static func meetingMarkdown(_ transcript: String, title: String) -> String? {
+        guard let m = meeting(transcript), !m.isEmpty else { return nil }
+        var lab = meetingLabels; lab.title = title
+        return MeetingNotes.markdown(m, lab, when: whenLine(transcript))
+    }
+
+    @MainActor static func whenLine(_ transcript: String) -> String {
+        guard let r = CallHistory.shared.records.first(where: { $0.file == transcript }) else { return "" }
+        return RecentCard.when(r) + (r.project.isEmpty ? "" : " · " + r.project)
+    }
+
     /// Inline Markdown of a notes line (**bold**, *italic*, `code`) as styled text; plain text when it does not parse.
     static func md(_ s: String) -> AttributedString {
         (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
@@ -85,10 +108,13 @@ struct ExportPanel: View {
     var onClose: () -> Void
     @State private var format = "docx"
     @State private var incSummary = true
+    @State private var incDiscussed = false     // 0.9.5.2: the former Summary (In short, What was discussed, For the next call)
     @State private var incDecisions = true
     @State private var incTasks = true
     @State private var incRisks = true
     @State private var incTranscript = false
+    @State private var preview = true            // 0.9.5.2 (owner): see the document as it will look, not only Markdown
+    private var hasMeeting: Bool { CallNotes.meeting(file).map { !$0.isEmpty } ?? false }
     @State private var text = ""
     @State private var touched = false
     @State private var note = ""
@@ -115,7 +141,8 @@ struct ExportPanel: View {
             .pickerStyle(.segmented).fixedSize()
             HStack(spacing: 14) {
                 Text(L("export.include")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
-                Toggle(L("export.summary"), isOn: $incSummary)
+                Toggle(hasMeeting ? L("page.mn.label") : L("export.summary"), isOn: $incSummary)
+                if hasMeeting { Toggle(L("page.sum.discussed"), isOn: $incDiscussed) }
                 Toggle(L("page.tab.decisions"), isOn: $incDecisions)
                 Toggle(L("page.tab.tasks"), isOn: $incTasks)
                 Toggle(L("page.tab.risks"), isOn: $incRisks)
@@ -134,12 +161,30 @@ struct ExportPanel: View {
                     }.fixedSize()
                 } else { Text(L("export.googleTo", ["email": googleAccounts[0].email])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
             }
-            Text(L("export.edit")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
-            TextEditor(text: Binding(get: { text }, set: { text = $0; touched = true }))
-                .font(.system(size: 12, design: .monospaced))
-                .scrollContentBackground(.hidden).padding(6).frame(height: 220)
-                .background(PN.C.bg, in: RoundedRectangle(cornerRadius: PN.Radius.s))
-                .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(Color.primary.opacity(0.12)))
+            HStack(spacing: 12) {
+                Text(L("export.edit")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
+                if format != "md" {
+                    Picker("", selection: $preview) {
+                        Text(L("export.preview")).tag(true)
+                        Text(L("export.editMd")).tag(false)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    if preview { Text(L("export.previewNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+                }
+            }
+            if format != "md" && preview {
+                ScrollView { DocPreview(blocks: DocMD.parse(text)).padding(.horizontal, 28).padding(.vertical, 20) }
+                    .frame(height: 360)
+                    .background(Color.white.opacity(0.98), in: RoundedRectangle(cornerRadius: PN.Radius.s))
+                    .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(Color.primary.opacity(0.12)))
+                    .environment(\.colorScheme, .light)
+            } else {
+                TextEditor(text: Binding(get: { text }, set: { text = $0; touched = true }))
+                    .font(.system(size: 12, design: .monospaced))
+                    .scrollContentBackground(.hidden).padding(6).frame(height: 360)
+                    .background(PN.C.bg, in: RoundedRectangle(cornerRadius: PN.Radius.s))
+                    .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(Color.primary.opacity(0.12)))
+            }
             HStack {
                 if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(2) }
                 Spacer()
@@ -156,22 +201,30 @@ struct ExportPanel: View {
         }
         .padding(16)
         .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.l))
-        .onAppear { rebuild() }
-        .onChange(of: [incSummary, incDecisions, incTasks, incRisks, incTranscript]) { if !touched { rebuild() } else { rebuildAsk() } }
+        .onAppear {
+            // 0.9.5.2: the Meeting notes already carry the decisions, action items and open questions
+            if hasMeeting { incDecisions = false; incTasks = false; incRisks = false }
+            rebuild()
+        }
+        .onChange(of: [incSummary, incDiscussed, incDecisions, incTasks, incRisks, incTranscript]) { if !touched { rebuild() } else { rebuildAsk() } }
     }
 
     private func rebuildAsk() { rebuild(); touched = false }      // a change of sections rebuilds the text
 
     private func rebuild() {
         text = Self.markdown(file: file, title: title, outcome: outcome, commitments: commitments,
-                             summary: incSummary, decisions: incDecisions, tasks: incTasks, risks: incRisks, transcript: incTranscript)
+                             summary: incSummary, discussed: incDiscussed, decisions: incDecisions, tasks: incTasks, risks: incRisks,
+                             transcript: incTranscript)
     }
 
     static func markdown(file: String, title: String, outcome o: CallOutcome, commitments: [Commitment],
-                         summary: Bool, decisions: Bool, tasks: Bool, risks: Bool, transcript: Bool) -> String {
+                         summary: Bool, discussed: Bool = false, decisions: Bool, tasks: Bool, risks: Bool, transcript: Bool) -> String {
         var md = "# " + title + "\n"
-        if let r = CallHistory.shared.records.first(where: { $0.file == file }) { md += "\n" + RecentCard.when(r) + (r.project.isEmpty ? "" : " · " + r.project) + "\n" }
-        if summary {
+        let when = CallNotes.whenLine(file)
+        if !when.isEmpty { md += "\n" + when + "\n" }
+        let meeting = CallNotes.meeting(file).flatMap { $0.isEmpty ? nil : $0 }
+        if summary, let m = meeting { md += MeetingNotes.markdown(m, CallNotes.meetingLabels) }      // 0.9.5.2
+        if (summary && meeting == nil) || (discussed && meeting != nil) {
             let s = CallNotes.inShort(file), d = CallNotes.discussed(file), n = CallNotes.nextCall(file)
             if !s.isEmpty { md += "\n## " + L("page.sum.inShort") + "\n\n" + s.joined(separator: " ") + "\n" }
             if !d.isEmpty { md += "\n## " + L("page.sum.discussed") + "\n\n" + d.map { "- " + $0 }.joined(separator: "\n") + "\n" }
@@ -200,14 +253,11 @@ struct ExportPanel: View {
             let p = NSSavePanel(); p.allowedContentTypes = [UTType(filenameExtension: "docx") ?? .data]; p.nameFieldStringValue = baseName + ".docx"
             guard p.runModal() == .OK, let u = p.url else { return }
             do {
-                let doc = Self.attributed(text)
-                let d = try doc.data(from: NSRange(location: 0, length: doc.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML])
-                try d.write(to: u); note = L("export.saved", ["name": u.lastPathComponent])
+                try DocMD.docx(DocMD.parse(text)).write(to: u); note = L("export.saved", ["name": u.lastPathComponent])
             } catch { note = error.localizedDescription }
         case "gdoc":
             let acct = googleAccounts.first { $0.email == googleAccount }?.email ?? googleAccounts.first?.email ?? ""
-            let doc = Self.attributed(text)
-            guard let d = try? doc.data(from: NSRange(location: 0, length: doc.length), documentAttributes: [.documentType: NSAttributedString.DocumentType.officeOpenXML]) else { return }
+            let d = DocMD.docx(DocMD.parse(text))      // 0.9.5.2: Word's heading styles become Google Docs headings
             busy = true; note = L("nset.checking", ["name": "Google"])
             Task {
                 do {
@@ -223,34 +273,13 @@ struct ExportPanel: View {
         }
     }
 
-    /// Headings, bullets and paragraphs into rich text for Word (AppKit's own writer, no extra dependency).
-    static func attributed(_ md: String) -> NSAttributedString {
-        let doc = NSMutableAttributedString()
-        for raw in md.split(separator: "\n", omittingEmptySubsequences: false) {
-            let l = String(raw)
-            if l.hasPrefix("# ") { doc.append(NSAttributedString(string: String(l.dropFirst(2)) + "\n", attributes: [.font: NSFont.boldSystemFont(ofSize: 20)])) }
-            else if l.hasPrefix("## ") { doc.append(NSAttributedString(string: "\n" + String(l.dropFirst(3)) + "\n", attributes: [.font: NSFont.boldSystemFont(ofSize: 14)])) }
-            else if l.hasPrefix("- ") { doc.append(NSAttributedString(string: "• " + String(l.dropFirst(2)) + "\n", attributes: [.font: NSFont.systemFont(ofSize: 11)])) }
-            else { doc.append(NSAttributedString(string: l + "\n", attributes: [.font: NSFont.systemFont(ofSize: 11)])) }
-        }
-        return doc
-    }
-
     /// A page in the meetings database (Settings > Integrations > Notion), blocks of at most 2000 characters, 100
     /// per request. Only on the PM's click.
     static func toNotion(_ md: String, title: String, file: String) async -> String {
         guard let tok = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken) else { return L("nset.saveToken") }
         let db = AppConfig.load(from: AppPaths.config).notionMeetingsDB
         guard !db.isEmpty else { return L("tr.noMeetingsDb") }
-        func block(_ type: String, _ s: String) -> [String: Any] { ["object": "block", "type": type, type: ["rich_text": [["type": "text", "text": ["content": String(s.prefix(2000))]]]]] }
-        var blocks: [[String: Any]] = []
-        for raw in md.split(separator: "\n") {
-            let l = String(raw)
-            if l.hasPrefix("# ") { continue }
-            if l.hasPrefix("## ") { blocks.append(block("heading_2", String(l.dropFirst(3)))) }
-            else if l.hasPrefix("- ") { blocks.append(block("bulleted_list_item", String(l.dropFirst(2)))) }
-            else { var s = Substring(l); while !s.isEmpty { blocks.append(block("paragraph", String(s.prefix(2000)))); s = s.dropFirst(2000) } }
-        }
+        let blocks = DocMD.notion(DocMD.parse(md))   // 0.9.5.2: ### headings, bold, nested lists as Notion has them
         do {
             var dsId = db
             var props = (try? await NotionAPI.call(tok, "GET", "/data_sources/\(db)"))?["properties"] as? [String: [String: Any]] ?? [:]
@@ -272,5 +301,59 @@ struct ExportPanel: View {
             if let u = page["url"] as? String, let url = URL(string: u) { NSWorkspace.shared.open(url) }
             return L("export.sent")
         } catch { return L("export.failed") + ": " + error.localizedDescription }
+    }
+}
+
+/// 0.9.5.2 (owner): Edit before you export shows the document as Word, Google Docs and Notion will show it: headings,
+/// lists with their indents, bold and italic, to-dos. The same reading (DocMD) as the files that go out.
+struct DocPreview: View {
+    let blocks: [DocMD.Block]
+
+    static func text(_ runs: [DocMD.Run], size: CGFloat, weight: Font.Weight = .regular) -> AttributedString {
+        var out = AttributedString()
+        for r in runs {
+            var a = AttributedString(r.text)
+            var f = Font.system(size: size, weight: r.bold ? .bold : weight, design: r.code ? .monospaced : .default)
+            if r.italic { f = f.italic() }
+            a.font = f
+            out += a
+        }
+        return out
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { i, b in
+                row(b, first: i == 0).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .foregroundStyle(Color(white: 0.12))
+        .textSelection(.enabled)
+    }
+
+    @ViewBuilder private func row(_ b: DocMD.Block, first: Bool) -> some View {
+        switch b.kind {
+        case .h1: Text(Self.text(b.runs, size: 24, weight: .bold)).padding(.bottom, 8)
+        case .h2: Text(Self.text(b.runs, size: 18, weight: .bold)).padding(.top, first ? 0 : 16).padding(.bottom, 6)
+        case .h3: Text(Self.text(b.runs, size: 15, weight: .bold)).padding(.top, first ? 0 : 12).padding(.bottom, 4)
+        case .h4: Text(Self.text(b.runs, size: 13.5, weight: .semibold)).padding(.top, first ? 0 : 10).padding(.bottom, 3)
+        case .bullet(let lv):
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(["\u{2022}", "\u{25E6}", "\u{25AA}"][min(lv, 2)]).font(.system(size: 13))
+                Text(Self.text(b.runs, size: 13)).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.leading, 18 + CGFloat(lv) * 20).padding(.vertical, 2)
+        case .todo(let on):
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: on ? "checkmark.square" : "square").font(.system(size: 12))
+                Text(Self.text(b.runs, size: 13)).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 2)
+        case .quote:
+            Text(Self.text(b.runs, size: 13)).italic().foregroundStyle(Color(white: 0.35)).padding(.leading, 12)
+                .overlay(alignment: .leading) { Rectangle().fill(Color(white: 0.8)).frame(width: 3) }.padding(.vertical, 4)
+        case .rule: Divider().padding(.vertical, 8)
+        case .para: Text(Self.text(b.runs, size: 13)).lineSpacing(2).fixedSize(horizontal: false, vertical: true).padding(.vertical, 3)
+        }
     }
 }

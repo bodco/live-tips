@@ -662,6 +662,81 @@ enginePathsFollowTheApp()
 versions()
 commitmentsRegister()
 /// 0.9.5: call recording: settings decode with defaults, presets and sizes, file names, the call window.
+func meetingNotes0952() {
+    // 0.9.5.2 (rules/notes.yaml, schema 2): the ## Meeting notes section of the call notes, and the export's Markdown
+    let notes = """
+    # Call notes: Orbit weekly
+    Date 2026-11-05 10:00, Mike Johnson (team), David Kim (client).
+    ## Meeting notes
+    ### TL;DR
+    The export is merged;
+    the pilot starts November 10.
+    ### Decisions
+    - [10:04:10] Export goes to production on Tuesday.
+    ### Action items
+    - [10:06:29] **David Kim**: send the test accounts (due: Friday)
+    ### Open questions
+    - Data retention statement needs legal approval.
+    ### Topics
+    #### Export screen [10:00:21]
+    Outcome: merged to main, ships Tuesday.
+    - [10:00:30] Mike: failed payments retry after 1, 6 and 24 hours.
+    #### Pilot readiness [10:06]
+    **Outcome:** starts November 10 if the accounts come by Friday.
+    - [10:06:18] David's manager wants one more approval.
+    ### Unclear
+    - The name of the security vendor.
+
+    ## Summary
+    Export and pilot.
+    ## Decisions
+    - Export goes to production on Tuesday
+
+    Coverage: numbers 4/4.
+    """
+    guard let m = MeetingNotes.parse(notes) else { expect(false, "meeting notes: the section is read"); return }
+    expect(m.tldr == "The export is merged; the pilot starts November 10.", "meeting notes: TL;DR lines joined")
+    expect(m.decisions == [MeetingNotes.Item(t: "10:04:10", text: "Export goes to production on Tuesday.")], "meeting notes: a decision with its time")
+    expect(m.actions.first?.hhmm == "10:06" && m.actions.first?.text.hasPrefix("**David Kim**") == true, "meeting notes: an action item")
+    expect(m.open.first?.t == "" && m.open.count == 1, "meeting notes: an item without a time")
+    expect(m.topics.map(\.title) == ["Export screen", "Pilot readiness"] && m.topics[1].t == "10:06", "meeting notes: topics and times")
+    expect(m.topics[0].outcome == "merged to main, ships Tuesday." && m.topics[1].outcome.hasPrefix("starts November 10"), "meeting notes: outcome lines")
+    expect(m.topics[0].points.count == 1 && m.topics[0].points[0].t == "10:00:30", "meeting notes: points with times")
+    expect(m.unclear.count == 1 && m.decisions.count == 1, "meeting notes: the full notes' sections are not read in")
+    expect(MeetingNotes.parse("# Call notes\n## Summary\nx\n") == nil, "meeting notes: none in older notes")
+    let lab = MeetingNotes.Labels(title: "Orbit weekly", tldr: "Summary", decisions: "Decisions", actions: "Action items",
+                                  open: "Open questions", topics: "Topics", unclear: "Unclear")
+    let md = MeetingNotes.markdown(m, lab, when: "Thu, Nov 5 · 10:00")
+    expect(md.hasPrefix("# Orbit weekly\n\nThu, Nov 5 · 10:00\n\n## Summary\n\nThe export"), "meeting notes: Markdown head")
+    expect(md.contains("\n### Export screen [10:00]\n\n*merged to main, ships Tuesday.*\n\n- [10:00] Mike"), "meeting notes: Markdown topic")
+
+    // the export: Markdown into blocks, Word, Notion, HTML
+    let b = DocMD.parse(md + "\n  - nested point\n- [ ] check the CSV\n")
+    expect(b.first == DocMD.Block(.h1, [DocMD.Run("Orbit weekly")]), "docmd: # is the title")
+    expect(b.contains { $0.kind == .h3 && $0.plain == "Export screen [10:00]" }, "docmd: ### is a heading, without the marks")
+    expect(DocMD.inline("**David Kim**: send *now* `X-1`") == [DocMD.Run("David Kim", bold: true), DocMD.Run(": send "),
+                                                              DocMD.Run("now", italic: true), DocMD.Run(" "), DocMD.Run("X-1", code: true)], "docmd: bold, italic, code")
+    expect(DocMD.inline("2 * 3 and a**b") == [DocMD.Run("2 * 3 and a**b")], "docmd: lone stars stay as typed")
+    expect(DocMD.inline("snake_case_name") == [DocMD.Run("snake_case_name")], "docmd: underscores inside a word stay")
+    expect(b.contains { $0.kind == .bullet(1) } && b.last?.kind == .todo(false), "docmd: a nested bullet and a to-do")
+    let doc = DocMD.documentXML(b)
+    expect(doc.contains("<w:pStyle w:val=\"Heading1\"/></w:pPr><w:r><w:t xml:space=\"preserve\">Summary</w:t>"), "docx: ## is Word's Heading 1")
+    expect(doc.contains("<w:pStyle w:val=\"Heading2\"/>") && doc.contains("<w:numId w:val=\"1\"/>") && doc.contains("<w:ilvl w:val=\"1\"/>"), "docx: Heading 2 and real lists")
+    expect(doc.contains("<w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">David Kim</w:t>") && !doc.contains("**") && !doc.contains("###"), "docx: bold runs, no marks left")
+    let z = DocMD.docx(b)
+    if let out = ProcessInfo.processInfo.environment["LT_DOCX_OUT"] { try? z.write(to: URL(fileURLWithPath: out)) }   // a manual look in Word
+    expect(z.prefix(4) == Data([0x50, 0x4B, 0x03, 0x04]) && z.suffix(22).prefix(4) == Data([0x50, 0x4B, 0x05, 0x06]), "docx: a zip")
+    expect(Zip.crc32(Data("123456789".utf8)) == 0xCBF43926, "zip: crc32")
+    let nb = DocMD.notion(b)
+    expect(nb.first?["type"] as? String == "paragraph" && nb.contains { $0["type"] as? String == "heading_2" } && nb.contains { $0["type"] as? String == "to_do" }, "notion: no title block, headings, to-do")
+    let bold = nb.compactMap { ($0["bulleted_list_item"] as? [String: Any])?["rich_text"] as? [[String: Any]] }.flatMap { $0 }
+        .first { (($0["annotations"] as? [String: Bool])?["bold"]) == true }
+    expect(((bold?["text"] as? [String: Any])?["content"] as? String) == "David Kim", "notion: bold as an annotation")
+    expect(nb.contains { (($0["bulleted_list_item"] as? [String: Any])?["children"] as? [[String: Any]])?.count == 1 }, "notion: a nested bullet is a child")
+    let h = DocMD.html(b)
+    expect(h.contains("<h2>Summary</h2>") && h.contains("<ul><li>") && h.contains("<ul><li>nested point</li></ul>") && h.contains("<strong>David Kim</strong>"), "html: headings and nested lists")
+}
+
 func callRecording() {
     let d = try? JSONDecoder().decode(RecordingSettings.self, from: Data("{\"kind\":\"bogus\",\"auto\":true,\"quality\":\"sharp\"}".utf8))
     expect(d?.kind == "video" && d?.auto == true && d?.quality == "sharp" && d?.drive == "manual", "recording: unknown values fall back, known ones kept")
@@ -805,5 +880,6 @@ expect(tmE.count == 2 && tmE[0]["d"] as? String == "2026-11-18" && tmE[0]["t"] =
 expect(((tmE[1]["p"] as? [String: Any])?["minutes"] as? NSNumber)?.intValue == 1, "telemetry: numbers as written")
 try? FileManager.default.removeItem(at: tmDir)
 callRecording()
+meetingNotes0952()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

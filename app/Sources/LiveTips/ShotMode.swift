@@ -619,10 +619,11 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if let r = self.demoCall { Self.writeDemoNotes(r.file) }
             self.next(after: 0.2)
         }
-        for (tab, w, h) in [("summary", 1280.0, 1180.0), ("summary", 900.0, 1180.0), ("decisions", 1280.0, 760.0), ("tasks", 1280.0, 760.0),
-                            ("risks", 1280.0, 760.0), ("transcript", 1280.0, 900.0)] {
+        for (tab, w, h) in [("summary", 1280.0, 1180.0), ("summary", 900.0, 1180.0), ("discussed", 1280.0, 1180.0), ("decisions", 1280.0, 760.0), ("tasks", 1280.0, 760.0),
+                            ("risks", 1280.0, 760.0), ("transcript", 1280.0, 900.0), ("export", 1280.0, 1180.0)] {
             steps.append { [unowned self] in
-                CallPageView.shotTab = tab
+                CallPageView.shotTab = tab == "export" ? "summary" : tab
+                CallPageView.shotExport = tab == "export"     // 0.9.5.2: the export panel in Preview
                 HomeNav.shared.path = []; HomeNav.shared.followUp = nil
                 if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }
                 HomeWindow.window?.setContentSize(NSSize(width: w, height: h))
@@ -630,7 +631,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [self] in
                     let uk = L10n.lang == "uk" ? "-uk" : ""
                     if let win = HomeWindow.window { capture(win, "callpage-\(tab)-\(Int(w))-\(theme)\(uk)") }
-                    CallPageView.shotTab = nil
+                    CallPageView.shotTab = nil; CallPageView.shotExport = false
                     next()
                 }
             }
@@ -641,6 +642,35 @@ final class ShotMode: NSObject, NSApplicationDelegate {
     static func writeDemoNotes(_ transcript: String) {
         let notes = """
         # Call notes: Orbit weekly with the client
+        ## Meeting notes
+        ### TL;DR
+        The export screen is merged and ships on Tuesday. The pilot starts on November 10 with five users if David sends the test accounts by Friday. The finance team's CSV download and scheduled emails need a change request against the 42 hours left.
+        ### Decisions
+        - [10:04:10] The export screen goes to production on Tuesday.
+        - [10:19:40] The CSV download and scheduled emails go through a change request, not into the pilot.
+        ### Action items
+        - [10:06:29] **David Kim**: send the test accounts (due: Friday)
+        - [10:12:05] **Mike Johnson**: get the penetration test summary from Redwood Security (due: Friday)
+        - [10:19:52] **Emily Clark**: write the change request options for the CSV download and scheduled emails
+        ### Open questions
+        - [10:06:18] Approval of the pilot account template by David's manager.
+        - [10:11:30] Legal approval of the data retention statement.
+        ### Topics
+        #### Export screen and payment retries [10:00:21]
+        Outcome: merged to main; ships Tuesday.
+        - [10:00:21] Mike: the export screen is merged to main since Monday.
+        - [10:00:30] Failed card payments retry after 1, 6 and 24 hours, then the subscription goes past due and the customer gets an email.
+        #### Pilot readiness and test accounts [10:06:12]
+        Outcome: the pilot starts November 10 if the accounts come by Friday.
+        - [10:06:18] David's manager wants one more approval, as the accounts reach finance data.
+        - [10:06:29] David can send them Friday if the permissions list comes today.
+        #### Security checklist [10:11:02]
+        Outcome: five of seven items done.
+        - [10:11:30] Open: the Redwood Security penetration test summary and the data retention statement.
+        #### New requests: CSV download and scheduled email [10:18:02]
+        Outcome: a change request against the 42 hours left in the pilot budget.
+        - [10:18:02] Emily brought both from the finance team.
+        - [10:18:40] Sarah needs two more days of testing for CSV formats, encoding and big files.
         ## Summary
         The team reviewed the export screen, payment retries, the security checklist and pilot readiness. The pilot starts on November 10 with five users on staging; production follows on November 18. The finance team asked for a CSV download and scheduled emails, which would need a change request against the **42 hours** left in the pilot budget.
         ## Topics

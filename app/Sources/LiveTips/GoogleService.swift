@@ -387,7 +387,9 @@ final class GoogleService: ObservableObject {
 
     // MARK: Meet
 
-    struct MeetResult { var participants: [String]; var transcript: String; var account: String; var started: Date }
+    struct MeetResult { var participants: [String]; var transcript: String; var account: String; var started: Date
+        var spoken: [MeetSpeakers.Spoken] = []   // 0.9.4: who spoke when (Meet transcript entries), to name the voices
+    }
 
     /// The Google Meet record of a call: by its meeting code when the calendar gave one, otherwise the conference that
     /// started closest to `start`. Participants always; the transcript only when someone turned it on in Meet.
@@ -408,7 +410,7 @@ final class GoogleService: ObservableObject {
                 let ps = try await call(a.email, "https://meet.googleapis.com/v2/\(name)/participants?pageSize=100")
                 var names: [String: String] = [:]
                 for p in (ps["participants"] as? [[String: Any]]) ?? [] { if let n = p["name"] as? String { names[n] = GoogleMeetText.name(p) } }
-                var text = ""
+                var text = "", spoken: [MeetSpeakers.Spoken] = []
                 let ts = try await call(a.email, "https://meet.googleapis.com/v2/\(name)/transcripts")
                 if let tr = ((ts["transcripts"] as? [[String: Any]]) ?? []).first?["name"] as? String {
                     var entries: [[String: Any]] = [], page = ""
@@ -419,8 +421,10 @@ final class GoogleService: ObservableObject {
                         if page.isEmpty { break }
                     }
                     text = GoogleMeetText.transcript(entries: entries, names: names, start: began)
+                    spoken = MeetSpeakers.spoken(entries: entries, names: names)
                 }
-                return MeetResult(participants: Array(Set(names.values)).sorted(), transcript: text, account: a.email, started: began)
+                return MeetResult(participants: Array(Set(names.values)).filter { $0 != "?" }.sorted(), transcript: text, account: a.email,
+                                  started: began, spoken: spoken)
             } catch { lastErr = error }
         }
         if let e = lastErr { throw e }

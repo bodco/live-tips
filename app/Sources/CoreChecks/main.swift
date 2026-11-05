@@ -695,5 +695,62 @@ expect(agyList.map(\.id) == ["gemini-4-argon-medium", "gemini-3.8-flash-medium"]
 expect(AgyCLI.environment(["GEMINI_API_KEY": "k", "GOOGLE_API_KEY": "k", "CLAUDE_API": "k", "PATH": "/bin"]) == ["PATH": "/bin"], "agy: no API key reaches the account")
 expect(AgyCLI.candidates(home: "/tmp/h", path: "/x/bin").contains("/tmp/h/.local/bin/agy"), "agy: the installer's place")
 expect(AgyCLI.loginCommand(cli: "/tmp/O'R/agy").contains("O'\\''R") && AgyCLI.loginCommand(cli: "/a/agy").contains("mktemp -d"), "agy: login quoted, in an empty folder")
+// 0.9.4: one person, many spellings (VoiceBook) and speakers named from Google Meet (MeetSpeakers)
+var vb: [String: Any] = ["people": ["M. T.": ["calls": 2, "embeddings": [[0.1]], "side": "team"], "Mike T.": ["calls": 3, "embeddings": [[0.2]]],
+                                    "Emily Clark": ["calls": 1]], "aliases": ["mt": "M. T."]]
+vb = VoiceBook.merge(vb, "M. T.", "Mike T.", keep: "Mike Turner")
+let vbp = vb["people"] as? [String: Any] ?? [:]
+expect(vbp["M. T."] == nil && vbp["Mike T."] == nil && ((vbp["Mike Turner"] as? [String: Any])?["calls"] as? Int) == 5, "voicebook: merged under a new primary")
+expect(((vbp["Mike Turner"] as? [String: Any])?["side"] as? String) == "team", "voicebook: the side is kept")
+expect(VoiceBook.resolve(vb, "m. t.") == "Mike Turner" && VoiceBook.resolve(vb, "MT") == "Mike Turner" && VoiceBook.resolve(vb, "Mike T.") == "Mike Turner", "voicebook: every spelling resolves")
+expect(VoiceBook.aliasesOf(vb, "Mike Turner") == ["m. t.", "mike t.", "mt"], "voicebook: aliases listed")
+let (vb2, r1) = VoiceBook.addAlias(vb, "Emily Clark", to: "Mike Turner")
+expect(r1 == .isPerson && VoiceBook.aliasesOf(vb2, "Mike Turner").count == 3, "voicebook: a person is not an alias")
+let (vb3, r2) = VoiceBook.addAlias(vb, "Mikey", to: "Mike Turner")
+expect(r2 == .added && VoiceBook.resolve(vb3, "mikey") == "Mike Turner", "voicebook: alias added")
+expect(VoiceBook.addAlias(vb3, "Mikey", to: "Emily Clark").1 == .otherPerson("Mike Turner"), "voicebook: an alias of someone else is asked first")
+let vb4 = VoiceBook.rename(vb3, "Mike Turner", to: "Mike Turner-K")
+expect(VoiceBook.resolve(vb4, "mt") == "Mike Turner-K" && VoiceBook.resolve(vb4, "Mike Turner") == "Mike Turner-K", "voicebook: rename keeps old names")
+let msMd = "[10:00:01] Them [S2] (en): hi\n[10:00:05] Me (en): hello\n[10:00:09] Them [S2] (en): so\n[10:00:20] Them [S3] (en): yes\n[10:00:30] Them [S2] (en): ok\n[10:00:40] Them [S3] (en): sure\n[10:00:50] Them [S3] (en): right\n"
+let msLines = MeetSpeakers.lines(msMd)
+expect(msLines.count == 6 && msLines[0].t == 36001 && msLines[0].sid == "S2", "meet: tagged lines only")
+var msCal = Calendar(identifier: .gregorian); msCal.timeZone = TimeZone(identifier: "UTC")!
+func msAt(_ s: Int) -> Date { Date(timeIntervalSince1970: TimeInterval(1_800_000_000 / 86400 * 86400 + s)) }
+let msSpoken = [MeetSpeakers.Spoken(name: "Mike Brown", start: msAt(36000), end: msAt(36012)), MeetSpeakers.Spoken(name: "Mike Brown", start: msAt(36028), end: msAt(36032)),
+                MeetSpeakers.Spoken(name: "Emily Clark", start: msAt(36018), end: msAt(36022)), MeetSpeakers.Spoken(name: "Emily Clark", start: msAt(36038), end: msAt(36055)),
+                MeetSpeakers.Spoken(name: "Mike Turner", start: msAt(36004), end: msAt(36006))]
+let msGot = MeetSpeakers.match(lines: msLines, spoken: msSpoken, participants: [], named: [:], me: ["Mike Turner"], calendar: msCal)
+expect(msGot == ["S2": "Mike Brown", "S3": "Emily Clark"], "meet: voices named by time \(msGot)")
+expect(MeetSpeakers.match(lines: msLines, spoken: msSpoken, participants: [], named: ["S2": "Mike Brown"], me: [], calendar: msCal) == ["S3": "Emily Clark"], "meet: a taken name is not given twice")
+expect(MeetSpeakers.match(lines: msLines, spoken: [], participants: ["Mike Turner", "Mike Brown"], named: ["S3": "Emily Clark"], me: ["mike turner"]) == ["S2": "Mike Brown"], "meet: one voice, one free participant")
+expect(MeetSpeakers.match(lines: msLines, spoken: [], participants: ["Mike Brown", "Emily Clark"], named: [:], me: []).isEmpty, "meet: no guess with two voices")
+expect(MeetSpeakers.match(lines: msLines, spoken: [], participants: ["Mike B."], named: ["S3": "Emily Clark"], me: [], resolve: { $0 == "Mike B." ? "Mike Brown" : $0 }) == ["S2": "Mike Brown"], "meet: the library's name kept")
+// 0.9.4: Help improve Pacenote (Telemetry): complete days since it was turned on, once a week, only allowed events
+let tmNow = ISO8601DateFormatter().date(from: "2026-11-20T12:00:00Z")!
+var tmS = Telemetry.State()
+expect(Telemetry.due(tmS, now: tmNow) == nil, "telemetry: nothing before it is turned on")
+tmS.since = "2026-11-10"
+expect(Telemetry.due(tmS, now: tmNow).map { $0.from + ".." + $0.to } == "2026-11-10..2026-11-19", "telemetry: from the day it was turned on to yesterday")
+tmS.sentUntil = "2026-11-17"; tmS.sentAt = "2026-11-18T09:00:00Z"
+expect(Telemetry.due(tmS, now: tmNow) == nil, "telemetry: once a week")
+tmS.sentAt = "2026-11-12T09:00:00Z"
+expect(Telemetry.due(tmS, now: tmNow).map { $0.from + ".." + $0.to } == "2026-11-18..2026-11-19", "telemetry: the days after the last batch")
+let tmR = Telemetry.ensured(Telemetry.State(), now: tmNow)
+expect(tmR.install.count == 36 && Telemetry.ensured(tmR, now: tmNow.addingTimeInterval(40 * 86400)).install == tmR.install, "telemetry: one id per install, kept")
+let tmDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pn-tm-\(UUID().uuidString)")
+try? FileManager.default.createDirectory(at: tmDir, withIntermediateDirectories: true)
+try? """
+{"t":"2026-11-09T10:00:00Z","e":"tip_rated","p":{"kind":"tip","verdict":"partly","reason":"off_topic"}}
+{"t":"2026-11-18T10:00:00Z","e":"tip_rated","p":{"kind":"tip","verdict":"partly","reason":"off_topic"}}
+{"t":"2026-11-18T10:01:00Z","e":"call_ended","p":{"minutes":1}}
+{"t":"2026-11-18T10:02:00Z","e":"made_up","p":{}}
+{"t":"2026-11-18T10:03:00Z","e":"tip_rated","p":{"text":"the words of the call"}}
+{"t":"2026-11-20T10:00:00Z","e":"help_now","p":{}}
+""".write(to: tmDir.appendingPathComponent("2026-11.jsonl"), atomically: true, encoding: .utf8)
+let tmB = Telemetry.batch(usageDir: tmDir, from: "2026-11-10", to: "2026-11-19", install: "x", appVersion: "0.9.4", rulesVersion: "0.3.0", uiLang: "uk", routes: ["tips": "api"])
+let tmE = tmB["events"] as? [[String: Any]] ?? []
+expect(tmE.count == 2 && tmE[0]["d"] as? String == "2026-11-18" && tmE[0]["t"] == nil, "telemetry: only allowed events of those days, days not times")
+expect(((tmE[1]["p"] as? [String: Any])?["minutes"] as? NSNumber)?.intValue == 1, "telemetry: numbers as written")
+try? FileManager.default.removeItem(at: tmDir)
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

@@ -22,6 +22,14 @@ public enum Learning {
             } else if k == "talk_edit", let t = r["say_after"] as? String, !t.isEmpty { out.append((k, t, f))
             } else if k == "card_onme_remove" || k == "card_onme_edit", let t = (r["before"] as? [String: Any])?["text"] as? String, !t.isEmpty {
                 out.append((k, t, f))
+            } else if k == "tip_rating", let v = r["verdict"] as? String, v == "partly" || v == "not_useful" {
+                // 0.9.4 (rules/learning.yaml > tip_rating): the PM's comment wins over the tip's own text
+                let c = (r["comment"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+                let t = c.isEmpty ? ((r["before"] as? [String: Any])?["text"] as? String ?? "").trimmingCharacters(in: .whitespaces) : c
+                if !t.isEmpty {
+                    let rs = ((r["reasons"] as? [Any]) ?? []).map { "\($0)" }.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                    out.append(("tip_" + v, t + (rs.isEmpty ? "" : " (" + rs.joined(separator: ", ") + ")"), f))
+                }
             }
         }
         return out.map { (kind: $0.0, text: $0.1, file: $0.2) }

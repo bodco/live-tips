@@ -31,6 +31,12 @@ def signals(records: list) -> list:
             out.append((k, str(r["say_after"]), f))
         elif k in ("card_onme_remove", "card_onme_edit") and (r.get("before") or {}).get("text"):
             out.append((k, str(r["before"]["text"]), f))
+        elif k == "tip_rating" and r.get("verdict") in ("partly", "not_useful"):
+            # 0.9.4 (rules/learning.yaml > tip_rating): the PM's comment wins over the tip's own text
+            t = str(r.get("comment") or (r.get("before") or {}).get("text") or "").strip()
+            if t:
+                rs = [str(x) for x in r.get("reasons") or [] if str(x).strip()]
+                out.append(("tip_" + r["verdict"], t + (" (" + ", ".join(rs) + ")" if rs else ""), f))
     return out
 
 
@@ -56,6 +62,19 @@ def prompt(items: list) -> str:
     if not items:
         return ""
     return HEAD + "\n" + "\n".join("- [{}] {}".format(x["kind"], x["text"]) for x in items[:20])
+
+
+TIP_HEAD = ("TIPS THE PM RATED DOWN ON TWO OR MORE CALLS (do not give tips like these; the reason in brackets says "
+            "what was wrong: off_topic = not this kind of tip here, too_long = shorter, late = earlier or not at all, "
+            "wrong_fact = check the fact):")
+
+
+def tip_lessons(records: list) -> str:
+    """0.9.4 (rules/learning.yaml > tip_rating): the standing tip ratings for the live tips prompt."""
+    items = standing(records, {"tip_not_useful", "tip_partly"})
+    if not items:
+        return ""
+    return TIP_HEAD + "\n" + "\n".join("- " + x["text"] for x in items[:12])
 
 
 def load(path: Path) -> list:

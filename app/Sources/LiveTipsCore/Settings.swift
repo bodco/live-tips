@@ -146,6 +146,9 @@ public struct AppConfig: Codable, Equatable {
     public var salesWebSearch = true
     /// 0.8.7 (M, rules/usage.yaml): the local log of which features are used (Settings > General > Privacy).
     public var usageLog = true
+    /// 0.9.4 (owner, rules/usage.yaml > telemetry): send the usage log to the author once a week. Off by default;
+    /// only event names and small numbers of complete days since it was turned on (Settings > General > Privacy).
+    public var shareUsage = false
     /// 0.8.6 (D, rules/notion-tasks.yaml): the PM's Notion tasks in On you.
     public var notionTasks = NotionTasksSettings()
     /// Speaker identification on the other side's audio (local voice prints, as in the skill).
@@ -208,6 +211,7 @@ public struct AppConfig: Codable, Equatable {
         crm = (try? c.decode(CRMSettings.self, forKey: .crm)) ?? d.crm
         salesWebSearch = (try? c.decode(Bool.self, forKey: .salesWebSearch)) ?? d.salesWebSearch
         usageLog = (try? c.decode(Bool.self, forKey: .usageLog)) ?? d.usageLog
+        shareUsage = (try? c.decode(Bool.self, forKey: .shareUsage)) ?? d.shareUsage
         migrateMeetingsDBs()
         notionTasks = (try? c.decode(NotionTasksSettings.self, forKey: .notionTasks)) ?? d.notionTasks
         speakersEnabled = (try? c.decode(Bool.self, forKey: .speakersEnabled)) ?? d.speakersEnabled

@@ -26,7 +26,7 @@
       deal: { tab: 'Deal', unknown: 'Unknown', partial: 'Partly', known: 'Known', objections: 'Objections', next: 'Next step', signals: 'Signals', noNext: 'No next step with a date yet', cycle: 'Click to change the state' },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
-      saidIt: 'Said it', collapse: 'Collapse', expand: 'Expand', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel',
+      saidIt: 'Said it', collapse: 'Collapse', expand: 'Expand', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel', rateUsed: 'Useful', ratePartly: 'Fine, but off the point', rateNot: 'Not useful', rateWhy: 'What was off?', rateComment: 'A comment, if you like (what to keep, what to change)', rateSave: 'Save', rateSkip: 'Skip', rateThanks: 'Rated: Pacenote learns from it after the call', reasons: { off_topic: 'Off topic', late: 'Late', wrong_fact: 'Wrong fact', too_long: 'Too long', not_now: 'Not now' },
       unverified: 'Not verified against documents',
       next: (t, m) => `${t} in ${m} min`, notPrepared: 'not prepared', ready: 'brief ready', preparing: 'preparing', prepare: 'Prepare', open: 'Open',
       ask: 'Ask about this project', help: 'Help',
@@ -91,7 +91,7 @@
       deal: { tab: 'Угода', unknown: 'Невідомо', partial: 'Частково', known: 'Відомо', objections: 'Заперечення', next: 'Наступний крок', signals: 'Сигнали', noNext: 'Ще немає наступного кроку з датою', cycle: 'Клік змінює стан' },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
-      saidIt: 'Сказав', collapse: 'Згорнути', expand: 'Розгорнути', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати',
+      saidIt: 'Сказав', collapse: 'Згорнути', expand: 'Розгорнути', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати', rateUsed: 'Корисно', ratePartly: 'Ніби ок, але не в тему', rateNot: 'Не корисно', rateWhy: 'Що не так?', rateComment: 'Коментар, якщо хочете (що лишити, що змінити)', rateSave: 'Зберегти', rateSkip: 'Пропустити', rateThanks: 'Оцінено: Pacenote врахує це після дзвінка', reasons: { off_topic: 'Не в тему', late: 'Запізно', wrong_fact: 'Хибний факт', too_long: 'Задовго', not_now: 'Не зараз' },
       unverified: 'Не звірено з документами',
       next: (t, m) => `${t} за ${m} хв`, notPrepared: 'не підготовлено', ready: 'бриф готовий', preparing: 'готується', prepare: 'Підготувати', open: 'Відкрити',
       ask: 'Запитай про проєкт', help: 'Допоможи',
@@ -153,7 +153,7 @@
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], tipsLang: null,
     openItems: [], notionItems: [], notionProject: '', minePending: [], mineN: 0, spkPrompt: 15,
-    ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, briefEdit: false,
+    ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, rateOpen: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
   };
   const T = () => STR[S.lang] || STR.en;
@@ -419,10 +419,37 @@
       ? `<li><details data-pt="${esc(c.id + ':' + i)}"${S.ui.openPts[c.id + ':' + i] ? ' open' : ''}><summary>${esc(x)}</summary><p>${esc(f[i])}</p></details></li>`
       : /^\d/.test(x) || x.split(/\s+/).length > 3 ? `<li class="pt">${esc(x)}</li>` : `<li class="grp">${esc(x)}</li>`).join('')}</ul>`;
   }
+  // 0.9.4 (owner, rules/learning.yaml > tip_rating): a green check (useful), an amber wave (fine but off the point), a red cross (not useful). After 〰️ or ❌
+  // reason chips and a short comment; every click is sent (the last one for a tip wins) and logged for learning.
+  // Own icons, one stroke width (owner 2026-11-05: the emoji had a thin cross and a thin wave next to a bold check).
+  const RATE_ICON = { used: '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 4.8"/></svg>', partly: '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9c1.4-2.2 2.8-2.2 4.2 0s2.8 2.2 4.2 0 2.1-2.2 2.6-1.2"/></svg>', not_useful: '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>' };
+  const RATE = [['used', RATE_ICON.used, 'rateUsed'], ['partly', RATE_ICON.partly, 'ratePartly'], ['not_useful', RATE_ICON.not_useful, 'rateNot']];
+  const REASONS = ['off_topic', 'late', 'wrong_fact', 'too_long', 'not_now'];
+  function rateHtml(c) {
+    const t = T(), v = c.rating && c.rating.v;
+    return `<span class="rate" role="group" aria-label="${esc(t.rateWhy)}">${RATE.map(([k, ico, lab]) =>
+      `<button class="ghost rbtn r-${k}${v === k ? ' on' : ''}" type="button" data-act="rate" data-v="${k}" data-id="${esc(c.id)}" title="${esc(t[lab])}" aria-label="${esc(t[lab])}" aria-pressed="${v === k}">${ico}</button>`).join('')}</span>`;
+  }
+  function rateBoxHtml(c) {
+    const t = T(), r = c.rating;
+    if (!r || S.ui.rateOpen !== c.id || r.v === 'used') return '';
+    return `<div class="ratebox"><div class="rh">${esc(t.rateWhy)}</div><div class="chips">${REASONS.map((k) =>
+      `<button class="chip${(r.reasons || []).includes(k) ? ' on' : ''}" type="button" data-act="rate-reason" data-r="${k}" data-id="${esc(c.id)}">${esc(t.reasons[k])}</button>`).join('')}</div>
+      <input type="text" maxlength="300" placeholder="${esc(t.rateComment)}" value="${esc(r.comment || '')}" data-id="${esc(c.id)}">
+      <div class="ra"><button class="btn1" type="button" data-act="rate-save" data-id="${esc(c.id)}">${esc(t.rateSave)}</button><button class="ghost" type="button" data-act="rate-skip" data-id="${esc(c.id)}">${esc(t.rateSkip)}</button></div></div>`;
+  }
+  function sendRate(card) {
+    const r = card.rating || {}, raw = card.raw || {};
+    post('rate', { id: card.id, key: cardKey(card), verdict: r.v, reasons: r.reasons || [], comment: (r.comment || '').slice(0, 300),
+                   kind: String(raw.kind || card.kind || 'tip').slice(0, 40), card: card.card || '', gist: String(raw.gist || card.say || '').slice(0, 300),
+                   say: String(card.say || '').slice(0, 300) });
+    usage('tip_rated', { kind: String(raw.kind || card.kind || 'tip').slice(0, 40), verdict: r.v, reason: (r.reasons || [])[0] || '' });
+  }
   function renderHero(c) {
     const el = $('hero'), t = T();
     if (!c) { el.hidden = true; el.dataset.id = ''; return; }
     if (S.ui.editing === c.id && el.dataset.id === c.id && el.querySelector('.say[contenteditable="true"]')) return;   // the PM is typing
+    if (S.ui.rateOpen === c.id && el.dataset.id === c.id && el.contains(document.activeElement) && document.activeElement.matches('.ratebox input')) return;   // 0.9.4: typing a rating comment
     if (el.dataset.id !== c.id) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
     el.hidden = false; el.dataset.id = c.id;
     el.classList.toggle('finish', c.kind === 'finish');
@@ -445,7 +472,8 @@
         <button class="ghost" type="button" data-act="pin" data-id="${esc(c.id)}">${esc(c.pinned ? t.unpin : t.pin)}</button>
         <button class="ghost" type="button" data-act="edit" data-id="${esc(c.id)}">${esc(t.edit)}</button>
         <button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button>
-      </div>`}`;
+        ${rateHtml(c)}
+      </div>${rateBoxHtml(c)}`}`;
     if (ptsTop) { const p = el.querySelector('.items.pts'); if (p) p.scrollTop = ptsTop; }
     if (editing) { const s = el.querySelector('.say'); if (s) { s.focus(); document.getSelection().selectAllChildren(s); } }
   }
@@ -979,8 +1007,29 @@
       case 'liveprep': post('liveprep', { a: 'start' }); if (feed) feed.setPrep({ state: 'running', progress: 0 }); return;
       case 'liveprep-cancel': post('liveprep', { a: 'cancel' }); return;
       case 'said':
-        if (card) { card.state = 'done'; if (feed) feed.mark(id, { state: 'done' }); post('said', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'say' }); }
+        if (card) { card.state = 'done'; card.rating = { v: 'used', reasons: [], comment: '' }; if (feed) feed.mark(id, { state: 'done' }); post('said', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'say' }); }
         S.ui.heroOverride = null; break;
+      case 'rate': {
+        if (!card) return;
+        const v = b.dataset.v, prev = card.rating || {};
+        card.rating = { v, reasons: v === prev.v ? (prev.reasons || []) : [], comment: v === prev.v ? (prev.comment || '') : '' };
+        S.ui.rateOpen = v === 'used' ? null : id;
+        sendRate(card); e.stopPropagation(); break;
+      }
+      case 'rate-reason': {
+        if (!card || !card.rating) return;
+        const r = b.dataset.r, list = card.rating.reasons || [];
+        const box = $('hero').querySelector('.ratebox input'); if (box) card.rating.comment = box.value;
+        card.rating.reasons = list.includes(r) ? list.filter((x) => x !== r) : list.concat(r);
+        e.stopPropagation(); break;
+      }
+      case 'rate-save': {
+        if (!card || !card.rating) return;
+        const box = $('hero').querySelector('.ratebox input'); if (box) card.rating.comment = box.value.trim();
+        S.ui.rateOpen = null; sendRate(card); showToast({ text: T().rateThanks, kind: 'info', at: Date.now() });
+        e.stopPropagation(); break;
+      }
+      case 'rate-skip': S.ui.rateOpen = null; e.stopPropagation(); break;
       case 'hide':
         if (card) { card.state = 'hidden'; if (feed) feed.mark(id, { state: 'hidden' }); post('hide', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'hide' }); }
         S.ui.heroOverride = null; e.stopPropagation(); break;
@@ -1162,6 +1211,11 @@
     }
   });
   document.addEventListener('keydown', (e) => {
+    if (e.target && e.target.matches && e.target.matches('.ratebox input')) {   // 0.9.4: the rating comment
+      if (e.key === 'Enter') { e.preventDefault(); const sb = e.target.closest('.ratebox').querySelector('[data-act=rate-save]'); if (sb) sb.click(); }
+      else if (e.key === 'Escape') { S.ui.rateOpen = null; render(); }
+      e.stopPropagation(); return;
+    }
     if (e.key === 'Enter' && e.target && e.target.id === 'spkCardName') {
       const sid = e.target.dataset.sid, name = e.target.value.replace(/\s+/g, ' ').trim().slice(0, 60);
       if (!name) return;

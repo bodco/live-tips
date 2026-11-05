@@ -959,7 +959,7 @@ layers are tuned there too: `speakers_enabled`, `speaker_join` (0.45), `speaker_
 ## 11. Privacy and etiquette
 
 The full texts: [privacy policy](https://tower.bodco.pm/pacenote/privacy/) and [terms of use](https://tower.bodco.pm/pacenote/terms/)
-(also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). Nothing is sent to the author: no analytics, no tracking.
+(also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). Nothing is sent to the author unless you turn on Help improve Pacenote (0.9.4, Settings > General > Privacy, off by default): then the usage log's event names and numbers of whole days go once a week, with a random id of this Mac. No words of a call, comments or names.
 
 - Audio is not stored: recognised phrases are appended to the `.md` immediately, audio
   buffers live only in memory.
@@ -1637,6 +1637,31 @@ last 7 days (the default), this month or chosen dates. The accounts paid by a pl
 
 **Provider bench.** `tools/provider_bench.py` replays five invented meetings (Fixtures/bench) through Claude, OpenAI and
 Gemini variants and writes one table (cost, latency, tips, errors) and the tips side by side.
+
+### 14.1q Rate tips, one person with many names, Meet names the voices, Help improve Pacenote (0.9.4, beta)
+
+- **Rate a tip.** The card has three marks at the end of its actions: a green check (useful), an amber wave (fine,
+  but off the point) and a red cross (not useful). After the wave or the cross, pick what was off (Off topic, Late,
+  Wrong fact, Too long, Not now) and add a comment if you like, then Save or Skip. Said it counts as useful. During
+  the call the tips engine reads your ratings: fewer tips of a kind you marked off topic, shorter ones after too
+  long, never the same wrong fact again, and your comment wins over the chips. A red tip or a fact is never muted.
+- **Learning from ratings.** Every rating joins the corrections log (edits.jsonl). A tip rated down on two or more
+  different calls is a standing lesson: every next call's tips and every preparation avoid it; a rating on one call
+  stays with that call. Each line of the log now also says where it was made (live, preparation, after the call,
+  speakers), the call type, the way to the AI and the versions, so a pattern can be traced to its setup.
+- **One person, many names.** Settings > Speakers > Voice library > Names: the name kept and the other spellings
+  (initials, a nickname, the Meet display name). Merge into asks which name stays, either of the two or a fuller one
+  ("M. T." and "Mike T." become "Mike Turner"); from then on every spelling names that person on every call.
+  Earlier transcripts are not rewritten.
+- **Google Meet names the voices.** For a calendar event with a Meet link and a Google account with Meet access,
+  Pacenote reads the Meet record by itself after End call (Meet writes it a few minutes later; tried at 1.5, 4, 10
+  and 20 minutes). With Meet's transcript on, each unnamed voice takes the participant who spoke at the same time;
+  without it, the participants are offered first as names, and one unnamed voice with one free participant is named.
+  Your own names are never given to the other side. The voice library does not learn from these names.
+- **Help improve Pacenote (off by default).** Settings > General > Privacy. Once a week the usage log (event names
+  and numbers of whole days since you turned it on, such as how many tips were rated and why) goes to the author,
+  with a random id of this Mac that is forgotten when you turn it off. Never the words of a call, comments, names,
+  projects or files; the server keeps no IP address and refuses anything else. Show what is sent opens the next batch.
 
 ### 14.2 After the call: the meeting page in Notion
 

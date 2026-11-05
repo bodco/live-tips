@@ -149,6 +149,7 @@ SETTINGS = {
     "onme_mine": _onme_mine,
     "deal_fix": _deal_fix,
     "tips_lang": _tips_lang,
+    "tip_feedback": lambda eng, v: eng.rate_tip(v),                          # 0.9.4: a check, wave or cross on a card
     "commitment_closed": lambda eng, v: eng.commitment_closed(str(v or "")),  # the app wrote the register
 }
 

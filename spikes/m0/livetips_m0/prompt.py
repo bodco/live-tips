@@ -289,6 +289,11 @@ class PromptBuilder:
         else:
             task = TIP_TASK.format(event=event, **self.fmt)
         st = json.dumps(state, ensure_ascii=False)
+        if role != "classify" and state.get("pm_ratings"):
+            # 0.9.4 (rules/learning.yaml > tip_rating): act by the reason, the comment wins; never mute a red tip or a fact
+            task += ("\nSTATE.pm_ratings are the PM's ratings of earlier tips in this call (partly = fine but off the point, "
+                     "not_useful = no). Act by the reason: off_topic = fewer tips of that kind, too_long = shorter, "
+                     "wrong_fact = do not repeat that fact, late or not_now = no change. His comment wins over the reasons.")
         now = "STATE: {}\n\nLIVE TRANSCRIPT (the last minutes, newest last):\n{}\n\n{}".format(st, "\n".join(tail_lines), task)
         if not earlier_lines:
             return now

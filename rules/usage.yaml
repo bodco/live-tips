@@ -48,3 +48,16 @@ events:
   google_links_read: [n]
   google_export: []
   google_meet: [transcript]
+  tip_rated: [kind, verdict, reason]       # 0.9.4: check, wave or cross on a card (reason: the first chip or empty)
+  speakers_merged: [aliases]               # 0.9.4: Settings > Voice library > Merge, how many names the person has now
+  meet_participants: [n, named]            # 0.9.4: Meet participants read after the call, speakers named from them
+  telemetry_sent: [lines]                  # 0.9.4: a batch sent to the author (Help improve Pacenote, off by default)
+telemetry:                               # 0.9.4 (owner): Help improve Pacenote
+  setting: shareUsage                    # Settings > General > Privacy, off by default; needs usageLog on
+  endpoint: https://pacenote-telemetry.neymet-bogdan.workers.dev/v1/batch   # app/telemetry (Cloudflare Worker + D1)
+  when: once a week (checked at launch and every 6 hours), complete days only, never days before it was turned on
+  what: the lines of this usage log, each re-checked against events above; the time becomes the day
+  header: schema 1, install (a random id made on this Mac when sharing is turned on, kept until it is turned off, to tell users apart; no accounts yet), app_version, rules_version, ui_lang, routes per job
+  never: words of a call, comments, names, projects, files, titles, emails, IP address (the server keeps none)
+  preview: Show what is sent writes usage/next-batch.json
+  server: telemetry/worker.js validates the same rules again and refuses anything else (400); 3 batches a day per install at most

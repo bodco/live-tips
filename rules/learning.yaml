@@ -2,7 +2,7 @@
 # Every correction is logged (Application Support/LiveTips/edits.jsonl, one JSON object per line; see
 # skill/references/sweep.md 3c). Learning is a search for patterns: a correction made once may be specific to that
 # call, the same correction made on different calls is a standing preference.
-schema_version: 1
+schema_version: 2
 logged:
   brief_edit: the preparation edited (lines removed and added)
   talk_edit: a slide of Your talk edited (say, title, budget, can skip, numbers, Q&A, short)
@@ -12,6 +12,8 @@ logged:
   cards: card and On me corrections in the tips window (kinds as before)
   deal_edit: 0.8.6+ a qualification criterion of the Deal tab or the call page's Sales section changed by the PM (state, text)
   call_page_edit: an item of the call page edited, moved, re-owned, re-dated, deleted or added (rules/commitments.yaml > edit)
+  tip_rating: 0.9.4 a card rated in the tips window (green check used, amber wave partly = fine but off the point, red cross not_useful) with reason chips (off_topic, late, wrong_fact, too_long, not_now) and an optional comment
+  speakers_merge: 0.9.4 two voice library entries merged, with the name kept
 signals:
   followup_instruction: the instruction text
   brief_edit: each removed line ("removed" = do not write this kind of line again)
@@ -21,8 +23,17 @@ signals:
   card_onme_edit: an On me line the PM reworded (the line before; the "after" is his wording)
   deal_edit: the criterion and the PM's state and wording (the tracker learns what counts as known for this PM)
   call_page_edit: the item before and after (the call picture learns the PM's wording and owners)
+  tip_rating: a partly or not_useful rating becomes tip_partly / tip_not_useful with the PM's comment (or the tip's text when there is none) and the reasons in brackets; used is counted, not learned
 similar: two signals of the same kind are the same pattern when their word sets overlap by half or more (Jaccard >= 0.5, words of 3+ letters)
 standing: a pattern seen in 2 or more different calls (different files) is applied to every new preparation or draft of that kind
 single: a pattern seen in one call only is applied only to the same meeting (same series) and the same project, as the newest corrections are now
 prompt: >-
   Recurring corrections (the PM made each of them on two or more different calls; apply them always, without being asked):
+record: >-
+  0.9.4 (schema 2): every line also has v 2, surface (live, prep, after, speakers, other), meeting_type (the call type of
+  the running call), route (the way to the AI for prep, tips and after), app_version and rules_version, so a pattern can
+  be traced to the setup it came from.
+tip_rating:
+  in_call: the engine keeps the last rating of each tip; the last 8 partly or not_useful ones go into STATE.pm_ratings of every tip request (act by the reason, the comment wins; never mute a red tip or a fact)
+  across_calls: tip_partly and tip_not_useful patterns seen on 2 or more calls go into the tips prompt at the start of a call (livetips_m0.learning.tip_lessons, the edits_log path from the app) and into every preparation (EditLog.promptBlock)
+  window: the ratings also reach the skill as @@SET tip_feedback, as before (skill/references/window.md)

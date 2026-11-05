@@ -84,6 +84,23 @@ button{font:inherit;color:inherit;cursor:pointer}
 .hero .acts{display:flex;flex-wrap:wrap;gap:2px;margin-left:-8px} /* 0.8.7.1: "Сховати" was cut at 380 px */
 .ghost{background:transparent;border:0;color:var(--text-3);font-size:13px;padding:6px 8px;border-radius:var(--radius-s)}
 .ghost:hover{background:var(--surface-2);color:var(--text)}
+/* 0.9.4 (owner): check, wave and cross (own icons, one stroke width) at the end of the card's actions; the chosen one stays lit, the others fade */
+.hero .rate{display:inline-flex;gap:0;margin-left:auto}
+.hero .rate .rbtn{display:inline-flex;align-items:center;line-height:1;padding:6px 6px;opacity:.55}
+.hero .rate .rbtn svg{display:block}
+.hero .rate .rbtn:hover,.hero .rate .rbtn.on{opacity:1}
+.hero .rate .rbtn.on{background:var(--surface-2)}
+.hero .rate .r-used{color:#34C759}
+.hero .rate .r-partly{color:#FF9F0A}
+.hero .rate .r-not_useful{color:#FF3B30}
+.ratebox{display:flex;flex-direction:column;gap:8px;margin-top:4px;padding:10px 12px;border-radius:var(--radius-s);background:var(--surface-2)}
+.ratebox .rh{font-size:12px;color:var(--text-3)}
+.ratebox .chips{display:flex;flex-wrap:wrap;gap:6px}
+.ratebox .chip{border:1px solid var(--border, color-mix(in srgb,var(--text) 14%,transparent));background:transparent;color:var(--text-2);font-size:12px;padding:3px 9px;border-radius:999px}
+.ratebox .chip.on{background:var(--text);color:var(--bg, #fff);border-color:var(--text)}
+.ratebox input{font:inherit;font-size:13px;padding:6px 8px;border-radius:var(--radius-s);border:1px solid color-mix(in srgb,var(--text) 14%,transparent);background:var(--surface, transparent);color:var(--text)}
+.ratebox .ra{display:flex;gap:4px;align-items:center}
+.app.compact .ratebox{display:none}
 .hero.finish{box-shadow:0 0 0 1px color-mix(in srgb,var(--k-onme) 45%,transparent) inset}
 
 /* ---------- Earlier ---------- */

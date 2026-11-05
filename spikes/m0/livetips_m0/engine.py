@@ -799,6 +799,8 @@ class Engine:
         self.onme_ticked: Dict[str, bool] = {}
         # 0.8.5 (owner): an On me line the PM marked "not mine" or reworded in the window; norm text -> new text ("" = drop)
         self.onme_fixed: Dict[str, str] = {}
+        # 0.9.4: tip ratings from the window, "<card>|<t>|<gist>" -> {verdict, reasons, comment, tip}; the last one wins
+        self.tip_ratings: Dict[str, dict] = {}
         # 0.8.6 (rules/commitments.yaml > mine): lines the PM made his with "Mine" in the window
         self.onme_mine: List[dict] = []
         self.risks_shown: set = set()
@@ -964,6 +966,9 @@ class Engine:
             nums = sorted(set(re.findall(r"\d[\d.,:%]*", " ".join([t.get("phrase", "")] + [point_text(x) for x in (t.get("items") or [])]))))
             given.append(t["gist"] + ((" [" + ", ".join(nums[:6]) + "]") if nums else ""))
         st = {"tips_given": given, "now": s_to_hms(self.clock())}
+        rated = [r for r in getattr(self, "tip_ratings", {}).values() if r["verdict"] != "used"][-8:]
+        if rated:                    # 0.9.4 (rules/learning.yaml > tip_rating): the PM's ratings in this call
+            st["pm_ratings"] = [{k: v for k, v in r.items() if v} for r in rated]
         sit = self.situation
         if sit:
             st["situation"] = {"topic": sit.get("topic", ""), "owner": sit.get("owner", ""), "mine": sit.get("mine"),
@@ -2145,6 +2150,24 @@ class Engine:
             keys.append('"done_commitments": ["<id>"]')
             rules.append("- " + cm.get("model_rule_done", "done_commitments = ids of OPEN COMMITMENTS said to be done."))
         return "\nAlso return these keys in the same JSON object: {}.\n{}".format(", ".join(keys), "\n".join(rules))
+
+    def rate_tip(self, value) -> None:
+        """tip_feedback from the window: 'verdict|card|t|gist[|r=a,b][|c=comment]' (skill/references/window.md)."""
+        v = str(value or "")
+        verdict, sep, rest = v.partition("|")
+        if not sep or verdict not in ("used", "partly", "not_useful"):
+            return
+        comment, reasons = "", []
+        i = rest.rfind("|c=")
+        if i >= 0:
+            comment, rest = rest[i + 3:].strip(), rest[:i]
+        i = rest.rfind("|r=")
+        if i >= 0:
+            reasons, rest = [r for r in rest[i + 3:].split(",") if r.strip()], rest[:i]
+        gist = rest.split("|", 2)[-1]
+        with self.lock:
+            self.tip_ratings.pop(rest, None)
+            self.tip_ratings[rest] = {"verdict": verdict, "reasons": reasons, "comment": comment[:300], "tip": gist[:120]}
 
     def _situation_extra_input(self) -> str:
         parts = []

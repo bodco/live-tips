@@ -138,6 +138,7 @@ final class CallEngine {
                                       "sales": ((request["sales"] as? [String: Any])?["enabled"] as? Bool) ?? false,
                                       "has_brief": !((request["brief"] as? String) ?? "").isEmpty])
         usageStart = Date()
+        EditLog.callType = String(((request["call_type"] as? String) ?? "").prefix(20))   // 0.9.4: kept with every correction
         if isRunning { return "A call is already running" }
         if let first = problems().first { return first }
         verifyCore()
@@ -327,6 +328,7 @@ final class CallEngine {
         if let p = callRequest["project_dir"] as? String { sc["project_dir"] = p }
         sc["proactive"] = ((UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:])["proactive"] as? String) == "1"   // remembered in the tips window
         sc["project_root"] = projectRoot
+        sc["edits_log"] = EditLog.url.path     // 0.9.4 (rules/learning.yaml > tip_rating): recurring tip ratings for the tips
         // lt search: by meaning with Local AI on, plain text search otherwise (2026-10-26: "Search the project" works either way).
         sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")]
         sc["local_ai"] = c.localAI.enabled

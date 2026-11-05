@@ -273,7 +273,7 @@ struct CallPageView: View {
         }
     }
 
-    /// <stem>.meet.md next to the transcript; the call's own transcript is not changed.
+    /// <stem>.meet.md next to the transcript; the call's own transcript is not changed, its unnamed voices get Meet names (0.9.4).
     private func getMeet(_ r: CallHistory.Record) {
         meetNote = L("meet.looking")
         let end = r.end ?? r.start.addingTimeInterval((r.minutes ?? 60) * 60)
@@ -282,11 +282,8 @@ struct CallPageView: View {
         Task {
             do {
                 guard let m = try await GoogleService.shared.meet(code: code, start: r.start, end: end) else { meetNote = L("meet.none"); return }
-                let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"
-                var md = "# Google Meet: " + r.title + "\n\n" + f.string(from: m.started) + " · " + m.account + "\n\n## " + L("meet.participants") + "\n\n"
-                md += m.participants.map { "- " + $0 }.joined(separator: "\n") + "\n"
-                md += "\n## " + L("meet.transcript") + "\n\n" + (m.transcript.isEmpty ? L("meet.noTranscript") : m.transcript) + "\n"
-                try md.write(toFile: out, atomically: true, encoding: .utf8)
+                // 0.9.4: the same as after End call: <stem>.meet.md and the voices named from Meet
+                MeetAfterCall.apply(stem: String(out.dropLast(8)), meet: m, title: r.title)
                 UsageLog.log("google_meet", ["transcript": !m.transcript.isEmpty])
                 meetNote = m.transcript.isEmpty ? L("meet.savedNoTranscript", ["n": "\(m.participants.count)"]) : L("meet.saved")
                 NSWorkspace.shared.open(URL(fileURLWithPath: out))

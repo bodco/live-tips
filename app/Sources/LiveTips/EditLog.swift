@@ -14,13 +14,39 @@ enum EditLog {
         title.lowercased().replacingOccurrences(of: "[^\\p{L}\\p{N}]", with: "", options: .regularExpression)
     }
 
+    /// 0.9.4 (owner, rules/learning.yaml > record): where a correction was made, by kind.
+    static func surface(_ kind: String) -> String {
+        if kind.hasPrefix("card_") || kind == "tip_rating" || kind.hasPrefix("speaker_") || kind == "rename" { return "live" }
+        if kind == "brief_edit" || kind == "talk_edit" || kind == "rehearsal_apply" { return "prep" }
+        if kind.hasPrefix("followup") || kind == "call_page_edit" || kind == "deal_edit" || kind == "summary_edit" { return "after" }
+        if kind.hasPrefix("speakers_") || kind.hasPrefix("voice_") { return "speakers" }
+        return "other"
+    }
+
+    /// 0.9.4: the call type, the ways to the AI per job and the versions, so a pattern can be traced to its setup.
+    static var context: () -> [String: Any] = {
+        let c = AppConfig.load(from: AppPaths.config)
+        var o: [String: Any] = ["route": ["prep": c.ai.route("prep"), "tips": c.ai.route("tips"), "after": c.ai.route("after")],
+                                "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"]
+        if let res = Bundle.main.resourceURL?.appendingPathComponent("core/rules/VERSION"),
+           let v = try? String(contentsOf: res, encoding: .utf8) { o["rules_version"] = v.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return o
+    }
+
+    /// The call type of the running call ("" when none): set by the window when a call starts.
+    static var callType = ""
+
     static func add(kind: String, title: String, project: String, file: String = "", fields: [String: Any] = [:]) {
         var r = fields
+        r["v"] = 2
         r["at"] = ISO8601DateFormatter().string(from: Date())
         r["kind"] = kind
         r["title"] = title
         r["series"] = seriesKey(title)
         r["project"] = project
+        if r["surface"] == nil { r["surface"] = surface(kind) }
+        if r["meeting_type"] == nil, !callType.isEmpty { r["meeting_type"] = callType }
+        for (k, v) in context() where r[k] == nil { r[k] = v }
         if !file.isEmpty { r["file"] = (file as NSString).lastPathComponent }
         guard JSONSerialization.isValidJSONObject(r), let d = try? JSONSerialization.data(withJSONObject: r, options: [.sortedKeys]) else { return }
         let fm = FileManager.default
@@ -58,7 +84,7 @@ enum EditLog {
     /// For the preparation prompt: what the PM corrected before, to learn from.
     static func promptBlock(title: String, project: String) -> String {
         // 0.8.5 (rules/learning.yaml): the corrections made on two or more different calls first, for every call.
-        let standing = Learning.prompt(Learning.standing(all(), kinds: ["brief_edit", "talk_edit", "card_onme_remove", "card_onme_edit"]))
+        let standing = Learning.prompt(Learning.standing(all(), kinds: ["brief_edit", "talk_edit", "card_onme_remove", "card_onme_edit", "tip_partly", "tip_not_useful"]))
         let list = recent(title: title, project: project)
         guard !list.isEmpty else { return standing }
         var lines: [String] = []

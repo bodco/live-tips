@@ -23,3 +23,13 @@ thresholds:
   automerge: two speakers merge from speaker_merge_k (0.9) x expected_same(their lines), never below speaker_automerge (0.6)
   check: a replay of two similar voices (cross 0.78 of rho) kept 0.92 of lines with the right speaker (0.59 with the fixed thresholds); more small speakers are the price, and naming two of them with one name joins them
 suggestions: the window shows up to 3 library names (score 0.5 and more, participants first) as one-click names; with no voice match, up to 4 people of the meeting series and the calendar event who have no speaker yet (the PM excluded), marked as not matched by voice. Every speakers update carries them, not only the "Who is speaking?" ask
+people:
+  rule: 0.9.4 (owner) one person, many spellings. Settings > Voice library > Names keeps the primary name and the other spellings (initials, nicknames, Meet display names); a spelling that is another person's primary name is refused (merge instead), one that already means another person is asked first
+  merge: Merge into asks which name stays, either of the two or a fuller one typed there ("M. T." + "Mike T." = "Mike Turner"); both names and their aliases point at it (LiveTipsCore.VoiceBook)
+  past: earlier transcripts are not rewritten (owner, 2026-11-05)
+meet:
+  rule: 0.9.4 (owner) after End call the Google Meet record is read by itself, 1.5, 4, 10 and 20 minutes after the end (only for a calendar event with a Meet link and a Google account with the Meet scope)
+  names: with Meet's transcript, an unnamed voice takes the participant who spoke at the same time (3 or more of its lines, 70 percent of them), the clearest voice first, never the PM's names, never a name already given; without it only one unnamed voice and one free participant is named
+  marked: named_by meet in <stem>.speakers.json; the voice library does not learn from it (it learns during a call, from names the PM gives)
+  suggestions: every other unnamed voice offers the participants first (source meet)
+  file: <stem>.meet.md as before; the call page's Google Meet record does the same

@@ -51,6 +51,8 @@ public enum UsageLog {
         "help_now": [], "ask_typed": [], "hotkey": ["name"], "update_crm": ["fields"], "answer_card_saved": [],
         "feature_try_it": ["feature"], "demo_opened": ["kind"], "onboarding_step": ["step", "skipped"],
         "google_connect": [], "google_links_read": ["n"], "google_export": [], "google_meet": ["transcript"],
+        "tip_rated": ["kind", "verdict", "reason"], "speakers_merged": ["aliases"], "meet_participants": ["n", "named"],
+        "telemetry_sent": ["lines"],
     ]
     public static var sink: UsageSink?
     public static var enabled = true

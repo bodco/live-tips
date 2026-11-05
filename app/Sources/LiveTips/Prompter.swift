@@ -773,6 +773,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let saved = info["saved"] as? Bool ?? false
         afterShown = saved
         if saved { pushAfter() }
+        if saved, !transcriptPath.isEmpty {     // 0.9.4: the Meet record names the speakers a few minutes after the call
+            let st = stem
+            MainActor.assumeIsolated {
+                MeetAfterCall.schedule(stem: st, event: CallEngine.shared.liveEventID.flatMap { CalendarService.shared.event($0) })
+            }
+        }
         if let b = endButton {                  // 2026-10-27: same pill style, green when saved (sizeToFit broke the shape)
             restylePill(b, saved ? L("tw.endedSaved") : L("tw.ended"), color: saved ? .systemGreen : .systemOrange)
             b.isEnabled = true                  // a click now closes the window
@@ -848,6 +854,22 @@ extension PrompterController {
             handle("ask", "shorter: one sentence I can say now, same facts: " + say)
         case "said":
             sendSetting("tip_feedback", "used|" + (d["key"] as? String ?? ""))
+        case "rate":
+            // 0.9.4 (owner, rules/learning.yaml > tip_rating): check = used, wave = partly, cross = not_useful, with reasons and a comment.
+            // The engine and the skill get it as tip_feedback (the last line for a tip wins); EditLog keeps it for learning.
+            let v = d["verdict"] as? String ?? ""
+            guard ["used", "partly", "not_useful"].contains(v), let key = d["key"] as? String, !key.isEmpty else { return }
+            let reasons = (d["reasons"] as? [String] ?? []).filter { ["off_topic", "late", "wrong_fact", "too_long", "not_now"].contains($0) }
+            let comment = (d["comment"] as? String ?? "").replacingOccurrences(of: "|", with: "/").trimmingCharacters(in: .whitespacesAndNewlines)
+            var val = v + "|" + key
+            if !reasons.isEmpty { val += "|r=" + reasons.joined(separator: ",") }
+            if !comment.isEmpty { val += "|c=" + String(comment.prefix(300)) }
+            sendSetting("tip_feedback", val)
+            let (ct, cp) = Self.callNames()
+            EditLog.add(kind: "tip_rating", title: ct, project: cp, file: stem,
+                        fields: ["surface": "live", "verdict": v, "reasons": reasons, "comment": String(comment.prefix(300)),
+                                 "tip_kind": d["kind"] as? String ?? "", "card": d["card"] as? String ?? "",
+                                 "before": ["text": String((d["say"] as? String ?? d["gist"] as? String ?? "").prefix(300))], "key": key])
         case "edit":
             var c = d
             c["action"] = "edit"

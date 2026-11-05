@@ -3,7 +3,29 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.9.3 (unreleased)
+## 0.9.4 (2026-11-05)
+
+Includes 0.9.3, which was not released on its own.
+
+- **Rate tips (2026-11-05):** each card ends with a green check (useful), an amber wave (fine, but off the point) and a
+  red cross (not useful), own icons of one stroke width. After the wave or the cross: reason chips (Off topic, Late,
+  Wrong fact, Too long, Not now) and an optional comment. The tips engine reads them during the call (STATE.pm_ratings:
+  fewer of a kind off topic, shorter after too long, the comment wins; red tips and facts are never muted), the skill
+  gets them as before (tip_feedback).
+- **Learning from ratings and a richer corrections log (2026-11-05):** ratings join edits.jsonl; a tip rated down on
+  two or more calls is a standing lesson for the tips of every next call and for every preparation. Every line now
+  carries surface, call type, the way to the AI per job, app and rules versions (rules/learning.yaml, schema 2; the
+  shared fixture covers ratings).
+- **One person, many names (2026-11-05):** Settings > Speakers > Voice library > Names keeps the primary name and other
+  spellings; Merge into asks which name stays, either one or a fuller one. Earlier transcripts are not rewritten.
+- **Google Meet names the voices after the call (2026-11-05):** the Meet record is read by itself after End call (1.5 to
+  20 minutes later). With Meet's transcript, voices are matched to participants by time; without it, the participants
+  are offered first and the one-voice, one-participant case is named. The call page's Google Meet record does the same.
+- **Help improve Pacenote (2026-11-05, off by default):** Settings > General > Privacy sends the usage log's event names
+  and numbers of whole days once a week, with a random id per Mac, to the author's Cloudflare Worker (app/telemetry).
+  Never call text, comments or names; Show what is sent opens the next batch. PRIVACY updated.
+
+## 0.9.3 (released as part of 0.9.4)
 
 - **Gemini API (2026-11-04):** Settings > AI has a third tab, Gemini, with a key (aistudio.google.com/apikey, a project
   with billing on: Google may use free-tier content to improve its products and does not use paid-tier content).

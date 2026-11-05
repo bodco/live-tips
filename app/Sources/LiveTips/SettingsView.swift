@@ -160,32 +160,38 @@ final class SettingsModel: ObservableObject {
         if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
         loadVoices()
     }
-    /// 0.8.5 (owner, rules/voices.yaml): two entries are one person ("Maria H." and "m.holosovska" are "Mariia H."):
-    /// src's voice prints join dst and src becomes an alias, so typing or picking it names dst. Not during a call.
-    func mergeVoice(_ src: String, into dst: String) {
-        guard !CallEngine.shared.isRunning, src != dst, let d = try? Data(contentsOf: URL(fileURLWithPath: voicesPath)),
-              var o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
-              var people = o["people"] as? [String: Any] else { return }
-        var aliases = (o["aliases"] as? [String: String]) ?? [:]
-        aliases[src.lowercased()] = dst
-        for (k, v) in aliases where v.lowercased() == src.lowercased() { aliases[k] = dst }
-        if let a = people.removeValue(forKey: src) as? [String: Any] {
-            if var b = people[dst] as? [String: Any] {
-                let ea = (a["embeddings"] as? [Any]) ?? [], eb = (b["embeddings"] as? [Any]) ?? []
-                b["embeddings"] = Array((eb + ea).suffix(20))
-                b["calls"] = ((b["calls"] as? Int) ?? 0) + ((a["calls"] as? Int) ?? 0)
-                var wh = Self.whereOf(b)
-                for x in Self.whereOf(a) where !wh.contains(x) { wh.append(x) }
-                b["where"] = wh.contains("all") ? ["all"] : wh
-                if Self.side(of: b).isEmpty, !Self.side(of: a).isEmpty { b["side"] = Self.side(of: a) }
-                people[dst] = b
-            } else { people[dst] = a }
-        }
-        o["people"] = people
-        o["aliases"] = aliases
-        if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
+    /// 0.8.5 (owner, rules/voices.yaml): two entries are one person ("Maria H." and "m.holosovska" are "Mariia H.").
+    /// 0.9.4 (owner): the PM picks the name to keep (either one or a new full name, "M. T." + "Mike T." = "Mike
+    /// Turner"); both old names and their aliases name that person from then on. Not during a call.
+    func mergeVoice(_ src: String, into dst: String, keep: String? = nil) {
+        editLibrary { VoiceBook.merge($0, src, dst, keep: keep ?? dst) }
+        UsageLog.log("speakers_merged", ["aliases": VoiceBook.aliasesOf(readLibrary(), keep ?? dst).count])
+        EditLog.add(kind: "speakers_merge", title: "", project: "", fields: ["before": [src, dst], "after": keep ?? dst])
+    }
+    func renameVoice(_ old: String, to new: String) { editLibrary { VoiceBook.rename($0, old, to: new) } }
+    /// nil when added, otherwise why not (a person's own name, or another person's alias).
+    func addVoiceAlias(_ alias: String, to name: String, force: Bool = false) -> VoiceBook.AddResult {
+        var res = VoiceBook.AddResult.added
+        editLibrary { let (o, r) = VoiceBook.addAlias($0, alias, to: name, force: force); res = r; return o }
+        return res
+    }
+    func removeVoiceAlias(_ alias: String) { editLibrary { VoiceBook.removeAlias($0, alias) } }
+    func voiceAliasesOf(_ name: String) -> [String] { VoiceBook.aliasesOf(readLibrary(), name) }
+    func readLibrary() -> [String: Any] {
+        FileManager.default.contents(atPath: voicesPath).flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] } ?? [:]
+    }
+    private func editLibrary(_ change: ([String: Any]) -> [String: Any]) {
+        guard !CallEngine.shared.isRunning else { return }
+        var o = readLibrary()
+        if o["people"] == nil { o["people"] = [String: Any]() }
+        let out = change(o)
+        try? FileManager.default.createDirectory(atPath: (voicesPath as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        if let d = try? JSONSerialization.data(withJSONObject: out) { try? d.write(to: URL(fileURLWithPath: voicesPath), options: .atomic) }
         loadVoices()
     }
+    @Published var personSheet: String? = nil          // 0.9.4: the person whose names are edited
+    @Published var mergeAsk: MergeAsk? = nil           // 0.9.4: which name to keep
+    struct MergeAsk: Identifiable { let a: String; let b: String; var id: String { a + "|" + b } }
     var voiceAliases: [String: String] {
         guard let d = try? Data(contentsOf: URL(fileURLWithPath: voicesPath)),
               let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
@@ -1113,12 +1119,14 @@ struct SettingsView: View {
                             Text("\(v.calls) call\(v.calls == 1 ? "" : "s")").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                             Menu(L("set.mergeInto")) {
                                 ForEach(model.voices.filter { $0.name != v.name }) { o in
-                                    Button(o.name) { model.mergeVoice(v.name, into: o.name) }
+                                    Button(o.name) { model.mergeAsk = .init(a: v.name, b: o.name) }
                                 }
                             }
                             .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
                             .disabled(CallEngine.shared.isRunning || model.voices.count < 2)
                             .help(L("set.mergeHelp", ["name": v.name]))
+                            Button(L("people.names")) { model.personSheet = v.name }.controlSize(.small).disabled(CallEngine.shared.isRunning)
+                                .help(L("people.namesHelp", ["name": v.name]))
                             Button(L("set.forget")) { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
                                 .help(L("set.removesThisPersonS"))
                         }
@@ -1130,6 +1138,10 @@ struct SettingsView: View {
                 }
                 }
                 .onAppear { model.loadVoices() }
+                .sheet(item: $model.mergeAsk) { ask in MergeNameSheet(model: model, ask: ask) }
+                .sheet(item: Binding(get: { model.personSheet.map { PersonName(name: $0) } }, set: { model.personSheet = $0?.name })) { p in
+                    PersonNamesSheet(model: model, name: p.name)
+                }
             } header: { Text(L("set.speakers")) } footer: {
                 Text(L("set.inTheTipsWindow"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -1499,9 +1511,27 @@ struct SettingsView: View {
                         Text(L("usage.toggle.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .onChange(of: model.config.usageLog) { UsageLog.enabled = model.config.usageLog }
+                .onChange(of: model.config.usageLog) {
+                    UsageLog.enabled = model.config.usageLog
+                    if !model.config.usageLog { model.config.shareUsage = false }
+                }
+                // 0.9.4 (owner, rules/usage.yaml > telemetry): the same log, sent to the author once a week
+                Toggle(isOn: $model.config.shareUsage) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("telemetry.toggle"))
+                        Text(L("telemetry.toggle.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .disabled(!model.config.usageLog)
+                .onChange(of: model.config.shareUsage) {
+                    if model.config.shareUsage { model.config.usageLog = true }
+                    TelemetrySender.setOn(model.config.shareUsage)
+                    if model.config.shareUsage { DispatchQueue.main.asyncAfter(deadline: .now() + 1) { TelemetrySender.tick() } }
+                }
                 HStack {
                     Spacer()
+                    Button(L("telemetry.preview")) { TelemetrySender.preview() }.buttonStyle(.pnTertiary)
+                        .help(L("telemetry.previewHelp"))
                     Button(L("set.showLog")) {
                         let d = FeatureRegistry.usageDir
                         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
@@ -1836,5 +1866,96 @@ struct NotionSeesLine: View {
             Button(L("set.check")) { m.find() }.disabled(m.busy)
         }
         .onAppear { if !m.searched && !m.busy { m.find() } }
+    }
+}
+
+
+// MARK: - 0.9.4 (owner, rules/voices.yaml > people): one person, many spellings
+
+struct PersonName: Identifiable { let name: String; var id: String { name } }
+
+/// Merge: which name stays. Either of the two, or a fuller one typed here; the others become its aliases.
+struct MergeNameSheet: View {
+    @ObservedObject var model: SettingsModel
+    let ask: SettingsModel.MergeAsk
+    @State private var keep = ""
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L("people.mergeTitle", ["a": ask.a, "b": ask.b])).font(SwiftUI.Font.system(size: 15, weight: .semibold))
+            Text(L("people.mergeSub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                ForEach([ask.a, ask.b], id: \.self) { n in
+                    Button(n) { keep = n }.buttonStyle(.pnTertiary)
+                }
+            }
+            TextField(L("people.primary"), text: $keep).textFieldStyle(.roundedBorder)
+            let others = Set([ask.a, ask.b, keep]).subtracting([keep]).sorted()
+            if !keep.isEmpty, !others.isEmpty {
+                Text(L("people.willMean", ["list": others.joined(separator: ", "), "name": keep])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
+            HStack {
+                Spacer()
+                Button(L("common.cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L("people.merge")) { model.mergeVoice(ask.a, into: ask.b, keep: keep.trimmingCharacters(in: .whitespaces)); dismiss() }
+                    .keyboardShortcut(.defaultAction).disabled(keep.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(20).frame(width: 420)
+        .onAppear { keep = ask.a.count >= ask.b.count ? ask.a : ask.b }      // the fuller spelling first
+    }
+}
+
+/// A person's primary name and the other spellings that mean them (typed on a call, in the calendar, in Meet).
+struct PersonNamesSheet: View {
+    @ObservedObject var model: SettingsModel
+    let name: String
+    @State private var primary = ""
+    @State private var newAlias = ""
+    @State private var note = ""
+    @State private var aliases: [String] = []
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L("people.title")).font(SwiftUI.Font.system(size: 15, weight: .semibold))
+            TextField(L("people.primary"), text: $primary).textFieldStyle(.roundedBorder)
+            Text(L("people.primarySub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            Text(L("people.aliases")).font(PN.Font.caption.weight(.semibold))
+            if aliases.isEmpty { Text(L("people.noAliases")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
+            ForEach(aliases, id: \.self) { a in
+                HStack {
+                    Text(a)
+                    Spacer()
+                    Button(L("people.remove")) { model.removeVoiceAlias(a); reload() }.controlSize(.small)
+                }
+            }
+            HStack {
+                TextField(L("people.addPlaceholder"), text: $newAlias).textFieldStyle(.roundedBorder).onSubmit(add)
+                Button(L("people.add"), action: add).disabled(newAlias.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.onMe).fixedSize(horizontal: false, vertical: true) }
+            HStack {
+                Spacer()
+                Button(L("common.cancel")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(L("common.save")) {
+                    let p = primary.trimmingCharacters(in: .whitespaces)
+                    if !p.isEmpty, p != name { model.renameVoice(name, to: p) }
+                    dismiss()
+                }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20).frame(width: 420)
+        .onAppear { primary = name; reload() }
+    }
+    private func reload() { aliases = model.voiceAliasesOf(name) }
+    private func add() {
+        let a = newAlias.trimmingCharacters(in: .whitespaces)
+        guard !a.isEmpty else { return }
+        switch model.addVoiceAlias(a, to: name) {
+        case .added: newAlias = ""; note = ""
+        case .isPerson: note = L("people.isPerson", ["name": a])
+        case .otherPerson(let o): note = L("people.otherPerson", ["alias": a, "name": o])
+        }
+        reload()
     }
 }

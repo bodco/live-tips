@@ -1,6 +1,6 @@
 # Pacenote privacy policy
 
-Updated 3 November 2026. The full text is on the website: **[tower.bodco.pm/pacenote/privacy/](https://tower.bodco.pm/pacenote/privacy/)** ([українською](PRIVACY.uk.md)).
+Updated 5 November 2026. The full text is on the website: **[tower.bodco.pm/pacenote/privacy/](https://tower.bodco.pm/pacenote/privacy/)** ([українською](PRIVACY.uk.md)).
 
 In short:
 
@@ -11,7 +11,8 @@ In short:
 - **Google (0.9.1).** If you connect Google accounts, Pacenote reads their calendars, the Google Docs, Sheets and Slides you link in a call's setup or that are attached to the invitation, and the Google Meet participants and transcript of a call when you ask for them. It writes only a new Google Doc when you export notes there. Copies of the documents stay in the project folder on your Mac; their text goes to the AI service of the preparation like your other files. The tokens stay in the macOS Keychain; Remove revokes them. Pacenote's use and transfer of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements; it is not used for advertising, not sold and not used to train models.
 - **Company web search before sales calls (0.8.7).** On by default, switch it off in Settings > AI. Only the company's name or domain goes into the search, never anything from your files; the brief says what was searched.
 - **Local usage log (0.8.7).** Pacenote keeps a log of which features you use (event names and numbers, never the words of a call, names or titles) in the app's folder, one file a month, 12 months kept. It stays on your Mac; switch it off in Settings > General > Privacy.
-- **Nothing is sent to the author.** No analytics, no tracking, no crash reporting. Nothing is sent to clients by itself.
+- **Help improve Pacenote (0.9.4), off by default.** Only if you turn it on in Settings > General > Privacy, the usage log above is sent to the author once a week: event names and small numbers of whole days since you turned it on (for example how many tips you rated useful, fine but off the point or not useful, and the reason chip), the app and rules versions, the interface language and which way to the AI each job uses. Never the words of a call, your comments on tips, names, projects, files or titles. A random id made on your Mac when you turn it on tells your batches apart from other people's; it is forgotten when you turn it off. The batches go to a Cloudflare Worker of the author that keeps no IP address; Show what is sent opens the next batch before it goes.
+- **Otherwise nothing is sent to the author.** No analytics SDK, no tracking, no crash reporting. Nothing is sent to clients by itself.
 - **You are responsible for the people on your calls:** tell them you transcribe and use an AI assistant, and get consent where it is required.
 
 Questions: [issues](https://github.com/bodco/live-tips/issues). Terms of use: [TERMS.md](TERMS.md).

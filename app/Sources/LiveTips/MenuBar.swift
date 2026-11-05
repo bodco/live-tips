@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UsageLog.sink = LocalFileSink(dir: FeatureRegistry.usageDir)
         UsageLog.enabled = AppConfig.load(from: AppPaths.config).usageLog
         MainActor.assumeIsolated { AppSignature.shared.check() }     // 2026-10-29: onboarding and About show it
+        MainActor.assumeIsolated { TelemetrySender.start() }         // 0.9.4: Help improve Pacenote (off by default)
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
         installMainMenu()
         NSApp.setActivationPolicy(config.showInDock ? .regular : .accessory)

@@ -63,9 +63,60 @@
    "before": {
     "text": "review the QA report today"
    }
+  },
+  {
+   "kind": "tip_rating",
+   "file": "call-1.md",
+   "verdict": "not_useful",
+   "reasons": [
+    "off_topic"
+   ],
+   "comment": "no pricing tips on internal stand-ups",
+   "before": {
+    "text": "Mention the discount for annual plans"
+   }
+  },
+  {
+   "kind": "tip_rating",
+   "file": "call-3.md",
+   "verdict": "not_useful",
+   "reasons": [
+    "off_topic"
+   ],
+   "comment": "no pricing tips on stand-ups",
+   "before": {
+    "text": "Offer the annual price"
+   }
+  },
+  {
+   "kind": "tip_rating",
+   "file": "call-2.md",
+   "verdict": "used",
+   "reasons": [],
+   "comment": "",
+   "before": {
+    "text": "Ask Emily about the test accounts"
+   }
+  },
+  {
+   "kind": "tip_rating",
+   "file": "call-2.md",
+   "verdict": "partly",
+   "reasons": [
+    "too_long"
+   ],
+   "comment": "",
+   "before": {
+    "text": "Summarize the release status in three points"
+   }
   }
  ],
  "expect": [
+  {
+   "kind": "tip_not_useful",
+   "text": "no pricing tips on stand-ups (off_topic)",
+   "calls": 2
+  },
   {
    "kind": "card_onme_remove",
    "text": "review the QA report today",

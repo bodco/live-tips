@@ -48,6 +48,12 @@ def build_engine(cfg, md: Path, out: Path, clock, provider=None):
         if extra:
             (out / (stem + ".app.context.md")).parent.mkdir(parents=True, exist_ok=True)
             (out / (stem + ".app.context.md")).write_text(extra, encoding="utf-8")
+    if cfg.get("edits_log"):
+        # 0.9.4 (rules/learning.yaml > tip_rating): tips the PM rated down on two or more calls, as standing lessons
+        from . import learning
+        lessons = learning.tip_lessons(learning.load(Path(cfg["edits_log"])))
+        if lessons:
+            extra = (extra + "\n\n" + lessons).strip()
     prompt = PromptBuilder(rules, call_meta_from_md(md, cfg), brief_path=Path(str(base) + ".brief.md"),
                            facts_path=Path(str(base) + ".facts.json"), cards_path=Path(str(base) + ".cards.json"),
                            extra_context=extra)

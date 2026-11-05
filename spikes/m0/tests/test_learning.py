@@ -75,3 +75,33 @@ def test_tips_lang_switch():
     assert e.cfg["tips_lang"] == "en" and e.prompt.fmt["tips_lang"] == "en"
     live.handle_setting(e, "tips_lang", "de")
     assert e.cfg["tips_lang"] == "en" and e.out_tips.items[0]["key"] == "tips_lang"
+
+
+def test_tip_ratings_become_tip_lessons():
+    """0.9.4 (rules/learning.yaml > tip_rating): two calls with the same down-rated tip are a standing lesson."""
+    lessons = learning.tip_lessons(FIX["records"])
+    assert lessons.startswith(learning.TIP_HEAD) and "- no pricing tips on stand-ups (off_topic)" in lessons
+    assert learning.tip_lessons([r for r in FIX["records"] if r.get("file") != "call-3.md"]) == ""
+
+
+def test_rating_in_the_call_reaches_the_tip_prompt():
+    import threading
+    from livetips_m0 import live
+    from livetips_m0.engine import Engine
+    from livetips_m0.prompt import PromptBuilder
+    from livetips_m0.rules import Rules
+
+    class E:
+        tip_ratings = {}
+        lock = threading.RLock()
+        rate_tip = Engine.rate_tip
+    e = E()
+    live.handle_setting(e, "tip_feedback", "not_useful|c1|10:00:01|Offer the annual price|r=off_topic")
+    live.handle_setting(e, "tip_feedback", "partly|c1|10:00:01|Offer the annual price|r=too_long|c=only the first line")
+    live.handle_setting(e, "tip_feedback", "used|c2|10:01:00|Ask about test accounts")
+    assert list(e.tip_ratings.values())[0] == {"verdict": "partly", "reasons": ["too_long"], "comment": "only the first line",
+                                               "tip": "Offer the annual price"}
+    pb = PromptBuilder(Rules(), {"title": "t", "tips_lang": "en", "langs": ["en"]})
+    st = {"pm_ratings": [{"verdict": "partly", "reasons": ["too_long"], "tip": "x"}]}
+    assert "STATE.pm_ratings" in pb.user("tip", "ask", ["a"], st)
+    assert "STATE.pm_ratings" not in pb.user("tip", "ask", ["a"], {})

@@ -5,6 +5,22 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.9.5 (unreleased)
 
+- **Floating call controls as a vertical strip (2026-11-05):** the panel is a narrow strip with the Pacenote mark on
+  top (its dot: green while transcribing, orange when paused, red while the call is recorded), then Home, Tips,
+  pause/resume transcription, one Record button and End call. The Record button opens a menu: record the sound and
+  screen or the sound only; while recording, pause or resume, record another window, stop only the recording (the call
+  goes on) or end the call and save. No running time in the strip or the menu bar: it is in the tips window. The call's
+  name is in the mark's tooltip; right-click the mark to hide the strip.
+- **Menu bar panel redesign (2026-11-05):** the call is a full-width card with Show tips, Record and End call; the calls
+  ahead are rows with their time and state; actions have icons and shortcuts; the money and Help (with Quit) are in
+  the footer.
+- **Prepare the recording before the call (2026-11-05):** the tips window's ready state has a Record this call card
+  (Off, Sound, Sound and screen). For the screen it shows exactly what will be recorded (a small picture, the app,
+  the window and its size) with Change; the recording starts with Start listening, nothing is asked at the last second.
+- **What to record, redesigned (2026-11-05):** Windows and Screens on the left, on the right a live picture of the
+  selected window or screen with its size, and Show on screen, which draws a blue frame with the name around the real
+  window for a moment (the frame is never recorded), to tell two similar windows apart.
+
 - **Call recording (2026-11-05, off by default):** save the call's sound, or the sound and the screen, on this Mac in
   `<project>/video/`, to watch a call again (for example the other side's reactions). Start call > Record the call
   (Off, Sound, Sound and screen) for one call; Settings > Call recording > Record every call for all. In the call the

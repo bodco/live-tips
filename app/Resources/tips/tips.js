@@ -17,7 +17,9 @@
       rec: { start: 'Record the call', sound: 'Record the sound', screen: 'Record the sound and the screen', rec: 'Rec', paused: 'Paused',
         pause: 'Pause the recording', resume: 'Resume the recording', stop: 'Stop and save the recording', source: 'Record another window or screen',
         settings: 'Recording settings', choosing: 'Choose what to record…', starting: 'Starting the recording…', menu: 'Recording',
-        hint: 'Saved on this Mac in the project\'s video folder' },
+        hint: 'Saved on this Mac in the project\'s video folder',
+        armTitle: 'Record this call', armOff: 'Off', armSound: 'Sound', armScreen: 'Sound and screen', armChange: 'Change', armChoose: 'Choose what to record',
+        armStarts: 'Starts with Start listening. Pacenote\'s own windows are never recorded.', armSoundNote: 'The call\'s sound and your microphone, starts with Start listening.' },
       micStalled: 'The microphone stopped', cantHear: "Can't hear the other side", asrBehind: (o) => `Transcription is ${o.n} s behind`,
       engineDeaf: 'Tips are not coming: end the call and start again',
       onMe: 'On me', more: 'More', earlier: 'Earlier',
@@ -86,7 +88,9 @@
       rec: { start: 'Записати дзвінок', sound: 'Записати звук', screen: 'Записати звук і екран', rec: 'Запис', paused: 'Пауза',
         pause: 'Призупинити запис', resume: 'Продовжити запис', stop: 'Зупинити і зберегти запис', source: 'Записувати інше вікно чи екран',
         settings: 'Налаштування запису', choosing: 'Оберіть, що записувати…', starting: 'Запускаю запис…', menu: 'Запис',
-        hint: 'Зберігається на цьому Mac у папці video проєкту' },
+        hint: 'Зберігається на цьому Mac у папці video проєкту' ,
+        armTitle: 'Записати цей дзвінок', armOff: 'Ні', armSound: 'Звук', armScreen: 'Звук і екран', armChange: 'Змінити', armChoose: 'Обрати, що записувати',
+        armStarts: 'Почнеться разом із «Почати слухати». Вікна Pacenote ніколи не записуються.', armSoundNote: 'Звук дзвінка і ваш мікрофон, почнеться разом із «Почати слухати».' },
       micStalled: 'Мікрофон зупинився', cantHear: 'Не чую іншу сторону', asrBehind: (o) => `Транскрипція відстає на ${o.n} с`,
       engineDeaf: 'Підказки не надходять: заверши дзвінок і почни знову',
       onMe: 'На мені', more: 'Більше', earlier: 'Раніше',
@@ -428,6 +432,23 @@
     tick();
   }
 
+  // 2026-11-05 (owner): the recording is prepared before listening starts: Off / Sound / Sound and screen, and for the
+  // screen what exactly will be recorded (a small picture, the app and the window) with Change.
+  function armCard(t) {
+    const tr2 = t.rec || STR.en.rec, a = (S.rec && S.rec.arm) || { kind: 'off' }, k = a.kind || 'off';
+    const seg = [['off', tr2.armOff], ['audio', tr2.armSound], ['video', tr2.armScreen]]
+      .map(([v, l]) => `<button type="button" class="${k === v ? 'on' : ''}" data-act="rec-arm" data-kind="${v}" aria-pressed="${k === v}">${esc(l)}</button>`).join('');
+    let src = '';
+    if (k === 'video') {
+      src = a.app
+        ? `<div class="armsrc">${a.thumb ? `<img src="${a.thumb}" alt="">` : '<span class="ph"></span>'}<span class="x"><b>${esc(a.app)}</b><span>${esc([a.title, a.size].filter(Boolean).join(' · '))}</span></span><button type="button" class="lnk" data-act="rec-arm-pick">${esc(tr2.armChange)}</button></div>`
+        : `<div class="armsrc"><span class="ph"></span><span class="x"><b>${esc(tr2.armChoose)}</b></span><button type="button" class="lnk" data-act="rec-arm-pick">${esc(tr2.armChange)}</button></div>`;
+    }
+    const note = k === 'video' ? tr2.armStarts : k === 'audio' ? tr2.armSoundNote : '';
+    return `<div class="armcard"><div class="top"><span class="rdot${k === 'off' ? ' off' : ''}"><i></i></span>${esc(tr2.armTitle)}</div>
+      <div class="seg" role="group">${seg}</div>${src}${note ? `<div class="sub">${esc(note)}</div>` : ''}</div>`;
+  }
+
   // Returns true when an empty state is shown instead of cards.
   function renderEmpty(list) {
     const el = $('empty'), t = T();
@@ -438,6 +459,7 @@
     if (isReady) {
       el.innerHTML = `${MARK}<div class="t1">${esc(t.readyTitle)}</div>${S.call.briefLine ? `<div class="t2">${esc(S.call.briefLine)}</div>` : ''}
         <div class="ctl"><button class="btn1" type="button" data-act="start">${esc(t.startListening)}</button>${S.brief ? `<button class="btn2" type="button" data-act="open-brief">${esc(t.openBrief)}</button>` : ''}</div>
+        ${armCard(t)}
         <div class="foot">${esc(t.onDevice)}</div>`;
     } else {
       const off = S.call.tipsOff && S.call.state !== 'ended';     // 0.8.5: Tips off or a Transcript call
@@ -1203,6 +1225,8 @@
       case 'rec-stop': S.ui.recMenu = false; post('rec', { a: 'stop' }); break;
       case 'rec-source': S.ui.recMenu = false; post('rec', { a: 'source' }); break;
       case 'rec-settings': S.ui.recMenu = false; post('rec', { a: 'settings' }); break;
+      case 'rec-arm': S.rec = Object.assign({}, S.rec, { arm: Object.assign({}, (S.rec || {}).arm, { kind: b.dataset.kind }) }); post('rec', { a: 'arm', kind: b.dataset.kind }); break;
+      case 'rec-arm-pick': post('rec', { a: 'arm-pick' }); return;
       case 'open-brief': openTab('brief'); return;
       case 'brief-edit': S.ui.briefEdit = true; break;
       case 'brief-cancel': S.ui.briefEdit = false; break;

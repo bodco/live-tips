@@ -87,33 +87,45 @@ final class MenuBarModel: ObservableObject {
 struct MenuBarPanel: View {
     @ObservedObject var model: MenuBarModel
     @ObservedObject private var lang = LangModel.shared
+    @ObservedObject private var recording = CallRecorder.shared
 
+    // 2026-11-05 (owner): redesigned in the style of Home: the call as a full-width card with its three actions, the
+    // calls ahead as rows with their state, actions with icons and shortcuts, the money and Help in the footer.
+    // No running time here: it is in the tips window only.
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            header
-            if model.micMissing { micBanner }
-            if model.isLive { liveCard } else { nextCard; laterList }
-            Divider()
-            if model.isLive {
-                if model.isRecording {
-                    row(L("menubar.helpNow"), model.helpKey) { $0.helpNow() }
-                    row(L("menubar.compact"), model.compactKey) { $0.toggleCompact() }
-                    row(L("menubar.pause"), model.pauseKey) { $0.togglePause() }
-                }
-                row(L("menubar.planCall"), "⌘N") { $0.startCall() }.keyboardShortcut("n")
-                row(L("menubar.home"), "⌘0") { $0.openHome() }.keyboardShortcut("0")
-            } else {
-                row(L("menubar.home"), "⌘0") { $0.openHome() }.keyboardShortcut("0")
-                row(L("menubar.startCall"), "⌘N") { $0.startCall() }.keyboardShortcut("n")
-                row(L("tr.window"), "") { $0.openTranscribe() }
-                Divider()
-                spend
+        VStack(alignment: .leading, spacing: 0) {
+            header.padding(.bottom, 10)
+            if model.micMissing { micBanner.padding(.bottom, 10) }
+            if model.isLive { liveCard } else { nextCard }
+            let rows = model.isLive ? ([model.next].compactMap { $0 } + model.later) : model.later
+            if !rows.isEmpty {
+                label(model.isLive ? L("home.comingUp") : L("home.later"))
+                laterList(Array(rows.prefix(4)))
             }
-            Divider()
-            footer
+            label(L("app.name"))
+            VStack(spacing: 1) {
+                if model.isLive {
+                    if model.isRecording {
+                        row(L("menubar.helpNow"), model.helpKey, icon: "lifepreserver") { $0.helpNow() }
+                        row(L("menubar.pause"), model.pauseKey, icon: "pause") { $0.togglePause() }
+                        row(L("menubar.compact"), model.compactKey, icon: "rectangle.compress.vertical") { $0.toggleCompact() }
+                    }
+                    row(L("menubar.planCall"), "⌘N", icon: "plus") { $0.startCall() }.keyboardShortcut("n")
+                    row(L("menubar.home"), "⌘0", icon: "house") { $0.openHome() }.keyboardShortcut("0")
+                } else {
+                    row(L("menubar.startCall"), "⌘N", icon: "play") { $0.startCall() }.keyboardShortcut("n")
+                    row(L("menubar.home"), "⌘0", icon: "house") { $0.openHome() }.keyboardShortcut("0")
+                    row(L("tr.window"), "", icon: "waveform") { $0.openTranscribe() }
+                    if model.canSendNotion {
+                        row(L("menubar.sendNotion"), "", icon: "arrow.up.doc") { $0.sendToNotion() }.help(model.notionResult)
+                    }
+                }
+            }
+            Divider().padding(.top, 8)
+            footer.padding(.top, 8)
         }
         .padding(12)
-        .frame(width: 340)
+        .frame(width: 330)
         .background(PN.C.bg, in: RoundedRectangle(cornerRadius: PN.Radius.l))
         .overlay(RoundedRectangle(cornerRadius: PN.Radius.l).stroke(Color.primary.opacity(0.12)))
         .onExitCommand { model.close() }
@@ -121,21 +133,19 @@ struct MenuBarPanel: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            if model.isRecording {
-                Circle().fill(PN.C.rec).frame(width: 8, height: 8).accessibilityHidden(true)
-                Text(L("menubar.status.recording", ["elapsed": model.elapsed]))
-                    .font(.system(size: 13, weight: .semibold)).monospacedDigit().foregroundStyle(PN.C.text)
-            } else {
-                PacenoteSymbol(height: 18)
-                Text(L("app.name")).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text)
-                Text("· " + (model.isLive ? model.statusLine : L("menubar.status.idle")))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
-            }
+            PacenoteSymbol(height: 18)
+            Text(L("app.name")).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text)
             Spacer()
             Button { model.run { $0.openSettings() } } label: { Image(systemName: "gearshape").foregroundStyle(PN.C.text2) }
                 .buttonStyle(.borderless).keyboardShortcut(",")
                 .help(L("menubar.settings") + " ⌘,").accessibilityLabel(L("menubar.settings"))
         }
+        .padding(.horizontal, 4)
+    }
+
+    private func label(_ t: String) -> some View {
+        Text(t.uppercased()).font(PN.Font.label).kerning(0.4).foregroundStyle(PN.C.text3)
+            .padding(.horizontal, 6).padding(.top, 14).padding(.bottom, 4)
     }
 
     private var micBanner: some View {
@@ -149,58 +159,72 @@ struct MenuBarPanel: View {
         .background(PN.C.onMe.opacity(0.12), in: RoundedRectangle(cornerRadius: PN.Radius.s))
     }
 
+    private func card<C: View>(@ViewBuilder _ c: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 3) { c() }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.06)))
+    }
+
+    private func kicker(_ t: String, _ c: Color) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(c).frame(width: 7, height: 7).accessibilityHidden(true)
+            Text(t.uppercased()).font(.system(size: 11, weight: .semibold)).kerning(0.3).foregroundStyle(c).lineLimit(1)
+        }
+    }
+
     @ViewBuilder private var nextCard: some View {
         if let n = model.next {
-            VStack(alignment: .leading, spacing: 4) {
+            card {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(L("menubar.upNext", ["relative": Self.relative(n.startsAt), "time": Self.time(n.startsAt)]))
-                        .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    kicker(L("menubar.upNext", ["relative": Self.relative(n.startsAt), "time": Self.time(n.startsAt)]), PN.C.accent)
                     Spacer()
                     badge(n.state)
                 }
                 Button { openPage(n) } label: {
-                    Text(n.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
-                }.buttonStyle(.plain).help(L("home.openCall.help"))
+                    Text(n.title).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
+                }.buttonStyle(.plain).help(L("home.openCall.help")).padding(.top, 2)
                 if !n.note.isEmpty { Text(n.note).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
-                // 0.9.0: the same rule as Home: one main button and one link under it
-                VStack(alignment: .leading, spacing: 5) {
+                // 0.9.0: the same rule as Home: one main button and one more next to it
+                HStack(spacing: 8) {
                     let st = CallState.of(n.state, ai: HomeView.aiReadyNow())
                     switch st {
                     case .noBrief:
-                        Button { start(n) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
-                        link(L("home.connectClaude")) { model.run { _ in SettingsWindow.show(tab: "ai") } }
+                        wide(L("home.startCall"), primary: true) { start(n) }.keyboardShortcut(.defaultAction)
+                        wide(L("home.connectClaude")) { model.run { _ in SettingsWindow.show(tab: "ai") } }
                     case .ready:
-                        Button { start(n) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
-                        link(L("talk.prepareAgain")) { prepare(n) }
+                        wide(L("home.startCall"), primary: true) { start(n) }.keyboardShortcut(.defaultAction)
+                        wide(L("talk.prepareAgain")) { prepare(n) }
                     case .preparing, .queued:
-                        Button { start(n) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                        wide(L("home.startCall"), primary: true) { start(n) }.keyboardShortcut(.defaultAction)
                     default:
-                        Button(L("home.getReady")) { prepare(n) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
-                        link(L("home.startWithout")) { start(n) }
+                        wide(L("home.getReady"), primary: true) { prepare(n) }.keyboardShortcut(.defaultAction)
+                        wide(L("home.startWithout")) { start(n) }
                     }
                 }
-                .padding(.top, 6)
+                .padding(.top, 8)
             }
-            .padding(12)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
         } else {
-            Text(L("menubar.nothingAhead")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.horizontal, 8)
+            card {
+                Text(L("menubar.nothingAhead")).font(PN.Font.body).foregroundStyle(PN.C.text3)
+                HStack(spacing: 8) { wide(L("menubar.startCall"), primary: true) { model.run { $0.startCall() } } }.padding(.top, 6)
+            }
         }
     }
 
-    private var laterList: some View {
-        VStack(spacing: 2) {
-            ForEach(model.later) { c in
+    private func laterList(_ rows: [MenuBarModel.Call]) -> some View {
+        VStack(spacing: 1) {
+            ForEach(rows) { c in
                 Button { openPage(c) } label: {
                     HStack(spacing: 10) {
-                        Circle().fill(CallState.of(c.state, ai: HomeView.aiReadyNow()).color).frame(width: 7, height: 7).accessibilityHidden(true)
-                        Text(Self.time(c.startsAt)).font(PN.Font.caption).monospacedDigit().foregroundStyle(PN.C.text3)
-                            .lineLimit(1).fixedSize()
+                        Text(Self.time(c.startsAt)).font(.system(size: 12, weight: .semibold)).monospacedDigit().foregroundStyle(PN.C.accent)
+                            .frame(width: 58, alignment: .leading)
                         Text(c.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1)
-                        Spacer()
+                        Spacer(minLength: 6)
                         badge(c.state)
                     }
-                    .padding(.horizontal, 8).frame(height: 28).contentShape(Rectangle())
+                    .padding(.horizontal, 6).frame(height: 30).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -208,47 +232,63 @@ struct MenuBarPanel: View {
     }
 
     private var liveCard: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(model.liveTitle).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text).lineLimit(2)
-            if !model.liveLine.isEmpty {
-                Text(model.liveLine).font(PN.Font.caption).foregroundStyle(model.warning ? PN.C.danger : PN.C.text3)
-                    .fixedSize(horizontal: false, vertical: true)
+        let recOn = ["recording", "paused", "starting"].contains(recording.state)
+        let (txt, col): (String, Color) = model.warning ? (L("menubar.status.audioFailing"), PN.C.danger)
+            : !model.isRecording ? (model.statusLine.isEmpty ? L("floating.starting") : model.statusLine, PN.C.text3)
+            : recOn ? (RecordingMenu.label(recording), PN.C.rec) : (L("floating.transcribing"), PN.C.turn)
+        return card {
+            kicker(txt, col)
+            Text(model.liveTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).padding(.top, 2)
+            if !model.liveLine.isEmpty && !model.warning {
+                Text(model.liveLine).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
             }
-            HStack(spacing: 8) {
-                Button(L("menubar.showTips")) { model.run { $0.showTips() } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
-                if model.isRecording { Button(L("menubar.pauseShort")) { model.run { $0.togglePause() } }.buttonStyle(.pnSecondary) }
+            HStack(spacing: 6) {
+                wide(L("menubar.showTips"), primary: true) { model.run { $0.showTips() } }.keyboardShortcut(.defaultAction)
+                Menu { RecordingMenu(app: model.app) } label: {
+                    HStack(spacing: 5) {
+                        ZStack {
+                            Circle().stroke(recOn ? PN.C.rec : PN.C.text2, lineWidth: 1.5).frame(width: 11, height: 11)
+                            Circle().fill(recOn ? PN.C.rec : PN.C.text2).frame(width: 5, height: 5)
+                        }
+                        Text(L(recOn ? "rec.short.on" : "rec.short.off")).font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(recOn ? PN.C.rec : PN.C.text2)
+                    .frame(maxWidth: .infinity).frame(height: 30)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(recOn ? PN.C.rec.opacity(0.12) : PN.C.surface2))
+                    .contentShape(Rectangle())
+                }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                .disabled(recording.state == "choosing" || !model.isRecording && !recOn)
                 // End call asks for confirmation first (AppDelegate.endCall / the tips window).
-                Button(L("menubar.endCall")) { model.run { $0.endCall() } }.buttonStyle(.pnSecondary)
+                wide(L("menubar.endCall"), danger: true) { model.run { $0.endCall() } }
             }
-            .padding(.top, 6)
+            .padding(.top, 8)
         }
-        .padding(12)
-        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
     }
 
-    private var spend: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(L("menubar.thisMonth", ["spent": String(format: "%.2f", model.monthSpend), "cap": String(format: "%.0f", model.monthCap)]))
-                .font(PN.Font.caption).monospacedDigit().foregroundStyle(PN.C.text2)
-            ProgressView(value: min(model.monthSpend / max(model.monthCap, 1), 1)).tint(PN.C.brand)
-                .accessibilityLabel(L("menubar.thisMonth", ["spent": String(format: "%.2f", model.monthSpend), "cap": String(format: "%.0f", model.monthCap)]))
-            if !model.lastCallLine.isEmpty {
-                Text(model.lastCallLine).font(PN.Font.caption).foregroundStyle(PN.C.text3).help(model.lastCallDetail ?? "")
-            }
-            if model.canSendNotion {
-                Button(L("menubar.sendNotion")) { model.run { $0.sendToNotion() } }.buttonStyle(.pnTertiary)
-                    .help(model.notionResult)
-            }
+    private func wide(_ t: String, primary: Bool = false, danger: Bool = false, _ run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            Text(t).font(.system(size: 12, weight: primary ? .semibold : .medium)).lineLimit(1).minimumScaleFactor(0.85)
+                .foregroundStyle(primary ? Color.white : danger ? PN.C.danger : PN.C.text2)
+                .frame(maxWidth: .infinity).frame(height: 30)
+                .background(RoundedRectangle(cornerRadius: 8).fill(primary ? PN.C.accentFill : danger ? PN.C.danger.opacity(0.1) : PN.C.surface2))
+                .contentShape(Rectangle())
         }
-        .padding(.horizontal, 8)
+        .buttonStyle(.plain)
     }
 
     private var footer: some View {
-        HStack {
-            if model.isLive {
-                Text(L("menubar.thisCall", ["cost": String(format: "%.2f", model.thisCallSpend)]))
-                    .font(PN.Font.caption).monospacedDigit().foregroundStyle(PN.C.text3)
+        HStack(spacing: 8) {
+            Group {
+                if model.isLive {
+                    Text(L("menubar.thisCall", ["cost": String(format: "%.2f", model.thisCallSpend)]))
+                } else {
+                    Text(L("menubar.thisMonth", ["spent": String(format: "%.2f", model.monthSpend), "cap": String(format: "%.0f", model.monthCap)]))
+                        .help(model.lastCallLine + (model.lastCallDetail.map { "\n" + $0 } ?? ""))
+                }
             }
+            .font(PN.Font.caption).monospacedDigit().foregroundStyle(PN.C.text3).lineLimit(1)
+            Spacer()
             Menu(L("menubar.helpAbout")) {
                 Button(L("menubar.setup")) { model.run { $0.openSetup() } }
                 Button(L("menubar.welcomeTour")) { model.run { $0.openOnboarding() } }
@@ -259,28 +299,32 @@ struct MenuBarPanel: View {
                 Divider()       // 0.8.7 (L1): the demo calls are always here, no Option key
                 Button(L("menubar.demo")) { model.run { $0.showDemo() } }
                 Button(L("menubar.demoPresentation")) { model.run { $0.showDemoPresentation() } }
+                if !model.isLive {
+                    Divider()
+                    Button(L("menubar.quit")) { NSApp.terminate(nil) }.keyboardShortcut("q")
+                }
             }
-            .menuStyle(.borderlessButton).fixedSize()
-            Spacer()
-            if !model.isLive {
-                Button(L("menubar.quit")) { NSApp.terminate(nil) }.buttonStyle(.pnTertiary).keyboardShortcut("q")
-            }
+            .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
         }
-        .font(PN.Font.body)
+        .padding(.horizontal, 6)
     }
 
-    private func row(_ title: String, _ key: String, _ action: @escaping (AppDelegate) -> Void) -> some View {
+    private func row(_ title: String, _ key: String, icon: String, _ action: @escaping (AppDelegate) -> Void) -> some View {
         Button { model.run(action) } label: {
-            HStack {
-                Text(title).foregroundStyle(PN.C.text)
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 12, weight: .medium)).foregroundStyle(PN.C.accent)
+                    .frame(width: 24, height: 24)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(PN.C.surface))
+                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.primary.opacity(0.08)))
+                Text(title).foregroundStyle(PN.C.text).lineLimit(1)
                 Spacer()
                 Text(key).foregroundStyle(PN.C.text3)
             }
             .font(PN.Font.body)
-            .padding(.horizontal, 8).frame(height: 28)
+            .padding(.horizontal, 6).frame(height: 32)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(MenuRowStyle())
     }
 
     /// 0.9.0: the soft pill of Home (Ready / Not ready), no loud fills.
@@ -415,5 +459,19 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         place(p)
         p.orderFrontRegardless()
         return p
+    }
+}
+
+/// A row of the menu bar panel: a soft highlight under the pointer, like a menu.
+private struct MenuRowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Hover(configuration: configuration) }
+    private struct Hover: View {
+        let configuration: ButtonStyle.Configuration
+        @State private var on = false
+        var body: some View {
+            configuration.label
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(configuration.isPressed ? 0.1 : on ? 0.06 : 0)))
+                .onHover { on = $0 }
+        }
     }
 }

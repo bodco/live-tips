@@ -104,6 +104,8 @@ struct PacenoteSymbol: View {
     var height: CGFloat
     /// Force a look (the white symbol on a dark title bar); nil follows the appearance.
     var dark: Bool? = nil
+    /// 2026-11-05: the dot can carry a state (the floating call controls: green, orange, red).
+    var dot: Color? = nil
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -117,7 +119,7 @@ struct PacenoteSymbol: View {
                        style: StrokeStyle(lineWidth: Brand.markStroke * s, lineCap: .round, lineJoin: .round))
             let c = Brand.dot.center.applying(t), r = Brand.dot.radius * s
             ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)),
-                     with: .color(isDark ? Brand.blueLight : Brand.blue))
+                     with: .color(dot ?? (isDark ? Brand.blueLight : Brand.blue)))
         }
         .frame(width: height * box.width / box.height, height: height)
         .accessibilityElement()

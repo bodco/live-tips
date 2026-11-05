@@ -33,6 +33,7 @@ enum RecTargets {
     struct Display: Identifiable, Hashable { var id: CGDirectDisplayID; var uuid: String; var name: String; var main: Bool }
     struct Window: Identifiable, Hashable {
         var id: CGWindowID; var app: String; var bundle: String; var title: String; var width: Double; var height: Double; var pid: pid_t
+        var frame: CGRect = .zero      // 2026-11-05: screen points, top-left origin (for "Show on screen")
         var label: String { title.isEmpty ? app : app + " - " + title }
     }
 
@@ -68,8 +69,37 @@ enum RecTargets {
         return c.windows.compactMap { w in
             guard let a = w.owningApplication, a.processID != me, w.windowLayer == 0, w.frame.width >= 320, w.frame.height >= 200 else { return nil }
             return Window(id: w.windowID, app: a.applicationName, bundle: a.bundleIdentifier, title: w.title ?? "",
-                          width: w.frame.width, height: w.frame.height, pid: a.processID)
+                          width: w.frame.width, height: w.frame.height, pid: a.processID, frame: w.frame)
         }
+    }
+
+    /// 2026-11-05 (owner): a small picture of what a source records, for the picker and the tips window. Works for
+    /// a window that is covered by others; Pacenote's own windows are left out of a screen.
+    static func thumbnail(_ s: RecSource, width: Int) async -> CGImage? {
+        guard ScreenPermission.granted(),
+              let c = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false) else { return nil }
+        let filter: SCContentFilter
+        var size = CGSize.zero
+        switch s {
+        case .window(let id):
+            guard let w = c.windows.first(where: { $0.windowID == id }) else { return nil }
+            filter = SCContentFilter(desktopIndependentWindow: w); size = w.frame.size
+        case .display(let id):
+            guard let d = c.displays.first(where: { $0.displayID == id }) else { return nil }
+            let me = c.applications.filter { $0.processID == ProcessInfo.processInfo.processIdentifier }
+            filter = SCContentFilter(display: d, excludingApplications: me, exceptingWindows: []); size = CGSize(width: d.width, height: d.height)
+        case .soundOnly: return nil
+        }
+        guard size.width > 0, size.height > 0 else { return nil }
+        let cfg = SCStreamConfiguration()
+        cfg.width = width; cfg.height = max(1, Int(Double(width) * size.height / size.width)); cfg.showsCursor = false
+        return try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
+    }
+
+    /// A JPEG data URL of a picture, for the tips window.
+    static func dataURL(_ img: CGImage?) -> String {
+        guard let img = img, let d = NSBitmapImageRep(cgImage: img).representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else { return "" }
+        return "data:image/jpeg;base64," + d.base64EncodedString()
     }
 
     static func meetingWindow(in list: [Window]) -> Window? {
@@ -111,13 +141,105 @@ final class CallRecorder: NSObject, ObservableObject {
 
     /// The tips window's view of the recording.
     var windowState: [String: Any] {
-        ["state": state, "kind": kind, "elapsed": elapsedSec, "source": sourceLabel, "note": lastNote]
+        ["state": state, "kind": kind, "elapsed": elapsedSec, "source": sourceLabel, "note": lastNote,
+         "arm": ["kind": armKind, "app": armApp, "title": armTitle, "size": armSize, "thumb": armThumb, "ready": armSource != nil]]
+    }
+
+    // MARK: prepared before listening (2026-11-05, owner: "not at the last second")
+
+    /// The tips window's ready state: what the recording of this call will be ("off", "audio", "video") and, for video,
+    /// the window or screen. Starts from Start call / Settings; used once when listening starts (startCallRecording).
+    private var armTouched = false
+    private var armChosen = "off"
+    private(set) var armSource: RecSource?
+    private var armApp = "", armTitle = "", armSize = "", armThumb = ""
+    private var armLoading = false
+
+    var armKind: String {
+        armTouched ? armChosen : ((CallEngine.shared.callRequest["recording"] as? String) ?? settings.defaultForCall)
+    }
+
+    /// Off / Sound / Sound and screen in the ready card. Video finds its source now (the call window or the screen).
+    func arm(_ k: String) {
+        armTouched = true
+        armChosen = ["audio", "video"].contains(k) ? k : "off"
+        if armChosen == "video" && armSource == nil { findArmSource() }
+        publish()
+    }
+
+    /// Change in the ready card: the picker now, so nothing is asked when the call starts.
+    func pickArmSource() {
+        guard ScreenPermission.granted() else { ScreenPermission.request(); note(L("rec.err.permission")); return }
+        Task { @MainActor in
+            let list = await RecTargets.windows()
+            let pre: CGWindowID? = { if case .window(let id) = self.armSource { return id }; return RecTargets.meetingWindow(in: list)?.id }()
+            RecordingPicker.show(windows: list, preselect: pre) { choice in
+                guard let c = choice else { return }
+                self.armTouched = true; self.armChosen = "video"
+                self.setArm(c.0, windows: list)
+            }
+        }
+    }
+
+    /// Video without a chosen source yet: the screen from Settings, else the call's window (or nothing to show).
+    func findArmSource() {
+        guard !armLoading, armKind == "video", armSource == nil, ScreenPermission.granted() else { return }
+        armLoading = true
+        Task { @MainActor in
+            defer { self.armLoading = false }
+            if self.settings.source == "display" {
+                self.setArm(.display(RecTargets.display(for: self.settings.display)), windows: []); return
+            }
+            let list = await RecTargets.windows()
+            if let w = RecTargets.meetingWindow(in: list) { self.setArm(.window(w.id), windows: list) }
+        }
+    }
+
+    private func setArm(_ src: RecSource, windows: [RecTargets.Window]) {
+        armSource = src
+        switch src {
+        case .window(let id):
+            let w = windows.first { $0.id == id }
+            armApp = w?.app ?? ""; armTitle = w?.title ?? ""; armSize = w.map { "\(Int($0.width)) × \(Int($0.height))" } ?? ""
+        case .display(let id):
+            let d = RecTargets.displays().first { $0.id == id }
+            armApp = d?.name ?? ""; armTitle = d?.main == true ? L("rec.display.main") : ""
+            armSize = Int(CGDisplayPixelsWide(id)) > 0 ? "\(CGDisplayPixelsWide(id)) × \(CGDisplayPixelsHigh(id))" : ""
+        case .soundOnly: armApp = ""; armTitle = ""; armSize = ""
+        }
+        armThumb = ""
+        publish()
+        Task { @MainActor in
+            let img = await RecTargets.thumbnail(src, width: 240)
+            if self.armSource == src { self.armThumb = RecTargets.dataURL(img); self.publish() }
+        }
+    }
+
+    /// The prepared choice, once, when listening starts (then the next call starts from Settings again).
+    func takeArm() -> (kind: String, source: (RecSource, String)?) {
+        let k = armKind
+        let label = armTitle.isEmpty ? armApp : armApp + " - " + armTitle
+        let src = armSource.map { ($0, label) }
+        resetArm()
+        return (k, k == "video" ? src : nil)
+    }
+
+    func resetArm() {
+        armTouched = false; armChosen = "off"; armSource = nil
+        armApp = ""; armTitle = ""; armSize = ""; armThumb = ""
+    }
+
+    /// Start a recording of the live call from the floating panel or the menu bar panel (the tips window has its own).
+    func beginLive(kind k: String) {
+        let ce = CallEngine.shared
+        guard let f = ce.lastFile, !f.isEmpty, ce.isRunning else { publish(); return }
+        begin(transcript: f, kind: k, title: (ce.callRequest["title"] as? String) ?? "", project: ce.projectName)
     }
 
     // MARK: control
 
     /// Starts recording the live call (kind "audio" or "video"); for video the source follows Settings (and the picker).
-    func begin(transcript t: String, kind k: String, title: String, project: String) {
+    func begin(transcript t: String, kind k: String, title: String, project: String, source chosen: (RecSource, String)? = nil) {
         guard !isActive, state != "choosing", !t.isEmpty else { publish(); return }
         transcript = t; kind = k == "audio" ? "audio" : "video"; self.title = title; self.project = project
         lastNote = ""
@@ -126,6 +248,7 @@ final class CallRecorder: NSObject, ObservableObject {
             note(L("rec.err.permission")); return
         }
         if kind == "audio" { open(.soundOnly, label: ""); return }
+        if let c = chosen { open(c.0, label: c.1); return }      // 2026-11-05: prepared in the ready state
         let s = settings
         if s.source == "display" {
             let id = RecTargets.display(for: s.display)
@@ -210,7 +333,7 @@ final class CallRecorder: NSObject, ObservableObject {
     }
 
     /// The call is over: stop, then copy to Drive when Settings say every recording goes there.
-    func callEnded() { stop(callEnded: true) }
+    func callEnded() { resetArm(); stop(callEnded: true) }
 
     private func afterCall() {
         let t = transcript

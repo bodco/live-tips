@@ -605,9 +605,10 @@ final class CallEngine {
 
     /// 0.9.5: the call recording chosen in Start call (or by Settings > Call recording > Record every call).
     func startCallRecording(file: String?) {
-        let kind = (callRequest["recording"] as? String) ?? config.recording.defaultForCall
-        guard kind == "audio" || kind == "video", let f = file else { return }
-        CallRecorder.shared.begin(transcript: f, kind: kind, title: (callRequest["title"] as? String) ?? "", project: projectName)
+        // 2026-11-05: the choice made in the tips window's ready state wins (Start call / Settings otherwise)
+        let arm = CallRecorder.shared.takeArm()
+        guard arm.kind == "audio" || arm.kind == "video", let f = file else { return }
+        CallRecorder.shared.begin(transcript: f, kind: arm.kind, title: (callRequest["title"] as? String) ?? "", project: projectName, source: arm.source)
     }
 
     /// The project's (or workspace's) name of the live call, for the Drive folder.

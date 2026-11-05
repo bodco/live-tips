@@ -285,6 +285,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     /// 0.9.5: LiveTips.setState({rec: {state, kind, elapsed, source, note}})
     func pushRecording() {
         guard !args.demo else { return }
+        if !CallRecorder.shared.isActive { CallRecorder.shared.findArmSource() }     // 2026-11-05: what the ready card shows
         push("window.LiveTips && LiveTips.setState({rec: " + jsonLine(CallRecorder.shared.windowState) + "})")
     }
 
@@ -965,6 +966,8 @@ extension PrompterController {
             case "resume": r.resume()
             case "stop": r.stop()
             case "source": r.changeSource()
+            case "arm": r.arm((d["kind"] as? String) ?? "off")      // 2026-11-05: the ready card
+            case "arm-pick": r.pickArmSource()
             case "settings": MainActor.assumeIsolated { SettingsWindow.show(tab: "recording") }
             default: break
             }

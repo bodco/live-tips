@@ -3,7 +3,7 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.9.5 (unreleased)
+## 0.9.5 (2026-11-05)
 
 - **Floating call controls as a vertical strip (2026-11-05):** the panel is a narrow strip with the Pacenote mark on
   top (its dot: green while transcribing, orange when paused, red while the call is recorded), then Home, Tips,

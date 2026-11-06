@@ -1033,16 +1033,18 @@ class Engine:
                             "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
                             "usd": c.usd, "error": c.error})
 
-    def _call(self, role: str, line: Line, event: str, on_text=None):
+    def _call(self, role: str, line: Line, event: str, on_text=None, provider=None, model=None):
         if role == "tip" and meeting_role(self.meta()) == "interviewer":
             event += INTERVIEWER_ROLE_NOTE
         user = self.prompt.user(role, event, self._tail(line), self._state(), self._earlier(line))
         max_tokens = self.cfg.get("max_tokens", {}).get(role, 60 if role == "classify" else 300)
         extra = (self.cfg.get("request_extra") or {}).get(role)
-        c = self.provider.complete(model=self.models[role], system=self.prompt.blocks, user=user,
-                                   max_tokens=max_tokens, cache_ttl=self.ttl, extra=extra, on_text=on_text)
+        # 2026-11-06 (owner): a typed question goes to the preparation's model (provider + model given)
+        c = (provider or self.provider).complete(model=model or self.models[role], system=self.prompt.blocks, user=user,
+                                                 max_tokens=max_tokens, cache_ttl=self.ttl, extra=None if provider else extra,
+                                                 on_text=on_text)
         self._bill(c)
-        self.out_llm.write({"at": s_to_hms(self.clock()), "role": role, "model": c.model, "line_id": line.line_id,
+        self.out_llm.write({"at": s_to_hms(self.clock()), "role": role + ("_prep" if provider else ""), "model": c.model, "line_id": line.line_id,
                             "ttft_ms": c.ms(c.t_first_token), "gist_ms": c.ms(c.t_gist), "total_ms": c.ms(c.t_done),
                             "input": c.input_tokens, "cache_read": c.cache_read, "cache_write_5m": c.cache_write_5m,
                             "cache_write_1h": c.cache_write_1h, "output": c.output_tokens,
@@ -1705,16 +1707,71 @@ class Engine:
                 pass
         return prev
 
-    def _project_snippets(self, text: str, budget_chars: int = 14000) -> List[dict]:
-        root, lt = self.cfg.get("project_root"), self.cfg.get("lt_cmd")
-        if not root or not lt:
+    def _search_roots(self) -> List[str]:
+        """The project folder and every folder added to the call (2026-11-06: the added ones were searched only by
+        the Claude Code lookup, so a typed question never saw them)."""
+        roots = []
+        for d in [self.cfg.get("project_root")] + list(self.cfg.get("extra_dirs") or []):
+            if isinstance(d, str) and d and d not in roots and Path(d).is_dir():
+                roots.append(d)
+        return roots
+
+    def _project_snippets(self, text: str, budget_chars: int = 14000, k: int = 6) -> List[dict]:
+        roots, lt = self._search_roots(), self.cfg.get("lt_cmd")
+        if not roots or not lt:
             return []
         from .context import index_snippets
         from concurrent.futures import ThreadPoolExecutor as _TP
         qs = self._find_queries(text)
-        with _TP(max_workers=len(qs) or 1) as ex:      # parallel, one overall wait (QA: up to 100 s in a row)
-            results = list(ex.map(lambda q: index_snippets(lt, Path(root), q, k=6, timeout=15.0), qs))
+        jobs = [(q, r) for r in roots[:4] for q in qs]
+        with _TP(max_workers=min(12, len(jobs)) or 1) as ex:      # parallel, one overall wait (QA: up to 100 s in a row)
+            results = list(ex.map(lambda j: index_snippets(lt, Path(j[1]), j[0], k=k, timeout=15.0), jobs))
         return fit_snippets(merge_hits(results), budget_chars, self._hit_text)
+
+    # ---------- the preparation's model for questions and the deep lookup (2026-11-06, owner) ----------
+    FAST_PREP_ROUTES = ("api", "openai", "gemini")
+
+    def _prep_route(self) -> str:
+        routes = (self.cfg.get("ai") or {}).get("routes") or {}
+        return routes.get("prep") or ""
+
+    def _prep_provider(self):
+        """The provider of the preparation job (Settings > AI), built once; None when the app did not send it."""
+        if not hasattr(self, "_prepp"):
+            self._prepp = None
+            if self._prep_route():
+                try:
+                    from .routing import provider_from_cfg
+                    from .secret_store import load_secret
+                    self._prepp = provider_from_cfg(self.cfg, lambda n: load_secret(n, self.cfg.get("secrets_file")),
+                                                    job="prep", env_route=False)
+                except Exception:  # noqa: BLE001  (questions then stay on the tips model)
+                    self._prepp = None
+        return self._prepp
+
+    def _deep_model(self) -> str:
+        return self.cfg.get("deep_model_id") or "claude-sonnet-5-5"
+
+    def _ask_on_prep(self) -> bool:
+        """A typed question is answered by the preparation's model when that way answers in seconds."""
+        return bool(self.cfg.get("ask_on_prep_model", True)) and self._prep_route() in self.FAST_PREP_ROUTES \
+            and self._prep_provider() is not None
+
+    def _deep_via_claude_code(self) -> bool:
+        """Claude Code reads the folders itself when the preparation runs on Claude (account or key); with no
+        preparation way known (an older app, the skill) it follows the tips way as before."""
+        from . import deep
+        route = self._prep_route() or ((self.cfg.get("ai") or {}).get("routes") or {}).get("tips") or "api"
+        return route in ("code", "api") and bool(deep.claude_path(self.cfg))
+
+    def _open_question(self, line: Optional[Line]) -> str:
+        """HELP NOW has no text: the last question of the other side (or the last line) is what to look up."""
+        with self.lock:
+            hist = list(self.history)[-6:]
+        for h in reversed(hist):
+            if h.speaker != "me" and "?" in (h.text or ""):
+                return h.text
+        return (hist[-1].text if hist else (line.text if line else "")) or ""
 
     def _run_find(self, text: str, line: Line, span: dict) -> None:
         span["tip_start"] = self.clock()
@@ -1794,9 +1851,20 @@ class Engine:
             self._run_wrap(line, span)
             return
         event = SOS_EVENT if kind == "sos" else self._ask_event(text)
+        if kind == "sos":            # 2026-11-06 (owner): HELP NOW also gets the folders' passages for the open question
+            q = self._open_question(line)
+            snips = self._project_snippets(q, budget_chars=6000) if q.strip() else []
+            if snips:
+                event += "\n\nPASSAGES FROM THE PROJECT FOLDERS (search for the open question; newest facts win):\n" + passages(snips)
         event = self._sales_cards_first(kind, text) + event   # 0.8.7 (H4.5): answer cards first in sales mode
         span["tip_start"] = self.clock()
-        c = self._call("tip", line, event)
+        strong = kind == "ask" and self._ask_on_prep()
+        c = self._call("tip", line, event, provider=self._prep_provider(), model=self._deep_model()) if strong \
+            else self._call("tip", line, event)
+        if strong and c.error:       # the preparation's way is out: the tips model answers as before
+            c = self._call("tip", line, event)
+        if strong and not c.error:
+            span["ask_model"] = "prep"
         done = self.clock()
         obj = self._request_answer(c, kind, text, line)
         item = request_item(obj, kind, text, span["src"], done)
@@ -1883,11 +1951,11 @@ class Engine:
     def _request_answer(self, c, kind: str, text: str, line: Line) -> dict:
         """The model's answer to an ask or HELP NOW; never empty: a bridge phrase and a deeper search when it has none."""
         obj = first_json(c.text) if not c.error else None
-        unanswered = not_answered(obj)
+        unanswered = not_answered(obj) or (kind == "ask" and obj.get("answered") is not True)   # 2026-11-06: a typed question without "answered": true digs
         uk = self._ui_uk()
         if not obj or obj.get("skip"):
-            obj = no_ready_answer(kind, uk, self.cfg.get("deep_lookup", True))
-        if unanswered and kind in ("ask", "sos") and self.cfg.get("deep_lookup", True):
+            obj = no_ready_answer(kind, uk, self.cfg.get("deep_lookup", True) and bool(self._search_roots()))
+        if unanswered and kind in ("ask", "sos") and self.cfg.get("deep_lookup", True) and self._search_roots():
             self._start_deep(text or (line.text if line else ""), kind)
             obj["note"] = with_deep_note(obj.get("note"), uk)
         return obj
@@ -1910,8 +1978,14 @@ class Engine:
         from . import deep
         uk = self._ui_uk()
         t0 = self.clock()
+        lang = "Ukrainian" if uk else "English"
         try:
-            res = deep.lookup(self.cfg, question, tail, "Ukrainian" if uk else "English")
+            if self._deep_via_claude_code():
+                res = deep.lookup(self.cfg, question, tail, lang)
+            else:     # 2026-11-06 (owner): every other way searches the folders here and asks the preparation's model
+                prov = self._prep_provider() or self.provider
+                res = deep.local_lookup(prov, self._deep_model(), question, tail, lang,
+                                        self._project_snippets(question, budget_chars=36000, k=10), passages)
         finally:
             with self.lock:
                 self.deep_running = max(0, getattr(self, "deep_running", 1) - 1)

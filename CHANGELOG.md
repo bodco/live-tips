@@ -3,6 +3,20 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.9.5.4 (2026-11-06)
+
+- **Questions dig into your folders on every AI way (2026-11-06, owner):** with tips on OpenAI, Gemini or a ChatGPT
+  account, a typed question or HELP NOW with no ready answer gave a bridge sentence and stopped: the deeper search ran
+  only through Claude Code. Now it runs on every way. When the preparation runs on Claude, Claude Code reads the
+  folders as before; otherwise Pacenote searches the project folder and every folder added to the call itself and the
+  preparation's model answers from the passages, as a new card. The quick answer also searches the added folders
+  (before, only the project folder), and HELP NOW gets passages for the open question.
+- **Typed questions use the preparation's model (2026-11-06, owner):** a question you type in the tips window is
+  answered by the model set for the preparation (Settings > AI, for example Sonnet or GPT-6.1 Sol) instead of the
+  fast tips model, when that way answers in seconds (a Claude or OpenAI key, Gemini API). With a Claude or ChatGPT
+  account or the Gemini account the question stays on the tips model and the deeper search uses the preparation's way.
+  If that way is out, the tips model answers.
+
 ## 0.9.5.3 (2026-11-05)
 
 - **Tips read like a person talking (2026-11-05, owner):** tips were telegrams (a 7-word label, a 12-word phrase) and

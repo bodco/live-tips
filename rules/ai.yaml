@@ -12,14 +12,14 @@ routes:
     The default Codex model is used (codex/default in the ledger); plan usage is not billed to an API key.
     No automatic provider switching. For prep, livetips_m0.codexprep uses the localprep context pack and
     prompt contracts; Pacenote writes and checks the output files itself and restores the previous prep
-    on failure. Live tips keep the local cards and search but do not start Claude Code deep folder lookup.
+    on failure. Live tips keep the local cards and search; the deep folder lookup follows the preparation (deep_lookup).
   openai: |
     OpenAI API key from macOS Keychain (OPENAI_API_KEY in the child process only), the job's OpenAI model (Settings > AI; defaults gpt-6-luna for tips, gpt-6.1-sol for preparation and after the call) through the
     streaming Responses API with reasoning effort none and store false. Available for tips, after-call jobs and,
     from 0.9.0, the preparation (livetips_m0.openaiprep: the same context pack and passes as the ChatGPT account
     route, Pacenote writes and checks the files and restores the previous prep on failure). No automatic fallback from OpenAI to Claude or local. Live-call
-    spending limits apply; cached input tokens are counted separately from uncached input. Claude Code deep
-    folder lookup is disabled when tips use OpenAI; the local project search and prepared cards remain available.
+    spending limits apply; cached input tokens are counted separately from uncached input. With tips on OpenAI the
+    deep folder lookup follows the preparation's way (deep_lookup); the local project search and prepared cards remain.
     Incomplete, refused, failed or unterminated streams are errors, with one exception (0.9.2, audit of a 04.11 call:
     Luna closed its JSON and ran on to the output limit, 14 of 98 classify and 3 of 24 tip answers were lost): an
     answer cut by the output limit (incomplete_details.reason max_output_tokens) whose text starts with a whole JSON
@@ -41,7 +41,7 @@ routes:
     follows the OpenAI rules (a whole JSON object at the start is kept, otherwise asked once more with three times
     the limit). Errors name only the status and a string code, never the message. No automatic fallback from a
     chosen Gemini to Claude, OpenAI or local. Available for tips, after-call jobs and the preparation
-    (livetips_m0.geminiprep). Claude Code deep folder lookup is disabled when tips use Gemini.
+    (livetips_m0.geminiprep). With tips on Gemini the deep folder lookup follows the preparation's way (deep_lookup).
   agy: |
     0.9.3 (owner, 2026-11-05): the Gemini account through Google's Antigravity CLI (agy), for the preparation and the
     after-the-call jobs only: a request takes 20-30 s however small (measured 2026-11-05), too slow for tips. One
@@ -81,6 +81,20 @@ routes:
   claude_tools: |
     0.8.5: Claude Code was refused `lt digest` and `lt prep-check` in every run; the app now makes <base>.digest.md
     right before Claude starts and runs `lt prep-check --fix` after it; Claude reads the digest with Read.
+deep_lookup: |
+  2026-11-06 (owner): a typed question or HELP NOW with no ready answer (a typed question without "answered": true)
+  starts a search of the project folder and every folder added to the call, on every AI way, in the background; the
+  answer comes as a new card. The preparation runs on Claude (account or key) and Claude Code is installed: read-only
+  Claude Code (Read, Grep, Glob) over the folders, as since 0.6.2. Any other way: the engine searches the folders
+  itself (lt search, several queries, wide passages) and the preparation's model answers from the passages; only the
+  question, the last call lines and the passages go to that provider. At most 2 at a time and 12 per call; spending
+  limits apply. No folders: no search, the card says there is no ready answer.
+ask_model: |
+  2026-11-06 (owner): a typed question is answered by the preparation's way and model (Settings > AI) when that way
+  answers in seconds: a Claude API key, the OpenAI API or the Gemini API. A Claude or ChatGPT account and the Gemini
+  account keep typed questions on the tips model. The preparation's way out: the tips model answers. HELP NOW stays
+  on the tips model (speed first). The quick answer searches the project folder and the added folders; HELP NOW
+  searches them for the other side's last question.
 fallback: |
   0.8.5 (owner: plan B when Claude is down): with "Use it when Claude does not answer" on (default), a preparation or
   an after-the-call job whose Claude ways are both out (no credit, plan limit, signed out, not installed) runs on the

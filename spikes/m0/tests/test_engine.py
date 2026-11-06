@@ -545,3 +545,71 @@ def test_speech_points_keep_their_full_text(tmp_path):
     out = speech_out(sec, 10.0, "g", "")
     assert out["items"][1]["full"].startswith("The release") and out["items"][2] == "2. Export in QA"
     assert speech_point({"text": "a", "full": "a"}) == "a" and point_text({"text": "b", "full": "c"}) == "b"
+
+
+def test_typed_question_uses_the_prep_model_and_searches_added_folders(tmp_path, monkeypatch):
+    # 2026-11-06 (owner): a typed question sees the folders added to the call and is answered by the preparation's
+    # model; with no "answered": true the deep lookup starts (here: on any AI way, not only Claude Code).
+    from livetips_m0 import context
+    proj, extra = tmp_path / "proj", tmp_path / "added"
+    proj.mkdir(); extra.mkdir()
+    (extra / "plan.md").write_text("Export: production on Tuesday after the review.\n")
+    roots = []
+
+    def fake_snippets(lt, root, query, k=8, timeout=25.0):
+        roots.append(str(root))
+        if str(root) != str(extra):
+            return []
+        return [{"path": str(extra / "plan.md"), "rel": "plan.md", "date": "2026-10-28", "score": 0.9,
+                 "preview": "Export: production on Tuesday"}]
+    monkeypatch.setattr(context, "index_snippets", fake_snippets)
+    tips_seen, prep_seen = [], []
+
+    def resp(model, user):
+        if "Question:" in user:
+            return '{"queries": ["export date"]}'
+        tips_seen.append(model)
+        return '{"gist": "?", "level": "info", "topic": "ask"}'
+
+    class Prep:
+        def complete(self, **kw):
+            prep_seen.append(kw["model"])
+            assert "PASSAGES FROM THE PROJECT FOLDER" in str(kw["user"]) and "Tuesday" in str(kw["user"])
+            from livetips_m0.providers import Completion
+            c = Completion(model=kw["model"])
+            c.text = '{"gist": "Tuesday", "phrase": "Production on Tuesday.", "answered": true, "level": "info", "topic": "ask"}'
+            return c
+    eng, clock = _meeting_engine(tmp_path, resp, project_root=str(proj), extra_dirs=[str(extra)], lt_cmd=["lt"],
+                                 ai={"routes": {"prep": "openai", "tips": "openai"}}, deep_lookup=True)
+    eng._prepp = Prep()
+    started = []
+    eng._start_deep = lambda q, kind: started.append(q)
+    eng.on_request("ask", "when is the export live?")
+    end = time.monotonic() + 5
+    while time.monotonic() < end and any(not f.done() for f in eng.futures):
+        time.sleep(0.01)
+    tips, timing = _out(tmp_path)
+    ans = [t for t in tips if t.get("kind") == "answer"]
+    assert ans and ans[-1]["gist"] == "Tuesday" and prep_seen == ["claude-sonnet-5-5"]
+    assert str(extra) in roots and str(proj) in roots and not started
+    assert timing[-1]["ask_model"] == "prep"
+
+
+def test_unanswered_ask_starts_the_deep_lookup_and_slow_prep_way_keeps_tips_model(tmp_path):
+    def resp(model, user):
+        if "Question:" in user:
+            return '{"queries": []}'
+        return '{"gist": "Not in the brief", "phrase": "Let me check.", "level": "info", "topic": "ask"}'
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    eng, clock = _meeting_engine(tmp_path, resp, project_root=str(proj), ai={"routes": {"prep": "agy", "tips": "openai"}}, deep_lookup=True)
+    started = []
+    eng._start_deep = lambda q, kind: started.append((q, kind))
+    assert not eng._ask_on_prep()            # the Gemini account takes 20-30 s: questions stay on the tips model
+    eng.on_request("ask", "who tests the pilot?")
+    end = time.monotonic() + 5
+    while time.monotonic() < end and any(not f.done() for f in eng.futures):
+        time.sleep(0.01)
+    assert started == [("who tests the pilot?", "ask")]
+    _, timing = _out(tmp_path)
+    assert "ask_model" not in timing[-1]

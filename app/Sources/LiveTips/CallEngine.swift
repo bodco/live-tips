@@ -335,8 +335,10 @@ final class CallEngine {
         // lt search: by meaning with Local AI on, plain text search otherwise (2026-10-26: "Search the project" works either way).
         sc["lt_cmd"] = [c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt")]
         sc["local_ai"] = c.localAI.enabled
-        // 2026-10-27 (owner): a question with no ready answer starts a read-only Claude Code search of the project folder.
-        sc["deep_lookup"] = ![AIRoute.openai, AIRoute.codex, AIRoute.gemini].contains(c.ai.tips)
+        // 2026-10-27 (owner): a question with no ready answer starts a search of the project folder and the added folders.
+        // 2026-11-06 (owner): on every AI way: Claude Code reads the folders when the preparation runs on Claude, otherwise
+        // the engine searches them and the preparation's model answers (rules/ai.yaml > deep_lookup).
+        sc["deep_lookup"] = true
         if let cl = PrepRunner.claudePath { sc["claude_cli"] = cl }
         let ws: [String] = (callRequest["workspace_root"] as? String).flatMap { $0.isEmpty ? nil : [$0] } ?? []
         let added: [String] = (callRequest["folders"] as? [String]) ?? []

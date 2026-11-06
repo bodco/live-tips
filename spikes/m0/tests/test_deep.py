@@ -69,3 +69,55 @@ def test_claude_path(tmp_path, monkeypatch):
     assert deep.claude_path({"claude_cli": str(cli)}) == str(cli)
     monkeypatch.setattr(deep.shutil, "which", lambda name, path: "/found/" + name if "/opt/homebrew/bin" in path else None)
     assert deep.claude_path({"claude_cli": str(tmp_path / "missing")}) == "/found/claude"
+
+
+# ---------- 2026-11-06: the deep lookup on any AI way (local search + the preparation's model) ----------
+class _Fake:
+    def __init__(self, text="", error=None, usd=0.02):
+        self.text, self.error, self.usd, self.seen = text, error, usd, {}
+
+    def complete(self, **kw):
+        self.seen.update(kw)
+        return types.SimpleNamespace(text=self.text, error=self.error, usd=self.usd)
+
+
+def _render(snips):
+    return "\n".join("[{}] {}".format(x["src"], x["text"]) for x in snips)
+
+
+SNIPS = [{"src": "notes/kickoff.md", "date": "2026-10-28", "text": "Export: production on Tuesday after the review."}]
+
+
+def test_local_lookup_answers_from_passages():
+    p = _Fake(text='Here: {"answered": true, "gist": "Tuesday", "phrase": "Production on Tuesday.", "items": []}')
+    res = deep.local_lookup(p, "claude-sonnet-5-5", "  When is the export live? ", ["them: when?"], "English", SNIPS, _render)
+    assert res["gist"] == "Tuesday" and res["cost_usd"] == 0.02 and res["sources"] == ["notes/kickoff.md"]
+    assert p.seen["model"] == "claude-sonnet-5-5" and p.seen["cache_ttl"] is None
+    assert "Write gist, phrase and items in English." in p.seen["system"][0]["text"]
+    u = p.seen["user"]
+    assert u.startswith("Question from the PM: When is the export live?") and "[notes/kickoff.md] Export" in u
+    assert "<transcript_data>\nthem: when?\n</transcript_data>" in u
+
+
+def test_local_lookup_failures():
+    assert deep.local_lookup(None, "m", "q", [], "English", SNIPS, _render) == {"error": "no AI way for the preparation"}
+    assert deep.local_lookup(_Fake(), "m", "q", [], "English", [], _render) == {"error": "nothing found in the project folders"}
+    assert deep.local_lookup(_Fake(error="OpenAI: 429 rate_limit"), "m", "q", [], "English", SNIPS, _render)["error"].startswith("OpenAI: 429")
+    assert deep.local_lookup(_Fake(text="no json"), "m", "q", [], "English", SNIPS, _render) == {"error": "no answer from the search", "cost_usd": 0.02}
+
+
+def test_prep_provider_ignores_the_tips_route_in_env(monkeypatch):
+    from livetips_m0 import routing
+    monkeypatch.setenv("LT_AI_ROUTE", "openai")
+    seen = {}
+
+    class RP:
+        def __init__(self, job, route, legs, **kw):
+            seen.update(job=job, route=route)
+    monkeypatch.setattr(routing, "RoutedProvider", RP)
+    monkeypatch.setattr(routing, "make_legs", lambda *a, **k: {})
+    cfg = {"ai": {"routes": {"prep": "code", "tips": "openai"}}}
+    routing.provider_from_cfg(cfg, lambda n: "", job="prep", env_route=False)
+    assert seen == {"job": "prep", "route": "code"}
+    routing.provider_from_cfg(cfg, lambda n: "", job="prep")
+    assert seen["route"] == "openai"          # a one-off run (LT_AI_ROUTE) still wins by default

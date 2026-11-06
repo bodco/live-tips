@@ -121,10 +121,11 @@ enum AIRoute {
 
     /// For sidecar-config.json (the tips engine and the judge).
     static func sidecarBlock(config c: AppConfig) -> [String: Any] {
-        ["routes": ["tips": c.ai.tips, "after": c.ai.after], "auto": c.ai.autoSwitch, "state": statePath,
-         "openai_models": ["tips": c.ai.openaiTips, "after": c.ai.openaiAfter],
-         "gemini_models": ["tips": c.ai.geminiTips, "after": c.ai.geminiAfter], "gemini_fallback": c.ai.geminiFallback,
-         "agy_models": ["after": c.ai.agyAfter],
+        // 2026-11-06: "prep" too: typed questions and the deep folder lookup use the preparation's way and model.
+        ["routes": ["prep": c.ai.prep, "tips": c.ai.tips, "after": c.ai.after], "auto": c.ai.autoSwitch, "state": statePath,
+         "openai_models": ["prep": c.ai.openaiPrep, "tips": c.ai.openaiTips, "after": c.ai.openaiAfter],
+         "gemini_models": ["prep": c.ai.geminiPrep, "tips": c.ai.geminiTips, "after": c.ai.geminiAfter], "gemini_fallback": c.ai.geminiFallback,
+         "agy_models": ["prep": c.ai.agyPrep, "after": c.ai.agyAfter],
          "claude_cli": PrepRunner.claudePath ?? ""]
     }
 

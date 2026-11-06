@@ -1149,15 +1149,15 @@ first minute.
 |---|---|
 | Red tips when you are addressed: a direct question to you, your turn, a new request, a date or commitment being made | The speech card (your update, point by point) |
 | HELP NOW: the next sentence to say, built from what was just said | Instant fact cards (⚡) that fire on a keyword in under a second |
-| Questions typed in the window, answered from the call so far | Facts from documents read before the call (the fact book) |
+| Questions typed in the window, answered from the call so far and the project folders, by the preparation's model when it answers in seconds (2026-11-06) | Facts from documents read before the call (the fact book) |
 | "Find" questions: a search over the project folder (local index) | |
-| A deeper search when nothing ready answers (0.6.2): Claude Code reads the project folder, the local Notion mirror and earlier call transcripts in the background and the answer arrives as a new card, usually in 15-60 s. With no preparation, a question to you starts this search by itself | |
+| A deeper search when nothing ready answers (0.6.2): the project folder, the folders added to the call, the local Notion mirror and earlier call transcripts are searched in the background and the answer arrives as a new card, usually in 15-60 s. With the preparation on Claude, Claude Code reads the folders; on any other way (2026-11-06) Pacenote searches them and the preparation's model answers. With no preparation, a question to you starts this search by itself | |
 | The call context you typed in Start call, the project's current state from the local Notion mirror, a digest of the project's recent calls | |
 | On me, the wrap-up and the Notion meeting page | |
 
 A typed question never ends with a bare "no answer": the card gives what is known nearest and a
 sentence you can say right away ("give me a minute, I will check"), and the deeper search starts.
-It is read-only (no shell, no web, no writes), runs on your Claude API key like the tips, and is
+It is read-only (no shell, no web, no writes), runs on the preparation's way (Settings > AI), and is
 limited to 2 at a time and 12 per call.
 
 A preparation that finishes after the call started joins it by itself: the window says

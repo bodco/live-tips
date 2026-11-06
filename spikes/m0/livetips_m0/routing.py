@@ -538,12 +538,14 @@ def provider_from_env(job: Optional[str] = None, timeout: float = 120.0) -> Prov
                           gemini_fallback=bool(route) and env.get("LT_GEMINI_FALLBACK") == "1")
 
 
-def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optional[str] = None) -> Provider:
+def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optional[str] = None,
+                      env_route: bool = True) -> Provider:
     """For the tips engine and the judge: cfg["ai"] = {"routes": {job: route}, "auto": bool, "state": path,
     "claude_cli": path}, written by the app into sidecar-config.json. LT_AI_ROUTE wins (a one-off run)."""
     ai = cfg.get("ai") or {}
     job = job or ai.get("job", "tips")
-    route = os.environ.get("LT_AI_ROUTE") or (ai.get("routes") or {}).get(job)
+    # env_route=False (2026-11-06): the tips engine builds the preparation's provider; LT_AI_ROUTE names the tips way
+    route = (os.environ.get("LT_AI_ROUTE") if env_route else None) or (ai.get("routes") or {}).get(job)
     key = _secret(secret_loader, cfg.get("api_key_env", "CLAUDE_API"))
     ws = cfg.get("workspace_id") or _secret(secret_loader, cfg.get("workspace_id_env", ""))
     from .openai_provider import job_model

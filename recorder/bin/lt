@@ -987,8 +987,16 @@ def cmd_index(args):
         if i == 1 or i % 25 == 0 or i == n:
             el = time.time() - t0
             print(f"  [{i}/{n}] {rel} ({nch} chunks, {el:.0f} s)", flush=True)
+    # 0.9.6: SIGTERM/SIGINT (the app stops the indexer when the Mac goes on battery) end the run after the
+    # current file and commit what is embedded; a checkpoint every 5 min keeps a long first build safe
+    import signal
+    import threading
+    stop = threading.Event()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda *_: stop.set())
     try:
-        res = idx.update(rebuild=rebuild, batch=16, progress=progress, lock_wait=120, timeout=120)
+        res = idx.update(rebuild=rebuild, batch=16, progress=progress, lock_wait=120, timeout=120,
+                         stop=stop, checkpoint_s=300)
     except S.IndexBusy:
         raise LtError("the index is being updated by the recorder right now; try again in a minute")
     except S.SemanticError as e:
@@ -996,7 +1004,8 @@ def cmd_index(args):
     rate = res["chunks_added"] / res["seconds"] if res["seconds"] else 0
     out(f"index {idx.dir}: files={res['files']} chunks={res['chunks']} new={res['new']} changed={res['changed']} "
         f"removed={res['removed']} embedded_chunks={res['chunks_added']} seconds={res['seconds']} "
-        f"chunks_per_s={rate:.1f} model={client.model}")
+        f"chunks_per_s={rate:.1f} model={client.model}"
+        + (f" stopped=1 remaining_files={res.get('remaining_files', 0)}" if stop.is_set() else ""))
 
 
 def print_hits(S, hits, header, as_json, note=None):

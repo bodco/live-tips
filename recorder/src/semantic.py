@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import collections
 import datetime as dt
+import fnmatch
 import hashlib
 import json
 import os
@@ -397,7 +398,11 @@ TEXT_EXT = {".md", ".txt", ".csv", ".json"}
 SKIP_DIRS = {".git", "node_modules", "repos", "_archived", INDEX_DIR, "__pycache__", ".venv", "venv",
              ".idea", ".vscode", ".Trash", ".cache",
              # never index secrets, deleted or archived material (2026-10-21)
-             "Secrets", "secrets", "_to_delete", "_archive", "_Archive"}
+             "Secrets", "secrets", "_to_delete", "_archive", "_Archive",
+             # 0.9.6: generated noise, never project knowledge: benchmark runs, judge packets, worktree copies (2026-11-09)
+             "runs", "_judge", "worktrees"}
+SKIP_DIR_GLOBS = ("wt-*",)                    # git worktree copies by naming convention
+IGNORE_FILE = ".livetipsignore"               # 0.9.6: per-folder ignore list (project root and each extra folder)
 SECRET_NAME = re.compile(r"(secret|credential|password|token|\.env$|apikey|api_key)", re.I)
 MAX_BYTES = 2 * 1024 * 1024
 JSON_MAX = 256 * 1024
@@ -405,6 +410,53 @@ CSV_ROWS = 30
 FRONT_KEYS = re.compile(r"^\s*(last[_ ]?edited(?:[_ ]time)?|last[_ ]?modified|updated(?:[_ ]at)?|modified|date)\s*:\s*(.+?)\s*$",
                         re.I | re.M)
 DATE_RX = re.compile(r"(\d{4}-\d{2}-\d{2})")
+
+
+def skip_dir(name: str) -> bool:
+    """Folders the walk never enters (rules/index.yaml > skip_dirs, skip_dir_globs, skip_hidden)."""
+    return name in SKIP_DIRS or name.startswith(".") or any(fnmatch.fnmatchcase(name, g) for g in SKIP_DIR_GLOBS)
+
+
+def load_ignore(base: Path) -> tuple[list[tuple[str, bool]], list[tuple[str, bool]]]:
+    """<folder>/.livetipsignore, a small subset of .gitignore: one pattern per line, # comments.
+    `name` or `name/` (glob allowed) matches that file or folder name at any depth; a trailing slash means
+    folders only. A pattern with a slash inside (or a leading one) is anchored to the folder: `private/`
+    matches any `private` folder, `/private/` and `docs/old/*` only from the top. No negation.
+    Returns (unanchored, anchored) lists of (pattern, folders_only)."""
+    names: list[tuple[str, bool]] = []
+    anchored: list[tuple[str, bool]] = []
+    try:
+        lines = (Path(base) / IGNORE_FILE).read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return names, anchored
+    for ln in lines:
+        pat = ln.strip()
+        if not pat or pat.startswith("#") or pat.startswith("!"):
+            continue
+        dir_only = pat.endswith("/")
+        pat = pat.rstrip("/")
+        lead = pat.startswith("/")
+        pat = pat.lstrip("/")
+        if not pat:
+            continue
+        (anchored if lead or "/" in pat else names).append((pat, dir_only))
+    return names, anchored
+
+
+def ignored_rel(rel_parts: tuple[str, ...], is_dir: bool, ignore) -> bool:
+    """True when a path (relative to its watched folder) matches the folder's .livetipsignore."""
+    names, anchored = ignore
+    if not rel_parts or not (names or anchored):
+        return False
+    name = rel_parts[-1]
+    for pat, dir_only in names:
+        if (is_dir or not dir_only) and fnmatch.fnmatchcase(name, pat):
+            return True
+    rel = "/".join(rel_parts)
+    for pat, dir_only in anchored:
+        if (is_dir or not dir_only) and fnmatch.fnmatchcase(rel, pat):
+            return True
+    return False
 
 
 def skip_file(path: Path, rel_parts: tuple[str, ...]) -> bool:
@@ -448,16 +500,21 @@ def iter_files(roots: list[tuple[Path, str]], exclude: set[str] | None = None):
         base = Path(base)
         if not base.is_dir():
             continue
+        ignore = load_ignore(base)
         for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
-            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
             dp = Path(dirpath)
+            try:
+                rel_dir = dp.relative_to(base).parts
+            except ValueError:
+                continue
+            dirnames[:] = [d for d in dirnames if not skip_dir(d) and not ignored_rel(rel_dir + (d,), True, ignore)]
             for fn in filenames:
                 p = dp / fn
                 try:
                     rel = p.relative_to(base)
                 except ValueError:
                     continue
-                if skip_file(p, rel.parts):
+                if skip_file(p, rel.parts) or ignored_rel(rel.parts, False, ignore):
                     continue
                 ap = str(p)
                 if ap in seen or ap in exclude or any(ap.startswith(x[:-1]) for x in exclude if x.endswith("*")):
@@ -751,10 +808,13 @@ class ProjectIndex:
     # ---- write side
     def update(self, rebuild: bool = False, batch: int = 16, should_yield=None, yield_sleep: float = 0.5,
                pause_s: float = 0.0, max_chunks: int | None = None, stop=None, progress=None,
-               lock_wait: float = 0.0, exclude: set[str] | None = None, timeout: float = 60.0) -> dict:
+               lock_wait: float = 0.0, exclude: set[str] | None = None, timeout: float = 60.0,
+               checkpoint_s: float = 0.0) -> dict:
         """Index new and changed files (by mtime + size), drop removed ones, commit atomically.
         Files are processed newest first. Returns a summary dict; raises IndexBusy or SemanticError
-        (work done before an embedding error is committed)."""
+        (work done before an embedding error is committed). When `stop` is set the loop ends after the
+        current file and the work done so far is committed. checkpoint_s > 0 (0.9.6) also commits every
+        so many seconds, so a long first build killed halfway does not start over."""
         t0 = time.time()
         summary = {"new": 0, "changed": 0, "removed": 0, "chunks_added": 0, "files": 0, "chunks": 0,
                    "remaining_files": 0, "seconds": 0.0, "committed": False}
@@ -795,6 +855,7 @@ class ProjectIndex:
             added = 0
             dirty = bool(removed) or (rebuild and bool(self.manifest))
             done_files = 0
+            last_commit = time.time()
             for n_done, (_mt, ap, rel, st, existed) in enumerate(todo):
                 if stop is not None and stop.is_set():
                     break
@@ -850,6 +911,9 @@ class ProjectIndex:
                 summary["changed" if existed else "new"] += 1
                 if progress:
                     progress(n_done + 1, len(todo), rel, len(ch))
+                if checkpoint_s and time.time() - last_commit >= checkpoint_s:
+                    self._commit(old_files, rows, dim)
+                    last_commit = time.time()
             summary["chunks_added"] = added
             summary["remaining_files"] = len(todo) - done_files
             if dirty:

@@ -21,6 +21,8 @@ def test_parity_with_live_transcriber():
     r = Rules()
     assert r.semantic["neutral_anchors"] == S.NEUTRAL_ANCHORS
     assert set(r.index["skip_dirs"]) == S.SKIP_DIRS
+    assert tuple(r.index["skip_dir_globs"]) == S.SKIP_DIR_GLOBS and r.index["ignore_file"]["name"] == S.IGNORE_FILE
+    assert r.index["checkpoint_s"] == 300
     assert r.index["secret_name_regex"] == S.SECRET_NAME.pattern
     assert r.index["max_bytes"] == S.MAX_BYTES and r.index["format_version"] == S.INDEX_VERSION
     import json

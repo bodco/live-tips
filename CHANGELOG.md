@@ -3,6 +3,77 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.9.6 (2026-11-09)
+
+- **The folder index waits for power and skips generated folders (2026-11-09, owner):** a full index of a project
+  with benchmark output ran 3 hours on four cores, on battery. Now the index starts only on mains power; when the Mac
+  goes on battery, a running `lt index` saves what it has embedded and stops, and the project continues once you plug
+  in (`defaults write io.github.example.livetips indexOnBattery -bool true` turns this off). `runs`, `_judge`,
+  `worktrees` and `wt-*` folders are never indexed, and each project root or extra folder can list more in a
+  `.livetipsignore` file (a small subset of .gitignore: `private/`, `/docs/old/`, `*.log`). Changes inside skipped
+  folders no longer start a reindex. A long first build saves every 5 minutes, so a stopped one continues where it
+  was instead of starting over (rules/index.yaml: skip_dir_globs, ignore_file, power, checkpoint_s).
+- **Start call opens the meeting (2026-11-09, owner):** starting a call from the calendar also opens its Meet, Teams or
+  Zoom link, in the place this series used before: a Chrome profile (found by its email, so the same profile with
+  another folder on another Mac still works), the Google Meet app of a profile, the Teams or Zoom app or the default
+  browser. A new series asks once in a small panel; after that it opens at once with "Opened in ..." and Wrong place,
+  which offers the other places and moves the wrong one to the end. Meet links get the chosen account
+  (`authuser`). Nothing is set up per project. Settings > Integrations > Calendars: Open the meeting when I start a
+  call (on by default) and Forget all. The call-start offer, made when the meeting is already on, never opens it again.
+- **One row per meeting (2026-11-09, owner):** the same meeting invited to two connected accounts showed twice on Home
+  and in the menu bar. The same link and start now make one row (the attendees are not compared; without a link, the
+  same calendar UID and start); it keeps the details of both copies, and a brief or a hidden state made on either copy
+  stays.
+- **Theme (2026-11-09, owner):** Settings > General > Theme: Same as the Mac (default), Light or Dark, for every window.
+- **Call agent, beta (2026-11-06, owner):** an opt-in Claude agent for the whole call (Settings > AI > Call agent),
+  built on the Claude Agent SDK. A question the brief does not answer goes to one agent session that remembers what
+  it already found and the lines it has seen. Besides reading and searching the project folders it has Pacenote's own
+  tools: the brief and the fact book, the call so far, the folder index and earlier calls of the project. Read-only:
+  no shell, no web, no writes, no skills or settings of your own. It uses the Claude API key only, never the Claude
+  account. On a 30 minute test call with five questions: $0.11 on Sonnet, about 6 s an answer ($0.01 on Haiku),
+  against $0.33 and about 11 s for the Claude Code search. A budget per call ($1 by default); when it fails, is off or
+  is spent, the 0.9.5.4 search answers. Needs the optional Call agent component (about 320 MB).
+- **Background searches of the call agent, beta (2026-11-06, owner):** a second switch under Call agent, off by
+  default. When the other side asks you something the brief does not cover, the agent looks it up on its own, at low
+  priority, and a card appears only when it found the answer; a "not found" never shows. Your own question always goes
+  first and stops a background search in flight. Its own share of the call ($0.25 and at most six searches by default,
+  part of the agent budget), at most one a minute, never the same question twice. Economy mode switches it off
+  explicitly, also in the middle of a call (the log says why a search was skipped).
+- **Shared tools (2026-11-06):** the call agent now also takes the open promises, the active decisions (the register
+  snapshot plus decisions from calls after it, the newer one wins) and the project's current state with its date,
+  besides the brief, the call so far, the folder index and earlier calls. The same read-only tools serve the
+  preparation (below), so both see the project the same way; an empty source says "(no data)" instead of guessing.
+- **Research preparation, beta (2026-11-06, owner):** three switches in Settings > AI > Preparation (beta), only on the
+  Claude ways of the preparation (the Claude account and the Claude API key). *Pacenote tools
+  first*: the preparation takes the last calls, promises, decisions and project state from those tools before it
+  searches the folders. *Check the facts*: after the brief is written, a separate check on Haiku looks for the source
+  of every number, date, owner and decision; a claim with no source gets "(unverified)" at the end of its line, and a
+  claim a newer source says otherwise is corrected in place with a short note, for example "The pilot starts November
+  16 (corrected per the decision Nov 3)". Nothing is removed; the original brief stays next to it
+  (`<base>.brief.preverify.md`) and the check writes `<base>.verify.json`. *Research in parallel*: the preparation
+  splits the research into 3 to 5 topics and gives them to at most five read-only helpers. On the API key a preparation
+  with these features has its own limit ($1.50 by default). Economy mode keeps the tools and the check on Haiku and
+  turns the parallel research off. *Pacenote tools first* is on by default: in our measure it made the preparation
+  8-30% cheaper at the same quality; the check and the parallel research stay off by default.
+- **Home shows a preparation for a call that has already begun (2026-11-06, owner):** Get ready > Prepare for a
+  call whose calendar time had started closed the form and Home kept the plain "in progress" card, so the
+  preparation running in the background was invisible. A running or waiting preparation now shows on the card.
+- **Menu bar: the economy switch is a leaf icon (2026-11-06):** with its label the footer wrapped ("Econom / y on")
+  and cut the month's spend; a filled green leaf means on, the state is in the tooltip and for VoiceOver.
+- **Monthly limits per AI provider (2026-11-06, owner):** Claude, OpenAI and Gemini each get their own monthly limit
+  and alert share (80% by default) in Settings > AI; only providers with a key are shown. At the alert share a
+  notification comes once a month and the menu bar icon turns orange; at the limit Pacenote stops using that key until
+  the next month (Claude can move to the Claude account with auto-switch on). The spend is the one in Usage.
+- **Economy mode (2026-11-06, owner):** switched by hand, also during a call (the leaf in the menu bar, or its own
+  section in Settings > AI), and it now means the least API money: where an account's plan can pay, it pays. At once,
+  also during a call: the call agent answers on Haiku with small limits ($0.05 a question, at most $0.25 a call), the
+  background searches stop, the deeper folder search runs on the Claude account instead of the key (signed out: the
+  folders are searched on the Mac and the tips model answers), typed questions go to the tips model. From the next
+  call: live tips on the cheapest model of their way. From the next job: the preparation and the after-the-call jobs
+  move from the Claude or OpenAI key to the Claude or ChatGPT account when it is set up; without one the
+  after-the-call jobs take the cheaper model and the preparation stays as it is; Gemini stays on its key. The monthly
+  limits apply as before. The leaf shows whenever there is an API key.
+
 ## 0.9.5.4 (2026-11-06)
 
 - **Questions dig into your folders on every AI way (2026-11-06, owner):** with tips on OpenAI, Gemini or a ChatGPT

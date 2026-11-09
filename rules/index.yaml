@@ -9,7 +9,11 @@ max_bytes: 2097152
 json_max_bytes: 262144
 csv_rows: 30
 chunk: {target_chars: 1000, max_chars: 1200, overlap_chars: 120}
-skip_dirs: [.git, node_modules, repos, _archived, .livetips-index, __pycache__, .venv, venv, .idea, .vscode, .Trash, .cache, Secrets, secrets, _to_delete, _archive, _Archive]
+skip_dirs: [.git, node_modules, repos, _archived, .livetips-index, __pycache__, .venv, venv, .idea, .vscode, .Trash, .cache, Secrets, secrets, _to_delete, _archive, _Archive, runs, _judge, worktrees]
+skip_dir_globs: ["wt-*"]          # 0.9.6: worktree copies by naming convention
+ignore_file: {name: .livetipsignore, where: "the project root and each extra folder", syntax: "gitignore subset: name or name/ at any depth, a slash inside or in front anchors to the folder, globs, # comments, no negation"}
+power: {app_indexes_on: ac_power_only, on_battery: "the running lt index gets SIGTERM, commits what it embedded and the project runs again on power", override: "defaults key indexOnBattery = true"}
+checkpoint_s: 300                 # lt index commits every 5 min, so a stopped first build resumes
 skip_hidden: true
 secret_name_regex: "(secret|credential|password|token|\\.env$|apikey|api_key)"
 call_artefacts: only transcripts (<stem>.md); never tips, state, timing, prep, named or clean copies

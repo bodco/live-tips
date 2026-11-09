@@ -30,7 +30,11 @@ final class CalendarService: ObservableObject {
         var uid: String? = nil       // 0.9.1: iCalendar UID, merges an EventKit copy with the same Google event
         var attachments: [String] = []   // 0.9.1: Drive links attached to the invitation (Google only)
         var meetCode: String? = nil  // 0.9.1: Google Meet code, finds the Meet record after the call
+        var accounts: [String] = []  // 0.9.6: every connected account invited to this meeting (one row for all of them)
+        var copies: [String] = []    // 0.9.6: ids of the same meeting in the other accounts, folded into this row
         var fromGoogle: Bool { id.hasPrefix("g:") }
+        /// This row or one of the copies folded into it (a plan saved before 0.9.6 may keep a copy's id).
+        func has(_ other: String?) -> Bool { other.map { $0 == id || copies.contains($0) } ?? false }
 
         static func == (a: CalEvent, b: CalEvent) -> Bool { a.id == b.id }
         func hash(into h: inout Hasher) { h.combine(id) }
@@ -118,7 +122,7 @@ final class CalendarService: ObservableObject {
             let now = Date()
             if !use.isEmpty { ek = fetch(from: now.addingTimeInterval(-3 * 3600), to: now.addingTimeInterval(36 * 3600), calendars: use) }
         } else { calendars = [] }
-        events = Self.merge(ek: ek, google: GoogleService.shared.events)
+        events = Self.dedup(Self.merge(ek: ek, google: GoogleService.shared.events))
     }
 
     /// rules/google.yaml > calendar.merge: one row per occurrence; the EventKit row stays and takes the Google details.
@@ -133,6 +137,33 @@ final class CalendarService: ObservableObject {
         }
         return (rows + p.keepGoogle.map { google[$0] }).sorted { $0.start < $1.start }
     }
+
+    /// 0.9.6 (owner): the same meeting invited to two connected accounts is one row: the same link and start
+    /// (attendees are not compared), or the same UID and start when there is no link. The kept row is the same on
+    /// every refresh (macOS calendars before Pacenote's Google rows, then the account name), so its brief and its
+    /// hidden state stay; it takes the details the copies have and remembers their ids.
+    nonisolated static func dedup(_ rows: [CalEvent]) -> [CalEvent] {
+        let r = rows.sorted { ($0.start, $0.fromGoogle ? 1 : 0, $0.account, $0.id) < ($1.start, $1.fromGoogle ? 1 : 0, $1.account, $1.id) }
+        return CalendarDedup.groups(link: r.map(\.link), uid: r.map(\.uid), start: r.map(\.start)).map { g in
+            var k = r[g[0]]
+            k.accounts = [k.account]
+            for i in g.dropFirst() {
+                let c = r[i]
+                if !k.accounts.contains(c.account) { k.accounts.append(c.account) }
+                k.copies.append(c.id)
+                k.link = k.link ?? c.link
+                k.meetCode = k.meetCode ?? c.meetCode
+                k.uid = k.uid ?? c.uid
+                k.attachments += c.attachments.filter { !k.attachments.contains($0) }
+                k.attendees += c.attendees.filter { !k.attendees.contains($0) }
+                k.emails += c.emails.filter { !k.emails.contains($0) }
+            }
+            return k
+        }
+    }
+
+    /// Hidden through this row or one of its copies (hidden before the copies were folded).
+    func isHidden(_ e: CalEvent) -> Bool { hidden.contains(e.id) || e.copies.contains { hidden.contains($0) } }
 
     /// 0.8.5: the next event whose title contains a text within `days` (a comparison of preparations, PrepBench).
     func next(titleContains want: String, days: Double = 14) -> CalEvent? {
@@ -182,7 +213,7 @@ final class CalendarService: ObservableObject {
         return String(text[r])
     }
 
-    func event(_ id: String) -> CalEvent? { events.first { $0.id == id } }
+    func event(_ id: String) -> CalEvent? { events.first { $0.id == id } ?? events.first { $0.copies.contains(id) } }
 
     static func openInternetAccounts() {
         for s in ["x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension", "x-apple.systempreferences:com.apple.preferences.internetaccounts"] {
@@ -193,11 +224,11 @@ final class CalendarService: ObservableObject {
     /// The calls to choose from now: in progress, just ended (15 min) or starting in the next 3 h.
     /// Several at the same time are normal (owner): the PM picks the one he is actually going to.
     func aroundNow(_ now: Date = Date()) -> [CalEvent] {
-        events.filter { !hidden.contains($0.id) && $0.end > now.addingTimeInterval(-15 * 60) && $0.start < now.addingTimeInterval(3 * 3600) }
+        events.filter { !isHidden($0) && $0.end > now.addingTimeInterval(-15 * 60) && $0.start < now.addingTimeInterval(3 * 3600) }
     }
 
     func upcoming(_ now: Date = Date()) -> [CalEvent] {
-        events.filter { !hidden.contains($0.id) && $0.end > now }
+        events.filter { !isHidden($0) && $0.end > now }
     }
 
     // MARK: optional reminder (Settings > General > Calendars)
@@ -228,6 +259,8 @@ struct CalendarsPane: View {
     @State private var accountsOpen = false
     @State private var remembered = SeriesMemory.shared.count
     @AppStorage(AutoStart.defaultsKey) private var autoSuggest = true
+    @AppStorage(MeetingLauncher.enabledKey) private var openMeeting = true
+    @State private var launches = MeetingLauncher.shared.rememberedCount
 
     var body: some View {
         Form {
@@ -273,6 +306,13 @@ struct CalendarsPane: View {
                 Section {
                     // Pacenote 0.8 (idea 08): a quiet offer to start tips when a meeting app is on at a calendar call.
                     Toggle(L("auto.setting"), isOn: $autoSuggest).help(L("auto.settingHelp"))
+                    // 0.9.6 (owner): Start call also opens the meeting (MeetingLauncher)
+                    Toggle(L("launch.setting"), isOn: $openMeeting).help(L("launch.settingHelp"))
+                    HStack {
+                        Text(L("launch.remembered", ["n": "\(launches)"]))
+                        Spacer()
+                        Button(L("cal.forgetAll")) { MeetingLauncher.shared.forgetAll(); launches = 0 }.disabled(launches == 0)
+                    }
                     Toggle(L("cal.remindMeBeforeCalendar"), isOn: $cal.remind)
                     if cal.remind { Stepper(L("cal.minBefore", ["n": "\(cal.remindMinutes)"]), value: $cal.remindMinutes, in: 1...15) }
                     HStack {

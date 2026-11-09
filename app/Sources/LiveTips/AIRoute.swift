@@ -95,7 +95,15 @@ enum AIRoute {
 
     /// The environment of an engine child process for one job: the way, the switch, the shared state, the key
     /// (to the child only, never written or logged) and the Claude Code tool.
-    static func env(job: String, config c: AppConfig, base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+    /// 0.9.6 Б1: the settings the jobs run with (economy mode on: EconomyPlan; an account counts when its tool is
+    /// installed, a signed-out account falls to the other way through auto-switch as before).
+    static func effective(_ c: AppConfig) -> AppConfig {
+        EconomyPlan.apply(c, on: Economy.isOn(stateDir: (statePath as NSString).deletingLastPathComponent),
+                          accounts: EconomyPlan.Accounts(claude: PrepRunner.claudePath != nil, chatgpt: CodexAccount.cliPath != nil))
+    }
+
+    static func env(job: String, config c0: AppConfig, base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+        let c = effective(c0)
         var env = base
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         if let k = store.get(.claudeAPIKey), !k.isEmpty { env["CLAUDE_API"] = k } else { env.removeValue(forKey: "CLAUDE_API") }
@@ -113,6 +121,11 @@ enum AIRoute {
         env["LT_LOCAL_FALLBACK"] = (job != "tips" && c.ai.localFallback) ? "1" : "0"                      // rules/ai.yaml > fallback
         env["LT_AI_AUTO"] = c.ai.autoSwitch ? "1" : "0"
         env["LT_AI_STATE"] = statePath
+        // 0.9.6 (owner): the monthly limits per provider (livetips_m0.cost.ProviderCaps); none set, none sent
+        let caps = ProviderLimits.caps(c.providerBudgets)
+        if !caps.isEmpty, let d = try? JSONSerialization.data(withJSONObject: caps), let s = String(data: d, encoding: .utf8) {
+            env["LT_PROVIDER_CAPS"] = s
+        } else { env.removeValue(forKey: "LT_PROVIDER_CAPS") }
         if let cl = PrepRunner.claudePath { env["LT_CLAUDE_CLI"] = cl }
         if let cli = CodexAccount.cliPath { env["LT_CODEX_CLI"] = cli }
         env.removeValue(forKey: "ANTHROPIC_API_KEY")
@@ -120,9 +133,10 @@ enum AIRoute {
     }
 
     /// For sidecar-config.json (the tips engine and the judge).
-    static func sidecarBlock(config c: AppConfig) -> [String: Any] {
+    static func sidecarBlock(config c0: AppConfig) -> [String: Any] {
+        let c = effective(c0)
         // 2026-11-06: "prep" too: typed questions and the deep folder lookup use the preparation's way and model.
-        ["routes": ["prep": c.ai.prep, "tips": c.ai.tips, "after": c.ai.after], "auto": c.ai.autoSwitch, "state": statePath,
+        return ["routes": ["prep": c.ai.prep, "tips": c.ai.tips, "after": c.ai.after], "auto": c.ai.autoSwitch, "state": statePath,
          "openai_models": ["prep": c.ai.openaiPrep, "tips": c.ai.openaiTips, "after": c.ai.openaiAfter],
          "gemini_models": ["prep": c.ai.geminiPrep, "tips": c.ai.geminiTips, "after": c.ai.geminiAfter], "gemini_fallback": c.ai.geminiFallback,
          "agy_models": ["prep": c.ai.agyPrep, "after": c.ai.agyAfter],

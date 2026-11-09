@@ -64,7 +64,7 @@ final class UpNext: ObservableObject {
         // 0.7.4 gave a regular meeting's preparation to every occurrence; it belongs to one (prepFits).
         let wrong = items.filter { m in m.calEventID != nil && m.prepBase.map { !m.prepFits($0) } == true }
         if !wrong.isEmpty { items.removeAll { m in wrong.contains { $0 === m } }; changed = true }
-        for e in CalendarService.shared.upcoming() where !items.contains(where: { $0.calEventID == e.id }) {
+        for e in CalendarService.shared.upcoming() where !items.contains(where: { e.has($0.calEventID) }) {
             let m = StartCallModel()
             m.applyEvent(e)
             guard !m.target.isEmpty, m.prepBase != nil, !isLive(m) else { continue }

@@ -1,0 +1,52 @@
+# The research preparation (Pacenote 0.9.6, point 4, beta; owner 2026-11-06). Shared by the app (PrepRunner) and the
+# engine (livetips_m0.prepverify). Three features, each behind its own switch in Settings > AI > Preparation (beta),
+# owner 2026-11-06 after the A/B measure (Б4, research/pacenote-prep-agent-ab-2026-11-06.md): tools on by default,
+# verify and parallel off by default (verify: try on real preparations first).
+schema_version: 1
+routes: >-
+  Only the Claude ways of the Preparation job (the Claude account and the Claude API key; both run Claude Code
+  headless, `claude -p`). The packed ways (ChatGPT, OpenAI, Gemini, the local model) ignore the switches.
+tools: >-
+  prepTools: the preparation gets Pacenote's shared tools (livetips_m0.pn_mcp, read-only: past_calls, commitments,
+  decisions, project_state, search_folders) and is told to take the earlier calls, the promises, the decisions and
+  the project state from them first, and only then to grep and read files.
+parallel: >-
+  prepParallel: the preparation is an orchestrator. It splits the research into 3 to 5 topics (agenda items, risks and
+  promises, people), gives each to a researcher subagent (read-only: the tools, Read, Grep, Glob), merges what they
+  return and removes duplicates. At most 5 subagents. On the API way the preparation's budget caps it
+  (budget_usd_default, Settings; `--max-budget-usd`). The --agents file goes to the system's temporary folder: Claude
+  Code refuses a file with a second hard link, which Google Drive gives new files under ~/work (Б4 smoke).
+prompt: >-
+  With tools or parallel on, the preparation prompt's line "no MCP tools, no recording, no subagents" (and "skip ...
+  the Agent tool") names the switched-on features instead (PrepAgent.adjust): with the old line the model never called
+  a researcher (Б4 smoke, 2026-11-06).
+verify:
+  what: >-
+    prepVerify: after the brief is written, a separate checker with a clean context (Haiku) takes every claim of the
+    brief that holds a number, a date, an owner or a decision and looks for its source (the shared tools, Read, Grep).
+    It never writes files: livetips_m0.prepverify applies its verdicts.
+  model: claude-haiku-5-5
+  max_claims: 40
+  verdicts: {verified: "a source says it", unverified: "no source found", contradicted: "a newer source says otherwise"}
+  unverified: mark            # the line keeps its text and gets the marker at its end
+  marker: "(unverified)"
+  # contradicted (owner 2026-11-06): nothing is removed and no warning goes next to it. The wrong part of the line is
+  # replaced in place with the value the newer source gives (the checker's "correct", taken only from the source) and a
+  # short note goes at the end. Without a correct value, or when the quote cannot be placed, the line gets the marker.
+  contradicted: correct
+  corrected_marker: {en: "(corrected per {source} {date})", uk: "(виправлено за {source} від {date})"}
+  keep_original: <base>.brief.preverify.md
+  output: <base>.verify.json  # claims, verified, unverified, contradicted, corrected (was -> now), marked, cost, model
+  never: >-
+    The checker never adds a fact of its own: a correction only puts in the value that stands in the source, in the
+    same line, and keeps every other word. It never removes a line and never touches headings, the agenda's order or
+    the cards. A line is corrected once. A claim whose quote is not found in the brief is counted, not applied.
+ledger: >-
+  The preparation's lines have job "prep"; the checker's own line has job "prep_verify" (Settings > Usage and the
+  provider limits count both as the preparation).
+run_json: >-
+  prep-runs/<base>/run.json keeps which features ran (tools, verify, parallel, economy), the turns, the cost and the
+  time, and the checker's summary (verify).
+economy: >-
+  Economy mode (rules/ai.yaml > economy): the tools stay, the checker runs on Haiku only, no parallel subagents.
+budget_usd_default: 1.50

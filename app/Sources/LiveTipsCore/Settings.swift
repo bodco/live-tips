@@ -15,6 +15,75 @@ public struct AppConfig: Codable, Equatable {
         public var monthlyHardUSD = 100.0
         public init() {}
     }
+    /// 0.9.6 (owner, 2026-11-06): a monthly limit and an alert per AI provider with a key (Claude, OpenAI, Gemini
+    /// apart). 0 = no limit. At `alertPercent` of the limit the app warns once a month (economy mode is one click
+    /// away); at the limit the engine stops using that provider's key (livetips_m0.cost.ProviderCaps).
+    public struct ProviderBudget: Codable, Equatable {
+        public var monthlyUSD = 0.0
+        public var alertPercent = 80.0
+        public init() {}
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            monthlyUSD = max(0, (try? c.decodeIfPresent(Double.self, forKey: .monthlyUSD)) ?? 0)
+            alertPercent = min(100, max(1, (try? c.decodeIfPresent(Double.self, forKey: .alertPercent)) ?? 80))
+        }
+    }
+    public struct ProviderBudgets: Codable, Equatable {
+        public var claude = ProviderBudget()
+        public var openai = ProviderBudget()
+        public var gemini = ProviderBudget()
+        public init() {}
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            claude = (try? c.decodeIfPresent(ProviderBudget.self, forKey: .claude)) ?? ProviderBudget()
+            openai = (try? c.decodeIfPresent(ProviderBudget.self, forKey: .openai)) ?? ProviderBudget()
+            gemini = (try? c.decodeIfPresent(ProviderBudget.self, forKey: .gemini)) ?? ProviderBudget()
+        }
+        public subscript(_ provider: String) -> ProviderBudget {
+            get { provider == "openai" ? openai : provider == "gemini" ? gemini : claude }
+            set { if provider == "openai" { openai = newValue } else if provider == "gemini" { gemini = newValue } else { claude = newValue } }
+        }
+    }
+    /// 0.9.6 (owner): the call agent (livetips_m0.agent, Claude Agent SDK): one session per call for questions the
+    /// brief does not answer, with Pacenote's own tools. A feature flag, off by default; never in economy mode.
+    public struct CallAgentSettings: Codable, Equatable {
+        public var enabled = false
+        public var tools = true
+        public var model = "claude-sonnet-5-5"
+        public var maxUSDPerCall = 1.0
+        /// 0.9.6 point 2: background searches when the other side asks what the brief does not cover (off by default)
+        public var proactive = false
+        public var proactiveUSDPerCall = 0.25
+        public init() {}
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let d = CallAgentSettings()
+            enabled = (try? c.decodeIfPresent(Bool.self, forKey: .enabled)) ?? d.enabled
+            tools = (try? c.decodeIfPresent(Bool.self, forKey: .tools)) ?? d.tools
+            model = (try? c.decodeIfPresent(String.self, forKey: .model)) ?? d.model
+            maxUSDPerCall = max(0.05, (try? c.decodeIfPresent(Double.self, forKey: .maxUSDPerCall)) ?? d.maxUSDPerCall)
+            proactive = (try? c.decodeIfPresent(Bool.self, forKey: .proactive)) ?? d.proactive
+            proactiveUSDPerCall = max(0.01, (try? c.decodeIfPresent(Double.self, forKey: .proactiveUSDPerCall)) ?? d.proactiveUSDPerCall)
+        }
+    }
+    /// 0.9.6 Б3 (point 4, rules/prep.yaml): the research preparation, beta. Owner 2026-11-06 after the A/B (Б4): the
+    /// tools on by default (cheaper, the same quality), the check and the parallel research off. Only the Claude ways of
+    /// the Preparation job use them.
+    public struct PrepAgentSettings: Codable, Equatable {
+        public var tools = true          // Pacenote's shared tools (pn_mcp) before grep and Read (on by default, Б4)
+        public var verify = false        // a checker with a clean context marks the claims it finds no source for
+        public var parallel = false      // an orchestrator with 3-5 researcher subagents
+        public var budgetUSD = 1.50      // the preparation's cap on the API way (--max-budget-usd)
+        public init() {}
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let d = PrepAgentSettings()
+            tools = (try? c.decodeIfPresent(Bool.self, forKey: .tools)) ?? d.tools
+            verify = (try? c.decodeIfPresent(Bool.self, forKey: .verify)) ?? d.verify
+            parallel = (try? c.decodeIfPresent(Bool.self, forKey: .parallel)) ?? d.parallel
+            budgetUSD = max(0.10, (try? c.decodeIfPresent(Double.self, forKey: .budgetUSD)) ?? d.budgetUSD)
+        }
+    }
     public struct LocalAI: Codable, Equatable {
         /// Master switch for every local model (embeddings now, a local generative model later).
         public var enabled = true
@@ -109,10 +178,14 @@ public struct AppConfig: Codable, Equatable {
     public var models = Models()
     public var ai = AIRoutes()
     public var budget = Budget()
+    public var providerBudgets = ProviderBudgets()     // 0.9.6
+    public var callAgent = CallAgentSettings()         // 0.9.6
+    public var prepAgent = PrepAgentSettings()         // 0.9.6 Б3
     public var localAI = LocalAI()
     public var uiLanguage = "en"           // en | uk
     public var stealthDefault = true
     public var showInDock = true
+    public var appearance = "system"       // 0.9.6 (owner): system | light | dark, Settings > General
     public var floatingCallControls = true
     public var notionWriteSummary = false
     /// 2026-10-26: where meeting pages go when the project has no Control Tower config (a data source id
@@ -193,10 +266,14 @@ public struct AppConfig: Codable, Equatable {
             if UserDefaults.standard.object(forKey: "prepUseAPI") != nil { ai.prep = UserDefaults.standard.bool(forKey: "prepUseAPI") ? "api" : "code" }
         }
         budget = (try? c.decode(Budget.self, forKey: .budget)) ?? d.budget
+        providerBudgets = (try? c.decode(ProviderBudgets.self, forKey: .providerBudgets)) ?? d.providerBudgets
+        callAgent = (try? c.decode(CallAgentSettings.self, forKey: .callAgent)) ?? d.callAgent
+        prepAgent = (try? c.decode(PrepAgentSettings.self, forKey: .prepAgent)) ?? d.prepAgent
         localAI = (try? c.decode(LocalAI.self, forKey: .localAI)) ?? d.localAI
         uiLanguage = (try? c.decode(String.self, forKey: .uiLanguage)) ?? d.uiLanguage
         stealthDefault = (try? c.decode(Bool.self, forKey: .stealthDefault)) ?? d.stealthDefault
         showInDock = (try? c.decode(Bool.self, forKey: .showInDock)) ?? d.showInDock
+        appearance = (try? c.decode(String.self, forKey: .appearance)) ?? d.appearance
         floatingCallControls = (try? c.decode(Bool.self, forKey: .floatingCallControls)) ?? d.floatingCallControls
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
         notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB

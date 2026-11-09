@@ -136,5 +136,13 @@ PY
   install:linkdl)
     pip_in --upgrade "yt-dlp>=2025.1.1" && echo "Link downloader ready" ;;
 
-  *) echo "usage: setup.sh check|install python|core|venv|recorder|tips|whisper|localai|voices|claude|linkdl"; exit 2 ;;
+  # 0.9.6 (owner): the optional call agent (Settings > AI > Call agent): the Claude Agent SDK, which brings its own
+  # Claude Code (about 320 MB in the app's Python). Needs Python 3.10+; only the API key is used, never a login.
+  check:agent)
+    if vimport "import sys, claude_agent_sdk; sys.exit(0 if sys.version_info >= (3, 10) else 1)"; then echo "OK $("$VPY" -c 'import importlib.metadata as m;print(m.version("claude-agent-sdk"))' 2>/dev/null)"; else echo "MISSING optional"; fi ;;
+  install:agent)
+    "$VPY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' || { echo "The call agent needs Python 3.10 or newer"; exit 1; }
+    pip_in "claude-agent-sdk>=0.2.170,<=0.2.178" && echo "Call agent ready" ;;
+
+  *) echo "usage: setup.sh check|install python|core|venv|recorder|tips|whisper|localai|voices|claude|linkdl|agent"; exit 2 ;;
 esac

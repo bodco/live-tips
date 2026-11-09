@@ -1151,7 +1151,7 @@ first minute.
 | HELP NOW: the next sentence to say, built from what was just said | Instant fact cards (⚡) that fire on a keyword in under a second |
 | Questions typed in the window, answered from the call so far and the project folders, by the preparation's model when it answers in seconds (2026-11-06) | Facts from documents read before the call (the fact book) |
 | "Find" questions: a search over the project folder (local index) | |
-| A deeper search when nothing ready answers (0.6.2): the project folder, the folders added to the call, the local Notion mirror and earlier call transcripts are searched in the background and the answer arrives as a new card, usually in 15-60 s. With the preparation on Claude, Claude Code reads the folders; on any other way (2026-11-06) Pacenote searches them and the preparation's model answers. With no preparation, a question to you starts this search by itself | |
+| A deeper search when nothing ready answers (0.6.2): the project folder, the folders added to the call, the local Notion mirror and earlier call transcripts are searched in the background and the answer arrives as a new card, usually in 15-60 s. With the preparation on Claude, Claude Code reads the folders; on any other way (2026-11-06) Pacenote searches them and the preparation's model answers. With the call agent on (0.9.6, beta), one Claude agent session for the whole call answers instead, in seconds. With no preparation, a question to you starts this search by itself | |
 | The call context you typed in Start call, the project's current state from the local Notion mirror, a digest of the project's recent calls | |
 | On me, the wrap-up and the Notion meeting page | |
 
@@ -1662,6 +1662,20 @@ not stop storage).
 by stage (call preparation, live tips, after the call, total) and by model with requests and tokens, for today, the
 last 7 days (the default), this month or chosen dates. The accounts paid by a plan are not counted.
 
+**Limits per provider and economy mode (0.9.6).** Settings > AI > Monthly limits per AI provider shows every
+provider with a key (Claude, OpenAI, Gemini; one without a key is not shown) with this month's spend from Usage, a
+monthly limit and an alert share (80% by default). At the alert share a notification comes once a month and the menu
+bar icon turns orange; at the limit Pacenote stops using that key until the next month: tips, the preparation and the
+after-the-call jobs on that provider stop or, for Claude with auto-switch on, move to the Claude account. 0 means no
+limit. Economy mode is switched by hand (the leaf in the menu bar, or Settings > AI > Economy mode), also during a
+call, and it means the least API money: where an account's plan can pay, it pays. At once: the call agent answers on
+Haiku with small limits ($0.05 a question, at most $0.25 a call), background searches stop, the deeper folder search
+runs on your Claude account instead of the key (signed out: the folders are searched on the Mac and the tips model
+answers), typed questions go to the tips model. From the next call: live tips on the cheapest model of their way
+(Haiku, gpt-6-luna, Flash-Lite). From the next job: the preparation and the after-the-call jobs move from the Claude or
+OpenAI key to the Claude or ChatGPT account when it is set up; without one the after-the-call jobs take the cheaper
+model and the preparation stays as it is. Gemini stays on its key. The limits per provider apply on top.
+
 **OpenAI prompt caching.** On the OpenAI API route the blocks Pacenote reuses during a call (the call's rules, the
 brief and the facts, while the tips run) carry explicit cache breakpoints with a 30-minute life, renewed by every
 read, the way Claude's `cache_control` works. Cache writes are billed apart from ordinary input and are shown in the
@@ -1790,6 +1804,77 @@ Risks start unticked, as the notes already have them; What was discussed can be 
 
 **The meeting page in Notion** (14.2) carries the Meeting notes too: the summary, decisions, action items as to-dos,
 open questions and the topics, then the agenda, Sales and the Pacenote lines.
+
+### 14.1u Research preparation (0.9.6, beta)
+
+Settings > AI > Preparation (beta) has three switches: Pacenote tools first is on by default, the other two are off.
+They work only on the Claude ways of the
+preparation (the Claude account and the Claude API key; both run Claude Code headless, `claude -p`); the ChatGPT,
+OpenAI, Gemini and local ways ignore them. The rules are in `rules/prep.yaml`.
+
+- **Pacenote tools first.** The preparation gets Pacenote's own read-only tools, the same ones the call agent uses:
+  the last calls of the project (notes, or the call's last picture, or the start and end of the transcript), the open
+  promises, the active decisions (the Notion register snapshot plus decisions from later calls, the newer one wins),
+  the project's current state with its date, and the folder index. It takes those first and only then reads files.
+- **Check the facts.** After the brief is written, a separate check with a clean context (Haiku) takes every claim
+  with a number, a date, an owner or a decision (up to 40) and looks for its source in the same tools and the
+  folders. It never writes files; Pacenote applies its answer. A claim with no source gets " (unverified)" at the end
+  of its line. A claim a newer source says otherwise is corrected in place: only the wrong part is replaced with the
+  value that stands in the source, and a short note goes at the end, for example "The pilot starts November 16 with
+  20 users. (corrected per the decision Nov 3)". Nothing is removed, headings and the agenda's order never change,
+  and a line is corrected once. Without a clear value from the source the line only gets " (unverified)". The
+  original brief stays next to it as `<base>.brief.preverify.md`; the check's verdicts with their sources, the cost
+  and the time are in `<base>.verify.json`. The call card shows "Checking the facts" while it runs; a failed check
+  leaves the brief as it was and never fails the preparation.
+- **Research in parallel.** The preparation is an orchestrator: it splits the research into 3 to 5 topics (agenda
+  items, risks and promises, people), gives each to a read-only helper (the tools, Read, Grep, Glob) at the same time,
+  merges what they return and writes the files itself. At most five helpers.
+
+**Limit.** On the Claude API key a preparation with the tools or the parallel research on has its own limit
+(Preparation limit, $1.50 by default; the check has $0.25). The Claude account's plan is not limited by it. Both
+count under Claude in Usage and in Claude's monthly limit; the check has its own line (job `prep_verify`).
+
+**Economy mode** keeps the tools and the check (on Haiku) and turns the parallel research off.
+
+**What a preparation did** is in its run.json (prep-runs): which features ran, the cost and the time, and the check's
+summary.
+
+**Measured (2026-11-06, one invented project, one run per variant, two AI judges).** With the tools the preparation
+cost 8-30% less (Sonnet on the API key: $0.39 against $0.43-0.45) at the same quality. The check added about $0.02 and
+1.5 minutes and found little to fix in a brief that already used the newest sources. Research in parallel cost 50-90%
+more and took longer without a better brief on a small project. Read it as a direction. So the tools are on by
+default; the check and the parallel research stay off until real preparations show they help.
+
+### 14.1v Start call opens the meeting, one row per meeting, the theme (0.9.6)
+
+**Start call opens the meeting.** When a call from the calendar starts, Pacenote also opens its Meet, Teams or Zoom
+link. Where it opens is never set up per project: the link tells the platform, this Mac tells the places it can open
+(a Chrome profile by its signed-in email, the Google Meet app of a Chrome profile, the Microsoft Teams and Zoom apps,
+the default browser), and your own choices rank them.
+
+- **The first time** a series starts, a small panel at the top right asks where to open it. The click opens the
+  meeting there and is remembered.
+- **Next time** the series opens there at once; the panel says "Opened in Chrome · mike@orbit.com" and has
+  **Wrong place**. Wrong place offers the other places, and the place marked wrong goes to the end for this series. So
+  a series that opens in one account one day and in another the next day only costs a click when it is not the usual
+  one.
+- **A new series** of the same invitation domain opens where that domain's calls opened before. Anything else asks.
+  When nothing is known yet, an account invited to the meeting comes first.
+- **Chrome profiles are found by email**, not by their folder: the same profile is "Profile 3" on one Mac and "Profile
+  1" on another, and Pacenote reads the folder from Chrome on this Mac at every start. A Meet link gets
+  `authuser=<email>`, so a profile with several Google accounts joins with the chosen one. Teams in a browser asks to
+  stay on the web.
+- A call started from the call-start offer (the meeting app is already on) never opens the meeting again.
+- Settings > Integrations > Calendars: **Open the meeting when I start a call** (on by default) and Forget all for the
+  remembered starts (`meeting-launches.json` in the app folder, on this Mac only).
+
+**One row per meeting.** The same meeting invited to two connected accounts showed twice on Home and in the menu bar.
+Now it is one row: the same meeting link and the same start are enough (the attendees are not compared; without a
+link, the same calendar UID and start). The row keeps the details of both copies and knows both accounts; a brief or
+a hidden state made on either copy before stays.
+
+**Theme.** Settings > General > Theme: Same as the Mac (default), Light or Dark. Every window, the tips window
+included, follows it at once.
 
 ### 14.2 After the call: the meeting page in Notion
 
@@ -2226,6 +2311,21 @@ address", `references/sweep.md`, `references/presentation.md`).
 105. **What a preparation costs (0.8.5).** Five runs of one preparation compared (14.1g): Sonnet through the API
    key $0.77 in 3 minutes, Opus $2.57, the local Gemma 4 26B free but thin. Every preparation keeps its files and
    run.json in prep-runs; a preparation can run on this Mac through Ollama (rules/ai.yaml).
+106. **Call agent and limits per provider (0.9.6).** An opt-in call agent (Settings > AI > Call agent, beta) keeps
+   one Claude session for the whole call, built on the Claude Agent SDK: a question the brief does not answer goes to
+   it, and it looks through the brief, the call so far, the folder index, earlier calls and the files themselves,
+   read-only. On a 30 minute test call with five questions it answered all five for $0.11 on Sonnet (about 6 s an
+   answer) or $0.01 on Haiku, against $0.33 and about 11 s for the Claude Code search. It needs a Claude API key (never
+   the Claude account) and the optional Call agent component. Each provider with a key (Claude, OpenAI, Gemini) has
+   its own monthly limit and alert share; economy mode, switched by hand in the menu bar or Settings, moves the agent
+   to Haiku with small limits and stops the background searches. **Background searches** (a second switch under Call agent, off by
+   default): when the other side asks you something the brief does not cover, the agent looks it up by itself at low
+   priority and shows a card only when it found the answer. Your own question goes first and stops a background search
+   in flight. They have their own share of the call ($0.25 and at most six by default, part of the agent budget), run
+   at most once a minute and never twice for the same question; economy mode stops them. **Research preparation**
+   (Settings > AI > Preparation (beta), three switches, off by default, 14.1u): Pacenote's tools first, a fact check
+   that marks a claim with no source "(unverified)" and corrects a claim a newer source says otherwise in place with a
+   short note, and research in parallel by up to five helpers; a limit per preparation on the API key.
 
 
 ### Live context and freshness

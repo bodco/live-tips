@@ -816,6 +816,55 @@ let usageStage = AIUsage.byStage(usageRows)
 expect(usageStage["prep"]?["openai"]?.requests == 1 && usageStage["live"]?["claude"]?.requests == 0, "usage: every stage and provider present")
 expect(AIUsage.byModel(usageRows).map(\.provider) == ["claude", "openai", "gemini"], "usage: models in provider order")
 expect(AIUsage.stage(job: "prep_refresh") == "prep" && AIUsage.stage(job: "judge") == "after" && AIUsage.stage(job: "tips") == "live", "usage: job names")
+// 0.9.6: monthly limits and alerts per provider, economy mode, the call agent's settings
+expect(AIUsage.stage(job: "agent") == "live", "usage: the call agent counts as live")
+let plMonth = ProviderLimits.monthSpend(usageRows, month: "2026-11")
+expect(abs((plMonth["openai"] ?? 0) - 0.05) < 1e-9 && abs((plMonth["claude"] ?? 0) - 0.02) < 1e-9 && plMonth["gemini"] != nil, "limits: month spend by provider")
+expect(ProviderLimits.monthSpend(usageRows, month: "2026-10").isEmpty, "limits: another month is empty")
+var plb = AppConfig.ProviderBudget()
+expect(ProviderLimits.level(spent: 99, budget: plb) == .ok, "limits: no limit, no alert")
+plb.monthlyUSD = 10; plb.alertPercent = 70
+expect(ProviderLimits.level(spent: 6.9, budget: plb) == .ok && ProviderLimits.level(spent: 7, budget: plb) == .alert
+       && ProviderLimits.level(spent: 10, budget: plb) == .capped, "limits: ok, alert at the share, capped at the limit")
+var plbs = AppConfig.ProviderBudgets(); plbs["gemini"] = plb
+expect(ProviderLimits.caps(plbs) == ["gemini": 10] && plbs.gemini.monthlyUSD == 10 && plbs.claude.monthlyUSD == 0, "limits: only set limits go to the engine")
+let plKey = ProviderLimits.alertKey(provider: "claude", month: "2026-11", level: .alert)
+expect(ProviderLimits.due(level: .alert, shown: [], provider: "claude", month: "2026-11") == .alert
+       && ProviderLimits.due(level: .alert, shown: [plKey], provider: "claude", month: "2026-11") == nil
+       && ProviderLimits.due(level: .capped, shown: [plKey], provider: "claude", month: "2026-11") == .capped
+       && ProviderLimits.due(level: .ok, shown: [], provider: "claude", month: "2026-11") == nil, "limits: each alert once a month")
+let plBad = try? JSONDecoder().decode(AppConfig.ProviderBudget.self, from: Data(#"{"monthlyUSD": -5, "alertPercent": 300}"#.utf8))
+expect(plBad?.monthlyUSD == 0 && plBad?.alertPercent == 100, "limits: bad values are clamped")
+let ecoDir = NSTemporaryDirectory() + "pn-economy-\(getpid())"
+Economy.set(true, stateDir: ecoDir)
+expect(Economy.isOn(stateDir: ecoDir), "economy: on")
+Economy.set(false, stateDir: ecoDir)
+expect(!Economy.isOn(stateDir: ecoDir), "economy: off")
+// 0.9.6 Б1: economy mode v1, the plan from the next job
+let both = EconomyPlan.Accounts(claude: true, chatgpt: true), none = EconomyPlan.Accounts(claude: false, chatgpt: false)
+expect(EconomyPlan.jobRoute("api", accounts: both) == "code" && EconomyPlan.jobRoute("openai", accounts: both) == "codex", "economy: key ways move to the accounts")
+expect(EconomyPlan.jobRoute("gemini", accounts: both) == "gemini" && EconomyPlan.jobRoute("api", accounts: none) == "api", "economy: Gemini never to agy; no account, no move")
+expect(EconomyPlan.tipsModel(route: "openai") == "gpt-6-luna" && EconomyPlan.tipsModel(route: "gemini") == "gemini-3.5-flash-lite" && EconomyPlan.tipsModel(route: "local") == nil, "economy: cheapest tips model per way")
+var ecoCfg = AppConfig(); ecoCfg.ai.prep = "api"; ecoCfg.ai.after = "openai"; ecoCfg.ai.tips = "api"; ecoCfg.models.tip = "claude-sonnet-5-5"; ecoCfg.ai.openaiTips = "gpt-6.1-sol"
+expect(EconomyPlan.apply(ecoCfg, on: false, accounts: both) == ecoCfg, "economy: off changes nothing")
+let ecoOn = EconomyPlan.apply(ecoCfg, on: true, accounts: EconomyPlan.Accounts(claude: true, chatgpt: false))
+expect(ecoOn.ai.prep == "code" && ecoOn.ai.after == "openai" && ecoOn.ai.openaiAfter == "gpt-6-luna", "economy: prep to the account, after on the cheaper model without an account")
+expect(ecoOn.models.tip == "claude-haiku-5-5" && ecoOn.ai.openaiTips == "gpt-6-luna" && ecoOn.models.classify == ecoCfg.models.classify, "economy: tips cheapest, classify untouched")
+expect(EconomyPlan.apply(ecoOn, on: true, accounts: EconomyPlan.Accounts(claude: true, chatgpt: false)) == ecoOn, "economy: applying twice changes nothing")
+var gemCfg = AppConfig(); gemCfg.ai.prep = "gemini"; gemCfg.ai.after = "gemini"
+let gemOn = EconomyPlan.apply(gemCfg, on: true, accounts: both)
+expect(gemOn.ai.prep == "gemini" && gemOn.ai.geminiPrep == gemCfg.ai.geminiPrep && gemOn.ai.geminiAfter == "gemini-3.5-flash-lite", "economy: the preparation is not made cheaper")
+let pf = EconomyPlan.prepFeatures(tools: true, verify: true, parallel: true, verifyModel: "claude-sonnet-5-5", economy: true)
+expect(pf.tools && pf.verify && pf.verifyModel == "claude-haiku-5-5" && !pf.parallel, "economy: prep tools yes, checker on Haiku, no parallel")
+let caOld = try? JSONDecoder().decode(AppConfig.self, from: Data(#"{"uiLanguage": "en"}"#.utf8))
+expect(caOld?.callAgent.enabled == false && caOld?.callAgent.tools == true && caOld?.providerBudgets.claude.alertPercent == 80, "agent: off by default in an older config")
+expect(caOld?.callAgent.proactive == false && caOld?.callAgent.proactiveUSDPerCall == 0.25, "agent: background searches off by default")
+var caCfg = AppConfig(); caCfg.callAgent.enabled = true; caCfg.callAgent.model = "claude-haiku-5-5"; caCfg.providerBudgets.openai.monthlyUSD = 20
+caCfg.callAgent.proactive = true; caCfg.callAgent.proactiveUSDPerCall = 0.4
+let caURL = URL(fileURLWithPath: NSTemporaryDirectory() + "pn-agent-config.json")
+try? caCfg.save(to: caURL)
+expect(AppConfig.load(from: caURL) == caCfg, "agent and limits: config round trip")
+try? FileManager.default.removeItem(at: caURL)
 // 0.9.3: the Gemini account through Antigravity CLI
 let agyList = AgyCLI.models(output: "gemini-4-argon-medium\tGemini 4 Argon (Medium)\nclaude-opus-5-5-low\tClaude Opus 5.5 (Low)\ngemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\nFetching available models...\n")
 expect(agyList.map(\.id) == ["gemini-4-argon-medium", "gemini-3.8-flash-medium"], "agy: only the Gemini models of the list")
@@ -879,7 +928,160 @@ let tmE = tmB["events"] as? [[String: Any]] ?? []
 expect(tmE.count == 2 && tmE[0]["d"] as? String == "2026-11-18" && tmE[0]["t"] == nil, "telemetry: only allowed events of those days, days not times")
 expect(((tmE[1]["p"] as? [String: Any])?["minutes"] as? NSNumber)?.intValue == 1, "telemetry: numbers as written")
 try? FileManager.default.removeItem(at: tmDir)
+/// 0.9.6 Б3 (rules/prep.yaml): the research preparation's plan, flags and process chain.
+func prepAgent096() {
+    let old = try? JSONDecoder().decode(AppConfig.self, from: Data(#"{"uiLanguage": "en"}"#.utf8))
+    expect(old?.prepAgent == AppConfig.PrepAgentSettings() && old?.prepAgent.tools == true && old?.prepAgent.verify == false
+           && old?.prepAgent.parallel == false && old?.prepAgent.budgetUSD == 1.5, "prep agent: tools on, the check and parallel off in an older config (owner, Б4)")
+    let kept = try? JSONDecoder().decode(AppConfig.self, from: Data(#"{"uiLanguage": "en", "prepAgent": {"tools": false}}"#.utf8))
+    expect(kept?.prepAgent.tools == false, "prep agent: a saved tools switch stays as saved")
+    let dflt = PrepAgent.plan(AppConfig.PrepAgentSettings(), route: "api", economy: false)
+    expect(dflt?.features.tools == true && dflt?.features.verify == false && dflt?.features.parallel == false && dflt?.budgetUSD == 1.5,
+           "prep agent: the default plan is the tools only, capped on the API way")
+    var s = AppConfig.PrepAgentSettings(); s.tools = false
+    expect(PrepAgent.plan(s, route: "api", economy: false) == nil, "prep agent: all off, no plan")
+    s.tools = true; s.verify = true; s.parallel = true
+    expect(PrepAgent.plan(s, route: "openai", economy: false) == nil && PrepAgent.plan(s, route: "local", economy: false) == nil
+           && PrepAgent.plan(s, route: "codex", economy: false) == nil, "prep agent: only the Claude ways")
+    let api = PrepAgent.plan(s, route: "api", economy: false), code = PrepAgent.plan(s, route: "code", economy: false)
+    expect(api?.budgetUSD == 1.5 && code?.budgetUSD == nil && api?.features.verifyModel == "claude-haiku-5-5", "prep agent: the budget only on the API way, the checker on Haiku")
+    let eco = PrepAgent.plan(s, route: "code", economy: true)
+    expect(eco?.features.tools == true && eco?.features.verify == true && eco?.features.parallel == false && eco?.record["economy"] == "true",
+           "prep agent: economy keeps tools and the checker, no parallel")
+    expect(api?.record == ["tools": "true", "verify": "true", "parallel": "true", "economy": "false", "verify_model": "claude-haiku-5-5", "budget_usd": "1.50"],
+           "prep agent: run.json record")
+    var onlyVerify = AppConfig.PrepAgentSettings(); onlyVerify.tools = false; onlyVerify.verify = true
+    expect(PrepAgent.plan(onlyVerify, route: "api", economy: false)?.budgetUSD == nil, "prep agent: the checker alone leaves the preparation uncapped")
+    if let p = api {
+        expect(PrepAgent.allowed(p).contains("mcp__pacenote__decisions") && PrepAgent.allowed(p).contains("Agent") && PrepAgent.undeny(p) == ["Task", "Agent"],
+               "prep agent: tools and the subagent tool allowed")
+        expect(PrepAgent.prompt(p).contains("PACENOTE TOOLS") && PrepAgent.prompt(p).contains("never more than 5 subagents") && !PrepAgent.prompt(p).contains("\u{2014}"),
+               "prep agent: prompt lines")
+        let basePrompt = "Work with local files: no Notion or Jira APIs, no MCP tools, no recording, no subagents (x). Skip every part that needs Notion, Jira, the Agent tool, device_bash, polling."
+        let adj = PrepAgent.adjust(basePrompt, p)
+        expect(!adj.contains("no subagents") && !adj.contains("the Agent tool") && adj.contains("except Pacenote's tools") && adj.contains("subagents only as"),
+               "prep agent: the base prompt names the switched-on features (Б4 smoke)")
+        var onlyTools = AppConfig.PrepAgentSettings(); onlyTools.tools = true
+        if let t = PrepAgent.plan(onlyTools, route: "code", economy: false) {
+            let a2 = PrepAgent.adjust(basePrompt, t)
+            expect(a2.contains("no subagents") && a2.contains("the Agent tool") && a2.contains("except Pacenote's tools"), "prep agent: tools only keep the no-subagents line")
+        }
+        expect(PrepAgent.adjust(basePrompt, PrepAgent.plan(onlyVerify, route: "code", economy: false)!) == basePrompt, "prep agent: the checker alone leaves the prompt as it was")
+        let vr = PrepAgent.verifyRequest(p, base: "/p/live/prep-x", root: "/p", extra: ["/d"], lt: ["/py", "/lt"], claude: "/c", route: "api",
+                                         stateDir: "/s", python: "/vpy", engineDir: "/eng", lang: "uk")
+        expect(vr["route"] as? String == "api" && vr["model"] as? String == "claude-haiku-5-5" && (vr["budget_usd"] as? Double ?? 0) > 0, "prep agent: checker request on the API way")
+        expect(PrepAgent.verifyRequest(p, base: "b", root: "r", extra: [], lt: [], claude: "c", route: "code", stateDir: "s", python: "p", engineDir: "e", lang: "en")["route"] as? String == "plan",
+               "prep agent: checker request on the account way")
+    }
+    let mcp = (try? JSONSerialization.jsonObject(with: Data(PrepAgent.mcpConfig(python: "/vpy", engineDir: "/eng", root: "/p", extra: ["/d"], lt: ["/py", "/lt"]).utf8))) as? [String: Any]
+    let srv = (mcp?["mcpServers"] as? [String: Any])?["pacenote"] as? [String: Any]
+    expect(srv?["command"] as? String == "/vpy" && srv?["args"] as? [String] == ["-m", "livetips_m0.pn_mcp", "--root", "/p", "--extra", "/d", "--lt", "/py", "/lt"]
+           && (srv?["env"] as? [String: String]) == ["PYTHONPATH": "/eng"], "prep agent: the pn_mcp config matches pn_mcp.mcp_config")
+    let ag = (try? JSONSerialization.jsonObject(with: Data(PrepAgent.agentsJSON(withTools: false).utf8))) as? [String: Any]
+    let tl = (ag?["researcher"] as? [String: Any])?["tools"] as? [String]
+    expect(tl == ["Read", "Grep", "Glob"], "prep agent: researcher read-only, no Pacenote tools when they are off")
+    // the chain with stand-ins: the checker runs only after a good preparation that wrote the brief
+    let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("pn-chain-\(getpid())")
+    try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let spy = tmp.appendingPathComponent("spy.sh").path, mark = tmp.appendingPathComponent("mark").path, brief = tmp.appendingPathComponent("b.brief.md").path
+    try? "#!/bin/sh\necho \"$PYTHONPATH $*\" > \"\(mark)\"\n".write(toFile: spy, atomically: true, encoding: .utf8)
+    try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: spy)
+    try? "brief".write(toFile: brief, atomically: true, encoding: .utf8)
+    func chain(_ exe: String, verify: Bool) -> (Int32, String?) {
+        try? FileManager.default.removeItem(atPath: mark)
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", PrepAgent.chain, "sh", "-p", "x"]
+        var env = ["LT_EXE": exe, "LT_BRIEF": brief, "LT_SPY": spy, "LT_ENGINE": "/eng", "PATH": "/usr/bin:/bin"]
+        if verify { env["LT_VERIFY"] = "/s/req.json" }
+        p.environment = env
+        guard (try? p.run()) != nil else { return (-1, nil) }
+        p.waitUntilExit()
+        return (p.terminationStatus, try? String(contentsOfFile: mark, encoding: .utf8))
+    }
+    let good = chain("/usr/bin/true", verify: true)
+    expect(good.0 == 0 && good.1 == "/eng -m livetips_m0.prepverify --request /s/req.json\n", "prep agent: chain runs the checker after a good preparation")
+    let bad = chain("/usr/bin/false", verify: true)
+    expect(bad.0 == 1 && bad.1 == nil, "prep agent: chain keeps the failure and skips the checker")
+    expect(chain("/usr/bin/true", verify: false).1 == nil, "prep agent: chain without the checker")
+    try? FileManager.default.removeItem(at: tmp)
+}
+
+// 0.9.6 (owner, 2026-11-09): one calendar row per meeting; where Start call opens the meeting.
+func meetingLaunch096() {
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000), t1 = t0.addingTimeInterval(1800)
+    expect(CalendarDedup.normalizedLink("https://meet.google.com/abc-defg-hij?authuser=1") == "meet.google.com/abc-defg-hij", "dedup: query dropped")
+    expect(CalendarDedup.normalizedLink(" HTTPS://www.Zoom.us/j/123/ ") == "zoom.us/j/123", "dedup: case, www, slash")
+    expect(CalendarDedup.normalizedLink("") == nil && CalendarDedup.normalizedLink(nil) == nil, "dedup: no link")
+    // two accounts invited to the same meeting (attendees not compared), another meeting at the same time, the same link later
+    let g = CalendarDedup.groups(link: ["https://meet.google.com/abc-defg-hij", "https://meet.google.com/abc-defg-hij?authuser=2",
+                                        "https://meet.google.com/xyz-xxxx-xyz", "https://meet.google.com/abc-defg-hij", nil, nil, nil],
+                                 uid: [nil, "U1", nil, nil, "U2", "u2", "U3"], start: [t0, t0, t0, t1, t0, t0, t0])
+    expect(g == [[0, 1], [2], [3], [4, 5], [6]], "dedup: link + start, uid + start without a link: \(g)")
+    // a row with a link and a UID joins a row with only the same UID
+    expect(CalendarDedup.groups(link: [nil, "https://zoom.us/j/1"], uid: ["U9", "U9"], start: [t0, t0]) == [[0, 1]], "dedup: uid bridges")
+
+    expect(MeetingPlatform.of("https://teams.microsoft.com/l/meetup-join/x") == .teams && MeetingPlatform.of("https://orbit.zoom.us/j/1") == .zoom
+           && MeetingPlatform.of("https://meet.google.com/a") == .meet && MeetingPlatform.of(nil) == .other, "launch: platform from the link")
+    expect(LaunchWay(id: "chrome:Mike@Orbit.com") == LaunchWay(kind: .chrome, profile: "mike@orbit.com") && LaunchWay(id: "teamsApp")?.kind == .teamsApp
+           && LaunchWay(id: "nope") == nil, "launch: way ids round-trip")
+    let wa = LaunchWay(kind: .meetApp, profile: "mike@orbit.com", account: "Mike@Acme.com")
+    expect(wa.id == "meetApp:mike@orbit.com|mike@acme.com" && LaunchWay(id: wa.id) == wa && wa.joinAs == "mike@acme.com", "launch: join as another account")
+    expect(LaunchWay(kind: .chrome, profile: "a@b.c", account: "A@b.c").account == "" && LaunchWay(kind: .chrome, profile: "work").joinAs == "", "launch: own account")
+
+    let state = #"{"profile":{"info_cache":{"Profile 3":{"name":"Work","user_name":"Mike@Orbit.com"},"Default":{"name":"Me","user_name":""}}}}"#
+    let pr = ChromeProfile.parse(localState: Data(state.utf8))
+    expect(pr.count == 2 && ChromeProfile.dir(for: "mike@orbit.com", in: pr) == "Profile 3" && ChromeProfile.dir(for: "emily@orbit.com", in: pr) == nil
+           && ChromeProfile.dir(for: "me", in: pr) == "Default", "launch: Chrome profile folder found by email or name")
+    expect(ChromeProfile.accounts(preferences: Data(#"{"account_info":[{"email":"Mike@Orbit.com"},{"email":"mike@acme.com"}]}"#.utf8)) == ["mike@orbit.com", "mike@acme.com"],
+           "launch: accounts of a profile")
+    let env = LaunchEnvironment(profiles: [ChromeProfile(dir: "Default", name: "Home", email: "mike@gmail.com"),
+                                           ChromeProfile(dir: "Profile 1", name: "A", email: "mike@orbit.com", accounts: ["mike@orbit.com", "mike@acme.com"]),
+                                           ChromeProfile(dir: "Profile 2", name: "Side", email: "")],
+                                meetAppDirs: ["Default", "Profile 1"], teamsApp: true, zoomApp: false)
+    expect(env.ways(for: .meet).map(\.id) == ["meetApp:mike@gmail.com", "meetApp:mike@orbit.com", "chrome:mike@gmail.com", "chrome:mike@orbit.com", "chrome:side", "browser"],
+           "launch: Meet ways, nobody invited: \(env.ways(for: .meet).map(\.id))")
+    let inv = env.ways(for: .meet, invited: ["mike@orbit.com", "mike@beta.com", "Calendar"]).map(\.id)
+    expect(inv == ["meetApp:mike@orbit.com", "meetApp:mike@gmail.com|mike@orbit.com", "meetApp:mike@gmail.com|mike@beta.com", "meetApp:mike@orbit.com|mike@beta.com",
+                   "chrome:mike@gmail.com", "chrome:mike@orbit.com", "chrome:side", "browser"], "launch: Meet ways for the invited accounts: \(inv)")
+    expect(env.ways(for: .teams).map(\.id) == ["teamsApp", "chrome:mike@gmail.com", "chrome:mike@orbit.com", "chrome:side", "browser"], "launch: Teams ways")
+    expect(env.ways(for: .zoom).first?.id == "chrome:mike@gmail.com", "launch: no Zoom app, no Zoom way")
+
+    let meet = env.ways(for: .meet)
+    var h: [LaunchRecord] = []
+    var r = LaunchRanking.rank(meet, history: h, platform: .meet, series: "cal:daily", organizer: "orbit.com")
+    expect(!r.auto && r.ways.first?.id == "meetApp:mike@gmail.com", "launch: nothing known asks")
+    r = LaunchRanking.rank(meet, history: h, platform: .meet, series: "cal:daily", organizer: "orbit.com", invited: ["mike@orbit.com"])
+    expect(!r.auto && r.ways.first?.id == "meetApp:mike@orbit.com", "launch: an invited account first when nothing is known")
+    h.append(LaunchRecord(at: t0, platform: .meet, series: "cal:daily", organizer: "orbit.com", way: "chrome:mike@orbit.com", ok: true))
+    r = LaunchRanking.rank(meet, history: h, platform: .meet, series: "cal:daily", organizer: "orbit.com")
+    expect(r.auto && r.ways.first?.id == "chrome:mike@orbit.com", "launch: what worked for the series opens at once")
+    h[0].ok = false
+    h.append(LaunchRecord(at: t1, platform: .meet, series: "cal:daily", organizer: "orbit.com", way: "meetApp:mike@gmail.com", ok: true))
+    r = LaunchRanking.rank(meet, history: h, platform: .meet, series: "cal:daily", organizer: "orbit.com")
+    expect(r.auto && r.ways.first?.id == "meetApp:mike@gmail.com" && r.ways.last?.id == "chrome:mike@orbit.com", "launch: wrong place goes last")
+    r = LaunchRanking.rank(meet, history: h, platform: .meet, series: "cal:weekly", organizer: "orbit.com")
+    expect(r.auto && r.ways.first?.id == "meetApp:mike@gmail.com", "launch: a new series of the same domain follows it")
+    r = LaunchRanking.rank(meet, history: h, platform: .meet, series: "cal:other", organizer: "acme.com")
+    expect(!r.auto && r.ways.first?.id == "meetApp:mike@gmail.com", "launch: another domain is offered, not opened")
+    r = LaunchRanking.rank(env.ways(for: .teams), history: h, platform: .teams, series: "cal:daily", organizer: "orbit.com")
+    expect(!r.auto, "launch: Meet history does not open Teams")
+    r = LaunchRanking.rank(meet, history: h, platform: .meet, series: "cal:x", organizer: "", pinned: "browser")
+    expect(r.auto && r.ways.first?.id == "browser", "launch: a pinned way wins")
+
+    let ml = "https://meet.google.com/abc-defg-hij"
+    expect(MeetingURL.forWay(ml, LaunchWay(kind: .chrome, profile: "mike@orbit.com")) == ml + "?authuser=mike@orbit.com", "launch: Meet authuser")
+    expect(MeetingURL.forWay(ml + "?authuser=0", LaunchWay(kind: .meetApp, profile: "x@y.z", account: "a@b.c")) == ml + "?authuser=a@b.c", "launch: authuser replaced")
+    expect(MeetingURL.forWay(ml, LaunchWay(kind: .chrome, profile: "side")) == ml, "launch: a profile without an email keeps the link")
+    expect(MeetingURL.forWay(ml, LaunchWay(kind: .browser)) == ml, "launch: browser keeps the link")
+    expect(MeetingURL.forWay("https://teams.microsoft.com/l/meetup-join/x", LaunchWay(kind: .chrome, profile: "a@b.c"))
+           == "https://teams.microsoft.com/l/meetup-join/x?msLaunch=false&suppressPrompt=true", "launch: Teams stays on the web")
+    expect(MeetingURL.zoomApp("https://orbit.zoom.us/j/123456789?pwd=abc") == "zoommtg://zoom.us/join?action=join&confno=123456789&pwd=abc", "launch: Zoom app link")
+    expect(MeetingURL.zoomApp("https://meet.google.com/x") == nil, "launch: not Zoom")
+}
+
 callRecording()
 meetingNotes0952()
+prepAgent096()
+meetingLaunch096()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

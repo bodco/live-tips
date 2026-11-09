@@ -337,8 +337,8 @@ struct HomeView: View {
         let liveKey = ce.isRunning ? EditLog.seriesKey(ce.renamed ?? (ce.callRequest["title"] as? String) ?? "") : ""
         for e in (calendarOn ? cal.upcoming(now) : []) {
             // 2026-10-28 (owner): the call being recorded is shown once, as live, not again as ahead.
-            if ce.isRunning, e.id == ce.liveEventID || (!liveKey.isEmpty && EditLog.seriesKey(e.title) == liveKey && e.start <= now.addingTimeInterval(15 * 60)) { continue }
-            let m = upnext.visible.first { $0.calEventID == e.id }
+            if ce.isRunning, e.has(ce.liveEventID) || (!liveKey.isEmpty && EditLog.seriesKey(e.title) == liveKey && e.start <= now.addingTimeInterval(15 * 60)) { continue }
+            let m = upnext.visible.first { e.has($0.calEventID) }
             if let m = m { used.insert(ObjectIdentifier(m)) }
             rows.append(Ahead(id: e.id, event: e, model: m, start: e.start))
         }
@@ -514,6 +514,12 @@ struct HomeView: View {
     }
 
     private func state(of r: Ahead) -> CallState {
+        // 2026-11-06 (owner: "Get ready > Prepare closes the window and nothing happens"): a preparation running or
+        // waiting for a call whose calendar time has already begun showed the plain "in progress" card, so the prep
+        // was invisible. A running or queued preparation now wins over "in progress".
+        if let m = r.model, [.running, .queued].contains(upnext.prepState(m)) {
+            return upnext.prepState(m) == .running ? .preparing : .queued
+        }
         if r.event?.relative(now) == "in progress" { return .live }
         guard let m = r.model else { return aiReady ? .notReady : .noBrief }
         switch upnext.prepState(m) {

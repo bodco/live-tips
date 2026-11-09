@@ -86,7 +86,7 @@ struct CRMCallRow: View {
         return ((root as NSString).appendingPathComponent("live") as NSString)
             .appendingPathComponent("prep-\(f.string(from: model.callDate))-\(StartCallModel.slugify(model.effectiveTitle))")
     }
-    var emails: [String] { model.calEventID.flatMap { id in CalendarService.shared.events.first { $0.id == id }?.emails } ?? [] }
+    var emails: [String] { model.calEventID.flatMap { CalendarService.shared.event($0)?.emails } ?? [] }
 
     var body: some View {
         if crm.connected {

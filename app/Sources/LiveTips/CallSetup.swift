@@ -178,7 +178,7 @@ struct CallSetupView: View {
     private var timeRow: some View {
         let evs = cal.hasSource ? cal.aroundNow() : []
         let tf = DateFormatter(); tf.dateFormat = "HH:mm"
-        let from = model.calEventID.flatMap { id in cal.events.first { $0.id == id } }
+        let from = model.calEventID.flatMap { cal.event($0) }
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .bottom, spacing: 14) {
                 // 0.8.7 (G4): fields without steppers; the date opens a calendar on click

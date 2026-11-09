@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
         installMainMenu()
         NSApp.setActivationPolicy(config.showInDock ? .regular : .accessory)
+        Self.applyAppearance(config.appearance)     // 0.9.6: Settings > General > Theme
         let it = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         it.button?.image = Brand.menuBarImage(recording: false)     // Pacenote 0.8: the brand template
         it.button?.imagePosition = .imageLeft
@@ -191,7 +192,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item?.button?.image = Brand.menuBarImage(recording: st.state == "recording")
         setClock(st.state == "recording" && !cfg.floatingCallControls)
         // Orange near a spending limit; no red tint while recording: the filled dot and the clock say it.
-        item?.button?.contentTintColor = (st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9) ? .systemOrange : nil
+        // 0.9.6: also a provider at its alert share or limit (Settings > AI > Spending limits); the alerts fire here
+        let providerAlert = MainActor.assumeIsolated { () -> Bool in SpendWatch.check(config: cfg); return SpendWatch.anyAlert(config: cfg) }
+        item?.button?.contentTintColor = (st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9 || providerAlert) ? .systemOrange : nil
     }
 
     /// The menu bar panel's data (Pacenote 0.8, F1).
@@ -225,6 +228,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.lastCallLine = [ce.lastCallLine, judge].filter { !$0.isEmpty }.joined(separator: " · ")
         m.lastCallDetail = ce.lastCallDetail
         m.thisCallSpend = st.callSpentUSD
+        // 0.9.6 Б1: the economy switch shows when there is something to save: any API key (or the agent, or economy on)
+        m.agentOn = cfg.callAgent.enabled || !SpendWatch.connected.isEmpty
+        m.economy = SpendWatch.economyOn
         m.canSendNotion = !m.isLive && (ce.lastFile != nil || (!ce.isRunning && ce.restoreLastCall()))
         m.notionResult = ce.notionResult
         m.micMissing = AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
@@ -235,6 +241,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
+
+    /// 0.9.6 (owner): the app's theme, "system" follows the Mac. Every window, the tips window included, takes it at once.
+    static func applyAppearance(_ v: String) {
+        NSApp.appearance = v == "light" ? NSAppearance(named: .aqua) : v == "dark" ? NSAppearance(named: .darkAqua) : nil
+    }
     @objc func openHome() {
         MainActor.assumeIsolated {
             // 0.8.7.1: Home (menu, Dock, Command-0) on a closed window starts at Home, not on the call page left open
@@ -739,7 +750,7 @@ extension AppDelegate {
     /// Starts a call set up in Start call or kept in Up next. Its finished preparation is used by name; one still
     /// being written joins the call when done. Returns an error line, or nil.
     @MainActor
-    func launch(_ model: StartCallModel) -> String? {
+    func launch(_ model: StartCallModel, openMeeting: Bool = true) -> String? {
         model.useDefaultTargetIfEmpty()
         if model.chosenPrep == nil { model.adoptExistingPrep() }
         if model.chosenPrep == nil, let b = model.prepBase, let root = model.root {
@@ -761,6 +772,8 @@ extension AppDelegate {
         UpNext.shared.removeMatching(model)          // 2026-10-28: no second entry of the call just started
         CallEngine.shared.liveEventID = model.calEventID
         SeriesMemory.shared.remember(model)          // the next call of this series starts from these settings
+        // 0.9.6 (owner): the call's meeting opens too, in the place this series uses (or Pacenote asks once)
+        if openMeeting, let id = model.calEventID, let e = CalendarService.shared.event(id) { MeetingLauncher.shared.open(e) }
         return nil
     }
 

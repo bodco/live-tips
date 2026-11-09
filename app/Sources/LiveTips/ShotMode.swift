@@ -127,6 +127,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         for theme in ["dark", "light"] {
             steps.append { [unowned self] in NSApp.appearance = NSAppearance(named: theme == "dark" ? .darkAqua : .aqua); self.next(after: 0.5) }
             if env["LT_SHOTS_ONLY"] == "ai" { steps.append { [unowned self] in self.settings("ai", theme) }; continue }   // Settings > AI only
+            if env["LT_SHOTS_ONLY"] == "spend" { spendShots(theme); continue }   // 0.9.6: limits, call agent, economy (scrolled)
             if env["LT_SHOTS_ONLY"] == "p085" { p085(theme); continue }    // 0.8.5: the boards P1-P8 next to the mockups
             if env["LT_SHOTS_ONLY"] == "p087" { p087(theme); continue }    // 0.8.7: the new screens
             if env["LT_SHOTS_ONLY"] == "p090" { p090(theme); continue }    // 0.9.0: Home in its integration states
@@ -364,6 +365,57 @@ final class ShotMode: NSObject, NSApplicationDelegate {
     }
 
     /// The menu bar panel (Pacenote 0.8, F1) on demo data: between calls and during one.
+    /// 0.9.6: Settings > AI scrolled page by page (the limits per provider, the call agent, economy mode sit below the
+    /// first screen), and the menu bar panel with the economy leaf, off and on.
+    func spendShots(_ theme: String) {
+        steps.append { [unowned self] in
+            var c = SettingsWindow.model.config
+            c.callAgent.enabled = true; c.callAgent.proactive = true
+            c.providerBudgets.claude.monthlyUSD = 40; c.providerBudgets.openai.monthlyUSD = 20
+            SettingsWindow.model.config = c
+            SpendWatch.shotConnected = ["claude", "openai"]
+            SettingsWindow.show(tab: "ai")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
+                guard let w = SettingsWindow.window else { next(); return }
+                @MainActor func scrolls(_ v: NSView) -> [NSScrollView] { ((v as? NSScrollView).map { [$0] } ?? []) + v.subviews.flatMap(scrolls) }
+                let sv = (w.contentView.map(scrolls) ?? []).max { ($0.documentView?.frame.height ?? 0) < ($1.documentView?.frame.height ?? 0) }
+                guard let sv = sv, let doc = sv.documentView else { capture(w, "spend-ai-0-\(theme)"); next(); return }
+                let page = max(200, sv.contentView.bounds.height - 80)
+                let pages = min(8, Int((doc.frame.height / page).rounded(.up)))
+                @MainActor func shot(_ i: Int) {
+                    guard i < pages else { next(); return }
+                    let y = min(CGFloat(i) * page, max(0, doc.frame.height - sv.contentView.bounds.height))
+                    sv.contentView.scroll(to: NSPoint(x: 0, y: doc.isFlipped ? y : doc.frame.height - sv.contentView.bounds.height - y))
+                    sv.reflectScrolledClipView(sv.contentView)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [self] in
+                        capture(w, "spend-ai-\(i)-\(theme)")
+                        shot(i + 1)
+                    }
+                }
+                shot(0)
+            }
+        }
+        for eco in [false, true] {
+            steps.append { [unowned self] in
+                let app = AppDelegate()
+                let c = MenuBarPanelController(app: app, button: nil)
+                let m = c.model
+                m.agentOn = true
+                m.economy = eco
+                m.monthSpend = 12.40
+                m.monthCap = 100
+                keep.append(c); keep.append(app)
+                guard let w = c.windowForShots() else { next(); return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [self] in
+                    c.place()
+                    capture(w, "spend-menu-\(eco ? "economy" : "normal")-\(theme)")
+                    w.orderOut(nil)
+                    next()
+                }
+            }
+        }
+    }
+
     func menuPanel(_ theme: String, live: Bool) {
         let app = AppDelegate()
         let c = MenuBarPanelController(app: app, button: nil)

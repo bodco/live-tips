@@ -23,8 +23,8 @@ struct AheadCall: Identifiable {
         var used = Set<ObjectIdentifier>()
         let liveKey = ce.isRunning ? EditLog.seriesKey(ce.renamed ?? (ce.callRequest["title"] as? String) ?? "") : ""
         for e in cal.upcoming(now) where e.start > now.addingTimeInterval(-10 * 60) {
-            if ce.isRunning, e.id == ce.liveEventID || (!liveKey.isEmpty && EditLog.seriesKey(e.title) == liveKey && e.start <= now.addingTimeInterval(15 * 60)) { continue }
-            let m = upnext.visible.first { $0.calEventID == e.id }
+            if ce.isRunning, e.has(ce.liveEventID) || (!liveKey.isEmpty && EditLog.seriesKey(e.title) == liveKey && e.start <= now.addingTimeInterval(15 * 60)) { continue }
+            let m = upnext.visible.first { e.has($0.calEventID) }
             if let m = m { used.insert(ObjectIdentifier(m)) }
             rows.append(AheadCall(id: e.id, event: e, model: m, start: e.start))
         }
@@ -68,6 +68,8 @@ final class MenuBarModel: ObservableObject {
     @Published var lastCallLine = ""
     @Published var lastCallDetail: String?
     @Published var thisCallSpend: Double = 0
+    @Published var agentOn = false             // 0.9.6: the call agent's flag or any API key (Б1): the economy leaf shows
+    @Published var economy = false             // 0.9.6: economy mode (state/economy)
     @Published var canSendNotion = false
     @Published var notionResult = ""
     @Published var micMissing = false
@@ -287,7 +289,23 @@ struct MenuBarPanel: View {
                         .help(model.lastCallLine + (model.lastCallDetail.map { "\n" + $0 } ?? ""))
                 }
             }
-            .font(PN.Font.caption).monospacedDigit().foregroundStyle(PN.C.text3).lineLimit(1)
+            .font(PN.Font.caption).monospacedDigit().foregroundStyle(PN.C.text3).lineLimit(1).layoutPriority(1)
+            if model.agentOn || model.economy {
+                // 0.9.6 (owner): economy mode by hand, also during a call: the call agent stops, the lookups answer
+                Button {
+                    model.economy.toggle()
+                    MainActor.assumeIsolated { SpendWatch.setEconomy(model.economy) }
+                } label: {
+                    // 2026-11-06 (GUI check): the leaf alone; with its label the panel wrapped "Econom / y on" and cut the
+                    // month's spend. Green and filled = on; the state is in the tooltip and for VoiceOver.
+                    Image(systemName: model.economy ? "leaf.fill" : "leaf")
+                        .font(PN.Font.caption).foregroundStyle(model.economy ? PN.C.turn : PN.C.text3)
+                        .frame(width: 18, height: 18).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).fixedSize()
+                .help(L(model.economy ? "economy.on" : "economy.off") + "\n" + L("economy.help"))
+                .accessibilityLabel(L("economy.title")).accessibilityValue(L(model.economy ? "economy.on" : "economy.off"))
+            }
             Spacer()
             Menu(L("menubar.helpAbout")) {
                 Button(L("menubar.setup")) { model.run { $0.openSetup() } }

@@ -613,3 +613,196 @@ def test_unanswered_ask_starts_the_deep_lookup_and_slow_prep_way_keeps_tips_mode
     assert started == [("who tests the pilot?", "ask")]
     _, timing = _out(tmp_path)
     assert "ask_model" not in timing[-1]
+
+
+# ---------- 0.9.6: the call agent behind its flag ----------
+class _FakeAgent:
+    def __init__(self, res):
+        self.res, self.asked = res, []
+
+    def ask(self, q, tail, lang):
+        self.asked.append((q, lang))
+        return dict(self.res)
+
+
+def _llm(tmp_path):
+    p = tmp_path / "o" / "demo-call.app.llm.jsonl"
+    return [json.loads(l) for l in p.read_text().splitlines()] if p.exists() else []
+
+
+def test_the_call_agent_answers_the_deep_lookup(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True)
+    fake = _FakeAgent({"answered": True, "gist": "42 hours", "phrase": "We have 42 hours.", "items": [], "sources": ["plan.md"],
+                       "cost_usd": 0.02, "turns": 2})
+    eng._call_agent = lambda: fake
+    eng._run_deep("budget left?", "ask", [])
+    tips, _ = _out(tmp_path)
+    assert tips[-1]["kind"] == "answer" and "42 hours" in tips[-1]["gist"] and fake.asked
+    row = [r for r in _llm(tmp_path) if r.get("role") == "deep_lookup"][-1]
+    assert row["via"] == "agent" and row["turns"] == 2 and row["cost_usd"] == 0.02
+
+
+def test_a_failed_call_agent_falls_back_to_the_lookup(tmp_path, monkeypatch):
+    from livetips_m0 import deep
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+                                 ai={"routes": {"prep": "openai", "tips": "openai"}})
+    eng._call_agent = lambda: _FakeAgent({"error": "the search took too long", "cost_usd": 0.05})
+    monkeypatch.setattr(deep, "local_lookup", lambda *a, **k: {"answered": True, "gist": "from the folders", "phrase": "p",
+                                                                "items": [], "sources": [], "cost_usd": 0.01})
+    eng._run_deep("budget left?", "ask", [])
+    tips, _ = _out(tmp_path)
+    assert tips[-1]["gist"].startswith("from the folders") or "from the folders" in json.dumps(tips[-1])
+    roles = [r.get("role") for r in _llm(tmp_path)]
+    assert "call_agent_error" in roles
+    assert "via" not in [r for r in _llm(tmp_path) if r.get("role") == "deep_lookup"][-1]
+
+
+def test_the_call_agent_gates(tmp_path, monkeypatch):
+    from livetips_m0 import agent as ag
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    eco = tmp_path / "economy"
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+                                 agent={"enabled": True, "economy_file": str(eco), "max_usd_per_call": 0.1})
+    monkeypatch.setattr(ag, "sdk_available", lambda: True)
+    eng._agent_key = lambda: "sk-test"
+    a = eng._call_agent()
+    assert a is not None and eng.agent_fast()
+    eco.write_text("on")
+    assert eng._call_agent() is a and a.a["model"] == "claude-haiku-5-5"   # 0.9.6 Б1: economy = Haiku, also mid-call
+    assert any(r.get("role") == "call_agent_profile" and r.get("economy") for r in _llm(tmp_path))
+    eco.unlink()
+    a.spent = 0.2
+    assert eng._call_agent() is None                       # the call's agent budget is spent
+    roles = [(r.get("role"), r.get("why")) for r in _llm(tmp_path)]
+    assert ("call_agent_off", "call_budget") in roles
+    eng2, _ = _meeting_engine(tmp_path / "b", lambda m, u: "{}", project_root=str(proj), deep_lookup=True)
+    assert eng2._call_agent() is None                      # the flag is off by default
+    eng.drain(1)
+
+
+# ---------- 0.9.6 point 2: background searches of the call agent ----------
+class _BgAgent:
+    def __init__(self, res, left=True):
+        self.res, self.left, self.asked = res, left, []
+
+    def bg_budget_left(self):
+        return self.left
+
+    def ask(self, q, tail, lang, background=False, who=""):
+        self.asked.append((q, background, who))
+        return dict(self.res)
+
+
+def _wait_bg(eng):
+    end = time.monotonic() + 5
+    while time.monotonic() < end and getattr(eng, "_bg_running", False):
+        time.sleep(0.01)
+
+
+def test_brief_covers():
+    from livetips_m0.engine import brief_covers
+    brief = "Export goes live on Tuesday after the review. Pilot: 5 users, names by Friday."
+    assert brief_covers("When does the export go live?", brief)
+    assert not brief_covers("What about the SSO integration budget?", brief)
+    assert brief_covers("Коли запускається експорт?", "Запуск експорту у вівторок")     # Ukrainian endings
+    assert brief_covers("ok?", brief)                                                 # nothing to search for
+
+
+def test_background_search_card_and_gates(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+                                 agent={"enabled": True, "proactive": True, "proactive_gap_s": 60})
+    eng.prompt._brief = "Export goes live on Tuesday after the review."
+    fake = _BgAgent({"answered": True, "gist": "SSO is in phase 2", "phrase": "SSO comes in phase 2.", "items": ["phase 2: May"],
+                     "sources": ["roadmap.md"], "cost_usd": 0.01, "turns": 2})
+    eng._call_agent = lambda: fake
+    assert not eng._maybe_proactive("When does the export go live?", "Emily C.")     # the brief covers it
+    assert eng._maybe_proactive("What about the SSO integration?", "Emily C.")
+    _wait_bg(eng)
+    tips, _ = _out(tmp_path)
+    assert tips[-1]["kind"] == "answer" and tips[-1]["auto"] is True and "SSO" in tips[-1]["gist"]
+    assert fake.asked == [("What about the SSO integration?", True, "Emily C.")]
+    assert not eng._maybe_proactive("What about the SSO integration?", "Emily C.")    # once per question
+    assert not eng._maybe_proactive("And the data migration owner?", "Emily C.")      # within the gap
+    clock["t"] += 120
+    fake.left = False
+    assert not eng._maybe_proactive("Who owns the data migration plan?", "Emily C.")  # background share spent
+    roles = [(r.get("role"), r.get("why")) for r in _llm(tmp_path)]
+    assert ("proactive_skip", "in_brief") in roles and ("proactive_skip", "gap") in roles and ("proactive_skip", "budget") in roles
+    assert any(r.get("role") == "proactive_lookup" and r.get("cost_usd") == 0.01 for r in _llm(tmp_path))
+    eng.drain(1)
+
+
+def test_background_search_is_quiet_without_an_answer_and_off_by_default(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+                                 agent={"enabled": True, "proactive": True})
+    eng.prompt._brief = "Export goes live on Tuesday."
+    fake = _BgAgent({"answered": False, "gist": "nothing", "phrase": "Let me check.", "cost_usd": 0.004})
+    eng._call_agent = lambda: fake
+    n0 = len(_out(tmp_path)[0])
+    assert eng._maybe_proactive("What about the SSO integration?", "Emily C.")
+    _wait_bg(eng)
+    assert len(_out(tmp_path)[0]) == n0                     # no "not found" card during the call
+    eng2, _ = _meeting_engine(tmp_path / "b", lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+                              agent={"enabled": True})
+    eng2._call_agent = lambda: fake
+    assert not eng2._maybe_proactive("What about the SSO integration?", "Emily C.")   # the flag is off by default
+    eng3, _ = _meeting_engine(tmp_path / "c", lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+                              agent={"enabled": True, "proactive": True})
+    eng3._call_agent = lambda: None                         # economy, no key, Claude capped: no agent, no search
+    assert not eng3._maybe_proactive("What about the SSO integration?", "Emily C.")
+    eng.drain(1)
+
+
+# ---------- 0.9.6 Б1: economy mode v1 ----------
+def test_economy_stops_background_searches(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    eco = tmp_path / "economy"
+    eco.write_text("on")
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+                                 agent={"enabled": True, "proactive": True, "economy_file": str(eco)})
+    eng.prompt._brief = "Export goes live on Tuesday."
+    fake = _BgAgent({"answered": True, "gist": "x", "cost_usd": 0.01})
+    eng._call_agent = lambda: fake
+    assert not eng._maybe_proactive("What about the SSO integration?", "Emily C.") and not fake.asked
+    assert ("proactive_skip", "economy") in [(r.get("role"), r.get("why")) for r in _llm(tmp_path)]
+    eng.drain(1)
+
+
+def test_economy_lookup_uses_the_account_then_the_tips_model(tmp_path, monkeypatch):
+    from livetips_m0 import deep
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    eco = tmp_path / "economy"
+    eco.write_text("on")
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+                                 agent={"economy_file": str(eco)}, ai={"routes": {"prep": "api", "tips": "api"}})
+    eng._call_agent = lambda: None
+    seen = {}
+    monkeypatch.setattr(deep, "claude_path", lambda cfg: "/usr/bin/claude")
+    monkeypatch.setattr(deep, "lookup", lambda cfg, q, t, lang, economy=False: seen.setdefault("eco", economy) and {"error": "not signed in"})
+    monkeypatch.setattr(deep, "local_lookup", lambda prov, model, *a, **k: seen.setdefault("model", model) and
+                        {"answered": True, "gist": "from the folders", "phrase": "p", "items": [], "sources": [], "cost_usd": 0.001})
+    assert not eng._ask_on_prep()                           # typed questions on the tips model
+    eng._run_deep("budget left?", "ask", [])
+    assert seen["eco"] is True and seen["model"] == eng.models["tip"]
+    rows = _llm(tmp_path)
+    assert any(r.get("role") == "deep_account_error" for r in rows)
+    assert [r for r in rows if r.get("role") == "deep_lookup"][-1]["economy"] is True
+    eng.drain(1)
+
+
+def test_deep_env_economy_has_no_key():
+    from livetips_m0.deep import deep_env
+    env = deep_env({"api_key_env": "CLAUDE_API"}, {"CLAUDE_API": "sk-x", "ANTHROPIC_API_KEY": "sk-y", "PATH": "/bin"}, economy=True)
+    assert "ANTHROPIC_API_KEY" not in env
+    assert deep_env({"api_key_env": "CLAUDE_API"}, {"CLAUDE_API": "sk-x", "PATH": "/bin"})["ANTHROPIC_API_KEY"] == "sk-x"

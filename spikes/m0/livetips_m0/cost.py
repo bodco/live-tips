@@ -113,3 +113,63 @@ class BudgetGuard:
         if self.call_spent >= self.call_soft:
             return "soft"
         return "ok"
+
+
+ROUTE_PROVIDER = {"api": "claude", "openai": "openai", "gemini": "gemini"}
+
+
+class ProviderCaps:
+    """0.9.6 (owner, 2026-11-06): a monthly limit per AI provider with a key (Settings > AI > Spending limits):
+    Claude, OpenAI and Gemini apart. The month's spend is the sum of state/spend-ledger.jsonl (the lines Settings >
+    Usage shows; the accounts paid by a plan are not there). A limit of 0 means none. Read at most every `ttl` s."""
+
+    def __init__(self, caps: dict, ledger_path, ttl: float = 30.0, clock=time.monotonic):
+        self.caps = {p: float(v or 0) for p, v in (caps or {}).items() if p in ROUTE_PROVIDER.values()}
+        self.path = Path(os.path.expanduser(str(ledger_path))) if ledger_path else None
+        self.ttl = ttl
+        self.clock = clock
+        self._at = None
+        self._spent = {}
+
+    @classmethod
+    def from_cfg(cls, cfg: dict, state_path=None):
+        """cfg["provider_caps"] = {"claude": usd, ...} (sidecar-config) or LT_PROVIDER_CAPS (one-off jobs, JSON);
+        the ledger next to the routes' state file. None when no limit is set."""
+        caps = cfg.get("provider_caps")
+        if caps is None and os.environ.get("LT_PROVIDER_CAPS"):
+            try:
+                caps = json.loads(os.environ["LT_PROVIDER_CAPS"])
+            except ValueError:
+                caps = None
+        if not caps or not any(float(v or 0) > 0 for v in caps.values()):
+            return None
+        st = state_path or (cfg.get("ai") or {}).get("state") or os.environ.get("LT_AI_STATE")
+        return cls(caps, Path(os.path.expanduser(st)).with_name("spend-ledger.jsonl") if st else None)
+
+    def month_spent(self) -> dict:
+        now = self.clock()
+        if self._at is not None and now - self._at < self.ttl:
+            return self._spent
+        month, spent = time.strftime("%Y-%m"), {}
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                for raw in f:
+                    try:
+                        o = json.loads(raw)
+                    except ValueError:
+                        continue
+                    p = ROUTE_PROVIDER.get(o.get("route"))
+                    if p and str(o.get("at", ""))[:7] == month:
+                        spent[p] = spent.get(p, 0.0) + float(o.get("usd") or 0.0)
+        except (OSError, TypeError):
+            pass
+        self._at, self._spent = now, spent
+        return spent
+
+    def capped(self, provider: str) -> bool:
+        cap = self.caps.get(provider, 0.0)
+        return cap > 0 and self.month_spent().get(provider, 0.0) >= cap
+
+    def capped_route(self, route: str) -> bool:
+        p = ROUTE_PROVIDER.get(route)
+        return bool(p) and self.capped(p)

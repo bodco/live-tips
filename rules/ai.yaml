@@ -89,6 +89,70 @@ deep_lookup: |
   itself (lt search, several queries, wide passages) and the preparation's model answers from the passages; only the
   question, the last call lines and the passages go to that provider. At most 2 at a time and 12 per call; spending
   limits apply. No folders: no search, the card says there is no ready answer.
+call_agent: |
+  0.9.6 (owner, 2026-11-06): opt-in (Settings > AI > Call agent, off by default). When on, the deep_lookup above goes
+  first to one Claude Agent SDK session per call (livetips_m0.agent): the model set there (Sonnet by default, Haiku
+  for less), Read, Grep and Glob over the project folder and the added folders, and with "Pacenote's own tools" the
+  in-process tools of livetips_m0.pn_tools (0.9.6 Б2, one list for the agent and the preparation): brief and
+  call_transcript (live call only), search_folders (lt search), past_calls (the last calls: notes, else the call's last
+  picture, else the transcript's start and end; with a query also matching passages), commitments (the open promises
+  register), decisions (the register snapshot plus decisions from later calls, newer wins, superseded dropped) and
+  project_state (the Notion current state with its date); each answers short dated lines with a source, "(no data)"
+  when there is none; the agent is told to call the cheapest first. Bash, writes, the web and
+  subagents are removed, anything else is denied; no user or project settings, skills or MCP servers
+  (setting_sources []); Claude Code gets its own config folder (state/agent-claude), so only the Claude API key pays,
+  never the Claude account (Anthropic's terms for products built on the SDK). Each question sends only the call lines
+  the session has not seen. Limits: $0.30 per question (max_budget_usd), 12 turns, 120 s, $1 per call by default
+  (Settings); the cost is the SDK's session total minus the previous one, written to spend-ledger.jsonl as job
+  "agent" (Usage: live, Claude). Not used, and the deep_lookup above answers: flag off,
+  no SDK (optional component "agent": setup.sh install agent, Python 3.10+), no Claude key, Claude at its monthly
+  limit, the call's agent budget spent, or the agent failed (its spend still counts).
+  Background searches (point 2, owner 2026-11-06): flag agent.proactive, off by default (Settings > AI > Call agent >
+  Background searches). Trigger: the call picture finds a new question of the other side to the PM (asks, type
+  question) while a brief exists and the brief plus the fact book do not cover it (engine.brief_covers: under 60% of
+  its content words by a 5-letter stem). The same session gets a BACKGROUND CHECK prompt (ask(background=True)): at
+  most 3 tool calls, 45 s, answered=false at once when the sources have nothing. Never queued: skipped while any
+  question or deep lookup is in flight; a PM question interrupts it (its result is dropped). Limits per call:
+  proactive_usd_per_call $0.25 and proactive_max_per_call 6, inside max_usd_per_call; proactive_gap_s 60 between two;
+  one search per question text. Economy mode (checked explicitly, proactive_skip why economy), no key, Claude capped: no search. A card (kind answer, auto true)
+  only when answered is true; llm rows proactive_lookup and proactive_skip (why: busy, gap, budget, in_brief); ledger
+  rows job "agent" with background true.
+prep_agent: |
+  0.9.6 Б3-Б4 (owner, 2026-11-06), point 4, beta: the research preparation. Rules and defaults in rules/prep.yaml
+  (that file wins over this summary). Three switches (Settings > AI > Preparation (beta)); tools on by default after the A/B, verify
+  and parallel off: tools (livetips_m0.pn_mcp, the read-only part of pn_tools over stdio MCP), verify (livetips_m0.prepverify: Haiku, clean
+  context; unverified -> " (unverified)", contradicted -> the wrong part replaced in place with the source's value plus
+  "(corrected per <source> <date>)", nothing removed; original <base>.brief.preverify.md, result <base>.verify.json,
+  ledger job prep_verify), parallel (up to 5 read-only `researcher` subagents through --agents). Only the Claude ways
+  (api and code), both through `claude -p`; no Agent SDK for the preparation (owner, 2026-11-06). On api a budget per
+  preparation (--max-budget-usd, $1.50 default) when tools or parallel are on; the checker $0.25. With the features on
+  the preparation prompt's "no MCP tools ... no subagents" line names them instead (PrepAgent.adjust). Economy: tools
+  yes, the checker on Haiku, no parallel. Defaults after the A/B (owner, 2026-11-06; research/
+  pacenote-prep-agent-ab-2026-11-06.md): tools on, the checker and parallel off.
+provider_limits: |
+  0.9.6 (owner, 2026-11-06): a monthly limit (0 = none) and an alert share (80% default) per provider with a key:
+  Claude (route api), OpenAI, Gemini, from spend-ledger.jsonl of the current month. Only providers with a key are shown
+  and alerted. The alert share: one notification a month and an orange menu bar icon. The limit: the router treats
+  that provider's way as not usable (livetips_m0.cost.ProviderCaps via sidecar-config provider_caps and
+  LT_PROVIDER_CAPS; the preparation in PrepRunner too); with auto-switch Claude moves to the account, otherwise the
+  request fails with "the monthly limit ... is reached". A limit is not an outage (the way is not marked down). The
+  ledger is read at most every 30 s, so a request may pass the limit by one call.
+economy: |
+  0.9.6 Б1 (owner, 2026-11-06): economy mode v1 = the least API money, the accounts' plans pay where they can. Switched
+  by hand only (menu bar leaf, shown with any API key; Settings > AI > Economy mode), the file state/economy.
+  Live, read before every agent question, lookup and background search: the call agent on the ECONOMY profile
+  (livetips_m0.agent: claude-haiku-5-5, 6 turns, $0.05 a question, min(setting, $0.25) a call; a profile change starts
+  a new session, the spend stays); background searches off; the deep lookup without the agent runs Claude Code with no
+  ANTHROPIC_API_KEY (deep_env economy, the Claude account), and on an error (signed out) local_lookup on the tips
+  model; typed questions on the tips model (_ask_on_prep False). llm rows carry "economy": true (deep_lookup,
+  call_agent_profile, deep_account_error), ledger rows too.
+  From the next call or job (EconomyPlan.apply in LiveTipsCore/Spending.swift through AIRoute.effective: CallEngine
+  config, AIRoute.env, sidecarBlock, PrepRunner): tips on the cheapest model of their way (api/code Haiku, openai
+  gpt-6-luna, gemini gemini-3.5-flash-lite; classify untouched); prep and after: api -> code, openai -> codex when that
+  account's tool is installed (a signed-out account falls back through auto-switch); gemini never to agy (Antigravity's
+  terms); no account: after on the cheaper model (openai gpt-6-luna, gemini flash-lite; the Claude after-call models
+  are fixed in the engine modules and stay), prep unchanged. Point 4 in economy (EconomyPlan.prepFeatures): tools yes,
+  the checker on Haiku only, no parallel subagents. The monthly limits per provider apply on top (checked after).
 ask_model: |
   2026-11-06 (owner): a typed question is answered by the preparation's way and model (Settings > AI) when that way
   answers in seconds: a Claude API key, the OpenAI API or the Gemini API. A Claude or ChatGPT account and the Gemini

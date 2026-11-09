@@ -1041,6 +1041,10 @@ struct SettingsView: View {
                 Text(L("set.monthSpend", ["spent": String(format: "%.2f", SpendLedger.monthSpent()), "cap": String(format: "%.0f", model.config.budget.monthlyHardUSD)]))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
+            ProviderLimitsSection(model: model)
+            EconomySection()                 // 0.9.6 Б1: between the limits and the agent
+            CallAgentSection(model: model)
+            PrepAgentSection(model: model)   // 0.9.6 Б3: the research preparation (beta)
             Section {
                 Text(L("search.what")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 Toggle(L("set.localAiDefaultFor"), isOn: $model.config.localAI.enabled)
@@ -1470,6 +1474,12 @@ struct SettingsView: View {
                     .help(L("floating.settingHelp"))
                     .onChange(of: model.config.floatingCallControls) { (NSApp.delegate as? AppDelegate)?.refresh() }
                 Text(L("floating.menuHelp")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                Picker(L("set.theme"), selection: $model.config.appearance) {
+                    Text(L("set.theme.system")).tag("system")
+                    Text(L("set.theme.light")).tag("light")
+                    Text(L("set.theme.dark")).tag("dark")
+                }
+                .onChange(of: model.config.appearance) { AppDelegate.applyAppearance(model.config.appearance) }
                 Toggle(L("settings.general.dock"), isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
             } header: { Text(L("set.behaviour")) } footer: {

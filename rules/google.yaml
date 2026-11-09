@@ -28,6 +28,8 @@ calendar:
     Google and EventKit show one row per occurrence: the same iCalendar UID and start is one event. The EventKit row
     stays (its id keeps the brief, the hidden state and the series) and takes the Google attachments and Meet code;
     the first connected account wins over the next. Outlook and other accounts stay with EventKit.
+    0.9.6: after that, rows with the same meeting link and start (or, without a link, the same UID and start) are one
+    meeting invited to several accounts and show once; attendees are not compared.
   extra: Drive attachments of the invitation are read for the preparation like links in the call context.
 links:
   where: the call context and the attachments of the calendar event

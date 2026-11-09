@@ -41,7 +41,7 @@ public enum AIUsage {
         let j = job.lowercased()
         if j == "ping" || j.isEmpty { return nil }
         if j.hasPrefix("prep") { return "prep" }
-        if j == "live" || j == "tips" { return "live" }
+        if j == "live" || j == "tips" || j == "agent" { return "live" }     // 0.9.6: the call agent works during the call
         return "after"
     }
 

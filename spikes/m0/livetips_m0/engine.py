@@ -590,6 +590,25 @@ def pacing_tip(obj: dict, trigger: str) -> bool:
     return trigger == "timer_checkpoint" or obj.get("trigger") == "timer_checkpoint" or bool(PACING.search(text))
 
 
+_STOP = {"what", "when", "which", "where", "will", "would", "could", "should", "with", "have", "this", "that", "your",
+         "they", "them", "there", "about", "from", "does", "коли", "який", "яка", "яке", "які", "хто", "скільки", "буде",
+         "можна", "чи", "щодо", "також", "якщо", "вони", "ваша", "ваш", "наша", "наш", "цього", "цей", "ця", "що"}
+
+
+def brief_covers(question: str, brief: str, share: float = 0.6) -> bool:
+    """The brief already speaks about the question: most of its content words (by a 5-letter stem, so Ukrainian
+    endings match) are in the brief and the fact book. A background search starts only when it does not."""
+    words = [w.lower() for w in re.findall(r"[^\W_]{4,}", question or "", re.U)]
+    stems = {w[:5] for w in words if w not in _STOP}
+    if not stems:
+        return True
+    text = (brief or "").lower()
+    if not text.strip() or text.strip().startswith("(no brief)") and len(text.strip()) < 20:
+        return False
+    hit = sum(1 for st in stems if st in text)
+    return hit / len(stems) >= share
+
+
 def deep_item(res: dict, uk: bool) -> dict:
     """The card fields of a deep folder lookup result (or of its failure)."""
     if res.get("error"):
@@ -660,7 +679,9 @@ def pm_leads(share: float, was: bool, presentation: bool) -> bool:
     return share > (0.55 if presentation else 0.65)
 
 
-def with_deep_note(note: Optional[str], uk: bool) -> str:
+def with_deep_note(note: Optional[str], uk: bool, fast: bool = False) -> str:
+    if fast:     # 0.9.6: the call agent answers in seconds (Orbit: 3-11 s)
+        return (note + " · " if note else "") + ("шукаю в папках проєкту, кілька секунд" if uk else "searching the project folders, a few seconds")
     return (note + " · " if note else "") + ("шукаю глибше в папці проєкту, ~1 хв" if uk else "searching the project folder, about 1 min")
 
 
@@ -1752,10 +1773,16 @@ class Engine:
     def _deep_model(self) -> str:
         return self.cfg.get("deep_model_id") or "claude-sonnet-5-5"
 
+    def _economy(self) -> bool:
+        """0.9.6 Б1: economy mode (the state/economy file, switched by hand, read on every question)."""
+        from .agent import economy_on
+        return economy_on(self.cfg)
+
     def _ask_on_prep(self) -> bool:
-        """A typed question is answered by the preparation's model when that way answers in seconds."""
+        """A typed question is answered by the preparation's model when that way answers in seconds (never in economy
+        mode: the tips model then)."""
         return bool(self.cfg.get("ask_on_prep_model", True)) and self._prep_route() in self.FAST_PREP_ROUTES \
-            and self._prep_provider() is not None
+            and not self._economy() and self._prep_provider() is not None
 
     def _deep_via_claude_code(self) -> bool:
         """Claude Code reads the folders itself when the preparation runs on Claude (account or key); with no
@@ -1957,7 +1984,7 @@ class Engine:
             obj = no_ready_answer(kind, uk, self.cfg.get("deep_lookup", True) and bool(self._search_roots()))
         if unanswered and kind in ("ask", "sos") and self.cfg.get("deep_lookup", True) and self._search_roots():
             self._start_deep(text or (line.text if line else ""), kind)
-            obj["note"] = with_deep_note(obj.get("note"), uk)
+            obj["note"] = with_deep_note(obj.get("note"), uk, fast=self.agent_fast())
         return obj
 
     # ---------- deep lookup with Claude Code (2026-10-27) ----------
@@ -1980,7 +2007,31 @@ class Engine:
         t0 = self.clock()
         lang = "Ukrainian" if uk else "English"
         try:
-            if self._deep_via_claude_code():
+            res = None
+            agent = self._call_agent()       # 0.9.6 (owner): one agent session for the call, behind a flag
+            if agent is not None:
+                res = agent.ask(question, tail, lang)
+                if res.get("error"):         # the agent failed: the 0.9.5.4 lookup answers, the agent's spend still counts
+                    if self.budget and res.get("cost_usd"):
+                        self.budget.add(float(res["cost_usd"]))
+                    self.out_llm.write({"at": s_to_hms(self.clock()), "role": "call_agent_error", "error": res.get("error"),
+                                        "cost_usd": res.get("cost_usd")})
+                    res = None
+                else:
+                    res["via"] = "agent"
+            economy = self._economy()
+            if res is not None:
+                pass
+            elif economy:
+                # 0.9.6 Б1: Claude Code on the PM's Claude account (no key in the child); signed out or failed: the
+                # folders are searched here and the tips model answers
+                res = deep.lookup(self.cfg, question, tail, lang, economy=True) if deep.claude_path(self.cfg) else {"error": "no Claude Code"}
+                if res.get("error"):
+                    self.out_llm.write({"at": s_to_hms(self.clock()), "role": "deep_account_error", "error": res.get("error"),
+                                        "economy": True})
+                    res = deep.local_lookup(self.provider, self.models["tip"], question, tail, lang,
+                                            self._project_snippets(question, budget_chars=36000, k=10), passages)
+            elif self._deep_via_claude_code():
                 res = deep.lookup(self.cfg, question, tail, lang)
             else:     # 2026-11-06 (owner): every other way searches the folders here and asks the preparation's model
                 prov = self._prep_provider() or self.provider
@@ -1992,13 +2043,145 @@ class Engine:
         if self.budget and res.get("cost_usd"):
             self.budget.add(float(res["cost_usd"]))
         done = self.clock()
-        self.out_llm.write({"at": s_to_hms(done), "role": "deep_lookup", "q": question[:200], "secs": round(done - t0, 1),
-                            "answered": res.get("answered"), "error": res.get("error"), "cost_usd": res.get("cost_usd")})
+        row = {"at": s_to_hms(done), "role": "deep_lookup", "q": question[:200], "secs": round(done - t0, 1),
+               "answered": res.get("answered"), "error": res.get("error"), "cost_usd": res.get("cost_usd")}
+        if res.get("via") == "agent":         # 0.9.6: the call agent answered (the golden rows stay as they were)
+            row.update(via="agent", turns=res.get("turns"))
+        if economy:
+            row["economy"] = True
+        self.out_llm.write(row)
         out = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": s_to_hms(t0), "kind": "answer",
                "q": question, "at": s_to_hms(done), **deep_item(res, uk)}
         out = {k: v for k, v in out.items() if v not in ("", [], None)}
         if kind == "ask":
             self._log_ask(question, out)
+        with self.lock:
+            self.tips.append(out)
+        self.out_tips.write(out)
+
+    # ---------- the call agent (0.9.6, owner 2026-11-06; livetips_m0.agent) ----------
+    def _agent_caps(self):
+        if not hasattr(self, "_acaps"):
+            from .cost import ProviderCaps
+            self._acaps = ProviderCaps.from_cfg(self.cfg)
+        return self._acaps
+
+    def _agent_key(self) -> str:
+        try:
+            from .secret_store import load_secret
+            return load_secret(self.cfg.get("api_key_env", "CLAUDE_API"), self.cfg.get("secrets_file"))
+        except KeyError:
+            return ""
+
+    def _call_agent(self):
+        """The call's agent when it may answer now (flag on, not economy, SDK, key, Claude under its limit, the call's
+        agent budget left, a folder to search); None sends the question to the 0.9.5.4 lookup. Built on first use."""
+        from . import agent as agent_mod
+        if not (self.cfg.get("agent") or {}).get("enabled") or not self._search_roots():
+            return None
+        why = agent_mod.why_not(self.cfg, "key" if getattr(self, "_agent_obj", None) else self._agent_key(), self._agent_caps())
+        if why:
+            if why != getattr(self, "_agent_why", None):
+                self._agent_why = why
+                self.out_llm.write({"at": s_to_hms(self.clock()), "role": "call_agent_off", "why": why})
+            return None
+        with self.lock:
+            a = getattr(self, "_agent_obj", None)
+            if a is None:
+                state = (self.cfg.get("ai") or {}).get("state")
+                a = agent_mod.CallAgent(self.cfg, self._agent_key(), AgentContext(self),
+                                        state_dir=str(Path(state).parent) if state else None)
+                self._agent_obj = a
+        if a.refresh() or getattr(self, "_agent_eco", None) is None:     # 0.9.6 Б1: economy on or off, live
+            if bool(a.a.get("economy")) != getattr(self, "_agent_eco", False):
+                self.out_llm.write({"at": s_to_hms(self.clock()), "role": "call_agent_profile", "economy": bool(a.a.get("economy")),
+                                    "model": a.a.get("model")})
+            self._agent_eco = bool(a.a.get("economy"))
+        if not a.call_budget_left():
+            if getattr(self, "_agent_why", None) != "call_budget":
+                self._agent_why = "call_budget"
+                self.out_llm.write({"at": s_to_hms(self.clock()), "role": "call_agent_off", "why": "call_budget",
+                                    "spent": round(a.spent, 4)})
+            return None
+        return a
+
+    def agent_fast(self) -> bool:
+        """The card's note promises seconds, not a minute, when the agent will answer."""
+        try:
+            return self._call_agent() is not None
+        except Exception:  # noqa: BLE001
+            return False
+
+    # ---------- background searches of the call agent (0.9.6 point 2, owner 2026-11-06) ----------
+    def _maybe_proactive(self, question: str, who: str = "") -> bool:
+        """The other side asked the PM something the brief does not cover: a low-priority search by the call agent
+        (flag agent.proactive). Skipped in economy mode, while a deep lookup runs, within proactive_gap_s of the last
+        one, for a question already searched, and when the background share of the call is spent."""
+        ac = (self.cfg.get("agent") or {})
+        q = " ".join((question or "").split())
+        if not ac.get("proactive") or not q or not self.cfg.get("deep_lookup", True):
+            return False
+        if self._economy():                   # 0.9.6 Б1: economy mode stops the background searches
+            self.out_llm.write({"at": s_to_hms(self.clock()), "role": "proactive_skip", "why": "economy", "q": q[:120]})
+            return False
+        agent = self._call_agent()
+        if agent is None:
+            return False
+        from .agent import agent_cfg
+        a = agent_cfg(self.cfg)
+        now = self.clock()
+
+        def skip(why):
+            self.out_llm.write({"at": s_to_hms(now), "role": "proactive_skip", "why": why, "q": q[:120]})
+            return False
+        key = q.lower()[:80]
+        with self.lock:
+            seen = self.__dict__.setdefault("_bg_seen", set())
+            if key in seen:
+                return False
+            seen.add(key)
+            if getattr(self, "deep_running", 0) > 0 or getattr(self, "_bg_running", False):
+                return skip("busy")
+            last = getattr(self, "_bg_last_at", None)
+            if last is not None and now - last < float(a.get("proactive_gap_s") or 0):
+                return skip("gap")
+        if not agent.bg_budget_left():
+            return skip("budget")
+        if brief_covers(q, AgentContext(self).brief()):
+            return skip("in_brief")
+        with self.lock:
+            self._bg_running = True
+            self._bg_last_at = now
+            tail = ["{}: {}".format(h.speaker, h.text) for h in list(self.history)[-8:]]
+        threading.Thread(target=self._run_proactive, args=(agent, q, who, tail), daemon=True).start()
+        return True
+
+    def _run_proactive(self, agent, question: str, who: str, tail: List[str]) -> None:
+        try:
+            self._proactive_round(agent, question, who, tail)
+        finally:
+            with self.lock:
+                self._bg_running = False
+
+    def _proactive_round(self, agent, question: str, who: str, tail: List[str]) -> None:
+        uk = self._ui_uk()
+        t0 = self.clock()
+        try:
+            res = agent.ask(question, tail, "Ukrainian" if uk else "English", background=True, who=who)
+        except Exception as e:  # noqa: BLE001
+            res = {"error": "the call agent failed: " + type(e).__name__, "cost_usd": 0.0}
+        if self.budget and res.get("cost_usd"):
+            self.budget.add(float(res["cost_usd"]))
+        done = self.clock()
+        self.out_llm.write({"at": s_to_hms(done), "role": "proactive_lookup", "q": question[:200], "secs": round(done - t0, 1),
+                            "answered": res.get("answered"), "error": res.get("error"), "skipped": res.get("skipped"),
+                            "cost_usd": res.get("cost_usd"), "turns": res.get("turns")})
+        # Quiet: a card only when the sources hold the answer (no "not found" noise during the call).
+        if res.get("error") or res.get("skipped") or res.get("answered") is not True:
+            return
+        out = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": s_to_hms(t0), "kind": "answer",
+               "q": question, "who": who, "at": s_to_hms(done), "auto": True, **deep_item(res, uk)}
+        out = {k: v for k, v in out.items() if v not in ("", [], None)}
         with self.lock:
             self.tips.append(out)
         self.out_tips.write(out)
@@ -2182,6 +2365,8 @@ class Engine:
             # folder at once, so the answer may be there before the PM has to ask for it.
             if a.get("type") == "question" and (getattr(self.prompt, "_brief", "") or "(no brief)").strip() == "(no brief)":
                 self._start_deep(a.get("what", ""), "ask")
+            elif a.get("type") == "question":
+                self._maybe_proactive(a.get("what", ""), a.get("who") or self.speakers.who(line))   # 0.9.6 point 2
 
     def _ask_line(self, a: dict, hist: List[Line]) -> Optional[Line]:
         """The other side's line an ask came from, when it still needs a tip (each ask is looked at once)."""
@@ -2468,6 +2653,52 @@ class Engine:
                 break
             time.sleep(0.2)
         self.pool.shutdown(wait=False)
+        a = getattr(self, "_agent_obj", None)
+        if a is not None:                      # 0.9.6: the call agent's session ends with the call
+            a.close()
+
+
+class AgentContext:
+    """The call agent's own tools (livetips_m0.agent): what the engine already knows, read on demand. Since 0.9.6 Б2
+    the data comes from pn_tools (the same functions the preparation gets through pn_mcp); brief() stays here, as
+    brief_covers() decides the background searches on its text."""
+
+    def __init__(self, engine):
+        self.e = engine
+
+    def search(self, query: str) -> str:
+        from . import pn_tools
+        return pn_tools.search(self.e._search_roots(), query, self.e.cfg.get("lt_cmd"))
+
+    def transcript(self, query: str, last: int = 40) -> str:
+        from . import pn_tools
+        with self.e.lock:
+            hist = list(self.e.history)
+        return pn_tools.transcript(hist, query, last)
+
+    def brief(self) -> str:
+        p = self.e.prompt
+        return (getattr(p, "_brief", "") or "(no brief)") + "\n\n" + (p.blocks[2]["text"] if len(p.blocks) > 2 else "")
+
+    def past_calls(self, query: str) -> str:
+        root = self.e.cfg.get("project_root")
+        if not root:
+            return ""
+        from . import pn_tools
+        lt = self.e.cfg.get("lt_cmd")
+        return pn_tools.past_calls(root, 3, query, lt if isinstance(lt, list) else None)
+
+    def commitments(self, open_only: bool = True) -> str:
+        from . import pn_tools
+        return pn_tools.commitments(self.e.cfg.get("project_root"), open_only)
+
+    def decisions(self, area=None) -> str:
+        from . import pn_tools
+        return pn_tools.decisions(self.e.cfg.get("project_root"), area)
+
+    def project_state(self) -> str:
+        from . import pn_tools
+        return pn_tools.project_state(self.e.cfg.get("project_root"))
 
 
 class SpeakerNames:

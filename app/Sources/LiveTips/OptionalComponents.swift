@@ -19,7 +19,9 @@ final class OptionalComponents: ObservableObject {
     var all: [Comp] {
         [Comp(id: "ollama", title: L("comp.human.ollama"), tech: "", purpose: L("comp.for.ollama")),
          Comp(id: "local_model", title: L("comp.human.model"), tech: LocalLLM.model, purpose: L("comp.for.model")),
-         Comp(id: "link_downloader", title: L("comp.human.link"), tech: "yt-dlp", purpose: L("comp.for.link"))]
+         Comp(id: "link_downloader", title: L("comp.human.link"), tech: "yt-dlp", purpose: L("comp.for.link")),
+         // 0.9.6 (owner): the call agent (Claude Agent SDK with its own Claude Code, ~320 MB, Python 3.10+)
+         Comp(id: "agent", title: L("comp.human.agent"), tech: "claude-agent-sdk", purpose: L("comp.for.agent"))]
     }
 
     var duringCall: Bool {
@@ -47,6 +49,9 @@ final class OptionalComponents: ObservableObject {
             var out = ""
             let rc = await SetupWindow.model.run("check", "linkdl") { out += $0 }
             states["link_downloader"] = rc == 0 && out.hasPrefix("OK") ? .installed(String(out.dropFirst(3)).trimmingCharacters(in: .whitespaces)) : .missing
+            var ag = ""
+            let rc2 = await SetupWindow.model.run("check", "agent") { ag += $0 }
+            states["agent"] = rc2 == 0 && ag.hasPrefix("OK") ? .installed(String(ag.dropFirst(3)).trimmingCharacters(in: .whitespaces)) : .missing
         }
     }
 
@@ -59,7 +64,7 @@ final class OptionalComponents: ObservableObject {
             states[id] = .installing(nil)
             linkTask = Task {
                 var last = ""
-                let rc = await SetupWindow.model.run("install", "linkdl") { last = $0 }
+                let rc = await SetupWindow.model.run("install", id == "agent" ? "agent" : "linkdl") { last = $0 }
                 states[id] = rc == 0 ? .installed("") : .failed(last.isEmpty ? L("comp.failed") : last)
                 if rc == 0 { refresh() }
             }
@@ -100,7 +105,7 @@ struct ComponentRow: View {
             Spacer()
             switch st {
             case .installed: EmptyView()
-            case .installing: if comp.id == "link_downloader" { Button(L("common.cancel")) { oc.cancel(comp.id) }.buttonStyle(.pnTertiary) }
+            case .installing: if ["link_downloader", "agent"].contains(comp.id) { Button(L("common.cancel")) { oc.cancel(comp.id) }.buttonStyle(.pnTertiary) }
             case .failed: Button(L("comp.retry")) { oc.install(comp.id) }.buttonStyle(.pnSecondary).disabled(oc.duringCall)
             default:
                 Button(oc.duringCall ? L("comp.afterCall") : L("comp.install")) { oc.install(comp.id) }
@@ -158,7 +163,7 @@ struct OptionalAddonsStep: View {
                 Spacer()
                 Button(L("comp.onb.skip")) { done() }.buttonStyle(.pnSecondary)
                 Button(L("comp.onb.install")) {
-                    for id in ["ollama", "link_downloader", "local_model"] where picked.contains(id) { oc.install(id) }
+                    for id in ["ollama", "link_downloader", "local_model", "agent"] where picked.contains(id) { oc.install(id) }
                     done()
                 }
                 .buttonStyle(.pnPrimary).disabled(picked.isEmpty || oc.duringCall)

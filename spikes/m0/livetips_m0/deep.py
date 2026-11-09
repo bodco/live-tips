@@ -78,7 +78,8 @@ def claude_path(cfg: dict) -> Optional[str]:
     return shutil.which("claude", path=":".join(extra + [os.environ.get("PATH", "")]))
 
 
-def lookup(cfg: dict, question: str, transcript_tail: List[str], lang: str, timeout: float = 150.0) -> dict:
+def lookup(cfg: dict, question: str, transcript_tail: List[str], lang: str, timeout: float = 150.0,
+           economy: bool = False) -> dict:
     """Returns {"answered", "gist", "phrase", "items", "sources", "cost_usd"} or {"error": ...}."""
     root = cfg.get("project_root") or ""
     if not root or not os.path.isdir(root):
@@ -87,7 +88,7 @@ def lookup(cfg: dict, question: str, transcript_tail: List[str], lang: str, time
     if not claude:
         return {"error": "Claude Code (the claude command) is not installed"}
     try:
-        r = subprocess.run(deep_args(cfg, claude, question, transcript_tail, lang), cwd=root, env=deep_env(cfg, os.environ),
+        r = subprocess.run(deep_args(cfg, claude, question, transcript_tail, lang), cwd=root, env=deep_env(cfg, os.environ, economy=economy),
                            capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return {"error": "the search took too long"}
@@ -111,10 +112,13 @@ def deep_args(cfg: dict, claude: str, question: str, transcript_tail: List[str],
     return args
 
 
-def deep_env(cfg: dict, environ) -> dict:
+def deep_env(cfg: dict, environ, economy: bool = False) -> dict:
+    """economy=True (0.9.6 Б1): no API key in the child, so Claude Code runs on the PM's Claude account (the plan)."""
     env = dict(environ)
     key = environ.get(cfg.get("api_key_env", "CLAUDE_API"), "")
-    if key:
+    if economy:
+        env.pop("ANTHROPIC_API_KEY", None)
+    elif key:
         env["ANTHROPIC_API_KEY"] = key          # billed like the tips; never written or logged
     env["PATH"] = ":".join([os.path.expanduser("~/.local/bin"), "/opt/homebrew/bin", "/usr/local/bin", env.get("PATH", "")])
     return env

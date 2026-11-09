@@ -296,8 +296,9 @@ class RoutedProvider(Provider):
 
     def __init__(self, job: str, preferred: str, legs: Dict[str, Optional[Provider]], auto: bool = True,
                  state: Optional[RouteState] = None, probe_every: float = PROBE_EVERY_S, background: bool = False,
-                 api_blocked: Optional[Callable[[], bool]] = None, gemini_fallback: bool = False):
+                 api_blocked: Optional[Callable[[], bool]] = None, gemini_fallback: bool = False, caps=None):
         self.job = job
+        self.caps = caps          # 0.9.6 (owner): cost.ProviderCaps, a monthly limit per provider; None = no limits
         self.preferred = preferred if preferred in ROUTES else "api"
         self.legs = dict(legs)
         self.gemini_fb = gemini_fallback
@@ -331,8 +332,12 @@ class RoutedProvider(Provider):
             m = model
         return {"route": r, "model": m, "available": leg is not None}
 
+    def capped(self, route: str) -> bool:
+        """0.9.6: the provider of this API way reached its monthly limit (Settings > AI > Spending limits)."""
+        return bool(self.caps is not None and self.caps.capped_route(route))
+
     def usable(self, route: str) -> bool:
-        if self.legs.get(route) is None:
+        if self.legs.get(route) is None or self.capped(route):
             return False
         return not (route in ("api", "openai", "gemini") and self.api_blocked and self.api_blocked())
 
@@ -408,6 +413,14 @@ class RoutedProvider(Provider):
 
     def _run(self, route, **kw) -> Completion:
         leg = self.legs.get(route)
+        if leg is not None and self.capped(route):          # 0.9.6: never past a provider's monthly limit
+            from .cost import ROUTE_PROVIDER
+            c = Completion(model=kw.get("model", ""), t_start=time.monotonic(), t_done=time.monotonic(),
+                           error="Limit: the monthly limit for {} is reached (Settings > AI)".format(
+                               {"claude": "Claude", "openai": "OpenAI", "gemini": "Gemini"}[ROUTE_PROVIDER[route]]))
+            c.route = route
+            self.last_route = route
+            return c
         if leg is None:
             missing = {"api": "no API key", "openai": "no API key", "gemini": "no API key",
                        "agy": "Antigravity CLI is not installed",
@@ -533,7 +546,8 @@ def provider_from_env(job: Optional[str] = None, timeout: float = 120.0) -> Prov
                      openai_model=job_model(j, env.get("LT_OPENAI_MODEL")),
                      gemini_model=gemini_job_model(j, env.get("LT_GEMINI_MODEL")),
                      agy_model=agy_job_model(j, env.get("LT_AGY_MODEL")))
-    return RoutedProvider(j, route, legs,
+    from .cost import ProviderCaps
+    return RoutedProvider(j, route, legs, caps=ProviderCaps.from_cfg({}),
                           auto=bool(route) and env.get("LT_AI_AUTO", "1") == "1", state=RouteState(),
                           gemini_fallback=bool(route) and env.get("LT_GEMINI_FALLBACK") == "1")
 
@@ -555,8 +569,9 @@ def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optio
                      openai_model=job_model(job, (ai.get("openai_models") or {}).get(job)),
                      gemini_model=gemini_job_model(job, (ai.get("gemini_models") or {}).get(job)),
                      agy_model=agy_job_model(job, (ai.get("agy_models") or {}).get(job)))
+    from .cost import ProviderCaps
     return RoutedProvider(job, route, legs, auto=bool(ai.get("auto", True)), state=RouteState(ai.get("state")),
-                          background=(job == "tips"),
+                          background=(job == "tips"), caps=ProviderCaps.from_cfg(cfg),
                           gemini_fallback=bool(ai.get("gemini_fallback", False)) or os.environ.get("LT_GEMINI_FALLBACK") == "1")
 
 

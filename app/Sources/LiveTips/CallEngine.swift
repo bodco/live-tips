@@ -11,7 +11,7 @@ final class CallEngine {
     var poll: Timer?
     var onReady: ((EngineStatus) -> Void)?
 
-    var config: AppConfig { AppConfig.load(from: AppPaths.config) }
+    var config: AppConfig { AIRoute.effective(AppConfig.load(from: AppPaths.config)) }   // 0.9.6 Б1: economy from the next call
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
     var statusPath: String { (appRoot as NSString).appendingPathComponent("state/status.json") }
     var isRunning: Bool { recorder?.isRunning ?? false }
@@ -321,6 +321,12 @@ final class CallEngine {
         // The meeting concept of this call (Start call): type, audience, interview role, tip model.
         for k in ["call_type", "audience", "hiring_role"] { if let v = callRequest[k] as? String, !v.isEmpty { sc[k] = v } }
         sc["ai"] = AIRoute.sidecarBlock(config: c)      // 0.8.2: models live in Settings > AI only, not per call
+        // 0.9.6 (owner): monthly limits per provider, and the call agent behind its flag (economy: a file, live)
+        sc["provider_caps"] = ProviderLimits.caps(c.providerBudgets)
+        sc["agent"] = ["enabled": c.callAgent.enabled, "tools": c.callAgent.tools, "model": c.callAgent.model,
+                       "max_usd_per_call": c.callAgent.maxUSDPerCall,
+                       "proactive": c.callAgent.proactive, "proactive_usd_per_call": c.callAgent.proactiveUSDPerCall,
+                       "economy_file": Economy.path(stateDir: (AIRoute.statePath as NSString).deletingLastPathComponent)] as [String: Any]
         sc["hedge"] = ["enabled": c.hedgeEnabled]
         sc["answer_any"] = c.answerAny
         // 2026-10-26: the running call picture needs who the PM is on this call.

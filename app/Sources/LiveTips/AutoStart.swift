@@ -95,7 +95,8 @@ final class AutoStart: NSObject, ObservableObject, UNUserNotificationCenterDeleg
         suggestion = nil
         let m = model(for: e)
         if m.target.isEmpty { StartCallWindow.show(delegate: app, prepared: m); return }
-        if let err = app.launch(m) { StartCallWindow.show(delegate: app, prepared: m); m.note = err }
+        // the meeting is already on (that is why it asked): tips only, the meeting is not opened again
+        if let err = app.launch(m, openMeeting: false) { StartCallWindow.show(delegate: app, prepared: m); m.note = err }
     }
 
     func dismiss() { suggestion = nil }
@@ -108,6 +109,7 @@ final class AutoStart: NSObject, ObservableObject, UNUserNotificationCenterDeleg
             MainActor.assumeIsolated {
                 NSApp.activate(ignoringOtherApps: true)
                 if id == TranscribeWindow.notificationId { TranscribeWindow.show(); return }   // 0.8.6 (B): a transcript is ready
+                if id.hasPrefix("pn-limit-") { SettingsWindow.show(tab: "ai"); return }        // 0.9.6: a provider's limit
                 guard id.hasPrefix(AutoStart.idPrefix), let app = NSApp.delegate as? AppDelegate else { return }
                 let eid = String(id.dropFirst(AutoStart.idPrefix.count))
                 if let e = CalendarService.shared.upcoming().first(where: { $0.id == eid }) {

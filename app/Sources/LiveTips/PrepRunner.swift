@@ -324,9 +324,9 @@ final class PrepRunner: ObservableObject {
             }
         }
         if forced == nil { switchedOnce = false; localTried = false; geminiTried = false }
-        let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini, AIRoute.agy].contains(forced ?? AppConfig.load(from: AppPaths.config).ai.prep)
+        let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini, AIRoute.agy].contains(forced ?? AIRoute.effective(AppConfig.load(from: AppPaths.config)).ai.prep)
         guard let claude = Self.claudePath ?? (wantsLocal ? "/usr/bin/true" : nil) else { return L("prep.err.noClaude") }
-        let c = AppConfig.load(from: AppPaths.config)
+        let c = AIRoute.effective(AppConfig.load(from: AppPaths.config))   // 0.9.6 Б1: economy mode, from the next job
         guard let skill = Self.skillDir(workRoot: c.workRoot) else { return L("prep.err.noSkill") }
         let appRoot = c.effectiveAppRoot(appSupport: AppPaths.support.path)
         let lt = (appRoot as NSString).appendingPathComponent("bin/lt")
@@ -439,7 +439,9 @@ final class PrepRunner: ObservableObject {
         // 0.8.2: the way from Settings > AI; with auto-switch the other one when this one cannot run at all.
         let routes = c.ai
         var route = forced ?? routes.prep
-        let usable: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.openai ? self.hasOpenAIKey : $0 == AIRoute.gemini ? self.hasGeminiKey : $0 == AIRoute.agy ? (AgyAccount.cliPath != nil && AgyAccount.shared.signedIn != false) : $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
+        let usable0: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.openai ? self.hasOpenAIKey : $0 == AIRoute.gemini ? self.hasGeminiKey : $0 == AIRoute.agy ? (AgyAccount.cliPath != nil && AgyAccount.shared.signedIn != false) : $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
+        // 0.9.6 (owner): a provider at its monthly limit is not usable (Settings > AI > Spending limits)
+        let usable: (String) -> Bool = { usable0($0) && !SpendWatch.capped(route: $0, config: c) }
         if forced == nil && routes.autoSwitch && !usable(route) && usable(AIRoute.other(route)) { route = AIRoute.other(route) }
         // 0.9.3 (owner): plan B, opt-in: the chosen way cannot run at all (no key, signed out) -> Gemini, the API key
         // first, then the Gemini account
@@ -453,6 +455,9 @@ final class PrepRunner: ObservableObject {
         if route == AIRoute.openai && !hasOpenAIKey { return L("prep.err.noOpenAIKey") }     // 0.9.0
         if route == AIRoute.gemini && !hasGeminiKey { return L("prep.err.noGeminiKey") }     // 0.9.3
         if route == AIRoute.agy && AgyAccount.cliPath == nil { return L("ai.agy.missing") }   // 0.9.3
+        if let p = AIUsage.provider(route: route), SpendWatch.capped(route: route, config: c) {      // 0.9.6
+            return L("limit.prepStopped", ["provider": AIUsageView.name(p)])
+        }
         let isCodex = route == AIRoute.codex
         let useAPI = route == AIRoute.api
         let isLocal = route == AIRoute.local
@@ -460,6 +465,10 @@ final class PrepRunner: ObservableObject {
         let isGemini = route == AIRoute.gemini      // 0.9.3 (owner): the preparation through the Gemini API
         let isAgy = route == AIRoute.agy            // 0.9.3 (owner): the preparation through the Gemini account
         let isPacked = isLocal || isCodex || isOpenAI || isGemini || isAgy
+        // 0.9.6 Б3 (rules/prep.yaml): the research preparation's features, only on the Claude ways; economy trims them
+        let pa: PrepAgent.Plan? = isPacked ? nil : PrepAgent.plan(c.prepAgent, route: route, economy: SpendWatch.economyOn)
+        let paRecord = pa?.record
+        let paVerify = pa?.features.verify == true
         let runModel = isCodex ? "codex/default" : isOpenAI ? c.ai.openaiPrep : isGemini ? c.ai.geminiPrep : isAgy ? "agy/" + c.ai.agyPrep : isLocal ? localModel : model
         let aside = r.refreshBase == nil ? Self.moveAside(base: base) : nil      // a clean start, the old one kept
         let p = Process()
@@ -477,16 +486,34 @@ final class PrepRunner: ObservableObject {
         allowed += Self.webHosts(in: r.context).map { "WebFetch(domain:\($0))" }
         let salesWeb = r.salesMethod != nil && c.salesWebSearch      // 0.8.7 (H3): only for a sales preparation
         if salesWeb { allowed += ["WebSearch", "WebFetch"] }
-        let denied = (py.hasPrefix("/") ? ["Bash(python3:*)", "Bash(python:*)"] : []) + ["Bash(curl:*)", "Bash(wget:*)", "Bash(sh:*)", "Bash(bash:*)", "Bash(zsh:*)", "Bash(osascript:*)",
+        if let pa = pa { allowed += PrepAgent.allowed(pa) }
+        var denied = (py.hasPrefix("/") ? ["Bash(python3:*)", "Bash(python:*)"] : []) + ["Bash(curl:*)", "Bash(wget:*)", "Bash(sh:*)", "Bash(bash:*)", "Bash(zsh:*)", "Bash(osascript:*)",
                       "Bash(find:*)", "Bash(rm:*)", "Bash(open:*)"] + (salesWeb ? [] : ["WebSearch"]) + ["Task", "NotebookEdit",
                       "Edit(/\(skill)/**)", "Write(/\(skill)/**)"]
-        p.arguments = ["-p", prompt, "--model", model, "--output-format", "stream-json", "--verbose", "--permission-mode", "default",
+        if let pa = pa { denied.removeAll { PrepAgent.undeny(pa).contains($0) } }
+        let extraDirs = Array(Set(r.folders.map { StartCallModel.isDir($0) ? $0 : ($0 as NSString).deletingLastPathComponent }))
+            + (r.workspaceRoot.isEmpty ? [] : [r.workspaceRoot])
+        let mcpJSON = pa?.features.tools == true
+            ? PrepAgent.mcpConfig(python: c.engine.sidecarPython, engineDir: c.engine.sidecarDir, root: r.root, extra: extraDirs, lt: [c.engine.python, lt])
+            : "{\"mcpServers\":{}}"
+        p.arguments = ["-p", pa.map { PrepAgent.adjust(prompt, $0) + PrepAgent.prompt($0) } ?? prompt, "--model", model, "--output-format", "stream-json", "--verbose", "--permission-mode", "default",
                        "--allowedTools", allowed.joined(separator: ","),
                        "--disallowedTools", denied.joined(separator: ","),
-                       "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}",
+                       "--strict-mcp-config", "--mcp-config", mcpJSON,
                        "--add-dir", skill, "--add-dir", live] + (r.workspaceRoot.isEmpty ? [] : ["--add-dir", r.workspaceRoot])
                        + Array(Set(r.folders.map { StartCallModel.isDir($0) ? $0 : ($0 as NSString).deletingLastPathComponent })).flatMap { ["--add-dir", $0] }
         if let dir = r.deck?.info?.dir { p.arguments! += ["--add-dir", dir] }
+        let stateDir = (appRoot as NSString).appendingPathComponent("state")
+        if let pa = pa, pa.features.parallel {     // --print takes the agents as a file
+            // 0.9.6 Б4 (smoke): Claude Code refuses an --agents file with more than one hard link, and Google Drive
+            // gives every new file under ~/work (the state folder too) a second link for a while. The file goes to the
+            // system's temporary folder, one per run.
+            let f = (NSTemporaryDirectory() as NSString).appendingPathComponent("pacenote-prep-agents-\(ProcessInfo.processInfo.processIdentifier).json")
+            try? FileManager.default.removeItem(atPath: f)
+            try? PrepAgent.agentsJSON(withTools: pa.features.tools).write(toFile: f, atomically: true, encoding: .utf8)
+            p.arguments! += ["--agents", f]
+        }
+        if useAPI, let b = pa?.budgetUSD { p.arguments! += ["--max-budget-usd", String(format: "%.2f", b)] }
         if isPacked {
             // rules/ai.yaml > local: the engine builds the context pack and asks Ollama once (livetips_m0.localprep)
             let req: [String: Any] = ["title": r.title, "when": h.string(from: r.date), "project_name": r.projectName, "root": r.root,
@@ -504,10 +531,24 @@ final class PrepRunner: ObservableObject {
         // 0.8.5 (owner: "lt digest" and "lt prep-check" were refused to Claude in every run): the app makes the digest
         // right before Claude starts (a one-line shell that then becomes Claude) and checks the files after it.
         var digestEnv: [String: String] = [:]
-        if !isPacked, r.useProjectFolder, let exe = p.executableURL?.path {
-            p.arguments = ["-c", "\"$LT_PY\" \"$LT_BIN\" digest \"$LT_ROOT\" --days 14 > \"$LT_DIGEST\" 2>/dev/null; exec \"$LT_EXE\" \"$@\"", "sh"] + (p.arguments ?? [])
+        if !isPacked, r.useProjectFolder || paVerify, let exe = p.executableURL?.path {
+            // 0.9.6 Б3: with the checker the chain runs it after the preparation (PrepAgent.chain); otherwise as before
+            let script = paVerify ? PrepAgent.chain : "\"$LT_PY\" \"$LT_BIN\" digest \"$LT_ROOT\" --days 14 > \"$LT_DIGEST\" 2>/dev/null; exec \"$LT_EXE\" \"$@\""
+            p.arguments = ["-c", script, "sh"] + (p.arguments ?? [])
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
-            digestEnv = ["LT_PY": c.engine.python, "LT_BIN": lt, "LT_ROOT": r.root, "LT_DIGEST": base + ".digest.md", "LT_EXE": exe]
+            digestEnv = ["LT_PY": c.engine.python, "LT_BIN": lt, "LT_ROOT": r.root, "LT_EXE": exe]
+            if r.useProjectFolder { digestEnv["LT_DIGEST"] = base + ".digest.md" }
+            if let pa = pa, paVerify {
+                let req = PrepAgent.verifyRequest(pa, base: base, root: r.root, extra: extraDirs, lt: [c.engine.python, lt], claude: exe,
+                                                  route: route, stateDir: stateDir, python: c.engine.sidecarPython,
+                                                  engineDir: c.engine.sidecarDir, lang: L10n.lang)
+                let reqPath = (stateDir as NSString).appendingPathComponent("prepverify-request.json")
+                if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
+                digestEnv["LT_VERIFY"] = reqPath
+                digestEnv["LT_BRIEF"] = base + ".brief.md"
+                digestEnv["LT_SPY"] = c.engine.sidecarPython
+                digestEnv["LT_ENGINE"] = c.engine.sidecarDir
+            }
         }
         var env = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -622,6 +663,10 @@ final class PrepRunner: ObservableObject {
                 var meta = self.resultMeta
                 meta["model"] = runModel
                 if !checkLine.isEmpty { meta["check"] = checkLine }
+                if let rec = paRecord {          // 0.9.6 Б3 (rules/prep.yaml > run_json)
+                    meta["prep_agent"] = rec
+                    if paVerify, let v = Self.verifySummary(base: base, since: self.startedAt) { meta["verify"] = v }
+                }
                 let readList = self.readFiles
                 if !readList.isEmpty { log?.write(("read: " + readList.joined(separator: ", ") + "\n").data(using: .utf8)!) }
                 Self.ledger(job: r.refreshOf == nil ? "prep" : "prep_refresh", route: routeName, usd: self.costUSD, meta: meta, ok: ok)
@@ -680,6 +725,18 @@ final class PrepRunner: ObservableObject {
         result = ""
         progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil; resultMeta = [:]; readFiles = []
         return nil
+    }
+
+    /// 0.9.6 Б3: what the checker found (<base>.verify.json of this run) for run.json and the ledger line.
+    nonisolated static func verifySummary(base: String, since: Date?) -> [String: Any]? {
+        let path = base + ".verify.json"
+        if let since = since, let m = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date,
+           m < since { return nil }
+        guard let d = FileManager.default.contents(atPath: path),
+              let v = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return nil }
+        let keep: Set<String> = ["ok", "claims", "verified", "unverified", "contradicted", "corrected", "cost_usd", "turns",
+                                 "duration_s", "error", "model"]
+        return v.filter { keep.contains($0.key) }
     }
 
     /// 0.9.2 (audit 04.11, sweep.md > Primary document): the files the PM added are the call's main source. Its
@@ -753,6 +810,7 @@ final class PrepRunner: ObservableObject {
                 case "pack": set(0.1, L("prep.st.local.pack"), "")
                 case "model": set(0.25, L("prep.st.local.model"), "")
                 case "writing": set(min(0.9, 0.3 + Double((o["pieces"] as? Int) ?? 0) / 6000), L("prep.st.local.writing"), "")
+                case "verify": set(0.94, L("prep.st.verify"), "")      // 0.9.6 Б3: livetips_m0.prepverify
                 default: set(0.92, L("prep.st.local.check"), "")
                 }
             }

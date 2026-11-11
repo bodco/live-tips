@@ -105,11 +105,16 @@ final class AutoStart: NSObject, ObservableObject, UNUserNotificationCenterDeleg
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                             withCompletionHandler done: @escaping () -> Void) {
         let id = response.notification.request.identifier
+        let action = response.actionIdentifier
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 NSApp.activate(ignoringOtherApps: true)
                 if id == TranscribeWindow.notificationId { TranscribeWindow.show(); return }   // 0.8.6 (B): a transcript is ready
                 if id.hasPrefix("pn-limit-") { SettingsWindow.show(tab: "ai"); return }        // 0.9.6: a provider's limit
+                if id == MeetingEndWatch.notificationId {   // 2026-11-10: Keep recording on the notification, or a click opens the tips
+                    if action == MeetingEndWatch.keepAction { MeetingEndWatch.shared.keepRecording() } else { (NSApp.delegate as? AppDelegate)?.showTips() }
+                    return
+                }
                 guard id.hasPrefix(AutoStart.idPrefix), let app = NSApp.delegate as? AppDelegate else { return }
                 let eid = String(id.dropFirst(AutoStart.idPrefix.count))
                 if let e = CalendarService.shared.upcoming().first(where: { $0.id == eid }) {

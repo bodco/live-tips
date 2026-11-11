@@ -77,6 +77,7 @@ struct UpcomingCallPage: View {
             })
             .frame(maxWidth: .infinity)      // centred
         }
+        .textSelection(.enabled)      // 2026-11-10 (owner): the call's title and every text on the page can be selected and copied
         .background(PN.C.bg)
         .onAppear { if snap == nil { snap = SetupSnap(model) }; model.scanPrep() }
         .onDisappear { askToSave() }

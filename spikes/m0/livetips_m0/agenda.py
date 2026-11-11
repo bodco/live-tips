@@ -54,12 +54,14 @@ def to_obtain(text: str, max_chars: int = 700) -> str:
     return ""
 
 
-def states(items: List[Tuple[str, bool]], done: set, now: int, manual: dict) -> List[str]:
-    """todo / now / done / skip per item; the PM's state (manual, by index; skip only from the PM) wins, then done,
-    then the model's now."""
+def states(items: List[Tuple[str, bool]], done: set, now: int, manual: dict, raised: Optional[set] = None) -> List[str]:
+    """todo / now / raised / done / skip per item; the PM's state (manual, by index; skip only from the PM) wins, then
+    done, then the model's now. 0.9.7 (owner, call of 11.11: all 11 items "not raised" although all were discussed):
+    an item that was "now" and is not decided is "raised", not "todo"."""
     out = []
+    raised = raised or set()
     for i, (_, ticked) in enumerate(items):
-        s = "done" if (ticked or i in done) else ("now" if i == now else "todo")
+        s = "done" if (ticked or i in done) else ("now" if i == now else ("raised" if i in raised else "todo"))
         out.append(manual.get(i, s))
     if out.count("now") > 1:                      # at most one item is "now": the PM's choice, else the first
         keep = next((i for i, s in manual.items() if s == "now"), out.index("now"))
@@ -90,7 +92,7 @@ def status_label(it: dict, uk: bool) -> str:
         return "обговорено" if uk else "discussed"
     if st == "skip":
         return "пропущено" if uk else "skipped"
-    if st == "now":
+    if st in ("now", "raised"):
         return "піднято" if uk else "raised"
     return "не піднято" if uk else "not raised"
 

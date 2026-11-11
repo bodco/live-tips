@@ -15,6 +15,7 @@ from .gemini_provider import GeminiProvider, job_model
 class GeminiPreparation(Preparation):
     label = "Gemini"
     head_route = "Gemini API"
+    route = "gemini"      # 0.9.7: the pack budget (prepcontext.BUDGETS)
 
 
 def main(argv=None):
@@ -31,6 +32,9 @@ def main(argv=None):
             raise RuntimeError("No Gemini API key: add it in Settings > AI > Gemini")
         preparation = GeminiPreparation(request, GeminiProvider(key, timeout=300, model=model))
         result["sources"] = preparation.run()
+        result["context_summary"] = preparation.summary      # the manifest is in <base>.context.json   # 0.9.7
+        if preparation.slides_error:
+            result["slides_error"] = preparation.slides_error
         result["tokens"] = preparation.tokens
         result["ok"] = True
     except Exception as error:  # noqa: BLE001  the app restores the previous files on failure

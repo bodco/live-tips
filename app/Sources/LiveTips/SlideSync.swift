@@ -12,6 +12,8 @@ final class SlideSync {
     var denied = false
     var last: Int?
     var app: String?
+    var map: [Int: Int] = [:]      // 0.9.7: show slide number -> deck slide number (hidden slides left out)
+    var mapFor = ""
 
     private static let keynote = "com.apple.iWork.Keynote", powerpoint = "com.microsoft.Powerpoint"
 
@@ -44,10 +46,25 @@ extension PrompterController {
             if slideSync.app != nil { slideSync.app = nil; push("window.LiveTips && LiveTips.setFollow(null)") }
             return
         }
-        guard r.n != slideSync.last || slideSync.app != r.app else { return }
-        slideSync.last = r.n; slideSync.app = r.app
+        // 0.9.7: Keynote and PowerPoint count hidden slides, the deck leaves them out (deck.json `src`); a hidden one is ignored.
+        guard let n = deckNumber(r.n) else { return }
+        guard n != slideSync.last || slideSync.app != r.app else { return }
+        slideSync.last = n; slideSync.app = r.app
         // The page moves and tells the recorder (inbox slide = "<n>|keynote" / "<n>|powerpoint").
-        push("window.LiveTips && LiveTips.setFollow({app: '\(r.app)', n: \(r.n)})")
+        push("window.LiveTips && LiveTips.setFollow({app: '\(r.app)', n: \(n)})")
+    }
+
+    /// The deck's slide number for the show's slide number: deck.json `src` when the deck has hidden slides.
+    func deckNumber(_ show: Int) -> Int? {
+        if slideSync.mapFor != stem || slideSync.map.isEmpty {
+            slideSync.mapFor = stem; slideSync.map = [:]
+            if let d = FileManager.default.contents(atPath: stem + ".deck.json"),
+               let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let slides = o["slides"] as? [[String: Any]] {
+                for s in slides { if let n = TalkMerge.num(s) { slideSync.map[(s["src"] as? Int) ?? n] = n } }
+            }
+        }
+        if slideSync.map.isEmpty { return show }
+        return slideSync.map[show]
     }
 
     /// The slide thumbnails of the deck read for this call (<stem>.deck.json, the PNGs next to it), once per call.

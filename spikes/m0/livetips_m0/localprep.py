@@ -37,7 +37,11 @@ def read_text(p: str, cap: int) -> str:
             t = Path(p).read_text(encoding="utf-8", errors="replace")
     except Exception:  # noqa: BLE001
         return ""
-    return t if len(t) <= cap else t[:cap] + "\n[... cut at %d characters]" % cap
+    # 0.9.7: the mark is inside the cap (a second slice by the caller used to cut it off, so the model never knew)
+    if len(t) <= cap:
+        return t
+    mark = "\n[... cut by Pacenote at %d of %d characters]" % (cap, len(t))
+    return t[:max(0, cap - len(mark))] + mark
 
 
 def slug(s: str) -> str:
@@ -79,6 +83,12 @@ def current_state(notion_dirs: List[str]) -> List[str]:
     return sorted(hits, key=lambda p: -os.path.getmtime(p))[:2]
 
 
+def talk_rules(skill: str) -> str:
+    """0.9.7 (owner, 11.11): references/talk.md, the PM's own speech per slide, put into the talk prompt as it is."""
+    t = read_text(os.path.join(skill or "", "references/talk.md"), 20_000) if skill else ""
+    return ("\n\n## The talk rules (references/talk.md), follow them exactly\n" + t) if t else ""
+
+
 def skill_rules(skill: str) -> str:
     parts = []
     for ref in ("references/sweep.md", "references/speech.md"):
@@ -89,41 +99,60 @@ def skill_rules(skill: str) -> str:
 
 
 def build_pack(r: dict) -> tuple:
-    used, blocks, left = [], [], PACK_CHARS
+    """The context pack and the labels used (0.8.5 shape). 0.9.7: picked by priority in prepcontext, see build_pack_ex."""
+    pack, used, _, _ = build_pack_ex(r)
+    return pack, used
 
-    def add(label: str, text: str, cap: int) -> None:
-        nonlocal left
-        if not text.strip() or left <= 2000:
-            return
-        text = text[:min(cap, left)]
-        blocks.append(f"### {label}\n{text}")
-        used.append(label)
-        left -= len(text)
 
-    add("Call context written by the PM", r.get("context") or "", 6000)
-    for f in r.get("files") or []:
-        add("File the PM added: " + f, read_text(f, 20_000), 20_000)
-    for d in r.get("folders") or []:
-        for root, _, files in os.walk(d):
-            for f in sorted(files)[:20]:
-                if f.lower().endswith((".md", ".txt", ".docx", ".csv")):
-                    add("Folder the PM added: " + os.path.join(root, f), read_text(os.path.join(root, f), 10_000), 10_000)
-    if r.get("config"):
-        add("Project config: " + r["config"], read_text(r["config"], 14_000), 14_000)
-    if r.get("use_project_folder", True):
-        if r.get("include_prev", True):
-            for p in previous_calls(r["live"], r["title"]):
-                add("Previous call of this meeting: " + os.path.basename(p), read_text(p, 25_000), 25_000)
-        for p in current_state(r.get("notion") or []):
-            add("Notion mirror: " + os.path.basename(p), read_text(p, 12_000), 12_000)
-        if r.get("lt"):
-            try:
-                d = subprocess.run(r["lt"] + ["digest", r["root"], "--days", "14", "--max-chars", "8000"],
-                                   capture_output=True, text=True, timeout=60)
-                add("Digest of the last 14 days (lt digest)", d.stdout, 8000)
-            except Exception:  # noqa: BLE001
-                pass
-    return "\n\n".join(blocks), used
+def build_pack_ex(r: dict, route: str = "local") -> tuple:
+    """0.9.7 (owner, case of 11.11): (pack, used, manifest, summary). The pinned sources (call context, deck, files
+    the PM added) come first and whole; the project state next; the previous calls; then the folders the PM added by
+    match and date instead of the alphabet. Nothing is cut silently: a compressed source says so in the pack and in
+    the manifest (prep.json)."""
+    from . import prepcontext
+    previous = []
+    if r.get("use_project_folder", True) and r.get("include_prev", True):
+        for p in previous_calls(r["live"], r["title"]):
+            previous.append(("Previous call of this meeting: " + os.path.basename(p), read_text(p, 25_000)))
+    return prepcontext.build(r, previous=previous, route=route)
+
+
+# 0.9.7 (owner, case of 11.11): the talk of a presentation on the packed ways. The colleague's slides get their text
+# too, as a backup for when the colleague drops out (shown folded in the window, never as cards).
+SLIDES_SYS = """You write the talk of a presentation for the PM's call window, from the deck's slide texts, the
+PM's speech documents and the brief. Answer with one JSON object and nothing else:
+{{"slides": [{{"n", "title", "who", "speaker", "sec", "body", "numbers", "qa", "short", "skip"}}], "talk_min", "qa_min"}}
+One entry per deck slide, n = the deck slide number, title from the deck. Keep "who" ("me", "shared", "other") and
+"speaker" exactly as the lines above set them; the "sec" budgets of all slides together fit the talk time given above.
+body: a list of {{"k": "p" | "s" | "h" | "c", "t": "<one paragraph>"}} (1-4 paragraphs) in {CALL_LANG}: what the PM
+himself says on this slide, a real speech in the first person, never a retelling of the slide ("this slide shows" is
+wrong), sized to its "sec" (about 2 words per second), taken from the speech documents when they have the slide (keep
+their wording and numbers), else from the deck text and its speaker notes; never invent. The talk rules below decide.
+numbers: up to 6 figures of the slide as short strings. qa: 1-2 likely questions {{"q", "a", "keywords"}} with answers
+from the material. short: one sentence the slide can be reduced to. skip: true on the 1-3 PM slides that matter least.
+EVERY slide gets body, numbers, qa and short, the colleague's ("other") slides too: they are the PM's backup when the
+colleague drops out. No long dashes."""
+
+
+def as_slides(s: str) -> dict:
+    """The talk object from a model reply ({"slides": [...]}, or a bare list); {} when unusable."""
+    s = re.sub(r"^```(?:json)?\s*|\s*```$", "", (s or "").strip())
+    i, j = s.find("{"), s.rfind("}")
+    if 0 <= i < j and s.lstrip().startswith("{"):
+        try:
+            v = json.loads(s[i:j + 1])
+            if isinstance(v, dict) and isinstance(v.get("slides"), list):
+                v["slides"] = [x for x in v["slides"] if isinstance(x, dict) and x.get("title")]
+                return v
+        except ValueError:
+            pass
+    lst = [x for x in as_list(s[s.find("["):] if "[" in s else "") if isinstance(x, dict) and x.get("title")]
+    return {"slides": lst} if lst else {}
+
+
+def with_context_line(brief: str, summary: dict, lang: str) -> str:
+    from .prepcontext import summary_line, with_line
+    return with_line(brief, summary_line(summary, lang)) if summary else brief
 
 
 OPEN_SYS = """From the notes of the earlier calls and the material, list what is still OPEN for the next call. Be
@@ -348,8 +377,9 @@ def main(argv=None) -> int:
                     f"{call}\n\nTranscript {os.path.basename(p)}:\n{read_text(p, 60_000)}")
             notes.append(f"### Notes: {os.path.basename(p)}\n{n.strip()}")
             res["sources"].append("Previous call of this meeting: " + os.path.basename(p))
-        pack, used = build_pack(dict(r, include_prev=False))      # the notes stand for the transcripts
+        pack, used, manifest, ctx = build_pack_ex(dict(r, include_prev=False))   # the notes stand for the transcripts
         res["sources"] += used
+        res["context_summary"] = ctx       # the whole manifest goes to <base>.context.json
         notes_txt = "\n\n".join(notes) or "(no earlier calls of this meeting found)"
 
         # Pass 2: the brief, every section but the speech
@@ -391,6 +421,9 @@ def main(argv=None) -> int:
                             f"{call}\n\n## The skill's rules for cards and facts\n{cr}\n\n## The brief\n{brief}\n\n## Notes of the earlier calls\n{notes_txt}"))
 
         base = r["base"]
+        brief = with_context_line(brief, ctx, r.get("brief_lang") or "en")
+        from .prepcontext import write_context
+        write_context(base, manifest, ctx)
         Path(base + ".brief.md").write_text(brief.rstrip() + "\n\nSources (local model): " + "; ".join(res["sources"]) + "\n",
                                             encoding="utf-8")
         if cards:

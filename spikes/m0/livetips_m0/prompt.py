@@ -64,6 +64,7 @@ Return JSON only: {"need_tip": true|false, "level": "red|orange|none", "trigger"
 need_tip is true only for a trigger in the table AND when the fact book, brief or cards hold something concrete to give, or the PM is asked directly. {address} If the question was already answered in the transcript, false."""
 
 TIP_TASK = """ROLE tip. Event: {event}. Write the tip for the newest line(s), or skip with {{"skip": true, "reason": "..."}}.
+When someone needs something from the PM (a question, a request, a "what did you find") and the context here does not hold it, but the project may (earlier calls, research and notes the PM or Claude made in the project folder, Notion pages), add "search": "<what to find, in your own words>" to the tip or to the skip; the project is then searched and the answer comes as its own card. Decide this from the moment, not from the words: who needs what, and whether the PM has it at hand.
 Before writing, decide what is NEW: a fact, number, owner, date or sentence that nobody has said aloud yet and that is not in tips_given. If nothing is new, or the PM already answered the question, skip. Skip is the normal outcome; a shown tip is the exception.
 Facts marked unverified, "(verify)", "to confirm" or similar are never stated as facts: at most "перевірити: ..." in items.
 Tip format (JSON, keys in this order, gist first):

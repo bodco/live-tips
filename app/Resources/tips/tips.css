@@ -61,6 +61,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .agenda-list .st.now{background:var(--accent-fill);border-color:var(--accent-fill)}
 .agenda-list .done .tt{color:var(--text-3)}
 /* 2026-11-03 (owner): skipped = not relevant, crossed out */
+.agenda-list .st.raised{background:var(--accent-soft);border-color:var(--accent-fill)}
 .agenda-list .st.skip{background:transparent;border-style:dashed}
 .agenda-list .skip .tt{color:var(--text-3);text-decoration:line-through}
 .agenda-list .hint .lg{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
@@ -109,6 +110,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 .ratebox .ra{display:flex;gap:4px;align-items:center}
 .app.compact .ratebox{display:none}
 .hero.finish{box-shadow:0 0 0 1px color-mix(in srgb,var(--k-onme) 45%,transparent) inset}
+.hero.finish .q{font-weight:600}
+.hero.finish .items.fin{margin:6px 0 10px;padding-left:18px;font-size:14px;line-height:1.4}
+.hero.finish .items.fin li{margin:2px 0}
+.hero.finish .items.fin li.more{list-style:none;margin-left:-18px}
+.hero.finish .say{font-size:18px}
 
 /* ---------- Earlier ---------- */
 /* 2026-11-02 (owner): the hero and Earlier scroll together; before, only Earlier scrolled and a short window cut the hero */
@@ -373,6 +379,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .sys .sbtn{border:0;border-radius:6px;background:rgba(255,255,255,.18);color:#fff;font:inherit;font-weight:600;padding:3px 9px;cursor:pointer;white-space:nowrap}
 .sys .sbtn:hover{background:rgba(255,255,255,.3)}
 .sys .sbtn.ghostish{background:transparent;font-weight:500}
+.sys.meetend .strip{background:#E8590C}   /* 2026-11-10: the meeting ended, orange not red */
 .sys .body{margin:10px 12px 0;background:var(--surface);border-radius:var(--radius-l);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-card)}
 .sys .step{font-size:18px;font-weight:600}
 .sys .say{font-size:14px;line-height:1.45;color:var(--text-2)}
@@ -504,3 +511,97 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 .app.compact .recc .pill .lbl{display:none}
 @keyframes recblink{50%{opacity:.35}}
 @media (prefers-reduced-motion:reduce){.recc .pill .dot{animation:none}}
+
+/* 0.9.7: a colleague's slide text as the PM's backup (folded until "Take this slide") */
+.present .pm-backup { margin-top: 10px; padding: 10px 12px; border-radius: var(--radius-m); border: 1px dashed var(--border); background: var(--surface-2); }
+.present .pm-backup .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.present .pm-backup .say p { margin: 6px 0; }
+.present .pm-backup-ctl { margin-top: 8px; }
+
+/* ---------- 0.9.7 presentation mode (owner, 11.11): one window (the slide on top, the tips below) or the split
+   view of 0.7.5 (slide cards beside the tips); the 0.7.5 controls and time bar. rules/presentation.yaml > window ---------- */
+.present.pm.dk{padding:12px 14px 10px;gap:8px;flex:0 1 auto;max-height:62vh;overflow:hidden;position:relative}
+.present.pm.dk.compact{max-height:none}
+.dk-top{flex:none;display:flex;flex-direction:column;gap:6px;min-width:0}
+.dk-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.dk-row.r1{flex-wrap:nowrap}
+.dk-num{flex:none;font-weight:700;font-size:13px;line-height:20px;font-variant-numeric:tabular-nums;background:var(--text);color:var(--bg);border-radius:6px;padding:0 6px;min-width:22px;text-align:center}
+.dk-ttl{flex:1 1 0;min-width:0;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dk-rem{flex:none;font-size:28px;line-height:1.1;font-weight:700;font-variant-numeric:tabular-nums}
+.dk-rem.warn{color:var(--k-onme)}
+.dk-rem.neg{color:var(--danger-text)}
+.dk-b{height:28px;min-width:28px;padding:0 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:12px;display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.dk-b:hover{border-color:var(--text-3);color:var(--text)}
+.dk-b:focus-visible,#dkMode:focus-visible,#dkMin:focus-visible,.dk-seg:focus-visible{outline:2px solid var(--accent-fill);outline-offset:1px}
+.dk-b[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.dk-b.pri{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600;padding:0 12px}
+#dkMode,#dkMin{height:28px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;font-size:12px;padding:0 6px}
+#dkMin{width:50px;font-variant-numeric:tabular-nums}
+.dk-minw{display:inline-flex;align-items:center;gap:4px}
+.dk-lab{font-size:12px;color:var(--text-3)}
+.dk-clock{margin-left:auto;font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dk-swapb{display:none}
+.present.dk.sv .dk-swapb{display:inline-flex}
+.dk-pace{font-size:12px;color:var(--text-3)}
+.dk-pace:empty{display:none}
+.dk-chip{padding:1px 8px;border-radius:999px;border:1px solid currentColor;font-weight:600;white-space:nowrap}
+.dk-chip.ok{color:var(--k-turn)}
+.dk-chip.warn{color:var(--k-onme)}
+.dk-chip.bad{color:var(--danger-text)}
+.dk-sync{display:inline-flex;align-items:center;gap:4px}
+.dk-sync .link{font-size:12px;padding:0 4px}
+#dkAdv:empty{display:none}
+.dk-track{position:relative;display:flex;gap:2px;height:8px;margin:2px 0}
+.dk-track.many{gap:1px}
+.dk-seg{height:100%;min-width:2px;padding:0;border:0;border-radius:2px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--separator);cursor:pointer}
+.dk-seg.o{background:repeating-linear-gradient(135deg,var(--separator) 0 3px,transparent 3px 6px)}
+.dk-seg.done{background:var(--accent-fill);opacity:.4;box-shadow:none}
+.dk-seg.cur{background:var(--accent-fill);opacity:1;box-shadow:none}
+.dk-seg.o.done,.dk-seg.o.cur{background:var(--k-onme)}
+.dk-mark{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--text);pointer-events:none;border-radius:1px}
+.dk-cards{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.dk-card{padding:6px 2px 4px}
+.present.dk:not(.sv) .dk-card:not(.cur){display:none}
+.dk-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.dk-head h2{font-size:17px;line-height:1.25;margin:0;flex:1 1 140px;min-width:0}
+.present.dk:not(.sv) .dk-head{display:none}
+.dk-card.cur .dk-head .dk-num{background:var(--accent-fill);color:#fff}
+.dk-who{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:5px;border:1px solid var(--border);color:var(--text-3)}
+.dk-who.me{color:var(--accent);border-color:var(--accent)}
+.dk-who.other{color:var(--k-onme);border-color:var(--k-onme)}
+.dk-bud{font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums;flex:none}
+.dk-go{font-size:12px;color:var(--text-3);margin-bottom:8px}
+.dk-txt p{font-size:calc(var(--fs-body, 15px) * 1.12);line-height:1.45;margin:0 0 .6em;color:var(--text)}
+.dk-txt p b{font-weight:700}
+.dk-txt p.nums{font-weight:700;font-variant-numeric:tabular-nums;background:var(--surface-2);border-radius:var(--radius-s);padding:6px 9px;font-size:14px}
+.dk-txt p.s{opacity:.6}
+.dk-txt p.s::before{content:attr(data-l);display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-right:6px;vertical-align:1px}
+.dk-txt p.h{font-size:13px;line-height:1.4;color:var(--text-3);border-left:3px solid var(--separator);padding-left:8px}
+.dk-txt p.c{color:var(--k-onme)}
+.dk-cards.comp p.s{display:none}
+.dk-card.other .dk-txt p{color:var(--text-2)}
+.dk-txt.folded{display:none}
+.dk-take{margin:0 0 8px}
+.dk-qas{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.dk-qa{font-size:13px;line-height:1.4;color:var(--text-2);border-left:3px solid var(--k-answer);background:var(--k-answer-soft);border-radius:var(--radius-s);padding:5px 8px}
+.dk-qa b{color:var(--text);font-weight:600}
+.dk-nx{margin-top:10px;font-size:12px;color:var(--text-3)}
+.dk-wrap{display:none;position:absolute;left:8px;right:8px;bottom:8px;max-height:70%;overflow:auto;z-index:7;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-m);box-shadow:var(--shadow-card);padding:10px 12px;font-size:12px}
+.dk-wrap.on{display:block}
+.dk-wrap table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;margin-top:6px}
+.dk-wrap th,.dk-wrap td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--separator);white-space:nowrap}
+.dk-wrap td.r,.dk-wrap th.r{text-align:right}
+.dk-wrap td.bad{color:var(--danger-text)}
+.dk-wrap td.ok{color:var(--k-turn)}
+.dk-wrap td.t{white-space:normal}
+/* Compact strip: the number, the title, the countdown and the bar only */
+.app.compact .present.dk .r2,.app.compact .present.dk .dk-pace,.app.compact .present.dk #dkAdv,.app.compact .present.dk .dk-cards{display:none}
+.app.compact .dk-rem{font-size:22px}
+/* The split view: the slide cards fill one half, the tips the other; no side pane */
+.app.pm-split .pane,.app.pm-split .split{display:none!important}
+.app.pm-split .present.pm.dk{order:0;flex:1 1 0;min-width:0;max-height:none;height:100vh;margin:0;border-radius:0;box-shadow:none;border-right:1px solid var(--separator);padding:10px 12px 0}
+.app.pm-split .main{order:1;flex:1 1 0}
+.app.pm-split.pm-swap .present.pm.dk{order:2;border-right:0;border-left:1px solid var(--separator)}
+.present.dk.sv .dk-cards{scroll-snap-type:y mandatory;margin:0 -12px;padding:0}
+.present.dk.sv .dk-card{scroll-snap-align:start;scroll-snap-stop:always;height:100%;overflow-y:auto;padding:12px 16px 18px;border-top:1px solid var(--separator)}
+.present.dk.sv .dk-card:first-child{border-top:0}

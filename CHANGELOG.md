@@ -3,6 +3,93 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased
+
+- **Presentation mode as in 0.7.5 (2026-11-11, owner):** one window by default, the slide on top and the tips below;
+  **Expand** puts the slide cards beside the tips in a window twice as wide, **One window** goes back. The 0.7.5
+  controls are back: Start / Pause, Previous / Next, Auto (the slides turn by the schedule with a beep), Trim, Sound,
+  Reset, My slides / All slides, the talk minutes, Swap sides, the time bar with a segment per slide and the run report
+  at the end. The countdown per slide stays. Keynote and PowerPoint still move the slides; the speech no longer does
+  and "Move to slide N?" is gone. The tips under the slide are the usual ones.
+- **The slide text is your speech (2026-11-11, owner):** a new skill module, `talk.md`, says how the text of every
+  slide is written: what you yourself say, in the first person, the point first, sized to the slide's time, never a
+  retelling of the slide. Claude and the ChatGPT, OpenAI and Gemini ways follow the same module.
+- **Decks read as the show plays (2026-11-11, owner):** PowerPoint slides in the presentation's order (not by file
+  name), hidden slides left out (and skipped when following PowerPoint or Keynote), the speaker notes read; a text plan
+  cut on one heading level only, so a subheading no longer becomes a slide; a folder-only preparation passes up to 8
+  speech documents to the talk; Claude writes a deck of more than 30 slides in passes of 20.
+- **The preparation takes what matters, not what comes first in the folder (2026-11-11, owner):** with a whole folder
+  added, ChatGPT, OpenAI, Gemini and the local model read it in alphabetical order (with dates in the names, the
+  oldest first) until the room ran out, before the project config and the Current State; a file you added was cut at
+  20,000 characters and the "cut" mark was lost, so the model never knew; the deck never reached these ways. Now the
+  call context, the deck and the files you add come first and whole; then the project config, decisions, Current State
+  and the 14-day digest; then the folder's files dated in the last 14 days or naming the call, the best match first.
+  Archived and hidden folders, generated call files and older versions of a document (v2 next to v3) are left out. A
+  source that does not fit is compressed section by section with a visible mark, never cut at the end. The cloud ways
+  get 280,000 characters instead of the local model's 120,000.
+- **The brief says what the preparation read (2026-11-11, owner):** one line under the brief's title, on every way:
+  "Preparation context: 18 in full, 3 compressed, 40 skipped (budget), 460 excluded by filters, deck: used", with a
+  warning when a file you added was compressed or not opened, when recent files about the call did not fit, or when a
+  presentation's deck did not reach it. The whole list (taken, compressed, skipped, excluded, read or not read by
+  Claude) is in `<call>.context.json`; prep.json keeps the counts.
+- **A presentation's talk on every way, with your colleague's text as a backup (2026-11-11, owner):** ChatGPT,
+  OpenAI and Gemini now write the slide talk of an attached deck too (before, only Claude did). Every slide gets its
+  text, numbers and likely questions, your colleague's slides as well: in the tips window they stay folded under
+  "Take this slide" during the colleague's block and open when you take over. No cards come from them.
+- **Slides no longer jump back (2026-11-11, owner):** in a two-presenter call the slide jumped between 18 and 1
+  dozens of times: the other side's words moved you into the colleague's section without asking, and back. Now a
+  slide you set by hand (or Keynote / PowerPoint) holds for 90 seconds, and the other side's words move only one
+  step forward, into a colleague's section right after the current one.
+- **Cards for the other side ignore your colleagues (2026-11-11, owner):** an "on the other side" card fired when a
+  colleague on the call said the trigger. A speaker marked as your team no longer fires it.
+- **The agenda knows "raised" (2026-11-11, owner):** items that were discussed but not decided went back to "not
+  raised", so a call that covered all 11 items showed none. Now such an item is "raised, not decided" in the window,
+  on the call page and in the summary.
+- **Whisper knows the call's words (2026-11-11, owner):** besides the names, the transcription now gets the names and
+  product terms of the brief (HubSpot, AI, Fireflies...), so they come out right more often.
+
+- **Preparation on the ChatGPT account shows where it is (2026-11-11, owner):** the bar sat at 25% for the whole
+  6 minutes, because the account sends each part of the preparation whole, not as it writes. Now it says "Waiting for
+  ChatGPT: the brief, step 1 of 4 · 2:40", moves on with each of the four steps and creeps forward while it waits.
+  The kept run's folder in prep-runs is one folder again (the model name "codex/default" made a nested one).
+- **The call stops when you hang up (2026-11-10, owner):** closing Zoom, Teams or Meet left Pacenote recording music
+  and videos until End call. Now hanging up stops the call within a few seconds, the way Notion stops its notes: the
+  meeting app (Zoom, Teams, Meet in the browser or the Meet app) closes the microphone, and that is the signal. Mute,
+  silence or walking away do not stop it, the meeting app keeps the microphone open then. In case the guess is wrong,
+  the tips window and a notification say "The meeting has ended? Stopping the call in 5 s" with Keep recording;
+  Pacenote's own recorder does not count, a call without a meeting app is never stopped. Settings >
+  Integrations > Calendars > "Stop the call when the meeting ends".
+- **Tips window or Home, not both (2026-11-10, owner):** opening the tips window closes Home, and Home in the tips
+  window closes the tips window; the call goes on and Tips brings the window back.
+- **"Not ready" is bright orange again (2026-11-10, owner):** it had turned brown in the light theme (amber #B45309).
+  Text is now #E8590C (light) / #FFA940 (dark), dots and pills #FF8A00 / #FFA826. A test
+  (`tools/tests/test_theme_pending.py`) fails if it gets dark, dull or red again.
+- **Text can be selected and copied (2026-11-10, owner):** in the tips window a drag over a card promoted it and the
+  next tip redrew the window, so a line could not be selected to paste into the ask field. Now a drag that selects
+  text is not a click, and a new tip waits up to 20 seconds while text is selected. On the call page and the upcoming
+  call page the title and every text can be selected and copied.
+- **The model decides when to search the project (2026-11-10, owner):** on a handover call, "давай мені по К2" got a
+  line from the brief marked answered, and a question to the PM ("what did you find on payments?") got nothing,
+  although the answers were in the project folder. There is no rule on the PM's words now: a typed question is read
+  as an instruction in the moment of the call, and the answer or a tip can ask for a search of the project in the
+  model's own words. When the answer is already given, that search runs quietly and its card comes only when it found
+  something.
+- **The preparation says what you already know and what is open (2026-11-10, owner):** the brief adds "What you
+  already know" (recent work and findings on the project, also Claude's research you may not have read, with sources)
+  and "Open by topic" (known, unclear, and the questions that follow from the gaps, worked out from the material, not
+  copied from a list). It gets the files changed in the project folder in the last 7 days. Claude ways of the
+  preparation only.
+- **Earlier calls reach the preparation again (2026-11-10, owner):** the digest of recent calls read only `<stem>.md`
+  and skipped the app's `<stem>.app.md`, so every preparation since the app started recording said "0 calls". It now
+  reads both.
+- **The last minutes card is readable (2026-11-10, owner):** "N min left" listed every open agenda item in one cut
+  comma line. Now it shows how many are left, the first three as a short list and "+N more in the agenda", which opens
+  it; the recap below it is smaller.
+- **Mute in the floating controls (2026-11-10, owner):** a microphone button between Pause and Record turns your
+  microphone off and on, the same as in the tips window.
+- **No Notion dialog after a call (2026-11-10, owner):** "Meeting page created in Notion" no longer opens a window
+  after every call; the link is on the call page. A failed write still says so.
+
 ## 0.9.6 (2026-11-09)
 
 - **The folder index waits for power and skips generated folders (2026-11-09, owner):** a full index of a project

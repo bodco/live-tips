@@ -23,9 +23,9 @@
       micStalled: 'The microphone stopped', cantHear: "Can't hear the other side", asrBehind: (o) => `Transcription is ${o.n} s behind`,
       engineDeaf: 'Tips are not coming: end the call and start again',
       onMe: 'On me', more: 'More', earlier: 'Earlier', allTips: 'Tips', showHero: 'Show the main card',
-      agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised yet:', allRaised: 'All agenda items raised',
+      agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised yet:', moreItems: (n) => `+${n} more in the agenda`, allRaised: 'All agenda items raised',
       agendaOpen: 'Show the whole agenda', agendaClose: 'Hide the agenda', agendaHint: 'A click moves an item on:', agendaLegend: ['not raised', 'now', 'done', 'skipped, not relevant'],
-      agState: { todo: 'not raised', now: 'now', done: 'done', skip: 'skipped' },
+      agState: { todo: 'not raised', now: 'now', raised: 'raised, not decided', done: 'done', skip: 'skipped' },
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk', decision_conflict: 'Decided earlier',
         objection: 'Objection', qualify: 'Qualify', pain: 'Pain', next_step: 'Next step', competitor: 'Competitor', signal: 'Buying signal' },
       firstHint: (k) => `Press ${k.h} when you need help · ${k.t} compact · ${k.l} proactive tips`,
@@ -60,6 +60,7 @@
         draft: 'Follow-up draft', draftTo: (o) => `To ${o.people} · not sent`, write: 'Write draft', writing: 'Writing the draft…', instruct: 'What to change: "drop the pricing line", "shorter"',
         rewrite: 'Rewrite', copy: 'Copy', openMail: 'Open in Mail', edit: 'Edit', neverSends: 'Pacenote never sends it for you', openNotion: 'Open in Notion', openCall: 'Open call page', done: 'Done',
         lessons: (o) => `Uses ${o.n} of your recurring corrections`, copied: 'Copied' },
+      meetEnd: { q: (o) => `The meeting has ended? Stopping the call in ${o.n} s`, stop: 'Stop now', keep: 'Keep recording' },
       sys: { details: 'Details', hideDetails: 'Hide', notRecording: 'Not recording', noAudio: 'No audio is captured', noAudioWhy: 'No sound from the microphone or the call for a minute. Usually another app took the microphone, or macOS revoked access after an update.',
         restart: 'End and restart', noAudioFoot: (o) => `Tips are off until audio comes back. What was said before ${o.t} is saved.`,
         noOther: "Can't hear the other side", noOtherTitle: 'No call audio is coming in', noOtherWhy: 'No call audio for 45 s while you were not speaking. Most often the call plays through another device, or Pacenote lost access to system audio.',
@@ -70,12 +71,22 @@
         updated: (o) => `updated ${o.t}`, asked: (o) => `${o.name} asked`, hide: 'Hide', now: (o) => `Now · ${o.n}`, next: (o) => `Next · ${o.n} · ${o.owner}`,
         nextColleague: (o) => `After this slide ${o.name} presents ${o.range}. Tips go quiet until slide ${o.n}.`, prev: 'Previous', nextBtn: 'Next',
         syncA: (o) => `Following ${o.app} · slide ${o.n}`, stopFollowing: 'Stop following', askMove: (o) => `Move to slide ${o.n}?`, why: (o) => `You are already talking about ${o.topic}.`,
-        go: 'Move', no: 'No', syncB: 'Slides follow your speech · asks before moving', colleague: (o) => `${o.name} is presenting`,
+        go: 'Move', no: 'No', syncB: 'Slides follow your speech · asks before moving', colleague: (o) => `${o.name} is presenting`, takeSlide: 'Take this slide', backupHide: 'Hide their text', backupNote: (o) => `${o.name}'s text, in case you take over`,
         colleagueHint: (o) => `Tips stay quiet while ${o.name} speaks. Questions to you still get an answer card.`, turnIn: (o) => `Your turn in about ${o.t}`,
         turnNext: (o) => `Your turn next · slide ${o.n}`, startWith: (o) => `Start with: "${o.line}"`, mode: 'Presentation mode', compactView: 'Compact view',
         emptyTitle: 'No presentation attached', emptyText: 'Attach a file and Pacenote shows the slides, the time for each and answers to questions. Until then, tips work as on a regular call.',
         attach: 'Attach presentation', slidesN: (o) => `${o.n} slides`, ofShort: (o) => `${o.i} of ${o.n}` },
       present: { next: 'Next', prev: 'Back', start: 'Start', nextUp: (t, s) => `Next: ${t} (${s})`, canSkip: 'Can skip if short on time' },
+      // 0.9.7 presentation controls, as in the 0.7.5 split view
+      dk: { start: 'Start', pause: 'Pause', cont: 'Resume', auto: 'Auto', comp: 'Trim', snd: 'Sound', reset: 'Reset',
+        mine: 'My slides', all: 'All slides', min: 'min', minTt: 'Talk time in minutes', of: (o) => `${o.a} of ${o.b}`, me: 'yours', shared: 'shared', other: 'speaks',
+        onSlide: (o) => `On screen: slide ${o.n}.`, silent: 'You stay quiet.', next: (o) => `Next: ${o.n}. ${o.title} (${o.t})`, last: 'This is the last slide.', skip: 'can skip', canSkip: 'can skip',
+        ontrack: 'on schedule', ahead: 'ahead', back: 'back', behind: 'behind', early: 'ahead', wpm: 'wpm',
+        slow: 'slow', ok: 'ok', fast: 'fast', squeeze: 'trim', timeout: 'slide time is up',
+        done: 'Run finished', total: (o) => `Total ${o.a} with a limit of ${o.b} (${o.d})`, over: 'over', spare: 'spare', close: 'Close',
+        slide: 'Slide', title: 'Title', plan: 'Plan', fact: 'Actual', diff: 'Diff',
+        autoTt: 'Slides turn by the schedule, with a beep', compTt: 'Hide the "can skip" paragraphs', swap: 'Swap the slides and tips sides',
+        expand: 'Expand', collapse: 'One window', expandTt: 'Slides next to the tips: the window gets twice as wide', collapseTt: 'Back to one window: the slide on top, the tips below' },
       doneQ: 'Done?', markDone: 'Mark done', onThemKind: 'On them', closed: 'Closed',
       noItems: 'Nothing on you yet', notMine: 'Not mine', tipsIn: (o) => `Tips in ${o.l}, click for ${o.o}`, close: 'Close', noBriefYet: 'No brief for this call yet.',
       readyStatus: 'Ready', readyTitle: 'Ready when you are', startListening: 'Start listening', openBrief: 'Open brief',
@@ -98,9 +109,9 @@
       micStalled: 'Мікрофон зупинився', cantHear: 'Не чую іншу сторону', asrBehind: (o) => `Транскрипція відстає на ${o.n} с`,
       engineDeaf: 'Підказки не надходять: заверши дзвінок і почни знову',
       onMe: 'На мені', more: 'Більше', earlier: 'Раніше', allTips: 'Підказки', showHero: 'Показати основну картку',
-      agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', allRaised: 'Усі пункти агенди підняті',
+      agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', moreItems: (n) => `ще ${n} в агенді`, allRaised: 'Усі пункти агенди підняті',
       agendaOpen: 'Показати всю агенду', agendaClose: 'Сховати агенду', agendaHint: 'Клік по пункту змінює його стан:', agendaLegend: ['не піднято', 'зараз', 'зроблено', 'пропущено, неактуально'],
-      agState: { todo: 'не піднято', now: 'зараз', done: 'зроблено', skip: 'пропущено' },
+      agState: { todo: 'не піднято', now: 'зараз', raised: 'піднято, не вирішено', done: 'зроблено', skip: 'пропущено' },
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик', decision_conflict: 'Вже вирішено',
         objection: 'Заперечення', qualify: 'Кваліфікація', pain: 'Біль', next_step: 'Наступний крок', competitor: 'Конкурент', signal: 'Сигнал купівлі' },
       firstHint: (k) => `Натисніть ${k.h}, коли потрібна допомога · ${k.t} компактно · ${k.l} проактивні підказки`,
@@ -136,6 +147,7 @@
         draft: 'Чернетка листа-підсумку', draftTo: (o) => `Кому: ${o.people} · не надіслано`, write: 'Написати чернетку', writing: 'Пишу чернетку…', instruct: 'Що змінити: «прибери рядок про ціну», «коротше»',
         rewrite: 'Переписати', copy: 'Копіювати', openMail: 'Відкрити в Mail', edit: 'Редагувати', neverSends: 'Pacenote ніколи не надсилає його за вас', openNotion: 'Відкрити в Notion', openCall: 'Сторінка дзвінка', done: 'Готово',
         lessons: (o) => `Враховує ваші повторювані правки: ${o.n}`, copied: 'Скопійовано' },
+      meetEnd: { q: (o) => `Мітинг закінчився? Зупиняю дзвінок за ${o.n} с`, stop: 'Зупинити зараз', keep: 'Не зупиняти' },
       sys: { details: 'Деталі', hideDetails: 'Сховати', notRecording: 'Запис не йде', noAudio: 'Звук не записується', noAudioWhy: 'Хвилину немає звуку ні з мікрофона, ні з дзвінка. Найчастіше мікрофон зайняв інший застосунок або macOS забрав доступ після оновлення.',
         restart: 'Завершити і почати знову', noAudioFoot: (o) => `Підказки вимкнені, поки звук не повернеться. Сказане до ${o.t} збережено.`,
         noOther: 'Не чую співрозмовника', noOtherTitle: 'Звук дзвінка не надходить', noOtherWhy: '45 с немає звуку дзвінка, поки ви мовчали. Найчастіше дзвінок іде через інший пристрій або Pacenote втратив доступ до системного звуку.',
@@ -145,12 +157,21 @@
         updated: (o) => `оновлено ${o.t}`, asked: (o) => `${o.name} питає`, hide: 'Сховати', now: (o) => `Зараз · ${o.n}`, next: (o) => `Далі · ${o.n} · ${o.owner}`,
         nextColleague: (o) => `Після цього слайда ${o.name} презентує ${o.range}. Підказки мовчать до слайда ${o.n}.`, prev: 'Назад', nextBtn: 'Далі',
         syncA: (o) => `Слідую за ${o.app} · слайд ${o.n}`, stopFollowing: 'Не слідувати', askMove: (o) => `Перейти до слайда ${o.n}?`, why: (o) => `Ви вже говорите про ${o.topic}.`,
-        go: 'Перейти', no: 'Ні', syncB: 'Слайди за вашою мовою · питаю перед переходом', colleague: (o) => `Презентує ${o.name}`,
+        go: 'Перейти', no: 'Ні', syncB: 'Слайди за вашою мовою · питаю перед переходом', colleague: (o) => `Презентує ${o.name}`, takeSlide: 'Взяти слайд', backupHide: 'Сховати текст', backupNote: (o) => `Текст ${o.name}, якщо підхопите`,
         colleagueHint: (o) => `Поки говорить ${o.name}, підказки мовчать. На питання до вас картка з відповіддю все одно зʼявиться.`, turnIn: (o) => `Ваша черга приблизно через ${o.t}`,
         turnNext: (o) => `Далі ви · слайд ${o.n}`, startWith: (o) => `Почніть з: «${o.line}»`, mode: 'Режим презентації', compactView: 'Компактний вигляд',
         emptyTitle: 'Презентацію не додано', emptyText: 'Додайте файл, і Pacenote покаже слайди, час кожного слайда і відповіді на питання. Поки файлу немає, підказки працюють як на звичайному дзвінку.',
         attach: 'Додати презентацію', slidesN: (o) => `${o.n} слайдів`, ofShort: (o) => `${o.i} з ${o.n}` },
       present: { next: 'Далі', prev: 'Назад', start: 'Почати', nextUp: (t, s) => `Далі: ${t} (${s})`, canSkip: 'Можна пропустити, якщо бракує часу' },
+      dk: { start: 'Старт', pause: 'Пауза', cont: 'Продовжити', auto: 'Авто', comp: 'Стиснути', snd: 'Звук', reset: 'Скинути',
+        mine: 'Мої слайди', all: 'Усі слайди', min: 'хв', minTt: 'Час виступу, хвилин', of: (o) => `${o.a} з ${o.b}`, me: 'твоє', shared: 'спільне', other: 'говорить',
+        onSlide: (o) => `У презентації: слайд ${o.n}.`, silent: 'Ти мовчиш.', next: (o) => `Далі: ${o.n}. ${o.title} (${o.t})`, last: 'Це останній слайд.', skip: 'можна пропустити', canSkip: 'можна пропустити',
+        ontrack: 'за графіком', ahead: 'уперед', back: 'назад', behind: 'відстаєш', early: 'випереджаєш', wpm: 'сл/хв',
+        slow: 'повільно', ok: 'норм', fast: 'швидко', squeeze: 'стисни', timeout: 'час слайда вийшов',
+        done: 'Прогін завершено', total: (o) => `Загалом ${o.a} при ліміті ${o.b} (${o.d})`, over: 'перебір', spare: 'запас', close: 'Закрити',
+        slide: 'Слайд', title: 'Назва', plan: 'План', fact: 'Факт', diff: 'Різниця',
+        autoTt: 'Слайди гортаються самі за розкладом, з сигналом', compTt: 'Сховати абзаци «можна пропустити»', swap: 'Поміняти місцями слайди і підказки',
+        expand: 'Розгорнути', collapse: 'Одне вікно', expandTt: 'Слайди поруч із підказками: вікно стає вдвічі ширшим', collapseTt: 'Назад в одне вікно: слайд зверху, підказки внизу' },
       noItems: 'Поки нічого на тобі', notMine: 'Не моє', tipsIn: (o) => `Підказки: ${o.l}, клацніть для ${o.o}`, close: 'Закрити', noBriefYet: 'Брифу для цього дзвінка ще немає.',
       readyStatus: 'Готово', readyTitle: 'Можна починати', startListening: 'Почати слухати', openBrief: 'Відкрити бриф',
       listeningTitle: 'Слухаю', tipsOffTitle: 'Лише транскрипт', tipsOffSub: 'Підказки вимкнено. Підсумок і фоллоу-ап будуть після дзвінка. Увімкнути підказки можна в налаштуваннях дзвінка.', listeningSub: (k) => `Підказки зʼявляться тут, коли будуть потрібні. Застряг? Натисни ${k}.`, onDevice: 'Аудіо лишається на цьому Mac',
@@ -172,7 +193,7 @@
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     rec: { state: 'off', kind: 'video', elapsed: 0, source: '', note: '' },
-    pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, rosterSide: {}, knownNames: [], knownSrc: {}, tipsLang: null,
+    pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, meetEnd: null, rosterSide: {}, knownNames: [], knownSrc: {}, tipsLang: null,
     openItems: [], notionItems: [], notionProject: '', minePending: [], mineN: 0, spkPrompt: 15,
     ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, rateOpen: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
@@ -217,11 +238,20 @@
     const left = S.call.minutesLeft;
     if (left == null || left > 5 || left < 0) return null;
     const missing = S.agenda.filter((a) => a.state === 'todo');
+    // 2026-11-10 (owner): 17 cut titles in one comma line could not be read in the last minutes. Now: the count,
+    // the first three as a short list (no numbering, no "\$", up to the first colon), "+N more" opens the agenda.
+    const short = (m) => {
+      let x = String(m.full || m.title || '').replace(/\\\$/g, '$').replace(/^\s*\d+[.)]\s*/, '').replace(/\s*(…|\.\.\.)\s*$/, '');
+      const c = x.indexOf(':'); if (c > 12) x = x.slice(0, c);
+      return x.length > 70 ? x.slice(0, 68).replace(/\s+\S*$/, '') + '…' : x;
+    };
+    const top = missing.slice(0, 3).map(short), more = missing.length - top.length;
     return {
       id: '__finish', kind: 'finish', at: Date.now() - 60000, state: 'active',
       label: `${left} ${T().kinds.finish}`,
-      question: missing.length ? `${T().notRaised} ${missing.map((m) => m.title).join(', ')}` : T().allRaised,
-      say: S.call.recap ? `${T().recap} ${S.call.recap}` : '', source: ''
+      question: missing.length ? `${T().notRaised} ${missing.length}` : T().allRaised,
+      finishItems: top, finishMore: more > 0 ? T().moreItems(more) : '',
+      say: S.call.recap ? `${T().recap} ${String(S.call.recap).replace(/\\\$/g, '$')}` : '', source: ''
     };
   }
   // 2026-11-05 (owner): the main card can be hidden when the feed alone is easier to read; kept per Mac.
@@ -322,7 +352,26 @@
     if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
   }
 
+  // 2026-11-10 (owner): text in the window can be selected and copied (to paste into the ask field and comment).
+  // A drag that selects text is not a click on the card, and a new tip waits (up to 20 s) instead of redrawing
+  // the window under the selection.
+  function selectingText() {
+    const s = window.getSelection();
+    if (!s || s.isCollapsed || !String(s).trim()) return false;
+    const n = s.anchorNode && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentNode);
+    return !!(n && !n.closest('input,textarea,[contenteditable="true"]'));
+  }
+  let renderHeldSince = 0, renderTimer = null;
   function render() {
+    if (selectingText() && (!renderHeldSince || Date.now() - renderHeldSince < 20000)) {
+      if (!renderHeldSince) renderHeldSince = Date.now();
+      clearTimeout(renderTimer); renderTimer = setTimeout(render, 800);
+      return;
+    }
+    renderHeldSince = 0; clearTimeout(renderTimer); renderTimer = null;
+    renderNow();
+  }
+  function renderNow() {
     const t = T();
     document.documentElement.lang = S.lang;
     if (S.theme === 'auto') document.documentElement.removeAttribute('data-theme');
@@ -415,17 +464,18 @@
     const sysOn = !!(S.sys && !ended);
     app.classList.toggle('sysview', sysOn);
     renderSys(sysOn);
+    renderMeetEnd(!!(S.meetEnd && !ended));   // 2026-11-10 (owner): the meeting app let go of the microphone
 
     // 2026-11-02 (owner, live call): an error in one part stopped render() before the side pane, so the tabs
     // did not switch and the transcript stayed empty. Each part now fails on its own and is reported to the app.
     const stream = $('stream'), streamTop = stream ? stream.scrollTop : 0;   // 2026-11-02: never jump back to the top
     const list = guard('cards', visibleCards) || [];
-    const hero = withSlides() ? null : guard('pickHero', () => pickHero(list));
+    const hero = guard('pickHero', () => pickHero(list));   // 0.9.7: tips below the slide as on any call
     guard('presentation', renderPresentation);
     guard('reportPresenting', reportPresenting);
     const showEmpty = guard('empty', () => renderEmpty(list));
     guard('hero', () => renderHero(showEmpty ? null : hero));
-    guard('earlier', () => renderEarlier(showEmpty ? [] : list.filter((c) => (!hero || c.id !== hero.id) && (!withSlides() || c.kind === 'answer'))));
+    guard('earlier', () => renderEarlier(showEmpty ? [] : list.filter((c) => !hero || c.id !== hero.id)));
     if (stream && stream.scrollTop !== streamTop) stream.scrollTop = streamTop;
 
     // next call, only within 10 minutes
@@ -544,6 +594,7 @@
     el.innerHTML = `
       <div class="head"><span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>${c.kind === 'finish' ? '' : `<span class="meta"${c.unverified ? ` title="${esc(t.unverified)}"` : ''}>${esc(meta)}</span>`}${S.ui.heroOverride === c.id ? `<button class="ghost backauto" type="button" data-act="hero-auto" title="Esc">${esc(t.backAuto)}</button>` : ''}</div>
       ${(c.commit ? t.doneQ : c.question) ? `<div class="q">${esc(c.commit ? t.doneQ : c.question)}</div>` : ''}
+      ${c.kind === 'finish' && (c.finishItems || []).length ? `<ul class="items fin">${c.finishItems.map((x) => `<li>${esc(x)}</li>`).join('')}${c.finishMore ? `<li class="more"><button class="ghost" type="button" data-act="agenda-toggle">${esc(c.finishMore)}</button></li>` : ''}</ul>` : ''}
       ${c.why && !c.commit ? `<div class="why">${esc(c.why)}</div>` : ''}
       ${c.say ? `<div class="say"${editing ? ' contenteditable="true" spellcheck="false"' : ''}>${esc(c.say)}</div>` : ''}
       ${(c.items || []).length && c.kind !== 'finish' && !S.ui.heroMin[c.id] ? itemsHtml(c) : ''}
@@ -584,145 +635,284 @@
   function fmtSecs(s) { return `${s < 0 ? '+' : ''}${Math.floor(Math.abs(s) / 60)}:${String(Math.abs(s) % 60).padStart(2, '0')}`; }
   function clock(s) { s = Math.max(0, Math.round(Math.abs(s))); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 
-  // ---------- 0.8.5 presentation mode (P5; rules/presentation.yaml) ----------
-  // The current slide comes from the recorder (outline_pos / timeline), or from Previous / Next at once.
-  function curIdx() {
-    const n = S.pres && S.pres.slide;
-    if (n != null) { const i = S.steps.findIndex((x) => x.n === n); if (i >= 0) return i; }
-    return Math.min(S.ui.present.index, Math.max(0, S.steps.length - 1));
+  // ---------- 0.9.7 presentation mode (owner, 11.11; rules/presentation.yaml > window) ----------
+  // One window by default: the slide on top (number, title, the countdown, the 0.7.5 controls, the time bar, the talk),
+  // the tips below. "Expand" makes the window twice as wide (native "split") with the slide cards beside the tips, as
+  // the 0.7.5 split view. The window keeps its own clock: Start / Pause, Auto turns the slides by the schedule with a
+  // beep, Previous / Next and a click on the bar move at once; Keynote or PowerPoint (sync A) move it too. Every move
+  // goes to the recorder (inbox slide = n|manual), so its facts, handoff card and time advice follow the window.
+  const DK = S.dk = { running: false, elapsed: 0, last: 0, offset: 0, idx: 0, enter: {}, warned: {}, finished: false, entryLag: 0,
+    auto: PREFS.deck_auto !== '0', sound: PREFS.deck_sound !== '0', compress: false, mode: PREFS.deck_mode === 'mine' ? 'mine' : 'all',
+    min: 0, minFor: '', split: PREFS.deck_split === '1', swap: PREFS.deck_swap === '1', sig: '', list: [], cs: [], ce: [], total: 0,
+    isSplit: false, prog: false, progT: null, scrollT: null, actx: null, open: {} };
+  function dkPref(k, v) { PREFS[k] = String(v); post('pref', { k, v: String(v) }); }
+  function dkIncl(st) { return DK.mode === 'all' || st.who !== 'other'; }
+  function dkDefMin() {
+    const m = S.deckMeta || {};
+    if (DK.mode === 'all' && m.talkMin > 0) return Math.round(m.talkMin);
+    const s = S.steps.filter(dkIncl).reduce((a, x) => a + (x.secs || 60), 0);
+    return Math.max(1, Math.round(s / 60));
   }
-  function budget(st) { return (st.secs || 0) + (S.extra[st.n] || 0); }
-  function onSlide() {
-    if (S.pres && S.pres.slideRx && S.pres.slide != null) return Math.max(0, Math.floor((Date.now() - S.pres.slideRx) / 1000));
-    return stepElapsed();
+  function dkBody(st) {
+    if (Array.isArray(st.body) && st.body.length) return st.body;
+    const say = Array.isArray(st.say) ? st.say : (st.say ? [String(st.say)] : []);
+    return say.map((t) => ({ k: 'p', t }));
   }
-  function ownerName(st) { const t = T().pm; return st.who === 'other' ? (st.speaker || '?') : st.who === 'shared' ? t.all : t.you; }
-  function runOf(i) {   // a colleague's run of slides around i: [from, to] indexes
-    let a = i, b = i; const sp = S.steps[i].speaker;
-    while (a > 0 && S.steps[a - 1].who === 'other' && S.steps[a - 1].speaker === sp) a--;
-    while (b < S.steps.length - 1 && S.steps[b + 1].who === 'other' && S.steps[b + 1].speaker === sp) b++;
-    return [a, b];
+  function dkWords(st) { return dkBody(st).reduce((n, b) => n + ((b.k === 'p' || b.k === 'c' || (b.k === 's' && !DK.compress)) ? String(b.t).split(/\s+/).filter(Boolean).length : 0), 0); }
+  function dkPlan() {
+    const base = S.steps.filter(dkIncl);
+    const key = DK.mode + '|' + base.map((x) => x.n).join(',');
+    if (DK.minFor !== key) { DK.minFor = key; DK.min = dkDefMin(); }
+    const sum = base.reduce((a, x) => a + (x.secs || 60), 0) || 1, k = DK.min * 60 / sum;
+    let acc = 0; DK.cs = []; DK.ce = [];
+    DK.list = base.map((x) => { const b = (x.secs || 60) * k + (S.extra[x.n] || 0); DK.cs.push(acc); acc += b; DK.ce.push(acc); return Object.assign({}, x, { b }); });
+    DK.total = acc;
+  }
+  function curIdx() { const st = DK.list[DK.idx]; const i = st ? S.steps.findIndex((x) => x.n === st.n) : -1; return i >= 0 ? i : 0; }
+  function dkCur() { return DK.list[Math.min(DK.idx, DK.list.length - 1)]; }
+  function dkSlideAt(v) { for (let i = 0; i < DK.list.length; i++) if (v < DK.ce[i]) return i; return DK.list.length - 1; }
+  function dkBeep(kind) {
+    if (!DK.sound) return;
+    try {
+      if (!DK.actx) DK.actx = new (window.AudioContext || window.webkitAudioContext)();
+      const a = DK.actx, f = kind === 'warn' ? [520] : [660, 880], t0 = a.currentTime;
+      f.forEach((fr, i) => {
+        const o = a.createOscillator(), g = a.createGain(); o.frequency.value = fr; o.type = 'sine';
+        g.gain.setValueAtTime(0.0001, t0 + i * 0.16); g.gain.exponentialRampToValueAtTime(0.16, t0 + i * 0.16 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.16 + 0.14);
+        o.connect(g); g.connect(a.destination); o.start(t0 + i * 0.16); o.stop(t0 + i * 0.16 + 0.16);
+      });
+    } catch (e) { /* no sound */ }
   }
   /** Numbers in bold: the slide's own numbers and any figure in the text (P5). */
   function bold(text, nums) {
     let h = esc(text);
     const list = (nums || []).filter((x) => x && x.length > 1).sort((x, y) => y.length - x.length);
     for (const x of list) { const e = esc(x); if (h.includes(e)) h = h.split(e).join('\u0000' + e + '\u0001'); }
-    h = h.replace(/(^|[^\u0000\w])(\d[\d.,:]*\s?(%|k|K|m|M|x|×)?)/g, (m, p, d) => p + '\u0000' + d + '\u0001');
+    // 0.9.7: "1 192" stays one number (a space between thousands), a trailing comma or dot is not part of it
+    h = h.replace(/(^|[^\u0000\w])((?:\d{1,3}(?:[   ]\d{3})+(?!\d)|\d(?:[\d.,:]*\d)?)(?:\s?(?:%|k|K|m|M|x|×)(?![\p{L}\d]))?)/gu, (m, p, d) => p + '\u0000' + d + '\u0001');
     return h.replace(/\u0000/g, '<b>').replace(/\u0001/g, '</b>').replace(/<b>([^<]*)<b>/g, '<b>$1').replace(/<\/b>([^<]*)<\/b>/g, '$1</b>');
   }
-  function timeLine() {
-    const tl = S.pres && S.pres.timeline, t = T().pm;
-    if (!tl || !tl.plan) return '';
-    const el = tl.elapsed + Math.floor((Date.now() - (tl.rx || Date.now())) / 1000);
-    const parts = [t.plan({ t: clock(tl.plan) }), t.elapsed({ t: clock(el) })];
-    if (tl.behind != null && Math.abs(tl.behind) >= 30) parts.push(tl.behind > 0 ? t.behind({ t: clock(tl.behind) }) : t.ahead({ t: clock(-tl.behind) }));
-    return `<div class="pm-time" id="pmTime">${esc(parts.join(' · '))}</div>`;
+  function dkWho(st) { const d = T().dk; return st.who === 'other' ? d.other + (st.speaker ? ': ' + st.speaker : '') : st.who === 'shared' ? d.shared : d.me; }
+  function dkCard(st, i) {
+    const d = T().dk, pm = T().pm, other = st.who === 'other', nx = DK.list[i + 1];
+    const folded = other && !DK.isSplit && !DK.open[st.n];
+    const nums = (st.numbers || []).length ? `<p class="nums">${(st.numbers || []).map(esc).join('  ·  ')}</p>` : '';
+    const body = dkBody(st).map((b) => `<p class="${b.k === 'p' ? '' : b.k}"${b.k === 's' ? ` data-l="${esc(d.skip)}"` : ''}>${bold(b.t, st.numbers)}</p>`).join('');
+    const qa = (st.qa || []).slice(0, 2).map((x) => `<div class="dk-qa"><b>${esc(x.q)}</b> ${bold(x.a, st.numbers)}</div>`).join('');
+    const take = other && !DK.isSplit && (body || nums) ? `<button class="btn2 dk-take" type="button" data-act="dk-take" data-n="${st.n}">${esc(DK.open[st.n] ? pm.backupHide : pm.takeSlide)}</button>` : '';
+    return `<section class="dk-card${i === DK.idx ? ' cur' : ''}${other ? ' other' : ''}" data-i="${i}">
+      <div class="dk-head"><span class="dk-num">${st.n}</span><span class="dk-who ${esc(st.who || 'me')}">${esc(dkWho(st))}</span><h2>${esc(st.title)}</h2><span class="dk-bud">${clock(st.b)}</span></div>
+      <div class="dk-go">${other ? esc(d.silent) + ' ' : ''}${esc(d.onSlide({ n: st.n }))}${st.canSkip && !other ? ' · ' + esc(d.canSkip) : ''}</div>
+      ${take}<div class="dk-txt${folded ? ' folded' : ''}">${nums}${body}${qa ? `<div class="dk-qas">${qa}</div>` : ''}</div>
+      <div class="dk-nx">${nx ? esc(d.next({ n: nx.n, title: nx.title, t: clock(nx.b) })) + (nx.who === 'other' && !other ? ' · ' + esc(dkWho(nx)) : '') : esc(d.last)}</div>
+    </section>`;
   }
-  function adviceLine() {
-    const tl = S.pres && S.pres.timeline;
-    if (!tl || !tl.advice || !tl.advice.text) return '';
-    return `<div class="pm-adv" role="status">${bold(tl.advice.text, [])} <span class="m">${esc(T().pm.updated({ t: clock(tl.elapsed) }))}</span></div>`;
+  const ICO = {
+    prev: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M8 2 4 6l4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    next: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    bell: '<svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.5 10V6.5a3.5 3.5 0 0 1 7 0V10l1 1h-9zM5.8 12.3a1.3 1.3 0 0 0 2.4 0" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+    reset: '<svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7a4 4 0 1 0 1.2-2.9M3 2.5v2.2h2.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    swap: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 4.5h9M8.5 2l2.5 2.5L8.5 7M12 9.5H3M5.5 7 3 9.5 5.5 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    expand: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="1.5" y="2.5" width="11" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M7 2.5v9" stroke="currentColor" stroke-width="1.3"/></svg>',
+    collapse: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="3" y="2.5" width="8" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>'
+  };
+  function dkBuild() {
+    const el = $('present'), d = T().dk;
+    const many = DK.list.length > 40;
+    const segs = DK.list.map((st, i) => `<button type="button" class="dk-seg${st.who === 'other' ? ' o' : ''}" style="flex:${st.b.toFixed(1)}" data-act="dk-seg" data-i="${i}" title="${esc(st.n + '. ' + st.title + ' (' + clock(st.b) + ')')}" aria-label="${esc(st.n + '. ' + st.title)}"></button>`).join('');
+    el.innerHTML = `<div class="dk-top">
+      <div class="dk-row r1"><span class="dk-num" id="dkNum"></span><span class="dk-ttl" id="dkTtl"></span><span class="dk-rem" id="dkRem">0:00</span></div>
+      <div class="dk-row r2" role="toolbar" aria-label="${esc(T().pm.mode)}">
+        <button class="dk-b pri" type="button" id="dkStart" data-act="dk-start"></button>
+        <button class="dk-b" type="button" data-act="dk-prev" title="${esc(T().pm.prev + ' ' + S.keys.prev)}" aria-label="${esc(T().pm.prev)}">${ICO.prev}</button>
+        <button class="dk-b" type="button" data-act="dk-next" title="${esc(T().pm.nextBtn + ' ' + S.keys.next)}" aria-label="${esc(T().pm.nextBtn)}">${ICO.next}</button>
+        <button class="dk-b" type="button" id="dkAuto" data-act="dk-auto" title="${esc(d.autoTt)}">${esc(d.auto)}</button>
+        <button class="dk-b" type="button" id="dkComp" data-act="dk-comp" title="${esc(d.compTt)}">${esc(d.comp)}</button>
+        <button class="dk-b" type="button" id="dkSnd" data-act="dk-snd" title="${esc(d.snd)}" aria-label="${esc(d.snd)}">${ICO.bell}</button>
+        <button class="dk-b" type="button" data-act="dk-reset" title="${esc(d.reset)}" aria-label="${esc(d.reset)}">${ICO.reset}</button>
+        <select id="dkMode" aria-label="${esc(d.mine + ' / ' + d.all)}"><option value="mine"${DK.mode === 'mine' ? ' selected' : ''}>${esc(d.mine)}</option><option value="all"${DK.mode === 'all' ? ' selected' : ''}>${esc(d.all)}</option></select>
+        <span class="dk-minw"><input id="dkMin" type="number" min="1" max="180" step="1" value="${DK.min}" aria-label="${esc(d.minTt)}"><span class="dk-lab">${esc(d.min)}</span></span>
+        <span class="dk-clock" id="dkClock"></span>
+        <button class="dk-b dk-swapb" type="button" id="dkSwap" data-act="dk-swap" title="${esc(d.swap)}" aria-label="${esc(d.swap)}">${ICO.swap}</button>
+        <button class="dk-b" type="button" id="dkSplit" data-act="dk-split" title="${esc(DK.isSplit ? d.collapseTt : d.expandTt)}">${DK.isSplit ? ICO.collapse : ICO.expand}<span>${esc(DK.isSplit ? d.collapse : d.expand)}</span></button>
+      </div>
+      <div class="dk-row dk-pace" id="dkPace"></div>
+      <div id="dkAdv"></div>
+      <div class="dk-track${many ? ' many' : ''}" id="dkTrack">${segs}<div class="dk-mark" id="dkMark"></div></div>
+    </div>
+    <div class="dk-cards" id="dkCards">${DK.list.map(dkCard).join('')}</div>
+    <div class="dk-wrap" id="dkWrap"></div>`;
+    $('dkCards').addEventListener('scroll', dkOnScroll);
+    dkMark(); dkUpdate();
   }
-  function moveAskBlock() {
-    const a = S.pres && S.pres.moveAsk, t = T().pm;
-    if (!a) return '';
-    return `<div class="pm-ask" role="alertdialog" aria-label="${esc(t.askMove({ n: a.n }))}"><div><b>${esc(t.askMove({ n: a.n }))}</b> ${a.topic ? esc(t.why({ topic: a.topic.toLowerCase() })) : ''}</div>
-      <div class="ctl"><button class="btn1" type="button" data-act="move-yes">${esc(t.go)}</button><button class="btn3" type="button" data-act="move-no">${esc(t.no)}</button><span class="m">↩ esc</span></div></div>`;
+  function dkMark() {
+    const segs = $('dkTrack') ? $('dkTrack').querySelectorAll('.dk-seg') : [];
+    segs.forEach((e, j) => { e.classList.toggle('done', j < DK.idx); e.classList.toggle('cur', j === DK.idx); });
+    const cards = $('dkCards') ? $('dkCards').children : [];
+    for (let j = 0; j < cards.length; j++) cards[j].classList.toggle('cur', j === DK.idx);
   }
-  function qaCard() {
-    const t = T().pm;
-    const c = S.cards.find((x) => x.kind === 'answer' && x.state === 'active' && Date.now() - x.at < 90000);
-    if (!c) return '';
-    return `<div class="pm-qa"><div class="top"><span class="kind k-answer">${esc(t.asked({ name: c.who || T().them }))}</span><button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></div>
-      ${c.question ? `<div class="q">${esc(c.question)}</div>` : ''}<div class="a">${bold(c.say || '', [])}</div></div>`;
+  function dkLabels() {
+    const d = T().dk, b = $('dkStart'); if (!b) return;
+    b.textContent = DK.running ? d.pause : (DK.elapsed > 0 && !DK.finished ? d.cont : d.start);
+    $('dkAuto').setAttribute('aria-pressed', String(DK.auto));
+    $('dkComp').setAttribute('aria-pressed', String(DK.compress));
+    $('dkSnd').setAttribute('aria-pressed', String(DK.sound));
+    $('dkSwap').setAttribute('aria-pressed', String(DK.swap));
+    $('dkCards').classList.toggle('comp', DK.compress);
   }
-  function rail(i) {
-    const t = T().pm, out = [];
-    for (let k = 0; k < S.steps.length; k++) {
-      const st = S.steps[k];
-      const state = k < i ? 'done' : k === i ? 'now' : 'todo';
-      if (st.who === 'other') {
-        const [a, b] = runOf(k);
-        const inRun = i >= a && i <= b;
-        const secs = S.steps.slice(a, b + 1).reduce((x, y) => x + budget(y), 0);
-        const label = a === b ? `${st.n}` : `${S.steps[a].n}-${S.steps[b].n}`;
-        out.push(`<button type="button" class="r ${inRun ? 'now' : b < i ? 'done' : 'todo'} other" data-act="slide-go" data-n="${S.steps[a].n}"><span class="n">${label}</span><span class="tt">${esc(st.speaker)} · ${esc(a === b ? st.title : t.slidesN({ n: b - a + 1 }))}</span><span class="d">${b < i ? '' : clock(secs)}</span></button>`);
-        k = b; continue;
+  function dkUpdate() {
+    const st = dkCur(); if (!st || !$('dkRem')) return;
+    const d = T().dk, v = DK.elapsed + DK.offset, rem = DK.ce[DK.idx] - v;
+    $('dkNum').textContent = st.n; $('dkTtl').textContent = st.title; $('dkTtl').title = st.title;
+    const r = $('dkRem'); r.textContent = (rem < 0 ? '-' : '') + clock(rem); r.className = 'dk-rem' + (rem < 0 ? ' neg' : rem < 10 ? ' warn' : '');
+    $('dkClock').textContent = d.of({ a: clock(DK.elapsed), b: clock(DK.min * 60) });
+    $('dkMark').style.left = Math.min(100, Math.max(0, v / (DK.total || 1) * 100)) + '%';
+    const chips = [];
+    if (DK.running || DK.elapsed > 0) {
+      if (Math.abs(DK.offset) > 8) chips.push([DK.offset > 0 ? 'ok' : 'warn', (DK.offset > 0 ? d.ahead : d.back) + ' ' + clock(DK.offset)]);
+      else if (!DK.auto && Math.abs(DK.entryLag) > 8) chips.push([DK.entryLag > 0 ? 'bad' : 'ok', (DK.entryLag > 0 ? d.behind : d.early) + ' ' + clock(DK.entryLag)]);
+      else chips.push(['ok', d.ontrack]);
+      if (st.who !== 'other') {
+        const wn = dkWords(st);
+        if (rem > 5 && wn > 0) {
+          const wpm = Math.round(wn / (rem / 60));
+          chips.push([wpm > 150 ? 'bad' : (wpm > 135 || wpm < 95) ? 'warn' : 'ok', wpm + ' ' + d.wpm + ' ' + (wpm > 150 ? d.squeeze : wpm > 135 ? d.fast : wpm < 95 ? d.slow : d.ok)]);
+        } else if (rem <= 5 && wn > 0) chips.push(['bad', d.timeout]);
       }
-      const th = S.thumbs[st.n];
-      out.push(`<button type="button" class="r ${state}" data-act="slide-go" data-n="${st.n}" aria-current="${state === 'now'}">${th ? `<img alt="" src="${th}">` : ''}<span class="n">${st.n}</span><span class="tt">${esc(st.title)}</span><span class="d">${state === 'done' ? '' : clock(budget(st))}</span></button>`);
     }
-    return `<nav class="pm-rail" aria-label="${esc(t.slides)}"><div class="cap">${esc(t.slides)}</div>${out.join('')}</nav>`;
+    const sync = S.syncA ? `<span class="dk-sync">${esc(T().pm.syncA({ app: S.syncA.app, n: S.syncA.n }))} <button class="link" type="button" data-act="stop-follow">${esc(T().pm.stopFollowing)}</button></span>` : '';
+    const html = chips.map(([c, x]) => `<span class="dk-chip ${c}">${esc(x)}</span>`).join('') + sync;
+    const pc = $('dkPace'); if (pc.innerHTML !== html) pc.innerHTML = html;
+    dkLabels();
   }
-  function footer() {
-    const t = T().pm, k = S.keys;
-    const sync = S.syncA ? `<div class="pm-sync"><span>${esc(t.syncA({ app: S.syncA.app, n: S.syncA.n }))}</span><button class="link" type="button" data-act="stop-follow">${esc(t.stopFollowing)}</button></div>`
-      : `<div class="pm-sync"><span>${esc(t.syncB)}</span></div>`;
-    return `<div class="ctl"><button class="btn2" type="button" data-act="present-prev">${esc(t.prev)}</button><button class="btn1" type="button" data-act="present-next">${esc(t.nextBtn)}</button><kbd>${esc(k.prev)} ${esc(k.next)}</kbd></div>${sync}`;
+  function dkAdvice() {
+    const a = $('dkAdv'); if (!a) return;
+    const tl = S.pres && S.pres.timeline, st = dkCur();
+    const h = tl && tl.advice && tl.advice.text && st && st.who !== 'other'
+      ? `<div class="pm-adv" role="status">${bold(tl.advice.text, [])} <span class="m">${esc(T().pm.updated({ t: clock(tl.elapsed) }))}</span></div>` : '';
+    if (a.innerHTML !== h) a.innerHTML = h;
+  }
+  function dkShowCard(i) {
+    const box = $('dkCards'); if (!box || !DK.isSplit || !box.clientHeight) return;
+    DK.prog = true; box.scrollTop = i * box.clientHeight;
+    clearTimeout(DK.progT); DK.progT = setTimeout(() => { DK.prog = false; }, 250);
+  }
+  function dkOnScroll() {
+    if (DK.prog || !DK.isSplit) return;
+    clearTimeout(DK.scrollT);
+    DK.scrollT = setTimeout(() => {
+      const box = $('dkCards'); if (!box || !box.clientHeight) return;
+      const i = Math.round(box.scrollTop / box.clientHeight);
+      if (i !== DK.idx && i >= 0 && i < DK.list.length) dkJump(i, true);
+    }, 120);
+  }
+  /** The slide changes: the bar and the cards, a beep on an automatic turn, the recorder is told. */
+  function dkSetCur(i, withBeep, fromScroll, source) {
+    if (!DK.list.length) return;
+    const was = DK.list[DK.idx] && DK.list[DK.idx].n;
+    DK.idx = i;
+    if (!(i in DK.enter)) DK.enter[i] = DK.elapsed;
+    DK.entryLag = DK.elapsed + DK.offset - DK.cs[i];
+    if (withBeep) dkBeep('go');
+    dkMark();
+    if (!fromScroll) dkShowCard(i);
+    const n = DK.list[i].n;
+    if (n !== was || source) {
+      S.ui.present.index = curIdx();
+      post('setting', { key: 'slide', value: n + '|' + (source || 'manual') });
+    }
+    dkAdvice(); dkUpdate();
+  }
+  function dkJump(i, fromScroll, source) {
+    if (!DK.list.length) return;
+    i = Math.max(0, Math.min(DK.list.length - 1, i));
+    if (DK.auto) DK.offset = DK.cs[i] - DK.elapsed;
+    dkSetCur(i, false, fromScroll, source);
+  }
+  function dkStartStop() {
+    if (DK.finished || !DK.list.length) return;
+    DK.running = !DK.running; DK.last = performance.now();
+    if (DK.running) { dkBeep('go'); if (!(DK.idx in DK.enter)) DK.enter[DK.idx] = DK.elapsed; }
+    dkUpdate();
+  }
+  function dkNext() {
+    if (!DK.running && !DK.finished && DK.elapsed === 0 && DK.idx === 0) { dkStartStop(); dkSetCur(0, false, false, 'manual'); return; }
+    if (DK.idx >= DK.list.length - 1) { dkFinish(); return; }
+    dkJump(DK.idx + 1);
+  }
+  function dkReset() {
+    Object.assign(DK, { running: false, elapsed: 0, offset: 0, enter: {}, warned: {}, finished: false, entryLag: 0 });
+    const w = $('dkWrap'); if (w) w.classList.remove('on');
+    dkSetCur(0, false, false);
+  }
+  function dkFinish() {
+    DK.running = false; DK.finished = true;
+    const d = T().dk, w = $('dkWrap'); if (!w) return;
+    const keys = Object.keys(DK.enter).map(Number).sort((a, b) => a - b);
+    const rows = keys.map((i, j) => {
+      const end = j + 1 < keys.length ? DK.enter[keys[j + 1]] : DK.elapsed, act = end - DK.enter[i], df = act - DK.list[i].b;
+      return `<tr><td>${DK.list[i].n}</td><td class="t">${esc(DK.list[i].title)}</td><td class="r">${clock(DK.list[i].b)}</td><td class="r">${clock(act)}</td><td class="r ${df > 8 ? 'bad' : df < -8 ? 'ok' : ''}">${df > 0 ? '+' : df < 0 ? '-' : ''}${clock(df)}</td></tr>`;
+    }).join('');
+    const dd = DK.elapsed - DK.min * 60;
+    w.innerHTML = `<div class="dk-row"><b style="flex:1">${esc(d.done)}</b><button class="dk-b" type="button" data-act="dk-close">${esc(d.close)}</button></div>
+      <div class="dk-lab">${esc(d.total({ a: clock(DK.elapsed), b: clock(DK.min * 60), d: (dd > 0 ? d.over : d.spare) + ' ' + clock(dd) }))}</div>
+      <table><tr><th>${esc(d.slide)}</th><th>${esc(d.title)}</th><th class="r">${esc(d.plan)}</th><th class="r">${esc(d.fact)}</th><th class="r">${esc(d.diff)}</th></tr>${rows}</table>`;
+    w.classList.add('on'); dkUpdate();
+  }
+  function dkTick() {
+    if (!withSlides() || !DK.list.length) return;
+    if (DK.running) {
+      const n = performance.now(); DK.elapsed += (n - DK.last) / 1000; DK.last = n;
+      const v = DK.elapsed + DK.offset;
+      if (v >= DK.total && DK.auto) { dkFinish(); return; }
+      if (DK.auto) { const ni = dkSlideAt(v); if (ni !== DK.idx) dkSetCur(ni, true, false); }
+      const rem = DK.ce[DK.idx] - v;
+      if (rem <= 10 && rem > 0 && !DK.warned[DK.idx]) { DK.warned[DK.idx] = 1; dkBeep('warn'); }
+    }
+    dkUpdate();
+  }
+  setInterval(() => guard('deckTick', dkTick), 250);
+  /** The split view: the window grows twice as wide on the slides side (as in 0.7.5), the slide cards move next to the tips. */
+  function dkApplySplit(want) {
+    const app = $('app'), el = $('present');
+    app.classList.toggle('pm-swap', DK.swap);
+    if (want === DK.isSplit) return false;
+    DK.isSplit = want;
+    app.classList.toggle('pm-split', want);
+    if (want) app.insertBefore(el, app.firstChild); else $('stream').parentNode.insertBefore(el, $('stream'));
+    post('split', { on: want, grow: DK.swap ? 'right' : 'left' });
+    if (want) setTimeout(() => dkShowCard(DK.idx), 350);
+    return true;
   }
   function renderPresentation() {
     const el = $('present'), t = T(), pm = t.pm;
-    if (!presenting()) { el.hidden = true; el.className = 'present'; return; }
+    const compact = S.call.mode === 'compact';
+    if (!presenting()) { dkApplySplit(false); el.hidden = true; el.className = 'present'; DK.sig = ''; return; }
     el.hidden = false;
     if (!S.steps.length) {   // P5 states: no deck yet
+      dkApplySplit(false); DK.sig = '';
       el.className = 'present pm-empty';
       el.innerHTML = `<div class="step">${esc(pm.emptyTitle)}</div><div class="say">${esc(pm.emptyText)}</div><div class="ctl"><button class="btn2" type="button" data-act="attach-deck">${esc(pm.attach)}</button></div>`;
       return;
     }
-    const i = curIdx(), st = S.steps[i], n = S.steps.length, nx = S.steps[i + 1];
-    const compact = S.call.mode === 'compact', wide = !compact && $('app').clientWidth >= 560;
-    el.className = 'present pm' + (wide ? ' wide' : '') + (compact ? ' compact' : '');
-    let main = moveAskBlock();
-    if (st.who === 'other') {   // a colleague's block: no tips, then the handoff card
-      const [a, b] = runOf(i), mineNext = S.steps[b + 1];
-      const left = S.steps.slice(i, b + 1).reduce((x, y) => x + budget(y), 0) - onSlide();
-      const tl = S.pres && S.pres.timeline;
-      main += `<div class="top"><span class="pm-k">${esc(pm.slideOf({ i: i + 1, n }))}</span></div>
-        <div class="step">${esc(pm.colleague({ name: st.speaker }))}</div>
-        <div class="meta">${esc(`${a === b ? st.n : S.steps[a].n + '-' + S.steps[b].n} · ${st.title}`)}</div>
-        <div class="say">${esc(pm.colleagueHint({ name: st.speaker }))}</div>
-        ${mineNext ? `<div class="meta">${esc(pm.turnIn({ t: clock(left) }))}${tl && tl.behind >= 30 ? ' · ' + esc(pm.behind({ t: clock(tl.behind) })) : ''}</div>` : ''}
-        ${mineNext && i === b ? `<div class="pm-handoff"><span class="pm-k">${esc(pm.turnNext({ n: mineNext.n }))}</span><div class="step">${esc(mineNext.title)}</div>${(Array.isArray(mineNext.say) ? mineNext.say : [mineNext.say])[0] ? `<div class="say">${esc(pm.startWith({ line: (Array.isArray(mineNext.say) ? mineNext.say : [mineNext.say])[0] }))}</div>` : ''}<div class="meta">${clock(budget(mineNext))}</div></div>` : ''}
-        ${qaCard()}`;
-    } else {
-      const left = budget(st) - onSlide();
-      const say = Array.isArray(st.say) ? st.say : (st.say ? [String(st.say)] : []);
-      const lines = compact ? say.slice(0, 1) : say;
-      main += `<div class="top"><span class="pm-k">${esc(compact ? pm.ofShort({ i: i + 1, n }) : pm.slideOf({ i: i + 1, n }))} · ${esc(ownerName(st))}</span></div>
-        <div class="step">${esc(st.title)}</div>
-        <div class="pm-clock"><span class="clock ${left < 0 ? 'over' : ''}" id="pclock">${clock(left)}</span><span class="m" id="pclockLbl">${esc(left < 0 ? pm.overSlide : pm.left)}</span><button class="btn3" type="button" data-act="add30" data-n="${st.n}">${esc(pm.add30)}</button></div>
-        ${timeLine()}${adviceLine()}
-        <div class="say">${lines.map((x) => `<p>${bold(x, st.numbers)}</p>`).join('')}</div>
-        ${compact ? '' : qaCard()}`;
-    }
-    if (!compact) {
-      main += `<div class="pm-nx"><span>${esc(pm.now({ n: st.n }))}</span>${nx ? `<span>${esc(pm.next({ n: nx.n, owner: ownerName(nx) }))}</span>` : ''}</div>`;
-      if (nx && nx.who === 'other' && st.who !== 'other') { const [a2, b2] = runOf(i + 1); const back = S.steps[b2 + 1]; main += `<div class="meta">${esc(pm.nextColleague({ name: nx.speaker, range: a2 === b2 ? `${nx.n}` : `${S.steps[a2].n}-${S.steps[b2].n}`, n: back ? back.n : '' }))}</div>`; }
-    } else if (nx) main += `<div class="meta">${esc(pm.next({ n: nx.n, owner: ownerName(nx) }))}</div>`;
-    main += footer();
-    el.innerHTML = wide ? `${rail(i)}<div class="pm-main">${main}</div>` : `<div class="pm-main">${main}</div>`;
+    const keep = dkCur() && dkCur().n;
+    dkPlan();
+    const moved = dkApplySplit(DK.split && !compact);
+    el.className = 'present pm dk' + (DK.isSplit ? ' sv' : '') + (compact ? ' compact' : '');
+    const sig = [S.lang, DK.mode, DK.min, DK.isSplit, JSON.stringify(DK.open), DK.list.map((x) => [x.n, x.title, x.who, x.speaker, Math.round(x.b), dkBody(x).length, (x.numbers || []).length, (x.qa || []).length].join('~')).join('|')].join('#');
+    if (keep != null) { const i = DK.list.findIndex((x) => x.n === keep); DK.idx = i >= 0 ? i : Math.min(DK.idx, DK.list.length - 1); }
+    DK.idx = Math.max(0, Math.min(DK.idx, DK.list.length - 1));
+    if (sig !== DK.sig || moved || !$('dkCards')) { DK.sig = sig; dkBuild(); if (DK.isSplit) setTimeout(() => dkShowCard(DK.idx), 30); }
+    dkMark(); dkAdvice(); dkUpdate();
   }
-  /** Previous / Next, a click on the rail or a shortcut: the window moves now, the recorder follows (inbox slide = n|manual). */
-  function goSlide(n, source) {
-    const i = S.steps.findIndex((x) => x.n === n); if (i < 0) return;
-    S.ui.present.index = i; S.ui.present.running = true; S.ui.present.stepStart = Date.now();
-    S.pres = Object.assign({}, S.pres, { slide: n, slideRx: Date.now(), moveAsk: null });
-    if (feed) feed.setSlide(n);
-    post('setting', { key: 'slide', value: n + '|' + (source || 'manual') });
-    render();
-  }
-  function stepBy(d) { if (!S.steps.length) return; const i = Math.max(0, Math.min(S.steps.length - 1, curIdx() + d)); goSlide(S.steps[i].n, 'manual'); }
-  function answerMove(yes) {
-    const a = S.pres && S.pres.moveAsk; if (!a) return;
-    if (feed) feed.answerMove(yes); else S.pres.moveAsk = null;
-    post('setting', { key: 'slide_move', value: (yes ? 'yes|' : 'no|') + a.n });
-    if (yes) { S.ui.present.stepStart = Date.now(); }
-    render();
-  }
+  // Kept names: the shortcuts, sync A and the menu use them.
+  function goSlide(n, source) { const i = DK.list.findIndex((x) => x.n === n); if (i >= 0) dkJump(i, false, source); }
+  function stepBy(d) { if (!DK.list.length) return; if (d > 0) dkNext(); else dkJump(DK.idx - 1); }
   function add30(n) { S.extra[n] = (S.extra[n] || 0) + 30; post('setting', { key: 'slide_add30', value: String(n) }); render(); }
   let lastPresenting = null;
   function reportPresenting() { const p = presenting() && S.steps.length > 0; if (p !== lastPresenting) { lastPresenting = p; post('presenting', { on: p }); } }
+  window.addEventListener('resize', () => { if (DK.isSplit) dkShowCard(DK.idx); });
 
   function renderLangSwitch() {
     let b = $('langBtn');
@@ -734,6 +924,18 @@
     b.textContent = name(cur);
     b.title = T().tipsIn({ l: name(cur), o: name(other) });
     b.setAttribute('aria-label', b.title);
+  }
+
+  // ---------- 2026-11-10 (owner): the meeting has ended, the call stops in a few seconds (MeetingEndWatch) ----------
+  function renderMeetEnd(on) {
+    let el = $('meetend');
+    if (!el) { el = document.createElement('section'); el.id = 'meetend'; el.className = 'sys meetend'; el.setAttribute('role', 'alert'); const bar = document.querySelector('header.bar'); bar.parentNode.insertBefore(el, bar.nextSibling); }
+    el.hidden = !on;
+    if (!on) return;
+    const t = T().meetEnd;
+    el.innerHTML = `<div class="strip"><span class="st">${esc(t.q({ n: S.meetEnd.left }))}</span>
+        <button class="sbtn" type="button" data-act="meetend-keep">${esc(t.keep)}</button>
+        <button class="sbtn ghostish" type="button" data-act="meetend-stop">${esc(t.stop)}</button></div>`;
   }
 
   // ---------- 0.8.5 recording problems (P8; rules/recording.yaml) ----------
@@ -948,15 +1150,6 @@
       const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
       $('timer').textContent = (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(sec).padStart(2, '0');
     }
-    if (presenting() && S.steps.length) {
-      const c = $('pclock'), st = S.steps[curIdx()];
-      if (c && st) {
-        const left = budget(st) - onSlide(); c.textContent = clock(left); c.classList.toggle('over', left < 0);
-        const l = $('pclockLbl'); if (l) l.textContent = left < 0 ? T().pm.overSlide : T().pm.left;
-      }
-      const tl = S.pres && S.pres.timeline, te = $('pmTime');
-      if (te && tl) { const h = timeLine(); const d = document.createElement('div'); d.innerHTML = h; if (d.firstChild) te.textContent = d.firstChild.textContent; }
-    }
   }
 
   let lastToast = 0, toastTimer = null;
@@ -1113,11 +1306,11 @@
     post('mute', { on: S.call.micOff });
     render();
   }
-  function isWide() { return $('app').clientWidth >= 760; }
+  function isWide() { return !$('app').classList.contains('pm-split') && $('app').clientWidth >= 760; }   // 0.9.7: no side pane in the split view
   // A window made wide with a sheet open: the sheet becomes the side pane (render() moves it).
   // 0.8.5: the presentation rail shows from 560 px, so a resize redraws it.
   let resizeT = null;
-  window.addEventListener('resize', () => { if (S.ui.sheet && isWide()) { render(); return; } if (presenting()) { clearTimeout(resizeT); resizeT = setTimeout(render, 80); } });
+  window.addEventListener('resize', () => { if (S.ui.sheet && isWide()) { render(); return; } });
   function openTab(tab) { if (isWide()) S.ui.paneTab = tab; else S.ui.sheet = tab; render(); }
   function cardKey(c) { return (c.card || '') + '|' + (c.t || '') + '|' + String((c.raw && c.raw.gist) || '').slice(0, 60); }
 
@@ -1126,6 +1319,8 @@
     if (d.open) S.ui.openPts[d.dataset.pt] = true; else delete S.ui.openPts[d.dataset.pt];
   }, true);
   document.addEventListener('click', (e) => {
+    if (selectingText() && !e.target.closest('button,input,textarea,label,a,select')) return;   // 2026-11-10: a text selection, not a click
+    if (e.target.closest('button,[data-act]')) { const sel = window.getSelection(); if (sel && !sel.isCollapsed) sel.removeAllRanges(); }   // a real click: the redraw goes ahead
     const b = e.target.closest('[data-act]');
     if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('#moreBtn')) { S.ui.menuOpen = false; renderMenu(); }
     // 2026-11-05: composedPath, not closest: a chip re-drawn by its own click is detached and looked like a click outside
@@ -1216,7 +1411,7 @@
       case 'hero-min': S.ui.heroMin[id] = !S.ui.heroMin[id]; break;   // 2026-11-02: the speech card folds to its first line
       case 'agenda': {
         const a = S.agenda.find((x) => x.id === id); if (!a) return;
-        const nextState = { todo: 'now', now: 'done', done: 'skip', skip: 'todo' }[a.state] || 'todo';   // 2026-11-03: skip = not relevant
+        const nextState = { todo: 'now', now: 'done', raised: 'done', done: 'skip', skip: 'todo' }[a.state] || 'todo';   // 2026-11-03: skip = not relevant
         a.state = nextState; if (feed) feed.setAgendaState(id, nextState);
         post('agenda', { id, title: a.title, state: nextState });
         break;
@@ -1312,15 +1507,20 @@
       }
       case 'prepare-next': post('prepare-next', { id: S.next && S.next.id }); return;
       case 'open-next': post('open-next', { id: S.next && S.next.id }); return;
-      case 'present-next': {
-        const p = S.ui.present;
-        if (!p.running && S.pres.slide == null) { p.running = true; p.stepStart = Date.now(); goSlide(S.steps[curIdx()].n, 'manual'); return; }
-        stepBy(1); return;
-      }
-      case 'present-prev': stepBy(-1); return;
+      case 'present-next': case 'dk-next': dkNext(); return;
+      case 'present-prev': case 'dk-prev': dkJump(DK.idx - 1); return;
       case 'slide-go': goSlide(+b.dataset.n, 'manual'); return;
-      case 'move-yes': answerMove(true); return;
-      case 'move-no': answerMove(false); return;
+      // 0.9.7: the 0.7.5 controls (rules/presentation.yaml > window)
+      case 'dk-start': { const first = DK.elapsed === 0 && !DK.running; dkStartStop(); if (first) dkSetCur(DK.idx, false, false, 'manual'); return; }
+      case 'dk-auto': DK.auto = !DK.auto; dkPref('deck_auto', DK.auto ? '1' : '0'); DK.offset = DK.auto ? DK.cs[DK.idx] - DK.elapsed : 0; dkUpdate(); return;
+      case 'dk-comp': DK.compress = !DK.compress; dkUpdate(); return;
+      case 'dk-snd': DK.sound = !DK.sound; dkPref('deck_sound', DK.sound ? '1' : '0'); dkUpdate(); return;
+      case 'dk-reset': dkReset(); return;
+      case 'dk-swap': DK.swap = !DK.swap; dkPref('deck_swap', DK.swap ? '1' : '0'); $('app').classList.toggle('pm-swap', DK.swap); dkUpdate(); return;
+      case 'dk-split': DK.split = !DK.isSplit; dkPref('deck_split', DK.split ? '1' : '0'); render(); return;
+      case 'dk-seg': dkJump(+b.dataset.i); return;
+      case 'dk-take': { const n = +b.dataset.n; DK.open[n] = !DK.open[n]; render(); return; }
+      case 'dk-close': { const w = $('dkWrap'); if (w) w.classList.remove('on'); return; }
       case 'add30': add30(+b.dataset.n); return;
       case 'stop-follow': S.syncA = null; post('stop-follow'); render(); return;
       case 'attach-deck': post('attach-deck'); return;
@@ -1329,6 +1529,8 @@
         const cur = tl.current || tl.meeting; tl.current = cur === 'uk' ? 'en' : 'uk';
         post('setting', { key: 'tips_lang', value: tl.current }); render(); return;
       }
+      case 'meetend-stop': post('meetend', { item: 'stop' }); S.meetEnd = null; render(); return;
+      case 'meetend-keep': post('meetend', { item: 'keep' }); S.meetEnd = null; render(); return;
       case 'sys-restart': post('sys', { item: 'restart' }); return;
       case 'sys-check': post('sys', { item: 'check' }); return;
       case 'sys-more': S.ui.sysOpen = !(S.ui.sysOpen == null ? (S.sys && S.sys.kind === 'notRecording') : S.ui.sysOpen); break;
@@ -1350,6 +1552,15 @@
   });
   // 0.8.6: ticks on register and Notion items, "Same person as", the card's name field and "Add to On me"
   document.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 'dkMode') {   // 0.9.7: My slides / All slides
+      DK.mode = e.target.value === 'mine' ? 'mine' : 'all'; dkPref('deck_mode', DK.mode);
+      if (!DK.running) Object.assign(DK, { elapsed: 0, offset: 0, enter: {}, warned: {}, finished: false, entryLag: 0 });
+      render(); return;
+    }
+    if (e.target && e.target.id === 'dkMin') {    // 0.9.7: the talk time in minutes; the slide budgets scale to it
+      let x = parseInt(e.target.value, 10); if (!x || x < 1) x = 1; if (x > 180) x = 180;
+      DK.min = x; render(); return;
+    }
     const el = e.target;
     if (el.dataset && el.dataset.act === 'ext-toggle') {
       const id = el.dataset.id, done = el.checked;
@@ -1392,7 +1603,6 @@
     if (e.metaKey && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) { e.preventDefault(); post('zoom', { step: e.key === '-' ? -1 : e.key === '0' ? 0 : 1 }); return; }
     if (e.metaKey && e.key === ',') { e.preventDefault(); post('menu', { item: 'settings' }); return; }
     const typing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
-    if (!typing && S.pres && S.pres.moveAsk && presenting() && (e.key === 'Enter' || e.key === 'Escape')) { e.preventDefault(); answerMove(e.key === 'Enter'); return; }
     if (e.key === 'Escape') {
       if (S.ui.editing) { S.ui.editing = null; render(); return; }
       S.ui.menuOpen = false; S.ui.recMenu = false; S.ui.sheet = null; S.ui.heroOverride = null; $('pop').hidden = true; render();
@@ -1452,11 +1662,13 @@
     presentKey(k) {
       if (k === 'mode') { S.ui.presentForced = !presenting(); render(); return; }
       if (!presenting() || !S.steps.length) return;
-      if (k === 'prev') stepBy(-1); else if (k === 'next') stepBy(1); else if (k === 'add30') add30(S.steps[curIdx()].n);
+      if (k === 'prev') stepBy(-1); else if (k === 'next') stepBy(1); else if (k === 'add30' && dkCur()) add30(dkCur().n);
     },
     /** Sync A (app only): the slide number read from Keynote or PowerPoint; null when not following. */
-    setFollow(f) { S.syncA = f && f.n ? { app: String(f.app || ''), n: +f.n } : null; if (S.syncA) goSlide(S.syncA.n, String(f.app || '').toLowerCase().includes('power') ? 'powerpoint' : 'keynote'); else render(); },
+    setFollow(f) { S.syncA = f && f.n ? { app: String(f.app || ''), n: +f.n } : null; if (S.syncA && !DK.list.length) renderPresentation(); if (S.syncA) goSlide(S.syncA.n, String(f.app || '').toLowerCase().includes('power') ? 'powerpoint' : 'keynote'); else render(); },
     setThumbs(t) { S.thumbs = t || {}; render(); },
+    /** 2026-11-10: {left: seconds} while the call is about to stop because the meeting ended; null hides it. */
+    setMeetEnd(m) { S.meetEnd = m && m.left != null ? { left: +m.left } : null; render(); },
     /** 0.8.5 (P7): the after-call screen: outcome, series, the follow-up draft. */
     setAfter(a) { S.after = a || null; render(); },
     /** 0.8.5: {meeting: 'uk', current: 'uk'}: the tips language and the meeting's. */
@@ -1501,7 +1713,7 @@
       call: { title: 'Orbit weekly with the client', state: q.get('state') === 'ready' ? 'ready' : 'live', briefLine: 'Brief ready · 09:40',
               startedAt: q.get('state') === 'empty' ? now - 42000 : now - 32 * min - 14000, minutesLeft: Number(q.get('left') || 13),
               mode: q.get('mode') === 'compact' ? 'compact' : 'normal', recap: 'export on Tuesday, our QA tests week one, names from you by Friday.',
-              presenting: q.get('mode') === 'presentation' },
+              presenting: q.get('mode') === 'presentation', presType: q.get('mode') === 'presentation' },
       agenda: [
         { id: 'a1', title: 'Export release date', state: 'done' },
         { id: 'a2', title: 'Who tests the pilot', state: 'now' },
@@ -1531,9 +1743,20 @@
         { title: 'Open from last call', items: ['Test accounts from the client (open)', 'Who tests the pilot (partly answered)'] },
         { title: 'Risks', items: ['Pilot slips if the test accounts are late'] } ] },
       steps: [
-        { title: 'Why a pilot', say: 'Five users for two weeks show whether the export saves the team an hour a day.', secs: 90 },
-        { title: 'Plan and dates', say: 'Starts Monday, review on day 10.', secs: 120 },
-        { title: 'What we need from you', say: 'Names by Friday, test accounts by Thursday.', secs: 60, canSkip: true } ]
+        { n: 1, title: 'Why a pilot', who: 'me', secs: 90, numbers: ['5 users', '2 weeks', '1 h a day'], say: [],
+          body: [{ k: 'p', t: 'We want to know one thing before the full rollout: does the export save your team an hour a day?' },
+                 { k: 'p', t: 'Five users for two weeks give us that answer with real work, not a demo.' },
+                 { k: 's', t: 'Last quarter the manual export took about 6 hours a week per person.' }],
+          qa: [{ q: 'Why only five users?', a: 'Five covers both teams and keeps support to one person.' }] },
+        { n: 2, title: 'What we found in the CRM', who: 'other', speaker: 'Emily', secs: 120, numbers: ['216 calls', '4 meetings'],
+          body: [{ k: 'p', t: 'Almost nothing in the CRM is logged by itself: all 216 calls this year were typed in by hand.' },
+                 { k: 'c', t: 'Mike, do you know why the call notes stopped in January?' }] },
+        { n: 3, title: 'Plan and dates', who: 'me', secs: 120, numbers: ['Monday', 'day 10'],
+          body: [{ k: 'p', t: 'We start on Monday and review on day 10, so you get the numbers before the budget meeting.' },
+                 { k: 'h', t: 'Pause for questions' }] },
+        { n: 4, title: 'What we need from you', who: 'me', secs: 60, canSkip: true,
+          body: [{ k: 'p', t: 'Two things from your side: the names by Friday and the test accounts by Thursday.' }] } ],
+      deckMeta: { talkMin: 6, qaMin: 2 }
     });
   }
 

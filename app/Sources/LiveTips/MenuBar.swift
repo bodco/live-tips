@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
         NotionMirrorService.shared.startSchedule()
         MainActor.assumeIsolated { AutoStart.shared.start() }      // Pacenote 0.8: offer to start tips when a call begins
+        MainActor.assumeIsolated { MeetingEndWatch.shared.start() } // 2026-11-10 (owner): hanging up in the meeting ends the call
         updateCoreIfNeeded()
         // Up next (2026-10-27): the switch goes on when the old call's recorder has stopped.
         NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in
@@ -355,7 +356,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func openTips(for call: CallFiles) {
         MainActor.assumeIsolated {
             // QA 26.10: one tips window per call; a second click brings the open one forward.
+            // 2026-11-10 (owner): the tips window and Home are never open together: opening the tips closes Home.
             if let t = tips, t.args.tips == call.tips, let w = t.window, w.isVisible {
+                HomeWindow.window?.close()
                 w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return
             }
             tips?.window?.close()
@@ -371,6 +374,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let c = PrompterController(args: a)
             c.show()
             tips = c
+            HomeWindow.window?.close()
         }
     }
 }

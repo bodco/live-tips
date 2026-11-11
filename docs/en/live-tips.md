@@ -794,7 +794,7 @@ Three equivalent ways. Each closes the transcript with a
    `idle_stop_minutes`, the skill asks once "Has the call ended? Stopping in 2 min" and
    stops. Hard limit: planned length + 20 min, or `hard_cap_minutes`.
 
-Important: **closing Zoom/Meet does not stop the recording.** The tool keeps listening to
+Important (the skill): **closing Zoom/Meet does not stop the recording** (the app stops by itself, see "Stop the call when the meeting ends"). The tool keeps listening to
 the system audio (music, videos). One of the three ways above is required.
 
 By hand, without the skill: `touch ~/work/Tools/live-transcriber/control/stop`.
@@ -1151,7 +1151,7 @@ first minute.
 | HELP NOW: the next sentence to say, built from what was just said | Instant fact cards (⚡) that fire on a keyword in under a second |
 | Questions typed in the window, answered from the call so far and the project folders, by the preparation's model when it answers in seconds (2026-11-06) | Facts from documents read before the call (the fact book) |
 | "Find" questions: a search over the project folder (local index) | |
-| A deeper search when nothing ready answers (0.6.2): the project folder, the folders added to the call, the local Notion mirror and earlier call transcripts are searched in the background and the answer arrives as a new card, usually in 15-60 s. With the preparation on Claude, Claude Code reads the folders; on any other way (2026-11-06) Pacenote searches them and the preparation's model answers. With the call agent on (0.9.6, beta), one Claude agent session for the whole call answers instead, in seconds. With no preparation, a question to you starts this search by itself | |
+| A deeper search when nothing ready answers (0.6.2): the project folder, the folders added to the call, the local Notion mirror and earlier call transcripts are searched in the background and the answer arrives as a new card, usually in 15-60 s. With the preparation on Claude, Claude Code reads the folders; on any other way (2026-11-06) Pacenote searches them and the preparation's model answers. With the call agent on (0.9.6, beta), one Claude agent session for the whole call answers instead, in seconds. With no preparation, a question to you starts this search by itself. Since 2026-11-10 the model itself can ask for this search when the brief does not hold what you need (for a typed question or a question to you); when it already answered, the search card comes only if something was found | |
 | The call context you typed in Start call, the project's current state from the local Notion mirror, a digest of the project's recent calls | |
 | On me, the wrap-up and the Notion meeting page | |
 
@@ -1245,8 +1245,8 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
 
 - **Agenda as a contract.** The brief's checklist is the agenda. The model that keeps the call picture marks the
   item being discussed and the ones already discussed; the window shows them as the agenda bar, and a click on a
-  segment sets the state by hand (your state wins). Five minutes before the end the "N min left" card lists what
-  was not raised. After the call the Notion page gets an "Agenda" section (discussed, raised, not raised), and the
+  segment sets the state by hand (your state wins). Five minutes before the end the "N min left" card shows how many items were not raised
+  and the first three. After the call the Notion page gets an "Agenda" section (discussed, raised, not raised), and the
   items not raised go into "What matters" of the next call of the same series as "Not raised last time: ...".
 - **Commitments register.** What you took on and what others promised your side are written at the end of the
   call to `<project>/live/commitments.jsonl` (one file per project, append only: nothing is ever rewritten).
@@ -1262,6 +1262,15 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
   use by another app) is on and the calendar has a call now (within 5 minutes of its start), Pacenote offers once,
   as a notification and a banner on Home: "Start tips for Orbit weekly?" with the project of the series. It never
   records by itself. Settings > Integrations > Calendars > "Suggest starting tips when a call begins" (on by default).
+- **Stop the call when the meeting ends (2026-11-10).** Hang up in Zoom, Teams, Meet in the browser or the Meet app
+  and the call stops within about 15 seconds, as with End call. First the tips window and a notification say "The
+  meeting has ended? Stopping the call in 5 s" with Keep recording (no more questions on this call) and Stop now; the
+  microphone coming back hides it. The signal is the meeting app
+  closing the microphone, not silence: while you are in the meeting it keeps the microphone open, also when you are
+  muted, quiet or away from the Mac. It counts only after a meeting app held the microphone for 10 seconds during the
+  call, and it waits 4 seconds (switching the microphone takes about one). Pacenote's own recorder and screen
+  recording do not count; a call with no meeting app (in person) is never stopped. Settings > Integrations > Calendars
+  > "Stop the call when the meeting ends" (on by default).
 
 ### 14.1e After the call: call page, follow-up email, memory, series, statistics, risks, rehearsal (0.8)
 
@@ -1552,7 +1561,9 @@ did not help. What changed:
 6. **On me is yours only; Home from the call window (2026-11-03).** The On me tab and its count
    hold only your items. What others promised on earlier calls sits below in "Waiting on others",
    folded, grouped by person: tick an item when they have done it, or take it over with Mine. The
-   call window has a Home button (a house, next to More; Command-0 works too).
+   call window has a Home button (a house, next to More; Command-0 works too). Since 2026-11-10 the two windows are not
+   open together: Home from the call window closes the tips window (the call goes on, Tips in the floating controls or
+   the menu bar brings it back), and opening the tips window closes Home.
 7. **Less noise.** A card found by meaning never fires on your own words and comes back at the
    earliest 15 minutes later. HELP NOW shows at most 2 facts or cards; a raw snippet from the
    project folder comes only when nothing else matched, one at most, without Notion page ids.
@@ -1876,6 +1887,60 @@ a hidden state made on either copy before stays.
 **Theme.** Settings > General > Theme: Same as the Mac (default), Light or Dark. Every window, the tips window
 included, follows it at once.
 
+### 14.1w What the preparation reads, a colleague's slides, slides that hold (0.9.7)
+
+**What is read, in order.** On every way the preparation now takes, first and whole, the call context, the deck
+and the files you add; then the project config, the decisions, the Current State page and the 14-day digest; then the
+previous calls of the meeting; then the files of a folder you add: those dated in the last 14 days (the date in the
+file name counts first) or naming the call (its title, the people, the words of your call context), the best match
+first, then the rest by match and date. Archived and hidden folders, prep runs, generated call files (transcripts,
+logs) and older versions of a document (`-v2` next to `-v3`) are left out. A source that does not fit is compressed
+section by section, every heading kept, with a mark the model sees; nothing is cut silently. ChatGPT, OpenAI and Gemini
+get 280,000 characters, the local model 120,000. Claude reads by itself, as before.
+
+**What was read, under the brief's title.** One line on every way: "Preparation context: 18 in full, 3 compressed,
+40 skipped (budget), 460 excluded by filters, deck: used". Warnings follow when a file you added was compressed or (on
+Claude) not opened, when recent files about the call did not fit, or when a presentation's deck did not reach the
+preparation. The whole list is in `<call>.context.json`, the counts in `prep.json` (`context`).
+
+**A colleague's slides are your backup.** With a deck, every way writes the slide talk, and every slide gets its text,
+numbers and likely questions, your colleague's too. During the colleague's block the tips window shows "Take this
+slide"; a click opens their text. No cards come from it.
+
+**Slides hold.** A slide you set by hand (Previous / Next, the rail, the shortcuts) or Keynote / PowerPoint holds for
+90 seconds. The other side's words move only one step forward, into a colleague's section right after the current one;
+they never pull you back into a colleague's block.
+
+**On the call.** A card for the other side does not fire when the speaker is marked as your team. An agenda item that
+was discussed but not decided shows "raised, not decided" instead of "not raised". Whisper gets the names and product
+terms of the brief besides the participants' names.
+
+**Presentation mode, as in 0.7.5 (owner, 11.11).** One window by default: the current slide on top (its number,
+title and countdown, the controls, the time bar and what to say), the tips below as on any call. **Expand** makes the
+window twice as wide with the slide cards beside the tips (one card per slide, the scroll snaps); **One window** goes
+back, and the choice is kept. The controls are the 0.7.5 ones: **Start / Pause**, **◀ ▶**, **Auto** (the slides turn by
+the schedule with a beep, 10 s warning), **Trim** (hides "can skip" paragraphs), **Sound**, **Reset**, **My slides /
+All slides**, the talk minutes (the slide budgets scale to them), **⇄** to swap the sides when expanded. The time bar
+has one segment per slide (a colleague's striped) and a marker where you should be; a click on a segment moves there.
+Chips show on schedule, ahead or behind and the words a minute the rest of the slide needs. After the last slide a
+table compares plan and actual. The window keeps its own clock; Keynote or PowerPoint still move it, the speech no
+longer does and "Move to slide N?" is gone. Every move goes to the recorder, so the handoff card, the facts and the
+time advice follow the window.
+
+**The talk is your speech (owner, 11.11).** A new skill module, `references/talk.md`, says how the text of every
+slide is written: in the first person, as you say it to this audience, the point first, numbers said in sentences, a
+bridge to the next slide, about 2 words per second of the slide's budget, never "this slide shows". Claude's
+preparation reads it; ChatGPT, OpenAI and Gemini get it in the talk prompt as it is. A colleague's slides are written
+the same way, so you can say them word for word.
+
+**Decks read as the show plays (capacity check, 11.11).** PowerPoint slides follow the order of the presentation, not
+the file names (a moved slide used to keep its old number), hidden slides are left out and Keynote / PowerPoint sync
+skips them, and the speaker notes of each slide reach the preparation. A text plan is cut on one heading level only:
+"Slide N" lines when there are any, else the level used most often (a single "# Talk title" above is the title), so a
+"###" inside a slide's text no longer becomes a slide. A folder-only preparation passes up to 8 speech documents to
+the talk (was 3). A deck of more than 30 slides is written by Claude in passes of 20. There is no limit on the number of
+slides; above 60 it is not tested.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the
@@ -2057,7 +2122,9 @@ address", `references/sweep.md`, `references/presentation.md`).
    speaking?" waits for 15 s of speech. Questions to anyone still get a tip when the context answers them.
 28. **Asks remember.** The ask field keeps the earlier asks of the call, so "more detail" builds on the
    last answer. "Where is my speech?" shows the speech; "add X to the speech" rewrites the speech card
-   in place.
+   in place. Any text in the window can be selected and copied (Command-C), for example to paste a line into
+   the ask field and comment on it; while you select, a new tip waits up to 20 s instead of redrawing the window. On the
+   call page the title and every text can be selected too.
 29. **Red is for you only.** A red tip means you were addressed (by name or "you"), a new request,
    your own commitment, or an open question to you; an answer to a question asked to the room comes in
    orange. The same answer in other words within 10 minutes is not shown again.
@@ -2070,6 +2137,8 @@ address", `references/sweep.md`, `references/presentation.md`).
    shows one button, its progress (stages from Claude Code's own events: instructions, sources with a
    file count, brief, cards, facts, check) and the cost when it is done. A prep made in the morning for
    an evening call counts as fresh: its age runs from the call time in its name.
+   On the ChatGPT account (since 2026-11-11) the progress is a step of four and a clock, "Waiting for
+   ChatGPT: the brief, step 1 of 4 · 2:40": the account sends each part whole, after a few minutes.
 32. **End call always ends.** End call reads the recorder's own state, so it stops the call even after
    the app was restarted during it, and then writes the Notion page as usual.
 33. **Two people, one initial.** When two participants share a short form ("Anna K."), both keep their
@@ -2366,6 +2435,6 @@ first gist and final write are engine events, not proof of a screen paint.
 
 ### Floating call controls
 
-During a call, a narrow vertical strip stays above other windows. On top is the Pacenote mark: its dot is green while Pacenote transcribes, orange when the transcription is paused and red while the call is recorded; hover it to see the call's name. Below are Home, Tips, pause/resume transcription, Record and End call. Record is one button with a menu: record the sound and screen or the sound only; while recording, pause or resume, record another window or screen, stop only the recording (the call goes on) or end the call and save. The running time is shown only in the tips window, not in the strip or the menu bar. Drag the strip to move it; its position is remembered. Disable it in Settings > General > Show floating call controls, or right-click the mark. During a call the menu bar shows only the icon: the P stays as it is and only its small dot turns red. macOS controls menu bar order; hold Command and drag the icon to the right to keep it within reach.
+During a call, a narrow vertical strip stays above other windows. On top is the Pacenote mark: its dot is green while Pacenote transcribes, orange when the transcription is paused and red while the call is recorded; hover it to see the call's name. Below are Home, Tips, pause/resume transcription, microphone off/on, Record and End call. Record is one button with a menu: record the sound and screen or the sound only; while recording, pause or resume, record another window or screen, stop only the recording (the call goes on) or end the call and save. The running time is shown only in the tips window, not in the strip or the menu bar. Drag the strip to move it; its position is remembered. Disable it in Settings > General > Show floating call controls, or right-click the mark. During a call the menu bar shows only the icon: the P stays as it is and only its small dot turns red. macOS controls menu bar order; hold Command and drag the icon to the right to keep it within reach.
 
 Before you start listening, the tips window has a Record this call card: Off, Sound, or Sound and screen. For the screen it shows exactly what will be recorded (a small picture, the app, the window and its size); Change opens What to record. The recording then starts together with Start listening. In What to record, pick a window or a screen on the left; the right side shows a live picture of it with its size, and Show on screen draws a blue frame with the name around the real window for a moment, so two similar windows (two Chrome tabs) are easy to tell apart. The frame is never recorded.

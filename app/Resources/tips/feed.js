@@ -227,7 +227,8 @@
           const done = typeof x === 'string' ? /^\s*\u2713/.test(x) : !!(x && x.done);
           const full = typeof x === 'object' && x && x.full ? clean(String(x.full)) : text;   // 2026-11-02: the whole item on a click
           const skip = typeof x === 'object' && x && x.state === 'skip';
-          return { id: (x && x.id) || 'a' + i, title: text, full, done, skip, cur: typeof x === 'object' && x && !!x.cur };
+          const raised = typeof x === 'object' && x && x.state === 'raised';   // 0.9.7: discussed, not decided
+          return { id: (x && x.id) || 'a' + i, title: text, full, done, skip, raised, cur: typeof x === 'object' && x && !!x.cur };
         });
         return true;
       case 'commitment_done': {
@@ -370,7 +371,7 @@
     if (cur < 0) cur = src.findIndex((a) => !a.done);
     return src.map((a, i) => {
       const manual = this.agendaManual[a.id];
-      return { id: a.id, title: a.title, full: a.full || a.title, state: manual || (a.skip ? 'skip' : a.done ? 'done' : i === cur ? 'now' : 'todo') };
+      return { id: a.id, title: a.title, full: a.full || a.title, state: manual || (a.skip ? 'skip' : a.done ? 'done' : i === cur ? 'now' : a.raised ? 'raised' : 'todo') };
     });
   };
 
@@ -382,7 +383,9 @@
         return { n: +sl.n || i + 1, title: clean(sl.title), say: body.filter((b) => (typeof b === 'string') || b.k === 'p').map((b) => clean(typeof b === 'string' ? b : b.t)).filter(Boolean),
                  secs: +sl.sec || 0, canSkip: sl.skip === true || body.some((b) => b.k === 's'), who, speaker: clean(sl.speaker),
                  numbers: (sl.numbers || []).map(clean).filter(Boolean), short: clean(sl.short),
-                 qa: (sl.qa || []).filter((x) => x && x.q).map((x) => ({ q: clean(x.q), a: clean(x.a) })) };
+                 qa: (sl.qa || []).filter((x) => x && x.q).map((x) => ({ q: clean(x.q), a: clean(x.a) })),
+                 // 0.9.7: the whole talk with its kinds (p said, s can skip, h a note, c a question) for the slide cards
+                 body: body.map((b) => typeof b === 'string' ? { k: 'p', t: clean(b) } : { k: ['p', 's', 'h', 'c'].includes(b && b.k) ? b.k : 'p', t: clean(b && b.t) }).filter((b) => b.t) };
       });
     }
     if (this.outline && this.outline.length) {
@@ -599,6 +602,7 @@
       transcript: this.transcript.slice(-400),
       brief: this.brief, briefText: this.briefText,
       steps,
+      deckMeta: { talkMin: this.slides && +this.slides.talk_min || 0, qaMin: this.slides && +this.slides.qa_min || 0 },
       toast: this.toast || null
     };
   };

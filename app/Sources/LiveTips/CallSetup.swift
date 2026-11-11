@@ -373,7 +373,7 @@ struct CallSetupView: View {
         HStack(alignment: .center, spacing: 10) {
             if runner.running && runner.callID == model.id {
                 ProgressView(value: runner.progress).frame(width: 60)
-                Text(L("call.brief.writing", ["stage": runner.stage.lowercased()])).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(1)
+                Text(L("call.brief.writing", ["stage": runner.stage.prefix(1).lowercased() + runner.stage.dropFirst()])).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(1)   // 2026-11-11: keeps "ChatGPT"
                 Spacer()
                 Button(L("call.stop")) { runner.cancel() }.buttonStyle(.pnTertiary)
             } else if st == .queued {

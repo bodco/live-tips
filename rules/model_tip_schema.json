@@ -57,6 +57,11 @@
           "type": "string",
           "maxLength": 160,
           "description": "What in this tip was not said aloud yet (2026-10-23)."
+        },
+        "search": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "2026-11-10: what the project folder should be searched for, in the model's words, when the context does not hold what the PM needs"
         }
       },
       "required": [
@@ -75,6 +80,11 @@
         "reason": {
           "type": "string",
           "maxLength": 1000
+        },
+        "search": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "2026-11-10: what the project folder should be searched for, in the model's words, when the context does not hold what the PM needs"
         }
       },
       "required": [

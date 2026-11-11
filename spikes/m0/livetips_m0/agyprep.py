@@ -14,6 +14,7 @@ from .codexprep import Preparation
 class AgyPreparation(Preparation):
     label = "Gemini account"
     head_route = "Gemini account through Antigravity CLI"
+    route = "agy"      # 0.9.7: the pack budget (prepcontext.BUDGETS)
 
 
 def main(argv=None):
@@ -29,6 +30,9 @@ def main(argv=None):
             raise RuntimeError("Antigravity CLI is not installed: see Settings > AI > Gemini")
         preparation = AgyPreparation(request, AgyProvider(cli, timeout=300, model=model))
         result["sources"] = preparation.run()
+        result["context_summary"] = preparation.summary      # the manifest is in <base>.context.json   # 0.9.7
+        if preparation.slides_error:
+            result["slides_error"] = preparation.slides_error
         result["tokens"] = preparation.tokens
         result["ok"] = True
     except Exception as error:  # noqa: BLE001  the app restores the previous files on failure

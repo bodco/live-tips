@@ -259,6 +259,7 @@ struct CalendarsPane: View {
     @State private var accountsOpen = false
     @State private var remembered = SeriesMemory.shared.count
     @AppStorage(AutoStart.defaultsKey) private var autoSuggest = true
+    @AppStorage(MeetingEndWatch.defaultsKey) private var meetEndStop = true
     @AppStorage(MeetingLauncher.enabledKey) private var openMeeting = true
     @State private var launches = MeetingLauncher.shared.rememberedCount
 
@@ -306,6 +307,7 @@ struct CalendarsPane: View {
                 Section {
                     // Pacenote 0.8 (idea 08): a quiet offer to start tips when a meeting app is on at a calendar call.
                     Toggle(L("auto.setting"), isOn: $autoSuggest).help(L("auto.settingHelp"))
+                    Toggle(L("meetend.setting"), isOn: $meetEndStop).help(L("meetend.settingHelp"))   // 2026-11-10 (owner)
                     // 0.9.6 (owner): Start call also opens the meeting (MeetingLauncher)
                     Toggle(L("launch.setting"), isOn: $openMeeting).help(L("launch.settingHelp"))
                     HStack {

@@ -981,6 +981,10 @@ extension PrompterController {
                     PrepDocWindow.show(path: p, title: m.effectiveTitle)
                 }
             }
+        case "split":
+            // 0.9.7 (owner, 11.11): "Expand" in presentation mode: slide cards and tips side by side, the window twice
+            // as wide (as in 0.7.5); "Collapse" goes back. {"on": Bool, "grow": "left" | "right"}.
+            handle("split", ["on": d["on"] as? Bool ?? false, "grow": d["grow"] as? String ?? "left"] as [String: Any])
         case "presenting":
             presentingNow = d["on"] as? Bool ?? false
             HotKeys.shared.setPresenting(presentingNow)
@@ -991,6 +995,10 @@ extension PrompterController {
             push("window.LiveTips && LiveTips.setFollow(null)")
         case "attach-deck":
             attachDeckLive()
+        case "meetend":       // 2026-11-10 (owner): the meeting seems to have ended (MeetingEndWatch)
+            MainActor.assumeIsolated {
+                if (d["item"] as? String) == "stop" { MeetingEndWatch.shared.stopNow() } else { MeetingEndWatch.shared.keepRecording() }
+            }
         case "sys":
             // 0.8.5 (P8; rules/recording.yaml): one action per state.
             if (d["item"] as? String) == "check" {
@@ -999,7 +1007,9 @@ extension PrompterController {
         case "menu":
             switch d["item"] as? String ?? "" {
             case "clear-speakers": sendSetting("speakers_clear", true)
-            case "home": MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.openHome() }   // 2026-11-03 (owner): Home from the call window
+            case "home":    // 2026-11-03 (owner): Home from the call window; 2026-11-10 (owner): it replaces the tips window
+                MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.openHome() }
+                window.close()           // the call goes on; Tips in the floating controls or the menu bar opens it again
             case "settings": MainActor.assumeIsolated { CallSettingsWindow.show(for: self) }
             case "switch-call":
                 MainActor.assumeIsolated {

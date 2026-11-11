@@ -10,7 +10,14 @@ import LiveTipsCore
 // Prepare gets the slide texts and writes <base>.slides.json, the app then sets who presents each slide from the
 // owners chosen here. Nothing about the deck is sent anywhere but to Prepare.
 
-struct DeckSlide: Codable, Hashable { var n: Int; var title: String; var text: String }
+struct DeckSlide: Codable, Hashable {
+    var n: Int; var title: String; var text: String
+    /// 0.9.7: the PowerPoint speaker notes of the slide (notesSlideN.xml), when it has them.
+    var notes: String? = nil
+    /// 0.9.7: the slide's position in the PowerPoint file counting hidden slides (what PowerPoint and Keynote report
+    /// during the show); nil when it equals n.
+    var src: Int? = nil
+}
 
 struct DeckInfo: Codable, Equatable {
     var file: String
@@ -134,6 +141,9 @@ enum DeckReader {
     }
 
     /// PowerPoint text without PowerPoint: the slide XML inside the .pptx (a zip).
+    /// 0.9.7: slides in the order of presentation.xml (not by file name: a moved slide keeps its old file), hidden
+    /// slides left out as in the show (their position is kept in `src` for Keynote / PowerPoint sync), and the speaker
+    /// notes of each slide read from its notes page.
     static func pptxText(_ path: String) throws -> [DeckSlide] {
         func unzip(_ args: [String]) -> String {
             let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/unzip"); p.arguments = args
@@ -142,23 +152,26 @@ enum DeckReader {
             let d = o.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
             return String(data: d, encoding: .utf8) ?? ""
         }
-        func num(_ s: String) -> Int { Int(s.filter { $0.isNumber }) ?? 0 }
         let all: [String] = unzip(["-Z1", path]).split(separator: "\n").map { String($0) }
-        let found: [String] = all.filter { $0.range(of: "^ppt/slides/slide[0-9]+\\.xml$", options: .regularExpression) != nil }
-        let names: [String] = found.sorted { num($0) < num($1) }
-        guard !names.isEmpty else { throw DeckError.unreadable(path) }
-        return names.enumerated().map { i, name in
+        let order = PptxOrder.slideFiles(files: all, presentation: unzip(["-p", path, "ppt/presentation.xml"]),
+                                         rels: unzip(["-p", path, "ppt/_rels/presentation.xml.rels"]))
+        guard !order.isEmpty else { throw DeckError.unreadable(path) }
+        var out: [DeckSlide] = []
+        for (pos, name) in order.enumerated() {
             let xml = unzip(["-p", path, name])
-            let paras = xml.components(separatedBy: "</a:p>").map { p -> String in
-                var t = "", rest = Substring(p)
-                while let a = rest.range(of: "<a:t>"), let b = rest[a.upperBound...].range(of: "</a:t>") {
-                    t += rest[a.upperBound..<b.lowerBound]; rest = rest[b.upperBound...]
-                }
-                return t.replacingOccurrences(of: "&amp;", with: "&").replacingOccurrences(of: "&lt;", with: "<")
-                    .replacingOccurrences(of: "&gt;", with: ">").replacingOccurrences(of: "&quot;", with: "\"").trimmingCharacters(in: .whitespaces)
-            }.filter { !$0.isEmpty }
-            return DeckSlide(n: i + 1, title: String((paras.first ?? "").prefix(120)), text: paras.dropFirst().joined(separator: "\n"))
+            if PptxOrder.hidden(xml) { continue }
+            let paras = PptxOrder.paragraphs(xml)
+            let file = (name as NSString).lastPathComponent
+            let rels = unzip(["-p", path, "ppt/slides/_rels/\(file).rels"])
+            var notes = ""
+            if let target = PptxOrder.notesTarget(rels) {
+                notes = PptxOrder.notesText(unzip(["-p", path, "ppt/notesSlides/" + (target as NSString).lastPathComponent]))
+            }
+            let n = out.count + 1
+            out.append(DeckSlide(n: n, title: String((paras.first ?? "").prefix(120)), text: paras.dropFirst().joined(separator: "\n"),
+                                 notes: notes.isEmpty ? nil : notes, src: pos + 1 == n ? nil : pos + 1))
         }
+        return out
     }
 
     /// Keynote opens .key and .pptx and exports a PDF (Automation permission is asked the first time).
@@ -169,7 +182,11 @@ enum DeckReader {
         let src = """
         tell application "Keynote"
           set d to open POSIX file "\(esc(path))"
-          export d to POSIX file "\(esc(out))" as PDF
+          try
+            export d to POSIX file "\(esc(out))" as PDF with properties {skipped slides:false}
+          on error
+            export d to POSIX file "\(esc(out))" as PDF
+          end try
           close d saving no
         end tell
         """
@@ -179,21 +196,10 @@ enum DeckReader {
     }
 
     /// A text outline or a pasted talk: "# Title" / "## Title" / "Slide 3: Title" lines or "---" start a slide;
-    /// without any of them, blank lines do.
+    /// without any of them, blank lines do. 0.9.7: only one heading level starts a slide (before: every #, ## and ###,
+    /// so a subheading inside a slide's text became a slide of its own), see `PptxOrder.outlineLevel`.
     static func outline(_ text: String) -> [DeckSlide] {
-        let lines = text.components(separatedBy: .newlines)
-        let head = "^(#{1,3}\\s+|(slide|слайд)\\s*[0-9]+[:.)]?\\s*)"
-        let marked = lines.contains { $0.range(of: head, options: [.regularExpression, .caseInsensitive]) != nil || $0.trimmingCharacters(in: .whitespaces) == "---" }
-        var blocks: [[String]] = [], cur: [String] = []
-        for l in lines {
-            let t = l.trimmingCharacters(in: .whitespaces)
-            let starts = marked ? (t == "---" || t.range(of: head, options: [.regularExpression, .caseInsensitive]) != nil) : t.isEmpty
-            if starts { if !cur.isEmpty { blocks.append(cur) }; cur = [] }
-            if t == "---" || t.isEmpty { continue }
-            cur.append(t.replacingOccurrences(of: head, with: "", options: [.regularExpression, .caseInsensitive]))
-        }
-        if !cur.isEmpty { blocks.append(cur) }
-        return blocks.enumerated().map { DeckSlide(n: $0.offset + 1, title: String($0.element[0].prefix(120)), text: $0.element.dropFirst().joined(separator: "\n")) }
+        PptxOrder.outlineBlocks(text).enumerated().map { DeckSlide(n: $0.offset + 1, title: $0.element.title, text: $0.element.text) }
     }
 }
 
@@ -614,10 +620,13 @@ enum TalkFiles {
         \(base).deck.json: read that file, not the deck itself. Also write \(base).slides.json as \
         references/presentation.md says (items 8 and 8a): one entry per deck slide, n = the deck slide number, the title \
         from the deck. Who presents (set by the PM, keep it): \(owners). Slide budgets `sec`: all slides together fit the \
-        talk time of \(d.talkMin) min (a \(d.duration) min call minus \(d.qaOn ? d.qaMin : 0) min of Q&A at the end); a \
-        colleague's slides get a budget and no talk text. On the PM's slides: what to say, the numbers, 1-2 likely \
-        questions with answers, a `short` one sentence each, and `"skip": true` on the 1-3 slides that matter least for \
-        the goal of the call. Top level: "talk_min": \(d.talkMin), "qa_min": \(d.qaOn ? d.qaMin : 0).
+        talk time of \(d.talkMin) min (a \(d.duration) min call minus \(d.qaOn ? d.qaMin : 0) min of Q&A at the end). \
+        On EVERY slide, a colleague's too: what to say (`body`, written by references/talk.md: the PM's own speech in the \
+        first person, never a retelling of the slide, sized to its `sec`; taken from the speech documents when they have \
+        the slide, else from the deck text and its speaker `notes`), the numbers, 1-2 likely questions with answers and a `short` one sentence; a \
+        colleague's slides are the PM's backup when the colleague drops out (0.9.7, rules/presentation.yaml > backup). \
+        `"skip": true` on the 1-3 PM slides that matter least for the goal of the call. Top level: "talk_min": \(d.talkMin), "qa_min": \(d.qaOn ? d.qaMin : 0). \
+        \(info.slides.count > 30 ? "The deck is long: write slides.json in passes of 20 slides (write the first 20, then add the next 20 with Edit), so one answer stays short." : "")
         \(edited.isEmpty || !d.keepEdits ? "" : "The PM edited slides \(TalkMerge.list(edited)) in the previous talk (\(base).slides.prev.json): they stay as they are, write the others.")
         """
     }

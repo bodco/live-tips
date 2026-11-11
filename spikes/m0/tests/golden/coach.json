@@ -45,7 +45,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 64\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 25\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -85,7 +85,7 @@
 "input": 100,
 "line_id": 4,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -93,7 +93,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 87\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 55\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -120,7 +120,7 @@
 "input": 100,
 "line_id": 5,
 "model": "fake-sonnet",
-"output": 36,
+"output": 8,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -128,7 +128,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 30\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
 "usd": null
 },
 {
@@ -155,7 +155,7 @@
 "input": 100,
 "line_id": 6,
 "model": "fake-sonnet",
-"output": 8,
+"output": 3,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -163,7 +163,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"text_head": "not json at all",
 "usd": null
 },
 {
@@ -190,7 +190,7 @@
 "input": 100,
 "line_id": 7,
 "model": "fake-sonnet",
-"output": 38,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -198,7 +198,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 94\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 77\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -233,7 +233,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 70\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 90\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -260,7 +260,7 @@
 "input": 100,
 "line_id": 9,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -268,7 +268,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 70\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 45\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -334,7 +334,7 @@
 "input": 100,
 "line_id": 13,
 "model": "fake-sonnet",
-"output": 36,
+"output": 3,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -342,7 +342,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 61\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "not json at all",
 "usd": null
 },
 {
@@ -369,7 +369,7 @@
 "input": 100,
 "line_id": 14,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -377,7 +377,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 55\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 62\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -438,7 +438,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 6\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 17\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -465,7 +465,7 @@
 "input": 100,
 "line_id": 20,
 "model": "fake-sonnet",
-"output": 3,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -473,7 +473,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "not json at all",
+"text_head": "{\"gist\": \"Tip 15\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -500,7 +500,7 @@
 "input": 100,
 "line_id": 21,
 "model": "fake-sonnet",
-"output": 38,
+"output": 3,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -508,7 +508,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 56\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "not json at all",
 "usd": null
 },
 {
@@ -535,7 +535,7 @@
 "input": 100,
 "line_id": 22,
 "model": "fake-sonnet",
-"output": 36,
+"output": 38,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -543,7 +543,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 64\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 34\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -557,7 +557,7 @@
 "input": 100,
 "line_id": 22,
 "model": "fake-sonnet",
-"output": 37,
+"output": 3,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -565,7 +565,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 13\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "not json at all",
 "usd": null
 },
 {
@@ -600,7 +600,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 89\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 86\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -635,7 +635,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"need_tip\": true, \"level\": \"info\", \"trigger\": \"your_turn\", \"topic\": \"topic 3\", \"reason\": \"scripted\"}",
+"text_head": "{\"need_tip\": true, \"level\": \"orange\", \"trigger\": \"add_fact\", \"topic\": \"topic 4\", \"reason\": \"scripted\"}",
 "usd": null
 },
 {
@@ -649,7 +649,7 @@
 "input": 100,
 "line_id": 25,
 "model": "fake-sonnet",
-"output": 38,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -657,7 +657,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 43\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 2\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -710,7 +710,7 @@
 "input": 100,
 "line_id": 29,
 "model": "fake-haiku",
-"output": 27,
+"output": 25,
 "reasoning": null,
 "retried": null,
 "role": "classify",
@@ -718,7 +718,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"need_tip\": true, \"level\": \"orange\", \"trigger\": \"new_requirement\", \"topic\": \"topic 2\", \"reason\": \"scripted\"}",
+"text_head": "{\"need_tip\": true, \"level\": \"orange\", \"trigger\": \"add_fact\", \"topic\": \"topic 1\", \"reason\": \"scripted\"}",
 "usd": null
 },
 {
@@ -732,7 +732,7 @@
 "input": 100,
 "line_id": 29,
 "model": "fake-sonnet",
-"output": 37,
+"output": 8,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -740,7 +740,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 90\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
 "usd": null
 },
 {
@@ -780,7 +780,7 @@
 "input": 100,
 "line_id": 31,
 "model": "fake-sonnet",
-"output": 36,
+"output": 38,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -788,7 +788,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 42\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 43\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -871,7 +871,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 70\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 49\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -919,7 +919,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 62\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 10\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -959,7 +959,7 @@
 "input": 100,
 "line_id": 40,
 "model": "fake-haiku",
-"output": 26,
+"output": 25,
 "reasoning": null,
 "retried": null,
 "role": "classify",
@@ -967,7 +967,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"need_tip\": true, \"level\": \"red\", \"trigger\": \"pm_commitment\", \"topic\": \"topic 1\", \"reason\": \"scripted\"}",
+"text_head": "{\"need_tip\": true, \"level\": \"info\", \"trigger\": \"your_turn\", \"topic\": \"topic 3\", \"reason\": \"scripted\"}",
 "usd": null
 },
 {
@@ -981,7 +981,7 @@
 "input": 100,
 "line_id": 40,
 "model": "fake-sonnet",
-"output": 36,
+"output": 8,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -989,7 +989,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 44\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
 "usd": null
 },
 {
@@ -1003,7 +1003,7 @@
 "input": 100,
 "line_id": 40,
 "model": "fake-sonnet",
-"output": 38,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1011,7 +1011,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 39\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 33\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1047,7 +1047,7 @@
 "input": 100,
 "line_id": 41,
 "model": "fake-haiku",
-"output": 25,
+"output": 24,
 "reasoning": null,
 "retried": null,
 "role": "classify",
@@ -1055,7 +1055,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"need_tip\": true, \"level\": \"orange\", \"trigger\": \"add_fact\", \"topic\": \"topic 1\", \"reason\": \"scripted\"}",
+"text_head": "{\"need_tip\": false, \"level\": \"info\", \"trigger\": \"none\", \"topic\": \"topic 3\", \"reason\": \"scripted\"}",
 "usd": null
 },
 {
@@ -1156,7 +1156,7 @@
 "input": 100,
 "line_id": 48,
 "model": "fake-sonnet",
-"output": 38,
+"output": 8,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1164,7 +1164,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 33\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
 "usd": null
 },
 {
@@ -1199,7 +1199,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 96\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 23\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1252,7 +1252,7 @@
 "input": 100,
 "line_id": 55,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1260,7 +1260,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 75\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 77\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1287,7 +1287,7 @@
 "input": 100,
 "line_id": 57,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1295,7 +1295,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 18\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 85\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1330,7 +1330,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 61\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 69\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1370,7 +1370,7 @@
 "input": 100,
 "line_id": 60,
 "model": "fake-sonnet",
-"output": 8,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1378,7 +1378,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"text_head": "{\"gist\": \"Tip 79\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1392,7 +1392,7 @@
 "input": 100,
 "line_id": 60,
 "model": "fake-sonnet",
-"output": 37,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1400,7 +1400,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 49\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 80\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1461,7 +1461,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 86\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 96\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1558,7 +1558,7 @@
 "input": 100,
 "line_id": 68,
 "model": "fake-sonnet",
-"output": 37,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1566,7 +1566,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 95\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 4\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1606,7 +1606,7 @@
 "input": 100,
 "line_id": 70,
 "model": "fake-sonnet",
-"output": 36,
+"output": 3,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1614,7 +1614,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 80\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "not json at all",
 "usd": null
 },
 {
@@ -1641,7 +1641,7 @@
 "input": 100,
 "line_id": 71,
 "model": "fake-sonnet",
-"output": 37,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1649,7 +1649,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 0\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 79\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1689,7 +1689,7 @@
 "input": 100,
 "line_id": 73,
 "model": "fake-sonnet",
-"output": 37,
+"output": 3,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1697,7 +1697,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 80\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "not json at all",
 "usd": null
 },
 {
@@ -1732,7 +1732,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 77\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 79\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1832,7 +1832,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 11\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 69\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1859,7 +1859,7 @@
 "input": 100,
 "line_id": 84,
 "model": "fake-sonnet",
-"output": 3,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1867,7 +1867,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "not json at all",
+"text_head": "{\"gist\": \"Tip 55\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1902,7 +1902,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 12\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 15\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1937,7 +1937,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 0\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 57\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 }
 ],
@@ -1952,7 +1952,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "f1afd92647f2"
+"user_sha": "3f602556291f"
 },
 {
 "model": "fake-haiku",
@@ -1964,7 +1964,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "7cd25c1e94f0"
+"user_sha": "d56ab891d275"
 },
 {
 "model": "fake-haiku",
@@ -1972,7 +1972,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "7844448029d1"
+"user_sha": "e8bd798fd98b"
 },
 {
 "model": "fake-haiku",
@@ -1980,7 +1980,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "eb2784e5727a"
+"user_sha": "2303acaef445"
 },
 {
 "model": "fake-haiku",
@@ -1988,7 +1988,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "abbc65bda195"
+"user_sha": "22989ace72db"
 },
 {
 "model": "fake-haiku",
@@ -1996,7 +1996,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "8196ab8a277b"
+"user_sha": "1f941f848f3a"
 },
 {
 "model": "fake-haiku",
@@ -2004,7 +2004,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "46d791f8e4db"
+"user_sha": "a7726e1264f3"
 },
 {
 "model": "fake-haiku",
@@ -2024,7 +2024,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "6ba3d74eb8ba"
+"user_sha": "70205a7a328f"
 },
 {
 "model": "fake-haiku",
@@ -2032,7 +2032,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "61d3ec64210a"
+"user_sha": "19ba1b416537"
 },
 {
 "model": "fake-haiku",
@@ -2048,7 +2048,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "879f3903459b"
+"user_sha": "8b49fc9e6eca"
 },
 {
 "model": "fake-haiku",
@@ -2056,7 +2056,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "58fddf67696d"
+"user_sha": "4d15ebf6e48b"
 },
 {
 "model": "fake-haiku",
@@ -2064,7 +2064,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "f798cdf335bb"
+"user_sha": "974d4ffe42eb"
 },
 {
 "model": "fake-haiku",
@@ -2072,11 +2072,11 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "ee05efd6d6db"
+"user_sha": "5a8b67c58254"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "3a1ca66355a1"
+"user_sha": "9f3c4b728279"
 },
 {
 "model": "fake-haiku",
@@ -2084,7 +2084,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "26177cfbcaba"
+"user_sha": "7ddb72fb5b35"
 },
 {
 "model": "fake-haiku",
@@ -2092,11 +2092,11 @@
 },
 {
 "model": "fake-haiku",
-"user_sha": "b1ce37c89920"
+"user_sha": "1ee1d2aed4ac"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "efb4db4789a4"
+"user_sha": "664fd4562967"
 },
 {
 "model": "fake-haiku",
@@ -2112,11 +2112,11 @@
 },
 {
 "model": "fake-haiku",
-"user_sha": "097573a1291e"
+"user_sha": "36862fce8f2c"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "14dabad13516"
+"user_sha": "aa0b74fdf4aa"
 },
 {
 "model": "fake-haiku",
@@ -2128,7 +2128,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "b3a782d2fd39"
+"user_sha": "7a53bda54b83"
 },
 {
 "model": "fake-haiku",
@@ -2140,7 +2140,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "a96e5ad24180"
+"user_sha": "59a72748e6d3"
 },
 {
 "model": "fake-haiku",
@@ -2148,7 +2148,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "1210d23cf847"
+"user_sha": "b50cfbe85370"
 },
 {
 "model": "fake-haiku",
@@ -2160,7 +2160,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "e0a1b1f9ed7a"
+"user_sha": "fb5961a73509"
 },
 {
 "model": "fake-haiku",
@@ -2172,15 +2172,15 @@
 },
 {
 "model": "fake-haiku",
-"user_sha": "b32cb232e8f6"
+"user_sha": "d9d08082b541"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "1213c428a58c"
+"user_sha": "d75707e25033"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "bc2f4d376f64"
+"user_sha": "bae39273d5c0"
 },
 {
 "model": "fake-haiku",
@@ -2188,11 +2188,11 @@
 },
 {
 "model": "fake-haiku",
-"user_sha": "4e7c89846253"
+"user_sha": "74acc977c711"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "4e75ac08bb82"
+"user_sha": "aa262425d35f"
 },
 {
 "model": "fake-haiku",
@@ -2216,7 +2216,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "30630d7b1889"
+"user_sha": "6c5e7452e416"
 },
 {
 "model": "fake-haiku",
@@ -2224,7 +2224,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "4c2668880dcc"
+"user_sha": "cc2fbab80f6c"
 },
 {
 "model": "fake-haiku",
@@ -2240,7 +2240,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "6757480a4a6e"
+"user_sha": "78eba182e494"
 },
 {
 "model": "fake-haiku",
@@ -2248,7 +2248,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "536d58da9264"
+"user_sha": "e19fd1fe8d47"
 },
 {
 "model": "fake-haiku",
@@ -2256,7 +2256,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "e053bd5be19d"
+"user_sha": "e0706dbabb50"
 },
 {
 "model": "fake-haiku",
@@ -2268,11 +2268,11 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "9c1f1589fec3"
+"user_sha": "39774773f4f1"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "24b6de33a27d"
+"user_sha": "0f307db873c5"
 },
 {
 "model": "fake-haiku",
@@ -2288,7 +2288,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "44b57ffb1c8d"
+"user_sha": "2c3cbf3de157"
 },
 {
 "model": "fake-haiku",
@@ -2300,11 +2300,11 @@
 },
 {
 "model": "fake-haiku",
-"user_sha": "9c62ceba2449"
+"user_sha": "e6b63114e3a7"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "7ddc2ca12648"
+"user_sha": "4120e78457a5"
 },
 {
 "model": "fake-haiku",
@@ -2312,7 +2312,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "e7af71ca8d60"
+"user_sha": "92c8c36e4905"
 },
 {
 "model": "fake-haiku",
@@ -2324,7 +2324,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "fc13a562e9bc"
+"user_sha": "b3805437f602"
 },
 {
 "model": "fake-haiku",
@@ -2332,7 +2332,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "5939147dce03"
+"user_sha": "ed01ed0ea484"
 },
 {
 "model": "fake-haiku",
@@ -2344,7 +2344,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "a82631e32f32"
+"user_sha": "a06ce717d299"
 },
 {
 "model": "fake-haiku",
@@ -2352,7 +2352,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "1b8633d68dea"
+"user_sha": "05e51770bd4e"
 },
 {
 "model": "fake-haiku",
@@ -2380,7 +2380,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "872fa8f9f12d"
+"user_sha": "712b170de8df"
 },
 {
 "model": "fake-haiku",
@@ -2388,7 +2388,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "0e035ccf5b75"
+"user_sha": "09ce9b04acd3"
 },
 {
 "model": "fake-haiku",
@@ -2396,7 +2396,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "8ddf4cab0d15"
+"user_sha": "0f9f414b7013"
 },
 {
 "model": "fake-haiku",
@@ -2404,7 +2404,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "5874917c1790"
+"user_sha": "fd8bc85c54ed"
 }
 ],
 "timing": [
@@ -2417,7 +2417,7 @@
 "emit_at": 36015.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 64",
+"gist": "Tip 25",
 "gist_at": 36015.0,
 "level": "red",
 "line_id": 1,
@@ -2440,15 +2440,21 @@
 {
 "available_at": 36042.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36042.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 87",
+"gist": "Tip 55",
 "gist_at": 36042.0,
+"level": "red",
 "line_id": 4,
 "meeting": "coach_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "emitted",
 "route": "direct",
 "seg_end": 36041.0,
+"shown_at": 36042.0,
 "signals": [
 "question"
 ],
@@ -2462,21 +2468,14 @@
 {
 "available_at": 36054.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36054.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 30",
-"gist_at": 36054.0,
-"level": "red",
 "line_id": 5,
 "meeting": "coach_question",
-"outcome": "emitted",
+"outcome": "skip",
+"reason": "nothing",
 "route": "direct",
 "seg_end": 36053.0,
-"shown_at": 36054.0,
 "signals": [
 "question",
 "second_person",
@@ -2504,15 +2503,21 @@
 {
 "available_at": 36081.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36081.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 94",
+"gist": "Tip 77",
 "gist_at": 36081.0,
+"level": "red",
 "line_id": 7,
 "meeting": "coach_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "emitted",
 "route": "direct",
 "seg_end": 36080.0,
+"shown_at": 36081.0,
 "signals": [
 "question",
 "second_person",
@@ -2528,21 +2533,15 @@
 {
 "available_at": 36093.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36093.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 70",
+"gist": "Tip 90",
 "gist_at": 36093.0,
-"level": "red",
 "line_id": 8,
 "meeting": "coach_question",
-"outcome": "emitted",
+"outcome": "diet_phrase_repeat",
 "route": "direct",
 "seg_end": 36092.0,
-"shown_at": 36093.0,
 "signals": [
 "question"
 ],
@@ -2556,15 +2555,21 @@
 {
 "available_at": 36099.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36099.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 70",
+"gist": "Tip 45",
 "gist_at": 36099.0,
+"level": "red",
 "line_id": 9,
 "meeting": "coach_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "emitted",
 "route": "direct",
 "seg_end": 36098.0,
+"shown_at": 36099.0,
 "signals": [
 "question",
 "second_person"
@@ -2579,13 +2584,12 @@
 {
 "available_at": 36145.0,
 "context_revision": 0,
+"error": null,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 61",
-"gist_at": 36145.0,
 "line_id": 13,
 "meeting": "coach_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "tip_invalid",
 "route": "direct",
 "seg_end": 36144.0,
 "signals": [
@@ -2617,7 +2621,7 @@
 "emit_at": 36203.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 6",
+"gist": "Tip 17",
 "gist_at": 36203.0,
 "level": "red",
 "line_id": 19,
@@ -2640,12 +2644,13 @@
 {
 "available_at": 36214.0,
 "context_revision": 0,
-"error": null,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
+"gist": "Tip 15",
+"gist_at": 36214.0,
 "line_id": 20,
 "meeting": "coach_question",
-"outcome": "tip_invalid",
+"outcome": "diet_phrase_repeat",
 "route": "direct",
 "seg_end": 36213.0,
 "signals": [
@@ -2662,21 +2667,14 @@
 {
 "available_at": 36227.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36227.0,
+"error": null,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 56",
-"gist_at": 36227.0,
-"level": "red",
 "line_id": 21,
 "meeting": "coach_question",
-"outcome": "emitted",
+"outcome": "tip_invalid",
 "route": "direct",
 "seg_end": 36226.0,
-"shown_at": 36227.0,
 "signals": [
 "question"
 ],
@@ -2690,15 +2688,21 @@
 {
 "available_at": 36236.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36236.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 64",
+"gist": "Tip 34",
 "gist_at": 36236.0,
+"level": "red",
 "line_id": 22,
 "meeting": "coach_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "emitted",
 "route": "direct",
 "seg_end": 36235.0,
+"shown_at": 36236.0,
 "signals": [
 "question"
 ],
@@ -2724,7 +2728,7 @@
 "context_revision": 0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 89",
+"gist": "Tip 86",
 "gist_at": 36241.0,
 "line_id": 23,
 "meeting": "coach_question",
@@ -2743,12 +2747,18 @@
 },
 {
 "available_at": 36259.0,
+"classify": {
+"level": "orange",
+"need_tip": true,
+"reason": "scripted",
+"topic": "topic 4",
+"trigger": "add_fact"
+},
 "classify_done": 36259.0,
 "classify_start": 36259.0,
-"error": null,
 "line_id": 25,
 "off": "your_turn",
-"outcome": "classify_invalid",
+"outcome": "classify_for_parallel",
 "route": "parallel",
 "seg_end": 36258.0,
 "signals": [
@@ -2765,7 +2775,7 @@
 {
 "available_at": 36259.0,
 "context_revision": 0,
-"gist": "Tip 43",
+"gist": "Tip 2",
 "gist_at": 36259.0,
 "line_id": 25,
 "off": "your_turn",
@@ -2791,8 +2801,8 @@
 "level": "orange",
 "need_tip": true,
 "reason": "scripted",
-"topic": "topic 2",
-"trigger": "new_requirement"
+"topic": "topic 1",
+"trigger": "add_fact"
 },
 "classify_done": 36299.0,
 "classify_start": 36299.0,
@@ -2815,19 +2825,12 @@
 {
 "available_at": 36299.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36299.0,
-"gist": "Tip 90",
-"gist_at": 36299.0,
-"level": "red",
 "line_id": 29,
 "off": "your_turn",
-"outcome": "emitted",
+"outcome": "skip",
+"reason": "nothing",
 "route": "parallel",
 "seg_end": 36298.0,
-"shown_at": 36299.0,
 "signals": [
 "second_person",
 "name_mention",
@@ -2850,7 +2853,7 @@
 "emit_at": 36320.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 42",
+"gist": "Tip 43",
 "gist_at": 36320.0,
 "level": "red",
 "line_id": 31,
@@ -2903,7 +2906,7 @@
 "emit_at": 36354.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 70",
+"gist": "Tip 49",
 "gist_at": 36354.0,
 "level": "red",
 "line_id": 35,
@@ -2927,7 +2930,7 @@
 "context_revision": 0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 62",
+"gist": "Tip 10",
 "gist_at": 36380.0,
 "line_id": 38,
 "meeting": "coach_question",
@@ -2947,18 +2950,12 @@
 },
 {
 "available_at": 36406.0,
-"classify": {
-"level": "red",
-"need_tip": true,
-"reason": "scripted",
-"topic": "topic 1",
-"trigger": "pm_commitment"
-},
 "classify_done": 36406.0,
 "classify_start": 36406.0,
+"error": null,
 "line_id": 40,
 "off": "your_turn",
-"outcome": "classify_for_parallel",
+"outcome": "classify_invalid",
 "route": "parallel",
 "seg_end": 36405.0,
 "signals": [
@@ -2975,19 +2972,12 @@
 {
 "available_at": 36406.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36406.0,
-"gist": "Tip 44",
-"gist_at": 36406.0,
-"level": "red",
 "line_id": 40,
 "off": "your_turn",
-"outcome": "emitted",
+"outcome": "skip",
+"reason": "nothing",
 "route": "parallel",
 "seg_end": 36405.0,
-"shown_at": 36406.0,
 "signals": [
 "second_person",
 "name_mention",
@@ -3014,18 +3004,12 @@
 },
 {
 "available_at": 36416.0,
-"classify": {
-"level": "orange",
-"need_tip": true,
-"reason": "scripted",
-"topic": "topic 1",
-"trigger": "add_fact"
-},
 "classify_done": 36416.0,
 "classify_start": 36416.0,
+"error": null,
 "line_id": 41,
 "off": "your_turn",
-"outcome": "classify_for_parallel",
+"outcome": "classify_invalid",
 "route": "parallel",
 "seg_end": 36415.0,
 "signals": [
@@ -3064,21 +3048,14 @@
 {
 "available_at": 36487.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36487.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 33",
-"gist_at": 36487.0,
-"level": "red",
 "line_id": 48,
 "meeting": "coach_question",
-"outcome": "emitted",
+"outcome": "skip",
+"reason": "nothing",
 "route": "direct",
 "seg_end": 36486.0,
-"shown_at": 36487.0,
 "signals": [
 "question"
 ],
@@ -3098,7 +3075,7 @@
 "emit_at": 36503.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 96",
+"gist": "Tip 23",
 "gist_at": 36503.0,
 "level": "red",
 "line_id": 50,
@@ -3120,21 +3097,15 @@
 {
 "available_at": 36534.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36534.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 75",
+"gist": "Tip 77",
 "gist_at": 36534.0,
-"level": "red",
 "line_id": 55,
 "meeting": "coach_question",
-"outcome": "emitted",
+"outcome": "diet_phrase_repeat",
 "route": "direct",
 "seg_end": 36533.0,
-"shown_at": 36534.0,
 "signals": [
 "question"
 ],
@@ -3148,15 +3119,21 @@
 {
 "available_at": 36549.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36549.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 18",
+"gist": "Tip 85",
 "gist_at": 36549.0,
+"level": "red",
 "line_id": 57,
 "meeting": "coach_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "emitted",
 "route": "direct",
 "seg_end": 36548.0,
+"shown_at": 36549.0,
 "signals": [
 "question",
 "second_person",
@@ -3176,7 +3153,7 @@
 "context_revision": 0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 61",
+"gist": "Tip 69",
 "gist_at": 36562.0,
 "line_id": 58,
 "meeting": "coach_question",
@@ -3202,10 +3179,11 @@
 "context_revision": 0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
+"gist": "Tip 79",
+"gist_at": 36584.0,
 "line_id": 60,
 "meeting": "coach_question",
-"outcome": "skip",
-"reason": "nothing",
+"outcome": "diet_phrase_repeat",
 "route": "direct",
 "seg_end": 36583.0,
 "signals": [
@@ -3240,7 +3218,7 @@
 "emit_at": 36628.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 86",
+"gist": "Tip 96",
 "gist_at": 36628.0,
 "level": "red",
 "line_id": 65,
@@ -3311,21 +3289,15 @@
 {
 "available_at": 36654.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36654.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 95",
+"gist": "Tip 4",
 "gist_at": 36654.0,
-"level": "red",
 "line_id": 68,
 "meeting": "coach_question",
-"outcome": "emitted",
+"outcome": "diet_phrase_repeat",
 "route": "direct",
 "seg_end": 36653.0,
-"shown_at": 36654.0,
 "signals": [
 "question"
 ],
@@ -3339,21 +3311,14 @@
 {
 "available_at": 36678.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36678.0,
+"error": null,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 80",
-"gist_at": 36678.0,
-"level": "red",
 "line_id": 70,
 "meeting": "coach_question",
-"outcome": "emitted",
+"outcome": "tip_invalid",
 "route": "direct",
 "seg_end": 36677.0,
-"shown_at": 36678.0,
 "signals": [
 "question"
 ],
@@ -3367,15 +3332,21 @@
 {
 "available_at": 36684.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36684.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 0",
+"gist": "Tip 79",
 "gist_at": 36684.0,
+"level": "red",
 "line_id": 71,
 "meeting": "coach_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "emitted",
 "route": "direct",
 "seg_end": 36683.0,
+"shown_at": 36684.0,
 "signals": [
 "question",
 "second_person"
@@ -3390,13 +3361,12 @@
 {
 "available_at": 36710.0,
 "context_revision": 0,
+"error": null,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 80",
-"gist_at": 36710.0,
 "line_id": 73,
 "meeting": "coach_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "tip_invalid",
 "route": "direct",
 "seg_end": 36709.0,
 "signals": [
@@ -3413,21 +3383,15 @@
 {
 "available_at": 36722.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36722.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 77",
+"gist": "Tip 79",
 "gist_at": 36722.0,
-"level": "red",
 "line_id": 74,
 "meeting": "coach_question",
-"outcome": "emitted",
+"outcome": "diet_phrase_repeat",
 "route": "direct",
 "seg_end": 36721.0,
-"shown_at": 36722.0,
 "signals": [
 "question",
 "name_mention",
@@ -3450,7 +3414,7 @@
 "emit_at": 36794.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 11",
+"gist": "Tip 69",
 "gist_at": 36794.0,
 "level": "red",
 "line_id": 83,
@@ -3472,12 +3436,13 @@
 {
 "available_at": 36800.0,
 "context_revision": 0,
-"error": null,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
+"gist": "Tip 55",
+"gist_at": 36800.0,
 "line_id": 84,
 "meeting": "coach_question",
-"outcome": "tip_invalid",
+"outcome": "diet_phrase_repeat",
 "route": "direct",
 "seg_end": 36799.0,
 "signals": [
@@ -3500,7 +3465,7 @@
 "emit_at": 36816.0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 12",
+"gist": "Tip 15",
 "gist_at": 36816.0,
 "level": "red",
 "line_id": 86,
@@ -3525,7 +3490,7 @@
 "context_revision": 0,
 "event": "Interview, role coach: the PM is being asked a question. Give ONE red tip: gist = what is asked, phrase = a ready opening sentence, items = situation, action, result with a number, only from the brief, the fact book or the cards. trigger direct_question.",
 "force_level": "red",
-"gist": "Tip 0",
+"gist": "Tip 57",
 "gist_at": 36824.0,
 "line_id": 88,
 "meeting": "coach_question",
@@ -3608,7 +3573,7 @@
 {
 "at": "10:00:15",
 "engine": "app",
-"gist": "Tip 64",
+"gist": "Tip 25",
 "kind": "tip",
 "level": "red",
 "partial": true,
@@ -3620,18 +3585,18 @@
 {
 "at": "10:00:15",
 "engine": "app",
-"gist": "Tip 64",
+"gist": "Tip 25",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "red",
-"phrase": "We ship it on Tuesday, 5 users.",
+"phrase": "We ship it on Tuesday, 6 users.",
 "schema_version": 1,
 "src": "10:00:11",
 "t": "10:00:15",
-"topic": "topic 1",
+"topic": "topic 2",
 "trigger": "direct_question",
 "uid": "a1-15000"
 },
@@ -3688,6 +3653,39 @@
 "topic": "release plan"
 },
 {
+"at": "10:00:42",
+"engine": "app",
+"gist": "Tip 55",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:00:38",
+"t": "10:00:42",
+"uid": "a4-42000"
+},
+{
+"at": "10:00:42",
+"engine": "app",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 55",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "red",
+"phrase": "We ship it on Tuesday, 0 users.",
+"schema_version": 1,
+"src": "10:00:38",
+"t": "10:00:42",
+"topic": "topic 3",
+"trigger": "direct_question",
+"uid": "a4-42000"
+},
+{
 "actions": [
 {
 "due": "Friday",
@@ -3712,36 +3710,6 @@
 "t": "10:00:54",
 "theirs": [],
 "topic": "release plan"
-},
-{
-"at": "10:00:54",
-"engine": "app",
-"gist": "Tip 30",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:00:50",
-"t": "10:00:54",
-"uid": "a5-54000"
-},
-{
-"at": "10:00:54",
-"engine": "app",
-"gist": "Tip 30",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 6 users.",
-"schema_version": 1,
-"src": "10:00:50",
-"t": "10:00:54",
-"topic": "topic 4",
-"trigger": "direct_question",
-"uid": "a5-54000"
 },
 {
 "actions": [
@@ -3816,21 +3784,21 @@
 "topic": "release plan"
 },
 {
-"at": "10:01:33",
+"at": "10:01:21",
 "engine": "app",
-"gist": "Tip 70",
+"gist": "Tip 77",
 "kind": "tip",
 "level": "red",
 "partial": true,
 "schema_version": 1,
-"src": "10:01:29",
-"t": "10:01:33",
-"uid": "a8-93000"
+"src": "10:01:17",
+"t": "10:01:21",
+"uid": "a7-81000"
 },
 {
-"at": "10:01:33",
+"at": "10:01:21",
 "engine": "app",
-"gist": "Tip 70",
+"gist": "Tip 77",
 "items": [
 "Review on Monday"
 ],
@@ -3839,11 +3807,11 @@
 "level": "red",
 "phrase": "We ship it on Tuesday, 3 users.",
 "schema_version": 1,
-"src": "10:01:29",
-"t": "10:01:33",
-"topic": "topic 3",
+"src": "10:01:17",
+"t": "10:01:21",
+"topic": "topic 1",
 "trigger": "direct_question",
-"uid": "a8-93000"
+"uid": "a7-81000"
 },
 {
 "actions": [
@@ -3870,6 +3838,36 @@
 "t": "10:01:39",
 "theirs": [],
 "topic": "release plan"
+},
+{
+"at": "10:01:39",
+"engine": "app",
+"gist": "Tip 45",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:01:35",
+"t": "10:01:39",
+"uid": "a9-99000"
+},
+{
+"at": "10:01:39",
+"engine": "app",
+"gist": "Tip 45",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "red",
+"phrase": "We ship it on Tuesday, 1 users.",
+"schema_version": 1,
+"src": "10:01:35",
+"t": "10:01:39",
+"topic": "topic 4",
+"trigger": "direct_question",
+"uid": "a9-99000"
 },
 {
 "actions": [
@@ -3978,13 +3976,13 @@
 {
 "at": "10:02:36",
 "engine": "app",
-"gist": "Tip 55",
+"gist": "Tip 62",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "level": "red",
-"phrase": "We ship it on Tuesday, 8 users.",
+"phrase": "We ship it on Tuesday, 6 users.",
 "schema_version": 1,
 "src": "10:02:36",
 "t": "10:02:36"
@@ -4078,7 +4076,7 @@
 {
 "at": "10:03:23",
 "engine": "app",
-"gist": "Tip 6",
+"gist": "Tip 17",
 "kind": "tip",
 "level": "red",
 "partial": true,
@@ -4090,43 +4088,7 @@
 {
 "at": "10:03:23",
 "engine": "app",
-"fact_ids": [
-"F1"
-],
-"gist": "Tip 6",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 3 users.",
-"schema_version": 1,
-"src": "10:03:19",
-"t": "10:03:23",
-"topic": "topic 4",
-"trigger": "direct_question",
-"uid": "a19-203000"
-},
-{
-"at": "10:03:47",
-"engine": "app",
-"gist": "Tip 56",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:03:43",
-"t": "10:03:47",
-"uid": "a21-227000"
-},
-{
-"at": "10:03:47",
-"engine": "app",
-"fact_ids": [
-"F1"
-],
-"gist": "Tip 56",
+"gist": "Tip 17",
 "items": [
 "Review on Monday"
 ],
@@ -4135,11 +4097,11 @@
 "level": "red",
 "phrase": "We ship it on Tuesday, 7 users.",
 "schema_version": 1,
-"src": "10:03:43",
-"t": "10:03:47",
+"src": "10:03:19",
+"t": "10:03:23",
 "topic": "topic 2",
 "trigger": "direct_question",
-"uid": "a21-227000"
+"uid": "a19-203000"
 },
 {
 "actions": [
@@ -4170,13 +4132,43 @@
 {
 "at": "10:03:56",
 "engine": "app",
-"gist": "Tip 13",
+"gist": "Tip 34",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:03:52",
+"t": "10:03:56",
+"uid": "a22-236000"
+},
+{
+"at": "10:03:56",
+"engine": "app",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 34",
 "items": [
 "Review on Monday"
 ],
-"kind": "answer",
+"kind": "tip",
+"late": false,
 "level": "red",
-"phrase": "We ship it on Tuesday, 0 users.",
+"phrase": "We ship it on Tuesday, 7 users.",
+"schema_version": 1,
+"src": "10:03:52",
+"t": "10:03:56",
+"topic": "topic 4",
+"trigger": "direct_question",
+"uid": "a22-236000"
+},
+{
+"at": "10:03:56",
+"engine": "app",
+"gist": "No ready answer",
+"kind": "answer",
+"level": "info",
+"phrase": "Give me a minute, I will check and tell you exactly.",
 "q": "What did we promise on retention?",
 "schema_version": 1,
 "src": "10:03:56",
@@ -4295,39 +4287,6 @@
 "topic": "release plan"
 },
 {
-"at": "10:04:59",
-"engine": "app",
-"gist": "Tip 90",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:04:55",
-"t": "10:04:59",
-"uid": "a29-299000"
-},
-{
-"at": "10:04:59",
-"engine": "app",
-"fact_ids": [
-"F1"
-],
-"gist": "Tip 90",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 6 users.",
-"schema_version": 1,
-"src": "10:04:55",
-"t": "10:04:59",
-"topic": "topic 3",
-"trigger": "your_turn",
-"uid": "a29-299000"
-},
-{
 "actions": [
 {
 "due": "Friday",
@@ -4364,7 +4323,7 @@
 {
 "at": "10:05:20",
 "engine": "app",
-"gist": "Tip 42",
+"gist": "Tip 43",
 "kind": "tip",
 "level": "red",
 "partial": true,
@@ -4376,18 +4335,21 @@
 {
 "at": "10:05:20",
 "engine": "app",
-"gist": "Tip 42",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 43",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "red",
-"phrase": "We ship it on Tuesday, 8 users.",
+"phrase": "We ship it on Tuesday, 4 users.",
 "schema_version": 1,
 "src": "10:05:16",
 "t": "10:05:20",
-"topic": "topic 1",
+"topic": "topic 4",
 "trigger": "direct_question",
 "uid": "a31-320000"
 },
@@ -4454,7 +4416,7 @@
 {
 "at": "10:05:54",
 "engine": "app",
-"gist": "Tip 70",
+"gist": "Tip 49",
 "kind": "tip",
 "level": "red",
 "partial": true,
@@ -4466,18 +4428,18 @@
 {
 "at": "10:05:54",
 "engine": "app",
-"gist": "Tip 70",
+"gist": "Tip 49",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "red",
-"phrase": "We ship it on Tuesday, 4 users.",
+"phrase": "We ship it on Tuesday, 7 users.",
 "schema_version": 1,
 "src": "10:05:50",
 "t": "10:05:54",
-"topic": "topic 4",
+"topic": "topic 1",
 "trigger": "direct_question",
 "uid": "a35-354000"
 },
@@ -4510,43 +4472,13 @@
 {
 "at": "10:06:46",
 "engine": "app",
-"gist": "Tip 44",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:06:42",
-"t": "10:06:46",
-"uid": "a40-406000"
-},
-{
-"at": "10:06:46",
-"engine": "app",
-"gist": "Tip 44",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 3 users.",
-"schema_version": 1,
-"src": "10:06:42",
-"t": "10:06:46",
-"topic": "topic 3",
-"trigger": "your_turn",
-"uid": "a40-406000"
-},
-{
-"at": "10:06:46",
-"engine": "app",
-"gist": "🔎 Tip 39",
+"gist": "🔎 Tip 33",
 "items": [
 "Review on Monday"
 ],
 "kind": "answer",
-"level": "orange",
-"phrase": "We ship it on Tuesday, 7 users.",
+"level": "info",
+"phrase": "We ship it on Tuesday, 8 users.",
 "q": "find: pilot users",
 "schema_version": 1,
 "src": "10:06:46",
@@ -4730,42 +4662,9 @@
 "topic": "release plan"
 },
 {
-"at": "10:08:07",
-"engine": "app",
-"gist": "Tip 33",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:08:03",
-"t": "10:08:07",
-"uid": "a48-487000"
-},
-{
-"at": "10:08:07",
-"engine": "app",
-"fact_ids": [
-"F1"
-],
-"gist": "Tip 33",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 7 users.",
-"schema_version": 1,
-"src": "10:08:03",
-"t": "10:08:07",
-"topic": "topic 3",
-"trigger": "direct_question",
-"uid": "a48-487000"
-},
-{
 "at": "10:08:23",
 "engine": "app",
-"gist": "Tip 96",
+"gist": "Tip 23",
 "kind": "tip",
 "level": "red",
 "partial": true,
@@ -4777,7 +4676,7 @@
 {
 "at": "10:08:23",
 "engine": "app",
-"gist": "Tip 96",
+"gist": "Tip 23",
 "items": [
 "Review on Monday"
 ],
@@ -4788,7 +4687,7 @@
 "schema_version": 1,
 "src": "10:08:19",
 "t": "10:08:23",
-"topic": "topic 4",
+"topic": "topic 1",
 "trigger": "direct_question",
 "uid": "a50-503000"
 },
@@ -4849,36 +4748,6 @@
 "topic": "release plan"
 },
 {
-"at": "10:08:54",
-"engine": "app",
-"gist": "Tip 75",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:08:50",
-"t": "10:08:54",
-"uid": "a55-534000"
-},
-{
-"at": "10:08:54",
-"engine": "app",
-"gist": "Tip 75",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 2 users.",
-"schema_version": 1,
-"src": "10:08:50",
-"t": "10:08:54",
-"topic": "topic 2",
-"trigger": "direct_question",
-"uid": "a55-534000"
-},
-{
 "actions": [
 {
 "due": "Friday",
@@ -4905,6 +4774,36 @@
 "t": "10:09:09",
 "theirs": [],
 "topic": "release plan"
+},
+{
+"at": "10:09:09",
+"engine": "app",
+"gist": "Tip 85",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:09:05",
+"t": "10:09:09",
+"uid": "a57-549000"
+},
+{
+"at": "10:09:09",
+"engine": "app",
+"gist": "Tip 85",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "red",
+"phrase": "We ship it on Tuesday, 7 users.",
+"schema_version": 1,
+"src": "10:09:05",
+"t": "10:09:09",
+"topic": "topic 2",
+"trigger": "direct_question",
+"uid": "a57-549000"
 },
 {
 "actions": [
@@ -4937,13 +4836,13 @@
 {
 "at": "10:09:44",
 "engine": "app",
-"gist": "Tip 49",
+"gist": "Tip 80",
 "items": [
 "Review on Monday"
 ],
 "kind": "answer",
-"level": "info",
-"phrase": "We ship it on Tuesday, 8 users.",
+"level": "red",
+"phrase": "We ship it on Tuesday, 0 users.",
 "q": "What is the release date?",
 "schema_version": 1,
 "src": "10:09:44",
@@ -4980,7 +4879,7 @@
 {
 "at": "10:10:28",
 "engine": "app",
-"gist": "Tip 86",
+"gist": "Tip 96",
 "kind": "tip",
 "level": "red",
 "partial": true,
@@ -4995,18 +4894,18 @@
 "fact_ids": [
 "F1"
 ],
-"gist": "Tip 86",
+"gist": "Tip 96",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "red",
-"phrase": "We ship it on Tuesday, 6 users.",
+"phrase": "We ship it on Tuesday, 2 users.",
 "schema_version": 1,
 "src": "10:10:24",
 "t": "10:10:28",
-"topic": "topic 2",
+"topic": "topic 1",
 "trigger": "direct_question",
 "uid": "a65-628000"
 },
@@ -5067,66 +4966,6 @@
 "topic": "release plan"
 },
 {
-"at": "10:10:54",
-"engine": "app",
-"gist": "Tip 95",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:10:50",
-"t": "10:10:54",
-"uid": "a68-654000"
-},
-{
-"at": "10:10:54",
-"engine": "app",
-"gist": "Tip 95",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 4 users.",
-"schema_version": 1,
-"src": "10:10:50",
-"t": "10:10:54",
-"topic": "topic 1",
-"trigger": "direct_question",
-"uid": "a68-654000"
-},
-{
-"at": "10:11:18",
-"engine": "app",
-"gist": "Tip 80",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:11:14",
-"t": "10:11:18",
-"uid": "a70-678000"
-},
-{
-"at": "10:11:18",
-"engine": "app",
-"gist": "Tip 80",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 0 users.",
-"schema_version": 1,
-"src": "10:11:14",
-"t": "10:11:18",
-"topic": "topic 4",
-"trigger": "direct_question",
-"uid": "a70-678000"
-},
-{
 "actions": [
 {
 "due": "Friday",
@@ -5153,6 +4992,36 @@
 "t": "10:11:24",
 "theirs": [],
 "topic": "release plan"
+},
+{
+"at": "10:11:24",
+"engine": "app",
+"gist": "Tip 79",
+"kind": "tip",
+"level": "red",
+"partial": true,
+"schema_version": 1,
+"src": "10:11:20",
+"t": "10:11:24",
+"uid": "a71-684000"
+},
+{
+"at": "10:11:24",
+"engine": "app",
+"gist": "Tip 79",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "red",
+"phrase": "We ship it on Tuesday, 0 users.",
+"schema_version": 1,
+"src": "10:11:20",
+"t": "10:11:24",
+"topic": "topic 4",
+"trigger": "direct_question",
+"uid": "a71-684000"
 },
 {
 "actions": [
@@ -5211,36 +5080,6 @@
 "topic": "release plan"
 },
 {
-"at": "10:12:02",
-"engine": "app",
-"gist": "Tip 77",
-"kind": "tip",
-"level": "red",
-"partial": true,
-"schema_version": 1,
-"src": "10:11:58",
-"t": "10:12:02",
-"uid": "a74-722000"
-},
-{
-"at": "10:12:02",
-"engine": "app",
-"gist": "Tip 77",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "red",
-"phrase": "We ship it on Tuesday, 6 users.",
-"schema_version": 1,
-"src": "10:11:58",
-"t": "10:12:02",
-"topic": "topic 1",
-"trigger": "direct_question",
-"uid": "a74-722000"
-},
-{
 "actions": [
 {
 "due": "Friday",
@@ -5271,7 +5110,7 @@
 {
 "at": "10:13:14",
 "engine": "app",
-"gist": "Tip 11",
+"gist": "Tip 69",
 "kind": "tip",
 "level": "red",
 "partial": true,
@@ -5286,25 +5125,25 @@
 "fact_ids": [
 "F1"
 ],
-"gist": "Tip 11",
+"gist": "Tip 69",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "red",
-"phrase": "We ship it on Tuesday, 8 users.",
+"phrase": "We ship it on Tuesday, 6 users.",
 "schema_version": 1,
 "src": "10:13:10",
 "t": "10:13:14",
-"topic": "topic 4",
+"topic": "topic 2",
 "trigger": "direct_question",
 "uid": "a83-794000"
 },
 {
 "at": "10:13:36",
 "engine": "app",
-"gist": "Tip 12",
+"gist": "Tip 15",
 "kind": "tip",
 "level": "red",
 "partial": true,
@@ -5319,18 +5158,18 @@
 "fact_ids": [
 "F1"
 ],
-"gist": "Tip 12",
+"gist": "Tip 15",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "red",
-"phrase": "We ship it on Tuesday, 8 users.",
+"phrase": "We ship it on Tuesday, 5 users.",
 "schema_version": 1,
 "src": "10:13:32",
 "t": "10:13:36",
-"topic": "topic 1",
+"topic": "topic 4",
 "trigger": "direct_question",
 "uid": "a86-816000"
 },

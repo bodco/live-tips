@@ -134,3 +134,121 @@ public enum PrepOwnership {
         }
     }
 }
+
+/// 0.9.7 (capacity check, 11.11): how a deck is cut into slides, testable without a deck file.
+public enum PptxOrder {
+    /// The slide XML files in the show order: presentation.xml <p:sldIdLst> r:ids resolved through its rels. Falls
+    /// back to the file numbers when presentation.xml cannot be read.
+    public static func slideFiles(files: [String], presentation: String, rels: String) -> [String] {
+        func num(_ s: String) -> Int { Int(((s as NSString).lastPathComponent).filter { $0.isNumber }) ?? 0 }
+        let found = files.filter { $0.range(of: "^ppt/slides/slide[0-9]+\\.xml$", options: .regularExpression) != nil }
+        var target: [String: String] = [:]
+        for r in rels.components(separatedBy: "<Relationship ").dropFirst() {
+            if let id = attr(r, "Id"), let t = attr(r, "Target"), t.contains("slides/slide") {
+                let clean = t.hasPrefix("/") ? String(t.dropFirst()) : (t.hasPrefix("ppt/") ? t : "ppt/" + t)
+                target[id] = clean
+            }
+        }
+        var ordered: [String] = []
+        if let a = presentation.range(of: "<p:sldIdLst"), let b = presentation.range(of: "</p:sldIdLst>"), a.upperBound < b.lowerBound {
+            for e in presentation[a.upperBound..<b.lowerBound].components(separatedBy: "<p:sldId ").dropFirst() {
+                if let id = attr(e, "r:id"), let t = target[id], found.contains(t), !ordered.contains(t) { ordered.append(t) }
+            }
+        }
+        return ordered.isEmpty ? found.sorted { num($0) < num($1) } : ordered
+    }
+    /// <p:sld ... show="0">: the slide is hidden in the show.
+    public static func hidden(_ xml: String) -> Bool {
+        guard let a = xml.range(of: "<p:sld "), let b = xml[a.upperBound...].range(of: ">") else { return false }
+        let head = xml[a.upperBound..<b.lowerBound]
+        return head.contains("show=\"0\"") || head.contains("show=\"false\"")
+    }
+    /// The text paragraphs of a slide or notes XML.
+    public static func paragraphs(_ xml: String) -> [String] {
+        xml.components(separatedBy: "</a:p>").map { p -> String in
+            var t = "", rest = Substring(p)
+            while let a = rest.range(of: "<a:t>"), let b = rest[a.upperBound...].range(of: "</a:t>") {
+                t += rest[a.upperBound..<b.lowerBound]; rest = rest[b.upperBound...]
+            }
+            return unescape(t).trimmingCharacters(in: .whitespaces)
+        }.filter { !$0.isEmpty }
+    }
+    /// The notes page of a slide from its rels file.
+    public static func notesTarget(_ rels: String) -> String? {
+        for r in rels.components(separatedBy: "<Relationship ").dropFirst() where (attr(r, "Type") ?? "").hasSuffix("/notesSlide") {
+            return attr(r, "Target")
+        }
+        return nil
+    }
+    /// Only the body placeholder of a notes page: not the slide image, the slide number or the header.
+    public static func notesText(_ xml: String) -> String {
+        let shapes = xml.components(separatedBy: "<p:sp>").dropFirst()
+        let body = shapes.filter { $0.contains("type=\"body\"") }
+        return paragraphs(body.joined(separator: "\n")).joined(separator: "\n")
+    }
+    public static func unescape(_ s: String) -> String {
+        var t = s.replacingOccurrences(of: "&lt;", with: "<").replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"").replacingOccurrences(of: "&apos;", with: "'")
+        while let r = t.range(of: "&#[0-9]+;", options: .regularExpression) {
+            let code = UInt32(t[r].dropFirst(2).dropLast()) ?? 32
+            t.replaceSubrange(r, with: String(Character(UnicodeScalar(code) ?? " ")))
+        }
+        return t.replacingOccurrences(of: "&amp;", with: "&")
+    }
+    public static func attr(_ s: String, _ name: String) -> String? {
+        guard let a = s.range(of: " " + name + "=\"") ?? (s.hasPrefix(name + "=\"") ? s.range(of: name + "=\"") : nil),
+              let b = s[a.upperBound...].range(of: "\"") else { return nil }
+        return String(s[a.upperBound..<b.lowerBound])
+    }
+
+    /// A text outline cut into slides (title, text), see outlineLevel.
+    public static func outlineBlocks(_ text: String) -> [(title: String, text: String)] {
+        let lines = text.components(separatedBy: .newlines)
+        let plan = outlineLevel(lines)
+        let strip = "^(#{1,6}\\s+|(slide|слайд)\\s*[0-9]+[:.)]?\\s*)"
+        var blocks: [[String]] = [], cur: [String] = [], seen = false
+        let headed = plan.marked && (plan.slideWord || plan.level > 0)   // text above the first slide heading is a preamble
+        for l in lines {
+            let t = l.trimmingCharacters(in: .whitespaces)
+            if plan.skip.contains(t) { continue }
+            let starts = plan.marked ? (t == "---" || startsSlide(t, plan)) : t.isEmpty
+            if starts { seen = true; if !cur.isEmpty { blocks.append(cur) }; cur = [] }
+            if headed && !seen { continue }
+            if t == "---" || t.isEmpty { continue }
+            let c = t.replacingOccurrences(of: strip, with: "", options: [.regularExpression, .caseInsensitive])
+            if !c.isEmpty { cur.append(c) }
+        }
+        if !cur.isEmpty { blocks.append(cur) }
+        return blocks.map { (String($0[0].prefix(120)), $0.dropFirst().joined(separator: "\n")) }
+    }
+
+    public struct OutlinePlan { public var marked: Bool; public var level: Int; public var slideWord: Bool; public var skip: Set<String> }
+    /// Which lines start a slide: "Slide N" lines when there are any (then headings stay text); else the shallowest
+    /// heading level used at least twice (a single "# Talk title" above it is the document title and is dropped);
+    /// else "---"; else blank lines.
+    public static func outlineLevel(_ lines: [String]) -> OutlinePlan {
+        let t = lines.map { $0.trimmingCharacters(in: .whitespaces) }
+        let word = "^(#{1,6}\\s+)?(slide|слайд)\\s*[0-9]+([:.)]|\\s|$)"
+        if t.contains(where: { $0.range(of: word, options: [.regularExpression, .caseInsensitive]) != nil }) {
+            return OutlinePlan(marked: true, level: 0, slideWord: true, skip: [])
+        }
+        func level(_ l: String) -> Int? {
+            guard let r = l.range(of: "^#{1,6}\\s+", options: .regularExpression) else { return nil }
+            return l[r].filter { $0 == "#" }.count
+        }
+        var count: [Int: Int] = [:]
+        for l in t { if let v = level(l) { count[v, default: 0] += 1 } }
+        if let lv = count.keys.sorted().first(where: { count[$0]! >= 2 }) {
+            var skip: Set<String> = []
+            if let top = count.keys.sorted().first, top < lv, count[top] == 1, let title = t.first(where: { level($0) == top }) { skip.insert(title) }
+            return OutlinePlan(marked: true, level: lv, slideWord: false, skip: skip)
+        }
+        if let only = count.keys.first, count.count == 1 { return OutlinePlan(marked: true, level: only, slideWord: false, skip: []) }
+        return OutlinePlan(marked: t.contains("---"), level: 0, slideWord: false, skip: [])
+    }
+    public static func startsSlide(_ line: String, _ plan: OutlinePlan) -> Bool {
+        if plan.slideWord { return line.range(of: "^(#{1,6}\\s+)?(slide|слайд)\\s*[0-9]+([:.)]|\\s|$)", options: [.regularExpression, .caseInsensitive]) != nil }
+        guard plan.level > 0, let r = line.range(of: "^#{1,6}\\s+", options: .regularExpression) else { return false }
+        return line[r].filter { $0 == "#" }.count == plan.level
+    }
+}

@@ -168,6 +168,7 @@ _REPEAT = re.compile(r"((?:\w[\w'’-]*\W+){1,4}?)\1{2,}")
 
 
 PROMPT_HEAD: list[str] = []   # first two words of the Whisper prompt, set in main()
+GLOSSARY: list[str] = []      # 0.9.7: the call's terms added to the Whisper prompt (main(), from the brief)
 
 
 def clean_text(text: str, prompt_words: set[str]) -> str:
@@ -909,6 +910,8 @@ class Cards:
                 on = c.get("on", "them")       # 2026-10-23: cards fire on the other side by default
                 if on != "any" and on != line.channel:
                     continue
+                if on == "them" and self.our_side(line):
+                    continue                   # 0.9.7: a colleague on the call audio is not "them"
                 cid = self.cid(c)
                 if now() - self.last.get(cid, 0) < float(c.get("cooldown_s", 300)):
                     continue
@@ -919,6 +922,18 @@ class Cards:
                     self._held(c, cid, line, "address")
                     continue
                 self._emit(c, cid, line)
+
+    # 0.9.7 (owner, call of 11.11: "them" cards fired on my own team): the call audio carries colleagues too. A line
+    # whose speaker is known to be on the PM's team (Speakers: side "team") does not fire an on: them card.
+    side_of_sid = None                 # set by main(): sid -> "team" | "client" | ""
+
+    def our_side(self, line: "Line") -> bool:
+        if line.channel != "them" or not line.sid or Cards.side_of_sid is None:
+            return False
+        try:
+            return Cards.side_of_sid(line.sid) == "team"
+        except Exception:  # noqa: BLE001
+            return False
 
     @staticmethod
     def cid(c: dict) -> str:
@@ -955,6 +970,8 @@ class Cards:
                 return "gone"
             if self.is_address(c):
                 return "address"
+            if c.get("on", "them") == "them" and self.our_side(line):
+                return "our side"
             # 2026-11-02 (a client monthly review): the same card came back 5 and 15 min later. 0.9.2 (audit 04.11: the
             # HubSpot card again after 21 min): by meaning a card shows once per call; again only by its trigger.
             if cid in self.last:
@@ -1357,6 +1374,9 @@ def qa_pick(text: str, entries: list[dict]) -> dict | None:
     return best
 
 
+PRESENT_HOLD_S = 90     # 0.9.7 rules/presentation.yaml > slide_sync > hold_s
+
+
 class Outline:
     """Presentation tracker (<transcript stem>.outline.json), written by the skill:
       [{"id": "s15", "title": "Pipedrive: prices 12-16", "points": [...], "keywords": [...],
@@ -1396,6 +1416,9 @@ class Outline:
         self.follow = ""                         # "keynote" | "powerpoint" while the app follows the deck (A)
         self.checkpoints: set = set()
         self.last_advice = None
+        # 0.9.7 (owner, call of 11.11: the slide jumped 1 <-> 18 dozens of times): a slide the PM set by hand holds,
+        # and the other side's words move only one step forward inside a colleague's block.
+        self.hold_until = 0.0
 
     def refresh(self) -> None:
         """Same contract as FactBook.refresh: never raises, mtime only after a good parse."""
@@ -1492,11 +1515,17 @@ class Outline:
         if not self.sections or line.channel not in ("me", "them"):
             return
         self._plan()
+        if now() < self.hold_until:
+            return                              # 0.9.7: the PM set this slide by hand (rules/presentation.yaml > hold_s)
         if line.channel == "them":
             if "other" not in self.who:
                 return                          # no colleague sections: the other side never moves us
             self.recent_them = (self.recent_them + tokens(line.text))[-60:]
-            words, allowed = self.recent_them, [w == "other" for w in self.who]
+            # 0.9.7: only the next section, and only when it is the colleague's; the start of the talk may go to a
+            # first colleague section. The client's words named the first slide and pulled the PM back to it.
+            nxt = self.cur + 1 if self.cur >= 0 else 0
+            words = self.recent_them
+            allowed = [i == nxt and w == "other" for i, w in enumerate(self.who)]
         else:
             self.recent = (self.recent + tokens(line.text))[-60:]   # ~the last 20-30 s of the PM's words
             words, allowed = self.recent, [w != "other" for w in self.who]
@@ -1541,6 +1570,8 @@ class Outline:
             self.follow = source
         elif source == "speech":
             self.follow = ""
+        if source != "speech":                  # 0.9.7: by hand (or the deck app): speech does not move it for a while
+            self.hold_until = now() + PRESENT_HOLD_S
         if not self.sections:
             return
         self._plan()
@@ -3750,6 +3781,16 @@ class SpeakerTracker:
         except Exception as e:  # noqa: BLE001
             log(f"voices: cannot update the library ({e!r})")
 
+    def side_for(self, sid: str) -> str:
+        """0.9.7: "team" | "client" | "" for a cluster (as in the snapshot: set by the PM, the library, the roster)."""
+        with self.lock:
+            sid = self.resolve(sid) or sid
+            c = self.clusters.get(sid)
+            if not c:
+                return ""
+            return c.get("side") or (self.lib.side(c["name"]) if (self.lib is not None and c["name"]) else "") or \
+                (self._roster_side(c["name"]) if c["name"] else "") or ""
+
     # ---- output
     def snapshot(self) -> dict:
         with self.lock:
@@ -4053,6 +4094,49 @@ def load_request(args) -> dict:
     return cfg
 
 
+GLOSSARY_CHARS = 220     # 0.9.7: room for the call's terms after the names (Whisper's prompt is ~224 tokens at most)
+
+
+def glossary_terms(brief: str, limit: int = 14) -> list[str]:
+    """0.9.7 (owner, call of 11.11: "AI" came out as "EI", "Fireflies" as "FireFest"): the terms Whisper should know,
+    from the brief: the spellings in "## 5. Names and aliases" first, then Latin-script product and tool names that
+    the brief uses at least twice. Never the long dashes or full sentences."""
+    terms: list[str] = []
+    seen: set = set()
+
+    def add(t: str) -> None:
+        t = re.sub(r"[*_`\[\]()]", "", t).strip(" .,:;\"'«»")
+        if 2 <= len(t) <= 28 and t.casefold() not in seen and len(t.split()) <= 3:
+            seen.add(t.casefold()); terms.append(t)
+    m = re.search(r"(?ms)^##\s*5\.[^\n]*\n(.*?)(?=^##\s)", brief or "")
+    if m:
+        for ln in m.group(1).splitlines():
+            ln = ln.strip().lstrip("-* ").strip()
+            if ln:
+                add(re.split(r"[:(\u2014-]", ln, 1)[0])
+    counts: dict = {}
+    for w in re.findall(r"\b[A-Z][A-Za-z0-9]*(?:[A-Z][a-z0-9]+)+\b|\b[A-Z][a-z]{3,}\b|\b[A-Z]{2,5}\b", brief or ""):
+        counts[w] = counts.get(w, 0) + 1
+    for w, n in sorted(counts.items(), key=lambda x: -x[1]):
+        if n >= 2 and w not in ("Live", "Brief", "Sources", "Checklist", "The", "This", "Needs", "Topic", "Insight", "Bank",
+                                "Previous", "Names", "Red", "Commitments"):
+            add(w)
+    return terms[:limit]
+
+
+def with_glossary(prompt: str | None, terms: list[str]) -> str | None:
+    """The names prompt plus the call's terms, within GLOSSARY_CHARS more characters."""
+    if not terms:
+        return prompt
+    extra, out = "", []
+    for t in terms:
+        if len(extra) + len(t) + 2 > GLOSSARY_CHARS:
+            break
+        out.append(t)
+        extra = ", ".join(out)
+    return ((prompt or "").rstrip() + " " + extra + ".").strip() if extra else prompt
+
+
 def auto_prompt(cfg: dict) -> None:
     """0.8.5 (owner: "Ukrainian was transcribed much better a week ago"): the skill always gives Whisper a prompt
     (start.md step 2: one natural sentence in the call language, names first), the app gave none, so names and
@@ -4222,6 +4306,7 @@ def main() -> int:
                            workspace=cfg.get("workspace") or "")
         tracker = SpeakerTracker(cfg, out.with_name(out.stem + ".speakers.json"), lib,
                                  emit=lambda item: _append_json(tips_file, item))
+        Cards.side_of_sid = tracker.side_for           # 0.9.7: a colleague's line fires no on: them card
         series = slugify(re.sub(r"\.app$", "", _s(cfg.get("title")))) if _s(cfg.get("title")).strip() else ""
         tracker.rosters = Rosters(lib.path.with_name("rosters.json"),
                                   f"{cfg.get('slug') or ''}|{series}" if series else "")
@@ -4268,6 +4353,29 @@ def main() -> int:
     prompt_words = set(re.findall(r"\w+", (prompt or "").lower()))
     global PROMPT_HEAD
     PROMPT_HEAD = re.findall(r"\w+", (prompt or "").lower())[:2]
+    # 0.9.7: the call's terms from the brief go to Whisper too (the app copies the brief in just after the start, so
+    # it is looked for until it appears). The echo filter keeps the names-only words: a one-word answer "HubSpot." is
+    # never taken for a prompt echo.
+    GLOSSARY[:] = [t for t in _strs(cfg.get("glossary"))]
+    prompt = with_glossary(prompt, GLOSSARY)
+    gloss = {"base": cfg.get("prompt"), "next": 0.0, "done": False}
+
+    def maybe_glossary() -> None:
+        if gloss["done"] or now() < gloss["next"]:
+            return
+        gloss["next"] = now() + 20
+        bp = out.with_name(out.stem + ".brief.md")
+        try:
+            if not bp.exists():
+                return
+            terms = glossary_terms(bp.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            return
+        gloss["done"] = True
+        GLOSSARY.extend(t for t in terms if t not in GLOSSARY)
+        if GLOSSARY and pcell[0] == prompt:
+            pcell[0] = with_glossary(gloss["base"], GLOSSARY)
+            log(f"whisper prompt: {len(GLOSSARY)} terms from the brief")
     # The Whisper prompt biases the language: a Ukrainian prompt makes English speech come out
     # as Ukrainian gibberish. When the window switches the call language, the prompt follows.
     cards = Cards(out, tips_file)
@@ -4310,6 +4418,7 @@ def main() -> int:
         else:
             lang = whisper.pick_language(seg.audio)
         t_asr0 = time.time()
+        maybe_glossary()
         text, lang = whisper.transcribe(seg.audio, lang, pcell[0])
         t_asr1 = time.time()
         text = clean_text(text, pwords[0])
@@ -4536,8 +4645,8 @@ def main() -> int:
                 last_lang["me"], last_lang["them"] = me, langs[0]
                 status.update(call_lang=val, me_lang=me, me_langs=me_langs, langs=langs)
                 newp = cfg.get("prompt_" + val) or (None if val == "en" else cfg.get("prompt"))
-                pcell[0] = newp
                 pwords[0] = set(re.findall(r"\w+", (newp or "").lower()))
+                pcell[0] = with_glossary(newp, GLOSSARY) if newp else newp      # 0.9.7
                 writer.marker(L("мова: ", "language: ") + '+'.join(langs))
                 log(f"languages switched in the tips window: me={me} allowed={'+'.join(langs)}")
             elif key == "mic_device" and (val in ("default", "builtin") or (val.startswith("uid:") and len(val) > 4)):

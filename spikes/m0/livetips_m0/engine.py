@@ -271,10 +271,13 @@ def tip_item(obj: dict, uid: str, line: Line, trigger: str, done: float, late: b
 SOS_EVENT = ("HELP NOW pressed: the PM is speaking and cannot type. Give ONE red tip now: gist starting with "
                      "'🆘 ', the next sentence the PM can say right now (answer to the open question, a fact with its number, "
                      "or a bridge such as 'Let me give you the exact number after the call.'), up to 2 fact lines. Never skip. Add \"answered\": false when no concrete fact answers the open question (a deeper search then starts by itself).")
-ASK_TAIL = (" Add \"answered\": true when the context really answers it, false otherwise. Never skip a typed "
-                      "question: when the answer is not here, gist says what is known nearest, phrase is a sentence the PM "
-                      "can say right now (an honest bridge such as checking and coming back with a date), and a deeper "
-                      "search of the project folder starts by itself.")
+ASK_TAIL = (" The PM's text is an instruction to understand, not search words: it may be a fragment, refer to an earlier "
+            "ask or to what is happening on the call; work out what the PM needs right now from the moment of the call. "
+            "Add \"answered\": true only when your answer gives that; a nearby fact from the brief is not an answer. "
+            "When the context here does not hold it but the project may (earlier calls, research and notes in the project "
+            "folder, Notion pages), add \"search\": \"<what to find, in your own words>\"; the project is then searched. "
+            "Never skip a typed question: when the answer is not here, gist says what is known nearest and phrase is a "
+            "sentence the PM can say right now (an honest bridge such as checking and coming back with a date).")
 
 
 # 2026-11-02 (owner, two calls): "Anything else you wanted to go over today?" got "Nope, my list is closed" while four
@@ -810,6 +813,7 @@ class Engine:
         self.agenda_obtain = ""                 # the brief's "Decisions to obtain" text (the wrap check)
         self.agenda_done: set = set()
         self.agenda_now = -1
+        self.agenda_raised: set = set()      # 0.9.7: stable ids of the items that were "now" at least once this call
         self.agenda_manual: Dict[int, str] = {}
         self.agenda_sent: Optional[list] = None
         self.register_dir = cfg.get("register_dir") or ""
@@ -1177,6 +1181,7 @@ class Engine:
                      "a{}-{}".format(line.line_id, int(span["tip_start"] * 1000) % 1000000))
         c = self._tip_call(line, span.get("event") or trigger, functools.partial(self._early_gist, run))
         run.done = self.clock()
+        self._tip_search(c, span)
         run.kept = run.shown is True
         tip_timing(span, c, run.done)
         outcome = self._judge_tip(run, c)
@@ -1187,6 +1192,16 @@ class Engine:
             self.out_timing.write(span)
             return
         self._emit_tip(run)
+
+    def _tip_search(self, c, span: dict) -> None:
+        """2026-11-10 (owner): a tip (or a skip) may ask for a search of the project ("search"): the model saw that
+        someone needs something from the PM that the context does not hold. Runs quietly, a card only when found."""
+        obj = first_json(c.text) if not c.error else None
+        want = str((obj or {}).get("search") or "").strip() if isinstance(obj, dict) else ""
+        if not want or not self.cfg.get("deep_lookup", True) or self._economy() or not self._search_roots():
+            return
+        span["search"] = want[:200]
+        self._start_deep(want, "quiet")
 
     def _tip_call(self, line: Line, event: str, on_text):
         if self.tip_cache_warm.is_set():
@@ -1904,7 +1919,7 @@ class Engine:
         self.out_timing.write(span)
 
     def wrap_event(self) -> str:
-        st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual)
+        st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual, self._raised_idx())
         full = self.agenda_full or [t for t, _ in self.agenda_items]
         ag = "\n".join("{}. [{}] {}".format(i, s, t) for i, (t, s) in enumerate(zip(full, st))) or "(none)"
         with self.lock:
@@ -1982,9 +1997,17 @@ class Engine:
         uk = self._ui_uk()
         if not obj or obj.get("skip"):
             obj = no_ready_answer(kind, uk, self.cfg.get("deep_lookup", True) and bool(self._search_roots()))
+        # 2026-11-10 (owner, MinuteDesk KT #2): the model decides whether the project must be searched and for what
+        # ("search"), from the moment and the PM's intent; no rule on the PM's words. Answered but with a search: the
+        # search runs quietly and its card comes only when it found something.
+        want = str(obj.get("search") or "").strip() if isinstance(obj, dict) else ""
+        query = (text + " | " + want) if want and text else (want or text or (line.text if line else ""))
         if unanswered and kind in ("ask", "sos") and self.cfg.get("deep_lookup", True) and self._search_roots():
-            self._start_deep(text or (line.text if line else ""), kind)
+            self._start_deep(query, kind)
             obj["note"] = with_deep_note(obj.get("note"), uk, fast=self.agent_fast())
+        elif want and kind == "ask" and self.cfg.get("deep_lookup", True) and self._search_roots():
+            self._start_deep(query, "quiet")
+        obj.pop("search", None)
         return obj
 
     # ---------- deep lookup with Claude Code (2026-10-27) ----------
@@ -2050,10 +2073,12 @@ class Engine:
         if economy:
             row["economy"] = True
         self.out_llm.write(row)
+        if kind == "quiet" and (res.get("error") or res.get("skipped") or res.get("answered") is not True):
+            return                            # a search the model asked for on its own: "not found" stays silent
         out = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": s_to_hms(t0), "kind": "answer",
-               "q": question, "at": s_to_hms(done), **deep_item(res, uk)}
+               "q": question.split(" | ")[0], "at": s_to_hms(done), **deep_item(res, uk)}
         out = {k: v for k, v in out.items() if v not in ("", [], None)}
-        if kind == "ask":
+        if kind in ("ask", "quiet"):
             self._log_ask(question, out)
         with self.lock:
             self.tips.append(out)
@@ -2492,9 +2517,20 @@ class Engine:
             self._inherit_agenda(previous, old_manual)
         self._emit_agenda()
 
+    def _raised_idx(self) -> set:
+        """0.9.7: the indexes of the items raised this call (kept by stable id, so a refreshed agenda keeps them)."""
+        ids = list(getattr(self, "agenda_ids", []) or [])
+        raised = getattr(self, "agenda_raised", None)
+        if raised is None:
+            raised = self.agenda_raised = set()
+        now = [self.agenda_now] if 0 <= self.agenda_now < len(ids) else []
+        for i in now + [i for i, v in self.agenda_manual.items() if v == "now" and i < len(ids)]:
+            raised.add(ids[i])
+        return {i for i, x in enumerate(ids) if x in raised}
+
     def agenda_strip(self) -> List[dict]:
         with self.lock:
-            st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual)
+            st = agenda_mod.states(self.agenda_items, self.agenda_done, self.agenda_now, self.agenda_manual, self._raised_idx())
             full = getattr(self, "agenda_full", None) or [t for t, _ in self.agenda_items]
             return [dict({"id": identity, "text": t, "done": s == "done", "cur": s == "now", "state": s}, **({"full": f} if f != t else {}))
                     for (t, _), s, f, identity in zip(self.agenda_items, st, full, self.agenda_ids)]

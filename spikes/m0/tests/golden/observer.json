@@ -45,7 +45,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 59\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 25\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -85,7 +85,7 @@
 "input": 100,
 "line_id": 4,
 "model": "fake-sonnet",
-"output": 3,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -93,7 +93,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "not json at all",
+"text_head": "{\"gist\": \"Tip 12\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -133,7 +133,7 @@
 "input": 100,
 "line_id": 6,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -141,7 +141,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 74\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 25\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -168,7 +168,7 @@
 "input": 100,
 "line_id": 7,
 "model": "fake-sonnet",
-"output": 8,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -176,7 +176,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"text_head": "{\"gist\": \"Tip 46\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -203,7 +203,7 @@
 "input": 100,
 "line_id": 8,
 "model": "fake-sonnet",
-"output": 8,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -211,7 +211,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"text_head": "{\"gist\": \"Tip 72\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -246,7 +246,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 44\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 68\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -320,7 +320,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 38\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 78\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -355,7 +355,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 82\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 2\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -408,7 +408,7 @@
 "input": 100,
 "line_id": 19,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -416,7 +416,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 8\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 45\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -443,7 +443,7 @@
 "input": 100,
 "line_id": 20,
 "model": "fake-sonnet",
-"output": 36,
+"output": 8,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -451,7 +451,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 7\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
 "usd": null
 },
 {
@@ -486,7 +486,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 5\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 56\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -513,7 +513,7 @@
 "input": 100,
 "line_id": 22,
 "model": "fake-sonnet",
-"output": 37,
+"output": 8,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -521,7 +521,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 12\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
 "usd": null
 },
 {
@@ -535,7 +535,7 @@
 "input": 100,
 "line_id": 22,
 "model": "fake-sonnet",
-"output": 3,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -543,7 +543,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "not json at all",
+"text_head": "{\"gist\": \"Tip 60\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -570,7 +570,7 @@
 "input": 100,
 "line_id": 23,
 "model": "fake-sonnet",
-"output": 36,
+"output": 3,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -578,7 +578,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 47\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "not json at all",
 "usd": null
 },
 {
@@ -670,7 +670,7 @@
 "input": 100,
 "line_id": 31,
 "model": "fake-sonnet",
-"output": 37,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -678,7 +678,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 70\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 83\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -731,7 +731,7 @@
 "input": 100,
 "line_id": 35,
 "model": "fake-sonnet",
-"output": 3,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -739,7 +739,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "not json at all",
+"text_head": "{\"gist\": \"Tip 66\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -779,7 +779,7 @@
 "input": 100,
 "line_id": 38,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -787,7 +787,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 39\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 20\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -827,7 +827,7 @@
 "input": 100,
 "line_id": 40,
 "model": "fake-sonnet",
-"output": 8,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -835,7 +835,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"text_head": "{\"gist\": \"Tip 14\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1032,7 +1032,7 @@
 "input": 100,
 "line_id": 55,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1040,7 +1040,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 48\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 4\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1106,7 +1106,7 @@
 "input": 100,
 "line_id": 60,
 "model": "fake-sonnet",
-"output": 37,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1114,7 +1114,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 25\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 0 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 50\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1167,7 +1167,7 @@
 "input": 100,
 "line_id": 65,
 "model": "fake-sonnet",
-"output": 36,
+"output": 8,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1175,7 +1175,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 29\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
 "usd": null
 },
 {
@@ -1236,7 +1236,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 79\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 5 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 60\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1276,7 +1276,7 @@
 "input": 100,
 "line_id": 70,
 "model": "fake-sonnet",
-"output": 37,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1284,7 +1284,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 6\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 47\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1311,7 +1311,7 @@
 "input": 100,
 "line_id": 71,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1319,7 +1319,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 41\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 51\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1359,7 +1359,7 @@
 "input": 100,
 "line_id": 73,
 "model": "fake-sonnet",
-"output": 37,
+"output": 38,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1367,7 +1367,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 30\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 80\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1472,7 +1472,7 @@
 "input": 100,
 "line_id": 83,
 "model": "fake-sonnet",
-"output": 8,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1480,7 +1480,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"skip\": true, \"reason\": \"nothing\"}",
+"text_head": "{\"gist\": \"Tip 35\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 4\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -1507,7 +1507,7 @@
 "input": 100,
 "line_id": 84,
 "model": "fake-sonnet",
-"output": 37,
+"output": 36,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1515,7 +1515,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 58\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 4 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 56\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1550,7 +1550,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 88\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 46\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 7 users.\", \"topic\": \"topic 2\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1577,7 +1577,7 @@
 "input": 100,
 "line_id": 88,
 "model": "fake-sonnet",
-"output": 3,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -1585,7 +1585,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "not json at all",
+"text_head": "{\"gist\": \"Tip 80\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 2 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 }
 ],
@@ -1600,7 +1600,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "30aa0c949e88"
+"user_sha": "fc01919681c5"
 },
 {
 "model": "fake-haiku",
@@ -1612,7 +1612,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "08bd9cc21f53"
+"user_sha": "c70465cc5741"
 },
 {
 "model": "fake-haiku",
@@ -1624,7 +1624,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "0d884396b7c1"
+"user_sha": "324ee7075e5f"
 },
 {
 "model": "fake-haiku",
@@ -1632,7 +1632,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "3219c2883569"
+"user_sha": "fcd4b86f3405"
 },
 {
 "model": "fake-haiku",
@@ -1640,7 +1640,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "b496ef56d4eb"
+"user_sha": "bd736afe5a75"
 },
 {
 "model": "fake-haiku",
@@ -1648,7 +1648,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "a6d31b76c090"
+"user_sha": "b30fff0c1779"
 },
 {
 "model": "fake-haiku",
@@ -1668,7 +1668,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "5ec4cf4d6572"
+"user_sha": "6deb49f1a020"
 },
 {
 "model": "fake-haiku",
@@ -1676,7 +1676,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "1608a353808a"
+"user_sha": "7cd24938a364"
 },
 {
 "model": "fake-haiku",
@@ -1692,7 +1692,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "0c65edd606ea"
+"user_sha": "e1de536d4445"
 },
 {
 "model": "fake-haiku",
@@ -1700,7 +1700,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "505933e2907e"
+"user_sha": "3e7105e167a6"
 },
 {
 "model": "fake-haiku",
@@ -1708,7 +1708,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "86a5ee96d36b"
+"user_sha": "d9312158634f"
 },
 {
 "model": "fake-haiku",
@@ -1716,11 +1716,11 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "a16c281d0b4d"
+"user_sha": "2159e76bb9e1"
 },
 {
 "model": "fake-sonnet",
-"user_sha": "68f18bf48783"
+"user_sha": "63e8bedfec3a"
 },
 {
 "model": "fake-haiku",
@@ -1728,7 +1728,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "4fe8395e56ef"
+"user_sha": "d04389d8022e"
 },
 {
 "model": "fake-haiku",
@@ -1756,7 +1756,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "5694f3150cf2"
+"user_sha": "561c0f9672b8"
 },
 {
 "model": "fake-haiku",
@@ -1772,7 +1772,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "485031fb1cab"
+"user_sha": "af2fb1aeb7c6"
 },
 {
 "model": "fake-haiku",
@@ -1784,7 +1784,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "eeeaa4b68f62"
+"user_sha": "6ea49e15a7e6"
 },
 {
 "model": "fake-haiku",
@@ -1796,7 +1796,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "df55b646f3fa"
+"user_sha": "401c925526a1"
 },
 {
 "model": "fake-haiku",
@@ -1824,7 +1824,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "3d4eb70a61c9"
+"user_sha": "650bee7a319a"
 },
 {
 "model": "fake-haiku",
@@ -1832,7 +1832,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "de6363af5de7"
+"user_sha": "60d11ef51ed2"
 },
 {
 "model": "fake-haiku",
@@ -1848,7 +1848,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "903e843c1fea"
+"user_sha": "abc371bdf507"
 },
 {
 "model": "fake-haiku",
@@ -1868,7 +1868,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "04cd6d452c18"
+"user_sha": "8b4a932c0373"
 },
 {
 "model": "fake-haiku",
@@ -1884,7 +1884,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "dc2102f68a33"
+"user_sha": "be90b2673b8f"
 },
 {
 "model": "fake-haiku",
@@ -1900,7 +1900,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "37feaca6c8ed"
+"user_sha": "d5f0bf4e6198"
 },
 {
 "model": "fake-haiku",
@@ -1912,7 +1912,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "f2d7b23810ce"
+"user_sha": "03921f56c4da"
 },
 {
 "model": "fake-haiku",
@@ -1920,7 +1920,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "bafe5acaea73"
+"user_sha": "a3c8ce4a7c8b"
 },
 {
 "model": "fake-haiku",
@@ -1932,7 +1932,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "8f3a0b1b5958"
+"user_sha": "6f1d7f974694"
 },
 {
 "model": "fake-haiku",
@@ -1964,7 +1964,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "a6c60da8f74c"
+"user_sha": "5c1a8e13171c"
 },
 {
 "model": "fake-haiku",
@@ -1972,7 +1972,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "b3ed389c59dd"
+"user_sha": "dab24ce0447b"
 },
 {
 "model": "fake-haiku",
@@ -1980,7 +1980,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "e775f387be2d"
+"user_sha": "d0b7895e2cad"
 },
 {
 "model": "fake-haiku",
@@ -1988,7 +1988,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "b7c06bc3b084"
+"user_sha": "37b185c9274e"
 }
 ],
 "timing": [
@@ -2001,7 +2001,7 @@
 "emit_at": 36015.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 59",
+"gist": "Tip 25",
 "gist_at": 36015.0,
 "level": "orange",
 "line_id": 1,
@@ -2025,15 +2025,22 @@
 {
 "available_at": 36042.0,
 "context_revision": 0,
-"error": null,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36042.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
+"gist": "Tip 12",
+"gist_at": 36042.0,
+"level": "orange",
 "line_id": 4,
 "meeting": "observer_question",
-"outcome": "tip_invalid",
+"outcome": "emitted",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36041.0,
+"shown_at": 36042.0,
 "signals": [
 "question"
 ],
@@ -2057,15 +2064,22 @@
 {
 "available_at": 36081.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36081.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
+"gist": "Tip 46",
+"gist_at": 36081.0,
+"level": "orange",
 "line_id": 7,
 "meeting": "observer_question",
-"outcome": "skip",
+"outcome": "emitted",
 "rate_exempt": true,
-"reason": "nothing",
 "route": "direct",
 "seg_end": 36080.0,
+"shown_at": 36081.0,
 "signals": [
 "question",
 "second_person",
@@ -2083,11 +2097,12 @@
 "context_revision": 0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
+"gist": "Tip 72",
+"gist_at": 36093.0,
 "line_id": 8,
 "meeting": "observer_question",
-"outcome": "skip",
+"outcome": "diet_phrase_repeat",
 "rate_exempt": true,
-"reason": "nothing",
 "route": "direct",
 "seg_end": 36092.0,
 "signals": [
@@ -2103,22 +2118,16 @@
 {
 "available_at": 36099.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36099.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 44",
+"gist": "Tip 68",
 "gist_at": 36099.0,
-"level": "orange",
 "line_id": 9,
 "meeting": "observer_question",
-"outcome": "emitted",
+"outcome": "diet_phrase_repeat",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36098.0,
-"shown_at": 36099.0,
 "signals": [
 "question",
 "second_person"
@@ -2139,7 +2148,7 @@
 "emit_at": 36145.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 38",
+"gist": "Tip 78",
 "gist_at": 36145.0,
 "level": "orange",
 "line_id": 13,
@@ -2178,7 +2187,7 @@
 "emit_at": 36203.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 8",
+"gist": "Tip 45",
 "gist_at": 36203.0,
 "level": "orange",
 "line_id": 19,
@@ -2202,22 +2211,15 @@
 {
 "available_at": 36214.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36214.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 7",
-"gist_at": 36214.0,
-"level": "orange",
 "line_id": 20,
 "meeting": "observer_question",
-"outcome": "emitted",
+"outcome": "skip",
 "rate_exempt": true,
+"reason": "nothing",
 "route": "direct",
 "seg_end": 36213.0,
-"shown_at": 36214.0,
 "signals": [
 "question",
 "second_person"
@@ -2232,16 +2234,22 @@
 {
 "available_at": 36227.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36227.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 5",
+"gist": "Tip 56",
 "gist_at": 36227.0,
+"level": "orange",
 "line_id": 21,
 "meeting": "observer_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "emitted",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36226.0,
+"shown_at": 36227.0,
 "signals": [
 "question"
 ],
@@ -2257,12 +2265,11 @@
 "context_revision": 0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 12",
-"gist_at": 36236.0,
 "line_id": 22,
 "meeting": "observer_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "skip",
 "rate_exempt": true,
+"reason": "nothing",
 "route": "direct",
 "seg_end": 36235.0,
 "signals": [
@@ -2288,13 +2295,12 @@
 {
 "available_at": 36241.0,
 "context_revision": 0,
+"error": null,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 47",
-"gist_at": 36241.0,
 "line_id": 23,
 "meeting": "observer_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "tip_invalid",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36240.0,
@@ -2317,7 +2323,7 @@
 "emit_at": 36320.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 70",
+"gist": "Tip 83",
 "gist_at": 36320.0,
 "level": "orange",
 "line_id": 31,
@@ -2340,15 +2346,22 @@
 {
 "available_at": 36354.0,
 "context_revision": 0,
-"error": null,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36354.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
+"gist": "Tip 66",
+"gist_at": 36354.0,
+"level": "orange",
 "line_id": 35,
 "meeting": "observer_question",
-"outcome": "tip_invalid",
+"outcome": "emitted",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36353.0,
+"shown_at": 36354.0,
 "signals": [
 "question"
 ],
@@ -2362,22 +2375,16 @@
 {
 "available_at": 36380.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36380.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 39",
+"gist": "Tip 20",
 "gist_at": 36380.0,
-"level": "orange",
 "line_id": 38,
 "meeting": "observer_question",
-"outcome": "emitted",
+"outcome": "diet_phrase_repeat",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36379.0,
-"shown_at": 36380.0,
 "signals": [
 "question",
 "second_person"
@@ -2453,7 +2460,7 @@
 "emit_at": 36534.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 48",
+"gist": "Tip 4",
 "gist_at": 36534.0,
 "level": "orange",
 "line_id": 55,
@@ -2486,22 +2493,15 @@
 {
 "available_at": 36628.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36628.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 29",
-"gist_at": 36628.0,
-"level": "orange",
 "line_id": 65,
 "meeting": "observer_question",
-"outcome": "emitted",
+"outcome": "skip",
 "rate_exempt": true,
+"reason": "nothing",
 "route": "direct",
 "seg_end": 36627.0,
-"shown_at": 36628.0,
 "signals": [
 "question"
 ],
@@ -2521,7 +2521,7 @@
 "emit_at": 36654.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 79",
+"gist": "Tip 60",
 "gist_at": 36654.0,
 "level": "orange",
 "line_id": 68,
@@ -2544,16 +2544,22 @@
 {
 "available_at": 36678.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36678.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 6",
+"gist": "Tip 47",
 "gist_at": 36678.0,
+"level": "orange",
 "line_id": 70,
 "meeting": "observer_question",
-"outcome": "diet_phrase_repeat",
+"outcome": "emitted",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36677.0,
+"shown_at": 36678.0,
 "signals": [
 "question"
 ],
@@ -2569,7 +2575,7 @@
 "context_revision": 0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 41",
+"gist": "Tip 51",
 "gist_at": 36684.0,
 "line_id": 71,
 "meeting": "observer_question",
@@ -2591,22 +2597,16 @@
 {
 "available_at": 36710.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36710.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 30",
+"gist": "Tip 80",
 "gist_at": 36710.0,
-"level": "orange",
 "line_id": 73,
 "meeting": "observer_question",
-"outcome": "emitted",
+"outcome": "diet_phrase_repeat",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36709.0,
-"shown_at": 36710.0,
 "signals": [
 "question",
 "second_person"
@@ -2621,15 +2621,22 @@
 {
 "available_at": 36794.0,
 "context_revision": 0,
+"e2e_gist_s": 1.0,
+"e2e_s": 1.0,
+"e2e_shown_s": 1.0,
+"emit_at": 36794.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
+"gist": "Tip 35",
+"gist_at": 36794.0,
+"level": "orange",
 "line_id": 83,
 "meeting": "observer_question",
-"outcome": "skip",
+"outcome": "emitted",
 "rate_exempt": true,
-"reason": "nothing",
 "route": "direct",
 "seg_end": 36793.0,
+"shown_at": 36794.0,
 "signals": [
 "question"
 ],
@@ -2649,7 +2656,7 @@
 "emit_at": 36800.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 58",
+"gist": "Tip 56",
 "gist_at": 36800.0,
 "level": "orange",
 "line_id": 84,
@@ -2673,22 +2680,16 @@
 {
 "available_at": 36816.0,
 "context_revision": 0,
-"e2e_gist_s": 1.0,
-"e2e_s": 1.0,
-"e2e_shown_s": 1.0,
-"emit_at": 36816.0,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
-"gist": "Tip 88",
+"gist": "Tip 46",
 "gist_at": 36816.0,
-"level": "orange",
 "line_id": 86,
 "meeting": "observer_question",
-"outcome": "emitted",
+"outcome": "diet_phrase_repeat",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36815.0,
-"shown_at": 36816.0,
 "signals": [
 "question",
 "second_person"
@@ -2703,12 +2704,13 @@
 {
 "available_at": 36824.0,
 "context_revision": 0,
-"error": null,
 "event": "Interview, role observer: the other side asked the candidate a question. Give ONE orange tip: gist = the interviewer's question VERBATIM (merge rephrasings into one question, the 7-word limit does not apply), phrase = what a strong answer contains, 4-5 sentences in the interview language, note = 'for comparison, not to say' written in the tips language. Never analyse the PM. trigger direct_question.",
 "force_level": "orange",
+"gist": "Tip 80",
+"gist_at": 36824.0,
 "line_id": 88,
 "meeting": "observer_question",
-"outcome": "tip_invalid",
+"outcome": "diet_phrase_repeat",
 "rate_exempt": true,
 "route": "direct",
 "seg_end": 36823.0,
@@ -2788,7 +2790,7 @@
 {
 "at": "10:00:15",
 "engine": "app",
-"gist": "Tip 59",
+"gist": "Tip 25",
 "kind": "tip",
 "level": "orange",
 "partial": true,
@@ -2800,14 +2802,14 @@
 {
 "at": "10:00:15",
 "engine": "app",
-"gist": "Tip 59",
+"gist": "Tip 25",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "orange",
-"phrase": "We ship it on Tuesday, 3 users.",
+"phrase": "We ship it on Tuesday, 8 users.",
 "schema_version": 1,
 "src": "10:00:11",
 "t": "10:00:15",
@@ -2866,6 +2868,36 @@
 "t": "10:00:42",
 "theirs": [],
 "topic": "release plan"
+},
+{
+"at": "10:00:42",
+"engine": "app",
+"gist": "Tip 12",
+"kind": "tip",
+"level": "orange",
+"partial": true,
+"schema_version": 1,
+"src": "10:00:38",
+"t": "10:00:42",
+"uid": "a4-42000"
+},
+{
+"at": "10:00:42",
+"engine": "app",
+"gist": "Tip 12",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 7 users.",
+"schema_version": 1,
+"src": "10:00:38",
+"t": "10:00:42",
+"topic": "topic 3",
+"trigger": "direct_question",
+"uid": "a4-42000"
 },
 {
 "actions": [
@@ -2930,7 +2962,7 @@
 {
 "at": "10:01:08",
 "engine": "app",
-"gist": "Tip 74",
+"gist": "Tip 25",
 "items": [
 "Review on Monday"
 ],
@@ -2969,6 +3001,39 @@
 "topic": "release plan"
 },
 {
+"at": "10:01:21",
+"engine": "app",
+"gist": "Tip 46",
+"kind": "tip",
+"level": "orange",
+"partial": true,
+"schema_version": 1,
+"src": "10:01:17",
+"t": "10:01:21",
+"uid": "a7-81000"
+},
+{
+"at": "10:01:21",
+"engine": "app",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 46",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 0 users.",
+"schema_version": 1,
+"src": "10:01:17",
+"t": "10:01:21",
+"topic": "topic 4",
+"trigger": "direct_question",
+"uid": "a7-81000"
+},
+{
 "actions": [
 {
 "due": "Friday",
@@ -2993,36 +3058,6 @@
 "t": "10:01:39",
 "theirs": [],
 "topic": "release plan"
-},
-{
-"at": "10:01:39",
-"engine": "app",
-"gist": "Tip 44",
-"kind": "tip",
-"level": "orange",
-"partial": true,
-"schema_version": 1,
-"src": "10:01:35",
-"t": "10:01:39",
-"uid": "a9-99000"
-},
-{
-"at": "10:01:39",
-"engine": "app",
-"gist": "Tip 44",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "orange",
-"phrase": "We ship it on Tuesday, 6 users.",
-"schema_version": 1,
-"src": "10:01:35",
-"t": "10:01:39",
-"topic": "topic 2",
-"trigger": "direct_question",
-"uid": "a9-99000"
 },
 {
 "actions": [
@@ -3105,7 +3140,7 @@
 {
 "at": "10:02:25",
 "engine": "app",
-"gist": "Tip 38",
+"gist": "Tip 78",
 "kind": "tip",
 "level": "orange",
 "partial": true,
@@ -3120,18 +3155,18 @@
 "fact_ids": [
 "F1"
 ],
-"gist": "Tip 38",
+"gist": "Tip 78",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "orange",
-"phrase": "We ship it on Tuesday, 4 users.",
+"phrase": "We ship it on Tuesday, 1 users.",
 "schema_version": 1,
 "src": "10:02:21",
 "t": "10:02:25",
-"topic": "topic 4",
+"topic": "topic 3",
 "trigger": "direct_question",
 "uid": "a13-145000"
 },
@@ -3164,13 +3199,13 @@
 {
 "at": "10:02:36",
 "engine": "app",
-"gist": "Tip 82",
+"gist": "Tip 2",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "level": "red",
-"phrase": "We ship it on Tuesday, 3 users.",
+"phrase": "We ship it on Tuesday, 7 users.",
 "schema_version": 1,
 "src": "10:02:36",
 "t": "10:02:36"
@@ -3264,7 +3299,7 @@
 {
 "at": "10:03:23",
 "engine": "app",
-"gist": "Tip 8",
+"gist": "Tip 45",
 "kind": "tip",
 "level": "orange",
 "partial": true,
@@ -3276,14 +3311,17 @@
 {
 "at": "10:03:23",
 "engine": "app",
-"gist": "Tip 8",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 45",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "orange",
-"phrase": "We ship it on Tuesday, 0 users.",
+"phrase": "We ship it on Tuesday, 6 users.",
 "schema_version": 1,
 "src": "10:03:19",
 "t": "10:03:23",
@@ -3292,34 +3330,34 @@
 "uid": "a19-203000"
 },
 {
-"at": "10:03:34",
+"at": "10:03:47",
 "engine": "app",
-"gist": "Tip 7",
+"gist": "Tip 56",
 "kind": "tip",
 "level": "orange",
 "partial": true,
 "schema_version": 1,
-"src": "10:03:30",
-"t": "10:03:34",
-"uid": "a20-214000"
+"src": "10:03:43",
+"t": "10:03:47",
+"uid": "a21-227000"
 },
 {
-"at": "10:03:34",
+"at": "10:03:47",
 "engine": "app",
-"gist": "Tip 7",
+"gist": "Tip 56",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "orange",
-"phrase": "We ship it on Tuesday, 8 users.",
+"phrase": "We ship it on Tuesday, 6 users.",
 "schema_version": 1,
-"src": "10:03:30",
-"t": "10:03:34",
-"topic": "topic 1",
+"src": "10:03:43",
+"t": "10:03:47",
+"topic": "topic 2",
 "trigger": "direct_question",
-"uid": "a20-214000"
+"uid": "a21-227000"
 },
 {
 "actions": [
@@ -3350,10 +3388,13 @@
 {
 "at": "10:03:56",
 "engine": "app",
-"gist": "No ready answer",
+"gist": "Tip 60",
+"items": [
+"Review on Monday"
+],
 "kind": "answer",
-"level": "info",
-"phrase": "Give me a minute, I will check and tell you exactly.",
+"level": "red",
+"phrase": "We ship it on Tuesday, 6 users.",
 "q": "What did we promise on retention?",
 "schema_version": 1,
 "src": "10:03:56",
@@ -3508,7 +3549,7 @@
 {
 "at": "10:05:20",
 "engine": "app",
-"gist": "Tip 70",
+"gist": "Tip 83",
 "kind": "tip",
 "level": "orange",
 "partial": true,
@@ -3520,21 +3561,18 @@
 {
 "at": "10:05:20",
 "engine": "app",
-"fact_ids": [
-"F1"
-],
-"gist": "Tip 70",
+"gist": "Tip 83",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "orange",
-"phrase": "We ship it on Tuesday, 0 users.",
+"phrase": "We ship it on Tuesday, 6 users.",
 "schema_version": 1,
 "src": "10:05:16",
 "t": "10:05:20",
-"topic": "topic 3",
+"topic": "topic 4",
 "trigger": "direct_question",
 "uid": "a31-320000"
 },
@@ -3599,6 +3637,36 @@
 "topic": "release plan"
 },
 {
+"at": "10:05:54",
+"engine": "app",
+"gist": "Tip 66",
+"kind": "tip",
+"level": "orange",
+"partial": true,
+"schema_version": 1,
+"src": "10:05:50",
+"t": "10:05:54",
+"uid": "a35-354000"
+},
+{
+"at": "10:05:54",
+"engine": "app",
+"gist": "Tip 66",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 0 users.",
+"schema_version": 1,
+"src": "10:05:50",
+"t": "10:05:54",
+"topic": "topic 3",
+"trigger": "direct_question",
+"uid": "a35-354000"
+},
+{
 "actions": [
 {
 "due": "Friday",
@@ -3625,41 +3693,15 @@
 "topic": "release plan"
 },
 {
-"at": "10:06:20",
+"at": "10:06:46",
 "engine": "app",
-"gist": "Tip 39",
-"kind": "tip",
-"level": "orange",
-"partial": true,
-"schema_version": 1,
-"src": "10:06:16",
-"t": "10:06:20",
-"uid": "a38-380000"
-},
-{
-"at": "10:06:20",
-"engine": "app",
-"gist": "Tip 39",
+"gist": "🔎 Tip 14",
 "items": [
 "Review on Monday"
 ],
-"kind": "tip",
-"late": false,
-"level": "orange",
-"phrase": "We ship it on Tuesday, 5 users.",
-"schema_version": 1,
-"src": "10:06:16",
-"t": "10:06:20",
-"topic": "topic 3",
-"trigger": "direct_question",
-"uid": "a38-380000"
-},
-{
-"at": "10:06:46",
-"engine": "app",
-"gist": "🔎 Nothing found in the project folder",
 "kind": "answer",
 "level": "info",
+"phrase": "We ship it on Tuesday, 2 users.",
 "q": "find: pilot users",
 "schema_version": 1,
 "src": "10:06:46",
@@ -3901,7 +3943,7 @@
 {
 "at": "10:08:54",
 "engine": "app",
-"gist": "Tip 48",
+"gist": "Tip 4",
 "kind": "tip",
 "level": "orange",
 "partial": true,
@@ -3913,14 +3955,17 @@
 {
 "at": "10:08:54",
 "engine": "app",
-"gist": "Tip 48",
+"fact_ids": [
+"F1"
+],
+"gist": "Tip 4",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "orange",
-"phrase": "We ship it on Tuesday, 5 users.",
+"phrase": "We ship it on Tuesday, 8 users.",
 "schema_version": 1,
 "src": "10:08:50",
 "t": "10:08:54",
@@ -3987,13 +4032,13 @@
 {
 "at": "10:09:44",
 "engine": "app",
-"gist": "Tip 25",
+"gist": "Tip 50",
 "items": [
 "Review on Monday"
 ],
 "kind": "answer",
-"level": "red",
-"phrase": "We ship it on Tuesday, 0 users.",
+"level": "info",
+"phrase": "We ship it on Tuesday, 2 users.",
 "q": "What is the release date?",
 "schema_version": 1,
 "src": "10:09:44",
@@ -4026,36 +4071,6 @@
 "t": "10:10:17",
 "theirs": [],
 "topic": "release plan"
-},
-{
-"at": "10:10:28",
-"engine": "app",
-"gist": "Tip 29",
-"kind": "tip",
-"level": "orange",
-"partial": true,
-"schema_version": 1,
-"src": "10:10:24",
-"t": "10:10:28",
-"uid": "a65-628000"
-},
-{
-"at": "10:10:28",
-"engine": "app",
-"gist": "Tip 29",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "orange",
-"phrase": "We ship it on Tuesday, 3 users.",
-"schema_version": 1,
-"src": "10:10:24",
-"t": "10:10:28",
-"topic": "topic 1",
-"trigger": "direct_question",
-"uid": "a65-628000"
 },
 {
 "actions": [
@@ -4116,7 +4131,7 @@
 {
 "at": "10:10:54",
 "engine": "app",
-"gist": "Tip 79",
+"gist": "Tip 60",
 "kind": "tip",
 "level": "orange",
 "partial": true,
@@ -4128,20 +4143,50 @@
 {
 "at": "10:10:54",
 "engine": "app",
-"gist": "Tip 79",
+"gist": "Tip 60",
 "items": [
 "Review on Monday"
 ],
 "kind": "tip",
 "late": false,
 "level": "orange",
-"phrase": "We ship it on Tuesday, 5 users.",
+"phrase": "We ship it on Tuesday, 8 users.",
 "schema_version": 1,
 "src": "10:10:50",
 "t": "10:10:54",
 "topic": "topic 2",
 "trigger": "direct_question",
 "uid": "a68-654000"
+},
+{
+"at": "10:11:18",
+"engine": "app",
+"gist": "Tip 47",
+"kind": "tip",
+"level": "orange",
+"partial": true,
+"schema_version": 1,
+"src": "10:11:14",
+"t": "10:11:18",
+"uid": "a70-678000"
+},
+{
+"at": "10:11:18",
+"engine": "app",
+"gist": "Tip 47",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 2 users.",
+"schema_version": 1,
+"src": "10:11:14",
+"t": "10:11:18",
+"topic": "topic 1",
+"trigger": "direct_question",
+"uid": "a70-678000"
 },
 {
 "actions": [
@@ -4200,39 +4245,6 @@
 "topic": "release plan"
 },
 {
-"at": "10:11:50",
-"engine": "app",
-"gist": "Tip 30",
-"kind": "tip",
-"level": "orange",
-"partial": true,
-"schema_version": 1,
-"src": "10:11:46",
-"t": "10:11:50",
-"uid": "a73-710000"
-},
-{
-"at": "10:11:50",
-"engine": "app",
-"fact_ids": [
-"F1"
-],
-"gist": "Tip 30",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "orange",
-"phrase": "We ship it on Tuesday, 8 users.",
-"schema_version": 1,
-"src": "10:11:46",
-"t": "10:11:50",
-"topic": "topic 4",
-"trigger": "direct_question",
-"uid": "a73-710000"
-},
-{
 "actions": [
 {
 "due": "Friday",
@@ -4289,54 +4301,24 @@
 "topic": "release plan"
 },
 {
-"at": "10:13:20",
+"at": "10:13:14",
 "engine": "app",
-"gist": "Tip 58",
+"gist": "Tip 35",
 "kind": "tip",
 "level": "orange",
 "partial": true,
 "schema_version": 1,
-"src": "10:13:16",
-"t": "10:13:20",
-"uid": "a84-800000"
+"src": "10:13:10",
+"t": "10:13:14",
+"uid": "a83-794000"
 },
 {
-"at": "10:13:20",
-"engine": "app",
-"gist": "Tip 58",
-"items": [
-"Review on Monday"
-],
-"kind": "tip",
-"late": false,
-"level": "orange",
-"phrase": "We ship it on Tuesday, 4 users.",
-"schema_version": 1,
-"src": "10:13:16",
-"t": "10:13:20",
-"topic": "topic 3",
-"trigger": "direct_question",
-"uid": "a84-800000"
-},
-{
-"at": "10:13:36",
-"engine": "app",
-"gist": "Tip 88",
-"kind": "tip",
-"level": "orange",
-"partial": true,
-"schema_version": 1,
-"src": "10:13:32",
-"t": "10:13:36",
-"uid": "a86-816000"
-},
-{
-"at": "10:13:36",
+"at": "10:13:14",
 "engine": "app",
 "fact_ids": [
 "F1"
 ],
-"gist": "Tip 88",
+"gist": "Tip 35",
 "items": [
 "Review on Monday"
 ],
@@ -4345,11 +4327,41 @@
 "level": "orange",
 "phrase": "We ship it on Tuesday, 6 users.",
 "schema_version": 1,
-"src": "10:13:32",
-"t": "10:13:36",
+"src": "10:13:10",
+"t": "10:13:14",
+"topic": "topic 4",
+"trigger": "direct_question",
+"uid": "a83-794000"
+},
+{
+"at": "10:13:20",
+"engine": "app",
+"gist": "Tip 56",
+"kind": "tip",
+"level": "orange",
+"partial": true,
+"schema_version": 1,
+"src": "10:13:16",
+"t": "10:13:20",
+"uid": "a84-800000"
+},
+{
+"at": "10:13:20",
+"engine": "app",
+"gist": "Tip 56",
+"items": [
+"Review on Monday"
+],
+"kind": "tip",
+"late": false,
+"level": "orange",
+"phrase": "We ship it on Tuesday, 3 users.",
+"schema_version": 1,
+"src": "10:13:16",
+"t": "10:13:20",
 "topic": "topic 1",
 "trigger": "direct_question",
-"uid": "a86-816000"
+"uid": "a84-800000"
 },
 {
 "at": "10:20:28",

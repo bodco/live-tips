@@ -536,7 +536,7 @@ final class CallEngine {
                 if (d["ok"] as? Bool) == true, let url = d["url"] as? String {
                     self.notionResult = url; UsageLog.log("notion_page_written")
                     MainActor.assumeIsolated { CallHistory.shared.setNotion(file: file, url: url) }
-                    self.notify(((d["created"] as? Bool) == true ? L("eng.notionCreated") : L("eng.notionAdded")), url: url)
+                    // 2026-11-10 (owner): no modal on success; it stole focus after every call. The link is on the call page.
                 } else {
                     self.notionResult = "Notion: " + ((d["error"] as? String) ?? L("eng.notionFailed"))
                     self.notify(self.notionResult)

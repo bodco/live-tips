@@ -32,6 +32,11 @@ final class PrepRunner: ObservableObject {
     @Published var costUSD: Double?          // from the stream's final "result" event (API key; the plan shows the equivalent)
     private var lineBuf = Data()
     private var process: Process?
+    /// 2026-11-11: the ChatGPT account (Codex CLI) sends each pass whole after minutes, so a step and a clock
+    /// replace the frozen 25%: which pass of how many, the time it has waited and a slow creep toward the next step.
+    private var waitTimer: Timer?
+    private var waitSince = Date()
+    private var waitStep = (n: 0, of: 0, what: "")
 
     /// How Claude Code is paid for: the PM's Claude account (Claude Code sign-in) or the app's API key.
     /// 0.8.2: chosen in Settings > AI (AppConfig.ai.prep); `runRoute` is the way this run took (auto-switch).
@@ -67,7 +72,7 @@ final class PrepRunner: ObservableObject {
         return (((c.effectiveAppRoot(appSupport: AppPaths.support.path) as NSString).appendingPathComponent("prep-runs") as NSString)
             .appendingPathComponent((base as NSString).lastPathComponent))
     }
-    static let runFiles = ["brief.md", "cards.json", "facts.json", "prep.json", "brief.orig.md", "brief.prev.md", "digest.md"]
+    static let runFiles = ["brief.md", "cards.json", "facts.json", "prep.json", "brief.orig.md", "brief.prev.md", "digest.md", "context.json"]
     static func stamp() -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmmss"; return f.string(from: Date()) }
 
     /// Before a full preparation: the previous one's files leave the live folder (kept in prep-runs), so the new one
@@ -84,10 +89,15 @@ final class PrepRunner: ObservableObject {
 
     /// After it: a copy of what it wrote and run.json (route, model, time, price, tokens, turns, sources); the
     /// previous brief is back as <base>.brief.prev.md (Restore previous version); a failed run puts the old files back.
+    /// 2026-11-11: a model name becomes one folder name ("codex/default" made a nested folder).
+    nonisolated static func folderSafe(_ model: String) -> String {
+        model.replacingOccurrences(of: ":", with: "_").replacingOccurrences(of: "/", with: "-")
+    }
+
     static func keepRun(base: String, aside: String?, ok: Bool, meta: [String: Any]) {
         let fm = FileManager.default
         let route = meta["route"] as? String ?? "", model = meta["model"] as? String ?? ""
-        let dir = (runsDir(base) as NSString).appendingPathComponent(stamp() + "-" + route + "-" + model.replacingOccurrences(of: ":", with: "_") + (ok ? "" : "-failed"))
+        let dir = (runsDir(base) as NSString).appendingPathComponent(stamp() + "-" + route + "-" + Self.folderSafe(model) + (ok ? "" : "-failed"))
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
         for f in runFiles where fm.fileExists(atPath: base + "." + f) { try? fm.copyItem(atPath: base + "." + f, toPath: (dir as NSString).appendingPathComponent(f)) }
         if let d = try? JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys]) {
@@ -103,6 +113,24 @@ final class PrepRunner: ObservableObject {
                 if fm.fileExists(atPath: src) { try? fm.copyItem(atPath: src, toPath: base + "." + f) }
             }
         }
+    }
+
+    /// 0.9.7: `python -m livetips_m0.prepcontext --request <req> --read <list> --write` (a second or two: the folder is
+    /// walked and scored once). Returns the summary for prep.json, nil when the engine could not run it.
+    static func contextManifest(python: String, engineDir: String, request: String, read: [String]) -> Any? {
+        let readPath = (request as NSString).deletingPathExtension + "-read.json"
+        guard let d = try? JSONSerialization.data(withJSONObject: read) else { return nil }
+        try? d.write(to: URL(fileURLWithPath: readPath))
+        let p = Process(), o = Pipe()
+        p.executableURL = URL(fileURLWithPath: python)
+        p.arguments = ["-m", "livetips_m0.prepcontext", "--request", request, "--read", readPath, "--write"]
+        p.currentDirectoryURL = URL(fileURLWithPath: engineDir)
+        p.standardOutput = o; p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return nil }
+        let out = o.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        guard p.terminationStatus == 0, let j = try? JSONSerialization.jsonObject(with: out) as? [String: Any] else { return nil }
+        return j["summary"]
     }
 
     static var models: [(id: String, label: String)] { [("sonnet", L("prep.model.sonnet")), ("opus", L("prep.model.opus")),
@@ -290,6 +318,7 @@ final class PrepRunner: ObservableObject {
         process = nil
         lineBuf = Data()
         running = false
+        stopWait()
         result = L("prep.stopped")
         UpNext.shared.prepFinished(id: callID, base: nil, ok: false, stopped: true)
     }
@@ -335,7 +364,7 @@ final class PrepRunner: ObservableObject {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmm"
         let h = DateFormatter(); h.dateFormat = "yyyy-MM-dd HH:mm"
         let base = r.refreshBase ?? (live as NSString).appendingPathComponent("prep-\(f.string(from: r.date))-\(StartCallModel.slugify(r.title))")
-        let refs = ["sweep.md", "speech.md"] + (r.callType == "presentation" ? ["presentation.md"] : [])
+        let refs = ["sweep.md", "speech.md"] + (r.callType == "presentation" ? ["presentation.md", "talk.md"] : [])   // 0.9.7: talk.md, the PM's own speech per slide
             + (r.callType == "interview" ? ["hiring.md"] : []) + (r.audience == "client" ? ["culture.md"] : [])
         var notion = [(r.root as NSString).appendingPathComponent("_notion")]
         if !r.workspaceRoot.isEmpty { notion.append((r.workspaceRoot as NSString).appendingPathComponent("_notion")) }
@@ -352,6 +381,18 @@ final class PrepRunner: ObservableObject {
         \(r.callType == "interview" ? ", role " + r.hiringRole : ""). Call languages: \(r.languages.joined(separator: "+")).
 
         Before choosing questions, reconcile THIS call's participants, their roles, goal and named source document with the latest PM context. A repeated title does not imply the same interviewee. Explicit current corrections override older calls and saved instructions. If sources conflict and no current correction resolves them, put a prominent "Needs confirmation" section before the checklist; state both alternatives and do not silently reuse either interviewee's questions. Start with a "Live essentials" section: the goal, interviewee and role, primary document, 3-5 key facts/red lines and unresolved confirmations. Keep that section below 180 words; preserve the detailed brief below it.
+
+        Think as the PM's co-driver for the whole call, not for one meeting type: a call mixes moments (a demo, someone \
+        asking the PM, the PM asking, a discussion). Two things the PM needs most and often does not have at hand: \
+        (1) "What you already know": what was done and found on this project recently, also work Claude or the team \
+        did that the PM may not have read (research, QA walkthroughs, notes, summaries in the project folder and the \
+        Notion copy). Write it as short findings with sources, so the PM can answer "what did you check, what did you \
+        find" from it. (2) "Open by topic": for each topic likely to come up, what is known, what is unclear or \
+        contradicts, and the questions that follow from those gaps. Work the questions out from the material (a finding \
+        that looks like a bug, a flow you could not explain, an area nobody covered), do not just copy a ready list; \
+        follow the focus the PM gave in the context or in his recent notes and requests (for example product \
+        functionality rather than general handover questions).
+        \(r.useProjectFolder ? Self.recentFilesBlock(r.root) : "")
 
         The PM's call context (what matters, the folders and documents to read first):
         \(r.context.isEmpty ? "(none)" : r.context)
@@ -514,14 +555,22 @@ final class PrepRunner: ObservableObject {
             p.arguments! += ["--agents", f]
         }
         if useAPI, let b = pa?.budgetUSD { p.arguments! += ["--max-budget-usd", String(format: "%.2f", b)] }
+        // rules/ai.yaml > local: the engine builds the context pack and asks the model (livetips_m0.localprep and the
+        // other packed ways). 0.9.7 (owner, case of 11.11): the deck and its owners reach these ways too, and the same
+        // request lets the Claude ways get the same context manifest afterwards (livetips_m0.prepcontext --read).
+        var req: [String: Any] = ["title": r.title, "when": h.string(from: r.date), "project_name": r.projectName, "root": r.root,
+            "config": r.config, "audience": r.audience, "call_type": r.callType, "languages": r.languages, "context": r.context,
+            "files": r.folders.filter { !StartCallModel.isDir($0) }, "folders": r.folders.filter { StartCallModel.isDir($0) },
+            "live": live, "notion": notion, "skill": skill, "base": base, "lt": [c.engine.python, lt], "model": runModel,
+            "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder, "brief_lang": L10n.lang,
+            "openai_model": c.ai.openaiPrep, "gemini_model": c.ai.geminiPrep, "agy_model": c.ai.agyPrep]
+        if r.deck?.info != nil, FileManager.default.fileExists(atPath: base + ".deck.json") {
+            req["deck"] = base + ".deck.json"
+            req["deck_lines"] = deckLines
+        }
+        let ctxReq = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("prepcontext-request.json")
+        if !isPacked, r.refreshBase == nil, let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: ctxReq)) }
         if isPacked {
-            // rules/ai.yaml > local: the engine builds the context pack and asks Ollama once (livetips_m0.localprep)
-            let req: [String: Any] = ["title": r.title, "when": h.string(from: r.date), "project_name": r.projectName, "root": r.root,
-                "config": r.config, "audience": r.audience, "call_type": r.callType, "languages": r.languages, "context": r.context,
-                "files": r.folders.filter { !StartCallModel.isDir($0) }, "folders": r.folders.filter { StartCallModel.isDir($0) },
-                "live": live, "notion": notion, "skill": skill, "base": base, "lt": [c.engine.python, lt], "model": runModel,
-                "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder, "brief_lang": L10n.lang,
-                "openai_model": c.ai.openaiPrep, "gemini_model": c.ai.geminiPrep, "agy_model": c.ai.agyPrep]
             let reqPath = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("localprep-request.json")
             if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
             p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
@@ -609,6 +658,7 @@ final class PrepRunner: ObservableObject {
                 && FileManager.default.fileExists(atPath: base + ".facts.json")
             Task { @MainActor in
                 guard let self = self, self.process === proc else { return }
+                self.stopWait()
                 (proc.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
                 let forID = self.callID
                 // 0.8.2: the way that is out is marked for everyone; with auto-switch the same preparation runs once
@@ -669,6 +719,13 @@ final class PrepRunner: ObservableObject {
                 }
                 let readList = self.readFiles
                 if !readList.isEmpty { log?.write(("read: " + readList.joined(separator: ", ") + "\n").data(using: .utf8)!) }
+                // 0.9.7 (owner, case of 11.11): the Claude ways read by themselves; the same candidates as on the packed
+                // ways, marked read / not read, go to <base>.context.json and one line under the brief's title.
+                if ok, !isPacked, r.refreshBase == nil,
+                   let ctx = Self.contextManifest(python: c.engine.sidecarPython, engineDir: c.engine.sidecarDir, request: ctxReq, read: readList) {
+                    meta["context"] = ctx
+                    self.resultMeta["context"] = ctx
+                }
                 Self.ledger(job: r.refreshOf == nil ? "prep" : "prep_refresh", route: routeName, usd: self.costUSD, meta: meta, ok: ok)
                 if r.refreshBase == nil {
                     var run = meta
@@ -694,6 +751,7 @@ final class PrepRunner: ObservableObject {
                        CallEngine.shared.isRunning, let f = CallEngine.shared.lastFile { CallEngine.shared.adoptLatePrep(base: base, file: f) }
                 }
                 self.running = false
+                self.stopWait()
                 self.process = nil
                 UpNext.shared.prepFinished(id: forID, base: base, ok: ok)
                 let mins = Int((Date().timeIntervalSince(self.startedAt ?? Date())) / 60)
@@ -723,7 +781,7 @@ final class PrepRunner: ObservableObject {
         callID = r.callID
         forTitle = r.title; forDate = r.date
         result = ""
-        progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil; resultMeta = [:]; readFiles = []
+        stopWait(); progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil; resultMeta = [:]; readFiles = []
         return nil
     }
 
@@ -741,6 +799,33 @@ final class PrepRunner: ObservableObject {
 
     /// 0.9.2 (audit 04.11, sweep.md > Primary document): the files the PM added are the call's main source. Its
     /// "what is missing" part was lost and its ready answer was split into words; the agenda ticked a decision nobody made.
+    /// 2026-11-10 (owner, MinuteDesk KT #2): the QA walkthrough Claude wrote the night before was never opened by the
+    /// preparation. The files changed in the project in the last 7 days are named, newest first (the model decides
+    /// what to read); generated folders, transcripts and the index are left out.
+    nonisolated static func recentFilesBlock(_ root: String, days: Double = 7, limit: Int = 40) -> String {
+        let fm = FileManager.default
+        let skip: Set<String> = ["live", "video", ".livetips-index", ".git", "node_modules", "_archived", "runs", "worktrees"]
+        let exts: Set<String> = ["md", "txt", "docx", "pdf", "csv", "json", "xlsx", "pptx"]
+        let since = Date().addingTimeInterval(-days * 86400)
+        var found: [(String, Date)] = []
+        guard let en = fm.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
+                                     options: [.skipsHiddenFiles]) else { return "" }
+        for case let u as URL in en {
+            let v = try? u.resourceValues(forKeys: [.contentModificationDateKey, .isDirectoryKey])
+            if v?.isDirectory == true {
+                if skip.contains(u.lastPathComponent) || u.lastPathComponent.hasPrefix("wt-") { en.skipDescendants() }
+                continue
+            }
+            guard exts.contains(u.pathExtension.lowercased()), let m = v?.contentModificationDate, m > since else { continue }
+            found.append((String(u.path.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/")), m))
+        }
+        guard !found.isEmpty else { return "" }
+        let f = DateFormatter(); f.dateFormat = "MM-dd HH:mm"
+        let list = found.sorted { $0.1 > $1.1 }.prefix(limit).map { "\($0.0) (\(f.string(from: $0.1)))" }
+        return "Files changed in the project folder in the last 7 days, newest first (look at them; read what matters for this call): "
+            + list.joined(separator: "; ")
+    }
+
     nonisolated static func primaryBlock(_ files: [String]) -> String {
         guard !files.isEmpty else { return "" }
         return "Primary document(s): " + files.joined(separator: "; ") + ". They are this call's main source. Every section " +
@@ -808,7 +893,10 @@ final class PrepRunner: ObservableObject {
             if let st = o["stage"] as? String {      // livetips_m0.localprep
                 switch st {
                 case "pack": set(0.1, L("prep.st.local.pack"), "")
-                case "model": set(0.25, L("prep.st.local.model"), "")
+                case "model":
+                    if let n = o["step"] as? Int, let of = o["steps"] as? Int, n > 0, of > 0 {
+                        startWait(n: n, of: of, pass: o["pass_"] as? String ?? "")
+                    } else { set(0.25, L("prep.st.local.model"), "") }
                 case "writing": set(min(0.9, 0.3 + Double((o["pieces"] as? Int) ?? 0) / 6000), L("prep.st.local.writing"), "")
                 case "verify": set(0.94, L("prep.st.verify"), "")      // 0.9.6 Б3: livetips_m0.prepverify
                 default: set(0.92, L("prep.st.local.check"), "")
@@ -819,6 +907,8 @@ final class PrepRunner: ObservableObject {
                 var m: [String: Any] = ["tokens": o["tokens"] ?? [:]]
                 if let d = o["duration_s"] { m["duration_s"] = d }
                 if let s = o["sources"] { m["sources"] = s }
+                if let s = o["context_summary"] { m["context"] = s }          // 0.9.7: what was taken (<base>.context.json)
+                if let s = o["slides_error"] as? String { m["slides_error"] = s }
                 if let e = o["error"] as? String { m["error"] = e }
                 resultMeta = m
             }
@@ -883,7 +973,31 @@ final class PrepRunner: ObservableObject {
         set(max(progress, p), L("prep.st.sources", ["n": "\(filesRead)"]), what)
     }
 
-    private func set(_ p: Double, _ s: String, _ d: String) { progress = p; stage = s; detail = d }
+    private func set(_ p: Double, _ s: String, _ d: String) { stopWait(); progress = p; stage = s; detail = d }
+
+    private func startWait(n: Int, of: Int, pass: String) {
+        stopWait()
+        let key = "prep.st.codex." + pass
+        let what = L(key)
+        waitStep = (n, of, what == key ? pass : what)
+        waitSince = Date()
+        tickWait()
+        waitTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.tickWait() }
+        }
+    }
+
+    private func tickWait() {
+        guard running, waitStep.of > 0 else { stopWait(); return }
+        let s = Int(Date().timeIntervalSince(waitSince))
+        let span = 0.65 / Double(waitStep.of), start = 0.25 + span * Double(waitStep.n - 1)
+        progress = max(progress, start + span * 0.9 * (1 - exp(-Double(s) / 120)))
+        stage = L("prep.st.codex.pass", ["what": waitStep.what, "n": "\(waitStep.n)", "of": "\(waitStep.of)",
+                                         "time": String(format: "%d:%02d", s / 60, s % 60)])
+        detail = ""
+    }
+
+    private func stopWait() { waitTimer?.invalidate(); waitTimer = nil; waitStep = (0, 0, "") }
 }
 
 /// 0.8.5 (owner: compare the preparations of one call by time, price and quality): control/prep-bench.json

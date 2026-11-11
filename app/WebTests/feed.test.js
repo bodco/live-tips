@@ -153,6 +153,9 @@ test('presentation steps from slides; a skippable step', () => {
   const s = get();
   assert.strictEqual(s.steps.length, 2);
   assert.strictEqual(s.steps[0].canSkip, true);
+  // 0.9.7: the whole talk with its kinds for the slide cards; talk_min for the time bar
+  assert.deepStrictEqual(s.steps[0].body.map((b) => b.k), ['p', 's']);
+  assert.strictEqual(s.steps[0].say.length, 1);
   assert.strictEqual(s.call.presenting, true);
 });
 

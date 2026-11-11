@@ -64,6 +64,11 @@ enum CallState {
         }
     }
 
+    /// The dot and pill fill: the bright orange for "not ready" (2026-11-10, owner), the text colour otherwise.
+    var dot: Color {
+        switch self { case .notReady, .failed, .noBrief: return PN.C.pendingFill; default: return color }
+    }
+
     var text: String {
         switch self {
         case .notReady: return L("home.state.notReady")
@@ -98,7 +103,7 @@ struct StatePill: View {
     var body: some View {
         Text(text ?? state.text).font(.system(size: 11, weight: .semibold)).foregroundStyle(state.color)
             .padding(.horizontal, 7).padding(.vertical, 2)
-            .background(state.color.opacity(0.13), in: Capsule())
+            .background(state.dot.opacity(0.16), in: Capsule())
             .lineLimit(1).fixedSize()
     }
 }
@@ -296,12 +301,12 @@ struct HomeView: View {
 
     private func pillLabel(_ text: String) -> some View {
         HStack(spacing: 5) {
-            Circle().fill(PN.C.pending).frame(width: 6, height: 6).accessibilityHidden(true)
+            Circle().fill(PN.C.pendingFill).frame(width: 6, height: 6).accessibilityHidden(true)
             Text(text).lineLimit(1)
         }
         .font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.pending)
         .padding(.horizontal, 9).padding(.vertical, 3)
-        .background(PN.C.pending.opacity(0.12), in: Capsule())
+        .background(PN.C.pendingFill.opacity(0.16), in: Capsule())
     }
 
     // MARK: the sentence on top
@@ -688,7 +693,7 @@ struct HomeView: View {
         return VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .leading) {
                 Rectangle().fill(PN.C.accent.opacity(0.25)).frame(height: 2)
-                Circle().fill(st.color).frame(width: 12, height: 12)
+                Circle().fill(st.dot).frame(width: 12, height: 12)
                     .overlay(Circle().stroke(PN.C.bg, lineWidth: 2))
             }
             .frame(height: 14)
@@ -734,7 +739,7 @@ struct HomeView: View {
         let people = (r.event?.attendees ?? m?.participants ?? []).prefix(3).joined(separator: ", ")
         let sub = [m.map { $0.target.isEmpty ? "" : $0.targetName } ?? "", people].filter { !$0.isEmpty }.joined(separator: " · ")
         return HStack(alignment: .center, spacing: 12) {
-            Circle().fill(st.color).frame(width: 8, height: 8).accessibilityHidden(true)
+            Circle().fill(st.dot).frame(width: 8, height: 8).accessibilityHidden(true)
             Text(f.string(from: r.start)).font(PN.Font.body.monospacedDigit()).foregroundStyle(PN.C.text3).frame(width: 120, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
                 Button { openCall(r) } label: { Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1) }.buttonStyle(.plain)
@@ -837,7 +842,7 @@ struct RecentCard: View {
         let series = CallPageView.series(of: r).count
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Circle().fill(st.color).frame(width: 7, height: 7).accessibilityHidden(true)
+                Circle().fill(st.dot).frame(width: 7, height: 7).accessibilityHidden(true)
                 Text(Self.when(r)).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                 Spacer(minLength: 0)
                 if let src = r.source {

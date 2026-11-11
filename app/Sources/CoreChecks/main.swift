@@ -1079,9 +1079,38 @@ func meetingLaunch096() {
     expect(MeetingURL.zoomApp("https://meet.google.com/x") == nil, "launch: not Zoom")
 }
 
+// 0.9.7 (capacity check, 11.11): the deck is cut into slides in the show order, hidden slides out, notes read,
+// a text plan cut on one heading level only.
+func deckCapacity097() {
+    let files = ["ppt/slides/slide1.xml", "ppt/slides/slide2.xml", "ppt/slides/slide3.xml", "ppt/slides/slide10.xml"]
+    let pres = "<p:presentation><p:sldIdLst><p:sldId id=\"256\" r:id=\"rId4\"/><p:sldId id=\"257\" r:id=\"rId2\"/><p:sldId id=\"258\" r:id=\"rId3\"/><p:sldId id=\"259\" r:id=\"rId5\"/></p:sldIdLst></p:presentation>"
+    let rels = "<Relationships><Relationship Id=\"rId2\" Type=\"x/slide\" Target=\"slides/slide1.xml\"/><Relationship Id=\"rId3\" Type=\"x/slide\" Target=\"slides/slide2.xml\"/><Relationship Id=\"rId4\" Type=\"x/slide\" Target=\"slides/slide10.xml\"/><Relationship Id=\"rId5\" Type=\"x/slide\" Target=\"/ppt/slides/slide3.xml\"/></Relationships>"
+    expect(PptxOrder.slideFiles(files: files, presentation: pres, rels: rels) == ["ppt/slides/slide10.xml", "ppt/slides/slide1.xml", "ppt/slides/slide2.xml", "ppt/slides/slide3.xml"], "deck: show order from presentation.xml")
+    expect(PptxOrder.slideFiles(files: files, presentation: "", rels: "") == ["ppt/slides/slide1.xml", "ppt/slides/slide2.xml", "ppt/slides/slide3.xml", "ppt/slides/slide10.xml"], "deck: file numbers when presentation.xml is missing")
+    expect(PptxOrder.hidden("<p:sld xmlns:p=\"x\" show=\"0\"><p:cSld/>"), "deck: hidden slide")
+    expect(!PptxOrder.hidden("<p:sld xmlns:p=\"x\"><p:cSld/>"), "deck: shown slide")
+    let nrels = "<Relationships><Relationship Id=\"rId1\" Type=\"http://x/slideLayout\" Target=\"../slideLayouts/slideLayout2.xml\"/><Relationship Id=\"rId2\" Type=\"http://x/notesSlide\" Target=\"../notesSlides/notesSlide7.xml\"/></Relationships>"
+    expect(PptxOrder.notesTarget(nrels) == "../notesSlides/notesSlide7.xml", "deck: notes page of a slide")
+    let notes = "<p:notes><p:sp><p:nvSpPr><p:nvPr><p:ph type=\"sldImg\"/></p:nvPr></p:nvSpPr></p:sp><p:sp><p:nvSpPr><p:nvPr><p:ph type=\"body\" idx=\"1\"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>Say the 216 calls</a:t></a:r></a:p><a:p><a:r><a:t>Mike &amp; Emily&#39;s team</a:t></a:r></a:p></p:txBody></p:sp><p:sp><p:nvSpPr><p:nvPr><p:ph type=\"sldNum\"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>21</a:t></a:r></a:p></p:txBody></p:sp></p:notes>"
+    expect(PptxOrder.notesText(notes) == "Say the 216 calls\nMike & Emily's team", "deck: notes text without the slide number")
+    // A text plan: "# Talk" title, "## Slide" headings, "### subheadings" inside a slide stay text.
+    let plan = "# Our talk\n\n## Why\nFive users.\n### Detail\nTwo weeks.\n\n## Plan\nMonday.\n### Risks\nNone."
+    let b = PptxOrder.outlineBlocks(plan)
+    expect(b.count == 2 && b[0].title == "Why" && b[0].text == "Five users.\nDetail\nTwo weeks." && b[1].title == "Plan", "deck: one heading level starts a slide")
+    let words = PptxOrder.outlineBlocks("## Intro\nSlide 1: Hello\nHi all.\n### Note\nSlide 2: Numbers\n216 calls.")
+    expect(words.count == 2 && words[0].title == "Hello" && words[1].title == "Numbers", "deck: Slide N lines win over headings")
+    let flat = PptxOrder.outlineBlocks("# A\none\n# B\ntwo\n# C\nthree")
+    expect(flat.count == 3, "deck: a single level of headings")
+    let blank = PptxOrder.outlineBlocks("First slide\nline\n\nSecond slide\nline")
+    expect(blank.count == 2, "deck: blank lines without markers")
+    let dashes = PptxOrder.outlineBlocks("One\ntext\n---\nTwo\ntext")
+    expect(dashes.count == 2 && dashes[1].title == "Two", "deck: --- starts a slide")
+}
+
 callRecording()
 meetingNotes0952()
 prepAgent096()
 meetingLaunch096()
+deckCapacity097()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

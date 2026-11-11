@@ -56,6 +56,8 @@ slide_sync:
     who: app only
     how: the app reads the current slide number from Keynote or PowerPoint (Automation permission, asked when the deck is attached) and sends it; the tracker does not ask while it follows. Falls back to B for PDF, Google Slides or without Automation access.
   manual: Previous / Next and the shortcuts always work (inbox setting slide = <n>).
+  hold_s: 90                   # 0.9.7: after a slide set by hand (or by Keynote / PowerPoint) the speech moves nothing for 90 s
+  colleague_follow: forward only, one section at a time, from the section right before it (0.9.7, case of 11.11)
   add30: 'inbox setting slide_add30 = <n>: +30 s to that slide'
 
 prepare_again:
@@ -64,4 +66,24 @@ prepare_again:
   versions_kept: 1              # <base>.slides.prev.json (and .outline.prev.json): "Restore previous version"
   replace_deck: the sheet lets the PM pick a new deck file (the slides changed); it is read first, then the talk is rewritten. Slides whose text changed in the deck are rewritten even with "Keep my edits"; their old edits stay in the previous version.
 
+backup:
+  # 0.9.7 (owner, case of 11.11: "I could not have picked up her slide"). Prepare writes body, numbers, qa and short
+  # for a colleague's (who = other) slides too, from the speech documents when they have the slide.
+  window: folded under "Their text (backup)" during the colleague's block; no cards, no time advice for it
+  take_over: '"Take this slide" (or Previous / Next onto it, or a click on it in the rail) opens the text; the slide stays the colleague''s in the plan'
+  cards: never fired from a colleague's slide text
+
 handoff: a colleague's last slide before the PM's slide shows one "Your turn next" card with the first sentence of the PM's slide (existing rule, presentation.md 10).
+
+window:
+  # 0.9.7 (owner, 11.11): the presentation layout and controls of the 0.7.5 split view, in the app window.
+  default: one window, the current slide on top (number, title, the countdown of the slide, the controls, the time bar, the talk), the tips below as on any call
+  expand: '"Expand" makes the window twice as wide (it grows on the slides side) with the slide cards beside the tips (scroll snaps one card per slide); "One window" goes back. Kept per Mac (deck_split). No side pane while expanded.'
+  controls: [Start / Pause / Resume, Previous, Next, Auto (turns the slides by the schedule with a beep, warns 10 s before the end of a slide), Trim (hides the "can skip" paragraphs), Sound, Reset, My slides / All slides, talk minutes, Swap sides (expanded only), Expand / One window]
+  defaults: {auto: on, sound: on, slides: all, minutes: talk_min of slides.json, else the sum of the budgets}
+  time_bar: one segment per slide sized by its budget (a colleague's striped), the current one filled, a marker at the planned position; a click on a segment moves there
+  countdown: per slide, orange under 10 s, red with a minus past the budget
+  pace: on schedule / ahead / behind chips and the words a minute the rest of the slide needs (warn over 135, trim over 150)
+  position: the window's own clock (Auto) or Previous / Next / a click; Keynote or PowerPoint (sync A) moves it too. The speech tracker does not move the window and "Move to slide N?" is not shown; every move is sent as slide = <n>|manual so the recorder follows the window.
+  run_report: after the last slide, plan, actual and difference per slide
+  colleague_slides: in one window their text stays folded behind "Take this slide"; expanded, it is shown dimmed

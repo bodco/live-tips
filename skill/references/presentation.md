@@ -83,7 +83,12 @@ part, not to interrupt.
    texts (the app gives `<base>.deck.json`: `slides[{n, title, text}]`), write one `slides.json` entry per deck
    slide with the deck's numbering, keep `who`/`speaker` exactly as the PM set them (`me`, `shared` for "All", `other`
    with the colleague's name), and fit all `sec` budgets into the talk time (call length minus Q&A; top-level
-   `talk_min`, `qa_min`, `speakers`). Prepare again keeps one previous version (`<base>.slides.prev.json`) and, with
+   `talk_min`, `qa_min`, `speakers`). Every slide gets `body`, `numbers`, `qa` and `short`, a colleague's (`other`)
+   slides too: they are the PM's backup when the colleague drops out (owner, 11.11: "I could not have picked up her
+   slide"). Write `body` by `talk.md` (the PM's own speech, never a retelling of the slide). Take it from the speech
+   documents when they have the slide, else from the deck text and its speaker notes. The window keeps
+   them folded during the colleague's block and shows no cards for them (rules/presentation.yaml > backup).
+   Prepare again keeps one previous version (`<base>.slides.prev.json`) and, with
    "Keep my edits", leaves slides with `"edited": true` as they are unless their deck text changed
    (rules/presentation.yaml > prepare_again).
 

@@ -14,6 +14,7 @@ max_chars: 60
 states:
   todo: not raised yet
   now: being discussed now (at most one item)
+  raised: was discussed on this call but is not decided or answered yet (0.9.7, set by the engine when a "now" item moves on; the wrapup counts it as Raised)
   done: discussed, decided or answered
   skip: the PM dropped it as not relevant (only the PM sets it; never reminded, never carried into the next call)
 # Text for the model that keeps the call picture (the app's engine adds it to its prompt; the skill follows it).

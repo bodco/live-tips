@@ -15,6 +15,7 @@ from .openai_provider import OpenAIProvider, job_model
 class OpenAIPreparation(Preparation):
     label = "OpenAI"
     head_route = "OpenAI API"
+    route = "openai"      # 0.9.7: the pack budget (prepcontext.BUDGETS)
 
 
 def main(argv=None):
@@ -31,6 +32,9 @@ def main(argv=None):
             raise RuntimeError("No OpenAI API key: add it in Settings > AI > ChatGPT")
         preparation = OpenAIPreparation(request, OpenAIProvider(key, timeout=300, model=model))
         result["sources"] = preparation.run()
+        result["context_summary"] = preparation.summary      # the manifest is in <base>.context.json   # 0.9.7
+        if preparation.slides_error:
+            result["slides_error"] = preparation.slides_error
         result["tokens"] = preparation.tokens
         result["ok"] = True
     except Exception as error:  # noqa: BLE001  the app restores the previous files on failure

@@ -38,7 +38,11 @@ enum PN {
         static let answer    = Color.pn(0x0058B0, 0x64B5FF)
         static let turn      = Color.pn(0x1A7431, 0x4CD964)
         static let onMe      = Color.pn(0x9A4600, 0xFFB340)
-        static let pending   = Color.pn(0xB45309, 0xFF9F45) // 0.9.0 (owner): a call not ready yet, orange. 2026-11-05 (owner): amber in light, C2410C read as pale red (5.0:1 on white)
+        // 2026-11-10 (owner): "not ready" orange must stay BRIGHT in both themes. It went brown twice (C2410C -> B45309
+        // "for contrast") and the owner asked for it back; do not darken it again. tools/tests/test_theme_pending.py
+        // fails when either value turns dull. Text uses `pending`, dots, pills and fills use the brighter `pendingFill`.
+        static let pending   = Color.pn(0xE8590C, 0xFFA940) // text: vivid orange, never amber or brown
+        static let pendingFill = Color.pn(0xFF8A00, 0xFFA826) // dots and pill backgrounds: bright orange
         static let docs      = Color.pn(0x7D3C9E, 0xD29BF5)
         static let danger    = Color.pn(0xC4000F, 0xFF6961)
     }

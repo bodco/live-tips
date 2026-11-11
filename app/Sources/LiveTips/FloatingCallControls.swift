@@ -36,6 +36,7 @@ final class FloatingCallController {
         let live = CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(status.state)
         guard config.floatingCallControls, live else { window.orderOut(nil); return }
         model.status = status
+        model.syncMic()
         let fit = (window.contentView as? NSHostingView<FloatingCallControls>)?.fittingSize ?? window.frame.size
         if abs(fit.height - window.frame.height) > 0.5 {      // keep the top edge where it is
             let top = window.frame.maxY
@@ -65,6 +66,23 @@ final class FloatingCallModel: ObservableObject {
 
     var pausePending: Bool {
         awaitingPause != nil && awaitingPause != status.transcriptPaused && Date().timeIntervalSince(pauseSentAt) < 3
+    }
+
+    /// 2026-11-10 (owner): mute from the strip. The tips window owns the mic state and writes control/mic_muted,
+    /// which the recorder reads; the strip shows that file and toggles through the same path as the menu.
+    @Published var micOff = false
+    private var micSentAt = Date.distantPast
+    private var micFile: String { (CallEngine.shared.appRoot as NSString).appendingPathComponent("control/mic_muted") }
+    func syncMic() {
+        guard Date().timeIntervalSince(micSentAt) > 2 else { return }   // let the window write the file first
+        let off = FileManager.default.fileExists(atPath: micFile)
+        if off != micOff { micOff = off }
+    }
+    func toggleMic() {
+        guard status.state == "recording" else { return }
+        micOff.toggle()
+        micSentAt = Date()
+        app?.toggleMute()
     }
 
     func pauseTranscript() {
@@ -105,6 +123,10 @@ struct FloatingCallControls: View {
                     model.status.transcriptPaused ? "floating.resume" : "floating.pause",
                     tint: model.status.transcriptPaused ? PN.C.pending : nil) { model.pauseTranscript() }
                 .disabled(model.status.state != "recording" || model.status.inboxFile?.isEmpty != false || model.pausePending)
+            control("mic", model.micOff ? "mic.slash.fill" : "mic.fill",
+                    model.micOff ? "floating.unmute" : "floating.mute",
+                    tint: model.micOff ? PN.C.danger : nil) { model.toggleMic() }
+                .disabled(model.status.state != "recording")
             recordButton
             sep
             control("end", "stop.fill", "menubar.endCall", tint: PN.C.danger) { model.app?.endCall() }
@@ -176,7 +198,7 @@ struct FloatingCallControls: View {
             Image(systemName: symbol).font(.system(size: size, weight: weight))
                 .foregroundStyle(tint ?? PN.C.text2)
                 .frame(width: 36, height: 36)
-                .background(RoundedRectangle(cornerRadius: 10).fill(tint == PN.C.pending ? PN.C.pending.opacity(0.14) : (hover == id ? Color.primary.opacity(0.07) : .clear)))
+                .background(RoundedRectangle(cornerRadius: 10).fill(tint == PN.C.pending ? PN.C.pendingFill.opacity(0.16) : (hover == id ? Color.primary.opacity(0.07) : .clear)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain).onHover { hover = $0 ? id : (hover == id ? nil : hover) }

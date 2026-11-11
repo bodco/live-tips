@@ -1095,7 +1095,8 @@ def cmd_search(args):
 
 
 # ---------------------------------------------------------------- digest of recent calls
-CALL_MD = re.compile(r"^(\d{4}-\d{2}-\d{2})-(\d{4})-([^.]+)\.md$")
+# 2026-11-10 (owner): calls recorded by the app are <stem>.app.md; the digest saw "0 calls" for every app call.
+CALL_MD = re.compile(r"^(\d{4}-\d{2}-\d{2})-(\d{4})-([^.]+)(?:\.app)?\.md$")
 Q_CUE = re.compile(r"(^|\W)(what|how|when|why|who|where|which|can|could|do|does|did|are|is|will|would|should|any|"
                    r"чи|що|як|коли|чому|навіщо|хто|де|скільки|який|яка|яке|які|можеш|можете|можна|"
                    r"что|когда|почему|кто|сколько|можешь)(\W|$)", re.I)

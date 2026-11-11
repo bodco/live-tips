@@ -52,7 +52,7 @@ enum CallPageEdit {
     }
 
     /// The next agenda state on a click: not raised, raised, discussed, skipped (not relevant), then not raised again.
-    static func nextAgendaState(_ s: String) -> String { s == "todo" ? "now" : s == "now" ? "done" : s == "done" ? "skip" : "todo" }
+    static func nextAgendaState(_ s: String) -> String { s == "todo" ? "now" : (s == "now" || s == "raised") ? "done" : s == "done" ? "skip" : "todo" }   // 0.9.7: raised
 
     static func appendLine(_ path: String, _ o: [String: Any]) -> Bool {
         guard JSONSerialization.isValidJSONObject(o), let d = try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]) else { return false }
@@ -83,7 +83,7 @@ enum CallPageEdit {
             case "risks": out[id] = o.risks
             case "agenda":
                 out[id] = StartCallModel.agenda(transcript: file).map { a in
-                    a.text + ": " + (a.state == "done" ? L("call.page.discussed") : a.state == "now" ? L("call.page.raised") : L("call.page.notRaised"))
+                    a.text + ": " + (a.state == "done" ? L("call.page.discussed") : (a.state == "now" || a.state == "raised") ? L("call.page.raised") : L("call.page.notRaised"))
                 }
             case "onYou", "onThem", "actions":
                 let folder = (file as NSString).deletingLastPathComponent

@@ -1,0 +1,155 @@
+{
+ "schema": "pacenote.sheet/1",
+ "id": "sheet-2026-11-13-orbit-standup",
+ "title": "Meeting Sheet: Orbit stand-up",
+ "meeting_ref": {
+  "event_id": "evt-orbit-standup",
+  "start": "2026-11-13T10:00:00+02:00"
+ },
+ "mode": "quick",
+ "preset": "standup",
+ "language": "en",
+ "route": "local",
+ "project": {
+  "slug": "orbit",
+  "root": "~/work/Demo/Orbit"
+ },
+ "call_type": "regular",
+ "audience": "internal",
+ "participants": {
+  "ours": [
+   {
+    "name": "Sarah M."
+   },
+   {
+    "name": "Jake T."
+   }
+  ],
+  "theirs": []
+ },
+ "sources": [
+  {
+   "id": "s1",
+   "n": 1,
+   "type": "tracker",
+   "title": "Open items on Orbit",
+   "size_tokens": 900,
+   "chars": 3600,
+   "access": "ok",
+   "used": "full",
+   "auto": true,
+   "modified_at": "2026-11-12"
+  }
+ ],
+ "versions": [
+  {
+   "n": 1,
+   "built_at": "2026-11-12T09:00:00+02:00",
+   "route": "local",
+   "model": "gemma"
+  }
+ ],
+ "built_at": "2026-11-12T09:00:00+02:00",
+ "blocks": [
+  {
+   "id": "b-header",
+   "type": "header",
+   "title": "Header",
+   "visible": true,
+   "only_if_data": false,
+   "order": 0,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-standup_since",
+   "type": "standup_since",
+   "title": "Since last time",
+   "visible": true,
+   "only_if_data": false,
+   "order": 1,
+   "facts": [
+    {
+     "id": "su-1",
+     "text": "Finished the export screen",
+     "source_ids": [
+      "s1"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-standup_today",
+   "type": "standup_today",
+   "title": "On me today",
+   "visible": true,
+   "only_if_data": false,
+   "order": 2,
+   "facts": [
+    {
+     "id": "su-2",
+     "text": "Fix the date filter bug",
+     "source_ids": [
+      "s1"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-standup_blockers",
+   "type": "standup_blockers",
+   "title": "Blockers",
+   "visible": true,
+   "only_if_data": true,
+   "order": 3,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-standup_waiting",
+   "type": "standup_waiting",
+   "title": "Waiting on others",
+   "visible": true,
+   "only_if_data": true,
+   "order": 4,
+   "facts": [
+    {
+     "id": "su-3",
+     "text": "Mike Carter: test accounts",
+     "source_ids": [
+      "s1"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "value": {
+      "owner": "Mike Carter"
+     }
+    }
+   ],
+   "edited_by_user": false
+  }
+ ],
+ "readiness": {
+  "state": "ready",
+  "gaps": [],
+  "checks": [
+   {
+    "rule": "standup_update",
+    "ok": true
+   }
+  ],
+  "dropped": []
+ }
+}

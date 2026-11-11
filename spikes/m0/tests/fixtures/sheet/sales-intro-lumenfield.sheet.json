@@ -1,0 +1,527 @@
+{
+ "schema": "pacenote.sheet/1",
+ "id": "sheet-2026-11-13-emily-parker",
+ "title": "Meeting Sheet: Emily Parker",
+ "meeting_ref": {
+  "event_id": "evt-lumenfield-intro",
+  "start": "2026-11-13T16:00:00+02:00",
+  "end": "2026-11-13T16:45:00+02:00",
+  "tz": "Europe/Kyiv",
+  "where": "https://meet.example.com/lumenfield-intro"
+ },
+ "mode": "expert",
+ "preset": "sales_intro",
+ "language": "en",
+ "route": "claude_account",
+ "project": {
+  "slug": "sales-demo",
+  "root": "~/work/Demo/Sales"
+ },
+ "call_type": "regular",
+ "audience": "external",
+ "participants": {
+  "ours": [
+   {
+    "name": "Mike Carter",
+    "role": "Account executive"
+   }
+  ],
+  "theirs": [
+   {
+    "name": "Emily Parker",
+    "role": "VP Operations",
+    "company": "Lumenfield",
+    "domain": "lumenfield.example"
+   }
+  ]
+ },
+ "goal": "Understand Lumenfield's reporting pain and agree on a discovery workshop",
+ "sources": [
+  {
+   "id": "s1",
+   "n": 1,
+   "type": "web_page",
+   "title": "Lumenfield - About",
+   "size_tokens": 900,
+   "chars": 3600,
+   "access": "ok",
+   "used": "full",
+   "auto": false,
+   "uri": "https://lumenfield.example/about",
+   "modified_at": "2026-10-02"
+  },
+  {
+   "id": "s2",
+   "n": 2,
+   "type": "linkedin_manual",
+   "title": "Emily Parker (filled in by hand)",
+   "size_tokens": 120,
+   "chars": 480,
+   "access": "ok",
+   "used": "full",
+   "auto": false,
+   "modified_at": "2026-11-10"
+  },
+  {
+   "id": "s3",
+   "n": 3,
+   "type": "web_page",
+   "title": "Lumenfield - Press",
+   "size_tokens": 900,
+   "chars": 3600,
+   "access": "ok",
+   "used": "full",
+   "auto": false,
+   "uri": "https://lumenfield.example/press",
+   "modified_at": "2025-09-10"
+  },
+  {
+   "id": "s4",
+   "n": 4,
+   "type": "folder_file",
+   "title": "cases/northwind-studio-reporting.md",
+   "size_tokens": 900,
+   "chars": 3600,
+   "access": "ok",
+   "used": "full",
+   "auto": true,
+   "path": "~/work/Demo/Sales/cases/northwind-studio-reporting.md",
+   "why": [
+    "same industry",
+    "matches the call context"
+   ],
+   "modified_at": "2026-08-20"
+  },
+  {
+   "id": "s5",
+   "n": 5,
+   "type": "text",
+   "title": "Call context",
+   "size_tokens": 60,
+   "chars": 240,
+   "access": "ok",
+   "used": "full",
+   "auto": false
+  }
+ ],
+ "versions": [
+  {
+   "n": 1,
+   "built_at": "2026-11-12T09:00:00+02:00",
+   "route": "claude_account",
+   "model": "claude-sonnet",
+   "note": "first build"
+  }
+ ],
+ "built_at": "2026-11-12T09:00:00+02:00",
+ "blocks": [
+  {
+   "id": "b-header",
+   "type": "header",
+   "title": "Header",
+   "visible": true,
+   "only_if_data": false,
+   "order": 0,
+   "facts": [
+    {
+     "id": "f-when",
+     "text": "Fri 13 Nov, 16:00 Kyiv / 09:00 Boston",
+     "source_ids": [
+      "s5"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "label": "When"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-my_focus",
+   "type": "my_focus",
+   "title": "My focus",
+   "visible": true,
+   "only_if_data": false,
+   "order": 1,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-overview",
+   "type": "overview",
+   "title": "Overview",
+   "visible": true,
+   "only_if_data": false,
+   "order": 2,
+   "facts": [
+    {
+     "id": "f-overview",
+     "text": "Lumenfield sells lighting control software; Emily runs operations and asked about reporting automation.",
+     "source_ids": [
+      "s1",
+      "s5"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-company",
+   "type": "company",
+   "title": "About the company",
+   "visible": true,
+   "only_if_data": true,
+   "order": 3,
+   "facts": [
+    {
+     "id": "f-size-site",
+     "text": "About 120 employees",
+     "source_ids": [
+      "s1"
+     ],
+     "locator": {
+      "quote": "Our team of 120 people",
+      "url": "https://lumenfield.example/about"
+     },
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "conflict",
+     "origin": "model",
+     "label": "Team size",
+     "conflict_with": [
+      "f-size-li"
+     ]
+    },
+    {
+     "id": "f-size-li",
+     "text": "About 80 employees",
+     "source_ids": [
+      "s2"
+     ],
+     "locator": {
+      "quote": "51-200 employees, team page lists 80"
+     },
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "conflict",
+     "origin": "model",
+     "label": "Team size",
+     "conflict_with": [
+      "f-size-site"
+     ]
+    },
+    {
+     "id": "f-industry",
+     "text": "Lighting control software for offices",
+     "source_ids": [
+      "s1"
+     ],
+     "locator": {
+      "line": 4
+     },
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "label": "Industry"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-signals",
+   "type": "signals",
+   "title": "Signals",
+   "visible": true,
+   "only_if_data": true,
+   "order": 4,
+   "facts": [
+    {
+     "id": "f-funding",
+     "text": "Raised a seed round",
+     "source_ids": [
+      "s3"
+     ],
+     "locator": {
+      "url": "https://lumenfield.example/press"
+     },
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "label": "Funding"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-tech_stack",
+   "type": "tech_stack",
+   "title": "Tech stack",
+   "visible": true,
+   "only_if_data": true,
+   "order": 5,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-contact",
+   "type": "contact",
+   "title": "About the contact",
+   "visible": true,
+   "only_if_data": false,
+   "order": 6,
+   "facts": [
+    {
+     "id": "f-contact-title",
+     "text": "VP Operations at Lumenfield since 2023",
+     "source_ids": [
+      "s2"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "label": "Title"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-qualification",
+   "type": "qualification",
+   "title": "Qualification",
+   "visible": true,
+   "only_if_data": false,
+   "order": 7,
+   "facts": [
+    {
+     "id": "f-q-budget",
+     "text": "Not found",
+     "source_ids": [],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "not_found",
+     "origin": "model",
+     "label": "Budget",
+     "value": {
+      "key": "budget",
+      "level": "unknown"
+     }
+    },
+    {
+     "id": "f-q-authority",
+     "text": "Emily decides together with the CEO",
+     "source_ids": [
+      "s2"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "label": "Authority",
+     "value": {
+      "key": "authority",
+      "level": "yellow"
+     }
+    },
+    {
+     "id": "f-q-need",
+     "text": "Monthly reports take two people three days",
+     "source_ids": [
+      "s5"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "label": "Need",
+     "value": {
+      "key": "need",
+      "level": "green"
+     }
+    },
+    {
+     "id": "f-q-timeline",
+     "text": "Wants something before Q2",
+     "source_ids": [
+      "s5"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "label": "Timeline",
+     "value": {
+      "key": "timeline",
+      "level": "yellow"
+     }
+    }
+   ],
+   "edited_by_user": false,
+   "method": "bant"
+  },
+  {
+   "id": "b-fit",
+   "type": "fit",
+   "title": "Fit for us",
+   "visible": true,
+   "only_if_data": true,
+   "order": 8,
+   "facts": [
+    {
+     "id": "f-case",
+     "text": "Northwind Studio: reporting automation, 3 days to 2 hours",
+     "source_ids": [
+      "s4"
+     ],
+     "locator": {
+      "line": 12
+     },
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "label": "Case"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-history",
+   "type": "history",
+   "title": "History",
+   "visible": true,
+   "only_if_data": true,
+   "order": 9,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-questions",
+   "type": "questions",
+   "title": "Questions for the call",
+   "visible": true,
+   "only_if_data": false,
+   "order": 10,
+   "facts": [
+    {
+     "id": "q-reports",
+     "text": "Which reports hurt the most today?",
+     "source_ids": [],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "user"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-best_outcome",
+   "type": "best_outcome",
+   "title": "Best outcome",
+   "visible": true,
+   "only_if_data": false,
+   "order": 11,
+   "facts": [
+    {
+     "id": "f-outcome",
+     "text": "A discovery workshop booked for next week",
+     "source_ids": [
+      "s5"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-red_lines",
+   "type": "red_lines",
+   "title": "Red lines and risks",
+   "visible": true,
+   "only_if_data": true,
+   "order": 12,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-gaps",
+   "type": "gaps",
+   "title": "Conflicts and gaps",
+   "visible": true,
+   "only_if_data": true,
+   "order": 13,
+   "facts": [],
+   "edited_by_user": false
+  }
+ ],
+ "readiness": {
+  "state": "almost",
+  "gaps": [
+   {
+    "id": "gap-qualification_complete-budget",
+    "rule": "qualification_complete",
+    "text": "Budget: no status yet",
+    "action": "add_question",
+    "severity": "warning",
+    "block": "b-qualification",
+    "fact": "f-q-budget"
+   },
+   {
+    "id": "gap-no_open_conflicts-f-size-site",
+    "rule": "no_open_conflicts",
+    "text": "Sources disagree: Team size: About 120 employees",
+    "action": "mark_checked",
+    "severity": "warning",
+    "block": "b-company",
+    "fact": "f-size-site"
+   },
+   {
+    "id": "gap-no_stale-f-funding",
+    "rule": "no_stale",
+    "text": "Old fact (source older than 6 months): Funding: Raised a seed round",
+    "action": "find_again",
+    "severity": "warning",
+    "block": "b-signals",
+    "fact": "f-funding"
+   }
+  ],
+  "checks": [
+   {
+    "rule": "goal_set",
+    "ok": true
+   },
+   {
+    "rule": "participants_both",
+    "ok": true
+   },
+   {
+    "rule": "contact_found",
+    "ok": true
+   },
+   {
+    "rule": "qualification_complete",
+    "ok": false
+   },
+   {
+    "rule": "fit_case",
+    "ok": true
+   },
+   {
+    "rule": "no_open_conflicts",
+    "ok": false
+   },
+   {
+    "rule": "no_stale",
+    "ok": false
+   }
+  ],
+  "dropped": []
+ }
+}

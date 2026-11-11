@@ -1,0 +1,305 @@
+# Meeting Sheet (Pacenote 0.10.0, phase 1): the block library, the presets, the readiness rules and the defaults of
+# the module that prepares every call except Transcript. Shared by the app (LiveTipsCore/MeetingSheet.swift) and the
+# Python sidecar (spikes/m0/livetips_m0/sheet/). A new block, preset or rule is added here as data, without code.
+# The file of a call: <project>/live/<base>.sheet.json (schema pacenote.sheet/1, see sheet_schema below).
+# The user's own presets live in the app folder, never here: <appRoot>/meeting-sheet/presets/<id>.yaml.
+schema_version: 1
+sheet_schema: pacenote.sheet/1
+
+settings:
+  stale_months: 6              # a fact whose sources are all older than this is "old" (status stale)
+  remind_minutes: 30           # the reminder before the meeting: "Meeting Sheet is ready / has N gaps"
+  default_preset: blank
+  # The mode a new sheet opens in. The first rule that matches wins; no match = the preset's own mode.
+  default_mode:
+    - {when: preset_in, presets: [standup, client_sync], mode: quick}
+    - {when: earlier_sheet, mode: quick}                # a series that already has a sheet
+    - {when: preset_in, presets: [sales_intro, internal_presentation, interview], mode: expert}
+    - {when: new_external_domain, mode: expert}         # a participant domain never met in this project
+    - {when: internal, mode: quick}                     # nobody from outside on the invite
+  # Facts the readiness engine adds by itself (origin readiness). Idempotent: the same id is never added twice,
+  # and the question goes away again once the criterion is known (unless the user edited it).
+  auto_questions:
+    - id: q-readiness-budget
+      block: questions
+      criterion: budget          # a criterion key of the qualification method (rules/sales.yaml)
+      levels: [red, unknown]     # a missing fact counts as unknown
+      label: Budget
+
+# Qualification methods offered in the header of the qualification block. The names and criteria are the methods of
+# rules/sales.yaml; bant is the default of the block.
+qualification:
+  default_method: bant
+  methods: [bant, spiced, meddic, general]
+  levels: [green, yellow, red, unknown]
+
+# The fields of a block are a description for the model and the designer, not a fixed form.
+# only_if_data: the block is hidden when it has no facts (the user can change it per meeting).
+# live: what the live call takes from the block (derive.py writes <base>.<live>.json from it; brief = only the
+# human copy <base>.brief.md).
+blocks:
+  header:
+    title: Header
+    fields: When (time zones of both sides), where (link), our participants, their participants, meeting type, goal, invite status
+    only_if_data: false
+    live: facts
+  my_focus:
+    title: My focus
+    fields: 3-7 fields the user wants to see first, set in Settings > Meeting Sheet (not per meeting)
+    only_if_data: false
+    live: cards
+  overview:
+    title: Overview
+    fields: 3-5 sentences - who they are, what they need, the main goal of the meeting
+    only_if_data: false
+    live: cards
+  company:
+    title: About the company
+    fields: Name, website, industry, location, founded, size, stage, product, mission (each with its source)
+    only_if_data: true
+    live: facts
+  signals:
+    title: Signals
+    fields: Funding and investments, hiring, news, growth numbers
+    only_if_data: true
+    live: cards
+  tech_stack:
+    title: Tech stack
+    fields: What is known publicly, what is not confirmed
+    only_if_data: true
+    live: facts
+  fit:
+    title: Fit for us
+    fields: Which of our services fit, relevant cases (from the case base), recommended approach
+    only_if_data: true
+    live: cards
+  contact:
+    title: About the contact
+    fields: Name, title, LinkedIn, location, education, experience, key achievements, technical fluency
+    only_if_data: false
+    live: facts
+  qualification:
+    title: Qualification
+    fields: Every criterion of the method - level (green, yellow, red, unknown), one sentence why, the source
+    only_if_data: false
+    live: sales
+  history:
+    title: History
+    fields: Correspondence with dates, previous calls (Pacenote recaps), what was promised and what was delivered
+    only_if_data: true
+    live: facts
+  project_context:
+    title: Project context
+    fields: Current state, team, decisions, risks, open questions (from the project folder)
+    only_if_data: true
+    live: facts
+  agenda:
+    title: Agenda
+    fields: Items to decide, who leads each
+    only_if_data: false
+    live: agenda               # the live checklist
+  action_items:
+    title: Open action items
+    fields: Ours and theirs, with owners and due dates
+    only_if_data: true
+    live: facts
+  questions:
+    title: Questions for the call
+    fields: What to find out, phrased as questions
+    only_if_data: false
+    live: questions            # checklist and "ask now" at the right moment
+  best_outcome:
+    title: Best outcome
+    fields: 3-6 points and the next step
+    only_if_data: false
+    live: cards                # checked at the end of the call
+  red_lines:
+    title: Red lines and risks
+    fields: What not to promise, what not to say
+    only_if_data: true
+    live: red_lines            # warnings, never repeated back as risks
+  structure_roles:
+    title: Structure and roles
+    fields: Slides, who leads, backup for a co-speaker
+    only_if_data: true
+    live: slides
+  gaps:
+    title: Conflicts and gaps
+    fields: Automatic - what conflicts, what was not found, what is old
+    only_if_data: true
+    live: brief
+  standup_since:
+    title: Since last time
+    fields: What I did since the last stand-up
+    only_if_data: false
+    live: standup
+  standup_today:
+    title: On me today
+    fields: What I am doing today
+    only_if_data: false
+    live: standup
+  standup_blockers:
+    title: Blockers
+    fields: What blocks me and who can help
+    only_if_data: true
+    live: standup
+  standup_waiting:
+    title: Waiting on others
+    fields: Whom to ask and about what
+    only_if_data: true
+    live: standup
+  interview_candidate:
+    title: Candidate
+    fields: Name, current role, experience, claims to verify
+    only_if_data: false
+    live: facts
+  interview_role:
+    title: Role requirements
+    fields: Must-haves, nice-to-haves, what the team needs
+    only_if_data: false
+    live: cards
+
+# Readiness: each rule is a check kind with params, a gap text, a quick action and a severity.
+# A blocker gap makes the sheet "not_ready", warnings only make it "almost", no gaps = "ready".
+# Actions: add_question, find_again, mark_checked, drop_check, assign_owner, add_source. Every gap can also be
+# dropped for this meeting (drop_check); dropped rules are kept in sheet.readiness.dropped.
+# A rule about a block the sheet does not have is skipped (ok).
+readiness_rules:
+  goal_set:
+    check: field
+    params: {path: goal}
+    gap: The meeting has no goal yet
+    action: add_source
+    severity: blocker
+  participants_both:
+    check: participants
+    params: {sides: [ours, theirs]}
+    gap: Participants are missing on one side
+    action: add_source
+    severity: blocker
+  contact_found:
+    check: block_facts
+    params: {block: contact, min: 1}
+    gap: Nothing is known about the contact yet
+    action: find_again
+    severity: blocker
+  qualification_complete:
+    check: qualification
+    params: {block: qualification}
+    gap: "{criterion}: no status yet"
+    action: add_question
+    severity: warning
+  fit_case:
+    check: block_facts
+    params: {block: fit, min: 1}
+    gap: No relevant case yet
+    action: add_source
+    severity: warning
+  history_found:
+    check: block_facts
+    params: {block: history, min: 1}
+    gap: No history with them yet
+    action: add_source
+    severity: warning
+  agenda_set:
+    check: block_facts
+    params: {block: agenda, min: 1}
+    gap: The agenda is empty
+    action: add_question
+    severity: blocker
+  owners_assigned:
+    check: owners
+    params: {block: action_items}
+    gap: "Action item without an owner: {fact}"
+    action: assign_owner
+    severity: warning
+  decisions_listed:
+    check: block_facts
+    params: {block: best_outcome, min: 1}
+    gap: No decisions to get from the meeting yet
+    action: add_question
+    severity: warning
+  structure_set:
+    check: block_facts
+    params: {block: structure_roles, min: 1}
+    gap: Slides and roles are not set
+    action: add_source
+    severity: warning
+  standup_update:
+    check: block_facts
+    params: {block: standup_today, min: 1}
+    gap: Nothing on you today yet
+    action: add_source
+    severity: warning
+  candidate_found:
+    check: block_facts
+    params: {block: interview_candidate, min: 1}
+    gap: Nothing is known about the candidate yet
+    action: find_again
+    severity: blocker
+  role_found:
+    check: block_facts
+    params: {block: interview_role, min: 1}
+    gap: The role requirements are missing
+    action: add_source
+    severity: blocker
+  questions_set:
+    check: block_facts
+    params: {block: questions, min: 1}
+    gap: No questions prepared
+    action: add_question
+    severity: warning
+  no_open_conflicts:
+    check: conflicts
+    params: {}
+    gap: "Sources disagree: {fact}"
+    action: mark_checked
+    severity: warning
+  no_stale:
+    check: stale
+    params: {}                  # the threshold is settings.stale_months
+    gap: "Old fact (source older than {months} months): {fact}"
+    action: find_again
+    severity: warning
+
+presets:
+  sales_intro:
+    name: Sales intro
+    mode: expert
+    blocks: [header, my_focus, overview, company, signals, tech_stack, contact, qualification, fit, history, questions, best_outcome, red_lines, gaps]
+    readiness: [goal_set, participants_both, contact_found, qualification_complete, fit_case, no_open_conflicts, no_stale]
+  upsell:
+    name: Upsell
+    mode: quick
+    blocks: [header, my_focus, overview, company, fit, history, project_context, action_items, questions, best_outcome, red_lines, gaps]
+    readiness: [goal_set, participants_both, history_found, fit_case, no_open_conflicts, no_stale]
+  repeat_call:
+    name: Repeat call
+    mode: quick
+    blocks: [header, my_focus, overview, company, signals, contact, qualification, history, questions, best_outcome, gaps]
+    readiness: [goal_set, participants_both, history_found, qualification_complete, no_open_conflicts, no_stale]
+  client_sync:
+    name: Client sync
+    mode: quick
+    blocks: [header, my_focus, overview, history, project_context, agenda, action_items, questions, best_outcome, red_lines, gaps]
+    readiness: [agenda_set, owners_assigned, decisions_listed, no_open_conflicts, no_stale]
+  internal_presentation:
+    name: Internal or presentation
+    mode: expert
+    blocks: [header, my_focus, overview, agenda, structure_roles, red_lines, gaps]
+    readiness: [goal_set, structure_set, no_open_conflicts]
+  standup:
+    name: Stand-up
+    mode: quick
+    blocks: [header, standup_since, standup_today, standup_blockers, standup_waiting]
+    readiness: [standup_update]
+  interview:
+    name: Interview
+    mode: expert
+    blocks: [header, my_focus, overview, interview_candidate, interview_role, questions, red_lines, structure_roles, gaps]
+    readiness: [candidate_found, role_found, questions_set, no_open_conflicts]
+  blank:
+    name: Blank
+    mode: quick
+    blocks: [header, my_focus]
+    readiness: []

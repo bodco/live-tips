@@ -1,0 +1,335 @@
+{
+ "schema": "pacenote.sheet/1",
+ "id": "sheet-2026-11-14-orbit-sync",
+ "title": "Meeting Sheet: Mike Carter",
+ "meeting_ref": {
+  "event_id": "evt-orbit-weekly",
+  "start": "2026-11-14T15:00:00+02:00",
+  "tz": "Europe/Kyiv"
+ },
+ "mode": "quick",
+ "preset": "client_sync",
+ "language": "en",
+ "route": "chatgpt_account",
+ "project": {
+  "slug": "orbit",
+  "root": "~/work/Demo/Orbit"
+ },
+ "call_type": "regular",
+ "audience": "external",
+ "participants": {
+  "ours": [
+   {
+    "name": "Sarah M.",
+    "role": "PM"
+   },
+   {
+    "name": "Jake T.",
+    "role": "Tech lead"
+   }
+  ],
+  "theirs": [
+   {
+    "name": "Mike Carter",
+    "role": "Product owner",
+    "company": "Orbit",
+    "domain": "orbit.example"
+   }
+  ]
+ },
+ "goal": "Agree on the release date and the scope of the next sprint",
+ "sources": [
+  {
+   "id": "s1",
+   "n": 1,
+   "type": "prev_call",
+   "title": "Orbit weekly, 7 Nov (Pacenote recap)",
+   "size_tokens": 900,
+   "chars": 3600,
+   "access": "ok",
+   "used": "full",
+   "auto": true,
+   "why": [
+    "same series"
+   ],
+   "modified_at": "2026-11-07"
+  },
+  {
+   "id": "s2",
+   "n": 2,
+   "type": "tracker",
+   "title": "Open items on Orbit",
+   "size_tokens": 900,
+   "chars": 3600,
+   "access": "ok",
+   "used": "full",
+   "auto": true,
+   "why": [
+    "open items of the project"
+   ],
+   "modified_at": "2026-11-11"
+  },
+  {
+   "id": "s3",
+   "n": 3,
+   "type": "project_state",
+   "title": "Orbit Current State",
+   "size_tokens": 900,
+   "chars": 3600,
+   "access": "ok",
+   "used": "full",
+   "auto": true,
+   "why": [
+    "project state"
+   ],
+   "modified_at": "2026-11-10"
+  }
+ ],
+ "versions": [
+  {
+   "n": 1,
+   "built_at": "2026-11-12T09:00:00+02:00",
+   "route": "chatgpt_account",
+   "model": "gpt-5"
+  }
+ ],
+ "built_at": "2026-11-12T09:00:00+02:00",
+ "blocks": [
+  {
+   "id": "b-header",
+   "type": "header",
+   "title": "Header",
+   "visible": true,
+   "only_if_data": false,
+   "order": 0,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-my_focus",
+   "type": "my_focus",
+   "title": "My focus",
+   "visible": true,
+   "only_if_data": false,
+   "order": 1,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-overview",
+   "type": "overview",
+   "title": "Overview",
+   "visible": true,
+   "only_if_data": false,
+   "order": 2,
+   "facts": [
+    {
+     "id": "f-overview",
+     "text": "Weekly sync with Orbit; the release slipped one week.",
+     "source_ids": [
+      "s1",
+      "s3"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-history",
+   "type": "history",
+   "title": "History",
+   "visible": true,
+   "only_if_data": true,
+   "order": 3,
+   "facts": [
+    {
+     "id": "f-last",
+     "text": "Last week Mike asked for a demo of the export",
+     "source_ids": [
+      "s1"
+     ],
+     "locator": {
+      "quote": "can we see the export next week"
+     },
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-project_context",
+   "type": "project_context",
+   "title": "Project context",
+   "visible": true,
+   "only_if_data": true,
+   "order": 4,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-agenda",
+   "type": "agenda",
+   "title": "Agenda",
+   "visible": true,
+   "only_if_data": false,
+   "order": 5,
+   "facts": [
+    {
+     "id": "a-1",
+     "text": "Release date",
+     "source_ids": [
+      "s3"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "value": {
+      "owner": "Sarah M."
+     }
+    },
+    {
+     "id": "a-2",
+     "text": "Next sprint scope",
+     "source_ids": [
+      "s2"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "value": {
+      "owner": "Mike Carter"
+     }
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-action_items",
+   "type": "action_items",
+   "title": "Open action items",
+   "visible": true,
+   "only_if_data": true,
+   "order": 6,
+   "facts": [
+    {
+     "id": "ai-1",
+     "text": "Send the export demo build",
+     "source_ids": [
+      "s2"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "value": {
+      "owner": "Jake T.",
+      "due": "2026-11-13"
+     }
+    },
+    {
+     "id": "ai-2",
+     "text": "Confirm the test accounts",
+     "source_ids": [
+      "s2"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model",
+     "value": {
+      "owner": "Mike Carter",
+      "due": "2026-11-14"
+     }
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-questions",
+   "type": "questions",
+   "title": "Questions for the call",
+   "visible": true,
+   "only_if_data": false,
+   "order": 7,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-best_outcome",
+   "type": "best_outcome",
+   "title": "Best outcome",
+   "visible": true,
+   "only_if_data": false,
+   "order": 8,
+   "facts": [
+    {
+     "id": "f-out",
+     "text": "Release date agreed and written down",
+     "source_ids": [
+      "s3"
+     ],
+     "locator": {},
+     "checked_at": "2026-11-12T09:00:00+02:00",
+     "status": "found",
+     "origin": "model"
+    }
+   ],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-red_lines",
+   "type": "red_lines",
+   "title": "Red lines and risks",
+   "visible": true,
+   "only_if_data": true,
+   "order": 9,
+   "facts": [],
+   "edited_by_user": false
+  },
+  {
+   "id": "b-gaps",
+   "type": "gaps",
+   "title": "Conflicts and gaps",
+   "visible": true,
+   "only_if_data": true,
+   "order": 10,
+   "facts": [],
+   "edited_by_user": false
+  }
+ ],
+ "readiness": {
+  "state": "ready",
+  "gaps": [],
+  "checks": [
+   {
+    "rule": "agenda_set",
+    "ok": true
+   },
+   {
+    "rule": "owners_assigned",
+    "ok": true
+   },
+   {
+    "rule": "decisions_listed",
+    "ok": true
+   },
+   {
+    "rule": "no_open_conflicts",
+    "ok": true
+   },
+   {
+    "rule": "no_stale",
+    "ok": true
+   }
+  ],
+  "dropped": []
+ }
+}

@@ -1107,10 +1107,61 @@ func deckCapacity097() {
     expect(dashes.count == 2 && dashes[1].title == "Two", "deck: --- starts a slide")
 }
 
+// 0.10.0 (Meeting Sheet, phase 1): the shared fixtures of the sidecar (spikes/m0/tests/fixtures/sheet) decode into the
+// models, survive a round trip, keep unknown enum values, and give the readiness badge the Python engine stored.
+func meetingSheet0100() {
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("spikes/m0/tests/fixtures/sheet")
+    let expected: [(String, ReadinessState, Int)] = [("sales-intro-lumenfield", .almost, 3), ("client-sync-orbit", .ready, 0), ("standup-orbit", .ready, 0)]
+    for (name, state, gaps) in expected {
+        let path = dir.appendingPathComponent(name + ".sheet.json").path
+        guard let s = try? MeetingSheetIO.load(path) else { expect(false, "sheet fixture \(name)"); continue }
+        expect(s.schema == MeetingSheetIO.schema, "sheet \(name): schema")
+        expect(s.readiness?.state == state && s.readinessBadge.gaps == gaps, "sheet \(name): readiness \(s.readiness?.state.rawValue ?? "-")")
+        expect(s.blocks.allSatisfy { $0.type.isKnown } && s.sources.allSatisfy { $0.type.isKnown && $0.access.isKnown }, "sheet \(name): known values")
+        guard let data = try? MeetingSheetIO.encode(s), let back = try? MeetingSheetIO.decode(data) else { expect(false, "sheet \(name): encode"); continue }
+        expect(back == s, "sheet \(name): round trip")
+        // The file's keys are snake_case and every key of the fixture survives the round trip.
+        if let a = try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as? NSDictionary,
+           let b = try? JSONSerialization.jsonObject(with: data) as? NSDictionary {
+            expect(a == b, "sheet \(name): same JSON after a round trip")
+        } else { expect(false, "sheet \(name): JSON") }
+    }
+    if let s = try? MeetingSheetIO.load(dir.appendingPathComponent("sales-intro-lumenfield.sheet.json").path) {
+        expect(s.title == "Meeting Sheet: Emily Parker" && s.mode == .expert && s.meetingRef.place == "https://meet.example.com/lumenfield-intro", "sheet: header fields")
+        expect(s.block(.qualification)?.method == "bant", "sheet: qualification method")
+        let budget = s.fact(id: "f-q-budget")
+        expect(budget?.status == .notFound && budget?.value?.level == .unknown && budget?.value?.key == "budget", "sheet: budget unknown")
+        expect(s.fact(id: "f-size-site")?.conflictWith == ["f-size-li"] && s.fact(id: "f-size-site")?.status == .conflict, "sheet: team size conflict")
+        expect(s.fact(id: "q-reports")?.isProtected == true && s.fact(id: "f-industry")?.isProtected == false, "sheet: protected facts")
+        expect(s.source(id: "s4")?.why == ["same industry", "matches the call context"] && s.source(id: "s4")?.auto == true, "sheet: source why")
+        expect(s.readinessBadge.label == "Almost" && s.readinessBadge.blockers == 0 && s.readiness?.gaps?.first?.action == .addQuestion, "sheet: badge and first gap")
+        expect(!s.shownBlocks.contains { $0.type == .techStack } && s.shownBlocks.contains { $0.type == .contact }, "sheet: only if data")
+    } else { expect(false, "sales fixture") }
+    // Unknown enum values decode, keep their text and encode back unchanged.
+    let future = """
+    {"schema":"pacenote.sheet/1","id":"x","title":"Meeting Sheet: Orbit","meeting_ref":{"start":"2026-11-13T10:00:00Z"},
+     "mode":"turbo","preset":"blank","language":"en","sources":[{"id":"s1","n":1,"type":"hologram","title":"t","access":"maybe","used":"full"}],
+     "blocks":[{"id":"b1","type":"weather","title":"W","visible":true,"only_if_data":false,"order":0,"edited_by_user":false,
+       "facts":[{"id":"f1","text":"t","source_ids":["s1"],"status":"rumour","origin":"model","value":{"level":"purple"}}]}],
+     "readiness":{"state":"perfect","gaps":[{"id":"g","rule":"r","text":"t","action":"call_mom","severity":"info"}]}}
+    """
+    if let s = try? MeetingSheetIO.decode(Data(future.utf8)) {
+        expect(!s.mode.isKnown && s.mode.rawValue == "turbo" && !s.blocks[0].type.isKnown && !s.sources[0].type.isKnown, "sheet: unknown values decode")
+        expect(s.blocks[0].facts[0].status.rawValue == "rumour" && s.blocks[0].facts[0].value?.level?.isKnown == false, "sheet: unknown fact values")
+        expect(s.readinessBadge.state == nil && s.readinessBadge.label == "Not checked" && s.readiness?.gaps?[0].action.rawValue == "call_mom", "sheet: unknown readiness")
+        let text = (try? MeetingSheetIO.encode(s)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+        expect(text.contains("\"status\" : \"rumour\"") && text.contains("\"mode\" : \"turbo\"") && !text.contains("rawValue"), "sheet: unknown values encode back")
+    } else { expect(false, "sheet: tolerant decoding") }
+    expect(MeetingSheetIO.path(liveFolder: "/p/live", base: "prep-2026-11-13-1600-lumenfield") == "/p/live/prep-2026-11-13-1600-lumenfield.sheet.json", "sheet: file name")
+    expect((try? MeetingSheetIO.decode(Data("{\"schema\":\"pacenote.sheet/1\"}".utf8))) == nil, "sheet: required fields")
+}
+
 callRecording()
 meetingNotes0952()
 prepAgent096()
 meetingLaunch096()
 deckCapacity097()
+meetingSheet0100()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

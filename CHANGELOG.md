@@ -3,7 +3,27 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## Unreleased
+## 0.10.0 (2026-11-12)
+
+- **Tips window title bar follows the theme (2026-11-12, owner):** after a switch to the dark theme the title bar of
+  the tips window stayed white, with a white pin circle. Its colours (the bar, the pin, Start and End call) are now
+  resolved again whenever the window's appearance changes.
+- **Co-driver: tips work as a prompter and answer anyone's questions (2026-11-12, owner):** after the Meeting Sheet
+  the tips window showed almost nothing during calls (1, 4, 1 and 0 tips on four calls of 12 November, against 8 to 21
+  the day before): the tips AI answered only questions put to you by name and skipped the rest as "not asking the PM",
+  even when the answer was in the project state. Now, on by default:
+  - **Any question on the call** (to you, to someone else or to the room) gets an orange card with the answer from
+    the brief, the sheet, the project state or a quick search of the project folders. When none of them holds it, a
+    card says at once "Mike asks: ..., heard the question, searching the project", and the answer replaces it in place
+    a few seconds later; when the project has no direct answer the card says so, gives the nearest known fact and a
+    sentence to bridge ("Let me check and come back to you today"). The same question is searched once.
+  - **A point to react to:** when someone makes a proposal, raises a doubt or a problem, a card gives you a short
+    paraphrase to check you understood, a counter-question, or the fact that confirms or contradicts it (at most one
+    every 90 seconds, never twice on one topic).
+  - **Prompter on every new topic:** when the talk moves to a new topic and stays there, a card says where the topic
+    stands by your sources (status, numbers, owners, what was agreed and what is open) and one thing to say or ask;
+    it is not shown when the sources hold nothing on the topic or another card just covered it (at most one a minute).
+  Turn it off with `codriver: false` in the sidecar config to get the earlier behaviour.
 
 - **Your own words in the transcript (2026-11-12, owner):** Settings > Transcription > Dictionary. Each row is the
   correct word and, optionally, what the transcript hears instead (comma-separated), for example "Lumenfield" heard as

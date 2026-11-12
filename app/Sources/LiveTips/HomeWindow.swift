@@ -591,7 +591,7 @@ struct HomeView: View {
             link(L("home.connectClaude")) { SettingsWindow.show(tab: "ai") }
         case .ready, .live:
             Button { start(r) } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
-            if st == .ready { link(L("talk.prepareAgain")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) } }
+            if st == .ready { link(L("talk.prepareAgain")) { prepare(r) } }
             else { link(L("home.getReady")) { prepare(r) } }
         case .preparing, .queued:
             Button { start(r) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
@@ -722,7 +722,7 @@ struct HomeView: View {
 
     /// "…": Get ready or Prepare again, Not my call (no Start here: a call starts from its card or its page).
     @ViewBuilder private func callMenuItems(_ r: Ahead, _ st: CallState) -> some View {
-        if st == .ready { Button(L("talk.prepareAgain")) { StartCallWindow.show(delegate: app, prepared: model(for: r)) } }
+        if st == .ready { Button(L("talk.prepareAgain")) { prepare(r) } }
         else if st == .notReady || st == .failed { Button(L("home.getReady")) { prepare(r) } }
         if st == .queued, let m = r.model { Button(L("common.cancel")) { upnext.unqueue(m) } }
         if st == .preparing { Button(L("common.cancel")) { runner.cancel() } }

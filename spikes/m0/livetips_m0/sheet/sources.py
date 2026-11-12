@@ -203,6 +203,20 @@ def check(s: dict, req: dict, texts: Dict[str, str], route: str, windows: dict) 
                 s["fix_action"] = "retry" if r["error"] == "file not found" else "paste_text"
             else:
                 s["access"] = "ok"
+        elif t == "tracker" and not s.get("path") and not (s.get("text") or "").strip():
+            # 0.10.0: the Tracker source has no file; it is the open items of the project registers, collected here
+            try:
+                from . import tracker as TR
+                _d = _dt.date.fromisoformat(req["today"]) if req.get("today") else _dt.date.today()
+                tr = TR.collect(req, _d)
+                text = TR.text(tr) if (tr["on_me"] or tr["waiting"]) else ""
+            except Exception:  # noqa: BLE001
+                text = ""
+            if text.strip():
+                s["access"] = "ok"
+                s["title"] = s.get("title") or TR.title(tr)
+            else:
+                s["access"], s["access_reason"], s["fix_action"] = "pending", "no open items found in the project registers", "retry"
         elif t in TEXT_TYPES or (s.get("text") and t not in ("gdoc", "gsheet", "gslides", "drive_file", "notion", "linkedin")):
             text = s.get("text") or ""
             s["access"] = "ok" if text.strip() else "pending"

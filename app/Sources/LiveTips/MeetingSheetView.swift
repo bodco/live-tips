@@ -770,3 +770,39 @@ enum SheetActions {
         SheetJobs.shared.start(kind: "refresh", request: r, call: call, title: doc.sheet?.title ?? "")
     }
 }
+
+
+// 0.10.0 (owner, 11.12): the Meeting Sheet in a window of its own, opened from the call window ("..." > Open Meeting
+// Sheet in a window). It follows the file, so a Refresh during the call shows here too.
+@MainActor
+enum SheetViewWindow {
+    static var windows: [String: NSWindow] = [:]
+
+    static func show(path: String, model m: StartCallModel) {
+        if let w = windows[path], w.isVisible { w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
+        let doc = SheetDoc(path: path)
+        let host = NSHostingController(rootView: Localized { SheetWindowBody(doc: doc, model: m) })
+        let w = NSWindow(contentViewController: host)
+        w.tabbingMode = .disallowed
+        w.styleMask.insert(.resizable)
+        w.title = L("sheet.ui.window", ["title": m.effectiveTitle])
+        w.setContentSize(NSSize(width: 900, height: 780))
+        w.isReleasedWhenClosed = false
+        windows[path] = w
+        w.center(); w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+private struct SheetWindowBody: View {
+    @ObservedObject var doc: SheetDoc
+    let model: StartCallModel
+    var body: some View {
+        ScrollView {
+            MeetingSheetTab(doc: doc, onRefresh: {}, onEditBlocks: { SheetPrepWindow.show(model, mode: .expert, step: 2) })
+                .padding(20)
+        }
+        .background(PN.C.bg)
+        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in doc.reload() }
+    }
+}

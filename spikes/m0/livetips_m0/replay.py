@@ -31,7 +31,7 @@ def call_meta_from_md(md: Path, cfg: dict) -> dict:
             "langs": cfg.get("langs", ["uk", "en"]), "me_label": cfg["me_label"], "them_label": cfg["them_label"],
             "name_aliases": cfg.get("name_aliases", []), "tips_lang": cfg.get("tips_lang", "uk"),
             "hiring_role": cfg.get("hiring_role", "") if cfg.get("call_type") == "interview" else "",
-            "answer_any": cfg.get("answer_any", True), "turn_tips": cfg.get("turn_tips", False),
+            "answer_any": cfg.get("answer_any", True), "codriver": cfg.get("codriver", True), "turn_tips": cfg.get("turn_tips", False),
             "proactive": cfg.get("proactive", False), "pm_projects": cfg.get("pm_projects", []),
             "participants": cfg.get("participants", [])}
     return meta

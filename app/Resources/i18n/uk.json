@@ -2397,6 +2397,7 @@
  "sheet.ui.ready.rules": "Правила пресету {preset}",
  "sheet.ui.ready.team": "Готовність команди · пізніше",
  "sheet.ui.ready.teamLater": "Head of Sales бачитиме готовність sheet своєї команди. Закладено зараз, зробимо пізніше.",
+ "sheet.ui.live.noSheet": "У цього дзвінка ще немає Meeting Sheet. Натисни Prepare now.",
  "sheet.ui.refresh": "Оновити",
  "sheet.ui.refresh.title": "Оновити Meeting Sheet?",
  "sheet.ui.refresh.body": "Джерела прочитаються заново, з'явиться нова версія. Ваші правки лишаться, зміни буде позначено.",

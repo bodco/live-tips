@@ -93,6 +93,9 @@
 
   Feed.prototype.kindOf = function (it) {
     const k = it.kind || 'tip', g = String(it.gist || '');
+    // 0.10.0 co-driver: a question someone asked on the call (heard, then its answer) is an answer card, so it takes
+    // the big place like any other answer, not a docs line under Earlier
+    if (k === 'answer' && (it.trigger === 'heard' || it.trigger === 'heard_answer')) return 'answer';
     if (k === 'answer' || k === 'fact' || k === 'card') return 'docs';
     if (k === 'speech') return 'turn';
     // 0.8.7 (H4): sales tips keep their own kind and label (rules/sales.yaml > tips)
@@ -116,8 +119,14 @@
       const q = clean(it.q).replace(/^(find|знайди|пошук)\s*:\s*/i, '');
       const shorter = /^shorter\b|^коротше\b/i.test(q);
       meta = shorter ? this.tr('shorterMeta') : this.tr('searched', { q });
+      // 0.10.0 co-driver: a question someone asked on the call (heard), searched by Pacenote, not typed by the PM
+      if (it.trigger === 'heard' || it.trigger === 'heard_answer') {
+        meta = this.tr(it.trigger === 'heard' ? 'heardMeta' : 'heardAnswer', { q, who: clean(it.who || '') });
+        who = clean(it.who || ''); question = q;
+      }
       say = phrase || gist;
       if (!phrase && items.length) { say = gist; }
+      if (it.trigger === 'heard') say = clean(it.note) || gist;     // 0.10.0: heard, searching, until the answer comes
     } else {
       let m;
       if ((m = ASKS_RX.exec(gist))) { who = clean(m[1]); question = clean(m[2]); say = phrase; }
@@ -130,6 +139,7 @@
     if (UNCHECKED_RX.test(note)) { unverified = true; note = ''; }
     note = note.replace(/^(sources?|джерела|джерело)\s*:\s*/i, '');
     source = note || (items.length && (kind === 'docs' || kind === 'answer') ? items[0] : '');
+    if (it.trigger === 'heard') source = '';            // the note is already the line under the question
     const id = this.idOf(it);
     const c = {
       id, kind, who, question, why, say, source, meta, unverified, topic: clean(it.topic).toLowerCase(), level: it.level, trigger: it.trigger || '',

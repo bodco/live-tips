@@ -29,6 +29,8 @@
         "add_fact",
         "answer_in_primary",
         "side_talk",
+        "question_any",
+        "reflect",
         "none"
       ]
     },

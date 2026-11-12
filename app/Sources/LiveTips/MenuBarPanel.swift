@@ -364,7 +364,14 @@ struct MenuBarPanel: View {
 
     private func prepare(_ c: MenuBarModel.Call) {
         // 2026-10-27 (owner): a preparation asks first (project, what matters): the call's setup window.
-        model.run { app in StartCallWindow.show(delegate: app, prepared: c.ahead.setup()) }
+        // 0.10.0 (Meeting Sheet): the same as Home. A call with its project known opens Quick or Expert at once; only a
+        // call without a project asks first in the call form (Prepare mode).
+        model.run { app in
+            let m = c.ahead.setup()
+            if m.target.isEmpty { StartCallWindow.show(delegate: app, prepared: m, mode: .prepare); return }
+            UpNext.shared.save(m)
+            SheetPrepWindow.show(m)
+        }
     }
 
     private func openBrief(_ c: MenuBarModel.Call) {

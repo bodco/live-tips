@@ -2179,6 +2179,30 @@ right of its header and is collapsed by default: it shows only "Speakers · 12, 
 many are still to name). Click the header or the chevron to open the chips and the card of a voice to name; your
 choice is remembered for the next calls.
 
+### 14.1z1 Co-driver: a prompter and answers to anyone's questions (0.10.0, beta)
+
+Live tips exist for two jobs: to be a prompter when you remember nothing about the call, and to answer the questions
+asked on it. On 12 November, after the Meeting Sheet, the tips AI answered only questions put to you by name and
+skipped the rest as "not asking the PM", even when the answer was in the project state. Co-driver mode, on by default,
+changes what the window shows:
+
+- **Any question on the call.** A question to you, to someone else or to the room gets an orange card with the answer
+  from the brief, the sheet, the project state or a quick search of the project folders (about a second, on this Mac).
+  When none of them holds it, a card appears at once: "Mike asks: ...", heard the question, searching the project.
+  A few seconds later the answer takes its place. When the project has no direct answer, the card says so, gives the
+  nearest known fact and a sentence to bridge. The same question is searched once, and one search starts at most
+  every 20 seconds.
+- **A point to react to.** When someone makes a proposal, raises a doubt or a problem, a card gives a short paraphrase
+  to check you understood ("So if I got it right, ... Is that correct?"), a counter-question that moves the goal, or the
+  fact that confirms or contradicts it. At most one every 90 seconds, never twice on one topic in 10 minutes.
+- **Prompter on every new topic.** When the talk moves to a new topic and stays there, a card says where the topic
+  stands by your sources (status, numbers, owners, what was agreed before, what is open) and one thing you can say or
+  ask. It is not shown when the sources hold nothing on the topic, when another card covered it in the last minute,
+  or more often than once a minute.
+
+The diet still applies: no tip about whose turn it is, no commitments for you, no invented numbers. To get the
+behaviour before co-driver, set `codriver: false` in the sidecar config.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the

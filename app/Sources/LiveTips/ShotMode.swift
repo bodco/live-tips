@@ -133,6 +133,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "p090" { p090(theme); continue }    // 0.9.0: Home in its integration states
             if env["LT_SHOTS_ONLY"] == "p092" { p092(theme); continue }    // 0.9.2: the site hero (Home + a live call)
             if env["LT_SHOTS_ONLY"] == "callpage" { callPageShots(theme); continue }   // 2026-11-05: the call page redesign, every tab
+            if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }   // 0.10.0: co-driver cards for the site
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
@@ -306,6 +307,32 @@ final class ShotMode: NSObject, NSApplicationDelegate {
     }
 
     /// The tips window in a given state and size (Pacenote 0.8: 380, 560, 1000 px, ready, menu, brief).
+    /// 0.10.0 co-driver (owner 2026-11-12): the prompter card on a new topic, a question someone else asked that is being
+    /// searched ("heard"), and the same question answered in place. Demo names only.
+    static let codriverJS: String = {
+        let base = """
+          const hms = (s) => new Date(Date.now() - s * 1000).toTimeString().slice(0, 8);
+          window.addItems([
+            {kind:'tip', uid:'cd1', t:hms(70), at:hms(70), level:'info', trigger:'topic_primer', topic:'pilot test accounts',
+             gist:'\u{1F4CC} Pilot test accounts: Emily owes the list, due Friday, not sent yet.',
+             items:['Kickoff 21 Oct: 5 pilot users, names from the client', 'Our QA covers week one, then their team'],
+             phrase:'Emily, can we get the five pilot names by Friday? Then QA starts on Monday.', note:'kickoff notes, 21 Oct'},
+            {kind:'tip', uid:'cd2', t:hms(40), at:hms(40), level:'orange', trigger:'question_any', topic:'export date',
+             gist:'\u{1F7E0} David asks: When does the export go live?',
+             why:'He asked Sarah, who is still checking. The decision of 30 Sep moved the release to Tuesday, after the Monday review.',
+             phrase:'Tuesday, after the review on Monday. Sarah, correct me if that moved.', note:'decision log, 30 Sep'},
+        """
+        return base
+    }()
+    func codriverShots(_ theme: String) {
+        let heard = "{kind:'answer', uid:'cd3', t:hms(4), at:hms(4), level:'orange', trigger:'heard', pending:true, who:'Emily', q:'Does the pilot include the mobile app?', gist:'\u{1F50E} Emily asks: Does the pilot include the mobile app?', note:'heard the question, searching the project, a few seconds'}"
+        let answered = "{kind:'answer', uid:'cd3', t:hms(1), at:hms(1), level:'info', trigger:'heard_answer', who:'Emily', q:'Does the pilot include the mobile app?', gist:'\u{1F50E} Web only in the pilot, mobile in phase 2', phrase:'Not in the pilot: it is the web app only. Mobile comes in phase 2, from January.', items:['Scope call 14 Oct: mobile moved to phase 2'], note:'Sources: scope-call-notes.md'}"
+        let size = NSSize(width: 560, height: 760)
+        steps.append { [unowned self] in self.tipsExtra(theme, js: Self.codriverJS + heard + "]);", name: "codriver-heard", size: size) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: Self.codriverJS + answered + "]);", name: "codriver", size: size) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: Self.codriverJS + answered + "]);", name: "codriver-wide", size: NSSize(width: 1040, height: 680)) }
+    }
+
     func tipsExtra(_ theme: String, js: String, name: String, size: NSSize = NSSize(width: 1040, height: 680), presentation: Bool = false) {
         var pa = prompterArgs(["LiveTips", presentation ? "--prompter-demo-presentation" : "--prompter-demo"])
         pa.title = "Orbit weekly with the client"

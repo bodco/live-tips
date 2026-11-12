@@ -2397,6 +2397,7 @@
  "sheet.ui.ready.rules": "{preset} rules",
  "sheet.ui.ready.team": "Team readiness · later",
  "sheet.ui.ready.teamLater": "A Head of Sales will see the readiness of the team's sheets. Designed now, built later.",
+ "sheet.ui.live.noSheet": "This call has no Meeting Sheet yet. Use Prepare now.",
  "sheet.ui.refresh": "Refresh",
  "sheet.ui.refresh.title": "Refresh the Meeting Sheet?",
  "sheet.ui.refresh.body": "The sources are read again and a new version is made. Your edits are kept, the changes are marked.",

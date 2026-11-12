@@ -49,6 +49,28 @@
 "usd": null
 },
 {
+"at": "10:00:15",
+"cache_read": 0,
+"cache_write_1h": 0,
+"cache_write_5m": 0,
+"error": null,
+"hedge": null,
+"incomplete": null,
+"input": 100,
+"line_id": 1,
+"model": "fake-sonnet",
+"output": 37,
+"reasoning": null,
+"retried": null,
+"role": "tip",
+"route": "api",
+"stop": null,
+"tail": null,
+"text": null,
+"text_head": "{\"gist\": \"Tip 6\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"usd": null
+},
+{
 "at": "10:00:32",
 "error": null,
 "incomplete": null,
@@ -1603,6 +1625,10 @@
 "user_sha": "fc01919681c5"
 },
 {
+"model": "fake-sonnet",
+"user_sha": "2dcc6ebb4725"
+},
+{
 "model": "fake-haiku",
 "user_sha": "a39c0db7ba73"
 },
@@ -2020,6 +2046,24 @@
 "tip_done": 36015.0,
 "tip_start": 36015.0,
 "to_pm": true,
+"written": 36015.0
+},
+{
+"available_at": 36015.0,
+"context_revision": 0,
+"event": "topic_primer. The talk has moved to a new topic: \"release plan\". The PM may remember nothing about it. Give ONE info tip that works like a prompter: gist '📌 ' + the topic and where it stands BY THE SOURCES (not a retelling of what was just said aloud), one plain sentence; items = up to 3 short lines the PM knows about it from the brief, the fact book, the cards, the project state or PROJECT PASSAGES (status, numbers, owners, dates, what was agreed before, what is open), each with no invented number; phrase = one thing the PM can say or ask now about it. Skip when nothing in the context is about this topic beyond what was said aloud, or tips_given already covers it.",
+"gist": "Tip 6",
+"gist_at": 36015.0,
+"line_id": 1,
+"outcome": "role_observer",
+"rate_exempt": true,
+"route": "primer",
+"seg_end": 36014.0,
+"speaker": "them",
+"src": "10:00:11",
+"tip_done": 36015.0,
+"tip_start": 36015.0,
+"topic": "release plan",
 "written": 36015.0
 },
 {

@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from xml.etree import ElementTree as ET
 
-TEXT_EXT = (".md", ".txt", ".csv", ".tsv", ".json", ".yaml", ".yml", ".log", ".markdown")
+TEXT_EXT = (".md", ".txt", ".csv", ".tsv", ".json", ".yaml", ".yml", ".log", ".markdown", ".jsonl", ".ndjson")
 HTML_EXT = (".html", ".htm")
 TEXTUTIL_EXT = (".doc", ".rtf", ".odt", ".pages")
 SUPPORTED = TEXT_EXT + HTML_EXT + TEXTUTIL_EXT + (".pdf", ".pptx", ".xlsx", ".docx")

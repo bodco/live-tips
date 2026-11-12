@@ -531,5 +531,24 @@ test('speakers block: tips.js remembers the chevron in the prompter prefs, colla
   assert.ok(/\.spk-chev\{[^}]*width:32px;height:32px/.test(css) && /\.spk-chev svg\{width:18px;height:18px/.test(css), '18 px glyph in a 32 px hit area');
 });
 
+test('co-driver: a heard question card is replaced in place by its answer (same uid)', () => {
+  const tr2 = (k, p) => (k === 'heardMeta' ? `Heard from ${p.who}` : k === 'heardAnswer' ? `${p.who} asked: ${p.q}` : tr(k, p));
+  let last = null; const f = new Feed({ setState: (s) => { last = s; }, tr: tr2, now: () => NOW });
+  f.addItems([{ t: '10:44:00', kind: 'answer', uid: 'h7-1', level: 'orange', trigger: 'heard', pending: true, who: 'Mike', q: 'When does 3DS start?',
+    gist: '\u{1F50E} Mike asks: When does 3DS start?', note: 'heard the question, searching the project', engine: 'app' }]);
+  let docs = last.cards.filter((c) => c.kind === 'answer');
+  assert.strictEqual(docs.length, 1, 'a heard question is an answer card (the big place), not a docs line');
+  assert.strictEqual(docs[0].meta, 'Heard from Mike');
+  assert.strictEqual(docs[0].who, 'Mike');
+  assert.strictEqual(docs[0].question, 'When does 3DS start?');
+  assert.strictEqual(docs[0].say, 'heard the question, searching the project');
+  f.addItems([{ t: '10:44:09', kind: 'answer', uid: 'h7-1', level: 'info', trigger: 'heard_answer', who: 'Mike', q: 'When does 3DS start?',
+    gist: '\u{1F50E} After Pomelo opens the sandbox', phrase: 'Once Pomelo gives us the sandbox, about 63 hours of work.', note: 'Sources: current state', engine: 'app' }]);
+  docs = last.cards.filter((c) => c.kind === 'answer');
+  assert.strictEqual(docs.length, 1, 'one card, not two');
+  assert.strictEqual(docs[0].meta, 'Mike asked: When does 3DS start?');
+  assert.ok(docs[0].say.startsWith('Once Pomelo'));
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

@@ -106,7 +106,18 @@ def render_rules(rules, tips_lang: str = "", meta: Optional[dict] = None) -> str
         version=rules.version, priorities=" > ".join(rules.priorities["order"]), triggers=trig,
         fact_lines=d["limits"]["fact_lines_max"], fact_words=d["limits"]["fact_words_max"],
         live_topic=d["live_topic_window_s"],
-        address_rule=ADDRESS_ANY if (meta or {}).get("answer_any", True) else ADDRESS_STRICT)
+        address_rule=_address_rule(meta))
+
+
+def _address_rule(meta: Optional[dict]) -> str:
+    """0.10.0 co-driver (owner 2026-11-12): questions to anyone, and a search instead of a skip (livetips_m0.codriver)."""
+    meta = meta or {}
+    if not meta.get("answer_any", True):
+        return ADDRESS_STRICT
+    if meta.get("codriver", True):
+        from .codriver import ADDRESS_CODRIVER
+        return ADDRESS_ANY + "\n" + ADDRESS_CODRIVER
+    return ADDRESS_ANY
 
 
 def _read(p: Optional[Path], limit: int) -> str:
@@ -290,7 +301,11 @@ class PromptBuilder:
 
     def user(self, role: str, event: str, tail_lines: List[str], state: dict, earlier_lines: List[str] = ()) -> str:
         if role == "classify":
-            task = CLASSIFY_TASK.replace("{address}", CLASSIFY_ANY if self.meta.get("answer_any", True) else CLASSIFY_STRICT)
+            addr = CLASSIFY_ANY if self.meta.get("answer_any", True) else CLASSIFY_STRICT
+            if self.meta.get("answer_any", True) and self.meta.get("codriver", True):
+                from .codriver import CLASSIFY_CODRIVER     # 0.10.0 co-driver (owner 2026-11-12)
+                addr = CLASSIFY_ANY + " " + CLASSIFY_CODRIVER
+            task = CLASSIFY_TASK.replace("{address}", addr)
         else:
             task = TIP_TASK.format(event=event, **self.fmt)
         st = json.dumps(state, ensure_ascii=False)

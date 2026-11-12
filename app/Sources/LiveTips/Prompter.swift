@@ -170,9 +170,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         // 2026-10-23: the title bar (close, minimise, End call) stays solid at any opacity setting.
         if let tb = window.standardWindowButton(.closeButton)?.superview {
             tb.wantsLayer = true
-            window.effectiveAppearance.performAsCurrentDrawingAppearance {
-                tb.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-            }
+            setLayerColor(tb, .windowBackgroundColor)
+        }
+        // 2026-11-12 (owner): the title bar stayed white after a switch to the dark theme: the layer colours are
+        // CGColors fixed at creation, so they are resolved again whenever the window's appearance changes.
+        appearanceObs = window.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.reapplyAppearance() } }
         }
         NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in
             MainActor.assumeIsolated { self?.showCallEnded(n.userInfo ?? [:]) }
@@ -572,7 +575,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         b.isBordered = false
         b.wantsLayer = true
         b.layer?.cornerRadius = Self.pillH / 2
-        b.layer?.backgroundColor = (filled ? color : color.withAlphaComponent(0.18)).cgColor
+        setLayerColor(b, filled ? color : color.withAlphaComponent(0.18))
         b.attributedTitle = NSAttributedString(string: title, attributes: [
             .foregroundColor: filled ? NSColor.white : color, .font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
         let size = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
@@ -583,7 +586,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func restylePill(_ b: NSButton, _ title: String, color: NSColor) {
         let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
         b.attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: color, .font: font])
-        b.layer?.backgroundColor = color.withAlphaComponent(0.18).cgColor
+        setLayerColor(b, color.withAlphaComponent(0.18))
         let w = ceil((title as NSString).size(withAttributes: [.font: font]).width) + Self.pillPad * 2
         b.frame.size = NSSize(width: w, height: Self.pillH)
         layoutTitleButtons()
@@ -635,14 +638,29 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let on = Self.onTop
         p.image = NSImage(systemSymbolName: on ? "pin.fill" : "pin.slash", accessibilityDescription: L("tw.onTop"))
         p.contentTintColor = on ? Self.pacenoteBlue : .secondaryLabelColor
-        p.layer?.backgroundColor = (on ? Self.pacenoteBlue.withAlphaComponent(0.18) : NSColor.white).cgColor
+        setLayerColor(p, on ? Self.pacenoteBlue.withAlphaComponent(0.18) : NSColor.controlBackgroundColor)
         p.layer?.borderWidth = on ? 0 : 1
-        p.layer?.borderColor = NSColor.separatorColor.cgColor
+        window.effectiveAppearance.performAsCurrentDrawingAppearance { p.layer?.borderColor = NSColor.separatorColor.cgColor }
         p.toolTip = on ? L("tw.onTopOn") : L("tw.onTopOff")
         p.setAccessibilityLabel(L("tw.onTop"))
     }
 
     @objc func pinClicked() { setOnTop(!Self.onTop) }
+
+    /// 2026-11-12 (owner, dark theme): a layer colour remembered as an NSColor and resolved for the window's current
+    /// appearance, again on every appearance change (reapplyAppearance).
+    var layerColors: [ObjectIdentifier: (NSView, NSColor)] = [:]
+    var appearanceObs: NSKeyValueObservation?
+    func setLayerColor(_ v: NSView, _ c: NSColor) {
+        layerColors[ObjectIdentifier(v)] = (v, c)
+        (window?.effectiveAppearance ?? NSApp.effectiveAppearance).performAsCurrentDrawingAppearance {
+            v.layer?.backgroundColor = c.cgColor
+        }
+    }
+    func reapplyAppearance() {
+        for (_, vc) in layerColors { setLayerColor(vc.0, vc.1) }
+        styleOnTop()
+    }
 
     /// 0.8.6 (D4): the call's project as a target ("<slug>" or "workspace:<name>"), nil for a call without a project.
     static func callTarget() -> String? {
@@ -821,7 +839,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             restylePill(g, label, color: .controlAccentColor)
             let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
             g.attributedTitle = NSAttributedString(string: label, attributes: [.foregroundColor: NSColor.white, .font: font])
-            g.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+            setLayerColor(g, .controlAccentColor)
             g.action = #selector(newCallClicked)
             g.target = self
             g.toolTip = next.map { n in L("tw.startNextTip", ["title": MainActor.assumeIsolated { n.effectiveTitle }]) } ?? L("tw.closeOpen")
@@ -1020,6 +1038,16 @@ extension PrompterController {
         case "menu":
             switch d["item"] as? String ?? "" {
             case "clear-speakers": sendSetting("speakers_clear", true)
+            case "open-sheet":
+                // 0.10.0 (owner, 11.12): the Meeting Sheet of the running call in its own window, the call goes on
+                MainActor.assumeIsolated {
+                    guard let m = LivePrep.liveModel() else { return }
+                    guard let p = SheetFiles.path(for: m) else {
+                        push("window.toastMsg && window.toastMsg(" + jsString(L("sheet.ui.live.noSheet")) + ")")
+                        return
+                    }
+                    SheetViewWindow.show(path: p, model: m)
+                }
             case "home":    // 2026-11-03 (owner): Home from the call window; 2026-11-10 (owner): it replaces the tips window
                 MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.openHome() }
                 window.close()           // the call goes on; Tips in the floating controls or the menu bar opens it again

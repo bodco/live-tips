@@ -17,6 +17,7 @@ from typing import Callable, Dict, List, Optional
 import jsonschema
 
 from . import usage
+from . import codriver
 from . import agenda as agenda_mod
 from . import commitments as register
 from .cost import cost_usd
@@ -793,6 +794,14 @@ class Engine:
         # 2026-10-23 PM sync review: a question to anyone on the call may be one the PM is expected to
         # answer or add to; the addressee is ignored (cfg "answer_any", on by default).
         self.answer_any = cfg.get("answer_any", True)
+        # 0.10.0 co-driver (owner 2026-11-12, livetips_m0.codriver): prompter cards on new topics, every question
+        # of anyone answered or searched with a "heard" card, reflections; cfg "codriver" (on by default)
+        self.codriver = bool(self.answer_any and cfg.get("codriver", True))
+        self.cd_primer_topics: List[str] = []
+        self.cd_primer_at: Optional[float] = None
+        self.cd_reflect_at: Optional[float] = None
+        self.cd_reflect_topics: List[str] = []
+        self.cd_heard: List[tuple] = []          # (question, at) of the heard cards shown
         # 2026-10-26: "Зафіксуй / Можеш додати" by the periodic classify only when proactive is on.
         self.proactive = cfg.get("proactive", False)
         self.situation: dict = {}
@@ -1126,6 +1135,12 @@ class Engine:
             gate["event"].set()
             span["outcome"] = "classify_for_parallel"
         elif obj.get("need_tip"):
+            if self.codriver and obj.get("trigger") in ("question_any", "reflect"):
+                why = self._codriver_gate(line, span, obj)
+                if why:
+                    span["outcome"] = why
+                    self.out_timing.write(span)
+                    return
             if obj.get("trigger") == "answer_in_primary":
                 why = self._aip_blocked(obj)
                 if why:
@@ -1174,7 +1189,8 @@ class Engine:
         self.futures.append(self.pool.submit(self._run_tip, line, trigger, span))
 
     def _run_tip(self, line: Line, trigger: str, span: dict) -> None:
-        if self._expired(line) or span.get("context_revision", self.context_revision) != self.context_revision:
+        limit = self.stale_s * 2.5 if trigger in codriver.TRIGGERS else None     # 0.10.0 co-driver
+        if self._expired(line, limit) or span.get("context_revision", self.context_revision) != self.context_revision:
             self.out_timing.write(dict(span, outcome="obsolete_before_request"))
             return
         span["tip_start"] = self.clock()
@@ -1198,8 +1214,11 @@ class Engine:
         """2026-11-10 (owner): a tip (or a skip) may ask for a search of the project ("search"): the model saw that
         someone needs something from the PM that the context does not hold. Runs quietly, a card only when found."""
         obj = first_json(c.text) if not c.error else None
+        if self.codriver and isinstance(obj, dict) and obj.get("skip") and str(obj.get("heard") or "").strip():
+            self._heard(obj, span)            # 0.10.0 co-driver: heard, searching, the answer follows
+            return
         want = str((obj or {}).get("search") or "").strip() if isinstance(obj, dict) else ""
-        if not want or not self.cfg.get("deep_lookup", True) or self._economy() or not self._search_roots():
+        if not want or not self.cfg.get("deep_lookup", True) or self._economy() or not self._lookup_ok():
             return
         span["search"] = want[:200]
         self._start_deep(want, "quiet")
@@ -1285,6 +1304,11 @@ class Engine:
             return why
         if span.get("force_level"):
             obj["level"] = span["force_level"]
+        if run.trigger in codriver.TRIGGERS:
+            obj["trigger"] = run.trigger           # 0.10.0 co-driver: the diets know the card by its trigger
+            if run.trigger == "topic_primer" and not obj.get("items"):
+                span["gist"] = obj.get("gist")
+                return "primer_no_facts"           # a topic card retelling the talk, with nothing from the sources
         run.obj = obj
         for step in (self._tip_blocked, self._tip_vetoed, self._tip_stale, self._tip_unseen_number, self._tip_aip_repeat,
                      self._tip_diet):
@@ -1349,6 +1373,9 @@ class Engine:
     def _tip_stale(self, run: "TipRun") -> Optional[str]:
         demote_red(run.obj, run.trigger, run.span)
         why = self.stale(run.line, run.obj.get("trigger", run.trigger), run.obj)
+        # 0.10.0 co-driver: a topic card or an answer to anyone's question is still worth it a little later
+        if why == "expired" and run.trigger in codriver.TRIGGERS and not self._expired(run.line, self.stale_s * 2.5):
+            why = None
         # a red warning (a wrong number, a promise to stop) is worth showing late: up to twice the window, marked late
         if why == "expired" and run.obj.get("level") == "red" and not self._expired(run.line, self.stale_s * RED_LATE_FACTOR):
             why = None
@@ -1445,6 +1472,8 @@ class Engine:
         at most TEAM_TIPS_PER_HOUR non-red model tips per hour."""
         if self.meta().get("audience") != "team":
             return None
+        if obj.get("trigger") in codriver.TRIGGERS:
+            return None                        # 0.10.0 co-driver: own gates (codriver_gate, primer gap)
         if obj.get("level") == "info":
             return "team_info"
         with self.lock:
@@ -1459,7 +1488,8 @@ class Engine:
         return "meeting_rate" if n >= MEETING_EXEMPT_PER_MIN else None
 
     def _rate_diet(self, obj: dict, now: float) -> Optional[str]:
-        if self.last_nonred_emit is not None and now - self.last_nonred_emit < self.rate_s:
+        cd = obj.get("trigger") in ("question_any", "topic_primer")     # 0.10.0 co-driver: not held by the rate
+        if not cd and self.last_nonred_emit is not None and now - self.last_nonred_emit < self.rate_s:
             return "rate"
         with self.lock:
             pm_recent = any(h.speaker == "me" and h.written is not None and 0 <= now - h.written <= self.pm_window
@@ -2116,6 +2146,106 @@ class Engine:
         return obj
 
     # ---------- deep lookup with Claude Code (2026-10-27) ----------
+    # ---------- 0.10.0 co-driver (owner 2026-11-12, livetips_m0.codriver) ----------
+    def _quick_passages(self, text: str, budget_chars: int = 6000) -> str:
+        """The shared search here on the Mac (sheet facts, the sheet's files, the folders' index) within ~1 s; no lt,
+        no model. Text for the tip's PROJECT PASSAGES, or ""."""
+        roots = self._search_roots()
+        sheet = self._sheet()
+        if not roots and sheet is None:
+            return ""
+        try:
+            from .sheet import lookup
+            snips = lookup.snippets(text, sheet=sheet, roots=roots[:4], k=6, queries=self._find_queries(text)[1:],
+                                    budget_chars=budget_chars, max_seconds=float(self.cfg.get("codriver_search_s", 1.0)),
+                                    exclude_prefix=self._call_prefix(), index=self._folder_index(roots))
+        except Exception:  # noqa: BLE001
+            return ""
+        return codriver.passages_text(snips, budget_chars)
+
+    def _codriver_gate(self, line: Line, span: dict, obj: dict) -> Optional[str]:
+        """question_any: every real question of the others, with passages; reflect: at most one per
+        codriver_reflect_gap_s (90 s), never twice on one topic in 10 minutes."""
+        trig = obj.get("trigger")
+        now = self.clock()
+        who = self.speakers.who(line)
+        if trig == "reflect":
+            topic = str(obj.get("topic") or "")
+            with self.lock:
+                if self.cd_reflect_at is not None and now - self.cd_reflect_at < float(self.cfg.get("codriver_reflect_gap_s", 90)):
+                    return "reflect_gap"
+                if topic and any(jaccard(topic, t) >= self.topic_sim for t in self.cd_reflect_topics[-5:]):
+                    return "reflect_same_topic"
+                self.cd_reflect_at = now
+                self.cd_reflect_topics.append(topic)
+            span["event"] = codriver.event_for("reflect", who=who)
+            return None
+        text = " ".join(h.text for h in self._after_tail(line))
+        span["event"] = codriver.event_for("question_any", who=who, passages=self._quick_passages(text))
+        span["rate_exempt"] = True
+        return None
+
+    def _after_tail(self, line: Line) -> List[Line]:
+        """The question line with the two lines before it (a question often spans two ASR lines)."""
+        with self.lock:
+            hist = [h for h in self.history if h.line_id <= line.line_id]
+        return hist[-3:]
+
+    def _heard(self, obj: dict, span: dict) -> None:
+        """A real question the context does not answer: a card at once, then the search's answer (found or not)."""
+        q = codriver.heard_text(obj.get("heard"))
+        now = self.clock()
+        with self.lock:
+            if any(codriver.same_question(q, x) and now - at < 240 for x, at in self.cd_heard):
+                span["heard"] = "dup"
+                return
+            # one search at a time per 20 s: two halves of one question gave two cards 7 s apart (replay 12.11)
+            if self.cd_heard and now - self.cd_heard[-1][1] < float(self.cfg.get("codriver_heard_gap_s", 20)):
+                span["heard"] = "gap"
+                return
+            self.cd_heard.append((q, now))
+        uk = self._ui_uk()
+        uid = "h{}-{}".format(span.get("line_id", 0), int(now * 1000) % 1000000)
+        card = codriver.heard_card(obj, uid, str(span.get("src") or ""), s_to_hms(now), uk, self.agent_fast())
+        with self.lock:
+            self.tips.append(dict(card, _at=now))
+        self.out_tips.write(card)
+        span["heard"] = q[:200]
+        want = str(obj.get("search") or "").strip()
+        query = (q + " | " + want) if want else q
+        with self.lock:
+            self.__dict__.setdefault("cd_heard_uid", {})[query] = (uid, card.get("who", ""))
+        self._start_deep(query, "heard")
+
+    def _maybe_primer(self, sit: dict, line: Line) -> None:
+        """Prompter: a topic card when the call moves to a new topic (called under self.lock)."""
+        if not self.codriver or not self.cfg.get("codriver_primer", True) or self.presenting(self.clock()):
+            return
+        topic = str(sit.get("topic") or "").strip()
+        now = self.clock()
+        sim = lambda a, b: jaccard(a, b) >= self.topic_sim      # noqa: E731
+        if not codriver.primer_due(topic, self.cd_primer_topics, self.cd_primer_at,
+                                   now, float(self.cfg.get("codriver_primer_gap_s", 60)), sim):
+            return
+        # a card on this topic in the last minute already says it (replay 12.11: a primer next to a pushback tip)
+        if any(t.get("_at", -1e9) >= now - 60 and sim(topic, str(t.get("topic") or "")) for t in self.tips):
+            return
+        prev = getattr(self, "_cd_topic_seen", "")
+        self._cd_topic_seen = topic
+        if not prev or not sim(prev, topic):
+            return                             # a topic counts once it holds for two pictures in a row
+        self.cd_primer_at = now
+        self.cd_primer_topics.append(topic)
+        span = {"line_id": line.line_id, "src": line.t, "speaker": line.speaker, "seg_end": line.seg_end,
+                "written": line.written, "available_at": now, "route": "primer", "topic": topic,
+                "context_revision": self.context_revision}
+        self.futures.append(self.pool.submit(self._run_primer, line, topic, span))
+
+    def _run_primer(self, line: Line, topic: str, span: dict) -> None:
+        span["event"] = codriver.event_for("topic_primer", topic=topic, passages=self._quick_passages(topic))
+        span["rate_exempt"] = True
+        self._run_tip(line, "topic_primer", span)
+
     def _start_deep(self, question: str, kind: str) -> None:
         if not self.cfg.get("deep_lookup", True) or not question.strip():
             return
@@ -2186,8 +2316,17 @@ class Engine:
         self.out_llm.write(row)
         if kind == "quiet" and (res.get("error") or res.get("skipped") or res.get("answered") is not True):
             return                            # a search the model asked for on its own: "not found" stays silent
+        body = deep_item(res, uk)
+        if kind == "heard":                   # 0.10.0 co-driver: the heard card gets its answer, found or not
+            if res.get("error") or res.get("answered") is not True:
+                body = dict(body, **codriver.not_found_card({} if res.get("error") else res, uk))
+            body["trigger"] = "heard_answer"
+            with self.lock:           # the answer takes the heard card's place in the window (same uid)
+                uid, who = self.__dict__.get("cd_heard_uid", {}).pop(question, ("", ""))
+                self.tips[:] = [t for t in self.tips if not (uid and t.get("uid") == uid)]
+            body.update(uid=uid, who=who)
         out = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": s_to_hms(t0), "kind": "answer",
-               "q": question.split(" | ")[0], "at": s_to_hms(done), **deep_item(res, uk)}
+               "q": question.split(" | ")[0], "at": s_to_hms(done), **body}
         out = {k: v for k, v in out.items() if v not in ("", [], None)}
         if kind in ("ask", "quiet"):
             self._log_ask(question, out)
@@ -2387,6 +2526,7 @@ class Engine:
                 return
             sit = next_situation(obj, self.situation or {}, pm_words, new[-1].t_s, self.cfg.get("ask_ttl_s", 360))
             self._publish_situation(sit, new[-1].line_id)
+            self._maybe_primer(sit, new[-1])
             self._asks_to_tips(sit, hist)
             self._agenda_from_model(obj)
             self._commitments_done(obj)

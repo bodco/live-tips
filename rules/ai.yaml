@@ -176,3 +176,45 @@ prep_runs:
     (Restore previous version); a failed run puts the old files back.
   compare: tools/prep_compare.py <appRoot>/prep-runs/<base> prints one table (time, price, tokens, brief size,
     sections, speech points with full text, cards, facts) for a quality review
+windows:
+  # 0.10.0 (Meeting Sheet, phase 2): what one pass of a model can read, in tokens, for the size check (S4) and the
+  # passes plan. window = the model's context window, input = the most the provider accepts as input when it caps it
+  # below the window, reserve = the tokens kept for the answer (the sheet JSON) and the prompt. Taken from the
+  # providers' documentation on 2026-11-12 (sources below); a value marked unverified is an estimate.
+  # chars_per_token: the estimate per script (Cyrillic takes more tokens per character than Latin). Latin for Claude
+  # from its documentation (1M tokens ~ 2.5M characters); the OpenAI and Gemini Latin values are the usual ~4 per
+  # token; every Cyrillic value is unverified (no provider tokenizer could be reached on 2026-11-12) and is checked
+  # against the usage the providers report after real builds.
+  checked: "2026-11-12"
+  sources:
+    claude: https://platform.claude.com/docs/en/models/overview (1M context, 128K output for Opus 5.5, Sonnet 5.5, Haiku 5.5; 1M tokens ~ 2.5M characters on the current tokenizer)
+    openai: https://developers.openai.com/api/docs/models/gpt-6.1-sol and gpt-6-luna (1,050,000 context, 922,000 input, 128,000 output)
+    gemini: https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash and gemini-3.5-flash (1,048,576 input, 65,536 output)
+  default_reserve: 12000
+  routes:
+    code:   {model: sonnet, window: 1000000, reserve: 16000, chars_per_token: {latin: 2.5, cyrillic: 1.6}}
+    api:    {model: sonnet, window: 1000000, reserve: 16000, chars_per_token: {latin: 2.5, cyrillic: 1.6}}
+    codex:  {model: codex/default, window: 272000, reserve: 12000, unverified: true,
+             note: "the ChatGPT account through Codex CLI does not name its model; the window is an estimate",
+             chars_per_token: {latin: 4.0, cyrillic: 2.6}}
+    openai: {model: gpt-6.1-sol, window: 1050000, input: 922000, reserve: 12000, chars_per_token: {latin: 4.0, cyrillic: 2.6}}
+    gemini: {model: gemini-3.8-flash, window: 1048576, reserve: 12000, chars_per_token: {latin: 4.0, cyrillic: 2.8}}
+    agy:    {model: gemini-3.8-flash-medium, window: 1048576, reserve: 12000, unverified: true,
+             note: "the Gemini account through Antigravity CLI; the API model's window is assumed",
+             chars_per_token: {latin: 4.0, cyrillic: 2.8}}
+    local:  {model: gemma4:26b, window: 65536, reserve: 8000, note: "Ollama num_ctx of livetips_m0.localprep",
+             unverified: true, chars_per_token: {latin: 3.8, cyrillic: 2.4}}
+  models:
+    sonnet: {window: 1000000, output: 128000}
+    opus: {window: 1000000, output: 128000}
+    haiku: {window: 1000000, output: 128000}
+    gpt-6.1-sol: {window: 1050000, input: 922000, output: 128000}
+    gpt-6-luna: {window: 1050000, input: 922000, output: 128000}
+    gemini-3.8-flash: {window: 1048576, output: 65536}
+    gemini-3.5-flash: {window: 1048576, output: 65536}
+    gemini-3.5-flash-lite: {window: 1048576, output: 65536, unverified: true}
+  # near: the share of the usable window above which the size check shows "near" (yellow)
+  near_share: 0.8
+  # One pass of a big model still loses detail on a huge pack: a pass is planned at most this many tokens even when
+  # the window is larger (the passes plan of S4). 0 = the whole usable window.
+  pass_cap: 250000

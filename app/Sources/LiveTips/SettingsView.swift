@@ -792,6 +792,7 @@ struct SettingsView: View {
         Pane(id: "integrations", title: "Integrations", symbol: "point.3.connected.trianglepath.dotted", subtitle: "Notion, calendars and your CRM."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
         Pane(id: "recording", title: "Call recording", symbol: "record.circle", subtitle: "Record the sound or the screen of your calls."),   // 0.9.5
+        Pane(id: "sheet", title: "Meeting Sheet", symbol: "doc.text.magnifyingglass", subtitle: "Quick or Expert, My focus, reminders, your presets."),   // 0.10.0 (Meeting Sheet, phase 4)
         Pane(id: "modules", title: "Modules", symbol: "square.grid.2x2", subtitle: "Turn parts of Pacenote on or off."),       // 0.9.0
         Pane(id: "usage", title: "Usage", symbol: "chart.bar", subtitle: "Calls this week and the full statistics."),       // 0.9.0: from Home
         Pane(id: "help", title: "Help", symbol: "questionmark.circle", subtitle: "What Pacenote can do and what is new."),  // 0.9.0: from Home
@@ -841,6 +842,7 @@ struct SettingsView: View {
         case "recording": RecordingSettingsPane(model: model)
         case "integrations": IntegrationsPane(model: model) { notion }
         case "how": HowItWorksView()
+        case "sheet": MeetingSheetSettingsPane()      // 0.10.0 (Meeting Sheet, phase 4)
         case "modules": Form {
             Section {
                 Toggle(isOn: $trackerModule) {
@@ -1830,7 +1832,7 @@ final class SettingsWindow {
         switch tab {
         case "how": return L("settings.how.title")
         case "about": return L("settings.about.windowTitle")
-        case "general", "projects", "ai", "recording", "integrations", "usage", "help", "modules": return L("settings.tab." + tab)
+        case "general", "projects", "ai", "recording", "integrations", "usage", "help", "modules", "sheet": return L("settings.tab." + tab)
         default: return L("settings.windowTitle")
         }
     }

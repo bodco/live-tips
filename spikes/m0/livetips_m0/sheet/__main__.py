@@ -5,7 +5,15 @@
   python -m livetips_m0.sheet presets   [--request <req.json>]      list | save | rename | duplicate | delete
   python -m livetips_m0.sheet new       --request <req.json>        an empty sheet from a preset
 Exit codes: 0 ok, 1 invalid sheet or failed action, 2 unknown or not yet implemented command, 3 bad input.
-Not implemented in phase 1 (later phases): sources, candidates, size, build, refresh, export, derive.
+0.10.0 (Meeting Sheet, phase 2-3, pipeline):
+  python -m livetips_m0.sheet sources    --request <req.json>   {sources: [with access, fix_action, size_tokens], suggestions}
+  python -m livetips_m0.sheet candidates --request <req.json>   {candidates: [with why, suggested], total_files, excluded}
+  python -m livetips_m0.sheet size       --request <req.json>   size_report (fits | near | too_much, biggest, plans)
+  python -m livetips_m0.sheet build      --request <req.json>   progress lines, then {"done": true, "sheet": path, ...}
+  python -m livetips_m0.sheet refresh    --request <req.json>   the same against <base>.sheet.json, with diff
+  python -m livetips_m0.sheet derive     --sheet <x.sheet.json> the live files (brief.md, cards, facts, slides, agenda)
+Exit codes of build / refresh: 4 the sources do not fit one pass (choose passes or compress), 5 the model failed.
+Not implemented yet: export (phase 5).
 """
 import argparse
 import json
@@ -16,8 +24,9 @@ from . import presets as P
 from . import readiness as R
 from . import schema as S
 
-LATER = {"sources": 2, "candidates": 2, "size": 2, "build": 3, "refresh": 3, "export": 5, "derive": 3}
-COMMANDS = ("validate", "readiness", "presets", "new") + tuple(LATER)
+LATER = {"export": 5}
+PIPELINE = ("sources", "candidates", "size", "build", "refresh", "derive")
+COMMANDS = ("validate", "readiness", "presets", "new") + PIPELINE + tuple(LATER) + ("webplan", "webfetch")
 
 
 def _out(obj, code=0):
@@ -111,6 +120,59 @@ def cmd_new(a, req, rules):
     return _out({"sheet": sheet})
 
 
+# 0.10.0 (Meeting Sheet, phase 2-3): the pipeline commands
+def cmd_sources(a, req, rules):
+    from . import sources as SRC
+    srcs, _texts, sugg = SRC.collect(req)
+    return _out({"sources": srcs, "suggestions": sugg})
+
+
+def cmd_candidates(a, req, rules):
+    from . import sources as SRC
+    return _out(SRC.candidates(req, int(req.get("limit") or 40)))
+
+
+def cmd_size(a, req, rules):
+    from . import size as Z
+    from . import sources as SRC
+    srcs, _texts, _s = SRC.collect(req)
+    rep = Z.report(srcs, req.get("route") or "codex", req.get("model") or None, None, req.get("plan"))
+    rep["sources"] = [{k: s.get(k) for k in ("id", "n", "type", "title", "access", "size_tokens", "chars")} for s in srcs]
+    return _out(rep)
+
+
+def _build(a, req, refresh):
+    from . import build as B
+    if not req.get("meeting") and not refresh:
+        return _out({"error": "request needs meeting"}, 3)
+    if refresh and not req.get("base"):
+        return _out({"error": "refresh needs base (the sheet's path without .sheet.json)"}, 3)
+    res = B.build(req, refresh=refresh)
+    code = res.pop("code", 0) if res.get("error") else 0
+    sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
+    return code
+
+
+def cmd_build(a, req, rules):
+    return _build(a, req, False)
+
+
+def cmd_refresh(a, req, rules):
+    return _build(a, req, True)
+
+
+def cmd_derive(a, req, rules):
+    from . import derive as D
+    path = a.sheet or req.get("sheet")
+    if not path:
+        return _out({"error": "--sheet is required"}, 3)
+    path = str(Path(path).expanduser())
+    sheet = _read_json(path)
+    base = path[:-len(".sheet.json")] if path.endswith(".sheet.json") else path
+    Path(base + ".sheet.md").write_text(D.render_md(sheet), encoding="utf-8")
+    return _out({"written": D.derive(sheet, base) + [base + ".sheet.md"]})
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m livetips_m0.sheet")
     ap.add_argument("command")
@@ -121,6 +183,9 @@ def main(argv=None):
     ap.add_argument("--rules")
     ap.add_argument("--no-write", action="store_true")
     a, _rest = ap.parse_known_args(argv)
+    if a.command in ("webplan", "webfetch"):   # 0.10.0 (Meeting Sheet, phase 6): site plan and fetch, browser captures
+        from . import web as W
+        return W.cli(a.command, a.request)
     if a.command not in COMMANDS:
         return _out({"error": f"unknown command {a.command!r}", "commands": list(COMMANDS)}, 2)
     if a.command in LATER:
@@ -131,7 +196,9 @@ def main(argv=None):
         return _out({"error": f"cannot read the request: {e}"}, 3)
     rules = P.load_rules(Path(a.rules)) if a.rules else P.load_rules()
     try:
-        return {"validate": cmd_validate, "readiness": cmd_readiness, "presets": cmd_presets, "new": cmd_new}[a.command](a, req, rules)
+        return {"validate": cmd_validate, "readiness": cmd_readiness, "presets": cmd_presets, "new": cmd_new,
+                "sources": cmd_sources, "candidates": cmd_candidates, "size": cmd_size, "build": cmd_build,
+                "refresh": cmd_refresh, "derive": cmd_derive}[a.command](a, req, rules)
     except (OSError, ValueError) as e:
         return _out({"error": str(e)}, 3)
 

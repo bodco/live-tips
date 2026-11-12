@@ -518,7 +518,7 @@ def adopt_prep(s):
     live = Path(s).parent
     title = call_title_slug(s)
     adopted = {}
-    exts = (".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json")
+    exts = (".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".sheet.json")   # 0.10.0: + the Meeting Sheet
     def is_fresh(p):
         """Made in the last 3 h, or (QA 26.10) made earlier for a call whose time in the name is near:
         prep-YYYY-MM-DD-HHMM-... from 3 h before now to 12 h ahead."""

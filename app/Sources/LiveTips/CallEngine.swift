@@ -245,7 +245,8 @@ final class CallEngine {
         if fm.fileExists(atPath: stem + ".brief.md"), fm.fileExists(atPath: base + ".brief.md") {
             try? fm.removeItem(atPath: stem + ".brief.prev.md"); try? fm.copyItem(atPath: stem + ".brief.md", toPath: stem + ".brief.prev.md")
         }
-        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json"] where fm.fileExists(atPath: base + ext) {
+        // 0.10.0 (Meeting Sheet, phase 7): + .sheet.json, live takes the sheet as its base
+        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json", ".sheet.json"] where fm.fileExists(atPath: base + ext) {
             let tmp = stem + ext + ".tmp"
             try? fm.removeItem(atPath: tmp)
             if (try? fm.copyItem(atPath: base + ext, toPath: tmp)) != nil {
@@ -271,11 +272,13 @@ final class CallEngine {
         // A prep chosen by hand in the Start call window: copy its files next to this call's transcript,
         // and do not let the automatic pick add files of another prep (QA 26.10).
         var auto = true
-        if let chosen = callRequest["prep_file"] as? String, !chosen.isEmpty, chosen.hasSuffix(".brief.md") {
+        // 0.10.0 (Meeting Sheet, phase 7): the chosen preparation may be a sheet (<base>.sheet.json); its files and the
+        // sheet itself go next to the transcript, the recorder reads <stem>.sheet.json directly.
+        if let chosen = callRequest["prep_file"] as? String, !chosen.isEmpty, chosen.hasSuffix(".brief.md") || chosen.hasSuffix(".sheet.json") {
             auto = false
-            let base = String(chosen.dropLast(".brief.md".count))
+            let base = String(chosen.dropLast(chosen.hasSuffix(".sheet.json") ? ".sheet.json".count : ".brief.md".count))
             let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-            for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json"] {
+            for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json", ".sheet.json"] {
                 let dst = stem + ext
                 if FileManager.default.fileExists(atPath: base + ext), !FileManager.default.fileExists(atPath: dst) {
                     try? FileManager.default.copyItem(atPath: base + ext, toPath: dst)
@@ -290,6 +293,18 @@ final class CallEngine {
         p.standardError = log
         try? p.run()
         p.waitUntilExit()
+    }
+
+    /// 0.10.0 (Meeting Sheet, phase 7): the preset of the call's Meeting Sheet (the chosen preparation's <base>.sheet.json,
+    /// or "sheet_preset" in the request), "" when the call has no sheet. Never throws.
+    nonisolated static func sheetPreset(_ req: [String: Any]) -> String {
+        if let p = req["sheet_preset"] as? String, !p.isEmpty { return p }
+        guard let chosen = req["prep_file"] as? String, !chosen.isEmpty else { return "" }
+        let base = chosen.hasSuffix(".sheet.json") ? String(chosen.dropLast(".sheet.json".count))
+            : chosen.hasSuffix(".brief.md") ? String(chosen.dropLast(".brief.md".count)) : chosen
+        guard let data = FileManager.default.contents(atPath: base + ".sheet.json"),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "" }
+        return (obj["preset"] as? String) ?? ""
     }
 
     /// 0.8.5 (rules/meeting.yaml > tips_language): tips and cards in the meeting's main language, not the window's.
@@ -334,6 +349,8 @@ final class CallEngine {
         sc["situation"] = true
         // 0.8.7 (H): Sales mode and what the tracker needs (the planned length for the qualify and next step tips)
         if let s = callRequest["sales"] as? [String: Any], (s["enabled"] as? Bool) == true { sc["sales"] = s }
+        // 0.10.0 (Meeting Sheet, phase 7): a stand-up sheet: no qualification (BANT) and no slides, whatever was switched
+        if Self.sheetPreset(callRequest) == "standup" { sc.removeValue(forKey: "sales"); sc["standup"] = true }
         if let p = callRequest["project_dir"] as? String { sc["project_dir"] = p }
         sc["proactive"] = ((UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:])["proactive"] as? String) == "1"   // remembered in the tips window
         sc["project_root"] = projectRoot

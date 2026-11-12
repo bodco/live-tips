@@ -843,25 +843,34 @@ class Cards:
         self.lock = threading.Lock()
         self.bad_mtime = None
         self.names: list[str] = []          # 0.9.2: the PM's name aliases (config name_aliases), for address cards
+        self.sheet: "SheetLive | None" = None   # 0.10.0 (Meeting Sheet, phase 7): set by main()
+        self.sheet_key = None
+        self.file_cards: list[dict] = []
+        self.last_ask = 0.0
 
     def _load(self) -> None:
         try:
             m = self.path.stat().st_mtime
         except OSError:
-            self.cards, self.mtime = [], None
+            m = None
+        skey = self.sheet.key() if self.sheet is not None else None
+        if m == self.mtime and skey == self.sheet_key:
             return
-        if m == self.mtime:
-            return
-        try:
-            cards = parse_cards(json.loads(self.path.read_text(encoding="utf-8")))
-        except Exception as e:  # noqa: BLE001
-            # Keep the last good set; retry on the next check (the file may be half-written).
-            if self.bad_mtime != m:
-                self.bad_mtime = m
-                log(f"cards: cannot read {self.path.name} ({e!r})")
-            return
-        self.cards, self.mtime = cards, m
-        log(f"cards: {len(self.cards)} loaded from {self.path.name}")
+        file_cards = self.file_cards if m == self.mtime else []
+        if m is not None and m != self.mtime:
+            try:
+                file_cards = parse_cards(json.loads(self.path.read_text(encoding="utf-8")))
+            except Exception as e:  # noqa: BLE001
+                # Keep the last good set; retry on the next check (the file may be half-written).
+                if self.bad_mtime != m:
+                    self.bad_mtime = m
+                    log(f"cards: cannot read {self.path.name} ({e!r})")
+                return
+        self.file_cards, self.mtime, self.sheet_key = file_cards, m, skey
+        # 0.10.0 (Meeting Sheet, phase 7): the sheet's cards first, the file's own cards without the derived copies
+        self.cards = self.sheet.merge_cards(file_cards) if self.sheet is not None else file_cards
+        if m is not None or skey is not None:
+            log(f"cards: {len(self.cards)} loaded from {self.path.name}" + (" and the Meeting Sheet" if skey is not None else ""))
 
     def snapshot(self) -> list[dict]:
         with self.lock:
@@ -915,13 +924,43 @@ class Cards:
                 cid = self.cid(c)
                 if now() - self.last.get(cid, 0) < float(c.get("cooldown_s", 300)):
                     continue
-                if not any(self._hit(t, low, plain) for t in c.get("triggers", [])):
+                hit = any(self._hit(t, low, plain) for t in c.get("triggers", []))
+                if not hit and c.get("kw"):     # 0.10.0 (Meeting Sheet, phase 7): content words of a sheet card
+                    hit = kw_hits(c["kw"], line.text) >= int(c.get("kw_min", 2))
+                if not hit or not self.sheet_ok(c, cid, line):
                     continue
                 self.last[cid] = now()
                 if self.is_address(c):
                     self._held(c, cid, line, "address")
                     continue
                 self._emit(c, cid, line)
+
+    ASK_GAP_S = 90.0
+
+    def sheet_ok(self, c: dict, cid: str, line: "Line") -> bool:
+        """0.10.0 (Meeting Sheet, phase 7): a red line warns only when the PM's line sounds like a promise; an "ask now"
+        never shows for a question already asked, and never two within ASK_GAP_S (one at a time, not all at once)."""
+        if c.get("promise") and not PROMISE_CUE.search(line.text or ""):
+            return False
+        if c.get("ask"):
+            if self.sheet is not None and cid in self.sheet.asked:
+                return False
+            if now() - self.last_ask < self.ASK_GAP_S:
+                return False
+            self.last_ask = now()
+        return True
+
+    def emit_direct(self, c: dict) -> None:
+        """A card shown by time, not by a line (the best outcome check before the planned end)."""
+        cid = self.cid(c)
+        with self.lock:
+            if cid in self.last:
+                return
+            self.last[cid] = now()
+        t = hhmmss(now())
+        tip = {k: c[k] for k in ("level", "gist", "phrase", "items", "note") if c.get(k)}
+        tip.update(t=t, src=t, at=t, kind="card", card=cid)
+        _append_json(self.tips, tip)
 
     # 0.9.7 (owner, call of 11.11: "them" cards fired on my own team): the call audio carries colleagues too. A line
     # whose speaker is known to be on the PM's team (Speakers: side "team") does not fire an on: them card.
@@ -972,6 +1011,10 @@ class Cards:
                 return "address"
             if c.get("on", "them") == "them" and self.our_side(line):
                 return "our side"
+            if c.get("on") == "me" and line.channel != "me":
+                return "not the PM"             # 0.10.0: a red line is about the PM's own promise
+            if cid not in self.last and not self.sheet_ok(c, cid, line):
+                return "sheet"
             # 2026-11-02 (a client monthly review): the same card came back 5 and 15 min later. 0.9.2 (audit 04.11: the
             # HubSpot card again after 21 min): by meaning a card shows once per call; again only by its trigger.
             if cid in self.last:
@@ -1032,6 +1075,9 @@ class FactBook:
         self.last: dict[str, float] = {}
         self.bad_mtime = None
         self.claim_lock = threading.Lock()
+        self.sheet: "SheetLive | None" = None   # 0.10.0 (Meeting Sheet, phase 7): set by main()
+        self.sheet_key = None
+        self.file_facts: list[dict] = []
 
     def claim(self, fid: str, cooldown: float = 300.0) -> bool:
         """True (and the cooldown starts) unless this fact was shown less than `cooldown` s ago.
@@ -1048,11 +1094,17 @@ class FactBook:
         try:
             m = self.path.stat().st_mtime
         except OSError:
-            return
-        if m == self.mtime:
+            m = None
+        skey = self.sheet.key() if self.sheet is not None else None
+        if m is None and skey is None:
+            return                       # no fact book, no sheet: as before (a removed file keeps the last book)
+        if m == self.mtime and skey == self.sheet_key:
             return
         try:
-            facts = parse_facts(json.loads(self.path.read_text(encoding="utf-8")))
+            file_facts = self.file_facts if (m == self.mtime or m is None) else \
+                parse_facts(json.loads(self.path.read_text(encoding="utf-8")))
+            # 0.10.0 (Meeting Sheet, phase 7): the sheet's facts (with their source numbers) and the file's own
+            facts = self.sheet.merge_facts(file_facts) if self.sheet is not None else file_facts
             index = [(f, set(tokens(" ".join([f["id"], f["title"], " ".join(f["keywords"])]))))
                      for f in facts]
         except Exception as e:  # noqa: BLE001
@@ -1061,13 +1113,14 @@ class FactBook:
                 log(f"facts: cannot read {self.path.name} ({e!r})")
             return
         self.facts, self.index, self.mtime = facts, index, m
+        self.file_facts, self.sheet_key = file_facts, skey
         cnt: dict[str, int] = {}
         for _, ft in index:
             for x in ft:
                 cnt[x] = cnt.get(x, 0) + 1
         self.generic = {x for x, c in sorted(cnt.items(), key=lambda kv: -kv[1])[:10] if c >= max(3, len(index) // 8)}
         _append_json(self.tips, {"kind": "facts", "at": hhmmss(now()), "facts": self.facts})
-        log(f"facts: {len(self.facts)} loaded from {self.path.name}")
+        log(f"facts: {len(self.facts)} loaded from {self.path.name}" + (" and the Meeting Sheet" if skey is not None else ""))
 
     def check(self, line: "Line") -> None:
         if not self.index or line.channel != "them" or not QUESTION_CUE.search(line.text):
@@ -1666,11 +1719,19 @@ class Slides:
         self.total_min = None
         self.qa: list[dict] = []
         self.qa_last: dict[str, float] = {}
+        self.sheet: "SheetLive | None" = None   # 0.10.0 (Meeting Sheet, phase 7): set by main()
+        self.sheet_key = None
 
     def refresh(self) -> None:
         try:
             m = self.path.stat().st_mtime
         except OSError:
+            # 0.10.0 (Meeting Sheet, phase 7): no slides.json: the sheet's Structure and roles, when it has any
+            if self.sheet is not None and self.sheet.key() is not None and self.sheet.key() != self.sheet_key:
+                self.sheet_key = self.sheet.key()
+                data = self.sheet.slides_data()
+                if data:
+                    self._apply(data, parse_slides(data), "the Meeting Sheet")
             return
         if m == self.mtime:
             return
@@ -1683,12 +1744,15 @@ class Slides:
                 log(f"slides: cannot read {self.path.name} ({e!r})")
             return
         self.mtime = m
+        self._apply(data, slides, self.path.name)
+
+    def _apply(self, data, slides: list[dict], name: str) -> None:
         meta = data if isinstance(data, dict) else {}
         self.slides, self.total_min = slides, meta.get("total_min")
         self.qa = [dict(e, n=s["n"], key=f"qa-{s['n']}-{j}") for s in slides for j, e in enumerate(s.get("qa", []))]
         _append_json(self.tips, {"kind": "slides", "at": hhmmss(now()), "title": _s(meta.get("title")),
                                  "total_min": meta.get("total_min"), "slides": slides})
-        log(f"slides: {len(slides)} slides from {self.path.name}" + (f", {len(self.qa)} Q&A" if self.qa else ""))
+        log(f"slides: {len(slides)} slides from {name}" + (f", {len(self.qa)} Q&A" if self.qa else ""))
 
     def check(self, line: "Line") -> None:
         if not self.qa or line.channel != "them" or not presenting_quiet():
@@ -1700,6 +1764,413 @@ class Slides:
         _append_json(self.tips, {"t": hhmmss(line.t), "src": hhmmss(line.t), "at": hhmmss(now()),
                                  "kind": "card", "level": "orange", "gist": "❓ " + short_gist(e["q"], 60),
                                  "phrase": e["a"], "card": f"qa-{e['n']}"})
+
+
+# --------------------------------------------------------------------------- Meeting Sheet (0.10.0)
+# 0.10.0 (Meeting Sheet, phase 7): live takes the Meeting Sheet (<stem>.sheet.json, copied next to the transcript
+# like cards.json) as its base. Questions -> a checklist and "ask now" cards when their topic comes up (one at a
+# time); red lines -> a warning when the PM is about to promise something on the list (the sheet's words, never the
+# PM's); facts -> the fact book with the source number "[2]"; best outcome -> a check before the call ends; agenda ->
+# the checklist; structure and roles -> slides (only when there is no slides.json); stand-up -> the PM's update and
+# whom to ask. No sheet: nothing here runs and live behaves exactly as before. Cards and facts that derive.py wrote
+# from the same sheet ("sheet": true, or the id of a sheet fact) are dropped, so nothing shows twice.
+
+SHEET_FACT_BLOCKS = ("header", "company", "signals", "tech_stack", "fit", "contact", "qualification", "history",
+                     "project_context", "action_items", "interview_candidate", "interview_role")
+SHEET_SKIP_STATUS = ("not_found",)
+ASK_STOP = set("""which what who whom whose how why when where does did do is are was were can could would should will
+shall may might any some much many more most today now call meeting think like need want ask know tell about
+your our their them they its it's this that these those there here also just really very then than with from into
+over please sure okay well thing things something anything everything time way chi чи хто що як коли чому де який
+яка яке які скільки можна треба зараз сьогодні дзвінок питання розкажіть розкажи ваш ваша ваше ваші наш наша""".split())
+RED_STOP = ASK_STOP | set("""not never don't dont avoid promise promises promised commit committed say mention
+before without unless until any anything only no не ні ніколи обіцяти обіцяй обіцяємо казати говорити без до""".split())
+PROMISE_CUE = re.compile(
+    r"\b(i will|i'll|we will|we'll|we can|i can|we could|sure|of course|no problem|absolutely|guarantee|promise|"
+    r"commit|definitely|deal|yes we|we do|we'd be able|i'd say|roughly|around|about \d|"
+    r"зробимо|зроблю|можемо|можу|звісно|звичайно|без проблем|гарантую|обіцяю|домовились|так, ми|точно|десь|приблизно)\b", re.I)
+WRAP_CUE = ["anything else", "wrap up", "wrap this up", "to sum up", "let's sum up", "next steps", "before we finish",
+            "before we go", "same time next week", "last thing", "one last", "we're almost out of time", "out of time",
+            "що далі", "підсумуємо", "наступні кроки", "до наступного", "на цьому все", "перед тим як закінчити",
+            "ще щось", "останнє питання", "час закінчувати"]
+
+
+def _iso_ts(v) -> float | None:
+    try:
+        return dt.datetime.fromisoformat(str(v).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+def load_sheet(path: Path) -> dict | None:
+    """The Meeting Sheet next to the transcript, or None (missing, half-written, not a sheet). Never raises."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(data, dict) or not str(data.get("schema", "")).startswith("pacenote.sheet/"):
+        return None
+    if not isinstance(data.get("blocks"), list):
+        return None
+    return data
+
+
+def sheet_blocks(sheet: dict, btype: str) -> list[dict]:
+    return [b for b in sheet.get("blocks") or [] if isinstance(b, dict) and b.get("type") == btype
+            and b.get("visible", True) is not False]
+
+
+def sheet_block_facts(sheet: dict, btype: str) -> list[dict]:
+    out = []
+    for b in sheet_blocks(sheet, btype):
+        for f in b.get("facts") or []:
+            if isinstance(f, dict) and _s(f.get("text")) and f.get("status") not in SHEET_SKIP_STATUS \
+                    and f.get("diff") != "gone":
+                out.append(f)
+    return out
+
+
+def sheet_sources(sheet: dict) -> dict:
+    return {s.get("id"): s for s in sheet.get("sources") or [] if isinstance(s, dict) and s.get("id")}
+
+
+def sheet_cite(sheet: dict, source_ids) -> str:
+    """"[2]" or "[1][2]" from the fact's source ids (the numbers shown in the sheet)."""
+    srcs = sheet_sources(sheet)
+    ns = []
+    for sid in source_ids or []:
+        n = (srcs.get(sid) or {}).get("n")
+        if n is not None and n not in ns:
+            ns.append(n)
+    return "".join(f"[{n}]" for n in ns)
+
+
+def sheet_source_note(sheet: dict, source_ids) -> str:
+    srcs = sheet_sources(sheet)
+    parts = []
+    for sid in source_ids or []:
+        s = srcs.get(sid)
+        if s and s.get("n") is not None:
+            parts.append(f"[{s['n']}] {_s(s.get('title'))}".strip())
+    return "; ".join(dict.fromkeys(parts))
+
+
+def sheet_lang(sheet: dict) -> str:
+    return "uk" if str(sheet.get("language") or "").lower().startswith("uk") else "en"
+
+
+def content_stems(text: str, stop: set, limit: int = 8) -> list[str]:
+    out = []
+    for w in tokens(text):
+        if w in stop or len(w) < 4 or w.isdigit():
+            continue
+        if not any(tok_match(w, x) for x in out):
+            out.append(w)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def kw_hits(kws: list[str], text: str) -> int:
+    toks = tokens(text)
+    return sum(1 for k in kws if any(tok_match(k, t) for t in toks))
+
+
+def sheet_facts(sheet: dict) -> list[dict]:
+    """Fact book entries (parse_facts shape) from the sheet's fact blocks, each with its source number."""
+    out = []
+    for btype in SHEET_FACT_BLOCKS:
+        for b in sheet_blocks(sheet, btype):
+            for f in b.get("facts") or []:
+                if not isinstance(f, dict) or not _s(f.get("text")) or f.get("status") in SHEET_SKIP_STATUS:
+                    continue
+                if f.get("diff") == "gone":
+                    continue
+                cite = sheet_cite(sheet, f.get("source_ids"))
+                text = _s(f.get("text"))
+                if f.get("status") == "conflict" and f.get("conflict_with"):
+                    text += " (conflicts with another source, check)" if sheet_lang(sheet) == "en" else " (суперечить іншому джерелу, перевір)"
+                elif f.get("status") == "stale":
+                    text += " (old source)" if sheet_lang(sheet) == "en" else " (старе джерело)"
+                title = _s(f.get("label")) or _s(b.get("title")) or btype
+                out.append({"id": "ms-" + _s(f.get("id")), "title": title, "text": (text + " " + cite).strip(),
+                            "keywords": content_stems(title + " " + _s(f.get("text")), ASK_STOP, 6),
+                            "source": sheet_source_note(sheet, f.get("source_ids")) or "Meeting Sheet",
+                            "sheet": True, "sheet_fact": _s(f.get("id")), "block": btype})
+    return out
+
+
+def sheet_names(sheet: dict) -> set:
+    """Words of the participants' names and companies: said all the time, so they never trigger a card."""
+    out = set()
+    parts = sheet.get("participants") if isinstance(sheet.get("participants"), dict) else {}
+    for side in ("ours", "theirs"):
+        for p in parts.get(side) or []:
+            if isinstance(p, dict):
+                out.update(tokens(_s(p.get("name")) + " " + _s(p.get("company"))))
+    return out
+
+
+def sheet_questions(sheet: dict) -> list[dict]:
+    stop = ASK_STOP | sheet_names(sheet)
+    return [{"id": "ms-q-" + _s(f.get("id")), "fact": _s(f.get("id")), "text": _s(f.get("text")),
+             "kw": content_stems(_s(f.get("label")) + " " + _s(f.get("text")), stop, 6)}
+            for f in sheet_block_facts(sheet, "questions")]
+
+
+def sheet_cards(sheet: dict) -> list[dict]:
+    """Cards (the Cards shape) from the sheet: "ask now" per question, a red-line warning per red line, the best
+    outcome check. They match by content words ("kw", at least `kw_min` in one line), not by exact phrases."""
+    uk = sheet_lang(sheet) == "uk"
+    out = []
+    for q in sheet_questions(sheet):
+        if not q["kw"]:
+            continue
+        # L6 (12.11): the judge found "Ask now: <question>" + the same question twice in one card; the gist is the
+        # label, the phrase the question. 3 of a question's content words when it has 4 or more (fewer early cards).
+        n = len(q["kw"])
+        out.append({"id": q["id"], "triggers": [], "kw": q["kw"], "kw_min": 1 if n == 1 else 2 if n <= 3 else 3,
+                    "on": "any", "level": "orange", "ask": True, "sheet": True, "sheet_fact": q["fact"],
+                    "gist": "Спитай зараз" if uk else "Ask now",
+                    "phrase": q["text"], "cooldown_s": 3600.0})
+    names = sheet_names(sheet)
+    for f in sheet_block_facts(sheet, "red_lines"):
+        kw = content_stems(_s(f.get("label")) + " " + _s(f.get("text")), RED_STOP | names, 6)
+        if not kw:
+            continue
+        out.append({"id": "ms-red-" + _s(f.get("id")), "triggers": [], "kw": kw, "kw_min": 1 if len(kw) <= 2 else 2,
+                    "on": "me", "level": "red", "promise": True, "sheet": True, "sheet_fact": _s(f.get("id")),
+                    "gist": ("Червона лінія: " if uk else "Red line: ") + short_gist(_s(f.get("text")), 80),
+                    "note": sheet_source_note(sheet, f.get("source_ids")), "cooldown_s": 600.0})
+    best = [_s(f.get("text")) for f in sheet_block_facts(sheet, "best_outcome")]
+    if best:
+        out.append({"id": "ms-best", "triggers": list(WRAP_CUE), "on": "any", "level": "orange", "sheet": True,
+                    "best": True, "gist": ("Перед завершенням: найкращий результат" if uk else "Before you close: best outcome"),
+                    "items": best[:6], "cooldown_s": 3600.0})
+    return out
+
+
+def sheet_agenda(sheet: dict) -> list[str]:
+    return [_s(f.get("text")) for f in sheet_block_facts(sheet, "agenda")]
+
+
+def sheet_slides(sheet: dict, me_names=()) -> dict | None:
+    """slides.json shape from the structure_roles block: one fact per slide (label = title, text = speech;
+    value: slide, owner, minutes / sec, backup). None when the block is empty."""
+    facts = sheet_block_facts(sheet, "structure_roles")
+    if not facts:
+        return None
+    mine = {n.strip().lower() for n in me_names if n and n.strip()} | {"me", "i", "я"}
+    owners = {}
+    for s in sheet.get("sources") or []:
+        if isinstance(s, dict) and isinstance(s.get("deck"), dict) and isinstance(s["deck"].get("owners"), dict):
+            owners.update({str(k): str(v) for k, v in s["deck"]["owners"].items()})
+    slides = []
+    for i, f in enumerate(facts):
+        v = f.get("value") if isinstance(f.get("value"), dict) else {}
+        n = v.get("slide") or v.get("n") or i + 1
+        owner = _s(v.get("owner") or owners.get(str(n)) or "me")
+        who = "me" if owner.lower() in mine or not owner else ("shared" if owner.lower() in ("shared", "both", "all") else "other")
+        try:
+            sec = int(float(v.get("sec") or float(v.get("minutes") or 0) * 60 or 60))
+        except (TypeError, ValueError):
+            sec = 60
+        body = [{"k": "p", "t": _s(f.get("text"))}]
+        if who == "other" and _s(v.get("backup")):
+            body.append({"k": "s", "t": _s(v.get("backup"))})
+        slides.append({"n": n, "title": _s(f.get("label")) or _s(f.get("text"))[:60], "who": who,
+                       "speaker": "" if who == "me" else owner, "sec": sec, "body": body})
+    return {"title": _s(sheet.get("title")), "slides": slides, "sheet": True}
+
+
+def sheet_standup(sheet: dict) -> dict | None:
+    """Stand-up: the PM's update (since, today, blockers) and whom to ask (waiting on others)."""
+    if sheet.get("preset") != "standup":
+        return None
+    since = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_since")]
+    today = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_today")]
+    blockers = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_blockers")]
+    ask = []
+    for f in sheet_block_facts(sheet, "standup_waiting"):
+        v = f.get("value") if isinstance(f.get("value"), dict) else {}
+        ask.append({"who": _s(v.get("owner")), "what": _s(f.get("text"))})
+    return {"since": since, "today": today, "blockers": blockers, "ask": ask}
+
+
+def drop_derived(items: list[dict], sheet_ids: set) -> list[dict]:
+    """Cards or facts from cards.json / facts.json without the ones derive.py made from the same sheet."""
+    out = []
+    for c in items:
+        if c.get("sheet") is True or c.get("from_sheet") is True:
+            continue
+        if _s(c.get("sheet_fact")) in sheet_ids or _s(c.get("id")) in sheet_ids:
+            continue
+        out.append(c)
+    return out
+
+
+def sheet_fact_ids(sheet: dict) -> set:
+    return {_s(f.get("id")) for b in sheet.get("blocks") or [] if isinstance(b, dict)
+            for f in b.get("facts") or [] if isinstance(f, dict) and _s(f.get("id"))}
+
+
+def question_asked(q: dict, text: str) -> bool:
+    """The PM's own line asks this question (half of its content words, at least two, or its only one)."""
+    kws = q.get("kw") or []
+    if not kws:
+        return False
+    hit = kw_hits(kws, text)
+    return hit >= max(1, min(2, len(kws))) and hit * 2 >= len(kws)
+
+
+class SheetLive:
+    """0.10.0 (Meeting Sheet, phase 7): <transcript stem>.sheet.json for the live call. Read on each refresh by mtime;
+    never raises; no file = no sheet (everything returns empty and the old files work as before)."""
+
+    def __init__(self, transcript: Path, tips: Path):
+        self.path = transcript.with_name(transcript.stem + ".sheet.json")
+        self.tips = tips
+        self.mtime = None
+        self.sheet: dict | None = None
+        self.cards: list[dict] = []
+        self.facts: list[dict] = []
+        self.ids: set = set()
+        self.questions: list[dict] = []
+        self.asked: set = set()
+        self.sent_qs = None
+        self.best_fired = False
+        self.lock = threading.Lock()
+        self.me_names: list[str] = []
+        self.has_slides_file = None      # set by main(): a callable, True when <stem>.slides.json exists
+
+    def refresh(self) -> bool:
+        """True when the sheet changed (loaded, replaced or removed)."""
+        try:
+            m = self.path.stat().st_mtime
+        except OSError:
+            m = None
+        if m == self.mtime:
+            return False
+        sheet = load_sheet(self.path) if m is not None else None
+        if m is not None and sheet is None:
+            return False                 # half-written: keep the last good one, read again next time
+        with self.lock:
+            self.mtime, self.sheet = m, sheet
+            if sheet is None:
+                self.cards, self.facts, self.ids, self.questions = [], [], set(), []
+                return True
+            try:
+                self.cards, self.facts = sheet_cards(sheet), sheet_facts(sheet)
+                self.ids, self.questions = sheet_fact_ids(sheet), sheet_questions(sheet)
+            except Exception as e:  # noqa: BLE001
+                log(f"sheet: cannot map {self.path.name} ({e!r})")
+                self.cards, self.facts, self.ids, self.questions = [], [], set(), []
+                return True
+        log(f"sheet: {len(self.cards)} cards, {len(self.facts)} facts, {len(self.questions)} questions from {self.path.name}")
+        self._emit_static()
+        self.emit_questions()
+        return True
+
+    def active(self) -> bool:
+        return self.sheet is not None
+
+    def _emit_static(self) -> None:
+        sheet = self.sheet
+        if not sheet:
+            return
+        t = hhmmss(now())
+        ag = sheet_agenda(sheet)
+        if ag:
+            # the brief's checklist channel: the engine's agenda (from the brief derive.py writes) still wins
+            _append_json(self.tips, {"kind": "checklist", "at": t, "items": ag, "sheet": True})
+        su = sheet_standup(sheet)
+        if su:
+            # Stand-up: one small card, the PM's update, what is on him today, blockers and whom to ask (the window
+            # goes compact for it); no slides, no time bar, no qualification.
+            uk = sheet_lang(sheet) == "uk"
+            asks = [("Спитати " if uk else "Ask ") + (a["who"] + ": " if a["who"] and not a["what"].startswith(a["who"]) else "")
+                    + a["what"] for a in su["ask"]]
+            items = list(su["since"]) + [("Сьогодні: " if uk else "Today: ") + x for x in su["today"]] \
+                + [("Блокер: " if uk else "Blocker: ") + x for x in su["blockers"]] + asks[:4]
+            if items:
+                _append_json(self.tips, {"schema_version": 1, "kind": "speech", "t": t, "at": t, "sheet": True,
+                                         "standup": True, "level": "info",
+                                         "gist": "Мій апдейт" if uk else "My update", "items": items,
+                                         "note": "Meeting Sheet"})
+
+    def slides_data(self) -> dict | None:
+        if not self.sheet or (self.has_slides_file and self.has_slides_file()):
+            return None
+        try:
+            return sheet_slides(self.sheet, self.me_names)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def merge_cards(self, file_cards: list[dict]) -> list[dict]:
+        with self.lock:
+            if not self.sheet:
+                return file_cards
+            return list(self.cards) + drop_derived(file_cards, self.ids)
+
+    def merge_facts(self, file_facts: list[dict]) -> list[dict]:
+        with self.lock:
+            if not self.sheet:
+                return file_facts
+            return list(self.facts) + drop_derived(file_facts, self.ids)
+
+    def key(self):
+        return self.mtime
+
+    def note_line(self, line: "Line") -> None:
+        """The PM asked a sheet question himself: it is ticked and its "ask now" card never shows."""
+        if not self.questions or line.channel != "me":
+            return
+        changed = False
+        for q in self.questions:
+            if q["id"] not in self.asked and question_asked(q, line.text):
+                self.asked.add(q["id"])
+                changed = True
+        if changed:
+            self.emit_questions()
+
+    def mark_asked(self, qid: str) -> None:
+        if qid not in self.asked and any(q["id"] == qid for q in self.questions):
+            self.asked.add(qid)
+            self.emit_questions()
+
+    def emit_questions(self) -> None:
+        items = [{"id": q["id"], "text": q["text"], "state": "asked" if q["id"] in self.asked else "todo"}
+                 for q in self.questions]
+        if items == self.sent_qs:
+            return
+        self.sent_qs = items
+        t = hhmmss(now())
+        _append_json(self.tips, {"kind": "questions", "t": t, "at": t, "items": items})
+
+    def save_state(self, transcript: Path) -> None:
+        """<stem>.sheet-live.json: which sheet questions the PM asked (for the after-call check)."""
+        if not self.sheet:
+            return
+        try:
+            write_json_atomic(transcript.with_name(transcript.stem + ".sheet-live.json"),
+                              {"sheet": self.path.name, "asked": sorted(self.asked),
+                               "questions": [{"id": q["id"], "text": q["text"]} for q in self.questions],
+                               "best_fired": self.best_fired})
+        except Exception as e:  # noqa: BLE001
+            log(f"sheet: state not saved ({e!r})")
+
+    def tick(self, t: float, emit) -> None:
+        """Five minutes before the planned end: the best outcome check once (emit(card) shows it)."""
+        if self.best_fired or not self.sheet:
+            return
+        end = _iso_ts((self.sheet.get("meeting_ref") or {}).get("end"))
+        start = _iso_ts((self.sheet.get("meeting_ref") or {}).get("start"))
+        if end is None or start is None or not (start <= t) or t < end - 300 or t > end + 1800:
+            return
+        c = next((x for x in self.cards if x.get("best")), None)
+        if c is not None:
+            self.best_fired = True
+            emit(c)
 
 
 def _append_json(path: Path, obj: dict) -> None:
@@ -4384,6 +4855,15 @@ def main() -> int:
     outline = Outline(out, tips_file)
     slides = Slides(out, tips_file)
     outline.slides_src = slides          # 2026-10-23: plan, colleague blocks and time from slides.json
+    # 0.10.0 (Meeting Sheet, phase 7): <stem>.sheet.json, when the call has one; without it nothing changes
+    sheet_live = SheetLive(out, tips_file)
+    sheet_live.me_names = [str(n) for n in cfg.get("name_aliases") or []]
+    sheet_live.has_slides_file = slides.path.exists
+    cards.sheet = facts.sheet = slides.sheet = sheet_live
+    try:
+        sheet_live.refresh()
+    except Exception as e:  # noqa: BLE001
+        log(f"sheet: {e!r}")
     # Semantic layer (Ollama): its own thread; the transcript path never waits for it.
     sem_live: SemanticLive | None = None
     sem_index = None          # read-only project index for SOS snippets and search requests
@@ -4473,6 +4953,10 @@ def main() -> int:
                 status["last_question"] = {"t": q["t"], "text": text[:200]}
         if sem_live is not None:
             sem_live.submit(line_obj, q is not None)      # O(1); embedding happens in its own thread
+        try:
+            sheet_live.note_line(line_obj)       # 0.10.0: a sheet question the PM asked is ticked, its card never shows
+        except Exception as e:  # noqa: BLE001
+            log(f"sheet: {e!r}")
         try:
             if not paused:
                 cards.check(line_obj)
@@ -4865,6 +5349,12 @@ def main() -> int:
             search_requests()
         if int(now() * 2) % 4 == 0:      # every ~2 s: pick up a new or changed fact book / outline
             try:
+                sheet_live.refresh()             # 0.10.0 (Meeting Sheet, phase 7): before the files that merge it
+                if not (flags["tips_paused"] or flags.get("tips_off", False)):
+                    sheet_live.tick(now(), cards.emit_direct)
+            except Exception as e:  # noqa: BLE001
+                log(f"sheet: {e!r}")
+            try:
                 facts.refresh()
                 outline.refresh()
                 slides.refresh()
@@ -4984,6 +5474,7 @@ def main() -> int:
     while segq.unfinished_tasks and now() < deadline:
         time.sleep(0.3)
     writer.close(f"\n--- {L('кінець запису', 'end of recording')} {hhmmss(now())} ---\n")
+    sheet_live.save_state(out)               # 0.10.0 (Meeting Sheet, phase 7): for the after-call check
     if spk["worker"] is not None:
         spk["worker"].stop()
     if sem_live is not None:

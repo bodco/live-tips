@@ -239,7 +239,9 @@ adds what the card does not cover. A JSON list of 15-40 cards:
 - Same tip format rules (short gist, ready phrase in the call language, no abbreviations).
 - The prep ahead saves `prep-...cards.json` (and `prep-...facts.json`, `prep-...outline.json`)
   next to the prep brief; at the start copy them to `<transcript name>.cards.json`,
-  `.facts.json`, `.outline.json`.
+  `.facts.json`, `.outline.json`. 0.10.0: a `prep-...sheet.json` (Meeting Sheet) is copied to
+  `<transcript name>.sheet.json` too; the recorder then takes questions, red lines, facts, best outcome and slides
+  from it and drops the copies derived from the same sheet (see SKILL.md, Speed layer).
 - `@@CARD [time] id: line` lines in the `read_delta` output tell which cards fired. Count
   them in state (`cards_fired`); do not repeat a card's content as a tip; follow up only with
   what the card could not know (the exact question, a newer fact). A card gets `"off": true`

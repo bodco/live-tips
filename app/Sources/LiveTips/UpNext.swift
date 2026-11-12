@@ -148,6 +148,7 @@ final class UpNext: ObservableObject {
     private func pump() {
         while !PrepRunner.shared.running, !queue.isEmpty {
             let m = queue.removeFirst()
+            PrepRunner.shared.startQueued = true      // 0.10.0 (Meeting Sheet): nobody to ask about a route switch
             if let r = m.prepRequest(), PrepRunner.shared.start(r) == nil { break }
             m.prepFailed = true
         }

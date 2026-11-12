@@ -111,6 +111,7 @@ final class AutoStart: NSObject, ObservableObject, UNUserNotificationCenterDeleg
                 NSApp.activate(ignoringOtherApps: true)
                 if id == TranscribeWindow.notificationId { TranscribeWindow.show(); return }   // 0.8.6 (B): a transcript is ready
                 if id.hasPrefix("pn-limit-") { SettingsWindow.show(tab: "ai"); return }        // 0.9.6: a provider's limit
+                if id.hasPrefix(SheetReminder.idPrefix) { SheetReminder.open(id); return }     // 0.10.0 (Meeting Sheet, phase 5): Open the gaps
                 if id == MeetingEndWatch.notificationId {   // 2026-11-10: Keep recording on the notification, or a click opens the tips
                     if action == MeetingEndWatch.keepAction { MeetingEndWatch.shared.keepRecording() } else { (NSApp.delegate as? AppDelegate)?.showTips() }
                     return

@@ -30,6 +30,13 @@ def build_user(md: Path) -> str:
         note = " (as the PM corrected it on the call page; it wins over the transcript)" if sit.get("edited") else ""
         parts.append("CALL PICTURE (decisions, the PM's actions, promises of the other side, open questions)" + note + ":\n" +
                      "\n".join(picture_lines(sit)))
+    try:      # 0.10.0 (Meeting Sheet, phase 7): what the preparation wanted and the call did not settle
+        from .sheet.aftercheck import followup_lines
+        open_ = followup_lines(md)
+    except Exception:  # noqa: BLE001
+        open_ = []
+    if open_:
+        parts.append("FROM THE MEETING SHEET CHECK (ask or propose these in the email when they fit):\n" + "\n".join(open_))
     parts.append("TRANSCRIPT:\n" + callinfo.transcript_text(md, 60000))
     return "\n\n".join(parts)
 

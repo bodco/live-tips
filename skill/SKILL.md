@@ -22,6 +22,15 @@ the recorder with no model: instant cards (`cards.json`), the fact book (`facts.
 search and the 📌 fact on a question), the ❓ question marker, the local 🆘 reaction and the
 presentation tracker (`outline.json`). The skill's main job before the call is to PREPARE these
 files; during the call model tips are few, short and only with facts.
+0.10.0 (Meeting Sheet): when the call has `<transcript name>.sheet.json`, the recorder reads it directly: the
+sheet's questions are a checklist and an "Ask now" card when their topic comes up (one at a time, never one the
+PM already asked), red lines warn only when the PM sounds like promising something on the list (the sheet's words,
+never the PM's), facts go to the fact book with their source number "[2]", the best outcome is checked before the
+call ends, Structure and roles gives the slides (when there is no `slides.json`), a stand-up sheet gives one small
+"My update" card. Cards and facts the app derived from the same sheet are not shown twice. The folder search
+during the call is local (sheet facts, the sheet's files, the project folders) and any model answers from it.
+After the call the notes get "## Meeting Sheet check": each question answered / partly / not, the best outcome
+reached or not, and what to ask in the follow-up.
 
 **Settings.** Everything personal (labels, paths, languages, tip rules, model hint) is in
 `settings.yaml` next to this file: read it first. If it is missing, the package is incomplete:

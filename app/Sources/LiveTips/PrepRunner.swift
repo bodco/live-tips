@@ -312,7 +312,12 @@ final class PrepRunner: ObservableObject {
         return Self.sameCall(prepTitle: forTitle, prepDate: forDate, liveTitle: r["title"] as? String ?? "", liveDate: when)
     }
 
+    /// 0.10.0 (Meeting Sheet, phase 3): set by the Up next queue right before it starts a waiting preparation, so the
+    /// sheet's route rule knows nobody is there to ask (switch and report instead of asking).
+    var startQueued = false
+
     func cancel() {
+        SheetRunner.shared.cancel()            // 0.10.0 (Meeting Sheet, phase 3): a running sheet build stops too
         (process?.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil   // QA: no stage updates after Stop
         process?.terminate()
         process = nil
@@ -326,6 +331,15 @@ final class PrepRunner: ObservableObject {
     /// Starts the prep. Returns an error line, or nil when it started.
     func start(_ r: Request, route forced: String? = nil) -> String? {
         if running { return L("prep.err.running") }
+        // 0.10.0 (Meeting Sheet, phase 3, PM 12.11): Prepare builds a Meeting Sheet for every call type except
+        // Transcript (no old briefs any more; SheetRunner writes the live files from the sheet). The path below stays
+        // for a correction during the live call (LivePrep) until phase 7 moves it to a sheet refresh.
+        if forced == nil, SheetRunner.handles(r), !SheetRunner.isLivePrep(r) {
+            let queued = startQueued
+            startQueued = false
+            return SheetRunner.shared.start(r, interactive: !queued)
+        }
+        startQueued = false
         // 0.9.1 (rules/google.yaml > links): Google Docs, Sheets and Slides links of the context and the invitation's
         // attachments are read through the PM's Google accounts first; the prep then gets local copies.
         if !r.googleDone, r.refreshBase == nil, GoogleService.shared.connected {

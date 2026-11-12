@@ -438,5 +438,31 @@ test('agenda identity and restore availability survive feed conversion', () => {
   assert.strictEqual(get().agendaCanUndo, false);
 });
 
+// 0.10.0 (Meeting Sheet, phase 7): the sheet's questions from the recorder, a checklist the PM can tick
+test('sheet questions: todo and asked, the PM ticks one', () => {
+  const { f, get } = make();
+  f.addItems([{ kind: 'questions', items: [{ id: 'ms-q-a', text: 'Which reports hurt the most?', state: 'todo' }, { id: 'ms-q-b', text: 'Is there a budget?', state: 'asked' }] }]);
+  assert.deepStrictEqual(get().questions.map((q) => q.state), ['todo', 'asked']);
+  f.toggleQuestion('ms-q-a');
+  assert.deepStrictEqual(get().questions.map((q) => q.state), ['asked', 'asked']);
+  f.addItems([{ kind: 'questions', items: [{ id: 'ms-q-a', text: 'Which reports hurt the most?', state: 'todo' }] }]);
+  assert.strictEqual(get().questions[0].state, 'asked');                  // the PM's tick wins over the recorder
+  assert.strictEqual(get().cards.length, 0);                              // a checklist, never a card
+});
+
+test('a stand-up sheet speech marks the call as a stand-up', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:00:01', kind: 'speech', standup: true, sheet: true, level: 'info', gist: 'My update', items: ['Finished the export screen', 'Today: Fix the date filter bug'] }]);
+  assert.strictEqual(get().call.standup, true);
+  assert.ok(get().cards.some((c) => c.id === 'u:speech'));
+});
+
+test('sheet questions already in the agenda show once (in the agenda)', () => {
+  const { f, get } = make();
+  f.addItems([{ kind: 'agenda', items: [{ id: 'x1', text: 'Ask: Which reports hurt the most?', full: 'Ask: Which reports hurt the most?' }] },
+              { kind: 'questions', items: [{ id: 'ms-q-a', text: 'Which reports hurt the most?' }, { id: 'ms-q-b', text: 'Is there a budget?' }] }]);
+  assert.deepStrictEqual(get().questions.map((q) => q.id), ['ms-q-b']);
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

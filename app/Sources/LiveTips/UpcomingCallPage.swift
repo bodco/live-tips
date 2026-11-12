@@ -44,9 +44,15 @@ struct UpcomingCallPage: View {
     @ObservedObject var register = Register.shared
     @ObservedObject var history = CallHistory.shared
     @AppStorage("moduleTracker") private var trackerOn = true
+    @ObservedObject var jobs = SheetJobs.shared
     @State private var tab = UpcomingCallPage.shotTab ?? "setup"
     /// Shot mode only: the tab the page opens on.
     static var shotTab: String? = nil
+    /// 0.10.0 (Meeting Sheet, phase 5): the tab a page opens on once (the reminder opens Readiness, a build the sheet).
+    static var openTab: [String: String] = [:]
+    @State private var doc: SheetDoc?
+    @State private var exporting = false
+    @State private var compareN: Int?
     @State private var snap: SetupSnap?
     @State private var note = ""
     @State private var confirmAgain = false
@@ -63,9 +69,14 @@ struct UpcomingCallPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 head
-                PageTabs(tabs: tabs, selection: $tab, counts: ["tasks": series.count, "earlier": earlier.count]).padding(.top, 4)
+                PageTabs(tabs: tabs, selection: $tab, counts: ["tasks": series.count, "earlier": earlier.count,
+                    "readiness": doc?.sheet?.readinessBadge.gaps ?? 0, "sources": doc?.sheet?.sources.count ?? 0,
+                    "versions": doc.map { SheetFiles.versions(of: $0.path).count + 1 } ?? 0]).padding(.top, 4)
                 switch tab {
-                case "brief": card { briefTab }
+                case "sheet", "brief": sheetTab
+                case "readiness": sheetOr { SheetReadinessTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }, onStart: { start() }) }
+                case "sources": sheetOr { SheetSourcesTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }) }
+                case "versions": sheetOr { SheetVersionsTab(doc: $0, initialOpen: compareN) }
                 case "tasks": tasksTab
                 case "earlier": card { earlierTab }
                 default: card { setupTab }
@@ -79,19 +90,28 @@ struct UpcomingCallPage: View {
         }
         .textSelection(.enabled)      // 2026-11-10 (owner): the call's title and every text on the page can be selected and copied
         .background(PN.C.bg)
-        .onAppear { if snap == nil { snap = SetupSnap(model) }; model.scanPrep() }
+        .onAppear {
+            if snap == nil { snap = SetupSnap(model) }; model.scanPrep(); syncDoc()
+            if let t = Self.openTab.removeValue(forKey: model.id.uuidString) { tab = t }
+        }
+        .onReceive(jobs.objectWillChange) { DispatchQueue.main.async { syncDoc() } }
+        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in syncDoc() }
+        .sheet(isPresented: $exporting) { if let d = doc { SheetExportView(doc: d, done: { exporting = false }) } }
         .onDisappear { askToSave() }
-        .confirmationDialog(L("again.title"), isPresented: $confirmAgain) {
-            Button(L("talk.prepareAgain")) { prepare() }
+        .confirmationDialog(L("sheet.ui.refresh.title"), isPresented: $confirmAgain) {
+            Button(L("sheet.ui.refresh")) { refresh() }
             Button(L("common.cancel"), role: .cancel) {}
-        } message: { Text(L("again.keepBrief")) }
+        } message: { Text(L("sheet.ui.refresh.body")) }
     }
 
     // MARK: head: meta, name, project and people, the actions
 
     private var tabs: [(String, String)] {
         // 2026-11-05 (redesign): the counts are badges, as on the past call page
-        [("setup", L("page.tab.setup")), ("brief", L("page.tab.brief")), ("tasks", L("page.tab.tasks")), ("earlier", L("page.tab.earlier"))]
+        // 0.10.0 (Meeting Sheet, phase 5): Setup / Meeting Sheet / Readiness / Sources / Versions / Tasks / Earlier
+        [("setup", L("page.tab.setup")), ("sheet", L("sheet.ui.tab.sheet")), ("readiness", L("sheet.ui.tab.readiness")),
+         ("sources", L("sheet.ui.tab.sources")), ("versions", L("sheet.ui.tab.versions")),
+         ("tasks", L("page.tab.tasks")), ("earlier", L("page.tab.earlier"))]
     }
 
     private var state: CallState {
@@ -120,7 +140,7 @@ struct UpcomingCallPage: View {
         let info = VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text(d.string(from: model.callDate) + " · " + t.string(from: model.callDate)).font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.accent)
-                StatePill(state: state)
+                if let b = doc?.sheet?.readinessBadge, state != .preparing { SheetReadinessPill(badge: b) } else { StatePill(state: state) }
                 if !model.target.isEmpty { PagePill(text: model.targetName, color: PN.C.answer) }
             }
             Text(model.effectiveTitle).font(.system(size: 28, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2)
@@ -150,21 +170,27 @@ struct UpcomingCallPage: View {
         .background(RoundedRectangle(cornerRadius: PageStyle.radius).fill(PN.C.surface))
     }
 
+    /// 0.10.0 (Meeting Sheet, phase 4): Get ready opens Quick or Expert by the default rules; Start without prep;
+    /// once the sheet is built: Start call, Refresh, Export.
     @ViewBuilder private var primary: some View {
         let live = app?.callIsLive ?? false
-        switch state {
-        case .noBrief:
+        if let j = jobs.job(for: model.id) {
+            Button { start() } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
+            Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
+            link(L("call.stop")) { j.stop() }
+        } else if doc != nil {
             Button { start() } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
-            link(L("home.connectClaude")) { SettingsWindow.show(tab: "ai") }
-        case .ready:
-            Button { start() } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
-            link(L("talk.prepareAgain")) { confirmAgain = true }
-        case .preparing, .queued:
+            HStack(spacing: 14) {
+                link(L("sheet.ui.refresh")) { confirmAgain = true }
+                link(L("sheet.ui.export")) { exporting = true }
+            }
+        } else if state == .preparing || state == .queued {
             Button { start() } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
             link(L("common.cancel")) { if state == .preparing { runner.cancel() } else { upnext.unqueue(model) } }
-        default:
-            Button(L("home.getReady")) { prepare() }.buttonStyle(.pnPrimary)
-            link(L("home.startWithout")) { start() }
+        } else {
+            Button(L("home.getReady")) { getReady(nil) }.buttonStyle(.pnPrimary)
+            link(L("sheet.ui.startWithout")) { start() }
+            if !SheetRoutes.ready(SheetRoutes.preferred) && SheetRoutes.firstReady() == nil { link(L("home.connectClaude")) { SettingsWindow.show(tab: "ai") } }
         }
     }
 
@@ -172,6 +198,9 @@ struct UpcomingCallPage: View {
         Menu {
             if upnext.contains(model) { Button(L("home.removeUpNext")) { upnext.remove(model); HomeNav.shared.back() } }
             if model.calEventID != nil { Button(L("home.showInCalendar")) { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app")) } }
+            Button(L("sheet.ui.quickPrep")) { getReady(.quick) }
+            Button(L("sheet.ui.expertPrep")) { getReady(.expert) }
+            if doc != nil { Button(L("sheet.ui.export")) { exporting = true } }
             Button(L("call.copyCowork")) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(model.prepPhrase, forType: .string) }
         } label: { Image(systemName: "ellipsis") }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().frame(height: 32).accessibilityLabel(L("home.more"))
@@ -189,11 +218,69 @@ struct UpcomingCallPage: View {
         if let e = app.launch(model) { note = e } else { HomeNav.shared.path = [] }
     }
 
-    private func prepare() {
+    /// Get ready: the Quick or Expert window (by Settings > Meeting Sheet when mode is nil).
+    private func getReady(_ mode: SheetMode?, step: Int = 1) {
         guard !model.target.isEmpty else { note = L("call.needProject"); tab = "setup"; return }
         if dirty { save() }
         upnext.save(model)
-        if let e = upnext.prepare(model) { note = e } else { note = ""; tab = "brief" }
+        note = ""
+        SheetPrepWindow.show(model, mode: mode, step: step)
+    }
+
+    private func refresh() {
+        guard let d = doc else { getReady(nil); return }
+        SheetActions.refresh(doc: d, call: model)
+    }
+
+    /// The page follows the sheet file: built, refreshed, or another version chosen.
+    private func syncDoc() {
+        let p = SheetFiles.path(for: model)
+        if p != doc?.path { doc = p.map { SheetDoc(path: $0) } } else { doc?.reload() }
+    }
+
+    @ViewBuilder private func sheetOr<C: View>(@ViewBuilder _ c: (SheetDoc) -> C) -> some View {
+        if let d = doc { c(d) } else { card { noSheet } }
+    }
+
+    /// The Meeting Sheet tab: the sheet; for a call prepared before 0.10.0 its brief, read only; else Get ready.
+    @ViewBuilder private var sheetTab: some View {
+        if let d = doc {
+            // Your talk and Rehearse stay with a presentation (the slides file is derived from the sheet)
+            if model.callType == "presentation" {
+                HStack(spacing: 8) {
+                    if TalkWindow.available(base: d.base) {
+                        Button(L("talk.open")) { TalkWindow.show(base: d.base, title: model.effectiveTitle, call: model) }.buttonStyle(.pnSecondary)
+                        Button(L("rehearse.button")) { RehearsalWindow.show(base: d.base, title: model.effectiveTitle, call: model) }.buttonStyle(.pnSecondary)
+                    } else {
+                        Text(L("rehearse.needPrep")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    }
+                }
+            }
+            MeetingSheetTab(doc: d, onRefresh: {}, onEditBlocks: { getReady(.expert, step: 2) }, onCompare: { compareN = $0; tab = "versions" })
+        } else if briefPath != nil {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(L("sheet.ui.legacy"), systemImage: "doc.text").font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                card { briefTab }
+            }
+        } else {
+            card { noSheet }
+        }
+    }
+
+    private var noSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PageEmpty(icon: "doc.text.magnifyingglass", title: L("sheet.ui.none"), text: L("sheet.ui.none.body"))
+            if let j = jobs.job(for: model.id) {
+                Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(PN.Font.body).foregroundStyle(PN.C.text2)
+            } else {
+                HStack(spacing: 10) {
+                    Button(L("home.getReady")) { getReady(nil) }.buttonStyle(.pnPrimary)
+                    Button(L("sheet.ui.quickPrep")) { getReady(.quick) }.buttonStyle(.pnSecondary)
+                    Button(L("sheet.ui.expertPrep")) { getReady(.expert) }.buttonStyle(.pnSecondary)
+                }
+            }
+        }
+        .padding(.horizontal, 24).padding(.vertical, 22)
     }
 
     private func save() {
@@ -243,7 +330,7 @@ struct UpcomingCallPage: View {
                     Text(state == .preparing ? L("home.check.preparing", ["p": "\(Int(runner.progress * 100))"]) : L("badge.queued"))
                         .font(PN.Font.body).foregroundStyle(PN.C.text2)
                 } else if HomeView.aiReadyNow() {
-                    Button(L("page.brief.getReady")) { prepare() }.buttonStyle(.pnPrimary)
+                    Button(L("page.brief.getReady")) { getReady(nil) }.buttonStyle(.pnPrimary)
                 } else {
                     link(L("home.connectClaude")) { SettingsWindow.show(tab: "ai") }
                 }

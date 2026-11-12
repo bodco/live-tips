@@ -24,6 +24,7 @@
       engineDeaf: 'Tips are not coming: end the call and start again',
       onMe: 'On me', more: 'More', earlier: 'Earlier', allTips: 'Tips', showHero: 'Show the main card',
       agenda: (a, b) => `Agenda ${a} of ${b}`, notRaised: 'Not raised yet:', moreItems: (n) => `+${n} more in the agenda`, allRaised: 'All agenda items raised',
+      questionsCap: (a, b) => `Questions: ${a} of ${b} asked`, questionsHead: 'Questions for the call', qState: { todo: 'not asked yet', asked: 'asked' },
       agendaOpen: 'Show the whole agenda', agendaClose: 'Hide the agenda', agendaHint: 'A click moves an item on:', agendaLegend: ['not raised', 'now', 'done', 'skipped, not relevant'],
       agState: { todo: 'not raised', now: 'now', raised: 'raised, not decided', done: 'done', skip: 'skipped' },
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk', decision_conflict: 'Decided earlier',
@@ -110,6 +111,7 @@
       engineDeaf: 'Підказки не надходять: заверши дзвінок і почни знову',
       onMe: 'На мені', more: 'Більше', earlier: 'Раніше', allTips: 'Підказки', showHero: 'Показати основну картку',
       agenda: (a, b) => `Агенда ${a} з ${b}`, notRaised: 'Ще не підняли:', moreItems: (n) => `ще ${n} в агенді`, allRaised: 'Усі пункти агенди підняті',
+      questionsCap: (a, b) => `Питання: поставлено ${a} з ${b}`, questionsHead: 'Питання на дзвінок', qState: { todo: 'ще не спитав', asked: 'спитав' },
       agendaOpen: 'Показати всю агенду', agendaClose: 'Сховати агенду', agendaHint: 'Клік по пункту змінює його стан:', agendaLegend: ['не піднято', 'зараз', 'зроблено', 'пропущено, неактуально'],
       agState: { todo: 'не піднято', now: 'зараз', raised: 'піднято, не вирішено', done: 'зроблено', skip: 'пропущено' },
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик', decision_conflict: 'Вже вирішено',
@@ -189,7 +191,7 @@
   const S = {
     lang: PREFS.ui_lang === 'uk' ? 'uk' : 'en', theme: 'auto',
     call: { title: '', state: 'live', startedAt: null, paused: false, micOff: false, minutesLeft: null, mode: 'normal', recap: '', briefLine: '', alert: null },
-    agenda: [], cards: [], onMe: [], next: null, deal: null,
+    agenda: [], questions: [], cards: [], onMe: [], next: null, deal: null,
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     rec: { state: 'off', kind: 'video', elapsed: 0, source: '', note: '' },
@@ -377,6 +379,12 @@
     if (S.theme === 'auto') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', S.theme);
     const app = $('app');
+    // 0.10.0 (Meeting Sheet, phase 7): a stand-up opens in the small window once (my update, today, whom to ask);
+    // the PM's own switch back to the full window wins for the rest of the call.
+    if (S.call.standup && !S.ui.standupAuto) {
+      S.ui.standupAuto = true;
+      if (S.call.mode !== 'compact' && S.call.state === 'live') { S.call.mode = 'compact'; post('compact', { on: true }); }
+    }
     app.classList.toggle('compact', S.call.mode === 'compact');
 
     // header: dot, timer, status (or the one problem that matters), On me, menu
@@ -425,7 +433,21 @@
 
     // agenda
     const ag = $('agenda');
-    ag.hidden = (!S.agenda.length && !S.agendaCanUndo) || withSlides() || isReady;
+    // 0.10.0 (Meeting Sheet, phase 7): the sheet's questions are a checklist here too (with or without an agenda)
+    const qs = S.questions || [];
+    ag.hidden = (!S.agenda.length && !S.agendaCanUndo && !qs.length) || withSlides() || isReady;
+    const qHtml = qs.length ? `<li class="hint qhead">${esc(t.questionsHead)}</li>` + qs.map((q) => `<li class="q ${esc(q.state)}"><button type="button" data-act="sheetq" data-id="${esc(q.id)}" aria-label="${esc(q.title + ', ' + (t.qState[q.state] || q.state))}"><span class="st ${q.state === 'asked' ? 'done' : 'todo'}"></span><span class="tt">${esc(q.title)}</span></button></li>`).join('') : '';
+    if (!S.agenda.length && !S.agendaCanUndo && qs.length) {
+      $('segs').innerHTML = qs.map((q) => `<button type="button" class="seg ${q.state === 'asked' ? 'done' : 'todo'}" data-act="sheetq" data-id="${esc(q.id)}" title="${esc(q.title)}" aria-label="${esc(q.title)}"></button>`).join('');
+      const askedN = qs.filter((q) => q.state === 'asked').length;
+      $('agendaNow').textContent = t.questionsCap(askedN, qs.length);
+      const left = qs.filter((q) => q.state !== 'asked');
+      $('agendaMissing').textContent = left.length ? `${left[0].title}${left.length > 1 ? ` +${left.length - 1}` : ''}` : '';
+      const cap = $('agendaCap'), list = $('agendaList'), open = !!S.ui.agendaOpen;
+      cap.setAttribute('aria-expanded', String(open));
+      list.hidden = !open;
+      if (open && list.dataset.html !== qHtml) { const top = list.scrollTop; list.innerHTML = qHtml; list.dataset.html = qHtml; list.scrollTop = top; }
+    }
     if (S.agenda.length || S.agendaCanUndo) {
       $('segs').innerHTML = S.agenda.map((a) => `<button type="button" class="seg ${a.state}" data-act="agenda" data-id="${esc(a.id)}" title="${esc(a.full || a.title)}" aria-label="${esc(a.full || a.title)}"></button>`).join('');
       const now = S.agenda.find((a) => a.state === 'now');
@@ -442,7 +464,7 @@
       if (open) {
         // 2026-11-02 (owner): the opened agenda shows each item in full (13 interview questions were cut to "…")
         const html = S.agenda.map((a) => `<li class="${esc(a.state)}"><button type="button" data-act="agenda" data-id="${esc(a.id)}" aria-label="${esc((a.full || a.title) + ', ' + (t.agState[a.state] || a.state))}"><span class="st ${esc(a.state)}"></span><span class="tt">${esc(a.full || a.title)}</span></button></li>`).join('')
-          + `<li class="hint">${esc(t.agendaHint)} ${['todo', 'now', 'done', 'skip'].map((s, i) => `<span class="lg"><span class="st ${s}"></span>${esc(t.agendaLegend[i])}</span>`).join(' → ')}</li>` + (S.agendaCanUndo ? `<li><button type="button" data-act="agenda-undo">${S.lang === 'uk' ? 'Повернути попередню агенду' : 'Restore previous agenda'}</button></li>` : '');
+          + `<li class="hint">${esc(t.agendaHint)} ${['todo', 'now', 'done', 'skip'].map((s, i) => `<span class="lg"><span class="st ${s}"></span>${esc(t.agendaLegend[i])}</span>`).join(' → ')}</li>` + (S.agendaCanUndo ? `<li><button type="button" data-act="agenda-undo">${S.lang === 'uk' ? 'Повернути попередню агенду' : 'Restore previous agenda'}</button></li>` : '') + qHtml;
         // 2026-11-03 (owner): the list was rebuilt every second and jumped back to the top while scrolling
         if (list.dataset.html !== html) { const top = list.scrollTop; list.innerHTML = html; list.dataset.html = html; list.scrollTop = top; }
       }
@@ -1406,6 +1428,7 @@
       }
       case 'agenda-undo': post('agenda-undo', {}); break;
       case 'agenda-toggle': S.ui.agendaOpen = !S.ui.agendaOpen; break;
+      case 'sheetq': if (feed && feed.toggleQuestion) feed.toggleQuestion(id); break;   // 0.10.0: the PM ticks a sheet question
       case 'theirs-toggle': S.ui.theirsOpen = !(b.getAttribute('aria-expanded') === 'true'); break;
       case 'home': post('menu', { item: 'home' }); return;
       case 'hero-min': S.ui.heroMin[id] = !S.ui.heroMin[id]; break;   // 2026-11-02: the speech card folds to its first line

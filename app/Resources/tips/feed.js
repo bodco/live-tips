@@ -51,6 +51,8 @@
     this.deal = null;           // 0.8.7 (H4): the engine's "deal" item in Sales mode (rules/sales.yaml), else null
     this.agendaBrief = [];
     this.agendaManual = {};     // id -> state, set by a click on a segment
+    this.sheetQs = [];          // 0.10.0 (Meeting Sheet, phase 7): the sheet's questions from the recorder, todo | asked
+    this.sheetQManual = {};     // id -> state the PM set with a click
     this.facts = [];
     this.slides = null;
     this.outline = null;
@@ -196,6 +198,7 @@
       if (it.uid) this.addItem({ kind: 'retract', uid: it.uid });
       return true;
     }
+    if (k === 'speech' && it.standup) this.standup = true;   // 0.10.0 (Meeting Sheet, phase 7): a stand-up sheet
     switch (k) {
       case 'retract': { const id = 'u:' + it.uid, c = this.byId[id]; if (c) { this.cards.splice(this.cards.indexOf(c), 1); delete this.byId[id]; } return true; }
       case 'context_reset':
@@ -274,6 +277,10 @@
         if (!this.agendaEngine) this.agendaBrief = (it.items || []).map((x, i) => ({ id: 'b' + i, title: clean(itemText(x)), done: false, cur: false }));
         return true;
       case 'facts': this.facts = it.facts || []; return false;
+      case 'questions':
+        // 0.10.0 (Meeting Sheet, phase 7): the sheet's "Questions for the call" as a checklist; "asked" when the PM asked
+        this.sheetQs = (it.items || []).map((x, i) => ({ id: String((x && x.id) || 'q' + i), text: clean(itemText(x)), asked: !!(x && x.state === 'asked') })).filter((x) => x.text);
+        return true;
       case 'outline': this.outline = it.sections || []; return true;
       case 'outline_pos':
         this.outlinePos = it.cur;
@@ -373,6 +380,19 @@
       const manual = this.agendaManual[a.id];
       return { id: a.id, title: a.title, full: a.full || a.title, state: manual || (a.skip ? 'skip' : a.done ? 'done' : i === cur ? 'now' : a.raised ? 'raised' : 'todo') };
     });
+  };
+
+  Feed.prototype.questions = function () {
+    // a question the agenda already holds (derive.py puts the sheet's questions into the brief's checklist) shows once
+    const ag = (this.agendaEngine || this.agendaBrief || []).map((a) => String(a.full || a.title || '').toLowerCase());
+    return (this.sheetQs || []).filter((q) => !ag.some((t) => t.includes(q.text.toLowerCase().slice(0, 60)))).map((q) => ({ id: q.id, title: q.text, state: this.sheetQManual[q.id] || (q.asked ? 'asked' : 'todo') }));
+  };
+
+  Feed.prototype.toggleQuestion = function (id) {
+    const q = this.questions().find((x) => x.id === id);
+    if (!q) return;
+    this.sheetQManual[id] = q.state === 'asked' ? 'todo' : 'asked';
+    this.emit();
   };
 
   Feed.prototype.presentation = function () {
@@ -587,12 +607,13 @@
         paused: s.tips_paused === true || s.tips_paused === 'on' || s.tips_paused === 'true',
         tipsOff: s.tips === 'off' || s.call_type === 'transcript' && s.tips !== 'on',   // rules/meeting.yaml > tips
         proactive: s.proactive == null ? null : (s.proactive === true || s.proactive === 'on' || s.proactive === 'true' || s.proactive === '1'),
+        standup: !!this.standup,
         micOff: s.mic === 'muted', minutesLeft: s.minutes_left != null ? +s.minutes_left : null,
         recap: this.recap, briefLine, prep: this.prep, prepInfo: this.prepInfo || { made: '', before: false, progress: 0 }, alert: this.alert(), presentable: steps.length > 0 || presType, presenting, presType
       },
       sys: this.sysState(),
       pres: { slide: this.slideN, slideRx: this.slideRx, timeline: this.timeline, moveAsk: this.moveAsk, follow: this.follow },
-      agenda: this.agenda(), agendaCanUndo: !!this.agendaCanUndo,
+      agenda: this.agenda(), agendaCanUndo: !!this.agendaCanUndo, questions: this.questions(),
       deal: this.deal,
       cards: this.cards.map((c) => Object.assign({}, c)),
       onMe: this.onMe(),

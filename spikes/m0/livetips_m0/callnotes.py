@@ -292,8 +292,20 @@ def make_meeting_only(md: Path, model: str, lang: str, provider=None, aliases: L
     if not lang or lang == "auto":
         lang = call_lang(text)
     notes = out.read_text(encoding="utf-8")
-    out.write_text(put_meeting(notes, make_meeting(md, notes, text, lang, ask, names_block(aliases or [], config))), encoding="utf-8")
+    notes = put_meeting(notes, make_meeting(md, notes, text, lang, ask, names_block(aliases or [], config)))
+    out.write_text(_sheet_check(md, notes, text, lang, ask), encoding="utf-8")
     return {"ok": True, "path": str(out), "coverage": None, "cost_usd": round(usd[0], 4), "parts": 0, "error": None}
+
+
+def _sheet_check(md: Path, notes: str, text: str, lang: str, ask) -> str:
+    """0.10.0 (Meeting Sheet, phase 7): the sheet's questions and best outcome checked against the call (one request,
+    only when the call has a sheet); the notes are kept whatever happens."""
+    try:
+        from .sheet import aftercheck
+        return aftercheck.add_to_notes(md, notes, text, lang, ask)
+    except Exception as e:  # noqa: BLE001
+        print("sheet check: " + str(e)[:200], file=sys.stderr)
+        return notes
 
 
 def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str] = None, config: str = "") -> dict:
@@ -338,6 +350,7 @@ def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str
         notes = put_meeting(notes, make_meeting(md, notes, text, lang, ask, names))
     except Exception as e:  # noqa: BLE001
         print("meeting notes: " + str(e)[:200], file=sys.stderr)
+    notes = _sheet_check(md, notes, text, lang, ask)
     out = md.with_name(md.name[:-3].replace(".named", "") + ".notes.md")
     out.write_text(notes, encoding="utf-8")
     return {"ok": True, "path": str(out), "coverage": coverage_line(c), "cost_usd": round(usd[0], 4), "parts": len(ps),

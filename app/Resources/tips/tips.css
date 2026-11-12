@@ -61,6 +61,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .agenda-list .st.now{background:var(--accent-fill);border-color:var(--accent-fill)}
 .agenda-list .done .tt{color:var(--text-3)}
 /* 2026-11-03 (owner): skipped = not relevant, crossed out */
+.agenda-list .qhead{padding:6px 6px 0;font-weight:600}
+.agenda-list .q.asked .tt{color:var(--text-3)}
 .agenda-list .st.raised{background:var(--accent-soft);border-color:var(--accent-fill)}
 .agenda-list .st.skip{background:transparent;border-style:dashed}
 .agenda-list .skip .tt{color:var(--text-3);text-decoration:line-through}

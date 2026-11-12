@@ -561,7 +561,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Text(meta1).font(.system(size: 14, weight: .semibold)).foregroundStyle(PN.C.accent)
-                    StatePill(state: st)
+                    StatePill(state: SheetBadges.state(r.model, st), text: SheetBadges.text(r.model, st))
                 }
                 Button { openCall(r) } label: {
                     Text(r.title).font(.system(size: 30, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
@@ -704,7 +704,7 @@ struct HomeView: View {
             }
             .buttonStyle(.plain).help(L("home.openCall.help"))
             HStack(spacing: 6) {
-                StatePill(state: st)
+                StatePill(state: SheetBadges.state(r.model, st), text: SheetBadges.text(r.model, st))
                 callMenu(r, st)
             }
         }
@@ -746,7 +746,7 @@ struct HomeView: View {
                 if !sub.isEmpty { Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
             }
             Spacer(minLength: 8)
-            StatePill(state: st)
+            StatePill(state: SheetBadges.state(r.model, st), text: SheetBadges.text(r.model, st))
             callMenu(r, st)
         }
         .padding(.horizontal, 8).padding(.vertical, 8)
@@ -799,7 +799,13 @@ struct HomeView: View {
     }
 
     /// Asks first: the project or workspace and what matters on this call (the call form in Prepare mode).
-    private func prepare(_ r: Ahead) { StartCallWindow.show(delegate: app, prepared: model(for: r), mode: .prepare) }
+    /// 0.10.0 (Meeting Sheet, phase 4): a call with its project known opens Quick or Expert at once.
+    private func prepare(_ r: Ahead) {
+        let m = model(for: r)
+        if m.target.isEmpty { StartCallWindow.show(delegate: app, prepared: m, mode: .prepare); return }
+        upnext.save(m)
+        SheetPrepWindow.show(m)
+    }
 
     private func start(_ r: Ahead) {
         let m = model(for: r)

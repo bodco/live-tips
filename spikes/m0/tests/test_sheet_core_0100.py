@@ -360,7 +360,7 @@ def test_cli(capsys, tmp_path, rules):
     code, o = run_cli(capsys, "presets", "--app-root", str(tmp_path / "app"))
     assert code == 0 and "my_quick_sync" in [p["id"] for p in o["presets"]] and o["methods"][0] == "bant"
 
-    code, o = run_cli(capsys, "build", "--request", str(req))
+    code, o = run_cli(capsys, "export", "--request", str(req))     # 0.10.0 phase 3: build is implemented now (pipeline)
     assert code == 2 and "not implemented yet" in o["error"]
     code, o = run_cli(capsys, "dance")
     assert code == 2

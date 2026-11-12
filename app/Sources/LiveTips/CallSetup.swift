@@ -14,6 +14,7 @@ struct CallSetupView: View {
     @ObservedObject var runner = PrepRunner.shared
     @ObservedObject var upnext = UpNext.shared
     @ObservedObject private var cal = CalendarService.shared
+    @ObservedObject private var jobs = SheetJobs.shared       // 0.10.0 (Meeting Sheet, phase 4)
     var mode: CallSetupMode
     var live = false                 // a call is being recorded (plan mode switches to it only when confirmed)
     var liveTitle = ""
@@ -370,8 +371,20 @@ struct CallSetupView: View {
 
     @ViewBuilder private var briefLine: some View {
         let st = upnext.prepState(model)
+        let sheet = SheetFiles.path(for: model).flatMap { SheetCache.shared.load($0) }
         HStack(alignment: .center, spacing: 10) {
-            if runner.running && runner.callID == model.id {
+            // 0.10.0 (Meeting Sheet, phase 4): the sheet first: building, or its readiness with Open
+            if let j = jobs.job(for: model.id) {
+                ProgressView(value: j.progress).frame(width: 60)
+                Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(1)
+                Spacer()
+                Button(L("call.stop")) { j.stop() }.buttonStyle(.pnTertiary)
+            } else if let s = sheet {
+                SheetReadinessPill(badge: s.readinessBadge)
+                Text(s.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1)
+                Spacer()
+                Button(L("common.open")) { openSheet() }.buttonStyle(.pnTertiary)
+            } else if runner.running && runner.callID == model.id {
                 ProgressView(value: runner.progress).frame(width: 60)
                 Text(L("call.brief.writing", ["stage": runner.stage.prefix(1).lowercased() + runner.stage.dropFirst()])).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(1)   // 2026-11-11: keeps "ChatGPT"
                 Spacer()
@@ -414,17 +427,30 @@ struct CallSetupView: View {
         .padding(.horizontal, 4)
     }
 
+    /// 0.10.0 (Meeting Sheet, phase 4): any AI route counts (Settings > AI > Preparation first), not Claude Code only;
+    /// Get ready opens Quick or Expert, where the route is shown before the run. Transcript calls have nothing to prepare.
     private var canPrepare: Bool {
-        !model.target.isEmpty && PrepRunner.claudePath != nil && (runner.useAPI ? runner.hasAPIKey : runner.loggedIn != false)
-            && upnext.prepState(model) != .queued
+        !model.target.isEmpty && model.callType != "transcript" && SheetRoutes.firstReady() != nil
+            && jobs.job(for: model.id) == nil && upnext.prepState(model) != .queued
+    }
+
+    private var hasSheet: Bool { SheetFiles.path(for: model) != nil }
+
+    /// The sheet's page (Meeting Sheet tab), from the Start call window.
+    private func openSheet() {
+        upnext.save(model)
+        StartCallWindow.window?.close()
+        UpcomingCallPage.openTab[model.id.uuidString] = "sheet"
+        UpcomingPages.open(model)
     }
 
     /// Only where something is wrong (spec 5: no cryptic status line).
     private var problemHint: String? {
         if !model.note.isEmpty { return model.note }
-        if PrepRunner.claudePath == nil { return L("call.hint.noClaudeCode") }
-        if !runner.useAPI && runner.loggedIn == false { return L("call.hint.notSignedIn") }
-        if runner.useAPI && !runner.hasAPIKey { return L("call.hint.noKey") }
+        // 0.10.0 (Meeting Sheet, phase 4): the route of Settings > AI > Preparation, whichever it is
+        if let p = SheetRoutes.problem(SheetRoutes.preferred) {
+            return SheetRoutes.firstReady().map { L("sheet.ui.route.otherReady", ["problem": p, "route": AIRoute.name($0)]) } ?? p
+        }
         if SettingsWindow.model.config.notionMeetingsDB.isEmpty && !model.target.isEmpty { return L("call.hint.noNotion") }
         if !runner.result.isEmpty && !runner.running { return runner.result }
         return nil
@@ -443,9 +469,17 @@ struct CallSetupView: View {
         return L("again.age", ["d": "\(days)", "n": "\(n)"]) + "\n" + L("again.keepBrief")
     }
 
+    /// 0.10.0 (Meeting Sheet, phase 4): Prepare = Get ready: the call is kept in Up next and Quick or Expert opens
+    /// (by Settings > Meeting Sheet). No brief is written any more; the sheet is.
     private func prepareNow() {
-        model.note = upnext.prepare(model) ?? ""
-        if !saved && model.note.isEmpty { upnext.save(model) }   // kept in Up next until the call; the window stays
+        if !saved { upnext.save(model) }
+        model.note = ""
+        SheetPrepWindow.show(model)
+    }
+
+    private func refreshSheet() {
+        guard let p = SheetFiles.path(for: model) else { prepareNow(); return }
+        SheetActions.refresh(doc: SheetDoc(path: p), call: model)
     }
 
     // MARK: Options (with labels)
@@ -556,6 +590,19 @@ struct CallSetupView: View {
                 if model.callType != "auto" { typeSection }
             }
             question(L("page.q.matters")) { contextBox }
+            // 0.10.0 (Meeting Sheet, phase 4): the preparation is the Meeting Sheet; the text and files above feed it
+            if model.callType != "transcript" {
+                question(L("sheet.ui.setup.prep")) {
+                    briefLine
+                    HStack(spacing: 8) {
+                        Button(L("sheet.ui.quickPrep")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .quick) } }
+                            .buttonStyle(.pnSecondary).disabled(!canPrepare)
+                        Button(L("sheet.ui.expertPrep")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .expert) } }
+                            .buttonStyle(.pnSecondary).disabled(!canPrepare)
+                    }
+                    Text(L("sheet.ui.setup.prepNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Text(L("page.files.note")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             if let h = problemHint { Label(h, systemImage: "info.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
             DisclosureGroup(isExpanded: $pageMore) {
@@ -602,12 +649,14 @@ struct CallSetupView: View {
                 Spacer()
                 Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 // 2026-10-29 (owner): once the brief is ready the same button prepares again (with one previous version kept).
-                Button(model.prep?.matches == true ? L("talk.prepareAgain") : L("call.prepare")) {
+                // 0.10.0 (Meeting Sheet, phase 4): Get ready (Quick or Expert); with a sheet it is Refresh (a new version, edits kept).
+                Button(hasSheet ? L("sheet.ui.refresh") : L("home.getReady")) {
                     if needProject() { return }
-                    if model.prep?.matches == true { againClicked() } else { prepareNow() }
+                    if hasSheet { refreshSheet() } else if model.callType == "presentation" && model.prep?.matches == true { againClicked() } else { prepareNow() }
                 }
                 .buttonStyle(.pnSecondary)
                 .disabled(!canPrepare || (runner.running && runner.callID == model.id))
+                .help(problemHint ?? "")
                 .confirmationDialog(L("again.title"), isPresented: $confirmAgain) {
                     Button(L("talk.prepareAgain")) { prepareNow() }
                     Button(L("common.cancel"), role: .cancel) {}
@@ -682,9 +731,10 @@ final class StartCallWindow {
             UpNext.shared.remove(model)
             window?.close()
         }, onPrepare: {
+            // 0.10.0 (Meeting Sheet, phase 4): Prepare opens Quick or Expert for this call
             UpNext.shared.save(model)
-            let err = UpNext.shared.prepare(model)
-            if let e = err { model.note = e } else { window?.close() }
+            window?.close()
+            SheetPrepWindow.show(model)
         })
         let host = NSHostingController(rootView: Localized { view })
         let w = window ?? NSWindow(contentViewController: host)

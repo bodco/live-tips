@@ -784,7 +784,8 @@ def test_economy_lookup_uses_the_account_then_the_tips_model(tmp_path, monkeypat
     proj.mkdir()
     eco = tmp_path / "economy"
     eco.write_text("on")
-    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True,
+    # 0.10.0 (Meeting Sheet, phase 7): Claude Code reads the folders only when deep_claude_code is on
+    eng, clock = _meeting_engine(tmp_path, lambda m, u: "{}", project_root=str(proj), deep_lookup=True, deep_claude_code=True,
                                  agent={"economy_file": str(eco)}, ai={"routes": {"prep": "api", "tips": "api"}})
     eng._call_agent = lambda: None
     seen = {}

@@ -1752,17 +1752,57 @@ class Engine:
                 roots.append(d)
         return roots
 
+    def _sheet(self):
+        """0.10.0 (Meeting Sheet, phase 7): the call's Meeting Sheet next to its brief, or None (read each time: small)."""
+        from .sheet.lookup import load_sheet_near
+        try:
+            return load_sheet_near(getattr(self.prompt, "_brief_path", None))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _lookup_ok(self) -> bool:
+        """0.10.0: something to search: a folder, or the call's Meeting Sheet."""
+        return bool(self._search_roots()) or self._sheet() is not None
+
     def _project_snippets(self, text: str, budget_chars: int = 14000, k: int = 6) -> List[dict]:
         roots, lt = self._search_roots(), self.cfg.get("lt_cmd")
-        if not roots or not lt:
+        sheet = self._sheet()
+        if not roots and not sheet:
             return []
-        from .context import index_snippets
-        from concurrent.futures import ThreadPoolExecutor as _TP
         qs = self._find_queries(text)
-        jobs = [(q, r) for r in roots[:4] for q in qs]
-        with _TP(max_workers=min(12, len(jobs)) or 1) as ex:      # parallel, one overall wait (QA: up to 100 s in a row)
-            results = list(ex.map(lambda j: index_snippets(lt, Path(j[1]), j[0], k=k, timeout=15.0), jobs))
-        return fit_snippets(merge_hits(results), budget_chars, self._hit_text)
+        # 0.10.0 (Meeting Sheet, phase 7, PM 12.11: "it must work, do not tie it to Claude"): the shared search here on
+        # the Mac (sheet facts with their source numbers, the sheet's files, the folders; no Ollama, no lt needed)
+        # first; the semantic index (lt search) adds what it finds when it is there.
+        own: List[dict] = []
+        try:
+            from .sheet import lookup
+            own = lookup.snippets(text, sheet=sheet, roots=roots[:4], k=max(k, 6), queries=qs[1:],
+                                  budget_chars=budget_chars, max_seconds=float(self.cfg.get("lookup_max_s", 3.0)))
+        except Exception:  # noqa: BLE001  (the index search below still runs)
+            own = []
+        idx: List[dict] = []
+        if roots and lt:
+            from .context import index_snippets
+            from concurrent.futures import ThreadPoolExecutor as _TP
+            jobs = [(q, r) for r in roots[:4] for q in qs]
+            with _TP(max_workers=min(12, len(jobs)) or 1) as ex:      # parallel, one overall wait (QA: up to 100 s in a row)
+                results = list(ex.map(lambda j: index_snippets(lt, Path(j[1]), j[0], k=k, timeout=15.0), jobs))
+            idx = fit_snippets(merge_hits(results), budget_chars, self._hit_text)
+        if not own:
+            return idx
+        out, used, seen = [], 0, set()
+        own_files = {x.get("src") for x in own}
+        idx = [x for x in idx if x.get("src") not in own_files]      # a file the shared search already gave
+        for x in own[: max(4, k)] + idx + own[max(4, k):]:
+            key = (x.get("src"), (x.get("text") or "")[:60])
+            if key in seen or used + len(x.get("text") or "") > budget_chars:
+                continue
+            seen.add(key)
+            used += len(x.get("text") or "")
+            out.append({"src": x["src"], "date": x.get("date") or "", "text": x["text"]})
+            if len(out) >= 10:
+                break
+        return out
 
     # ---------- the preparation's model for questions and the deep lookup (2026-11-06, owner) ----------
     FAST_PREP_ROUTES = ("api", "openai", "gemini")
@@ -1803,6 +1843,10 @@ class Engine:
         """Claude Code reads the folders itself when the preparation runs on Claude (account or key); with no
         preparation way known (an older app, the skill) it follows the tips way as before."""
         from . import deep
+        # 0.10.0 (Meeting Sheet, phase 7, PM 12.11): the search is ours on every way and the route's model answers;
+        # Claude Code reading the folders itself only when switched on (deep_claude_code: true in the sidecar config).
+        if not self.cfg.get("deep_claude_code", False):
+            return False
         route = self._prep_route() or ((self.cfg.get("ai") or {}).get("routes") or {}).get("tips") or "api"
         return route in ("code", "api") and bool(deep.claude_path(self.cfg))
 
@@ -1996,16 +2040,16 @@ class Engine:
         unanswered = not_answered(obj) or (kind == "ask" and obj.get("answered") is not True)   # 2026-11-06: a typed question without "answered": true digs
         uk = self._ui_uk()
         if not obj or obj.get("skip"):
-            obj = no_ready_answer(kind, uk, self.cfg.get("deep_lookup", True) and bool(self._search_roots()))
+            obj = no_ready_answer(kind, uk, self.cfg.get("deep_lookup", True) and self._lookup_ok())
         # 2026-11-10 (owner, MinuteDesk KT #2): the model decides whether the project must be searched and for what
         # ("search"), from the moment and the PM's intent; no rule on the PM's words. Answered but with a search: the
         # search runs quietly and its card comes only when it found something.
         want = str(obj.get("search") or "").strip() if isinstance(obj, dict) else ""
         query = (text + " | " + want) if want and text else (want or text or (line.text if line else ""))
-        if unanswered and kind in ("ask", "sos") and self.cfg.get("deep_lookup", True) and self._search_roots():
+        if unanswered and kind in ("ask", "sos") and self.cfg.get("deep_lookup", True) and self._lookup_ok():
             self._start_deep(query, kind)
             obj["note"] = with_deep_note(obj.get("note"), uk, fast=self.agent_fast())
-        elif want and kind == "ask" and self.cfg.get("deep_lookup", True) and self._search_roots():
+        elif want and kind == "ask" and self.cfg.get("deep_lookup", True) and self._lookup_ok():
             self._start_deep(query, "quiet")
         obj.pop("search", None)
         return obj
@@ -2045,20 +2089,26 @@ class Engine:
             economy = self._economy()
             if res is not None:
                 pass
+            elif not self._lookup_ok() and not self._deep_via_claude_code():
+                res = {"error": "no project folder for this call"}     # 0.10.0: nothing to search, no model call
             elif economy:
                 # 0.9.6 Б1: Claude Code on the PM's Claude account (no key in the child); signed out or failed: the
-                # folders are searched here and the tips model answers
-                res = deep.lookup(self.cfg, question, tail, lang, economy=True) if deep.claude_path(self.cfg) else {"error": "no Claude Code"}
+                # folders are searched here and the tips model answers. 0.10.0: Claude Code only when switched on.
+                use_cc = self.cfg.get("deep_claude_code", False) and deep.claude_path(self.cfg)
+                res = deep.lookup(self.cfg, question, tail, lang, economy=True) if use_cc else {"error": "local"}
                 if res.get("error"):
-                    self.out_llm.write({"at": s_to_hms(self.clock()), "role": "deep_account_error", "error": res.get("error"),
-                                        "economy": True})
+                    if use_cc:
+                        self.out_llm.write({"at": s_to_hms(self.clock()), "role": "deep_account_error", "error": res.get("error"),
+                                            "economy": True})
                     res = deep.local_lookup(self.provider, self.models["tip"], question, tail, lang,
                                             self._project_snippets(question, budget_chars=36000, k=10), passages)
             elif self._deep_via_claude_code():
                 res = deep.lookup(self.cfg, question, tail, lang)
             else:     # 2026-11-06 (owner): every other way searches the folders here and asks the preparation's model
-                prov = self._prep_provider() or self.provider
-                res = deep.local_lookup(prov, self._deep_model(), question, tail, lang,
+                prov = self._prep_provider()
+                # 0.10.0: no preparation way known: the tips model answers (the deep model id may not be of this way)
+                prov, model = (prov, self._deep_model()) if prov is not None else (self.provider, self.models["tip"])
+                res = deep.local_lookup(prov, model, question, tail, lang,
                                         self._project_snippets(question, budget_chars=36000, k=10), passages)
         finally:
             with self.lock:

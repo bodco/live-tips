@@ -51,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotionMirrorService.shared.startSchedule()
         MainActor.assumeIsolated { AutoStart.shared.start() }      // Pacenote 0.8: offer to start tips when a call begins
         MainActor.assumeIsolated { MeetingEndWatch.shared.start() } // 2026-11-10 (owner): hanging up in the meeting ends the call
+        MainActor.assumeIsolated { SheetReminder.shared.start() }   // 0.10.0 (Meeting Sheet, phase 5): N minutes before a call with gaps
         updateCoreIfNeeded()
         // Up next (2026-10-27): the switch goes on when the old call's recorder has stopped.
         NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in

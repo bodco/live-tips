@@ -1157,11 +1157,165 @@ func meetingSheet0100() {
     expect((try? MeetingSheetIO.decode(Data("{\"schema\":\"pacenote.sheet/1\"}".utf8))) == nil, "sheet: required fields")
 }
 
+// 0.10.0 (Meeting Sheet, phase 6): the Pacenote browser's pure logic: page kinds, the capture plan, the pause, the
+// file names under <project>/live/sources, and the contact scrubber (emails and phones are never collected).
+func browserCapture0100() {
+    let prof = URL(string: "https://www.linkedin.com/in/emily-parker-lf/?trk=x")!
+    expect(BrowserURL.kind(prof) == .linkedinProfile, "browser: profile kind")
+    expect(BrowserURL.kind(URL(string: "https://www.linkedin.com/in/emily-parker-lf/details/skills/")!) == .linkedinDetail, "browser: detail kind")
+    expect(BrowserURL.kind(URL(string: "https://www.linkedin.com/company/lumenfield/")!) == .linkedinCompany, "browser: company kind")
+    expect(BrowserURL.kind(URL(string: "https://lumenfield.example/about")!) == .web, "browser: web kind")
+    expect(!BrowserURL.isLinkedIn(URL(string: "https://linkedin.com.example/in/x")!), "browser: look-alike host")
+    expect(BrowserURL.fromInput("lumenfield.example/about")?.absoluteString == "https://lumenfield.example/about", "browser: address without scheme")
+    expect(BrowserURL.fromInput("javascript:alert(1)") == nil && BrowserURL.fromInput("file:///etc/hosts") == nil && BrowserURL.fromInput("two words") == nil, "browser: refused addresses")
+    let plan = CapturePlan.make(for: prof, sections: ["skills", "experience", "unknown"])
+    expect(plan.steps.map(\.url.absoluteString) == ["https://www.linkedin.com/in/emily-parker-lf/",
+        "https://www.linkedin.com/in/emily-parker-lf/details/experience/", "https://www.linkedin.com/in/emily-parker-lf/details/skills/"], "browser: linkedin plan order")
+    expect(plan.offersSections && plan.detailSections == ["experience", "skills"], "browser: plan sections")
+    expect(plan.summary.contains("2 detail pages (Experience, Skills)"), "browser: plan summary")
+    let full = CapturePlan.make(for: prof)
+    expect(full.steps.count == 6, "browser: profile + 5 detail pages")
+    let site = CapturePlan.make(for: URL(string: "https://lumenfield.example/team")!)
+    expect(site.steps.count == 1 && !site.offersSections && site.steps[0].section == nil, "browser: one page for a site")
+    let detail = CapturePlan.make(for: URL(string: "https://www.linkedin.com/in/emily-parker-lf/details/skills/")!)
+    expect(detail.steps.count == 1, "browser: a detail page alone")
+    expect(CapturePlan.pause(0) == 3 && CapturePlan.pause(1) == 6 && CapturePlan.pause(7) == 6 && CapturePlan.pause(0.5) == 4.5, "browser: pause 3-6 s")
+    let d = Date(timeIntervalSince1970: 1_794_445_323)       // 2026-11-12 01:02:03 UTC
+    expect(CaptureFiles.base(for: prof, at: d) == "emily-parker-lf-20261112-010203", "browser: profile file name \(CaptureFiles.base(for: prof, at: d))")
+    expect(BrowserURL.slug(URL(string: "https://www.lumenfield.example/about/team")!) == "lumenfield-example-about-team", "browser: site slug")
+    let s = ContactScrubber.scrub("Mail emily.parker@lumenfield.example, call +1 512 555 0142 or (512) 555-0199. 2018 - 2023 · 5 yrs. 50,000+ users.")
+    expect(s.removed == 3 && !s.text.contains("@") && !s.text.contains("555"), "browser: contacts removed")
+    expect(s.text.contains("2018 - 2023") && s.text.contains("50,000+ users"), "browser: dates and numbers kept")
+    let h = ContactScrubber.scrubHTML("<a href=\"https://x.example/u/123456789012\">Call 512 555 0142</a>")
+    expect(h.removed == 1 && h.html.contains("123456789012") && h.html.contains("[phone removed]"), "browser: html attributes untouched")
+    let parts = [CapturedPart(url: "https://www.linkedin.com/in/emily-parker-lf/", title: "Emily Parker | LinkedIn",
+                              html: "<main><h1>Emily Parker</h1><p>emily@lumenfield.example</p></main>", text: "Emily Parker\nemily@lumenfield.example", section: nil),
+                 CapturedPart(url: "https://www.linkedin.com/in/emily-parker-lf/details/skills/", title: "Skills | Emily Parker | LinkedIn",
+                              html: "<main><ul><li>Python</li></ul></main>", text: "Python", section: "skills")]
+    let r = CaptureFiles.assemble(start: prof, kind: .linkedinProfile, parts: parts, signedIn: true, at: d,
+                                  folder: CaptureFiles.folder(live: URL(fileURLWithPath: "/p/live")))
+    expect(r.page.htmlPath == "/p/live/sources/emily-parker-lf-20261112-010203.html" && r.page.textPath.hasSuffix(".txt"), "browser: saved under live/sources")
+    expect(r.page.pages.count == 2 && r.page.pages[1].section == "skills" && r.page.contactsRemoved == 1, "browser: parts")
+    expect(!r.htmlDoc.contains("@lumenfield") && !r.textDoc.contains("@lumenfield"), "browser: no email in files")
+    expect(r.htmlDoc.contains("data-pacenote-page=\"https://www.linkedin.com/in/emily-parker-lf/details/skills/\"")
+           && r.htmlDoc.contains("name=\"pacenote:session\" content=\"signed_in\"") && r.page.capturedAt == "2026-11-12T01:02:03Z", "browser: document")
+    if let data = try? JSONEncoder().encode(r.page), let back = try? JSONDecoder().decode(CapturedPage.self, from: data),
+       let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        expect(back == r.page && o["captured_at"] != nil && o["html_path"] != nil, "browser: captured page JSON")
+    } else { expect(false, "browser: captured page JSON") }
+    expect(r.page.sidecarItem["html"] == r.page.htmlPath && r.page.sidecarItem["url"] == r.page.url, "browser: sidecar item")
+}
+
 callRecording()
 meetingNotes0952()
 prepAgent096()
 meetingLaunch096()
+/// 0.10.0 (Meeting Sheet, phases 4-5, ui): Quick / Expert default, the Refresh banner counts, edits on the sheet
+/// (inline edit, block menu, conflict, gap quick actions) and the export rendering (footnotes, links, colleague).
+func meetingSheetUI0100() {
+    let rules = SheetModeRule.defaults
+    func mode(_ p: String, _ pm: String = "quick", earlier: Bool = false, domains: [String] = [], known: [String] = [], theirs: Int = 1) -> String {
+        SheetModeDecider.decide(rules: rules, preset: p, presetMode: pm, earlierSheet: earlier, theirDomains: domains, knownDomains: known, theirCount: theirs).rawValue
+    }
+    expect(mode("standup", "quick", domains: ["new.example"]) == "quick", "mode: stand-up is quick first")
+    expect(mode("sales_intro", "expert", earlier: true) == "quick", "mode: a series with an earlier sheet is quick")
+    expect(mode("sales_intro", "expert") == "expert", "mode: sales intro expert")
+    expect(mode("upsell", "quick", domains: ["lumenfield.example"]) == "expert", "mode: new external domain expert")
+    expect(mode("upsell", "quick", domains: ["lumenfield.example"], known: ["Lumenfield.example"]) == "quick", "mode: known domain falls to preset")
+    expect(mode("blank", "expert", theirs: 0) == "quick", "mode: internal quick")
+    expect(mode("blank", "expert") == "expert", "mode: no rule, the preset's mode")
+    var off = rules; off[0].off = true
+    expect(SheetModeDecider.decide(rules: off, preset: "standup", presetMode: "expert", earlierSheet: false, theirDomains: [], knownDomains: [], theirCount: 1) == .expert, "mode: a rule turned off")
+    expect(SheetModeDecider.decide(rules: rules, preset: "my-orbit", presetBase: "client_sync", presetMode: "expert", earlierSheet: false, theirDomains: [], knownDomains: [], theirCount: 1) == .quick, "mode: user preset follows its base")
+
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("spikes/m0/tests/fixtures/sheet")
+    guard let base = try? MeetingSheetIO.load(dir.appendingPathComponent("sales-intro-lumenfield.sheet.json").path) else { expect(false, "ui: fixture"); return }
+    expect(SheetDiffCounts.of(base).isEmpty, "diff: none on a fresh sheet")
+    var s = base
+    // inline edit
+    expect(SheetEdit.editFact(&s, factID: "f-overview", text: "  Lumenfield wants reporting automation.  ", now: "2026-11-12T10:00:00+02:00"), "edit: applied")
+    expect(s.fact(id: "f-overview")?.status == .edited && s.fact(id: "f-overview")?.text == "Lumenfield wants reporting automation." && s.fact(id: "f-overview")?.isProtected == true, "edit: fact edited and protected")
+    expect(s.blocks.first { $0.type == .overview }?.editedByUser == true, "edit: block marked edited_by_user")
+    expect(!SheetEdit.editFact(&s, factID: "f-overview", text: "   ", now: "x"), "edit: empty text is not saved")
+    expect(!SheetEdit.editFact(&s, factID: "nope", text: "x", now: "x"), "edit: unknown fact")
+    // diff banner
+    var d = s
+    if let bi = d.blocks.firstIndex(where: { $0.type == .company }) {
+        d.blocks[bi].facts[0].diff = .new
+        if d.blocks[bi].facts.count > 1 { d.blocks[bi].facts[1].diff = .gone }
+    }
+    let c = SheetDiffCounts.of(d)
+    expect(c.new == 1 && c.gone == 1 && c.changed == 0 && c.keptEdits == d.blocks.flatMap(\.facts).filter(\.isProtected).count && c.keptEdits >= 1, "diff: counts from marks \(c)")
+    d.diff = try? JSONDecoder().decode(SheetDiff.self, from: Data(#"{"new":["a","b"],"changed":["c"],"gone":[]}"#.utf8))
+    expect(SheetDiffCounts.of(d) == SheetDiffCounts(new: 2, changed: 1, gone: 0, keptEdits: c.keptEdits), "diff: counts from sheet.diff")
+    let before = d.blocks.flatMap(\.facts).count
+    SheetEdit.acceptDiff(&d)
+    expect(d.diff == nil && d.blocks.flatMap(\.facts).allSatisfy { $0.diff == nil } && d.blocks.flatMap(\.facts).count == before - 1, "diff: accept all clears and drops gone")
+    // block menu
+    var b = base
+    let shown = b.shownBlocks.map(\.id)
+    let second = shown[1]
+    expect(SheetEdit.block(&b, id: second, .moveUp) && b.shownBlocks.first?.id == second, "block: move up")
+    expect(SheetEdit.block(&b, id: second, .moveDown) && b.shownBlocks.map(\.id) == shown, "block: move down back")
+    expect(!SheetEdit.block(&b, id: shown[0], .moveUp), "block: first cannot go up")
+    expect(SheetEdit.block(&b, id: second, .hide) && !b.shownBlocks.contains { $0.id == second }, "block: hide")
+    expect(SheetEdit.block(&b, id: second, .show) && b.shownBlocks.contains { $0.id == second }, "block: show")
+    expect(SheetEdit.block(&b, id: second, .delete) && !b.blocks.contains { $0.id == second }, "block: delete")
+    // conflict
+    var k = base
+    expect(SheetEdit.settle(&k, factID: "f-size-site", .use("f-size-li"), now: "n") && k.fact(id: "f-size-site") == nil && k.fact(id: "f-size-li")?.status == .edited, "conflict: use B")
+    var k2 = base
+    let qBefore = k2.block(.questions)?.facts.count ?? 0
+    expect(SheetEdit.settle(&k2, factID: "f-size-site", .keepBoth, now: "n", question: "120 or 80?") && k2.fact(id: "f-size-site")?.status == .needsCheck
+           && k2.fact(id: "f-size-li")?.conflictWith == nil && (k2.block(.questions)?.facts.count ?? 0) == qBefore + 1, "conflict: keep both adds a question")
+    expect(!SheetEdit.settle(&k2, factID: "f-size-site", .use("f-industry"), now: "n"), "conflict: only a value of the group")
+    // gaps
+    var g = base
+    expect(SheetEdit.closeGap(&g, gapID: "gap-no_stale-f-funding", action: .dropCheck, now: "n") && g.readiness?.dropped == ["gap-no_stale-f-funding"] && g.readiness?.gaps?.count == 2, "gap: drop check")
+    expect(SheetEdit.closeGap(&g, gapID: "gap-no_open_conflicts-f-size-site", action: .markChecked, now: "n") && g.fact(id: "f-size-site")?.status == .edited, "gap: mark checked")
+    expect(SheetEdit.closeGap(&g, gapID: "gap-qualification_complete-budget", action: .addQuestion, now: "n", question: "Budget?") && g.readiness?.state == .ready
+           && g.block(.questions)?.facts.contains { $0.text == "Budget?" && $0.origin == .user } == true, "gap: add question, then ready")
+    expect(SheetEdit.setOwner(&g, factID: "f-overview", owner: "Mike Carter") && g.fact(id: "f-overview")?.value?.owner == "Mike Carter", "gap: owner")
+    expect(SheetEdit.addFact(&g, blockType: .agenda, text: "Kick-off", now: "n") != nil && g.block(.agenda)?.facts.first?.status == .edited, "fact: added into a new block")
+    // export
+    let md = SheetExport.markdown(base)
+    expect(md.hasPrefix("# Meeting Sheet: Emily Parker") && md.contains("## About the company") && md.contains("[^1]") && md.contains("[^1]: Lumenfield - About https://lumenfield.example/about"), "export: markdown footnotes")
+    expect(md.contains("(sources disagree)") && md.contains("(not found)"), "export: statuses in words")
+    let inline = SheetExport.markdown(base, SheetExportOptions(sources: .inline))
+    expect(inline.contains("([1](https://lumenfield.example/about))") && !inline.contains("[^"), "export: inline links")
+    let col = SheetExport.markdown(base, SheetExportOptions(colleague: true))
+    expect(!col.contains("## My focus") && !col.contains("## Red lines") && col.contains("## Overview"), "export: colleague leaves internal blocks out")
+    let pick = SheetExport.blocks(base, SheetExportOptions(blocks: ["b-overview"]))
+    expect(pick.map(\.id) == ["b-overview"], "export: chosen blocks")
+    let html = SheetExport.html(base)
+    expect(html.contains("<sup>1</sup>") && html.contains("<h2>Sources</h2>") && !html.contains("\u{2014}") && !md.contains("\u{2014}"), "export: html, no long dash")
+    expect(SheetExport.esc("<a & \"b\">") == "&lt;a &amp; &quot;b&quot;&gt;", "export: escaping")
+}
+
+// 0.10.0 (Meeting Sheet, phase 3, pipeline): which calls build a sheet, the preset without the wizard, progress lines
+func sheetPipeline0100() {
+    expect(SheetPipeline.builds(callType: "auto") && SheetPipeline.builds(callType: "presentation") && !SheetPipeline.builds(callType: "transcript"), "sheet: every type but Transcript")
+    expect(SheetPipeline.preset(callType: "interview", sales: false, title: "x", earlier: false) == "interview", "sheet preset: interview")
+    expect(SheetPipeline.preset(callType: "presentation", sales: true, title: "x", earlier: false) == "internal_presentation", "sheet preset: presentation")
+    expect(SheetPipeline.preset(callType: "auto", sales: false, title: "Orbit daily stand-up", earlier: true) == "standup", "sheet preset: stand-up by title")
+    expect(SheetPipeline.preset(callType: "auto", sales: true, title: "Lumenfield intro", earlier: false) == "sales_intro", "sheet preset: sales intro")
+    expect(SheetPipeline.preset(callType: "auto", sales: true, title: "Lumenfield intro", earlier: true) == "repeat_call", "sheet preset: sales, a series")
+    expect(SheetPipeline.preset(callType: "auto", sales: false, title: "Orbit weekly sync", earlier: false) == "client_sync", "sheet preset: default")
+    expect(SheetPipeline.preset(callType: "auto", sales: false, title: "x", earlier: false, seriesChoice: "upsell") == "upsell", "sheet preset: the series' choice wins")
+    let p = SheetPipeline.parse("{\"progress\": 0.4, \"stage\": \"model\", \"pass\": 2, \"passes\": 3}")
+    expect(p?.progress == 0.4 && p?.stage == "model" && p?.pass == 2 && p?.passes == 3 && p?.done == false, "sheet line: progress")
+    let s = SheetPipeline.parse("{\"progress\": 0.05, \"stage\": \"sources\", \"source_id\": \"s2\", \"access\": \"denied\"}")
+    expect(s?.sourceID == "s2" && s?.access == "denied", "sheet line: a source")
+    let d = SheetPipeline.parse("{\"done\": true, \"sheet\": \"/x/prep-a.sheet.json\", \"readiness\": \"almost\"}")
+    expect(d?.done == true && d?.sheet == "/x/prep-a.sheet.json" && d?.readiness == "almost", "sheet line: done")
+    expect(SheetPipeline.parse("{\"error\": \"too_much\"}")?.error == "too_much" && SheetPipeline.parse("not json") == nil, "sheet line: error, garbage")
+}
+
 deckCapacity097()
 meetingSheet0100()
+meetingSheetUI0100()
+browserCapture0100()
+sheetPipeline0100()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

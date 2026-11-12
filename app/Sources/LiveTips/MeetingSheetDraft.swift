@@ -253,6 +253,9 @@ final class SheetDraft: ObservableObject {
             "use_project_folder": false, "folders": [String](),
         ]
         if let m = blocks.first(where: { $0.type == "qualification" })?.method { r["method"] = m }
+        // 0.10.0 (Meeting Sheet, Google Picker): Google's state and the Drive files already confirmed in Google Picker
+        r["google"] = ["connected": GoogleService.shared.connected,
+                       "copies": GooglePicker.copies(for: sources.compactMap(\.uri), root: model.root)] as [String: Any]
         if let o = out { r["out"] = o }
         if let e = SheetFiles.earlier(for: model) { r["earlier_sheet"] = e }
         return r

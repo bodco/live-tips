@@ -149,6 +149,7 @@ enum SheetCLI {
 
     /// One-shot command on a background thread; done on the main thread. The last JSON object of stdout is `json`.
     static func run(_ cmd: String, request: [String: Any]? = nil, args: [String] = [], done: @escaping (Result) -> Void) {
+        if SheetShots.active { return }      // 0.10.0 (Meeting Sheet, smoke): offscreen pictures never start the sidecar
         var a = args
         if let r = request {
             let path = (stateDir as NSString).appendingPathComponent("\(cmd)-\(UUID().uuidString.prefix(8)).request.json")

@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- 0.10.0 (Meeting Sheet, Google Picker): the page that hosts Google Picker in Pacenote (GooglePicker.swift).
+     The app injects window.PN_PICKER {fileId, token, apiKey, appId, origin, locale, opening, failed} before this runs;
+     nothing here is stored. The Picker opens on the one Drive file of the source (DocsView.setFileIds); when the PM
+     confirms it, drive.file gives Pacenote access to that file only. Messages go to the app through
+     window.webkit.messageHandlers.pacenotePicker: loaded, picked {id, name, mimeType}, cancel, error. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confirm in Google</title>
+<style>
+  :root { --bg: #ffffff; --text: #1d1d1f; --text2: #6e6e73; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1e1e1e; --text: #f5f5f7; --text2: #a1a1a6; } }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px -apple-system, system-ui, sans-serif; }
+  #status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px;
+            text-align: center; color: var(--text2); }
+</style>
+</head>
+<body>
+<div id="status"></div>
+<script>
+  var cfg = window.PN_PICKER || {};
+  var statusEl = document.getElementById("status");
+  statusEl.textContent = cfg.opening || "Opening Google Picker...";
+  function post(o) {
+    try { window.webkit.messageHandlers.pacenotePicker.postMessage(o); } catch (e) { /* outside the app */ }
+  }
+  function fail(why) {
+    statusEl.textContent = (cfg.failed || "Google Picker did not open.") + " (" + why + ")";
+    post({ event: "error", error: String(why) });
+  }
+  function build() {
+    try {
+      var P = google.picker;
+      var view = new P.DocsView(P.ViewId.DOCS)
+        .setFileIds(cfg.fileId)
+        .setIncludeFolders(false)
+        .setMode(P.DocsViewMode.LIST);
+      var picker = new P.PickerBuilder()
+        .addView(view)
+        .setOAuthToken(cfg.token)
+        .setDeveloperKey(cfg.apiKey)
+        .setAppId(cfg.appId)
+        .setOrigin(cfg.origin || window.location.origin)
+        .setLocale(cfg.locale || "en")
+        .enableFeature(P.Feature.SUPPORT_DRIVES)
+        .enableFeature(P.Feature.NAV_HIDDEN)
+        .setSize(Math.max(400, window.innerWidth - 16), Math.max(320, window.innerHeight - 16))
+        .setCallback(function (data) {
+          var action = data[P.Response.ACTION];
+          if (action === P.Action.PICKED) {
+            var d = (data[P.Response.DOCUMENTS] || [])[0] || {};
+            post({ event: "picked", id: d[P.Document.ID] || "", name: d[P.Document.NAME] || "",
+                   mimeType: d[P.Document.MIME_TYPE] || "" });
+          } else if (action === P.Action.CANCEL) {
+            post({ event: "cancel" });
+          }
+        })
+        .build();
+      picker.setVisible(true);
+      statusEl.textContent = "";
+      post({ event: "loaded" });
+    } catch (e) { fail(e && e.message ? e.message : e); }
+  }
+  function onApiLoad() {
+    if (!window.gapi) { fail("api.js"); return; }
+    gapi.load("picker", { callback: build, onerror: function () { fail("picker library"); },
+                          timeout: 20000, ontimeout: function () { fail("timeout"); } });
+  }
+</script>
+<script src="https://apis.google.com/js/api.js" onload="onApiLoad()" onerror="fail('api.js')"></script>
+</body>
+</html>

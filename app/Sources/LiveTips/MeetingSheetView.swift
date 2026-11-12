@@ -177,7 +177,7 @@ struct SheetBlockCard: View {
                 Label(L("sheet.ui.block.empty"), systemImage: "questionmark.circle").font(PN.Font.caption).foregroundStyle(PN.C.pending)
             }
             // 0.10.0 (Meeting Sheet, round 2): a value replaced by a newer one shows as "was X" under the newer fact
-            ForEach(block.facts.filter { $0.supersededBy == nil }) { f in SheetFactRow(doc: doc, fact: f) }
+            ForEach(shownFacts) { f in SheetFactRow(doc: doc, fact: f) }
             if adding {
                 HStack(spacing: 8) {
                     TextField(L("sheet.ui.fact.addPh"), text: $newText).textFieldStyle(.roundedBorder).onSubmit(add)
@@ -190,6 +190,20 @@ struct SheetBlockCard: View {
         .confirmationDialog(L("sheet.ui.block.deleteQ", ["title": block.title]), isPresented: $confirmDelete) {
             Button(L("sheet.ui.block.delete"), role: .destructive) { doc.change { SheetEdit.block(&$0, id: block.id, .delete) } }
             Button(L("common.cancel"), role: .cancel) {}
+        }
+    }
+
+    /// 0.10.0 (Meeting Sheet, smoke): one row per conflict (the mockup S6: both values and Use A / Use B in one box);
+    /// the other side of the pair is not shown a second time with the same box. Replaced facts show as "was X".
+    private var shownFacts: [SheetFact] {
+        var partners = Set<String>()
+        return block.facts.filter { f in
+            guard f.supersededBy == nil else { return false }
+            if f.status == .conflict {
+                if partners.contains(f.id) { return false }
+                partners.formUnion(f.conflictWith ?? [])
+            }
+            return true
         }
     }
 
@@ -516,8 +530,9 @@ struct SheetSourceReportRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                Label(source.access == .ok ? SheetLabels.used(source.used) : a.text, systemImage: source.access == .ok ? (source.used == .skipped || source.used == .notUsed ? "minus.circle" : "checkmark.circle.fill") : a.icon)
-                    .font(PN.Font.caption.weight(.semibold)).foregroundStyle(source.access == .ok ? (source.used == .skipped ? PN.C.pending : PN.C.turn) : a.color)
+                // 0.10.0 (Meeting Sheet, smoke): a cut source is a warning (orange, scissors), not a green "read"
+                Label(source.access == .ok ? SheetLabels.used(source.used) : a.text, systemImage: source.access == .ok ? (source.used == .skipped || source.used == .notUsed ? "minus.circle" : source.used == .truncated ? "scissors" : "checkmark.circle.fill") : a.icon)
+                    .font(PN.Font.caption.weight(.semibold)).foregroundStyle(source.access == .ok ? (source.used == .skipped || source.used == .truncated ? PN.C.pending : PN.C.turn) : a.color)
                 if let f = source.fixAction { Text(SheetLabels.fix(f)).font(PN.Font.caption).foregroundStyle(PN.C.accent) }
             }
         }
@@ -536,7 +551,8 @@ struct SheetVersionsTab: View {
             VStack(alignment: .leading, spacing: 16) {
                 PageCard(spacing: 0) {
                     PageLabel(text: L("sheet.ui.versions")).padding(.bottom, 8)
-                    row(n: (s.versions?.map(\.n).max() ?? 1), at: s.builtAt, route: s.route, note: L("sheet.ui.versions.current"), current: true)
+                    // 0.10.0 (Meeting Sheet, smoke): the current version shows when it was refreshed, not the first build
+                    row(n: (s.versions?.map(\.n).max() ?? 1), at: s.refreshedAt ?? s.builtAt, route: s.route, note: L("sheet.ui.versions.current"), current: true)
                     ForEach(files, id: \.n) { v in
                         Divider()
                         let meta = s.versions?.first { $0.n == v.n }

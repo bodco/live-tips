@@ -171,6 +171,17 @@ func prompterArgs(_ args: [String]) -> PrompterArgs {
 }
 
 let args = CommandLine.arguments
+// 0.10.0 (Meeting Sheet, smoke): `LiveTips --render-sheet-shots <outdir>` draws the Meeting Sheet screens offscreen
+// into PNG files on demo data in <outdir>/work and exits (developer flag, see SheetShots.swift).
+if let i = args.firstIndex(of: "--render-sheet-shots") {
+    let out = i + 1 < args.count ? args[i + 1] : NSTemporaryDirectory() + "pacenote-sheet-shots"
+    SheetShots.prepare(out: out)
+    let app = NSApplication.shared
+    let d = MainActor.assumeIsolated { SheetShots(out: URL(fileURLWithPath: out)) }
+    app.delegate = d
+    app.setActivationPolicy(.accessory)
+    app.run()
+}
 if let i = args.firstIndex(of: "--shots") {
     ShotMode.prepareDemo()
     let app = NSApplication.shared

@@ -34,13 +34,30 @@ calendar:
 links:
   where: the call context and the attachments of the calendar event
   kinds: {doc: Docs API with tabs, sheet: Sheets values of up to 20 sheets and 400 rows each, slides: slide text and speaker notes}
-  file: Other Drive files (PDF, docx) are not read (no restricted scope); the brief's sources line says so.
+  file: >-
+    Other Drive files (PDF, docx, any non Docs/Sheets/Slides file) are not read with the scopes above (no restricted
+    scope). 0.10.0: the source shows "No access" with "Confirm in Google"; see picker. Until then the brief's sources
+    line says the file was not read.
   accounts: each link is tried with every connected account until one can open it
   copy: <project>/live/google/google-<kind>-<id>.md, a Markdown copy with the link and time in the first line; kept on this Mac
   prompt: >-
     The preparation gets the copies as files the PM added and the line "Google links already read through the PM's
     Google account: <link> -> <file>"; it never fetches those links. Links no account could open keep the old rule:
     a public export link with WebFetch, or "needs a sign-in" in the sources line.
+picker:
+  # 0.10.0 (Meeting Sheet, Google Picker): drive.file, the scope of the export, also confirms one linked Drive file
+  scope: drive.file (already on the consent screen; an account without it is asked again with include_granted_scopes)
+  when: only on the PM's click on "Confirm in Google" of a Drive file source that the scopes above cannot read
+  how: >-
+    A Pacenote window hosts Google Picker (Resources/google/picker.html, https://apis.google.com/js/api.js) with the
+    account's token, setAppId(<Cloud project number>), setDeveloperKey(<Picker API key>) and a DocsView with
+    setFileIds(<the link's file id>), so it opens on that file. After the PM confirms it, drive.file covers that file
+    only; the app downloads it (files/<id>?alt=media, or the export of a Google-native file as text or CSV).
+  copy: <project>/live/google/google-file-<id16>.<ext>; the source becomes ok with that copy (sheet/sources.py picked_copy)
+  build: >-
+    PACENOTE_GOOGLE_PICKER_API_KEY and PACENOTE_GOOGLE_APP_ID from the build machine's environment go into
+    Resources/google_oauth.json (bundle.sh); never in git. Without them "Confirm in Google" opens the file in the
+    browser with one line "Google Picker is not set up in this build" and the source stays "No access".
 export:
   how: the export text as Word (.docx, the same as Download .docx), uploaded with conversion to a Google Doc
   where: My Drive of the chosen account; the doc opens in the browser

@@ -1616,7 +1616,7 @@ Remove, which also revokes Pacenote's access at Google.
 | What | How it works |
 |---|---|
 | Calendars | The main calendar of each account is on; tick the others. Events from 3 hours ago to 36 hours ahead, refreshed every 5 minutes. The same event that macOS also shows (Internet Accounts) appears once. Outlook and other calendars still come through macOS |
-| Links for the brief | A Google Docs, Sheets or Slides link in What matters or the call context, and a document attached to the invitation, is read through the first account that can open it, also when it is private. A Markdown copy goes to `<project>/live/google/`; the brief reads the copy. Other Drive files (PDF, Word) are not read |
+| Links for the brief | A Google Docs, Sheets or Slides link in What matters or the call context, and a document attached to the invitation, is read through the first account that can open it, also when it is private. A Markdown copy goes to `<project>/live/google/`; the brief reads the copy. Other Drive files (PDF, Word) are not read, except one you confirm with Confirm in Google in the Meeting Sheet's Sources (Google Picker, 0.10.0) |
 | Export | Export on a past call has Google Docs: a new doc in the chosen account, opened in the browser |
 | Google Meet | On a past call, "..." > Google Meet record saves the participants and, if transcription was on in Meet, the Meet transcript as `<call>.meet.md` next to the call. Your own transcript does not change |
 
@@ -1988,8 +1988,12 @@ text, Retry, Open in the browser. A link you type into the goal or into "Anythin
 
 Google Docs, Sheets and Slides are read with your Google account as before. Other Drive files (a PDF or a Word file
 behind a `/file/d/` link) are not readable with those permissions: such a source says No access with **Confirm in
-Google**. Today the button opens the file in the browser so you can save it and add it as a file; a Google file
-picker is planned for this step.
+Google**. The button opens Google Picker on that one file (the file from the link is already selected); confirm it
+and Pacenote reads only that file, keeps its copy in the project's `live/google` folder and the source turns Access
+ok. This uses the same "files you create or pick" Google permission (`drive.file`) as the export to Google Docs;
+Pacenote never asks for access to all of your Drive. If Google Picker is not set up in your build, the button opens
+the file in the browser and says so in one line; save the file and add it as a file. If your Google account was
+connected without that permission, Pacenote asks Google once more, then press Confirm in Google again.
 
 **Size.** Before the run the **Size** step counts the sources in tokens for the chosen route and compares them with
 the model's window (from the providers' documentation, `rules/ai.yaml > windows`), keeping room for the answer. It

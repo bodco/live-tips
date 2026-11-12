@@ -16,6 +16,14 @@ Pacenote. Earlier versions are described in the commit messages and in
   the "sheet is ready" notification opens the call's Meeting Sheet, and a "·" typed alone as a person no longer
   closes the wizard.
 
+- **Confirm in Google opens Google Picker on the file (2026-11-12, owner):** a linked Drive file that is not a Google
+  Doc, Sheet or Slides (a PDF or Word file behind a `/file/d/` link) shows No access with **Confirm in Google**. The
+  button now opens Google Picker on that one file; after you confirm it, Pacenote reads only that file, keeps its copy
+  in the project's `live/google` folder and the source turns Access ok. No new Google permission: Pacenote uses the
+  same "files you create or pick" access as the export to Google Docs, never access to all of your Drive. In a build
+  without Google Picker set up the button opens the file in the browser and says so in one line; the source stays No
+  access.
+
 - **Meeting Sheet replaces the brief, beta (2026-11-12, owner):** preparing a call now gives one document, the
   Meeting Sheet, and a readiness check, instead of a brief. It lives on the upcoming call's page in its own tabs:
   Setup, Meeting Sheet, Readiness, Sources, Versions, Tasks, Earlier. Every call type except Transcript is prepared

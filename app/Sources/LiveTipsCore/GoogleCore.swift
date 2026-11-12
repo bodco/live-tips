@@ -380,3 +380,131 @@ public enum DriveUpload {
         return d
     }
 }
+
+// MARK: - Google Picker (0.10.0, Meeting Sheet)
+
+// 0.10.0 (Meeting Sheet, Google Picker): a Drive file link (PDF, Word, any non Docs/Sheets/Slides file) is not read
+// with the read-only Docs, Sheets and Slides scopes, and drive.readonly is restricted (CASA). "Confirm in Google"
+// opens Google Picker on that one file with the drive.file token; after the PM confirms it the app may read that file
+// only. rules/google.yaml > picker. Pure helpers here (CoreChecks); the window and the network are in the app.
+
+/// The Picker's two build-time values: the API key (Google Picker API only) and the App ID (the Cloud project number).
+/// bundle.sh writes them next to the OAuth client in Resources/google_oauth.json from PACENOTE_GOOGLE_PICKER_API_KEY
+/// and PACENOTE_GOOGLE_APP_ID; never in git.
+public struct GooglePickerKeys: Equatable {
+    public var apiKey: String
+    public var appID: String
+    public init(apiKey: String, appID: String) { self.apiKey = apiKey; self.appID = appID }
+
+    /// {"picker_api_key","app_id"} of google_oauth.json; nil when either is missing or empty (the Picker is off).
+    public static func parse(_ data: Data) -> GooglePickerKeys? {
+        guard let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        let key = ((o["picker_api_key"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let app: String
+        if let n = o["app_id"] as? NSNumber { app = n.stringValue } else { app = ((o["app_id"] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard !key.isEmpty, !app.isEmpty, app.allSatisfy(\.isNumber) else { return nil }
+        return GooglePickerKeys(apiKey: key, appID: app)
+    }
+}
+
+public enum GooglePickerPlan {
+    /// What "Confirm in Google" does for one source.
+    public enum Step: Equatable {
+        case picker(account: String)      // open the Picker with this account's token
+        case consent(account: String)     // the account lacks drive.file: sign in again for it, then the Picker
+        case connect                      // no Google account at all
+        case browser(reason: String)      // the honest fallback: open the file in the browser, the source stays "No access"
+        case notDrive                     // not a Drive file link: nothing to confirm here
+    }
+
+    /// The Drive file id of a link that the Picker can confirm (drive.google.com/file/d/<id> or open?id=<id>).
+    public static func fileID(_ url: String) -> String? {
+        guard let l = GoogleLink.parse(url), l.kind == .file else { return nil }
+        return l.id
+    }
+
+    /// keys nil = the build has no Picker values -> the browser. Accounts: the first one with drive.file wins
+    /// (`preferred` first when it is one of them); none with it -> consent for the first account.
+    public static func decide(url: String, keys: GooglePickerKeys?, accounts: [GoogleAccount], preferred: String? = nil) -> Step {
+        guard fileID(url) != nil else { return .notDrive }
+        guard keys != nil else { return .browser(reason: "picker_not_set_up") }
+        guard let first = accounts.first else { return .connect }
+        let withFile = accounts.filter { $0.has(GoogleScopes.export) }
+        if let p = preferred, withFile.contains(where: { $0.email == p }) { return .picker(account: p) }
+        if let a = withFile.first { return .picker(account: a.email) }
+        return .consent(account: first.email)
+    }
+
+    /// The JSON the bundled picker page reads (window.PN_PICKER). The token is in memory only; it never reaches a file.
+    public static func config(fileID: String, token: String, keys: GooglePickerKeys, origin: String, locale: String) -> [String: String] {
+        ["fileId": fileID, "token": token, "apiKey": keys.apiKey, "appId": keys.appID, "origin": origin,
+         "locale": locale == "uk" ? "uk" : "en"]
+    }
+
+    /// The picker page's message to the app (WKScriptMessageHandler "pacenotePicker").
+    public enum Message: Equatable { case picked(id: String, name: String, mimeType: String), cancelled, loaded, failed(String) }
+
+    public static func message(_ body: Any) -> Message? {
+        guard let o = body as? [String: Any], let k = o["event"] as? String else { return nil }
+        switch k {
+        case "picked":
+            guard let id = o["id"] as? String, !id.isEmpty else { return .failed("no file id") }
+            return .picked(id: id, name: (o["name"] as? String) ?? "", mimeType: (o["mimeType"] as? String) ?? "")
+        case "cancel": return .cancelled
+        case "loaded": return .loaded
+        case "error": return .failed((o["error"] as? String) ?? "unknown")
+        default: return nil
+        }
+    }
+}
+
+/// The local copy of a confirmed Drive file: <project>/live/google/google-file-<id16>.<ext>, like the other Google copies.
+public enum GoogleDriveCopy {
+    /// Google-native files are exported (Docs and Slides as text, Sheets as CSV); others are downloaded as they are.
+    public static func export(for mimeType: String) -> (mime: String, ext: String)? {
+        switch mimeType {
+        case "application/vnd.google-apps.document": return ("text/plain", "txt")
+        case "application/vnd.google-apps.presentation": return ("text/plain", "txt")
+        case "application/vnd.google-apps.spreadsheet": return ("text/csv", "csv")
+        default: return nil
+        }
+    }
+
+    static let extByMime: [String: String] = [
+        "application/pdf": "pdf", "text/plain": "txt", "text/markdown": "md", "text/csv": "csv", "text/html": "html",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+        "application/rtf": "rtf", "application/msword": "doc", "application/json": "json",
+    ]
+
+    /// The extension of the copy: the export's, else the file name's, else the MIME type's, else "bin".
+    public static func ext(mimeType: String, name: String) -> String {
+        if let e = export(for: mimeType) { return e.ext }
+        let n = (name as NSString).pathExtension.lowercased()
+        if !n.isEmpty, n.count <= 5, n.allSatisfy({ $0.isLetter || $0.isNumber }) { return n }
+        return extByMime[mimeType] ?? "bin"
+    }
+
+    public static func fileName(id: String, mimeType: String, name: String) -> String {
+        "google-file-\(id.prefix(16)).\(ext(mimeType: mimeType, name: name))"
+    }
+
+    /// An existing confirmed copy of this file id in `folder` (any extension), the newest first; nil when none.
+    public static func existing(in folder: String, id: String) -> String? {
+        let prefix = "google-file-\(id.prefix(16))."
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []
+        let hits = names.filter { $0.hasPrefix(prefix) && !$0.hasSuffix(".part") }.map { (folder as NSString).appendingPathComponent($0) }
+        func m(_ p: String) -> Date { ((try? FileManager.default.attributesOfItem(atPath: p))?[.modificationDate] as? Date) ?? .distantPast }
+        return hits.max { m($0) < m($1) }
+    }
+
+    /// The Drive API URL that gives the file's bytes (alt=media) or its export (Google-native types).
+    public static func downloadURL(id: String, mimeType: String) -> String {
+        let base = "https://www.googleapis.com/drive/v3/files/\(id)"
+        if let e = export(for: mimeType) {
+            return base + "/export?mimeType=" + (e.mime.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? e.mime)
+        }
+        return base + "?alt=media&supportsAllDrives=true"
+    }
+}

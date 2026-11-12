@@ -553,3 +553,11 @@ final class SheetRunner: ObservableObject {
         set(0, "")
     }
 }
+
+extension SheetRunner {
+    // 0.10.0 (Meeting Sheet, smoke): the route question for the offscreen pictures only (SheetShots); starts nothing.
+    func shotQuestion(from: String, to: String, reason: String, call: StartCallModel) {
+        guard let r = call.prepRequest() else { return }
+        pendingSwitch = PendingSwitch(from: from, to: to, reason: reason, job: Job(prep: r, base: "", refresh: false, interactive: true, route: to))
+    }
+}

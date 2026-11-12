@@ -36,10 +36,20 @@ ENG="$APP/Contents/Resources/engine"; mkdir -p "$ENG/spikes/m0"
 rsync -a --exclude __pycache__ --exclude generated "$HERE/../rules/" "$ENG/rules/"
 rsync -a --exclude __pycache__ "$HERE/../spikes/m0/livetips_m0" "$ENG/spikes/m0/"
 cp "$HERE/Resources/setup.sh" "$APP/Contents/Resources/setup.sh"
+# 0.10.0 (Meeting Sheet, Google Picker): the local page that hosts Google Picker (GooglePicker.swift)
+mkdir -p "$APP/Contents/Resources/google"
+cp "$HERE/Resources/google/picker.html" "$APP/Contents/Resources/google/picker.html"
 # 0.9.1 (rules/google.yaml > auth.client): the Google OAuth client comes from the build machine's environment, never git
 if [ -n "${PACENOTE_GOOGLE_CLIENT_ID:-}" ] && [ -n "${PACENOTE_GOOGLE_CLIENT_SECRET:-}" ]; then
-  python3 -c 'import json,os; print(json.dumps({"client_id": os.environ["PACENOTE_GOOGLE_CLIENT_ID"], "client_secret": os.environ["PACENOTE_GOOGLE_CLIENT_SECRET"]}))' \
+  # 0.10.0 (Meeting Sheet, Google Picker): PACENOTE_GOOGLE_PICKER_API_KEY and PACENOTE_GOOGLE_APP_ID (the Cloud
+  # project number) go into the same file when both are set; without them "Confirm in Google" opens the file in the browser
+  python3 -c 'import json,os; o={"client_id": os.environ["PACENOTE_GOOGLE_CLIENT_ID"], "client_secret": os.environ["PACENOTE_GOOGLE_CLIENT_SECRET"]}
+k=os.environ.get("PACENOTE_GOOGLE_PICKER_API_KEY",""); a=os.environ.get("PACENOTE_GOOGLE_APP_ID","")
+o.update({"picker_api_key": k, "app_id": a} if k and a else {}); print(json.dumps(o))' \
     > "$APP/Contents/Resources/google_oauth.json"
+  if [ -z "${PACENOTE_GOOGLE_PICKER_API_KEY:-}" ] || [ -z "${PACENOTE_GOOGLE_APP_ID:-}" ]; then
+    echo "google: no Picker key or App ID in the environment, Confirm in Google opens the file in the browser in this build"
+  fi
 else
   echo "google: no OAuth client in the environment, Google sign-in is off in this build"
 fi

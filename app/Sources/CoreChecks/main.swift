@@ -1416,6 +1416,57 @@ func sheetHardening0100() {
     try? FileManager.default.removeItem(at: tmp)
 }
 
+// 0.10.0 (Meeting Sheet, Google Picker): the Drive file id, the Picker values of the build, the fallback decision,
+// the page config, the page's messages and the local copy's name. Invented accounts only.
+func googlePicker0100() {
+    let url = "https://drive.google.com/file/d/1FileIdABCDEFGHIJKL/view?usp=sharing"
+    expect(GooglePickerPlan.fileID(url) == "1FileIdABCDEFGHIJKL", "picker: file id from /file/d/")
+    expect(GooglePickerPlan.fileID("https://drive.google.com/open?id=1OpenIdABCDEFGHIJ") == "1OpenIdABCDEFGHIJ", "picker: file id from open?id=")
+    expect(GooglePickerPlan.fileID("https://docs.google.com/document/d/1AbcDEFghijkLMNOP_qrs/edit") == nil, "picker: a Doc is not a Picker file")
+    expect(GooglePickerPlan.fileID("https://drive.google.com/file/d/short/view") == nil, "picker: short ids are not ids")
+    // the build's values: both or nothing; the App ID is the project number
+    let keys = GooglePickerKeys.parse(Data(#"{"client_id":"c","client_secret":"s","picker_api_key":"k-test","app_id":"123456789012"}"#.utf8))
+    expect(keys == GooglePickerKeys(apiKey: "k-test", appID: "123456789012"), "picker: keys from google_oauth.json")
+    expect(GooglePickerKeys.parse(Data(#"{"picker_api_key":"k","app_id":123456789012}"#.utf8))?.appID == "123456789012", "picker: numeric app id")
+    expect(GooglePickerKeys.parse(Data(#"{"client_id":"c","client_secret":"s"}"#.utf8)) == nil, "picker: no keys = off")
+    expect(GooglePickerKeys.parse(Data(#"{"picker_api_key":"k","app_id":""}"#.utf8)) == nil, "picker: empty app id = off")
+    expect(GooglePickerKeys.parse(Data(#"{"picker_api_key":"k","app_id":"pacenote-project"}"#.utf8)) == nil, "picker: a project id is not the project number")
+    // the decision
+    let k = GooglePickerKeys(apiKey: "k", appID: "1")
+    let full = GoogleAccount(email: "emily@example.com", refreshToken: "r", scopes: GoogleScopes.all)
+    let noFile = GoogleAccount(email: "mike@example.com", refreshToken: "r", scopes: GoogleScopes.identity + GoogleScopes.files)
+    expect(GooglePickerPlan.decide(url: url, keys: nil, accounts: [full]) == .browser(reason: "picker_not_set_up"), "picker: no keys = browser fallback")
+    expect(GooglePickerPlan.decide(url: url, keys: k, accounts: []) == .connect, "picker: no account = connect")
+    expect(GooglePickerPlan.decide(url: url, keys: k, accounts: [noFile, full]) == .picker(account: "emily@example.com"), "picker: the account with drive.file")
+    expect(GooglePickerPlan.decide(url: url, keys: k, accounts: [noFile]) == .consent(account: "mike@example.com"), "picker: drive.file missing = consent")
+    expect(GooglePickerPlan.decide(url: "https://docs.google.com/document/d/1AbcDEFghijkLMNOP_qrs/edit", keys: k, accounts: [full]) == .notDrive, "picker: a Doc link")
+    let second = GoogleAccount(email: "jake@example.com", refreshToken: "r", scopes: GoogleScopes.all)
+    expect(GooglePickerPlan.decide(url: url, keys: k, accounts: [full, second], preferred: "jake@example.com") == .picker(account: "jake@example.com"), "picker: preferred account")
+    expect(!GoogleScopes.all.contains { $0.hasSuffix("/drive") || $0.hasSuffix("drive.readonly") }, "picker: still no restricted scope")
+    // the page config and messages
+    let cfg = GooglePickerPlan.config(fileID: "1FileIdABCDEFGHIJKL", token: "t", keys: k, origin: "https://pacenote.bodco.pm", locale: "uk")
+    expect(cfg["fileId"] == "1FileIdABCDEFGHIJKL" && cfg["appId"] == "1" && cfg["apiKey"] == "k" && cfg["locale"] == "uk" && cfg["origin"] == "https://pacenote.bodco.pm", "picker: page config")
+    expect(GooglePickerPlan.config(fileID: "x", token: "t", keys: k, origin: "o", locale: "de")["locale"] == "en", "picker: locale falls back to en")
+    expect(GooglePickerPlan.message(["event": "picked", "id": "1FileIdABCDEFGHIJKL", "name": "Plan.pdf", "mimeType": "application/pdf"])
+           == .picked(id: "1FileIdABCDEFGHIJKL", name: "Plan.pdf", mimeType: "application/pdf"), "picker: picked message")
+    expect(GooglePickerPlan.message(["event": "cancel"]) == .cancelled && GooglePickerPlan.message(["event": "loaded"]) == .loaded, "picker: cancel and loaded")
+    expect(GooglePickerPlan.message(["event": "picked"]) == .failed("no file id") && GooglePickerPlan.message("junk") == nil, "picker: bad messages")
+    // the local copy
+    expect(GoogleDriveCopy.fileName(id: "1FileIdABCDEFGHIJKL", mimeType: "application/pdf", name: "Plan.pdf") == "google-file-1FileIdABCDEFGHI.pdf", "picker: copy name")
+    expect(GoogleDriveCopy.ext(mimeType: "application/vnd.google-apps.spreadsheet", name: "Budget") == "csv", "picker: Sheets export as CSV")
+    expect(GoogleDriveCopy.ext(mimeType: "application/octet-stream", name: "notes") == "bin" && GoogleDriveCopy.ext(mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", name: "Brief") == "docx", "picker: ext from MIME")
+    expect(GoogleDriveCopy.downloadURL(id: "abc", mimeType: "application/pdf").hasSuffix("/files/abc?alt=media&supportsAllDrives=true"), "picker: download URL")
+    expect(GoogleDriveCopy.downloadURL(id: "abc", mimeType: "application/vnd.google-apps.document").hasSuffix("/files/abc/export?mimeType=text%2Fplain"), "picker: export URL")
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pn-picker-\(UUID().uuidString)").path
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    expect(GoogleDriveCopy.existing(in: dir, id: "1FileIdABCDEFGHIJKL") == nil, "picker: no copy yet")
+    let copy = (dir as NSString).appendingPathComponent("google-file-1FileIdABCDEFGHI.pdf")
+    FileManager.default.createFile(atPath: copy, contents: Data("x".utf8))
+    FileManager.default.createFile(atPath: (dir as NSString).appendingPathComponent("google-file-1FileIdABCDEFGHI.txt.part"), contents: Data())
+    expect(GoogleDriveCopy.existing(in: dir, id: "1FileIdABCDEFGHIJKL") == copy, "picker: the confirmed copy is found")
+    try? FileManager.default.removeItem(atPath: dir)
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -1423,5 +1474,6 @@ browserCapture0100()
 sheetPipeline0100()
 sheetFixer0100()
 sheetHardening0100()
+googlePicker0100()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

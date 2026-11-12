@@ -221,7 +221,7 @@ struct SheetQuickDone: View {
                 ForEach(s.shownBlocks.prefix(6)) { b in
                     HStack(alignment: .top, spacing: 12) {
                         Text(b.title).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: 140, alignment: .leading)
-                        Text(b.facts.prefix(2).map(\.text).joined(separator: "\n")).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(3)
+                        Text(b.facts.filter { $0.supersededBy == nil }.prefix(2).map(\.text).joined(separator: "\n"))      // 0.10.0 (smoke): no replaced values.font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(3)
                     }
                 }
                 HStack {
@@ -747,7 +747,12 @@ struct SheetDraftSourceRow: View {
     @ViewBuilder private var action: some View {
         switch source.fix {
         case "connect_notion", "connect_google": Button(SheetLabels.fix(FixAction(rawValue: source.fix!))) { SettingsWindow.show(tab: "integrations") }.buttonStyle(.pnSecondary)
-        case "confirm_google": Button(SheetLabels.fix(.confirmGoogle)) { if let u = source.uri, let url = URL(string: u) { NSWorkspace.shared.open(url) }; draft.checkSources() }.buttonStyle(.pnSecondary)
+        // 0.10.0 (Meeting Sheet, Google Picker): Google Picker on this one Drive file; a read copy makes the source ok
+        case "confirm_google": Button(SheetLabels.fix(.confirmGoogle)) {
+            GooglePicker.confirm(url: source.uri ?? "", root: draft.model.root) { o in
+                switch o { case .copied: draft.checkSources(); case .note(let m): draft.note = m; case .cancelled: break }
+            }
+        }.buttonStyle(.pnSecondary)
         case "paste_text", "save_as_pdf": Button(SheetLabels.fix(.pasteText)) { pasting = true }.buttonStyle(.pnSecondary)
         case "retry": Button(SheetLabels.fix(.retry)) { draft.checkSources() }.buttonStyle(.pnSecondary)
         case "open_in_browser": Button(SheetLabels.fix(.openInBrowser)) { if let u = source.uri, let url = URL(string: u) { NSWorkspace.shared.open(url) } }.buttonStyle(.pnSecondary)
@@ -784,14 +789,18 @@ struct SheetLinkedInCard: View {
             Text(L("sheet.ui.li.state." + state)).font(PN.Font.body.weight(.semibold))
             Text(L("sheet.ui.li.state." + state + ".body")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             if state != "read" {
+                // 0.10.0 (Meeting Sheet, smoke): two rows, the buttons keep their width (one row wrapped and cut
+                // "Open in Pacenote browser" in the card, worse in Ukrainian)
                 HStack(spacing: 8) {
-                    Button(L("sheet.ui.li.pdf")) { way = "pdf" }.buttonStyle(.pnSecondary)
+                    Button(L("sheet.ui.li.pdf")) { way = "pdf" }.buttonStyle(.pnSecondary).fixedSize()
                     if SheetBrowserBridge.available {
-                        Button(L("sheet.ui.li.browser")) { if let u = source.uri { SheetBrowserBridge.open(u, draft: draft, replacing: source.id) } }.buttonStyle(.pnSecondary)
+                        Button(L("sheet.ui.li.browser")) { if let u = source.uri { SheetBrowserBridge.open(u, draft: draft, replacing: source.id) } }.buttonStyle(.pnSecondary).fixedSize()
                     }
-                    Button(L("sheet.ui.li.paste")) { way = "paste" }.buttonStyle(.pnSecondary)
-                    Button(L("sheet.ui.li.hand")) { way = "hand" }.buttonStyle(.pnSecondary)
-                    Button(L("sheet.ui.li.skip")) { source.checked = false; source.reason = L("sheet.ui.li.skipped") }.buttonStyle(.pnTertiary)
+                }
+                HStack(spacing: 8) {
+                    Button(L("sheet.ui.li.paste")) { way = "paste" }.buttonStyle(.pnSecondary).fixedSize()
+                    Button(L("sheet.ui.li.hand")) { way = "hand" }.buttonStyle(.pnSecondary).fixedSize()
+                    Button(L("sheet.ui.li.skip")) { source.checked = false; source.reason = L("sheet.ui.li.skipped") }.buttonStyle(.pnTertiary).fixedSize()
                 }
             }
             switch way {

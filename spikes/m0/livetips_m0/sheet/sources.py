@@ -5,7 +5,9 @@
 - Access per source: access ok | denied | unsupported | pending, access_reason, fix_action (and fix_actions for
   LinkedIn). Google is read by the app through OAuth: the request carries the copies the app already fetched
   (google.copies) or a status hint (google.status: ok | denied | not_found); a Drive file nobody can open is
-  "denied" with confirm_google (drive.file + Picker). Notion without a connection: connect_notion. LinkedIn: pending
+  "denied" with confirm_google (drive.file + Google Picker) until the PM confirms it there; the app then keeps a copy
+  in <project>/live/google/google-file-<id16>.<ext> and the source is "ok" with that copy (picked_copy).
+  Notion without a connection: connect_notion. LinkedIn: pending
   with save_as_pdf, open_in_browser, paste_text, fill_by_hand. A web page: ok, read when the sheet is built (the
   robots.txt check lives in the web module of phase 6: web_allowed() is the hook).
 - Candidates from the project folder with a "why" (same contact, fresh, title match, previous sheet, newer version),
@@ -124,6 +126,24 @@ def _lookup(d: dict, s: dict) -> Optional[str]:
     return None
 
 
+def picked_copy(req: dict, s: dict) -> Optional[str]:
+    """0.10.0 (Meeting Sheet, Google Picker): the local copy of a Drive file the PM confirmed in Google Picker,
+    <project>/live/google/google-file-<id16>.<ext> (GoogleDriveCopy in LiveTipsCore/GoogleCore.swift), newest first.
+    None until the file was confirmed: the source stays denied with confirm_google."""
+    g = google_link(s.get("uri") or s.get("url") or "")
+    if not g or g[0] != "file":
+        return None
+    project = req.get("project") or {}
+    root = os.path.expanduser(project.get("root") or req.get("root") or "")
+    live = req.get("live") or (os.path.join(root, "live") if root else "")
+    folder = os.path.join(os.path.expanduser(live), "google") if live else ""
+    if not folder or not os.path.isdir(folder):
+        return None
+    prefix = f"google-file-{g[1][:16]}."
+    hits = [os.path.join(folder, f) for f in os.listdir(folder) if f.startswith(prefix) and not f.endswith(".part")]
+    return max(hits, key=os.path.getmtime) if hits else None
+
+
 def _mtime(path: str) -> Optional[str]:
     """The source's date: the date in its name (a dated note or status), else the file's time (prepcontext.file_date)."""
     if not os.path.exists(path):
@@ -170,6 +190,8 @@ def check(s: dict, req: dict, texts: Dict[str, str], route: str, windows: dict) 
                 s["fix_action"] = "paste_text" if t != "linkedin_manual" else "fill_by_hand"
         elif t in ("gdoc", "gsheet", "gslides", "drive_file"):
             copy = _lookup(g.get("copies") or {}, s)
+            if not (copy and os.path.exists(os.path.expanduser(copy))) and t == "drive_file":
+                copy = picked_copy(req, s) or copy      # 0.10.0 (Google Picker): confirmed earlier, on this Mac
             status = _lookup(g.get("status") or {}, s)
             if copy and os.path.exists(os.path.expanduser(copy)):
                 r = readers.read(copy)

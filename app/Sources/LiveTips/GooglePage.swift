@@ -33,6 +33,9 @@ struct GooglePage: View {
                 }
                 Text(L("google.unverified")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 Text(L("google.what")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                // 0.10.0 (Meeting Sheet, Google Picker): whether "Confirm in Google" can open Google Picker in this build
+                Text(L(GooglePickerConfig.load() == nil ? "sheet.google.page.off" : "sheet.google.page.on")).font(PN.Font.caption)
+                    .foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             .padding(20)
             .frame(maxWidth: 640, alignment: .leading)

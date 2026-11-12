@@ -333,6 +333,8 @@ final class GoogleService: ObservableObject {
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         var files: [(GoogleLink, String)] = [], problems: [String] = []
         for l in links {
+            // 0.10.0 (Meeting Sheet, Google Picker): a Drive file the PM confirmed in Google Picker is already on this Mac
+            if l.kind == .file, let p = GoogleDriveCopy.existing(in: folder, id: l.id) { files.append((l, p)); continue }
             var got: String?, last = ""
             for a in accounts where a.has(GoogleScopes.files) {
                 do { got = try await read(l, account: a.email); break } catch { last = error.localizedDescription }
@@ -361,6 +363,35 @@ final class GoogleService: ObservableObject {
         case .file:
             throw GoogleError.noAccess(L("google.err.fileKind"))
         }
+    }
+
+    // MARK: a Drive file confirmed in Google Picker
+
+    /// 0.10.0 (Meeting Sheet, Google Picker): downloads one Drive file the PM confirmed in Google Picker (drive.file
+    /// covers exactly that file) into `folder` as google-file-<id16>.<ext>. Google-native files are exported as text
+    /// or CSV. Returns the local path.
+    func downloadDriveFile(id: String, account: String, folder: String, mimeType: String = "", name: String = "") async throws -> String {
+        let token = try await accessToken(account)
+        var mime = mimeType, title = name
+        if mime.isEmpty || title.isEmpty {
+            let m = try await get("https://www.googleapis.com/drive/v3/files/\(id)?fields=id,name,mimeType&supportsAllDrives=true", token: token)
+            if mime.isEmpty { mime = (m["mimeType"] as? String) ?? "" }
+            if title.isEmpty { title = (m["name"] as? String) ?? "" }
+        }
+        var r = URLRequest(url: URL(string: GoogleDriveCopy.downloadURL(id: id, mimeType: mime))!)
+        r.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+        r.timeoutInterval = 120
+        let (d, resp) = try await URLSession.shared.data(for: r)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200 else {
+            let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] ?? [:]
+            throw GoogleError.http(code, ((o["error"] as? [String: Any])?["message"] as? String) ?? "")
+        }
+        try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        let path = (folder as NSString).appendingPathComponent(GoogleDriveCopy.fileName(id: id, mimeType: mime, name: title))
+        try d.write(to: URL(fileURLWithPath: path), options: .atomic)
+        UsageLog.log("google_picker_copy")
+        return path
     }
 
     // MARK: export

@@ -169,6 +169,7 @@ _REPEAT = re.compile(r"((?:\w[\w'’-]*\W+){1,4}?)\1{2,}")
 
 PROMPT_HEAD: list[str] = []   # first two words of the Whisper prompt, set in main()
 GLOSSARY: list[str] = []      # 0.9.7: the call's terms added to the Whisper prompt (main(), from the brief)
+DICT_RULES: list = []         # 0.10.0: the PM's dictionary, "heard as" variants -> the correct word (main())
 
 
 def clean_text(text: str, prompt_words: set[str]) -> str:
@@ -1986,18 +1987,80 @@ def sheet_slides(sheet: dict, me_names=()) -> dict | None:
     return {"title": _s(sheet.get("title")), "slides": slides, "sheet": True}
 
 
-def sheet_standup(sheet: dict) -> dict | None:
-    """Stand-up: the PM's update (since, today, blockers) and whom to ask (waiting on others)."""
+# 0.10.0 (Meeting Sheet, fix 2026-11-12, owner): a line about the sources ("the call context mentions an email;
+# maybe it needs handling") is never a stand-up line. The same patterns as spikes/m0/livetips_m0/sheet/standup.py
+# (META_PATTERNS); tests/test_standup_fix77.py keeps the two in step.
+STANDUP_META_PATTERNS = [
+    r"\b(?:call )?(?:context|sources?|invitation|invite|documents?|notes|transcripts?)\s+(?:mentions?|mentioned|says?|said|"
+    r"do(?:es)? not|don't|doesn't|has no|have no|contains?|refers?|indicates?|gives? no|lacks?)\b",
+    r"\b(?:is|are|was|were)\s+(?:not\s+)?(?:mentioned|given|specified|stated|provided|indicated)\b",
+    r"\bnot\s+(?:given|specified|stated|provided|indicated|clear|known)\b",
+    r"\b(?:no|nothing)\s+(?:data|information|details|info)\b",
+    r"\b(?:maybe|perhaps|possibly|might need|may need|unclear)\b",
+    r"\bin the (?:sources|context|invitation|documents)\b",
+    r"(?:^|\s)(?:у|в)\s+(?:контексті|джерелах|запрошенні|документах|нотатках|транскрипті)",
+    r"згадан|згадує|згадуєть",
+    r"(?:^|\s)не\s+(?:вказан|зазначен|сказан|наведен|уточнен|відом)",
+    r"немає\s+(?:даних|інформації|деталей|відомостей)",
+    r"(?:^|\s)(?:можливо|ймовірно|неясно|незрозуміло)(?:\s|,|$)",
+    r"джерел\w*\s+(?:не|немає)",
+]
+STANDUP_META = re.compile("|".join(STANDUP_META_PATTERNS), re.I | re.U)
+
+
+def standup_line_ok(f: dict) -> bool:
+    """A real stand-up line: not "not found" (sheet_block_facts skips those) and not a sentence about the sources."""
+    return not (STANDUP_META.search(_s(f.get("text"))) or STANDUP_META.search(_s(f.get("label"))))
+
+
+def tracker_on_me(sheet: dict, live_dir: Path | None = None, limit: int = 5) -> list[str]:
+    """The PM's open Tracker items: the list the build put in the sheet (sheet.tracker.on_me, every register of the
+    project or workspace), else this call's own register (<live>/commitments.jsonl, owner me)."""
+    tr = sheet.get("tracker") if isinstance(sheet.get("tracker"), dict) else {}
+    out = [_s(x.get("text")) for x in tr.get("on_me") or [] if isinstance(x, dict) and _s(x.get("text"))]
+    if not out and live_dir is not None:
+        items: dict = {}
+        try:
+            for ln in (Path(live_dir) / "commitments.jsonl").read_text(encoding="utf-8", errors="replace").splitlines():
+                try:
+                    e = json.loads(ln)
+                except ValueError:
+                    continue
+                if not isinstance(e, dict):
+                    continue
+                op, cid = e.get("op"), e.get("id")
+                if op == "add" and cid not in items:
+                    items[cid] = {"text": _s(e.get("text")), "owner": _s(e.get("owner")) or "me", "open": True}
+                elif cid in items and op in ("done", "drop"):
+                    items[cid]["open"] = False
+                elif cid in items and op == "reopen":
+                    items[cid]["open"] = True
+                elif cid in items and op == "edit":
+                    for k in ("text", "owner"):
+                        if e.get(k) is not None:
+                            items[cid][k] = _s(e.get(k))
+        except OSError:
+            items = {}
+        out = [x["text"] for x in reversed(list(items.values())) if x["open"] and x["text"] and x["owner"].lower() == "me"]
+    return out[:limit]
+
+
+def sheet_standup(sheet: dict, live_dir: Path | None = None) -> dict | None:
+    """Stand-up: the PM's update (since, today, blockers) and whom to ask (waiting on others). Only real lines: no
+    "not found", no sentence about the sources; with none at all, the PM's open Tracker items (fallback)."""
     if sheet.get("preset") != "standup":
         return None
-    since = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_since")]
-    today = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_today")]
-    blockers = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_blockers")]
+    since = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_since") if standup_line_ok(f)]
+    today = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_today") if standup_line_ok(f)]
+    blockers = [_s(f.get("text")) for f in sheet_block_facts(sheet, "standup_blockers") if standup_line_ok(f)]
     ask = []
     for f in sheet_block_facts(sheet, "standup_waiting"):
+        if not standup_line_ok(f):
+            continue
         v = f.get("value") if isinstance(f.get("value"), dict) else {}
         ask.append({"who": _s(v.get("owner")), "what": _s(f.get("text"))})
-    return {"since": since, "today": today, "blockers": blockers, "ask": ask}
+    onme = [] if (since or today or blockers or ask) else tracker_on_me(sheet, live_dir)
+    return {"since": since, "today": today, "blockers": blockers, "ask": ask, "on_me": onme}
 
 
 def drop_derived(items: list[dict], sheet_ids: set) -> list[dict]:
@@ -2086,15 +2149,16 @@ class SheetLive:
         if ag:
             # the brief's checklist channel: the engine's agenda (from the brief derive.py writes) still wins
             _append_json(self.tips, {"kind": "checklist", "at": t, "items": ag, "sheet": True})
-        su = sheet_standup(sheet)
+        su = sheet_standup(sheet, self.path.parent)
         if su:
-            # Stand-up: one small card, the PM's update, what is on him today, blockers and whom to ask (the window
-            # goes compact for it); no slides, no time bar, no qualification.
+            # Stand-up: one small card, the PM's update, what is on him today, blockers and whom to ask; no slides, no
+            # time bar, no qualification. 2026-11-12 (owner): only real lines; with none, the PM's Tracker items.
             uk = sheet_lang(sheet) == "uk"
             asks = [("Спитати " if uk else "Ask ") + (a["who"] + ": " if a["who"] and not a["what"].startswith(a["who"]) else "")
                     + a["what"] for a in su["ask"]]
             items = list(su["since"]) + [("Сьогодні: " if uk else "Today: ") + x for x in su["today"]] \
-                + [("Блокер: " if uk else "Blocker: ") + x for x in su["blockers"]] + asks[:4]
+                + [("Блокер: " if uk else "Blocker: ") + x for x in su["blockers"]] + asks[:4] \
+                + [("На мені: " if uk else "On me: ") + x for x in su.get("on_me") or []]
             if items:
                 _append_json(self.tips, {"schema_version": 1, "kind": "speech", "t": t, "at": t, "sheet": True,
                                          "standup": True, "level": "info",
@@ -4611,6 +4675,72 @@ def with_glossary(prompt: str | None, terms: list[str]) -> str | None:
     return ((prompt or "").rstrip() + " " + extra + ".").strip() if extra else prompt
 
 
+def dictionary_entries(v) -> list[dict]:
+    """0.10.0 (owner 12.11, Settings > Transcription > Dictionary): the PM's own words, [{"word": "Testlum", "heard":
+    ["Tesla"]}] in config.json ("heard" may also be one comma-separated string). Empty words are dropped, the same
+    word twice is kept once (its variants joined)."""
+    out: list[dict] = []
+    seen: dict = {}
+    for e in v if isinstance(v, list) else []:
+        if isinstance(e, str):
+            e = {"word": e}
+        if not isinstance(e, dict):
+            continue
+        w = re.sub(r"\s+", " ", _s(e.get("word"))).strip()
+        if not w or len(w) > 60:
+            continue
+        h = e.get("heard") or []
+        h = h.split(",") if isinstance(h, str) else h if isinstance(h, list) else []
+        heard = [x for x in (re.sub(r"\s+", " ", _s(x)).strip() for x in h) if x and x.casefold() != w.casefold()]
+        if w.casefold() in seen:
+            cur = seen[w.casefold()]
+            cur["heard"] += [x for x in heard if x.casefold() not in {y.casefold() for y in cur["heard"]}]
+            continue
+        item = {"word": w, "heard": []}
+        for x in heard:
+            if x.casefold() not in {y.casefold() for y in item["heard"]}:
+                item["heard"].append(x)
+        seen[w.casefold()] = item
+        out.append(item)
+    return out
+
+
+def dictionary_words(entries: list[dict]) -> list[str]:
+    """The correct words for Whisper's prompt, in the PM's order (they go before the brief's terms)."""
+    return [e["word"] for e in entries]
+
+
+def dictionary_rules(entries: list[dict]) -> list[tuple]:
+    """(pattern, correct word) per "heard as" variant: whole words, any case, any spacing between the words of a
+    phrase; the longer variants first, so "Lumen field" is replaced before a shorter "Lumen"."""
+    pairs = [(h, e["word"]) for e in entries for h in e.get("heard") or []]
+    pairs.sort(key=lambda x: -len(x[0]))
+    rules = []
+    for h, w in pairs:
+        body = r"\s+".join(re.escape(p) for p in h.split())
+        rules.append((re.compile(r"(?<!\w)" + body + r"(?!\w)", re.IGNORECASE), w))
+    return rules
+
+
+def apply_dictionary(text: str, rules: list[tuple]) -> str:
+    """The transcript line with the PM's "heard as" variants replaced by the correct word (shown, stored and sent to
+    the tips model as replaced)."""
+    if not text or not rules:
+        return text
+    for rx, w in rules:
+        text = rx.sub(lambda _m, w=w: w, text)
+    return text
+
+
+def glossary_with_dictionary(words: list[str], terms: list[str]) -> list[str]:
+    """The PM's dictionary words first, then the call's terms (brief, start request), each once."""
+    out, seen = [], set()
+    for t in list(words) + list(terms):
+        if t and t.casefold() not in seen:
+            seen.add(t.casefold()); out.append(t)
+    return out
+
+
 def auto_prompt(cfg: dict) -> None:
     """0.8.5 (owner: "Ukrainian was transcribed much better a week ago"): the skill always gives Whisper a prompt
     (start.md step 2: one natural sentence in the call language, names first), the app gave none, so names and
@@ -4830,7 +4960,13 @@ def main() -> int:
     # 0.9.7: the call's terms from the brief go to Whisper too (the app copies the brief in just after the start, so
     # it is looked for until it appears). The echo filter keeps the names-only words: a one-word answer "HubSpot." is
     # never taken for a prompt echo.
-    GLOSSARY[:] = [t for t in _strs(cfg.get("glossary"))]
+    # 0.10.0 (owner 12.11): the PM's dictionary (Settings > Transcription) goes first; its "heard as" variants are
+    # replaced in every line before it is shown, stored or sent to the tips model.
+    dict_entries = dictionary_entries(cfg.get("dictionary"))
+    DICT_RULES[:] = dictionary_rules(dict_entries)
+    GLOSSARY[:] = glossary_with_dictionary(dictionary_words(dict_entries), _strs(cfg.get("glossary")))
+    if dict_entries:
+        log(f"dictionary: {len(dict_entries)} words, {len(DICT_RULES)} heard-as variants")
     prompt = with_glossary(prompt, GLOSSARY)
     gloss = {"base": cfg.get("prompt"), "next": 0.0, "done": False}
 
@@ -4846,7 +4982,7 @@ def main() -> int:
         except OSError:
             return
         gloss["done"] = True
-        GLOSSARY.extend(t for t in terms if t not in GLOSSARY)
+        GLOSSARY.extend(t for t in terms if t.casefold() not in {g.casefold() for g in GLOSSARY})
         if GLOSSARY and pcell[0] == prompt:
             pcell[0] = with_glossary(gloss["base"], GLOSSARY)
             log(f"whisper prompt: {len(GLOSSARY)} terms from the brief")
@@ -4907,6 +5043,7 @@ def main() -> int:
         text = clean_text(text, pwords[0])
         if not text or not norm(text):
             return
+        text = apply_dictionary(text, DICT_RULES)          # 0.10.0: the PM's dictionary, before anything sees the line
         last_lang[seg.channel] = lang
         sid = None
         late_job = None

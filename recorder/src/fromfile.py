@@ -214,14 +214,19 @@ def run(args, T) -> int:
         whisper = T.FakeWhisper(cfg) if args.fake_whisper else T.Whisper(cfg)
     except Exception as e:  # noqa: BLE001
         emit({"stage": "error", "error": f"whisper load failed: {e!r}"}); return 1
+    # 0.10.0 (owner 12.11): the PM's dictionary (Settings > Transcription), as in a live call: the correct words go to
+    # Whisper's prompt first, the "heard as" variants are replaced in every line.
+    dict_entries = T.dictionary_entries(cfg.get("dictionary"))
+    rules = T.dictionary_rules(dict_entries)
+    prompt = T.with_glossary(cfg.get("prompt"), T.dictionary_words(dict_entries))
     vad = T.Vad(int(cfg.get("vad_mode") or 2))
     spans = segments(audio, vad.is_speech)
     lines: list[dict] = []
     for a, b in spans:
         seg = audio[a:b]
         lang = whisper.pick_language(seg)
-        text, lang = whisper.transcribe(seg, lang, cfg.get("prompt"))
-        text = (text or "").strip()
+        text, lang = whisper.transcribe(seg, lang, prompt)
+        text = T.apply_dictionary((text or "").strip(), rules)
         if text:
             ln = {"t": a / SR, "end": b / SR, "lang": lang or langs[0], "text": text}
             lines.append(ln)

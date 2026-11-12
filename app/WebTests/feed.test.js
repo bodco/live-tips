@@ -474,5 +474,62 @@ test('a failed refresh during the call shows its note, a plain failure the usual
   assert.ok(!JSON.stringify(get()).includes('keeps the previous'));
 });
 
+// 2026-11-12 (owner, fix77): compact mode is gone (no use at all): no menu item, no key, no small window; an older
+// caller or a stored mode still gets the full window.
+test('compact mode is gone: no menu item, no key, setMode and setState keep the full window', () => {
+  const fs = require('fs');
+  const src = fs.readFileSync(path.join(__dirname, '../Resources/tips/tips.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '../Resources/tips/tips.css'), 'utf8');
+  assert.ok(!src.includes("['compact'") && !src.includes("post('compact'") && !src.includes('k.compact'));
+  assert.ok(!src.includes("compact: '"), 'no compact strings or key');
+  assert.ok(src.includes("function setMode() { S.call.mode = 'normal'; render(); }"));
+  assert.ok(src.includes("S.call.mode = 'normal'; }   // a stored compact mode is ignored"));
+  assert.ok(!css.includes('.compact'), 'no compact styles');
+});
+
+// 2026-11-12 (owner, fix77): the stand-up card carries only the lines the recorder sends (real lines, or the Tracker's
+// On me list when the sheet has none); the feed shows them as they are.
+test('a stand-up My update card from the Tracker fallback keeps its lines', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:00:01', kind: 'speech', standup: true, sheet: true, level: 'info', gist: 'My update',
+    items: ['On me: Send Mike Carter the test accounts', 'On me: Review the release notes'] }]);
+  const card = get().cards.find((c) => c.id === 'u:speech');
+  assert.ok(card && get().call.standup === true);
+  const all = JSON.stringify(card);
+  assert.ok(all.includes('Send Mike Carter the test accounts') && all.includes('Review the release notes'));
+  assert.ok(!/context mentions|not_found/.test(all));
+});
+
+// 0.10.0 (owner 12.11): the Speakers header has a large disclosure chevron, collapsed by default (a prompter pref)
+test('speakers block: collapsed shows the header, the count and the chevron only; expanded keeps the to-name chips', () => {
+  const t = Object.assign({}, tS, { spkCount: (o) => o.u ? `${o.n}, ${o.u} to name` : `${o.n}`, spkShow: 'Show the speakers', spkHide: 'Hide the speakers' });
+  const speakers = { S1: { name: 'Emily Clark', side: 'client', seconds: 130 }, S2: { name: '', label: 'Speaker 2', seconds: 40 },
+    S3: { name: '', label: 'Speaker 3', seconds: 20 }, S4: { name: 'Emily Clark', seconds: 10 } };
+  const S = spkState({ speakers });
+  S.ui.spkCollapsed = true;
+  const c = SPK.block(S, t, escT);
+  assert.ok(c.includes('class="spkbar collapsed"') && c.includes('data-act="spk-collapse"') && c.includes('aria-expanded="false"'));
+  assert.ok(c.includes('\u00b7 3, 2 to name') && c.includes('spk-count todo'), 'the compact count: voices and how many to name');
+  assert.ok(c.includes('class="spk-chev"') && c.includes('<svg') && c.includes('Show the speakers'), 'the chevron and its label');
+  assert.ok(!c.includes('spk-chip') && !c.includes('class="spk-card"'), 'no chips and no card while collapsed');
+  S.ui.spkCollapsed = false;
+  const e = SPK.block(S, t, escT);
+  assert.ok(e.includes('aria-expanded="true"') && e.includes('Hide the speakers'));
+  assert.ok(/spk-chip unnamed[^>]*data-act="spk-card"[\s\S]*to name/.test(e), 'expanded: the to-name chips open the card');
+  assert.ok(e.includes('class="spk-card"'), 'expanded: the card of the voice to name');
+  S.speakers.S2.name = 'Mike Johnson'; S.speakers.S3.name = 'Ann Lee';
+  S.ui.spkCollapsed = true;
+  assert.ok(SPK.block(S, t, escT).includes('\u00b7 3</span>') && !SPK.block(S, t, escT).includes('spk-count todo'), 'all named: the number only');
+});
+
+test('speakers block: tips.js remembers the chevron in the prompter prefs, collapsed by default', () => {
+  const fs = require('fs');
+  const src = fs.readFileSync(path.join(__dirname, '../Resources/tips/tips.js'), 'utf8');
+  assert.ok(src.includes("spkCollapsed: PREFS.spk_collapsed !== '0'"), 'collapsed unless the PM opened it');
+  assert.ok(/case 'spk-collapse'[\s\S]{0,300}post\('pref', \{ k: 'spk_collapsed'/.test(src), 'the choice goes to the prefs');
+  const css = fs.readFileSync(path.join(__dirname, '../Resources/tips/tips.css'), 'utf8');
+  assert.ok(/\.spk-chev\{[^}]*width:32px;height:32px/.test(css) && /\.spk-chev svg\{width:18px;height:18px/.test(css), '18 px glyph in a 32 px hit area');
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

@@ -8,6 +8,8 @@ get the same contract and read the files themselves (agent_prompt).
 import json
 from typing import Dict, List, Optional
 
+from . import standup as SU
+
 LANGS = {"uk": "Ukrainian", "en": "English", "es": "Spanish", "de": "German", "pl": "Polish", "ru": "Russian"}
 SKIP_BLOCKS = ("header", "gaps")       # header: from the invitation (built by Pacenote); gaps: from conflicts and readiness
 
@@ -58,6 +60,8 @@ def block_lines(blocks: List[dict], lib: dict, criteria: Optional[Dict[str, List
         if t == "agenda":
             line += ". Each item with value.owner when known"
         out.append(line)
+    if any(b["type"] in SU.BLOCKS for b in blocks):
+        out.append(SU.RULE)        # 0.10.0 (Meeting Sheet, fix 2026-11-12): the PM's own update, never meta lines
     return "\n".join(out)
 
 

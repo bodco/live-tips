@@ -63,6 +63,9 @@ struct MeetingSheetSettingsPane: View {
 
             Section {
                 Stepper(L("sheet.ui.set.stale", ["n": "\(prefs.staleMonths)"]), value: $prefs.staleMonths, in: 1...36)
+                // 0.10.0 (Meeting Sheet, folders): the preparation's window of a folder source; the call searches all of it
+                Stepper(L("sheet.ui.set.folderDays", ["n": "\(prefs.folderDays)"]), value: $prefs.folderDays, in: 1...90)
+                Text(L("sheet.ui.set.folderDaysNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 Picker(L("sheet.ui.set.remind"), selection: $prefs.remindMinutes) {
                     Text(L("sheet.ui.remind.off")).tag(0)
                     Text(L("sheet.ui.remind.n", ["n": "15"])).tag(15)

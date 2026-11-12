@@ -232,7 +232,8 @@ def mcp_json(req: dict) -> str:
 
 
 def command(req: dict, prompt: str, model: str) -> List[str]:
-    args = [req.get("claude") or "claude", "-p", prompt, "--model", model, "--output-format", "json",
+    # 0.10.0 (status fix): stream-json, so the Claude account's rate_limit_event comes too (run() takes the result)
+    args = [req.get("claude") or "claude", "-p", prompt, "--model", model, "--output-format", "stream-json", "--verbose",
             "--permission-mode", "default", "--allowedTools", ",".join(["Read", "Grep", "Glob"] + TOOLS),
             "--disallowedTools", ",".join(DENIED), "--strict-mcp-config", "--mcp-config", mcp_json(req)]
     for d in [req.get("root")] + list(req.get("extra") or []) + [str(Path(req["base"]).parent)]:
@@ -270,7 +271,12 @@ def run(req: dict, runner: Optional[Callable] = None) -> dict:
            "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
     try:
         p = runner(command(req, prompt, model))
-        outer = first_json(p.stdout or "")
+        from .routing import cc_stream_result, note_account_usage
+        outer, acct = cc_stream_result(p.stdout or "")
+        if not outer:
+            outer = first_json(p.stdout or "")
+        if acct and req.get("route") != "api" and req.get("state_dir"):
+            note_account_usage("code", acct, str(Path(req["state_dir"]) / "ai-routes.json"))
     except Exception as e:  # noqa: BLE001
         p, outer = None, {}
         res["error"] = "the checker did not run: " + type(e).__name__

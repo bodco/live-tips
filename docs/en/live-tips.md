@@ -736,7 +736,7 @@ what is going on and have enough to build your own answer.
    Always first. Language: Ukrainian when the window interface or the call is Ukrainian,
    otherwise English.
 2. **Why**, a quieter line: 1-2 sentences of context, max 35 words: what exactly is asked,
-   what the brief or the facts say, what to avoid. Hidden in the compact window.
+   what the brief or the facts say, what to avoid.
 3. **Phrase**, in quotes, in the language of the call. What you can say, as people talk:
    the answer first, then a reason or a next step, 1-3 sentences. In English: simple
    everyday words, active voice, no idioms, up to 40 words.
@@ -747,7 +747,7 @@ what is going on and have enough to build your own answer.
 A long phrase gets a smaller font, so the main card does not fill the window. The window menu (⋯) has
 **Hide the main card**: all tips then go to one feed, newest on top, each with its question above it; a click
 on a row still opens that tip big, and **Show the main card** in the feed header brings it back. The choice is kept
-on this Mac; the compact window always shows the main card.
+on this Mac.
 
 **No abbreviations:** "a new request", not CR; "date", not ETA. No ticket keys either, the
 topic name instead. People and product names stay as they are.
@@ -974,7 +974,8 @@ The full texts: [privacy policy](https://pacenote.bodco.pm/privacy/) and [terms 
 - Text goes only to the AI you chose for each job in Settings > AI (Claude, OpenAI or Gemini, with your key or
   account). A Gemini account runs through Google's Antigravity CLI, never for tips; its terms forbid use through
   third-party software and let Google use and review the conversations, so a red warning appears when you choose
-  it. Plan B through Gemini is off by default (14.1p).
+  it. Since 0.10.0 a job whose chosen AI is out goes to the next connected AI of one list you order (14.1y), so the
+  text of a call may reach another provider then.
 - Audio is not stored for the transcript: recognised phrases are appended to the `.md` immediately, audio
   buffers live only in memory. A call recording (14.1s, off by default) is the one exception: a file in
   `<project>/video/` that you chose to make; it never goes to an AI, and to Google Drive only when you upload it.
@@ -1320,6 +1321,8 @@ preselected in **During the call > Tip** for new installs. **Classify**
 (decides whether a tip is needed) is Haiku by default. A typical call, a Sonnet preparation through the API key and
 Haiku tips, costs about $1.05 for 30 minutes and $1.15 for an hour.
 
+Since 0.10.0 switching follows one AI chain for every job (14.1y); what follows is how it began.
+
 **Switch automatically when one way is out** (on by default). When the chosen way stops working
 (the API credit is used up, the app's own monthly limit is reached, the plan limit is reached,
 you are signed out of Claude Code, or it is not installed), the job goes the other way. The
@@ -1654,9 +1657,9 @@ default for tips), Gemini 3.8 Flash (balanced, the default for the preparation a
 Argon. The classic streaming API is used, so nothing is stored as an interaction on Google's side. Prices
 per 1M tokens (input / output, 2026-11-04): $0.30 / $2.50, $0.75 / $3.75 and $2 / $10; Google announced rises
 (Argon to $4 / $20 from 1 December 2026, Flash to $1.50 / $7.50 from 1 January 2027), which Pacenote's spending counts
-from those days. A chosen Gemini never falls back to another provider by itself.
+from those days. Since 0.10.0 a chosen Gemini that is out moves down the AI chain like any AI (14.1y).
 
-**Plan B.** Automatic switching has "Use Gemini when Claude or ChatGPT is out", off by default. With it on, a job whose
+**Plan B (replaced in 0.10.0 by one AI chain, 14.1y).** Automatic switching had "Use Gemini when Claude or ChatGPT is out", off by default. With it on, a job whose
 chosen way has no credit, has hit its plan limit or has a bad key goes to Gemini and goes back as soon as the chosen
 way answers again. The text of the call then reaches Google, which is why you turn it on yourself.
 
@@ -1974,11 +1977,24 @@ or always Expert. The first time in a series Quick shows "Suggested" and Pacenot
 - files: drop them or Choose files (PDF, PowerPoint, Keynote, Excel, Word, CSV, Markdown, text);
 - a pasted link: Google Docs, Sheets, Slides and Drive files, Notion pages, LinkedIn, any web page;
 - pasted text;
-- a folder: its files come as suggestions, not all at once;
+- a folder (Choose files, drop it, Add folder in Start call, or remembered by the series): a source of its own,
+  Access ok. For the preparation Pacenote reads the files changed in the last 7 days, newest first (the file's time or
+  a date in its name, whichever is newer; ties go to the files that match the meeting), until the size budget; if no
+  file is that fresh, the newest 5. The row says, for example, "12 recent files for the preparation (last 7 days) ·
+  340 searchable during the call". The files read are listed under the folder in the sheet's Sources and report;
+  files not taken are not an error. The Size step counts only the files taken. The number of days is in
+  Settings > Meeting Sheet (Folders: read files changed in the last N days), and a folder row in Expert Sources can
+  have its own. During the call the search looks through the whole folder, older files too (the same filters:
+  archived, hidden, generated call files, logs, binaries and older -vN versions are never read);
 - "From the project folder": files with the reason they fit (same contact, title match, fresh, newer version, used by
   the previous sheet). **Nothing is ticked for you**; press Add N ticked;
-- earlier calls of the series, the open commitments and the project state (config, decisions, Current State) come in
-  as sources by themselves;
+- every build (Quick, Expert, Up next, also when the series already remembers its sources) adds, ticked and with the
+  reason: the last 1-3 calls of the series (their notes, the transcript when there are no notes), the Tracker (your
+  open items and what you wait for from others; for a workspace call, every project of the workspace and every folder
+  added), the project state (config, decisions, Current State), the digest of the last 14 days and the recent
+  commits of the folders. A stand-up sheet is written as your own short update lines (since last time, today from
+  the Tracker items due today or overdue, blockers, whom to ask); a line about the sources instead of the work is
+  dropped, and a block with nothing concrete says "not found";
 - for a presentation, "This is the deck" on a deck's row, with the slide owners, the minutes and Q&A in the same row.
 
 Every source shows its access before anything runs, with an icon and a word: **Access ok**, **No access**, **Not
@@ -2065,8 +2081,9 @@ or an empty page.
 when their topic comes up (never one you already asked; a preset without an Agenda block shows them as the agenda strip
 too, once); Red lines warn only when you sound like promising something
 on the list; facts answer with their source number "[2]"; Best outcome is checked before you close; Structure and
-roles gives the slides with a colleague's backup text. A stand-up sheet gives one "My update" card in a compact window,
-without Sales or slides. **Prepare again** during the call refreshes the sheet with the transcript so far as a source;
+roles gives the slides with a colleague's backup text. A stand-up sheet gives one "My update" card in the normal window,
+without Sales or slides. The card lists only real lines of your update (never "not found" and never a sentence about
+the sources); when the sheet has none, it lists your open Tracker items On me. **Prepare again** during the call refreshes the sheet with the transcript so far as a source;
 if the refresh fails, the previous sheet stays and the window says so. A question the sheet does not answer searches
 the sheet's facts, its files and the project folders on the Mac, and the model of any route answers. The folders are
 read once in the background when the call starts, so the search itself takes under a second and HELP NOW is not slower
@@ -2084,6 +2101,83 @@ presets.
 copy), `<base>.sheet.v<N>.json` (versions), `<base>.sheet.sources.json` (the report by source). For the live layer the
 app also writes the brief, cards and facts files from the sheet; they are generated copies, not a second brief.
 Details: [DEVELOPMENT.md](../../DEVELOPMENT.md#meeting-sheet-0100).
+
+### 14.1y One AI chain and the limit status icon (0.10.0, beta)
+
+**One chain for every job (Settings > AI > If an AI is out).** The AI you chose for a job goes first. When it is
+out, the job goes to the next connected AI in one list you order yourself: arrows to move an AI up or down, a
+checkbox to leave it out. The default order: Claude account, ChatGPT account, Claude API, OpenAI API, Gemini API,
+Gemini account, model on this Mac. Every connected AI is in the list by default, so the text of a call may go to
+another provider when the chosen one is out. **Switch to the next AI automatically** turns the chain off: then a job
+on an AI that is out stops with the reason, as before.
+
+- Tips during a call never go to the model on this Mac (19-59 seconds an answer) or to the Gemini account (20-30
+  seconds); when every cloud AI is out, the instant cards and facts keep working.
+- For the preparation (the Meeting Sheet build), the work after the call and typed questions, the model on this Mac
+  is always the last step, wherever it is in the list.
+
+**What switches.** A real outage while the job runs, not only a check before it: "usage limit reached" (ChatGPT
+account), a plan limit, out of credits, a quota error, a key that is not valid, signed out, not installed. A plain short
+rate limit or a timeout does not switch. When the message names when the limit resets ("try again at 12:48 PM",
+"resets 9am"), that AI is left alone until then; otherwise it is tried again every 15 minutes. The job goes back to
+the AI you chose as soon as it answers. A Meeting Sheet build moves a failed pass to the next AI and goes on; when
+the Claude account is out before the first pass, the build goes on with the next AI reading the sources itself (a web
+page only Claude would have opened is named as skipped).
+
+**Never silent.** Every switch is written down: the tips window and Home list the switches of the last hour, a switch
+outside a call is a notification, the Meeting Sheet build shows it in its line and in the sheet's report.
+
+**The status icon.** On Home (top bar, next to the setup pill) and in the tips window header:
+
+| Icon | When |
+|---|---|
+| Red octagon | An AI the current jobs chose or use has reached its limit, its monthly spending limit, or is out |
+| Orange triangle | One of them is close: 95% or more of an account's limit used, or $1 or less left of an API's monthly spending limit |
+| Chip (neutral) | Otherwise |
+
+Hover or click shows every connected AI: which jobs it is used for (tips, preparation, after the call), its status,
+and its usage. A healthy AI says "OK" (the icon's title "AI: OK"). An account shows the percent used and when it
+resets: "{pct}% used, resets at HH:MM" for the 5-hour window and "{pct}% of the week" for the weekly one. The Claude
+account reports on each Claude Code run Pacenote makes (preparation, its checker, Meeting Sheet, the call's lookup,
+after the call); until the first one it says "usage appears after the next Claude run". The ChatGPT account: the jobs
+run `--ephemeral` and leave no session log, so the numbers come from the usage probe below, whose one run keeps its
+session log (`~/.codex/sessions/.../rollout-...-<id>.jsonl`) just long enough for Pacenote to read the limit numbers
+in it, then Pacenote removes that one file, by its id, and nothing else; at launch the newest of your own Codex
+session logs of the last 6 hours gives a first reading (only its limit numbers). A reached limit, and the reset time of the last limit error ("try again at 12:48 PM"), are kept in
+`state/ai-accounts.json`, so the icon is red from launch and clears itself at the reset time; the status is recomputed
+every 3 minutes. An API shows "$X left of your $Y monthly limit" from Settings > AI > Spending limits and the spend
+Pacenote counted: a provider does not show your balance through a key, so this is your own limit, not the provider's
+balance. The model on this Mac has no limit. An AI that is out says "limit reached, resets at HH:MM" or "out (reason),
+next check at HH:MM". The Gemini account does not report its usage.
+
+**Usage probe (2026-11-12).** So the numbers are there before the next real job, Pacenote asks each account for its
+usage with one tiny run: the Claude account through Claude Code on the smallest model ("Reply with OK", one turn, no
+tools, no files, no saved session), the ChatGPT account through `codex exec` with the same tiny prompt, whose own
+session log is read for the limit numbers and then removed by its id (only this probe keeps that log; real jobs stay
+`--ephemeral`). No call text is ever in a probe. It runs 60 seconds after launch, then every 30 minutes while no call
+is recording and no preparation runs, and when you open the popover with numbers older than 10 minutes; at most once
+per account in 10 minutes, never for an account that is signed out or at its limit (until its reset time). Each
+account's line ends with "updated HH:MM", the time of its last report. The probe's tokens go to the usage ledger
+(`state/spend-ledger.jsonl`, job `usage_probe`) as account usage, without a price.
+
+### 14.1z Your own words in the transcript, a folding Speakers block (0.10.0, beta)
+
+**Settings > Transcription > Dictionary.** Add the words the transcript gets wrong: company, product and people
+names. Each row has the **Correct word** and, optionally, what the transcript hears instead (**Heard as**, several
+variants separated by commas), for example "Lumenfield" heard as "Lumen field". Add a word, edit it in place or
+remove it with the minus button; the list is saved in the app's settings and copied to the recorder's `config.json`.
+
+- The correct words go to the transcription model (Whisper's prompt) first, before the terms of the brief, within the
+  prompt's length limit.
+- Each "heard as" variant is replaced by the correct word as a whole word, in any case and with any spacing between
+  its words, before the line is shown in the tips window, saved in the transcript or sent to the AI for tips. The
+  longer variant wins ("Lumen field" before "Lumen"); a variant inside another word is left alone.
+- Recordings transcribed after the call (Transcribe a recording) use the same dictionary.
+
+**Speakers block: one chevron.** The Speakers block above the tabs of the tips window has a large chevron on the
+right of its header and is collapsed by default: it shows only "Speakers · 12, 9 to name" (how many voices, and how
+many are still to name). Click the header or the chevron to open the chips and the card of a voice to name; your
+choice is remembered for the next calls.
 
 ### 14.2 After the call: the meeting page in Notion
 
@@ -2141,7 +2235,6 @@ that scores every tip of both sides 1 to 5 without knowing which side wrote it.
 - **Control-Option-H**: HELP NOW, also when the meeting app has the focus.
 - **Control-Option-P**: pause or resume tips.
 - **Control-Option-M**: your microphone off or on (the app).
-- **Control-Option-T**: the compact tips window (the app).
 - **Control-Option-L**: proactive tips on or off (the app, since 0.8.1).
 - **Control-Option-S**: presentation mode on or off (the app, since 0.8.5).
 - **Control-Option-Left / Right**: the previous or the next slide, and **Control-Option-=**: +30 s on
@@ -2454,6 +2547,9 @@ address", `references/sweep.md`, `references/presentation.md`).
 84. **Deeper preparation (0.7.0, skill v54).** Prepare reads the last 3 calls of the same meeting in full (the app
    names their transcripts) and the brief (up to ~2500 words) has a "Previous meetings" section: what was discussed,
    questions and whether they were answered, open items, action items with owner, due and status, promises.
+   Since 2026-11-12 the brief gives no homework before the call ("confirm", "verify"): an unknown takes the likely
+   reading, becomes a question on the call when it matters, or is left out; "Needs confirmation" only for a real
+   conflict of two sources.
 85. **Correct cards and On me in the window (0.7.1).** ✎ on a card edits its heading, phrase and points (change,
    remove, add) or removes the card; the correction stays for the call, a prepared card is changed in
    `<stem>.cards.json`. On me: × removes a line, a double-click corrects it, the field adds a missing one. All

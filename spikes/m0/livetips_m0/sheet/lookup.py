@@ -227,8 +227,49 @@ def sheet_source_paths(sheet: Optional[dict]) -> List[tuple]:
     return out
 
 
+def sheet_folder_roots(sheet: Optional[dict]) -> List[str]:
+    """0.10.0 (Meeting Sheet, folders): the folder sources of the sheet (access ok, still a folder on this Mac). The
+    preparation read only their recent files; the call searches them in full (deep)."""
+    out: List[str] = []
+    if not isinstance(sheet, dict):
+        return out
+    for s in sheet.get("sources") or []:
+        if not isinstance(s, dict) or s.get("type") != "folder" or s.get("access") in ("denied", "unsupported"):
+            continue
+        p = os.path.expanduser(str(s.get("path") or ""))
+        if p and os.path.isdir(p) and p not in out:
+            out.append(p)
+    return out
+
+
+def deep_files(root: str) -> List[Path]:
+    """0.10.0 (Meeting Sheet, folders): every file of a folder source that passes the preparation's filters (archived,
+    hidden, prep-runs, generated call files, binaries, logs, older -vN versions), not only the recent ones; newest first."""
+    try:
+        from .sources import folder_files
+        return [Path(c["path"]) for c in folder_files(root)[0]]
+    except Exception:  # noqa: BLE001
+        return list(walk_files(Path(root)))
+
+
+def _text_of(pp: Path, max_bytes: int) -> str:
+    """A text file as is; a pdf, pptx, xlsx or docx of a folder source through the shared readers."""
+    if pp.suffix.lower() in TEXT_EXT or pp.name.endswith(".jsonl"):
+        text = _read(pp, max_bytes)
+        if pp.suffix.lower() in (".json", ".jsonl") or pp.name.endswith(".jsonl"):
+            text = _jsonl_text(text)
+        return text
+    try:
+        from . import readers
+        if not readers.supported(str(pp)):
+            return ""
+        return (readers.read(str(pp)).get("text") or "")[: max_bytes * 2]
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def collect(question: str, sheet=None, roots=(), max_files: int = 4000, max_bytes: int = 400_000,
-            max_seconds: float = 3.0, exclude_prefix: str = "", max_docs: int = 6000) -> List[dict]:
+            max_seconds: float = 3.0, exclude_prefix: str = "", max_docs: int = 6000, folders: bool = True) -> List[dict]:
     """Every passage to rank: sheet facts, sheet source files, then the folders (newest first is not needed: BM25).
     0.10.0 (Meeting Sheet, hardening): at most `max_docs` passages, so ranking stays within the call's time budget."""
     t0 = time.time()
@@ -263,6 +304,23 @@ def collect(question: str, sheet=None, roots=(), max_files: int = 4000, max_byte
             except ValueError:
                 rel = pp.name
             date = _date_of(pp, rel)
+            for head, body in chunks(text)[: max(0, max_docs - len(docs))]:
+                docs.append({"src": rel, "path": str(pp), "date": date, "head": head, "text": body, "n": None})
+    # 0.10.0 (Meeting Sheet, folders): the sheet's folder sources, every file (without the background index)
+    for r in (sheet_folder_roots(sheet) if folders else []):
+        root = Path(r)
+        for pp in deep_files(r):
+            if time.time() - t0 > max_seconds or len(docs) >= max_docs:
+                break
+            key = str(pp.resolve())
+            if key in seen:
+                continue
+            seen.add(key)
+            text = _text_of(pp, max_bytes)
+            if not text.strip():
+                continue
+            rel = root.name + "/" + str(pp.relative_to(root)) if str(pp).startswith(str(root)) else pp.name
+            date = _date_of(pp, pp.name)
             for head, body in chunks(text)[: max(0, max_docs - len(docs))]:
                 docs.append({"src": rel, "path": str(pp), "date": date, "head": head, "text": body, "n": None})
     return docs
@@ -393,12 +451,19 @@ class FolderIndex:
     Thread-safe: build() appends under a lock; readers take a snapshot of the length."""
 
     def __init__(self, roots, exclude_prefix: str = "", max_files: int = 1500, max_docs: int = 20000,
-                 max_bytes: int = 400_000, max_seconds: float = 90.0, ttl: float = 300.0):
+                 max_bytes: int = 400_000, max_seconds: float = 90.0, ttl: float = 300.0, deep=(),
+                 max_deep_files: int = 5000):
         self.roots = [str(r) for r in roots if r]
+        # 0.10.0 (Meeting Sheet, folders): the sheet's folder sources, indexed in full (every file that passes the
+        # filters, pdf/pptx/xlsx/docx too), not capped by max_files; the preparation took only their recent files
+        self.deep = [str(r) for r in deep if r]
+        self.max_deep_files = max_deep_files
         self.exclude = exclude_prefix
         self.max_files, self.max_docs, self.max_bytes = max_files, max_docs, max_bytes
+        if self.deep:
+            self.max_docs = max(max_docs, 40000)
         self.max_seconds, self.ttl = max_seconds, ttl
-        self.key = (tuple(self.roots), exclude_prefix)
+        self.key = (tuple(self.roots), exclude_prefix, tuple(self.deep))
         self.docs: List[dict] = []
         self.post: dict = {}
         self.lock = threading.Lock()
@@ -422,6 +487,19 @@ class FolderIndex:
 
     def _paths(self) -> List[tuple]:
         out, seen = [], set()
+        deep = []
+        for r in self.deep:                              # 0.10.0 (Meeting Sheet, folders): in full, first
+            root = Path(os.path.expanduser(r))
+            for pp in deep_files(str(root))[: self.max_deep_files]:
+                try:
+                    key = str(pp.resolve())
+                    m = pp.stat().st_mtime
+                except OSError:
+                    continue
+                if key in seen or (self.exclude and pp.name.startswith(self.exclude)):
+                    continue
+                seen.add(key)
+                deep.append((m, pp, root))
         for r in self.roots:
             root = Path(os.path.expanduser(r))
             if not root.is_dir():
@@ -437,7 +515,7 @@ class FolderIndex:
                 seen.add(key)
                 out.append((m, pp, root))
         out.sort(key=lambda x: -x[0])                    # newest files first: a capped big folder keeps the recent
-        return out[: self.max_files]
+        return deep + out[: self.max_files]
 
     def build(self) -> "FolderIndex":
         t0 = self.started_at = self.started_at or time.time()
@@ -445,13 +523,13 @@ class FolderIndex:
             for _m, pp, root in self._paths():
                 if time.time() - t0 > self.max_seconds or len(self.docs) >= self.max_docs:
                     break
-                text = _read(pp, self.max_bytes)
+                text = _text_of(pp, self.max_bytes)
                 if not text.strip():
                     continue
-                if pp.suffix.lower() in (".json", ".jsonl") or pp.name.endswith(".jsonl"):
-                    text = _jsonl_text(text)
                 try:
                     rel = str(pp.relative_to(root))
+                    if str(root) in self.deep or str(root) in {os.path.expanduser(d) for d in self.deep}:
+                        rel = root.name + "/" + rel             # a folder source: its name leads the citation
                 except ValueError:
                     rel = pp.name
                 date = _date_of(pp, rel)
@@ -510,7 +588,7 @@ class FolderIndex:
             key = None
         if key is not None and key == self._extra_key:
             return self._extra
-        docs = collect("", sheet, (), max_bytes=self.max_bytes)
+        docs = collect("", sheet, (), max_bytes=self.max_bytes, folders=False)   # the folder sources are indexed
         for d in docs:
             d["_t"] = terms(d["text"])
             d["_m"] = set(terms(d.get("src", "") + " " + d.get("head", "")))

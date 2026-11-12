@@ -411,7 +411,7 @@ struct OnboardingView: View {
             }
             // 0.8.7 (L3): the three shortcuts, shown again on the first call
             VStack(alignment: .leading, spacing: 4) {
-                Text(L("onb.done.keys", ["h": HotKeys.shared.combo(.help).display, "t": HotKeys.shared.combo(.compact).display, "l": HotKeys.shared.combo(.proactive).display]))
+                Text(L("onb.done.keys", ["h": HotKeys.shared.combo(.help).display, "l": HotKeys.shared.combo(.proactive).display]))
                     .font(PN.Font.body.monospacedDigit()).foregroundStyle(PN.C.text)
                 Text(L("onb.done.keysAgain")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }

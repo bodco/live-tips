@@ -78,8 +78,10 @@ public struct SourceType: SheetValue {
         prevCall = Self(rawValue: "prev_call"), tracker = Self(rawValue: "tracker"), webSearch = Self(rawValue: "web_search"),
         crm = Self(rawValue: "crm"), projectState = Self(rawValue: "project_state"), digest = Self(rawValue: "digest"),
         transcript = Self(rawValue: "transcript")
+    // 0.10.0 (Meeting Sheet, folders): a folder is a source of its own (its recent files are folder_file with parent)
+    public static let folder = Self(rawValue: "folder")
     public static let known: [Self] = [file, folderFile, gdoc, gsheet, gslides, driveFile, notion, web, webPage, linkedin,
-        linkedinManual, text, prevCall, tracker, webSearch, crm, projectState, digest, transcript]
+        linkedinManual, text, prevCall, tracker, webSearch, crm, projectState, digest, transcript, folder]
 }
 
 public struct SourceAccess: SheetValue {
@@ -280,9 +282,72 @@ public struct SheetSource: Codable, Equatable, Identifiable {
     public var why: [String]?
     public var deck: DeckInfo?
     public var modifiedAt: String?
+    // 0.10.0 (Meeting Sheet, folders): a folder file names its folder; a folder has its own days and its counts
+    public var parent: String?
+    public var days: Int?
+    public var folder: SheetFolderInfo?
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case id, n, type, uri, path, title, chars, access, used, reason, pass, auto, why, deck
+        case id, n, type, uri, path, title, chars, access, used, reason, pass, auto, why, deck, parent, days, folder
         case sizeTokens = "size_tokens", accessReason = "access_reason", fixAction = "fix_action", modifiedAt = "modified_at"
+    }
+}
+
+/// 0.10.0 (Meeting Sheet, folders): what a folder source gave: files taken for the preparation (changed in the last
+/// `days` days, or the newest few when none is that fresh), files searchable during the call, files over the budget.
+public struct SheetFolderInfo: Codable, Equatable {
+    public var days: Int?
+    public var recent: Int?
+    public var inWindow: Int?
+    public var searchable: Int?
+    public var fallback: Bool?
+    public var overBudget: Int?
+    public var tokens: Int?
+    public init(days: Int? = nil, recent: Int? = nil, inWindow: Int? = nil, searchable: Int? = nil, fallback: Bool? = nil,
+                overBudget: Int? = nil, tokens: Int? = nil) {
+        self.days = days; self.recent = recent; self.inWindow = inWindow; self.searchable = searchable
+        self.fallback = fallback; self.overBudget = overBudget; self.tokens = tokens
+    }
+    enum CodingKeys: String, CodingKey {
+        case days, recent, searchable, fallback, tokens, inWindow = "in_window", overBudget = "over_budget"
+    }
+    public init(json o: [String: Any]) {
+        self.init(days: o["days"] as? Int, recent: o["recent"] as? Int, inWindow: o["in_window"] as? Int,
+                  searchable: o["searchable"] as? Int, fallback: o["fallback"] as? Bool, overBudget: o["over_budget"] as? Int,
+                  tokens: o["tokens"] as? Int)
+    }
+}
+
+/// 0.10.0 (Meeting Sheet, folders): the pure rules of folder sources, shared by Quick, Expert, Start call and the
+/// series memory (CoreChecks).
+public enum SheetFolders {
+    public static let defaultDays = 7
+
+    /// A path added as a source: a folder is "folder", never a file that fails with "a folder, not a file".
+    public static func sourceType(isDir: Bool) -> String { isDir ? SourceType.folder.rawValue : SourceType.file.rawValue }
+
+    /// A source saved by an older setup (series memory): "file" or "folder_file" that is a folder now reads as "folder".
+    public static func migrate(type: String, isDir: Bool) -> String {
+        isDir && (type == SourceType.file.rawValue || type == SourceType.folderFile.rawValue || type.isEmpty) ? SourceType.folder.rawValue : type
+    }
+
+    /// The folder row as an i18n key and its arguments:
+    /// "12 recent files for the preparation (last 7 days) · 340 searchable during the call".
+    public static func line(_ i: SheetFolderInfo, days fallbackDays: Int = defaultDays) -> (key: String, args: [String: String]) {
+        let days = i.days ?? fallbackDays, n = i.recent ?? 0, total = i.searchable ?? 0
+        let key: String
+        if total == 0 { key = "sheet.ui.folder.empty" }
+        else if i.fallback == true { key = n > 0 ? "sheet.ui.folder.fallback" : "sheet.ui.folder.none" }
+        else { key = "sheet.ui.folder.line" }
+        return (key, ["n": "\(n)", "days": "\(days)", "m": "\(total)", "over": "\(i.overBudget ?? 0)"])
+    }
+
+    /// The tokens a folder adds to the size: only the files taken.
+    public static func tokens(_ i: SheetFolderInfo?) -> Int { i?.tokens ?? 0 }
+
+    /// A per-folder days value as typed in Expert Sources: 1...365, empty or 0 = the default of Settings.
+    public static func days(_ typed: String) -> Int? {
+        guard let v = Int(typed.trimmingCharacters(in: .whitespaces)), v > 0 else { return nil }
+        return min(365, v)
     }
 }
 

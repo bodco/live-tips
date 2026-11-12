@@ -102,8 +102,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     /// <transcript stem> (without .md): the call's files share it.
     var stem: String { transcriptPath.hasSuffix(".md") ? String(transcriptPath.dropLast(3)) : transcriptPath }
     var lastPrep = ""
+    var lastAI = ""          // 0.10.0 (AI chain): the tips window's AI status, pushed on change
     var ticker: Timer?               // stopped when the window closes (QA: closed windows kept reading files)
-    var compactFrame: NSRect?        // the full window's frame while the compact strip is shown
     // 0.8.5 (P5): presentation mode, sync A and the slide thumbnails
     var presentingNow = false
     var slideSync = SlideSync()
@@ -121,7 +121,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         // 2026-10-27 (owner): one interface language for the whole app: the window follows Settings > General.
         prefs["ui_lang"] = MainActor.assumeIsolated { AppConfig.load(from: AppPaths.config).uiLanguage == "uk" ? "uk" : "en" }
         prefs["keys"] = ["help": HotKeys.shared.combo(.help).display, "pause": HotKeys.shared.combo(.pause).display,
-                         "mute": HotKeys.shared.combo(.mute).display, "compact": HotKeys.shared.combo(.compact).display,
+                         "mute": HotKeys.shared.combo(.mute).display,
                          "proactive": HotKeys.shared.combo(.proactive).display, "present": HotKeys.shared.combo(.presentation).display,
                          "prev": HotKeys.shared.combo(.prevSlide).display, "next": HotKeys.shared.combo(.nextSlide).display,
                          "add30": HotKeys.shared.combo(.add30).display]
@@ -154,6 +154,13 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         window.delegate = self
         window.isReleasedWhenClosed = false
         _ = window.setFrameAutosaveName("LiveTipsAppPrompter")   // remembers position and size
+        // 2026-11-12 (owner): compact mode is gone; a window last saved as the compact strip (560 x 150 or the
+        // 380 x 330 presentation column) opens at the normal size in the same place.
+        if Self.wasCompact(window.frame.size) {
+            var f = window.frame
+            f.origin.y = f.maxY - h; f.size = NSSize(width: w, height: h)
+            window.setFrame(f, display: false)
+        }
         // 0.8.6 (A5): a taller title bar (about 36 pt) from an empty compact toolbar; the traffic lights stay centred.
         window.toolbar = NSToolbar(identifier: "PacenoteCallWindow")
         window.toolbarStyle = .unifiedCompact
@@ -254,6 +261,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             if js != lastPrep { lastPrep = js; push("window.setPrep && window.setPrep(" + js + ")") }
             let un: String = MainActor.assumeIsolated { UpNext.shared.json() }
             if un != lastUpNext { lastUpNext = un; push("window.setUpNext && window.setUpNext(" + un + ")") }
+            // 0.10.0 (AI chain): the limit status icon of the header and its list
+            let ai: String = MainActor.assumeIsolated {
+                let d = (try? JSONSerialization.data(withJSONObject: AIStatusModel.shared.windowState())) ?? Data("{}".utf8)
+                return String(data: d, encoding: .utf8) ?? "{}"
+            }
+            if ai != lastAI { lastAI = ai; push("window.LiveTips && LiveTips.setState({ai: " + ai + "})") }
         }
         // The live transcript and the speaker names (speakers.json) for the transcript pane.
         if let tr = transcript {
@@ -827,7 +840,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     }
 }
 
-// MARK: - Pacenote 0.8 (F2): the new window's actions, compact mode, zoom, Call settings
+// MARK: - Pacenote 0.8 (F2): the new window's actions, zoom, Call settings
 
 extension PrompterController {
     /// One handler for the page: {"action": ..., ...} (REDESIGN-SPEC 3.10). Old behaviour is reused through handle(_:_:).
@@ -949,8 +962,6 @@ extension PrompterController {
             if let k = d["key"] as? String { handle("setting", ["key": k, "value": d["value"] ?? NSNull()] as [String: Any]) }
         case "mute":
             handle("mute", d["on"] as? Bool ?? false)
-        case "compact":
-            setCompact(d["on"] as? Bool ?? false)
         case "zoom":
             zoom(d["step"] as? Int ?? 0)
         case "start":
@@ -1035,30 +1046,10 @@ extension PrompterController {
         }
     }
 
-    // Compact mode (REDESIGN-SPEC 3.8): a strip about 560 x 150 at the top of the same place, always on top,
-    // still hidden from screen sharing. Control-Option-T or the window menu; the same again goes back.
-    var isCompact: Bool { compactFrame != nil }
-    func setCompact(_ on: Bool) {
-        guard let w = window else { return }
-        if on, compactFrame == nil {
-            compactFrame = w.frame
-            var f = w.frame
-            // 0.8.5 (P5 states): compact presentation is a 380 px column (slide, countdown, behind, advice, one line).
-            let size = presentingNow ? NSSize(width: 380, height: 330) : NSSize(width: 560, height: 150)
-            f.origin.y = f.maxY - size.height
-            f.size = size
-            w.minSize = NSSize(width: 360, height: 90)
-            w.setFrame(f, display: true, animate: true)
-            w.level = .floating
-        } else if !on, let f = compactFrame {
-            compactFrame = nil
-            w.minSize = NSSize(width: 300, height: 140)
-            w.setFrame(f, display: true, animate: true)
-            w.level = Self.onTop ? .floating : .normal
-        }
-        push("window.LiveTips && LiveTips.setMode('" + (on ? "compact" : "normal") + "')")
+    /// 2026-11-12 (owner): compact mode removed. The sizes the old compact strip saved, so such a frame is not reused.
+    static func wasCompact(_ s: NSSize) -> Bool {
+        (abs(s.width - 560) < 1 && abs(s.height - 150) < 1) || (abs(s.width - 380) < 1 && abs(s.height - 330) < 1) || s.height < 140
     }
-    func toggleCompact() { setCompact(!isCompact) }
 
     /// Cmd + / Cmd - / Cmd 0 in the window: the page zoom, remembered for the next calls.
     func zoom(_ step: Int) {

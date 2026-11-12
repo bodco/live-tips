@@ -207,6 +207,7 @@ struct HomeView: View {
                 if trackerOn { navTab(L("home.nav.tracker"), selected: false) { nav.open(.tracker) } }
             }
             integrationsPill
+            AIStatusIcon()            // 0.10.0 (AI chain): the limit status of the AIs the jobs use
             Spacer(minLength: 8)
             ViewThatFits(in: .horizontal) { headerButtons(icons: false); headerButtons(icons: true) }
         }

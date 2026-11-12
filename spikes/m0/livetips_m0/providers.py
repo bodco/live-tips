@@ -38,6 +38,8 @@ class Completion:
     incomplete: Optional[str] = None  # 0.9.2: why a stream stopped early (OpenAI incomplete_details.reason)
     retried: Optional[str] = None     # 0.9.2: "longer" when an answer cut by the output limit was asked again
     tail: int = 0                     # 0.9.2: characters after the first JSON object (the model ran on)
+    account_usage: Optional[dict] = None  # 0.10.0 (AI chain): what an account reported about its limits (routing.account_usage_*)
+    reset_at: Optional[float] = None      # 0.10.0 (AI chain): when the limit that stopped this request resets (unix time)
 
     def ms(self, t):
         return None if t is None else round((t - self.t_start) * 1000)

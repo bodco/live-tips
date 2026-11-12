@@ -5,6 +5,69 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **Your own words in the transcript (2026-11-12, owner):** Settings > Transcription > Dictionary. Each row is the
+  correct word and, optionally, what the transcript hears instead (comma-separated), for example "Lumenfield" heard as
+  "Lumen field". The correct words go to the transcription model first, before the brief's terms; each "heard as"
+  variant is replaced by the correct word (whole word, any case) before a line is shown, saved or sent to the AI for
+  tips, in live calls and in recordings transcribed after the call.
+- **Speakers block folds (2026-11-12, owner):** the Speakers block of the tips window has a large chevron on the right
+  of its header and is collapsed by default, showing only "Speakers · 12, 9 to name". Open it to name the voices; the
+  choice is remembered for the next calls.
+- **Account usage without waiting for a job (2026-11-12, owner):** the AI status popover said "usage not reported" for
+  the Claude and ChatGPT accounts until a real job ran. Now Pacenote asks each account with one tiny run ("Reply with
+  OK" on the smallest model, no call text): 60 seconds after launch, every 30 minutes with no call and no preparation,
+  and when you open the popover with numbers older than 10 minutes, at most once per account in 10 minutes and never
+  for an account that is signed out or at its limit. Each account's line ends with "updated HH:MM". The ChatGPT probe
+  keeps its own session log only to read the limit numbers and then removes that one file; real jobs are unchanged.
+  The probe's tokens are logged as account usage, without a price.
+
+- **Compact mode removed (2026-11-12, owner):** the tips window no longer has Compact mode / Full window in the ⋯ menu,
+  the Control-Option-T shortcut (Settings > Shortcuts, the menu bar and the onboarding list it no more) or the small
+  always-on-top strip, in a regular call and in presentation mode alike. A window last closed as the small strip opens
+  at the normal size, and a key once set for it is forgotten.
+- **Stand-up preparation is never empty (2026-11-12, owner):** a stand-up built with Quick had only the invitation:
+  the earlier stand-ups, the Tracker and the project state were not read, and "My update" said that "the call context
+  mentions an email" instead of an update. Now every build (Quick, Expert, Up next, also when the series remembers its
+  sources) adds, ticked and with the reason in Sources: the last 1-3 calls of the series (notes first), the Tracker
+  (your open items and what you wait for from others; for a workspace call every project of the workspace and every
+  folder added), the project state, the digest and the recent commits of the folders. Stand-up lines are your own
+  short update (since last time, today from the Tracker items due today or overdue, blockers, whom to ask); a sentence
+  about the sources is dropped, and On me today and Waiting on others fall back to the Tracker. During the call the
+  "My update" card shows only real lines, or your open Tracker items when the sheet has none.
+
+- **Folders are sources in the Meeting Sheet (2026-11-12, owner):** a project folder added to a preparation (Quick,
+  Expert Sources, Add folder in Start call, or remembered by the series) no longer shows "a folder, not a file" with
+  Needs you. It is a source of its own: the preparation reads its files changed in the last 7 days, newest first,
+  within the size budget (the newest 5 when nothing is that fresh), and the row says, for example, "12 recent files for
+  the preparation (last 7 days) · 340 searchable during the call". The Size step counts only the files taken, the
+  sheet's Sources and report list the folder with its counts and the files read. During the call the search looks
+  through the whole folder, older files too, from the index built at call start. The days are in Settings > Meeting
+  Sheet (Folders: read files changed in the last N days), and each folder row in Expert Sources can have its own.
+
+- **No homework in the brief (2026-11-12, owner):** a brief made on the ChatGPT account asked the PM to "confirm
+  the date of the previous meeting" and to "verify" a list of things before the call, although there is nowhere to
+  look them up. Now an unknown takes the most likely reading, becomes a question on the call when it matters for the
+  goal, or is left out. "Needs confirmation" appears only when two sources really conflict (at most 3, the likely
+  reading first), and the speech has no "[check]" marks. Applies to the ChatGPT account, OpenAI, Gemini and the model
+  on this Mac; the rule is in rules/live_prep.yaml for every way.
+- **One AI chain for every job and a limit status icon (2026-11-12, owner):** when the AI chosen for a job is out, the
+  job goes to the next connected AI in one list you order in Settings > AI > If an AI is out (arrows and a checkbox
+  per AI; default Claude account, ChatGPT account, Claude API, OpenAI API, Gemini API, Gemini account, model on this
+  Mac). It now switches on real failures while the job runs too: a usage limit, no credit, a quota error, a key that is
+  not valid, signed out; never on a short rate limit or a timeout. An AI out until a known reset time ("try again at
+  12:48 PM") is left alone until then, otherwise tried again every 15 minutes, and the job goes back to your choice
+  once it answers. Tips never use the model on this Mac or the Gemini account; for the preparation, after the call and
+  typed questions the model on this Mac is the last step. A Meeting Sheet build moves a failed pass to the next AI and
+  finishes. Every switch shows: in the tips window, on Home, as a notification outside a call and in the sheet's
+  report. A new icon on Home and in the tips window header turns red when an AI your jobs use has reached a limit and
+  orange when it is close (95% of an account, $1 left of an API's monthly limit); hover it for each AI's jobs, status
+  and usage (accounts in percent with the reset time, APIs as "$X left of your $Y monthly limit"). A healthy AI reads
+  "OK" ("AI: OK" on the icon), never "working". The ChatGPT account shows "{pct}% used, resets at {time}" for the
+  5-hour window and "{pct}% of the week", read from each run's own Codex session log, which Pacenote then removes (that
+  file only). A reached limit and its reset time are kept, so the icon is red from launch and clears itself at the reset
+  time; the Claude account says "usage appears after the next Claude run" until it has reported once, and every Claude
+  Code run of the app (preparation, its checker, Meeting Sheet, the call's lookup, after the call) now reports it.
+
 - **Meeting Sheet, ready for real calls (2026-11-12, owner):** a call prepared in 0.9.7 (a brief, no sheet) shows
   Start call as the main button again, Get ready next to it. The AI route question never opens a pop-up over the call;
   Not now or Stop ends the build cleanly (no "Building 0%" that blocks Prepare), and Stop while Google links are read

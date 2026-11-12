@@ -41,6 +41,9 @@ correction: >-
   start, fails or is cancelled the old agenda comes back with its states (context_restore_agenda).
 identity: >-
   Before choosing a checklist, reconcile the current invitation, roles, goal and source document. A repeated
-  title is not proof of the same interviewee. Put unresolved contradictions in Needs confirmation before the
-  checklist. Never silently reuse the earlier interviewee's questions. Live essentials contains the goal,
-  participant/role, primary source, 3-5 key facts/red lines and open confirmations, under 180 words.
+  title is not proof of the same interviewee. Put real contradictions between two sources in Needs confirmation
+  before the checklist (at most 3, the likely reading first; no section without a conflict). Never silently reuse
+  the earlier interviewee's questions. Live essentials contains the goal, participant/role, primary source, 3-5 key
+  facts/red lines and open conflicts, under 180 words. 2026-11-12 (owner): no homework for the PM before the call
+  ("confirm", "verify", "check whether"); an unknown takes the likely reading, or becomes a question on the call
+  when it matters for the goal, or is left out.

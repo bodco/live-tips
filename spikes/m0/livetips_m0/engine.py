@@ -1778,18 +1778,23 @@ class Engine:
         """0.10.0 (Meeting Sheet, hardening): the folders' search index, built once in the background (call start or
         first question) and rebuilt lazily in the background when older than lookup_refresh_s (default 300 s); the
         current one answers meanwhile. None when off (cfg lookup_index false)."""
-        if not roots or self.cfg.get("lookup_index") is False:
+        from .sheet.lookup import FolderIndex, sheet_folder_roots
+        # 0.10.0 (Meeting Sheet, folders): the sheet's folder sources are indexed in full (deep), next to the roots
+        try:
+            deep = sheet_folder_roots(self._sheet())
+        except Exception:  # noqa: BLE001
+            deep = []
+        if (not roots and not deep) or self.cfg.get("lookup_index") is False:
             return None
-        from .sheet.lookup import FolderIndex
-        key = (tuple(str(r) for r in roots[:4]), self._call_prefix())
+        key = (tuple(str(r) for r in roots[:4]), self._call_prefix(), tuple(deep))
         with self._fidx_lock:
             cur = getattr(self, "_fidx", None)
             if cur is None or cur.key != key:
-                cur = self._fidx = FolderIndex(roots[:4], exclude_prefix=key[1],
+                cur = self._fidx = FolderIndex(roots[:4], exclude_prefix=key[1], deep=deep,
                                                ttl=float(self.cfg.get("lookup_refresh_s", 300))).start()
                 self._fidx_next = None
             elif cur.stale() and getattr(self, "_fidx_next", None) is None:
-                nxt = self._fidx_next = FolderIndex(roots[:4], exclude_prefix=key[1], ttl=cur.ttl)
+                nxt = self._fidx_next = FolderIndex(roots[:4], exclude_prefix=key[1], ttl=cur.ttl, deep=deep)
 
                 def swap():
                     nxt.build()

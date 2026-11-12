@@ -62,7 +62,7 @@ Settings > AI has three tabs: Claude (Claude account, Claude API), ChatGPT and G
 
 Codex preparation uses a text context pack built by Pacenote (call context, added files, project config,
 local Notion mirror, earlier calls and digest), and Pacenote writes the brief, speech, cards and facts. The
-model has no shell, MCP, web search or subagents. Codex jobs are ephemeral and may start slower than direct
+model has no shell, MCP, web search or subagents. Each Codex job's session log is removed by its id right after Pacenote reads its usage limits; jobs may start slower than direct
 API requests; API spending caps do not measure your account-plan usage. Plan-limit and sign-in failures are
 shown without switching providers. Prepared cards and local project search remain available, while Claude
 Code's deep folder lookup is disabled for OpenAI/Codex live tips. Failed or incomplete answers are errors.

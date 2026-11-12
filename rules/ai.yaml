@@ -7,17 +7,17 @@ routes:
     ChatGPT account through the official Codex CLI (forced_login_method=chatgpt), never API-key credentials.
     Available for prep, tips and after. The CLI handles browser login and token storage; Pacenote checks
     login status but never reads or copies auth.json. Requests use an empty temporary working directory,
-    ephemeral sessions, ignored user config, read-only sandbox, no approvals, shell, web search, MCP,
+    a session log kept only until Pacenote reads its rate limits and removes it by id (0.10.0), ignored user config, read-only sandbox, no approvals, shell, web search, MCP,
     plugins, hooks, memories or subagents. Prompts go through stdin; stderr and credentials are not logged.
     The default Codex model is used (codex/default in the ledger); plan usage is not billed to an API key.
-    No automatic provider switching. For prep, livetips_m0.codexprep uses the localprep context pack and
+    0.10.0: switches like every AI through the chain below (chain). For prep, livetips_m0.codexprep uses the localprep context pack and
     prompt contracts; Pacenote writes and checks the output files itself and restores the previous prep
     on failure. Live tips keep the local cards and search; the deep folder lookup follows the preparation (deep_lookup).
   openai: |
     OpenAI API key from macOS Keychain (OPENAI_API_KEY in the child process only), the job's OpenAI model (Settings > AI; defaults gpt-6-luna for tips, gpt-6.1-sol for preparation and after the call) through the
     streaming Responses API with reasoning effort none and store false. Available for tips, after-call jobs and,
     from 0.9.0, the preparation (livetips_m0.openaiprep: the same context pack and passes as the ChatGPT account
-    route, Pacenote writes and checks the files and restores the previous prep on failure). No automatic fallback from OpenAI to Claude or local. Live-call
+    route, Pacenote writes and checks the files and restores the previous prep on failure). 0.10.0: an outage (insufficient_quota, a bad key) moves the job down the chain below. Live-call
     spending limits apply; cached input tokens are counted separately from uncached input. With tips on OpenAI the
     deep folder lookup follows the preparation's way (deep_lookup); the local project search and prepared cards remain.
     Incomplete, refused, failed or unterminated streams are errors, with one exception (0.9.2, audit of a 04.11 call:
@@ -39,8 +39,8 @@ routes:
     maxOutputTokens counts the thinking too, so the answer limit gets room on top (128 for minimal, 512 for low).
     Caching is implicit (a stable prefix of 4,096 tokens or more, no write charge). An answer cut by the output limit
     follows the OpenAI rules (a whole JSON object at the start is kept, otherwise asked once more with three times
-    the limit). Errors name only the status and a string code, never the message. No automatic fallback from a
-    chosen Gemini to Claude, OpenAI or local. Available for tips, after-call jobs and the preparation
+    the limit). Errors name only the status and a string code, never the message. 0.10.0: an outage (402,
+    quota_exceeded, failed_precondition, 401/403) moves the job down the chain below. Available for tips, after-call jobs and the preparation
     (livetips_m0.geminiprep). With tips on Gemini the deep folder lookup follows the preparation's way (deep_lookup).
   agy: |
     0.9.3 (owner, 2026-11-05): the Gemini account through Google's Antigravity CLI (agy), for the preparation and the
@@ -51,11 +51,12 @@ routes:
     Reading outside the folder, writing and shell commands are denied in print mode; a denied action with no answer
     is an error, as is a status other than SUCCESS. agy keeps every conversation under ~/.gemini/antigravity-cli
     (brain/<id>, annotations/<id>.pbtxt); Pacenote removes the ones it made, by id, and nothing else. No API price
-    (paid by the plan). No automatic switch from a chosen agy. Plan B for those jobs when no Gemini key is set.
+    (paid by the plan). 0.10.0: switches through the chain below like every AI; never a step for tips.
     Settings shows a red warning when it is chosen: Google's Antigravity terms (antigravity.google/terms, read
     2026-11-05) forbid using the service through third-party software, with suspension of the account as the stated
     consequence, and let Google use and review Interactions (Telemetry off does not stop storage).
   gemini_fallback: |
+    Replaced in 0.10.0 by the chain below (the setting is no longer shown or read when the app sends a chain).
     0.9.3 (owner): plan B, off by default (Settings > AI > Automatic switching). With it on and a Gemini key set, a job
     whose chosen way is out (no credit, plan limit, bad key, not signed in; a plain rate limit or a timeout is not an
     outage) goes to Gemini: after the other Claude way when auto-switch is on, before the model on this Mac. Tips
@@ -134,8 +135,8 @@ provider_limits: |
   Claude (route api), OpenAI, Gemini, from spend-ledger.jsonl of the current month. Only providers with a key are shown
   and alerted. The alert share: one notification a month and an orange menu bar icon. The limit: the router treats
   that provider's way as not usable (livetips_m0.cost.ProviderCaps via sidecar-config provider_caps and
-  LT_PROVIDER_CAPS; the preparation in PrepRunner too); with auto-switch Claude moves to the account, otherwise the
-  request fails with "the monthly limit ... is reached". A limit is not an outage (the way is not marked down). The
+  LT_PROVIDER_CAPS; the preparation in PrepRunner too); the job moves down the chain below (0.10.0), with the chain
+  off the request fails with "the monthly limit ... is reached". A limit is not an outage (the way is not marked down). The
   ledger is read at most every 30 s, so a request may pass the limit by one call.
 economy: |
   0.9.6 Б1 (owner, 2026-11-06): economy mode v1 = the least API money, the accounts' plans pay where they can. Switched
@@ -160,12 +161,46 @@ ask_model: |
   on the tips model (speed first). The quick answer searches the project folder and the added folders; HELP NOW
   searches them for the other side's last question.
 fallback: |
+  0.10.0: the model on this Mac is the last step of the chain below for the preparation, after-call jobs and typed
+  questions (its checkbox there is the same switch as "Use it when Claude does not answer").
   0.8.5 (owner: plan B when Claude is down): with "Use it when Claude does not answer" on (default), a preparation or
   an after-the-call job whose Claude ways are both out (no credit, plan limit, signed out, not installed) runs on the
   model on this Mac (Settings > AI > Model on this Mac). Measured quality is about 60% of Sonnet (docs 14.1g), so
   what it writes is read before use. Tips during a call never fall back: the local model answers in 19-59 s and
   bge-m3 is a search model that cannot write; when Claude is out during a call the instant cards and facts (bge-m3
   and keywords) still show.
+chain: |
+  0.10.0 (owner, 2026-11-12): one fallback chain for every job (LiveTipsCore/AIChain.swift, livetips_m0.routing:
+  chain_order, RoutedProvider with a chain; Settings > AI > If an AI is out). The AI chosen for the job first, then the
+  other connected AIs in the order the PM sets (a reorderable list with a checkbox each; default: Claude account,
+  ChatGPT account, Claude API, OpenAI API, Gemini API, Gemini account (agy), model on this Mac). Connected AIs are in
+  it by default: sending call text to another provider when the chosen one is out is fine (owner 12.11; the 0.9.3
+  "plan B is the PM's explicit privacy choice, off by default" rule is gone). The model on this Mac is always the last
+  step for the preparation (Meeting Sheet build), after-call jobs and typed questions, never for live tips (19-59 s);
+  agy never for tips (20-30 s a request). Tips use only cloud AIs; when all are out the instant cards and facts keep
+  working. "Switch to the next AI automatically" off: the chosen AI only, as before.
+  What switches: a runtime outage, not only a static check: Codex "usage limit reached", a plan limit, out of credits,
+  a 429 with a quota or limit code (insufficient_quota, quota_exceeded), a bad key (401/403), signed out, not installed.
+  A plain short rate limit (429 rate_limit_exceeded) or a timeout never switches. The out AI is marked in
+  state/ai-routes.json with "until" when the error names a reset time ("try again at 12:48 PM", "resets 9am", "try
+  again in 2 hours", Claude Code's "limit reached|<unix time>"), else it is checked again every 15 minutes; the job
+  goes back to the chosen AI once it answers. Never silent: every switch is a line in state/ai-switches.jsonl
+  {at, job, from, to, reason}; Home's AI status icon and the tips window list the switches of the last hour, a
+  switch outside a call is a notification, the Meeting Sheet build shows it in its views (SheetRunner.switchNotice)
+  and in the report (notes, sheet route_switches). The Meeting Sheet build moves a failed pass to the next AI inside
+  the same build (sheet/build.py Asker.switch, the app gives the chain's keys to that child only); when Claude Code is
+  out before any pass the build goes on packed on the next AI (web pages only Claude would have fetched are named as
+  skipped). Codex's limit message keeps only its reset part ("try again at 12:48 pm"), never its links.
+  Usage shown by the status icon (Home top bar, the tips window header; red octagon: an AI the current jobs chose or
+  use is at a limit or out; orange triangle: >= 95% of an account or <= $1 left of an API's monthly limit; a chip
+  otherwise): the Claude account from Claude Code's rate_limit_event (five_hour, seven_day: utilization, resetsAt),
+  stored per account in state/ai-accounts.json by every Claude Code run the app does; the ChatGPT account from Codex's
+  rate_limits (primary, secondary: used_percent, window_minutes, resets_at) when an event carries it, else the newest
+  rate_limits line of Codex's own session logs (~/.codex/sessions, the last 7 days; only that object is read). Check
+  of 2026-11-12: `codex exec --json` (0.167.0-alpha.3.2) printed no rate_limits (thread.started, turn.started, error,
+  turn.failed at a reached limit); the session logs have them in token_count events. The APIs: "$X left of your $Y
+  monthly limit" from Settings > AI > Spending limits and spend-ledger.jsonl (a provider does not give the balance
+  through a key); the model on this Mac "no limit"; agy "usage not reported". Never a key or a token in these files.
 prep_runs:
   rule: |
     0.8.5 (owner: compare preparations by time, price and quality): a full preparation (not a refresh) moves the

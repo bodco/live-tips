@@ -88,20 +88,37 @@ def lookup(cfg: dict, question: str, transcript_tail: List[str], lang: str, time
     if not claude:
         return {"error": "Claude Code (the claude command) is not installed"}
     try:
-        r = subprocess.run(deep_args(cfg, claude, question, transcript_tail, lang), cwd=root, env=deep_env(cfg, os.environ, economy=economy),
+        env = deep_env(cfg, os.environ, economy=economy)
+        r = subprocess.run(deep_args(cfg, claude, question, transcript_tail, lang), cwd=root, env=env,
                            capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return {"error": "the search took too long"}
     except OSError as e:
         return {"error": "could not start Claude Code: " + str(e)[:80]}
+    note_usage(cfg, r.stdout, account="ANTHROPIC_API_KEY" not in env)
     return read_result(r.stdout, r.returncode)
+
+
+def note_usage(cfg: dict, stdout: str, account: bool) -> None:
+    """0.10.0 (status fix): the Claude account's own limit report (rate_limit_event) of this run, for the AI status.
+    Only when the account answered (no API key in the child); numbers only."""
+    if not account:
+        return
+    try:
+        from .routing import cc_stream_result, note_account_usage
+        st = (cfg.get("ai") or {}).get("state") or os.environ.get("LT_AI_STATE")
+        if st:
+            note_account_usage("code", cc_stream_result(stdout)[1], st)
+    except Exception:  # noqa: BLE001  a hint for the UI, never a reason to fail the lookup
+        pass
 
 
 def deep_args(cfg: dict, claude: str, question: str, transcript_tail: List[str], lang: str) -> List[str]:
     """Read-only Claude Code: Read, Grep and Glob over the folders; the call lines go in as data."""
     prompt = ("Question from the PM: " + question.strip()[:600] + "\n\n<transcript_data>\n" +
               "\n".join(x[:400] for x in transcript_tail[-8:]) + "\n</transcript_data>")
-    args = [claude, "-p", prompt, "--model", cfg.get("deep_model") or "sonnet", "--output-format", "json",
+    # 0.10.0 (status fix): stream-json, so the account's rate_limit_event comes too (read_result takes the result event)
+    args = [claude, "-p", prompt, "--model", cfg.get("deep_model") or "sonnet", "--output-format", "stream-json", "--verbose",
             "--append-system-prompt", SYSTEM.replace("{lang}", lang),
             "--permission-mode", "default", "--allowedTools", "Read,Grep,Glob",
             "--disallowedTools", "Bash,Write,Edit,NotebookEdit,WebFetch,WebSearch,Task",
@@ -125,9 +142,9 @@ def deep_env(cfg: dict, environ, economy: bool = False) -> dict:
 
 
 def read_result(stdout: str, returncode: int) -> dict:
-    try:
-        out = json.loads(stdout or "{}")
-    except json.JSONDecodeError:
+    from .routing import cc_stream_result
+    out = cc_stream_result(stdout)[0]
+    if not out and (stdout or "").strip():          # output that is not Claude Code's (an empty one: no answer)
         return {"error": "Claude Code gave no result (exit {})".format(returncode)}
     cost = out.get("total_cost_usd") or 0.0
     from .engine import first_json

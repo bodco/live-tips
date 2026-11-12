@@ -42,6 +42,7 @@ final class SheetRunner: ObservableObject {
         var switchedFrom: String?
         var switchReason: String?
         var live = false                 // 0.10.0 (round 2): Prepare again during this very call
+        var tried: [String] = []         // 0.10.0 (AI chain): the AIs this build already tried (app and engine)
     }
 
     @Published var running = false
@@ -126,6 +127,19 @@ final class SheetRunner: ObservableObject {
         return order.first { $0 != r && usable($0, config: c) }
     }
 
+    /// 0.10.0 (AI chain, owner 12.11): the next AI of the chain for the preparation that can run now (connected,
+    /// not out or its reset time passed, not at its monthly limit), the ones already tried skipped.
+    static func nextInChain(after tried: [String], config c: AppConfig) -> String? {
+        AIChain.next(Array(AIRoute.order(job: "prep", config: c).dropFirst()), tried: Set(tried)) { usable($0, config: c) && AIRoute.due($0) }
+    }
+
+    /// Why an AI is out now, from the shared out state ("limit reached, resets at 12:48").
+    static func outWhy(_ r: String) -> String? {
+        guard let st = AIRoute.outStates()[r], st.down, !AIRoute.due(r) else { return nil }
+        let reason = L("ai.reason." + (st.reason.isEmpty ? "error" : st.reason))
+        return st.until.map { L("ai.status.outWhyUntil", ["reason": reason, "time": AIStatus.hhmm($0)]) } ?? reason
+    }
+
     static func whyNot(_ r: String) -> String {
         switch r {
         case AIRoute.codex: return L("ai.codex.missing")
@@ -160,6 +174,16 @@ final class SheetRunner: ObservableObject {
         let chosen = r.callID.flatMap { Self.overrides[$0]?["route"] as? String } ?? c.ai.prep   // 0.10.0 (ui): the route shown in Quick / Expert
         var j = Job(prep: r, base: b, refresh: refresh, interactive: interactive, route: chosen)
         j.live = duringCall
+        // 0.10.0 (AI chain, owner 12.11): the chosen AI cannot run or is out until its reset time: the next AI of the
+        // chain, automatically and never silently (a line in the build views, a banner, the report)
+        if c.ai.autoSwitch, !Self.usable(chosen, config: c) || Self.outWhy(chosen) != nil {
+            let why = Self.outWhy(chosen) ?? Self.whyNot(chosen)
+            guard let alt = Self.nextInChain(after: [chosen], config: c) else { return why }
+            j.route = alt; j.switchedFrom = chosen; j.switchReason = why; j.tried = [chosen]
+            noticeSwitch(from: chosen, to: alt, why: why)
+            AIRoute.noteSwitch(job: "prep", from: chosen, to: alt, reason: AIRoute.outStates()[chosen]?.reason ?? "missing")
+            return launch(j)
+        }
         if !Self.usable(chosen, config: c) {
             guard let alt = Self.alternative(to: chosen, config: c) else { return Self.whyNot(chosen) }
             let why = Self.whyNot(chosen)
@@ -241,6 +265,11 @@ final class SheetRunner: ObservableObject {
             p == liveFile ? ["path": p, "title": L("sheet.live.transcriptSource"), "type": "transcript"]
                           : ["path": p, "title": (p as NSString).lastPathComponent]
         }
+        // 0.10.0 (Meeting Sheet, folders): a folder added to the call is a folder source (its recent files for the
+        // preparation, all of it searchable during the call), not a list of candidates
+        for f in r.folders where StartCallModel.isDir(f) {
+            sources.append(["path": f, "type": SourceType.folder.rawValue, "title": (f as NSString).lastPathComponent])
+        }
         if let d = r.deck, let info = d.info {
             var owners: [String: String] = [:]
             for (k, v) in d.owners { owners[String(k)] = v }
@@ -265,7 +294,7 @@ final class SheetRunner: ObservableObject {
             "language": L10n.lang, "languages": r.languages, "route": j.route, "model": model,
             "project": ["slug": r.slug, "root": r.root, "config": r.config],
             "call_type": r.callType, "audience": r.audience, "context": r.context,
-            "sources": sources, "folders": r.folders.filter { StartCallModel.isDir($0) },
+            "sources": sources, "folders": [String](), "options": ["folder_days": SheetPrefs.storedFolderDays],
             "use_project_folder": r.useProjectFolder, "live": live, "base": j.base, "app_root": appRoot,
             "lt": [c.engine.python, lt], "google": google, "notion": ["connected": false],
             "auto_pick": 12, "on_too_much": "passes", "timeout": 1500
@@ -276,6 +305,9 @@ final class SheetRunner: ObservableObject {
         }
         if let from = j.switchedFrom { req["route_switch"] = ["from": from, "to": j.route, "reason": j.switchReason ?? ""] }
         if let claude = PrepRunner.claudePath { req["claude"] = claude }
+        // 0.10.0 (Meeting Sheet, fix 2026-11-12, owner): the Tracker of every build: the project's register, for a
+        // workspace call every project of the workspace (the sidecar adds the folders added to the call)
+        req["tracker_folders"] = Self.trackerFolders(root: r.root)
         // 0.10.0 (Meeting Sheet, phase 4, ui agent): the wizard's choices win; its sources come first, the deck and
         // the files found here stay unless the wizard has them; nothing is auto-picked once the person ticked.
         if let id = r.callID, let o = Self.overrides[id] {
@@ -286,6 +318,18 @@ final class SheetRunner: ObservableObject {
             req["auto_pick"] = nil
         }
         return req
+    }
+
+    /// The live folders whose commitments register feeds the sheet's Tracker source (sheet/tracker.py).
+    static func trackerFolders(root: String) -> [String] {
+        let reg = ProjectRegistry.load(from: AppPaths.projects)
+        var roots = [root]
+        if let ws = reg.workspaces.first(where: { $0.root == root }) {
+            roots += reg.projects.filter { $0.status != "archived" && !$0.root.isEmpty && ($0.workspace == ws.name || ws.projects.contains($0.slug)) }
+                .map(\.root)
+        }
+        var seen = Set<String>()
+        return roots.filter { !$0.isEmpty }.map { ($0 as NSString).appendingPathComponent("live") }.filter { seen.insert($0).inserted }
     }
 
     private func launch(_ j: Job) -> String? {
@@ -372,6 +416,12 @@ final class SheetRunner: ObservableObject {
         if let cd = try? JSONSerialization.data(withJSONObject: ["actions": [Any]()]) { try? cd.write(to: URL(fileURLWithPath: ctl), options: .atomic) }
         Self.controlPath = ctl
         req["control"] = ctl
+        // 0.10.0 (AI chain, owner 12.11): the next AIs of the chain (connected, enabled, in the PM's order) and their
+        // models, so the engine moves a failed pass to the next AI without stopping the build
+        let chain = c.ai.autoSwitch ? AIRoute.order(job: "prep", config: c).filter { $0 != j.route && !j.tried.contains($0) } : []
+        req["chain"] = [j.route] + chain
+        req["models"] = ["openai": c.ai.openaiPrep, "gemini": c.ai.geminiPrep, "agy": c.ai.agyPrep, "local": LocalLLM.model,
+                         "code": PrepRunner.shared.model, "api": PrepRunner.shared.model]
         req["control_wait_s"] = j.interactive ? 30 : 0
         guard let d = try? JSONSerialization.data(withJSONObject: req, options: [.prettyPrinted]) else { return L("sheet.err.request") }
         try? d.write(to: URL(fileURLWithPath: reqPath))
@@ -385,6 +435,7 @@ final class SheetRunner: ObservableObject {
         env["PATH"] = [home + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", env["PATH"] ?? ""].joined(separator: ":")
         for k in ["ANTHROPIC_API_KEY", "ANTHROPIC_CUSTOM_HEADERS", "OPENAI_API_KEY", "GEMINI_API_KEY"] { env.removeValue(forKey: k) }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
+        env["LT_AI_STATE"] = AIRoute.statePath          // 0.10.0 (AI chain): the shared out state, switches, account usage
         switch j.route {
         case AIRoute.api:
             if let key = store.get(.claudeAPIKey), !key.isEmpty {
@@ -396,6 +447,18 @@ final class SheetRunner: ObservableObject {
         case AIRoute.agy: env = AgyCLI.environment(env); env["LT_AGY_CLI"] = AgyAccount.cliPath
         case AIRoute.codex: env = CodexCLI.environment(env); env["LT_CODEX_CLI"] = CodexAccount.cliPath
         default: break
+        }
+        // 0.10.0 (AI chain): after the route's own environment (an account's strips every key): the keys of the
+        // chain's API AIs too; the account providers strip them again for their own CLI (to the child only, never written or logged)
+        for r in chain {
+            switch r {
+            case AIRoute.api: if let k = store.get(.claudeAPIKey), !k.isEmpty { env["CLAUDE_API"] = k }
+            case AIRoute.openai: if let k = store.get(.openaiAPIKey), !k.isEmpty { env["OPENAI_API_KEY"] = k }
+            case AIRoute.gemini: if let k = store.get(.geminiAPIKey), !k.isEmpty { env["GEMINI_API_KEY"] = k }
+            case AIRoute.agy: env["LT_AGY_CLI"] = AgyAccount.cliPath
+            case AIRoute.codex: env["LT_CODEX_CLI"] = CodexAccount.cliPath
+            default: break
+            }
         }
         if let claude = PrepRunner.claudePath { env["LT_CLAUDE_CLI"] = claude }
         p.environment = env
@@ -445,6 +508,18 @@ final class SheetRunner: ObservableObject {
                 else if st == "reading" || st == "summarize" { s.status = "reading" }
                 sources[sid] = s
             }
+            if st == "switch", let to = o["to"] as? String {       // 0.10.0 (AI chain): the engine moved a pass on
+                let from = (o["from"] as? String) ?? (job?.route ?? "")
+                let why = L("ai.reason." + ((o["reason"] as? String) ?? "error"))
+                if var jj = job {
+                    if jj.switchedFrom == nil { jj.switchedFrom = from; jj.switchReason = why }
+                    jj.tried.append(from); jj.route = to
+                    job = jj
+                }
+                PrepRunner.shared.runRoute = to
+                noticeSwitch(from: from, to: to, why: why)
+                continue
+            }
             if let n = o["pass"] as? Int { pass = n }
             if let n = o["passes"] as? Int { passes = n }
             let name: String
@@ -463,8 +538,10 @@ final class SheetRunner: ObservableObject {
         }
     }
 
-    private func finished(_ j: Job, code: Int32) {
+    private func finished(_ j0: Job, code: Int32) {
         process = nil
+        var j = job ?? j0                 // 0.10.0 (AI chain): the route the engine switched to, if it did
+        if let r = lastOutcome["route"] as? String, !r.isEmpty, r != "fake" { j.route = r }
         let o = lastOutcome
         let ok = code == 0 && (o["done"] as? Bool) == true
         let routeName = j.route == AIRoute.code ? "plan" : j.route
@@ -492,9 +569,21 @@ final class SheetRunner: ObservableObject {
             let err = (o["error"] as? String) ?? L("prep.failedExit", ["code": "\(code)"])
             result = err
             if let why = AIRoute.outReason(j.route, err) {
-                AIRoute.markDown(j.route, why)
+                AIRoute.markDown(j.route, why, text: err)
                 let c = AIRoute.effective(AppConfig.load(from: AppPaths.config))
-                if j.switchedFrom == nil, let alt = Self.alternative(to: j.route, config: c) {
+                // 0.10.0 (AI chain, owner 12.11): the next AI of the chain, automatically, with a notice; every AI once
+                let tried = j.tried + [j.route] + (((o["switches"] as? [[String: Any]]) ?? []).compactMap { $0["from"] as? String })
+                if c.ai.autoSwitch, let alt = Self.nextInChain(after: tried, config: c) {
+                    PrepRunner.ledger(job: "prep", route: routeName, usd: usd, meta: meta, ok: false)
+                    var j2 = j
+                    end(j, ok: false, notify: false)
+                    j2.switchedFrom = j2.switchedFrom ?? j.route; j2.switchReason = err; j2.route = alt; j2.tried = tried
+                    noticeSwitch(from: j.route, to: alt, why: L("ai.reason." + why))
+                    AIRoute.noteSwitch(job: "prep", from: j.route, to: alt, reason: why)
+                    if let e = launch(j2) { fail(j2, e) }
+                    return
+                }
+                if !c.ai.autoSwitch, j.switchedFrom == nil, let alt = Self.alternative(to: j.route, config: c) {
                     PrepRunner.ledger(job: "prep", route: routeName, usd: usd, meta: meta, ok: false)
                     var j2 = j
                     end(j, ok: false, notify: false)

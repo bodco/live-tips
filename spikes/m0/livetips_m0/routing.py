@@ -18,6 +18,12 @@ monthly limit; Claude Code: the plan limit, signed out, not installed), the work
 out route is checked again before the next job (during a call: in the background, every 2 minutes), and the
 job goes back to it as soon as it answers. The app, the tips engine and the one-off jobs share the state in one
 small file (state/ai-routes.json), so Settings > AI can show it.
+
+0.10.0 (AI chain, owner 12.11; rules/ai.yaml > chain): with a chain from the app (LT_AI_CHAIN, sidecar ai.chain) every
+job, whatever AI it chose, goes down one chain on an outage: the chosen AI, then the connected AIs in the PM's order,
+the model on this Mac last (never for tips, nor agy). The out AI is marked until its reset time when the error names
+one (else checked again every 15 minutes) and every switch is a line in state/ai-switches.jsonl. Without a chain (an
+older app) the rules above apply unchanged.
 """
 import argparse
 import json
@@ -34,7 +40,12 @@ from .providers import AnthropicProvider, Completion, Provider, gist_closed, use
 
 ROUTES = ("api", "code", "local", "openai", "codex", "gemini", "agy")   # 0.8.5: "local" = a model on this Mac (rules/ai.yaml)
 JOBS = ("prep", "tips", "after")
-PROBE_EVERY_S = 120
+# 0.10.0 (AI chain, owner 12.11): an AI out without a known reset time is checked again every 15 minutes
+PROBE_EVERY_S = 900
+# 0.10.0 (AI chain, owner 12.11): one fallback chain for every job (LiveTipsCore/AIChain.swift, rules/ai.yaml > chain):
+# the job's AI first, then the connected AIs in the PM's order; tips never on the model on this Mac or the Gemini
+# account; the model on this Mac always the last step.
+CHAIN_DEFAULT = ("code", "codex", "api", "openai", "gemini", "agy", "local")
 PING_MODEL = {"codex": "codex/default", "openai": "gpt-6-luna", "gemini": "gemini-3.5-flash-lite", "agy": "gemini-3.8-flash-low", "api": "claude-haiku-5-5", "code": "haiku", "local": os.environ.get("LT_LOCAL_MODEL", "gemma4:26b")}
 
 
@@ -85,12 +96,181 @@ def cc_model(model: str) -> str:
     return model or "sonnet"
 
 
+def chain_allowed(route: str, job: str) -> bool:
+    """0.10.0 (AI chain): live tips never run on the model on this Mac (19-59 s) or the Gemini account (20-30 s)."""
+    return not (job == "tips" and route in ("local", "agy"))
+
+
+def chain_order(job: str, chosen: str, chain, connected, auto: bool = True) -> list:
+    """The order a job tries its AIs (same as AIChain.order in Swift): the chosen one first, then the connected AIs
+    of `chain` (the enabled routes in the PM's order), the model on this Mac last."""
+    out = [chosen]
+    if not auto:
+        return out
+    local = False
+    seen = set(out)
+    for r in chain or ():
+        if r in seen or r not in ROUTES or r not in connected or not chain_allowed(r, job):
+            continue
+        seen.add(r)
+        if r == "local":
+            local = True
+        else:
+            out.append(r)
+    if local:
+        out.append("local")
+    return out
+
+
+def chain_from(value) -> Optional[list]:
+    """LT_AI_CHAIN (a JSON list) or sidecar-config ai.chain; None when the app did not send one (older app)."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return None
+    return [str(r) for r in value if str(r) in ROUTES] if isinstance(value, (list, tuple)) else None
+
+
+_UNIT_S = {"d": 86400, "h": 3600, "m": 60}
+
+
+def reset_time(text: Optional[str], now: Optional[float] = None) -> Optional[float]:
+    """0.10.0 (AI chain): the reset time an error names (same rules as AIOut.resetTime in Swift): "try again at
+    12:48 PM", "resets 9am", "resets at 15:30", "try again in 2 hours 5 minutes", "resets_at": 1793731185. The next
+    such local clock time after now; None when there is none."""
+    import re
+    import datetime as _dt
+    t = (text or "").lower()
+    if not t:
+        return None
+    now = time.time() if now is None else now
+    m = re.search(r'resets?_?at"?\s*[:=]\s*(\d{9,11})', t) or re.search(r"limit reached\|(\d{9,11})", t)
+    if m:
+        return float(m.group(1))
+    m = re.search(r"(?:try again|resets?|available again)\s+in\s+((?:\d+\s*(?:days?|d|hours?|hrs?|h|minutes?|mins?|m)\b[\s,]*(?:and\s+)?)+)", t)
+    if m:
+        secs = sum(int(n) * _UNIT_S[u[0]] for n, u in re.findall(r"(\d+)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m)\b", m.group(1)))
+        if secs:
+            return now + secs
+    m = re.search(r"(?:try again at|resets? at|resets|reset|available again at)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?", t)
+    if not m or (m.group(2) is None and m.group(3) is None):
+        return None
+    h, mi, ap = int(m.group(1)), int(m.group(2) or 0), m.group(3) or ""
+    if ap.startswith("p") and h < 12:
+        h += 12
+    if ap.startswith("a") and h == 12:
+        h = 0
+    if h > 23 or mi > 59:
+        return None
+    base = _dt.datetime.fromtimestamp(now)
+    d = base.replace(hour=h, minute=mi, second=0, microsecond=0)
+    if d.timestamp() <= now:
+        d = d + _dt.timedelta(days=1)
+    return d.timestamp()
+
+
+def account_usage_claude(ev: dict, now: Optional[float] = None) -> Optional[dict]:
+    """0.10.0 (AI chain): a Claude Code stream-json rate_limit_event as {"at", "limited", "windows": [{"name",
+    "used_percent", "resets_at"}]} (same as AIAccountUsage.fromClaude in Swift)."""
+    if not isinstance(ev, dict) or ev.get("type") != "rate_limit_event":
+        return None
+    info = ev.get("rate_limit_info") or {}
+    ws = []
+    uw = info.get("unifiedWindows")
+    if isinstance(uw, dict):
+        for k in ("five_hour", "seven_day"):
+            w = uw.get(k) or {}
+            if isinstance(w, dict) and w.get("utilization") is not None:
+                ws.append({"name": k, "used_percent": round(float(w["utilization"]) * 100, 1), "resets_at": w.get("resetsAt")})
+    elif info.get("utilization") is not None:
+        ws.append({"name": info.get("rateLimitType") or "five_hour", "used_percent": round(float(info["utilization"]) * 100, 1),
+                   "resets_at": info.get("resetsAt")})
+    if not ws:
+        return None
+    out = {"at": time.time() if now is None else now, "limited": info.get("status") == "rejected", "windows": ws}
+    if out["limited"]:                     # 0.10.0 (status fix): the limit holds until the account's reset time
+        resets = [w["resets_at"] for w in ws if w.get("resets_at")]
+        until = info.get("resetsAt") or (max(resets) if resets else None)
+        if until:
+            out["until"] = until
+    return out
+
+
+def account_usage_codex(rl: dict, now: Optional[float] = None) -> Optional[dict]:
+    """0.10.0 (AI chain): a Codex rate_limits object (primary / secondary: used_percent, window_minutes, resets_at)."""
+    if not isinstance(rl, dict):
+        return None
+    ws = []
+    for k in ("primary", "secondary"):
+        w = rl.get(k)
+        if isinstance(w, dict) and w.get("used_percent") is not None:
+            mins = int(w.get("window_minutes") or 0)
+            ws.append({"name": "five_hour" if mins == 300 else "seven_day" if mins == 10080 else "%dm" % mins,
+                       "used_percent": float(w["used_percent"]), "resets_at": w.get("resets_at")})
+    if not ws:
+        return None
+    out = {"at": time.time() if now is None else now, "limited": False, "windows": ws}
+    reached = rl.get("rate_limit_reached_type")
+    full = [w for w in ws if w["used_percent"] >= 100]
+    if reached is None and not full:
+        return out
+    # 0.10.0 (status fix, same as AIAccountUsage.fromCodex): limit reached until the window at 100% resets, else the
+    # one the account names (primary = 5 hours, secondary = the week), else the later reset
+    r = str(reached or "").lower()
+    named = [w for w in ws if (w["name"] == "five_hour" and "primary" in r) or (w["name"] == "seven_day" and "secondary" in r)]
+    pick = [w["resets_at"] for w in (full or named or ws) if w.get("resets_at")]
+    out["limited"] = True
+    if pick:
+        out["until"] = max(pick)
+    return out
+
+
+def accounts_path(state_path=None) -> Path:
+    return Path(state_path or default_state_path()).with_name("ai-accounts.json")
+
+
+def note_account_usage(route: str, usage: Optional[dict], state_path=None) -> None:
+    """The latest usage an account reported, per account, in state/ai-accounts.json (read by the app's AI status).
+    Numbers only: never a key, a token or any text of the request."""
+    if not usage:
+        return
+    p = accounts_path(state_path)
+    try:
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+            d = d if isinstance(d, dict) else {}
+        except Exception:  # noqa: BLE001
+            d = {}
+        d[route] = usage
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".tmp{}".format(os.getpid()))
+        tmp.write_text(json.dumps(d), encoding="utf-8")
+        os.replace(tmp, p)
+    except Exception:  # noqa: BLE001  a hint for the UI, never a reason to fail a request
+        pass
+
+
+def note_switch(job: str, from_route: str, to_route: str, reason: str, state_path=None) -> None:
+    """0.10.0 (AI chain): never silent. One line per switch in state/ai-switches.jsonl; the app shows the recent ones
+    (Home, the tips window) and notifies the PM about a job that switched outside a call."""
+    try:
+        p = Path(state_path or default_state_path()).with_name("ai-switches.jsonl")
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"at": time.time(), "job": os.environ.get("LT_AI_STAGE") or job, "from": from_route,
+                                "to": to_route, "reason": reason}) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
+
+
 # Why a route is out, by the words of its error. (route or None for both, reason, words); first match wins.
 OUT_REASONS = [
     ("codex", "auth", ("not logged in",)),
-    ("codex", "limit", ("usage limit",)),
+    ("codex", "limit", ("usage limit", "hit your limit", "purchase more credits")),
     ("openai", "auth", ("http 401", "http 403")),
-    ("openai", "credit", ("insufficient_quota",)),
+    ("openai", "credit", ("insufficient_quota", "billing_hard_limit", "exceeded your current quota")),
     # 0.9.3: Gemini: 401 a bad key, 403 no permission, 402 prepay credit gone, 429 quota_exceeded the day's quota,
     # 400 failed_precondition billing off. A plain 429 (rate_limit_exceeded) is a passing error: not listed.
     ("agy", "auth", ("not signed in",)),
@@ -99,7 +279,7 @@ OUT_REASONS = [
     ("gemini", "credit", ("http 402", "quota_exceeded", "failed_precondition")),
     (None, "no_key", ("no api key",)),
     (None, "missing", ("noroute", "not installed")),
-    (None, "credit", ("credit balance", "billing", "insufficient")),
+    (None, "credit", ("credit balance", "billing", "insufficient", "out of credits")),
     ("api", "auth", ("authentication", "x-api-key", "permissiondenied")),
     ("code", "limit", ("limit",)),            # "usage limit reached", "5-hour limit", "weekly limit"
     ("code", "auth", ("login", "logged in", "oauth", "authentication", "invalid api key")),
@@ -142,16 +322,23 @@ class RouteState:
         return bool((self.read().get(route) or {}).get("down"))
 
     def due(self, route: str, every_s: float) -> bool:
-        checked = (self.read().get(route) or {}).get("checked")
+        """0.10.0 (AI chain): an AI out until a known reset time is due at that time; otherwise `every_s` after the
+        last check."""
+        cur = self.read().get(route) or {}
+        if cur.get("down") and cur.get("until"):
+            return time.time() >= float(cur["until"])
+        checked = cur.get("checked")
         return checked is None or time.time() - float(checked) >= every_s
 
-    def mark_down(self, route: str, reason: str) -> None:
+    def mark_down(self, route: str, reason: str, until: Optional[float] = None) -> None:
         with self.lock:
             d = self.read()
             cur = d.get(route) or {}
             now = time.time()
             d[route] = {"down": True, "reason": reason, "since": cur.get("since") if cur.get("down") else now,
                         "checked": now}
+            if until and until > now:
+                d[route]["until"] = float(until)        # 0.10.0 (AI chain): out until the limit resets
             self._write(d)
 
     def mark_up(self, route: str) -> None:
@@ -193,6 +380,34 @@ def text_delta(ev: dict) -> Optional[str]:
     return d.get("text", "") if d.get("type") == "text_delta" else None
 
 
+def cc_stream_result(stdout: str):
+    """0.10.0 (status fix): the output of `claude -p --output-format stream-json --verbose` (or the older single
+    `--output-format json` object): (the final result event or {}, the account's rate_limit_event as usage or None).
+    Every Claude Code run of the app (prep checker, the call's lookup) passes its account report through this."""
+    result, usage = {}, None
+    for line in (stdout or "").splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(ev, dict):
+            continue
+        if ev.get("type") == "rate_limit_event":
+            usage = account_usage_claude(ev) or usage
+        elif ev.get("type") == "result" or "result" in ev and "type" not in ev:
+            result = ev
+    if not result:
+        try:
+            whole = json.loads(stdout or "{}")
+            result = whole if isinstance(whole, dict) else {}
+        except ValueError:
+            result = {}
+    return result, usage
+
+
 def cc_event(c: Completion, line: str, on_text=None) -> Optional[dict]:
     """Applies one stream-json line to the completion; returns the final "result" event when this is it."""
     try:
@@ -201,6 +416,9 @@ def cc_event(c: Completion, line: str, on_text=None) -> Optional[dict]:
         return None
     if ev.get("type") == "result":
         return ev
+    if ev.get("type") == "rate_limit_event":           # 0.10.0 (AI chain): the account's own limit report
+        c.account_usage = account_usage_claude(ev) or c.account_usage
+        return None
     piece = text_delta(ev)
     if piece is None:
         return None
@@ -296,8 +514,13 @@ class RoutedProvider(Provider):
 
     def __init__(self, job: str, preferred: str, legs: Dict[str, Optional[Provider]], auto: bool = True,
                  state: Optional[RouteState] = None, probe_every: float = PROBE_EVERY_S, background: bool = False,
-                 api_blocked: Optional[Callable[[], bool]] = None, gemini_fallback: bool = False, caps=None):
+                 api_blocked: Optional[Callable[[], bool]] = None, gemini_fallback: bool = False, caps=None,
+                 chain: Optional[list] = None):
         self.job = job
+        # 0.10.0 (AI chain, owner 12.11): the enabled AIs in the PM's order (LT_AI_CHAIN, sidecar ai.chain). None: an
+        # older app, the switching rules of 0.9.x below. With a chain every chosen AI may switch, on its own outage.
+        self.chain = list(chain) if chain is not None else None
+        self.chain_auto = bool(auto)
         self.caps = caps          # 0.9.6 (owner): cost.ProviderCaps, a monthly limit per provider; None = no limits
         self.preferred = preferred if preferred in ROUTES else "api"
         self.legs = dict(legs)
@@ -349,8 +572,57 @@ class RoutedProvider(Provider):
             return False
         return self.preferred == "code" or self.auto
 
+    def order(self) -> list:
+        """0.10.0 (AI chain): the AIs this job tries, in order (the chosen one first)."""
+        connected = {r for r, leg in self.legs.items() if leg is not None}
+        return chain_order("tips" if self.background else self.job, self.preferred, self.chain or (), connected,
+                           self.chain_auto)
+
+    def _try_now(self, route: str) -> bool:
+        """An AI of the chain worth a request now: usable, and not out (or out with its check due)."""
+        return self.usable(route) and (not self.state.is_down(route) or self.state.due(route, self.probe_every))
+
+    def _pick_chain(self) -> str:
+        order = self.order()
+        p = order[0]
+        if self._ready(p) or self._recheck(p):
+            return p
+        for r in order[1:]:
+            if self._ready(r):
+                return r
+        for r in order[1:]:
+            if self._try_now(r):
+                return r
+        return p if self.usable(p) else next((r for r in order if self.usable(r)), p)
+
+    def _complete_chain(self, kw) -> Completion:
+        """0.10.0 (AI chain): the job's AI, and on an outage (a limit, no credit, a bad key, signed out; never a plain
+        rate limit or a timeout) the next AI of the chain, until one answers. The out AI is marked until its reset
+        time when the error names one (else checked again in 15 minutes); every switch is written down."""
+        order = self.order()
+        tried = []
+        r = self._pick_chain()
+        while True:
+            c = self._run(r, **kw)
+            tried.append(r)
+            reason = out_reason(r, c.error)
+            if not reason:
+                if not c.error:
+                    self.state.mark_up(r)
+                    if r != self.preferred:
+                        c.switched_from = self.preferred
+                return c
+            self.state.mark_down(r, reason, c.reset_at or reset_time(c.error))
+            nxt = next((x for x in order if x not in tried and self._try_now(x)), None)
+            if nxt is None:
+                return c
+            note_switch(self.job, r, nxt, reason, self.state.path)
+            r = nxt
+
     def pick(self) -> str:
         """The chosen route while it answers; with auto-switch the other one while it is out."""
+        if self.chain is not None:
+            return self._pick_chain()
         p, o = self.preferred, other(self.preferred)
         if self.gemini_fallback():
             # 0.9.3 (owner): plan B. The chosen way while it answers (an out way is checked again as before), then the
@@ -391,8 +663,9 @@ class RoutedProvider(Provider):
         self.state.touch(route)
         c = leg.complete(model=PING_MODEL[route], system=[{"text": "Reply with OK."}], user="OK?", max_tokens=5,
                          cache_ttl=None, extra=None)
+        note_account_usage(route, c.account_usage, self.state.path)
         if c.error:
-            self.state.mark_down(route, out_reason(route, c.error) or "error")
+            self.state.mark_down(route, out_reason(route, c.error) or "error", c.reset_at or reset_time(c.error))
             return False
         self.state.mark_up(route)
         return True
@@ -437,11 +710,14 @@ class RoutedProvider(Provider):
         self.last_route = route
         if leg is not None:
             spend_ledger(self.job, route, c, self.state.path)
+            note_account_usage(route, getattr(c, "account_usage", None), self.state.path)   # 0.10.0 (AI chain)
         return c
 
     def complete(self, *, model, system, user, max_tokens, cache_ttl, on_text=None, extra=None):
         kw = dict(model=model, system=system, user=user, max_tokens=max_tokens, cache_ttl=cache_ttl,
                   on_text=on_text, extra=extra)
+        if self.chain is not None:
+            return self._complete_chain(kw)
         r = self.pick()
         c = self._run(r, **kw)
         if r in self._plan_b() and not c.error:
@@ -549,7 +825,8 @@ def provider_from_env(job: Optional[str] = None, timeout: float = 120.0) -> Prov
     from .cost import ProviderCaps
     return RoutedProvider(j, route, legs, caps=ProviderCaps.from_cfg({}),
                           auto=bool(route) and env.get("LT_AI_AUTO", "1") == "1", state=RouteState(),
-                          gemini_fallback=bool(route) and env.get("LT_GEMINI_FALLBACK") == "1")
+                          gemini_fallback=bool(route) and env.get("LT_GEMINI_FALLBACK") == "1",
+                          chain=chain_from(env.get("LT_AI_CHAIN")) if route else None)
 
 
 def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optional[str] = None,
@@ -572,7 +849,8 @@ def provider_from_cfg(cfg: dict, secret_loader: Callable[[str], str], job: Optio
     from .cost import ProviderCaps
     return RoutedProvider(job, route, legs, auto=bool(ai.get("auto", True)), state=RouteState(ai.get("state")),
                           background=(job == "tips"), caps=ProviderCaps.from_cfg(cfg),
-                          gemini_fallback=bool(ai.get("gemini_fallback", False)) or os.environ.get("LT_GEMINI_FALLBACK") == "1")
+                          gemini_fallback=bool(ai.get("gemini_fallback", False)) or os.environ.get("LT_GEMINI_FALLBACK") == "1",
+                          chain=chain_from(ai.get("chain")) if "chain" in ai else chain_from(os.environ.get("LT_AI_CHAIN")))
 
 
 def main(argv=None) -> int:

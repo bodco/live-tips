@@ -27,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UsageLog.enabled = AppConfig.load(from: AppPaths.config).usageLog
         MainActor.assumeIsolated { AppSignature.shared.check() }     // 2026-10-29: onboarding and About show it
         MainActor.assumeIsolated { TelemetrySender.start() }         // 0.9.4: Help improve Pacenote (off by default)
+        MainActor.assumeIsolated { AIStatusModel.shared.start() }    // 0.10.0 (status fix): limits known from launch
+        MainActor.assumeIsolated { AIUsageProbe.shared.start() }     // 0.10.0 (owner 12.11): account usage numbers, 60 s after launch
         // 0.9.5: recordings that were on their way to Google Drive when the app quit go on (after the accounts load)
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { MainActor.assumeIsolated { DriveRecordings.shared.resumeQueue() } }
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
@@ -68,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() },
-                               mute: { [weak self] in self?.toggleMute() }, compact: { [weak self] in self?.toggleCompact() },
+                               mute: { [weak self] in self?.toggleMute() },
                                proactive: { [weak self] in self?.pushTips("window.LiveTips && LiveTips.toggleProactive()") },
                                present: { [weak self] k in self?.pushTips("window.LiveTips && LiveTips.presentKey('\(k)')") })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
@@ -238,7 +240,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.micMissing = AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
         m.helpKey = HotKeys.shared.combo(.help).display
         m.pauseKey = HotKeys.shared.combo(.pause).display
-        m.compactKey = HotKeys.shared.combo(.compact).display
         panel?.place()
     }
 
@@ -270,11 +271,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func togglePause() { pushTips("window.LiveTips && LiveTips.togglePause()") }
     @objc func helpNow() { pushTips("window.LiveTips && LiveTips.help()") }
     @objc func toggleMute() { pushTips("window.LiveTips && LiveTips.toggleMute()") }
-    @objc func toggleCompact() {
-        guard lastStatus.state == "recording" || lastStatus.state == "standby" else { return }
-        if tips == nil { showTips() }
-        MainActor.assumeIsolated { tips?.toggleCompact() }
-    }
     func pushTips(_ js: String) {
         guard lastStatus.state == "recording" else { return }
         if tips == nil { showTips() }

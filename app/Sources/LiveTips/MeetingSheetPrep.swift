@@ -123,7 +123,10 @@ struct SheetQuickView: View {
                 (draft.preset?.blocks ?? []).map { SheetLibrary.shared.title($0) }.prefix(5).joined(separator: ", "), ok: true, fix: nil)
             let bad = draft.sources.filter { $0.checked && ["denied", "unsupported"].contains($0.access) }
             row(L("sheet.ui.row.sources"), L("sheet.ui.quick.sources", ["n": "\(draft.sources.filter(\.checked).count)"]),
-                bad.isEmpty ? draft.sources.filter(\.checked).prefix(3).map(\.title).joined(separator: ", ") : bad.map { $0.title + ": " + ($0.reason ?? SheetLabels.access(source: $0)) }.joined(separator: "; "),
+                bad.isEmpty ? draft.sources.filter(\.checked).prefix(3).map { s in
+                    // 0.10.0 (Meeting Sheet, folders): "bink: 12 recent files for the preparation (last 7 days) · 340 searchable"
+                    s.folder.map { s.title + ": " + SheetLabels.folderLine($0) } ?? s.title
+                }.joined(separator: s3Sep) : bad.map { $0.title + ": " + ($0.reason ?? SheetLabels.access(source: $0)) }.joined(separator: "; "),
                 ok: bad.isEmpty, fix: bad.isEmpty ? nil : "sources")
             let total = draft.sources.filter(\.checked).compactMap(\.tokens).reduce(0, +)
             let routeProblem = SheetRoutes.problem(draft.route)
@@ -161,6 +164,9 @@ struct SheetQuickView: View {
         }
     }
 
+    /// 0.10.0 (Meeting Sheet, folders): folder lines are long, one per line; plain titles stay comma-separated.
+    private var s3Sep: String { draft.sources.filter(\.checked).prefix(3).contains { $0.folder != nil } ? "\n" : ", " }
+
     private var liveLine: String {
         var parts = [m.callType == "presentation" ? L("start.type.presentation") : m.callType == "interview" ? L("callSettings.type.interview") : L("sheet.ui.live.regular")]
         if m.salesEnabled { parts.append(L("page.salesMode")) }
@@ -195,6 +201,14 @@ struct SheetQuickView: View {
 }
 
 extension SheetLabels {
+    /// 0.10.0 (Meeting Sheet, folders): "12 recent files for the preparation (last 7 days) · 340 searchable during the call".
+    static func folderLine(_ i: SheetFolderInfo) -> String {
+        let l = SheetFolders.line(i, days: SheetPrefs.storedFolderDays)
+        var s = L(l.key, l.args)
+        if (i.overBudget ?? 0) > 0 { s += " · " + L("sheet.ui.folder.over", l.args) }
+        return s
+    }
+
     static func access(source s: DraftSource) -> String {
         switch s.access {
         case "ok": return L("sheet.ui.access.ok")
@@ -705,13 +719,28 @@ struct SheetDraftSourceRow: View {
                     }
                     Text(([SheetLabels.kind(st), SheetLabels.tokens(source.tokens)] + source.why).filter { !$0.isEmpty }.joined(separator: " · "))
                         .font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
-                    if let r = source.reason { Text(r).font(PN.Font.caption).foregroundStyle(source.access == "ok" ? PN.C.text3 : PN.C.pending).fixedSize(horizontal: false, vertical: true) }
+                    if let f = source.folder {
+                        Text(SheetLabels.folderLine(f)).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    } else if let r = source.reason { Text(r).font(PN.Font.caption).foregroundStyle(source.access == "ok" ? PN.C.text3 : PN.C.pending).fixedSize(horizontal: false, vertical: true) }
                 }
                 Spacer(minLength: 6)
                 Label(SheetLabels.access(source: source), systemImage: icon).font(PN.Font.caption.weight(.semibold)).foregroundStyle(color).fixedSize()
                 action
                 Button { draft.sources.removeAll { $0.id == source.id } } label: { Image(systemName: "xmark").foregroundStyle(PN.C.text3) }
                     .buttonStyle(.plain).accessibilityLabel(L("call.remove"))
+            }
+            if source.type == SourceType.folder.rawValue {
+                // 0.10.0 (Meeting Sheet, folders): this folder's own window; empty = Settings > Meeting Sheet
+                HStack(spacing: 6) {
+                    Text(L("sheet.ui.folder.days")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    TextField(L("sheet.ui.folder.daysPh", ["n": "\(SheetPrefs.shared.folderDays)"]), text: Binding(
+                        get: { source.days.map { "\($0)" } ?? "" },
+                        set: { source.days = SheetFolders.days($0) }))
+                        .textFieldStyle(.roundedBorder).frame(width: 60)
+                        .onSubmit { draft.checkSources() }
+                    Text(L("sheet.ui.folder.daysUnit")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
+                .padding(.leading, 52)
             }
             if draft.model.callType == "presentation" && ["pptx", "pdf", "key"].contains(((source.path ?? "") as NSString).pathExtension.lowercased()) {
                 Toggle(L("sheet.ui.s3.isDeck"), isOn: $source.deck).toggleStyle(.checkbox).font(PN.Font.caption).padding(.leading, 52)
@@ -754,7 +783,7 @@ struct SheetDraftSourceRow: View {
             }
         }.buttonStyle(.pnSecondary)
         case "paste_text", "save_as_pdf": Button(SheetLabels.fix(.pasteText)) { pasting = true }.buttonStyle(.pnSecondary)
-        case "retry": Button(SheetLabels.fix(.retry)) { draft.checkSources() }.buttonStyle(.pnSecondary)
+        case "retry": Button(SheetLabels.fix(.retry)) { draft.retryGoogle() }.buttonStyle(.pnSecondary)
         case "open_in_browser": Button(SheetLabels.fix(.openInBrowser)) { if let u = source.uri, let url = URL(string: u) { NSWorkspace.shared.open(url) } }.buttonStyle(.pnSecondary)
         default: EmptyView()
         }

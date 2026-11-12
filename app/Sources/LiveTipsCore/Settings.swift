@@ -130,6 +130,14 @@ public struct AppConfig: Codable, Equatable {
         /// 0.9.3 (owner): the Gemini account (Antigravity CLI) model for the preparation and after the call.
         public var agyPrep = "gemini-3.8-flash-medium"
         public var agyAfter = "gemini-3.8-flash-medium"
+        /// 0.10.0 (AI chain, owner 12.11): one fallback chain for every job (LiveTipsCore/AIChain.swift): the job's
+        /// AI first, then the connected AIs in this order, each with its own checkbox. Connected AIs are in it by
+        /// default (sending call text to another provider is fine, PM 12.11); `autoSwitch` turns the chain off.
+        /// The model on this Mac follows `localFallback` when an older config has no chain.
+        public var chain: [AIChain.Entry] = AIChain.defaults()
+        public func order(_ job: String, connected: Set<String>) -> [String] {
+            AIChain.order(job: job, chosen: route(job), chain: chain, connected: connected, auto: autoSwitch)
+        }
         public init() {}
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -148,6 +156,8 @@ public struct AppConfig: Codable, Equatable {
             geminiFallback = (try? c.decodeIfPresent(Bool.self, forKey: .geminiFallback)) ?? d.geminiFallback
             agyPrep = (try? c.decodeIfPresent(String.self, forKey: .agyPrep)) ?? d.agyPrep
             agyAfter = (try? c.decodeIfPresent(String.self, forKey: .agyAfter)) ?? d.agyAfter
+            // 0.10.0 (AI chain): an older config has no chain: the default order, the local step as it was
+            chain = AIChain.normalized((try? c.decodeIfPresent([AIChain.Entry].self, forKey: .chain)) ?? AIChain.defaults(localOn: localFallback))
         }
         public func openaiModel(_ job: String) -> String { job == "prep" ? openaiPrep : job == "tips" ? openaiTips : openaiAfter }
         public func geminiModel(_ job: String) -> String { job == "prep" ? geminiPrep : job == "tips" ? geminiTips : geminiAfter }
@@ -175,6 +185,9 @@ public struct AppConfig: Codable, Equatable {
     public var engine = Engine()
     /// How people address the PM on calls (any form); the "your turn" trigger.
     public var nameAliases: [String] = []
+    /// 0.10.0 (owner 12.11, Settings > Transcription > Dictionary): the PM's own words for the transcript. The correct
+    /// words go to Whisper's prompt first; the "heard as" variants are replaced in the transcript (recorder/src/transcriber.py).
+    public var dictionary: [DictionaryEntry] = []
     public var models = Models()
     public var ai = AIRoutes()
     public var budget = Budget()
@@ -259,6 +272,7 @@ public struct AppConfig: Codable, Equatable {
         let d = AppConfig()
         engine = (try? c.decode(Engine.self, forKey: .engine)) ?? d.engine
         nameAliases = (try? c.decode([String].self, forKey: .nameAliases)) ?? d.nameAliases
+        dictionary = (try? c.decode([DictionaryEntry].self, forKey: .dictionary)) ?? d.dictionary
         models = (try? c.decode(Models.self, forKey: .models)) ?? d.models
         if let a = try? c.decode(AIRoutes.self, forKey: .ai) { ai = a } else {
             // Before 0.8.2 the preparation's way was a separate switch; keep what the PM chose there.
@@ -357,6 +371,44 @@ public struct AppConfig: Codable, Equatable {
 }
 
 /// 0.8.7 (I, rules/crm.yaml). No secret here: the service key is in the Keychain (SecretStore.Key.hubspotKey).
+/// 0.10.0 (owner 12.11): one row of Settings > Transcription > Dictionary: the correct word and what Whisper hears
+/// instead (optional, any number of variants).
+public struct DictionaryEntry: Codable, Equatable, Identifiable {
+    public var id: String
+    public var word: String
+    public var heard: [String]
+    public init(id: String = UUID().uuidString, word: String = "", heard: [String] = []) { self.id = id; self.word = word; self.heard = heard }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        word = (try? c.decode(String.self, forKey: .word)) ?? ""
+        heard = (try? c.decode([String].self, forKey: .heard)) ?? []
+    }
+
+    /// "Lumen field, Lumin field" -> ["Lumen field", "Lumin field"].
+    public static func split(_ text: String) -> [String] {
+        text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+    public var heardText: String { heard.joined(separator: ", ") }
+
+    /// What the recorder reads (<app folder>/config.json "dictionary"): rows with a word, trimmed, the word once, a
+    /// variant equal to the word dropped. The recorder cleans the same way again (transcriber.dictionary_entries).
+    public static func core(_ entries: [DictionaryEntry]) -> [[String: Any]] {
+        var out: [[String: Any]] = [], seen = Set<String>()
+        for e in entries {
+            let w = e.word.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+            guard !w.isEmpty, seen.insert(w.lowercased()).inserted else { continue }
+            var hs: [String] = [], hseen = Set<String>()
+            for h in e.heard {
+                let x = h.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+                if !x.isEmpty && x.lowercased() != w.lowercased() && hseen.insert(x.lowercased()).inserted { hs.append(x) }
+            }
+            out.append(["word": w, "heard": hs])
+        }
+        return out
+    }
+}
+
 public struct CRMSettings: Codable, Equatable {
     public var provider = "hubspot"
     public var account = ""            // the portal's name from the last good test, for the card

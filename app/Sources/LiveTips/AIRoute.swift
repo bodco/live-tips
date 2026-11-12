@@ -32,12 +32,72 @@ enum AIRoute {
 
     static func isDown(_ r: String) -> Bool { ((read()[r] as? [String: Any])?["down"] as? Bool) ?? false }
 
-    static func markDown(_ r: String, _ reason: String) {
+    /// 0.10.0 (AI chain): `text` is the error; when it names a reset time ("try again at 12:48 PM") the AI is out
+    /// until then, otherwise it is checked again in 15 minutes (AIOut).
+    static func markDown(_ r: String, _ reason: String, text: String = "") {
         var o = read()
         let cur = o[r] as? [String: Any] ?? [:]
         let now = Date().timeIntervalSince1970
-        o[r] = ["down": true, "reason": reason, "since": (cur["down"] as? Bool) == true ? (cur["since"] ?? now) : now, "checked": now]
+        var d: [String: Any] = ["down": true, "reason": reason, "since": (cur["down"] as? Bool) == true ? (cur["since"] ?? now) : now, "checked": now]
+        if let u = AIOut.resetTime(text, now: Date())?.timeIntervalSince1970, u > now { d["until"] = u }
+        o[r] = d
         write(o)
+    }
+
+    // MARK: 0.10.0 (AI chain, owner 12.11)
+
+    /// The AIs that can be tried at all now: installed and signed in (as far as the app knows), or a key is set.
+    @MainActor static func connected() -> Set<String> {
+        var out = Set<String>()
+        let p = PrepRunner.shared
+        if PrepRunner.claudePath != nil && p.loggedIn != false { out.insert(code) }
+        if CodexAccount.cliPath != nil && CodexAccount.shared.signedIn != false { out.insert(codex) }
+        if p.hasAPIKey { out.insert(api) }
+        if p.hasOpenAIKey { out.insert(openai) }
+        if p.hasGeminiKey { out.insert(gemini) }
+        if AgyAccount.cliPath != nil && AgyAccount.shared.signedIn != false { out.insert(agy) }
+        if !LocalLLM.downloaded().isEmpty { out.insert(local) }       // a model on this Mac is downloaded
+        return out
+    }
+
+    /// The enabled AIs for the engine, the model on this Mac only when one is downloaded (the engine treats every AI
+    /// it has a key or a tool for as connected).
+    static func chainForEngine(_ c: AppConfig) -> [String] {
+        AIChain.enabled(c.ai.chain).filter { $0 != local || !LocalLLM.downloaded().isEmpty }
+    }
+
+    /// The order a job tries its AIs (AIChain.order over the connected ones).
+    @MainActor static func order(job: String, config c: AppConfig) -> [String] {
+        c.ai.order(job, connected: connected())
+    }
+
+    /// The out state of every AI (AIOut).
+    static func outStates() -> [String: AIOut.State] { AIOut.parse(read()) }
+
+    /// An AI worth trying now: not out, or its next check is due (its reset time passed).
+    static func due(_ r: String) -> Bool { AIOut.due(outStates()[r], now: Date().timeIntervalSince1970) }
+
+    static var accountsPath: String { ((statePath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("ai-accounts.json") }
+    static var switchesPath: String { ((statePath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("ai-switches.jsonl") }
+
+    /// The latest limits an account reported (Claude Code's rate_limit_event, Codex's rate_limits), per account.
+    static func noteAccountUsage(_ r: String, _ u: AIAccountUsage.Usage) {
+        var o: [String: Any] = [:]
+        if let d = FileManager.default.contents(atPath: accountsPath), let x = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { o = x }
+        o[r] = AIAccountUsage.encode(u)
+        if let d = try? JSONSerialization.data(withJSONObject: o) { try? d.write(to: URL(fileURLWithPath: accountsPath), options: .atomic) }
+    }
+
+    /// Never silent: one line per switch (the engine writes the same file, livetips_m0.routing.note_switch).
+    static func noteSwitch(job: String, from: String, to: String, reason: String) {
+        let row: [String: Any] = ["at": Date().timeIntervalSince1970, "job": job, "from": from, "to": to, "reason": reason]
+        guard let d = try? JSONSerialization.data(withJSONObject: row), var line = String(data: d, encoding: .utf8) else { return }
+        line += "\n"
+        if let h = FileHandle(forWritingAtPath: switchesPath) {
+            h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close()
+        } else {
+            try? line.write(toFile: switchesPath, atomically: true, encoding: .utf8)
+        }
     }
 
     static func markUp(_ r: String) {
@@ -87,10 +147,10 @@ enum AIRoute {
     /// A job on this way can run: the way itself, or with auto-switch the other one.
     static func canRun(job: String, config c: AppConfig) -> Bool {
         let r = c.ai.route(job)
-        if r == agy { return job != "tips" && available(r) }      // 0.9.3: never during a call (20-30 s a request)
-        if [openai, codex, gemini].contains(r) { return available(r) }
-        return available(r) || (c.ai.autoSwitch && available(other(r))) || (job != "tips" && c.ai.localFallback)
-            || (c.ai.geminiFallback && (available(gemini) || (job != "tips" && available(agy))))
+        if r == agy && job == "tips" { return false }      // 0.9.3: never during a call (20-30 s a request)
+        // 0.10.0 (AI chain, owner 12.11): the chosen AI, or any AI of the chain this job may use
+        let avail = Set(([api, code, codex, openai, gemini, agy] as [String]).filter { available($0) } + [local])
+        return available(r) || AIChain.order(job: job, chosen: r, chain: c.ai.chain, connected: avail, auto: c.ai.autoSwitch).count > 1
     }
 
     /// The environment of an engine child process for one job: the way, the switch, the shared state, the key
@@ -120,6 +180,10 @@ enum AIRoute {
         env["LT_LOCAL_MODEL"] = UserDefaults.standard.string(forKey: "prepLocalModel") ?? "gemma4:26b"   // rules/ai.yaml > local
         env["LT_LOCAL_FALLBACK"] = (job != "tips" && c.ai.localFallback) ? "1" : "0"                      // rules/ai.yaml > fallback
         env["LT_AI_AUTO"] = c.ai.autoSwitch ? "1" : "0"
+        // 0.10.0 (AI chain): the enabled AIs in the PM's order; the engine applies the same job rules (AIChain)
+        if let d = try? JSONSerialization.data(withJSONObject: chainForEngine(c)), let s = String(data: d, encoding: .utf8) {
+            env["LT_AI_CHAIN"] = s
+        }
         env["LT_AI_STATE"] = statePath
         // 0.9.6 (owner): the monthly limits per provider (livetips_m0.cost.ProviderCaps); none set, none sent
         let caps = ProviderLimits.caps(c.providerBudgets)
@@ -137,6 +201,7 @@ enum AIRoute {
         let c = effective(c0)
         // 2026-11-06: "prep" too: typed questions and the deep folder lookup use the preparation's way and model.
         return ["routes": ["prep": c.ai.prep, "tips": c.ai.tips, "after": c.ai.after], "auto": c.ai.autoSwitch, "state": statePath,
+         "chain": chainForEngine(c),        // 0.10.0 (AI chain)
          "openai_models": ["prep": c.ai.openaiPrep, "tips": c.ai.openaiTips, "after": c.ai.openaiAfter],
          "gemini_models": ["prep": c.ai.geminiPrep, "tips": c.ai.geminiTips, "after": c.ai.geminiAfter], "gemini_fallback": c.ai.geminiFallback,
          "agy_models": ["prep": c.ai.agyPrep, "after": c.ai.agyAfter],
@@ -152,10 +217,14 @@ enum AIRoute {
     static func statusLines() -> [String] {
         let o = read()
         let t = DateFormatter(); t.dateFormat = "HH:mm"
-        return [code, api, openai, codex, gemini, agy].compactMap { r in
+        return [code, api, openai, codex, gemini, agy, local].compactMap { r in
             guard let s = o[r] as? [String: Any], (s["down"] as? Bool) == true else { return nil }
             let since = (s["since"] as? Double).map { t.string(from: Date(timeIntervalSince1970: $0)) } ?? ""
-            return L("ai.status.out", ["route": name(r), "reason": L("ai.reason." + ((s["reason"] as? String) ?? "error")), "time": since])
+            let reason = L("ai.reason." + ((s["reason"] as? String) ?? "error"))
+            if let u = (s["until"] as? NSNumber)?.doubleValue, u > Date().timeIntervalSince1970 {     // 0.10.0 (AI chain)
+                return L("ai.status.outUntilLine", ["route": name(r), "reason": reason, "time": since, "until": t.string(from: Date(timeIntervalSince1970: u))])
+            }
+            return L("ai.status.out", ["route": name(r), "reason": reason, "time": since])
         }
     }
 

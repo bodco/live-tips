@@ -1500,6 +1500,309 @@ func googlePicker0100() {
     try? FileManager.default.removeItem(atPath: dir)
 }
 
+// 0.10.0 (AI chain, owner 12.11): one fallback chain, out-state with reset times, account usage, the status icon
+func aiChain0100() {
+    let all: Set<String> = ["code", "codex", "api", "openai", "gemini", "agy", "local"]
+    let d = AIChain.defaults()
+    expect(d.map { $0.route } == ["code", "codex", "api", "openai", "gemini", "agy", "local"] && d.allSatisfy { $0.on }, "chain: default order, all on")
+    expect(AIChain.defaults(localOn: false).last == AIChain.Entry("local", on: false), "chain: an old localFallback off keeps local off")
+    expect(AIChain.order(job: "prep", chosen: "api", chain: d, connected: all) == ["api", "code", "codex", "openai", "gemini", "agy", "local"], "chain: prep, chosen first")
+    expect(AIChain.order(job: "tips", chosen: "api", chain: d, connected: all) == ["api", "code", "codex", "openai", "gemini"], "chain: tips never local or agy")
+    expect(AIChain.order(job: "tips", chosen: "openai", chain: d, connected: ["openai", "api"]) == ["openai", "api"], "chain: only connected")
+    expect(AIChain.order(job: "after", chosen: "code", chain: d, connected: all, auto: false) == ["code"], "chain: switching off = the chosen AI only")
+    let moved = AIChain.move(d, route: "local", by: 1)
+    expect(moved == d, "chain: a move past the end changes nothing")
+    var c = AIChain.move(d, route: "local", by: -1)
+    expect(c.map { $0.route }.suffix(2) == ["local", "agy"], "chain: local moved up")
+    expect(AIChain.order(job: "after", chosen: "code", chain: c, connected: all).last == "local", "chain: local is always the last step")
+    c = AIChain.setOn(d, route: "gemini", on: false)
+    expect(!AIChain.order(job: "after", chosen: "code", chain: c, connected: all).contains("gemini"), "chain: an AI switched off is skipped")
+    expect(AIChain.order(job: "after", chosen: "gemini", chain: c, connected: all).first == "gemini", "chain: a chosen AI goes first even when off in the list")
+    expect(AIChain.enabled(c) == ["code", "codex", "api", "openai", "agy", "local"], "chain: enabled order for the engine")
+    expect(AIChain.normalized([AIChain.Entry("x"), AIChain.Entry("api", on: false), AIChain.Entry("api")]).first == AIChain.Entry("api", on: false)
+           && AIChain.normalized([]).count == 7, "chain: normalized")
+    expect(AIChain.next(["api", "code", "codex"], tried: ["api"], usable: { $0 != "code" }) == "codex", "chain: next untried usable")
+    // Settings: an old config without a chain
+    let old = #"{"prep":"code","tips":"api","after":"code","autoSwitch":true,"localFallback":false}"#
+    let r = try? JSONDecoder().decode(AppConfig.AIRoutes.self, from: Data(old.utf8))
+    expect(r?.chain.last == AIChain.Entry("local", on: false) && r?.chain.count == 7, "chain: decoded from an old config")
+    expect(r?.order("tips", connected: all) == ["api", "code", "codex", "openai", "gemini"], "chain: AIRoutes.order")
+    if let r = r, let data = try? JSONEncoder().encode(r), let back = try? JSONDecoder().decode(AppConfig.AIRoutes.self, from: data) {
+        expect(back.chain == r.chain, "chain: round trip")
+    } else { expect(false, "chain: encode") }
+
+    // out-state and reset times
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "Europe/Kyiv")!
+    let now = cal.date(from: DateComponents(year: 2026, month: 11, day: 12, hour: 10, minute: 15))!
+    let codexMsg = "You\u{2019}ve hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/settings/usage to purchase more credits or try again at 12:48 PM."
+    let r1 = AIOut.resetTime(codexMsg, now: now, calendar: cal)
+    expect(r1.map { cal.component(.hour, from: $0) == 12 && cal.component(.minute, from: $0) == 48 && cal.isDate($0, inSameDayAs: now) } == true, "reset: Codex 12:48 PM")
+    let r2 = AIOut.resetTime("5-hour limit reached \u{2219} resets 9am", now: now, calendar: cal)
+    expect(r2.map { cal.component(.hour, from: $0) == 9 && !cal.isDate($0, inSameDayAs: now) } == true, "reset: Claude 9am is tomorrow")
+    let r3 = AIOut.resetTime("Your limit will reset at 3:05 pm (Europe/Kyiv)", now: now, calendar: cal)
+    expect(r3.map { cal.component(.hour, from: $0) == 15 && cal.component(.minute, from: $0) == 5 } == true, "reset: will reset at 3:05 pm")
+    expect(AIOut.resetTime("resets at 18:30", now: now, calendar: cal).map { cal.component(.hour, from: $0) == 18 } == true, "reset: 24-hour")
+    expect(AIOut.resetTime("try again in 2 hours 5 minutes", now: now, calendar: cal) == now.addingTimeInterval(7500), "reset: in 2 hours 5 minutes")
+    expect(AIOut.resetTime("try again in 1 day 3h", now: now, calendar: cal) == now.addingTimeInterval(97200), "reset: in 1 day 3h")
+    expect(AIOut.resetTime(#"{"resets_at": 1793731185}"#, now: now)?.timeIntervalSince1970 == 1793731185, "reset: epoch")
+    expect(AIOut.resetTime("rate limit exceeded, retry later", now: now) == nil && AIOut.resetTime("resets 5 things", now: now) == nil, "reset: no time")
+    let st = AIOut.parse(["codex": ["down": true, "reason": "limit", "since": 100.0, "checked": 100.0, "until": 5000.0],
+                          "api": ["down": true, "reason": "auth", "since": 100.0, "checked": 200.0], "code": ["down": false]])
+    expect(st["codex"]?.until == 5000 && AIOut.nextCheck(st["codex"]!) == 5000, "out: until is the next check")
+    expect(AIOut.nextCheck(st["api"]!) == 1100 && !AIOut.due(st["api"], now: 1000) && AIOut.due(st["api"], now: 1100), "out: 15 minutes without a reset time")
+    expect(AIOut.due(st["code"], now: 0) && AIOut.due(nil, now: 0), "out: not down is due")
+
+    // account usage
+    let claudeEv: [String: Any] = ["type": "rate_limit_event", "rate_limit_info": ["status": "allowed_warning", "resetsAt": 1794063600, "utilization": 0.81,
+        "unifiedWindows": ["five_hour": ["utilization": 0.1, "resetsAt": 1793977200, "status": "allowed"],
+                           "seven_day": ["utilization": 0.81, "resetsAt": 1794063600, "status": "allowed_warning"]]]]
+    let cu = AIAccountUsage.fromClaude(claudeEv, now: 1793970000)
+    expect(cu?.windows.count == 2 && cu?.maxUsed == 81 && cu?.resetOfMax == 1794063600 && cu?.limited == false, "usage: Claude rate_limit_event")
+    expect(AIAccountUsage.fromClaude(["type": "result"], now: 0) == nil, "usage: other events ignored")
+    let codexRL: [String: Any] = ["limit_id": "codex", "primary": ["used_percent": 12.0, "window_minutes": 300, "resets_at": 1793968790],
+        "secondary": ["used_percent": 54.0, "window_minutes": 10080, "resets_at": 1794317985], "rate_limit_reached_type": NSNull()]
+    let xu = AIAccountUsage.fromCodex(codexRL, now: 1793960000)
+    expect(xu?.windows.map { $0.name } == ["five_hour", "seven_day"] && xu?.maxUsed == 54 && xu?.limited == false, "usage: Codex rate_limits")
+    if let u = cu {
+        let back = AIAccountUsage.parseFile(["code": AIAccountUsage.encode(u)])["code"]
+        expect(back == u, "usage: file round trip")
+        expect(AIAccountUsage.current(u, now: 1793980000).windows.map { $0.name } == ["seven_day"], "usage: a passed window is dropped")
+    }
+
+    // the status icon and its rows
+    let tz = TimeZone(identifier: "Europe/Kyiv")!
+    let chosen = ["tips": "api", "prep": "code", "after": "code"]
+    var inp = AIStatus.Input(connected: ["code", "codex", "api", "local"], chosen: chosen, chain: d,
+                             accounts: ["code": cu!], spend: ["claude": 3.5], limits: ["claude": 10], now: 1793970000)
+    var rows = AIStatus.rows(inp, tz: tz)
+    expect(AIStatus.level(rows) == .ok && AIStatus.symbol(.ok) == "cpu", "status: neutral")
+    expect(rows.first { $0.route == "api" }?.usage == AIStatus.Line("ai.status.usage.api", ["left": "6.50", "limit": "10.00"]), "status: API left of the limit")
+    expect(rows.first { $0.route == "local" }?.usage.key == "ai.status.usage.local", "status: local no limit")
+    expect(rows.first { $0.route == "code" }?.usage == AIStatus.Line("ai.status.usage.account", ["pct": "10", "time": "17:00"])
+           && rows.first { $0.route == "code" }?.usageMore == [AIStatus.Line("ai.status.usage.week", ["pct": "81"])]
+           && rows.first { $0.route == "code" }?.serving == ["prep", "after"], "status: 5-hour % with reset, weekly %, and jobs")
+    expect(rows.first { $0.route == "codex" }?.usage.key == "ai.status.usage.afterCodex", "status: ChatGPT usage appears after its next run")
+    expect(rows.first { $0.route == "code" }?.status.key == "ai.status.state.ok", "status: a healthy AI is OK")
+    inp.spend = ["claude": 9.2]
+    rows = AIStatus.rows(inp, tz: tz)
+    expect(AIStatus.level(rows) == .warn && AIStatus.symbol(.warn) == "exclamationmark.triangle.fill", "status: <= $1 left is orange")
+    inp.spend = ["claude": 1]
+    var near = cu!; near.windows[1].usedPercent = 96
+    inp.accounts = ["code": near]
+    expect(AIStatus.level(AIStatus.rows(inp, tz: tz)) == .warn, "status: >= 95% of an account is orange")
+    inp.accounts = ["codex": near]
+    expect(AIStatus.level(AIStatus.rows(inp, tz: tz)) == .ok, "status: an AI no job uses does not color the icon")
+    // the Claude account out with a reset time: red, tips stay on the API, prep and after move to the ChatGPT account
+    inp.accounts = [:]
+    inp.out = ["code": AIOut.State(down: true, reason: "limit", since: 1793969000, checked: 1793969000, until: 1793977200)]
+    rows = AIStatus.rows(inp, tz: tz)
+    let code = rows.first { $0.route == "code" }!
+    expect(AIStatus.level(rows) == .out && AIStatus.symbol(.out) == "exclamationmark.octagon.fill", "status: chosen AI out is red")
+    expect(code.status == AIStatus.Line("ai.status.state.limitUntil", ["time": "17:00"]), "status: limit reached, resets at")
+    expect(code.serving.isEmpty && code.chosenFor == ["prep", "after"] && rows.first { $0.route == "codex" }?.serving == ["prep", "after"], "status: jobs moved to the next AI")
+    expect(AIStatus.jobsLines(code) == [AIStatus.Line("ai.status.jobs.moved", ["jobs": "ai.status.job.prep,ai.status.job.after"])], "status: jobs line of a moved AI")
+    inp.out = ["code": AIOut.State(down: true, reason: "auth", since: 1793969000, checked: 1793969500)]
+    rows = AIStatus.rows(inp, tz: tz)
+    expect(rows.first { $0.route == "code" }?.status == AIStatus.Line("ai.status.state.outUntil", ["reason": "ai.reason.auth", "time": "15:06"]), "status: out, checking again at")
+    inp.out = ["code": AIOut.State(down: true, reason: "auth", since: 1793969000, checked: 1793969000)]
+    expect(AIStatus.rows(inp, tz: tz).first { $0.route == "code" }?.status.key == "ai.status.state.checking", "status: out and due: being checked")
+    inp.now = 1793977300
+    inp.out = ["code": AIOut.State(down: true, reason: "limit", since: 1793969000, checked: 1793969000, until: 1793977200)]
+    expect(AIStatus.rows(inp, tz: tz).first { $0.route == "code" }?.state == .ok, "status: after the reset time it is tried again")
+    inp.spend = ["claude": 10]
+    rows = AIStatus.rows(inp, tz: tz)
+    expect(rows.first { $0.route == "api" }?.state == .capped && AIStatus.level(rows) == .out, "status: monthly limit reached is red")
+    expect(AIStatus.current(job: "tips", inp) == "code", "status: tips leave a capped API")
+    statusFix0100()
+}
+
+// 0.10.0 (status fix, 12.11): "OK" not "working", the ChatGPT account's limits and a reached limit known at launch
+func statusFix0100() {
+    let tz = TimeZone(identifier: "Europe/Kyiv")!
+    let d = AIChain.defaults()
+    let t0 = 1793970000.0, reset = 1793977200.0                // 17:00 Kyiv
+    // Codex rate_limits: 100% of the 5 hours, the reached type named, or neither
+    let full: [String: Any] = ["primary": ["used_percent": 100.0, "window_minutes": 300, "resets_at": reset],
+                               "secondary": ["used_percent": 40.0, "window_minutes": 10080, "resets_at": 1794317985], "rate_limit_reached_type": NSNull()]
+    let fu = AIAccountUsage.fromCodex(full, now: t0)
+    expect(fu?.limited == true && fu?.until == reset, "statusfix: 100% of a window is a reached limit until its reset")
+    let named: [String: Any] = ["primary": ["used_percent": 80.0, "window_minutes": 300, "resets_at": reset],
+                                "secondary": ["used_percent": 99.0, "window_minutes": 10080, "resets_at": 1794317985], "rate_limit_reached_type": "primary"]
+    expect(AIAccountUsage.fromCodex(named, now: t0)?.until == reset, "statusfix: the reached type names the window")
+    let plain: [String: Any] = ["primary": ["used_percent": 20.0, "window_minutes": 300, "resets_at": reset], "secondary": NSNull(), "rate_limit_reached_type": NSNull()]
+    let pu = AIAccountUsage.fromCodex(plain, now: t0)
+    expect(pu?.limited == false && pu?.until == nil && pu?.windows.count == 1, "statusfix: no limit, a missing window is skipped")
+    let claudeRejected: [String: Any] = ["type": "rate_limit_event", "rate_limit_info": ["status": "rejected", "resetsAt": reset,
+        "unifiedWindows": ["five_hour": ["utilization": 1.0, "resetsAt": reset, "status": "rejected"]]]]
+    expect(AIAccountUsage.fromClaude(claudeRejected, now: t0)?.until == reset, "statusfix: Claude rejected holds until its reset")
+    // a limit error with no numbers: persisted, red until the reset time, then OK again
+    let le = AIAccountUsage.limitError(until: reset, now: t0)
+    let back = AIAccountUsage.parseFile(["codex": AIAccountUsage.encode(le)])["codex"]
+    expect(back == le && back?.until == reset, "statusfix: a limit error round-trips with its reset time")
+    expect(AIAccountUsage.current(le, now: reset - 60).limited && !AIAccountUsage.current(le, now: reset + 60).limited,
+           "statusfix: the limit holds until the reset time only")
+    var inp = AIStatus.Input(connected: ["code", "codex"], chosen: ["tips": "code", "prep": "codex", "after": "code"], chain: d,
+                             accounts: ["codex": le], now: t0)
+    var rows = AIStatus.rows(inp, tz: tz)
+    var cx = rows.first { $0.route == "codex" }!
+    expect(cx.state == .limit && cx.status == AIStatus.Line("ai.status.state.limitUntil", ["time": "17:00"]) && AIStatus.level(rows) == .out,
+           "statusfix: ChatGPT at its limit is red at launch, resets at 17:00")
+    expect(rows.first { $0.route == "code" }?.usage.key == "ai.status.usage.afterClaude", "statusfix: Claude usage appears after its next run")
+    inp.now = reset + 60
+    rows = AIStatus.rows(inp, tz: tz)
+    cx = rows.first { $0.route == "codex" }!
+    expect(cx.state == .ok && cx.status.key == "ai.status.state.ok" && cx.usage.key == "ai.status.usage.afterCodex" && AIStatus.level(rows) == .ok,
+           "statusfix: after the reset time it is OK again")
+    // numbers: 100% of the 5 hours -> limit until its reset; 96% of the week -> close
+    inp.now = t0
+    inp.accounts = ["codex": fu!]
+    cx = AIStatus.rows(inp, tz: tz).first { $0.route == "codex" }!
+    expect(cx.state == .limit && cx.status.vars["time"] == "17:00" && cx.usage == AIStatus.Line("ai.status.usage.account", ["pct": "100", "time": "17:00"])
+           && cx.usageMore == [AIStatus.Line("ai.status.usage.week", ["pct": "40"])], "statusfix: 5-hour line, weekly line, limit until reset")
+    var near = AIAccountUsage.fromCodex(plain, now: t0)!
+    near.windows.append(AIAccountUsage.Window(name: "seven_day", usedPercent: 96, resetsAt: 1794317985))
+    inp.accounts = ["codex": near]
+    rows = AIStatus.rows(inp, tz: tz)
+    expect(rows.first { $0.route == "codex" }?.state == .near && AIStatus.level(rows) == .warn, "statusfix: 95% of the week is a warning")
+    // the wording: a state, never an activity
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources/i18n")
+    func table(_ l: String) -> [String: String] {
+        guard let d = try? Data(contentsOf: dir.appendingPathComponent("\(l).json")),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return [:] }
+        return o.compactMapValues { $0 as? String }
+    }
+    let tables = ["en": table("en"), "uk": table("uk")]
+    for k in ["ai.status.state.ok", "ai.status.title.ok", "ai.status.state.checking", "ai.status.state.outUntil", "ai.status.jobs.now"] {
+        for lang in ["en", "uk"] {
+            let v = tables[lang]?[k] ?? ""
+            expect(!v.isEmpty && !v.lowercased().contains("working") && !v.contains("працює") && !v.contains("перевіряємо"), "statusfix: \(lang) \(k) reads as a state")
+        }
+    }
+    expect(tables["en"]?["ai.status.state.ok"] == "OK" && tables["en"]?["ai.status.title.ok"] == "AI: OK", "statusfix: OK wording")
+    for (k, v) in (tables["en"] ?? [:]) where k.hasPrefix("ai.status.state.") || k.hasPrefix("ai.status.title.") {
+        expect(!v.lowercased().contains("working") && !v.lowercased().contains("checking"), "statusfix: en \(k) is not an activity")
+    }
+}
+
+// 0.10.0 (Meeting Sheet, folders): a folder is a source of its own, never "a folder, not a file"
+func sheetFolders0100() {
+    expect(SourceType.known.contains(.folder) && SourceType(rawValue: "folder") == .folder, "folders: folder is a known source type")
+    expect(SheetFolders.sourceType(isDir: true) == "folder" && SheetFolders.sourceType(isDir: false) == "file", "folders: a folder path is a folder source")
+    expect(SheetFolders.migrate(type: "folder_file", isDir: true) == "folder" && SheetFolders.migrate(type: "file", isDir: true) == "folder",
+           "folders: an older setup's folder becomes a folder source")
+    expect(SheetFolders.migrate(type: "folder_file", isDir: false) == "folder_file" && SheetFolders.migrate(type: "gdoc", isDir: true) == "gdoc",
+           "folders: files and links keep their type")
+    let i = SheetFolderInfo(days: 7, recent: 12, inWindow: 12, searchable: 340, fallback: false, overBudget: 0, tokens: 9000)
+    let l = SheetFolders.line(i)
+    expect(l.key == "sheet.ui.folder.line" && l.args["n"] == "12" && l.args["days"] == "7" && l.args["m"] == "340", "folders: the row line")
+    let fb = SheetFolders.line(SheetFolderInfo(recent: 5, searchable: 8, fallback: true), days: 10)
+    expect(fb.key == "sheet.ui.folder.fallback" && fb.args == ["n": "5", "days": "10", "m": "8", "over": "0"],
+           "folders: fallback line with the default days")
+    expect(SheetFolders.line(SheetFolderInfo(days: 7, recent: 0, searchable: 0)).key == "sheet.ui.folder.empty", "folders: an empty folder")
+    expect(SheetFolders.tokens(i) == 9000 && SheetFolders.tokens(nil) == 0, "folders: the size counts only the files taken")
+    expect(SheetFolders.days("14") == 14 && SheetFolders.days("") == nil && SheetFolders.days("0") == nil && SheetFolders.days("999") == 365,
+           "folders: a folder's own days")
+    let json = """
+    {"id": "s3", "n": 3, "type": "folder", "title": "Orbit", "path": "/p/Orbit", "access": "ok", "used": "full", "days": 14,
+     "folder": {"days": 14, "recent": 4, "in_window": 4, "searchable": 6, "fallback": false, "over_budget": 0, "tokens": 820}}
+    """
+    let kid = """
+    {"id": "s3-fa1b2c3d4", "n": 4, "type": "folder_file", "title": "status.md", "path": "/p/Orbit/status.md", "access": "ok", "used": "full", "parent": "s3"}
+    """
+    let s = try? JSONDecoder().decode(SheetSource.self, from: Data(json.utf8))
+    let k = try? JSONDecoder().decode(SheetSource.self, from: Data(kid.utf8))
+    expect(s?.type == .folder && s?.days == 14 && s?.folder?.searchable == 6 && s?.folder?.inWindow == 4 && s?.folder?.tokens == 820,
+           "folders: a folder source decodes with its counts")
+    expect(k?.parent == "s3" && k?.type == .folderFile, "folders: a folder file names its folder")
+    if let s, let d = try? JSONEncoder().encode(s), let back = try? JSONDecoder().decode(SheetSource.self, from: d) {
+        expect(back == s, "folders: round trip")
+    } else { expect(false, "folders: encode") }
+    expect(SheetFolderInfo(json: ["recent": 2, "searchable": 9, "in_window": 3, "over_budget": 1]) == SheetFolderInfo(recent: 2, inWindow: 3, searchable: 9, overBudget: 1),
+           "folders: the counts from the sidecar")
+}
+
+/// 2026-11-12 (owner, fix77): compact mode is gone (menu item, Control-Option-T, the small window, its strings), and a
+/// stand-up sheet keeps the Tracker the build put in it (live fallback) and shows why Pacenote added a source.
+func fix77() {
+    let res = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources")
+    func text(_ p: String) -> String { (try? String(contentsOf: res.appendingPathComponent(p), encoding: .utf8)) ?? "" }
+    let js = text("tips/tips.js"), css = text("tips/tips.css"), html = text("tips/index.html")
+    expect(!js.isEmpty && !css.isEmpty, "fix77: the tips window files load")
+    expect(!js.contains("['compact'") && !js.contains("post('compact'") && !js.contains("k.compact") && !js.contains("compact: '"),
+           "fix77: no compact item, key or string in the tips window")
+    expect(!css.contains(".compact") && !html.contains("compact"), "fix77: no compact styles")
+    expect(js.contains("function setMode() { S.call.mode = 'normal'; render(); }"), "fix77: an old setMode('compact') opens the full window")
+    for l in ["en", "uk"] {
+        guard let d = try? Data(contentsOf: res.appendingPathComponent("i18n/\(l).json")),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { expect(false, "fix77: i18n \(l)"); continue }
+        expect(o["menubar.compact"] == nil && o["pm.menu.compact"] == nil, "fix77: \(l) has no compact strings")
+        expect(!((o["onb.done.keys"] as? String) ?? "{t}").contains("{t}"), "fix77: \(l) onboarding keys without compact")
+    }
+    let orig = #"{"schema": "pacenote.sheet/1", "id": "x", "tracker": {"on_me": [{"text": "Send Mike Carter the test accounts"}]}}"#
+    let new = #"{"schema": "pacenote.sheet/1", "id": "x"}"#
+    if let m = try? MeetingSheetIO.patched(original: Data(orig.utf8), new: Data(new.utf8)),
+       let o = (try? JSONSerialization.jsonObject(with: m)) as? [String: Any] {
+        expect((o["tracker"] as? [String: Any])?["on_me"] != nil, "fix77: a save keeps the sheet's Tracker")
+    } else { expect(false, "fix77: patch") }
+    let src = #"{"id": "s-tracker", "n": 2, "type": "tracker", "title": "Tracker: 3 on me, 1 waiting on others", "access": "ok", "used": "full", "auto": true, "why": ["open items on you and waiting on others", "from 2 project registers"]}"#
+    let s = try? JSONDecoder().decode(SheetSource.self, from: Data(src.utf8))
+    expect(s?.type == .tracker && s?.auto == true && s?.why?.count == 2, "fix77: an auto source decodes with its why")
+}
+
+// f78 (owner 12.11): the dictionary in the config, the usage probe's schedule, the "updated" time and the wording
+func f78() {
+    var c = AppConfig()
+    c.dictionary = [DictionaryEntry(word: "Lumenfield", heard: ["Lumen field", "Lumin field"]), DictionaryEntry(word: "Kestrel")]
+    let url = URL(fileURLWithPath: NSTemporaryDirectory() + "f78-dict-\(getpid()).json")
+    try? c.save(to: url)
+    let back = AppConfig.load(from: url)
+    expect(back == c && back.dictionary.count == 2 && back.dictionary[0].heard == ["Lumen field", "Lumin field"], "f78: the dictionary round-trips")
+    try? FileManager.default.removeItem(at: url)
+    let old = try? JSONDecoder().decode(AppConfig.self, from: Data(#"{"nameAliases": ["Mike"]}"#.utf8))
+    expect(old?.dictionary == [] && old?.nameAliases == ["Mike"], "f78: an older config has an empty dictionary")
+    let noId = try? JSONDecoder().decode(AppConfig.self, from: Data(#"{"dictionary": [{"word": "Orbitex", "heard": ["Orbit ex"]}]}"#.utf8))
+    expect(noId?.dictionary.first?.word == "Orbitex" && noId?.dictionary.first?.id.isEmpty == false, "f78: a hand-written row gets an id")
+    expect(DictionaryEntry.split(" Lumen field, ,Lumin field ,") == ["Lumen field", "Lumin field"], "f78: heard-as splits on commas")
+    let core = DictionaryEntry.core([DictionaryEntry(word: " Lumenfield ", heard: ["Lumen  field", "lumenfield", "Lumen field"]),
+                                     DictionaryEntry(word: "lumenfield", heard: ["x"]), DictionaryEntry(word: "  ")])
+    expect(core.count == 1 && (core[0]["word"] as? String) == "Lumenfield" && (core[0]["heard"] as? [String]) == ["Lumen field"],
+           "f78: the recorder gets clean rows, the word once")
+    // the probe's schedule
+    let t = 1_794_000_000.0
+    typealias P = AIUsageProbePlan
+    expect(P.due(signedIn: true, busy: false, reportedAt: nil, blockedUntil: nil, lastProbe: nil, now: t), "f78: probe a quiet account")
+    expect(!P.due(signedIn: false, busy: false, reportedAt: nil, blockedUntil: nil, lastProbe: nil, now: t), "f78: never a signed-out account")
+    expect(!P.due(signedIn: true, busy: true, reportedAt: nil, blockedUntil: nil, lastProbe: nil, now: t), "f78: never during a call or a preparation")
+    expect(!P.due(signedIn: true, busy: false, reportedAt: nil, blockedUntil: nil, lastProbe: t - 300, now: t), "f78: one probe per 10 minutes")
+    expect(!P.due(signedIn: true, busy: false, reportedAt: t - 300, blockedUntil: nil, lastProbe: nil, now: t), "f78: fresh numbers need no probe")
+    expect(P.due(signedIn: true, busy: false, reportedAt: t - 700, blockedUntil: nil, lastProbe: t - 700, now: t), "f78: older than 10 minutes: probe")
+    expect(!P.due(signedIn: true, busy: false, reportedAt: nil, blockedUntil: t + 60, lastProbe: nil, now: t), "f78: never while at the limit")
+    let lim = AIAccountUsage.limitError(until: t + 3600, now: t - 60)
+    expect(P.blockedUntil(usage: lim, out: nil, now: t) == t + 3600 && P.blockedUntil(usage: lim, out: nil, now: t + 3601) == nil,
+           "f78: a limit blocks the probe until its reset")
+    let ok = AIAccountUsage.Usage(at: t, windows: [AIAccountUsage.Window(name: "five_hour", usedPercent: 30, resetsAt: t + 900)])
+    expect(P.blockedUntil(usage: ok, out: nil, now: t) == nil, "f78: an account in its limits is not blocked")
+    let out = AIOut.State(down: true, reason: "limit", since: t - 60, checked: t - 60, until: t + 1200)
+    expect(P.blockedUntil(usage: nil, out: out, now: t) == t + 1200, "f78: an out account waits for its reset")
+    expect(P.firstDelay == 60 && P.every == 1800 && P.minGap == 600 && P.staleAfter == 600, "f78: launch +60 s, every 30 min, 10 min gap")
+    // i18n: both languages
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources/i18n")
+    for l in ["en", "uk"] {
+        guard let d = try? Data(contentsOf: dir.appendingPathComponent("\(l).json")),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { expect(false, "f78: i18n \(l)"); continue }
+        for k in ["settings.tab.transcription", "settings.pane.transcription", "dict.head", "dict.col.word", "dict.col.heard", "dict.add",
+                  "dict.remove", "dict.empty", "dict.footer", "dict.word.placeholder", "dict.heard.placeholder", "ai.status.updated"] {
+            let v = (o[k] as? String) ?? ""
+            expect(!v.isEmpty && !v.contains("\u{2014}"), "f78: \(l) \(k)")
+        }
+        expect(((o["ai.status.updated"] as? String) ?? "").contains("{time}"), "f78: \(l) updated has the time")
+        expect(((o["ai.status.state.ok"] as? String) ?? "") == "OK", "f78: \(l) the healthy state reads OK")
+    }
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -1508,5 +1811,9 @@ sheetPipeline0100()
 sheetFixer0100()
 sheetHardening0100()
 googlePicker0100()
+aiChain0100()
+sheetFolders0100()
+fix77()
+f78()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

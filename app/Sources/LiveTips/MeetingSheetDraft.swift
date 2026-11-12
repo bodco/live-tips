@@ -41,6 +41,9 @@ struct DraftSource: Identifiable, Equatable {
     var deck = false
     var deckMinutes: Double?
     var deckQA: Double?
+    // 0.10.0 (Meeting Sheet, folders): a folder's own days (nil = Settings > Meeting Sheet) and its counts from the check
+    var days: Int?
+    var folder: SheetFolderInfo?
 }
 
 @MainActor
@@ -65,6 +68,12 @@ final class SheetDraft: ObservableObject {
     @Published var size: SizeReport?
     @Published var plan = "one"
     @Published var checking = false
+    // 0.10.0 (Meeting Sheet): the real access check of Google links, read through the connected accounts with a time limit
+    private var googleCopies: [String: String] = [:]
+    private var googleStatus: [String: String] = [:]
+    private var googleProbing = Set<String>()
+    private var googleTried = Set<String>()
+    func retryGoogle() { googleTried.removeAll(); checkSources() }
     @Published var note = ""
     @Published var keptLink: Set<String> = []
     @Published var job: SheetJob?
@@ -89,11 +98,15 @@ final class SheetDraft: ObservableObject {
         withEvent = model.calEventID != nil
         // The files and folders already added in Start call, and the call's text, are sources from the start.
         for f in model.folders {
-            sources.append(DraftSource(type: StartCallModel.isDir(f) ? "folder_file" : "file", path: f, title: (f as NSString).lastPathComponent))
+            // 0.10.0 (Meeting Sheet, folders): a folder added in Start call is a folder source, never a failing file
+            sources.append(DraftSource(type: SheetFolders.sourceType(isDir: StartCallModel.isDir(f)), path: f, title: (f as NSString).lastPathComponent))
         }
         if let m = mem {
             for s in m.sources where !sources.contains(where: { $0.path == s["path"] && $0.uri == s["uri"] }) {
-                sources.append(DraftSource(type: s["type"] ?? "file", path: s["path"], uri: s["uri"], title: s["title"] ?? (s["path"] ?? s["uri"] ?? ""), auto: true, why: [L("sheet.ui.why.lastTime")]))
+                // 0.10.0 (Meeting Sheet, folders): a folder remembered as "folder_file" or "file" is a folder source
+                let type = SheetFolders.migrate(type: s["type"] ?? "file", isDir: s["path"].map { StartCallModel.isDir($0) } ?? false)
+                sources.append(DraftSource(type: type, path: s["path"], uri: s["uri"], title: s["title"] ?? (s["path"] ?? s["uri"] ?? ""), auto: true,
+                                           why: [L("sheet.ui.why.lastTime")], days: s["days"].flatMap { Int($0) }))
             }
         }
         if model.callType == "presentation", let p = model.deck.path, !sources.contains(where: { $0.path == p }) {
@@ -171,13 +184,13 @@ final class SheetDraft: ObservableObject {
         return "web"
     }
 
-    /// Files become sources; a folder lists its files as candidates (nothing is taken without a tick).
+    /// Files and folders become sources. 0.10.0 (Meeting Sheet, folders): a folder is a source of its own: the
+    /// preparation reads its recent files (Settings > Meeting Sheet, or the folder's own days), the call searches all of it.
     func add(paths: [String]) {
-        let dirs = paths.filter { StartCallModel.isDir($0) }
-        if !dirs.isEmpty { loadCandidates(folders: dirs) }
-        for p in paths where !StartCallModel.isDir(p) && !sources.contains(where: { $0.path == p }) {
-            let isDeck = model.callType == "presentation" && ["pptx", "pdf", "key"].contains((p as NSString).pathExtension.lowercased()) && !sources.contains { $0.deck }
-            sources.append(DraftSource(type: StartCallModel.isDir(p) ? "folder_file" : "file", path: p, title: (p as NSString).lastPathComponent, deck: isDeck))
+        for p in paths where !sources.contains(where: { $0.path == p }) {
+            let dir = StartCallModel.isDir(p)
+            let isDeck = !dir && model.callType == "presentation" && ["pptx", "pdf", "key"].contains((p as NSString).pathExtension.lowercased()) && !sources.contains { $0.deck }
+            sources.append(DraftSource(type: SheetFolders.sourceType(isDir: dir), path: p, title: (p as NSString).lastPathComponent, deck: isDeck))
         }
         checkSources()
     }
@@ -222,6 +235,7 @@ final class SheetDraft: ObservableObject {
             if let u = s.uri { d["uri"] = u }
             if let t = s.text { d["text"] = t }
             if !s.why.isEmpty { d["why"] = s.why }
+            if s.type == SourceType.folder.rawValue, let days = s.days { d["days"] = days }     // 0.10.0 (Meeting Sheet, folders)
             if s.deck {
                 var dk: [String: Any] = [:]
                 if s.deckMinutes != nil || model.callType == "presentation" {
@@ -240,6 +254,7 @@ final class SheetDraft: ObservableObject {
         }
         let people: [String: Any] = ["ours": ours.filter { !$0.name.isEmpty }.map(person), "theirs": theirs.filter { !$0.name.isEmpty }.map(person)]
         let options: [String: Any] = ["plan": plan, "special": special, "remind_minutes": remind, "stale_months": SheetPrefs.shared.staleMonths,
+                                      "folder_days": SheetPrefs.shared.folderDays,
                                       "use_project_folder": false, "sales": model.salesEnabled, "hiring_role": model.hiringRole]
         var r: [String: Any] = [
             "project": ["slug": model.project?.slug ?? model.workspace?.name.lowercased() ?? "", "root": model.root ?? ""],
@@ -255,7 +270,8 @@ final class SheetDraft: ObservableObject {
         if let m = blocks.first(where: { $0.type == "qualification" })?.method { r["method"] = m }
         // 0.10.0 (Meeting Sheet, Google Picker): Google's state and the Drive files already confirmed in Google Picker
         r["google"] = ["connected": GoogleService.shared.connected,
-                       "copies": GooglePicker.copies(for: sources.compactMap(\.uri), root: model.root)] as [String: Any]
+                       "copies": GooglePicker.copies(for: sources.compactMap(\.uri), root: model.root).merging(googleCopies) { a, _ in a },
+                       "status": googleStatus] as [String: Any]
         if let o = out { r["out"] = o }
         if let e = SheetFiles.earlier(for: model) { r["earlier_sheet"] = e }
         return r
@@ -273,6 +289,7 @@ final class SheetDraft: ObservableObject {
                 self.localCheck()
                 return
             }
+            defer { self.probeGoogle() }
             for o in list {
                 guard let id = o["id"] as? String, let i = self.sources.firstIndex(where: { $0.id == id }) else { continue }
                 self.sources[i].access = o["access"] as? String ?? self.sources[i].access
@@ -280,8 +297,41 @@ final class SheetDraft: ObservableObject {
                 self.sources[i].fix = o["fix_action"] as? String
                 self.sources[i].tokens = o["size_tokens"] as? Int ?? self.sources[i].tokens
                 if let t = o["title"] as? String, !t.isEmpty { self.sources[i].title = t }
+                // 0.10.0 (Meeting Sheet, folders): the folder's counts; its size is the files taken, its line not a problem
+                if let t = o["type"] as? String, t == SourceType.folder.rawValue { self.sources[i].type = t }
+                if let f = o["folder"] as? [String: Any] {
+                    let info = SheetFolderInfo(json: f)
+                    self.sources[i].folder = info
+                    self.sources[i].tokens = SheetFolders.tokens(info)
+                    self.sources[i].reason = nil
+                }
             }
             self.note = ""
+        }
+    }
+
+    /// A Google link is opened for real (at most 25 s each): ok with its text kept as the copy, or denied with the reason.
+    /// Without this the link stayed "Checking access" until the sheet was built.
+    private func probeGoogle() {
+        guard GoogleService.shared.connected, let live = SheetFiles.liveFolder(model) else { return }
+        let folder = (live as NSString).appendingPathComponent("google")
+        for s in sources where s.access == "pending" && ["gdoc", "gsheet", "gslides"].contains(s.type) {
+            guard let u = s.uri, let l = GoogleLink.parse(u), !googleProbing.contains(l.id), !googleTried.contains(l.id) else { continue }
+            googleProbing.insert(l.id); googleTried.insert(l.id)
+            Task { @MainActor in
+                let res = await withTaskGroup(of: (files: [(GoogleLink, String)], problems: [String])?.self) { g in
+                    g.addTask { await GoogleService.shared.readLinks(in: l.url, folder: folder) }
+                    g.addTask { try? await Task.sleep(nanoseconds: 25_000_000_000); return nil }
+                    let first = await g.next() ?? nil
+                    g.cancelAll()
+                    return first
+                }
+                self.googleProbing.remove(l.id)
+                if let r = res, let f = r.files.first { self.googleCopies[l.id] = f.1; self.googleStatus[l.id] = "ok" }
+                else if let r = res, !r.problems.isEmpty { self.googleStatus[l.id] = "denied" }
+                // a timeout stays pending: it is read when the sheet is built, Retry tries again
+                self.checkSources()
+            }
         }
     }
 
@@ -364,6 +414,7 @@ final class SheetDraft: ObservableObject {
         let keep = sources.filter { $0.checked && $0.type != "text" }.map { s -> [String: String] in
             var d = ["type": s.type, "title": s.title]
             if let p = s.path { d["path"] = p }
+            if let days = s.days { d["days"] = "\(days)" }          // 0.10.0 (Meeting Sheet, folders): the folder's own days
             if let u = s.uri { d["uri"] = u }
             return d
         }

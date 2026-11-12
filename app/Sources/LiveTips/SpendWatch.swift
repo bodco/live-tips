@@ -51,6 +51,7 @@ enum SpendWatch {
 
     /// Posts the alerts that are due; called with the menu bar refresh.
     static func check(config c: AppConfig) {
+        AIStatusModel.shared.refresh()          // 0.10.0 (AI chain): switch notifications also with Home closed
         let month = ProviderLimits.month()
         var shown = Set(UserDefaults.standard.stringArray(forKey: shownKey) ?? [])
         var changed = false

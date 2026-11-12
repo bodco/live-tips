@@ -41,6 +41,7 @@ from . import readers
 from . import schema as S
 from . import size as Z
 from . import sources as SRC
+from . import standup as SU
 
 PACKED = ("local", "codex", "openai", "gemini", "agy", "fake")
 CLAUDE = ("code", "api")
@@ -85,6 +86,7 @@ class Asker:
 
     def __init__(self, route: str, req: dict, responder: Optional[Callable[[str, str], str]] = None):
         self.route = Z.route_key(route)
+        self.chosen = self.route
         self.req = req
         self.responder = responder
         self.tokens = {"input": 0, "output": 0}
@@ -92,13 +94,94 @@ class Asker:
         self.model = req.get("model") or ""
         self.provider = None
         self.calls = 0
+        # 0.10.0 (AI chain, owner 12.11): the next AIs of the chain (the app sends the connected, enabled ones in the
+        # PM's order) and the switches made during this build (shown in the build views and the report)
+        self.chain = [Z.route_key(r) for r in (req.get("chain") or []) if r and Z.route_key(r) != self.route]
+        self.tried = [self.route]
+        self.switches: List[dict] = []
+        self.on_switch: Optional[Callable[[dict], None]] = None
+
+    def _model_for(self, r: str) -> str:
+        """The chosen route's model from the request; another AI of the chain its own (Settings > AI), else its default."""
+        return (self.req.get("model") or "") if r == self.chosen else ((self.req.get("models") or {}).get(r) or "")
+
+    def _state(self):
+        st = os.environ.get("LT_AI_STATE")
+        if not st:
+            return None
+        from ..routing import RouteState
+        return RouteState(st)
+
+    def can_run(self, r: str) -> bool:
+        """The AI can be tried at all (its tool installed, its key given to this build)."""
+        if r == "code":
+            return bool(find_claude(self.req.get("claude")))
+        if r == "api":
+            return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API"))
+        if r == "codex":
+            from ..codex_provider import find_codex_cli
+            return bool(find_codex_cli())
+        if r == "openai":
+            return bool(os.environ.get("OPENAI_API_KEY"))
+        if r == "gemini":
+            return bool(os.environ.get("GEMINI_API_KEY"))
+        if r == "agy":
+            from ..agy_provider import find_agy_cli
+            return bool(find_agy_cli())
+        return r == "local"
+
+    def switch(self, error: str, reason: str) -> Optional[str]:
+        """0.10.0 (AI chain): the AI is out (a limit, no credit, a bad key, signed out): mark it until its reset time
+        and go on with the next AI of the chain. None when there is none left."""
+        st = self._state()
+        if st is not None:
+            from ..routing import reset_time
+            st.mark_down(self.route, reason, reset_time(error))
+        st_ok = None
+        for r in self.chain:
+            if r in self.tried:
+                continue
+            if st is not None and st.is_down(r) and not st.due(r, 900):
+                continue
+            if self.can_run(r):
+                st_ok = r
+                break
+        if not st_ok:
+            return None
+        rec = {"from": self.route, "to": st_ok, "reason": reason, "error": str(error)[:160]}
+        self.route = st_ok
+        self.tried.append(st_ok)
+        self.provider = None
+        self.model = self._model_for(st_ok)
+        self.switches.append(rec)
+        if st is not None:
+            from ..routing import note_switch
+            note_switch("prep", rec["from"], st_ok, reason, st.path)
+        if self.on_switch:
+            self.on_switch(rec)
+        return st_ok
 
     def _provider(self):
         if self.provider is not None:
             return self.provider
         r, req = self.route, self.req
         t = float(req.get("timeout") or 900)
-        if r == "codex":
+        m = self._model_for(r)
+        if r == "code":               # 0.10.0 (AI chain): a packed pass on the Claude account (no tools)
+            from ..routing import ClaudeCodeProvider
+            cli = find_claude(req.get("claude"))
+            if not cli:
+                raise RuntimeError("Claude Code is not installed")
+            self.model = m or "sonnet"
+            self.provider = ClaudeCodeProvider(cli, timeout=t)
+        elif r == "api":              # 0.10.0 (AI chain): a packed pass on the Claude API key
+            from ..providers import AnthropicProvider
+            key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API") or ""
+            if not key:
+                raise RuntimeError("No API key: add it in Settings > AI > Claude")
+            self.model = m if m.startswith("claude-") else "claude-sonnet-5-5"
+            self.provider = AnthropicProvider(key, timeout=t, workspace_id=os.environ.get("CLAUDE_WORKSPACE", ""))
+        elif r == "codex":
             from ..codex_provider import CodexProvider, MODEL, find_codex_cli
             cli = find_codex_cli()
             if not cli:
@@ -110,25 +193,25 @@ class Asker:
             key = os.environ.get("OPENAI_API_KEY", "")
             if not key:
                 raise RuntimeError("No OpenAI API key: add it in Settings > AI > ChatGPT")
-            self.model = job_model("prep", req.get("model"))
+            self.model = job_model("prep", m)
             self.provider = OpenAIProvider(key, timeout=t, model=self.model)
         elif r == "gemini":
             from ..gemini_provider import GeminiProvider, job_model
             key = os.environ.get("GEMINI_API_KEY", "")
             if not key:
                 raise RuntimeError("No Gemini API key: add it in Settings > AI > Gemini")
-            self.model = job_model("prep", req.get("model"))
+            self.model = job_model("prep", m)
             self.provider = GeminiProvider(key, timeout=t, model=self.model)
         elif r == "agy":
             from ..agy_provider import AgyProvider, find_agy_cli, job_model
             cli = find_agy_cli()
             if not cli:
                 raise RuntimeError("Antigravity CLI is not installed: see Settings > AI > Gemini")
-            self.model = job_model("prep", req.get("model"))
+            self.model = job_model("prep", m)
             self.provider = AgyProvider(cli, timeout=t, model=self.model)
         elif r == "local":
             from ..providers import OllamaProvider
-            self.model = req.get("model") or "gemma4:26b"
+            self.model = m or "gemma4:26b"
             self.provider = OllamaProvider(req.get("url") or "http://127.0.0.1:11434", num_ctx=65536, timeout=max(t, 1800))
         else:
             raise RuntimeError(f"no packed provider for route {r}")
@@ -138,21 +221,38 @@ class Asker:
         self.calls += 1
         if self.responder is not None:
             return self.responder(system, user)
-        prov = self._provider()
-        res = prov.complete(model=self.model, system=[{"text": system}], user=user, max_tokens=max_tokens, cache_ttl=None)
-        self.tokens["input"] += int(res.input_tokens or 0) + int(res.cache_read or 0)
-        self.tokens["output"] += int(res.output_tokens or 0)
-        try:
-            from ..cost import cost_usd
-            self.usd += cost_usd(res.model or self.model, res.input_tokens, res.cache_write_5m, res.cache_write_1h,
-                                 res.cache_read, res.output_tokens) or 0.0
-        except Exception:  # noqa: BLE001
-            pass
-        if res.error:
-            raise RuntimeError(str(res.error)[:300])
-        if not (res.text or "").strip():
-            raise RuntimeError("the model returned an empty answer")
-        return res.text
+        from ..routing import out_reason, note_account_usage
+        while True:
+            try:
+                prov = self._provider()
+            except RuntimeError as e:          # not installed, no key: the next AI of the chain, when there is one
+                if self.route != self.chosen or self.chain:
+                    if self.switch(str(e), "missing"):
+                        continue
+                raise
+            res = prov.complete(model=self.model, system=[{"text": system}], user=user, max_tokens=max_tokens, cache_ttl=None)
+            self.tokens["input"] += int(res.input_tokens or 0) + int(res.cache_read or 0)
+            self.tokens["output"] += int(res.output_tokens or 0)
+            try:
+                from ..cost import cost_usd
+                self.usd += cost_usd(res.model or self.model, res.input_tokens, res.cache_write_5m, res.cache_write_1h,
+                                     res.cache_read, res.output_tokens) or 0.0
+            except Exception:  # noqa: BLE001
+                pass
+            st = self._state()
+            if st is not None:
+                note_account_usage(self.route, getattr(res, "account_usage", None), st.path)
+            if res.error:
+                # 0.10.0 (AI chain): an outage (not a plain rate limit or a timeout) moves this pass to the next AI
+                why = out_reason(self.route, res.error)
+                if why and self.switch(res.error, why):
+                    continue
+                raise RuntimeError(str(res.error)[:300])
+            if not (res.text or "").strip():
+                raise RuntimeError("the model returned an empty answer")
+            if st is not None:
+                st.mark_up(self.route)
+            return res.text
 
 
 def find_claude(hint: Optional[str] = None) -> Optional[str]:
@@ -598,6 +698,9 @@ def run_claude(req: dict, prompt: str, files: Dict[str, str], hosts: List[str], 
             ev = json.loads(line)
         except ValueError:
             continue
+        if ev.get("type") == "rate_limit_event" and route != "api" and os.environ.get("LT_AI_STATE"):   # 0.10.0 (AI chain)
+            from ..routing import account_usage_claude, note_account_usage
+            note_account_usage("code", account_usage_claude(ev), os.environ["LT_AI_STATE"])
         if ev.get("type") == "assistant":
             for c in (ev.get("message") or {}).get("content") or []:
                 if c.get("type") == "tool_use":
@@ -843,22 +946,54 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     for s in raw:
         if s.get("type") == "digest" and not s.get("text") and not s.get("path"):
             s["text"] = digest_text(req)
-    # 0.10.0 (bridge until the wizard): Prepare without the wizard picks what the series says and the best matches
+    # 0.10.0 (Meeting Sheet, fix 2026-11-12, owner): every build (Quick, Expert, Up next, also when the series memory
+    # or the wizard lists sources) reads the series, the Tracker, the project state and the digest; a Tracker the
+    # request already carries is replaced by today's. auto_sources: false in the request turns this off (tests).
+    tracker, auto_n = None, {}
+    if req.get("auto_sources", True):
+        have = {os.path.realpath(os.path.expanduser(s.get("path") or "")) for s in raw if s.get("path")}
+        try:
+            autos = SRC.auto_sources(req)
+        except Exception as e:  # noqa: BLE001
+            autos = []
+            notes.append(f"Auto sources failed: {type(e).__name__}")
+        for c in autos:
+            if c.get("path") and os.path.realpath(os.path.expanduser(c["path"])) in have:
+                continue
+            if c["type"] == "tracker":
+                tracker = c.pop("_tracker", None)
+                raw = [s for s in raw if s.get("type") != "tracker"]
+                c["id"] = "s-tracker"
+            if c["type"] == "digest" and c.get("cmd"):
+                if any(s.get("type") == "digest" and str(s.get("title") or "").startswith("Digest of") for s in raw):
+                    continue                     # the wizard ticked the digest: filled above, once
+                c["text"] = digest_text(req)
+                if not c["text"].strip():
+                    continue
+            if c.get("path"):
+                have.add(os.path.realpath(os.path.expanduser(c["path"])))
+            auto_n[c["type"]] = auto_n.get(c["type"], 0) + 1
+            raw.append({k: v for k, v in c.items() if k not in ("suggested", "score", "kind", "cmd")})
+        if auto_n:
+            notes.append("Sources added by Pacenote: " + ", ".join(f"{k} {v}" for k, v in sorted(auto_n.items())) + ".")
+    # 0.10.0 (bridge until the wizard): Prepare without the wizard also picks the best matching folder files
     if req.get("auto_pick"):
         have = {os.path.expanduser(s.get("path") or "") for s in raw if s.get("path")}
         try:
-            cands = SRC.candidates(req, int(req.get("auto_pick") or 12) + 20)["candidates"]
+            cands = [c for c in SRC.candidates(req, int(req.get("auto_pick") or 12) + 20)["candidates"]
+                     if c["type"] == "folder_file" or not req.get("auto_sources", True)]
         except Exception:  # noqa: BLE001
             cands = []
         n_folder = 0
         for c in cands:
+            c.pop("_tracker", None)
             if c.get("path") and os.path.expanduser(c["path"]) in have:
                 continue
             if c["type"] == "folder_file":
                 if not c.get("suggested") and (c.get("why") == ["rest of the folder"] or n_folder >= int(req["auto_pick"])):
                     continue
                 n_folder += 1
-            if c["type"] == "digest":
+            if c["type"] == "digest" and c.get("cmd"):
                 c["text"] = digest_text(req)
                 if not c["text"].strip():
                     continue
@@ -938,6 +1073,10 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         s["access"] = s.get("access") or "ok"
         s["used"] = "skipped"
         s["reason"] = "skipped by you"
+    # 0.10.0 (Meeting Sheet, folders): each folder gives its recent files (folder_file, parent = the folder) within the
+    # size budget; the folder itself has no text and is never "skipped" for it
+    srcs = SRC.expand_folders(srcs, texts, req, route, windows)
+    by_sid.update({s["id"]: s for s in srcs})
     for s in srcs:
         for k in ("text",):
             s.pop(k, None)                     # the texts live in the files, not in the sheet
@@ -945,7 +1084,7 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     usable = [s for s in srcs if s.get("access") == "ok" and (s["id"] in texts or s.get("fetch"))
               and s["id"] not in skipped_by_user]
     for s in srcs:
-        if s not in usable:
+        if s not in usable and not (s.get("type") == "folder" and s.get("access") == "ok" and s["id"] not in skipped_by_user):
             s["used"] = "skipped"
             s["reason"] = "skipped by you" if s["id"] in skipped_by_user else (s.get("access_reason") or "no text")
     # the size and the plan the user chose
@@ -965,11 +1104,18 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     blocks_text = PR.block_lines(ask_blocks, lib, crit, req.get("focus"), lang) + find_note
     system = PR.system(lang, call_langs)
     asker = Asker(route, req, responder)
+
+    def switched(rec: dict) -> None:
+        # 0.10.0 (AI chain): never silent: a progress line for the build views and a note in the report
+        emit(progress=0.13, stage="switch", **{"from": rec["from"], "to": rec["to"], "reason": rec["reason"]})
+        notes.append(f"Switched from {rec['from']} to {rec['to']}: {rec['reason']} ({rec['error']}).")
+    asker.on_switch = switched
     meta: dict = {}
     parts: List[Dict[str, List[dict]]] = []
     src_ids = {s["id"] for s in srcs}
     failures = []
-    if route in CLAUDE and responder is None:
+    use_claude = route in CLAUDE and responder is None
+    if use_claude:
         emit(progress=0.13, stage="model", route=route)
         files = claude_files(usable, texts, os.path.join(os.path.dirname(base), ".sheet-cache", os.path.basename(base)))
         hosts = sorted({urlparse(s["uri"]).hostname for s in usable if s.get("fetch") and s.get("uri")} - {None})
@@ -977,7 +1123,14 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         try:
             text, meta = run_claude(req, prompt, files, hosts, emit, usable)
         except Exception as e:  # noqa: BLE001
-            return {"error": str(e)[:300], "code": 5, "route": route}
+            # 0.10.0 (AI chain): Claude is out (a limit, signed out, no credit): the build goes on, packed, on the next AI
+            from ..routing import out_reason
+            why = out_reason(route, str(e))
+            if not (why and asker.switch(str(e), why)):
+                return {"error": str(e)[:300], "code": 5, "route": route, "out": why}
+            use_claude = False
+            text, meta = "", {}
+    if use_claude:
         ans = PR.as_json(text)
         if not ans:
             return {"error": "Claude returned no sheet JSON", "code": 5, "route": route}
@@ -999,6 +1152,19 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         asker.tokens = meta.get("tokens") or asker.tokens
         asker.usd = meta.get("cost_usd") or 0.0
     else:
+        if asker.route != route:
+            # 0.10.0 (AI chain): switched before any pass: the size and the plan of the AI that builds now. Web pages
+            # that only Claude would have fetched have no text here and are named as skipped.
+            for s in usable:
+                if s["id"] not in texts and s.get("fetch"):
+                    s["used"] = "skipped"
+                    s["reason"] = "the page was for Claude to read; the build switched to " + asker.route
+            usable = [s for s in usable if s["id"] in texts]
+            sr = Z.report(srcs, asker.route, None, windows, plan_mode)
+            if sr["state"] == "too_much" and plan_mode == "one":
+                plan_mode = "passes"
+                sr = Z.report(srcs, asker.route, None, windows, plan_mode)
+                notes.append("The sources did not fit one pass of " + asker.route + " after the switch: built in passes and merged.")
         # summaries first (compress): the biggest sources are summarized one by one, each named in the report
         if plan_mode == "compress":
             ids = (sr.get("plan") or {}).get("summarize") or []
@@ -1077,6 +1243,16 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
                     "failures": failures}
     emit(progress=0.92, stage="merge")
     facts = merge_passes(parts)
+    # 0.10.0 (Meeting Sheet, fix 2026-11-12, owner): a stand-up is the PM's own update; no meta lines about the sources
+    if SU.has_blocks(ask_blocks):
+        wanted = {b["type"] for b in ask_blocks}
+        n_meta = SU.guard(facts, lang, checked, wanted)
+        n_tr = SU.fill_from_tracker(facts, tracker, "s-tracker" if any(s["id"] == "s-tracker" for s in srcs) else None,
+                                    lang, checked, wanted)
+        if n_meta:
+            notes.append(f"Stand-up: {n_meta} line(s) about the sources instead of the work were dropped.")
+        if n_tr:
+            notes.append(f"Stand-up: {n_tr} line(s) taken from the Tracker.")
     srcmap = {s["id"]: s for s in srcs}
     try:
         year = int(str((req.get("meeting") or {}).get("start") or req.get("today") or "")[:4])
@@ -1125,9 +1301,14 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
             s["reason"] = "the page is longer than %d KB: only the first %d KB were read" % (
                 int(cut.get("limit_bytes") or 0) // 1000, int(cut.get("read_bytes") or 0) // 1000)
     sheet["sources"] = srcs
-    sr = Z.report(srcs, route, req.get("model") or None, windows, plan_mode)
+    if tracker and SU.has_blocks(sheet["blocks"]):
+        from . import tracker as TR
+        sheet["tracker"] = TR.for_sheet(tracker)    # the live window's fallback for the My update card
+    sr = Z.report(srcs, asker.route, (req.get("model") or None) if asker.route == route else None, windows, plan_mode)
     sheet["size_report"] = {k: sr[k] for k in ("route", "model", "window", "reserve", "total_tokens", "state", "plan")}
-    sheet["route"] = route
+    sheet["route"] = asker.route
+    if asker.switches:
+        sheet["route_switches"] = asker.switches        # 0.10.0 (AI chain): the report names every switch
     sheet["built_at"] = old.get("built_at") if old else checked
     if old:
         sheet["refreshed_at"] = checked
@@ -1139,7 +1320,7 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         sheet["readiness"] = dict(old.get("readiness") or {})
         sheet["readiness"]["dropped"] = (old.get("readiness") or {}).get("dropped") or []
     n = next_version(base)
-    sheet.setdefault("versions", []).append({"n": n, "built_at": checked, "route": route, "model": asker.model or "",
+    sheet.setdefault("versions", []).append({"n": n, "built_at": checked, "route": asker.route, "model": asker.model or "",
                                              "note": "refresh" if old else ("first build" if n == 1 else "rebuild")})
     R.apply(sheet, rules, req.get("today"), req.get("settings") or {}, req.get("app_root"))
     for b in sheet["blocks"]:
@@ -1159,8 +1340,9 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     written = D.derive(sheet, base)
     res = {"done": True, "sheet": base + ".sheet.json", "version": n, "readiness": sheet["readiness"]["state"],
            "facts": sum(len(b.get("facts") or []) for b in sheet["blocks"]), "conflicts": conflicts,
-           "route": route, "model": asker.model or "", "tokens": asker.tokens, "cost_usd": round(asker.usd or 0, 4),
-           "duration_s": int(time.time() - t0), "failures": failures, "derived": written, "notes": notes}
+           "route": asker.route, "model": asker.model or "", "tokens": asker.tokens, "cost_usd": round(asker.usd or 0, 4),
+           "duration_s": int(time.time() - t0), "failures": failures, "derived": written, "notes": notes,
+           "switches": asker.switches}
     if old:
         res["diff"] = {k: len(v) for k, v in (sheet.get("diff") or {}).items()}
     return res
@@ -1176,12 +1358,17 @@ def report(sheet: dict, failures: List[dict], notes: List[str], asker: Asker, me
     rows = []
     for s in sheet.get("sources") or []:
         rows.append({k: s.get(k) for k in ("id", "n", "type", "title", "path", "uri", "access", "access_reason",
-                                           "fix_action", "used", "reason", "pass", "size_tokens", "chars") if s.get(k) is not None}
+                                           "fix_action", "used", "reason", "pass", "size_tokens", "chars",
+                                           "parent", "folder") if s.get(k) is not None}
                     | {"facts": cites.get(s["id"], 0)})
     st = {}
     for s in sheet.get("sources") or []:
         st[s.get("used", "")] = st.get(s.get("used", ""), 0) + 1
-    return {"schema": "pacenote.sheet.sources/1", "sheet": sheet.get("id"), "built": now_iso(),
+    # 0.10.0 (Meeting Sheet, folders): each folder with its counts (files taken for the preparation, searchable later)
+    folders = [{"id": s["id"], "title": s.get("title"), "path": s.get("path"), **(s.get("folder") or {}),
+                "line": s.get("reason") or "", "files": [c["id"] for c in sheet.get("sources") or [] if c.get("parent") == s["id"]]}
+               for s in sheet.get("sources") or [] if s.get("type") == "folder"]
+    return {"schema": "pacenote.sheet.sources/1", "sheet": sheet.get("id"), "built": now_iso(), "folders": folders,
             "route": sheet.get("route"), "model": asker.model, "size_report": sheet.get("size_report"),
             "counts": st, "sources": rows, "failures": failures, "notes": notes,
             "claude": {"read": meta.get("read"), "fetched": meta.get("fetched"), "turns": meta.get("turns")} if meta else None,

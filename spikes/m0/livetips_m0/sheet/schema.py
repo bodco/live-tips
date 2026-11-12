@@ -18,7 +18,7 @@ LEVELS = ("green", "yellow", "red", "unknown")
 DIFFS = ("new", "changed", "gone")
 SOURCE_TYPES = ("file", "folder_file", "gdoc", "gsheet", "gslides", "drive_file", "notion", "web", "web_page",
                 "linkedin", "linkedin_manual", "text", "prev_call", "tracker", "web_search", "crm", "project_state",
-                "digest", "transcript")
+                "digest", "transcript", "folder")      # 0.10.0 (Meeting Sheet, folders): folder
 ACCESS = ("ok", "denied", "unsupported", "pending")
 FIX_ACTIONS = ("confirm_google", "connect_notion", "connect_google", "open_in_browser", "save_as_pdf", "paste_text",
                "fill_by_hand", "retry")
@@ -222,10 +222,15 @@ def _source(v, s, p):
     v.typ(s, "id", str, p)
     v.typ(s, "n", int, p)
     v.enum(s, "type", SOURCE_TYPES, p)
-    for k in ("uri", "path", "title", "access_reason", "reason", "modified_at"):
+    for k in ("uri", "path", "title", "access_reason", "reason", "modified_at", "parent"):
         v.typ(s, k, str, p)
-    for k in ("size_tokens", "chars", "pass"):
+    for k in ("size_tokens", "chars", "pass", "days"):
         v.typ(s, k, int, p)
+    fo = s.get("folder")             # 0.10.0 (Meeting Sheet, folders): the folder's counts
+    if fo is not None and v.obj(fo, f"{p}.folder"):
+        for k in ("days", "recent", "in_window", "searchable", "over_budget", "tokens"):
+            v.typ(fo, k, int, f"{p}.folder")
+        v.typ(fo, "fallback", bool, f"{p}.folder")
     v.enum(s, "access", ACCESS, p)
     v.enum(s, "fix_action", FIX_ACTIONS, p)
     v.enum(s, "used", USED, p)

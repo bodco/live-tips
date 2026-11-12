@@ -48,6 +48,7 @@ final class PrepRunner: ObservableObject {
     var switchedOnce = false
     var localTried = false          // 0.8.5: the fallback to the model on this Mac ran for this preparation
     var geminiTried = false         // 0.9.3: plan B (Gemini) ran for this preparation
+    var chainTried: [String] = []   // 0.10.0 (AI chain): the AIs this preparation already tried
     /// Claude Code model alias (always the newest of the family). Sonnet by default: it reads and
     /// extracts well, is quicker, and uses the account's limits several times slower than Opus.
     @Published var model = UserDefaults.standard.string(forKey: "prepModel") ?? "sonnet" {
@@ -370,7 +371,7 @@ final class PrepRunner: ObservableObject {
                 return nil
             }
         }
-        if forced == nil { switchedOnce = false; localTried = false; geminiTried = false }
+        if forced == nil { switchedOnce = false; localTried = false; geminiTried = false; chainTried = [] }
         let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini, AIRoute.agy].contains(forced ?? AIRoute.effective(AppConfig.load(from: AppPaths.config)).ai.prep)
         guard let claude = Self.claudePath ?? (wantsLocal ? "/usr/bin/true" : nil) else { return L("prep.err.noClaude") }
         let c = AIRoute.effective(AppConfig.load(from: AppPaths.config))   // 0.9.6 Б1: economy mode, from the next job
@@ -501,6 +502,14 @@ final class PrepRunner: ObservableObject {
         let usable0: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.openai ? self.hasOpenAIKey : $0 == AIRoute.gemini ? self.hasGeminiKey : $0 == AIRoute.agy ? (AgyAccount.cliPath != nil && AgyAccount.shared.signedIn != false) : $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
         // 0.9.6 (owner): a provider at its monthly limit is not usable (Settings > AI > Spending limits)
         let usable: (String) -> Bool = { usable0($0) && !SpendWatch.capped(route: $0, config: c) }
+        // 0.10.0 (AI chain, owner 12.11): the chosen AI cannot run or is out until its reset time: the next AI of the
+        // chain (AIChain), with a notice; the old plan B and local steps below stay for a chain switched off
+        if forced == nil && routes.autoSwitch && (!usable(route) || !AIRoute.due(route)),
+           let next = AIChain.next(Array(AIRoute.order(job: "prep", config: c).dropFirst()), tried: [route], usable: { usable($0) && AIRoute.due($0) }) {
+            AIRoute.noteSwitch(job: "prep", from: route, to: next, reason: AIRoute.outStates()[route]?.reason ?? "missing")
+            chainTried = [route]
+            route = next
+        }
         if forced == nil && routes.autoSwitch && !usable(route) && usable(AIRoute.other(route)) { route = AIRoute.other(route) }
         // 0.9.3 (owner): plan B, opt-in: the chosen way cannot run at all (no key, signed out) -> Gemini, the API key
         // first, then the Gemini account
@@ -642,6 +651,7 @@ final class PrepRunner: ObservableObject {
             env["LT_CODEX_CLI"] = CodexAccount.cliPath
         }
         for (k, v) in digestEnv { env[k] = v }
+        env["LT_AI_STATE"] = AIRoute.statePath      // 0.10.0 (status fix): the engine's preparations note the account's limits too
         p.environment = env
         let logs = (appRoot as NSString).appendingPathComponent("logs")
         try? FileManager.default.createDirectory(atPath: logs, withIntermediateDirectories: true)
@@ -690,6 +700,26 @@ final class PrepRunner: ObservableObject {
                 // routes say their error in the result, not in the log.
                 let errText = (self.resultMeta["error"] as? String) ?? logText
                 let packedOut = !ok && (isOpenAI || isCodex) && AIRoute.outReason(route, errText) != nil
+                // 0.10.0 (AI chain, owner 12.11): any AI out at run time (a limit, no credit, a bad key, signed out):
+                // marked until its reset time, the preparation runs again on the next AI of the chain, each AI once
+                let outText = isPacked ? errText : logText
+                if !ok, routes.autoSwitch, let why = AIRoute.outReason(route, outText) {
+                    AIRoute.markDown(route, why, text: outText)
+                    self.chainTried.append(route)
+                    let order = AIRoute.order(job: "prep", config: c)
+                    if let next = AIChain.next(order, tried: Set(self.chainTried), usable: { usable($0) && AIRoute.due($0) }) {
+                        AIRoute.noteSwitch(job: "prep", from: route, to: next, reason: why)
+                        self.switchedOnce = true; self.geminiTried = true; self.localTried = true
+                        self.running = false
+                        self.process = nil
+                        let tried = self.chainTried
+                        if self.start(r, route: next) == nil {
+                            self.chainTried = tried
+                            self.detail = L("prep.switched", ["route": AIRoute.name(next)])
+                            return
+                        }
+                    }
+                }
                 if claudeOut || packedOut, routes.geminiFallback, let b = planB, !self.geminiTried,
                    (packedOut || self.switchedOnce || !usable(AIRoute.other(route)) || !routes.autoSwitch) {
                     AIRoute.markDown(route, AIRoute.outReason(route, packedOut ? errText : logText) ?? "out")
@@ -908,6 +938,8 @@ final class PrepRunner: ObservableObject {
             lineBuf.removeSubrange(lineBuf.startIndex..<r.upperBound)
             guard let o = try? JSONSerialization.jsonObject(with: ln) as? [String: Any] else { continue }
             if (o["type"] as? String) == "system", progress < 0.05 { set(0.05, L("prep.st.instructions"), "") }
+            // 0.10.0 (AI chain): Claude Code's own report of the account's limits (the API key has none)
+            if runRoute == AIRoute.code, let u = AIAccountUsage.fromClaude(o, now: Date().timeIntervalSince1970) { AIRoute.noteAccountUsage(AIRoute.code, u) }
             if let st = o["stage"] as? String {      // livetips_m0.localprep
                 switch st {
                 case "pack": set(0.1, L("prep.st.local.pack"), "")

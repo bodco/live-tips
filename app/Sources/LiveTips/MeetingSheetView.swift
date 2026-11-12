@@ -642,6 +642,8 @@ struct SheetSourceReportRow: View {
                 Text([SheetLabels.kind(source.type), SheetLabels.tokens(source.sizeTokens), source.pass.map { L("sheet.ui.pass", ["n": "\($0)"]) }].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 if let r = source.reason ?? source.accessReason { Text(r).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true) }
+                // 0.10.0 (Meeting Sheet, fix 2026-11-12): a source Pacenote added says why (Tracker, earlier calls, digest)
+                else if let w = source.why, !w.isEmpty { Text(w.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {

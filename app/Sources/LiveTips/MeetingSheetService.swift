@@ -434,6 +434,9 @@ final class SheetPrefs: ObservableObject {
     @Published var rules: [SheetModeRule] { didSet { save("sheetModeRules", rules) } }
     @Published var focus: [String] { didSet { d.set(focus, forKey: "sheetFocusFields") } }
     @Published var staleMonths: Int { didSet { d.set(staleMonths, forKey: "sheetStaleMonths") } }
+    /// 0.10.0 (Meeting Sheet, folders): a folder source gives the preparation its files changed in the last N days.
+    @Published var folderDays: Int { didSet { d.set(folderDays, forKey: "sheetFolderDays") } }
+    nonisolated static var storedFolderDays: Int { UserDefaults.standard.object(forKey: "sheetFolderDays") as? Int ?? SheetFolders.defaultDays }
     @Published var remindMinutes: Int { didSet { d.set(remindMinutes, forKey: "sheetRemindMinutes") } }
     /// Always Quick or always Expert for every call ("" = by the rules).
     @Published var forced: String { didSet { d.set(forced, forKey: "sheetModeForced") } }
@@ -444,6 +447,7 @@ final class SheetPrefs: ObservableObject {
         rules = (d.data(forKey: "sheetModeRules").flatMap { try? JSONDecoder().decode([SheetModeRule].self, from: $0) }) ?? SheetModeRule.defaults
         focus = d.stringArray(forKey: "sheetFocusFields") ?? Self.defaultFocus
         staleMonths = d.object(forKey: "sheetStaleMonths") as? Int ?? 6
+        folderDays = d.object(forKey: "sheetFolderDays") as? Int ?? SheetFolders.defaultDays
         remindMinutes = d.object(forKey: "sheetRemindMinutes") as? Int ?? 30
         forced = d.string(forKey: "sheetModeForced") ?? ""
     }
@@ -619,7 +623,7 @@ enum SheetLabels {
         case .prevCall: return "clock.arrow.circlepath"
         case .tracker: return "checklist"
         case .crm: return "person.2"
-        case .projectState, .digest: return "folder"
+        case .projectState, .digest, .folder: return "folder"
         default: return "doc"
         }
     }

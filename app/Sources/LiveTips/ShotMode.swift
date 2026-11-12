@@ -159,7 +159,6 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "", name: "tips-440", size: NSSize(width: 440, height: 760)) }
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "LiveTips.openTab('brief');", name: "tips-brief") }
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "document.getElementById('moreBtn').click();", name: "tips-menu", size: NSSize(width: 560, height: 620)) }
-                steps.append { [unowned self] in self.tipsExtra(theme, js: "LiveTips.setMode('compact');", name: "tips-compact", size: NSSize(width: 560, height: 150)) }
                 steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setStatus({state:'recording',title:'Orbit weekly with the client',started_at:new Date(Date.now()-55*60000).toISOString(),minutes_left:4});", name: "tips-finish", size: NSSize(width: 560, height: 620)) }
             }
             if all {
@@ -306,7 +305,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// The tips window in a given state and size (Pacenote 0.8: 380, 560, 1000 px, ready, compact, menu, brief).
+    /// The tips window in a given state and size (Pacenote 0.8: 380, 560, 1000 px, ready, menu, brief).
     func tipsExtra(_ theme: String, js: String, name: String, size: NSSize = NSSize(width: 1040, height: 680), presentation: Bool = false) {
         var pa = prompterArgs(["LiveTips", presentation ? "--prompter-demo-presentation" : "--prompter-demo"])
         pa.title = "Orbit weekly with the client"
@@ -806,13 +805,12 @@ final class ShotMode: NSObject, NSApplicationDelegate {
                 w.isReleasedWhenClosed = false; w.center(); w.makeKeyAndOrderFront(nil)
             }
         }
-        // P5: presentation mode (wide with the rail, Move to slide?, a colleague's block, the handoff, compact, empty, menu).
+        // P5: presentation mode (wide with the rail, Move to slide?, a colleague's block, the handoff, empty, menu).
         let st = "window.setStatus({state:'recording',call_type:'presentation',title:'Orbit pilot review',system_audio:'ok',mic:'ok',started_at:new Date(Date.now()-580000).toISOString()});"
         steps.append { [unowned self] in self.tipsExtra(theme, js: st, name: "p5-presentation", size: NSSize(width: 1040, height: 700), presentation: true) }
         steps.append { [unowned self] in self.tipsExtra(theme, js: st + "window.addItems([{kind:'move_ask',n:5,topic:'Support rollout',section:'sl5'}]);", name: "p5-move-ask", size: NSSize(width: 560, height: 700), presentation: true) }
         steps.append { [unowned self] in self.tipsExtra(theme, js: st + "window.addItems([{kind:'outline_pos',cur:'sl7',slide:7},{kind:'timeline',plan:1500,elapsed:860,slide:7,slide_el:30,slide_sec:90,behind:40,advice:null}]);", name: "p5-colleague", size: NSSize(width: 560, height: 640), presentation: true) }
         steps.append { [unowned self] in self.tipsExtra(theme, js: st + "window.addItems([{kind:'outline_pos',cur:'sl9',slide:9}]);", name: "p5-handoff", size: NSSize(width: 560, height: 700), presentation: true) }
-        steps.append { [unowned self] in self.tipsExtra(theme, js: st + "LiveTips.setMode('compact');", name: "p5-compact-380", size: NSSize(width: 380, height: 360), presentation: true) }
         steps.append { [unowned self] in self.tipsExtra(theme, js: "window.setStatus({state:'recording',call_type:'presentation',title:'Orbit pilot review',system_audio:'ok',mic:'ok',started_at:new Date(Date.now()-40000).toISOString()});document.getElementById('moreBtn').click();", name: "p5-empty-menu", size: NSSize(width: 560, height: 560)) }
         // P6: rehearsal (intro).
         steps.append { [unowned self] in self.window("p6-rehearsal-\(theme)") { RehearsalWindow.show(base: Self.talkBase, title: "Orbit pilot review") } }

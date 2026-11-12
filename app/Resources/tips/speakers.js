@@ -44,8 +44,18 @@
         <div class="spk-more meta">${esc(t.more)} ${others ? `<select class="spk-same" data-sid="${esc(voice)}" aria-label="${esc(t.samePerson)}"><option value="">${esc(t.samePerson)}</option>${others}</select> · ` : ''}<button class="link" type="button" data-act="spk-notnow" data-sid="${esc(voice)}">${esc(t.notNow)}</button></div>
       </div>`;
     }
-    return `<div class="spkbar${open && voice ? ' open' : ''}"><div class="spk-chips"><button class="spks-h" type="button" data-act="spk-toggle" aria-expanded="${!!(open && voice)}"><b>${esc(t.speakersH)}</b></button>${chips.join('')}</div>${card}</div>`;
+    // 0.10.0 (owner 12.11): a large disclosure chevron on the right of the header; collapsed by default (the choice is a
+    // prompter pref, remembered across calls). Collapsed: the header and a compact count ("Speakers · 12, 9 to name").
+    const collapsed = !!(S.ui && S.ui.spkCollapsed);
+    const toName = list.filter(([, sp]) => !sp.name).length;
+    const count = t.spkCount ? t.spkCount({ n: chips.length, u: toName }) : (toName ? `${chips.length}, ${toName} ${t.toName}` : `${chips.length}`);
+    const label = collapsed ? (t.spkShow || t.speakersH) : (t.spkHide || t.speakersH);
+    const head = `<button class="spks-h" type="button" data-act="spk-collapse" aria-expanded="${!collapsed}" aria-label="${esc(label)}" title="${esc(label)}"><b>${esc(t.speakersH)}</b><span class="spk-count${toName ? ' todo' : ''}">\u00b7 ${esc(count)}</span><span class="spk-chev" aria-hidden="true">${CHEVRON}</span></button>`;
+    if (collapsed) return `<div class="spkbar collapsed">${head}</div>`;
+    return `<div class="spkbar${open && voice ? ' open' : ''}">${head}<div class="spk-chips">${chips.join('')}</div>${card}</div>`;
   }
+  // SF Symbols' chevron.down, drawn in SVG (the window is a web view): 18 px, in a 32 px hit area (tips.css .spk-chev)
+  const CHEVRON = '<svg viewBox="0 0 20 20" width="18" height="18" focusable="false"><path d="M4.5 7.25 10 12.75l5.5-5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const api = { list: listOf, cardVoice, block };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PacenoteSpeakers = api;

@@ -792,6 +792,7 @@ struct SettingsView: View {
         Pane(id: "integrations", title: "Integrations", symbol: "point.3.connected.trianglepath.dotted", subtitle: "Notion, calendars and your CRM."),
         Pane(id: "ai", title: "AI", symbol: "cpu", subtitle: "Models, spending limits, the local AI layer and the preparation."),
         Pane(id: "recording", title: "Call recording", symbol: "record.circle", subtitle: "Record the sound or the screen of your calls."),   // 0.9.5
+        Pane(id: "transcription", title: "Transcription", symbol: "character.book.closed", subtitle: "Your own words, so the transcript spells them right."),   // 0.10.0 (owner 12.11): the dictionary
         Pane(id: "sheet", title: "Meeting Sheet", symbol: "doc.text.magnifyingglass", subtitle: "Quick or Expert, My focus, reminders, your presets."),   // 0.10.0 (Meeting Sheet, phase 4)
         Pane(id: "modules", title: "Modules", symbol: "square.grid.2x2", subtitle: "Turn parts of Pacenote on or off."),       // 0.9.0
         Pane(id: "usage", title: "Usage", symbol: "chart.bar", subtitle: "Calls this week and the full statistics."),       // 0.9.0: from Home
@@ -840,6 +841,7 @@ struct SettingsView: View {
         case "projects": projects
         case "ai": ai
         case "recording": RecordingSettingsPane(model: model)
+        case "transcription": TranscriptionSettingsPane(model: model)      // 0.10.0 (owner 12.11): the dictionary
         case "integrations": IntegrationsPane(model: model) { notion }
         case "how": HowItWorksView()
         case "sheet": MeetingSheetSettingsPane()      // 0.10.0 (Meeting Sheet, phase 4)
@@ -923,7 +925,11 @@ struct SettingsView: View {
                 // 0.8.6 (E, rules/components.yaml): Ollama and the model as optional components
                 ForEach(OptionalComponents.shared.all.filter { $0.id != "link_downloader" }) { c in ComponentRow(comp: c) }
                 LocalStatus(local: LocalLLM.shared)
-                Toggle(L("local.fallback"), isOn: $model.config.ai.localFallback).help(L("local.fallback.help"))
+                // 0.10.0 (AI chain): the same switch as the model on this Mac's checkbox in the AI chain
+                Toggle(L("local.fallback"), isOn: Binding(
+                    get: { model.config.ai.chain.first { $0.route == AIRoute.local }?.on ?? true },
+                    set: { on in model.config.ai.chain = AIChain.setOn(model.config.ai.chain, route: AIRoute.local, on: on); model.config.ai.localFallback = on }))
+                    .help(L("local.fallback.help"))
             } header: { Text(L("local.section")) } footer: {
                 Text(L("local.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
@@ -1000,29 +1006,8 @@ struct SettingsView: View {
             } header: { Text(L("ai.job.after")) } footer: {
                 Text(L("ai.after.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            Section {
-                Toggle(L("ai.auto"), isOn: $model.config.ai.autoSwitch)
-                    .help(L("ai.auto.help"))
-                // 0.9.3 (owner): plan B, off by default; needs a Gemini key
-                Toggle(isOn: $model.config.ai.geminiFallback) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L("ai.geminiFallback"))
-                        Text(L("ai.geminiFallback.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .disabled(!model.isSet(.geminiAPIKey))
-                let lines = AIRoute.statusLines()
-                if lines.isEmpty {
-                    Text(L("ai.status.ok")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                } else {
-                    ForEach(lines, id: \.self) { Text($0).font(PN.Font.caption).foregroundStyle(PN.C.onMe) }
-                    Button(L("ai.status.checkNow")) { aiChecking = true; AIRoute.checkNow { aiChecking = false; aiTick += 1 } }
-                        .disabled(aiChecking)
-                }
-            } header: { Text(L("ai.auto.header")) } footer: {
-                Text(L("ai.auto.help")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            // 0.10.0 (AI chain, owner 12.11): one fallback chain for every job, reorderable, each AI with its checkbox
+            AIChainSection(model: model, checking: $aiChecking, tick: $aiTick)
             .id(aiTick)
             Section {
                 // Pacenote 0.8 (F4, spec 8): the month's spend and the balance live here, not on Home.
@@ -1570,7 +1555,6 @@ struct SettingsView: View {
                 ShortcutRow(action: .help)
                 ShortcutRow(action: .pause)
                 ShortcutRow(action: .mute)
-                ShortcutRow(action: .compact)
                 ShortcutRow(action: .proactive)
                 ShortcutRow(action: .presentation)
                 ShortcutRow(action: .prevSlide)
@@ -1832,7 +1816,7 @@ final class SettingsWindow {
         switch tab {
         case "how": return L("settings.how.title")
         case "about": return L("settings.about.windowTitle")
-        case "general", "projects", "ai", "recording", "integrations", "usage", "help", "modules", "sheet": return L("settings.tab." + tab)
+        case "general", "projects", "ai", "recording", "transcription", "integrations", "usage", "help", "modules", "sheet": return L("settings.tab." + tab)
         default: return L("settings.windowTitle")
         }
     }
@@ -1979,5 +1963,63 @@ struct PersonNamesSheet: View {
         case .otherPerson(let o): note = L("people.otherPerson", ["alias": a, "name": o])
         }
         reload()
+    }
+}
+
+/// 0.10.0 (AI chain, owner 12.11): Settings > AI > If an AI is out. One fallback chain for every job: the AI chosen for
+/// the job first, then the connected AIs in this order (arrows to reorder, a checkbox each). Tips never use the model
+/// on this Mac or the Gemini account; the model on this Mac is always the last step. The status of every AI below.
+struct AIChainSection: View {
+    @ObservedObject var model: SettingsModel
+    @Binding var checking: Bool
+    @Binding var tick: Int
+
+    var body: some View {
+        let chain = AIChain.normalized(model.config.ai.chain)
+        let connected = MainActor.assumeIsolated { AIRoute.connected() }
+        Section {
+            Toggle(L("ai.auto"), isOn: $model.config.ai.autoSwitch).help(L("ai.auto.help"))
+            ForEach(Array(chain.enumerated()), id: \.element.route) { i, e in
+                HStack(spacing: 8) {
+                    Text("\(i + 1).").font(PN.Font.caption.monospacedDigit()).foregroundStyle(PN.C.text3).frame(width: 18, alignment: .trailing)
+                    Toggle(isOn: Binding(get: { e.on }, set: { on in
+                        model.config.ai.chain = AIChain.setOn(model.config.ai.chain, route: e.route, on: on)
+                        if e.route == AIRoute.local { model.config.ai.localFallback = on }
+                    })) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(AIRoute.name(e.route))
+                            Text(note(e.route, connected: connected.contains(e.route))).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                    Spacer()
+                    Button { model.config.ai.chain = AIChain.move(model.config.ai.chain, route: e.route, by: -1) } label: { Image(systemName: "chevron.up") }
+                        .buttonStyle(.borderless).disabled(i == 0).help(L("ai.chain.up")).accessibilityLabel(L("ai.chain.up"))
+                    Button { model.config.ai.chain = AIChain.move(model.config.ai.chain, route: e.route, by: 1) } label: { Image(systemName: "chevron.down") }
+                        .buttonStyle(.borderless).disabled(i == chain.count - 1).help(L("ai.chain.down")).accessibilityLabel(L("ai.chain.down"))
+                }
+                .disabled(!model.config.ai.autoSwitch)
+            }
+            Button(L("ai.chain.reset")) { model.config.ai.chain = AIChain.defaults(localOn: model.config.ai.localFallback) }
+                .buttonStyle(.link).font(PN.Font.caption).disabled(!model.config.ai.autoSwitch)
+            let lines = AIRoute.statusLines()
+            if lines.isEmpty {
+                Text(L("ai.status.ok")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            } else {
+                ForEach(lines, id: \.self) { Text($0).font(PN.Font.caption).foregroundStyle(PN.C.onMe) }
+                Button(L("ai.status.checkNow")) { checking = true; AIRoute.checkNow { checking = false; tick += 1 } }
+                    .disabled(checking)
+            }
+        } header: { Text(L("ai.chain.header")) } footer: {
+            Text(L("ai.chain.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func note(_ r: String, connected: Bool) -> String {
+        var parts: [String] = [L(connected ? "ai.chain.connected" : "ai.chain.notConnected")]
+        if r == AIRoute.local { parts.append(L("ai.chain.localNote")) }
+        if r == AIRoute.agy { parts.append(L("ai.chain.agyNote")) }
+        return parts.joined(separator: " · ")
     }
 }

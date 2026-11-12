@@ -22,7 +22,7 @@ if 'login' in args:
     sys.exit(0)
 prompt = sys.stdin.read()
 assert prompt.startswith('rules\n\n'.replace('\\n', '\n')) or 'rules' in prompt
-assert '--ignore-user-config' in args and '--ephemeral' in args and '--sandbox' in args
+assert '--ignore-user-config' in args and '--sandbox' in args
 assert args[args.index('--sandbox') + 1] == 'read-only'
 assert 'features.shell_tool=false' in args and 'features.multi_agent=false' in args
 assert 'web_search="disabled"' in args and 'features.plugins=false' in args

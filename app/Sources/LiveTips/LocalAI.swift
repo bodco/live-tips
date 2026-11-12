@@ -73,6 +73,9 @@ final class LocalAIService: @unchecked Sendable {
         core["semantic_enabled"] = c.localAI.enabled
         core["speakers_enabled"] = c.speakersEnabled
         if !c.nameAliases.isEmpty { core["name_aliases"] = c.nameAliases }   // "❓" cards for lines that name the PM
+        // 0.10.0 (owner 12.11): Settings > Transcription > Dictionary, for the live recorder and recordings after the call
+        let dict = DictionaryEntry.core(c.dictionary)
+        if dict.isEmpty { core.removeValue(forKey: "dictionary") } else { core["dictionary"] = dict }
         core["ollama_url"] = c.localAI.engine == "embedded" ? Self.builtinURL : c.localAI.ollamaURL
         core["semantic_model"] = c.localAI.engine == "embedded" ? "bge-m3" : (c.localAI.ollamaModel.isEmpty ? "bge-m3" : c.localAI.ollamaModel)
         if let out = try? JSONSerialization.data(withJSONObject: core, options: [.prettyPrinted, .sortedKeys]) {

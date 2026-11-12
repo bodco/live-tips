@@ -3,7 +3,7 @@
  * Native -> web:  the item stream and the recorder status through feed.js (addItems, setStatus, addTranscript,
  *                 setSpeakers, setPrepDoc, setPrep, setUpNext), plus window.LiveTips.setState(partial) for
  *                 window state, LiveTips.setLang('en'|'uk'), setTheme('auto'|'light'|'dark'), setOpacity(0.65..1),
- *                 setMode('normal'|'compact'), togglePause(), toggleMute(), rename(title), setKeys({help, pause, mute, compact}).
+ *                 setMode() (kept, always the full window), togglePause(), toggleMute(), rename(title), setKeys({help, pause, mute}).
  * Web -> native:  window.webkit.messageHandlers.liveTips.postMessage({action, ...payload}).
  * No emoji, no colored left stripes, nothing smaller than 12 px.
  */
@@ -29,7 +29,7 @@
       agState: { todo: 'not raised', now: 'now', raised: 'raised, not decided', done: 'done', skip: 'skipped' },
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk', decision_conflict: 'Decided earlier',
         objection: 'Objection', qualify: 'Qualify', pain: 'Pain', next_step: 'Next step', competitor: 'Competitor', signal: 'Buying signal' },
-      firstHint: (k) => `Press ${k.h} when you need help · ${k.t} compact · ${k.l} proactive tips`,
+      firstHint: (k) => `Press ${k.h} when you need help · ${k.l} proactive tips`,
       deal: { tab: 'Deal', unknown: 'Unknown', partial: 'Partly', known: 'Known', objections: 'Objections', next: 'Next step', signals: 'Signals', noNext: 'No next step with a date yet', cycle: 'Click to change the state' },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
@@ -38,7 +38,7 @@
       next: (t, m) => `${t} in ${m} min`, notPrepared: 'not prepared', ready: 'brief ready', preparing: 'preparing', prepare: 'Prepare', open: 'Open',
       ask: 'Ask about this project', help: 'Help',
       tabs: { transcript: 'Transcript', onme: (n) => `On me · ${n}`, brief: 'Brief' },
-      newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team', speakersH: 'Speakers', namedOf: (o) => `${o.n} of ${o.m} named`, notNamed: 'not named yet',
+      newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team', speakersH: 'Speakers', spkCount: (o) => o.u ? `${o.n}, ${o.u} to name` : `${o.n}`, spkShow: 'Show the speakers', spkHide: 'Hide the speakers', namedOf: (o) => `${o.n} of ${o.m} named`, notNamed: 'not named yet',
       toName: 'to name', mins: (o) => o.m < 1 ? '<1 min' : `${o.m} min`, secsSpoken: (o) => `${o.s} s of speech`, noClip: 'No clip to play: Pacenote never keeps the call audio. The last line helps tell who it is.', soundsLike: (o) => `${o.name} · sounds like ${o.p}%`,
       whoGroups: { voice: 'Sounds like', call: 'On this call', invited: 'Invited to this call', project: 'Project people', library: 'Voice library' }, whoMore: (o) => `${o.n} more from your voice library`, whoWhy: 'Why these names: the voice match, who is on this call, the invitation, then the project and your voice library.',
       whoHint: 'Pick a person and a side: it saves at once.', whoNeedName: 'Pick or type a name first.',
@@ -51,7 +51,7 @@
       ariaMic: 'Mute microphone', ariaPause: 'Pause listening', ariaProactive: 'Proactive tips',
       proactiveOn: 'Proactive tips: on', proactiveOff: 'Proactive tips: off', resumeShort: 'Resume',
       menu: { pause: 'Pause listening', resume: 'Resume listening', mute: 'Turn mic off', unmute: 'Turn mic on',
-        compact: 'Compact mode', full: 'Full window', present: 'Presentation mode', stopPresent: 'Stop presenting', presentNeedDeck: 'Attach a deck in Start call',
+        present: 'Presentation mode', stopPresent: 'Stop presenting', presentNeedDeck: 'Attach a deck in Start call',
         heroHide: 'Hide the main card', heroShow: 'Show the main card',
         transcript: 'Transcript', brief: 'Brief', settings: 'Call settings…', switchCall: 'Switch to next call…', clearSpeakers: 'Forget speaker names' },
       recap: 'Recap:',
@@ -74,7 +74,7 @@
         syncA: (o) => `Following ${o.app} · slide ${o.n}`, stopFollowing: 'Stop following', askMove: (o) => `Move to slide ${o.n}?`, why: (o) => `You are already talking about ${o.topic}.`,
         go: 'Move', no: 'No', syncB: 'Slides follow your speech · asks before moving', colleague: (o) => `${o.name} is presenting`, takeSlide: 'Take this slide', backupHide: 'Hide their text', backupNote: (o) => `${o.name}'s text, in case you take over`,
         colleagueHint: (o) => `Tips stay quiet while ${o.name} speaks. Questions to you still get an answer card.`, turnIn: (o) => `Your turn in about ${o.t}`,
-        turnNext: (o) => `Your turn next · slide ${o.n}`, startWith: (o) => `Start with: "${o.line}"`, mode: 'Presentation mode', compactView: 'Compact view',
+        turnNext: (o) => `Your turn next · slide ${o.n}`, startWith: (o) => `Start with: "${o.line}"`, mode: 'Presentation mode',
         emptyTitle: 'No presentation attached', emptyText: 'Attach a file and Pacenote shows the slides, the time for each and answers to questions. Until then, tips work as on a regular call.',
         attach: 'Attach presentation', slidesN: (o) => `${o.n} slides`, ofShort: (o) => `${o.i} of ${o.n}` },
       present: { next: 'Next', prev: 'Back', start: 'Start', nextUp: (t, s) => `Next: ${t} (${s})`, canSkip: 'Can skip if short on time' },
@@ -116,7 +116,7 @@
       agState: { todo: 'не піднято', now: 'зараз', raised: 'піднято, не вирішено', done: 'зроблено', skip: 'пропущено' },
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик', decision_conflict: 'Вже вирішено',
         objection: 'Заперечення', qualify: 'Кваліфікація', pain: 'Біль', next_step: 'Наступний крок', competitor: 'Конкурент', signal: 'Сигнал купівлі' },
-      firstHint: (k) => `Натисніть ${k.h}, коли потрібна допомога · ${k.t} компактно · ${k.l} проактивні підказки`,
+      firstHint: (k) => `Натисніть ${k.h}, коли потрібна допомога · ${k.l} проактивні підказки`,
       deal: { tab: 'Угода', unknown: 'Невідомо', partial: 'Частково', known: 'Відомо', objections: 'Заперечення', next: 'Наступний крок', signals: 'Сигнали', noNext: 'Ще немає наступного кроку з датою', cycle: 'Клік змінює стан' },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
@@ -125,7 +125,7 @@
       next: (t, m) => `${t} за ${m} хв`, notPrepared: 'не підготовлено', ready: 'бриф готовий', preparing: 'готується', prepare: 'Підготувати', open: 'Відкрити',
       ask: 'Запитай про проєкт', help: 'Допоможи',
       tabs: { transcript: 'Транскрипт', onme: (n) => `На мені · ${n}`, brief: 'Бриф' },
-      newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда', speakersH: 'Спікери', namedOf: (o) => `названо ${o.n} з ${o.m}`, notNamed: 'ще без імені',
+      newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда', speakersH: 'Спікери', spkCount: (o) => o.u ? `${o.n}, ${o.u} без імені` : `${o.n}`, spkShow: 'Показати спікерів', spkHide: 'Сховати спікерів', namedOf: (o) => `названо ${o.n} з ${o.m}`, notNamed: 'ще без імені',
       toName: 'назвати', mins: (o) => o.m < 1 ? '<1 хв' : `${o.m} хв`, secsSpoken: (o) => `${o.s} с мовлення`, noClip: 'Кліпу немає: Pacenote не зберігає звук дзвінка. Остання фраза допомагає зрозуміти, хто це.', soundsLike: (o) => `${o.name} · схоже на ${o.p}%`,
       whoGroups: { voice: 'Схожий голос', call: 'Уже на цьому дзвінку', invited: 'Запрошені на дзвінок', project: 'Люди проєкту', library: 'Бібліотека голосів' }, whoMore: (o) => `Ще ${o.n} з бібліотеки голосів`, whoWhy: 'Звідки ці імена: схожість голосу, хто вже на дзвінку, запрошення, потім проєкт і ваша бібліотека голосів.',
       whoHint: 'Оберіть людину і сторону: зберігається одразу.', whoNeedName: 'Спершу оберіть або впишіть імʼя.',
@@ -138,7 +138,7 @@
       ariaMic: 'Вимкнути мікрофон', ariaPause: 'Пауза прослуховування', ariaProactive: 'Проактивні підказки',
       proactiveOn: 'Проактивні підказки: увімкнено', proactiveOff: 'Проактивні підказки: вимкнено', resumeShort: 'Продовжити',
       menu: { pause: 'Призупинити', resume: 'Продовжити', mute: 'Вимкнути мікрофон', unmute: 'Увімкнути мікрофон',
-        compact: 'Компактний режим', full: 'Повне вікно', present: 'Режим презентації', stopPresent: 'Завершити презентацію', presentNeedDeck: 'Додайте презентацію в Start call',
+        present: 'Режим презентації', stopPresent: 'Завершити презентацію', presentNeedDeck: 'Додайте презентацію в Start call',
         heroHide: 'Сховати основну картку', heroShow: 'Показати основну картку',
         transcript: 'Транскрипт', brief: 'Бриф', settings: 'Налаштування дзвінка…', switchCall: 'Перейти до наступного дзвінка…', clearSpeakers: 'Забути імена спікерів' },
       recap: 'Підсумок:',
@@ -193,11 +193,12 @@
     call: { title: '', state: 'live', startedAt: null, paused: false, micOff: false, minutesLeft: null, mode: 'normal', recap: '', briefLine: '', alert: null },
     agenda: [], questions: [], cards: [], onMe: [], next: null, deal: null,
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
-    keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', compact: '⌃⌥T', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
+    keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     rec: { state: 'off', kind: 'video', elapsed: 0, source: '', note: '' },
     pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, meetEnd: null, rosterSide: {}, knownNames: [], knownSrc: {}, tipsLang: null,
     openItems: [], notionItems: [], notionProject: '', minePending: [], mineN: 0, spkPrompt: 15,
-    ui: { spkOpen: null, spkCard: null, spkSnooze: {}, lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, rateOpen: null, briefEdit: false,
+    ui: { spkOpen: null, spkCard: null, spkSnooze: {}, spkCollapsed: PREFS.spk_collapsed !== '0',   // 0.10.0: collapsed by default, remembered
+          lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, rateOpen: null, briefEdit: false,
           present: { index: 0, running: false, stepStart: 0 }, presentForced: null }
   };
   const T = () => STR[S.lang] || STR.en;
@@ -260,9 +261,8 @@
   const HERO_KEY = 'pacenote.heroOff';
   function heroOffSaved() { try { return localStorage.getItem(HERO_KEY) === '1'; } catch (e) { return false; } }
   function setHeroOff(on) { S.ui.heroOff = !!on; try { if (on) localStorage.setItem(HERO_KEY, '1'); else localStorage.removeItem(HERO_KEY); } catch (e) {} }
-  // Compact mode shows only the main card, so hiding it applies to the full window only.
   function heroOffNow() { if (S.ui.heroOff == null) S.ui.heroOff = heroOffSaved(); return S.ui.heroOff; }
-  function heroHidden() { return heroOffNow() && S.call.mode !== 'compact'; }
+  function heroHidden() { return heroOffNow(); }
   function visibleCards() {
     const list = S.cards.filter((c) => c.state !== 'hidden').slice();
     const f = finishCard(); if (f) list.push(f);
@@ -302,7 +302,7 @@
   function renderBriefBar(t) {
     const bar = $('briefBar');
     if (!bar) return;
-    const live = S.call.state === 'live' && !S.call.tipsOff && S.call.mode !== 'compact';
+    const live = S.call.state === 'live' && !S.call.tipsOff;
     bar.hidden = !live;
     if (!live) return;
     const p = S.call.prep || 'none', info = S.call.prepInfo || {};
@@ -319,6 +319,30 @@
     }
     if (p !== 'running') html += `<button class="ghost" type="button" data-act="correct-context">${S.lang === 'uk' ? 'Виправити контекст' : 'Correct context'}</button>`;
     if (bar.dataset.html !== html) { bar.innerHTML = html; bar.dataset.html = html; }
+  }
+
+  // 0.10.0 (AI chain, owner 12.11): the limit status icon. S.ai = {level: ok|warn|out, title, head, rows: [{name, jobs,
+  // status, usage, state}], recent: [text]}, pushed by the app (AIStatusModel.windowState); every text is localized there.
+  const AI_ICON = {
+    out: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.2 1.4h5.6l3.8 3.8v5.6l-3.8 3.8H5.2l-3.8-3.8V5.2z" fill="currentColor"/><path d="M8 4.6v4.3" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="11.3" r="1" fill="#fff"/></svg>',
+    warn: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M7.1 2.1a1 1 0 0 1 1.8 0l6 11a1 1 0 0 1-.9 1.5H2a1 1 0 0 1-.9-1.5z" fill="currentColor"/><path d="M8 6.2v3.6" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="12.1" r="1" fill="#fff"/></svg>',
+    ok: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.6"/><rect x="6.4" y="6.4" width="3.2" height="3.2" rx=".5"/><path d="M6 1.8V4M10 1.8V4M6 12v2.2M10 12v2.2M1.8 6H4M1.8 10H4M12 6h2.2M12 10h2.2"/></svg>'
+  };
+  function renderAI() {
+    const el = $('aiSt'), a = S.ai;
+    if (!el) return;
+    if (!a || !a.level) { el.hidden = true; el.innerHTML = ''; el.dataset.html = ''; return; }
+    el.hidden = false;
+    const lv = AI_ICON[a.level] ? a.level : 'ok';
+    el.className = 'aist ' + lv + (S.ui.aiOpen ? ' open' : '');
+    const rows = (a.rows || []).map((r) => {
+      const cls = ['limit', 'out', 'capped'].includes(r.state) ? ' bad' : r.state === 'near' ? ' near' : '';
+      return `<div class="r${cls}"><div class="n"><span>${esc(r.name)}</span><span class="s">${esc(r.status)}</span></div><div class="j">${esc(r.jobs)}</div><div class="u">${esc(r.usage)}</div></div>`;
+    }).join('');
+    const sw = (a.recent || []).length ? `<div class="sw">${(a.recent || []).map((x) => `<div>${esc(x)}</div>`).join('')}</div>` : '';
+    const html = `<button class="aibtn" type="button" data-act="ai-toggle" title="${esc(a.title || '')}" aria-label="${esc(a.title || '')}" aria-expanded="${S.ui.aiOpen ? 'true' : 'false'}">${AI_ICON[lv]}</button>`
+      + `<div class="aipop" role="dialog" aria-label="${esc(a.head || a.title || '')}"><div class="h">${esc(a.title || '')}</div>${rows}${sw}</div>`;
+    if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
   }
 
   // 0.9.5: the call recording. Off: one button (a menu: sound, or sound and screen). On: the time, Pause, Stop.
@@ -381,11 +405,9 @@
     const app = $('app');
     // 0.10.0 (Meeting Sheet, phase 7): a stand-up opens in the small window once (my update, today, whom to ask);
     // the PM's own switch back to the full window wins for the rest of the call.
-    if (S.call.standup && !S.ui.standupAuto) {
-      S.ui.standupAuto = true;
-      if (S.call.mode !== 'compact' && S.call.state === 'live') { S.call.mode = 'compact'; post('compact', { on: true }); }
-    }
-    app.classList.toggle('compact', S.call.mode === 'compact');
+    // 2026-11-12 (owner, live stand-up): no automatic switch to the small window for a stand-up: the compact window
+    // hides the transcript and On me. The stand-up card shows in the normal window.
+    // 2026-11-12 (owner): compact mode is gone (no use at all); the window is always the full one.
 
     // header: dot, timer, status (or the one problem that matters), On me, menu
     const isReady = S.call.state === 'ready', ended = S.call.state === 'ended';
@@ -396,6 +418,7 @@
     const st = $('status');
     st.textContent = al ? al.text : isReady ? t.readyStatus : ended ? t.ended : S.call.paused ? t.paused : (S.call.micOff ? t.muted : t.listening);
     st.classList.toggle('warn', !!(al && al.level === 'warn'));
+    guard('ai', () => renderAI());
     const openOnMe = openOnMeCount();
     $('onmeLbl').textContent = t.onMe; $('onmeN').textContent = openOnMe;
     $('onmeBtn').hidden = openOnMe === 0;
@@ -909,7 +932,6 @@
   }
   function renderPresentation() {
     const el = $('present'), t = T(), pm = t.pm;
-    const compact = S.call.mode === 'compact';
     if (!presenting()) { dkApplySplit(false); el.hidden = true; el.className = 'present'; DK.sig = ''; return; }
     el.hidden = false;
     if (!S.steps.length) {   // P5 states: no deck yet
@@ -920,8 +942,8 @@
     }
     const keep = dkCur() && dkCur().n;
     dkPlan();
-    const moved = dkApplySplit(DK.split && !compact);
-    el.className = 'present pm dk' + (DK.isSplit ? ' sv' : '') + (compact ? ' compact' : '');
+    const moved = dkApplySplit(DK.split);
+    el.className = 'present pm dk' + (DK.isSplit ? ' sv' : '');
     const sig = [S.lang, DK.mode, DK.min, DK.isSplit, JSON.stringify(DK.open), DK.list.map((x) => [x.n, x.title, x.who, x.speaker, Math.round(x.b), dkBody(x).length, (x.numbers || []).length, (x.qa || []).length].join('~')).join('|')].join('#');
     if (keep != null) { const i = DK.list.findIndex((x) => x.n === keep); DK.idx = i >= 0 ? i : Math.min(DK.idx, DK.list.length - 1); }
     DK.idx = Math.max(0, Math.min(DK.idx, DK.list.length - 1));
@@ -1153,8 +1175,7 @@
     const items = [
       // 0.8.7 (L2): without a deck the item stays, greyed, with the condition; a click attaches a deck
       (S.steps.length || S.call.presType) ? ['present', presenting() ? t.stopPresent : t.present, k.present] : ['present-off', t.present, '', t.presentNeedDeck],
-      ['compact', S.call.mode === 'compact' ? t.full : t.compact, k.compact],
-      S.call.mode === 'compact' ? null : ['hero', heroOffNow() ? t.heroShow : t.heroHide, ''],
+      ['hero', heroOffNow() ? t.heroShow : t.heroHide, ''],
       ['transcript', t.transcript, ''], ['brief', t.brief, ''],
       '-',
       ['clear-speakers', t.clearSpeakers, ''],
@@ -1182,7 +1203,7 @@
     post('pref', { k: 'firstCallHintShown', v: '1' });
     const k = Object.assign({}, S.keys, PREFS.keys || {});
     const el = $('toast');
-    el.textContent = T().firstHint({ h: k.help, t: k.compact, l: k.proactive || '⌃⌥L' });
+    el.textContent = T().firstHint({ h: k.help, l: k.proactive || '⌃⌥L' });
     el.className = 'toast show first';
     el.onclick = () => { el.className = 'toast'; el.onclick = null; };
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.className = 'toast'; }, 20000);
@@ -1299,7 +1320,8 @@
 
 
   // ---------- Actions ----------
-  function setMode(mode) { S.call.mode = mode === 'compact' ? 'compact' : 'normal'; render(); }
+  // 2026-11-12 (owner): compact mode removed; an older caller asking for it gets the full window.
+  function setMode() { S.call.mode = 'normal'; render(); }
   function togglePause() {
     S.call.paused = !S.call.paused;
     post('setting', { key: 'tips_paused', value: S.call.paused ? 'on' : 'off' });
@@ -1468,6 +1490,12 @@
         if (S.ui.spkOpen && !cardVoice(speakerList())) { const u = speakerList().find(([, sp]) => !sp.name); if (u) { S.ui.spkCard = u[0]; delete S.ui.spkSnooze[u[0]]; } }
         render(); return;
       }
+      case 'spk-collapse': {   // 0.10.0 (owner 12.11): the Speakers chevron; the choice is a prompter pref (all calls)
+        S.ui.spkCollapsed = !S.ui.spkCollapsed;
+        PREFS.spk_collapsed = S.ui.spkCollapsed ? '1' : '0';
+        post('pref', { k: 'spk_collapsed', v: PREFS.spk_collapsed });
+        render(); return;
+      }
       case 'spk-card': S.ui.spkCard = b.dataset.sid; S.ui.spkOpen = true; delete S.ui.spkSnooze[b.dataset.sid]; render(); return;
       case 'spk-who': openWhoSheet({ sid: b.dataset.sid, anchor: b }); return;      // 2026-11-05: the card's Name this voice
       case 'spk-notnow': {   // 0.8.6 (F3): the card of this voice waits for its next 60 s of speech
@@ -1511,6 +1539,7 @@
       }
       case 'start': S.call.state = 'live'; post('start'); break;
       case 'rec-menu': S.ui.recMenu = !S.ui.recMenu; break;
+      case 'ai-toggle': S.ui.aiOpen = !S.ui.aiOpen; break;     // 0.10.0 (AI chain)
       case 'rec-start': S.ui.recMenu = false; S.rec = Object.assign({}, S.rec, { state: 'starting' }); post('rec', { a: 'start', kind: b.dataset.kind || 'video' }); break;
       case 'rec-pause': S.ui.recMenu = false; post('rec', { a: 'pause' }); return;
       case 'rec-resume': S.ui.recMenu = false; post('rec', { a: 'resume' }); return;
@@ -1560,7 +1589,6 @@
       case 'menu': {
         const item = b.dataset.item; S.ui.menuOpen = false;
         if (item === 'hero') { setHeroOff(!heroOffNow()); S.ui.heroOverride = null; }
-        else if (item === 'compact') { S.call.mode = S.call.mode === 'compact' ? 'normal' : 'compact'; post('compact', { on: S.call.mode === 'compact' }); }
         else if (item === 'present-off') { post('attach-deck'); render(); return; }
         else if (item === 'present') { S.ui.presentForced = !presenting(); post('setting', { key: 'call_type', value: S.ui.presentForced ? 'presentation' : 'auto' }); }
         else if (item === 'transcript' || item === 'brief') { openTab(item); return; }
@@ -1666,7 +1694,7 @@
   window.LiveTips = {
     setState(partial) {
       for (const k of Object.keys(partial || {})) {
-        if (k === 'call') { const mode = S.call.mode; S.call = Object.assign({}, S.call, partial.call); if (!partial.call.mode) S.call.mode = mode; }
+        if (k === 'call') { S.call = Object.assign({}, S.call, partial.call); S.call.mode = 'normal'; }   // a stored compact mode is ignored
         else if (k === 'speakers' || k === 'keys') S[k] = Object.assign({}, S[k], partial[k]);
         else if (k === 'ui') S.ui = Object.assign({}, S.ui, partial.ui);
         else if (k === 'toast') showToast(partial.toast);
@@ -1727,15 +1755,16 @@
   render();
   if (inApp) { post('setting', { key: 'ui_lang', value: S.lang }); post('ready'); }
 
-  // ---------- Demo data when opened in a browser (?state=ready|empty, ?lang=uk, ?theme=dark, ?mode=compact|presentation, ?left=4) ----------
+  // ---------- Demo data when opened in a browser (?state=ready|empty, ?lang=uk, ?theme=dark, ?mode=presentation, ?left=4, ?spk=open) ----------
   if (!inApp) {
     const now = Date.now(), min = 60000;
     const q = new URLSearchParams(location.search);
+    if (q.get('spk') === 'open') S.ui.spkCollapsed = false;      // 0.10.0: the Speakers block expanded
     window.LiveTips.setState({
       lang: q.get('lang') || 'en', theme: q.get('theme') || 'auto',
       call: { title: 'Orbit weekly with the client', state: q.get('state') === 'ready' ? 'ready' : 'live', briefLine: 'Brief ready · 09:40',
               startedAt: q.get('state') === 'empty' ? now - 42000 : now - 32 * min - 14000, minutesLeft: Number(q.get('left') || 13),
-              mode: q.get('mode') === 'compact' ? 'compact' : 'normal', recap: 'export on Tuesday, our QA tests week one, names from you by Friday.',
+              mode: 'normal', recap: 'export on Tuesday, our QA tests week one, names from you by Friday.',
               presenting: q.get('mode') === 'presentation', presType: q.get('mode') === 'presentation' },
       agenda: [
         { id: 'a1', title: 'Export release date', state: 'done' },
@@ -1753,7 +1782,7 @@
       ],
       onMe: [ { id: 'o1', text: 'Send the test account list', due: 'Today' }, { id: 'o2', text: 'Add 2 support users to the pilot', due: 'This week' } ],
       next: { title: 'Team retro', startsInMin: 8, prepared: false },
-      speakers: { S1: { name: 'Emily', side: 'client' }, me: { name: 'Me', side: 'team' }, S3: { name: 'David', side: 'client' }, S4: { name: '', label: 'Speaker 4' } },
+      speakers: { S1: { name: 'Emily', side: 'client', seconds: 410 }, me: { name: 'Me', side: 'team' }, S3: { name: 'David', side: 'client', seconds: 190 }, S4: { name: '', label: 'Speaker 4', seconds: 42, lastQuote: 'Can we add two people from support to the pilot?' } },
       transcript: [
         { speakerId: 'S1', text: 'When is the export live for our users?' },
         { speakerId: 'me', text: 'It is on dev now, production on Tuesday after the review.' },

@@ -10,6 +10,12 @@ settings:
   stale_months: 6              # a fact whose sources are all older than this is "old" (status stale)
   remind_minutes: 30           # the reminder before the meeting: "Meeting Sheet is ready / has N gaps"
   default_preset: blank
+  # 0.10.0 (Meeting Sheet, folders): a folder source gives the preparation its files changed in the last folder_days
+  # days (newest first, within folder_tokens of the pass); with none in the window, the newest folder_fallback files.
+  # The whole folder stays searchable during the call. Settings > Meeting Sheet and each folder row can change the days.
+  folder_days: 7
+  folder_tokens: 60000
+  folder_fallback: 5
   # The mode a new sheet opens in. The first rule that matches wins; no match = the preset's own mode.
   default_mode:
     - {when: preset_in, presets: [standup, client_sync], mode: quick}

@@ -37,19 +37,18 @@ final class HotKeys: @unchecked Sendable {
         }
     }
 
-    // Pacenote 0.8 (F2): Control-Option-M turns the microphone off or on, Control-Option-T the compact tips window,
-    // Control-Option-L proactive tips.
+    // Pacenote 0.8 (F2): Control-Option-M turns the microphone off or on, Control-Option-L proactive tips.
+    // 2026-11-12 (owner): the compact window and its Control-Option-T are gone; raw value 4 stays unused.
     // 0.8.5 (PRESENTATION-SPEC 3.3): Control-Option-S presentation mode; Control-Option-Left/Right the previous and next
     // slide and Control-Option-= +30 s on the slide. The last three are registered only while the window presents, so
-    // they never take the keys from a window manager the rest of the time. Compact (T) and proactive (L) keep their keys.
-    enum Action: UInt32, CaseIterable { case help = 1, pause = 2, mute = 3, compact = 4, proactive = 5,
+    // they never take the keys from a window manager the rest of the time. Proactive (L) keeps its key.
+    enum Action: UInt32, CaseIterable { case help = 1, pause = 2, mute = 3, proactive = 5,
                                             presentation = 6, prevSlide = 7, nextSlide = 8, add30 = 9
         var title: String {
             switch self {
             case .help: return L("menubar.helpNow")
             case .pause: return L("menubar.pause")
             case .mute: return L("hotkey.mute")
-            case .compact: return L("menubar.compact")
             case .proactive: return L("hotkey.proactive")
             case .presentation: return L("hotkey.presentation")
             case .prevSlide: return L("hotkey.prevSlide")
@@ -64,7 +63,6 @@ final class HotKeys: @unchecked Sendable {
             case .help: return Combo(key: UInt32(kVK_ANSI_H), mods: mods, char: "h")
             case .pause: return Combo(key: UInt32(kVK_ANSI_P), mods: mods, char: "p")
             case .mute: return Combo(key: UInt32(kVK_ANSI_M), mods: mods, char: "m")
-            case .compact: return Combo(key: UInt32(kVK_ANSI_T), mods: mods, char: "t")
             case .proactive: return Combo(key: UInt32(kVK_ANSI_L), mods: mods, char: "l")
             case .presentation: return Combo(key: UInt32(kVK_ANSI_S), mods: mods, char: "s")
             case .prevSlide: return Combo(key: UInt32(kVK_LeftArrow), mods: mods, char: "←")
@@ -72,8 +70,7 @@ final class HotKeys: @unchecked Sendable {
             case .add30: return Combo(key: UInt32(kVK_ANSI_Equal), mods: mods, char: "=")
             }
         }
-        var prefix: String { ["hk.help", "hk.pause", "hk.mute", "hk.compact", "hk.proactive",
-                              "hk.presentation", "hk.prevSlide", "hk.nextSlide", "hk.add30"][Int(rawValue) - 1] }
+        var prefix: String { "hk.\(self)" }    // hk.help, hk.pause, hk.mute, hk.proactive, hk.presentation, ...
     }
 
     func combo(_ a: Action) -> Combo {
@@ -94,10 +91,10 @@ final class HotKeys: @unchecked Sendable {
     }
 
     func install(help: @escaping () -> Void, pause: @escaping () -> Void,
-                 mute: @escaping () -> Void = {}, compact: @escaping () -> Void = {},
+                 mute: @escaping () -> Void = {},
                  proactive: @escaping () -> Void = {}, present: @escaping (String) -> Void = { _ in }) {
         guard handler == nil else { return }
-        actions = [Action.help.rawValue: help, Action.pause.rawValue: pause, Action.mute.rawValue: mute, Action.compact.rawValue: compact,
+        actions = [Action.help.rawValue: help, Action.pause.rawValue: pause, Action.mute.rawValue: mute,
                    Action.proactive.rawValue: proactive, Action.presentation.rawValue: { present("mode") },
                    Action.prevSlide.rawValue: { present("prev") }, Action.nextSlide.rawValue: { present("next") },
                    Action.add30.rawValue: { present("add30") }]
@@ -112,6 +109,8 @@ final class HotKeys: @unchecked Sendable {
             return noErr
         }, 1, &spec, nil, &handler)
         for a in Action.allCases where !a.onlyWhilePresenting { register(a) }
+        // 2026-11-12: a key once set for the removed compact window is forgotten
+        for k in [".key", ".mods", ".char"] { UserDefaults.standard.removeObject(forKey: "hk.compact" + k) }
     }
 
     private var presenting = false

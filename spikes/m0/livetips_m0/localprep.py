@@ -163,12 +163,12 @@ exhaustive: a missing item costs the PM more than a repeated one. Write in {BRIE
 ## Promises in flight (ours and theirs, with dates)
 ## Dates and deadlines ahead (expiries, releases, holidays, reports)
 ## People (who joined, left or is replaced; anyone in the invitation who has left the project)
-## Things to check before the call (what may have changed since the newest source)"""
+## Questions to ask on the call (what may have changed since the newest source and matters for this call)"""
 
 REVIEW_SYS = """You review a Live Brief for a project manager's call like a demanding senior PM. Compare it with the
 open items list and the notes. List concretely what is missing, wrong, vague, unsupported by the sources, or in the
-wrong language ({BRIEF_LANG} expected), section by section; also anything that should be marked "check before the
-call". No praise, only the fixes, numbered. No long dashes."""
+wrong language ({BRIEF_LANG} expected), section by section; also any "confirm / verify / check before the call" homework
+for the PM, which must become a question on the call or go. No praise, only the fixes, numbered. No long dashes."""
 
 REVISE_SYS = """Rewrite the Live Brief applying every fix of the review, using only the notes and the material (never
 invent). Keep its first line, its sections and their order; keep everything correct that the review did not touch.
@@ -189,8 +189,11 @@ Open after the call: what is still unanswered or undecided."""
 
 BRIEF_SYS = """You prepare the PM for a work call: a Live Brief the PM reads before the call and keeps open during it.
 Use only the material given (notes of earlier calls, project config, Current State, digest, the PM's context and
-files). Never invent facts, names, numbers or dates; when something is unknown or may be old, say so and what to
-check. Newer facts win. Write the brief in the language the project config asks for the brief, else in {BRIEF_LANG}; quotes and ready
+files). Never invent facts, names, numbers or dates; when something is unknown or may be old, say so in a few words
+and go on with the most likely reading. Never give the PM homework before the call ("confirm", "verify", "check
+whether"): the PM has only this brief and the call itself, no place to look things up (2026-11-12, owner). A gap that
+matters for the call's goal becomes a question to ask on the call, in the checklist or the speech; a gap that does
+not matter is left out. Newer facts win. Write the brief in the language the project config asks for the brief, else in {BRIEF_LANG}; quotes and ready
 phrases in the call language ({CALL_LANG}).
 No long dashes. Be concrete and detailed (1500-2500 words): dates, numbers, ticket keys, who said what.
 
@@ -199,7 +202,7 @@ Then a short header: audience, call language, the call time, participants from t
 material says has left the project as not expected), a freshness line (the newest source and what you cannot see),
 the update period (since the last call of this meeting) and what was already said there and must not be repeated.
 
-Before choosing questions, reconcile THIS call's participants, their roles, goal and named source document with the latest PM context. A repeated title does not imply the same interviewee. Explicit current corrections override older calls and saved instructions. If sources conflict and no current correction resolves them, put a prominent "Needs confirmation" section before the checklist; state both alternatives and do not silently reuse either interviewee's questions. Start with a "Live essentials" section: the goal, interviewee and role, primary document, 3-5 key facts/red lines and unresolved confirmations. Keep that section below 180 words; preserve the detailed brief below it.
+Before choosing questions, reconcile THIS call's participants, their roles, goal and named source document with the latest PM context. A repeated title does not imply the same interviewee. Explicit current corrections override older calls and saved instructions. If two sources really conflict and no current correction resolves them, put a short "Needs confirmation" section before the checklist (real conflicts only, at most 3, never things that are simply unknown): the likely reading first and what it rests on, then the other one in a line; do not silently reuse either interviewee's questions. With no conflict, leave the section out. Start with a "Live essentials" section: the goal, interviewee and role, primary document, 3-5 key facts/red lines and the open conflicts, if any. Keep that section below 180 words; preserve the detailed brief below it.
 
 Then these sections, in this order, with these headings:
 ## 1. Checklist
@@ -225,11 +228,12 @@ Do not write a section 6 (the speech is written separately)."""
 
 SPEECH_SYS = """You write the PM's speech for the call: the update the PM gives when asked, from the brief and the notes.
 In the call language ({CALL_LANG}); the explanation lines in {BRIEF_LANG}. No long dashes. Only facts from the material;
-mark a point the PM must check first with "[check]". The full texts are said to the other side as they are: confident,
+a point the material does not support is left out or asked as a question to the others, never marked for the PM to
+check first. The full texts are said to the other side as they are: confident,
 client-ready sentences ("Two-step login is on dev. Did your team try it?"), never notes to self ("I need to confirm
 whether...") and never internal details the red lines exclude. Format, exactly:
 ## 6. My update
-<one line in {BRIEF_LANG}: the period and what to check before the call>
+<one line in {BRIEF_LANG}: the period it covers>
 Opening: "<one ready sentence>"
 1. <short point, max 8 words>
    > <the full text to read aloud: 1-3 sentences, with the facts, dates and names of that point>

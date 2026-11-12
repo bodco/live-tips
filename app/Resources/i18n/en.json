@@ -2629,5 +2629,7 @@
  "sheet.switch.declined": "Not prepared: the AI route is not available",
  "sheet.live.transcriptSource": "This call so far (transcript)",
  "sheet.ui.s3.folderCount": "{n} files in the folder · {k} suggested · nothing is taken without a tick",
- "sheet.ui.li.captured": "Captured in the Pacenote browser · {at}"
+ "sheet.ui.li.captured": "Captured in the Pacenote browser · {at}",
+ "sheet.ui.fact.was": "was: {v}",
+ "sheet.live.refreshFailed": "Prepare again failed, the call keeps the previous Meeting Sheet: {err}"
 }

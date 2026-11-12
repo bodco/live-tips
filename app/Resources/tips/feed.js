@@ -550,7 +550,8 @@
   };
 
   Feed.prototype.setPrep = function (p) {
-    if (p && p.state) { this.prep = p.state; this.prepInfo = { made: p.made || '', before: !!p.before, progress: +p.progress || 0 }; this.emit(); }
+    // 0.10.0 (Meeting Sheet, round 2): note = why Prepare again failed (the call keeps its previous sheet)
+    if (p && p.state) { this.prep = p.state; this.prepInfo = { made: p.made || '', before: !!p.before, progress: +p.progress || 0, note: clean(p.note || '') }; this.emit(); }
   };
 
   Feed.prototype.setUpNext = function (list) {
@@ -599,7 +600,7 @@
     const presType = String(s.call_type || '') === 'presentation';
     const presenting = presType && steps.length > 0;
     const briefLine = this.prep === 'ready' ? this.tr('briefReady', { at: this.briefAt })
-      : this.prep === 'running' ? this.tr('briefPreparing') : this.prep === 'failed' ? this.tr('briefFailed') : this.tr('noBrief');
+      : this.prep === 'running' ? this.tr('briefPreparing') : this.prep === 'failed' ? ((this.prepInfo && this.prepInfo.note) || this.tr('briefFailed')) : this.tr('noBrief');
     return {
       call: {
         title: this.title || clean(s.title), state: ready ? 'ready' : st === 'stopped' ? 'ended' : 'live',

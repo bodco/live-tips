@@ -212,6 +212,90 @@ provider for tests.
 `budget` in the config: a soft and a hard limit per call and a hard monthly cap kept in a small
 local ledger. At the hard limit model tips stop and only the local layer runs.
 
+## Meeting Sheet (0.10.0)
+
+The preparation of every call type except Transcript builds a Meeting Sheet instead of a brief. User guide: docs,
+section 14.1x. The design rules: every AI route is equal (the sources, access checks, size and readers are shared
+and run before any model), nothing is cut silently, every fact has a source, a locator, a date and a status, the
+PM's edits survive a refresh, Google uses no restricted scope.
+
+**Layout.**
+
+| Part | Where | What |
+|---|---|---|
+| Sidecar package | `spikes/m0/livetips_m0/sheet/` | `schema.py` (validator), `presets.py` (rules + the PM's presets), `readiness.py` (rules, auto questions, stale), `merge.py` (`protect_edits`), `sources.py` (link kinds, access, fix actions, Move to Sources, candidates with "why"), `readers.py` (pdf, pptx in `presentation.xml` order, xlsx, docx, csv, md, txt, html; stdlib only), `size.py` (tokens per script, windows, plans), `prompt.py` (one contract for all routes), `build.py` (passes, merge, conflicts, refresh diff, the report), `derive.py` (files for the live layer), `web.py` + `linkedin.py` (crawl plan, robots.txt, captured pages, the profile parser), `lookup.py` (the folder search during a call), `aftercheck.py` (questions and best outcome after the call) |
+| Rules | `rules/meeting-sheet.yaml` | The block library (title, fields, `only_if_data`, which live file a block feeds), the presets (blocks, quick or expert, readiness rules), the readiness rules, settings (`stale_months: 6`, `remind_minutes: 30`, `default_mode` rules, auto questions), the qualification methods (names from `rules/sales.yaml`) |
+| Windows | `rules/ai.yaml > windows` | Context window, output and reserve per route and model, from the providers' documentation; `pass_cap` 250,000 tokens per pass, `near_share` 0.8; unverified numbers are marked `unverified: true` |
+| Swift models | `LiveTipsCore/MeetingSheet.swift`, `SheetPipeline.swift`, `MeetingSheetOps.swift`, `BrowserCapture.swift` | Codable models with tolerant enums (an unknown value round-trips), the pure logic of Quick/Expert, diff counts, edits, export, the browser's plan and contact scrubber |
+| Runner | `LiveTips/SheetRunner.swift` | Starts the sidecar with the route's key in the child's environment only, mirrors progress into `PrepRunner.shared` (Up next, the tips window and the queue work unchanged), asks before switching routes (a queued run switches and writes `route_switch` into the report), ledger and usage lines. `PrepRunner.start` hands every call type except Transcript to it |
+| UI | `LiveTips/MeetingSheet*.swift`, `UpcomingCallPage.swift`, `PacenoteBrowser.swift` | Quick and Expert (S1-S5), the sheet, readiness, sources, versions tabs, export (PDF through WKWebView), Settings > Meeting Sheet, the reminder, the Pacenote browser (non-persistent `WKWebsiteDataStore`) |
+| Recorder | `recorder/src/transcriber.py` (`SheetLive`) | Reads `<stem>.sheet.json` directly: questions, Ask now, red lines, facts with source numbers, best outcome, slides, stand-up; drops the copies `derive.py` made from the same sheet |
+| Custom presets | `<appRoot>/meeting-sheet/presets/*.yaml` | The PM's own presets; delete moves the file to `presets/_deleted/` |
+
+**CLI.** `cd spikes/m0 && python -m livetips_m0.sheet <command> --request <request.json>` (or `--sheet <path>`).
+Commands: `validate`, `readiness`, `presets`, `new`, `sources`, `candidates`, `size`, `build`, `refresh`, `derive`,
+`export`, `webplan`, `webfetch`. Output is JSON on stdout; `build` and `refresh` print progress lines
+(`{"progress": 0.4, "stage": "model", "pass": 1, "passes": 2}`) and end with `{"done": true, ...}` or
+`{"error": ...}`. Exit codes: 0 ok, 1 invalid sheet, 2 unknown command, 3 bad input, 4 too much for one pass (choose
+`plan: passes` or `compress`), 5 the model did not answer. A request (only `meeting` is required; invented names):
+
+```json
+{"meeting": {"title": "Lumenfield intro", "start": "2026-11-13T16:00:00+02:00", "event_id": "..."},
+ "participants": {"ours": [{"name": "Mike Carter"}], "theirs": [{"name": "Emily Parker", "company": "Lumenfield"}]},
+ "preset": "sales_intro", "blocks": ["header", "company", "qualification", "questions"], "method": "bant",
+ "mode": "expert", "language": "en", "context": "free text; links in it come back as suggestions",
+ "route": "code|api|codex|openai|gemini|agy|local", "plan": "one|passes|compress",
+ "sources": [{"path": "~/deck.pptx", "deck": {"owners": {"2": "Jake T."}, "minutes": 20, "qa_minutes": 5}},
+             {"uri": "https://docs.google.com/document/d/<id>/edit"}, {"type": "linkedin_manual", "text": "..."}],
+ "google": {"connected": true, "copies": {"<id>": "<live/google/...md>"}}, "notion": {"connected": false},
+ "project": {"slug": "lumenfield", "root": "~/work/..."}, "base": "<root>/live/prep-2026-11-13-1600-lumenfield-intro"}
+```
+
+**Files of a call** (`<base>` = `prep-<yyyy-MM-dd-HHmm>-<slug>` in `<project>/live/`, so the live layer finds them by
+name as before): `<base>.sheet.json` (the sheet), `<base>.sheet.md` (a readable copy), `<base>.sheet.v<N>.json`
+(versions), `<base>.sheet.sources.json` (the report: per source used / reason / access / facts citing it, passes,
+failures, tokens, cost, time), `<base>.sheet.request.json`. Text copies for Claude go to `live/.sheet-cache/<base>/`;
+pages from the Pacenote browser to `live/sources/`. After a call: `<stem>.sheet-live.json` (questions asked) and
+`<stem>.sheet-check.json`.
+
+**Schema v1** (`"schema": "pacenote.sheet/1"`): `sheet` {id, title, meeting_ref, mode quick|expert, preset, language,
+route, project, call_type, audience, participants, goal, blocks[], sources[], size_report, readiness, versions[],
+built_at, refreshed_at, diff}; `block` {id, type, title, visible, only_if_data, order, method, facts[],
+edited_by_user}; `fact` {id, label, text, source_ids[], locator {quote, line, page, url, slide, cell}, checked_at,
+status found|not_found|needs_check|conflict|stale|edited, conflict_with[], origin model|user|readiness, value {level,
+key, owner, due}, diff}; `source` {id, n, type, uri|path, title, size_tokens, chars, access ok|denied|unsupported|
+pending, access_reason, fix_action, used full|summarized|truncated|skipped|not_used, reason, pass, auto, why[], deck,
+modified_at}; `gap` {id, rule, text, block, fact, action add_question|find_again|mark_checked|drop_check|
+assign_owner|add_source, severity blocker|warning}. Unknown keys are allowed; `schema.validate` checks types, enums,
+unique ids, references and that a model fact marked found has a source and a date. The Swift models mirror it
+(`meeting_ref.where` is `place` in Swift).
+
+**Conflicts and stale facts.** Only attribute blocks (company, contact, tech stack, project context, qualification,
+interview candidate, signals, header, fit) can conflict: the same label, different values, different sources. When
+both sources are dated and differ, the newer wins (`found`) and the older is `stale` with `conflict_with` (shown as
+"was X"); `conflict` remains when the dates are equal or unknown. A source's date is the date in its file name, else
+its modification time. A fact is `stale` when all its dated sources are older than `stale_months`. `edited` and
+`user` facts never go stale and are never replaced (`merge.protect_edits`).
+
+**Derive, the fallback for live.** `derive.py` writes from the sheet `<base>.brief.md` (a generated readable copy,
+first line `# Live Brief: ... Meeting Sheet`), `<base>.cards.json`, `.facts.json`, `.agenda.json` and, for a deck
+source, `.slides.json`, so the recorder and the engine work with or without `SheetLive`. Derived cards and facts
+carry `sheet_fact` (or `"sheet": true`); the recorder drops them when it reads the sheet itself, so nothing shows
+twice. Without a `.sheet.json` the live layer behaves exactly as in 0.9.7 (golden replays unchanged).
+
+**Tests.**
+
+```
+cd spikes/m0 && .venv/bin/python -m pytest -q tests -k sheet     # schema, presets, readiness, pipeline, web, live
+cd app && swift build && swift run CoreChecks                      # meetingSheet0100, sheetPipeline0100,
+                                                                   # meetingSheetUI0100, browserCapture0100
+node app/WebTests/feed.test.js                                    # the sheet's questions in the tips window
+```
+
+Fixtures are invented only (`spikes/m0/tests/fixtures/sheet/`: Lumenfield, Orbit; people Emily Parker, Mike Carter,
+Sarah M., Jake T.); never real leads. `tools/check_anonymized.py` and the em dash test run in the full pytest suite.
+The web tests run a local `http.server` with its own robots.txt; never test against other people's profiles.
+
 ## Call recording (0.9.5)
 
 `LiveTipsCore/RecordingCore.swift`: the settings (`AppConfig.recording`), the quality presets and their size an hour,

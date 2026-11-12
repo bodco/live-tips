@@ -17,13 +17,25 @@ from . import readers
 LIVE_FACTS = {"header", "company", "tech_stack", "contact", "history", "project_context", "action_items",
               "interview_candidate", "qualification", "red_lines", "signals", "fit", "overview", "best_outcome",
               "my_focus", "interview_role", "standup_since", "standup_today", "standup_blockers", "standup_waiting"}
+# 0.10.0 (Meeting Sheet, round 2): questions live only in the questions checklist (the recorder's "questions" and
+# "Ask now"); no keyword card of their own here
 CARD_BLOCKS = {"my_focus": "yellow", "overview": "yellow", "signals": "yellow", "fit": "green", "best_outcome": "green",
-               "interview_role": "yellow", "red_lines": "red", "questions": "yellow"}
+               "interview_role": "yellow", "red_lines": "red"}
 SHOWN = ("found", "conflict", "edited", "needs_check", "stale")
 
 
 def _live(f: dict) -> bool:
-    return f.get("status") in SHOWN
+    # 0.10.0 (Meeting Sheet, round 2): a value replaced by a newer one (superseded_by) never goes live
+    return f.get("status") in SHOWN and not f.get("superseded_by")
+
+
+def _was(sheet: dict, f: dict) -> str:
+    """ (was: <older value>) for a fact that replaced an older one (newer wins, round 2)."""
+    old = [x for b in sheet.get("blocks") or [] for x in b.get("facts") or [] if x.get("superseded_by") == f.get("id")]
+    if not old:
+        return ""
+    t = old[0].get("text") or ""
+    return f" ({_w('was')}: " + (t if len(t) <= 90 else t[:87].rstrip() + "...") + ")"
 
 
 def _src_label(sheet: dict, ids: List[str]) -> str:
@@ -43,9 +55,11 @@ def _when(sheet: dict) -> str:
 
 
 WORDS = {"en": {"conflict": "sources disagree", "stale": "old", "needs_check": "check", "not_found": "Not found",
-                "goal": "Goal", "sources": "Sources", "owner": "owner", "lead": "lead", "none": "Not found yet."},
+                "goal": "Goal", "sources": "Sources", "owner": "owner", "lead": "lead", "none": "Not found yet.", "was": "was",
+                "questions": "Questions to ask"},
          "uk": {"conflict": "джерела розходяться", "stale": "застаріло", "needs_check": "перевірити", "not_found": "Не знайдено",
-                "goal": "Мета", "sources": "Джерела", "owner": "відповідальний", "lead": "веде", "none": "Поки нічого не знайдено."}}
+                "goal": "Мета", "sources": "Джерела", "owner": "відповідальний", "lead": "веде", "none": "Поки нічого не знайдено.", "was": "було",
+                "questions": "Питання"}}
 _LANG = ["en"]
 
 
@@ -90,6 +104,10 @@ def render_md(sheet: dict, for_brief: bool = False) -> str:
             dec = [f for b in blocks if b["type"] == "best_outcome" for f in b.get("facts") or [] if _live(f)]
             if dec:
                 lines += ["", "**Decisions to obtain:** " + " ".join(f"({chr(97 + i)}) {f['text']}" for i, f in enumerate(dec[:6]))]
+        qs = [f for b in blocks if b["type"] == "questions" for f in b.get("facts") or [] if _live(f)]
+        if qs:
+            # 0.10.0 (round 2): a plain list, not checkboxes: the window ticks them in the questions checklist only
+            lines += ["", "## " + _w("questions")] + [f"- {f['text']}" for f in qs]
     for b in blocks:
         facts = b.get("facts") or []
         shown = [f for f in facts if _live(f) or f.get("status") == "not_found"]
@@ -108,7 +126,8 @@ def render_md(sheet: dict, for_brief: bool = False) -> str:
             own = (f.get("value") or {}).get("owner")
             own = f" ({_w('owner')}: {own})" if own else ""
             nf = _w("not_found") + ": " if f.get("status") == "not_found" else ""
-            lines.append(f"- {lab}{nf}{f['text']}{lvl}{own}{_mark(f.get('status', ''))}{_cite(sheet, f.get('source_ids') or [])}")
+            lines.append(f"- {lab}{nf}{f['text']}{lvl}{own}{_mark(f.get('status', ''))}{_cite(sheet, f.get('source_ids') or [])}"
+                         + ("" if for_brief else _was(sheet, f)))
     rd = sheet.get("readiness") or {}
     if rd.get("gaps") and not for_brief:
         lines += ["", f"## Readiness: {rd.get('state', '')}"] + [f"- {g.get('text', '')}" for g in rd["gaps"]]
@@ -128,12 +147,12 @@ def agenda_id(f: dict) -> str:
 def checklist(sheet: dict) -> List[str]:
     out = []
     for b in sorted(sheet.get("blocks") or [], key=lambda b: b.get("order", 0)):
-        if b["type"] not in ("agenda", "questions") or not b.get("visible", True):
-            continue
+        if b["type"] != "agenda" or not b.get("visible", True):
+            continue                     # 0.10.0 (round 2): the agenda block only; questions are their own checklist
         for f in b.get("facts") or []:
             if not _live(f):
                 continue
-            topic = f.get("label") or ("Ask" if b["type"] == "questions" else "Item")
+            topic = f.get("label") or "Item"
             own = (f.get("value") or {}).get("owner")
             out.append(f"- [ ] **{topic}:** {f['text']}" + (f" ({_w('lead')}: {own})" if own else "") + f" <!-- agenda:{agenda_id(f)} -->")
     return out
@@ -242,7 +261,7 @@ def derive(sheet: dict, base: str) -> List[str]:
     put(".cards.json", cards(sheet))
     put(".facts.json", facts(sheet))
     ag = [{"id": agenda_id(f), "text": f["text"], "label": f.get("label", ""), "owner": (f.get("value") or {}).get("owner", ""),
-           "kind": b["type"]} for b in sheet.get("blocks") or [] if b["type"] in ("agenda", "questions")
+           "kind": b["type"]} for b in sheet.get("blocks") or [] if b["type"] == "agenda"
           for f in b.get("facts") or [] if _live(f)]
     if ag:
         put(".agenda.json", ag)

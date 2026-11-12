@@ -235,6 +235,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 let mine = r.joinsCurrentCall
                 if r.running && mine {
                     d = ["state": "running", "stage": r.stage, "detail": r.detail, "progress": r.progress]
+                } else if mine, let lf = r.liveFailure {
+                    d = ["state": "failed", "stage": lf, "note": lf]   // 0.10.0 (round 2): the previous sheet stays, say why
                 } else if !transcriptPath.isEmpty, FileManager.default.fileExists(atPath: String(transcriptPath.dropLast(3)) + ".brief.md") {
                     // 0.9.0: when the brief was made, and whether before the call (the brief strip)
                     let bp = String(transcriptPath.dropLast(3)) + ".brief.md"

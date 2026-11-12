@@ -244,6 +244,8 @@ def facts_from(answer: dict, blocks: List[dict], source_ids: set, checked_at: st
                 v.pop("level")
             if v:
                 g["value"] = v
+            if _date(f.get("as_of")):
+                g["as_of"] = str(f["as_of"])[:10]        # 0.10.0 (round 2): the date the source says this was true
             if pass_n:
                 g["pass"] = pass_n
             out.setdefault(t, []).append(g)
@@ -281,10 +283,113 @@ def _date(s: Optional[str]) -> Optional[_dt.date]:
         return None
 
 
-def mark_conflicts(facts: Dict[str, List[dict]], sources: Dict[str, dict], stale_months: int = 6) -> int:
+# 0.10.0 (Meeting Sheet, round 2): newer wins. A changed decision ("moves production to November 19") or a dated
+# status ("as of November 3") beats the value an older note still holds; "conflict" only when the dates are equal or
+# unknown. The older fact stays as "stale" with conflict_with and superseded_by pointing to the newer one ("was X").
+_MONTHS = {m: i + 1 for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"))}
+_UK_MONTHS = {"січ": 1, "лют": 2, "берез": 3, "квіт": 4, "трав": 5, "черв": 6, "лип": 7, "серп": 8, "верес": 9,
+              "жовт": 10, "листопад": 11, "груд": 12}
+_D_ISO = r"(\d{4}-\d{2}-\d{2})"
+_D_EN = r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*(?:\s+\d{4})?)"
+_D_UK = r"(\d{1,2}\s+(?:січ|лют|берез|квіт|трав|черв|лип|серп|верес|жовт|листопад|груд)\w*(?:\s+\d{4})?|\d{1,2}\.\d{1,2}(?:\.\d{4})?)"
+_D_ANY = "(?:" + "|".join((_D_ISO, _D_EN, _D_UK)) + ")"
+_ASOF_BEFORE = re.compile(r"(?:\bas of|\bas at|\bsnapshot of|\bstatus of|\bupdated(?: on)?|\bdated|\bsigned(?: on)?|\bdecided(?: on)?|"
+                          r"\bagreed(?: on)?|^on|^\W*on|станом на|від|оновлено)\s+" + _D_ANY, re.I | re.U)
+_ASOF_AFTER = re.compile(_D_ANY + r"(?:,?\s+\d{1,2}:\d{2})?\s+(?:decision|snapshot|current state|status|update|register|"
+                         r"note|notes|call|meeting|plan|рішення|статус|стан|нотатк|дзвін|зустріч)", re.I | re.U)
+CHANGE_CUE = re.compile(r"\b(?:mov(?:e|es|ed|ing)|chang(?:e|es|ed|ing)|replac(?:e|es|ed|ing)|postpon\w*|push(?:es|ed)?\s+(?:back|to)|"
+                        r"reschedul\w*|instead of|no longer|amend\w*|revis\w*|supersed\w*|overrid\w*|shift(?:s|ed)?\s+to|"
+                        r"now (?:is|set|planned|scheduled))\b|перенес|змінен|змінил|замість|тепер|поправк|переглянут", re.I | re.U)
+OLD_CUE = re.compile(r"\b(?:still\s+(?:list|has|have|say|show|hold|record|use|read|state|mention|name|give|put|carr|keep|point)\w*|older|outdated|originally|original|previous(?:ly)?|earlier version|old (?:plan|version|value|date))\b|"
+                     r"досі|раніше|старий|старіш|попередн|початков|первісн", re.I | re.U)
+
+
+def parse_day(text: str, year: Optional[int] = None) -> Optional[_dt.date]:
+    """One date as written in a fact: 2026-11-04, November 4, Nov 4 2026, 4 November, 4 листопада, 04.11.2026."""
+    t = (text or "").strip().lower().rstrip(".,")
+    y = year or _dt.date.today().year
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", t):
+            return _dt.date.fromisoformat(t)
+        m = re.fullmatch(r"(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?", t)
+        if m:
+            return _dt.date(int(m.group(3) or y), int(m.group(2)), int(m.group(1)))
+        m = re.fullmatch(r"([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?", t)
+        if m and m.group(1)[:3] in _MONTHS:
+            return _dt.date(int(m.group(3) or y), _MONTHS[m.group(1)[:3]], int(m.group(2)))
+        m = re.fullmatch(r"(\d{1,2})\s+(\w+?)(?:\s+(\d{4}))?", t, re.U)
+        if m:
+            w = m.group(2)
+            mon = _MONTHS.get(w[:3]) if w[:3] in _MONTHS else next((v for k, v in _UK_MONTHS.items() if w.startswith(k)), None)
+            if mon:
+                return _dt.date(int(m.group(3) or y), mon, int(m.group(1)))
+    except ValueError:
+        return None
+    return None
+
+
+def fact_as_of(f: dict, year: Optional[int] = None) -> Optional[_dt.date]:
+    """The date a fact was true or decided: the model's as_of, else a dated status in its text or quote."""
+    d = _date(f.get("as_of"))
+    if d:
+        return d
+    for t in (f.get("text") or "", (f.get("locator") or {}).get("quote") or ""):
+        for rx in (_ASOF_BEFORE, _ASOF_AFTER):
+            m = rx.search(t)
+            if m:
+                d = parse_day(next(g for g in m.groups() if g), year)
+                if d:
+                    return d
+    return None
+
+
+def _source_day(f: dict, sources: Dict[str, dict]) -> Optional[_dt.date]:
+    ds = [_date(sources.get(i, {}).get("modified_at")) for i in f.get("source_ids") or []]
+    ds = [d for d in ds if d]
+    return max(ds) if ds else None
+
+
+def _newest_unique(fs: List[dict], day) -> Optional[List[dict]]:
+    """The facts with the newest date when every fact has a date and the newest is newer than the rest; else None."""
+    ds = [(day(f), f) for f in fs]
+    if not all(d for d, _ in ds):
+        return None
+    top = max(d for d, _ in ds)
+    win = [f for d, f in ds if d == top]
+    return win if len(win) < len(fs) else None
+
+
+def pick_newer(fs: List[dict], sources: Dict[str, dict], year: Optional[int] = None) -> Optional[List[dict]]:
+    """Which facts of a disagreeing group win (newer), or None for a real conflict (dates equal or unknown)."""
+    asof = {id(f): fact_as_of(f, year) for f in fs}
+    # 1. a value a note itself calls old ("the config still lists ...", "the older plan") loses to the others
+    old = [f for f in fs if OLD_CUE.search(f.get("text") or "")]
+    live = [f for f in fs if f not in old] if old and len(old) < len(fs) else list(fs)
+    # 2. a changed decision beats the value it changed, unless that value is dated later than the change
+    chg = [f for f in live if CHANGE_CUE.search(f.get("text") or "")]
+    if chg and len(chg) < len(live):
+        rest = [f for f in live if f not in chg]
+        latest_chg = max((asof[id(f)] for f in chg if asof[id(f)]), default=None)
+        if not any(asof[id(f)] and (latest_chg is None or asof[id(f)] > latest_chg) for f in rest):
+            return chg
+    if len({norm(f["text"]) for f in live}) < 2:
+        return live if len(live) < len(fs) else None
+    # 3. dates: the facts' own dates when they have them, else the sources' dates (file name or modified)
+    if any(asof[id(f)] for f in live):
+        win = _newest_unique(live, lambda f: asof[id(f)])
+    else:
+        win = _newest_unique(live, lambda f: _source_day(f, sources))
+    if win:
+        return win
+    return live if len(live) < len(fs) else None
+
+
+def mark_conflicts(facts: Dict[str, List[dict]], sources: Dict[str, dict], stale_months: int = 6,
+                   year: Optional[int] = None) -> int:
     """Same attribute (block + label, or criterion key), different values from different sources: both facts stay.
-    When both sources are dated and the older one is stale_months older, the newer wins (found) and the older is
-    stale; otherwise both are "conflict" and point to each other. Returns the number of conflict groups."""
+    The newer one (pick_newer) is found and the older ones stale, linked by conflict_with and superseded_by after the
+    ids are assigned; when nothing says which is newer, all are "conflict". Returns the number of conflict groups.
+    stale_months is kept for the callers: a newer fact wins at any age now (round 2)."""
     groups = 0
     for t, lst in facts.items():
         if t not in CONFLICT_BLOCKS:
@@ -293,27 +398,26 @@ def mark_conflicts(facts: Dict[str, List[dict]], sources: Dict[str, dict], stale
         for f in lst:
             if f["status"] == "not_found" or not f.get("label") and not (f.get("value") or {}).get("key"):
                 continue
+            if not f.get("source_ids"):
+                continue             # 0.10.0 (round 2): a fact without a known source is needs_check, never a side of a conflict
             by.setdefault(fact_key(t, f), []).append(f)
         for k, fs in by.items():
             vals = {norm(f["text"]) for f in fs}
             srcs = {tuple(sorted(f["source_ids"])) for f in fs}
             if len(fs) < 2 or len(vals) < 2 or len(srcs) < 2:
                 continue
-            def newest(f):
-                ds = [_date(sources.get(i, {}).get("modified_at")) for i in f["source_ids"]]
-                ds = [d for d in ds if d]
-                return max(ds) if ds else None
-            dated = [(newest(f), f) for f in fs]
-            if all(d for d, _ in dated):
-                dated.sort(key=lambda x: x[0], reverse=True)
-                top = dated[0][0]
-                old = [f for d, f in dated[1:] if R.months_before(top, stale_months) >= d]
-                if old and len(old) == len(dated) - 1:
-                    dated[0][1]["status"] = "found"
-                    for f in old:
+            win = pick_newer(fs, sources, year)
+            if win:
+                wvals = {norm(f["text"]) for f in win}
+                for f in win:
+                    f["status"] = "conflict" if len(win) > 1 and len(wvals) > 1 else "found"
+                for f in fs:
+                    if f not in win:
                         f["status"] = "stale"
-                        f["superseded_by"] = dated[0][1].get("id")
-                    continue
+                        f["_newer"] = win
+                if len(win) > 1 and len(wvals) > 1:
+                    groups += 1
+                continue
             groups += 1
             for f in fs:
                 f["status"] = "conflict"
@@ -340,6 +444,13 @@ def assign_ids(facts: Dict[str, List[dict]]) -> None:
         for f in lst:
             if f["status"] == "conflict" and not f.get("conflict_with"):
                 f["status"] = "needs_check"
+    # 0.10.0 (Meeting Sheet, round 2): an older value points to the newer one ("was X" in the UI)
+    for lst in facts.values():
+        for f in lst:
+            newer = f.pop("_newer", None)
+            if newer:
+                f["conflict_with"] = [x["id"] for x in newer]
+                f["superseded_by"] = newer[0]["id"]
 
 
 def header_facts(req: dict, src_id: str, checked_at: str) -> List[dict]:
@@ -368,6 +479,8 @@ def gap_facts(facts: Dict[str, List[dict]], blocks: List[dict], checked_at: str)
     out = []
     for t, lst in facts.items():
         for f in lst:
+            if f.get("superseded_by"):
+                continue                  # 0.10.0 (round 2): replaced by a newer value, not a gap
             what = {"conflict": "Sources disagree", "not_found": "Not found", "stale": "Old"}.get(f["status"])
             if not what or t == "questions":
                 continue
@@ -554,6 +667,31 @@ def diff(old: dict, new: dict) -> dict:
     return res
 
 
+class Control:
+    """0.10.0 (Meeting Sheet, round 2): Retry / Skip from the build screen (S5). The app writes a small JSON file
+    (request "control": path) {"actions": [{"action": "retry" | "skip", "source_id": "s3"}, ...]} and only appends;
+    the build reads it between sources and before every pass and handles each action once. No file: nothing."""
+
+    def __init__(self, path: Optional[str]):
+        self.path = os.path.expanduser(path) if path else None
+        self.seen = 0
+
+    def poll(self) -> List[dict]:
+        if not self.path:
+            return []
+        try:
+            acts = json.loads(Path(self.path).read_text(encoding="utf-8")).get("actions") or []
+        except (OSError, ValueError, AttributeError):
+            return []
+        new = [a for a in acts[self.seen:] if isinstance(a, dict) and a.get("action") in ("retry", "skip") and a.get("source_id")]
+        self.seen = len(acts)
+        return new
+
+
+def _wanted(b: dict, only: set) -> bool:
+    return not only or b.get("id") in only or b.get("type") in only
+
+
 def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callable[[str, str], str]] = None) -> dict:
     t0 = time.time()
     rules = P.load_rules()
@@ -590,21 +728,62 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         keep = {b["type"]: b for b in sheet["blocks"]}
         bl = []
         for i, t in enumerate(req["blocks"]):
-            t = t if isinstance(t, str) else t.get("type")
+            d = t if isinstance(t, dict) else {"type": t}
+            t = d.get("type")
             if t not in lib:
                 continue
             b = keep.get(t) or {"id": f"b-{t}", "type": t, "title": lib[t].get("title", t), "visible": True,
                                 "only_if_data": bool(lib[t].get("only_if_data")), "facts": [], "edited_by_user": False}
             b["order"] = i
+            # 0.10.0 (Meeting Sheet, round 2): the wizard's eye (visible), "Only if there is data", title and method
+            if "visible" in d:
+                b["visible"] = bool(d["visible"])
+            if "only_if_data" in d:
+                b["only_if_data"] = bool(d["only_if_data"])
+            if d.get("title"):
+                b["title"] = str(d["title"])
+            if t == "qualification" and d.get("method"):
+                b["method"] = str(d["method"])
             bl.append(b)
         sheet["blocks"] = bl
     for b in sheet["blocks"]:
         if b["type"] == "qualification" and req.get("method"):
             b["method"] = req["method"]
     if old:
-        for k in ("blocks",):
-            pass
         sheet["versions"] = list(old.get("versions") or [])
+    # 0.10.0 (Meeting Sheet, round 2): options.blocks = regenerate only these blocks (ids or types), the rest and the
+    # edits stay as they were; options.find_again = a gap or fact id searched once more (its block only, a pointed
+    # note to the model). Both need the previous sheet; a first build always builds every visible block.
+    opts = req.get("options") if isinstance(req.get("options"), dict) else {}
+    only = {str(x) for x in (opts.get("blocks") or []) if x} if old else set()
+    find_note = ""
+    if old and opts.get("find_again"):
+        fa = opts["find_again"] if isinstance(opts["find_again"], list) else [opts["find_again"]]
+        gaps = {g.get("id"): g for g in (old.get("readiness") or {}).get("gaps") or []}
+        ofacts = {f.get("id"): (b, f) for b in old.get("blocks") or [] for f in b.get("facts") or []}
+        lines = []
+        for x in fa:
+            g = gaps.get(x) or {}
+            fid = g.get("fact") or (x if x in ofacts else None)
+            ob, of = ofacts.get(fid, (None, None))
+            bid = g.get("block") or (ob or {}).get("id")
+            if bid:
+                only.add(bid)
+            what = g.get("text") or ""
+            if of:
+                what += (" | now: " if what else "") + ((of.get("label") + ": ") if of.get("label") else "") + (of.get("text") or "")
+            if what:
+                lines.append("- " + what)
+        if lines:
+            find_note = ("\n\n## Find again (the person asked to look once more)\n" + "\n".join(lines) +
+                         "\nSearch every source for exactly this. When a source says it, write it as found with a quote; "
+                         "when two sources disagree, write both with their as_of; only when no source says it, not_found.")
+            notes.append("Find again: " + "; ".join(l[2:] for l in lines)[:300])
+    if only:
+        notes.append("Rebuilt only: " + ", ".join(sorted(only)) + "; the other blocks kept as they were.")
+    ask_blocks = [b for b in sheet["blocks"] if b.get("visible", True) and _wanted(b, only)]
+    control = Control(req.get("control"))
+    wait_s = float(req.get("control_wait_s") or 0)
     # the sources: the invitation header first, then what the user ticked
     raw = [{"id": "s-meeting", "type": "text", "title": "Meeting invitation", "text": PR.header_text(req), "role": "invite"}]
     raw += list(req.get("sources") or [])
@@ -643,7 +822,13 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     texts: Dict[str, str] = {}
     windows = Z.load_windows()
     report_rows = []
-    for i, s in enumerate(srcs):
+    by_sid = {s["id"]: s for s in srcs}
+    raw_text = {s["id"]: s.get("text") for s in srcs if s.get("text")}
+    skipped_by_user: set = set()
+
+    def check_one(s: dict, i: int) -> None:
+        if raw_text.get(s["id"]) and not s.get("text"):
+            s["text"] = raw_text[s["id"]]
         SRC.check(s, req, texts, route, windows)
         if s.get("fetch") and route in PACKED and route != "fake":
             emit(progress=0.03 + 0.07 * i / max(1, len(srcs)), stage="reading", source_id=s["id"])
@@ -658,17 +843,59 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
                 s["access"] = "denied"
                 s["access_reason"] = why
                 s["fix_action"] = "open_in_browser"
+
+    def handle_control() -> int:
+        """Retry / Skip actions written by the app since the last look; returns how many were handled."""
+        acts = control.poll()
+        for a in acts:
+            s = by_sid.get(str(a["source_id"]))
+            if s is None:
+                continue
+            if a["action"] == "skip":
+                skipped_by_user.add(s["id"])
+                emit(stage="sources", source_id=s["id"], skipped=True)
+            else:
+                skipped_by_user.discard(s["id"])
+                texts.pop(s["id"], None)
+                for k in ("access", "access_reason", "fix_action", "fix_actions"):
+                    s.pop(k, None)
+                check_one(s, srcs.index(s))
+                emit(stage="sources", source_id=s["id"], access=s.get("access"), retried=True)
+        return len(acts)
+
+    for i, s in enumerate(srcs):
+        handle_control()
+        if s["id"] in skipped_by_user:
+            continue
+        check_one(s, i)
         emit(progress=round(0.03 + 0.07 * (i + 1) / max(1, len(srcs)), 3), stage="sources", source_id=s["id"],
              access=s.get("access"))
+    # someone is watching (S5): a source that failed waits a little for Retry or Skip, then the build goes on
+    def failed_waiting() -> List[dict]:
+        return [s for s in srcs if s["id"] not in skipped_by_user and s.get("access") in ("denied", "unsupported")
+                and s.get("type") not in ("linkedin",) and not s.get("auto")]
+    if wait_s > 0 and control.path and failed_waiting():
+        emit(progress=0.1, stage="sources", waiting=[s["id"] for s in failed_waiting()], wait_s=int(wait_s))
+        until = time.time() + wait_s
+        while time.time() < until and failed_waiting():
+            if not handle_control():
+                time.sleep(0.5)
+    handle_control()
+    for sid in skipped_by_user:
+        s = by_sid[sid]
+        s["access"] = s.get("access") or "ok"
+        s["used"] = "skipped"
+        s["reason"] = "skipped by you"
     for s in srcs:
         for k in ("text",):
             s.pop(k, None)                     # the texts live in the files, not in the sheet
         s.pop("role", None)
-    usable = [s for s in srcs if s.get("access") == "ok" and (s["id"] in texts or s.get("fetch"))]
+    usable = [s for s in srcs if s.get("access") == "ok" and (s["id"] in texts or s.get("fetch"))
+              and s["id"] not in skipped_by_user]
     for s in srcs:
         if s not in usable:
             s["used"] = "skipped"
-            s["reason"] = s.get("access_reason") or "no text"
+            s["reason"] = "skipped by you" if s["id"] in skipped_by_user else (s.get("access_reason") or "no text")
     # the size and the plan the user chose
     plan_mode = req.get("plan") or "one"
     sr = Z.report(srcs, route, req.get("model") or None, windows, plan_mode)
@@ -683,7 +910,7 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
                     "message": "The sources do not fit one pass of this model. Choose passes or summaries first."}
     lib = rules.get("blocks") or {}
     crit = {m: (rules.get("sales_methods") or {}).get(m, {}).get("criteria") or [] for m in (rules.get("sales_methods") or {})}
-    blocks_text = PR.block_lines(sheet["blocks"], lib, crit, req.get("focus"), lang)
+    blocks_text = PR.block_lines(ask_blocks, lib, crit, req.get("focus"), lang) + find_note
     system = PR.system(lang, call_langs)
     asker = Asker(route, req, responder)
     meta: dict = {}
@@ -702,7 +929,7 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         ans = PR.as_json(text)
         if not ans:
             return {"error": "Claude returned no sheet JSON", "code": 5, "route": route}
-        parts.append(facts_from(ans, sheet["blocks"], src_ids, checked))
+        parts.append(facts_from(ans, ask_blocks, src_ids, checked))
         opened = set(meta.get("read") or [])
         for s in usable:
             f = files.get(s["id"])
@@ -744,6 +971,13 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
             passes = [usable]
         lo, hi = (0.45, 0.9) if plan_mode == "compress" else (0.13, 0.9)
         for n, group in enumerate(passes, 1):
+            if handle_control() and skipped_by_user:
+                group = [s for s in group if s["id"] not in skipped_by_user]
+                for sid in skipped_by_user:
+                    by_sid[sid]["used"] = "skipped"
+                    by_sid[sid]["reason"] = "skipped by you"
+                if not group:
+                    continue
             emit(progress=round(lo + (hi - lo) * (n - 1) / len(passes), 3), stage="model", **{"pass": n, "passes": len(passes)})
             note = (f"## This is pass {n} of {len(passes)}: only part of the sources are here; fill what they say, "
                     f"not_found for the rest") if len(passes) > 1 else ""
@@ -772,7 +1006,7 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
                     ans = PR.as_json(asker.ask(system, user, OUT_TOKENS))
                     if not ans:
                         raise RuntimeError("the model returned no sheet JSON")
-                    parts.append(facts_from(ans, sheet["blocks"], src_ids, checked, n if len(passes) > 1 else 0))
+                    parts.append(facts_from(ans, ask_blocks, src_ids, checked, n if len(passes) > 1 else 0))
                     if ans.get("goal") and not sheet.get("goal"):
                         sheet["goal"] = ans["goal"]
                     for s in (chunk if not (chunk and isinstance(chunk[0], tuple)) else [c[0] for c in chunk]):
@@ -792,22 +1026,46 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     emit(progress=0.92, stage="merge")
     facts = merge_passes(parts)
     srcmap = {s["id"]: s for s in srcs}
-    conflicts = mark_conflicts(facts, srcmap, stale_months)
+    try:
+        year = int(str((req.get("meeting") or {}).get("start") or req.get("today") or "")[:4])
+    except ValueError:
+        year = None
+    conflicts = mark_conflicts(facts, srcmap, stale_months, year)
     assign_ids(facts)
     for f in sum(facts.values(), []):
         if f.get("superseded_by") is None:
             f.pop("superseded_by", None)
+    old_blocks = {}
+    for ob in (old or {}).get("blocks") or []:
+        old_blocks.setdefault(ob.get("id"), ob)
+        old_blocks.setdefault(ob.get("type"), ob)
     for b in sheet["blocks"]:
         t = b["type"]
         if t == "header":
             b["facts"] = header_facts(req, "s-meeting", checked)
         elif t == "gaps":
             b["facts"] = []
-        else:
+        elif b in ask_blocks:
             b["facts"] = facts.get(t, [])
+        else:
+            # 0.10.0 (round 2): a block not rebuilt (options.blocks) or hidden keeps what it had
+            ob = old_blocks.get(b.get("id")) or old_blocks.get(t)
+            b["facts"] = copy.deepcopy((ob or {}).get("facts") or [])
+        if b.get("only_if_data") and b in ask_blocks and t not in ("header", "gaps"):
+            if not any(f.get("status") != "not_found" for f in b["facts"]):
+                b["facts"] = []           # "Only if there is data": an empty block stays empty and is not shown
+    allf = {b["type"]: b["facts"] for b in sheet["blocks"] if b["type"] not in ("header", "gaps")}
     gb = next((b for b in sheet["blocks"] if b["type"] == "gaps"), None)
     if gb is not None:
-        gb["facts"] = gap_facts(facts, sheet["blocks"], checked)
+        gb["facts"] = gap_facts(allf, sheet["blocks"], checked)
+    if old:
+        # a fact kept from the previous sheet may cite a source this request no longer lists: keep that source
+        have = {s["id"] for s in srcs}
+        cited = {i for b in sheet["blocks"] for f in b.get("facts") or [] for i in f.get("source_ids") or []}
+        for os_ in old.get("sources") or []:
+            if os_.get("id") in cited - have:
+                srcs.append(dict(os_, used=os_.get("used") or "full"))
+                have.add(os_["id"])
     sheet["sources"] = srcs
     sr = Z.report(srcs, route, req.get("model") or None, windows, plan_mode)
     sheet["size_report"] = {k: sr[k] for k in ("route", "model", "window", "reserve", "total_tokens", "state", "plan")}

@@ -44,7 +44,8 @@ conversation, which costs tens of seconds without tips and loses detail. So:
 
 **Required output of every sweep (no exceptions):** `<transcript name>.brief.md`,
 `<transcript name>.cards.json` (15-40 cards) and `<transcript name>.facts.json` (40-120 facts, never over 200),
-plus `<transcript name>.outline.json` for a presentation. The main session verifies them with
+plus `<transcript name>.outline.json` for a presentation. Since Pacenote 0.10.0 also
+`<transcript name>.sheet.json`, the Meeting Sheet (contract in `references/sheet.md`). The main session verifies them with
 `lt prep-check`; a sweep that returns without cards and facts is not finished.
 
 **Local Notion mirror (read before Notion).** For history and context beyond the Current State
@@ -352,7 +353,8 @@ Only when the PM asks during the call ("підготуй зараз", "пере�
 Run the full sweep above in a subagent, with one more source: the transcript of this call up to now (`<stem>.md`).
 What was asked, agreed and left open so far changes the brief, the agenda and the cards. The loop (SKILL.md Step 3)
 never waits: keep answering `@@` lines and giving tips on the current brief. Write the result as
-`<stem>.brief.new.md`, `<stem>.cards.new.json`, `<stem>.facts.new.json`; when all three are written, copy
+`<stem>.brief.new.md`, `<stem>.cards.new.json`, `<stem>.facts.new.json` (and `<stem>.sheet.new.json`, see
+`sheet.md`); when all three are written, copy
 `<stem>.brief.md` to `<stem>.brief.prev.md` (one previous version), rename each `.new` file over the current one and
 read the new brief on the next turn of the loop. A failed run leaves the current brief as it was. Tell the PM one
 line when it is ready: "Brief updated with what was said so far".

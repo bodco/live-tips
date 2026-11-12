@@ -30,6 +30,29 @@ public enum SheetPipeline {
         public var error: String?
         public var sheet: String?
         public var readiness: String?
+        /// 0.10.0 (round 2): Skip from the build screen took this source out; a failed source waits for Retry / Skip.
+        public var skipped = false
+        public var waiting: [String] = []
+    }
+
+    /// 0.10.0 (Meeting Sheet, round 2): a build refreshes the call's sheet when it exists and either Refresh was asked
+    /// or it runs during that very call (Prepare again: the transcript so far is one more source, edits stay).
+    public static func isRefresh(sheetExists: Bool, refreshAsked: Bool, duringCall: Bool) -> Bool {
+        sheetExists && (refreshAsked || duringCall)
+    }
+
+    /// What a finished build during the call means for the call: adopt the new sheet, or keep the previous one and say
+    /// so in the tips window (never fall back to an old brief), or nothing (not during a call).
+    public enum LiveOutcome: Equatable { case adopt, keepPrevious, none }
+    public static func liveOutcome(ok: Bool, duringCall: Bool) -> LiveOutcome {
+        guard duringCall else { return .none }
+        return ok ? .adopt : .keepPrevious
+    }
+
+    /// The Retry / Skip control file the sidecar reads (sheet/build.py Control): the actions so far plus one.
+    public static func controlActions(_ existing: [[String: String]], add action: String, source: String) -> [[String: String]] {
+        guard action == "retry" || action == "skip", !source.isEmpty else { return existing }
+        return existing + [["action": action, "source_id": source]]
     }
 
     /// One stdout line of the sidecar; nil for anything that is not a JSON object.
@@ -47,6 +70,8 @@ public enum SheetPipeline {
         l.error = o["error"] as? String
         l.sheet = o["sheet"] as? String
         l.readiness = o["readiness"] as? String
+        l.skipped = (o["skipped"] as? Bool) == true
+        l.waiting = o["waiting"] as? [String] ?? []
         return l
     }
 }

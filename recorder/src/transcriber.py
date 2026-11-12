@@ -1825,7 +1825,7 @@ def sheet_block_facts(sheet: dict, btype: str) -> list[dict]:
     for b in sheet_blocks(sheet, btype):
         for f in b.get("facts") or []:
             if isinstance(f, dict) and _s(f.get("text")) and f.get("status") not in SHEET_SKIP_STATUS \
-                    and f.get("diff") != "gone":
+                    and f.get("diff") != "gone" and not f.get("superseded_by"):
                 out.append(f)
     return out
 
@@ -1884,8 +1884,8 @@ def sheet_facts(sheet: dict) -> list[dict]:
             for f in b.get("facts") or []:
                 if not isinstance(f, dict) or not _s(f.get("text")) or f.get("status") in SHEET_SKIP_STATUS:
                     continue
-                if f.get("diff") == "gone":
-                    continue
+                if f.get("diff") == "gone" or f.get("superseded_by"):
+                    continue          # 0.10.0 (Meeting Sheet, round 2): an older value replaced by a newer one
                 cite = sheet_cite(sheet, f.get("source_ids"))
                 text = _s(f.get("text"))
                 if f.get("status") == "conflict" and f.get("conflict_with"):

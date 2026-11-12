@@ -60,6 +60,7 @@ Older step names used in the modules: Step 0 and Step 1 = `start.md` and "Start"
 | `start.md` (paths, project, audience and type concept, languages, fast start, Whisper prompt) | at the start of every call, before `lt start` |
 | `speech.md` (the PM's speech, status round, leading a stand-up, opening, formats) | at the start when a speech is due (not for interview or presentation) |
 | `sweep.md` (context sweep, Insight Bank, brief, cards, fact book formats) | the sweep subagent reads it first; the main session only for an inline sweep or a cards/facts rewrite |
+| `sheet.md` (the Meeting Sheet: `sheet.json` contract, blocks, statuses, sources with locators; Pacenote 0.10.0) | the sweep subagent, right after `sweep.md`, at every prep and refresh |
 | `window.md` (window layout and protocol, quick asks, ratings, settings and acks, find, focus, language switching, chat questions, context refresh) | once in a quiet poll after the speech, and when an `@@` line arrives whose handling you do not remember |
 | `culture.md` (culture lens, client signals, tone read) | audience `client` and the config has a Cultural Profile |
 | `checks.md` (answer check, questioning stretches) | audience `client` or `boss`, or when the PM starts asking a series of questions |

@@ -232,9 +232,12 @@ public struct SheetFact: Codable, Equatable, Identifiable {
     public var origin: FactOrigin
     public var value: FactValue?
     public var diff: DiffMark?
+    /// 0.10.0 (Meeting Sheet, round 2): an older value replaced by a newer fact (newer wins); the UI shows "was X".
+    public var supersededBy: String? = nil
     enum CodingKeys: String, CodingKey {
         case id, label, text, locator, status, origin, value, diff
         case sourceIds = "source_ids", checkedAt = "checked_at", conflictWith = "conflict_with"
+        case supersededBy = "superseded_by"
     }
     /// A fact Refresh never overwrites (livetips_m0/sheet/merge.py).
     public var isProtected: Bool { status == .edited || origin == .user }
@@ -413,4 +416,6 @@ public extension MeetingSheet {
     }
     func source(id: String) -> SheetSource? { sources.first { $0.id == id } }
     func fact(id: String) -> SheetFact? { blocks.lazy.flatMap(\.facts).first { $0.id == id } }
+    /// 0.10.0 (Meeting Sheet, round 2): the older values a fact replaced (newer wins), newest first as built.
+    func replaced(by id: String) -> [SheetFact] { blocks.flatMap(\.facts).filter { $0.supersededBy == id } }
 }

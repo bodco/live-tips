@@ -270,6 +270,11 @@ public enum SheetExport {
     public static func blocks(_ s: MeetingSheet, _ o: SheetExportOptions) -> [SheetBlock] {
         s.shownBlocks.filter { b in
             (o.blocks == nil || o.blocks!.contains(b.id)) && !(o.colleague && SheetExportOptions.internalBlocks.contains(b.type))
+        }.map { b in
+            // 0.10.0 (Meeting Sheet, round 2): a value replaced by a newer one (superseded_by) is not exported
+            var c = b
+            c.facts = b.facts.filter { $0.supersededBy == nil }
+            return c
         }
     }
 

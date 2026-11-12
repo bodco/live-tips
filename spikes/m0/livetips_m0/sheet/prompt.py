@@ -18,7 +18,9 @@ short exact quote (at most 20 words, in the source's own language) and, when the
 sources do not say something a block asks for, write ONE fact with "status": "not_found" and a text saying what is
 missing; never guess, never fill from general knowledge. A fact the sources only hint at gets "status":
 "needs_check". When two sources disagree on the same thing (a size, a date, a name, a price), write BOTH facts with
-the SAME label, each with its own source; Pacenote marks the conflict. In list blocks (agenda, questions, best
+the SAME label, each with its own source, and give each its "as_of" when the source dates it (a dated status,
+decision, snapshot or amendment); Pacenote keeps the newer one and marks the older one as replaced, or marks the
+conflict when nothing says which is newer. In list blocks (agenda, questions, best
 outcome, action items, red lines, history) every item gets its own short label. Facts are short (one or two sentences) and
 concrete: numbers, dates, names, who said what. Source ids belong in source_ids only, never in the text. Write the fact texts in {LANG}; quotes stay as written. No long dashes.
 
@@ -26,6 +28,7 @@ Answer with one JSON object and nothing else:
 {{"blocks": {{"<block type>": [{{"label": "<short attribute, e.g. Team size>", "text": "<the fact>",
    "source_ids": ["s1"], "locator": {{"quote": "...", "page": 2, "slide": 3, "line": 14, "url": "...", "cell": "B4"}},
    "status": "found" | "needs_check" | "not_found",
+   "as_of": "<YYYY-MM-DD: the date the source says this was true or decided; leave out when it does not say>",
    "keywords": ["2-4 lowercase phrases someone may say in the meeting about this, in {CALL_LANGS}"],
    "value": {{"key": "<criterion key, qualification only>", "level": "green|yellow|red|unknown",
              "owner": "<agenda and action items>", "due": "<YYYY-MM-DD when known>"}}}}]}},

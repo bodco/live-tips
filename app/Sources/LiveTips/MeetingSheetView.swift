@@ -176,7 +176,8 @@ struct SheetBlockCard: View {
             if block.facts.isEmpty {
                 Label(L("sheet.ui.block.empty"), systemImage: "questionmark.circle").font(PN.Font.caption).foregroundStyle(PN.C.pending)
             }
-            ForEach(block.facts) { f in SheetFactRow(doc: doc, fact: f) }
+            // 0.10.0 (Meeting Sheet, round 2): a value replaced by a newer one shows as "was X" under the newer fact
+            ForEach(block.facts.filter { $0.supersededBy == nil }) { f in SheetFactRow(doc: doc, fact: f) }
             if adding {
                 HStack(spacing: 8) {
                     TextField(L("sheet.ui.fact.addPh"), text: $newText).textFieldStyle(.roundedBorder).onSubmit(add)
@@ -223,6 +224,10 @@ struct SheetFactRow: View {
         VStack(alignment: .leading, spacing: 4) {
             if editing { editor } else { line }
             if fact.status == .conflict, !(fact.conflictWith ?? []).isEmpty { conflict }
+            if let old = doc.sheet?.replaced(by: fact.id).first {
+                Text(L("sheet.ui.fact.was", ["v": old.text]) + (old.sourceIds.first.flatMap { doc.sheet?.source(id: $0)?.title }.map { " · " + $0 } ?? ""))
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, fact.diff == nil ? 0 : 6)

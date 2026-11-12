@@ -14,6 +14,9 @@ final class PrepRunner: ObservableObject {
     @Published var running = false
     @Published var startedAt: Date?
     @Published var result = ""            // last outcome, one line
+    /// 0.10.0 (Meeting Sheet, round 2): Prepare again during the call failed; the call keeps its previous sheet and the
+    /// tips window says so (cleared when the next preparation starts).
+    @Published var liveFailure: String?
     @Published var target = ""            // the prep base name being written
     /// 2026-10-27 (owner, Up next): the call this preparation is for (StartCallModel.id). It joins a live call
     /// only when that call has the same id, so a preparation for an upcoming call never lands in the live one.
@@ -333,11 +336,12 @@ final class PrepRunner: ObservableObject {
         if running { return L("prep.err.running") }
         // 0.10.0 (Meeting Sheet, phase 3, PM 12.11): Prepare builds a Meeting Sheet for every call type except
         // Transcript (no old briefs any more; SheetRunner writes the live files from the sheet). The path below stays
-        // for a correction during the live call (LivePrep) until phase 7 moves it to a sheet refresh.
-        if forced == nil, SheetRunner.handles(r), !SheetRunner.isLivePrep(r) {
+        // 0.10.0 (Meeting Sheet, round 2, L5): Prepare again during the call refreshes the call's sheet too (the
+        // transcript so far is a "transcript" source); nobody is asked anything mid-call (no route alert, no wait).
+        if forced == nil, SheetRunner.handles(r) {
             let queued = startQueued
             startQueued = false
-            return SheetRunner.shared.start(r, interactive: !queued)
+            return SheetRunner.shared.start(r, interactive: !queued && !SheetRunner.isLivePrep(r))
         }
         startQueued = false
         // 0.9.1 (rules/google.yaml > links): Google Docs, Sheets and Slides links of the context and the invitation's

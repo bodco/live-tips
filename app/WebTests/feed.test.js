@@ -464,5 +464,15 @@ test('sheet questions already in the agenda show once (in the agenda)', () => {
   assert.deepStrictEqual(get().questions.map((q) => q.id), ['ms-q-b']);
 });
 
+// 0.10.0 (Meeting Sheet, round 2): Prepare again failed during the call; the window says the previous sheet stays.
+test('a failed refresh during the call shows its note, a plain failure the usual line', () => {
+  const { f, get } = make();
+  f.setPrep({ state: 'failed', note: 'Prepare again failed, the call keeps the previous Meeting Sheet: timeout' });
+  assert.ok(JSON.stringify(get()).includes('keeps the previous Meeting Sheet'));
+  f.setPrep({ state: 'failed' });
+  assert.ok(JSON.stringify(get()).includes('"Failed"') || JSON.stringify(get()).includes('Failed'));
+  assert.ok(!JSON.stringify(get()).includes('keeps the previous'));
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

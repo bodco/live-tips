@@ -268,8 +268,10 @@ def test_web_plan_same_site_skips_and_external(site):
     assert p["start"]["status"] == "ok" and p["robots"]["found"] is True
     by = {x["path"]: x for x in p["pages"]}
     assert by["/"]["planned"] and by["/"]["depth"] == 0
-    for path in ("/about", "/team", "/services", "/cases", "/blog", "/contact", "/about-us", "/empty"):
+    for path in ("/about", "/team", "/services", "/cases", "/blog", "/about-us", "/empty"):
         assert by[path]["planned"], path
+    # 0.10.0 (round 2): the Contact page is skipped entirely (never fetched)
+    assert not by["/contact"]["planned"] and by["/contact"]["note"] == "contact"
     assert by["/login"]["note"] == "sign-in" and by["/cart"]["note"] == "cart" and by["/privacy-policy"]["note"] == "policy"
     assert by["/private/secret"]["note"] == "robots" and by["/brochure.pdf"]["note"] == "file"
     assert sum(1 for x in p["pages"] if x["path"] == "/about") == 1          # fragment and utm are the same page
@@ -279,7 +281,7 @@ def test_web_plan_same_site_skips_and_external(site):
     assert all("Pacenote" in a for a in h.agents)
     planned = [x["path"] for x in p["pages"] if x["planned"]]
     assert planned[1] == "/about"                                            # about pages first
-    assert planned.index("/contact") > planned.index("/blog")
+    assert "/contact" not in planned
 
 
 def test_web_plan_limit(site):
@@ -306,15 +308,15 @@ def test_web_fetch_pages_become_sources_with_a_report(site, tmp_path):
     uris = [s["uri"] for s in srcs]
     assert len(uris) == len(set(uris)) and base + "/blog/post-1" in uris
     assert [s["n"] for s in srcs] == list(range(1, len(srcs) + 1))
-    contact = next(s for s in srcs if s["uri"].endswith("/contact"))
-    txt = Path(contact["path"]).read_text()
-    assert "hello@" not in txt and "555 0100" not in txt and "Office in Austin" in txt
+    # 0.10.0 (round 2): the Contact page is skipped entirely: never fetched, never a source
+    assert st["/contact"] == "skipped" and "/contact" not in h.hits
+    assert not any(s["uri"].endswith("/contact") for s in srcs)
     assert "Footer links" not in Path(srcs[0]["path"]).read_text()           # main content only
     empty = next(s for s in srcs if s["uri"].endswith("/empty"))
     assert empty["used"] == "not_used" and "placeholder" in empty["reason"]
     fetched = [x for x in r["pages"] if x["status"] in ("read", "empty", "duplicate", "error")]
     assert len(slept) == len(fetched) - 1 and all(x >= 0.01 for x in slept)          # a wait before every page but the first
-    assert r["summary"]["read"] >= 9 and r["summary"]["duplicate"] == 1 and r["summary"]["empty"] == 1
+    assert r["summary"]["read"] >= 8 and r["summary"]["duplicate"] == 1 and r["summary"]["empty"] == 1
     assert {e["domain"] for e in r["external"]} >= {"linkedin.com", "crunchbase.example", "medium.example"}
     sugg = W.external_sources(r["external"])
     li = next(s for s in sugg if "linkedin" in s["uri"])

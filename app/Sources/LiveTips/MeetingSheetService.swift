@@ -210,6 +210,11 @@ final class SheetJob: ObservableObject, Identifiable {
     init(callID: UUID?, kind: String) { self.callID = callID; self.kind = kind }
 
     func start(_ req: [String: Any], requestPath: String) {
+        // 0.10.0 (Meeting Sheet, round 2): the sidecar reads Retry / Skip from this job's control file
+        var req = req
+        _ = SheetCLI.writeRequest(["actions": [Any]()], to: ownControlPath)
+        req["control"] = ownControlPath
+        req["control_wait_s"] = 30
         guard SheetCLI.writeRequest(req, to: requestPath) else { failed = "request"; return }
         guard let p = SheetCLI.process(kind, ["--request", requestPath]) else { failed = L("sheet.ui.err.noEngine"); return }
         let o = Pipe(), e = Pipe()
@@ -239,8 +244,12 @@ final class SheetJob: ObservableObject, Identifiable {
             if let n = o["pass"] as? Int { pass = n }
             if let n = o["passes"] as? Int { passes = n }
             if let sid = o["source_id"] as? String {
-                sourceState[sid] = (o["state"] as? String) ?? (o["error"] != nil ? "failed" : "read")
+                // 0.10.0 (round 2): a denied / unsupported source is failed (Retry / Skip), a skipped one skipped
+                let acc = o["access"] as? String ?? ""
+                let bad = acc == "denied" || acc == "unsupported"
+                sourceState[sid] = (o["state"] as? String) ?? (o["skipped"] as? Bool == true ? "skipped" : (o["error"] != nil || bad) ? "failed" : "read")
                 if let note = (o["error"] as? String) ?? (o["note"] as? String) { sourceNote[sid] = note }
+                else if bad { sourceNote[sid] = L("sheet.ui.access." + acc) }
             }
             if let e = o["error"] as? String, o["source_id"] == nil { failed = e }
             if o["done"] as? Bool == true { done = true; sheetPath = o["sheet"] as? String; progress = 1 }
@@ -303,11 +312,15 @@ final class SheetJob: ObservableObject, Identifiable {
     }
 
     /// Retry or skip one source that failed: the sidecar takes a small control file next to the request.
+    private var ownControlPath: String { (SheetCLI.stateDir as NSString).appendingPathComponent("control-\(id.uuidString.prefix(8)).json") }
+
     func control(_ action: String, source: String) {
         sourceState[source] = action == "skip" ? "skipped" : "reading"
-        let path = (SheetCLI.stateDir as NSString).appendingPathComponent("control-\(id.uuidString.prefix(8)).json")
-        var list = ((try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path)))) as? [[String: String]]) ?? []
-        list.append(["action": action, "source_id": source])
+        // a build SheetRunner runs reads the runner's control file; a CLI job its own (both: sheet/build.py Control)
+        let path = following ? (SheetRunner.controlPath ?? ownControlPath) : ownControlPath
+        // 0.10.0 (round 2): the file is {"actions": [...]} (sheet/build.py Control); read it in that shape
+        let o = (try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path)))) as? [String: Any]
+        let list = SheetPipeline.controlActions(o?["actions"] as? [[String: String]] ?? [], add: action, source: source)
         _ = SheetCLI.writeRequest(["actions": list], to: path)
     }
 }

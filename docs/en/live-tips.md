@@ -1137,7 +1137,8 @@ They work best together. Make the prep in Cowork (brief, fact cards, an outline 
 presentation): the app picks it up by itself when the prep title matches the call title (rule
 in section 5.0). In **Start call** press **Copy request for Cowork** to get a ready prep request.
 Without a prep the app uses the call context you type in Start call, the project's current state
-and local search over the project folder (14.1a).
+and local search over the project folder (14.1a). Since 0.10.0 the app's own preparation is the
+**Meeting Sheet** (14.1x): a document with a source for every fact and a readiness check, built on any AI route.
 
 ### 14.1a No time to prepare? Start the call anyway
 
@@ -1161,7 +1162,7 @@ It is read-only (no shell, no web, no writes), runs on the preparation's way (Se
 limited to 2 at a time and 12 per call.
 
 A preparation that finishes after the call started joins it by itself: the window says
-"Preparation ready", the speech appears and tips use the brief from then on (0.6.0). So the
+"Preparation ready", the speech appears and tips use the brief from then on (0.6.0; since 0.10.0 the Meeting Sheet, 14.1x). So the
 worst case of a late prep is a quieter first few minutes, not a lost call. Two lines in Call
 context in Start call (the goal, what to look for) already help a lot.
 
@@ -1189,7 +1190,7 @@ current call ends the usual way (transcript saved, the Notion summary and the ti
 background with A's settings), and B starts as soon as the recorder has stopped, usually in a few
 seconds. If the recorder does not stop in 45 s, the app says so and B stays in Up next.
 
-**Preparations.** Claude Code writes one preparation at a time; the others wait in line ("preparation
+**Preparations.** One preparation runs at a time (since 0.10.0 a Meeting Sheet on the route of Settings > AI > Preparation, 14.1x); the others wait in line ("preparation
 in line") and start by themselves. Each preparation belongs to its call (an id), so it joins only
 that call: a preparation for B that finishes while A records is kept for B, and one still running at the
 switch joins B when ready. A finished preparation is used by name when its call starts.
@@ -1940,6 +1941,142 @@ skips them, and the speaker notes of each slide reach the preparation. A text pl
 "###" inside a slide's text no longer becomes a slide. A folder-only preparation passes up to 8 speech documents to
 the talk (was 3). A deck of more than 30 slides is written by Claude in passes of 20. There is no limit on the number of
 slides; above 60 it is not tested.
+
+### 14.1x Meeting Sheet: the preparation (0.10.0, beta)
+
+**What it is.** Preparing a call gives one document, the **Meeting Sheet**, and a **readiness check**. The sheet is
+a set of blocks (who they are, the company, signals, fit, the contact, qualification, history, agenda, questions for
+the call, best outcome, red lines, structure and roles, and more), and every fact in it says where it comes from. It
+replaces the brief: every call type except Transcript is prepared this way, and the tips during the call are built
+from the sheet. A brief made before 0.10.0 stays readable on its call's page, marked "Prepared before Meeting Sheet".
+
+The upcoming call's page has the tabs **Setup**, **Meeting Sheet**, **Readiness**, **Sources**, **Versions**,
+**Tasks** and **Earlier**. The header shows the readiness pill and the buttons for the state: Get ready and Start
+without prep before a sheet exists; Start call, Refresh and Export once it does; Building N% and Stop while it builds.
+
+**Presets.** A preset picks the blocks and what "ready" means: Sales intro, Upsell, Repeat call, Client sync,
+Internal or presentation, Stand-up, Interview and Blank. **Save as my preset** on the Blocks step keeps your own set
+(Settings > Meeting Sheet renames, duplicates and deletes them).
+
+**Quick or Expert.** **Get ready** opens one of two ways into the same sheet; the switch is in the header.
+
+| | Quick | Expert |
+|---|---|---|
+| What | One screen: the series' last setup (preset, sources, size, route, live), "Anything special today?", Prepare | Five clickable steps: Meeting, Blocks, Sources, Size, Build |
+| Default for | A series that already has a sheet, internal calls, stand-ups, client syncs | A new external domain, a sales intro, a presentation |
+| When something needs you | The row says "Needs you" with Fix, which opens that step in Expert | Each step shows it in place |
+
+Settings > Meeting Sheet decides which one opens: by the rules (each rule can be turned off or flipped), always Quick
+or always Expert. The first time in a series Quick shows "Suggested" and Pacenote remembers the setup for next time.
+
+**Sources: what you can add.** One panel for everything:
+
+- files: drop them or Choose files (PDF, PowerPoint, Keynote, Excel, Word, CSV, Markdown, text);
+- a pasted link: Google Docs, Sheets, Slides and Drive files, Notion pages, LinkedIn, any web page;
+- pasted text;
+- a folder: its files come as suggestions, not all at once;
+- "From the project folder": files with the reason they fit (same contact, title match, fresh, newer version, used by
+  the previous sheet). **Nothing is ticked for you**; press Add N ticked;
+- earlier calls of the series, the open commitments and the project state (config, decisions, Current State) come in
+  as sources by themselves;
+- for a presentation, "This is the deck" on a deck's row, with the slide owners, the minutes and Q&A in the same row.
+
+Every source shows its access before anything runs, with an icon and a word: **Access ok**, **No access**, **Not
+supported**, **Checking access**, and the fix next to it: Connect Google, Connect Notion, Confirm in Google, Paste the
+text, Retry, Open in the browser. A link you type into the goal or into "Anything special today?" is offered with
+**Move to Sources** (or Keep as text); it is never moved silently.
+
+Google Docs, Sheets and Slides are read with your Google account as before. Other Drive files (a PDF or a Word file
+behind a `/file/d/` link) are not readable with those permissions: such a source says No access with **Confirm in
+Google**. Today the button opens the file in the browser so you can save it and add it as a file; a Google file
+picker is planned for this step.
+
+**Size.** Before the run the **Size** step counts the sources in tokens for the chosen route and compares them with
+the model's window (from the providers' documentation, `rules/ai.yaml > windows`), keeping room for the answer. It
+shows the biggest sources and one of three states: **Fits in one pass**, **Close to the limit**, **Too much for one
+pass**. When it is too much, Build waits for your choice: two passes (merged into one sheet), summarize the big
+sources first, remove sources, or a bigger route. Nothing is cut silently. The route is the one of Settings > AI >
+Preparation; when it cannot run, Pacenote asks before building on another one (a queued run without you switches and
+says so in the report).
+
+**Build.** The **Build** step shows the progress by source and by pass. A source that fails does not stop the rest.
+You can close the window and get a notification when it is done. The same contract runs on every route (Claude
+account, Claude API, ChatGPT account, OpenAI, Gemini, the local model), so the sheet has the same structure whatever
+you use.
+
+**Facts and statuses.** Every fact has the number of its source; a hover shows the quote, the page, slide, line, cell
+or the exact web page, and the date it was checked; a click opens the source. Statuses: found, **Not found** (instead
+of a guess), **Check**, **Conflict** (two sources disagree: both values with their sources, and Use A, Use B or Keep
+both and ask on the call), **Old** (all its sources are older than 6 months, Settings > Meeting Sheet) and **Edited**.
+When two dated sources disagree, the newer wins and the older is marked old with "was X".
+
+**Editing and Refresh.** Click a fact to edit it; it becomes Edited. The block menu adds a fact, regenerates the
+block, hides it, moves it up or down, or removes it. The qualification block has its method in the header (BANT by
+default, SPICED, MEDDIC, general). **Refresh** rebuilds the sheet from the sources again and **never touches what you
+edited**. A banner then says how many facts are new, changed and gone, with Accept all and Compare with version N.
+**Versions** keeps every earlier sheet; Open shows one read-only, **Use this version** makes it current again (the
+current one is kept as a version, nothing is deleted).
+
+**Readiness.** The **Readiness** tab says Ready, Almost (N gaps) or Not ready, with an icon and a word (Almost and Not
+ready are bright orange in both themes). Each gap has its quick action: add a question, find again, mark checked, drop
+this check, assign an owner, add a source. A Budget that is unknown or red adds a question for the call by itself. All
+checks of the preset are listed below. A notification before the call (30 minutes by default; Off, 15, 30, 60 or 120
+in Settings > Meeting Sheet) says "Meeting Sheet ready" or "Almost: N gaps" with **Open the gaps**.
+
+**Export.** Export the sheet to **PDF** (new), Google Doc, Notion, Word, Markdown or Copy. The sources go with it, as
+footnotes or as links next to each fact. Choose all blocks, some blocks, or **For a colleague** (without My focus and
+Red lines). Nothing is sent to anyone.
+
+**LinkedIn.** A LinkedIn link in Sources gets its own card (without one, Sources shows a one-line hint):
+
+| Option | What happens |
+|---|---|
+| Save to PDF | Save the profile as PDF in your browser and add the file |
+| Open in Pacenote browser | The page opens in the Pacenote browser (below) and you add it yourself |
+| Paste the text | Copy the profile's text and paste it |
+| Fill in by hand | Role and company, location, experience, other; all optional. Saved as a source of its own |
+| Skip | The sheet is built without it |
+
+The card also says what happened: blocked by robots.txt, a sign-in wall without a session, hidden by the owner, read,
+or an empty page.
+
+**The Pacenote browser.** A separate window for pages you want to add yourself.
+
+- It has its own session that lives only in that window and ends when you close it. Pacenote never signs in for you
+  and keeps no passwords; if you sign in there, that is your own session, in that window only.
+- You choose the page and press **Add this page to sources**. One page at a time. For a LinkedIn profile you first see
+  the plan (the profile and the detail pages you tick: Experience, Education, Skills, Certifications, Languages) and
+  it goes page by page with a pause of a few seconds between pages; Cancel stops it.
+- Only the profile's own sections are kept. Ads, "People you may know", "Who viewed", the owner's analytics and
+  activity (likes, reposts) are dropped. Emails and phone numbers are removed before anything is saved; no contacts
+  are collected. Different numbers for the same thing are shown side by side with a question. Links from Featured are
+  offered as new sources.
+- What it does not do: no crawling of LinkedIn, no lists of people, no background visits. A website (not LinkedIn) gets
+  a crawl plan you can see before it starts: the same site, depth 2, up to 15 pages, sign-in, cart and policy pages and
+  duplicates skipped, robots.txt respected, a polite pause between pages. Each page read becomes its own source, so a
+  fact points to the exact page.
+
+**During the call.** The tips window takes the sheet directly: Questions become a checklist and an **Ask now** card
+when their topic comes up (never one you already asked); Red lines warn only when you sound like promising something
+on the list; facts answer with their source number "[2]"; Best outcome is checked before you close; Structure and
+roles gives the slides with a colleague's backup text. A stand-up sheet gives one "My update" card in a compact window,
+without Sales or slides. **Prepare again** during the call refreshes the sheet with the transcript so far as a source;
+if the refresh fails, the previous sheet stays and the window says so. A question the sheet does not answer searches
+the sheet's facts, its files and the project folders on the Mac, and the model of any route answers (usually 6 to 10
+seconds). After the call the notes get a **Meeting Sheet check**: each question answered, partly or not, the best
+outcome reached or not, and what to ask in the follow-up.
+
+**Prepare without Claude Code.** Prepare works when any AI route is ready, not only Claude Code. When the route of
+Settings > AI > Preparation cannot run, the hint names another one that is ready.
+
+**Settings > Meeting Sheet.** Which way Get ready opens and its rules, My focus (up to 7 fields at the top of every
+sheet, for example Budget or Decision maker), when a fact is old (6 months), the reminder (30 minutes) and your
+presets.
+
+**Files.** Next to the call in `<project>/live/`: `<base>.sheet.json` (the sheet), `<base>.sheet.md` (a readable
+copy), `<base>.sheet.v<N>.json` (versions), `<base>.sheet.sources.json` (the report by source). For the live layer the
+app also writes the brief, cards and facts files from the sheet; they are generated copies, not a second brief.
+Details: [DEVELOPMENT.md](../../DEVELOPMENT.md#meeting-sheet-0100).
 
 ### 14.2 After the call: the meeting page in Notion
 

@@ -5,6 +5,81 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **Meeting Sheet replaces the brief, beta (2026-11-12, owner):** preparing a call now gives one document, the
+  Meeting Sheet, and a readiness check, instead of a brief. It lives on the upcoming call's page in its own tabs:
+  Setup, Meeting Sheet, Readiness, Sources, Versions, Tasks, Earlier. Every call type except Transcript is prepared
+  this way; there is no switch back. Briefs of past calls stay readable, marked "Prepared before Meeting Sheet".
+  Eight presets pick the blocks: Sales intro, Upsell, Repeat call, Client sync, Internal or presentation, Stand-up,
+  Interview and Blank, plus your own presets.
+- **Quick and Expert (2026-11-12, owner):** Get ready opens one of two ways into the same sheet. Quick is one screen
+  that repeats the series' last setup (preset, sources, size, route, live) with "Anything special today?" and
+  Prepare; it is the default for a series that already has a sheet, internal calls, stand-ups and client syncs. Expert
+  is five clickable steps (Meeting, Blocks, Sources, Size, Build) for a new external domain, a sales intro or a
+  presentation. Switch between them in the header; Settings > Meeting Sheet sets which one opens.
+- **Sources with access shown before the run (2026-11-12, owner):** one panel for everything you add: files (drop
+  or Choose files), a pasted link or text, a folder, the deck. Every source shows its access at once, with an icon and
+  a word, not only a colour (Access ok, No access, Not supported, Checking access) and the fix next to it: Connect Google or
+  Notion, Confirm in Google, Paste the text, Retry, Open in the browser. A link typed into the goal or "Anything special
+  today?" is offered with **Move to Sources**; nothing is moved silently. "From the project folder" suggests files
+  with the reason (same contact, title match, fresh, newer version, used by the previous sheet), and none is ticked
+  for you. Earlier calls of the series, open commitments and the project state come in as sources too. PDF,
+  PowerPoint (in the show's order), Excel, Word, CSV, Markdown and text are read the same way for every AI route.
+- **Size in tokens, and a choice when it is too much (2026-11-12, owner):** before the run the Size step shows the
+  total in tokens against the chosen model's window (from the providers' documentation), the biggest sources and
+  "Fits in one pass", "Close to the limit" or "Too much for one pass". When it is too much, you choose: two passes, summarize the big sources first,
+  remove sources, or a bigger route. Nothing is cut silently, and the Sources tab says afterwards what was read in
+  full, summarized, skipped or not opened, and why.
+- **The sheet is built on every AI route (2026-11-12, owner):** Claude account, Claude API, ChatGPT account,
+  OpenAI, Gemini and the local model all get the same sheet contract and give the same structure. The route is the
+  one in Settings > AI > Preparation; if it cannot run, Pacenote asks before using another one, and a queued run
+  without you switches and writes so in the report. Never silently.
+- **Facts with sources (2026-11-12, owner):** every fact carries the number of its source, a quote, page, slide,
+  line, cell or the exact web page, and the date it was checked. A hover shows them, a click opens the source.
+  What was not found says "Not found" instead of a guess. Statuses: found, Not found, Check, Conflict, Old (older
+  than 6 months, Settings > Meeting Sheet), Edited. When two sources disagree, both values are shown with their
+  sources; when both are dated and differ, the newer one wins and the older one is marked old ("was X").
+- **Your edits survive Refresh, and every version is kept (2026-11-12, owner):** edit any fact in place (it becomes
+  "edited"), add, hide, move or remove blocks, regenerate one block, pick the qualification method (BANT by default,
+  SPICED, MEDDIC, general) in the block's header. Refresh rebuilds the sheet but never touches what you edited, and a
+  banner says what is new, changed and gone, with Accept all and Compare with the previous version. Versions keeps
+  every earlier sheet; "Use this version" brings one back without deleting anything.
+- **Readiness with quick actions and a reminder (2026-11-12, owner):** Ready, Almost (with the number of gaps) or
+  Not ready, in bright orange in both themes when it is not ready. Each gap has its action: add a question, find
+  again, mark checked, drop this check, assign an owner, add a source. An unknown or red Budget adds a question for
+  the call by itself. A macOS notification 30 minutes before the call (Off, 15, 30, 60 or 120 in Settings) says
+  whether the sheet is ready, with Open the gaps.
+- **Export with sources, and PDF (2026-11-12, owner):** Export the sheet to PDF (new), Google Doc, Notion, Word,
+  Markdown or Copy, with the sources as footnotes or as links next to each fact. All blocks, a choice of blocks, or
+  "For a colleague" without your own blocks (My focus, Red lines). Nothing is sent to anyone.
+- **Pacenote browser and LinkedIn options, beta (2026-11-12, owner):** a LinkedIn link in Sources gets its own card:
+  Save to PDF, Open in Pacenote browser, Paste the text, Fill in by hand (role and company, location, experience,
+  other; all optional) or Skip. The Pacenote browser is a separate window with its own session that lives only in
+  that window (Pacenote never signs in for you and keeps no passwords); you open a page and press **Add this page to
+  sources**. For a LinkedIn profile you see the plan of detail pages first, one page at a time with pauses. Only the
+  profile's sections are kept (no ads, "People you may know", activity or viewer analytics), emails and phone numbers
+  are removed before anything is saved. A website gets a crawl plan you can see (the same site, depth 2, up to 15
+  pages, sign-in, cart and policy pages skipped) and respects robots.txt.
+- **Live from the sheet (2026-11-12, owner):** during the call the window takes the sheet directly. Questions become
+  a checklist and an **Ask now** card when their topic comes up (never one you already asked); Red lines warn only
+  when you sound like promising something on the list; facts answer with their source number "[2]"; Best outcome is
+  checked before you close ("Before you close"); Structure and roles gives the slides with a colleague's backup text.
+  A stand-up sheet gives one small "My update" card and a compact window, without Sales or slides. After the call the
+  notes get a "Meeting Sheet check": each question answered, partly or not, the best outcome reached or not, and what
+  to ask in the follow-up.
+- **The folder search during the call works on every AI route (2026-11-12, owner):** a question the sheet does not
+  answer searches the sheet's facts, the sheet's files and the project folders on the Mac, and the model of any route
+  answers, usually in 6 to 10 seconds. Claude Code no longer reads the folders by default.
+- **Prepare during a call refreshes the sheet (2026-11-12, owner):** Prepare again while the call is live refreshes
+  the call's Meeting Sheet with the transcript so far as a source. If the refresh fails, the previous sheet stays and
+  the window says so.
+- **Prepare without Claude Code (2026-11-12, owner):** Prepare was greyed out unless Claude Code was installed. Now
+  it works whenever any AI route is ready (Claude account or API, ChatGPT account, OpenAI, Gemini key or account,
+  local), and the hint names the route of Settings > AI > Preparation and another one that is ready.
+- **Settings > Meeting Sheet (2026-11-12, owner):** which way Get ready opens (by the rules, always Quick, always
+  Expert) and the rules themselves, My focus (up to 7 fields shown at the top of every sheet), when a fact is old
+  (6 months), the reminder (30 minutes) and your presets: rename, duplicate, delete with confirmation. "Save as my
+  preset" is on the Blocks step.
+
 - **Presentation mode as in 0.7.5 (2026-11-11, owner):** one window by default, the slide on top and the tips below;
   **Expand** puts the slide cards beside the tips in a window twice as wide, **One window** goes back. The 0.7.5
   controls are back: Start / Pause, Previous / Next, Auto (the slides turn by the schedule with a beep), Trim, Sound,

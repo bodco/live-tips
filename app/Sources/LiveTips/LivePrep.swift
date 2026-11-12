@@ -43,7 +43,8 @@ enum LivePrep {
         if !correction.isEmpty {
             r.context = "Latest explicit correction from the PM for THIS call (overrides conflicting earlier prep):\n" + correction + "\n\nEarlier context:\n" + r.context
         }
-        if correction.isEmpty, let path = st.tipsFile,
+        // 0.10.0 (round 2): a sheet refresh keeps agenda ids by the sheet's own labels; the old brief needed them here
+        if correction.isEmpty, !SheetRunner.handles(r), let path = st.tipsFile,
            let data = try? String(contentsOfFile: path, encoding: .utf8) {
             let agendas = data.split(separator: "\n").compactMap { line -> [[String: Any]]? in
                 guard let d = line.data(using: .utf8),

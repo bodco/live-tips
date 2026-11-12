@@ -39,6 +39,7 @@ final class SheetRunner: ObservableObject {
         var route: String
         var switchedFrom: String?
         var switchReason: String?
+        var live = false                 // 0.10.0 (round 2): Prepare again during this very call
     }
 
     @Published var running = false
@@ -59,6 +60,9 @@ final class SheetRunner: ObservableObject {
     /// 0.10.0 (Meeting Sheet, phase 4, ui agent): what Quick / Expert chose for a call (preset, blocks, sources, goal,
     /// participants, language, route, plan, method, focus), by call id; laid over the request built here.
     static var overrides: [UUID: [String: Any]] = [:]
+    /// 0.10.0 (Meeting Sheet, round 2): Retry / Skip of the build screen (S5) for the running build. The sidecar reads
+    /// {"actions": [{"action": "retry" | "skip", "source_id": "s3"}]} between sources and before every pass.
+    static var controlPath: String?
 
     private var process: Process?
     private var buffer = Data()
@@ -71,7 +75,8 @@ final class SheetRunner: ObservableObject {
     nonisolated static func handles(callType: String) -> Bool { SheetPipeline.builds(callType: callType) }
     static func handles(_ r: PrepRunner.Request) -> Bool { handles(callType: r.callType) }
 
-    /// A correction during the live call (LivePrep) keeps the old path until the live agent replaces it (phase 7).
+    /// A preparation for the call being recorded right now (LivePrep: Prepare again / a correction during the call).
+    /// 0.10.0 (round 2): it goes through the sheet too, as a refresh of the call's sheet (SheetPipeline.isRefresh).
     static func isLivePrep(_ r: PrepRunner.Request) -> Bool {
         guard r.callID != nil, CallEngine.shared.isRunning else { return false }
         return PrepRunner.joinsLiveCall(prepFor: r.callID, liveCall: CallEngine.shared.currentCallID)
@@ -131,7 +136,9 @@ final class SheetRunner: ObservableObject {
         let live = (r.root as NSString).appendingPathComponent("live")
         try? FileManager.default.createDirectory(atPath: live, withIntermediateDirectories: true)
         let b = r.refreshBase ?? Self.baseName(live: live, date: r.date, title: r.title)
-        let refresh = FileManager.default.fileExists(atPath: b + ".sheet.json") && r.refreshBase != nil
+        let duringCall = Self.isLivePrep(r)
+        let refresh = SheetPipeline.isRefresh(sheetExists: FileManager.default.fileExists(atPath: b + ".sheet.json"),
+                                              refreshAsked: r.refreshBase != nil, duringCall: duringCall)
         // An old brief of this call (made before 0.10.0) is kept as the previous version (Restore previous version):
         // the sheet writes <base>.brief.md again as its own copy.
         let fm = FileManager.default
@@ -142,6 +149,7 @@ final class SheetRunner: ObservableObject {
         let c = AIRoute.effective(AppConfig.load(from: AppPaths.config))
         let chosen = r.callID.flatMap { Self.overrides[$0]?["route"] as? String } ?? c.ai.prep   // 0.10.0 (ui): the route shown in Quick / Expert
         var j = Job(prep: r, base: b, refresh: refresh, interactive: interactive, route: chosen)
+        j.live = duringCall
         if !Self.usable(chosen, config: c) {
             guard let alt = Self.alternative(to: chosen, config: c) else { return Self.whyNot(chosen) }
             let why = Self.whyNot(chosen)
@@ -308,6 +316,7 @@ final class SheetRunner: ObservableObject {
         pr.target = (j.base as NSString).lastPathComponent
         pr.runRoute = j.route
         pr.result = ""
+        pr.liveFailure = nil
         pr.costUSD = nil
         set(0.02, L("sheet.st.sources"))
     }
@@ -330,6 +339,12 @@ final class SheetRunner: ObservableObject {
         let state = (appRoot as NSString).appendingPathComponent("state")
         try? FileManager.default.createDirectory(atPath: state, withIntermediateDirectories: true)
         let reqPath = (state as NSString).appendingPathComponent("sheet-request.json")
+        // 0.10.0 (Meeting Sheet, round 2): a fresh control file per build; a person watching gets 30 s per failed source
+        let ctl = (state as NSString).appendingPathComponent("sheet-control.json")
+        if let cd = try? JSONSerialization.data(withJSONObject: ["actions": [Any]()]) { try? cd.write(to: URL(fileURLWithPath: ctl), options: .atomic) }
+        Self.controlPath = ctl
+        req["control"] = ctl
+        req["control_wait_s"] = j.interactive ? 30 : 0
         guard let d = try? JSONSerialization.data(withJSONObject: req, options: [.prettyPrinted]) else { return L("sheet.err.request") }
         try? d.write(to: URL(fileURLWithPath: reqPath))
         let p = Process()
@@ -397,7 +412,8 @@ final class SheetRunner: ObservableObject {
             let sid = o["source_id"] as? String
             if let sid = sid {
                 var s = sources[sid] ?? SourceState(id: sid)
-                if let a = o["access"] as? String { s.access = a; s.status = a == "ok" ? "ok" : "failed" }
+                if o["skipped"] as? Bool == true { s.access = "skipped"; s.status = "skipped" }      // 0.10.0 (round 2)
+                else if let a = o["access"] as? String { s.access = a; s.status = a == "ok" ? "ok" : "failed" }
                 else if st == "reading" || st == "summarize" { s.status = "reading" }
                 sources[sid] = s
             }
@@ -466,11 +482,19 @@ final class SheetRunner: ObservableObject {
             }
         }
         PrepRunner.ledger(job: j.refresh ? "prep_refresh" : "prep", route: routeName, usd: usd, meta: meta, ok: ok)
+        // 0.10.0 (round 2, L5): a failed refresh during the call leaves the call's sheet as it was (the sidecar writes
+        // nothing on failure) and the tips window says so; never an old brief instead.
+        if SheetPipeline.liveOutcome(ok: ok, duringCall: j.live && CallEngine.shared.isRunning) == .keepPrevious {
+            PrepRunner.shared.liveFailure = L("sheet.live.refreshFailed", ["err": String(result.prefix(160))])
+        }
         end(j, ok: ok)
     }
 
     private func fail(_ j: Job, _ err: String) {
         result = err
+        if SheetPipeline.liveOutcome(ok: false, duringCall: j.live && CallEngine.shared.isRunning) == .keepPrevious {
+            PrepRunner.shared.liveFailure = L("sheet.live.refreshFailed", ["err": String(err.prefix(160))])
+        }
         end(j, ok: false)
     }
 

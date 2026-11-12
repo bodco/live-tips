@@ -1312,10 +1312,49 @@ func sheetPipeline0100() {
     expect(SheetPipeline.parse("{\"error\": \"too_much\"}")?.error == "too_much" && SheetPipeline.parse("not json") == nil, "sheet line: error, garbage")
 }
 
+/// 0.10.0 (Meeting Sheet, round 2, fixer): Prepare again during a call refreshes the sheet, a failed refresh keeps
+/// the previous sheet, Retry / Skip lines and the control file.
+func sheetFixer0100() {
+    expect(SheetPipeline.isRefresh(sheetExists: true, refreshAsked: false, duringCall: true), "sheet r2: during the call a sheet is refreshed, not rebuilt")
+    expect(SheetPipeline.isRefresh(sheetExists: true, refreshAsked: true, duringCall: false), "sheet r2: Refresh refreshes")
+    expect(!SheetPipeline.isRefresh(sheetExists: false, refreshAsked: true, duringCall: true), "sheet r2: no sheet yet = a build")
+    expect(!SheetPipeline.isRefresh(sheetExists: true, refreshAsked: false, duringCall: false), "sheet r2: Prepare before the call builds again")
+    expect(SheetPipeline.liveOutcome(ok: false, duringCall: true) == .keepPrevious, "sheet r2: a failed refresh during the call keeps the previous sheet")
+    expect(SheetPipeline.liveOutcome(ok: true, duringCall: true) == .adopt && SheetPipeline.liveOutcome(ok: false, duringCall: false) == .none, "sheet r2: adopt / none")
+    let sk = SheetPipeline.parse("{\"stage\": \"sources\", \"source_id\": \"s2\", \"skipped\": true}")
+    expect(sk?.skipped == true && sk?.sourceID == "s2" && sk?.progress == nil, "sheet r2: a skipped source line")
+    expect(SheetPipeline.parse("{\"progress\": 0.1, \"stage\": \"sources\", \"waiting\": [\"s3\"], \"wait_s\": 30}")?.waiting == ["s3"], "sheet r2: waiting for Retry / Skip")
+    let a = SheetPipeline.controlActions([], add: "skip", source: "s2")
+    expect(SheetPipeline.controlActions(a, add: "retry", source: "s3") == [["action": "skip", "source_id": "s2"], ["action": "retry", "source_id": "s3"]], "sheet r2: control actions append")
+    expect(SheetPipeline.controlActions(a, add: "delete", source: "s3") == a && SheetPipeline.controlActions(a, add: "skip", source: "") == a, "sheet r2: control ignores the unknown")
+    // newer wins: the older value is linked to the newer one ("was X") and never exported
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("spikes/m0/tests/fixtures/sheet")
+    guard var s = try? MeetingSheetIO.load(dir.appendingPathComponent("sales-intro-lumenfield.sheet.json").path) else { expect(false, "sheet r2: fixture"); return }
+    for bi in s.blocks.indices {
+        for fi in s.blocks[bi].facts.indices where s.blocks[bi].facts[fi].id == "f-size-site" {
+            s.blocks[bi].facts[fi].status = .stale
+            s.blocks[bi].facts[fi].conflictWith = ["f-size-li"]
+            s.blocks[bi].facts[fi].supersededBy = "f-size-li"
+        }
+        for fi in s.blocks[bi].facts.indices where s.blocks[bi].facts[fi].id == "f-size-li" {
+            s.blocks[bi].facts[fi].status = .found
+            s.blocks[bi].facts[fi].conflictWith = nil
+        }
+    }
+    expect(s.replaced(by: "f-size-li").map(\.id) == ["f-size-site"] && s.replaced(by: "f-size-site").isEmpty, "sheet r2: replaced(by:) finds the older value")
+    let oldText = s.fact(id: "f-size-site")?.text ?? "\u{0}"
+    expect(!SheetExport.markdown(s).contains(oldText), "sheet r2: the replaced value is not exported")
+    if let d = try? JSONEncoder().encode(s), let back = try? JSONDecoder().decode(MeetingSheet.self, from: d) {
+        expect(back.fact(id: "f-size-site")?.supersededBy == "f-size-li", "sheet r2: superseded_by survives a save")
+    } else { expect(false, "sheet r2: encode") }
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
 browserCapture0100()
 sheetPipeline0100()
+sheetFixer0100()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

@@ -242,13 +242,15 @@ SKIP_RULES = [
     ("cart", re.compile(r"/(cart|basket|checkout|bag|order)(/|\.|$)", re.I)),
     ("policy", re.compile(r"/(privacy|privacy-policy|policy|policies|terms|terms-of-service|tos|cookies?|cookie-policy|legal|gdpr|disclaimer|imprint|impressum)(/|\.|-|$)", re.I)),
     ("feed", re.compile(r"/(feed|rss|atom)(/|\.xml|$)|/tag/|/author/|[?&](replytocom|share)=", re.I)),
+    # 0.10.0 (Meeting Sheet, round 2, orchestrator): a Contact page is skipped entirely, not read and stripped
+    ("contact", re.compile(r"/(contacts?|contact-us|contactus|get-in-touch|kontakt[iy]?|контакти|zv-iazok|зв-язок)(/|\.|$)", re.I | re.U)),
     ("file", re.compile(r"\.(pdf|jpe?g|png|gif|svg|webp|zip|gz|mp4|mp3|mov|docx?|xlsx?|pptx?|ics|css|js|json|xml)$", re.I)),
 ]
 # Sections worth reading first on a company site (spec 4.4).
 PRIORITY = [("about", 0), ("company", 0), ("team", 1), ("leadership", 1), ("people", 1), ("services", 2), ("products", 2),
             ("product", 2), ("solutions", 2), ("platform", 2), ("pricing", 3), ("cases", 3), ("case-studies", 3),
             ("customers", 3), ("clients", 3), ("work", 3), ("portfolio", 3), ("careers", 4), ("jobs", 4), ("blog", 5),
-            ("news", 5), ("press", 5), ("contact", 6)]
+            ("news", 5), ("press", 5)]
 
 
 def normalize(url: str, base: str = None):

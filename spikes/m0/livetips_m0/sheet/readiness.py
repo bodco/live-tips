@@ -77,6 +77,8 @@ def stale_fact_ids(sheet: dict, today: DateLike = None, months: int = 6) -> List
     for _, f in _facts(sheet):
         if not _live(f) or f.get("origin") == "readiness":
             continue
+        if f.get("superseded_by"):
+            continue                  # 0.10.0 (round 2): replaced by a newer value, not a gap
         if f.get("status") == "stale":
             out.append(f["id"])
             continue

@@ -16,6 +16,7 @@ Prints one JSON line {"ok", "path", "coverage", "cost_usd", "error"}.
 import argparse
 import json
 import collections
+import os
 import re
 import sys
 import time
@@ -293,8 +294,28 @@ def make_meeting_only(md: Path, model: str, lang: str, provider=None, aliases: L
         lang = call_lang(text)
     notes = out.read_text(encoding="utf-8")
     notes = put_meeting(notes, make_meeting(md, notes, text, lang, ask, names_block(aliases or [], config)))
-    out.write_text(_sheet_check(md, notes, text, lang, ask), encoding="utf-8")
+    _write_then_check(out, md, notes, text, lang, ask)
     return {"ok": True, "path": str(out), "coverage": None, "cost_usd": round(usd[0], 4), "parts": 0, "error": None}
+
+
+def _write(out: Path, text: str) -> None:
+    """Whole file at once (a reader never sees half of the notes)."""
+    tmp = out.with_name(out.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, out)
+
+
+def _write_then_check(out: Path, md: Path, notes: str, text: str, lang: str, ask) -> str:
+    """0.10.0 (Meeting Sheet, hardening): the notes are written first, so they are never late because of the sheet
+    check (one more model request); its section is added to the file when it comes."""
+    _write(out, notes)
+    checked = _sheet_check(md, notes, text, lang, ask)
+    if checked != notes:
+        try:
+            _write(out, checked)
+        except OSError as e:
+            print("sheet check: " + str(e)[:200], file=sys.stderr)
+    return checked
 
 
 def _sheet_check(md: Path, notes: str, text: str, lang: str, ask) -> str:
@@ -350,9 +371,8 @@ def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str
         notes = put_meeting(notes, make_meeting(md, notes, text, lang, ask, names))
     except Exception as e:  # noqa: BLE001
         print("meeting notes: " + str(e)[:200], file=sys.stderr)
-    notes = _sheet_check(md, notes, text, lang, ask)
     out = md.with_name(md.name[:-3].replace(".named", "") + ".notes.md")
-    out.write_text(notes, encoding="utf-8")
+    _write_then_check(out, md, notes, text, lang, ask)
     return {"ok": True, "path": str(out), "coverage": coverage_line(c), "cost_usd": round(usd[0], 4), "parts": len(ps),
             "error": None}
 

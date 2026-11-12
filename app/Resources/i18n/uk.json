@@ -2631,5 +2631,8 @@
  "sheet.ui.s3.folderCount": "Файлів у папці: {n} · запропоновано: {k} · без галочки нічого не береться",
  "sheet.ui.li.captured": "Захоплено в браузері Pacenote · {at}",
  "sheet.ui.fact.was": "було: {v}",
- "sheet.live.refreshFailed": "Повторна підготовка не вдалася, дзвінок лишає попередній Meeting Sheet: {err}"
+ "sheet.live.refreshFailed": "Повторна підготовка не вдалася, дзвінок лишає попередній Meeting Sheet: {err}",
+ "sheet.switch.notice": "{from} зараз не працює ({why}), тому Meeting Sheet будується на {to}. Звіт sheet про це каже; Settings > AI не змінюються.",
+ "sheet.switch.noticeTitle": "Meeting Sheet: інший маршрут AI",
+ "sheet.ui.check.skippedHidden": "пропущено: блок схований"
 }

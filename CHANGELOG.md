@@ -5,6 +5,17 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## Unreleased
 
+- **Meeting Sheet, ready for real calls (2026-11-12, owner):** a call prepared in 0.9.7 (a brief, no sheet) shows
+  Start call as the main button again, Get ready next to it. The AI route question never opens a pop-up over the call;
+  Not now or Stop ends the build cleanly (no "Building 0%" that blocks Prepare), and Stop while Google links are read
+  really stops. Editing a fact keeps what Pacenote wrote that this version does not show yet ("was X", facts that went
+  away, when a source was checked). The call notes appear first, the Meeting Sheet check is added when it is ready.
+  A silent robots.txt, a slow page or a Claude Code run that prints nothing for 4 minutes no longer hangs a build (a
+  clear error instead), and a web page longer than the limit is marked as cut in Sources. A readiness check about a
+  block hidden for this meeting says "skipped: block hidden". A reminder is not sent again after Pacenote restarts,
+  the "sheet is ready" notification opens the call's Meeting Sheet, and a "·" typed alone as a person no longer
+  closes the wizard.
+
 - **Meeting Sheet replaces the brief, beta (2026-11-12, owner):** preparing a call now gives one document, the
   Meeting Sheet, and a readiness check, instead of a brief. It lives on the upcoming call's page in its own tabs:
   Setup, Meeting Sheet, Readiness, Sources, Versions, Tasks, Earlier. Every call type except Transcript is prepared
@@ -31,8 +42,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   full, summarized, skipped or not opened, and why.
 - **The sheet is built on every AI route (2026-11-12, owner):** Claude account, Claude API, ChatGPT account,
   OpenAI, Gemini and the local model all get the same sheet contract and give the same structure. The route is the
-  one in Settings > AI > Preparation; if it cannot run, Pacenote asks before using another one, and a queued run
-  without you switches and writes so in the report. Never silently.
+  one in Settings > AI > Preparation; if it cannot run, Pacenote asks before using another one (in the build view
+  and on the call page, Use / Not now, never a pop-up), and a queued run without you or a run during a live call
+  switches, writes so in the report and shows a notice. Never silently.
 - **Facts with sources (2026-11-12, owner):** every fact carries the number of its source, a quote, page, slide,
   line, cell or the exact web page, and the date it was checked. A hover shows them, a click opens the source.
   What was not found says "Not found" instead of a guess. Statuses: found, Not found, Check, Conflict, Old (older
@@ -60,7 +72,8 @@ Pacenote. Earlier versions are described in the commit messages and in
   are removed before anything is saved. A website gets a crawl plan you can see (the same site, depth 2, up to 15
   pages, sign-in, cart and policy pages skipped) and respects robots.txt.
 - **Live from the sheet (2026-11-12, owner):** during the call the window takes the sheet directly. Questions become
-  a checklist and an **Ask now** card when their topic comes up (never one you already asked); Red lines warn only
+  a checklist and an **Ask now** card when their topic comes up (never one you already asked); in a preset without an
+  Agenda block (Repeat call, Sales intro) the questions are also the agenda strip, shown once; Red lines warn only
   when you sound like promising something on the list; facts answer with their source number "[2]"; Best outcome is
   checked before you close ("Before you close"); Structure and roles gives the slides with a colleague's backup text.
   A stand-up sheet gives one small "My update" card and a compact window, without Sales or slides. After the call the
@@ -68,7 +81,9 @@ Pacenote. Earlier versions are described in the commit messages and in
   to ask in the follow-up.
 - **The folder search during the call works on every AI route (2026-11-12, owner):** a question the sheet does not
   answer searches the sheet's facts, the sheet's files and the project folders on the Mac, and the model of any route
-  answers, usually in 6 to 10 seconds. Claude Code no longer reads the folders by default.
+  answers. Claude Code no longer reads the folders by default. The folders are read once in the background when the
+  call starts, so HELP NOW and a typed question are not slower than in 0.9.7 (the search itself has 1 second); the
+  call's own transcript and the files Pacenote generates (briefs, sheets, cards) are not searched.
 - **Prepare during a call refreshes the sheet (2026-11-12, owner):** Prepare again while the call is live refreshes
   the call's Meeting Sheet with the transcript so far as a source. If the refresh fails, the previous sheet stays and
   the window says so.

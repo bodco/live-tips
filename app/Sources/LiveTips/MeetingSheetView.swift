@@ -383,7 +383,7 @@ struct SheetReadinessTab: View {
                                 .foregroundStyle(c.dropped == true ? PN.C.text3 : c.ok ? PN.C.turn : PN.C.pending)
                             Text(ruleText(c.rule)).font(PN.Font.body).foregroundStyle(c.dropped == true ? PN.C.text3 : PN.C.text)
                             Spacer()
-                            Text(c.dropped == true ? L("sheet.ui.check.dropped") : c.skipped == true ? L("sheet.ui.check.skipped") : c.ok ? L("sheet.ui.check.ok") : L("sheet.ui.check.gap"))
+                            Text(c.dropped == true ? L("sheet.ui.check.dropped") : c.skipped == true ? (c.reason == "block_hidden" ? L("sheet.ui.check.skippedHidden") : L("sheet.ui.check.skipped")) : c.ok ? L("sheet.ui.check.ok") : L("sheet.ui.check.gap"))
                                 .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
                         .padding(.vertical, 3)
@@ -583,7 +583,12 @@ struct SheetVersionsTab: View {
               let cur = doc.sheet else { return }
         let next = (SheetFiles.versions(of: doc.path).map(\.n).max() ?? 0) + 1
         let keep = doc.base + ".sheet.v\(max(next, (cur.versions?.map(\.n).max() ?? 0) + 1)).json"
-        guard (try? MeetingSheetIO.save(cur, to: keep)) != nil, SheetCache.shared.save(chosen, to: doc.path) else { note = L("sheet.ui.err.save"); return }
+        // 0.10.0 (Meeting Sheet, hardening): byte copies, so the fields this app does not know stay in both files
+        _ = cur; _ = chosen
+        guard let curData = try? Data(contentsOf: URL(fileURLWithPath: doc.path)), let chosenData = try? Data(contentsOf: URL(fileURLWithPath: f.path)),
+              (try? curData.write(to: URL(fileURLWithPath: keep), options: .atomic)) != nil,
+              (try? chosenData.write(to: URL(fileURLWithPath: doc.path), options: .atomic)) != nil else { note = L("sheet.ui.err.save"); return }
+        SheetCache.shared.forget(doc.path)
         doc.reload()
         SheetCLI.run("derive", args: ["--sheet", doc.path]) { r in
             self.note = SheetCLI.error(r).map { L("sheet.ui.versions.deriveFailed", ["e": $0]) } ?? L("sheet.ui.versions.used", ["n": "\(n)"])

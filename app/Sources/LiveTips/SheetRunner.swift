@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 import Foundation
 import LiveTipsCore
 
@@ -29,6 +30,7 @@ final class SheetRunner: ObservableObject {
         let to: String
         let reason: String
         fileprivate let job: Job
+        var callID: UUID? { job.prep.callID }
     }
 
     fileprivate struct Job {
@@ -55,8 +57,15 @@ final class SheetRunner: ObservableObject {
     @Published var lastOutcome: [String: Any] = [:]
     @Published var pendingSwitch: PendingSwitch?
     @Published var callID: UUID?
-    /// The Meeting Sheet UI sets this when it shows `pendingSwitch` itself; until then an alert asks.
-    static var uiHandlesSwitch = false
+    /// 0.10.0 (Meeting Sheet, hardening): the UI shows `pendingSwitch` itself (SheetSwitchPrompt in the build views
+    /// and on the call page); never a modal alert (during a call it would sit over everything).
+    static var uiHandlesSwitch = true
+    /// 0.10.0 (Meeting Sheet, hardening): a route switched without asking (during a call, or queued with nobody there);
+    /// shown as a line in the build views and as a notification banner, never a modal. The report has it too.
+    @Published var switchNotice: String?
+    /// 0.10.0 (Meeting Sheet, hardening): bumped by every begin / cancel, so a build that waited on the Google links
+    /// does not start after Stop.
+    private var generation = 0
     /// 0.10.0 (Meeting Sheet, phase 4, ui agent): what Quick / Expert chose for a call (preset, blocks, sources, goal,
     /// participants, language, route, plan, method, focus), by call id; laid over the request built here.
     static var overrides: [UUID: [String: Any]] = [:]
@@ -133,6 +142,7 @@ final class SheetRunner: ObservableObject {
     /// Starts a build (or a refresh when the call already has a sheet). Returns an error line, or nil.
     func start(_ r: PrepRunner.Request, interactive: Bool) -> String? {
         if running || PrepRunner.shared.running { return L("prep.err.running") }
+        switchNotice = nil
         let live = (r.root as NSString).appendingPathComponent("live")
         try? FileManager.default.createDirectory(atPath: live, withIntermediateDirectories: true)
         let b = r.refreshBase ?? Self.baseName(live: live, date: r.date, title: r.title)
@@ -153,14 +163,26 @@ final class SheetRunner: ObservableObject {
         if !Self.usable(chosen, config: c) {
             guard let alt = Self.alternative(to: chosen, config: c) else { return Self.whyNot(chosen) }
             let why = Self.whyNot(chosen)
-            if interactive {
+            // 0.10.0 (Meeting Sheet, hardening): during a live call nobody is asked (SheetPipeline.asksRouteSwitch)
+            if SheetPipeline.asksRouteSwitch(interactive: interactive, callLive: CallEngine.shared.isRunning) {
                 j.route = alt
                 ask(PendingSwitch(from: chosen, to: alt, reason: why, job: j))
                 return nil
             }
             j.route = alt; j.switchedFrom = chosen; j.switchReason = why        // queued, nobody to ask: switch, report it
+            noticeSwitch(from: chosen, to: alt, why: why)
         }
         return launch(j)
+    }
+
+    /// 0.10.0 (Meeting Sheet, hardening): a switch nobody was asked about: a line in the build views and a banner.
+    private func noticeSwitch(from: String, to: String, why: String) {
+        let text = L("sheet.switch.notice", ["from": AIRoute.name(from), "to": AIRoute.name(to), "why": why])
+        switchNotice = text
+        let c = UNMutableNotificationContent()
+        c.title = L("sheet.switch.noticeTitle")
+        c.body = text
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "pn-sheet-switch-" + UUID().uuidString, content: c, trigger: nil))
     }
 
     private func ask(_ p: PendingSwitch) {
@@ -180,6 +202,8 @@ final class SheetRunner: ObservableObject {
     /// The person agreed to run this build on the other route (the UI's button, or the alert).
     func acceptSwitch() {
         guard var j = pendingSwitch?.job, let p = pendingSwitch else { return }
+        // 0.10.0 (Meeting Sheet, hardening): Up next may have started another preparation while the question was open
+        if running || PrepRunner.shared.running { result = L("prep.err.running"); return }
         pendingSwitch = nil
         j.switchedFrom = p.from; j.switchReason = p.reason + " (" + L("sheet.switch.accepted") + ")"
         if let err = launch(j) { result = err }
@@ -276,8 +300,11 @@ final class SheetRunner: ObservableObject {
         if GoogleService.shared.connected, !GoogleLink.find(in: linkText).isEmpty {
             set(0.01, L("prep.st.google"))
             let folder = ((r.root as NSString).appendingPathComponent("live") as NSString).appendingPathComponent("google")
+            let gen = generation
             Task { @MainActor in
                 let res = await GoogleService.shared.readLinks(in: r.context, extra: ev?.attachments ?? [], folder: folder)
+                // 0.10.0 (Meeting Sheet, hardening): Stop while the links were read: no build afterwards
+                guard self.generation == gen, self.running else { return }
                 var copies: [String: String] = [:], status: [String: String] = [:]
                 for (l, p) in res.files { copies[l.id] = p; status[l.id] = "ok" }
                 for p in res.problems {
@@ -302,6 +329,7 @@ final class SheetRunner: ObservableObject {
     }
 
     private func begin(_ j: Job) {
+        generation += 1
         job = j
         running = true
         startedAt = Date()
@@ -470,11 +498,12 @@ final class SheetRunner: ObservableObject {
                     PrepRunner.ledger(job: "prep", route: routeName, usd: usd, meta: meta, ok: false)
                     var j2 = j
                     end(j, ok: false, notify: false)
-                    if j.interactive {
+                    if SheetPipeline.asksRouteSwitch(interactive: j.interactive, callLive: CallEngine.shared.isRunning) {
                         j2.route = alt
                         ask(PendingSwitch(from: j.route, to: alt, reason: err, job: j2))
                     } else {
                         j2.route = alt; j2.switchedFrom = j.route; j2.switchReason = err
+                        noticeSwitch(from: j.route, to: alt, why: err)
                         if let e = launch(j2) { fail(j2, e) }
                     }
                     return
@@ -508,11 +537,17 @@ final class SheetRunner: ObservableObject {
     }
 
     /// Stop (PrepRunner.cancel calls this first): the sidecar ends; PrepRunner reports the stop.
+    /// 0.10.0 (Meeting Sheet, hardening): also while the Google links are read (no process yet) and while the route
+    /// question is open: the build does not start afterwards.
     func cancel() {
-        guard let p = process else { return }
-        (p.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
-        process = nil
-        p.terminate()
+        generation += 1
+        if pendingSwitch != nil { pendingSwitch = nil; result = L("prep.stopped") }
+        guard running || process != nil else { return }
+        if let p = process {
+            (p.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
+            process = nil
+            p.terminate()
+        }
         running = false
         job = nil
         set(0, "")

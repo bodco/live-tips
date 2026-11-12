@@ -379,6 +379,7 @@ struct CallSetupView: View {
                 Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(1)
                 Spacer()
                 Button(L("call.stop")) { j.stop() }.buttonStyle(.pnTertiary)
+                SheetSwitchPrompt(callID: model.id)       // 0.10.0 (Meeting Sheet, hardening): the route question inline
             } else if let s = sheet {
                 SheetReadinessPill(badge: s.readinessBadge)
                 Text(s.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1)

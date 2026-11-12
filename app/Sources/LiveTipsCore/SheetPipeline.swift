@@ -75,3 +75,46 @@ public enum SheetPipeline {
         return l
     }
 }
+
+// 0.10.0 (Meeting Sheet, hardening): the rules behind what could hurt a real call, kept here so CoreChecks test them.
+extension SheetPipeline {
+    /// The route question is asked only when a person started the build and no call is live; otherwise the build
+    /// switches, the report says so and a notice (never a modal) tells the PM.
+    public static func asksRouteSwitch(interactive: Bool, callLive: Bool) -> Bool { interactive && !callLive }
+
+    /// What a job that follows SheetRunner shows for its call.
+    public enum FollowState: Equatable { case running, waitingForChoice, finished, gaveUp, queued }
+    public static func followState(runningThis: Bool, pendingThis: Bool, sawRunning: Bool, sawPending: Bool) -> FollowState {
+        if runningThis { return .running }
+        if pendingThis { return .waitingForChoice }
+        if sawRunning { return .finished }
+        if sawPending { return .gaveUp }          // the route question was answered Not now, or Stop: no build comes
+        return .queued
+    }
+
+    /// A notification of the sheet (pn-sheet-<call id> reminder, pn-sheet-built-<call id> ready): the call and the tab
+    /// of its page to open; nil for anything else (a route notice).
+    public static func notificationTarget(_ id: String, prefix: String) -> (call: String, tab: String)? {
+        guard id.hasPrefix(prefix) else { return nil }
+        let rest = String(id.dropFirst(prefix.count))
+        if rest.hasPrefix("built-") {
+            let u = String(rest.dropFirst("built-".count))
+            return UUID(uuidString: u) == nil ? nil : (u, "sheet")
+        }
+        return UUID(uuidString: rest) == nil ? nil : (rest, "readiness")
+    }
+
+    /// A person typed in the wizard ("Emily Parker · Lumenfield"): name and company; nil when there is no name
+    /// (an empty line, or only "·").
+    public static func person(_ typed: String) -> (name: String, company: String)? {
+        let t = typed.trimmingCharacters(in: .whitespaces)
+        let parts = t.split(separator: "·", maxSplits: 1, omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard let first = parts.first, !first.isEmpty else { return nil }
+        return (first, parts.count > 1 ? parts[1] : "")
+    }
+
+    /// Reminder keys already sent (kept between app starts), the old ones dropped: at most `keep`, newest last.
+    public static func rememberSent(_ sent: [String], add key: String, keep: Int = 200) -> [String] {
+        Array((sent.filter { $0 != key } + [key]).suffix(keep))
+    }
+}

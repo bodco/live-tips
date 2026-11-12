@@ -170,7 +170,7 @@ public struct MeetingSheet: Codable, Equatable {
     public var refreshedAt: String?
     public var diff: SheetDiff?
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case schema, id, title, mode, preset, language, route, project, audience, participants, goal, blocks, sources,
              readiness, versions, diff
         case meetingRef = "meeting_ref", callType = "call_type", sizeReport = "size_report", builtAt = "built_at",
@@ -214,7 +214,7 @@ public struct SheetBlock: Codable, Equatable, Identifiable {
     public var method: String?            // the qualification method (rules/sales.yaml key), qualification blocks only
     public var facts: [SheetFact]
     public var editedByUser: Bool
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id, type, title, visible, order, method, facts
         case onlyIfData = "only_if_data", editedByUser = "edited_by_user"
     }
@@ -234,7 +234,7 @@ public struct SheetFact: Codable, Equatable, Identifiable {
     public var diff: DiffMark?
     /// 0.10.0 (Meeting Sheet, round 2): an older value replaced by a newer fact (newer wins); the UI shows "was X".
     public var supersededBy: String? = nil
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id, label, text, locator, status, origin, value, diff
         case sourceIds = "source_ids", checkedAt = "checked_at", conflictWith = "conflict_with"
         case supersededBy = "superseded_by"
@@ -280,7 +280,7 @@ public struct SheetSource: Codable, Equatable, Identifiable {
     public var why: [String]?
     public var deck: DeckInfo?
     public var modifiedAt: String?
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id, n, type, uri, path, title, chars, access, used, reason, pass, auto, why, deck
         case sizeTokens = "size_tokens", accessReason = "access_reason", fixAction = "fix_action", modifiedAt = "modified_at"
     }
@@ -338,6 +338,8 @@ public struct ReadinessCheck: Codable, Equatable {
     public var ok: Bool
     public var dropped: Bool?
     public var skipped: Bool?
+    /// 0.10.0 (Meeting Sheet, hardening): why a rule was skipped ("block_hidden": the block is hidden for this meeting).
+    public var reason: String? = nil
 }
 
 public struct SheetVersion: Codable, Equatable {
@@ -379,10 +381,57 @@ public enum MeetingSheetIO {
         try decode(Data(contentsOf: URL(fileURLWithPath: (path as NSString).expandingTildeInPath)))
     }
 
+    /// 0.10.0 (Meeting Sheet, hardening): a save patches the file that is there: fields this model does not know
+    /// (top-level gone_facts, fact.was, source.checked_at, value.minutes / backup, any later key) stay as Python wrote
+    /// them; the fields the model knows are written from the model (so a value it cleared stays cleared).
     public static func save(_ sheet: MeetingSheet, to path: String) throws {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try encode(sheet).write(to: url, options: .atomic)
+        var data = try encode(sheet)
+        if let old = try? Data(contentsOf: url), let merged = try? patched(original: old, new: data) { data = merged }
+        try data.write(to: url, options: .atomic)
+    }
+
+    /// The keys each level of the sheet knows; anything else in the file is kept on save.
+    struct KeyTree {
+        let known: Set<String>
+        let children: [String: KeyTree]
+    }
+
+    static let keyTree = KeyTree(known: Set(MeetingSheet.CodingKeys.allCases.map(\.rawValue)), children: [
+        "blocks": KeyTree(known: Set(SheetBlock.CodingKeys.allCases.map(\.rawValue)), children: [
+            "facts": KeyTree(known: Set(SheetFact.CodingKeys.allCases.map(\.rawValue)), children: [
+                "value": KeyTree(known: ["level", "key", "owner", "due"], children: [:]),
+                "locator": KeyTree(known: ["quote", "line", "page", "url", "slide", "cell"], children: [:]),
+            ]),
+        ]),
+        "sources": KeyTree(known: Set(SheetSource.CodingKeys.allCases.map(\.rawValue)), children: [:]),
+    ])
+
+    /// The new JSON with the original's unknown keys laid back in (blocks, facts and sources matched by id).
+    public static func patched(original: Data, new: Data) throws -> Data {
+        guard let o = try JSONSerialization.jsonObject(with: original) as? [String: Any],
+              let n = try JSONSerialization.jsonObject(with: new) as? [String: Any] else { return new }
+        let m = merge(o, n, keyTree)
+        return try JSONSerialization.data(withJSONObject: m, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+    }
+
+    static func merge(_ orig: [String: Any], _ new: [String: Any], _ tree: KeyTree) -> [String: Any] {
+        var out = new
+        for (k, v) in orig where out[k] == nil && !tree.known.contains(k) { out[k] = v }
+        for (k, sub) in tree.children {
+            if let nd = out[k] as? [String: Any], let od = orig[k] as? [String: Any] {
+                out[k] = merge(od, nd, sub)
+            } else if let na = out[k] as? [[String: Any]], let oa = orig[k] as? [[String: Any]] {
+                var byID: [String: [String: Any]] = [:]
+                for x in oa { if let id = x["id"] as? String, byID[id] == nil { byID[id] = x } }
+                out[k] = na.map { x -> [String: Any] in
+                    guard let id = x["id"] as? String, let ox = byID[id] else { return x }
+                    return merge(ox, x, sub)
+                }
+            }
+        }
+        return out
     }
 }
 

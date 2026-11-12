@@ -71,6 +71,8 @@ def build_engine(cfg, md: Path, out: Path, clock, provider=None):
     if cfg.get("speech_card", True):
         eng.speech_card(_brief_text(base))
     eng.set_agenda_items(_brief_text(base))
+    if cfg.get("lookup_prewarm", True):
+        eng.prewarm_lookup()          # 0.10.0 (Meeting Sheet, hardening): read the folders in the background now
     return eng, stem
 
 

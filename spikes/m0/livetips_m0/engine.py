@@ -766,6 +766,7 @@ class Engine:
         self.history: List[Line] = []
         # Result application nests local state helpers; model requests stay outside this lock.
         self.lock = threading.RLock()
+        self._fidx_lock = threading.Lock()        # 0.10.0 (Meeting Sheet, hardening): the folder index
         self.pool = ThreadPoolExecutor(max_workers=cfg.get("max_parallel_calls", 4))
         self.futures = []
         self.tips: List[dict] = []
@@ -1764,7 +1765,48 @@ class Engine:
         """0.10.0: something to search: a folder, or the call's Meeting Sheet."""
         return bool(self._search_roots()) or self._sheet() is not None
 
-    def _project_snippets(self, text: str, budget_chars: int = 14000, k: int = 6) -> List[dict]:
+    def _call_prefix(self) -> str:
+        """0.10.0 (Meeting Sheet, hardening): the name prefix of this call's own files (<base>.app.md, <base>.brief.md,
+        <base>.sheet.json, ...), so the folder search never offers the call itself as a source."""
+        name = Path(str(self.cfg.get("call_file") or "")).name
+        for suf in (".app.md", ".md"):
+            if name.endswith(suf):
+                return name[: -len(suf)] + "."
+        return (name + ".") if name else ""
+
+    def _folder_index(self, roots: List[str]):
+        """0.10.0 (Meeting Sheet, hardening): the folders' search index, built once in the background (call start or
+        first question) and rebuilt lazily in the background when older than lookup_refresh_s (default 300 s); the
+        current one answers meanwhile. None when off (cfg lookup_index false)."""
+        if not roots or self.cfg.get("lookup_index") is False:
+            return None
+        from .sheet.lookup import FolderIndex
+        key = (tuple(str(r) for r in roots[:4]), self._call_prefix())
+        with self._fidx_lock:
+            cur = getattr(self, "_fidx", None)
+            if cur is None or cur.key != key:
+                cur = self._fidx = FolderIndex(roots[:4], exclude_prefix=key[1],
+                                               ttl=float(self.cfg.get("lookup_refresh_s", 300))).start()
+                self._fidx_next = None
+            elif cur.stale() and getattr(self, "_fidx_next", None) is None:
+                nxt = self._fidx_next = FolderIndex(roots[:4], exclude_prefix=key[1], ttl=cur.ttl)
+
+                def swap():
+                    nxt.build()
+                    with self._fidx_lock:
+                        if self._fidx_next is nxt:
+                            self._fidx, self._fidx_next = nxt, None
+                threading.Thread(target=swap, name="pacenote-folder-index-refresh", daemon=True).start()
+        return cur
+
+    def prewarm_lookup(self) -> None:
+        """0.10.0 (Meeting Sheet, hardening): start reading the folders at call start, so the first HELP NOW is fast."""
+        try:
+            self._folder_index(self._search_roots())
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _project_snippets(self, text: str, budget_chars: int = 14000, k: int = 6, max_s: Optional[float] = None) -> List[dict]:
         roots, lt = self._search_roots(), self.cfg.get("lt_cmd")
         sheet = self._sheet()
         if not roots and not sheet:
@@ -1773,21 +1815,35 @@ class Engine:
         # 0.10.0 (Meeting Sheet, phase 7, PM 12.11: "it must work, do not tie it to Claude"): the shared search here on
         # the Mac (sheet facts with their source numbers, the sheet's files, the folders; no Ollama, no lt needed)
         # first; the semantic index (lt search) adds what it finds when it is there.
-        own: List[dict] = []
-        try:
-            from .sheet import lookup
-            own = lookup.snippets(text, sheet=sheet, roots=roots[:4], k=max(k, 6), queries=qs[1:],
-                                  budget_chars=budget_chars, max_seconds=float(self.cfg.get("lookup_max_s", 3.0)))
-        except Exception:  # noqa: BLE001  (the index search below still runs)
-            own = []
+        # 0.10.0 (Meeting Sheet, hardening): HELP NOW and typed questions must not be slower than 0.9.7: the folders
+        # come from the background index (FolderIndex), the whole search has lookup_max_s (default 1 s), and it runs
+        # next to the lt search instead of before it.
+        from concurrent.futures import ThreadPoolExecutor as _TP
+        budget_s = float(max_s if max_s is not None else self.cfg.get("lookup_max_s", 1.0))
+
+        def own_search() -> List[dict]:
+            try:
+                from .sheet import lookup
+                fidx = self._folder_index(roots)
+                return lookup.snippets(text, sheet=sheet, roots=roots[:4], k=max(k, 6), queries=qs[1:],
+                                       budget_chars=budget_chars, max_seconds=budget_s,
+                                       exclude_prefix=self._call_prefix(), index=fidx)
+            except Exception:  # noqa: BLE001  (the index search below still runs)
+                return []
+        own_ex = _TP(max_workers=1)
+        own_f = own_ex.submit(own_search)
         idx: List[dict] = []
         if roots and lt:
             from .context import index_snippets
-            from concurrent.futures import ThreadPoolExecutor as _TP
             jobs = [(q, r) for r in roots[:4] for q in qs]
             with _TP(max_workers=min(12, len(jobs)) or 1) as ex:      # parallel, one overall wait (QA: up to 100 s in a row)
                 results = list(ex.map(lambda j: index_snippets(lt, Path(j[1]), j[0], k=k, timeout=15.0), jobs))
             idx = fit_snippets(merge_hits(results), budget_chars, self._hit_text)
+        try:
+            own = own_f.result(timeout=budget_s + 1.0)
+        except Exception:  # noqa: BLE001  (over the budget: the answer goes without the folders)
+            own = []
+        own_ex.shutdown(wait=False)
         if not own:
             return idx
         out, used, seen = [], 0, set()
@@ -2101,7 +2157,7 @@ class Engine:
                         self.out_llm.write({"at": s_to_hms(self.clock()), "role": "deep_account_error", "error": res.get("error"),
                                             "economy": True})
                     res = deep.local_lookup(self.provider, self.models["tip"], question, tail, lang,
-                                            self._project_snippets(question, budget_chars=36000, k=10), passages)
+                                            self._project_snippets(question, budget_chars=36000, k=10, max_s=3.0), passages)
             elif self._deep_via_claude_code():
                 res = deep.lookup(self.cfg, question, tail, lang)
             else:     # 2026-11-06 (owner): every other way searches the folders here and asks the preparation's model
@@ -2109,7 +2165,7 @@ class Engine:
                 # 0.10.0: no preparation way known: the tips model answers (the deep model id may not be of this way)
                 prov, model = (prov, self._deep_model()) if prov is not None else (self.provider, self.models["tip"])
                 res = deep.local_lookup(prov, model, question, tail, lang,
-                                        self._project_snippets(question, budget_chars=36000, k=10), passages)
+                                        self._project_snippets(question, budget_chars=36000, k=10, max_s=3.0), passages)
         finally:
             with self.lock:
                 self.deep_running = max(0, getattr(self, "deep_running", 1) - 1)

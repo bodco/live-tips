@@ -1350,11 +1350,78 @@ func sheetFixer0100() {
     } else { expect(false, "sheet r2: encode") }
 }
 
+// 0.10.0 (Meeting Sheet, hardening): route question rules, the job after Not now, notifications, the wizard's person
+// line, reminders kept between starts, and a save that keeps the fields this app does not know.
+func sheetHardening0100() {
+    expect(SheetPipeline.asksRouteSwitch(interactive: true, callLive: false), "hardening: a person at Prepare is asked (inline)")
+    expect(!SheetPipeline.asksRouteSwitch(interactive: true, callLive: true), "hardening: never asked during a live call")
+    expect(!SheetPipeline.asksRouteSwitch(interactive: false, callLive: false), "hardening: queued without a person: switch and report")
+    expect(SheetPipeline.followState(runningThis: false, pendingThis: false, sawRunning: false, sawPending: true) == .gaveUp, "hardening: Not now ends the job (no stuck 0%)")
+    expect(SheetPipeline.followState(runningThis: false, pendingThis: true, sawRunning: false, sawPending: true) == .waitingForChoice, "hardening: question open = waiting")
+    expect(SheetPipeline.followState(runningThis: false, pendingThis: false, sawRunning: true, sawPending: true) == .finished, "hardening: a build that ran finishes")
+    expect(SheetPipeline.followState(runningThis: false, pendingThis: false, sawRunning: false, sawPending: false) == .queued, "hardening: not started yet = queued")
+    let u = "6F9619FF-8B86-D011-B42D-00C04FC964FF"
+    expect(SheetPipeline.notificationTarget("pn-sheet-built-" + u, prefix: "pn-sheet-").map { $0.call + "|" + $0.tab } == u + "|sheet", "hardening: the ready notification opens the sheet")
+    expect(SheetPipeline.notificationTarget("pn-sheet-" + u, prefix: "pn-sheet-").map { $0.tab } == "readiness", "hardening: the reminder opens readiness")
+    expect(SheetPipeline.notificationTarget("pn-sheet-switch-x", prefix: "pn-sheet-") == nil && SheetPipeline.notificationTarget("other", prefix: "pn-sheet-") == nil, "hardening: other ids open nothing")
+    expect(SheetPipeline.person("·") == nil && SheetPipeline.person("  ") == nil && SheetPipeline.person("· Lumenfield") == nil, "hardening: '·' alone is no person (no crash)")
+    expect(SheetPipeline.person("Emily Parker · Lumenfield").map { $0.name + "|" + $0.company } == "Emily Parker|Lumenfield", "hardening: name · company")
+    expect(SheetPipeline.person("Mike Carter").map { $0.name + "|" + $0.company } == "Mike Carter|", "hardening: name only")
+    var sent = SheetPipeline.rememberSent([], add: "a")
+    sent = SheetPipeline.rememberSent(sent, add: "a")
+    expect(sent == ["a"], "hardening: a sent reminder is kept once")
+    expect(SheetPipeline.rememberSent((0..<300).map(String.init), add: "x", keep: 200).count == 200, "hardening: sent reminders capped")
+    // H4: a save keeps unknown keys (gone_facts, was, checked_at of a source, value extras, a future key)
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("spikes/m0/tests/fixtures/sheet")
+    guard let raw = try? Data(contentsOf: dir.appendingPathComponent("sales-intro-lumenfield.sheet.json")),
+          var o = (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any],
+          var blocks = o["blocks"] as? [[String: Any]], var srcs = o["sources"] as? [[String: Any]], !srcs.isEmpty else { expect(false, "hardening: fixture"); return }
+    o["gone_facts"] = [["id": "f-gone", "text": "Lumenfield had 40 people"]]
+    o["future_top"] = ["x": 1]
+    var factID = ""
+    for bi in blocks.indices {
+        guard var facts = blocks[bi]["facts"] as? [[String: Any]], !facts.isEmpty, factID.isEmpty else { continue }
+        factID = facts[0]["id"] as? String ?? ""
+        facts[0]["was"] = "Mike Carter leads sales"
+        facts[0]["future_fact"] = "keep me"
+        facts[0]["value"] = ["level": "high", "minutes": 3, "backup": "Northwind: 3 days to 2 hours."]
+        blocks[bi]["facts"] = facts
+        blocks[bi]["future_block"] = true
+    }
+    srcs[0]["checked_at"] = "2026-11-12T09:00:00+02:00"
+    o["blocks"] = blocks; o["sources"] = srcs
+    let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("pn-hardening-\(UUID().uuidString).sheet.json")
+    guard let d0 = try? JSONSerialization.data(withJSONObject: o), (try? d0.write(to: tmp)) != nil,
+          var sheet = try? MeetingSheetIO.load(tmp.path) else { expect(false, "hardening: write fixture"); return }
+    for bi in sheet.blocks.indices { for fi in sheet.blocks[bi].facts.indices where sheet.blocks[bi].facts[fi].id == factID {
+        sheet.blocks[bi].facts[fi].text = "Edited by the PM"; sheet.blocks[bi].facts[fi].status = .edited } }
+    guard (try? MeetingSheetIO.save(sheet, to: tmp.path)) != nil, let back = try? Data(contentsOf: tmp),
+          let b = (try? JSONSerialization.jsonObject(with: back)) as? [String: Any] else { expect(false, "hardening: save"); return }
+    expect((b["gone_facts"] as? [[String: Any]])?.first?["id"] as? String == "f-gone", "hardening: gone_facts survive a save")
+    expect((b["future_top"] as? [String: Any]) != nil, "hardening: an unknown top-level key survives")
+    let bf = (b["blocks"] as? [[String: Any]] ?? []).flatMap { ($0["facts"] as? [[String: Any]]) ?? [] }.first { $0["id"] as? String == factID }
+    expect(bf?["text"] as? String == "Edited by the PM" && bf?["status"] as? String == "edited", "hardening: the edit is saved")
+    expect(bf?["was"] as? String == "Mike Carter leads sales" && bf?["future_fact"] as? String == "keep me", "hardening: fact.was and unknown fact keys survive")
+    let v = bf?["value"] as? [String: Any]
+    expect(v?["level"] as? String == "high" && (v?["minutes"] as? Int) == 3 && v?["backup"] as? String != nil, "hardening: value extras survive")
+    expect((b["blocks"] as? [[String: Any]] ?? []).contains { $0["future_block"] as? Bool == true }, "hardening: unknown block keys survive")
+    expect((b["sources"] as? [[String: Any]])?.first?["checked_at"] as? String == "2026-11-12T09:00:00+02:00", "hardening: source.checked_at survives")
+    // a key the model knows and cleared stays cleared
+    for bi in sheet.blocks.indices { for fi in sheet.blocks[bi].facts.indices where sheet.blocks[bi].facts[fi].id == factID { sheet.blocks[bi].facts[fi].label = nil } }
+    _ = try? MeetingSheetIO.save(sheet, to: tmp.path)
+    let b2 = (try? JSONSerialization.jsonObject(with: Data(contentsOf: tmp))) as? [String: Any] ?? [:]
+    let bf2 = (b2["blocks"] as? [[String: Any]] ?? []).flatMap { ($0["facts"] as? [[String: Any]]) ?? [] }.first { $0["id"] as? String == factID }
+    expect(bf2?["label"] == nil && bf2?["was"] != nil, "hardening: a cleared known field is not brought back")
+    try? FileManager.default.removeItem(at: tmp)
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
 browserCapture0100()
 sheetPipeline0100()
 sheetFixer0100()
+sheetHardening0100()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

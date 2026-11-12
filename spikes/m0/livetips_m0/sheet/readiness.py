@@ -160,6 +160,10 @@ def _run_rule(sheet: dict, rules: dict, rule_id: str, rule: dict, today, sett) -
     block = _block(sheet, params.get("block", "")) if params.get("block") else None
     if params.get("block") and block is None:
         return [], True
+    if block is not None and block.get("visible", True) is False:
+        # 0.10.0 (Meeting Sheet, hardening, PM decision): a rule about a block hidden for this meeting is skipped
+        # ("skipped: block hidden"), never a gap the PM cannot fill
+        return [], "block_hidden"
     if kind == "block_facts":
         n = sum(1 for f in block.get("facts") or [] if _has_data(f))
         return ([] if n >= int(params.get("min", 1)) else [{"text": gap, "block": block["id"]}]), False
@@ -228,6 +232,8 @@ def evaluate(sheet: dict, rules: dict, today: DateLike = None, settings: Optiona
         c = {"rule": rid, "ok": not kept}
         if skipped:
             c["skipped"] = True
+            if isinstance(skipped, str):
+                c["reason"] = skipped
         checks.append(c)
         gaps.extend(kept)
     if any(g["severity"] == "blocker" for g in gaps):
@@ -250,7 +256,7 @@ def auto_questions(sheet: dict, rules: dict, today: DateLike = None, settings: O
     all_ids = {f["id"] for _, f in _facts(sheet)}
     for aq in sett.get("auto_questions") or []:
         qual = _block(sheet, "qualification")
-        if qual is None:
+        if qual is None or qual.get("visible", True) is False:     # 0.10.0 (hardening): hidden = not asked about
             continue
         crit = next((c for c in _criteria(rules, _method(rules, qual)) if c["key"] == aq["criterion"]), None)
         if crit is None:

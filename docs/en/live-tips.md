@@ -1996,8 +1996,9 @@ the model's window (from the providers' documentation, `rules/ai.yaml > windows`
 shows the biggest sources and one of three states: **Fits in one pass**, **Close to the limit**, **Too much for one
 pass**. When it is too much, Build waits for your choice: two passes (merged into one sheet), summarize the big
 sources first, remove sources, or a bigger route. Nothing is cut silently. The route is the one of Settings > AI >
-Preparation; when it cannot run, Pacenote asks before building on another one (a queued run without you switches and
-says so in the report).
+Preparation; when it cannot run, Pacenote asks before building on another one, in the build view and on the call
+page (Use / Not now, never a pop-up); a queued run without you, or a run during a live call, switches, says so in the
+report and shows a notice.
 
 **Build.** The **Build** step shows the progress by source and by pass. A source that fails does not stop the rest.
 You can close the window and get a notification when it is done. The same contract runs on every route (Claude
@@ -2057,13 +2058,15 @@ or an empty page.
   fact points to the exact page.
 
 **During the call.** The tips window takes the sheet directly: Questions become a checklist and an **Ask now** card
-when their topic comes up (never one you already asked); Red lines warn only when you sound like promising something
+when their topic comes up (never one you already asked; a preset without an Agenda block shows them as the agenda strip
+too, once); Red lines warn only when you sound like promising something
 on the list; facts answer with their source number "[2]"; Best outcome is checked before you close; Structure and
 roles gives the slides with a colleague's backup text. A stand-up sheet gives one "My update" card in a compact window,
 without Sales or slides. **Prepare again** during the call refreshes the sheet with the transcript so far as a source;
 if the refresh fails, the previous sheet stays and the window says so. A question the sheet does not answer searches
-the sheet's facts, its files and the project folders on the Mac, and the model of any route answers (usually 6 to 10
-seconds). After the call the notes get a **Meeting Sheet check**: each question answered, partly or not, the best
+the sheet's facts, its files and the project folders on the Mac, and the model of any route answers. The folders are
+read once in the background when the call starts, so the search itself takes under a second and HELP NOW is not slower
+than before; the call's own transcript and the files Pacenote generates (briefs, sheets, cards) are left out. After the call the notes get a **Meeting Sheet check**: each question answered, partly or not, the best
 outcome reached or not, and what to ask in the follow-up.
 
 **Prepare without Claude Code.** Prepare works when any AI route is ready, not only Claude Code. When the route of

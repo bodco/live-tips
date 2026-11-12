@@ -105,7 +105,7 @@ def render_md(sheet: dict, for_brief: bool = False) -> str:
             if dec:
                 lines += ["", "**Decisions to obtain:** " + " ".join(f"({chr(97 + i)}) {f['text']}" for i, f in enumerate(dec[:6]))]
         qs = [f for b in blocks if b["type"] == "questions" for f in b.get("facts") or [] if _live(f)]
-        if qs:
+        if qs and agenda_type(sheet) != "questions":      # 0.10.0 (hardening): already the checklist above
             # 0.10.0 (round 2): a plain list, not checkboxes: the window ticks them in the questions checklist only
             lines += ["", "## " + _w("questions")] + [f"- {f['text']}" for f in qs]
     for b in blocks:
@@ -144,10 +144,19 @@ def agenda_id(f: dict) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "-", f.get("id", ""))[:80]
 
 
+def agenda_type(sheet: dict) -> str:
+    """0.10.0 (Meeting Sheet, hardening, PM decision): the block that feeds the agenda strip: the agenda block, or the
+    questions when the preset has no (visible) agenda block (repeat_call, sales_intro, ...); the window shows a
+    question that is also an agenda item once (feed.js)."""
+    has = any(b.get("type") == "agenda" and b.get("visible", True) for b in sheet.get("blocks") or [])
+    return "agenda" if has else "questions"
+
+
 def checklist(sheet: dict) -> List[str]:
     out = []
+    want = agenda_type(sheet)
     for b in sorted(sheet.get("blocks") or [], key=lambda b: b.get("order", 0)):
-        if b["type"] != "agenda" or not b.get("visible", True):
+        if b["type"] != want or not b.get("visible", True):
             continue                     # 0.10.0 (round 2): the agenda block only; questions are their own checklist
         for f in b.get("facts") or []:
             if not _live(f):
@@ -261,7 +270,7 @@ def derive(sheet: dict, base: str) -> List[str]:
     put(".cards.json", cards(sheet))
     put(".facts.json", facts(sheet))
     ag = [{"id": agenda_id(f), "text": f["text"], "label": f.get("label", ""), "owner": (f.get("value") or {}).get("owner", ""),
-           "kind": b["type"]} for b in sheet.get("blocks") or [] if b["type"] == "agenda"
+           "kind": b["type"]} for b in sheet.get("blocks") or [] if b["type"] == agenda_type(sheet) and b.get("visible", True)
           for f in b.get("facts") or [] if _live(f)]
     if ag:
         put(".agenda.json", ag)

@@ -178,6 +178,7 @@ struct UpcomingCallPage: View {
             Button { start() } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
             Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
             link(L("call.stop")) { j.stop() }
+            SheetSwitchPrompt(callID: model.id)      // 0.10.0 (Meeting Sheet, hardening): the route question inline
         } else if doc != nil {
             Button { start() } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
             HStack(spacing: 14) {
@@ -187,6 +188,11 @@ struct UpcomingCallPage: View {
         } else if state == .preparing || state == .queued {
             Button { start() } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
             link(L("common.cancel")) { if state == .preparing { runner.cancel() } else { upnext.unqueue(model) } }
+        } else if state == .ready {
+            // 0.10.0 (Meeting Sheet, hardening): a call prepared in 0.9.7 (a brief, no sheet) starts with that brief:
+            // Start call stays the main button, Get ready (build a sheet) is the second choice.
+            Button { start() } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
+            link(L("home.getReady")) { getReady(nil) }
         } else {
             Button(L("home.getReady")) { getReady(nil) }.buttonStyle(.pnPrimary)
             link(L("sheet.ui.startWithout")) { start() }
@@ -272,6 +278,7 @@ struct UpcomingCallPage: View {
             PageEmpty(icon: "doc.text.magnifyingglass", title: L("sheet.ui.none"), text: L("sheet.ui.none.body"))
             if let j = jobs.job(for: model.id) {
                 Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(PN.Font.body).foregroundStyle(PN.C.text2)
+                SheetSwitchPrompt(callID: model.id)
             } else {
                 HStack(spacing: 10) {
                     Button(L("home.getReady")) { getReady(nil) }.buttonStyle(.pnPrimary)

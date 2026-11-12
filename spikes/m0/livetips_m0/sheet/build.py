@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -165,32 +166,50 @@ def find_claude(hint: Optional[str] = None) -> Optional[str]:
 
 # ---------------------------------------------------------------- web pages (packed routes)
 
-def fetch_page(url: str, timeout: float = 20.0) -> Tuple[str, Optional[str]]:
-    """One page, the user's own link, read once. robots.txt is honoured (urllib.robotparser) until the browser
-    module (phase 6) takes this over through sources.web_allowed."""
+PAGE_MAX_BYTES = 3_000_000
+
+
+def robots_allowed(url: str, timeout: float = 10.0) -> bool:
+    """0.10.0 (Meeting Sheet, hardening): robots.txt with a timeout (RobotFileParser.read() has none: a silent host
+    hung the build). Unreachable or slow: allowed (the page itself decides); 401/403: not allowed."""
+    import urllib.error
+    import urllib.robotparser as RP
+    u = urlparse(url)
+    rp = RP.RobotFileParser(f"{u.scheme}://{u.netloc}/robots.txt")
+    try:
+        rq = urllib.request.Request(rp.url, headers={"User-Agent": "Pacenote (meeting sheet; one page the user linked)"})
+        with urllib.request.urlopen(rq, timeout=timeout) as r:
+            from .web import read_capped
+            raw, _cut = read_capped(r, 500_000, timeout)
+        rp.parse(raw.decode("utf-8", "replace").splitlines())
+    except urllib.error.HTTPError as e:
+        return e.code not in (401, 403)
+    except Exception:  # noqa: BLE001
+        return True
+    return rp.can_fetch("Pacenote", url)
+
+
+def fetch_page(url: str, timeout: float = 20.0) -> Tuple[str, Optional[str], int]:
+    """One page, the user's own link, read once. robots.txt is honoured (with a timeout) until the browser module
+    (phase 6) takes this over through sources.web_allowed. 0.10.0 (hardening): the whole read has `timeout` s, and
+    the third value is the bytes read when the page was cut at PAGE_MAX_BYTES (0 = whole page)."""
     allowed = SRC.web_allowed(url)
     if allowed is None:
-        try:
-            import urllib.robotparser as RP
-            u = urlparse(url)
-            rp = RP.RobotFileParser(f"{u.scheme}://{u.netloc}/robots.txt")
-            rp.read()
-            allowed = rp.can_fetch("Pacenote", url)
-        except Exception:  # noqa: BLE001  no robots.txt reachable: the page itself decides
-            allowed = True
+        allowed = robots_allowed(url)
     if not allowed:
-        return "", "the site's robots.txt does not allow automatic reading"
+        return "", "the site's robots.txt does not allow automatic reading", 0
     try:
+        from .web import read_capped
         rq = urllib.request.Request(url, headers={"User-Agent": "Pacenote (meeting sheet; one page the user linked)"})
         with urllib.request.urlopen(rq, timeout=timeout) as r:
             ctype = r.headers.get("Content-Type", "")
-            raw = r.read(3_000_000)
+            raw, cut = read_capped(r, PAGE_MAX_BYTES, timeout * 2)
         if "html" not in ctype and "text" not in ctype:
-            return "", f"not a web page ({ctype.split(';')[0] or 'unknown type'})"
+            return "", f"not a web page ({ctype.split(';')[0] or 'unknown type'})", 0
         text = readers.html_text(raw.decode("utf-8", "replace"))
-        return text, None if text.strip() else "the page has no text"
+        return text, None if text.strip() else "the page has no text", (len(raw) if cut else 0)
     except Exception as e:  # noqa: BLE001
-        return "", f"cannot open the page: {type(e).__name__}"
+        return "", f"cannot open the page: {type(e).__name__}", 0
 
 
 def digest_text(req: dict) -> str:
@@ -539,10 +558,39 @@ def run_claude(req: dict, prompt: str, files: Dict[str, str], hosts: List[str], 
     by_path = {v: k for k, v in files.items()}
     meta = {"read": [], "fetched": [], "turns": 0, "cost_usd": None, "model": req.get("model") or "sonnet"}
     final = ""
-    p = subprocess.Popen(args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    # 0.10.0 (Meeting Sheet, hardening): its own process group, so the watchdog stops claude and anything it started
+    p = subprocess.Popen(args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                         start_new_session=True)
     deadline = time.time() + float(req.get("timeout") or 1500)
     n_src = max(1, len(files))
+    # 0.10.0 (Meeting Sheet, hardening): a watchdog, so `claude -p` that prints nothing (signed out, a hung tool, no
+    # network) cannot hold the build forever: no output for `inactivity_s` (default 240 s) or past the deadline stops
+    # it with a clear error in the report.
+    quiet_s = float(req.get("inactivity_s") or 240)
+    last = [time.time()]
+    why: List[str] = []
+
+    def watchdog():
+        while p.poll() is None:
+            now = time.time()
+            if now - last[0] > quiet_s:
+                why.append("Claude Code stopped answering: no output for %d s, the build was stopped" % int(quiet_s))
+            elif now > deadline:
+                why.append("Claude Code took too long (over %d s), the build was stopped" % int(float(req.get("timeout") or 1500)))
+            if why:
+                try:
+                    import signal
+                    os.killpg(p.pid, signal.SIGKILL)
+                except OSError:
+                    try:
+                        p.kill()
+                    except OSError:
+                        pass
+                return
+            time.sleep(min(1.0, quiet_s / 4))
+    threading.Thread(target=watchdog, name="pacenote-claude-watchdog", daemon=True).start()
     for line in p.stdout:
+        last[0] = time.time()
         if time.time() > deadline:
             p.kill()
             raise RuntimeError("Claude Code took too long")
@@ -577,6 +625,8 @@ def run_claude(req: dict, prompt: str, files: Dict[str, str], hosts: List[str], 
     err = p.stderr.read() if p.stderr else ""
     p.wait()
     shutil.rmtree(cwd, ignore_errors=True)
+    if why:
+        raise RuntimeError(why[0])
     if p.returncode != 0 and not final:
         raise RuntimeError(("Claude Code: " + err.strip().splitlines()[-1]) if err.strip() else f"Claude Code exited {p.returncode}")
     return final, meta
@@ -832,7 +882,9 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         SRC.check(s, req, texts, route, windows)
         if s.get("fetch") and route in PACKED and route != "fake":
             emit(progress=0.03 + 0.07 * i / max(1, len(srcs)), stage="reading", source_id=s["id"])
-            text, why = fetch_page(s["uri"])
+            text, why, cut = fetch_page(s["uri"])
+            if cut:
+                s["cut"] = {"read_bytes": cut, "limit_bytes": PAGE_MAX_BYTES}
             if text:
                 texts[s["id"]] = text
                 s["chars"] = len(text)
@@ -1066,6 +1118,12 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
             if os_.get("id") in cited - have:
                 srcs.append(dict(os_, used=os_.get("used") or "full"))
                 have.add(os_["id"])
+    for s in srcs:                       # 0.10.0 (Meeting Sheet, hardening): a cut page is never reported as whole
+        cut = s.get("cut")
+        if isinstance(cut, dict) and s.get("used") in ("full", "truncated", None):
+            s["used"] = "truncated"
+            s["reason"] = "the page is longer than %d KB: only the first %d KB were read" % (
+                int(cut.get("limit_bytes") or 0) // 1000, int(cut.get("read_bytes") or 0) // 1000)
     sheet["sources"] = srcs
     sr = Z.report(srcs, route, req.get("model") or None, windows, plan_mode)
     sheet["size_report"] = {k: sr[k] for k in ("route", "model", "window", "reserve", "total_tokens", "state", "plan")}

@@ -1951,7 +1951,10 @@ def sheet_cards(sheet: dict) -> list[dict]:
 
 
 def sheet_agenda(sheet: dict) -> list[str]:
-    return [_s(f.get("text")) for f in sheet_block_facts(sheet, "agenda")]
+    # 0.10.0 (Meeting Sheet, hardening, PM decision): a preset without an agenda block: its questions feed the agenda
+    # strip (sheet/derive.py agenda_type); the window shows a question that is also an agenda item once.
+    has = any(isinstance(b, dict) and b.get("type") == "agenda" and b.get("visible", True) for b in sheet.get("blocks") or [])
+    return [_s(f.get("text")) for f in sheet_block_facts(sheet, "agenda" if has else "questions")]
 
 
 def sheet_slides(sheet: dict, me_names=()) -> dict | None:

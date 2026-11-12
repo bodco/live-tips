@@ -330,16 +330,42 @@ class FetchError(Exception):
         self.reason = reason
 
 
-def http_get(url: str, timeout: float = 15.0):
-    """(status, final url, content type, text). Raises FetchError for transport errors."""
+class Body(str):
+    """0.10.0 (Meeting Sheet, hardening): page text that knows whether it was cut at MAX_BYTES (`cut` = bytes read,
+    0 = whole page), so a cut page is reported as `used: truncated`, never silently."""
+    cut = 0
+
+
+def read_capped(r, limit: int, total_s: float):
+    """(bytes, cut) from a response: at most `limit` bytes and `total_s` seconds in all (the socket timeout alone lets
+    a slow server drip forever); cut = True when the page was longer."""
+    deadline = time.time() + total_s
+    buf = bytearray()
+    while len(buf) <= limit:
+        if time.time() > deadline:
+            raise FetchError(0, "the page took longer than %d s to load" % int(total_s))
+        piece = r.read(min(65536, limit + 1 - len(buf)))
+        if not piece:
+            break
+        buf += piece
+    return bytes(buf[:limit]), len(buf) > limit
+
+
+def http_get(url: str, timeout: float = 15.0, total_s: float = 30.0):
+    """(status, final url, content type, text). Raises FetchError for transport errors (and a page slower than
+    total_s in all). The text is a Body: .cut > 0 when the page was longer than MAX_BYTES."""
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,text/plain;q=0.8,*/*;q=0.1",
                                                "Accept-Language": "en,uk;q=0.8"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             ctype = r.headers.get("Content-Type", "")
-            raw = r.read(MAX_BYTES + 1)[:MAX_BYTES]
+            raw, cut = read_capped(r, MAX_BYTES, total_s)
             cs = r.headers.get_content_charset() or "utf-8"
-            return r.status, r.geturl(), ctype, raw.decode(cs, errors="replace")
+            body = Body(raw.decode(cs, errors="replace"))
+            body.cut = len(raw) if cut else 0
+            return r.status, r.geturl(), ctype, body
+    except FetchError:
+        raise
     except urllib.error.HTTPError as e:
         return e.code, url, e.headers.get("Content-Type", "") if e.headers else "", ""
     except Exception as e:  # DNS, TLS, timeout
@@ -531,6 +557,7 @@ def fetch(the_plan: dict, out_dir=None, delay: float = 1.0, getter=http_get, sle
         if ctype and "html" not in ctype and "text" not in ctype:
             report.append(dict(row, status="skipped", note="not a page (" + ctype.split(";")[0] + ")"))
             continue
+        page_cut = int(getattr(body, "cut", 0) or 0)       # 0.10.0 (hardening): longer than MAX_BYTES
         root = parse_html(body)
         title = title_of(root)
         text, cut = scrub_contacts(main_text(root))
@@ -551,6 +578,13 @@ def fetch(the_plan: dict, out_dir=None, delay: float = 1.0, getter=http_get, sle
                "parent_uri": start, "checked_at": _now()}
         if st == "empty":
             src["reason"] = "the page is empty or a placeholder"
+        elif page_cut:
+            # 0.10.0 (Meeting Sheet, hardening): never a silent cut
+            src["used"] = "truncated"
+            src["cut"] = {"read_bytes": page_cut, "limit_bytes": MAX_BYTES}
+            src["reason"] = "the page is longer than %d KB: only the first %d KB were read" % (MAX_BYTES // 1000, page_cut // 1000)
+            rr["status_note"] = "truncated"
+            rr["note"] = src["reason"]
         if out_path:
             base = f"{_slug(domain_of(url))}-{_slug(urllib.parse.urlsplit(url).path or 'home', 40) or 'home'}"
             tp, k = out_path / (base + ".txt"), 2

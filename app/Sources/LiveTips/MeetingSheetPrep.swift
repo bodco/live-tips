@@ -455,10 +455,9 @@ struct SheetMeetingStep: View {
     }
 
     private func addPerson(_ list: Binding<[DraftPerson]>, _ new: Binding<String>) {
-        let t = new.wrappedValue.trimmingCharacters(in: .whitespaces)
-        guard !t.isEmpty else { return }
-        let parts = t.split(separator: "·", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-        list.wrappedValue.append(DraftPerson(name: parts[0], company: parts.count > 1 ? parts[1] : ""))
+        // 0.10.0 (Meeting Sheet, hardening): "·" alone used to crash (parts[0] of an empty list)
+        guard let p = SheetPipeline.person(new.wrappedValue) else { return }
+        list.wrappedValue.append(DraftPerson(name: p.name, company: p.company))
         new.wrappedValue = ""
     }
 
@@ -997,6 +996,7 @@ struct SheetBuildProgress: View {
                 Text(job.done ? L("sheet.ui.s5.done") : job.failed ?? (job.stage.isEmpty ? L("sheet.ui.build.starting") : job.stage))
                     .font(PN.Font.body).foregroundStyle(job.failed == nil ? PN.C.text : PN.C.pending).fixedSize(horizontal: false, vertical: true)
                 PageProgress(value: job.progress)
+                SheetSwitchPrompt(callID: draft.model.id)      // 0.10.0 (Meeting Sheet, hardening): inline, never a modal
                 Text(L("sheet.ui.s5.note", ["route": AIRoute.name(draft.route)])).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             PageCard(spacing: 4) {

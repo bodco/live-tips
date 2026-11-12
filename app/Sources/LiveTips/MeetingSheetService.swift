@@ -103,6 +103,9 @@ final class SheetCache {
         return true
     }
 
+    /// 0.10.0 (Meeting Sheet, hardening): the file changed outside the cache (a version swapped in).
+    func forget(_ path: String) { map[path] = nil }
+
     /// The readiness of a call's sheet, nil when it has none.
     func badge(for m: StartCallModel) -> ReadinessBadge? {
         guard let p = SheetFiles.path(for: m), let s = load(p) else { return nil }
@@ -272,6 +275,7 @@ final class SheetJob: ObservableObject, Identifiable {
 
     private var sink: AnyCancellable?
     private var sawRunning = false
+    private var sawPending = false            // 0.10.0 (Meeting Sheet, hardening)
     private(set) var following = false
 
     /// Mirror SheetRunner's state while it builds this call's sheet (queued in Up next until it starts).
@@ -295,8 +299,15 @@ final class SheetJob: ObservableObject, Identifiable {
                 sourceState[k] = v.status == "ok" ? "reading" : v.status.isEmpty ? "reading" : v.status
                 if v.access == "denied" || v.access == "unsupported" { sourceState[k] = "failed"; sourceNote[k] = L("sheet.ui.access." + v.access) }
             }
-        } else if r.pendingSwitch != nil && r.callID == id {
-            stage = r.result                       // the route question is open (an alert or the UI); still waiting
+        } else if let p = r.pendingSwitch, p.callID == id || r.callID == id {
+            sawPending = true
+            stage = r.result                       // the route question is open (inline in the UI); still waiting
+        } else if sawPending && !sawRunning {
+            // 0.10.0 (Meeting Sheet, hardening): Not now (or Stop) on the route question: no build comes, the job ends
+            // (it used to stay "Building 0%" and block Prepare)
+            sink = nil
+            failed = r.result.isEmpty ? L("sheet.switch.declined") : r.result
+            SheetJobs.shared.finished(self)
         } else if sawRunning {
             sink = nil
             if let p = r.sheetPath, FileManager.default.fileExists(atPath: p) {
@@ -666,7 +677,9 @@ final class SheetReminder {
     static let category = "pn-sheet-cat"
     static let openGaps = "pn-sheet-open-gaps"
     private var timer: Timer?
-    private var sent: Set<String> = []
+    /// 0.10.0 (Meeting Sheet, hardening): kept between app starts, so a restart does not send a reminder again.
+    private static let sentKey = "sheet.remind.sent"
+    private var sent: [String] = UserDefaults.standard.stringArray(forKey: SheetReminder.sentKey) ?? []
 
     func start() {
         let open = UNNotificationAction(identifier: Self.openGaps, title: L("sheet.ui.remind.openGaps"), options: [.foreground])
@@ -686,7 +699,8 @@ final class SheetReminder {
             let key = m.id.uuidString + "@" + SheetFiles.baseFormat.string(from: m.callDate)
             guard left > 0, left <= Double(minutes), !sent.contains(key) else { continue }
             guard let p = SheetFiles.path(for: m), let s = SheetCache.shared.load(p) else { continue }
-            sent.insert(key)
+            sent = SheetPipeline.rememberSent(sent, add: key)
+            UserDefaults.standard.set(sent, forKey: Self.sentKey)
             let b = s.readinessBadge
             let c = UNMutableNotificationContent()
             c.title = L("sheet.ui.remind.title", ["n": "\(Int(left.rounded()))", "title": m.effectiveTitle])
@@ -700,11 +714,12 @@ final class SheetReminder {
     }
 
     /// A click on the reminder (or on Open the gaps): the call's page on the Readiness tab.
+    /// 0.10.0 (Meeting Sheet, hardening): the "ready" notification (pn-sheet-built-<id>) opens the call's sheet tab.
     static func open(_ id: String) {
-        let uid = String(id.dropFirst(idPrefix.count))
-        guard let m = UpNext.shared.items.first(where: { $0.id.uuidString == uid }) else { return }
+        guard let t = SheetPipeline.notificationTarget(id, prefix: idPrefix),
+              let m = UpNext.shared.items.first(where: { $0.id.uuidString == t.call }) else { return }
         if let app = NSApp.delegate as? AppDelegate { HomeWindow.show(delegate: app) }
-        UpcomingCallPage.openTab[m.id.uuidString] = "readiness"
+        UpcomingCallPage.openTab[m.id.uuidString] = t.tab
         UpcomingPages.open(m)
     }
 }

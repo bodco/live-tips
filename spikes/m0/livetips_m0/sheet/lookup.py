@@ -20,6 +20,7 @@ import json
 import math
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Iterable, List, Optional
@@ -36,6 +37,13 @@ let lets get got make made say said see seen need needs want right okay yes well
 але або щоб тому коли якщо тобто типу просто також треба можна буде було були який яка яке які цей цього цьому ця
 це ці там тут вже ще дуже нам вам вони воно його йому її мені тебе тобі тоді хто що як чи скільки зараз де чому
 наш наша наше наші ваш ваша ваше ваші""".split())
+# 0.10.0 (Meeting Sheet, hardening): files Pacenote writes for a call (briefs, sheets, cards, logs) are derived from the
+# sources searched here; they are not searched again (a stale brief must never become "the source").
+GEN_SUFFIX = (".brief.md", ".brief.prev.md", ".brief.preverify.md", ".sheet.json", ".sheet.md", ".sheet.sources.json",
+              ".sheet.request.json", ".cards.json", ".facts.json", ".agenda.json", ".slides.json", ".outline.json",
+              ".verify.json", ".context.md", ".run.json", ".stdout", ".stderr", ".llm.jsonl", ".timing.jsonl",
+              ".context-correction.txt", ".npz")
+GEN_RX = re.compile(r"\.sheet\.v\d+\.json$")
 DATE_RX = re.compile(r"(20\d\d)-(\d\d)-(\d\d)")
 WORD_RX = re.compile(r"[^\W_]+(?:['’][^\W_]+)?", re.U)
 
@@ -168,7 +176,7 @@ def walk_files(root: Path, max_files: int = 4000, exclude_prefix: str = "") -> I
         dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d not in SKIP_DIRS
                              and not d.startswith("_to_delete"))
         for fn in sorted(filenames):
-            if fn.startswith(".") or fn.endswith(SKIP_SUFFIX):
+            if fn.startswith(".") or fn.endswith(SKIP_SUFFIX) or fn.endswith(GEN_SUFFIX) or GEN_RX.search(fn):
                 continue
             if exclude_prefix and fn.startswith(exclude_prefix):
                 continue
@@ -220,8 +228,9 @@ def sheet_source_paths(sheet: Optional[dict]) -> List[tuple]:
 
 
 def collect(question: str, sheet=None, roots=(), max_files: int = 4000, max_bytes: int = 400_000,
-            max_seconds: float = 3.0, exclude_prefix: str = "") -> List[dict]:
-    """Every passage to rank: sheet facts, sheet source files, then the folders (newest first is not needed: BM25)."""
+            max_seconds: float = 3.0, exclude_prefix: str = "", max_docs: int = 6000) -> List[dict]:
+    """Every passage to rank: sheet facts, sheet source files, then the folders (newest first is not needed: BM25).
+    0.10.0 (Meeting Sheet, hardening): at most `max_docs` passages, so ranking stays within the call's time budget."""
     t0 = time.time()
     docs = sheet_passages(sheet)
     seen = set()
@@ -238,7 +247,7 @@ def collect(question: str, sheet=None, roots=(), max_files: int = 4000, max_byte
         if not root.is_dir():
             continue
         for pp in walk_files(root, max_files, exclude_prefix):
-            if time.time() - t0 > max_seconds:
+            if time.time() - t0 > max_seconds or len(docs) >= max_docs:
                 break
             key = str(pp.resolve())
             if key in seen:
@@ -254,20 +263,32 @@ def collect(question: str, sheet=None, roots=(), max_files: int = 4000, max_byte
             except ValueError:
                 rel = pp.name
             date = _date_of(pp, rel)
-            for head, body in chunks(text):
+            for head, body in chunks(text)[: max(0, max_docs - len(docs))]:
                 docs.append({"src": rel, "path": str(pp), "date": date, "head": head, "text": body, "n": None})
     return docs
 
 
-def rank(question: str, docs: List[dict], k: int = 8, k1: float = 1.4, b: float = 0.7) -> List[dict]:
+def rank(question: str, docs: List[dict], k: int = 8, k1: float = 1.4, b: float = 0.7,
+         deadline: float = 0.0, rest: tuple = (0, 0)) -> List[dict]:
+    """0.10.0 (Meeting Sheet, hardening): `deadline` (time.time() value, 0 = none) stops tokenizing and scoring when
+    the call's time budget is spent; what was scored so far is returned."""
     base_q = list(dict.fromkeys(terms(question)))
     if not base_q or not docs:
         return []
     q = expand(base_q)
-    toks = [terms(d["text"]) for d in docs]
-    meta = [set(terms(d.get("src", "") + " " + d.get("head", ""))) for d in docs]
-    n = len(docs)
-    avg = sum(len(t) for t in toks) / max(1, n)
+    toks, meta = [], []
+    for i, d in enumerate(docs):
+        if deadline and i % 200 == 0 and time.time() > deadline:
+            docs = docs[:i]
+            break
+        toks.append(d["_t"] if "_t" in d else terms(d["text"]))
+        meta.append(d["_m"] if "_m" in d else set(terms(d.get("src", "") + " " + d.get("head", ""))))
+    if not docs:
+        return []
+    # rest = (passages, words) of the indexed folder that hold none of the question's words: they count in N and the
+    # average length (BM25 as over the whole folder) but need no scoring
+    n = len(docs) + int(rest[0])
+    avg = (sum(len(t) for t in toks) + int(rest[1])) / max(1, n)
     df = {t: 0 for t in q}
     for tt in toks:
         s = set(tt)
@@ -278,7 +299,9 @@ def rank(question: str, docs: List[dict], k: int = 8, k1: float = 1.4, b: float 
     dates = sorted({d.get("date") or "" for d in docs if d.get("date")})
     newest = {dd: i / max(1, len(dates) - 1) for i, dd in enumerate(dates)}
     scored = []
-    for d, tt, mm in zip(docs, toks, meta):
+    for i, (d, tt, mm) in enumerate(zip(docs, toks, meta)):
+        if deadline and i % 500 == 0 and time.time() > deadline + 0.15:
+            break
         if not tt:
             continue
         tf = {}
@@ -303,20 +326,33 @@ def rank(question: str, docs: List[dict], k: int = 8, k1: float = 1.4, b: float 
         if per_file.get(key, 0) >= 2:                              # at most two passages of one file
             continue
         per_file[key] = per_file.get(key, 0) + 1
-        out.append(dict(d, score=round(s, 3)))
+        out.append({kk: vv for kk, vv in d.items() if kk not in ("_t", "_m")} | {"score": round(s, 3)})
         if len(out) >= k:
             break
     return out
 
 
 def snippets(question: str, sheet=None, roots=(), k: int = 8, queries=(), budget_chars: int = 14000,
-             max_seconds: float = 3.0, exclude_prefix: str = "") -> List[dict]:
+             max_seconds: float = 3.0, exclude_prefix: str = "", index: "Optional[FolderIndex]" = None) -> List[dict]:
     """The best passages for the question (and extra queries, e.g. from the model), within the character budget.
-    Shape fits engine.passages(): src, date, text (+ path, score, n)."""
-    docs = collect(question, sheet, roots, max_seconds=max_seconds, exclude_prefix=exclude_prefix)
+    Shape fits engine.passages(): src, date, text (+ path, score, n).
+    0.10.0 (Meeting Sheet, hardening): `max_seconds` is the whole budget (reading and ranking). With `index` (a
+    FolderIndex built in the background at call start) the folders are not read again: only the passages that hold a
+    word of the question are scored, so a question takes milliseconds, not seconds."""
+    t0 = time.time()
+    deadline = t0 + max(0.05, float(max_seconds))
+    rest = (0, 0)
+    if index is not None:
+        cands = index.candidates(question, list(queries), deadline)
+        rest = (max(0, index.size()[0] - len(cands)), max(0, index.size()[1] - sum(len(d["_t"]) for d in cands)))
+        docs = index.extra_docs(sheet) + cands
+    else:
+        docs = collect(question, sheet, roots, max_seconds=max_seconds * 0.6, exclude_prefix=exclude_prefix)
     merged, seen = [], set()
     for q in [question] + [x for x in queries if x and x != question]:
-        for h in rank(q, docs, k=k * 3):
+        if time.time() > deadline and merged:
+            break
+        for h in rank(q, docs, k=k * 3, deadline=deadline, rest=rest):
             key = (h.get("path") or h["src"], h["text"][:60])
             if key in seen:
                 continue
@@ -344,6 +380,142 @@ def snippets(question: str, sheet=None, roots=(), k: int = 8, queries=(), budget
         if len(out) >= k:
             break
     return out
+
+
+class FolderIndex:
+    """0.10.0 (Meeting Sheet, hardening): the call's folders read once, in the background, at call start.
+
+    HELP NOW and typed questions used to walk the folder (up to 4000 files) and rank every passage on each request:
+    3-6 s more than 0.9.7. The index keeps each passage's words and a word -> passages map, so a question scores only
+    the passages that hold one of its words. Newest files first (a big folder is capped: `max_files`, `max_docs`).
+    Built lazily again when older than `ttl` s (the old index answers meanwhile). The current call's own files
+    (`exclude_prefix`, its transcript and everything named after it) and Pacenote's generated files are left out.
+    Thread-safe: build() appends under a lock; readers take a snapshot of the length."""
+
+    def __init__(self, roots, exclude_prefix: str = "", max_files: int = 1500, max_docs: int = 20000,
+                 max_bytes: int = 400_000, max_seconds: float = 90.0, ttl: float = 300.0):
+        self.roots = [str(r) for r in roots if r]
+        self.exclude = exclude_prefix
+        self.max_files, self.max_docs, self.max_bytes = max_files, max_docs, max_bytes
+        self.max_seconds, self.ttl = max_seconds, ttl
+        self.key = (tuple(self.roots), exclude_prefix)
+        self.docs: List[dict] = []
+        self.post: dict = {}
+        self.lock = threading.Lock()
+        self.ready = threading.Event()
+        self.started_at = 0.0
+        self.built_at = 0.0
+        self.files = 0
+        self.words = 0
+        self._extra_key = None
+        self._extra: List[dict] = []
+
+    # ---- build ----
+    def start(self) -> "FolderIndex":
+        """Build in a daemon thread (returns at once)."""
+        self.started_at = time.time()
+        threading.Thread(target=self.build, name="pacenote-folder-index", daemon=True).start()
+        return self
+
+    def stale(self) -> bool:
+        return self.ready.is_set() and time.time() - self.built_at > self.ttl
+
+    def _paths(self) -> List[tuple]:
+        out, seen = [], set()
+        for r in self.roots:
+            root = Path(os.path.expanduser(r))
+            if not root.is_dir():
+                continue
+            for pp in walk_files(root, max_files=self.max_files * 6, exclude_prefix=self.exclude):
+                try:
+                    key = str(pp.resolve())
+                    m = pp.stat().st_mtime
+                except OSError:
+                    continue
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append((m, pp, root))
+        out.sort(key=lambda x: -x[0])                    # newest files first: a capped big folder keeps the recent
+        return out[: self.max_files]
+
+    def build(self) -> "FolderIndex":
+        t0 = self.started_at = self.started_at or time.time()
+        try:
+            for _m, pp, root in self._paths():
+                if time.time() - t0 > self.max_seconds or len(self.docs) >= self.max_docs:
+                    break
+                text = _read(pp, self.max_bytes)
+                if not text.strip():
+                    continue
+                if pp.suffix.lower() in (".json", ".jsonl") or pp.name.endswith(".jsonl"):
+                    text = _jsonl_text(text)
+                try:
+                    rel = str(pp.relative_to(root))
+                except ValueError:
+                    rel = pp.name
+                date = _date_of(pp, rel)
+                batch = []
+                for head, body in chunks(text):
+                    d = {"src": rel, "path": str(pp), "date": date, "head": head, "text": body, "n": None}
+                    d["_t"] = terms(body)
+                    d["_m"] = set(terms(rel + " " + head))
+                    batch.append(d)
+                with self.lock:
+                    for d in batch:
+                        i = len(self.docs)
+                        self.docs.append(d)
+                        self.words += len(d["_t"])
+                        for t in set(d["_t"]) | d["_m"]:
+                            self.post.setdefault(t, []).append(i)
+                    self.files += 1
+        except Exception:  # noqa: BLE001  (a partial index still answers)
+            pass
+        self.built_at = time.time()
+        self.ready.set()
+        return self
+
+    # ---- query ----
+    def size(self) -> tuple:
+        with self.lock:
+            return len(self.docs), self.words
+
+    def candidates(self, question: str, queries=(), deadline: float = 0.0, cap: int = 4000) -> List[dict]:
+        """The passages that hold a word of the question (or of the extra queries), best-covered first, at most `cap`."""
+        q = set()
+        for x in [question] + list(queries or []):
+            q.update(expand(list(dict.fromkeys(terms(x)))))
+        with self.lock:
+            n = len(self.docs)
+            lists = [self.post.get(t, ()) for t in q]
+            lists = [lst[:] if len(lst) <= n else lst[:n] for lst in lists]
+        hits: dict = {}
+        for lst in sorted(lists, key=len):
+            if deadline and time.time() > deadline:
+                break
+            for i in lst:
+                hits[i] = hits.get(i, 0) + 1
+        best = sorted(hits, key=lambda i: -hits[i])[:cap]
+        return [self.docs[i] for i in best]
+
+    def extra_docs(self, sheet) -> List[dict]:
+        """The sheet's facts and the sheet's source files as passages (cached while the sheet's files do not change)."""
+        if not isinstance(sheet, dict):
+            return []
+        paths = sheet_source_paths(sheet)
+        try:
+            key = (json.dumps(sheet.get("blocks"), sort_keys=True, default=str)[:200000],
+                   tuple((str(p), p.stat().st_mtime) for p, _n, _t in paths))
+        except (OSError, TypeError):
+            key = None
+        if key is not None and key == self._extra_key:
+            return self._extra
+        docs = collect("", sheet, (), max_bytes=self.max_bytes)
+        for d in docs:
+            d["_t"] = terms(d["text"])
+            d["_m"] = set(terms(d.get("src", "") + " " + d.get("head", "")))
+        self._extra_key, self._extra = key, docs
+        return docs
 
 
 def load_sheet_near(brief_path) -> Optional[dict]:

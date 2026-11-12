@@ -40,6 +40,7 @@ final class PrepDocWindow {
 struct PrepDocView: View {
     let path: String
     let title: String
+    var background: Color = PN.C.bg       // 0.10.0 (Meeting Sheet, polish): the call page puts it on the white card (PN.C.surface)
     @State private var text = ""
     @State private var editingAll = false
     @State private var editLine: Int?
@@ -99,7 +100,7 @@ struct PrepDocView: View {
                 }
             }
         }
-        .background(PN.C.bg)
+        .background(background)
         .frame(minWidth: 480, minHeight: 400)
         .onAppear { load() }
     }

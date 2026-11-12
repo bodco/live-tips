@@ -46,19 +46,32 @@ struct MeetingSheetTab: View {
     var onRefresh: () -> Void
     var onEditBlocks: () -> Void
     var onCompare: (Int) -> Void = { _ in }
+    @State private var width: CGFloat = 0        // 0.10.0 (Meeting Sheet, polish): the right column only on a wide page
 
     var body: some View {
         if let s = doc.sheet {
-            VStack(alignment: .leading, spacing: 16) {
-                headerLine(s)
-                let d = SheetDiffCounts.of(s)
-                if !d.isEmpty { diffBanner(s, d) }
-                if !doc.note.isEmpty { Text(doc.note).font(PN.Font.caption).foregroundStyle(PN.C.pending) }
-                myFocus(s)
-                ForEach(s.shownBlocks.filter { $0.type != .myFocus }) { b in
-                    SheetBlockCard(doc: doc, block: b, onRefresh: onRefresh)
+            // 0.10.0 (Meeting Sheet, polish): the right column "On this sheet" (mockup S6) when the page is wide enough
+            ScrollViewReader { proxy in
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        headerLine(s)
+                        let d = SheetDiffCounts.of(s)
+                        if !d.isEmpty { diffBanner(s, d) }
+                        if !doc.note.isEmpty { Text(doc.note).font(PN.Font.caption).foregroundStyle(PN.C.pending) }
+                        myFocus(s).id("sheet-block-" + (s.block(.myFocus)?.id ?? "my_focus"))
+                        ForEach(s.shownBlocks.filter { $0.type != .myFocus }) { b in
+                            SheetBlockCard(doc: doc, block: b, onRefresh: onRefresh).id("sheet-block-" + b.id)
+                        }
+                        hiddenLine(s)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if width >= 900 { SheetOnThisSheet(sheet: s, myFocusShown: myFocusShown(s)) { id in
+                        withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo("sheet-block-" + id, anchor: .top) }
+                    }.frame(width: 232) }
                 }
-                hiddenLine(s)
+                .background(GeometryReader { g in
+                    Color.clear.onAppear { width = g.size.width }.onChange(of: g.size.width) { _, w in width = w }
+                })
             }
         } else {
             PageCard { PageEmpty(icon: "doc.text", title: L("sheet.ui.err.read"), text: doc.path) }
@@ -99,6 +112,11 @@ struct MeetingSheetTab: View {
                 Button(L("sheet.ui.diff.accept")) { doc.change { SheetEdit.acceptDiff(&$0); return true } }.buttonStyle(.pnSecondary)
             }
         }
+    }
+
+    private func myFocusShown(_ s: MeetingSheet) -> Bool {
+        guard let b = s.block(.myFocus) else { return false }
+        return b.visible || !prefs.focus.isEmpty
     }
 
     /// My focus on top: the fields from Settings > Meeting Sheet, each with its fact or "Not found".
@@ -142,6 +160,80 @@ struct MeetingSheetTab: View {
                 }
             }
             .padding(.horizontal, 6)
+        }
+    }
+}
+
+/// 0.10.0 (Meeting Sheet, polish): the right column of S6. "On this sheet": the facts by status, then each block with
+/// its facts, not found and conflicts (a click scrolls to the block), then a short sources report.
+struct SheetOnThisSheet: View {
+    let sheet: MeetingSheet
+    var myFocusShown: Bool
+    var go: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            PageCard(spacing: 6) {
+                PageLabel(text: L("sheet.ui.nav.title")) { EmptyView() }
+                ForEach(SheetBlockCount.statuses(sheet).filter { $0.1 > 0 }, id: \.0.rawValue) { st, n in
+                    HStack(spacing: 6) {
+                        let l = legend(st)
+                        Label(l.text, systemImage: l.icon).font(PN.Font.caption.weight(.semibold)).foregroundStyle(l.color)
+                        Spacer()
+                        Text("\(n)").font(PN.Font.caption.monospacedDigit()).foregroundStyle(PN.C.text2)
+                    }
+                }
+                Divider().padding(.vertical, 4)
+                PageLabel(text: L("sheet.ui.nav.blocks")) { EmptyView() }
+                ForEach(blocks) { b in
+                    let c = SheetBlockCount.of(b)
+                    Button { go(b.id) } label: {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(b.type == .myFocus ? L("sheet.ui.myFocus") : b.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1)
+                            HStack(spacing: 6) {
+                                Text(L("sheet.ui.nav.facts", ["n": "\(c.facts)"])).foregroundStyle(PN.C.text3)
+                                if c.notFound > 0 { Text(L("sheet.ui.nav.notFound", ["n": "\(c.notFound)"])).foregroundStyle(PN.C.pending) }
+                                if c.conflicts > 0 { Text(L("sheet.ui.nav.conflicts", ["n": "\(c.conflicts)"])).foregroundStyle(PN.C.pending) }
+                            }
+                            .font(PN.Font.caption).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain).padding(.vertical, 2)
+                }
+                Text(L("sheet.ui.nav.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true).padding(.top, 4)
+            }
+            if !sheet.sources.isEmpty {
+                PageCard(spacing: 6) {
+                    PageLabel(text: L("sheet.ui.sources.report")) { EmptyView() }
+                    ForEach(sheet.sources.sorted { $0.n < $1.n }.prefix(8)) { src in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("\(src.n)").font(.system(size: 10, weight: .bold).monospacedDigit()).foregroundStyle(PN.C.answer).frame(width: 14, alignment: .trailing)
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(src.title).font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1).truncationMode(.tail)
+                                let a = SheetLabels.access(src)
+                                Text(src.access == .ok ? SheetLabels.used(src.used) : a.text).font(PN.Font.caption).lineLimit(1)
+                                    .foregroundStyle(src.access == .ok ? (src.used == .skipped || src.used == .truncated ? PN.C.pending : PN.C.text3) : a.color)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var blocks: [SheetBlock] {
+        sheet.shownBlocks.filter { $0.type != .myFocus || myFocusShown }
+    }
+
+    private func legend(_ st: FactStatus) -> (text: String, icon: String, color: Color) {
+        switch st {      // the same words and icons as the fact chips (SheetLabels.status)
+        case .notFound: return (L("sheet.ui.status.notFound"), "questionmark.circle", PN.C.pending)
+        case .needsCheck: return (L("sheet.ui.status.check"), "exclamationmark.circle", PN.C.pending)
+        case .conflict: return (L("sheet.ui.status.conflict"), "arrow.left.arrow.right.circle", PN.C.pending)
+        case .stale: return (L("sheet.ui.status.old"), "clock.arrow.circlepath", PN.C.onMe)
+        case .edited: return (L("sheet.ui.status.edited"), "pencil.circle", PN.C.docs)
+        default: return (L("sheet.ui.status.found"), "checkmark.circle", PN.C.turn)
         }
     }
 }
@@ -263,7 +355,8 @@ struct SheetFactRow: View {
                 Text(L("sheet.ui.diff." + d.rawValue)).font(.system(size: 10, weight: .bold)).foregroundStyle(diffColor ?? PN.C.text3)
                     .padding(.horizontal, 4).background(Capsule().stroke(diffColor ?? PN.C.text3))
             }
-            (Text(fact.label.map { $0 + ": " } ?? "").fontWeight(.semibold) + Text(fact.text))
+            // 0.10.0 (Meeting Sheet, polish): "Budget:" + the Not found chip, without the "Not found" text repeated.
+            (Text(fact.label.map { fact.shownText.isEmpty ? $0 + ":" : $0 + ": " } ?? "").fontWeight(.semibold) + Text(fact.shownText))
                 .font(PN.Font.body).foregroundStyle(fact.diff == .gone ? PN.C.text3 : PN.C.text)
                 .strikethrough(fact.diff == .gone)
                 .fixedSize(horizontal: false, vertical: true)
@@ -488,6 +581,7 @@ struct SheetReadinessTab: View {
 struct SheetSourcesTab: View {
     @ObservedObject var doc: SheetDoc
     var onAddSource: () -> Void
+    var root: String? = nil               // 0.10.0 (Meeting Sheet, polish): the project folder, for the Confirm in Google copy
 
     var body: some View {
         if let s = doc.sheet {
@@ -502,16 +596,37 @@ struct SheetSourcesTab: View {
                 }
                 ForEach(Array(s.sources.sorted { $0.n < $1.n }.enumerated()), id: \.element.id) { i, src in
                     if i > 0 { Divider() }
-                    SheetSourceReportRow(source: src).padding(.vertical, 8)
+                    SheetSourceReportRow(source: src, onFix: { fix(src, $0) }).padding(.vertical, 8)
                 }
+                if !doc.note.isEmpty { Text(doc.note).font(PN.Font.caption).foregroundStyle(PN.C.pending).padding(.top, 6) }
                 if s.sources.isEmpty { Text(L("sheet.ui.sources.none")).font(PN.Font.body).foregroundStyle(PN.C.text3) }
             }
+        }
+    }
+
+    /// 0.10.0 (Meeting Sheet, polish): the fix actions are real buttons, wired to the same actions as Expert step 3.
+    private func fix(_ src: SheetSource, _ f: FixAction) {
+        switch f {
+        case .connectGoogle: SettingsWindow.show(tab: "google")          // Settings > Integrations > Google
+        case .connectNotion: SettingsWindow.show(tab: "notion")          // Settings > Integrations > Notion
+        case .confirmGoogle:
+            GooglePicker.confirm(url: src.uri ?? "", root: root) { o in
+                switch o {
+                case .copied: doc.note = L("sheet.ui.sources.confirmed")
+                case .note(let m): doc.note = m
+                case .cancelled: break
+                }
+            }
+        case .openInBrowser:
+            if let u = src.uri, let url = URL(string: u), url.scheme != nil { NSWorkspace.shared.open(url) } else { SheetOpen.source(src) }
+        default: onAddSource()                                           // paste the text, save as PDF, fill in, retry: Expert step 3
         }
     }
 }
 
 struct SheetSourceReportRow: View {
     let source: SheetSource
+    var onFix: (FixAction) -> Void = { _ in }
     var body: some View {
         let a = SheetLabels.access(source)
         HStack(alignment: .top, spacing: 10) {
@@ -533,7 +648,8 @@ struct SheetSourceReportRow: View {
                 // 0.10.0 (Meeting Sheet, smoke): a cut source is a warning (orange, scissors), not a green "read"
                 Label(source.access == .ok ? SheetLabels.used(source.used) : a.text, systemImage: source.access == .ok ? (source.used == .skipped || source.used == .notUsed ? "minus.circle" : source.used == .truncated ? "scissors" : "checkmark.circle.fill") : a.icon)
                     .font(PN.Font.caption.weight(.semibold)).foregroundStyle(source.access == .ok ? (source.used == .skipped || source.used == .truncated ? PN.C.pending : PN.C.turn) : a.color)
-                if let f = source.fixAction { Text(SheetLabels.fix(f)).font(PN.Font.caption).foregroundStyle(PN.C.accent) }
+                // 0.10.0 (Meeting Sheet, polish): a button, not text
+                if let f = source.fixAction { Button(SheetLabels.fix(f)) { onFix(f) }.buttonStyle(.pnSecondary).controlSize(.small).fixedSize().padding(.top, 4) }
             }
         }
     }

@@ -2647,5 +2647,13 @@
  "sheet.google.wrongFile": "Another file was selected. Select the file of this source.",
  "sheet.google.err": "Could not read the confirmed file: {e}",
  "sheet.google.page.on": "Confirm in Google: a linked Drive file (PDF, Word) opens in Google Picker; after you confirm it, Pacenote reads that one file.",
- "sheet.google.page.off": "Confirm in Google: Google Picker is not set up in this build, so a linked Drive file (PDF, Word) opens in the browser."
+ "sheet.google.page.off": "Confirm in Google: Google Picker is not set up in this build, so a linked Drive file (PDF, Word) opens in the browser.",
+ "sheet.ui.nav.title": "On this sheet",
+ "sheet.ui.nav.facts": "facts: {n}",
+ "sheet.ui.nav.notFound": "not found: {n}",
+ "sheet.ui.nav.conflicts": "conflicts: {n}",
+ "sheet.ui.nav.hint": "Click a block to jump to it. Hover a source number to see the quote and the date.",
+ "sheet.ui.nav.blocks": "Blocks",
+ "sheet.ui.status.found": "Found",
+ "sheet.ui.sources.confirmed": "The file is confirmed and copied to this Mac. Press Refresh to use it on the sheet."
 }

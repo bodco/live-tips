@@ -75,7 +75,7 @@ struct UpcomingCallPage: View {
                 switch tab {
                 case "sheet", "brief": sheetTab
                 case "readiness": sheetOr { SheetReadinessTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }, onStart: { start() }) }
-                case "sources": sheetOr { SheetSourcesTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }) }
+                case "sources": sheetOr { SheetSourcesTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }, root: model.root) }    // 0.10.0 (Meeting Sheet, polish): root for Confirm in Google
                 case "versions": sheetOr { SheetVersionsTab(doc: $0, initialOpen: compareN) }
                 case "tasks": tasksTab
                 case "earlier": card { earlierTab }
@@ -328,7 +328,7 @@ struct UpcomingCallPage: View {
                     }
                     .padding(16)
                 }
-                PrepDocView(path: p, title: model.effectiveTitle).frame(minHeight: 520)
+                PrepDocView(path: p, title: model.effectiveTitle, background: PN.C.surface).frame(minHeight: 520)   // 0.10.0 (Meeting Sheet, polish): white card like the other tabs
             }
         } else {
             VStack(alignment: .leading, spacing: 12) {

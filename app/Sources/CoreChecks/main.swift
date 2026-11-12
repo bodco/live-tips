@@ -1246,7 +1246,40 @@ func meetingSheetUI0100() {
         if d.blocks[bi].facts.count > 1 { d.blocks[bi].facts[1].diff = .gone }
     }
     let c = SheetDiffCounts.of(d)
-    expect(c.new == 1 && c.gone == 1 && c.changed == 0 && c.keptEdits == d.blocks.flatMap(\.facts).filter(\.isProtected).count && c.keptEdits >= 1, "diff: counts from marks \(c)")
+    expect(c.new == 1 && c.gone == 1 && c.changed == 0 && c.keptEdits == 2, "diff: counts from marks \(c)")
+    // 0.10.0 (Meeting Sheet, polish): no edits by the person -> no "Your edits (N) are kept", even with origin user facts that came new.
+    do {
+        var z = base
+        for bi in z.blocks.indices { for fi in z.blocks[bi].facts.indices where z.blocks[bi].facts[fi].origin == .user { z.blocks[bi].facts[fi].origin = .model } }
+        if let bi = z.blocks.firstIndex(where: { !$0.facts.isEmpty }) {
+            z.blocks[bi].facts[0].origin = .user
+            z.blocks[bi].facts[0].diff = .new
+            z.blocks[bi].editedByUser = false
+        }
+        for i in z.blocks.indices { z.blocks[i].editedByUser = false }
+        let zc = SheetDiffCounts.of(z)
+        expect(zc.keptEdits == 0 && zc.new >= 1, "diff: a new user-origin fact is not a kept edit \(zc)")
+        if let bi = z.blocks.firstIndex(where: { $0.facts.count > 1 }) { z.blocks[bi].facts[1].status = .edited }
+        expect(SheetDiffCounts.of(z).keptEdits == 1, "diff: an edited fact without a diff mark is a kept edit")
+        if let bi = z.blocks.firstIndex(where: { $0.facts.count > 1 }) { z.blocks[bi].editedByUser = true }
+        expect(SheetDiffCounts.keptEdits(z) >= 1, "diff: an edited block counts")
+    }
+    // 0.10.0 (Meeting Sheet, polish): "Budget: Not found" + the chip, the text is not repeated.
+    if let nf = base.blocks.flatMap(\.facts).first(where: { $0.status == .notFound }) {
+        expect(nf.shownText.isEmpty, "not found: placeholder text hidden")
+        var real = nf; real.text = "No budget in the notes"
+        expect(real.shownText == "No budget in the notes", "not found: a real explanation stays")
+        var found = nf; found.status = .found
+        expect(found.shownText == nf.text, "not found: other statuses keep their text")
+    } else { expect(false, "not found: fixture has a not_found fact") }
+    // 0.10.0 (Meeting Sheet, polish): "On this sheet" counts per block (a conflict pair is one)
+    if let co = base.block(.company), let q = base.block(.qualification) {
+        expect(SheetBlockCount.of(co) == SheetBlockCount(facts: 2, notFound: 0, conflicts: 1), "nav: company 2 facts, 1 conflict \(SheetBlockCount.of(co))")
+        expect(SheetBlockCount.of(q).notFound == 1 && SheetBlockCount.of(q).facts == 4, "nav: qualification 1 not found of 4")
+        let st = Dictionary(uniqueKeysWithValues: SheetBlockCount.statuses(base).map { ($0.0.rawValue, $0.1) })
+        expect(st["conflict"] == 1 && st["not_found"] == 1, "nav: legend counts \(st)")
+    } else { expect(false, "nav: fixture blocks") }
+    expect(SheetFact.isPlaceholder(" not found. ") && SheetFact.isPlaceholder("Не знайдено") && !SheetFact.isPlaceholder("20K"), "not found: placeholder list")
     d.diff = try? JSONDecoder().decode(SheetDiff.self, from: Data(#"{"new":["a","b"],"changed":["c"],"gone":[]}"#.utf8))
     expect(SheetDiffCounts.of(d) == SheetDiffCounts(new: 2, changed: 1, gone: 0, keptEdits: c.keptEdits), "diff: counts from sheet.diff")
     let before = d.blocks.flatMap(\.facts).count

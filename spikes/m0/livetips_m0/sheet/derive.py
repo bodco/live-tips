@@ -67,6 +67,12 @@ def _w(k: str) -> str:
     return WORDS.get(_LANG[0], WORDS["en"]).get(k, WORDS["en"][k])
 
 
+def is_placeholder(text) -> bool:
+    """0.10.0 (Meeting Sheet, polish): the text of a not_found fact that says nothing beyond the status itself."""
+    t = str(text or "").strip().rstrip(".").strip().lower()
+    return t in ("", "not found", "не знайдено", "n/a", "unknown")
+
+
 def _mark(st: str) -> str:
     return f" ({_w(st)})" if st in ("conflict", "stale", "needs_check") else ""
 
@@ -126,7 +132,12 @@ def render_md(sheet: dict, for_brief: bool = False) -> str:
             own = (f.get("value") or {}).get("owner")
             own = f" ({_w('owner')}: {own})" if own else ""
             nf = _w("not_found") + ": " if f.get("status") == "not_found" else ""
-            lines.append(f"- {lab}{nf}{f['text']}{lvl}{own}{_mark(f.get('status', ''))}{_cite(sheet, f.get('source_ids') or [])}"
+            txt = f['text']
+            # 0.10.0 (Meeting Sheet, polish): a not_found fact whose text only repeats "Not found" reads "Budget: Not found",
+            # not "Budget: Not found: Not found".
+            if nf and is_placeholder(txt):
+                nf, txt = _w("not_found"), ""
+            lines.append(f"- {lab}{nf}{txt}{lvl}{own}{_mark(f.get('status', ''))}{_cite(sheet, f.get('source_ids') or [])}"
                          + ("" if for_brief else _was(sheet, f)))
     rd = sheet.get("readiness") or {}
     if rd.get("gaps") and not for_brief:

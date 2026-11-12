@@ -62,12 +62,21 @@ public struct SheetDiffCounts: Equatable {
     /// (edited by the person) that Refresh left as they were.
     public static func of(_ s: MeetingSheet) -> SheetDiffCounts {
         let facts = s.blocks.flatMap(\.facts)
-        let kept = s.diff == nil && facts.allSatisfy({ $0.diff == nil }) ? 0 : facts.filter(\.isProtected).count
+        let kept = s.diff == nil && facts.allSatisfy({ $0.diff == nil }) ? 0 : keptEdits(s)
         if let d = s.diff {
             return SheetDiffCounts(new: d.new?.count ?? 0, changed: d.changed?.count ?? 0, gone: d.gone?.count ?? 0, keptEdits: kept)
         }
         return SheetDiffCounts(new: facts.filter { $0.diff == .new }.count, changed: facts.filter { $0.diff == .changed }.count,
                                gone: facts.filter { $0.diff == .gone }.count, keptEdits: kept)
+    }
+
+    // 0.10.0 (Meeting Sheet, polish): only the person's own edits count: a block marked edited_by_user counts once,
+    // and in other blocks a fact with status edited or origin user that Refresh kept (merge.py drops its diff mark).
+    // A protected-looking fact that arrived with a diff mark (new, changed, gone) is not a kept edit.
+    public static func keptEdits(_ s: MeetingSheet) -> Int {
+        s.blocks.reduce(0) { n, b in
+            b.editedByUser ? n + 1 : n + b.facts.filter { $0.isProtected && $0.diff == nil }.count
+        }
     }
 }
 
@@ -403,6 +412,48 @@ public extension SheetEdit {
             let bt = BlockType(rawValue: t)
             return SheetBlock(id: "b-" + t, type: bt, title: titles[t] ?? blockTitle(bt), visible: true, onlyIfData: onlyIfData.contains(t),
                               order: i, method: bt == .qualification ? "bant" : nil, facts: [], editedByUser: false)
+        }
+    }
+}
+
+// 0.10.0 (Meeting Sheet, polish): a not_found fact whose text only repeats the status ("Not found", empty) shows the
+// label and the chip, not "Budget: Not found" next to a "Not found" chip. Same list as derive.is_placeholder.
+public extension SheetFact {
+    static func isPlaceholder(_ text: String) -> Bool {
+        var t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while t.hasSuffix(".") { t.removeLast() }
+        return ["", "not found", "не знайдено", "n/a", "unknown"].contains(t.trimmingCharacters(in: .whitespaces).lowercased())
+    }
+    /// The text the sheet shows next to the label.
+    var shownText: String { status == .notFound && Self.isPlaceholder(text) ? "" : text }
+}
+
+// 0.10.0 (Meeting Sheet, polish): the right column "On this sheet" (mockup S6): per block the facts shown, not found and
+// conflicts (one per pair, as the sheet shows them); replaced facts ("was X") do not count.
+public struct SheetBlockCount: Equatable {
+    public var facts: Int, notFound: Int, conflicts: Int
+    public init(facts: Int, notFound: Int, conflicts: Int) { self.facts = facts; self.notFound = notFound; self.conflicts = conflicts }
+
+    public static func of(_ b: SheetBlock) -> SheetBlockCount {
+        var partners = Set<String>()
+        let shown = b.facts.filter { f in
+            guard f.supersededBy == nil else { return false }
+            if f.status == .conflict {
+                if partners.contains(f.id) { return false }
+                partners.formUnion(f.conflictWith ?? [])
+            }
+            return true
+        }
+        return SheetBlockCount(facts: shown.count, notFound: shown.filter { $0.status == .notFound }.count,
+                               conflicts: shown.filter { $0.status == .conflict }.count)
+    }
+
+    /// The whole sheet by status, for the legend: found, not found, check, conflict, old, edited.
+    public static func statuses(_ s: MeetingSheet) -> [(FactStatus, Int)] {
+        let all = s.shownBlocks.flatMap { b in b.facts.filter { $0.supersededBy == nil } }
+        let pairs = s.shownBlocks.reduce(0) { $0 + of($1).conflicts }
+        return [FactStatus.found, .notFound, .needsCheck, .conflict, .stale, .edited].map { st in
+            (st, st == .conflict ? pairs : all.filter { $0.status == st }.count)
         }
     }
 }

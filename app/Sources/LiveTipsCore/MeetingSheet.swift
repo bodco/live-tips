@@ -222,6 +222,16 @@ public struct SheetBlock: Codable, Equatable, Identifiable {
     }
 }
 
+public extension SheetBlock {
+    /// 0.10.2 (Q, v4): the model found nothing real for this block, only "not found" placeholders (or values replaced
+    /// by newer ones). Never the header, the gaps, qualification (its unknowns are the point) or a block the user edited.
+    /// Mirrors livetips_m0/sheet/derive.py empty_block.
+    var nothingFound: Bool {
+        if [.header, .gaps, .qualification].contains(type) || editedByUser || facts.isEmpty { return false }
+        return facts.allSatisfy { $0.status == .notFound || $0.supersededBy != nil }
+    }
+}
+
 public struct SheetFact: Codable, Equatable, Identifiable {
     public var id: String
     public var label: String?
@@ -524,9 +534,10 @@ public struct ReadinessBadge: Equatable {
 public extension MeetingSheet {
     var readinessBadge: ReadinessBadge { ReadinessBadge.of(readiness) }
     func block(_ type: BlockType) -> SheetBlock? { blocks.first { $0.type == type } }
-    /// Blocks in their order; a block marked only_if_data without facts is left out.
+    /// Blocks in their order; a block marked only_if_data without facts is left out, and so is a block that holds
+    /// only "not found" placeholders (0.10.2, Q v4: the Gaps block says what is missing).
     var shownBlocks: [SheetBlock] {
-        blocks.filter { $0.visible && !($0.onlyIfData && $0.facts.isEmpty) }.sorted { $0.order < $1.order }
+        blocks.filter { $0.visible && !($0.onlyIfData && $0.facts.isEmpty) && !$0.nothingFound }.sorted { $0.order < $1.order }
     }
     func source(id: String) -> SheetSource? { sources.first { $0.id == id } }
     func fact(id: String) -> SheetFact? { blocks.lazy.flatMap(\.facts).first { $0.id == id } }

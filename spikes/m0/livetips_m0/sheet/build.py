@@ -572,7 +572,12 @@ def assign_ids(facts: Dict[str, List[dict]]) -> None:
                 f["superseded_by"] = newer[0]["id"]
 
 
-def header_facts(req: dict, src_id: str, checked_at: str) -> List[dict]:
+HEADER_NOISE = {"auto", "blank", "you", "я", ""}
+
+
+def header_facts(req: dict, src_id: str, checked_at: str, goal: Optional[str] = None) -> List[dict]:
+    """0.10.2 (Q, v4): no meta lines: the meeting type is not shown, "Our side" only when it names someone, and the
+    goal is the sheet's goal (the user's, else the model's "Likely: ..." guess)."""
     m = req.get("meeting") or {}
     p = req.get("participants") or {}
     out = []
@@ -585,12 +590,73 @@ def header_facts(req: dict, src_id: str, checked_at: str) -> List[dict]:
         when += " - " + m["end"][11:16] if len(m["end"]) > 15 else ""
     add("When", (when + (f" ({m['tz']})" if m.get("tz") else "")).strip())
     add("Where", m.get("where", ""))
-    add("Our side", ", ".join(x.get("name", "") + (f" ({x['role']})" if x.get("role") else "") for x in p.get("ours") or []))
+    ours = ", ".join(x.get("name", "") + (f" ({x['role']})" if x.get("role") else "") for x in p.get("ours") or [])
+    add("Our side", "" if ours.strip().lower() in HEADER_NOISE else ours)
     add("Their side", ", ".join(x.get("name", "") + (f" ({x['role']})" if x.get("role") else "")
                                  + (f", {x['company']}" if x.get("company") else "") for x in p.get("theirs") or []))
-    add("Meeting type", req.get("call_type", ""))
-    add("Goal", req.get("goal", ""))
+    add("Goal", (goal if goal is not None else req.get("goal", "")) or "")
     return out
+
+
+# 0.10.2 (Q, v4): the clean-up after the build. On 15 real calls it cut the repeats per sheet from 5.1 to 3.9 and the
+# placeholders from most blocks without losing coverage (research/pacenote-sheet-prompt-quality-2026-11-14.md).
+NO_DEDUP = ("header", "gaps", "qualification")      # qualification: one fact per criterion, never merged away
+
+
+STOP = set("the and for with from that this was were are has have had not but its into will can who what when how "
+           "his her their our you про для від що але щоб які яка яке або вже ще його її їх наш ваш при цей ця це як "
+           "коли хто чи над під між".split())
+
+
+def _toks(t: str) -> set:
+    return {w[:5] for w in re.findall(r"\w{3,}", (t or "").lower()) if w not in STOP and (not w.isdigit() or len(w) > 2)}
+
+
+LONE_NUM = re.compile(r"(?<!\w)\d+(?:[.,:/-]\d+)*(?!\w)")    # 12, 2026-11-03, 19:00; not the 365 of O365
+
+
+def same_fact(a: str, b: str) -> bool:
+    """The same fact told again, maybe in other words: no number or date of one contradicts the other (the numbers of
+    one are among the other's), and at least two and at least half of the shorter text's words (by their first five
+    letters) are in the other. "94 deals in 2024" and "96 deals in 2024" are two facts; "Confirm the SOW" and "Was the SOW signed on
+    2026-10-19?" are one."""
+    na, nb = set(LONE_NUM.findall(a or "")), set(LONE_NUM.findall(b or ""))
+    if not (na <= nb or nb <= na):
+        return False
+    x, y = _toks(a), _toks(b)
+    shared = len(x & y)
+    return shared >= 2 and shared / min(len(x), len(y)) >= 0.5      # one shared word ("operations") is not a repeat
+
+
+def _kept(f: dict) -> bool:
+    """Never dropped by the clean-up: the user's own facts and the facts of a conflict (both sides stay)."""
+    return (f.get("origin") == "user" or f.get("status") in ("edited", "conflict", "stale")
+            or bool(f.get("conflict_with")) or bool(f.get("superseded_by")))
+
+
+def tidy(blocks: List[dict], only: Optional[List[dict]] = None) -> int:
+    """In block order: a fact that repeats one shown earlier in the sheet is dropped, and a "not found" placeholder
+    goes when its block has real facts. Only the blocks in `only` (the rebuilt ones) are changed; the others still
+    count as "shown earlier". Returns how many repeats were dropped."""
+    seen, dropped = [], 0
+    for b in sorted(blocks, key=lambda b: b.get("order", 0)):
+        if b.get("type") in ("header", "gaps") or not b.get("visible", True):
+            continue
+        change = (only is None or b in only) and b.get("type") not in NO_DEDUP and not b.get("edited_by_user")
+        keep = []
+        for f in b.get("facts") or []:
+            t = (f.get("label") or "") + " " + (f.get("text") or "")
+            real = f.get("status") != "not_found"
+            if change and real and not _kept(f) and any(same_fact(t, x) for x in seen):
+                dropped += 1
+                continue
+            keep.append(f)
+            if real:
+                seen.append(t)
+        if change and any(f.get("status") != "not_found" for f in keep):
+            keep = [f for f in keep if f.get("status") != "not_found" or _kept(f)]
+        b["facts"] = keep
+    return dropped
 
 
 def gap_facts(facts: Dict[str, List[dict]], blocks: List[dict], checked_at: str) -> List[dict]:
@@ -1270,7 +1336,7 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     for b in sheet["blocks"]:
         t = b["type"]
         if t == "header":
-            b["facts"] = header_facts(req, "s-meeting", checked)
+            b["facts"] = header_facts(req, "s-meeting", checked, sheet.get("goal"))
         elif t == "gaps":
             b["facts"] = []
         elif b in ask_blocks:
@@ -1282,6 +1348,9 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         if b.get("only_if_data") and b in ask_blocks and t not in ("header", "gaps"):
             if not any(f.get("status") != "not_found" for f in b["facts"]):
                 b["facts"] = []           # "Only if there is data": an empty block stays empty and is not shown
+    n_rep = tidy(sheet["blocks"], ask_blocks)
+    if n_rep:
+        notes.append(f"Clean-up: {n_rep} fact(s) that repeated another block were dropped.")
     allf = {b["type"]: b["facts"] for b in sheet["blocks"] if b["type"] not in ("header", "gaps")}
     gb = next((b for b in sheet["blocks"] if b["type"] == "gaps"), None)
     if gb is not None:

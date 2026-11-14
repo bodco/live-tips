@@ -2251,6 +2251,7 @@
  "sheet.ui.blocks.edit": "Add, hide or reorder blocks",
  "sheet.ui.blocks.hidden": "Hidden: {list}.",
  "sheet.ui.blocks.onlyIfData": "Only if there is data, nothing yet: {list}.",
+ "sheet.ui.blocks.nothingFound": "Nothing found, not shown: {list}. Conflicts and gaps lists what is missing.",
  "sheet.ui.build": "Build the sheet",
  "sheet.ui.build.again": "Try again",
  "sheet.ui.build.closeNotify": "Close, notify me",

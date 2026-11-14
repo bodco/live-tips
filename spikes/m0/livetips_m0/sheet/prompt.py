@@ -1,4 +1,5 @@
-"""0.10.0 (Meeting Sheet, phase 3): one prompt contract for every route.
+"""0.10.0 (Meeting Sheet, phase 3): one prompt contract for every route. 0.10.2 (Q, v4): the likely goal ("Likely: ...")
+when no source states it, and the facts of each block ordered from it.
 
 The model gets the blocks of the preset (title and fields from rules/meeting-sheet.yaml), the meeting header and the
 sources, each with its id. It answers one JSON object: facts per block, each with source_ids and a locator. Whatever
@@ -26,6 +27,10 @@ conflict when nothing says which is newer. In list blocks (agenda, questions, be
 outcome, action items, red lines, history) every item gets its own short label. Facts are short (one or two sentences) and
 concrete: numbers, dates, names, who said what. Source ids belong in source_ids only, never in the text. Write the fact texts in {LANG}; quotes stay as written. No long dashes.
 
+The goal: first decide what this meeting is most likely about (its title, what the previous calls of the series left
+open or promised for next time, the newest files, the user's note) and put it in "goal"; when no source states the
+goal, write your best one-sentence guess starting with "Likely: ". Order the facts in each block from that goal.
+
 Answer with one JSON object and nothing else:
 {{"blocks": {{"<block type>": [{{"label": "<short attribute, e.g. Team size>", "text": "<the fact>",
    "source_ids": ["s1"], "locator": {{"quote": "...", "page": 2, "slide": 3, "line": 14, "url": "...", "cell": "B4"}},
@@ -34,7 +39,7 @@ Answer with one JSON object and nothing else:
    "keywords": ["2-4 lowercase phrases someone may say in the meeting about this, in {CALL_LANGS}"],
    "value": {{"key": "<criterion key, qualification only>", "level": "green|yellow|red|unknown",
              "owner": "<agenda and action items>", "due": "<YYYY-MM-DD when known>"}}}}]}},
- "goal": "<the meeting's goal when the sources state it, else empty>"}}
+ "goal": "<the meeting's goal; when no source states it: Likely: <your best guess>>"}}
 Leave out locator keys you do not have and "value" when it does not apply. Only the block types listed below."""
 
 

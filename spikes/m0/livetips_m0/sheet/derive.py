@@ -24,6 +24,16 @@ CARD_BLOCKS = {"my_focus": "yellow", "overview": "yellow", "signals": "yellow", 
 SHOWN = ("found", "conflict", "edited", "needs_check", "stale")
 
 
+def empty_block(b: dict) -> bool:
+    """0.10.2 (Q, v4): a block the model filled with "not found" placeholders only is not shown (the Gaps block lists
+    what is missing). The header, the gaps, qualification (its unknowns are the point), a block the user edited and an
+    empty block are not touched here."""
+    facts = b.get("facts") or []
+    if b.get("type") in ("header", "gaps", "qualification") or b.get("edited_by_user") or not facts:
+        return False
+    return not any(_live(f) for f in facts) and all(f.get("status") == "not_found" or f.get("superseded_by") for f in facts)
+
+
 def _live(f: dict) -> bool:
     # 0.10.0 (Meeting Sheet, round 2): a value replaced by a newer one (superseded_by) never goes live
     return f.get("status") in SHOWN and not f.get("superseded_by")
@@ -119,6 +129,10 @@ def render_md(sheet: dict, for_brief: bool = False) -> str:
         shown = [f for f in facts if _live(f) or f.get("status") == "not_found"]
         if not shown and b.get("only_if_data"):
             continue
+        if b["type"] == "header" and sheet.get("goal"):
+            shown = [f for f in shown if f.get("id") != "f-header-goal"]     # 0.10.2: the goal is already on top
+        if empty_block(b):
+            continue                     # 0.10.2 (Q, v4): nothing real found; the Gaps block says what is missing
         if for_brief and b["type"] in ("agenda", "questions"):
             continue
         head = b.get("title", b["type"]) + (f" ({str(b.get('method')).upper()})" if b.get("method") else "")

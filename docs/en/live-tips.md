@@ -2031,6 +2031,14 @@ of a guess), **Check**, **Conflict** (two sources disagree: both values with the
 both and ask on the call), **Old** (all its sources are older than 6 months, Settings > Meeting Sheet) and **Edited**.
 When two dated sources disagree, the newer wins and the older is marked old with "was X".
 
+**Goal and clean-up (0.10.2).** The sheet's goal is yours when you gave one; otherwise the AI writes its best guess,
+marked "Likely: ...", and orders the facts of each block from it. After the build Pacenote cleans the sheet: the
+header has no meta lines (the meeting type, an empty "Our side"), a fact that repeats one in an earlier block is
+dropped (never your own facts, both sides of a conflict or a qualification criterion; two facts with different numbers
+are never one), a "Not found" line goes when its block has real facts, and a block with only "Not found" lines is not
+shown: Conflicts and gaps lists what is missing, and a line under the blocks names them. Tested on 15 real calls:
+fewer repeats and empty blocks, the same share of the call's topics covered.
+
 **Editing and Refresh.** Click a fact to edit it; it becomes Edited. The block menu adds a fact, regenerates the
 block, hides it, moves it up or down, or removes it. The qualification block has its method in the header (BANT by
 default, SPICED, MEDDIC, general). **Refresh** rebuilds the sheet from the sources again and **never touches what you

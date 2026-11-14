@@ -1158,6 +1158,19 @@ func meetingSheet0100() {
         expect(s.source(id: "s4")?.why == ["same industry", "matches the call context"] && s.source(id: "s4")?.auto == true, "sheet: source why")
         expect(s.readinessBadge.label == "Almost" && s.readinessBadge.blockers == 0 && s.readiness?.gaps?.first?.action == .addQuestion, "sheet: badge and first gap")
         expect(!s.shownBlocks.contains { $0.type == .techStack } && s.shownBlocks.contains { $0.type == .contact }, "sheet: only if data")
+        // 0.10.2 (Q, v4): a block with only "not found" placeholders is not shown; an edited one and qualification are
+        var t = s
+        if let i = t.blocks.firstIndex(where: { $0.type == .contact }), !t.blocks[i].facts.isEmpty {
+            for j in t.blocks[i].facts.indices { t.blocks[i].facts[j].status = .notFound }
+            t.blocks[i].editedByUser = false
+            expect(t.blocks[i].nothingFound && !t.shownBlocks.contains { $0.type == .contact }, "sheet: nothing found is not shown")
+            t.blocks[i].editedByUser = true
+            expect(!t.blocks[i].nothingFound && t.shownBlocks.contains { $0.type == .contact }, "sheet: an edited block stays")
+        } else { expect(false, "sheet: contact facts in the fixture") }
+        if let i = t.blocks.firstIndex(where: { $0.type == .qualification }) {
+            for j in t.blocks[i].facts.indices { t.blocks[i].facts[j].status = .notFound }
+            expect(!t.blocks[i].nothingFound, "sheet: qualification unknowns stay shown")
+        }
     } else { expect(false, "sales fixture") }
     // Unknown enum values decode, keep their text and encode back unchanged.
     let future = """

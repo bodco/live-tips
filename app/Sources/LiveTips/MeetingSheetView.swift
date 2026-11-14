@@ -145,7 +145,8 @@ struct MeetingSheetTab: View {
     @ViewBuilder private func hiddenLine(_ s: MeetingSheet) -> some View {
         let hidden = s.blocks.filter { !$0.visible }
         let empty = s.blocks.filter { $0.visible && $0.onlyIfData && $0.facts.isEmpty }
-        if !hidden.isEmpty || !empty.isEmpty {
+        let nothing = s.blocks.filter { $0.visible && $0.nothingFound }       // 0.10.2 (Q, v4)
+        if !hidden.isEmpty || !empty.isEmpty || !nothing.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 if !hidden.isEmpty {
                     HStack(spacing: 6) {
@@ -157,6 +158,9 @@ struct MeetingSheetTab: View {
                 }
                 if !empty.isEmpty {
                     Text(L("sheet.ui.blocks.onlyIfData", ["list": empty.map(\.title).joined(separator: ", ")])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
+                if !nothing.isEmpty {
+                    Text(L("sheet.ui.blocks.nothingFound", ["list": nothing.map(\.title).joined(separator: ", ")])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
             .padding(.horizontal, 6)

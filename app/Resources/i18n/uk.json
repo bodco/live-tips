@@ -2251,6 +2251,7 @@
  "sheet.ui.blocks.edit": "Додати, сховати чи переставити блоки",
  "sheet.ui.blocks.hidden": "Сховано: {list}.",
  "sheet.ui.blocks.onlyIfData": "Лише якщо є дані, поки нічого: {list}.",
+ "sheet.ui.blocks.nothingFound": "Нічого не знайдено, не показано: {list}. Чого бракує, видно в конфліктах і прогалинах.",
  "sheet.ui.build": "Зібрати sheet",
  "sheet.ui.build.again": "Спробувати ще раз",
  "sheet.ui.build.closeNotify": "Закрити, сповістити мене",

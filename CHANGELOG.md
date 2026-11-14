@@ -3,6 +3,17 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.10.2 (unreleased)
+
+- **Meeting Sheet: a likely goal and a cleaner sheet (2026-11-14, Q):** when no source and no setting states the
+  meeting's goal, the AI writes its best guess, marked "Likely: ...", and orders the facts of each block from it. The
+  header has no meta lines any more (the meeting type, an empty "Our side"); the goal stays on top. A fact that repeats
+  one in an earlier block is dropped (never your own facts, both sides of a conflict or a qualification criterion; two
+  facts with different numbers are kept), a "Not found" line goes when its block has real facts, and a block with only
+  "Not found" lines is not shown: Conflicts and gaps lists what is missing and a line under the blocks names them.
+  Measured on 15 real calls: repeats per sheet 5.1 to 3.9, empty blocks rated 2.6 to 3.6 of 5, the share of the
+  call's topics the sheet had an answer for unchanged.
+
 ## 0.10.1 (2026-11-14)
 
 - **Every way into a preparation opens the Meeting Sheet (2026-11-14, owner):** "Start a call now" on Home (⌘N), "Start

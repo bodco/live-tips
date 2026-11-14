@@ -3,7 +3,7 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## Unreleased (0.10.1)
+## 0.10.1 (2026-11-14)
 
 - **Every way into a preparation opens the Meeting Sheet (2026-11-14, owner):** "Start a call now" on Home (⌘N), "Start
   a call" in the menu bar menu and "Try it" for calls in Features opened the old call form. They now open the Meeting

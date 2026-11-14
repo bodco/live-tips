@@ -57,6 +57,16 @@ final class SeriesMemory {
     /// The project of the last call that came from this calendar.
     func projectFor(calendarKey: String) -> String? { map["calendar:" + calendarKey]?.target }
 
+    /// 0.10.1 (A2): the remembered setup of a title (and of its calendar series) points at another project.
+    func setTarget(forTitleKey key: String, _ target: String) {
+        guard let e = map[key] else { return }
+        for (k, v) in map where k == key || (!k.hasPrefix("title:") && !k.hasPrefix("calendar:") && v.title == e.title && v.savedAt == e.savedAt) {
+            map[k]?.target = target
+        }
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let d = try? enc.encode(map) { try? d.write(to: path, options: .atomic) }
+    }
+
     func lookup(seriesKey: String?, title: String) -> Entry? {
         if let s = seriesKey, let e = map[s] { return e }
         return map[Self.titleKey(title)]
@@ -365,6 +375,13 @@ final class CallHistory: ObservableObject {
     nonisolated static func wasPrepared(_ file: String) -> Bool {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         return FileManager.default.fileExists(atPath: stem + ".brief.md")
+    }
+
+    func replace(at i: Int, with r: Record) {
+        guard records.indices.contains(i) else { return }
+        records[i] = r
+        records = records.enumerated().filter { $0.offset == i || $0.element.file != r.file }.map(\.element)
+        persist()
     }
 
     private func update(_ file: String, _ change: (inout Record) -> Void) {

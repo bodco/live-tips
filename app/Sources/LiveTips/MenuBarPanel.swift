@@ -61,6 +61,9 @@ final class MenuBarModel: ObservableObject {
     @Published var warning = false
     @Published var liveTitle = ""
     @Published var liveLine = ""              // project · lines · tips
+    @Published var liveProject = ""           // 0.10.1 (A3): the project, a button that changes it
+    @Published var liveCallLine = ""          // lines · tips · cost
+    @Published var liveFile: String?          // the live call's transcript
     @Published var next: Call?
     @Published var later: [Call] = []
     @Published var monthSpend: Double = 0
@@ -109,6 +112,10 @@ struct MenuBarPanel: View {
                     if model.isRecording {
                         row(L("menubar.helpNow"), model.helpKey, icon: "lifepreserver") { $0.helpNow() }
                         row(L("menubar.pause"), model.pauseKey, icon: "pause") { $0.togglePause() }
+                        // 0.10.1 (A4): Prepare again = Get ready, the Meeting Sheet in live mode
+                        row(L("talk.prepareAgain") + "…", "", icon: "arrow.clockwise") { _ in
+                            MainActor.assumeIsolated { if let e = LivePrep.openSheet() { CallEngine.shared.notify(e) } }
+                        }
                     }
                     row(L("menubar.planCall"), "⌘N", icon: "plus") { $0.startCall() }.keyboardShortcut("n")
                     row(L("menubar.home"), "⌘0", icon: "house") { $0.openHome() }.keyboardShortcut("0")
@@ -239,7 +246,24 @@ struct MenuBarPanel: View {
         return card {
             kicker(txt, col)
             Text(model.liveTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).padding(.top, 2)
-            if !model.liveLine.isEmpty && !model.warning {
+            if model.warning {
+                EmptyView()
+            } else if let f = model.liveFile, !model.liveProject.isEmpty {
+                // 0.10.1 (A3, roadmap п.9): the project is clickable; the call moves to another one
+                HStack(spacing: 4) {
+                    Button { model.run { _ in ReassignPanel.show(file: f) } } label: {
+                        HStack(spacing: 2) {
+                            Text(model.liveProject).underline()
+                            Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+                        }
+                        .font(PN.Font.caption).foregroundStyle(PN.C.accent)
+                    }
+                    .buttonStyle(.plain).help(L("reassign.help"))
+                    if !model.liveCallLine.isEmpty {
+                        Text("· " + model.liveCallLine).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
+                    }
+                }
+            } else if !model.liveLine.isEmpty {
                 Text(model.liveLine).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
             }
             HStack(spacing: 6) {
@@ -368,9 +392,7 @@ struct MenuBarPanel: View {
         // call without a project asks first in the call form (Prepare mode).
         model.run { app in
             let m = c.ahead.setup()
-            if m.target.isEmpty { StartCallWindow.show(delegate: app, prepared: m, mode: .prepare); return }
-            UpNext.shared.save(m)
-            SheetPrepWindow.show(m)
+            StartCallWindow.getReady(m)      // A1 (2026-11-14): one way in, the same as Home
         }
     }
 

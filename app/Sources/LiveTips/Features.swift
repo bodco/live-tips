@@ -13,7 +13,7 @@ enum FeatureRegistry {
     static var app: AppDelegate? { NSApp.delegate as? AppDelegate }
 
     static var all: [Feature] { [
-        Feature(id: "start", event: "call_started", hasWhen: false) { if let a = app { StartCallWindow.show(delegate: a) } },
+        Feature(id: "start", event: "call_started", hasWhen: false) { if let a = app { StartCallWindow.startNow(delegate: a) } },
         Feature(id: "prepare", event: "prepare_run", hasWhen: true) { if let a = app { StartCallWindow.show(delegate: a, planOnly: true) } },
         Feature(id: "presentation", event: "presentation_mode_on", hasWhen: true) { startWith(type: "presentation") },
         Feature(id: "rehearse", event: "rehearsal_started", hasWhen: true) { startWith(type: "presentation") },
@@ -39,7 +39,7 @@ enum FeatureRegistry {
         let m = StartCallModel()
         if !type.isEmpty { m.callType = type }
         if sales { m.salesEnabled = true }
-        StartCallWindow.show(delegate: a, prepared: m)
+        StartCallWindow.startNow(delegate: a, prepared: m)      // A1: Meeting Sheet Quick (the old form only during a call)
     }
 
     static func tryIt(_ f: Feature) {

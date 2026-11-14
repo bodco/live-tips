@@ -489,6 +489,11 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 .briefbar .bb-s { font-size: 11px; color: var(--text-3); }
 .briefbar .bb-prog { display: block; height: 3px; border-radius: 2px; background: var(--surface-2); margin-top: 3px; overflow: hidden; }
 .briefbar .bb-prog span { display: block; height: 100%; background: var(--brand); }
+/* 0.10.1 (A3): the call's project line, for a call started without a project */
+.projbar { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-bottom: 1px solid var(--separator); font-size: 12px; color: var(--text-2); }
+.projbar[hidden] { display: none; }
+.projbar .pb-t b { color: var(--text); font-weight: 600; }
+.projbar .lnk { border: 0; background: none; padding: 0; color: var(--accent); font-size: 12px; font-weight: 500; cursor: default; }
 
 /* 0.9.5: the call recording in the top bar */
 .recc{display:flex;align-items:center;gap:2px;position:relative}

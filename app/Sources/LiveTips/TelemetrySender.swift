@@ -20,6 +20,16 @@ import LiveTipsCore
     }
 
     static func start() {
+        // 0.10.1 (A6, D15): an update switched sharing on; say so once, with the way to turn it off
+        var c = AppConfig.load(from: AppPaths.config)
+        if c.shareUsageNote {
+            c.shareUsageNote = false
+            try? c.save(to: AppPaths.config)
+            SettingsWindow.model.config.shareUsageNote = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                MainActor.assumeIsolated { CallEngine.shared.notify(L("telemetry.nowOn"), settingsTab: "general") }
+            }
+        }
         tick()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in MainActor.assumeIsolated { tick() } }

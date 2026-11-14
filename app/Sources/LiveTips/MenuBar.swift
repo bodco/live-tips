@@ -63,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let file = n.userInfo?["file"] as? String ?? ""
                 let root = ce.callRequest["project_dir"] as? String ?? ""
                 CallHistory.shared.recordEnd(file: file, title: ce.renamed ?? (ce.callRequest["title"] as? String) ?? "Call",
-                                             project: self?.lastStatus.project ?? (root as NSString).lastPathComponent,
+                                             project: CallReassignService.shared.pendingName(for: file) ?? self?.lastStatus.project ?? (root as NSString).lastPathComponent,
                                              lines: n.userInfo?["lines"] as? Int ?? 0, cost: ce.lastCall["tips_usd"] as? Double)
                 SpendDays.add(ce.lastCall["tips_usd"] as? Double ?? 0)
                 self?.finishSwitch()
@@ -182,6 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func refresh() {
         let cfg = config
+        MainActor.assumeIsolated { CallReassignService.shared.tick() }     // 0.10.1 (A2): a live call's move waits for quiet
         IndexService.shared.configure(projects: ProjectRegistry.load(from: AppPaths.projects).projects, appRoot: appRoot,
                                       python: cfg.engine.python, enabled: cfg.localAI.enabled)
         let st = EngineStatus.load(path: (appRoot as NSString).appendingPathComponent("state/status.json"))
@@ -216,7 +217,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ? L("menubar.status.callLine", ["lines": "\(st.lines)", "tips": "\(st.tips)",
                                             "cost": String(format: "%.2f", st.callSpentUSD), "cap": String(format: "%.0f", cfg.budget.callHardUSD)])
             : ""
-        m.liveLine = failing ? L("menubar.status.audioFailing") : [st.project ?? "", callLine].filter { !$0.isEmpty }.joined(separator: " · ")
+        let liveProj = ce.lastFile.flatMap { CallReassignService.shared.pendingName(for: $0) } ?? st.project ?? ""
+        m.liveLine = failing ? L("menubar.status.audioFailing") : [liveProj, callLine].filter { !$0.isEmpty }.joined(separator: " · ")
+        m.liveProject = liveProj           // 0.10.1 (A3)
+        m.liveCallLine = callLine
+        m.liveFile = ce.isRunning ? ce.lastFile : nil
         let calls = AheadCall.list().map { a -> MenuBarModel.Call in
             let target = a.model.map { $0.target.isEmpty ? "" : $0.targetName } ?? ""
             let note = [target, a.event?.timeRange ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
@@ -243,7 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel?.place()
     }
 
-    @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.show(delegate: self) } }
+    @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.startNow(delegate: self) } }      // A1: Meeting Sheet Quick
 
     /// 0.9.6 (owner): the app's theme, "system" follows the Mac. Every window, the tips window included, takes it at once.
     static func applyAppearance(_ v: String) {

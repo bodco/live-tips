@@ -233,9 +233,14 @@ public struct AppConfig: Codable, Equatable {
     public var salesWebSearch = true
     /// 0.8.7 (M, rules/usage.yaml): the local log of which features are used (Settings > General > Privacy).
     public var usageLog = true
-    /// 0.9.4 (owner, rules/usage.yaml > telemetry): send the usage log to the author once a week. Off by default;
-    /// only event names and small numbers of complete days since it was turned on (Settings > General > Privacy).
-    public var shareUsage = false
+    /// 0.9.4 (owner, rules/usage.yaml > telemetry): send the usage log to the author once a week: only event names and
+    /// small numbers of complete days since it was turned on (Settings > General > Privacy).
+    /// 0.10.1 (A6, owner decision D15): on by default, for new installs and once for updates.
+    public var shareUsage = true
+    /// 0.10.1 (A6): the on-by-default was applied to this config (a config written before 0.10.1 has no such key).
+    public var shareUsageDefaulted = true
+    /// 0.10.1 (A6): an update switched sharing on; the app says so once at launch.
+    public var shareUsageNote = false
     /// 0.8.6 (D, rules/notion-tasks.yaml): the PM's Notion tasks in On you.
     public var notionTasks = NotionTasksSettings()
     /// Speaker identification on the other side's audio (local voice prints, as in the skill).
@@ -310,6 +315,13 @@ public struct AppConfig: Codable, Equatable {
         salesWebSearch = (try? c.decode(Bool.self, forKey: .salesWebSearch)) ?? d.salesWebSearch
         usageLog = (try? c.decode(Bool.self, forKey: .usageLog)) ?? d.usageLog
         shareUsage = (try? c.decode(Bool.self, forKey: .shareUsage)) ?? d.shareUsage
+        shareUsageNote = (try? c.decode(Bool.self, forKey: .shareUsageNote)) ?? false
+        if (try? c.decode(Bool.self, forKey: .shareUsageDefaulted)) != true {
+            // 0.10.1 (A6, D15): an older config. Sharing goes on once, unless the local usage log itself is off (a clear
+            // "keep it to myself"); the app tells the PM at the next launch, with the way to turn it off.
+            if usageLog && !shareUsage { shareUsage = true; shareUsageNote = true }
+        }
+        shareUsageDefaulted = true
         migrateMeetingsDBs()
         notionTasks = (try? c.decode(NotionTasksSettings.self, forKey: .notionTasks)) ?? d.notionTasks
         speakersEnabled = (try? c.decode(Bool.self, forKey: .speakersEnabled)) ?? d.speakersEnabled

@@ -913,6 +913,27 @@ tmS.sentAt = "2026-11-12T09:00:00Z"
 expect(Telemetry.due(tmS, now: tmNow).map { $0.from + ".." + $0.to } == "2026-11-18..2026-11-19", "telemetry: the days after the last batch")
 let tmR = Telemetry.ensured(Telemetry.State(), now: tmNow)
 expect(tmR.install.count == 36 && Telemetry.ensured(tmR, now: tmNow.addingTimeInterval(40 * 86400)).install == tmR.install, "telemetry: one id per install, kept")
+// 0.10.1 (A6, D15): on by default; an older config is switched on once and told, unless its usage log is off
+func telemetryDefault0101() {
+    let dec = { (j: String) in try? JSONDecoder().decode(AppConfig.self, from: Data(j.utf8)) }
+    expect(AppConfig().shareUsage && AppConfig().shareUsageDefaulted && !AppConfig().shareUsageNote, "telemetry 0.10.1: on for a new install, nothing to tell")
+    let upd = dec("{\"usageLog\":true,\"shareUsage\":false}")
+    expect(upd?.shareUsage == true && upd?.shareUsageNote == true && upd?.shareUsageDefaulted == true, "telemetry 0.10.1: an update turns it on once and says so")
+    let noLog = dec("{\"usageLog\":false,\"shareUsage\":false}")
+    expect(noLog?.shareUsage == false && noLog?.shareUsageNote == false, "telemetry 0.10.1: the usage log off keeps sharing off")
+    let was = dec("{\"usageLog\":true,\"shareUsage\":true}")
+    expect(was?.shareUsage == true && was?.shareUsageNote == false, "telemetry 0.10.1: already on, nothing to tell")
+    let off = dec("{\"usageLog\":true,\"shareUsage\":false,\"shareUsageDefaulted\":true}")
+    expect(off?.shareUsage == false && off?.shareUsageNote == false, "telemetry 0.10.1: turned off after the default stays off")
+    if let u = upd, let d = try? JSONEncoder().encode(u), let again = try? JSONDecoder().decode(AppConfig.self, from: d) {
+        var a2 = again; a2.shareUsage = false; a2.shareUsageNote = false
+        let back = (try? JSONEncoder().encode(a2)).flatMap { try? JSONDecoder().decode(AppConfig.self, from: $0) }
+        expect(back?.shareUsage == false, "telemetry 0.10.1: the default is applied once, a later off survives a reload")
+    }
+    expect(UsageLog.line("call_reassign", ["when": "after", "files": 7]) != nil && UsageLog.line("rec_saved", ["kind": "audio", "minutes": 30]) != nil,
+           "usage 0.10.1: events the app logs are allowed")
+}
+telemetryDefault0101()
 let tmDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("pn-tm-\(UUID().uuidString)")
 try? FileManager.default.createDirectory(at: tmDir, withIntermediateDirectories: true)
 try? """
@@ -1803,6 +1824,99 @@ func f78() {
     }
 }
 
+/// 0.10.1 (A2): moving a call to another project (CallReassign) and its register items (op move).
+func callReassign0101() {
+    let fm = FileManager.default
+    let base = NSTemporaryDirectory() + "pn-reassign-" + UUID().uuidString
+    let a = base + "/orbit", b = base + "/my-calls"
+    for d in [a + "/live", a + "/video", b + "/live", a + "/live/2026-11-14-1000-weekly.app.judge"] { try? fm.createDirectory(atPath: d, withIntermediateDirectories: true) }
+    let key = "2026-11-14-1000-weekly"
+    let mine = [key + ".app.md", key + ".app.brief.md", key + ".app.tips.jsonl", key + ".md", key + ".notes.md", key + ".app.notion.json"]
+    let other = [key + "-sync.app.md", "2026-11-14-1000-weekly2.md", "commitments.jsonl", "prep-2026-11-14-1000-weekly.brief.md"]
+    for n in mine + other { fm.createFile(atPath: a + "/live/" + n, contents: Data("x".utf8)) }
+    fm.createFile(atPath: a + "/live/" + key + ".app.judge/judge.summary.json", contents: Data("{}".utf8))
+    for n in [key + ".recording.json", key + ".recording.mp4", key + ".recording-2.m4a", key + "-sync.recording.mp4"] {
+        fm.createFile(atPath: a + "/video/" + n, contents: Data("v".utf8))
+    }
+    let file = a + "/live/" + key + ".app.md"
+    expect(CallReassign.key(file) == key, "A2: key drops .app and .md")
+    expect(CallReassign.root(of: file) == a, "A2: root of a transcript")
+    expect(CallReassign.belongs(key + ".app.tips.jsonl", key: key) && !CallReassign.belongs(key + "-sync.app.md", key: key), "A2: belongs by name and dot")
+    expect(CallReassign.plan(file: file, toRoot: a).sameProject && !CallReassign.plan(file: file, toRoot: a).canApply, "A2: same project is not a move")
+    var p = CallReassign.plan(file: file, toRoot: b)
+    expect(p.moves.count == mine.count + 1 + 3, "A2: plan moves the call's live files, the judge folder and 3 recording files (\(p.moves.count))")
+    expect(p.collisions.isEmpty && p.canApply, "A2: no collisions")
+    expect(p.newFile == b + "/live/" + key + ".app.md", "A2: new transcript path")
+    // collision: nothing moves
+    fm.createFile(atPath: b + "/live/" + key + ".notes.md", contents: Data("y".utf8))
+    p = CallReassign.plan(file: file, toRoot: b)
+    expect(p.collisions == [b + "/live/" + key + ".notes.md"] && !p.canApply, "A2: collision found")
+    var threw = false
+    do { try CallReassign.apply(p) } catch CallReassign.Failure.collision(let c) { threw = c.count == 1 } catch {}
+    expect(threw && fm.fileExists(atPath: file), "A2: a collision moves nothing")
+    try? fm.moveItem(atPath: b + "/live/" + key + ".notes.md", toPath: base + "/aside.md")
+    p = CallReassign.plan(file: file, toRoot: b)
+    let done = (try? CallReassign.apply(p)) ?? []
+    expect(done.count == p.moves.count, "A2: all moved")
+    expect(!fm.fileExists(atPath: file) && fm.fileExists(atPath: p.newFile), "A2: transcript in the new project")
+    expect(fm.fileExists(atPath: b + "/live/" + key + ".app.judge/judge.summary.json"), "A2: judge folder moved whole")
+    expect(fm.fileExists(atPath: b + "/video/" + key + ".recording-2.m4a"), "A2: recording moved to the new video folder")
+    expect(other.allSatisfy { fm.fileExists(atPath: a + "/live/" + $0) } && fm.fileExists(atPath: a + "/video/" + key + "-sync.recording.mp4"), "A2: other calls and the prep original stay")
+    // rollback: the second move fails (its source is gone), the first goes back
+    let r1 = base + "/r1.txt", r2 = base + "/r2-missing.txt"
+    fm.createFile(atPath: r1, contents: Data("1".utf8))
+    var rp = CallReassign.Plan(file: r1, newFile: base + "/x/r1.txt", key: "r", fromRoot: base, toRoot: base + "/x")
+    rp.moves = [CallReassign.Move(from: r1, to: base + "/x/r1.txt"), CallReassign.Move(from: r2, to: base + "/x/r2.txt")]
+    var failed = false
+    do { try CallReassign.apply(rp) } catch CallReassign.Failure.moveFailed { failed = true } catch {}
+    expect(failed && fm.fileExists(atPath: r1) && !fm.fileExists(atPath: base + "/x/r1.txt"), "A2: rollback on failure")
+    // sweep: a late file in the old project follows; an existing name stays
+    fm.createFile(atPath: a + "/live/" + key + ".app.speakers.json", contents: Data("s".utf8))
+    fm.createFile(atPath: a + "/live/" + key + ".app.brief.md", contents: Data("late twin".utf8))
+    let sw = CallReassign.sweep(key: key, fromRoot: a, toRoot: b)
+    expect(sw.count == 1 && fm.fileExists(atPath: b + "/live/" + key + ".app.speakers.json"), "A2: sweep moves late files")
+    expect(fm.fileExists(atPath: a + "/live/" + key + ".app.brief.md"), "A2: sweep never overwrites")
+    // waiting for quiet
+    let now = Date()
+    expect(!CallReassign.readyToMove(callLive: true, lastWrite: nil, now: now), "A2: not during the call")
+    expect(!CallReassign.readyToMove(callLive: false, lastWrite: now.addingTimeInterval(-10), now: now), "A2: files still written")
+    expect(CallReassign.readyToMove(callLive: false, lastWrite: now.addingTimeInterval(-61), now: now), "A2: quiet after 60 s")
+    var pend = CallReassign.Pending(file: file, toRoot: b, toTarget: "project:x", toName: "X", requested: now)
+    expect(!CallReassign.sweepDone(pend, now: now), "A2: not moved yet")
+    pend.moved = now.addingTimeInterval(-31 * 60)
+    expect(CallReassign.sweepDone(pend, now: now) && pend.key == key && pend.fromRoot == a, "A2: sweeps end after 30 min")
+    // the register: the call's items go along, others stay; both registers stay append-only
+    let la = a + "/live", lb = b + "/live"
+    try? fm.removeItem(atPath: la + "/commitments.jsonl")
+    let c1 = CommitmentRegister.makeID(call: file, owner: "me", text: "Send the deck to Mike")
+    let c2 = CommitmentRegister.makeID(call: file, owner: "Emily", text: "Check the budget")
+    let c3 = CommitmentRegister.makeID(call: la + "/2026-11-13-0900-other.app.md", owner: "me", text: "Other call item")
+    CommitmentRegister.append(folder: la, [
+        ["op": "add", "id": c1, "text": "Send the deck to Mike", "owner": "me", "project": "orbit", "series": "orbit|weekly", "call": file, "created": "2026-11-14T10:05:00+02:00"],
+        ["op": "add", "id": c2, "text": "Check the budget", "owner": "Emily", "project": "orbit", "series": "orbit|weekly", "call": key + ".md", "created": "2026-11-14T10:06:00+02:00"],
+        ["op": "add", "id": c3, "text": "Other call item", "owner": "me", "project": "orbit", "call": "2026-11-13-0900-other.app.md", "created": "2026-11-13T09:05:00+02:00"],
+        ["op": "done", "id": c1, "at": "2026-11-14T11:00:00+02:00", "source": "manual"]])
+    let before = (try? String(contentsOfFile: la + "/commitments.jsonl", encoding: .utf8)) ?? ""
+    let n = CommitmentRegister.moveCall(file, from: la, to: lb, project: "my-calls", title: "Weekly")
+    expect(n == 2, "A2: two items of the call moved (\(n))")
+    let after = (try? String(contentsOfFile: la + "/commitments.jsonl", encoding: .utf8)) ?? ""
+    expect(after.hasPrefix(before), "A2: the old register only grew")
+    expect(CommitmentRegister.load(folder: la).map(\.id) == [c3], "A2: only the other call's item stays")
+    let nb = CommitmentRegister.load(folder: lb)
+    expect(Set(nb.map(\.id)) == [c1, c2], "A2: both items in the new register")
+    expect(nb.first { $0.id == c1 }?.status == "done", "A2: later ops go along (done)")
+    expect(nb.allSatisfy { $0.project == "my-calls" && $0.series == "my-calls|weekly" }, "A2: new project and series")
+    expect(nb.first { $0.id == c1 }?.call == lb + "/" + key + ".app.md", "A2: a full call path points to the new folder")
+    expect(nb.first { $0.id == c2 }?.call == key + ".md", "A2: a bare call name stays")
+    expect(CommitmentRegister.moveCall(file, from: la, to: lb, project: "my-calls") == 0, "A2: moving again moves nothing")
+    // and back: the old register holds them again, once
+    let back = CommitmentRegister.moveCall(lb + "/" + key + ".app.md", from: lb, to: la, project: "orbit", title: "Weekly")
+    let na = CommitmentRegister.load(folder: la)
+    expect(back == 2 && Set(na.map(\.id)) == [c1, c2, c3] && na.count == 3, "A2: moved back once")
+    expect(na.first { $0.id == c1 }?.status == "done" && CommitmentRegister.load(folder: lb).isEmpty, "A2: state kept, new register empty")
+    try? fm.removeItem(atPath: base)
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -1815,5 +1929,6 @@ aiChain0100()
 sheetFolders0100()
 fix77()
 f78()
+callReassign0101()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

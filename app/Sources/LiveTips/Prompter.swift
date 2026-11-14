@@ -674,9 +674,28 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         }
     }
     var onYouSent = ""
+    var projectSent = ""
+    /// 0.10.1 (A3, roadmap п.9): "Project: My calls · Change" under the header, for a call started without a project
+    /// (an unbound calendar event, Start now) and after the PM changed it. Every 10 s with On me, and after a change.
+    func pushProject() {
+        guard !transcriptPath.isEmpty else { return }
+        let file = transcriptPath
+        let d: [String: Any] = MainActor.assumeIsolated {
+            let svc = CallReassignService.shared
+            let pending = svc.pendingName(for: file)
+            let unbound = svc.target(for: file) == "workspace:" + ProjectRegistry.defaultWorkspaceName
+            return ["name": pending ?? CallEngine.shared.projectName, "show": CallEngine.shared.isRunning && (unbound || pending != nil),
+                    "label": L("reassign.tips.label"), "change": L("reassign.tips.change")]
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: d, options: [.sortedKeys]), let js = String(data: data, encoding: .utf8),
+              js != projectSent else { return }
+        projectSent = js
+        push("window.LiveTips && LiveTips.setProject && LiveTips.setProject(" + js + ")")
+    }
     /// The On me tab's outside groups (open register items of earlier calls and the PM's Notion tasks), every 10 s.
     func pushOnYou() {
         guard !transcriptPath.isEmpty else { return }
+        pushProject()
         let folder = (transcriptPath as NSString).deletingLastPathComponent, file = transcriptPath
         let target = Self.callTarget()
         let payload: [String: Any] = MainActor.assumeIsolated {
@@ -892,6 +911,9 @@ extension PrompterController {
             // 0.9.0 (rules/live_prep.yaml): Prepare now / Prepare again / Cancel from the brief strip
             MainActor.assumeIsolated {
                 if (d["a"] as? String) == "cancel" { LivePrep.cancel() }
+                else if (d["a"] as? String) == "open" {      // 0.10.1 (A4): the Meeting Sheet in live mode, no modal
+                    if let e = LivePrep.openSheet() { push("window.toastMsg && window.toastMsg(" + jsString(e) + ")") }
+                }
                 else if let e = LivePrep.start() { push("window.toastMsg && window.toastMsg(" + jsString(e) + ")") }
             }
         case "shorter":
@@ -1052,6 +1074,9 @@ extension PrompterController {
                 MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.openHome() }
                 window.close()           // the call goes on; Tips in the floating controls or the menu bar opens it again
             case "settings": MainActor.assumeIsolated { CallSettingsWindow.show(for: self) }
+            case "project":      // 0.10.1 (A3): "Project: My calls · Change"
+                let f = transcriptPath
+                if !f.isEmpty { MainActor.assumeIsolated { ReassignPanel.show(file: f) } }
             case "switch-call":
                 MainActor.assumeIsolated {
                     guard let app = NSApp.delegate as? AppDelegate else { return }

@@ -85,3 +85,29 @@ def test_heard_text_drops_who_asks():
     assert codriver.heard_text("Mike asks if we will be over 10,000 transactions") == "whether we will be over 10,000 transactions"
     assert codriver.heard_text("Emily питає: коли старт?") == "коли старт?"
     assert codriver.heard_text("When does 3DS start?") == "When does 3DS start?"
+
+
+# Z3 (2026-11-14): names, primer language and emoji, heard only for questions
+def test_z3_looks_like_question():
+    from livetips_m0 import codriver
+    assert codriver.looks_like_question("Can we move the demo to Friday?")
+    assert codriver.looks_like_question("коли буде реліз")
+    assert codriver.looks_like_question("whether the sandbox has one location")
+    assert not codriver.looks_like_question("у sandbox одне розташування")
+    assert not codriver.looks_like_question("The sandbox has one location")
+    assert not codriver.looks_like_question("")
+
+
+def test_z3_primer_gist_emoji():
+    from livetips_m0 import codriver
+    assert codriver.primer_gist("🟢 Billing: two invoices open").startswith("📌 Billing")
+    assert codriver.primer_gist("Billing: open") == "📌 Billing: open"
+    assert codriver.primer_gist("📌 Billing") == "📌 Billing"
+
+
+def test_z3_event_names_and_lang():
+    from livetips_m0 import codriver
+    ev = codriver.event_for("topic_primer", topic="billing", lang="Ukrainian")
+    assert "exactly as the transcript" in ev and "in Ukrainian" in ev
+    assert "exactly as the transcript" in codriver.event_for("question_any", who="Emily")
+    assert "Names (Z3" in codriver.ADDRESS_CODRIVER

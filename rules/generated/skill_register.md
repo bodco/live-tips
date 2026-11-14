@@ -13,6 +13,7 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - `drop`: `{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}`
 - `link`: `{"v":1,"op":"link","id":"<id>","notion_page":"<Notion page id>","at":"<ISO time>"}`
 - `unlink`: `{"v":1,"op":"unlink","id":"<id>","at":"<ISO time>","reason":"removed|undo"}`
+- `move`: `{"v":1,"op":"move","id":"<id>","to":"<project slug>","at":"<ISO time>"}`
 - `edit`: `{"v":1,"op":"edit","id":"<id>","at":"<ISO time>","text":"<new text, optional>","owner":"me|<name>, optional","due":"<new due, optional>"}`
 - id: `c-<first 10 hex characters of sha1 of: call file name without .app, owner, text in lower case>`; series: `<project slug>|<call title in lower case, letters and digits only>`.
 - Owner: me = what the PM took on (the call picture's actions). A name = what someone else promised the PM or the PM's team on this call ("on them"). General team to-dos and other people's updates about their own work are not commitments.

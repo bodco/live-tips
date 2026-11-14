@@ -1309,6 +1309,8 @@ class Engine:
             if run.trigger == "topic_primer" and not obj.get("items"):
                 span["gist"] = obj.get("gist")
                 return "primer_no_facts"           # a topic card retelling the talk, with nothing from the sources
+            if run.trigger == "topic_primer":
+                obj["gist"] = codriver.primer_gist(obj.get("gist"))     # Z3: 📌, never 🟢
         run.obj = obj
         for step in (self._tip_blocked, self._tip_vetoed, self._tip_stale, self._tip_unseen_number, self._tip_aip_repeat,
                      self._tip_diet):
@@ -2178,10 +2180,10 @@ class Engine:
                     return "reflect_same_topic"
                 self.cd_reflect_at = now
                 self.cd_reflect_topics.append(topic)
-            span["event"] = codriver.event_for("reflect", who=who)
+            span["event"] = codriver.event_for("reflect", who=who, lang="Ukrainian" if self._ui_uk() else "English")
             return None
         text = " ".join(h.text for h in self._after_tail(line))
-        span["event"] = codriver.event_for("question_any", who=who, passages=self._quick_passages(text))
+        span["event"] = codriver.event_for("question_any", who=who, passages=self._quick_passages(text), lang="Ukrainian" if self._ui_uk() else "English")
         span["rate_exempt"] = True
         return None
 
@@ -2195,6 +2197,9 @@ class Engine:
         """A real question the context does not answer: a card at once, then the search's answer (found or not)."""
         q = codriver.heard_text(obj.get("heard"))
         now = self.clock()
+        if not codriver.looks_like_question(q):       # Z3 (2026-11-14): never a heard card for a statement
+            span["heard"] = "not_question"
+            return
         with self.lock:
             if any(codriver.same_question(q, x) and now - at < 240 for x, at in self.cd_heard):
                 span["heard"] = "dup"
@@ -2242,7 +2247,8 @@ class Engine:
         self.futures.append(self.pool.submit(self._run_primer, line, topic, span))
 
     def _run_primer(self, line: Line, topic: str, span: dict) -> None:
-        span["event"] = codriver.event_for("topic_primer", topic=topic, passages=self._quick_passages(topic))
+        span["event"] = codriver.event_for("topic_primer", topic=topic, passages=self._quick_passages(topic),
+                                           lang="Ukrainian" if self._ui_uk() else "English")
         span["rate_exempt"] = True
         self._run_tip(line, "topic_primer", span)
 

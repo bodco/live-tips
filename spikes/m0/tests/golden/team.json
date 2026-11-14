@@ -59,7 +59,7 @@
 "input": 100,
 "line_id": 1,
 "model": "fake-sonnet",
-"output": 36,
+"output": 37,
 "reasoning": null,
 "retried": null,
 "role": "tip",
@@ -67,7 +67,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 14\", \"level\": \"info\", \"phrase\": \"We ship it on Tuesday, 8 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
+"text_head": "{\"gist\": \"Tip 26\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 6 users.\", \"topic\": \"topic 3\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
 "usd": null
 },
 {
@@ -2748,7 +2748,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "157c0a604f9a"
+"user_sha": "f7e1ae6b62e7"
 },
 {
 "model": "fake-haiku",
@@ -3373,8 +3373,8 @@
 {
 "available_at": 36015.0,
 "context_revision": 0,
-"event": "topic_primer. The talk has moved to a new topic: \"release plan\". The PM may remember nothing about it. Give ONE info tip that works like a prompter: gist '📌 ' + the topic and where it stands BY THE SOURCES (not a retelling of what was just said aloud), one plain sentence; items = up to 3 short lines the PM knows about it from the brief, the fact book, the cards, the project state or PROJECT PASSAGES (status, numbers, owners, dates, what was agreed before, what is open), each with no invented number; phrase = one thing the PM can say or ask now about it. Skip when nothing in the context is about this topic beyond what was said aloud, or tips_given already covers it.",
-"gist": "Tip 14",
+"event": "topic_primer. The talk has moved to a new topic: \"release plan\". The PM may remember nothing about it. Give ONE info tip that works like a prompter: gist '📌 ' + the topic and where it stands BY THE SOURCES (not a retelling of what was just said aloud), one plain sentence; items = up to 3 short lines the PM knows about it from the brief, the fact book, the cards, the project state or PROJECT PASSAGES (status, numbers, owners, dates, what was agreed before, what is open), each with no invented number; phrase = one thing the PM can say or ask now about it. Skip when nothing in the context is about this topic beyond what was said aloud, or tips_given already covers it. Write each person's name exactly as the transcript spells it, never shortened, translated or replaced by a name from the examples. Write gist, why and items in English; phrase in the language of the call.",
+"gist": "📌 Tip 26",
 "gist_at": 36015.0,
 "line_id": 1,
 "outcome": "diet_phrase_repeat",

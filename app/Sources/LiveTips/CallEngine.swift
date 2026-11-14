@@ -735,6 +735,32 @@ final class CallEngine {
         }
     }
 
+    /// 0.10.1 (A2): the live call now belongs to another project. The recorder and the tips engine go on writing
+    /// where they are (the files move after the call); the Notion page, Home and the history use the new project.
+    func retarget(root: String, slug: String, workspace: String, config: String) {
+        callRequest["project_dir"] = root
+        callRequest["slug"] = slug
+        callRequest["workspace"] = workspace
+        callRequest["project_config"] = config
+        projectConfig = config
+        projectRoot = root
+        if !isRunning, lastFile != nil { rememberLastCall(file: lastFile!) }
+    }
+
+    /// 0.10.1 (A2): a call's files moved; the last call (Send last call to Notion) follows them.
+    func callMoved(from old: String, to new: String, root: String, config: String) {
+        if lastFile == old {
+            lastFile = new
+            callRequest["project_dir"] = root
+            projectConfig = config
+            rememberLastCall(file: new)
+        } else if let d = FileManager.default.contents(atPath: notionCallPath),
+                  var o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], (o["file"] as? String) == old {
+            o["file"] = new; o["project_dir"] = root; o["config"] = config
+            if let out = try? JSONSerialization.data(withJSONObject: o) { try? out.write(to: URL(fileURLWithPath: notionCallPath)) }
+        }
+    }
+
     func stop() {
         if let s = usageStart { UsageLog.log("call_ended", ["minutes": Int(Date().timeIntervalSince(s) / 60)]); usageStart = nil }
         lastCallSummary = ""

@@ -238,7 +238,7 @@ struct HomeView: View {
             if !live {
                 // 0.9.1 (owner): one split button, the arrow is part of the blue button, not a loose chevron
                 HStack(spacing: 0) {
-                    Button { StartCallWindow.show(delegate: app) } label: {
+                    Button { StartCallWindow.startNow(delegate: app) } label: {
                         Text(L("home.startCallNow")).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                             .padding(.leading, 14).padding(.trailing, 12).frame(height: 32).contentShape(Rectangle())
                     }
@@ -496,7 +496,7 @@ struct HomeView: View {
             HStack(spacing: 14) {
                 if !preparing {
                     link(hasBrief ? L("talk.prepareAgain") : L("bb.prepareNow")) {
-                        if let e = LivePrep.start() { note = e }
+                        if let e = LivePrep.openSheet() { note = e }      // 0.10.1 (A4): the Meeting Sheet in live mode
                     }
                 }
                 link(L("menubar.endCall")) { app.endCall() }
@@ -803,9 +803,7 @@ struct HomeView: View {
     /// 0.10.0 (Meeting Sheet, phase 4): a call with its project known opens Quick or Expert at once.
     private func prepare(_ r: Ahead) {
         let m = model(for: r)
-        if m.target.isEmpty { StartCallWindow.show(delegate: app, prepared: m, mode: .prepare); return }
-        upnext.save(m)
-        SheetPrepWindow.show(m)
+        StartCallWindow.getReady(m)      // A1: no old Prepare form, a call without a project opens Expert step 1
     }
 
     private func start(_ r: Ahead) {
@@ -884,6 +882,7 @@ struct RecentCard: View {
             Button(L("call.page.followup")) { FollowUpWindow.show(file: r.file) }
             if series > 1 { Button(L("call.page.series", ["n": "\(series)"])) { SeriesWindow.show(record: r) } }
             Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.file)]) }
+            Button(L("reassign.menu")) { ReassignPanel.show(file: r.file) }      // 0.10.1 (A3)
             Divider()
             Button(L("home.recent.hide"), action: onHide)
         }
@@ -1024,6 +1023,7 @@ struct RecentRow: View {
             Button(L("call.page.followup")) { FollowUpWindow.show(file: r.file) }
             if series > 1 { Button(L("call.page.series", ["n": "\(series)"])) { SeriesWindow.show(record: r) } }
             Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.file)]) }
+            Button(L("reassign.menu")) { ReassignPanel.show(file: r.file) }      // 0.10.1 (A3)
             Divider()
             Button(L("home.recent.hide"), action: onHide)
         }

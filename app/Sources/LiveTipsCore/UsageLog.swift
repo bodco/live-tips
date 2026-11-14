@@ -53,6 +53,9 @@ public enum UsageLog {
         "google_connect": [], "google_links_read": ["n"], "google_export": [], "google_meet": ["transcript"],
         "tip_rated": ["kind", "verdict", "reason"], "speakers_merged": ["aliases"], "meet_participants": ["n", "named"],
         "telemetry_sent": ["lines"],
+        // 0.10.1 (A6 audit): events the app already logged but this list did not have, so they were never written
+        "rec_started": ["kind", "source"], "rec_paused": [], "rec_saved": ["kind", "minutes"], "rec_uploaded": ["minutes", "auto"],
+        "call_reassign": ["when", "files"], "call_reassign_notion": ["kind"], "meeting_end": ["action"], "google_picker_copy": [],
     ]
     public static var sink: UsageSink?
     public static var enabled = true

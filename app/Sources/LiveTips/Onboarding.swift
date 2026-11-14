@@ -409,6 +409,7 @@ struct OnboardingView: View {
                     .padding(6).background(RoundedRectangle(cornerRadius: 6).fill(PN.C.surface2))
                 Text(L("onboarding.done.menubarHint")).font(PN.Font.body).foregroundStyle(PN.C.text2)
             }
+            OnboardingTelemetryRow()          // 0.10.1 (A6, D15): on by default, said here with the switch
             // 0.8.7 (L3): the three shortcuts, shown again on the first call
             VStack(alignment: .leading, spacing: 4) {
                 Text(L("onb.done.keys", ["h": HotKeys.shared.combo(.help).display, "l": HotKeys.shared.combo(.proactive).display]))
@@ -562,5 +563,30 @@ struct SystemAudioSettingsPicture: View {
         .padding(.horizontal, 5).padding(.vertical, 3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(selected ? PN.C.accent : Color.clear, in: RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+/// 0.10.1 (A6, owner decision D15): Help improve Pacenote is on from the first launch; onboarding says what goes and
+/// lets the PM turn it off right there (the same switch as Settings > General > Privacy).
+struct OnboardingTelemetryRow: View {
+    @State private var on = AppConfig.load(from: AppPaths.config).shareUsage
+
+    var body: some View {
+        Toggle(isOn: $on) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L("telemetry.toggle")).font(PN.Font.body.weight(.medium))
+                Text(L("telemetry.onb.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .toggleStyle(.switch)
+        .onChange(of: on) {
+            var c = AppConfig.load(from: AppPaths.config)
+            c.shareUsage = on
+            if on { c.usageLog = true }
+            try? c.save(to: AppPaths.config)
+            SettingsWindow.model.config.shareUsage = on
+            if on { SettingsWindow.model.config.usageLog = true }
+            TelemetrySender.setOn(on)
+        }
     }
 }

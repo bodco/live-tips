@@ -19,6 +19,27 @@ final class HomeNav: ObservableObject {
     }
     @Published var path: [Route] = []
     @Published var followUp: String?         // the call page whose follow-up panel is open (A3)
+    private var reassigned: Any?
+
+    init() {
+        // 0.10.1 (A3, roadmap п.9): a call moved to another project; its open screens follow the new path
+        reassigned = NotificationCenter.default.addObserver(forName: CallReassignService.changed, object: nil, queue: .main) { n in
+            guard let old = n.userInfo?["old"] as? String, let new = n.userInfo?["file"] as? String else { return }
+            MainActor.assumeIsolated { HomeNav.shared.retarget(old, to: new) }
+        }
+    }
+
+    func retarget(_ old: String, to new: String) {
+        path = path.map { r in
+            switch r {
+            case .call(let f) where f == old: return .call(new)
+            case .series(let f) where f == old: return .series(new)
+            case .transcript(let f, let at) where f == old: return .transcript(new, at)
+            default: return r
+            }
+        }
+        if followUp == old { followUp = new }
+    }
 
     func open(_ r: Route) {
         if let app = NSApp.delegate as? AppDelegate { HomeWindow.show(delegate: app) }

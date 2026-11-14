@@ -3,6 +3,54 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased (0.10.1)
+
+- **Every way into a preparation opens the Meeting Sheet (2026-11-14, owner):** "Start a call now" on Home (⌘N), "Start
+  a call" in the menu bar menu and "Try it" for calls in Features opened the old call form. They now open the Meeting
+  Sheet in Quick, with a Project row at the top (marked "Needs you" until a project is chosen) and "Start without
+  prep" for a call that starts right away. "Plan a call" opens the Meeting Sheet in Expert at the Meeting step, with
+  Save to keep the call in Up next without preparing it. Get ready for a call without a project opens Expert at the
+  Meeting step, where the project is chosen, instead of the old Prepare form. The setup of an upcoming call and every
+  form show the same "Preparation: Meeting Sheet" block. During a live call the old form stays: it is the one that can
+  switch to another call.
+- **Co-driver cards: names as spoken, topic cards in your language, "heard" only for questions (2026-11-14):**
+  the tips AI shortened or anglicized names it heard (it wrote a short English name for a longer one); it now keeps
+  every name exactly as the transcript spells it. Topic cards (📌) are written in the language of the tips window,
+  and always start with 📌. A "heard, searching" card no longer appears for a statement: it needs a question mark or a
+  question word.
+- **Quick, done: facts are trimmed again (2026-11-14):** the short sheet in Quick showed long facts in full and in the
+  default style; they are back to three lines in the body style.
+
+- **A call can move to another project (core, 2026-11-14):** moving a call takes all its files (transcript, the
+  skill's twin, preparation, tips, notes, Notion links, judge, recording parts) from one project's folder to the other,
+  together with its tasks in the commitments register, Home's history, the series memory (the next call of the series
+  starts in the new project) and the search index. Nothing is copied or deleted; if a file with the same name is
+  already there, nothing moves, and a failed move puts back what had moved. During a call the project changes at once
+  (the Notion page and Home use it) and the files follow after the call, once nothing writes next to the transcript;
+  files written later (notes, judge) follow for 30 minutes. The commitments register gets a new event, "move"; the
+  skill reads it the same way. The buttons to do it come next (0.10.1, A3).
+- **Change a call's project from the app (2026-11-14):** the project on the call page is now a picker (the same list as
+  in Quick and Expert), and the page's "…" menu, Home > Recent calls (right click) and the menu bar during a call (click
+  the project name) have "Change project…". A call started without a project shows "Project: My calls · Change" under
+  the tips window's header. In Notion the call's meeting page gets the new Project and Workspace on the same page, and
+  so do the decisions and risks it made; nothing is duplicated. When the new project keeps its meetings in another
+  Notion database, Pacenote asks first and only then writes a new page there (a new summary) with a "Moved to" link on
+  the old one.
+- **Prepare again during a call opens the Meeting Sheet (2026-11-14):** "Prepare again" and "Prepare now" in the tips
+  window, on Home's live card and (new) in the menu bar during a call open the Meeting Sheet in Quick, in its own window
+  next to the tips: change the goal, the sources or the preset, then Prepare. What was said so far joins the sources and
+  the tips switch to the new sheet when it is ready. "Prepare again with the same setup" runs the last setup at once.
+- **Quick asks for the basics (2026-11-14):** Quick now has the meeting's name, date and time, and both sides' people,
+  the same fields as Expert's Meeting step, and an Add button for sources. With no sources it no longer says "Ok": it
+  says what the sheet will rest on (the meeting details, the project and your note) and marks the row "Thin".
+- **Help improve Pacenote is on by default (2026-11-14, owner):** new installs start with it on, and the last
+  onboarding step says what goes (event names and numbers once a week, never the words of a call, tip texts, your
+  edits, names or files) with the switch to turn it off. An update switches it on once and says so at the next launch,
+  with the way to turn it off (Settings > General > Privacy); if the usage log itself is off, sharing stays off. What
+  Pacenote learns from your edits and ratings never leaves the Mac. PRIVACY and the docs say the same. Events the app
+  already logged but the usage log did not accept (call recording, moving a call, the meeting-end prompt, Google Picker
+  copies) are now written.
+
 ## 0.10.0 (2026-11-12)
 
 - **Tips window title bar follows the theme (2026-11-12, owner):** after a switch to the dark theme the title bar of

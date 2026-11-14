@@ -969,7 +969,7 @@ layers are tuned there too: `speakers_enabled`, `speaker_join` (0.45), `speaker_
 ## 11. Privacy and etiquette
 
 The full texts: [privacy policy](https://pacenote.bodco.pm/privacy/) and [terms of use](https://pacenote.bodco.pm/terms/)
-(also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). Nothing is sent to the author unless you turn on Help improve Pacenote (0.9.4, Settings > General > Privacy, off by default): then the usage log's event names and numbers of whole days go once a week, with a random id of this Mac. No words of a call, comments or names.
+(also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). The only thing sent to the author is Help improve Pacenote (Settings > General > Privacy; on by default since 0.10.1, the switch turns it off): the usage log's event names and numbers of whole days go once a week, with a random id of this Mac. No words of a call, tip texts, your edits or comments, names or files.
 
 - Text goes only to the AI you chose for each job in Settings > AI (Claude, OpenAI or Gemini, with your key or
   account). A Gemini account runs through Google's Antigravity CLI, never for tips; its terms forbid use through
@@ -2202,6 +2202,38 @@ changes what the window shows:
 
 The diet still applies: no tip about whose turn it is, no commitments for you, no invented numbers. To get the
 behaviour before co-driver, set `codriver: false` in the sidecar config.
+
+### 14.1z2 Change a call's project, Prepare again, a fuller Quick, Help improve Pacenote (0.10.1, beta)
+
+- **Every way into a preparation opens the Meeting Sheet.** "Start a call now" on Home (⌘N), "Start a call" in the
+  menu bar menu and "Try it" for calls in Features open the Meeting Sheet in Quick, with a Project row on top and
+  "Start without prep" for a call that starts right away. "Plan a call" and Get ready for a call without a project
+  open Expert at the Meeting step. During a live call the old form stays: it is the one that can switch to another call.
+- **A call belongs to another project.** On the call page, the project next to the date is a picker (the same list
+  as in Quick and Expert); the page's "…" menu, Home > Recent calls (right click) and the menu bar during a call
+  (click the project name) have "Change project…". A call started without a project shows "Project: My calls ·
+  Change" under the tips window's header. Everything of the call moves: the transcript and the skill's twin, the brief,
+  tips, notes, Notion links, the judge, the recording parts, its tasks in the register, Home's history, the series (the
+  next call of the series starts in the new project) and the search index. Nothing is copied or deleted; when a file
+  with the same name is already there, nothing moves. During a call the project changes at once (notes and the Notion
+  page go to the new one) and the files follow when the call is over. The original preparation file (`prep-*.brief.md`)
+  stays in the old project; the call keeps its own copy.
+- **Notion follows the call.** The meeting page, and the decisions and risks the call made, get the new Project and
+  Workspace on the same pages; nothing is duplicated. When the new project keeps its meetings in another Notion
+  database, Pacenote asks first; only then it writes a new page there (a new summary, about the cost of a usual one)
+  and leaves a "Moved to" link on the old page.
+- **Prepare again = Get ready.** "Prepare again" and "Prepare now" in the tips window, on Home's live card and in the
+  menu bar during a call open the Meeting Sheet in Quick, in its own window next to the tips. Change the goal, the
+  sources or the preset, then Prepare: what was said so far joins the sources and the tips switch to the new sheet
+  when it is ready. "Prepare again with the same setup" runs the last setup at once.
+- **Quick asks for the basics.** The meeting's name, date and time, both sides' people (the same fields as Expert's
+  Meeting step) and Add for sources. With no sources Quick no longer says "Ok": it says the sheet will rest only on
+  the meeting details, the project and your note, and marks the row "Thin".
+- **Names as spoken.** Co-driver cards keep every name exactly as the transcript spells it; topic cards (📌) are written
+  in the tips window's language; "heard, searching" appears only for questions.
+- **Help improve Pacenote is on by default.** New installs start with it on; the last onboarding step says what goes
+  and has the switch. An update switches it on once and says so at the next launch; if the usage log itself is off,
+  sharing stays off. What goes and what never goes: section 11 and [PRIVACY.md](../../PRIVACY.md).
 
 ### 14.2 After the call: the meeting page in Notion
 

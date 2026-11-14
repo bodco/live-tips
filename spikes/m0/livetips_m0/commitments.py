@@ -126,6 +126,10 @@ def fold(events: List[dict]) -> List[dict]:
         op, cid = e.get("op"), e.get("id")
         if op == "add":
             _add(items, alias, e)
+        elif op == "move":      # 0.10.1 (A2): the item went with its call to another project
+            items.pop(cid, None)
+            for k in [k for k, v in alias.items() if v == cid or k == cid]:
+                alias.pop(k, None)
         elif items.get(alias.get(cid, cid)):
             _apply(items[alias.get(cid, cid)], op, e)
     return list(items.values())

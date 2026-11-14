@@ -31,6 +31,7 @@ struct CallPageView: View {
     @State private var making = false
     @State private var makeNote = ""
     @State private var copied = false
+    @State private var reassigning = false       // 0.10.1 (A3): the project picker in the header
 
     /// Shot mode only: the tab the page opens on.
     static var shotTab: String? = nil
@@ -123,6 +124,7 @@ struct CallPageView: View {
             })
             .frame(maxWidth: .infinity)      // 0.9.0: centred
         }
+        .onReceive(NotificationCenter.default.publisher(for: CallReassignService.changed)) { _ in tick += 1 }   // 0.10.1 (A3)
         .textSelection(.enabled)      // 2026-11-10 (owner): the call's title and every text on the page can be selected and copied
         .background(PN.C.bg)
         .sheet(item: $cardDraft) { c in
@@ -141,12 +143,20 @@ struct CallPageView: View {
     }
 
     @ViewBuilder private func header(_ proj: Project?, _ ws: Workspace?, _ o: CallOutcome) -> some View {
-        let projName = proj?.name ?? ws?.name ?? record?.project ?? ""
+        let projName = CallReassignService.shared.pendingName(for: file) ?? proj?.name ?? ws?.name ?? record?.project ?? ""
         let series = record.map { Self.series(of: $0).count } ?? 0
         let info = VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 if !whenText.isEmpty { Text(whenText).font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.accent) }
-                if !projName.isEmpty { PagePill(text: projName, color: PN.C.answer) }
+                // 0.10.1 (A3): the project is a picker: the call, its tasks, series and Notion pages move to another one
+                Button { reassigning = true } label: {
+                    HStack(spacing: 4) {
+                        PagePill(text: projName.isEmpty ? L("reassign.noProject") : projName, color: PN.C.answer)
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(PN.C.text3)
+                    }
+                }
+                .buttonStyle(.plain).help(L("reassign.help")).accessibilityLabel(L("reassign.help"))
+                .popover(isPresented: $reassigning, arrowEdge: .bottom) { ReassignPickerView(file: file, done: { reassigning = false }) }
                 if let m = record?.minutes {
                     Text(L("call.page.minutes", ["n": "\(Int(m.rounded()))"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
@@ -574,6 +584,7 @@ struct CallPageView: View {
                 }
                 if let u = record?.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
                 Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }
+                Button(L("reassign.menu")) { reassigning = true }       // 0.10.1 (A3)
                 Button(L("call.page.transcript")) { TranscriptWindow.show(file: file) }
                 if let r = record, Self.series(of: r).count > 1 { Button(L("call.page.series", ["n": "\(Self.series(of: r).count)"])) { SeriesWindow.show(record: r) } }
                 Divider()

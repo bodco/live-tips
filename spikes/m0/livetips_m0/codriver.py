@@ -29,7 +29,12 @@ CLASSIFY_CODRIVER = (
 ADDRESS_CODRIVER = (
     "- Co-driver mode (owner 2026-11-12), it overrides the skip in the line above: the PM is a listener who may have "
     "forgotten everything about this call. A real question of anyone with no answer in the context is never a plain "
-    "skip: it becomes a search (event question_any). Who was addressed does not matter, the PM may answer, add or steer.")
+    "skip: it becomes a search (event question_any). Who was addressed does not matter, the PM may answer, add or steer.\n"
+    "- Names (Z3, 2026-11-14): write every person's name exactly as the transcript or the participants list spells it. "
+    "Never shorten, translate or anglicize a name, and never swap it for a name from the examples in these rules.")
+
+NAMES_RULE = ("Write each person's name exactly as the transcript spells it, never shortened, translated or replaced "
+              "by a name from the examples.")
 
 QUESTION_ANY_EVENT = (
     "question_any. {who} asked a question on the call (to the PM, to someone else or to the room). "
@@ -60,7 +65,7 @@ TOPIC_PRIMER_EVENT = (
     "already covers it.")
 
 
-def event_for(trigger: str, who: str = "", topic: str = "", passages: str = "") -> str:
+def event_for(trigger: str, who: str = "", topic: str = "", passages: str = "", lang: str = "") -> str:
     who = who or "someone"
     if trigger == "question_any":
         ev = QUESTION_ANY_EVENT.format(who=who)
@@ -70,6 +75,10 @@ def event_for(trigger: str, who: str = "", topic: str = "", passages: str = "") 
         ev = TOPIC_PRIMER_EVENT.format(topic=topic.replace('"', "'"))
     else:
         return trigger
+    ev += " " + NAMES_RULE
+    if lang:
+        # Z3 (2026-11-14): a primer came in English on a Ukrainian call; gist, why and items follow the tips window
+        ev += " Write gist, why and items in {}; phrase in the language of the call.".format(lang)
     if passages:
         ev += "\n\nPROJECT PASSAGES (searched just now, newest first; facts only from here, the brief or the transcript):\n" + passages
     return ev
@@ -147,3 +156,30 @@ def primer_due(topic: str, last_topics: List[str], last_at: Optional[float], now
     if last_at is not None and now - last_at < gap_s:
         return False
     return not any(sim(t, x) for x in last_topics[-6:])
+
+
+PRIMER_EMOJI = "📌"
+LEAD_EMOJI = re.compile(r"^\s*[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F]+\s*")
+
+
+def primer_gist(gist: str) -> str:
+    """Z3 (2026-11-14): a topic card always starts with 📌 (the model sometimes put 🟢)."""
+    g = str(gist or "").strip()
+    return PRIMER_EMOJI + " " + LEAD_EMOJI.sub("", g) if g else g
+
+
+QUESTION_WORDS = re.compile(
+    r"\b(what|when|where|who|whom|whose|why|how|which|is|are|was|were|do|does|did|can|could|will|would|should|shall|"
+    r"may|might|have|has|any|чи|що|коли|де|хто|кому|чому|навіщо|як|який|яка|яке|які|скільки|куди|звідки|чого|кого)\b",
+    re.I)
+
+
+def looks_like_question(q: str) -> bool:
+    """Z3 (2026-11-14): "heard" fired on a statement ("in sandbox there is one location"). A heard card needs a
+    question: a question mark, or an interrogative word at the start of the sentence."""
+    t = " ".join(str(q or "").split())
+    if not t:
+        return False
+    if "?" in t:
+        return True
+    return bool(QUESTION_WORDS.match(t)) or bool(re.match(r"^(whether|if)\b", t, re.I))

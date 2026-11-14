@@ -31,6 +31,15 @@ enum LivePrep {
         return m
     }
 
+    /// 0.10.1 (A4, roadmap п.8): Prepare again = Get ready. The Meeting Sheet window in live mode (Quick, its own
+    /// window, no modal): goal, sources and preset can change; "Prepare again with the same setup" is its second action.
+    static func openSheet() -> String? {
+        guard let m = liveModel() else { return L("call.chooseProjectFirst") }
+        if PrepRunner.shared.running { return L("liveprep.busy") }
+        SheetPrepWindow.show(m, mode: .quick, live: true)
+        return nil
+    }
+
     /// Starts the preparation; nil or the reason it cannot start.
     static func start(correction: String = "") -> String? {
         guard let m = liveModel(), var r = m.prepRequest() else { return L("call.chooseProjectFirst") }

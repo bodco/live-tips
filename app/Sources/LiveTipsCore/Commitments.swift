@@ -86,6 +86,12 @@ public enum CommitmentRegister {
                 order.append(cid)
                 continue
             }
+            if op == "move" {            // 0.10.1 (A2): the item went with its call to another project
+                if items.removeValue(forKey: cid) != nil { order.removeAll { $0 == cid } }
+                alias = alias.filter { $0.value != cid }
+                alias.removeValue(forKey: cid)
+                continue
+            }
             guard var it = items[alias[cid] ?? cid] else { continue }
             switch op {
             case "done": it.status = "done"; it.doneAt = s(e, "at"); it.doneSource = s(e, "source").isEmpty ? "manual" : s(e, "source")

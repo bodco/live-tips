@@ -321,6 +321,19 @@
     if (bar.dataset.html !== html) { bar.innerHTML = html; bar.dataset.html = html; }
   }
 
+  // 0.10.1 (A3, roadmap п.9): "Project: My calls · Change" for a call without a project; the texts come from the app
+  function renderProjBar() {
+    const bar = $('projBar');
+    if (!bar) return;
+    const p = S.proj;
+    const show = !!(p && p.show && S.call.state === 'live');
+    bar.hidden = !show;
+    if (!show) return;
+    const html = `<span class="pb-t">${esc(p.label || 'Project')}: <b>${esc(p.name || '')}</b></span>`
+      + `<button class="lnk" type="button" data-act="project-change">${esc(p.change || 'Change')}</button>`;
+    if (bar.dataset.html !== html) { bar.innerHTML = html; bar.dataset.html = html; }
+  }
+
   // 0.10.0 (AI chain, owner 12.11): the limit status icon. S.ai = {level: ok|warn|out, title, head, rows: [{name, jobs,
   // status, usage, state}], recent: [text]}, pushed by the app (AIStatusModel.windowState); every text is localized there.
   const AI_ICON = {
@@ -424,6 +437,7 @@
     $('onmeBtn').hidden = openOnMe === 0;
     firstCallHint();
     renderBriefBar(t);
+    renderProjBar();
     // 0.8.7 (H4): "BANT 2/4" in the header for methods with a chip; a click opens the Deal tab
     const dealChip = S.deal && S.deal.chip ? `${S.deal.name} ${S.deal.known}/${S.deal.total}` : '';
     $('dealBtn').hidden = !dealChip; $('dealBtn').textContent = dealChip;
@@ -1381,7 +1395,7 @@
         showToast({ text: S.lang === 'uk' ? 'Напиши, з ким дзвінок, його мету та потрібний документ. Enter оновить підготовку.' : 'Enter the participant, goal and source document. Press Enter to update preparation.', kind: 'info', at: Date.now() });
         return;
       case 'brief-full': S.ui.briefFull = !S.ui.briefFull; render(); return;
-      case 'liveprep': post('liveprep', { a: 'start' }); if (feed) feed.setPrep({ state: 'running', progress: 0 }); return;
+      case 'liveprep': post('liveprep', { a: 'open' }); return;   // 0.10.1 (A4): opens the Meeting Sheet in live mode
       case 'liveprep-cancel': post('liveprep', { a: 'cancel' }); return;
       case 'said':
         if (card) { card.state = 'done'; card.rating = { v: 'used', reasons: [], comment: '' }; if (feed) feed.mark(id, { state: 'done', rating: card.rating }); post('said', { id, key: cardKey(card) }); usage('tip_action', { kind: String((card.raw || {}).kind || 'tip').slice(0, 40), action: 'say' }); }
@@ -1453,6 +1467,7 @@
       case 'sheetq': if (feed && feed.toggleQuestion) feed.toggleQuestion(id); break;   // 0.10.0: the PM ticks a sheet question
       case 'theirs-toggle': S.ui.theirsOpen = !(b.getAttribute('aria-expanded') === 'true'); break;
       case 'home': post('menu', { item: 'home' }); return;
+      case 'project-change': post('menu', { item: 'project' }); return;   // 0.10.1 (A3)
       case 'hero-min': S.ui.heroMin[id] = !S.ui.heroMin[id]; break;   // 2026-11-02: the speech card folds to its first line
       case 'agenda': {
         const a = S.agenda.find((x) => x.id === id); if (!a) return;
@@ -1726,6 +1741,8 @@
     /** 0.8.6 (D4): open register items of this project from earlier calls and the PM's Notion tasks:
      *  [{id, text, due, done, mine, owner, badge: 'CALL'|'N', status, fromCall, note}]; project = the group's name. */
     setOnYou(d) { S.openItems = (d && d.open) || []; S.notionItems = (d && d.notion) || []; S.notionProject = (d && d.project) || ''; render(); },
+    /** 0.10.1 (A3): {name, show, label, change}: the call's project line under the header. */
+    setProject(p) { S.proj = p || null; render(); },
     setSpeakerPrompt(sec) { S.spkPrompt = +sec || 15; render(); },
     setTipsLang(t) { S.tipsLang = t && t.meeting ? { meeting: t.meeting, current: t.current || t.meeting } : null; render(); },
     help() { post('help'); },

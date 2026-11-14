@@ -67,7 +67,7 @@
 "stop": null,
 "tail": null,
 "text": null,
-"text_head": "{\"gist\": \"Tip 6\", \"level\": \"red\", \"phrase\": \"We ship it on Tuesday, 3 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": [\"F1\"]}",
+"text_head": "{\"gist\": \"Tip 30\", \"level\": \"orange\", \"phrase\": \"We ship it on Tuesday, 1 users.\", \"topic\": \"topic 1\", \"items\": [\"Review on Monday\"], \"fact_ids\": []}",
 "usd": null
 },
 {
@@ -1626,7 +1626,7 @@
 },
 {
 "model": "fake-sonnet",
-"user_sha": "2dcc6ebb4725"
+"user_sha": "2cf3fcb6b40b"
 },
 {
 "model": "fake-haiku",
@@ -2051,8 +2051,8 @@
 {
 "available_at": 36015.0,
 "context_revision": 0,
-"event": "topic_primer. The talk has moved to a new topic: \"release plan\". The PM may remember nothing about it. Give ONE info tip that works like a prompter: gist '📌 ' + the topic and where it stands BY THE SOURCES (not a retelling of what was just said aloud), one plain sentence; items = up to 3 short lines the PM knows about it from the brief, the fact book, the cards, the project state or PROJECT PASSAGES (status, numbers, owners, dates, what was agreed before, what is open), each with no invented number; phrase = one thing the PM can say or ask now about it. Skip when nothing in the context is about this topic beyond what was said aloud, or tips_given already covers it.",
-"gist": "Tip 6",
+"event": "topic_primer. The talk has moved to a new topic: \"release plan\". The PM may remember nothing about it. Give ONE info tip that works like a prompter: gist '📌 ' + the topic and where it stands BY THE SOURCES (not a retelling of what was just said aloud), one plain sentence; items = up to 3 short lines the PM knows about it from the brief, the fact book, the cards, the project state or PROJECT PASSAGES (status, numbers, owners, dates, what was agreed before, what is open), each with no invented number; phrase = one thing the PM can say or ask now about it. Skip when nothing in the context is about this topic beyond what was said aloud, or tips_given already covers it. Write each person's name exactly as the transcript spells it, never shortened, translated or replaced by a name from the examples. Write gist, why and items in English; phrase in the language of the call.",
+"gist": "📌 Tip 30",
 "gist_at": 36015.0,
 "line_id": 1,
 "outcome": "role_observer",

@@ -50,6 +50,8 @@ struct DraftSource: Identifiable, Equatable {
 final class SheetDraft: ObservableObject {
     let model: StartCallModel
     @Published var mode: SheetMode = .quick
+    /// 0.10.1 (A4, roadmap п.8): opened during the call; Prepare refreshes the live call's sheet with the transcript so far.
+    var live = false
     @Published var step = 1
     @Published var presetID = "blank"
     @Published var presetSuggested = true
@@ -408,8 +410,14 @@ final class SheetDraft: ObservableObject {
         var o = request(out: nil)
         for k in ["project", "meeting", "app_root", "call_type", "audience", "earlier_sheet"] { o.removeValue(forKey: k) }
         SheetRunner.overrides[model.id] = o
-        if !UpNext.shared.contains(model) { UpNext.shared.save(model) }
-        if let e = UpNext.shared.prepare(model) { return e }
+        if live {
+            // 0.10.1 (A4): the same run as Prepare again in the tips window (the transcript so far joins the sources),
+            // with what the PM chose here; the live call adopts the result when it is ready
+            if let e = LivePrep.start() { return e }
+        } else {
+            if !UpNext.shared.contains(model) { UpNext.shared.save(model) }
+            if let e = UpNext.shared.prepare(model) { return e }
+        }
         job = SheetJobs.shared.follow(kind: SheetFiles.path(for: model) == nil ? "build" : "refresh", call: model)
         let keep = sources.filter { $0.checked && $0.type != "text" }.map { s -> [String: String] in
             var d = ["type": s.type, "title": s.title]

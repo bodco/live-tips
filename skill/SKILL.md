@@ -269,6 +269,28 @@ Whisper language or prompt; restart with the right one and tell the PM what was 
 | 🟠 | At 2/3 of the length and 5 min before the end | the open checklist items and "Decisions to obtain" not obtained yet |
 | silent | Action items, new requests, commitments, answers (internal calls) | log in state, list in the wrap-up |
 
+### Co-driver (Pacenote 0.10.0, on by default; mirrors the app's `codriver.py`)
+
+The PM may remember nothing about the call. Three kinds of cards, on top of the table above:
+- **Anyone's question.** A real question from anyone other than the PM (to the PM, to someone else, to the room)
+  gets an orange card "🟠 {who} питає: {питання}" with the answer from the brief, sheet, cards, fact book or Current
+  State. When none of them holds it, show at once "🔎 {who} питає: {питання} (чую питання, шукаю в проєкті)", search
+  the project folders and earlier calls, then replace that card with the answer; when the project has no direct
+  answer, say so, give the nearest known fact and a bridge phrase ("Let me check and come back to you today"). The
+  same question is searched once (4 min), at most one search per 20 s. Not for small talk, a rhetorical question, a
+  question answered aloud, or a statement: a "heard" card needs a question mark or a question word.
+- **Reflect.** When someone else finishes a substantive point (proposal, doubt, problem, plan), one orange card
+  "💬 {what they mean}" with a paraphrase to check understanding, one counter-question, or the fact that confirms or
+  contradicts it (the fact first when there is one). At most one per 90 s, never twice on one topic in 10 min. Never
+  agree to scope, dates or estimates for the PM.
+- **Topic primer.** When the talk moves to a new topic and stays there, one info card "📌 {topic}: where it stands by
+  the sources" with up to 3 short lines (status, numbers, owners, what was agreed, what is open) and one thing to say
+  or ask. Always 📌. Skip when the sources hold nothing on the topic beyond what was said aloud. At most one a minute.
+- **Language and names (2026-11-14).** Gist, why and lines are in the tips window language (a Ukrainian window gets
+  Ukrainian topic cards); the phrase is in the call language. Write every name exactly as the transcript or the
+  participants list spells it: never shortened, translated, or replaced by a name from the examples.
+- These three are not held by the 45 s rate of the tip diet below, but count toward the 10-minute caps.
+
 ### Call picture (state, 2026-10-26)
 
 Keep a running picture in the state file and update it every poll with new lines: `topic` (and
@@ -303,6 +325,7 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - `drop`: `{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}`
 - `link`: `{"v":1,"op":"link","id":"<id>","notion_page":"<Notion page id>","at":"<ISO time>"}`
 - `unlink`: `{"v":1,"op":"unlink","id":"<id>","at":"<ISO time>","reason":"removed|undo"}`
+- `move`: `{"v":1,"op":"move","id":"<id>","to":"<project slug>","at":"<ISO time>"}`
 - `edit`: `{"v":1,"op":"edit","id":"<id>","at":"<ISO time>","text":"<new text, optional>","owner":"me|<name>, optional","due":"<new due, optional>"}`
 - id: `c-<first 10 hex characters of sha1 of: call file name without .app, owner, text in lower case>`; series: `<project slug>|<call title in lower case, letters and digits only>`.
 - Owner: me = what the PM took on (the call picture's actions). A name = what someone else promised the PM or the PM's team on this call ("on them"). General team to-dos and other people's updates about their own work are not commitments.

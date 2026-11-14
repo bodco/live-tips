@@ -51,7 +51,10 @@ struct CallSetupView: View {
                     block(1) { titleRow; timeRow; typeRow }
                     block(2, title: L("start.context")) { projectRow; contextBox }
                     block(3) { typeSection }
-                    briefLine
+                    // 2026-11-13 (owner, urgent): Plan a call showed the old "No brief yet" line with no way to prepare.
+                    // Every form now shows the Meeting Sheet preparation; Plan a call also gets Quick / Expert (Start call
+                    // and Prepare keep theirs in the footer).
+                    if model.callType != "transcript" { prepSection(buttons: mode == .plan) } else { briefLine }
                     if let h = problemHint { Label(h, systemImage: "info.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
                     options
                 }
@@ -122,40 +125,11 @@ struct CallSetupView: View {
         }
     }
 
+    /// 0.10.1 (A3): the same list as the call page's "change project" picker (CallReassignUI.swift).
     private var projectPicker: some View {
-        let q = search.lowercased()
-        let ws = model.registry.workspaces.filter { q.isEmpty || $0.name.lowercased().contains(q) }
-        let ps = model.registry.projects.filter { $0.status != "archived" && (q.isEmpty || $0.name.lowercased().contains(q)) }
-        return VStack(alignment: .leading, spacing: 6) {
-            TextField("", text: $search, prompt: Text(L("call.findProject"))).textFieldStyle(.roundedBorder)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    if !ps.isEmpty { Text(L("stats.projects")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 4) }
-                    ForEach(ps, id: \.slug) { p in pickRow("folder", p.name, p.workspace, "project:" + p.slug) }
-                    if !ws.isEmpty { Text(L("stats.workspaces")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 6) }
-                    ForEach(ws, id: \.name) { w in pickRow("square.stack.3d.up", w.name, L("call.generalCalls"), "workspace:" + w.name) }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(12)
-        .frame(width: 340, height: 360)
-    }
-
-    private func pickRow(_ symbol: String, _ name: String, _ sub: String, _ tag: String) -> some View {
-        Button { model.target = tag; picking = false } label: {
-            HStack(spacing: 10) {
-                Image(systemName: symbol).foregroundStyle(PN.C.accent).frame(width: 18)
-                Text(name).foregroundStyle(PN.C.text)
-                if !sub.isEmpty { Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                Spacer()
-                if model.target == tag { Image(systemName: "checkmark").foregroundStyle(PN.C.accent) }
-            }
-            .padding(.horizontal, 6).padding(.vertical, 5)
-            .contentShape(Rectangle())
-            .background(RoundedRectangle(cornerRadius: 6).fill(model.target == tag ? PN.C.accent.opacity(0.12) : .clear))
-        }
-        .buttonStyle(.plain)
+        ProjectTargetList(current: model.target) { tag in model.target = tag; picking = false }
+            .padding(12)
+            .frame(width: 340, height: 360)
     }
 
     // MARK: 2-3. name, date and time (from the calendar)
@@ -417,7 +391,7 @@ struct CallSetupView: View {
                 }
             } else {
                 Image(systemName: "doc.badge.clock").foregroundStyle(PN.C.onMe)
-                Text(model.target.isEmpty ? L("call.chooseProjectFirst") : L("home.check.noBrief")).font(PN.Font.body).foregroundStyle(PN.C.text2)
+                Text(model.target.isEmpty ? L("call.chooseProjectFirst") : L("sheet.ui.none")).font(PN.Font.body).foregroundStyle(PN.C.text2)
                 if let p = model.prep {
                     Text(L("call.brief.other", ["heading": p.heading])).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                 }
@@ -592,18 +566,7 @@ struct CallSetupView: View {
             }
             question(L("page.q.matters")) { contextBox }
             // 0.10.0 (Meeting Sheet, phase 4): the preparation is the Meeting Sheet; the text and files above feed it
-            if model.callType != "transcript" {
-                question(L("sheet.ui.setup.prep")) {
-                    briefLine
-                    HStack(spacing: 8) {
-                        Button(L("sheet.ui.quickPrep")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .quick) } }
-                            .buttonStyle(.pnSecondary).disabled(!canPrepare)
-                        Button(L("sheet.ui.expertPrep")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .expert) } }
-                            .buttonStyle(.pnSecondary).disabled(!canPrepare)
-                    }
-                    Text(L("sheet.ui.setup.prepNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            if model.callType != "transcript" { prepSection(buttons: true) }
             Text(L("page.files.note")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             if let h = problemHint { Label(h, systemImage: "info.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
             DisclosureGroup(isExpanded: $pageMore) {
@@ -616,6 +579,22 @@ struct CallSetupView: View {
                 }
                 .padding(.top, 8)
             } label: { Text(L("page.more")).font(PN.Font.section).foregroundStyle(PN.C.text) }
+        }
+    }
+
+    /// 0.10.0 (Meeting Sheet): the preparation block, the same on the call page and in Start / Plan / Prepare.
+    @ViewBuilder private func prepSection(buttons: Bool) -> some View {
+        question(L("sheet.ui.setup.prep")) {
+            briefLine
+            if buttons {
+                HStack(spacing: 8) {
+                    Button(L("sheet.ui.quickPrep")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .quick); if mode != .page { StartCallWindow.window?.close() } } }
+                        .buttonStyle(.pnSecondary).disabled(!canPrepare)
+                    Button(L("sheet.ui.expertPrep")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .expert); if mode != .page { StartCallWindow.window?.close() } } }
+                        .buttonStyle(.pnSecondary).disabled(!canPrepare)
+                }
+                Text(L("sheet.ui.setup.prepNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -705,9 +684,32 @@ final class StartCallWindow {
     static var window: NSWindow?
     static var model: StartCallModel?
 
+    /// A1 (2026-11-14, owner п.5): "Start a call now" opens the Meeting Sheet (Quick) like every other entry.
+    /// While a call is live the old form stays: it is the one that can switch to the new call.
+    static func startNow(delegate: AppDelegate, prepared: StartCallModel? = nil) {
+        if delegate.callIsLive { show(delegate: delegate, prepared: prepared); return }
+        window?.close()
+        SheetPrepWindow.show(prepared ?? StartCallModel(), mode: .quick)
+    }
+
+    /// A1 (2026-11-14): Get ready for a known call. Without a project it opens Expert at step 1 (the project picker
+    /// is there), not the old Prepare form; with one, Quick or Expert by the default rules.
+    static func getReady(_ m: StartCallModel) {
+        if m.target.isEmpty { SheetPrepWindow.show(m, mode: .expert, step: 1); return }
+        UpNext.shared.save(m)
+        SheetPrepWindow.show(m)
+    }
+
     /// One window for the three forms. While a call is live it plans an upcoming call (Save, or switch with a
     /// confirmation); Prepare asks first what the preparation is based on (owner, 2026-10-27).
     static func show(delegate: AppDelegate, prepared: StartCallModel? = nil, planOnly: Bool = false, mode wanted: CallSetupMode? = nil) {
+        // 2026-11-13 (owner, urgent): Plan a call opens the Meeting Sheet (Expert, step 1 Meeting), not the old form.
+        // While a call is live the old form stays: it is the one that can switch to the planned call.
+        if planOnly && prepared == nil && wanted == nil && !delegate.callIsLive {
+            window?.close()
+            SheetPrepWindow.show(StartCallModel(), mode: .expert, step: 1)
+            return
+        }
         let model = prepared ?? StartCallModel()
         Self.model = model
         let live = delegate.callIsLive

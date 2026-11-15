@@ -31,7 +31,7 @@ struct TranscriptionSettingsPane: View {
                     } label: { Label(L("dict.add"), systemImage: "plus") }
                     Spacer()
                 }
-            } header: { Text(L("dict.head")) } footer: {
+            } header: { Text(L("dict.head")).settingsAnchor("tr.dict") } footer: {
                 Text(L("dict.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             .onChange(of: model.config.dictionary) { LocalAIService.shared.writeCoreConfig() }

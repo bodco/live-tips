@@ -3,6 +3,18 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.15.0 (2026-11-15)
+
+- **Search in Settings (2026-11-15, D2):** a search field on top of the Settings sidebar (Command-F). Type a word in
+  English or Ukrainian, "key", "мова", "Notion", and the sidebar lists the matching settings with where they live; a
+  click or Return opens the pane and the group and marks the row for a moment.
+- **Settings > General, Projects, Integrations, lighter (2026-11-15, D2):** General has three groups, Basics, During
+  calls and Data, one at a time. Recording consent moved to Call recording, next to the rest of recording. Projects
+  is a short list: the tick, the name and one line (Notion, Sales, answer cards, what is off); a click opens the
+  project's own page with In Notion, Sales, answer cards and what leaves this Mac. Found folders are one line with
+  Review. Integrations is one list with a Connect button where nothing is set up; Notion and HubSpot pages show one
+  group at a time, and only Connection until a token or key is set.
+
 ## 0.14.0 (2026-11-15)
 
 - **Get ready, lighter (2026-11-15, D1):** Quick is now three short lines, People, Sources and Setup, each with a dot

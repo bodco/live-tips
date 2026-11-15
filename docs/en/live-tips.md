@@ -969,7 +969,7 @@ layers are tuned there too: `speakers_enabled`, `speaker_join` (0.45), `speaker_
 ## 11. Privacy and etiquette
 
 The full texts: [privacy policy](https://pacenote.bodco.pm/privacy/) and [terms of use](https://pacenote.bodco.pm/terms/)
-(also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). The only thing sent to the author is Help improve Pacenote (Settings > General > Privacy; on by default since 0.10.1, the switch turns it off): the usage log's event names and numbers of whole days go once a week, with a random id of this Mac. No words of a call, tip texts, your edits or comments, names or files.
+(also [PRIVACY.md](../../PRIVACY.md) and [TERMS.md](../../TERMS.md)). The only thing sent to the author is Help improve Pacenote (Settings > General > Data; on by default since 0.10.1, the switch turns it off): the usage log's event names and numbers of whole days go once a week, with a random id of this Mac. No words of a call, tip texts, your edits or comments, names or files.
 
 - Text goes only to the AI you chose for each job in Settings > AI (Claude, OpenAI or Gemini, with your key or
   account). A Gemini account runs through Google's Antigravity CLI, never for tips; its terms forbid use through
@@ -1439,12 +1439,21 @@ Statistics open inside Home; Back (or Command-[) returns. The follow-up email is
 **Settings.** The sidebar has four groups: You (Account, General), Calls (Projects, Meeting Sheet, Call recording,
 Transcription), Connections (Integrations, AI) and More (Modules, Usage, Help, About). Settings > AI shows one group
 at a time: Access, Jobs (which AI prepares, tips and writes the notes, and the AI chain), Limits, On this Mac (the
-local model, search, speakers) and Advanced (company research, the agents). Integrations lists Notion, Calendars and
-HubSpot as cards with their state; a click opens the page. On the Notion page, Databases holds one Meetings, one
-Tasks and one Risks database for all projects. The project is a property of each page: write its name next to the
-database (Project if empty) and set each project's value in Settings > Projects > In Notion. Fill from project
-configs takes the databases most of your Control Tower configs name. Without a Notion token every section but the
-connection is greyed out.
+local model, search, speakers) and Advanced (company research, the agents). Settings > General has three groups:
+Basics (your name, work folder, language, theme, Dock), During calls (the tips window, floating controls, shortcuts)
+and Data (usage log, Help improve Pacenote, add-ons, app folder). Recording consent is under Settings > Call
+recording. **Search** sits on top of the sidebar (Command-F): type a word in English or Ukrainian ("key", "мова",
+"Notion") and the sidebar lists the settings as "Name / Pane › Group"; a click (or Return for the first one) opens
+the pane and the group and marks the row for a moment. Settings > Projects is a short list: the tick offers a
+project in Start call, the line under the name says Notion, Sales, answer cards and what is off; a click opens the
+project's page (In Notion, Sales, answer cards, and what leaves this Mac: AI tips, search in the folder, sync to your
+account); Back or Command-[ returns. Integrations is one list of connections with their state and Connect for the
+ones not set up; a click opens the page. The Notion page has four groups: Connection, Databases, After the call
+(meeting pages, your tasks) and Local copy; HubSpot has Connection, Matching, Reads and writes, Qualification.
+Without a token or key only Connection shows. In Databases, one Meetings, one Tasks and one Risks database serve all
+projects. The project is a property of each page: write its name next to the database (Project if empty) and set
+each project's value on the project's page, In Notion. Fill from project configs takes the databases most of your
+Control Tower configs name.
 
 **Editing the call page.** Edit (Command-E) turns decisions, items on you and on them (text and due date), open
 questions and risks into fields; Save writes a new call picture and the register's `edit` events. When the call
@@ -1498,7 +1507,7 @@ call. It writes only from the call page's menu, Update HubSpot: a note on the de
 seconds. The transcript goes into the note only if you turn that on.
 
 **What Pacenote can do.** Help > What Pacenote can do lists every feature with Try it and how often you used it
-(from the local usage log, Settings > General > Privacy). For the first 14 days it is also a card on Home.
+(from the local usage log, Settings > General > Data). For the first 14 days it is also a card on Home.
 
 ### 14.1j Pacenote 0.8.8: the decision register, automatic add, Workspace
 
@@ -1753,7 +1762,7 @@ Gemini variants and writes one table (cost, latency, tips, errors) and the tips 
   and 20 minutes). With Meet's transcript on, each unnamed voice takes the participant who spoke at the same time;
   without it, the participants are offered first as names, and one unnamed voice with one free participant is named.
   Your own names are never given to the other side. The voice library does not learn from these names.
-- **Help improve Pacenote (off by default).** Settings > General > Privacy. Once a week the usage log (event names
+- **Help improve Pacenote (off by default).** Settings > General > Data. Once a week the usage log (event names
   and numbers of whole days since you turned it on, such as how many tips were rated and why) goes to the author,
   with a random id of this Mac that is forgotten when you turn it off. Never the words of a call, comments, names,
   projects or files; the server keeps no IP address and refuses anything else. Show what is sent opens the next batch (`usage/next-batch.json`).
@@ -1808,7 +1817,7 @@ was on the shared screen. Pacenote can save the call's sound, or the sound and t
 - **Permission.** macOS Screen & System Audio Recording, in the same set as the microphone during onboarding (or Settings
   > Call recording > Allow). Recording needs it also for sound only, because the call's sound comes through the same
   macOS service. macOS may ask you to quit and reopen Pacenote after allowing it.
-- **Consent.** Nothing is shown or played to the other participants. Settings > General > Recording consent can say or
+- **Consent.** Nothing is shown or played to the other participants. Settings > Call recording > Recording consent can say or
   copy a message when the recording starts; when the call is also recorded, its second message says so ("transcribes
   and records this call"), also when you start recording later in the call. Check the rules of your company and of
   your clients' countries.
@@ -2399,7 +2408,7 @@ In the app the tips window has three icon buttons in its top bar, after On me: t
 recording dot and the timer turn grey) and a bulb for proactive tips (tinted blue when they are
 on). Each tooltip shows the shortcut; screen readers get the button's name and whether it is
 pressed. HELP and pause are also in the menu bar menu during a call, with the shortcut next to
-them, and **Settings > General > Shortcuts** lists them all and lets you change every one except
+them, and **Settings > General > During calls > Shortcuts** lists them all and lets you change every one except
 Option-Command-T. The skill's
 tips window (live-transcriber) has HELP and pause since 2026-10-22; when both run, the one
 started first owns them.
@@ -2550,7 +2559,7 @@ address", `references/sweep.md`, `references/presentation.md`).
 38. **Demo window.** Help and About in the menu bar (and the Help menu): "Demo call" and "Demo call:
    presentation" show every element of the window with sample data, for checking the window without a call
    (since 0.8.7 always there, no Option key).
-39. **Recording consent.** Settings > General > Recording consent, both off by default: "Play an audio
+39. **Recording consent.** Settings > Call recording > Recording consent, both off by default: "Play an audio
    consent message" speaks a short notice when recording starts (in the call's language), "Copy a consent message
    for the meeting chat" puts it on the clipboard with a reminder to paste it into the call chat. Both texts are
    editable (English and Ukrainian). Recording without consent may be illegal where you or the others are.
@@ -2630,7 +2639,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    preparation finishes in the background, its files join the call, the window shows "Preparation ready"
    and the speech appears, and tips use the brief from then on. The ⚙ panel's Context block shows the
    preparation: being written (stage and progress), ready and loaded, failed or none.
-57. **Your own shortcuts (0.6.0).** Settings > General > Shortcuts: Change, press the new keys (with
+57. **Your own shortcuts (0.6.0).** Settings > General > During calls > Shortcuts: Change, press the new keys (with
    Control, Option or Command; Esc cancels), Reset. The HELP button no longer shows the keys; the menu shows
    the current ones.
 58. **Tips window (0.6.0).** The microphone button is an icon like the others; the ⚙ panel has more space

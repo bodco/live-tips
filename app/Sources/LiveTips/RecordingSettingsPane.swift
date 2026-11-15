@@ -37,7 +37,7 @@ struct RecordingSettingsPane: View {
                     Text(L("rec.kind.video")).tag("video")
                 }
                 Toggle(L("rec.set.mic"), isOn: r.mic)
-            } header: { Text(L("rec.set.what")) } footer: {
+            } header: { Text(L("rec.set.what")).settingsAnchor("rec.what") } footer: {
                 Text(L("rec.set.where")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
 
@@ -123,12 +123,9 @@ struct RecordingSettingsPane: View {
                         }
                     }
                 }
-                HStack {
-                    Text(L("rec.set.consent")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                    Spacer()
-                    Button(L("rec.set.consent.open")) { model.tab = "general" }.buttonStyle(.pnTertiary)
-                }
-            } header: { Text(L("rec.set.privacy")) }
+            } header: { Text(L("rec.set.privacy")).settingsAnchor("rec.privacy") }
+            // 0.15.0 (D2): the consent message lives here now (was General)
+            ConsentSection(model: model)
         }
         .formStyle(.grouped)
         .onAppear {

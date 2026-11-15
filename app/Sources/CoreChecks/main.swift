@@ -2414,6 +2414,57 @@ func sheetPeopleD1b() {
     expect(PeopleSides.teamName(for: "Jake T.", team: team) == nil, "d1b: not on the team")
 }
 
+// 0.15.0 (D2): search in Settings
+func settingsSearchD2() {
+    let base = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    func load(_ l: String) -> [String: String] {
+        guard let d = try? Data(contentsOf: base.appendingPathComponent("Resources/i18n/\(l).json")),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return [:] }
+        return o.compactMapValues { $0 as? String }
+    }
+    let en = load("en"), uk = load("uk")
+    let es = SettingsSearch.entries
+    let panes: Set<String> = ["account", "general", "projects", "sheet", "recording", "transcription", "integrations", "ai", "modules", "usage", "help", "about"]
+    expect(Set(es.map(\.id)).count == es.count, "d2: search ids are unique")
+    for e in es {
+        expect(panes.contains(e.pane), "d2: \(e.id) pane \(e.pane) exists")
+        expect(en[e.titleKey] != nil && uk[e.titleKey] != nil, "d2: \(e.id) title \(e.titleKey) in en and uk")
+        if let g = e.defaults[SettingsSearch.generalGroupKey] { expect(SettingsSearch.generalGroups.contains(g) && e.pane == "general", "d2: \(e.id) general group") }
+        if let g = e.defaults[SettingsSearch.aiGroupKey] { expect(SettingsSearch.aiGroups.contains(g) && e.pane == "ai", "d2: \(e.id) ai group") }
+        if let g = e.defaults[SettingsSearch.notionGroupKey] { expect(SettingsSearch.notionGroups.contains(g) && e.integration == "notion", "d2: \(e.id) notion group") }
+        if let g = e.defaults[SettingsSearch.hubspotGroupKey] { expect(SettingsSearch.hubspotGroups.contains(g) && e.integration == "hubspot", "d2: \(e.id) hubspot group") }
+        if e.integration != nil { expect(e.pane == "integrations", "d2: \(e.id) integration lives under Integrations") }
+        if e.projectPage { expect(e.pane == "projects", "d2: \(e.id) project page lives under Projects") }
+        for k in ["gen.group.", "ai.group.", "ntn.group.", "hs.group."] { _ = k }
+    }
+    for (p, gs) in [("gen.group.", SettingsSearch.generalGroups), ("ai.group.", SettingsSearch.aiGroups),
+                    ("ntn.group.", SettingsSearch.notionGroups), ("hs.group.", SettingsSearch.hubspotGroups)] {
+        for g in gs { expect(en[p + g] != nil && uk[p + g] != nil && en[p + "sub." + g] != nil && uk[p + "sub." + g] != nil, "d2: group strings \(p)\(g)") }
+    }
+    // every target the search jumps to carries its anchor in the app (pages that are a target as a whole need none)
+    let src = (try? FileManager.default.contentsOfDirectory(at: base.appendingPathComponent("Sources/LiveTips"), includingPropertiesForKeys: nil)) ?? []
+    let code = src.filter { $0.pathExtension == "swift" }.compactMap { try? String(contentsOf: $0, encoding: .utf8) }.joined()
+    for e in es where !["int.calendars", "int.google"].contains(e.id) {
+        expect(code.contains("settingsAnchor(\"\(e.id)\")"), "d2: anchor for \(e.id) in the app")
+    }
+    let titles: (SettingsSearchEntry) -> [String] = { [en[$0.titleKey] ?? "", uk[$0.titleKey] ?? ""] }
+    let key = Set(SettingsSearch.find("key", titles: titles).map(\.id))
+    expect(["ai.claude", "ai.openai", "ai.gemini", "int.notion.token", "int.hubspot.key"].allSatisfy(key.contains), "d2: \"key\" finds the keys: \(key.sorted())")
+    expect(Set(SettingsSearch.find("ключ", titles: titles).map(\.id)).isSuperset(of: ["ai.claude", "int.hubspot.key"]), "d2: \"ключ\" finds the keys")
+    expect(SettingsSearch.find("мова", titles: titles).first?.id == "gen.lang", "d2: \"мова\" opens Language first")
+    expect(SettingsSearch.find("Theme", titles: titles).first?.id == "gen.theme", "d2: a title prefix ranks first")
+    expect(SettingsSearch.find("notion key", titles: titles).first?.id == "int.notion.token", "d2: two words narrow it down")
+    expect(SettingsSearch.find("bant", titles: titles).map(\.id).contains("pr.sales"), "d2: synonyms find the setting")
+    expect(SettingsSearch.find("zzqx", titles: titles).isEmpty, "d2: nothing for nonsense")
+    expect(SettingsSearch.find("   ", titles: titles).isEmpty, "d2: nothing for an empty query")
+    expect(SettingsSearch.normalize("  Ключ   API ") == "ключ api", "d2: normalize spaces and case")
+    expect(SettingsSearch.normalize("Café імʼя") == "cafe ім'я", "d2: normalize accents and apostrophes")
+    expect(SettingsSearch.score("ab", titles: ["Abc"], extra: "") > SettingsSearch.score("ab", titles: ["x ab"], extra: ""), "d2: prefix beats inside")
+    expect(SettingsSearch.score("q", titles: ["x"], extra: "q") == 1, "d2: extra words still match")
+    let gen = SettingsSearch.entries.first { $0.id == "gen.lang" }
+    expect(gen?.group == "basics", "d2: the group of an entry")
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -2434,5 +2485,6 @@ callConsent0130()
 callSyncAnalysis0130()
 sheetPeopleD1()
 sheetPeopleD1b()
+settingsSearchD2()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

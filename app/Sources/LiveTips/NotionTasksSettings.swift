@@ -188,7 +188,7 @@ struct NotionTasksSection: View {
                     if !nt.database.isEmpty { globalRows }
                 }
             }
-        } header: { Text(L("ntset.header")) } footer: {
+        } header: { Text(L("ntset.header")).settingsAnchor("int.notion.tasks") } footer: {
             Text(L("ntset.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
         }
         .onAppear { if dest.items.isEmpty && model.isSet(.notionToken) { dest.find() }; m.load() }

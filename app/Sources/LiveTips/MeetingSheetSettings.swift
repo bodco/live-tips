@@ -42,7 +42,7 @@ struct MeetingSheetSettingsPane: View {
                     Text(L("sheet.ui.set.rulesNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                     Button(L("sheet.ui.set.resetRules")) { prefs.rules = SheetModeRule.defaults }.buttonStyle(.pnTertiary)
                 }
-            } header: { Text(L("sheet.ui.set.modeTitle")) }
+            } header: { Text(L("sheet.ui.set.modeTitle")).settingsAnchor("sh.mode") }
 
             Section {
                 ForEach(Array(prefs.focus.enumerated()), id: \.offset) { i, f in
@@ -59,7 +59,7 @@ struct MeetingSheetSettingsPane: View {
                     Button(L("sheet.ui.add"), action: addField).disabled(newField.trimmingCharacters(in: .whitespaces).isEmpty || prefs.focus.count >= 7)
                 }
                 Text(L("sheet.ui.set.focusNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            } header: { Text(L("sheet.ui.myFocus")) }
+            } header: { Text(L("sheet.ui.myFocus")).settingsAnchor("sh.focus") }
 
             Section {
                 Stepper(L("sheet.ui.set.stale", ["n": "\(prefs.staleMonths)"]), value: $prefs.staleMonths, in: 1...36)
@@ -74,7 +74,7 @@ struct MeetingSheetSettingsPane: View {
                     Text(L("sheet.ui.remind.n", ["n": "120"])).tag(120)
                 }
                 Text(L("sheet.ui.set.remindNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            } header: { Text(L("sheet.ui.set.timing")) }
+            } header: { Text(L("sheet.ui.set.timing")).settingsAnchor("sh.timing") }
 
             Section {
                 let mine = lib.presets.filter(\.mine)
@@ -100,7 +100,7 @@ struct MeetingSheetSettingsPane: View {
                 }
                 Text(L("sheet.ui.set.presetsNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.pending) }
-            } header: { Text(L("sheet.ui.set.presets")) }
+            } header: { Text(L("sheet.ui.set.presets")).settingsAnchor("sh.presets") }
         }
         .formStyle(.grouped)
         .onAppear { lib.reload() }

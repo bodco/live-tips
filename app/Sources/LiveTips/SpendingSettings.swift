@@ -87,7 +87,7 @@ struct CallAgentSection: View {
                         .help(L("agent.proactivePerCall.help"))
                 }
             }
-        } header: { Text(L("agent.header")) } footer: {
+        } header: { Text(L("agent.header")).settingsAnchor("ai.agent") } footer: {
             Text(L("agent.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -145,7 +145,7 @@ struct EconomySection: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-        } header: { Text(L("economy.header")) } footer: {
+        } header: { Text(L("economy.header")).settingsAnchor("ai.economy") } footer: {
             Text(L("economy.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
         }
         .onAppear { economy = MainActor.assumeIsolated { SpendWatch.economyOn } }

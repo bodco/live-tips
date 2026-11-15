@@ -67,7 +67,7 @@ struct AccountSettingsPane: View {
             }
             Text(L("account.signIn.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             if let n = acct.notice { Text(n).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true) }
-        } header: { Text(L("account.head")) }
+        } header: { Text(L("account.head")).settingsAnchor("acc.head") }
     }
 
     @ViewBuilder private func signedIn(_ s: PacenoteServer.Session) -> some View {
@@ -91,7 +91,7 @@ struct AccountSettingsPane: View {
                 Label(p, systemImage: "exclamationmark.triangle.fill").font(PN.Font.caption).foregroundStyle(PN.C.pending)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        } header: { Text(L("account.head")) }
+        } header: { Text(L("account.head")).settingsAnchor("acc.head") }
 
         Section {
             if acct.devices.isEmpty {

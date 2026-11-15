@@ -26,6 +26,9 @@ public struct Project: Codable, Equatable {
     public var aliases: [String: String] = [:]   // transcript alias -> real name
     /// D5b: may this project's call text go to the model API? Off = local layer only.
     public var apiAllowed: Bool = true
+    /// 0.12.0 (B8b): send this project's call notes, decisions, tasks, Meeting Sheet and Drive links to the Pacenote
+    /// server (when signed in). Off by default: a client's or an employer's data may not be allowed to leave the Mac.
+    public var serverSync: Bool = false
     public var index = IndexSettings()
     /// 0.8.7 (F3): the value of the Meetings and Risks "project" property for this project (option name or page id).
     public var notionValue = ""
@@ -40,7 +43,7 @@ public struct Project: Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case name, slug, root, config, status, workspace, defaultLanguage, clientLanguage, audienceDefault, people, aliases,
-             apiAllowed, index, notionValue, salesEnabled, salesMethod, crmCompanyId, crmCompanyName
+             apiAllowed, serverSync, index, notionValue, salesEnabled, salesMethod, crmCompanyId, crmCompanyName
     }
 
     /// 0.8.7: every field but the name is optional in the file, so new fields never drop a saved project.
@@ -58,6 +61,7 @@ public struct Project: Codable, Equatable {
         people = (try? c.decode([Person].self, forKey: .people)) ?? []
         aliases = (try? c.decode([String: String].self, forKey: .aliases)) ?? [:]
         apiAllowed = (try? c.decode(Bool.self, forKey: .apiAllowed)) ?? true
+        serverSync = (try? c.decode(Bool.self, forKey: .serverSync)) ?? false
         index = (try? c.decode(IndexSettings.self, forKey: .index)) ?? IndexSettings()
         notionValue = (try? c.decode(String.self, forKey: .notionValue)) ?? ""
         salesEnabled = (try? c.decode(Bool.self, forKey: .salesEnabled)) ?? false

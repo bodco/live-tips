@@ -148,6 +148,15 @@ final class MeetingLauncher {
         return "msteams:/" + link[r.upperBound...]
     }
 
+    /// 0.12.0: opens a Google link as `account` (Chrome profile with that account, authuser), see GoogleAccountLink.
+    func openGoogle(_ link: String, account: String?) {
+        let acct = account ?? ""
+        let url = GoogleAccountLink.url(link, account: acct)
+        if let dir = GoogleAccountLink.profileDir(account: acct, in: environment().profiles),
+           run("/usr/bin/open", ["-na", Self.chromeApp, "--args", "--profile-directory=" + dir, url]) { return }
+        if let u = URL(string: url) { NSWorkspace.shared.open(u) }
+    }
+
     private func run(_ exe: String, _ args: [String]) -> Bool {
         let p = Process(); p.executableURL = URL(fileURLWithPath: exe); p.arguments = args
         do { try p.run(); p.waitUntilExit(); return p.terminationStatus == 0 } catch { return false }

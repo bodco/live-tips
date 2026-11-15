@@ -196,7 +196,7 @@ final class DriveRecordings: ObservableObject {
             do {
                 let id = try await rootID(account: acct)
                 rootState[acct.lowercased()] = .ok
-                NSWorkspace.shared.open(URL(string: "https://drive.google.com/drive/folders/\(id)")!)
+                MeetingLauncher.shared.openGoogle("https://drive.google.com/drive/folders/\(id)", account: acct)
             } catch {
                 if error is FolderUnavailable { rootState[acct.lowercased()] = .unavailable }
                 errors["settings"] = error.localizedDescription
@@ -304,6 +304,12 @@ final class DriveRecordings: ObservableObject {
     func transcriptLink(_ t: String) -> String? {
         guard let m = DriveTranscriptMeta.load(DriveTranscript.metaPath(transcript: t)), !m.fileID.isEmpty, !m.link.isEmpty else { return nil }
         return m.link
+    }
+
+    /// 0.12.0: the account the transcript copy was written with (to open it as that account).
+    func transcriptAccount(_ t: String) -> String? {
+        let a = DriveTranscriptMeta.load(DriveTranscript.metaPath(transcript: t))?.account ?? ""
+        return a.isEmpty ? account : a
     }
 
     /// Title, start, duration, project and participants: the renamed title and the project from the call history.

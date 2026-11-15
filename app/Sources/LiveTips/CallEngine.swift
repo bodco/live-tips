@@ -223,7 +223,11 @@ final class CallEngine {
                     : "⚠ Call ended \(f.string(from: Date())) · no transcript file found"
                 NotificationCenter.default.post(name: CallEngine.callEnded, object: nil,
                                                 userInfo: ["summary": self.lastCallSummary, "saved": saved,
-                                                           "file": (st.file ?? self.lastFile) ?? "", "lines": self.lastLines])
+                                                           "file": (st.file ?? self.lastFile) ?? "", "lines": self.lastLines,
+                                                           // 0.12.0 (B8b): kept for the server copy of the call
+                                                           "call_type": (self.callRequest["call_type"] as? String) ?? "",
+                                                           "audience": (self.callRequest["audience"] as? String) ?? "",
+                                                           "language": (self.callRequest["me_lang"] as? String) ?? ""])
                 if let file = st.file ?? self.lastFile, apiAllowed {
                     self.writeToNotion(file: file)
                     self.runJudge(file: file)          // background, optional: never blocks the UI or the call

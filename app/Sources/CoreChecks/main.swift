@@ -1094,6 +1094,49 @@ func meetingLaunch096() {
     expect(MeetingURL.forWay(ml + "?authuser=0", LaunchWay(kind: .meetApp, profile: "x@y.z", account: "a@b.c")) == ml + "?authuser=a@b.c", "launch: authuser replaced")
     expect(MeetingURL.forWay(ml, LaunchWay(kind: .chrome, profile: "side")) == ml, "launch: a profile without an email keeps the link")
     expect(MeetingURL.forWay(ml, LaunchWay(kind: .browser)) == ml, "launch: browser keeps the link")
+    // 0.12.0: Drive links open as their account.
+    let dl = "https://drive.google.com/drive/folders/1AbcFolderIdXYZ"
+    expect(GoogleAccountLink.url(dl, account: "Mike@Orbit.com") == dl + "?authuser=mike@orbit.com", "drive link: authuser")
+    expect(GoogleAccountLink.url(dl + "?usp=sharing&authuser=0", account: "mike@orbit.com") == dl + "?usp=sharing&authuser=mike@orbit.com", "drive link: authuser replaced, query kept")
+    expect(GoogleAccountLink.url(dl, account: "") == dl, "drive link: no account keeps the link")
+    let gp = [ChromeProfile(dir: "Default", name: "Work", email: "emily@example.com", accounts: ["emily@example.com", "mike@orbit.com"]),
+              ChromeProfile(dir: "Profile 2", name: "Orbit", email: "mike@orbit.com")]
+    expect(GoogleAccountLink.profileDir(account: "MIKE@orbit.com", in: gp) == "Profile 2", "drive link: profile signed in as the account wins")
+    expect(GoogleAccountLink.profileDir(account: "emily@example.com", in: gp) == "Default", "drive link: own profile")
+    expect(GoogleAccountLink.profileDir(account: "mike@orbit.com", in: [gp[0]]) == "Default", "drive link: a profile that knows the account")
+    expect(GoogleAccountLink.profileDir(account: "nobody@example.com", in: gp) == nil, "drive link: no profile -> default browser")
+    // 0.12.0 (B8b): what a call sends to the server.
+    let cc = CallSync.clientCallID(device: "a1b2c3d4", transcript: "/x/Orbit/calls/2026-11-14 10-00 Weekly sync.md")
+    expect(cc == "a1b2c3d4-2026-11-14_10-00_Weekly_sync", "sync: client call id \(cc)")
+    expect(CallSync.clientCallID(device: "d", transcript: "/x/Зустріч з Emily.md").allSatisfy { $0.isASCII && !$0.isWhitespace }, "sync: client id ascii")
+    expect(CallSync.localSlug("Orbit sales/EU") == "Orbit-sales-EU" && CallSync.localSlug("") == "project", "sync: local slug")
+    expect(CallSync.statePath(transcript: "/a/b.md") == "/a/b.sync.json" && CallSync.sheetPath(transcript: "/a/b.md") == "/a/b.sheet.json", "sync: paths")
+    let cb = CallSync.callBody(projectID: "p1", title: String(repeating: "t", count: 400), start: Date(timeIntervalSince1970: 1_794_650_400),
+                               durationS: -5, meta: ["call_type": "client", "language": "english-long"], appVersion: "0.12.0")
+    expect((cb["title"] as? String)?.count == 300 && cb["duration_s"] as? Int == 0 && cb["started_at"] as? String == "2026-11-14T10:00:00Z", "sync: call body limits")
+    expect(cb["call_type"] as? String == "client" && cb["language"] as? String == "english-lo" && cb["participants"] == nil, "sync: call body meta, no names")
+    expect(CallSync.summaryBody(notes: "  \n ") == nil && (CallSync.summaryBody(notes: "## Summary\nok")?["body_md"] as? String) == "## Summary\nok", "sync: summary")
+    var mn = MeetingNotes.Notes(); mn.decisions = [MeetingNotes.Item(t: "00:10", text: "Pilot in December"), MeetingNotes.Item(t: "", text: " ")]
+    mn.actions = [MeetingNotes.Item(t: "00:20", text: "Mike sends the proposal")]
+    expect(CallSync.decisions(mn).count == 1 && CallSync.tasks(mn).first?["text"] as? String == "Mike sends the proposal", "sync: decisions and tasks")
+    expect(CallSync.sheetBody(Data("[1]".utf8)) == nil && CallSync.sheetBody(Data("{\"a\":1}".utf8)) != nil, "sync: sheet is an object")
+    var rm = RecordingMeta(); var rp = RecordingMeta.Part(file: "v.mp4", kind: "video", started: Date())
+    rp.driveID = "1AbcDEFghijkLMNOPqrs"; rp.driveLink = "https://drive.google.com/file/d/1AbcDEFghijkLMNOPqrs/view"; rp.driveKind = "shared_drive"; rp.bytes = 10
+    var bad = rp; bad.driveLink = "https://evil.example/x"
+    rm.parts = [rp, bad]
+    var tm = DriveTranscriptMeta(); tm.fileID = "1TranscriptIdABCDEFG"; tm.link = "https://drive.google.com/file/d/1TranscriptIdABCDEFG/view"
+    let am = CallSync.assets(recording: rm, transcript: tm)
+    expect(am.count == 2 && am[0]["drive_kind"] as? String == "shared_drive" && am[1]["kind"] as? String == "transcript_md", "sync: assets, Drive links only")
+    var sst = CallSync.State(); let b1 = CallSync.json(["a": 1]), b2 = CallSync.json(["b": 2])
+    sst.hashes["summary"] = CallSync.hash(b1)
+    expect(CallSync.changed([("summary", b1), ("tasks", b2)], state: sst).map(\.0) == ["tasks"], "sync: only changed parts")
+    expect(CallSync.json(["b": 1, "a": 2]) == Data("{\"a\":2,\"b\":1}".utf8), "sync: stable json")
+    expect(CallSync.outcome(status: 201) == .ok && CallSync.outcome(status: 410) == .deletedElsewhere, "sync: outcome ok/gone")
+    expect(CallSync.outcome(status: 503) == .retryLater("HTTP 503") && CallSync.outcome(status: 403, problem: "plan") == .stop("plan"), "sync: outcome retry/stop")
+    let sd = try! JSONDecoder().decode(CallSync.State.self, from: Data("{\"callID\":\"x\"}".utf8))
+    expect(sd.callID == "x" && !sd.skip && sd.hashes.isEmpty, "sync: old state decodes")
+    let pj = try! JSONDecoder().decode(Project.self, from: Data("{\"name\":\"Orbit\"}".utf8))
+    expect(pj.serverSync == false, "sync: projects are off by default")
     expect(MeetingURL.forWay("https://teams.microsoft.com/l/meetup-join/x", LaunchWay(kind: .chrome, profile: "a@b.c"))
            == "https://teams.microsoft.com/l/meetup-join/x?msLaunch=false&suppressPrompt=true", "launch: Teams stays on the web")
     expect(MeetingURL.zoomApp("https://orbit.zoom.us/j/123456789?pwd=abc") == "zoommtg://zoom.us/join?action=join&confno=123456789&pwd=abc", "launch: Zoom app link")

@@ -241,3 +241,20 @@ public enum MeetingURL {
         return u.string ?? link
     }
 }
+
+/// 0.12.0: a Google link (the Drive folder, a recording, a transcript) opens as the account it belongs to: in the
+/// Chrome profile signed in as that account, else one that knows it, with authuser=<email> so a profile with several
+/// Google accounts picks the right one. Without such a profile the default browser gets the link with authuser.
+public enum GoogleAccountLink {
+    public static func url(_ link: String, account: String) -> String {
+        let a = account.trimmingCharacters(in: .whitespaces).lowercased()
+        guard a.contains("@") else { return link }
+        return MeetingURL.setQuery(link, "authuser", a)
+    }
+
+    public static func profileDir(account: String, in profiles: [ChromeProfile]) -> String? {
+        let a = account.trimmingCharacters(in: .whitespaces).lowercased()
+        guard a.contains("@") else { return nil }
+        return (profiles.first { $0.email == a } ?? profiles.first { $0.accounts.contains(a) })?.dir
+    }
+}

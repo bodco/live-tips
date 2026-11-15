@@ -16,7 +16,9 @@ struct RecordingRow: View {
             let folder = RecordingFiles.folder(transcript: file)
             let paths = meta.parts.map { (folder as NSString).appendingPathComponent($0.file) }
             let uploading = drive.isUploading(file)
-            let link = meta.parts.compactMap { $0.driveLink.isEmpty ? nil : $0.driveLink }.first
+            let linked = meta.parts.first { !$0.driveLink.isEmpty }
+            let link = linked?.driveLink
+            let linkAccount = (linked?.driveAccount).flatMap { $0.isEmpty ? nil : $0 } ?? drive.account
             let gone = meta.parts.contains { $0.driveError == RecordingMeta.Part.folderUnavailable }
             HStack(spacing: 8) {
                 Image(systemName: meta.parts.contains { $0.kind == "video" } ? "video" : "waveform").foregroundStyle(PN.C.text3)
@@ -43,24 +45,24 @@ struct RecordingRow: View {
                         .buttonStyle(.pnSecondary).disabled(uploading)
                         .help(drive.account.map { L("rec.page.uploadTo", ["email": $0]) } ?? L("rec.drive.noAccount"))
                 }
-                if let l = link, let u = URL(string: l) {
-                    Button(L("rec.page.openDrive")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary)
+                if let l = link {
+                    Button(L("rec.page.openDrive")) { MeetingLauncher.shared.openGoogle(l, account: linkAccount) }.buttonStyle(.pnTertiary)
                 }
-                if let l = drive.transcriptLink(file), let u = URL(string: l) {
-                    Button(L("rec.page.openTranscript")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary)
+                if let l = drive.transcriptLink(file) {
+                    Button(L("rec.page.openTranscript")) { MeetingLauncher.shared.openGoogle(l, account: drive.transcriptAccount(file)) }.buttonStyle(.pnTertiary)
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 14)          // the call page's cards (PageCard), one line high
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PageStyle.radius))
             .onReceive(drive.objectWillChange) { _ in DispatchQueue.main.async { tick += 1 } }
-        } else if let l = drive.transcriptLink(file), let u = URL(string: l) {
+        } else if let l = drive.transcriptLink(file) {
             // 0.11.0 (B7b): a call without a recording whose transcript is in Drive ("For every call").
             HStack(spacing: 8) {
                 Image(systemName: "doc.text").foregroundStyle(PN.C.text3)
                 Text(L("rec.page.transcriptInDrive")).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
                 Spacer()
-                Button(L("rec.page.openTranscript")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary)
+                Button(L("rec.page.openTranscript")) { MeetingLauncher.shared.openGoogle(l, account: drive.transcriptAccount(file)) }.buttonStyle(.pnTertiary)
             }
             .padding(.horizontal, 24).padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)

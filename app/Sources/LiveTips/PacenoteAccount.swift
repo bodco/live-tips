@@ -6,7 +6,8 @@ import LiveTipsCore
 // one-shot server on 127.0.0.1 and PKCE, like the Google accounts, but with `openid email profile` only and no Google
 // refresh token. Google's ID token goes to the Pacenote server once (POST /v1/auth/google); from then on the app uses
 // the server's tokens. The refresh token (60 days, rotated on every use) is in the Keychain, the access token
-// (15 minutes) only in memory. Optional: without signing in nothing changes. Nothing about calls is sent yet (B8).
+// (15 minutes) only in memory. Optional: without signing in nothing changes. Calls go only for projects with
+// "Sync to Pacenote server" on (0.12.0, B8b: CallSyncService).
 
 enum PacenoteAccountError: LocalizedError {
     case noClient, notSignedIn, server(Int, String), network(String)
@@ -222,6 +223,11 @@ final class PacenoteAccount: ObservableObject {
         }
         refreshing = task
         return try await task.value
+    }
+
+    /// 0.12.0 (B8b): an authorized JSON request for the call sync (CallSyncService).
+    func api(_ method: String, _ path: String, body: Data? = nil) async throws -> (Data, Int) {
+        try await call(method, path, body: body)
     }
 
     /// An authorized request; a 401 on a fresh-looking access token gets one refresh and one retry.

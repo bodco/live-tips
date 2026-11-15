@@ -2257,9 +2257,13 @@ Pacenote works exactly as before.
   of them, this one too. Nothing on any Mac is deleted.
 - **Delete server data** asks twice, then deletes your account on the server: your content key is destroyed at once,
   the rest is purged within 30 days. Calls on your Mac and files in your Google Drive stay.
-- **What goes there.** In 0.11.0 only your account and your devices. From the next version: after each call the
-  summary, decisions, tasks, the call's details and the Meeting Sheet, with links to the recording and transcript in
-  your Drive, with a switch per project and per call. Never audio, video, transcripts, voice prints or live tips.
+- **What goes there.** Your account and your devices. From 0.12.0 also calls, but only for a project with **Sync to
+  Pacenote server** on (Settings > Projects, the project's menu; off by default, available while signed in): the
+  call's title, start, length, type and audience, the call notes as the summary, decisions, tasks, the Meeting Sheet
+  and links to the recording and transcript in your Drive. **Don't sync this call** in a call page's menu keeps one call off
+  the server. A call goes after it ends and again when its notes or Sheet change (only the changed parts); without a
+  network it waits for the next time. Never audio, video, transcripts, names from the transcript, voice prints or
+  live tips.
   The server is in the EU; see [PRIVACY](../../PRIVACY.md).
 
 ### 14.1z4 Google Drive: the folder and the transcript (0.11.0, beta)
@@ -2267,7 +2271,8 @@ Pacenote works exactly as before.
 Settings > Call recording > Google Drive.
 
 - **Folder.** The first upload makes My Drive > Pacenote, with a folder per project in it. **Open folder in Drive**
-  opens it. To keep recordings on a shared drive (the files then belong to the organization) or to show them to your
+  opens it as the account the recordings go to (in the Chrome profile with that account; 0.12.0), and so do Open in
+  Drive and Open transcript on the call page. To keep recordings on a shared drive (the files then belong to the organization) or to show them to your
   team lead, move or share this folder in Google Drive: Pacenote remembers the folder's id per Google account and keeps
   writing into it wherever it is; "Shared drive" next to Folder says it is on one. Moving the folder does not need
   any new permission: `drive.file` covers the folders Pacenote made. **Use default** forgets the folder: new uploads

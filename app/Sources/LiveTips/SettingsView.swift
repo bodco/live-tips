@@ -1261,6 +1261,9 @@ struct SettingsView: View {
             // Both on by default; kept here for a project whose call text must not leave the Mac.
             Toggle(L("set.useClaudeForTips"), isOn: $model.registry.projects[i].apiAllowed)
             Toggle(L("set.searchThisFolder"), isOn: $model.registry.projects[i].index.enabled)
+            // 0.12.0 (B8b): off by default; only with a Pacenote account (Settings > Account)
+            Toggle(L("set.syncToServer"), isOn: $model.registry.projects[i].serverSync)
+                .disabled(!PacenoteAccount.shared.signedIn && !p.serverSync)
             Button(L("set.reindexNow")) { IndexService.shared.reindex(p.root) }.disabled(!p.index.enabled)
             Divider()
             Button(L("set.removeProjectFromPacenote"), role: .destructive) { model.excludeProject(p.slug) }

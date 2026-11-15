@@ -3,6 +3,21 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.12.0 (unreleased)
+
+- **Your calls on the Pacenote server, per project (2026-11-15, B8b):** with a Pacenote account (Settings > Account),
+  a project can send its calls to the server: Settings > Projects > the project's menu > **Sync to Pacenote server**.
+  Off by default for every project, so a client's or an employer's calls stay on the Mac unless you turn it on. What
+  goes: the call's title, start, length, type and audience, the call notes as the summary, decisions, tasks, the
+  Meeting Sheet and the links to the recording and the transcript in Google Drive. What never goes: audio, video, the
+  transcript, names from the transcript and the live tips. A call goes after it ends, again when its notes or Sheet
+  change (on its page or at the next launch, last 30 days), and only the parts that changed. No network just waits for
+  the next time. A call deleted on another device is not sent again.
+- **Drive links open as the right account (2026-11-15):** Open folder in Drive (Settings > Call recording) and Open in
+  Drive / Open transcript on the call page now open in the Chrome profile that has the Google account the recordings go
+  to, with that account selected. Before, they opened in the browser's current profile, and with another account there
+  Google showed "You need access".
+
 ## 0.11.0 (2026-11-15)
 
 Was 0.10.2 until signing in to the Pacenote server was added; everything below ships together.

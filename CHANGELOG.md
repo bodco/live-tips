@@ -3,6 +3,13 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.12.3 (2026-11-15)
+
+- **Automatic Notion adds follow your edits (2026-11-15):** "Add automatically after each call" for Decisions and
+  Risks now writes the same list the call page shows: your edit first, then the Meeting notes, then what was caught
+  live. Before, it took the last live picture, so it could miss the decisions and risks of the notes or bring back an
+  item you had removed. The preparation and the call agent read earlier calls' decisions and promises by the same rule.
+
 ## 0.12.2 (2026-11-15)
 
 - **One list of decisions per call (2026-11-15, L1-L2):** the Decisions tab and its count, Summary (Meeting notes, its

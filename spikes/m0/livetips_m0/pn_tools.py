@@ -7,8 +7,8 @@ gives "(no data)". Nothing here writes a file or talks to the network; `lt searc
 
 Where the data lives (read, never guessed):
 - earlier calls: <project>/live/<YYYY-MM-DD-HHMM-title>.md (the app's copy .app.md), their notes <stem>.notes.md
-  (## Meeting notes, rules/notes.yaml schema 2, callnotes.parse_meeting) or, without notes, the last call picture
-  (kind "situation" in <stem>.tips.jsonl, callinfo.last_item);
+  (## Meeting notes, rules/notes.yaml schema 3, callnotes.parse_meeting) and the call pictures (kind "situation" in
+  <stem>.tips.jsonl); decisions and promises by the call page's one rule (call_lists, 0.12.3);
 - promises: <project>/live/commitments.jsonl (commitments.load, events folded by id);
 - active decisions: <project>/pacenote/decisions.md (the Notion register's snapshot, decision_notion.parse_snapshot);
 - the project's state: <project>/_notion/current-state.md (the local Notion copy, front matter last_edited/mirrored).
@@ -63,25 +63,31 @@ def _at(date: str, t: str) -> str:
 
 
 def call_facts(md: Path) -> tuple:
-    """(source, [(kind, time, text)]) of one call: the meeting notes, else the call picture, else transcript lines."""
+    """(source, [(kind, time, text)]) of one call. Decisions and promises follow the call page's one rule
+    (call_lists, 0.12.3: the PM's edit > the meeting notes > the call picture > the older notes sections); open
+    questions come from the notes, else the call picture; without any, the TL;DR, else transcript lines."""
+    from . import call_lists
+    from .callnotes import parse_meeting
     nf = notes_file(md)
-    if nf is not None:
-        from .callnotes import parse_meeting
-        m = parse_meeting(nf.read_text(encoding="utf-8", errors="replace"))
-        rows = [("decision", i["t"], i["text"]) for i in m["decisions"][:PER_KIND]]
-        rows += [("promise", i["t"], i["text"].replace("**", "")) for i in m["actions"][:PER_KIND]]
+    L = call_lists.read(md, nf)
+    m = parse_meeting(nf.read_text(encoding="utf-8", errors="replace")) if nf is not None else None
+    sit = {} if nf is not None else next((o for o in reversed(call_lists.situations(md)) if o.get("source") != "call_page"), {})
+    rows = [("decision", i["t"], i["text"]) for i in L["decision_items"][:PER_KIND]]
+    for t in L["tasks"][:PER_KIND]:
+        line = call_lists.task_line(t)
+        rows.append(("promise", t["t"], "PM: " + line if t["mine"] is True else line))
+    if m is not None:
         rows += [("open", i["t"], i["text"]) for i in m["open"][:PER_KIND]]
-        if not rows and m["tldr"]:
-            rows = [("summary", "", m["tldr"])]
-        if rows:
-            return "notes " + nf.name, rows
-    sit = callinfo.last_item(md, "situation") or {}
-    rows = [("decision", "", str(d)) for d in (sit.get("decisions") or [])[:PER_KIND]]
-    rows += [("promise", "", "PM: " + a.get("what", "") + _due(a)) for a in (sit.get("actions") or [])[:PER_KIND]]
-    rows += [("promise", "", a.get("who", "") + ": " + a.get("what", "") + _due(a)) for a in (sit.get("theirs") or [])[:PER_KIND]]
-    rows += [("open", "", a.get("what", "")) for a in (sit.get("asks") or [])[:PER_KIND] if a.get("type") != "update"]
+    else:
+        rows += [("open", "", a.get("what", "")) for a in (sit.get("asks") or [])[:PER_KIND] if a.get("type") != "update"]
+    if not rows and m is not None and m["tldr"]:
+        rows = [("summary", "", m["tldr"])]
     if rows:
-        return "call picture " + md.name, rows
+        froms = {L["decisions_from"], L["tasks_from"]}
+        src = "notes " + nf.name if nf is not None and froms & {"notes", "legacy", "none"} else "call picture " + md.name
+        if "pm" in froms:
+            src += " + call page edit"
+        return src, rows
     ls = callinfo.lines(md, 60000)
     pick = ls[:2] + ls[-4:] if len(ls) > 6 else ls
     return "transcript " + md.name, [("line", l["t"], "{}: {}".format(l["who"], l["text"][:240])) for l in pick]

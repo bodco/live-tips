@@ -4,7 +4,7 @@
        [--call "<title, date>"] [--source <meeting page url>] [--date YYYY-MM-DD] [--stated-by <name>]
        [--project-name N | --project-page ids] [--project-prop P] [--workspace-prop P --workspace-value V | --workspace-page ids]
        [--no-ai] [--no-supersede-check] [--dry-run]
-  ... --from-call --call-file <md>            every decision of the call's last call picture not written yet
+  ... --from-call --call-file <md>            every decision of the call (call_lists) not written yet
   ... --list-active                           the project's active decisions as JSON
   ... --snapshot <root>/pacenote/decisions.md the same list written for the preparation and the live engine
   ... --supersede <old page id> --new <new page id>   only after the PM's click: old Status = Superseded + links
@@ -224,9 +224,9 @@ def parse_snapshot(text: str) -> List[dict]:
 
 # ---------------------------------------------------------------- writing
 def call_decisions(md: Path) -> List[str]:
-    from .callinfo import last_item
-    sit = last_item(md, "situation") or {}
-    return [str(x).strip() for x in sit.get("decisions") or [] if str(x).strip()]
+    """0.12.3: the call's decisions by the one rule of the call page (call_lists: PM edit > notes > live picture)."""
+    from .call_lists import read
+    return read(md)["decisions"]
 
 
 def transcript_of(md: Optional[Path]) -> str:

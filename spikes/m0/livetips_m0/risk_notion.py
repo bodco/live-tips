@@ -6,7 +6,7 @@ rules/risks.yaml > after_call). The app runs it after the PM confirms, or (0.8.8
        [--db <data source id>] [--project-name <name>] [--workspace-prop P --workspace-value V | --workspace-page ids]
        [--call-file <transcript.md>] [--from-call] [--dry-run]
 --call-file keeps the page next to the call (<stem>.notion.json) so the same risk of the same call is written once;
---from-call writes every risk of the call's last call picture that is not written yet (the automatic add).
+--from-call writes every risk of the call (call_lists, the call page's rule) that is not written yet (the automatic add).
 Needs NOTION_TOKEN in the environment (the app passes it to the child only). Prints JSON {"ok", "url", "error"}.
 """
 import argparse
@@ -38,11 +38,9 @@ def risk_db(a, ids: dict) -> str:
 
 
 def call_risks(md: Path) -> list:
-    """The risks of the call's last call picture (the call page's edits included)."""
-    from .callinfo import last_item
-    sit = last_item(md, "situation") or {}
-    return [str(r.get("what") if isinstance(r, dict) else r).strip() for r in sit.get("risks") or []
-            if str(r.get("what") if isinstance(r, dict) else r).strip()]
+    """0.12.3: the call's risks by the one rule of the call page (call_lists: PM edit > notes > live picture)."""
+    from .call_lists import read
+    return read(md)["risks"]
 
 
 def write_one(a, db: str, sc: dict, ids: dict, title: str) -> dict:

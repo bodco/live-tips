@@ -1510,7 +1510,9 @@ Superseded and links Supersedes and Superseded By; without the click nothing cha
 **Add automatically after each call.** Under Tasks, Risks and Decisions there is a switch, each off by default. When
 it is on, 40 seconds after a call ends the open commitments on you, the risks or the decisions of that call are
 written to that database once (the call file and the text are the key, kept next to the call in `<stem>.notion.json`),
-never for a hidden call. The 0.8.6 switch "Add my commitments to Notion tasks" moved under Tasks with its value.
+never for a hidden call. From 0.12.3 the risks and decisions written are the call's one list (above): your edits on
+the call page count, and an item you removed is not written. The preparation and the call agent read earlier calls by
+the same rule. The 0.8.6 switch "Add my commitments to Notion tasks" moved under Tasks with its value.
 
 **Workspace next to Project.** Each database row has a Project property and a Workspace property (relation, select,
 multi-select or text; a property named Workspace is chosen by itself; None is allowed). Every page Pacenote writes

@@ -3,7 +3,7 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.12.0 (unreleased)
+## 0.12.0 (2026-11-15)
 
 - **Your calls on the Pacenote server, per project (2026-11-15, B8b):** with a Pacenote account (Settings > Account),
   a project can send its calls to the server: Settings > Projects > the project's menu > **Sync to Pacenote server**.
@@ -13,6 +13,10 @@ Pacenote. Earlier versions are described in the commit messages and in
   transcript, names from the transcript and the live tips. A call goes after it ends, again when its notes or Sheet
   change (on its page or at the next launch, last 30 days), and only the parts that changed. No network just waits for
   the next time. A call deleted on another device is not sent again.
+- **Texts about the server match 0.12.0 (2026-11-15):** Settings > Account now says which calls go to the server and how
+  to turn it on per project, instead of "in the next version"; About > Your data no longer says nothing goes to the author
+  (the weekly usage numbers, if on, and the server for projects you turn on). PRIVACY EN/UK describe what 0.12.0 sends;
+  participants' names and the consent record are not sent yet.
 - **Drive links open as the right account (2026-11-15):** Open folder in Drive (Settings > Call recording) and Open in
   Drive / Open transcript on the call page now open in the Chrome profile that has the Google account the recordings go
   to, with that account selected. Before, they opened in the browser's current profile, and with another account there

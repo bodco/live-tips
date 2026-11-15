@@ -776,6 +776,7 @@
  "reassign.tips.label": "Project",
  "reassign.tips.change": "Change",
  "reassign.notion.failed": "Notion: the call moved, but its pages were not updated: {why}",
+ "reassign.notion.notShared": "Notion: the call moved, but Pacenote cannot see its Notion page. Open the page in Notion, ••• > Connections, add the Pacenote integration, then move the call again.",
  "reassign.notion.otherDB.title": "Write a meeting page in the new project's database?",
  "reassign.notion.otherDB.body": "The new project keeps its meetings in another Notion database. Pacenote can write a new page there (a new summary, about the cost of a usual one) and leave a \"Moved to\" link on the old page. Otherwise the old page stays as it is.",
  "reassign.notion.otherDB.yes": "Write a new page",

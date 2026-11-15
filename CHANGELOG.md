@@ -3,6 +3,13 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.13.2 (2026-11-15)
+
+- **Moving a call: a clear message when Notion hides the page (2026-11-15):** when a call moves to another project and
+  its Notion page, decisions or risks are not shared with the Pacenote integration, Notion answers "not found" and the
+  app showed that raw error. It now says what to do: open the page in Notion, ••• > Connections, add the Pacenote
+  integration, then move the call again.
+
 ## 0.13.1 (2026-11-15)
 
 - **Calls sync at launch again (2026-11-15):** for projects with Sync to Pacenote server on, the app is meant to send

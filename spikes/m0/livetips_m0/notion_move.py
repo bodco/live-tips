@@ -26,6 +26,12 @@ from .wrapup_notion import (add_link_args, apply_link_args, config_ids, find_pag
                             notion, rt)
 
 TXT = {"en": "Moved to ", "uk": "Перенесено в: "}
+NOT_SHARED = "not_shared"   # 0.13.2: Notion answers 404 for a page the integration cannot see; the app explains it
+
+
+def not_shared(e: Exception) -> bool:
+    t = str(e)
+    return "-> 404" in t or "object_not_found" in t
 
 
 def page_id(v: str) -> str:
@@ -103,7 +109,9 @@ def run_items(a, ids: dict) -> dict:
         try:
             done.append(move_page(pid, ids, a)["id"])
         except Exception as e:  # noqa: BLE001 (one page failing does not stop the others)
-            errors.append(str(e)[:200])
+            errors.append(NOT_SHARED if not_shared(e) else str(e)[:200])
+    if errors and all(x == NOT_SHARED for x in errors):
+        return {"ok": False, "updated": len(done), "error": NOT_SHARED}
     return {"ok": not errors, "updated": len(done), "error": "; ".join(errors) or None}
 
 
@@ -143,7 +151,7 @@ def main(argv=None) -> int:
             apply_link_args(a, ids)
             res.update(run_meetings(a, ids) if a.kind == "meetings" else run_items(a, ids))
     except Exception as e:  # noqa: BLE001
-        res["ok"], res["error"] = False, str(e)[:400]
+        res["ok"], res["error"] = False, (NOT_SHARED if not_shared(e) else str(e)[:400])
     print(json.dumps(res, ensure_ascii=False))
     return 0 if res["ok"] else 1
 

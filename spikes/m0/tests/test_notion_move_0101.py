@@ -80,3 +80,15 @@ def test_moved_to_appends_one_paragraph(monkeypatch, capsys):
     assert r["ok"]
     (m, path, body), = [c for c in fake.calls if c[0] == "PATCH"]
     assert path == f"/blocks/{PAGE}/children" and len(body["children"]) == 1
+
+
+class GoneNotion(FakeNotion):
+    def __call__(self, method, path, body=None):
+        raise RuntimeError(f"{method} https://api.notion.com/v1{path} -> 404: {{\"code\":\"object_not_found\"}}")
+
+
+def test_page_not_shared_is_named(monkeypatch, capsys):
+    """0.13.2: a 404 (the page is not shared with the integration) comes back as not_shared, not the raw error."""
+    r = run(monkeypatch, capsys, GoneNotion(DS_A), ["--kind", "meetings", "--page", PAGE, "--meetings-db", DS_A,
+                                                    "--project-page", "p9"])
+    assert not r["ok"] and r["error"] == "not_shared"

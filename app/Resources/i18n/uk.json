@@ -776,6 +776,7 @@
  "reassign.tips.label": "Проєкт",
  "reassign.tips.change": "Змінити",
  "reassign.notion.failed": "Notion: дзвінок перенесено, але його сторінки не оновлено: {why}",
+ "reassign.notion.notShared": "Notion: дзвінок перенесено, але Pacenote не бачить його сторінку в Notion. Відкрий сторінку в Notion, ••• > Connections, додай інтеграцію Pacenote і перенеси дзвінок ще раз.",
  "reassign.notion.otherDB.title": "Написати сторінку зустрічі в базі нового проєкту?",
  "reassign.notion.otherDB.body": "Новий проєкт тримає зустрічі в іншій базі Notion. Pacenote може написати там нову сторінку (нове саммарі, вартість як у звичайного) і лишити посилання \"Перенесено в\" на старій. Інакше стара сторінка лишиться як є.",
  "reassign.notion.otherDB.yes": "Написати нову сторінку",

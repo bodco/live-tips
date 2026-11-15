@@ -135,7 +135,7 @@ enum NotionCallMove {
                 if (r["other_db"] as? Bool) == true {
                     askNewPage(file: file, oldURL: (r["url"] as? String) ?? "", link: link("meetings"), c: c)
                 } else if (r["ok"] as? Bool) != true {
-                    CallEngine.shared.notify(L("reassign.notion.failed", ["why": (r["error"] as? String) ?? ""]))
+                    CallEngine.shared.notify(failure(r))
                 } else if (r["updated"] as? Int ?? 0) > 0 {
                     UsageLog.log("call_reassign_notion", ["kind": "meetings"])
                 }
@@ -144,10 +144,16 @@ enum NotionCallMove {
         for kind in ["decisions", "risks"] {
             PyTool.run("notion_move", ["--kind", kind, "--md", file] + link(kind), notion: true, needsAI: false) { r in
                 if (r["ok"] as? Bool) != true {
-                    CallEngine.shared.notify(L("reassign.notion.failed", ["why": (r["error"] as? String) ?? ""]))
+                    CallEngine.shared.notify(failure(r))
                 }
             }
         }
+    }
+
+    /// 0.13.2: a page the Notion integration cannot see (404) gets a fix the PM can do, not the raw error.
+    private static func failure(_ r: [String: Any]) -> String {
+        let why = (r["error"] as? String) ?? ""
+        return why == "not_shared" ? L("reassign.notion.notShared") : L("reassign.notion.failed", ["why": why])
     }
 
     /// The new project keeps its meetings in another database: a new page there only when the PM says so.
@@ -168,7 +174,7 @@ enum NotionCallMove {
         PyTool.run("wrapup_notion", args, notion: true) { r in
             if let usd = r["cost_usd"] as? Double, usd > 0 { SpendDays.add(usd); CallHistory.shared.addCost(file: file, usd) }
             guard (r["ok"] as? Bool) == true, let url = r["url"] as? String else {
-                CallEngine.shared.notify(L("reassign.notion.failed", ["why": (r["error"] as? String) ?? ""])); return
+                CallEngine.shared.notify(failure(r)); return
             }
             CallHistory.shared.setNotion(file: file, url: url)
             UsageLog.log("call_reassign_notion", ["kind": "new_page"])

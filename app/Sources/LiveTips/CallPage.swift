@@ -125,6 +125,7 @@ struct CallPageView: View {
             .frame(maxWidth: .infinity)      // 0.9.0: centred
         }
         .onReceive(NotificationCenter.default.publisher(for: CallReassignService.changed)) { _ in tick += 1 }   // 0.10.1 (A3)
+        .onAppear { DriveRecordings.shared.syncTranscript(file, create: false) }   // 0.11.0 (B7b): a changed transcript in Drive
         .textSelection(.enabled)      // 2026-11-10 (owner): the call's title and every text on the page can be selected and copied
         .background(PN.C.bg)
         .sheet(item: $cardDraft) { c in

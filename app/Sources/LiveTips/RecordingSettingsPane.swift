@@ -8,11 +8,20 @@ import LiveTipsCore
 struct RecordingSettingsPane: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject private var google = GoogleService.shared
+    @ObservedObject private var drive = DriveRecordings.shared
+    @ObservedObject private var pacenote = PacenoteAccount.shared
+    @State private var confirmDefault = false
     @State private var permission = ScreenPermission.granted()
     @State private var displays = RecTargets.displays()
 
     private var r: Binding<RecordingSettings> { $model.config.recording }
-    private var accounts: [GoogleAccount] { google.accounts.filter { $0.has(GoogleScopes.export) } }
+    private var accounts: [GoogleAccount] { Self.shotAccounts ?? google.accounts.filter { $0.has(GoogleScopes.export) } }
+    /// 0.11.0 (smoke shots): demo Google accounts instead of the real ones.
+    nonisolated(unsafe) static var shotAccounts: [GoogleAccount]?
+    /// The account the recordings go to (Settings' choice, else the first one).
+    private var driveAccount: String? {
+        accounts.first { $0.email == model.config.recording.driveAccount }?.email ?? accounts.first?.email
+    }
 
     var body: some View {
         Form {
@@ -90,6 +99,8 @@ struct RecordingSettingsPane: View {
                         Text(L("rec.drive.firstAccount", ["email": accounts[0].email])).tag("")
                         ForEach(accounts, id: \.email) { a in Text(a.email).tag(a.email) }
                     }
+                    if let a = driveAccount { folderRow(a) }
+                    transcriptRow
                 }
             } header: { Text("Google Drive") } footer: {
                 Text(L("rec.set.drive.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
@@ -120,8 +131,66 @@ struct RecordingSettingsPane: View {
             } header: { Text(L("rec.set.privacy")) }
         }
         .formStyle(.grouped)
-        .onAppear { permission = ScreenPermission.granted(); displays = RecTargets.displays() }
+        .onAppear {
+            permission = ScreenPermission.granted(); displays = RecTargets.displays()
+            if let a = driveAccount { drive.refreshRoot(account: a) }
+        }
+        .onChange(of: model.config.recording.driveAccount) { _, _ in if let a = driveAccount { drive.refreshRoot(account: a) } }
+        .confirmationDialog(L("rec.set.folder.defaultAsk"), isPresented: $confirmDefault) {
+            Button(L("rec.set.folder.default")) { if let a = driveAccount { drive.useDefault(account: a) } }
+            Button(L("common.cancel"), role: .cancel) {}
+        } message: { Text(L("rec.set.folder.defaultAsk.sub")) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in permission = ScreenPermission.granted() }
+    }
+
+    /// 0.11.0 (B7b, server ADR 3.7): where the recordings go. Pacenote makes My Drive > Pacenote; the PM moves or shares
+    /// that folder in Drive (to a shared drive, to a lead) and Pacenote goes on writing into it by its id.
+    @ViewBuilder private func folderRow(_ a: String) -> some View {
+        let root = drive.store.account(a).root
+        let gone = drive.rootState[a.lowercased()] == .unavailable
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(L("rec.set.folder"))
+                    if let r = root, !r.driveId.isEmpty {
+                        Text(L("rec.set.folder.shared")).font(PN.Font.caption).foregroundStyle(PN.C.text2)
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(PN.C.surface2, in: Capsule())
+                    }
+                }
+                Text(root.map { L("rec.set.folder.saved", ["name": $0.name.isEmpty ? DriveFolderStore.rootName : $0.name]) } ?? L("rec.set.folder.none"))
+                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                if gone {
+                    Text(L("rec.drive.folderGone")).font(PN.Font.caption).foregroundStyle(PN.C.onMe).fixedSize(horizontal: false, vertical: true)
+                }
+                if let e = drive.errors["settings"] {
+                    Text(e).font(PN.Font.caption).foregroundStyle(PN.C.onMe).lineLimit(2)
+                }
+            }
+            Spacer()
+            if gone {
+                Button(L("rec.drive.newFolder")) { drive.recreateRoot(account: a) }.buttonStyle(.pnSecondary)
+            } else {
+                Button(L("rec.set.folder.open")) { drive.openRoot(account: a) }.buttonStyle(.pnTertiary)
+            }
+            if root != nil {
+                Button(L("rec.set.folder.default")) { confirmDefault = true }.buttonStyle(.pnTertiary)
+            }
+        }
+        Text(L("rec.set.folder.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// 0.11.0 (B7b, server ADR 3.4): the call's transcript as .md next to the video. An organization can require it.
+    @ViewBuilder private var transcriptRow: some View {
+        let org = pacenote.me?.transcriptRequiredBy
+        Picker(L("rec.set.transcript"), selection: org == nil ? r.transcriptDrive : .constant(TranscriptInDrive.everyCall.rawValue)) {
+            Text(L("rec.transcript.off")).tag(TranscriptInDrive.off.rawValue)
+            Text(L("rec.transcript.withRecording")).tag(TranscriptInDrive.withRecording.rawValue)
+            Text(L("rec.transcript.everyCall")).tag(TranscriptInDrive.everyCall.rawValue)
+        }
+        .disabled(org != nil)
+        Text(org.map { L("rec.set.transcript.required", ["org": $0]) } ?? L("rec.set.transcript.sub"))
+            .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
     }
 
     static func size(_ mb: Int) -> String { mb >= 1000 ? String(format: "%.1f GB", Double(mb) / 1000) : "\(mb) MB" }

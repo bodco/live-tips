@@ -268,6 +268,74 @@ if let i = args.firstIndex(of: "--rec-drive-test"), i + 1 < args.count {   // 0.
     }
     RunLoop.main.run()
 }
+if let i = args.firstIndex(of: "--drive-b7b-test"), i + 2 < args.count {   // 0.11.0 QA: B7b against the live Drive
+    let file = args[i + 1], outPath = args[i + 2]
+    MainActor.assumeIsolated {
+        Task { @MainActor in
+            let g = GoogleService.shared
+            g.reload()
+            await g.refreshAll()
+            let r = await DriveRecordings.shared.testB7b(path: file)
+            let d = (try? JSONSerialization.data(withJSONObject: r, options: [.sortedKeys, .prettyPrinted])) ?? Data()
+            try? d.write(to: URL(fileURLWithPath: outPath))
+            exit(0)
+        }
+    }
+    RunLoop.main.run()
+}
+if let i = args.firstIndex(of: "--drive-b7b-cleanup"), i + 2 < args.count {   // 0.11.0 QA: test files to the Drive trash
+    let outPath = args[i + 1], ids = Array(args[(i + 2)...])
+    MainActor.assumeIsolated {
+        Task { @MainActor in
+            let g = GoogleService.shared
+            g.reload()
+            await g.refreshAll()
+            let r = await DriveRecordings.shared.testTrash(ids)
+            let d = (try? JSONSerialization.data(withJSONObject: r, options: [.sortedKeys, .prettyPrinted])) ?? Data()
+            try? d.write(to: URL(fileURLWithPath: outPath))
+            exit(0)
+        }
+    }
+    RunLoop.main.run()
+}
+if let i = args.firstIndex(of: "--account-test"), i + 1 < args.count {   // B7 QA: sign in, me, devices, refresh, sign out
+    let outPath = args[i + 1]
+    MainActor.assumeIsolated {
+        Task { @MainActor in
+            let a = PacenoteAccount.shared
+            var out: [String: Any] = ["server": a.base.absoluteString, "app_version": PacenoteAccount.appVersion]
+            func done() {
+                let d = (try? JSONSerialization.data(withJSONObject: out, options: [.sortedKeys, .prettyPrinted])) ?? Data()
+                try? d.write(to: URL(fileURLWithPath: outPath)); exit(0)
+            }
+            a.startSignIn()
+            for _ in 0..<600 where !a.signedIn {      // up to 5 minutes for the browser
+                if case .failed(let e) = a.signIn { out["sign_in_error"] = e; done() }
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+            guard let s = a.session else { out["sign_in_error"] = "timeout"; done(); return }
+            out["signed_in"] = true; out["email_domain"] = String(s.email.split(separator: "@").last ?? "")
+            await a.refreshInfo()
+            out["me_ok"] = a.me != nil; out["orgs"] = a.me?.orgs.map { ["kind": $0.kind, "role": $0.role, "plan": $0.plan] } ?? []
+            out["devices"] = a.devices.count; out["this_device_listed"] = a.devices.contains { $0.current }
+            out["problem_after_me"] = a.problem ?? ""
+            // two requests at once after the access token expires: one refresh only, the session survives
+            a.expireAccessForTest()
+            async let x: String? = try? a.accessToken()
+            async let y: String? = try? a.accessToken()
+            let (t1, t2) = await (x, y)
+            out["refresh_both_ok"] = t1 != nil && t2 != nil; out["refresh_same_token"] = t1 != nil && t1 == t2
+            await a.refreshInfo()
+            out["me_after_refresh_ok"] = a.me != nil && a.signedIn
+            out["problem_after_refresh"] = a.problem ?? ""
+            if args.contains("--keep") { out["kept_signed_in"] = true; done() }
+            await a.signOut(everywhere: false)
+            out["signed_out"] = !a.signedIn; out["notice"] = a.notice ?? ""
+            done()
+        }
+    }
+    RunLoop.main.run()
+}
 if args.contains("--probe") {
     probe(request: args.contains("--request"))
     exit(0)

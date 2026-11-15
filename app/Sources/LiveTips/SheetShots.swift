@@ -64,6 +64,100 @@ final class SheetShots: NSObject, NSApplicationDelegate {
         try? "# Lumenfield-like case: Northwind Studio reporting automation\n\nMonthly reports went from three days to two hours.\n"
             .write(toFile: sales + "/cases/northwind-studio-reporting.md", atomically: true, encoding: .utf8)
         try? "# Pricing notes\n\nDiscovery workshop: fixed price.\n".write(toFile: sales + "/cases/pricing-notes.md", atomically: true, encoding: .utf8)
+        prepareB7b(sales: sales)
+    }
+
+    // MARK: 0.11.0 (B7a, B7b smoke): Settings > Account, Settings > Call recording, the call page's recording line
+
+    /// Three demo calls in Northwind Sales: a recording in Drive with its transcript, a recording whose Drive folder is
+    /// gone, a call without a recording whose transcript is in Drive. Only meta files; no audio or video.
+    nonisolated static func prepareB7b(sales: String) {
+        try? FileManager.default.createDirectory(atPath: sales + "/video", withIntermediateDirectories: true)
+        let start = Date().addingTimeInterval(-26 * 3600)
+        for (stem, state) in [("2026-11-14-1030-weekly-sync", "uploaded"), ("2026-11-14-1500-pricing-review", "gone"), ("2026-11-14-1700-quick-check", "none")] {
+            let t = sales + "/live/" + stem + ".app.md"
+            try? "# Live transcript: x\n\n[10:30:05] Me (en): Hi Emily\n".write(toFile: t, atomically: true, encoding: .utf8)
+            if state != "none" {
+                var m = RecordingMeta(); m.title = "Weekly sync"; m.project = "Northwind Sales"
+                var p = RecordingMeta.Part(file: stem + ".recording.mp4", kind: "video", started: start); p.seconds = 1860; p.bytes = 212_000_000
+                if state == "uploaded" {
+                    p.driveID = "demo-file"; p.driveLink = "https://drive.google.com/file/d/demo-file/view"; p.driveAccount = "mike@example.com"
+                    p.driveFolderID = "demo-project"; p.driveKind = "shared_drive"
+                } else { p.driveError = RecordingMeta.Part.folderUnavailable }
+                m.parts = [p]
+                m.save(RecordingFiles.metaPath(transcript: t))
+            }
+            if state != "gone" {
+                var d = DriveTranscriptMeta(); d.fileID = "demo-md"; d.link = "https://drive.google.com/file/d/demo-md/view"; d.kind = "shared_drive"
+                d.account = "mike@example.com"; d.hash = "x"
+                d.save(DriveTranscript.metaPath(transcript: t))
+            }
+        }
+    }
+
+    var salesLive: String { work + "/projects/Northwind Studio/Northwind Sales/live/" }
+
+    func b7bScenes() -> [Scene] {
+        var s: [Scene] = []
+        let mike = GoogleAccount(email: "mike@example.com", refreshToken: "demo", scopes: GoogleScopes.export)
+        let emily = GoogleAccount(email: "emily@example.com", refreshToken: "demo", scopes: GoogleScopes.export)
+        func store(root: DriveFolderStore.Folder?) -> DriveFolderStore {
+            var st = DriveFolderStore()
+            if let r = root { st.setRoot(mike.email, r); st.setProject(mike.email, "Northwind Sales", .init(id: "demo-project", name: "Northwind Sales", driveId: r.driveId)) }
+            return st
+        }
+        let me: (Bool) -> PacenoteServer.Me? = { req in
+            PacenoteServer.me(["user": ["email": "mike@example.com", "name": "Mike Carter"], "organizations": [
+                ["id": "o1", "name": "Mike's workspace", "kind": "personal", "org_role": "owner", "plan": "beta"],
+                ["id": "o2", "name": "Northwind Studio", "kind": "team", "org_role": "member", "plan": "team",
+                 "policy": ["require_transcript_in_drive": req]]]])
+        }
+        func rec(_ name: String, accounts: [GoogleAccount], root: DriveFolderStore.Folder?, state: DriveFolderState? = nil,
+                 transcript: String = "off", required: Bool = false, error: String? = nil) -> Scene {
+            Scene(name: "settings-recording-" + name, size: NSSize(width: 720, height: 1500), make: { [unowned self] in
+                RecordingSettingsPane.shotAccounts = accounts
+                DriveRecordings.shared.shotState(store: store(root: root), rootState: state.map { [mike.email: $0] } ?? [:],
+                                                 errors: error.map { ["settings": $0] } ?? [:])
+                PacenoteAccount.shared.shotState(session: nil, me: required ? me(true) : nil)
+                let lang = L10n.lang                 // saving the config sets the language from it: keep the pass's language
+                let m = SettingsModel()
+                var c = m.config
+                c.uiLanguage = lang
+                c.recording.kind = "audio"; c.recording.drive = "auto"; c.recording.transcriptDrive = transcript; c.recording.driveAccount = ""
+                m.config = c
+                L10n.set(lang)
+                keep.append(m)
+                return AnyView(RecordingSettingsPane(model: m))
+            })
+        }
+        s.append(rec("no-account", accounts: [], root: nil))
+        s.append(rec("first-upload", accounts: [mike, emily], root: nil))
+        s.append(rec("my-drive", accounts: [mike], root: .init(id: "demo-root", name: "Pacenote"), state: .ok, transcript: "with_recording"))
+        s.append(rec("shared-drive", accounts: [mike], root: .init(id: "demo-root", name: "Pacenote", driveId: "demo-shared"), state: .ok, transcript: "every_call"))
+        s.append(rec("folder-gone", accounts: [mike], root: .init(id: "demo-root", name: "Pacenote"), state: .unavailable))
+        s.append(rec("required", accounts: [mike], root: .init(id: "demo-root", name: "Pacenote", driveId: "demo-shared"), state: .ok, required: true))
+        for (n, stem) in [("uploaded", "2026-11-14-1030-weekly-sync"), ("folder-gone", "2026-11-14-1500-pricing-review"), ("transcript-only", "2026-11-14-1700-quick-check")] {
+            s.append(Scene(name: "row-recording-" + n, size: NSSize(width: 1000, height: 140), make: { [unowned self] in
+                RecordingSettingsPane.shotAccounts = [mike]
+                DriveRecordings.shared.shotState(store: store(root: .init(id: "demo-root", name: "Pacenote")))
+                return AnyView(RecordingRow(file: salesLive + stem + ".app.md").padding(20))
+            }))
+        }
+        s.append(Scene(name: "settings-account-signed-out", size: NSSize(width: 720, height: 900), make: {
+            PacenoteAccount.shared.shotState(session: nil, me: nil)
+            return AnyView(AccountSettingsPane())
+        }))
+        s.append(Scene(name: "settings-account-signed-in", size: NSSize(width: 720, height: 1300), make: {
+            let ses = PacenoteServer.Session(refreshToken: "demo", refreshExpires: Date().addingTimeInterval(50 * 86400),
+                                             email: "mike@example.com", name: "Mike Carter")
+            let iso = ISO8601DateFormatter()
+            let devs = PacenoteServer.devices([
+                ["id": "d1", "name": "Mike's MacBook Pro", "app_version": "0.11.0", "last_seen_at": iso.string(from: Date()), "current": true],
+                ["id": "d2", "name": "Mike's Mac mini", "app_version": "0.10.2", "last_seen_at": iso.string(from: Date().addingTimeInterval(-3 * 86400))]])
+            PacenoteAccount.shared.shotState(session: ses, me: me(false), devices: devs)
+            return AnyView(AccountSettingsPane())
+        }))
+        return s
     }
 
     // MARK: demo calls
@@ -287,6 +381,7 @@ final class SheetShots: NSObject, NSApplicationDelegate {
             keep.append(doc)
             return AnyView(SheetExportView(doc: doc, done: {}).background(Color(nsColor: .windowBackgroundColor)))
         }))
+        s += b7bScenes()
         return s
     }
 
@@ -296,12 +391,12 @@ final class SheetShots: NSObject, NSApplicationDelegate {
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         log("launched, work " + work)
         writeSheet()
-        let only = ProcessInfo.processInfo.environment["LT_SHEETSHOTS_ONLY"] ?? ""
+        let only = ProcessInfo.processInfo.environment["LT_SHEETSHOTS_ONLY"] ?? ""   // a prefix, or several split by commas
         for (lang, themes) in [("en", ["light", "dark"]), ("uk", ["light"])] {
             queue.append { [unowned self] in L10n.set(lang); next(0.3) }
             for t in themes {
                 queue.append { [unowned self] in theme = t; NSApp.appearance = NSAppearance(named: t == "dark" ? .darkAqua : .aqua); next(0.3) }
-                for sc in scenes() where only.isEmpty || sc.name.hasPrefix(only) {
+                for sc in scenes() where only.isEmpty || only.split(separator: ",").contains(where: { sc.name.hasPrefix(String($0)) }) {
                     queue.append { [unowned self] in shoot(sc, suffix: "-" + t + (lang == "uk" ? "-uk" : "")) }
                 }
             }

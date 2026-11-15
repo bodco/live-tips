@@ -321,6 +321,7 @@ final class CallHistory: ObservableObject {
 
     func rename(file: String, title: String) {
         if records.contains(where: { $0.file == file }) { update(file) { $0.title = title } }
+        DriveRecordings.shared.renamed(file: file, title: title)       // 0.11.0 (B7b): the Drive copies take the new name
     }
 
     /// Renames found in the calls' inbox files (calls of the last 60 days).
@@ -328,7 +329,12 @@ final class CallHistory: ObservableObject {
         var changed = false
         let since = Date().addingTimeInterval(-60 * 86400)
         for i in records.indices where records[i].start > since {
-            if let t = Self.renamedTitle(records[i].file), t != records[i].title { records[i].title = t; changed = true }
+            if let t = Self.renamedTitle(records[i].file), t != records[i].title {
+                records[i].title = t; changed = true
+                let f = records[i].file
+                // Later, not now: this runs inside CallHistory's init (scan), and the Drive side reads CallHistory.shared.
+                DispatchQueue.main.async { MainActor.assumeIsolated { DriveRecordings.shared.renamed(file: f, title: t) } }
+            }
         }
         if changed { persist() }
     }

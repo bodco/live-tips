@@ -1779,7 +1779,8 @@ was on the shared screen. Pacenote can save the call's sound, or the sound and t
   to the account in Settings > Call recording (any account added in Integrations > Google that allows the export), into
   My Drive > Pacenote > <project>, with the `drive.file` permission: Pacenote sees only the files and folders it made.
   The upload goes in 8 MB pieces and goes on after a dropped connection or a restart. The recording stays on the Mac;
-  share the Drive copy from Drive.
+  share the Drive copy from Drive. Since 0.11.0 the Pacenote folder can be moved or shared in Drive, and the
+  transcript can go next to the recording: 14.1z4.
 - **Permission.** macOS Screen & System Audio Recording, in the same set as the microphone during onboarding (or Settings
   > Call recording > Allow). Recording needs it also for sound only, because the call's sound comes through the same
   macOS service. macOS may ask you to quit and reopen Pacenote after allowing it.
@@ -2242,6 +2243,50 @@ behaviour before co-driver, set `codriver: false` in the sidecar config.
 - **Help improve Pacenote is on by default.** New installs start with it on; the last onboarding step says what goes
   and has the switch. An update switches it on once and says so at the next launch; if the usage log itself is off,
   sharing stays off. What goes and what never goes: section 11 and [PRIVACY.md](../../PRIVACY.md).
+
+### 14.1z3 Pacenote account (0.11.0, beta, optional)
+
+**Settings > Account** signs you in to the Pacenote server with Google. Nothing else depends on it: without signing in
+Pacenote works exactly as before.
+
+- **Sign in with Google** opens the browser. Pacenote asks Google only for your email, name and picture. This is not
+  one of the Google accounts in Integrations (calendars, Docs, Drive): you can sign in with a work account and keep
+  calendars on another, or the other way round.
+- After signing in the page shows your workspace (the first sign-in makes a personal one, you are its owner) and the
+  Macs signed in to your account. **Sign out** next to another Mac ends its session; **Sign out everywhere** ends all
+  of them, this one too. Nothing on any Mac is deleted.
+- **Delete server data** asks twice, then deletes your account on the server: your content key is destroyed at once,
+  the rest is purged within 30 days. Calls on your Mac and files in your Google Drive stay.
+- **What goes there.** In 0.11.0 only your account and your devices. From the next version: after each call the
+  summary, decisions, tasks, the call's details and the Meeting Sheet, with links to the recording and transcript in
+  your Drive, with a switch per project and per call. Never audio, video, transcripts, voice prints or live tips.
+  The server is in the EU; see [PRIVACY](../../PRIVACY.md).
+
+### 14.1z4 Google Drive: the folder and the transcript (0.11.0, beta)
+
+Settings > Call recording > Google Drive.
+
+- **Folder.** The first upload makes My Drive > Pacenote, with a folder per project in it. **Open folder in Drive**
+  opens it. To keep recordings on a shared drive (the files then belong to the organization) or to show them to your
+  team lead, move or share this folder in Google Drive: Pacenote remembers the folder's id per Google account and keeps
+  writing into it wherever it is; "Shared drive" next to Folder says it is on one. Moving the folder does not need
+  any new permission: `drive.file` covers the folders Pacenote made. **Use default** forgets the folder: new uploads
+  go to My Drive > Pacenote again, files already uploaded stay where they are.
+- **When the folder is gone.** Deleted, in the trash or the access removed: the upload stops, the call page and
+  Settings say **Folder not available** and offer **Create a new folder**. No network or a Google error only delays
+  the upload; the queue is kept.
+- **Transcript in Drive.** Off (the default), **With the recording** (when the recording is uploaded) or **For every
+  call** (also calls without a recording, within a minute after the call ends). A `.md` file in the same folder as the video,
+  with the same name base: `2026-11-05 14.30 Weekly sync.md`, one file for a recording in several parts. It has the
+  title, date, duration, project and participants, then the lines with the speaker's name and the time. No tips, no
+  private notes, no Meeting Sheet. Drive shows it as text; it is not converted to a Google Doc. The call page shows
+  **Open transcript**.
+- **Updated in place.** Renaming the call, or a changed transcript (opening the call page checks), sends the file again
+  under the same id, so links stay. Renaming the call also renames its recording in Drive.
+- **Required by your organization.** When an organization you belong to in Pacenote requires the transcript in Drive,
+  the switch is locked on For every call with "Required by <organization>".
+- Removing a call from Home only hides it, so its Drive files stay. Asking to move them to the trash comes with real
+  deletion of calls, later.
 
 ### 14.2 After the call: the meeting page in Notion
 

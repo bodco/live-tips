@@ -17,13 +17,16 @@ struct RecordingRow: View {
             let paths = meta.parts.map { (folder as NSString).appendingPathComponent($0.file) }
             let uploading = drive.isUploading(file)
             let link = meta.parts.compactMap { $0.driveLink.isEmpty ? nil : $0.driveLink }.first
+            let gone = meta.parts.contains { $0.driveError == RecordingMeta.Part.folderUnavailable }
             HStack(spacing: 8) {
                 Image(systemName: meta.parts.contains { $0.kind == "video" } ? "video" : "waveform").foregroundStyle(PN.C.text3)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("rec.page.title")).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
                     Text(summary(meta)).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     if let p = drive.progress[file] { Text(p).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                    if let e = drive.errors[file] ?? meta.parts.first(where: { !$0.driveError.isEmpty })?.driveError, !uploading {
+                    if gone && !uploading {
+                        Text(L("rec.drive.folderGone")).font(PN.Font.caption).foregroundStyle(PN.C.onMe).lineLimit(2)
+                    } else if let e = drive.errors[file] ?? meta.parts.first(where: { !$0.driveError.isEmpty })?.driveError, !uploading {
                         Text(L("rec.drive.failed", ["err": e])).font(PN.Font.caption).foregroundStyle(PN.C.onMe).lineLimit(2)
                     }
                 }
@@ -32,7 +35,10 @@ struct RecordingRow: View {
                     .buttonStyle(.pnSecondary)
                 Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) }) }
                     .buttonStyle(.pnTertiary)
-                if !meta.notUploaded.isEmpty && !(rec.isActive && rec.transcript == file) {
+                if gone && !uploading && !(rec.isActive && rec.transcript == file) {
+                    Button(L("rec.drive.newFolder")) { drive.recreateFolder(transcript: file); tick += 1 }
+                        .buttonStyle(.pnSecondary).help(L("rec.drive.newFolder.help"))
+                } else if !meta.notUploaded.isEmpty && !(rec.isActive && rec.transcript == file) {
                     Button(uploading ? L("rec.page.uploading") : L("rec.page.upload")) { drive.upload(transcript: file); tick += 1 }
                         .buttonStyle(.pnSecondary).disabled(uploading)
                         .help(drive.account.map { L("rec.page.uploadTo", ["email": $0]) } ?? L("rec.drive.noAccount"))
@@ -40,8 +46,23 @@ struct RecordingRow: View {
                 if let l = link, let u = URL(string: l) {
                     Button(L("rec.page.openDrive")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary)
                 }
+                if let l = drive.transcriptLink(file), let u = URL(string: l) {
+                    Button(L("rec.page.openTranscript")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary)
+                }
             }
             .padding(.horizontal, 24).padding(.vertical, 14)          // the call page's cards (PageCard), one line high
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PageStyle.radius))
+            .onReceive(drive.objectWillChange) { _ in DispatchQueue.main.async { tick += 1 } }
+        } else if let l = drive.transcriptLink(file), let u = URL(string: l) {
+            // 0.11.0 (B7b): a call without a recording whose transcript is in Drive ("For every call").
+            HStack(spacing: 8) {
+                Image(systemName: "doc.text").foregroundStyle(PN.C.text3)
+                Text(L("rec.page.transcriptInDrive")).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                Spacer()
+                Button(L("rec.page.openTranscript")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary)
+            }
+            .padding(.horizontal, 24).padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PageStyle.radius))
             .onReceive(drive.objectWillChange) { _ in DispatchQueue.main.async { tick += 1 } }

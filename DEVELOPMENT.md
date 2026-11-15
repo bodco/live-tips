@@ -306,7 +306,14 @@ into one AAC track, AVAssetWriter with 10 s fragments; pause keeps one file, sto
 `CallEngine.startCallRecording` (the request's `recording`) and by the tips window (`{"action": "rec"}`), stopped with
 the call and before the app quits. `RecordingPicker.swift` (the window list), `RecordingSettingsPane.swift` (Settings
 > Call recording), `RecordingRow.swift` (the call page), `DriveRecordings.swift` (resumable upload, `drive.file`, the
-queue in UserDefaults). The recorder (`recorder/`) is not involved: the transcript works as before.
+queue in UserDefaults). Since 0.11.0 (B7b): the folder ids per Google account in `Application Support/LiveTips/drive-folders.json`
+(`LiveTipsCore/DriveCore.swift`: `DriveFolderStore`, migrated once from the UserDefaults keys `driveFolder|...`, which
+stay for a downgrade); a saved id is used while Drive gives it (`DriveFolderState`: 404, trash, no write access or a
+403 other than a rate limit is gone, everything else is "later"), a new "Pacenote" is made only with no saved id; every
+Drive request has `supportsAllDrives=true`, searches also `includeItemsFromAllDrives` and `corpora=allDrives`. The
+transcript in Drive (`DriveTranscript`, `<stem>.drive.json` next to the transcript) is rendered from `<stem>.named.md`
+or `<stem>.md`, sent as `text/markdown` in one multipart request and updated with `PATCH` on the same id when its hash
+changes. CoreChecks: `pacenoteDriveB7b`. `--rec-drive-test <file> [out.json]` uploads into the saved folder > Test. `--drive-b7b-test <file> <out.json>` runs the B7b paths against the live Drive in the same Test folder (video upload and rename, transcript made and updated in place, an unknown saved folder stops with Folder not available); the output has no tokens or emails. `--drive-b7b-cleanup <out.json> <id...>` moves such test files to the Drive trash. `--render-sheet-shots` also draws Settings > Call recording (six Drive states), the call page's recording line (three) and Settings > Account (signed out, signed in) from demo data (`LT_SHEETSHOTS_ONLY=settings-recording,row-recording,settings-account`); in that mode PacenoteAccount and DriveRecordings make no network calls and read no Keychain. The recorder (`recorder/`) is not involved: the transcript works as before.
 
 Sizes on this Mac: `"/Applications/Pacenote.app/Contents/MacOS/LiveTips" --rec-bench /tmp/rb 15` (better through
 `open -n Pacenote.app --args --rec-bench /tmp/rb 15`, so the app's Screen Recording permission applies) records the main
@@ -315,9 +322,26 @@ screen with every preset and format and writes `bench.json`.
 ## Privacy
 
 Audio and voice prints never leave the Mac, and a call recording leaves it only to the PM's own Google Drive when the
-PM uploads it. Only text goes to the model API. Keys are read at
+PM uploads it. With a Pacenote account (optional) the server keeps the account and its devices; from B8 also
+summaries, decisions, tasks, call details and the Meeting Sheet, never audio, video or transcripts. Only text goes to the model API. Keys are read at
 runtime (Keychain in the app, an environment variable or a secrets file in the spike) and are
 never printed or logged.
+
+## Pacenote account (0.11.0, B7)
+
+Optional sign-in to the Pacenote server (private repository `bodco/pacenote-server`, https://pacenote-api.bodco.pm).
+The design is the server ADR, section 5.1; the server API is `openapi.yaml` in that repository.
+
+| Part | File | What it does |
+|---|---|---|
+| Core | `LiveTipsCore/PacenoteServer.swift` | The server address (override in UserDefaults `pacenoteServerURL`: https, or http to 127.0.0.1), the Keychain session (`SecretStore.Key.pacenoteSession`: refresh token, its expiry, email, name), parsing of TokenPair, `/v1/me`, `/v1/devices` and problem bodies, the sign-in body. Checked in CoreChecks (`pacenoteAccountB7`) |
+| Service | `LiveTips/PacenoteAccount.swift` | Sign-in: the browser, `LoopbackReceiver` and PKCE like the Google accounts, but `GoogleScopes.signIn` (`openid email profile`) and `authURL(offline: false)`: no Google refresh token, the Google access token of the exchange is dropped. The ID token goes once to `POST /v1/auth/google`. Access token (15 min) in memory, refresh token (60 days, rotated) in the Keychain. **One refresh at a time** (`refreshing` task): the server revokes the device when a rotated refresh token comes back. A 401 on refresh ends the session here; no network or 5xx keeps it |
+| Settings | `LiveTips/AccountSettingsPane.swift` | Settings > Account: sign in, the account and workspace, devices (sign out one or everywhere), Delete server data (two confirmations, `DELETE /v1/me`), what goes to the server and what never does |
+
+The sign-in is separate from the Google accounts in Integrations on purpose: a person can sign in with one account and
+keep calendars and Drive on another. The server checks the ID token's `aud` against `PN_GOOGLE_CLIENT_IDS`, which the
+deploy takes from `PACENOTE_GOOGLE_CLIENT_ID`, the same value `bundle.sh` writes into `google_oauth.json`. Nothing
+about calls is sent yet (B8).
 
 ## Screenshots for the website
 

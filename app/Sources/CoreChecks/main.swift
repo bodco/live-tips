@@ -1930,6 +1930,172 @@ func callReassign0101() {
     try? fm.removeItem(atPath: base)
 }
 
+/// B7 (server ADR 5.1): the Pacenote account. Sign-in scopes, the auth URL without offline access, the server's
+/// replies (TokenPair, /v1/me, /v1/devices, problems), the request body and the Keychain session.
+func pacenoteAccountB7() {
+    expect(GoogleScopes.signIn == ["openid", "email", "profile"], "B7: sign-in scopes only")
+    expect(!GoogleScopes.signIn.contains { $0.contains("drive") || $0.contains("calendar") }, "B7: no data scopes")
+    let u = GoogleOAuth.authURL(client: "cid", redirect: "http://127.0.0.1:5000", scopes: GoogleScopes.signIn, state: "st",
+                                challenge: "ch", offline: false).absoluteString
+    expect(!u.contains("access_type") && !u.contains("include_granted_scopes") && !u.contains("consent"), "B7: no offline access, no forced consent")
+    expect(u.contains("prompt=select_account") && u.contains("scope=openid%20email%20profile") && u.contains("code_challenge_method=S256"), "B7: auth URL")
+    let old = GoogleOAuth.authURL(client: "cid", redirect: "http://127.0.0.1:5000", scopes: ["openid"], state: "st", challenge: "ch").absoluteString
+    expect(old.contains("access_type=offline") && old.contains("prompt=consent%20select_account"), "B7: the Google accounts flow unchanged")
+    // server address
+    expect(PacenoteServer.baseURL(override: nil).absoluteString == "https://pacenote-api.bodco.pm", "B7: default server")
+    expect(PacenoteServer.baseURL(override: "https://dev.example.com/").absoluteString == "https://dev.example.com", "B7: https override, slash dropped")
+    expect(PacenoteServer.baseURL(override: "http://127.0.0.1:8000").absoluteString == "http://127.0.0.1:8000", "B7: local http")
+    expect(PacenoteServer.baseURL(override: "http://example.com").absoluteString == PacenoteServer.defaultURL, "B7: plain http elsewhere refused")
+    expect(PacenoteServer.baseURL(override: "nonsense").absoluteString == PacenoteServer.defaultURL, "B7: garbage refused")
+    // tokens
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let t = PacenoteServer.tokens(["access_token": "pna_x", "access_expires_in": 900, "refresh_token": "pnr_y", "refresh_expires_in": 5_184_000], now: now)
+    expect(t?.access == "pna_x" && t?.refresh == "pnr_y", "B7: token pair")
+    expect(t?.accessExpires == now.addingTimeInterval(840) && t?.refreshExpires == now.addingTimeInterval(5_184_000), "B7: expiry a minute early")
+    expect(PacenoteServer.tokens(["access_token": "a"], now: now) == nil && PacenoteServer.tokens([:]) == nil, "B7: incomplete pair")
+    // me and devices
+    let me = PacenoteServer.me(["user": ["id": "u1", "email": "mike@example.com", "name": "Mike"],
+                                "organizations": [["id": "o1", "name": "Mike's workspace", "kind": "personal", "org_role": "owner", "plan": "beta"], ["name": "no id"]]])
+    expect(me?.email == "mike@example.com" && me?.name == "Mike" && me?.orgs.count == 1, "B7: me")
+    expect(me?.orgs.first == PacenoteServer.Org(id: "o1", name: "Mike's workspace", kind: "personal", role: "owner", plan: "beta"), "B7: personal organization")
+    expect(PacenoteServer.me(["organizations": []]) == nil, "B7: me without a user")
+    let ds = PacenoteServer.devices([
+        ["id": "d1", "name": "Emily's Mac", "platform": "macos", "app_version": "0.11.0", "last_seen_at": "2026-11-15T09:00:00.123456+00:00", "current": false],
+        ["id": "d2", "name": "Mike's MacBook Pro", "platform": "macos", "app_version": "0.11.0", "last_seen_at": "2026-11-14T09:00:00+00:00", "current": true],
+        ["id": "d3", "name": "Old", "platform": "macos", "app_version": "0.10.2", "last_seen_at": NSNull(), "current": false],
+        ["name": "no id"]])
+    expect(ds.map(\.id) == ["d2", "d1", "d3"], "B7: this Mac first, then the latest")
+    expect(ds[1].lastSeen != nil && ds[0].lastSeen != nil && ds[2].lastSeen == nil, "B7: dates with and without fractions")
+    // the sign-in body: exactly the fields the server allows
+    let body = PacenoteServer.signInBody(idToken: "h.p.s", deviceName: "  " + String(repeating: "M", count: 120), appVersion: "0.11.0")
+    let bo = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] ?? [:]
+    let dev = bo["device"] as? [String: Any] ?? [:]
+    expect(Set(bo.keys) == ["id_token", "device"] && Set(dev.keys) == ["name", "platform", "app_version"], "B7: body fields")
+    expect((dev["name"] as? String)?.count == 100 && dev["platform"] as? String == "macos" && bo["id_token"] as? String == "h.p.s", "B7: device name capped")
+    let empty = (try? JSONSerialization.jsonObject(with: PacenoteServer.signInBody(idToken: "x", deviceName: " ", appVersion: ""))) as? [String: Any]
+    expect((empty?["device"] as? [String: Any])?["name"] as? String == "Mac" && (empty?["device"] as? [String: Any])?["app_version"] as? String == "dev", "B7: defaults")
+    // problems and the refresh rule
+    expect(PacenoteServer.problem(Data(#"{"type":"about:blank","title":"Unauthorized","status":401,"detail":"invalid Google token"}"#.utf8), status: 401) == "invalid Google token", "B7: problem detail")
+    expect(PacenoteServer.problem(Data(#"{"title":"Too Many Requests","status":429}"#.utf8), status: 429) == "Too Many Requests", "B7: problem title")
+    expect(PacenoteServer.problem(Data("<html>".utf8), status: 502) == "HTTP 502", "B7: no raw body")
+    expect(PacenoteServer.refreshEndsSession(status: 401) && !PacenoteServer.refreshEndsSession(status: 0)
+           && !PacenoteServer.refreshEndsSession(status: 503) && !PacenoteServer.refreshEndsSession(status: 429), "B7: only 401 ends the session")
+    // the Keychain session
+    let ses = PacenoteServer.Session(refreshToken: "pnr_y", refreshExpires: now, email: "mike@example.com", name: "Mike", signedIn: now)
+    expect(PacenoteServer.Session.decode(ses.encoded()) == ses && PacenoteServer.Session.decode("junk") == nil && PacenoteServer.Session.decode(nil) == nil, "B7: session round trip")
+    expect(SecretStore.Key.pacenoteSession.rawValue == "pacenote_session", "B7: Keychain key")
+}
+
+// 0.11.0 (B7b, server ADR 3.3, 3.4, 3.7): Drive folder ids kept per account, what a Drive answer means for a saved
+// folder, the transcript .md, the new meta fields read from older files.
+func pacenoteDriveB7b() {
+    // migration from UserDefaults (0.9.5-0.10.2)
+    let old = ["driveFolder|Mike@Example.com|root|Pacenote": "R1", "driveFolder|Mike@Example.com|R1|Orbit": "P1",
+               "driveFolder|Mike@Example.com|R1|Calls": "P2", "driveFolder|Mike@Example.com|X9|Pacenote spike A": "S1",
+               "driveFolder|emily@example.com|root|Other": "O1", "driveFolder|bad": "Z"]
+    let m = DriveFolderStore.migrated(DriveFolderStore(), defaults: old)
+    let a = m.account("mike@example.com")
+    expect(a.root == DriveFolderStore.Folder(id: "R1", name: "Pacenote"), "B7b: the root migrates, email in any case")
+    expect(a.projects.count == 2 && a.projects["Orbit"]?.id == "P1" && a.projects["Calls"]?.id == "P2", "B7b: project folders under the root migrate")
+    expect(a.projects["Pacenote spike A"] == nil && m.account("emily@example.com").root == nil, "B7b: spike folders and other names stay out")
+    var kept = DriveFolderStore(); kept.setRoot("mike@example.com", .init(id: "NEW", name: "Calls archive", driveId: "D1"))
+    let m2 = DriveFolderStore.migrated(kept, defaults: old)
+    expect(m2.account("mike@example.com").root?.id == "NEW" && m2.account("mike@example.com").projects.isEmpty, "B7b: the store wins over old keys")
+    var st = m; st.setRoot("emily@example.com", .init(id: "E1", name: "Pacenote")); st.reset("MIKE@example.com")
+    expect(st.account("mike@example.com").root == nil && st.account("emily@example.com").root?.id == "E1", "B7b: Use default forgets one account")
+    let sp = NSTemporaryDirectory() + "pn-b7b-\(UUID().uuidString)/drive-folders.json"
+    m.save(sp)
+    expect(DriveFolderStore.load(sp) == m, "B7b: store round trip")
+    try? Data(#"{"accounts":{"x@y.z":{"root":{"id":"R"}}}}"#.utf8).write(to: URL(fileURLWithPath: sp))
+    expect(DriveFolderStore.load(sp)?.account("x@y.z").root?.id == "R" && DriveFolderStore.load(sp)?.account("x@y.z").projects.isEmpty == true, "B7b: missing fields default")
+    try? FileManager.default.removeItem(atPath: (sp as NSString).deletingLastPathComponent)
+
+    // a Drive answer about a saved folder
+    typealias S = DriveFolderState
+    expect(S.of(status: 200, body: ["id": "x"]) == .ok, "B7b: 200 is there")
+    expect(S.of(status: 200, body: ["trashed": true]) == .unavailable, "B7b: in the trash is gone")
+    expect(S.of(status: 200, body: ["capabilities": ["canAddChildren": false]]) == .unavailable, "B7b: no write access is gone")
+    expect(S.of(status: 404, body: [:]) == .unavailable, "B7b: 404 is gone")
+    expect(S.of(status: 403, body: ["error": ["errors": [["reason": "insufficientFilePermissions"]]]]) == .unavailable, "B7b: 403 permissions is gone")
+    expect(S.of(status: 403, body: ["error": ["errors": [["reason": "userRateLimitExceeded"]]]]) == .retry, "B7b: 403 rate limit is later")
+    expect(S.of(status: 0, body: [:]) == .retry && S.of(status: 401, body: [:]) == .retry && S.of(status: 429, body: [:]) == .retry
+           && S.of(status: 503, body: [:]) == .retry, "B7b: network, token, limits and server errors keep the id")
+    expect(S.kind(driveId: "0AB") == "shared_drive" && S.kind(driveId: "") == "my_drive" && S.kind(driveId: nil) == "my_drive", "B7b: drive kind")
+
+    // settings
+    let rs = try? JSONDecoder().decode(RecordingSettings.self, from: Data(#"{"drive":"auto"}"#.utf8))
+    expect(rs?.transcriptDrive == "off" && rs?.drive == "auto", "B7b: transcript in Drive is off by default")
+    let rs2 = try? JSONDecoder().decode(RecordingSettings.self, from: Data(#"{"transcriptDrive":"every_call"}"#.utf8))
+    let rs3 = try? JSONDecoder().decode(RecordingSettings.self, from: Data(#"{"transcriptDrive":"always"}"#.utf8))
+    expect(rs2?.transcriptDrive == "every_call" && rs3?.transcriptDrive == "off", "B7b: transcript setting values")
+    expect(TranscriptInDrive.allCases.map(\.rawValue) == ["off", "with_recording", "every_call"], "B7b: three choices")
+
+    // meta: older files without the new fields
+    let oldPart = #"{"schema":1,"title":"Weekly","project":"Orbit","parts":[{"file":"a.recording.mp4","kind":"video","started":"2026-11-05T14:30:00Z","seconds":60,"bytes":10,"driveID":"F1","driveLink":"L","driveAccount":"mike@example.com","driveError":""}]}"#
+    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+    let om = try? dec.decode(RecordingMeta.self, from: Data(oldPart.utf8))
+    expect(om?.parts.first?.driveID == "F1" && om?.parts.first?.driveFolderID == "" && om?.parts.first?.driveKind == "", "B7b: old meta reads, new fields empty")
+    let bare = #"{"schema":1,"title":"","project":"","parts":[{"file":"b.recording.m4a","kind":"audio","started":"2026-11-05T14:30:00Z"}]}"#
+    let bm = try? dec.decode(RecordingMeta.self, from: Data(bare.utf8))
+    expect(bm?.parts.first?.seconds == 0 && bm?.parts.first?.source == "" && bm?.notUploaded.isEmpty == true, "B7b: a part with only the first fields")
+    var nm = om!; nm.parts[0].driveFolderID = "P1"; nm.parts[0].driveKind = "shared_drive"
+    let mp = NSTemporaryDirectory() + "pn-b7b-\(UUID().uuidString)/x.recording.json"
+    nm.save(mp)
+    expect(RecordingMeta.load(mp) == nm, "B7b: new fields round trip")
+    try? FileManager.default.removeItem(atPath: (mp as NSString).deletingLastPathComponent)
+
+    // the transcript file
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = .current
+    let start = cal.date(from: DateComponents(year: 2026, month: 11, day: 5, hour: 14, minute: 30))!
+    expect(DriveTranscript.fileName(title: "Weekly sync", start: start) == "2026-11-05 14.30 Weekly sync.md", "B7b: transcript name like the video's")
+    expect(DriveTranscript.fileName(title: "A/B review ", start: start) == "2026-11-05 14.30 A-B review.md"
+           && DriveTranscript.fileName(title: "", start: start) == "2026-11-05 14.30 Call.md", "B7b: name cleaned")
+    let tr = """
+    # Live transcript: Weekly sync
+
+    - Project: orbit
+    - Model: mlx-community/whisper-large-v3-turbo
+
+    [14:30:05] Me (en): Hi everyone (2.1s)
+    [14:30:09] Them [S2] (en): Hi Mike
+    [14:30:12] Emily (en): Morning
+    [14:30:15] Them (en):  (0.4s)
+
+    --- end of recording 14:31:00 ---
+    """
+    let ls = DriveTranscript.lines(tr)
+    expect(ls.count == 3, "B7b: spoken lines only (\(ls.count))")
+    expect(ls.first == DriveTranscript.Line(time: "14:30:05", who: "Me", text: "Hi everyone"), "B7b: the timing is dropped")
+    expect(ls.count > 2 && ls[1].who == "Them 2" && ls[2].who == "Emily", "B7b: an unnamed speaker keeps its number, a named one its name")
+    let h = DriveTranscript.Header(title: "Weekly sync", start: start, minutes: 31, project: "Orbit", participants: ["Emily", "Mike"])
+    let md = DriveTranscript.render(h, transcript: tr)
+    expect(md.hasPrefix("# Weekly sync\n") && md.contains("- Duration: 31 min") && md.contains("- Project: Orbit")
+           && md.contains("- Participants: Emily, Mike") && md.contains("**14:30:09 Them 2:** Hi Mike"), "B7b: header and lines")
+    expect(!md.contains("Model:") && !md.contains("end of recording") && !md.contains("whisper"), "B7b: no internal header lines")
+    let empty = DriveTranscript.render(.init(title: "", start: start, minutes: nil, project: "", participants: []), transcript: "# x\n")
+    expect(empty.hasPrefix("# Call\n") && !empty.contains("Duration") && !empty.contains("Project") && empty.contains("No speech"), "B7b: an empty call")
+    expect(DriveTranscript.hash(md) == DriveTranscript.hash(md) && DriveTranscript.hash(md) != DriveTranscript.hash(md + " "), "B7b: hash")
+    expect(DriveTranscript.metaPath(transcript: "/p/live/x.app.md") == "/p/live/x.app.drive.json", "B7b: drive meta next to the transcript")
+    let dir = NSTemporaryDirectory() + "pn-b7b-\(UUID().uuidString)"
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    let t = dir + "/2026-11-05-1430-weekly.app.md"
+    try? "x".write(toFile: t, atomically: true, encoding: .utf8)
+    expect(DriveTranscript.source(transcript: t) == t, "B7b: the transcript when there is no named copy")
+    try? "y".write(toFile: dir + "/2026-11-05-1430-weekly.app.named.md", atomically: true, encoding: .utf8)
+    expect(DriveTranscript.source(transcript: t) == dir + "/2026-11-05-1430-weekly.app.named.md", "B7b: the named copy first")
+    var dm = DriveTranscriptMeta(); dm.fileID = "T1"; dm.kind = "my_drive"; dm.hash = "abc"
+    dm.save(DriveTranscript.metaPath(transcript: t))
+    expect(DriveTranscriptMeta.load(DriveTranscript.metaPath(transcript: t)) == dm, "B7b: transcript meta round trip")
+    try? FileManager.default.removeItem(atPath: dir)
+
+    // the organization's policy
+    let me = PacenoteServer.me(["user": ["email": "mike@example.com"], "organizations": [
+        ["id": "o1", "name": "Mike's workspace", "kind": "personal", "policy": ["require_transcript_in_drive": false]],
+        ["id": "o2", "name": "Acme", "kind": "team", "policy": ["require_transcript_in_drive": true]]]])
+    expect(me?.transcriptRequiredBy == "Acme" && me?.orgs.first?.requireTranscriptInDrive == false, "B7b: the policy names the organization")
+    expect(PacenoteServer.me(["user": ["email": "a@b.c"], "organizations": [["id": "o1"]]])?.transcriptRequiredBy == nil, "B7b: no policy, not required")
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -1943,5 +2109,7 @@ sheetFolders0100()
 fix77()
 f78()
 callReassign0101()
+pacenoteAccountB7()
+pacenoteDriveB7b()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

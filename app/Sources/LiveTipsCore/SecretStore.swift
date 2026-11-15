@@ -11,6 +11,7 @@ public struct SecretStore {
         case notionToken = "notion_token"
         case hubspotKey = "hubspot_service_key"     // 0.8.7 (I2): a HubSpot service key
         case googleAccounts = "google_accounts"     // 0.9.1: JSON list of the connected Google accounts (refresh tokens)
+        case pacenoteSession = "pacenote_session"   // B7: the Pacenote server session (refresh token, who signed in)
     }
 
     public let service: String

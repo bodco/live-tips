@@ -1,9 +1,10 @@
-# Pacenote for teams (design, not built yet)
+# Pacenote for teams (in progress)
 
 [Українською](README.uk.md)
 
-**Status:** a design written on 2026-10-28 to keep the idea. Nothing on this page is built yet, except
-that Stage 0 works with what Pacenote 0.8.2 already does.
+**Status:** Stage 0 works today. Stage 1 is being built: the server part has run since 2026-11-15, the app part
+comes next (see Stage 1). The diagram below is the original idea from 2026-10-28; in Stage 1 transcripts stay with
+the person (on the Mac and, if they choose, in their Google Drive) and preparation stays on the Mac.
 
 **The question:** project knowledge lives in one place, several people (PMs, sales) use the app, each
 prepares for their own calls, and all summaries land in one place. How should that be organized?
@@ -102,148 +103,147 @@ Stage 0 is the right way to try the team idea with 2-5 people before building an
 
 ---
 
-## Stage 1: the team server (design)
+## Stage 1: the Pacenote server
+
+**Status (2026-11-15):** the first part is built and running (sign-in, organizations and roles in the database,
+isolation tests). The app does not use it yet: signing in from the app comes next, then sending calls.
 
 ### Goal
 
-One place that knows every project and account, prepares any person's call from it, and collects every
-summary, with users, roles and permissions. The Mac app stays the same for the live part and gets a
-third way for preparation and summaries: **Team server**, next to "API key" and "Claude account" in
-Settings > AI (the routing added in 0.8.2 is the hook for it).
+Every person keeps working on their Mac as today. After each call the app also keeps a copy of the call's results
+on the Pacenote server, so they are not lost with the Mac, can be opened on another Mac and later on the phone, and
+a team lead can see the calls of the people they manage. The server is optional: without signing in, nothing changes.
+
+### What goes to the server, and what never does
+
+| Data | Mac | The person's Google Drive | Pacenote server |
+|---|---|---|---|
+| Audio of the call | yes (during recognition; the file if recording is on) | only if a recording is uploaded | **never** |
+| Screen recording (video) | yes | yes, in the chosen folder | only the link |
+| Transcript | yes | optional, a `.md` file next to the recording | only the link |
+| Voice prints, settings, keys | yes | no | never |
+| Live tips | yes | no | never (only counts: shown, rated useful) |
+| Meeting Sheet | yes | no | yes |
+| Summary, decisions, tasks | yes | no | yes |
+| Call details (title, time, length, type, project, participants, consent) | yes | no | yes |
+
+The Mac stays the source of truth for its own calls; the server holds a copy.
 
 ### Components
 
+One server in the EU (Hetzner), Docker Compose with four parts:
+
 | Component | What it does |
 |---|---|
-| **API** | HTTPS JSON API for the app and the admin UI (endpoints below) |
-| **Auth** | Sign-in with Google Workspace (OIDC). The app signs in through the browser (device code flow) and keeps its token in the macOS Keychain |
-| **Knowledge store** | Project folders (synced from Google Drive through the Drive API, or uploaded), the Notion copy (one mirror for everyone), CRM context from connectors |
-| **Search index** | The same local-AI search (bge-m3 embeddings) per project, built once on the server |
-| **Preparation worker** | Runs the same preparation instructions as the app (the live-tips skill's prep), through Claude Code headless or the API, on the server's copy of the project |
-| **Summary worker** | Builds the summary from an uploaded transcript, writes the Notion page and the CRM activity |
-| **Connectors** | Google Drive, Notion, HubSpot, a custom CRM (adapter interface below), later Salesforce |
-| **Database** | Users, roles, projects, memberships, calls, jobs, audit log. SQLite is enough for up to ~10 people; Postgres after that |
-| **Admin UI** | A small web page: people, roles, projects, connectors, costs, retention |
-| **Audit log** | Who prepared, read, downloaded or deleted what, and when |
+| **Caddy** | HTTPS in front of the API; reachable only through Cloudflare |
+| **API** (Python, FastAPI) | Sign-in, sessions, organizations, calls, permissions, plans, audit log |
+| **PostgreSQL** (with pgvector for later search) | All data, with row-level security |
+| **Backup** | A nightly encrypted dump to separate storage, with a monthly restore test |
 
-### Where it runs
+The server makes no AI calls in this stage: preparation, tips and notes keep running on the Mac through the
+person's own key or Claude account.
 
-| | Mac mini (owned, static IP) | Hetzner dedicated or cloud (Linux) | AWS |
-|---|---|---|---|
-| Start | Fastest: the engine runs on macOS today | Needs the Python engine on Linux (it is plain Python; the embeddings run on ONNX on Linux too) | Same as Hetzner |
-| Reliability | One machine: power, home internet, updates | Data center, backups, EU location | Highest, plus compliance options |
-| Cost | Already owned | about EUR 40-60 a month | Several times more |
+### Sign-in
 
-A sensible path: start on the Mac mini, move to a Hetzner Linux server when more than a handful of
-people depend on it. Speech recognition does not run on the server at all (it stays on each Mac), so
-the server needs no GPU.
+- Google only (OpenID Connect, scopes `openid email profile`). The app signs in through the browser with a local
+  redirect and PKCE, the same way it connects Google today, but as a separate sign-in: the account used for Pacenote
+  and the Google accounts connected for Drive and Calendar stay independent.
+- The server checks the Google ID token (signature, audience, issuer, expiry, verified email) and keys the person
+  by Google's stable id, not the email.
+- The app gets a short access token (15 minutes) and a refresh token that changes on every use; both live in the
+  Keychain. A refresh token used twice ends that device's session. Devices are listed in the profile, with
+  "Sign out everywhere".
+- The server never gets access to the person's Drive, Calendar or Docs.
 
-### Network
+### Organizations, teams and roles
 
-Every request carries a signed-in user's token, so the server can be on the public internet behind
-HTTPS: Caddy with Let's Encrypt on the static IP, or a Cloudflare Tunnel (no open ports). A private
-network (Tailscale or a VPN) is optional, for an organization that wants the server unreachable from
-the internet at all.
+The first sign-in creates a personal organization with the person as its owner. The same tables serve teams later,
+so moving to a team needs no data migration.
 
-### Users, teams and roles
-
-**Users** sign in with their Google Workspace account. The admin allows the company domain and invites
-people; SCIM provisioning comes in Stage 2. **Teams** group people (Sales EU, Delivery). A **membership**
-gives a user or a whole team a role on a workspace or a project.
-
-| Role | Who | In short |
+| Level | Role | In short |
 |---|---|---|
-| **Owner** | One or two people | Everything, including billing, connectors and deleting the organization's data |
-| **Admin** | IT or ops | People, teams, roles, connectors, retention; does not read transcripts by default |
-| **Manager** | Team lead | Their team's projects: prepare, read summaries and transcripts of the team's calls, see the team's costs |
-| **Member** | PM, sales | Projects they are a member of: prepare their own calls, read summaries, their own transcripts |
-| **Viewer** | Stakeholder | Read summaries of projects they are a member of; no preparation, no transcripts |
+| Organization | **Owner** | Everything, including plan, policy and deleting the organization |
+| Organization | **Admin** | People, departments, teams, policy; does **not** read the content of other people's calls |
+| Organization | **Member** | Their own calls; more through a team or department role |
+| Department | **Head** | Calls of everyone in the department's teams |
+| Team | **Lead** | Calls of the people in their team |
 
-### Permissions
+### Who sees what
 
-| Permission | Owner | Admin | Manager | Member | Viewer |
-|---|---|---|---|---|---|
-| Invite and remove people, change roles | yes | yes | own team: invite only | no | no |
-| Connect Google Drive, Notion, CRM | yes | yes | no | no | no |
-| Create workspaces and projects | yes | yes | yes | no | no |
-| See a project | all | all | team's | member of | member of |
-| Prepare a call | yes | no | yes | own calls | no |
-| Read summaries | all | no (unless member) | team's | project's | project's |
-| Read full transcripts | yes | no | team's (unless marked private) | own; others' only if the owner shares | no |
-| Write a summary to the CRM | yes | no | yes | own calls, after "Send to CRM" | no |
-| Edit preparation rules and templates | yes | yes | team's | no | no |
-| See costs | all | all | team's | own | no |
-| Export or delete data | yes | yes (with audit) | no | own transcripts | no |
+| What | The person | Team lead, department head | Admin | Others |
+|---|---|---|---|---|
+| Call details | yes | yes | totals only, no titles | no |
+| Summary, decisions, tasks | yes | yes | no | no |
+| Meeting Sheet | yes | yes, unless the organization turns it off | no | no |
+| Links to the recording and transcript | yes | yes (Drive decides who can open them) | no | no |
+| A call marked private | yes | only that it happened and its length | no | no |
 
-Rules behind the table:
+When a person leaves an organization, their calls stay with the organization. Recordings and transcripts in Google
+Drive are seen by whoever has access to that Drive folder; for teams a shared drive per team or department works
+best.
 
-- **Transcripts are private to the person who recorded the call by default.** The summary is what the
-  project shares. A person can share a transcript with the project; a manager can read the team's
-  transcripts unless the owner marked the call private.
-- **Nothing goes to a CRM or to the client by itself.** The app shows the draft; the person presses
-  "Send to CRM" (the same rule as Pacenote today: drafts yes, sending always by a person).
-- **Every read of a transcript and every download of a preparation package is in the audit log.**
+### How it is protected
 
-### Data model
+- Row-level security in Postgres on every table: the database itself refuses rows of another person or another
+  organization, even if the API had a bug. Isolation tests run on every change.
+- The content of calls (titles, participants, summaries, decisions, tasks, Meeting Sheets) is encrypted with a key
+  of each person, kept wrapped by a server key that is not in the database or its backups. Deleting a person
+  destroys their key, so their content is unreadable in old backups too.
+- HTTPS only, the server reachable only through Cloudflare, administrative access only from known addresses, logs without any
+  call content, an audit log of sign-ins, exports, deletions and a manager opening someone's call.
+- Delete a call or all server data at any time (removed at once, from backups within 30 days); export everything.
 
-| Entity | Main fields |
-|---|---|
-| Organization | name, allowed domains, retention policy, Claude key reference |
-| User | email, name, status, teams |
-| Team | name, members, manager |
-| Workspace | name (a client or a group), projects |
-| Project | name, slug, workspace, sources (Drive folder id, Notion page, CRM company or deal ids), rules |
-| Membership | subject (user or team), object (workspace or project), role |
-| Call | title, start, owner, attendees' emails, project, CRM ids, consent recorded (who, when, how) |
-| Preparation | call, version, files (brief, cards, facts, outline), sources used, created by, cost |
-| Transcript | call, owner, private flag, uploaded at, retention date |
-| Summary | call, structured JSON, Notion page URL, CRM activity id, sent by |
-| Commitment | project, text, owner, due date, status (the register Pacenote already keeps) |
-| Connector | type, account, encrypted token, scopes, status |
-| Job | type (prep, summary, sync), status, timings, cost, error |
-| Audit event | who, what, object, when, from where |
+### API (version 1)
 
-### API (first version)
+| Method and path | Purpose | Status |
+|---|---|---|
+| `GET /healthz` | Uptime check | built |
+| `POST /v1/auth/google`, `/v1/auth/refresh`, `/v1/auth/logout` | Sign-in, token refresh, sign-out (this device or all) | built |
+| `GET /v1/me`, `DELETE /v1/me` | The person, organizations, roles, plan, policy; delete all server data | built |
+| `GET /v1/devices`, `DELETE /v1/devices/{id}` | Signed-in devices | built |
+| `PUT /v1/calls/{client_call_id}` and its parts (`/summary`, `/decisions`, `/tasks`, `/sheet`, `/assets`) | Send a call, each part on its own | next |
+| `GET /v1/calls`, `GET /v1/calls/{id}`, `DELETE /v1/calls/{id}`, `GET /v1/sync` | Read and sync across devices | next |
+| `GET /v1/export` | Export everything | next |
+| `/v1/orgs/{id}/members`, `/departments`, `/teams`, `/invites`, `/policy` | Team structure and policy | later |
+| `GET /v1/team/calls`, `GET /v1/team/analysis` | The manager's overview | later |
 
-| Method and path | Purpose |
-|---|---|
-| `POST /v1/auth/device`, `POST /v1/auth/token` | Sign-in from the app through the browser (device code) |
-| `GET /v1/me` | The user, roles and projects |
-| `GET /v1/projects` | Projects the user can see, with their sources |
-| `GET /v1/calls?from&to` | The user's upcoming calls the server knows about (from CRM meetings; the app adds its own calendar) |
-| `POST /v1/calls` | Register a call from the app (title, start, attendees, project) |
-| `POST /v1/calls/{id}/prep` | Start a preparation job; returns a job id |
-| `GET /v1/jobs/{id}` | Job status and progress |
-| `GET /v1/calls/{id}/prep/package` | The preparation as a signed package (brief, cards, facts, outline) with an expiry; the app caches it, so a call works even if the connection drops |
-| `POST /v1/calls/{id}/transcript` | Upload the transcript and the app's tips after the call |
-| `POST /v1/calls/{id}/summary` | Build the summary (server) and return the draft |
-| `POST /v1/calls/{id}/summary/send` | Send the approved summary to Notion and the CRM |
-| `GET /v1/projects/{id}/search?q=` | Search the project's knowledge (optional for "find" during a call, 1-3 s is acceptable there) |
-| `POST /v1/webhooks/{connector}` | Events from the CRM (a deal stage changed) |
+### What changes in the Mac app
 
-### Flows
+- Settings > Account: **Sign in to Pacenote**, devices, sign out, delete server data.
+- After the notes, the call goes into a send queue that survives restarts and being offline. Sending can be turned
+  off for a project or a single call.
+- Settings > Call recording > Google Drive: choose the folder for recordings (a shared drive works too) and,
+  optionally, a transcript `.md` next to each recording.
+- Live tips, recording and preparation: unchanged.
 
-**Before the call.** The app shows the person's calls (their Mac calendar plus calls the server knows).
-"Prepare" sends the call to the server. The server gathers the project's files and Notion copy, the CRM
-context of the account and the earlier calls of the same meeting, runs the preparation and stores it.
-The app downloads the package and keeps it locally.
+### Build plan
 
-**During the call.** Unchanged: recording, Whisper and tips on the Mac, tips through the person's own
-way to Claude. Optionally "find" can search the server's index.
+| Step | Scope | Status |
+|---|---|---|
+| B5 | Server: sign-in, organizations, teams, roles, visibility, row-level security with tests, audit, plans, deploy | built 2026-11-15 (backups pending) |
+| B7 | App: Settings > Account, sign-in, Keychain, devices; Drive folder picker and transcript in Drive | next |
+| B8 | Sending calls, queue, export, deletion | after B7 |
+| B6 | Team structure and policy through the API, a minimal admin page, quotas | before the first team |
+| B9 | The manager's overview, search | after B8 |
 
-**After the call.** The app uploads the transcript (with the consent record). The server builds the
-summary through the organization's Claude key and returns the draft. The person checks it and presses
-"Send": the Notion meeting page, the CRM activity and the tasks are created, and commitments go into
-the project's register.
+### Open questions
 
-### Claude on the server
+- Microsoft sign-in: only when a real team asks for it.
+- Moving personal calls into a team organization: per project is the proposal.
+- Preparation on the server (B11) would send text to AI providers from the server: a separate decision, with an
+  update to the privacy notice.
 
-- The organization's **API key** from the Anthropic Console, in its own workspace, with per-user spend
-  tracked by the server (and limits per user and per team).
-- Not a personal Claude plan: a plan belongs to one person and its limits would run out for a team.
-- Preparation can still use Claude Code headless with that key, exactly as the app does today.
+---
 
-### CRM integration
+## Stage 2: later
+
+SCIM provisioning, several organizations on one server, Salesforce and Pipedrive adapters, analytics
+across calls (talk time, open commitments per account), approval flows for summaries, and an on-premise
+package for clients who require it.
+
+### CRM integration (design from 2026-10-28, for later)
+
+Not part of Stage 1: the Pacenote server does not talk to a CRM yet. Kept as the design for when it does.
 
 The server talks to every CRM through one **adapter interface** and turns what it gets into one
 normalized context that the preparation reads. The CRM is the source of truth for sales facts (deal
@@ -322,50 +322,3 @@ so check again before building)
 - **It has no API:** a nightly export (CSV or JSON into a Drive folder or a bucket) read as context,
   read-only; the summary goes back as an email to the CRM's inbox address or through a webhook the CRM
   accepts. Less fresh, but it works without touching the CRM.
-
-### Security and privacy
-
-- Sign-in with Google Workspace; the app's token in the Keychain; short-lived tokens with refresh.
-- Roles and memberships checked on every request; transcripts private to the owner by default.
-- Encryption in transit (TLS) and at rest (disk encryption; connector tokens encrypted with a key that is
-  not stored with the database).
-- Consent: the app records when the consent message was said or posted; the server stores it with the
-  call. No recording without it is the organization's policy, not a technical guess.
-- Retention: transcripts deleted after a set number of days (for example 90), summaries kept; deletion on
-  request with an audit entry.
-- Data location: an EU server keeps files and transcripts in the EU; text sent to Claude follows
-  Anthropic's commercial terms (API data is not used for training by default).
-- Backups of the database and the knowledge store, encrypted, tested by a restore.
-
-### What changes in the Mac app
-
-- Settings > AI: a third way **Team server** for preparation and after the call; sign-in to the server.
-- Projects come from the server (the person can still add local ones).
-- A cache of preparation packages and an upload queue that survives being offline.
-- "Send to CRM" next to "Send to Notion" on the call page.
-- Live tips and recording: unchanged.
-
-### Build plan (one developer, rough)
-
-| Step | Scope | Time |
-|---|---|---|
-| M1 | Server skeleton, Google sign-in, users, teams, roles, projects, memberships, audit log; Drive sync of project folders | 2-3 weeks |
-| M2 | Preparation as a service, the package API; the app's "Team server" way, package cache | 2 weeks |
-| M3 | Transcript upload, summary worker, Notion page; HubSpot adapter (read context, write meeting and tasks, webhook) | 2-3 weeks |
-| M4 | Admin UI, costs per user, retention, the custom CRM adapter with field mapping | 2 weeks |
-
-### Open questions
-
-- Is Google Workspace the identity for every team that would use it, or is Microsoft 365 needed too?
-- Should managers read the team's transcripts by default, or only summaries?
-- One Notion workspace for everyone, or one per team?
-- Which CRM comes first after HubSpot?
-- Is a hosted version for other companies a goal, or only self-hosted?
-
----
-
-## Stage 2: later
-
-SCIM provisioning, several organizations on one server, Salesforce and Pipedrive adapters, analytics
-across calls (talk time, open commitments per account), approval flows for summaries, and an on-premise
-package for clients who require it.

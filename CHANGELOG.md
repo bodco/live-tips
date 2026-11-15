@@ -3,8 +3,38 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.10.2 (unreleased)
+## 0.11.0 (2026-11-15)
 
+Was 0.10.2 until signing in to the Pacenote server was added; everything below ships together.
+
+- **Google Drive: your folder stays yours, and the transcript can go with the recording (2026-11-15, B7b):**
+  Settings > Call recording > Google Drive shows the folder the recordings go to, with **Open folder in Drive** and
+  **Use default**. To keep recordings on a shared drive or show them to your lead, move or share the Pacenote folder in
+  Google Drive: Pacenote keeps writing into it by its id (marked "Shared drive" when it is on one), and no longer makes
+  a second "Pacenote" in My Drive after a move. If the folder is deleted, in the trash or the access is gone, the call
+  page says "Folder not available" with **Create a new folder**; no network only delays the upload. New: **Transcript in
+  Drive** (Off by default, With the recording, For every call): a `.md` file next to the video, named like it, with the
+  title, date, duration, project, participants and the lines with speaker and time; no tips, notes or Meeting Sheet. It
+  is updated in place when the call is renamed or its transcript changes; renaming a call also renames its recording in
+  Drive. An organization can require the transcript (shown as "Required by ..."). The test commands of the Drive spike
+  are gone.
+
+- **Pacenote account, optional (2026-11-15, B7):** Settings > Account (new, at the top) signs you in to the Pacenote
+  server with Google. The sign-in asks Google only for your email, name and picture, separate from the Google accounts
+  that give calendars and Drive, and keeps no Google token. The server's own tokens stay in the Keychain. The page shows
+  your workspace and plan, the Macs signed in to your account (sign one out, or sign out everywhere) and Delete server
+  data, which destroys your content key on the server at once; calls on the Mac and files in Drive are not touched.
+  It also says what goes to the server and what never does. Nothing about calls is sent yet: that is the next version.
+  Without signing in nothing changes.
+- **Privacy policy and terms (2026-11-15):** [PRIVACY](PRIVACY.md) and [TERMS](TERMS.md) (EN and UK) describe the
+  Pacenote account and server: what it keeps now (your account and devices), what it will keep once calls are sent,
+  what never goes there (audio, video, transcripts, voice prints, live tips), where it is (EU), encryption with a key of
+  your own, deletion, and that you or your organization are responsible for what you send.
+- **Docs: Pacenote for teams, Stage 1 rewritten (2026-11-15):** [docs/team](docs/team/README.md) (EN and UK) now describes the
+  Pacenote server as decided and built: what goes to the server and what never does (no audio, video or transcripts),
+  Google sign-in, organizations with owner, admin, member, team lead and department head, who sees what, encryption
+  per person, the API with its built and planned parts, and the build plan. The CRM design from October moved under
+  Stage 2.
 - **Meeting Sheet: a likely goal and a cleaner sheet (2026-11-14, Q):** when no source and no setting states the
   meeting's goal, the AI writes its best guess, marked "Likely: ...", and orders the facts of each block from it. The
   header has no meta lines any more (the meeting type, an empty "Our side"); the goal stays on top. A fact that repeats

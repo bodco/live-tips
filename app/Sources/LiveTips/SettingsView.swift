@@ -787,6 +787,7 @@ struct SettingsView: View {
 
     struct Pane: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
     static var panes: [Pane] { [   // titles follow the interface language
+        Pane(id: "account", title: "Account", symbol: "person.crop.circle", subtitle: "Sign in to Pacenote: optional, your devices."),   // B7
         Pane(id: "general", title: "General", symbol: "gearshape", subtitle: "Your name on calls, folders, Notion and how the app behaves."),
         Pane(id: "projects", title: "Projects", symbol: "folder", subtitle: "Your workspaces and projects. Ticked ones show up in Start call."),
         Pane(id: "integrations", title: "Integrations", symbol: "point.3.connected.trianglepath.dotted", subtitle: "Notion, calendars and your CRM."),
@@ -840,6 +841,7 @@ struct SettingsView: View {
         switch model.tab {
         case "projects": projects
         case "ai": ai
+        case "account": AccountSettingsPane()      // B7 (server ADR 5.1)
         case "recording": RecordingSettingsPane(model: model)
         case "transcription": TranscriptionSettingsPane(model: model)      // 0.10.0 (owner 12.11): the dictionary
         case "integrations": IntegrationsPane(model: model) { notion }
@@ -1816,7 +1818,7 @@ final class SettingsWindow {
         switch tab {
         case "how": return L("settings.how.title")
         case "about": return L("settings.about.windowTitle")
-        case "general", "projects", "ai", "recording", "transcription", "integrations", "usage", "help", "modules", "sheet": return L("settings.tab." + tab)
+        case "account", "general", "projects", "ai", "recording", "transcription", "integrations", "usage", "help", "modules", "sheet": return L("settings.tab." + tab)
         default: return L("settings.windowTitle")
         }
     }

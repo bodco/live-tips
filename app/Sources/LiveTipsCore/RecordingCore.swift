@@ -25,6 +25,9 @@ public struct RecordingSettings: Codable, Equatable {
     public var drive = "manual"
     /// The Google account whose Drive gets the recordings ("" the first account that allows the export).
     public var driveAccount = ""
+    /// 0.11.0 (B7b): the call's transcript as .md next to the video: "off", "with_recording" or "every_call"
+    /// (also calls without a recording). TranscriptInDrive.
+    public var transcriptDrive = "off"
     public init() {}
 
     public init(from decoder: Decoder) throws {
@@ -40,6 +43,7 @@ public struct RecordingSettings: Codable, Equatable {
         mic = (try? c.decodeIfPresent(Bool.self, forKey: .mic)) ?? nil ?? d.mic
         drive = Self.pick((try? c.decodeIfPresent(String.self, forKey: .drive)) ?? nil, ["manual", "auto"], d.drive)
         driveAccount = (try? c.decodeIfPresent(String.self, forKey: .driveAccount)) ?? nil ?? d.driveAccount
+        transcriptDrive = Self.pick((try? c.decodeIfPresent(String.self, forKey: .transcriptDrive)) ?? nil, TranscriptInDrive.allCases.map(\.rawValue), d.transcriptDrive)
     }
 
     static func pick(_ v: String?, _ allowed: [String], _ def: String) -> String { v.flatMap { allowed.contains($0) ? $0 : nil } ?? def }
@@ -121,9 +125,28 @@ public struct RecordingMeta: Codable, Equatable {
         public var driveLink: String = ""
         public var driveAccount: String = ""
         public var driveError: String = ""
+        /// 0.11.0 (B7b): the Drive folder the copy went to and "my_drive" | "shared_drive" (from the file's driveId).
+        public var driveFolderID: String = ""
+        public var driveKind: String = ""
         public init(file: String, kind: String, source: String = "", started: Date) {
             self.file = file; self.kind = kind; self.source = source; self.started = started
         }
+        /// Older meta files have no driveFolderID or driveKind: every field after the first ones is optional.
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            func s(_ k: CodingKeys) -> String { (try? c.decodeIfPresent(String.self, forKey: k)) ?? nil ?? "" }
+            file = try c.decode(String.self, forKey: .file)
+            kind = try c.decode(String.self, forKey: .kind)
+            started = try c.decode(Date.self, forKey: .started)
+            source = s(.source)
+            seconds = (try? c.decodeIfPresent(Double.self, forKey: .seconds)) ?? nil ?? 0
+            bytes = (try? c.decodeIfPresent(Int64.self, forKey: .bytes)) ?? nil ?? 0
+            driveID = s(.driveID); driveLink = s(.driveLink); driveAccount = s(.driveAccount); driveError = s(.driveError)
+            driveFolderID = s(.driveFolderID); driveKind = s(.driveKind)
+        }
+        /// driveError value when the saved Drive folder is gone (deleted, in the trash, no access): the call page offers
+        /// Create a new folder instead of a retry.
+        public static let folderUnavailable = "folder_unavailable"
     }
     public var schema = 1
     public var title = ""

@@ -15,6 +15,8 @@ public enum GoogleScopes {
                                "https://www.googleapis.com/auth/presentations.readonly"]
     public static let export = ["https://www.googleapis.com/auth/drive.file"]
     public static let meet = ["https://www.googleapis.com/auth/meetings.space.readonly"]
+    /// B7 (server ADR 5.1): signing in to Pacenote asks for nothing else, separate from the accounts above.
+    public static let signIn = ["openid", "email", "profile"]
     /// Everything at once: one consent screen per account. The PM can untick a scope there; the app then says
     /// what does not work for that account instead of failing.
     public static var all: [String] { identity + calendar + files + export + meet }
@@ -79,17 +81,25 @@ public enum GoogleOAuth {
     /// RFC 7636, S256.
     public static func challenge(_ verifier: String) -> String { base64url(Data(SHA256.hash(data: Data(verifier.utf8)))) }
 
-    public static func authURL(client: String, redirect: String, scopes: [String], state: String, challenge: String, hint: String? = nil) -> URL {
+    /// `offline: false` (B7, signing in to Pacenote): no Google refresh token is asked for or kept, only the ID token
+    /// is used once; no consent screen again for an account that already allowed it, the chooser still shows.
+    public static func authURL(client: String, redirect: String, scopes: [String], state: String, challenge: String, hint: String? = nil,
+                               offline: Bool = true) -> URL {
         var c = URLComponents(string: authEndpoint)!
         var q: [URLQueryItem] = [
             .init(name: "client_id", value: client), .init(name: "redirect_uri", value: redirect),
             .init(name: "response_type", value: "code"), .init(name: "scope", value: scopes.joined(separator: " ")),
             .init(name: "state", value: state), .init(name: "code_challenge", value: challenge),
-            .init(name: "code_challenge_method", value: "S256"), .init(name: "access_type", value: "offline"),
+            .init(name: "code_challenge_method", value: "S256"),
+        ]
+        if offline {
             // consent: Google gives a refresh token again when the same account is added a second time;
             // select_account: the chooser shows every signed-in account, so another one is one click away
-            .init(name: "prompt", value: "consent select_account"), .init(name: "include_granted_scopes", value: "true"),
-        ]
+            q += [.init(name: "access_type", value: "offline"), .init(name: "prompt", value: "consent select_account"),
+                  .init(name: "include_granted_scopes", value: "true")]
+        } else {
+            q.append(.init(name: "prompt", value: "select_account"))
+        }
         if let h = hint, !h.isEmpty { q.append(.init(name: "login_hint", value: h)) }
         c.queryItems = q
         return c.url!

@@ -136,12 +136,22 @@ final class CallSyncService: ObservableObject {
             }
             guard !st.callID.isEmpty else { return }
             let notes = try? String(contentsOfFile: CallNotes.path(t), encoding: .utf8)
-            let parsed = notes.flatMap { MeetingNotes.parse($0) }
             var parts: [(String, Data)] = []
             if let s = CallSync.summaryBody(notes: notes) { parts.append(("summary", CallSync.json(s))) }
-            if parsed != nil {
-                parts.append(("decisions", CallSync.json(CallSync.decisions(parsed))))
-                parts.append(("tasks", CallSync.json(CallSync.tasks(parsed))))
+            // 0.12.2 (L2): decisions by the one rule (the PM's edit, notes, live picture, older notes); sent also when the
+            // PM removed them all, so the server copy follows. Tasks still from the notes until L4.
+            let lists = CallLists.read(transcript: t)
+            if lists.decisionsFrom != .none || st.hashes["decisions"] != nil {
+                parts.append(("decisions", CallSync.json(CallSync.decisions(lists))))
+            }
+            // 0.12.2 (L4): tasks from the commitments register (status, owner, due), else by the one rule
+            let reg = CommitmentRegister.load(folder: (t as NSString).deletingLastPathComponent)
+                .filter { CommitmentRegister.callKey($0.call) == CommitmentRegister.callKey(t) }
+            let tasks = CallSync.tasks(register: reg, lists: lists, me: AppConfig.load(from: AppPaths.config).nameAliases.first ?? "")
+            if !tasks.isEmpty || st.hashes["tasks"] != nil { parts.append(("tasks", CallSync.json(tasks))) }
+            // 0.12.2 (L3): risks by the same rule, also when the PM removed them all
+            if lists.risksFrom != .none || st.hashes["risks"] != nil {
+                parts.append(("risks", CallSync.json(CallSync.risks(lists))))
             }
             if let s = CallSync.sheetBody(FileManager.default.contents(atPath: CallSync.sheetPath(transcript: t))) {
                 parts.append(("sheet", CallSync.json(s)))
@@ -151,6 +161,7 @@ final class CallSyncService: ObservableObject {
             if !assets.isEmpty || st.hashes["assets"] != nil { parts.append(("assets", CallSync.json(assets))) }
             for (name, body) in CallSync.changed(parts, state: st) {
                 let (d, c) = try await PacenoteAccount.shared.api("PUT", "/v1/calls/\(st.callID)/\(name)", body: body)
+                if CallSync.partMissing(name, status: c) { continue }   // server before 0.4.0
                 switch CallSync.outcome(status: c, problem: Self.problemText(d, c)) {
                 case .ok: st.hashes[name] = CallSync.hash(body)
                 case .deletedElsewhere: st.deletedElsewhere = true; return

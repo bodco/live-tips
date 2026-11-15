@@ -284,7 +284,7 @@ struct CallPageView: View {
     /// 0.12.1: a line that only says there are none ("Жодних рішень не приймалося.") is not a decision, so the tab no
     /// longer counts it as 1 (the server sync already sent 0).
     private func decisions(_ o: CallOutcome) -> [String] {
-        (o.decisions.isEmpty ? CallNotes.decisions(file) : o.decisions).filter { !MeetingNotes.isNothing($0) }
+        o.decisions   // 0.12.2 (L2): CallOutcome.read already applies the one rule (CallLists)
     }
 
     private func pageTabs(_ o: CallOutcome) -> [(String, String)] {
@@ -294,7 +294,7 @@ struct CallPageView: View {
 
     /// 2026-11-05 (redesign): the counts are badges on the tabs, not part of the name.
     private func tabCounts(_ o: CallOutcome) -> [String: Int] {
-        ["decisions": decisions(o).count, "tasks": max(items.count, items.isEmpty ? o.onMe.count : 0), "risks": o.risks.count]
+        ["decisions": decisions(o).count, "tasks": items.isEmpty ? o.tasks.count : items.count, "risks": o.risks.count]
     }
 
     private var trackerNote: some View {
@@ -305,7 +305,7 @@ struct CallPageView: View {
 
     @ViewBuilder private func meetingTab(_ o: CallOutcome) -> some View {
         if let m = CallNotes.meeting(file), !m.isEmpty {
-            let side = !(m.decisions.isEmpty && m.actions.isEmpty && m.open.isEmpty)
+            let side = !(m.decisions.isEmpty && m.actions.isEmpty && m.open.isEmpty && m.risks.isEmpty)
             if wide && side {
                 HStack(alignment: .top, spacing: 16) {
                     meetingMain(m)
@@ -400,7 +400,7 @@ struct CallPageView: View {
     @ViewBuilder private func meetingSide(_ m: MeetingNotes.Notes) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             ForEach([(L("page.tab.decisions"), m.decisions, PN.C.accent as Color?), (L("page.mn.actions"), m.actions, nil),
-                     (L("page.mn.open"), m.open, nil)].filter { !$0.1.isEmpty }, id: \.0) { title, items, tint in
+                     (L("page.mn.open"), m.open, nil), (L("page.tab.risks"), m.risks, nil)].filter { !$0.1.isEmpty }, id: \.0) { title, items, tint in
                 PageCard(tint: tint) {
                     PageLabel(text: title, color: tint == nil ? PN.C.text3 : PN.C.answer)
                     VStack(alignment: .leading, spacing: 9) { ForEach(Array(items.enumerated()), id: \.offset) { _, it in itemRow(it) } }
@@ -577,8 +577,10 @@ struct CallPageView: View {
     // MARK: Tasks (2026-11-05 redesign: On you and On them side by side, theirs grouped by person)
 
     @ViewBuilder private func tasksTab(_ o: CallOutcome, _ proj: Project?, _ ws: Workspace?) -> some View {
-        let mine = PageCard { commitments(items.filter { $0.mine }, mine: true, legacy: items.isEmpty ? o.onMe : [], proj, ws) }
-        let theirs = PageCard { commitments(items.filter { !$0.mine }, mine: false, legacy: [], proj, ws) }
+        // 0.12.2 (L4): a call without register items shows its one-rule tasks (notes, live picture, older notes)
+        let old = items.isEmpty ? o.tasks : []
+        let mine = PageCard { commitments(items.filter { $0.mine }, mine: true, legacy: old.filter { $0.mine ?? $0.owner.isEmpty }.map(\.text), proj, ws) }
+        let theirs = PageCard { commitments(items.filter { !$0.mine }, mine: false, legacy: old.filter { !($0.mine ?? $0.owner.isEmpty) }.map(\.line), proj, ws) }
         if wide {
             HStack(alignment: .top, spacing: 16) { mine; theirs }
         } else {
@@ -657,8 +659,12 @@ struct CallPageView: View {
     }
 
     private func saveLists(_ o: CallOutcome, decisions: [String]? = nil, open: [String]? = nil, risks: [String]? = nil, section: String) {
-        CallPageEdit.save(file: file, decisions: decisions ?? o.decisions, open: open ?? o.openQuestions, risks: risks ?? o.risks)
+        CallPageEdit.save(file: file, decisions: decisions ?? o.decisions, open: open ?? o.openQuestions, risks: risks ?? o.risks, lists: [section])
         changed(section)
+        if section == "decisions" || section == "risks" {   // 0.12.2 (L2, L3): the PM's edits go to the server too (only the changed part)
+            let f = file
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { MainActor.assumeIsolated { CallSyncService.shared.sync(f) } }
+        }
     }
 
     private var bullet: some View { Text("•").font(PN.Font.body).foregroundStyle(PN.C.text3) }
@@ -706,7 +712,12 @@ struct CallPageView: View {
                 ForEach(list.filter { mine || $0.owner == who }) { c in commitmentRow(c, section: section) }
             }
             ForEach(legacy, id: \.self) { t in
-                EditableRow(text: t, copy: t, onSave: { v in addItem(v, owner: "me", proj, ws); changed(section) }) { bullet }
+                EditableRow(text: t, copy: t, onSave: { v in
+                    let parts = v.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+                    if !mine, parts.count == 2, !parts[0].isEmpty, parts[0].count <= 40 { addItem(parts[1], owner: parts[0], proj, ws) }
+                    else { addItem(v, owner: mine ? "me" : L("callEdit.them"), proj, ws) }
+                    changed(section)
+                }) { bullet }
             }
             AddRowField(placeholder: mine ? L("callEdit.addPh") : L("callEdit.addTheirsPh")) { v in
                 if mine { addItem(v, owner: "me", proj, ws) } else {

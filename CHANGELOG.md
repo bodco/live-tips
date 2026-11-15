@@ -3,6 +3,24 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.12.2 (2026-11-15)
+
+- **One list of decisions per call (2026-11-15, L1-L2):** the Decisions tab and its count, Summary (Meeting notes, its
+  Copy and Export), Home, the call export, the follow-up email, CRM, series memory and the Pacenote server now show the
+  same decisions. They come from the first of: your edit on the call page, the Meeting notes, what was caught live
+  during the call, the older notes sections. Your edits on the Decisions tab now reach Summary and the server, and
+  editing risks or open questions no longer freezes the decisions that the notes bring later.
+- **Risks in the Meeting notes (2026-11-15, L3):** new call notes have a **Risks** section (what may go wrong and what it
+  depends on), on the Summary tab, in its Copy and Export and on the call's Notion meeting page. The Risks tab follows
+  the same rule as Decisions, so a call where no risk was caught live now shows the risks from its notes. Risks go to
+  the Pacenote server with the call (needs server 0.4.0; an older server skips them), your edits too. Open questions
+  in the notes no longer mix in risks.
+- **Tasks from the Meeting notes (2026-11-15, L4):** when a call's notes are written, their Action items are added to
+  the call's tasks (On you, On them). A task the call already has (same person, similar text) is kept as it is and only
+  gets the due date from the notes when it had none; a task you deleted or edited is not brought back. Home, the
+  follow-up email, CRM and the export read the same tasks, and the Pacenote server now gets each task with its owner,
+  status (open, done, dropped) and due day.
+
 ## 0.12.1 (2026-11-15)
 
 - **Sync status on the call page (2026-11-15, B8):** for a project that syncs to the Pacenote server, the call page shows

@@ -31,14 +31,20 @@ enum CallNotes {
     static func decisions(_ t: String) -> [String] { lines(t, ["decisions", "рішення"]).map(plain).filter { !$0.isEmpty } }
 
     /// 0.9.5.2 (rules/notes.yaml, schema 2): the readable ## Meeting notes of the call, nil for older notes.
+    /// 0.12.2 (L2): its Decisions follow the one rule (CallLists), so Summary, its Copy and Export show the decisions of
+    /// the Decisions tab (the PM's edits included), with the notes times where they come from the notes.
     static func meeting(_ transcript: String) -> MeetingNotes.Notes? {
-        guard let text = try? String(contentsOfFile: path(transcript), encoding: .utf8) else { return nil }
-        return MeetingNotes.parse(text)
+        guard let text = try? String(contentsOfFile: path(transcript), encoding: .utf8), var m = MeetingNotes.parse(text) else { return nil }
+        let lists = CallLists.read(transcript: transcript)
+        m.decisions = lists.decisionItems
+        m.risks = lists.riskItems       // 0.12.2 (L3)
+        return m
     }
 
     static var meetingLabels: MeetingNotes.Labels {
         MeetingNotes.Labels(title: "", tldr: L("page.mn.tldr"), decisions: L("page.tab.decisions"), actions: L("page.mn.actions"),
                             open: L("page.mn.open"), topics: L("page.mn.topics"), unclear: L("page.mn.unclear"))
+            .withRisks(L("page.tab.risks"))
     }
 
     /// The Meeting notes as Markdown for Copy: the call's name, when and project, then the sections.
@@ -223,7 +229,9 @@ struct ExportPanel: View {
         let when = CallNotes.whenLine(file)
         if !when.isEmpty { md += "\n" + when + "\n" }
         let meeting = CallNotes.meeting(file).flatMap { $0.isEmpty ? nil : $0 }
-        if summary, let m = meeting { md += MeetingNotes.markdown(m, CallNotes.meetingLabels) }      // 0.9.5.2
+        var lab = CallNotes.meetingLabels
+        if risks { lab.risks = "" }      // 0.12.2 (L3): the Risks section below has them, not twice
+        if summary, let m = meeting { md += MeetingNotes.markdown(m, lab) }      // 0.9.5.2
         if (summary && meeting == nil) || (discussed && meeting != nil) {
             let s = CallNotes.inShort(file), d = CallNotes.discussed(file), n = CallNotes.nextCall(file)
             if !s.isEmpty { md += "\n## " + L("page.sum.inShort") + "\n\n" + s.joined(separator: " ") + "\n" }

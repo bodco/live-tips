@@ -1448,6 +1448,20 @@ questions and risks into fields; Save writes a new call picture and the register
 already has a Notion page, the same sections on that page are rewritten at once; a line under the title says
 "The Notion page is updated" or why not, with Retry. The rest of the page (your notes, comments) is not touched.
 
+**One list of decisions and risks per call (0.12.2).** The Decisions and Risks tabs and their counts, Summary with
+its Copy and Export, Home, the call export, the follow-up email, CRM, series memory and the Pacenote server
+show the same items. They come from the first of: your edit on the call page, the Meeting notes, what was caught live
+during the call, the older notes sections (decisions only). Lines that only say there are none ("None", "Немає") never
+count. An edit of one list does not freeze the others; an edit is kept even when you removed everything. Risks go to
+the Pacenote server from its version 0.4.0; an older server skips them.
+
+**Tasks from the Meeting notes (0.12.2).** Tasks live in the commitments register. When the call notes are
+written (or you click Make meeting notes on an older call), their Action items are added to the call's On you and On
+them: on you when the notes name you or nobody, else on that person. A task the call already has (same person, similar
+text) stays as it is and only takes the due date from the notes when it had none; a task you deleted or edited is not
+brought back. A call without register items shows the tasks of its notes, else what was caught live. The Pacenote
+server gets the register's tasks with owner, status and due day.
+
 **Sales methods.** Sales is an option on top of any call type (Start call > Options > Sales), remembered for the
 series; the default per project is in Settings > Projects. The methods live in `rules/sales.yaml`, a new one is data:
 
@@ -1798,7 +1812,8 @@ People need something else: short notes they can read in a minute and send on. S
 **Summary** tab is these **Meeting notes**:
 
 - **Summary** (TL;DR): two or three sentences on what the call was about and what came out of it.
-- **Decisions**, **Action items** (owner, what, by when as said) and **Open questions**, each item with its time.
+- **Decisions**, **Action items** (owner, what, by when as said), **Open questions** and **Risks** (what may go wrong
+  and what it depends on; notes made since 0.12.2), each item with its time.
 - **Topics**: four to eight, in the call's order, each with its time, a one-line outcome and two to four points (who,
   numbers, dates). Doubtful names or facts go into one quiet **Unclear** line at the end, never "heard ..." in the text.
 - **A time is a link**: a click opens the Transcript tab at that line.
@@ -2259,8 +2274,8 @@ Pacenote works exactly as before.
   the rest is purged within 30 days. Calls on your Mac and files in your Google Drive stay.
 - **What goes there.** Your account and your devices. From 0.12.0 also calls, but only for a project with **Sync to
   Pacenote server** on (Settings > Projects, the project's menu; off by default, available while signed in): the
-  call's title, start, length, type and audience, the call notes as the summary, decisions, tasks, the Meeting Sheet
-  and links to the recording and transcript in your Drive. **Don't sync this call** in a call page's menu keeps one call off
+  call's title, start, length, type and audience, the call notes as the summary, decisions, tasks, risks (0.12.2, server 0.4.0), the
+  Meeting Sheet and links to the recording and transcript in your Drive. **Don't sync this call** in a call page's menu keeps one call off
   the server. A call goes after it ends and again when its notes or Sheet change (only the changed parts); without a
   network it waits for the next time. The call page shows a line under the header: synced (when), syncing, not synced yet
   or the error (with **Sync now**), not synced for this call, or deleted on another device. **Delete from server…** in a

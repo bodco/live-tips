@@ -12,10 +12,11 @@ struct CallOutcome: Equatable {
     var openQuestions: [String] = []    // questions to the PM still open at the end
     var theirs: [(who: String, what: String)] = []   // 0.8: promises made to the PM's side
     var risks: [String] = []            // 0.8: risks heard on the call (rules/risks.yaml)
+    var tasks: [CallLists.Task] = []    // 0.12.2 (L4): the one-rule tasks, for a call whose register has none
 
     static func == (a: CallOutcome, b: CallOutcome) -> Bool {
         a.decisions == b.decisions && a.onMe == b.onMe && a.openQuestions == b.openQuestions && a.risks == b.risks
-            && a.theirs.map { $0.who + "|" + $0.what } == b.theirs.map { $0.who + "|" + $0.what }
+            && a.theirs.map { $0.who + "|" + $0.what } == b.theirs.map { $0.who + "|" + $0.what } && a.tasks == b.tasks
     }
 
     var isEmpty: Bool { decisions.isEmpty && onMe.isEmpty && openQuestions.isEmpty }
@@ -30,7 +31,31 @@ struct CallOutcome: Equatable {
     }
 
     /// The last call picture in the call's tips file (the app's <stem>.md.tips.jsonl or the skill's <stem>.tips.jsonl).
+    /// 0.12.2 (L2): decisions follow the one rule (CallLists: the PM's edit, Meeting notes, live picture, older notes),
+    /// so Home, Export, follow-up, CRM, Memory and the call page agree; a call with decisions only in its notes has an
+    /// outcome too.
     static func read(transcript file: String) -> CallOutcome? {
+        let lists = CallLists.read(transcript: file)
+        var c = readSituation(transcript: file)
+        let folder = (file as NSString).deletingLastPathComponent
+        let reg = CommitmentRegister.load(folder: folder)
+            .filter { CommitmentRegister.callKey($0.call) == CommitmentRegister.callKey(file) && $0.status != "dropped" }
+        if c == nil, !(lists.isEmpty && reg.isEmpty) { c = CallOutcome() }
+        c?.decisions = lists.decisions
+        c?.risks = lists.risks          // 0.12.2 (L3): risks by the same rule
+        c?.tasks = lists.tasks
+        // 0.12.2 (L4): on you and on them from the register (the store), else by the one rule
+        if !reg.isEmpty {
+            c?.onMe = reg.filter(\.mine).map(\.text)
+            c?.theirs = reg.filter { !$0.mine }.map { (who: $0.owner, what: $0.text) }
+        } else if !lists.tasks.isEmpty {
+            c?.onMe = lists.tasks.filter { $0.mine ?? $0.owner.isEmpty }.map(\.text)
+            c?.theirs = lists.tasks.filter { !($0.mine ?? $0.owner.isEmpty) }.map { (who: $0.owner, what: $0.text) }
+        }
+        return c
+    }
+
+    private static func readSituation(transcript file: String) -> CallOutcome? {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         for p in [file + ".tips.jsonl", stem + ".tips.jsonl"] {
             guard let s = try? String(contentsOfFile: p, encoding: .utf8) else { continue }
@@ -63,7 +88,8 @@ final class OutcomeCache {
     func outcome(_ file: String) -> CallOutcome? {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         let fm = FileManager.default
-        let m = [file + ".tips.jsonl", stem + ".tips.jsonl"]
+        let m = [file + ".tips.jsonl", stem + ".tips.jsonl", CallLists.notesPath(transcript: file),   // 0.12.2: notes bring decisions
+                 CommitmentRegister.path(folder: (file as NSString).deletingLastPathComponent)]           // and the register tasks
             .compactMap { (try? fm.attributesOfItem(atPath: $0))?[.modificationDate] as? Date }.max() ?? .distantPast
         if let c = cache[file], c.0 == m { return c.1 }
         let o = CallOutcome.read(transcript: file)

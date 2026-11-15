@@ -18,8 +18,9 @@ public enum MeetingNotes {
         public var open: [Item] = []
         public var topics: [Topic] = []
         public var unclear: [Item] = []
+        public var risks: [Item] = []      // 0.12.2 (L1): "### Risks", written from notes schema 3 (L3)
         public init() {}
-        public var isEmpty: Bool { tldr.isEmpty && decisions.isEmpty && actions.isEmpty && open.isEmpty && topics.isEmpty }
+        public var isEmpty: Bool { tldr.isEmpty && decisions.isEmpty && actions.isEmpty && open.isEmpty && topics.isEmpty && risks.isEmpty }
     }
 
     public static let heading = "## Meeting notes"
@@ -65,7 +66,7 @@ public enum MeetingNotes {
         var n = Notes()
         var cur = ""
         let keys = ["tl;dr": "tldr", "decisions": "decisions", "action items": "actions", "open questions": "open",
-                    "topics": "topics", "unclear": "unclear"]
+                    "topics": "topics", "unclear": "unclear", "risks": "risks", "ризики": "risks"]
         for raw in lines {
             let l = raw.trimmingCharacters(in: .whitespaces)
             if l.isEmpty { continue }
@@ -99,6 +100,7 @@ public enum MeetingNotes {
             case "actions": n.actions.append(item(body))
             case "open": n.open.append(item(body))
             case "unclear": n.unclear.append(item(body))
+            case "risks": n.risks.append(item(body))
             default: continue
             }
         }
@@ -108,10 +110,12 @@ public enum MeetingNotes {
     /// The headings of the copied and exported text, in the interface language.
     public struct Labels {
         public var title, tldr, decisions, actions, open, topics, unclear: String
+        public var risks = ""      // 0.12.2 (L3): "### Risks" is written only when this label is set
         public init(title: String, tldr: String, decisions: String, actions: String, open: String, topics: String, unclear: String) {
             self.title = title; self.tldr = tldr; self.decisions = decisions; self.actions = actions; self.open = open
             self.topics = topics; self.unclear = unclear
         }
+        public func withRisks(_ r: String) -> Labels { var l = self; l.risks = r; return l }
     }
 
     /// Markdown for Copy and Export: "#" title (when given), "##" sections, "###" topics, "- " items with their time.
@@ -121,7 +125,8 @@ public enum MeetingNotes {
         var md = L.title.isEmpty ? "" : String(repeating: "#", count: level - 1) + " " + L.title + "\n"
         if !when.isEmpty { md += "\n" + when + "\n" }
         if !n.tldr.isEmpty { md += "\n" + h + L.tldr + "\n\n" + n.tldr + "\n" }
-        for (title, items) in [(L.decisions, n.decisions), (L.actions, n.actions), (L.open, n.open)] where !items.isEmpty {
+        for (title, items) in [(L.decisions, n.decisions), (L.actions, n.actions), (L.open, n.open), (L.risks, n.risks)]
+            where !items.isEmpty && !title.isEmpty {
             md += "\n" + h + title + "\n\n" + items.map(line).joined(separator: "\n") + "\n"
         }
         if !n.topics.isEmpty {

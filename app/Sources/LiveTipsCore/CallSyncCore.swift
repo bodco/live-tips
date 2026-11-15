@@ -95,6 +95,47 @@ public enum CallSync {
         }
     }
 
+    /// 0.12.2 (L2): the call's decisions by the one rule (CallLists), so the server shows what the call page shows.
+    public static func decisions(_ l: CallLists.Lists) -> [[String: Any]] {
+        l.decisions.prefix(200).map { ["text": String($0.prefix(2000))] }
+    }
+
+    /// 0.12.2 (L3): the call's risks by the one rule (CallLists), for PUT /v1/calls/{id}/risks (server 0.4.0).
+    public static func risks(_ l: CallLists.Lists) -> [[String: Any]] {
+        l.risks.prefix(200).map { ["text": String($0.prefix(2000))] }
+    }
+
+    /// 0.12.2 (L3): a server older than 0.4.0 has no risks part (404 or 405): skip it quietly, never treat it as
+    /// "the call is gone".
+    public static func partMissing(_ name: String, status: Int) -> Bool { name == "risks" && (status == 404 || status == 405) }
+
+    /// 0.12.2 (L4): the call's tasks from the commitments register (the store: text, owner, status, due), else by the
+    /// one rule (CallLists: notes, live picture, older notes). `me`: the PM's name for "me" items ("" leaves it out).
+    /// A due date goes only when it reads as a day (CommitmentRegister.dueDate); a Notion link only when it is one.
+    public static func tasks(register: [Commitment], lists: CallLists.Lists, me: String) -> [[String: Any]] {
+        let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        func row(_ text: String, owner: String, mine: Bool, due: String, from: Date, status: String, notion: String) -> [String: Any]? {
+            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty, !MeetingNotes.isNothing(t) else { return nil }
+            var o: [String: Any] = ["text": String(t.prefix(2000)), "status": status]
+            let who = mine ? me : owner
+            if !who.isEmpty { o["assignee"] = String(who.prefix(200)) }
+            if !due.isEmpty, let d = CommitmentRegister.dueDate(due, from: from) { o["due_date"] = f.string(from: d) }
+            if notion.hasPrefix("https://www.notion.so/") || notion.hasPrefix("https://notion.so/") { o["notion_url"] = notion }
+            return o
+        }
+        if !register.isEmpty {
+            return register.prefix(200).compactMap { c in
+                row(c.text, owner: c.owner, mine: c.mine, due: c.due, from: c.createdDate ?? Date(),
+                    status: ["open", "done", "dropped"].contains(c.status) ? c.status : "open", notion: c.notionPage)
+            }
+        }
+        return lists.tasks.prefix(200).compactMap { k in
+            row(k.text, owner: k.owner, mine: k.mine ?? k.owner.isEmpty, due: "", from: Date(), status: "open", notion: "")
+        }
+    }
+
     public static func tasks(_ n: MeetingNotes.Notes?) -> [[String: Any]] {
         (n?.actions ?? []).prefix(200).compactMap { i in
             let t = i.text.trimmingCharacters(in: .whitespaces)

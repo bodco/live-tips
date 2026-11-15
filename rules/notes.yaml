@@ -1,6 +1,6 @@
 # Call notes (Pacenote 0.8.5, owner: "summaries that never drop details, so the context is not lost"). Shared by the
 # app and the skill: what a later preparation reads instead of an older call's whole transcript.
-schema_version: 2
+schema_version: 3
 file: <stem>.notes.md next to the transcript (livetips_m0.callnotes)
 language: the language the call was held in (the majority of the transcript lines' language tags), not the app's interface language (0.9.1, owner)
 when: after every recorded call, whether or not Notion is set up (with the meeting page when it is), on the "After the call" way (model claude-sonnet-5-5,
@@ -29,10 +29,13 @@ meeting_notes: |
   times) writes the "## Meeting notes" section at the top of the notes, before "## Summary"; written again, it is
   replaced, never added twice. Fixed English headings (the app reads them), the text in the call's language:
   ### TL;DR (2-3 sentences), ### Decisions, ### Action items ("**Owner**: what (due: when)"), ### Open questions,
-  ### Topics (4-8, "#### Title [HH:MM:SS]", "Outcome: one line", 2-4 points), ### Unclear (doubtful names or facts,
+  ### Risks (schema 3, 0.12.2: conditional threats as in rules/risks.yaml > model_rule, at most 5), ### Topics (4-8, "#### Title [HH:MM:SS]", "Outcome: one line", 2-4 points), ### Unclear (doubtful names or facts,
   never "heard" in the text). Every item starts with its transcript time "[HH:MM:SS]"; on the call page a time opens
   the transcript there. Readers: the app (MeetingNotes.parse, the Summary tab, Copy, Export) and the Notion meeting
   page (wrapup_notion.meeting_blocks, which waits for the notes up to 10 minutes when the app started both).
   Make meeting notes on an older call: `callnotes --meeting` (only this section when the notes exist, about $0.05 to $0.10).
   The preparation still reads the whole notes file.
+  0.12.2 (L1-L3): the call page, Summary, Home, Export, follow-up, CRM and the server read Decisions, Tasks and Risks
+  by one rule (LiveTipsCore CallLists): the PM's edit on the call page, else these Meeting notes, else the live call
+  picture, else the older notes sections. Notes of schema 2 have no ### Risks: their risks come from the live picture.
 

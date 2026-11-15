@@ -26,6 +26,11 @@ write_when: >-
   At the end of the call (state stopped), once: every action of the call picture (owner me) and every promise
   made to the PM's side (owner = the person's name), with the due date when one was named. An item the PM ticked
   in the window's On me is added and closed at once (done, source manual).
+  0.12.2 (L4): when the call notes are written (callnotes, also "Make meeting notes" on an older call), their
+  ### Action items complete the register (commitments.record_notes, add with "source":"notes"). An item with the same
+  owner (the same first name counts) and a similar text as one this call already has, open, done, dropped or edited
+  by the PM, is the same commitment: the register keeps its item and only takes the notes' due date when it had none
+  (op edit). Owner me when the notes name the PM (his name aliases) or nobody, else the name.
 open_on_call: >-
   At the start, read the open items of this project (up to 15, this series first). Give them to the model
   that keeps the call picture as OPEN COMMITMENTS with their ids.

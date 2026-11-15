@@ -80,7 +80,7 @@ Rules:
 - Short, plain sentences. Group by topic, not by the order of speaking. Merge repeats.
 - Keep what a reader needs: who, numbers, dates, decisions, owners. Leave out small talk and filler.
 - Not overloaded: at most 8 action items (merge the small ones of one owner into one line), at most 5 open questions,
-  2-4 points per topic, one line each. A detail that does not change what a reader does or knows stays in the full notes.
+  at most 5 risks, 2-4 points per topic, one line each. A detail that does not change what a reader does or knows stays in the full notes.
 - Never write "heard", "unclear", "(heard ...)" or "inaudible" inside the notes. Speech recognition garbles names: write
   the real name (use the names below and the full notes); what stays doubtful goes once into ### Unclear at the end.
 - Every item starts with the time of the transcript line where it was said, copied as [HH:MM:SS].
@@ -96,7 +96,10 @@ Format:
 ### Action items
 - [HH:MM:SS] **Owner**: what (due: when, only if said)
 ### Open questions
-- [HH:MM:SS] a question, risk or blocker left open
+- [HH:MM:SS] a question or blocker left open
+### Risks
+- [HH:MM:SS] a conditional threat said on the call: what may go wrong and what it depends on, max 16 words ("the
+  pilot moves if the accounts come after Friday"). Not every problem is a risk: a bug being fixed now is not.
 ### Topics
 4-8 topics in the call's order, each:
 #### Topic title [HH:MM:SS]
@@ -148,11 +151,11 @@ def _item(s: str) -> dict:
 
 
 def parse_meeting(notes: str) -> dict:
-    """The section as data: tldr, decisions, actions, open, topics [{title, t, outcome, points}], unclear.
-    The same reading as the app's MeetingNotes.parse (LiveTipsCore)."""
-    out = {"tldr": "", "decisions": [], "actions": [], "open": [], "topics": [], "unclear": []}
+    """The section as data: tldr, decisions, actions, open, risks (schema 3), topics [{title, t, outcome, points}],
+    unclear. The same reading as the app's MeetingNotes.parse (LiveTipsCore)."""
+    out = {"tldr": "", "decisions": [], "actions": [], "open": [], "risks": [], "topics": [], "unclear": []}
     keys = {"tl;dr": "tldr", "decisions": "decisions", "action items": "actions", "open questions": "open",
-            "topics": "topics", "unclear": "unclear"}
+            "risks": "risks", "ризики": "risks", "topics": "topics", "unclear": "unclear"}
     cur = None
     for raw in meeting_text(notes).split("\n")[1:]:
         l = raw.strip()
@@ -178,7 +181,7 @@ def parse_meeting(notes: str) -> dict:
                 tp["outcome"] = body[m.end():].strip()
             else:
                 tp["points"].append(_item(body))
-        elif cur in ("decisions", "actions", "open", "unclear"):
+        elif cur in ("decisions", "actions", "open", "risks", "unclear"):
             out[cur].append(_item(body))
     return out
 
@@ -295,6 +298,7 @@ def make_meeting_only(md: Path, model: str, lang: str, provider=None, aliases: L
     notes = out.read_text(encoding="utf-8")
     notes = put_meeting(notes, make_meeting(md, notes, text, lang, ask, names_block(aliases or [], config)))
     _write_then_check(out, md, notes, text, lang, ask)
+    _register_tasks(md, notes, aliases)
     return {"ok": True, "path": str(out), "coverage": None, "cost_usd": round(usd[0], 4), "parts": 0, "error": None}
 
 
@@ -303,6 +307,17 @@ def _write(out: Path, text: str) -> None:
     tmp = out.with_name(out.name + ".tmp")
     tmp.write_text(text, encoding="utf-8")
     os.replace(tmp, out)
+
+
+def _register_tasks(md: Path, notes: str, aliases: List[str]) -> None:
+    """0.12.2 (L4): the notes' Action items complete the call's commitments register (<call folder>/commitments.jsonl,
+    commitments.record_notes); the notes are kept whatever happens."""
+    try:
+        from . import commitments
+        call = md.name.replace(".named.md", ".md")
+        commitments.record_notes(md.parent, call=call, notes=notes, aliases=aliases or [])
+    except Exception as e:  # noqa: BLE001
+        print("register from notes: " + str(e)[:200], file=sys.stderr)
 
 
 def _write_then_check(out: Path, md: Path, notes: str, text: str, lang: str, ask) -> str:
@@ -373,6 +388,7 @@ def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str
         print("meeting notes: " + str(e)[:200], file=sys.stderr)
     out = md.with_name(md.name[:-3].replace(".named", "") + ".notes.md")
     _write_then_check(out, md, notes, text, lang, ask)
+    _register_tasks(md, notes, aliases)
     return {"ok": True, "path": str(out), "coverage": coverage_line(c), "cost_usd": round(usd[0], 4), "parts": len(ps),
             "error": None}
 

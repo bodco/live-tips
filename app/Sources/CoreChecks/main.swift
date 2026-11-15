@@ -2174,6 +2174,88 @@ func pacenoteDriveB7b() {
     expect(PacenoteServer.me(["user": ["email": "a@b.c"], "organizations": [["id": "o1"]]])?.transcriptRequiredBy == nil, "B7b: no policy, not required")
 }
 
+// 0.12.2 (L1): one rule for Decisions, Tasks and Risks (CallLists)
+func callLists0122() {
+    let live: [String: Any] = ["kind": "situation", "decisions": ["Ship on Friday", "Немає."],
+        "actions": [["what": "Send the deck", "due": "Monday", "t": "10:05:00"]],
+        "theirs": [["who": "Mike", "what": "Share the budget"]], "risks": [["what": "Budget not approved"]]]
+    var r = CallLists.resolve(situations: [live], notes: nil)
+    expect(r.decisions == ["Ship on Friday"] && r.decisionsFrom == .live, "L1: live decisions, nothing line dropped")
+    expect(r.risks == ["Budget not approved"] && r.risksFrom == .live, "L1: live risks")
+    expect(r.tasks.count == 2 && r.tasks[0].mine == true && r.tasks[0].due == "Monday" && r.tasks[1].owner == "Mike" && r.tasks[1].mine == false, "L1: live tasks, mine and theirs")
+    expect(r.tasks[1].line == "Mike: Share the budget", "L1: task line")
+
+    let mn = "# Call notes\n\n## Meeting notes\n\n### TL;DR\nShort.\n\n### Decisions\n- [10:01:00] **Go with plan B**\n- Go with plan B\n\n### Action items\n- **Emily**: draft the contract (due: Friday)\n- **Mike:** review the draft\n- Book the room\n\n### Risks\n- Vendor may slip\n\n## Decisions\n- Old decision\n"
+    r = CallLists.resolve(situations: [live], notes: mn)
+    expect(r.decisions == ["Go with plan B"] && r.decisionsFrom == .notes, "L1: notes beat the live picture, repeats dropped")
+    expect(r.decisionItems.map(\.t) == ["10:01:00"], "L2: notes decisions keep their time")
+    expect(CallSync.decisions(r).map { $0["text"] as? String } == ["Go with plan B"], "L2: sync sends the one-rule decisions")
+    expect(r.risks == ["Vendor may slip"] && r.risksFrom == .notes, "L1: notes risks (schema 3)")
+    expect(r.riskItems.first?.t == "", "L3: a risk without a time")
+    if var mm = MeetingNotes.parse(mn) {
+        mm.risks = [MeetingNotes.Item(t: "10:09:00", text: "Vendor may slip")]
+        let lab = MeetingNotes.Labels(title: "", tldr: "TL;DR", decisions: "Decisions", actions: "Action items", open: "Open", topics: "Topics", unclear: "Unclear")
+        expect(!MeetingNotes.markdown(mm, lab).contains("Vendor"), "L3: no Risks without its label")
+        expect(MeetingNotes.markdown(mm, lab.withRisks("Risks")).contains("## Risks\n\n- [10:09] Vendor may slip"), "L3: Risks in Copy and Export")
+    } else { expect(false, "L3: notes parse") }
+    expect(r.tasksFrom == .notes && r.tasks.count == 3, "L1: notes tasks beat live actions")
+    expect(r.tasks[0].owner == "Emily" && r.tasks[0].text == "draft the contract" && r.tasks[0].due == "Friday" && r.tasks[0].mine == nil, "L1: owner and due parsed")
+    expect(r.tasks[1].owner == "Mike" && r.tasks[1].text == "review the draft", "L1: bold owner with the colon inside")
+    expect(r.tasks[2].owner.isEmpty && r.tasks[2].text == "Book the room", "L1: task without owner")
+
+    let empty = "## Meeting notes\n\n### Decisions\n- Жодних рішень не приймалося.\n\n### Action items\n- None\n"
+    r = CallLists.resolve(situations: [live], notes: empty)
+    expect(r.decisionsFrom == .live && r.tasksFrom == .live && r.risksFrom == .live, "L1: nothing-only notes fall through")
+
+    var editRisks = live; editRisks["source"] = "call_page"; editRisks["lists"] = ["risks"]; editRisks["risks"] = [["what": "Legal review"]]
+    r = CallLists.resolve(situations: [live, editRisks], notes: mn)
+    expect(r.risks == ["Legal review"] && r.risksFrom == .pm, "L1: the PM's risks edit wins")
+    expect(r.decisions == ["Go with plan B"] && r.decisionsFrom == .notes, "L1: a risks edit does not freeze decisions")
+
+    var editAll = live; editAll["source"] = "call_page"; editAll["decisions"] = [String](); editAll["risks"] = [[String: Any]]()
+    r = CallLists.resolve(situations: [live, editAll], notes: mn)
+    expect(r.decisions.isEmpty && r.decisionsFrom == .pm && r.risks.isEmpty && r.risksFrom == .pm, "L1: an old edit line covers all, an empty edit counts")
+    expect(CallSync.decisions(r).isEmpty, "L2: the PM removed all decisions, the server gets none")
+    let later: [String: Any] = ["kind": "situation", "decisions": ["Later live"]]
+    r = CallLists.resolve(situations: [live, editAll, later], notes: nil)
+    expect(r.decisionsFrom == .pm, "L1: a live line after the edit does not undo it")
+
+    let old = "# Call notes\n## Summary\nx\n## Decisions\n- **Keep the old API**\n- None\n## Action items\n- **Mike**: send notes\n## Concerns and mood\n- calm\n"
+    r = CallLists.resolve(situations: [], notes: old)
+    expect(r.decisions == ["Keep the old API"] && r.decisionsFrom == .legacy, "L1: older notes sections last")
+    expect(r.tasks.first?.owner == "Mike" && r.tasksFrom == .legacy && r.risks.isEmpty && r.risksFrom == .none, "L1: older tasks, no older risks")
+    expect(CallLists.resolve(situations: [], notes: nil) == CallLists.Lists(), "L1: nothing at all")
+    expect(MeetingNotes.parse(mn)?.risks.map(\.text) == ["Vendor may slip"], "L1: meeting notes read ### Risks")
+
+    // 0.12.2 (L4): server tasks from the register, else the one-rule tasks
+    let regEv: [[String: Any]] = [
+        ["op": "add", "id": "c-1", "text": "Send the deck", "owner": "me", "call": "x.app.md", "created": "2026-11-13T10:00:00+02:00", "due": "2026-11-20"],
+        ["op": "link", "id": "c-1", "notion_page": "abc123"],
+        ["op": "add", "id": "c-2", "text": "Share the budget", "owner": "Mike", "call": "x.app.md", "created": "2026-11-13T10:00:00+02:00"],
+        ["op": "drop", "id": "c-2"]]
+    let regItems = CommitmentRegister.fold(regEv)
+    let lst = CallLists.resolve(situations: [live], notes: mn)
+    let st = CallSync.tasks(register: regItems, lists: lst, me: "Emily")
+    expect(st.count == 2 && st[0]["assignee"] as? String == "Emily" && st[0]["due_date"] as? String == "2026-11-20" && st[0]["notion_url"] == nil,
+           "L4: a register item with the PM's name, its day and no fake Notion link")
+    expect(st[1]["assignee"] as? String == "Mike" && st[1]["status"] as? String == "dropped" && st[1]["due_date"] == nil, "L4: their item, dropped")
+    let fb = CallSync.tasks(register: [], lists: lst, me: "")
+    expect(fb.count == 3 && fb[0]["assignee"] as? String == "Emily" && fb.allSatisfy { ($0["status"] as? String) == "open" }, "L4: no register, the notes tasks")
+    expect(CallSync.tasks(register: [], lists: CallLists.Lists(), me: "Emily").isEmpty, "L4: nothing to send")
+    expect(CallSync.risks(lst).map { $0["text"] as? String } == ["Vendor may slip"], "L3: server risks by the one rule")
+    expect(CallSync.partMissing("risks", status: 404) && CallSync.partMissing("risks", status: 405), "L3: an old server without risks")
+    expect(!CallSync.partMissing("tasks", status: 404) && !CallSync.partMissing("risks", status: 410), "L3: other parts and 410 as before")
+    let dir = NSTemporaryDirectory() + "pn-l1-\(UUID().uuidString)"
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    let t = dir + "/2026-11-15-1000-sync.app.md"
+    let lines = [live, editRisks].map { String(data: try! JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]), encoding: .utf8)! }
+    try? (["{\"kind\":\"tip\",\"text\":\"x\"}"] + lines).joined(separator: "\n").write(toFile: t + ".tips.jsonl", atomically: true, encoding: .utf8)
+    try? mn.write(toFile: dir + "/2026-11-15-1000-sync.app.notes.md", atomically: true, encoding: .utf8)
+    r = CallLists.read(transcript: t)
+    expect(r.decisionsFrom == .notes && r.risksFrom == .pm && r.tasksFrom == .notes, "L1: read from the call's files")
+    try? FileManager.default.removeItem(atPath: dir)
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -2189,5 +2271,6 @@ f78()
 callReassign0101()
 pacenoteAccountB7()
 pacenoteDriveB7b()
+callLists0122()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

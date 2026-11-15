@@ -213,6 +213,77 @@ def record_call(folder, *, call: str, project: str, title: str, actions: List[di
     return rec.events
 
 
+OWNER_RX = re.compile(r"^\*\*([^*]{1,60}?):?\*\*\s*:?\s*")
+DUE_RX = re.compile(r"\s*\((?:due|до|термін|deadline)\s*:?\s*([^)]*)\)\s*\.?$", re.I)
+
+
+def notes_task(text: str) -> dict:
+    """0.12.2 (L4): a Meeting notes action item, "**Owner**: what (due: when)" (rules/notes.yaml), as owner, what, due.
+    The same reading as the app's CallLists.task."""
+    s = str(text or "").replace(chr(0x2014), "-").strip()
+    owner, due = "", ""
+    m = OWNER_RX.match(s)
+    if m:
+        owner, s = m.group(1).strip(), s[m.end():]
+    d = DUE_RX.search(s)
+    if d:
+        due, s = d.group(1).strip(), s[:d.start()]
+    return {"owner": owner, "what": s.replace("**", "").strip(), "due": due}
+
+
+NOTHING = re.compile(r"^(немає|нема|нічого|відсутні|none|nothing|no|n/a|na|-|жодних .*|no action items.*|no tasks.*)$", re.I)
+
+
+def owner_match(a: str, b: str) -> bool:
+    """The same person: equal names, or the same first name ("David" and "David Kim")."""
+    a, b = (a or "me").strip().lower(), (b or "me").strip().lower()
+    return a == b or (a.split()[:1] == b.split()[:1] and a != "me" and b != "me")
+
+
+def record_notes(folder, *, call: str, notes: str, aliases: Optional[List[str]] = None, by: str = "app") -> List[dict]:
+    """0.12.2 (L4, rules/commitments.yaml > write_when): after the call notes are written, their ### Action items
+    complete the register. An item with the same owner and a similar text as one this call already has (open, done,
+    dropped or edited) is the same commitment: the register keeps its item and only takes the notes' due date when it
+    had none. Owner: me when the notes name the PM (aliases) or nobody, else the name. Returns the events written."""
+    from .callnotes import parse_meeting
+    acts = parse_meeting(notes or "").get("actions") or []
+    if not acts:
+        return []
+    names = {x.strip().lower() for x in (aliases or []) if x.strip()} | {"me", "я", "pm"}
+    first = {n.split()[0] for n in names if n.split()}
+    events = read_events(folder)
+    have = [i for i in fold(events) if call_key(i.get("call")) == call_key(call)]
+    added = {e["id"]: e.get("text", "") for e in events if e.get("op") == "add" and call_key(e.get("call")) == call_key(call)}
+    project = next((i.get("project", "") for i in have if i.get("project")), "")
+    series = next((i.get("series", "") for i in have if i.get("series")), "")
+    if not series:
+        title = re.sub(r"^\d{4}-\d\d-\d\d-\d{4}-", "", Path(call).name.split(".")[0]).replace("-", " ")
+        series = series_key(project, title)
+    rec = _CallRecord(have, call, project, series, now_iso(), by)
+    out: List[dict] = []
+    for a in acts:
+        tk = notes_task(a.get("text", ""))
+        what = re.sub(r"\s+", " ", tk["what"]).strip()
+        if not what or NOTHING.match(what.rstrip(".!")):
+            continue
+        o = tk["owner"].strip()
+        owner = "me" if not o or o.lower() in names or o.lower().split()[0] in first else o[:40]
+        twin = next((i for i in rec.have if owner_match(i.get("owner"), owner)
+                     and (similar(i.get("text", ""), what) or similar(added.get(i.get("id"), ""), what))), None)
+        if twin:
+            if tk["due"] and not twin.get("due") and twin.get("status", "open") == "open":
+                out.append({"op": "edit", "id": twin["id"], "at": rec.created, "due": tk["due"][:40], "source": "notes"})
+                twin["due"] = tk["due"][:40]
+            continue
+        n = len(rec.events)
+        rec.add(what, owner, tk["due"], a.get("t"), False)
+        for e in rec.events[n:]:
+            if e.get("op") == "add":
+                e["source"] = "notes"
+    append(folder, rec.events + out)
+    return rec.events + out
+
+
 def mark(folder, cid: str, op: str = "done", source: str = "manual", call: str = "", notion_page: str = "") -> dict:
     e = {"op": op, "id": cid, "at": now_iso()}
     if op == "link":

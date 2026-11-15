@@ -23,8 +23,10 @@ enum CallPageEdit {
     }
 
     /// Writes the edited lists as a new call picture line. Lines are trimmed, empty ones dropped, long dashes replaced.
+    /// 0.12.2 (L1): `lists` names the lists the PM changed ("decisions", "open", "risks"); CallLists takes only those
+    /// from this line, so editing risks does not freeze the decisions the notes bring later.
     @discardableResult
-    static func save(file: String, decisions: [String], open: [String], risks: [String]) -> Bool {
+    static func save(file: String, decisions: [String], open: [String], risks: [String], lists: [String]? = nil) -> Bool {
         let clean: ([String]) -> [String] = { $0.map { $0.replacingOccurrences(of: "\u{2014}", with: "-").trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
         let path = tipsFile(file)
         var o = lastSituation(path)
@@ -35,6 +37,7 @@ enum CallPageEdit {
         o["risks"] = clean(risks).map { ["what": $0] }
         o["edited"] = ISO8601DateFormatter().string(from: Date())
         o["source"] = "call_page"
+        if let lists { o["lists"] = lists } else { o.removeValue(forKey: "lists") }
         return appendLine(path, o)
     }
 

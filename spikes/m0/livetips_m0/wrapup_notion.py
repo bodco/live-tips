@@ -269,12 +269,12 @@ def timed(it: dict) -> list:
 
 
 def meeting_blocks(m: dict, md: Path, stats: dict, prep_used: bool, lang: str = "uk") -> list:
-    """0.9.5.2 (owner): the meeting page carries the call's Meeting notes (rules/notes.yaml, schema 2): TL;DR, decisions,
-    action items as to-dos, open questions, the topics with their outcome and points; then the agenda, Sales, Pacenote."""
+    """0.9.5.2 (owner): the meeting page carries the call's Meeting notes (rules/notes.yaml, schema 3): TL;DR, decisions,
+    action items as to-dos, open questions, risks (0.12.2), the topics with their outcome and points; then the agenda, Sales, Pacenote."""
     T = TXT[lang]
     b = [para(m["tldr"])] if m.get("tldr") else []
     for title, key, kind in ((T["decisions"], "decisions", "bulleted_list_item"), (T["actions"], "actions", "to_do"),
-                             (T["open"], "open", "bulleted_list_item")):
+                             (T["open"], "open", "bulleted_list_item"), (T["risks"], "risks", "bulleted_list_item")):
         if m.get(key):
             b.append(h(3, title))
             for it in m[key]:

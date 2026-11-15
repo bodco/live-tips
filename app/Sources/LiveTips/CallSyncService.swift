@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import LiveTipsCore
 
@@ -12,6 +13,7 @@ final class CallSyncService: ObservableObject {
 
     @Published private(set) var running: Set<String> = []      // 0.12.1: the call page shows "Syncing"
     private var started = false
+    private var sessionWait: AnyCancellable?             // 0.13.1: the launch sweep waits for the saved session
     private var projectIDs: [String: String] = [:]          // "<account email>|<local slug>" -> server project id
     private var projectsPath: URL { AppPaths.support.appendingPathComponent("server-projects.json") }
 
@@ -40,6 +42,16 @@ final class CallSyncService: ObservableObject {
             // the notes are written in the background after the call; the call page and the next launch send later changes
             DispatchQueue.main.asyncAfter(deadline: .now() + 120) { MainActor.assumeIsolated { CallSyncService.shared.sync(file) } }
         }
+        // 0.13.1: the account reads its saved session from the Keychain in the background, so right after launch it is
+        // not signed in yet and the sweep skipped every call. Sweep once the session is there (now or when it loads).
+        sessionWait = PacenoteAccount.shared.$session.compactMap { $0 }.first().receive(on: DispatchQueue.main).sink { _ in
+            MainActor.assumeIsolated { CallSyncService.shared.sweep() }
+        }
+    }
+
+    /// The calls of the last 30 days, once the account is signed in.
+    private func sweep() {
+        sessionWait = nil
         let since = Date().addingTimeInterval(-30 * 86400)
         for r in CallHistory.shared.records where r.start > since && !r.hidden { sync(r.file) }
     }

@@ -3,6 +3,13 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.13.1 (2026-11-15)
+
+- **Calls sync at launch again (2026-11-15):** for projects with Sync to Pacenote server on, the app is meant to send
+  the calls of the last 30 days a few seconds after launch. It checked the account before its saved sign-in was read,
+  so it skipped every call, and calls reached the server only after a call ended or when its page was opened. The
+  launch sync now waits for the sign-in.
+
 ## 0.13.0 (2026-11-15)
 
 - **Consent record of a call (2026-11-15, B8 part 2, step 1):** the app now keeps what happened with the recording

@@ -2262,7 +2262,11 @@ Pacenote works exactly as before.
   call's title, start, length, type and audience, the call notes as the summary, decisions, tasks, the Meeting Sheet
   and links to the recording and transcript in your Drive. **Don't sync this call** in a call page's menu keeps one call off
   the server. A call goes after it ends and again when its notes or Sheet change (only the changed parts); without a
-  network it waits for the next time. Never audio, video, transcripts, names from the transcript, voice prints or
+  network it waits for the next time. The call page shows a line under the header: synced (when), syncing, not synced yet
+  or the error (with **Sync now**), not synced for this call, or deleted on another device. **Delete from server…** in a
+  call page's menu removes that call's copy from the server for good (the files on your Mac and in Drive stay);
+  **Export server data…** in Settings > Account saves everything of yours on the server as a zip (JSON and one Markdown
+  file per call). When your plan's server storage is full, the sync line says so. Never audio, video, transcripts, names from the transcript, voice prints or
   live tips.
   The server is in the EU; see [PRIVACY](../../PRIVACY.md).
 

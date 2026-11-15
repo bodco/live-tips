@@ -126,6 +126,17 @@ public enum PacenoteServer {
         return s.isEmpty ? "HTTP \(status)" : String(s.prefix(160))
     }
 
+    /// 0.12.1 (B8): a 402 names the plan quota it hit ("storage_mb") and its limit; nil for any other answer.
+    public struct Quota: Equatable {
+        public let name: String; public let limit: Int
+        public init(name: String, limit: Int) { self.name = name; self.limit = limit }
+    }
+    public static func quota(_ data: Data, status: Int) -> Quota? {
+        guard status == 402, let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let n = o["quota"] as? String, !n.isEmpty else { return nil }
+        return Quota(name: n, limit: (o["limit"] as? Int) ?? 0)
+    }
+
     /// What the app does after a failed refresh: 401 means the session ended on the server (signed out elsewhere,
     /// revoked, deleted): forget it here. Anything else (no network, 5xx, 429) keeps it and tries again later.
     public static func refreshEndsSession(status: Int) -> Bool { status == 401 }

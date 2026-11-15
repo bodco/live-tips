@@ -7,10 +7,10 @@ import LiveTipsCore
 /// time only the parts that changed. No network or a server error just waits for the next time. A call deleted on
 /// another device (410) is marked and never sent again by itself. Rules and payloads: LiveTipsCore/CallSyncCore.swift.
 @MainActor
-final class CallSyncService {
+final class CallSyncService: ObservableObject {
     static let shared = CallSyncService()
 
-    private var running: Set<String> = []
+    @Published private(set) var running: Set<String> = []      // 0.12.1: the call page shows "Syncing"
     private var started = false
     private var projectIDs: [String: String] = [:]          // "<account email>|<local slug>" -> server project id
     private var projectsPath: URL { AppPaths.support.appendingPathComponent("server-projects.json") }
@@ -73,10 +73,41 @@ final class CallSyncService {
         Task { await run(t, project: p); running.remove(t) }
     }
 
+    /// 0.12.1 (B8): the call page's sync line; nil when the call's project does not sync (or signed out). A call
+    /// deleted from the server keeps its line while signed in, even after its project stops syncing.
+    func status(_ t: String) -> CallSync.Status? {
+        let st = CallSync.State.load(CallSync.statePath(transcript: t))
+        guard project(for: t) != nil || (PacenoteAccount.shared.signedIn && st?.removed == true) else { return nil }
+        return CallSync.status(st, syncing: running.contains(t))
+    }
+
+    /// 0.12.1 (B8): "Delete from server" is offered while signed in and the server has a copy (also when the project
+    /// stopped syncing since).
+    func canDelete(_ t: String) -> Bool {
+        PacenoteAccount.shared.signedIn && CallSync.canDelete(CallSync.State.load(CallSync.statePath(transcript: t)))
+    }
+
+    /// 0.12.1 (B8): removes the server's copy of one call (DELETE /v1/calls/{id}); the files on this Mac stay. The call
+    /// is never sent again by itself. Returns the error to show, nil when done.
+    func deleteFromServer(_ t: String) async -> String? {
+        let path = CallSync.statePath(transcript: t)
+        guard let st = CallSync.State.load(path), CallSync.canDelete(st), !running.contains(t) else { return nil }
+        running.insert(t)
+        defer { running.remove(t) }
+        do {
+            let (d, c) = try await PacenoteAccount.shared.api("DELETE", "/v1/calls/" + st.callID)
+            let (next, err) = CallSync.afterDelete(st, status: c, problem: Self.problemText(d, c))
+            next.save(path)
+            return err
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     private func run(_ t: String, project p: Project) async {
         let path = CallSync.statePath(transcript: t)
         var st = CallSync.State.load(path) ?? CallSync.State()
-        guard !st.skip, !st.deletedElsewhere else { return }
+        guard !st.skip, !st.deletedElsewhere, !st.removed else { return }
         if st.clientCallID.isEmpty { st.clientCallID = CallSync.clientCallID(device: Self.deviceKey, transcript: t) }
         defer { st.save(path) }
         do {
@@ -89,7 +120,7 @@ final class CallSyncService {
                                                        appVersion: PacenoteAccount.appVersion))
             if st.callID.isEmpty || st.hashes["call"] != CallSync.hash(call) {
                 let (d, c) = try await PacenoteAccount.shared.api("PUT", "/v1/calls/" + st.clientCallID, body: call)
-                switch CallSync.outcome(status: c, problem: PacenoteServer.problem(d, status: c)) {
+                switch CallSync.outcome(status: c, problem: Self.problemText(d, c)) {
                 case .ok:
                     let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] ?? [:]
                     st.callID = o["id"] as? String ?? st.callID
@@ -120,7 +151,7 @@ final class CallSyncService {
             if !assets.isEmpty || st.hashes["assets"] != nil { parts.append(("assets", CallSync.json(assets))) }
             for (name, body) in CallSync.changed(parts, state: st) {
                 let (d, c) = try await PacenoteAccount.shared.api("PUT", "/v1/calls/\(st.callID)/\(name)", body: body)
-                switch CallSync.outcome(status: c, problem: PacenoteServer.problem(d, status: c)) {
+                switch CallSync.outcome(status: c, problem: Self.problemText(d, c)) {
                 case .ok: st.hashes[name] = CallSync.hash(body)
                 case .deletedElsewhere: st.deletedElsewhere = true; return
                 case .stop(let e), .retryLater(let e):
@@ -138,6 +169,12 @@ final class CallSyncService {
         }
     }
 
+    /// The server's reason in words; a full storage quota (402) says so with the plan's limit.
+    private static func problemText(_ d: Data, _ c: Int) -> String {
+        if let q = PacenoteServer.quota(d, status: c), q.name == "storage_mb" { return L("sync.quota.storage", ["limit": "\(q.limit)"]) }
+        return PacenoteServer.problem(d, status: c)
+    }
+
     private func forgetProject(_ p: Project) {
         projectIDs[(PacenoteAccount.shared.session?.email ?? "") + "|" + CallSync.localSlug(p.slug)] = nil
         if let data = try? JSONEncoder().encode(projectIDs) { try? data.write(to: projectsPath, options: .atomic) }
@@ -151,7 +188,7 @@ final class CallSyncService {
         let body = CallSync.json(["name": String(p.name.prefix(200)), "local_slug": slug])
         let (d, c) = try await PacenoteAccount.shared.api("POST", "/v1/projects", body: body)
         guard c == 200 || c == 201, let id = ((try? JSONSerialization.jsonObject(with: d)) as? [String: Any])?["id"] as? String else {
-            throw PacenoteAccountError.server(c, PacenoteServer.problem(d, status: c))
+            throw PacenoteAccountError.server(c, Self.problemText(d, c))
         }
         projectIDs[key] = id
         if let data = try? JSONEncoder().encode(projectIDs) { try? data.write(to: projectsPath, options: .atomic) }

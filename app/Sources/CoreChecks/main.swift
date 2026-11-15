@@ -1137,6 +1137,41 @@ func meetingLaunch096() {
     expect(sd.callID == "x" && !sd.skip && sd.hashes.isEmpty, "sync: old state decodes")
     let pj = try! JSONDecoder().decode(Project.self, from: Data("{\"name\":\"Orbit\"}".utf8))
     expect(pj.serverSync == false, "sync: projects are off by default")
+    // 0.12.1: "nothing" lines are neither decisions nor tasks, on the call page or on the server
+    for l in ["Жодних рішень не приймалося.", "Немає.", "None", "**No decisions were made.**", "n/a", "Рішень не ухвалено", ""] {
+        expect(MeetingNotes.isNothing(l), "notes: nothing line \(l)")
+    }
+    for l in ["Mike sends the proposal", "Немає блокерів, реліз у п'ятницю", "No-code tool stays", "None of the old flags stay, we drop them"] {
+        expect(!MeetingNotes.isNothing(l), "notes: real line \(l)")
+    }
+    var none = MeetingNotes.Notes(); none.decisions = [MeetingNotes.Item(text: "Немає.")]; none.actions = [MeetingNotes.Item(text: "None")]
+    expect(CallSync.decisions(none).isEmpty && CallSync.tasks(none).isEmpty, "sync: nothing lines are not sent")
+    // 0.12.1 (B8): the call page's sync line
+    var cs = CallSync.State()
+    expect(CallSync.status(nil, syncing: false) == .waiting && CallSync.status(cs, syncing: true) == .syncing, "sync status: waiting, syncing")
+    cs.callID = "c1"; cs.syncedAt = Date(timeIntervalSince1970: 100)
+    expect(CallSync.status(cs, syncing: false) == .synced(Date(timeIntervalSince1970: 100)), "sync status: synced")
+    cs.error = "HTTP 503"
+    expect(CallSync.status(cs, syncing: false) == .failed("HTTP 503"), "sync status: failed")
+    cs.skip = true
+    expect(CallSync.status(cs, syncing: true) == .skipped, "sync status: skipped wins over syncing")
+    cs.deletedElsewhere = true
+    expect(CallSync.status(cs, syncing: false) == .deletedElsewhere, "sync status: deleted elsewhere first")
+    // 0.12.1 (B8): Delete from server
+    var ds = CallSync.State(); ds.callID = "c1"; ds.version = "3"; ds.hashes = ["call": "h"]; ds.syncedAt = Date()
+    expect(CallSync.canDelete(ds) && !CallSync.canDelete(nil) && !CallSync.canDelete(CallSync.State()), "delete: offered only with a server copy")
+    for code in [204, 404, 410] {
+        let (after, err) = CallSync.afterDelete(ds, status: code)
+        expect(err == nil && after.removed && after.callID.isEmpty && after.hashes.isEmpty && !CallSync.canDelete(after), "delete: \(code) removes")
+        expect(CallSync.status(after, syncing: false) == .removed, "delete: status removed")
+    }
+    let (kept, why) = CallSync.afterDelete(ds, status: 503)
+    expect(kept == ds && why == "HTTP 503", "delete: a server error keeps the copy")
+    let rd = try! JSONDecoder().decode(CallSync.State.self, from: Data("{\"callID\":\"x\"}".utf8))
+    expect(!rd.removed, "delete: old state is not removed")
+    let q = Data("{\"status\":402,\"detail\":\"storage\",\"quota\":\"storage_mb\",\"limit\":500,\"used_mb\":499.9}".utf8)
+    expect(PacenoteServer.quota(q, status: 402) == PacenoteServer.Quota(name: "storage_mb", limit: 500), "quota: 402 names storage_mb")
+    expect(PacenoteServer.quota(q, status: 403) == nil && PacenoteServer.quota(Data("{}".utf8), status: 402) == nil, "quota: only a named 402")
     expect(MeetingURL.forWay("https://teams.microsoft.com/l/meetup-join/x", LaunchWay(kind: .chrome, profile: "a@b.c"))
            == "https://teams.microsoft.com/l/meetup-join/x?msLaunch=false&suppressPrompt=true", "launch: Teams stays on the web")
     expect(MeetingURL.zoomApp("https://orbit.zoom.us/j/123456789?pwd=abc") == "zoommtg://zoom.us/join?action=join&confno=123456789&pwd=abc", "launch: Zoom app link")

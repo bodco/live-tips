@@ -24,6 +24,22 @@ public enum MeetingNotes {
 
     public static let heading = "## Meeting notes"
 
+    /// 0.12.1: a line that only says there is nothing ("Немає.", "Жодних рішень не приймалося.", "None", "No decisions
+    /// were made"). The notes model writes one under an empty heading; it is not a decision or a task, so the call page
+    /// and the server sync both leave it out.
+    public static func isNothing(_ s: String) -> Bool {
+        var l = s.replacingOccurrences(of: "*", with: "").trimmingCharacters(in: .whitespaces).lowercased()
+        while let c = l.last, ".!:;-–".contains(c) { l.removeLast() }
+        l = l.trimmingCharacters(in: .whitespaces)
+        guard !l.isEmpty else { return true }
+        guard l.count <= 80 else { return false }
+        let exact: Set<String> = ["немає", "нема", "нічого", "відсутні", "відсутнє", "-", "n/a", "na", "none", "nothing", "no", "нет"]
+        if exact.contains(l) { return true }
+        let prefixes = ["жодних ", "жодного ", "жодної ", "рішень не ", "задач не ", "завдань не ", "немає рішень", "немає задач",
+                        "немає завдань", "no decisions", "no action items", "no tasks", "none were ", "nothing was "]
+        return prefixes.contains { l.hasPrefix($0) }
+    }
+
     /// The section's lines (without its heading), nil when the notes have none.
     public static func section(_ notes: String) -> [String]? {
         let lines = notes.components(separatedBy: "\n")

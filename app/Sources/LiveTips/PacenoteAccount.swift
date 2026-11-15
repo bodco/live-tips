@@ -187,6 +187,13 @@ final class PacenoteAccount: ObservableObject {
         } catch { problem = error.localizedDescription; return false }
     }
 
+    /// 0.12.1 (B8): GET /v1/export, the zip of everything of mine on the server (export.json and one .md per call).
+    func exportData() async throws -> Data {
+        let (b, c) = try await call("GET", "/v1/export")
+        guard c == 200 else { throw PacenoteAccountError.server(c, PacenoteServer.problem(b, status: c)) }
+        return b
+    }
+
     /// QA (`--account-test`): drops the access token so the next request refreshes.
     func expireAccessForTest() { access = nil }
 

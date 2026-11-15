@@ -32,6 +32,8 @@ struct CallPageView: View {
     @State private var makeNote = ""
     @State private var copied = false
     @State private var reassigning = false       // 0.10.1 (A3): the project picker in the header
+    @State private var confirmServerDelete = false  // 0.12.1 (B8): "Delete from server"
+    @State private var serverDeleteError = ""
 
     /// Shot mode only: the tab the page opens on.
     static var shotTab: String? = nil
@@ -83,6 +85,7 @@ struct CallPageView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header(proj, ws, o)
                 RecordingRow(file: file)       // 0.9.5: the call recording, if there is one
+                ServerSyncRow(file: file)      // 0.12.1 (B8): the call's copy on the Pacenote server
                 if exportOpen {
                     ExportPanel(file: file, title: Self.title(file), outcome: o, commitments: items) { exportOpen = false }
                 }
@@ -131,6 +134,15 @@ struct CallPageView: View {
         }
         .textSelection(.enabled)      // 2026-11-10 (owner): the call's title and every text on the page can be selected and copied
         .background(PN.C.bg)
+        .alert(L("sync.call.delete.q"), isPresented: $confirmServerDelete) {
+            Button(L("sync.call.delete.ok"), role: .destructive) {
+                Task { serverDeleteError = await CallSyncService.shared.deleteFromServer(file) ?? "" }
+            }
+            Button(L("common.cancel"), role: .cancel) {}
+        } message: { Text(L("sync.call.delete.m")) }
+        .alert(L("sync.call.delete.failed"), isPresented: Binding(get: { !serverDeleteError.isEmpty }, set: { if !$0 { serverDeleteError = "" } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(serverDeleteError) }
         .sheet(item: $cardDraft) { c in
             AnswerCardForm(card: c, title: L("cards.saveAs"), onSave: { saveCard($0, proj, ws) }, onCancel: { cardDraft = nil })
         }
@@ -269,7 +281,11 @@ struct CallPageView: View {
     private var hasSales: Bool { FileManager.default.fileExists(atPath: (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".sales.json") }
 
     /// Decisions of the call: the call picture's, else the "## Decisions" of the notes (the follow-up email reads those too).
-    private func decisions(_ o: CallOutcome) -> [String] { o.decisions.isEmpty ? CallNotes.decisions(file) : o.decisions }
+    /// 0.12.1: a line that only says there are none ("Жодних рішень не приймалося.") is not a decision, so the tab no
+    /// longer counts it as 1 (the server sync already sent 0).
+    private func decisions(_ o: CallOutcome) -> [String] {
+        (o.decisions.isEmpty ? CallNotes.decisions(file) : o.decisions).filter { !MeetingNotes.isNothing($0) }
+    }
 
     private func pageTabs(_ o: CallOutcome) -> [(String, String)] {
         [("summary", L("page.tab.summary")), ("discussed", L("page.sum.discussed")), ("decisions", L("page.tab.decisions")), ("tasks", L("page.tab.tasks")),
@@ -593,6 +609,10 @@ struct CallPageView: View {
                 if CallSyncService.shared.project(for: file) != nil {
                     let skipped = CallSync.State.load(CallSync.statePath(transcript: file))?.skip ?? false
                     Button(L(skipped ? "sync.call.allow" : "sync.call.skip")) { CallSyncService.shared.setSkip(!skipped, transcript: file) }
+                }
+                // 0.12.1 (B8): remove the server's copy of this call; the files on this Mac stay
+                if CallSyncService.shared.canDelete(file) {
+                    Button(L("sync.call.delete")) { confirmServerDelete = true }
                 }
                 Button(L("call.page.transcript")) { TranscriptWindow.show(file: file) }
                 if let r = record, Self.series(of: r).count > 1 { Button(L("call.page.series", ["n": "\(Self.series(of: r).count)"])) { SeriesWindow.show(record: r) } }

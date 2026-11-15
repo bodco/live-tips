@@ -3,6 +3,22 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.12.1 (2026-11-15)
+
+- **Sync status on the call page (2026-11-15, B8):** for a project that syncs to the Pacenote server, the call page shows
+  a line under the header: synced (with the time), syncing, not synced yet or the error with **Sync now**, not synced for
+  this call (with **Sync this call to the server**), or deleted on another device.
+- **Delete one call from the server (2026-11-15, B8):** the call page's menu has **Delete from server…** while signed in
+  and the server has a copy. It removes the call's notes, decisions, tasks, Meeting Sheet and Drive links from the server
+  and the call is not sent again; the files on this Mac and in Google Drive stay.
+- **Export your server data (2026-11-15, B8):** Settings > Account > **Export server data…** saves a zip with
+  `export.json` (every call and part on the server) and a readable Markdown file per call. Needs Pacenote server 0.3.0.
+- **Server storage limit (2026-11-15, B8):** when your plan's storage on the server is full, the call page's sync line says
+  so with the limit instead of a bare error.
+- **"Decisions 1" for a call without decisions (2026-11-15):** a line in the call notes that only says there are none
+  ("No decisions were made", "Немає") no longer counts as a decision on the call page, and such lines are not sent to
+  the server as decisions or tasks.
+
 ## 0.12.0 (2026-11-15)
 
 - **Your calls on the Pacenote server, per project (2026-11-15, B8b):** with a Pacenote account (Settings > Account),

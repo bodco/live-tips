@@ -17,6 +17,7 @@ public enum CallSync {
         public var meta: [String: String] = [:]     // call_type, audience, language: kept when the call ends
         public var skip = false             // Don't sync this call
         public var deletedElsewhere = false // the server answered 410: deleted on another device, never re-sent by itself
+        public var removed = false          // 0.12.1: "Delete from server" on this Mac; never re-sent (the server keeps a tombstone)
         public var error = ""
         public var syncedAt: Date?
         public init() {}
@@ -30,6 +31,7 @@ public enum CallSync {
             meta = (try? c.decodeIfPresent([String: String].self, forKey: .meta)) ?? nil ?? [:]
             skip = (try? c.decodeIfPresent(Bool.self, forKey: .skip)) ?? nil ?? false
             deletedElsewhere = (try? c.decodeIfPresent(Bool.self, forKey: .deletedElsewhere)) ?? nil ?? false
+            removed = (try? c.decodeIfPresent(Bool.self, forKey: .removed)) ?? nil ?? false
             syncedAt = (try? c.decodeIfPresent(Date.self, forKey: .syncedAt)) ?? nil
         }
 
@@ -89,14 +91,14 @@ public enum CallSync {
     public static func decisions(_ n: MeetingNotes.Notes?) -> [[String: Any]] {
         (n?.decisions ?? []).prefix(200).compactMap { i in
             let t = i.text.trimmingCharacters(in: .whitespaces)
-            return t.isEmpty ? nil : ["text": String(t.prefix(2000))]
+            return MeetingNotes.isNothing(t) ? nil : ["text": String(t.prefix(2000))]
         }
     }
 
     public static func tasks(_ n: MeetingNotes.Notes?) -> [[String: Any]] {
         (n?.actions ?? []).prefix(200).compactMap { i in
             let t = i.text.trimmingCharacters(in: .whitespaces)
-            return t.isEmpty ? nil : ["text": String(t.prefix(2000))]
+            return MeetingNotes.isNothing(t) ? nil : ["text": String(t.prefix(2000))]
         }
     }
 
@@ -133,6 +135,34 @@ public enum CallSync {
     /// The parts whose body changed since the last accepted send, in the order they go out (the call first).
     public static func changed(_ bodies: [(String, Data)], state: State) -> [(String, Data)] {
         bodies.filter { state.hashes[$0.0] != hash($0.1) }
+    }
+
+    /// 0.12.1 (B8): what the call page says about a call's copy on the server.
+    public enum Status: Equatable { case syncing, synced(Date), waiting, failed(String), skipped, deletedElsewhere, removed }
+    public static func status(_ st: State?, syncing: Bool) -> Status {
+        guard let st else { return syncing ? .syncing : .waiting }
+        if st.removed { return .removed }
+        if st.deletedElsewhere { return .deletedElsewhere }
+        if st.skip { return .skipped }
+        if syncing { return .syncing }
+        if !st.error.isEmpty { return .failed(st.error) }
+        if let d = st.syncedAt, !st.callID.isEmpty { return .synced(d) }
+        return .waiting
+    }
+
+    /// 0.12.1: "Delete from server" may be offered: the server has a copy of this call and it is not gone yet.
+    public static func canDelete(_ st: State?) -> Bool {
+        guard let st else { return false }
+        return !st.callID.isEmpty && !st.removed && !st.deletedElsewhere
+    }
+
+    /// 0.12.1: the answer to DELETE /v1/calls/{id}: 204 deleted, 410 already deleted, 404 the server no longer has it.
+    /// All three leave the call off the server for good; anything else keeps the state and says why.
+    public static func afterDelete(_ st: State, status: Int, problem: String = "") -> (State, String?) {
+        guard [200, 204, 404, 410].contains(status) else { return (st, problem.isEmpty ? "HTTP \(status)" : problem) }
+        var s = st
+        s.removed = true; s.callID = ""; s.version = ""; s.hashes = [:]; s.error = ""; s.syncedAt = nil
+        return (s, nil)
     }
 
     /// What a server answer means for the queue.

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import LiveTipsCore
 
 /// B7 (server ADR 5.1, 12.2): Settings > Account. Signing in to the Pacenote server is optional; the page says what
@@ -10,6 +11,8 @@ struct AccountSettingsPane: View {
     @State private var confirmDelete = false
     @State private var confirmDeleteAgain = false
     @State private var confirmEverywhere = false
+    @State private var exporting = false          // 0.12.1 (B8): Export server data
+    @State private var exportNote = ""
 
     var body: some View {
         Form {
@@ -119,11 +122,38 @@ struct AccountSettingsPane: View {
 
         Section {
             HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L("account.export.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    if !exportNote.isEmpty { Text(exportNote).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true) }
+                }
+                Spacer()
+                Button(L(exporting ? "account.export.busy" : "account.export")) { exportServerData() }
+                    .buttonStyle(.pnSecondary).disabled(acct.busy || exporting)
+            }
+            HStack(alignment: .top) {
                 Text(L("account.delete.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button(L("account.delete")) { confirmDelete = true }.buttonStyle(.pnSecondary).disabled(acct.busy)
             }
         } header: { Text(L("account.delete.head")) }
+    }
+
+    /// 0.12.1 (B8): downloads the export zip and asks where to keep it.
+    private func exportServerData() {
+        exporting = true; exportNote = ""
+        Task {
+            defer { exporting = false }
+            do {
+                let data = try await acct.exportData()
+                let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+                let p = NSSavePanel()
+                p.allowedContentTypes = [UTType(filenameExtension: "zip") ?? .data]
+                p.nameFieldStringValue = "pacenote-export-" + f.string(from: Date()) + ".zip"
+                guard p.runModal() == .OK, let url = p.url else { return }
+                try data.write(to: url, options: .atomic)
+                exportNote = L("account.export.saved", ["file": url.lastPathComponent])
+            } catch { exportNote = error.localizedDescription }
+        }
     }
 
     static func deviceLine(_ d: PacenoteServer.Device) -> String {

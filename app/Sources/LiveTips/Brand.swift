@@ -28,12 +28,14 @@ enum Brand {
     /// The menu bar image: a template (macOS tints it for the menu bar), drawn as vectors.
     /// 2026-11-05 (owner): while recording the P stays the same and only its small dot turns red and filled. A red
     /// dot cannot be a template, so that image draws the line in the menu bar's own text colour (light or dark bar).
-    static func menuBarImage(recording: Bool) -> NSImage {
+    /// 0.16.0 (D3): `update` adds a small blue dot at the top right when a new version is there (not while recording).
+    static func menuBarImage(recording: Bool, update: Bool = false) -> NSImage {
+        let update = update && !recording
         let img = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             let m = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua, .vibrantLight, .vibrantDark])
             let dark = m == .darkAqua || m == .vibrantDark
-            let line = recording ? (dark ? NSColor.white : NSColor.black) : NSColor.black
+            let line = (recording || update) ? (dark ? NSColor.white : NSColor.black) : NSColor.black
             ctx.setStrokeColor(line.cgColor)
             ctx.setLineCap(.round)
             ctx.setLineJoin(.round)
@@ -49,10 +51,15 @@ enum Brand {
                 ctx.setLineWidth(1.4)
                 ctx.strokeEllipse(in: CGRect(x: 6 - r, y: 15 - r, width: 2 * r, height: 2 * r))
             }
+            if update {
+                let r: CGFloat = 2.6
+                ctx.setFillColor(NSColor(srgbRed: 0x0A / 255, green: 0x6C / 255, blue: 1, alpha: 1).cgColor)   // PN.C.brand
+                ctx.fillEllipse(in: CGRect(x: 15 - r, y: 3 - r, width: 2 * r, height: 2 * r))
+            }
             return true
         }
-        img.isTemplate = !recording
-        img.accessibilityDescription = recording ? "Pacenote, recording" : "Pacenote"
+        img.isTemplate = !recording && !update
+        img.accessibilityDescription = recording ? "Pacenote, recording" : update ? "Pacenote, update available" : "Pacenote"
         return img
     }
 

@@ -164,7 +164,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             }
             if all {
                 steps.append { [unowned self] in self.prepDoc(theme) }
-                for st in OnboardingModel.Step.allCases where st != .splash { steps.append { [unowned self] in self.onboarding(st, theme) } }
+                for st in OnboardingModel.Step.allCases where st != .welcome { steps.append { [unowned self] in self.onboarding(st, theme) } }
             }
         }
         }
@@ -475,9 +475,9 @@ final class ShotMode: NSObject, NSApplicationDelegate {
     /// First launch: the splash with the brand (Pacenote 0.8).
     func splash(_ theme: String) {
         OnboardingWindow.show()
-        OnboardingWindow.model.step = .splash
+        OnboardingWindow.model.step = .welcome
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
-            if let w = OnboardingWindow.window { capture(w, "onboarding-0-splash-\(theme)"); w.close() }
+            if let w = OnboardingWindow.window { capture(w, "onboarding-0-welcome-\(theme)"); w.close() }
             next()
         }
     }
@@ -592,7 +592,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         steps.append { [unowned self] in self.homePage("p087-series-\(theme)") { if let r = self.demoCall { SeriesWindow.show(record: r) } } }
         steps.append { [unowned self] in self.window("p087-features-\(theme)") { FeaturesWindow.show() } }
         for tab in ["general", "projects", "integrations", "notion", "hubspot", "ai"] { steps.append { [unowned self] in self.settings(tab, theme) } }
-        for st in OnboardingModel.Step.allCases where st != .splash { steps.append { [unowned self] in self.onboarding(st, theme) } }
+        for st in OnboardingModel.Step.allCases where st != .welcome { steps.append { [unowned self] in self.onboarding(st, theme) } }
         let deal = "LiveTips.setState({deal:{name:'BANT',chip:true,known:2,total:4,criteria:[{key:'budget',name:'Budget',state:'known',what:'Northwind set aside a budget for Q1',quote:'we have money for this',t:'10:04'},{key:'authority',name:'Authority',state:'partial',what:'Emily Clark decides with the CFO',quote:'',t:''},{key:'need',name:'Need',state:'known',what:'Reports take two days a week',quote:'',t:''},{key:'timeline',name:'Timeline',state:'unknown',what:'',quote:'',t:''}],objections:['Price is high for a pilot'],nextStep:'Demo for the CFO on Friday',signals:['Asked about onboarding']}}); LiveTips.openTab('deal');"
         steps.append { [unowned self] in self.tipsExtra(theme, js: deal, name: "p087-tips-deal") }
     }

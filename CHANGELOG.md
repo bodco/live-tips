@@ -3,6 +3,36 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.16.0 (2026-11-16)
+
+- **Setup in seven steps (2026-11-15, D3):** the first screen says what Pacenote does before, during and after a
+  call. The AI step shows what happens when your AI is out: the other provider, the model on this Mac, then the
+  rules only. "What to install" lists the required parts (ticked, already installing, with their sizes) and the
+  optional ones, nothing ticked: the local AI model, the call agent (only with Claude, with what it does and costs)
+  and the link downloader. A new step, "Your calls", sets Quick or Expert, when tips speak up, call recording and
+  the consent line. The last step offers a practice call: a sample conversation in the tips window, nothing
+  recorded or saved.
+- **Settings > Components (2026-11-15, D3):** a new pane in More. It shows how much space Pacenote takes on this Mac,
+  measured, and what is free. Optional parts can be removed: Remove... says what changes and how much it frees.
+  Removing the local model moves the jobs set to "On this Mac" to the next AI in your chain; the Ollama app stays.
+  Required parts are locked, with Check again and Repair. Nothing is installed or removed during a call. About
+  keeps the app's signature and a link here.
+- **What's new, for you (2026-11-15, D3):** after an update Pacenote shows once what changed since the version you
+  last saw, only what applies to you, and a setup step you have not done yet (choose the optional add-ons right in
+  the window). Not after a fresh setup. Every change: Settings > Help > What's new, also in the Help menu.
+- **Updates from inside Pacenote (2026-11-15, D3):** Pacenote checks for a new version at launch and twice a day,
+  downloads it in the background and asks before it installs and restarts: Settings > About > Updates, a line on
+  Home and a small dot on the menu bar icon, or Pacenote > Check for Updates. Never during a call: no checks while a
+  call is live, and "Install after the call" waits for it to end. Updates are signed (Sparkle 2, EdDSA). Versions
+  before 0.16.0 have no updater, so 0.16.0 itself is installed by hand.
+- **Setup and What's new, smoke fixes (2026-11-15, D3):** "What to install" no longer cuts off its header; the AI
+  chain on the AI step shows each step on two lines instead of breaking words; the consent switch on "Your calls"
+  sits at the row's end; parts that are not installed show their expected size instead of "0 MB"; Settings >
+  Components says "Checking" while it looks; people who closed the setup with "Set up later" before 0.16 also get
+  What's new. Ukrainian texts name Settings sections in Ukrainian.
+- **No freeze after an update (2026-11-16):** after a reinstall macOS may ask to allow Keychain access; Pacenote no
+  longer waits for that answer on its main thread, so Home, the menu and Quit keep working while the prompt is open.
+
 ## 0.15.0 (2026-11-15)
 
 - **Search in Settings (2026-11-15, D2):** a search field on top of the Settings sidebar (Command-F). Type a word in

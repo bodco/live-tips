@@ -410,6 +410,23 @@ outside git. A new database gets its tables from `schema.sql` (`wrangler d1 exec
 `SELECT event, params, SUM(n) FROM event_counts GROUP BY 1, 2`. One test row from the first check (install id of zeros,
 version `0.9.4-test`) is still there; delete it only with the owner's agreement.
 
+## Updates (0.16.0, Sparkle 2)
+
+- Sparkle comes from SwiftPM (`app/Package.swift`, pinned in `Package.resolved`); `buildtools/bundle.sh` copies
+  `Sparkle.framework` into `Contents/Frameworks`, signs its helpers and the framework, and writes `SUFeedURL`
+  (`https://pacenote.bodco.pm/appcast.xml`) and `SUPublicEDKey` into Info.plist only when the build machine has
+  `PACENOTE_SPARKLE_PUBLIC_KEY` in its environment. Without it the build has updates off (developer builds).
+- The private EdDSA key never enters this repository: it lives in the maintainer's login Keychain with an offline copy
+  outside the repo. Sign a release DMG with Sparkle's `sign_update` (in the SwiftPM artifacts of the build folder) and
+  write the feed with `tools/make_appcast.py`; the feed's source is `public/pacenote/appcast.xml` of the website
+  sources, published with the site after the DMG is in the GitHub release.
+- `UpdateService.swift`: scheduled finds never open Sparkle's window (gentle reminders): the menu bar dot, the line on
+  Home and Settings > About > Updates say it. No background checks during a call; a restart waits for the call to end.
+- Testing an update without publishing: build a higher build number into a DMG, sign it, write an appcast with an
+  `http://127.0.0.1:<port>/` enclosure, serve the folder locally and point the app at it with
+  `defaults write <bundle id> updateFeedOverride http://127.0.0.1:<port>/appcast.xml` (Sparkle refuses `file://`).
+  `defaults delete <bundle id> updateFeedOverride` returns to the real feed.
+
 ## The website (pacenote.bodco.pm)
 
 The site is separate from PM Control Tower, the author's other project, and has no source in this repository. Its pages

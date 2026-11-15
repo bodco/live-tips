@@ -382,6 +382,31 @@ final class SheetShots: NSObject, NSApplicationDelegate {
             return AnyView(SheetExportView(doc: doc, done: {}).background(Color(nsColor: .windowBackgroundColor)))
         }))
         s += b7bScenes()
+        s += d3Scenes()
+        return s
+    }
+
+    /// 0.16.0 (D3 smoke): the seven onboarding steps at the window's own size, What's new (as after 0.15.0, every item),
+    /// Settings > Components and Help > What's new. Read-only: the steps only check what is installed, nothing is set.
+    func d3Scenes() -> [Scene] {
+        var s: [Scene] = []
+        for st in OnboardingModel.Step.allCases {
+            s.append(Scene(name: "d3-onb-\(st.rawValue)-\(st)", size: NSSize(width: 760, height: 680), make: {
+                let m = OnboardingModel()
+                m.step = st
+                return AnyView(OnboardingView(m: m, close: {}))
+            }))
+        }
+        s.append(Scene(name: "d3-whatsnew", size: NSSize(width: 760, height: 680), make: {
+            let all = WhatsNew.pending(WhatsNewStore.items, lastSeen: "0.14.0", current: "0.16.0", facts: ["provider:claude", "module:tracker", "os:15"])
+            return AnyView(WhatsNewView(items: all, from: "0.14.0") { _ in })
+        }))
+        s.append(Scene(name: "d3-settings-components", size: NSSize(width: 720, height: 1000), make: {
+            AnyView(SettingsComponentsPane())
+        }, tweak: nil))
+        s.append(Scene(name: "d3-help-whatsnew", size: NSSize(width: 720, height: 900), make: {
+            AnyView(ScrollView { WhatsNewHistory().padding(24) })
+        }))
         return s
     }
 

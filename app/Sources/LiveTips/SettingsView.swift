@@ -805,6 +805,7 @@ struct SettingsView: View {
         Pane(id: "transcription", title: "Transcription", symbol: "character.book.closed", subtitle: "Your own words, so the transcript spells them right."),   // 0.10.0 (owner 12.11): the dictionary
         Pane(id: "sheet", title: "Meeting Sheet", symbol: "doc.text.magnifyingglass", subtitle: "Quick or Expert, My focus, reminders, your presets."),   // 0.10.0 (Meeting Sheet, phase 4)
         Pane(id: "modules", title: "Modules", symbol: "square.grid.2x2", subtitle: "Turn parts of Pacenote on or off."),       // 0.9.0
+        Pane(id: "components", title: "Components", symbol: "shippingbox", subtitle: "What is installed and what you can remove."),   // 0.16.0 (D3)
         Pane(id: "usage", title: "Usage", symbol: "chart.bar", subtitle: "Calls this week and the full statistics."),       // 0.9.0: from Home
         Pane(id: "help", title: "Help", symbol: "questionmark.circle", subtitle: "What Pacenote can do and what is new."),  // 0.9.0: from Home
         Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
@@ -815,7 +816,7 @@ struct SettingsView: View {
         ("settings.group.you", ["account", "general"]),
         ("settings.group.calls", ["projects", "sheet", "recording", "transcription"]),
         ("settings.group.connect", ["integrations", "ai"]),
-        ("settings.group.more", ["modules", "usage", "help", "about"]),
+        ("settings.group.more", ["modules", "components", "usage", "help", "about"]),
     ]
 
     // 2026-10-26 (owner): the welcome tour's look: a sidebar of icon tiles, a header per pane, soft cards.
@@ -910,7 +911,9 @@ struct SettingsView: View {
         case "help": ScrollView { VStack(alignment: .leading, spacing: 12) {
             Button(L("settings.how.title")) { model.tab = "how" }.buttonStyle(.pnSecondary)
             FeaturesView()
+            WhatsNewHistory()      // 0.16.0 (D3): every change, newest first
         }.padding(20) }
+        case "components": SettingsComponentsPane()      // 0.16.0 (D3)
         case "about": AboutView(model: model)
         default: general
         }
@@ -1823,8 +1826,11 @@ struct AboutView: View {
                     }
                     Spacer()
                     // Asks GitHub for the latest release only when pressed; nothing is checked in the background.
-                    Button(L("settings.about.checkUpdates")) { Task { await checkUpdates() } }
-                        .buttonStyle(.pnSecondary).disabled(checking)
+                    // 0.16.0 (D3): only in builds without Sparkle (no key); otherwise About > Updates below.
+                    if !UpdateService.shared.isOn {
+                        Button(L("settings.about.checkUpdates")) { Task { await checkUpdates() } }
+                            .buttonStyle(.pnSecondary).disabled(checking)
+                    }
                 }
                 if !updateNote.isEmpty {
                     HStack {
@@ -1839,6 +1845,7 @@ struct AboutView: View {
                     Link("PM Control Tower", destination: URL(string: "https://tower.bodco.pm")!)
                 }
             }
+            if UpdateService.shared.isOn { UpdatesSection() }     // 0.16.0 (D3): Sparkle 2
             // 2026-10-27 (owner): privacy policy and terms of use, published on the website.
             Section {
                 Text(L("settings.about.dataBody"))
@@ -1849,21 +1856,8 @@ struct AboutView: View {
                     Link(L("settings.about.license"), destination: URL(string: "https://github.com/bodco/live-tips/blob/main/LICENSE")!)
                 }
             } header: { Text(L("settings.about.yourData")) }
-            // Pacenote 0.8 (F4, spec 7-8): the technical install status lives here (onboarding shows one progress line).
+            // 0.16.0 (D3): the parts, their sizes and Remove moved to Settings > Components; here the signature and a link
             Section {
-                ForEach(setup.steps) { st in
-                    HStack(spacing: 8) {
-                        Image(systemName: st.state == .ok ? "checkmark.circle.fill" : st.state == .failed ? "xmark.circle.fill" : "circle")
-                            .foregroundStyle(st.state == .ok ? PN.C.turn : st.state == .failed ? PN.C.danger : PN.C.text3)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(st.title)
-                            if !st.detail.isEmpty { Text(st.detail).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
-                        }
-                    }
-                }
-                // 0.8.6 (E): optional components at the end, never red or orange, never part of readiness
-                ForEach(OptionalComponents.shared.all) { c in ComponentRow(comp: c, markOptional: true) }
                 // 2026-10-29 (owner): the app's own signature, so "Open Anyway" reads as expected, not as a fault.
                 if !AppSignature.shared.line.isEmpty {
                     HStack(spacing: 8) {
@@ -1875,12 +1869,10 @@ struct AboutView: View {
                         }
                     }
                 }
-                if let cc = setup.steps.first(where: { $0.id == "claude" }), cc.state != .ok, cc.state != .unknown {
-                    Button(L("onboarding.claude.install")) { Task { await setup.installOne("claude") } }.buttonStyle(.pnSecondary).disabled(setup.busy)
-                }
                 HStack {
-                    Button(L("about.components.check")) { Task { await setup.checkAll() } }.buttonStyle(.pnTertiary).disabled(setup.busy)
-                    Button(L("about.components.open")) { SetupWindow.show() }.buttonStyle(.pnTertiary)
+                    Text(L("cmp.aboutNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button(L("cmp.manage")) { model.tab = "components" }.buttonStyle(.pnSecondary)
                 }
             } header: { Text(L("about.components")) } footer: {
                 Text(L("settings.about.readyFooter", ["help": HotKeys.shared.combo(.help).display, "pause": HotKeys.shared.combo(.pause).display]))
@@ -1915,7 +1907,7 @@ final class SettingsWindow {
         switch tab {
         case "how": return L("settings.how.title")
         case "about": return L("settings.about.windowTitle")
-        case "account", "general", "projects", "ai", "recording", "transcription", "integrations", "usage", "help", "modules", "sheet": return L("settings.tab." + tab)
+        case "account", "general", "projects", "ai", "recording", "transcription", "integrations", "usage", "help", "modules", "sheet", "components": return L("settings.tab." + tab)
         default: return L("settings.windowTitle")
         }
     }

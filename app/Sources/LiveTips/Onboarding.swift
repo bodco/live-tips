@@ -5,13 +5,13 @@ import SwiftUI
 
 /// First-run onboarding (2026-10-26, owner: "like Fireflies"): one window, one question per screen,
 /// a progress line on top, Back and Continue. Everything here can be changed later in Settings.
-/// Notion is an optional step: Live Tips works with plain folders.
+/// 0.16.0 (D3): seven steps. Welcome (the three moments of a call), Permissions, Folder, AI with the fallback chain,
+/// What to install (required parts locked, optional ones unticked), Your calls (new: Quick or Expert, tips, recording,
+/// consent; it only sets what Settings already has), Ready with a practice call.
 @MainActor
 final class OnboardingModel: ObservableObject {
-    // Pacenote 0.8 (F4, REDESIGN-SPEC 7): the splash, then four steps. Speech recognition installs in the background
-    // from the first step; your name, Notion and calendars (if skipped) become Finish setup cards on Home.
-    enum Step: Int, CaseIterable { case splash, permissions, folder, claude, addons, done }   // 0.8.6 (E): optional add-ons
-    @Published var step: Step = .splash
+    enum Step: Int, CaseIterable { case welcome, permissions, folder, ai, install, calls, done }
+    @Published var step: Step = .welcome
     @Published var micState = AVCaptureDevice.authorizationStatus(for: .audio)
     /// true granted, false denied, nil not asked yet (or macOS does not say).
     @Published var sysAudio: Bool? = SystemAudioPermission.granted()
@@ -106,33 +106,9 @@ struct OnboardingView: View {
         self.m = m; self.settings = m.settings; self.setup = m.setup; self.close = close
     }
 
-    var body: some View {
-        if m.step == .splash { splash } else { steps }
-    }
-
     var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.8" }
 
-    /// First launch: the icon, the wordmark, the tagline and one button (no Skip).
-    var splash: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            Image(nsImage: Brand.appIcon).resizable().interpolation(.high).frame(width: 144, height: 144)
-                .accessibilityHidden(true)
-            PacenoteWordmark(height: 40).padding(.top, 22)
-            Text(L("app.tagline")).font(.system(size: 20)).foregroundStyle(PN.C.text2).padding(.top, 14)
-            Spacer()
-            Button { m.next() } label: { Text(L("onboarding.splash.cta")).frame(minWidth: 180) }
-                .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
-            Text(L("onboarding.splash.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 10)
-            Spacer().frame(height: 56)
-            Text(L("onboarding.splash.footer", ["version": appVersion])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-        }
-        .padding(32)
-        .frame(width: 760, height: 680)
-        .background(PN.C.bg)
-    }
-
-    var steps: some View {
+    var body: some View {
         VStack(spacing: 0) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
@@ -142,16 +118,23 @@ struct OnboardingView: View {
             }
             .frame(height: 3)
             .animation(.easeInOut(duration: 0.25), value: m.step)
-            VStack(spacing: 18) {
+            VStack(spacing: m.step == .install ? 8 : 14) {      // What to install: tighter, so it fits 680
                 HStack {
-                    if m.step != .permissions && m.step != .done {
+                    if ![.welcome, .permissions, .done].contains(m.step) {
                         Button { m.back() } label: { Image(systemName: "arrow.left") }.buttonStyle(.borderless).accessibilityLabel(L("onboarding.back"))
+                    } else { Color.clear.frame(width: 16, height: 16) }
+                    Spacer()
+                    if m.step != .welcome {
+                        Text(L("onb.stepOf", ["n": "\(m.step.rawValue)", "total": "\(OnboardingModel.Step.allCases.count - 1)"]))
+                            .font(PN.Font.label).foregroundStyle(PN.C.text3)
                     }
                     Spacer()
-                    if m.step != .done { Button(L("onboarding.skip")) { close() }.buttonStyle(.pnTertiary) }
+                    if m.step != .done { Button(L("onb.later")) { close() }.buttonStyle(.pnTertiary) } else { Color.clear.frame(width: 16, height: 16) }
                 }
                 if m.step == .done {
-                    Image(nsImage: Brand.appIcon).resizable().interpolation(.high).frame(width: 112, height: 112).accessibilityHidden(true)
+                    Image(nsImage: Brand.appIcon).resizable().interpolation(.high).frame(width: 96, height: 96).accessibilityHidden(true)
+                } else if m.step == .install {
+                    EmptyView()                     // What to install is the tallest step: no mark, so it fits 680
                 } else if let logo = logo {
                     IconTile(symbol: "sparkles", image: logo)
                 } else {
@@ -159,21 +142,25 @@ struct OnboardingView: View {
                 }
                 Text(title).font(.title.weight(.semibold)).multilineTextAlignment(.center).foregroundStyle(PN.C.text)
                 Text(subtitle).font(.body).foregroundStyle(PN.C.text2).multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 520)
-                content.frame(maxWidth: 560)
+                    .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 560)
+                if m.step == .folder {      // smoke 15.11: What to install scrolls too, so a long language never clips the header
+                    content.frame(maxWidth: 620)
+                } else {
+                    ScrollView { content.frame(maxWidth: 620) }.scrollBounceBehavior(.basedOnSize)
+                }
                 Spacer(minLength: 0)
                 HStack(spacing: 10) {
                     if m.step == .done {
-                        Button(L("onboarding.done.secondary")) { finish(); (NSApp.delegate as? AppDelegate)?.openHome() }.buttonStyle(.pnSecondary)
+                        Button(L("onb.done.home")) { finish(); (NSApp.delegate as? AppDelegate)?.openHome() }.buttonStyle(.pnSecondary)
                     }
-                    if m.step != .addons {          // the add-ons step has its own Install selected and Skip
-                        Button { primary() } label: { Text(primaryLabel).frame(minWidth: 180) }
+                    if m.step != .install {          // What to install has its own "Install N and continue"
+                        Button { primary() } label: { Text(primaryLabel).frame(minWidth: 200) }
                             .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                     }
                 }
                 installFooter
             }
-            .padding(.horizontal, 40).padding(.vertical, 24)
+            .padding(.horizontal, 32).padding(.vertical, 16)
         }
         .frame(width: 760, height: 680)
         .background(PN.C.bg)
@@ -186,7 +173,7 @@ struct OnboardingView: View {
         }
     }
 
-    /// Speech recognition and the local AI model install while the PM goes through the steps (spec 7).
+    /// Speech recognition and the local search model install while the PM goes through the steps (spec 7).
     func installInBackground() {
         guard !setup.busy else { return }
         Task {
@@ -195,12 +182,14 @@ struct OnboardingView: View {
         }
     }
 
-    /// One line of progress at the bottom; the list of components lives in Settings > About > Components.
+    /// One line of progress at the bottom; the parts themselves are on step 5 and in Settings > Components.
     @ViewBuilder var installFooter: some View {
         let total = setup.steps.filter { !$0.optional }.count
         let done = setup.steps.filter { !$0.optional && $0.state == .ok }.count
         let failed = setup.steps.contains { $0.state == .failed }
-        if setup.pythonMissing && !setup.busy {
+        if m.step == .welcome {
+            Text(L("onb.changeLater")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+        } else if setup.pythonMissing && !setup.busy {
             // 0.8.7 (L3.5): without Python nothing else installs; say how to get it
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(PN.C.onMe)
@@ -218,8 +207,8 @@ struct OnboardingView: View {
                 Button(L("onboarding.install.details")) { SetupWindow.show() }.buttonStyle(.pnTertiary)
             }
         } else if setup.busy || (done < total && done > 0) {
-            VStack(spacing: 4) {
-                ProgressView(value: Double(done), total: Double(max(total, 1))).frame(width: 260).tint(PN.C.brand)
+            HStack(spacing: 8) {
+                ProgressView(value: Double(done), total: Double(max(total, 1))).frame(width: 160).tint(PN.C.brand)
                 Text(L("onboarding.install.progress", ["done": "\(done)", "total": "\(total)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         } else if total > 0 && done == total {
@@ -229,47 +218,59 @@ struct OnboardingView: View {
         }
     }
 
-    /// The installed Claude app's own icon on its step.
-    var logo: NSImage? { m.step == .claude ? AppLogo.claude : nil }
+    /// The installed Claude app's own icon on the AI step (Claude chosen).
+    var logo: NSImage? { m.step == .ai && provider == "claude" ? AppLogo.claude : nil }
 
     var title: String {
         switch m.step {
-        case .splash: return L("app.name")
+        case .welcome: return L("onb.welcome.title")
         case .permissions: return L("onboarding.permissions.title")
         case .folder: return L("onboarding.folder.title")
-        case .claude: return L("onboarding.claude.title")
-        case .addons: return L("comp.onb.title")
+        case .ai: return L("onboarding.claude.title")
+        case .install: return L("onb.install.title")
+        case .calls: return L("onb.calls.title")
         case .done: return L("onboarding.done.title")
         }
     }
 
     var subtitle: String {
         switch m.step {
-        case .splash: return L("app.tagline")
+        case .welcome: return L("onb.welcome.body")
         case .permissions: return L("onboarding.permissions.body")
         case .folder: return L("onboarding.folder.body")
-        case .claude: return L("onboarding.claude.body")
-        case .addons: return L("comp.onb.body")
-        case .done: return L("onboarding.done.body", ["help": HotKeys.shared.combo(.help).display])
+        case .ai: return L("onb.ai.body")
+        case .install: return L("onb.install.body")
+        case .calls: return L("onb.calls.body")
+        case .done: return L("onb.done.body")
         }
     }
 
     @ViewBuilder var content: some View {
         switch m.step {
-        case .splash:
-            // 2026-10-29 (owner): while the beta is not notarized, say why macOS asked for "Open Anyway" and that an
-            // update may ask again. Shown only when this copy is not notarized.
-            if sig.kind == .developer || sig.kind == .unsigned {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "checkmark.shield").foregroundStyle(PN.C.onMe)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("onboarding.unsigned.title")).font(PN.Font.body.weight(.semibold))
-                        Text(L("onboarding.unsigned.body")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
-                    }
+        case .welcome:
+            VStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 14) {
+                    beat("doc.text", "before")
+                    beat("waveform", "during")
+                    beat("checklist", "after")
                 }
-                .padding(12).frame(maxWidth: 440, alignment: .leading)
-                .background(PN.C.onMe.opacity(0.10), in: RoundedRectangle(cornerRadius: PN.Radius.m))
+                Text(L("onb.welcome.audio")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                // 2026-10-29 (owner): while the beta is not notarized, say why macOS asked for "Open Anyway" and that an
+                // update may ask again. Shown only when this copy is not notarized.
+                if sig.kind == .developer || sig.kind == .unsigned {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "checkmark.shield").foregroundStyle(PN.C.onMe)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(L("onboarding.unsigned.title")).font(PN.Font.body.weight(.semibold))
+                            Text(L("onboarding.unsigned.body")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(12)
+                    .background(PN.C.onMe.opacity(0.10), in: RoundedRectangle(cornerRadius: PN.Radius.m))
+                }
             }
+            .onAppear { sig.check() }
         case .permissions:
             VStack(spacing: 10) {
                 permissionRow("mic", L("onboarding.permissions.mic"), ok: m.micState == .authorized,
@@ -350,81 +351,123 @@ struct OnboardingView: View {
             }
             .onAppear { if !settings.config.workRoot.isEmpty { m.applyFolders() } }
             .onChange(of: settings.config.workRoot) { m.applyFolders() }
-        case .claude:
-            VStack(spacing: 8) {
-                Picker("", selection: $provider) {
-                    Text("Claude").tag("claude")
-                    Text("ChatGPT").tag("chatgpt")
-                }
-                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 280)
-                if provider == "claude" {
-                // 2026-10-29 (owner): preparing calls always needs Claude Code, whichever way pays (plan or API key).
-                if let cc = setup.steps.first(where: { $0.id == "claude" }) {
-                    HStack(spacing: 10) {
-                        Image(systemName: cc.state == .ok ? "checkmark.circle.fill" : "terminal").foregroundStyle(cc.state == .ok ? PN.C.turn : PN.C.text3)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(L("setup.step.claude.title")).font(PN.Font.body)
-                            Text(cc.state == .ok ? cc.detail : L("setup.step.claude.why")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
-                        }
-                        Spacer()
-                        if cc.state == .installing { ProgressView().controlSize(.small) }
-                        else if cc.state != .ok { Button(L("onboarding.claude.install")) { Task { await setup.installOne("claude") } }.buttonStyle(.pnSecondary).disabled(setup.busy) }
-                    }
-                    .padding(10).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
-                }
-                // 0.8.7 (L3): 1) sign in (above), 2) an API key behind a disclosure, 3) continue without Claude, said honestly
-                DisclosureGroup(L("onb.claude.haveKey"), isExpanded: $keyOpen) {
-                HStack {
-                    SecureField("", text: $m.apiKey, prompt: Text(settings.isSet(.claudeAPIKey) ? L("onboarding.claude.saved") : "sk-ant-…"))
-                        .textFieldStyle(.roundedBorder)
-                    Button(L("common.save")) { m.saveKey() }.buttonStyle(.pnSecondary).disabled(m.apiKey.isEmpty)
-                }
-                keyState(settings.keyState[.claudeAPIKey], fallback: m.keyNote)
-                Link(L("onboarding.claude.getKey"), destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(PN.Font.caption)
-                }
-                } else {
-                // 0.9.0: ChatGPT: the account through Codex, or an OpenAI API key; one button sets every job to it
-                CodexAccountRow()
-                Button(L("ai.codex.use")) {
-                    settings.config.ai.prep = AIRoute.codex
-                    settings.config.ai.tips = AIRoute.codex
-                    settings.config.ai.after = AIRoute.codex
-                }.buttonStyle(.pnSecondary).disabled(CodexAccount.cliPath == nil)
-                KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: settings)
-                Button(L("ai.openai.use")) {
-                    settings.config.ai.prep = AIRoute.openai
-                    settings.config.ai.tips = AIRoute.openai
-                    settings.config.ai.after = AIRoute.openai
-                }.buttonStyle(.pnSecondary).disabled(!settings.isSet(.openaiAPIKey))
-                }
-                if ![AIRoute.codex, AIRoute.openai].contains(settings.config.ai.prep) && !settings.isSet(.claudeAPIKey) && !settings.isSet(.openaiAPIKey) && setup.steps.first(where: { $0.id == "claude" })?.state != .ok {
-                    Text(L("onb.claude.without")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                }
+        case .ai:
+            VStack(spacing: 10) {
+                aiAccess
+                OnboardingAIChain(provider: provider)
             }
-        case .addons:
-            OptionalAddonsStep(showHeader: false) { m.next() }
+        case .install:
+            ComponentsChecklist(provider: provider) { m.next() }
+        case .calls:
+            OnboardingCallsStep(settings: settings)
         case .done:
-            HStack(spacing: 10) {
-                Image(nsImage: Brand.menuBarImage(recording: false))
-                    .padding(6).background(RoundedRectangle(cornerRadius: 6).fill(PN.C.surface2))
-                Text(L("onboarding.done.menubarHint")).font(PN.Font.body).foregroundStyle(PN.C.text2)
+            VStack(spacing: 10) {
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        Image(nsImage: Brand.menuBarImage(recording: false))
+                            .padding(6).background(RoundedRectangle(cornerRadius: 6).fill(PN.C.surface2))
+                        Text(L("onb.done.menubar")).font(PN.Font.body).foregroundStyle(PN.C.text)
+                        Spacer()
+                    }
+                    .padding(.vertical, 10)
+                    Divider()
+                    keyRow(L("onb.done.keyHelp"), HotKeys.shared.combo(.help).display)
+                    Divider()
+                    keyRow(L("onb.done.keyTips"), HotKeys.shared.combo(.proactive).display)
+                    Divider()
+                    OnboardingTelemetryRow().padding(.vertical, 10)          // 0.10.1 (A6, D15): on by default, said here with the switch
+                }
+                .padding(.horizontal, 16)
+                .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+                Text(L("onb.done.practice")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            OnboardingTelemetryRow()          // 0.10.1 (A6, D15): on by default, said here with the switch
-            // 0.8.7 (L3): the three shortcuts, shown again on the first call
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L("onb.done.keys", ["h": HotKeys.shared.combo(.help).display, "l": HotKeys.shared.combo(.proactive).display]))
-                    .font(PN.Font.body.monospacedDigit()).foregroundStyle(PN.C.text)
-                Text(L("onb.done.keysAgain")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-            }
-            .padding(.top, 8)
         }
+    }
+
+    /// Claude or ChatGPT, as before 0.16 (the provider row, the API key behind a disclosure, ChatGPT through Codex).
+    @ViewBuilder var aiAccess: some View {
+        VStack(spacing: 8) {
+            Picker("", selection: $provider) {
+                Text("Claude").tag("claude")
+                Text("ChatGPT").tag("chatgpt")
+            }
+            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 280)
+            if provider == "claude" {
+            // 2026-10-29 (owner): preparing calls always needs Claude Code, whichever way pays (plan or API key).
+            if let cc = setup.steps.first(where: { $0.id == "claude" }) {
+                HStack(spacing: 10) {
+                    Image(systemName: cc.state == .ok ? "checkmark.circle.fill" : "terminal").foregroundStyle(cc.state == .ok ? PN.C.turn : PN.C.text3)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L("setup.step.claude.title")).font(PN.Font.body)
+                        Text(cc.state == .ok ? cc.detail : L("setup.step.claude.why")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
+                    }
+                    Spacer()
+                    if cc.state == .installing { ProgressView().controlSize(.small) }
+                    else if cc.state != .ok { Button(L("onboarding.claude.install")) { Task { await setup.installOne("claude") } }.buttonStyle(.pnSecondary).disabled(setup.busy) }
+                }
+                .padding(10).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            }
+            // 0.8.7 (L3): 1) sign in (above), 2) an API key behind a disclosure, 3) continue without Claude, said honestly
+            DisclosureGroup(L("onb.claude.haveKey"), isExpanded: $keyOpen) {
+            HStack {
+                SecureField("", text: $m.apiKey, prompt: Text(settings.isSet(.claudeAPIKey) ? L("onboarding.claude.saved") : "sk-ant-…"))
+                    .textFieldStyle(.roundedBorder)
+                Button(L("common.save")) { m.saveKey() }.buttonStyle(.pnSecondary).disabled(m.apiKey.isEmpty)
+            }
+            keyState(settings.keyState[.claudeAPIKey], fallback: m.keyNote)
+            Link(L("onboarding.claude.getKey"), destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(PN.Font.caption)
+            }
+            } else {
+            // 0.9.0: ChatGPT: the account through Codex, or an OpenAI API key; one button sets every job to it
+            CodexAccountRow()
+            Button(L("ai.codex.use")) {
+                settings.config.ai.prep = AIRoute.codex
+                settings.config.ai.tips = AIRoute.codex
+                settings.config.ai.after = AIRoute.codex
+            }.buttonStyle(.pnSecondary).disabled(CodexAccount.cliPath == nil)
+            KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: settings)
+            Button(L("ai.openai.use")) {
+                settings.config.ai.prep = AIRoute.openai
+                settings.config.ai.tips = AIRoute.openai
+                settings.config.ai.after = AIRoute.openai
+            }.buttonStyle(.pnSecondary).disabled(!settings.isSet(.openaiAPIKey))
+            }
+            if ![AIRoute.codex, AIRoute.openai].contains(settings.config.ai.prep) && !settings.isSet(.claudeAPIKey) && !settings.isSet(.openaiAPIKey) && setup.steps.first(where: { $0.id == "claude" })?.state != .ok {
+                Text(L("onb.claude.without")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    func beat(_ symbol: String, _ id: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Image(systemName: symbol).font(.system(size: 18)).foregroundStyle(PN.C.accent).accessibilityHidden(true)
+            Text(L("onb.beat.\(id).when")).font(PN.Font.label).foregroundStyle(PN.C.text3).padding(.top, 4)
+            Text(L("onb.beat.\(id).head")).font(PN.Font.section).foregroundStyle(PN.C.text)
+            Text(L("onb.beat.\(id).body", ["help": HotKeys.shared.combo(.help).display])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(16).frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .combine)
+    }
+
+    func keyRow(_ action: String, _ keys: String) -> some View {
+        HStack {
+            Text(action).foregroundStyle(PN.C.text)
+            Spacer()
+            Text(keys).font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text2)
+                .padding(.horizontal, 6).padding(.vertical, 2).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 6))
+        }
+        .padding(.vertical, 10)
     }
 
     var primaryLabel: String {
         switch m.step {
-        case .splash: return L("onboarding.splash.cta")
-        case .claude: return (settings.isSet(.claudeAPIKey) || settings.isSet(.openaiAPIKey) || [AIRoute.codex, AIRoute.openai].contains(settings.config.ai.prep)) ? L("common.continue") : L("onboarding.claude.continueNoKey")
-        case .done: return L("onboarding.done.primary")
+        case .welcome: return L("onb.welcome.cta")
+        case .ai: return (settings.isSet(.claudeAPIKey) || settings.isSet(.openaiAPIKey) || [AIRoute.codex, AIRoute.openai].contains(settings.config.ai.prep)) ? L("common.continue") : L("onboarding.claude.continueNoKey")
+        case .done: return L("onb.done.practiceCta")
         default: return L("common.continue")
         }
     }
@@ -434,13 +477,16 @@ struct OnboardingView: View {
         case .folder: m.applyFolders(); m.next()
         case .done:
             finish()
-            (NSApp.delegate as? AppDelegate)?.showDemo()     // the tips window on demo data
+            UsageLog.log("practice_call", ["from": "onboarding"])
+            (NSApp.delegate as? AppDelegate)?.showDemo()     // the tips window on a sample call, nothing recorded or saved
         default: m.next()
         }
     }
 
+    /// Done: the onboarding never comes back by itself, and What's new for this version is not shown to a new person.
     func finish() {
         UserDefaults.standard.set(true, forKey: "onboardingDone")
+        WhatsNewStore.markSeen()
         close()
     }
 
@@ -480,6 +526,155 @@ struct OnboardingView: View {
     }
 }
 
+/// 0.16.0 (D3, step 4): "If your AI is out". The order Pacenote tries when the chosen AI is out of limit, offline or
+/// too slow: 1 the chosen provider, 2 the other one, 3 the model on this Mac, 4 the rules only. What is not
+/// connected is grey with the reason. The real order and the AI per job: Settings > AI.
+struct OnboardingAIChain: View {
+    let provider: String
+    @ObservedObject var oc = OptionalComponents.shared
+
+    struct Link: Identifiable { let id: String; let label: String; let note: String; let on: Bool }
+
+    var links: [Link] {
+        let c = AIRoute.connected()
+        let claude = c.contains(AIRoute.code) || c.contains(AIRoute.api)
+        let gpt = c.contains(AIRoute.codex) || c.contains(AIRoute.openai)
+        let first = provider == "claude" ? ("Claude", claude) : ("ChatGPT", gpt)
+        let second = provider == "claude" ? ("ChatGPT", gpt) : ("Claude", claude)
+        let local = c.contains(AIRoute.local)
+        return [Link(id: "1", label: first.0, note: L(first.1 ? "ai.chain.connected" : "ai.chain.notConnected"), on: first.1),
+                Link(id: "2", label: second.0, note: L(second.1 ? "ai.chain.connected" : "ai.chain.notConnected"), on: second.1),
+                Link(id: "3", label: L("onb.chain.local"), note: L(local ? "ai.chain.connected" : "onb.chain.notInstalled"), on: local),
+                Link(id: "4", label: L("onb.chain.rules"), note: L("onb.chain.always"), on: true)]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("onb.chain.title")).font(PN.Font.section).foregroundStyle(PN.C.text)
+            Text(L("onb.chain.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                ForEach(links) { l in
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(l.id + "  " + l.label).font(PN.Font.caption.weight(.semibold)).lineLimit(1)
+                        Text(l.note).font(PN.Font.caption).foregroundStyle(l.on && l.id != "4" ? PN.C.turn : PN.C.text3).lineLimit(1)
+                    }
+                    .fixedSize()
+                    .foregroundStyle(l.on && l.id != "4" ? PN.C.turn : PN.C.text2)
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .background((l.on && l.id != "4" ? PN.C.turn.opacity(0.13) : PN.C.surface2), in: RoundedRectangle(cornerRadius: 6))
+                    .accessibilityElement(children: .combine)
+                    if l.id != "4" { Text("›").foregroundStyle(PN.C.text3).accessibilityHidden(true) }
+                }
+            }
+            Text(L("onb.chain.foot")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+    }
+}
+
+/// 0.16.0 (D3, step 6): Your calls. Sets what Settings already has, nothing new: Quick or Expert for every call
+/// (Settings > Meeting Sheet), tips when useful or only when asked (the tips window's own switch), recording off,
+/// sound or sound and screen (Settings > Call recording), and the consent line to paste in the chat.
+struct OnboardingCallsStep: View {
+    @ObservedObject var settings: SettingsModel
+    @ObservedObject var prefs = SheetPrefs.shared
+    @State private var proactive = ((UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:])["proactive"] as? String) == "1"
+    @State private var screenOK = ScreenPermission.granted()
+
+    var sheetMode: Binding<String> {
+        Binding(get: { prefs.forced.isEmpty ? "quick" : prefs.forced }, set: { prefs.forced = $0 })
+    }
+    var tips: Binding<String> {
+        Binding(get: { proactive ? "useful" : "ask" }, set: { v in
+            proactive = v == "useful"
+            var p = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]; p["proactive"] = proactive ? "1" : "0"
+            UserDefaults.standard.set(p, forKey: "prompterPrefs")
+        })
+    }
+    var record: Binding<String> {
+        Binding(get: { !settings.config.recording.auto ? "off" : settings.config.recording.kind == "audio" ? "sound" : "screen" },
+                set: { v in
+                    settings.config.recording.auto = v != "off"
+                    if v != "off" { settings.config.recording.kind = v == "sound" ? "audio" : "video" }
+                })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(spacing: 0) {
+                row(L("onb.calls.sheet"), sheetMode.wrappedValue == "quick" ? L("onb.calls.sheet.quick") : L("onb.calls.sheet.expert")) {
+                    Picker("", selection: sheetMode) {
+                        Text(L("sheet.ui.quick")).tag("quick")
+                        Text(L("sheet.ui.expert")).tag("expert")
+                    }
+                }
+                Divider()
+                row(L("onb.calls.tips"), proactive ? L("onb.calls.tips.useful.sub") : L("onb.calls.tips.ask.sub", ["help": HotKeys.shared.combo(.help).display])) {
+                    Picker("", selection: tips) {
+                        Text(L("onb.calls.tips.useful")).tag("useful")
+                        Text(L("onb.calls.tips.ask")).tag("ask")
+                    }
+                }
+                Divider()
+                row(L("onb.calls.rec"), recordSub) {
+                    Picker("", selection: record) {
+                        Text(L("onb.calls.rec.off")).tag("off")
+                        Text(L("onb.calls.rec.sound")).tag("sound")
+                        Text(L("onb.calls.rec.screen")).tag("screen")
+                    }
+                }
+                if record.wrappedValue == "screen" && !screenOK {
+                    HStack {
+                        Text(L("onb.calls.rec.needsScreen")).font(PN.Font.caption).foregroundStyle(PN.C.onMe)
+                        Spacer()
+                        Button(L("onboarding.permissions.screenButton")) {
+                            if !ScreenPermission.request() { ScreenPermission.openSettings() }
+                            screenOK = ScreenPermission.granted()
+                        }.buttonStyle(.pnTertiary)
+                    }
+                    .padding(.bottom, 8)
+                }
+                Divider()
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("onb.calls.consent"))
+                        Text(settings.config.consentChat ? L("onb.calls.consent.on") : L("onb.calls.consent.off"))
+                            .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Toggle("", isOn: $settings.config.consentChat).toggleStyle(.switch).labelsHidden()
+                        .accessibilityLabel(L("onb.calls.consent"))
+                }
+                .padding(.vertical, 12)
+            }
+            .padding(.horizontal, 16)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            Text(L("onb.calls.foot")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+        }
+    }
+
+    var recordSub: String {
+        switch record.wrappedValue {
+        case "off": return L("onb.calls.rec.off.sub")
+        case "sound": return L("onb.calls.rec.sound.sub")
+        default: return L("onb.calls.rec.screen.sub")
+        }
+    }
+
+    func row<P: View>(_ label: String, _ sub: String, @ViewBuilder picker: () -> P) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).foregroundStyle(PN.C.text)
+                Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            picker().pickerStyle(.segmented).labelsHidden().fixedSize()
+        }
+        .padding(.vertical, 10)
+    }
+}
+
 @MainActor
 final class OnboardingWindow {
     static var window: NSWindow?
@@ -494,7 +689,8 @@ final class OnboardingWindow {
             w.isReleasedWhenClosed = false
             window = w
         }
-        model.step = .splash
+        model.step = .welcome
+        WhatsNewStore.markSeen()     // 0.16.0 (D3): the onboarding covers this version; What's new does not follow it
         window?.title = L("onboarding.window.title")
         window?.center()
         window?.makeKeyAndOrderFront(nil)

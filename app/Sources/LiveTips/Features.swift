@@ -32,6 +32,9 @@ enum FeatureRegistry {
         Feature(id: "sales", event: "call_started", hasWhen: false) { startWith(type: "", sales: true) },
         Feature(id: "demo", event: "demo_opened", hasWhen: false) { app?.showDemo() },
         Feature(id: "demoPresentation", event: "demo_opened", hasWhen: false) { app?.showDemoPresentation() },
+        // 0.16.0 (D3): Try it from What's new
+        Feature(id: "components", event: "component_removed", hasWhen: false) { SettingsWindow.show(tab: "components") },
+        Feature(id: "settingsSearch", event: "settings_search", hasWhen: false) { SettingsWindow.show(tab: "general") },
     ] }
 
     static func startWith(type: String, sales: Bool = false) {

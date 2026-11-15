@@ -1412,7 +1412,7 @@ follows Notion both ways.
 
 **E. Optional add-ons** (rules/components.yaml): Ollama, the local model (about 16 GB) and the Link downloader
 (yt-dlp). Each has one row with its size, purpose, state and Install, in Settings (AI for the first two, General >
-Optional add-ons for the downloader), at the end of About > Components marked optional, and in an optional
+Optional add-ons for the downloader), in Settings > Components since 0.16.0 (before: About > Components), and in an optional
 onboarding step. They never change readiness, Install or repair never installs them, and nothing installs during a
 call. Ollama does not have to be running: a job that needs the local model starts it by itself, and a model already
 downloaded counts as installed. A control that needs a missing one is disabled with a small Install link.
@@ -1433,11 +1433,44 @@ another device and back makes the browser reconnect its audio; the "Can't hear t
 
 ### 14.1i Pacenote 0.8.7: Integrations, editable call page, Sales mode, HubSpot
 
+**Setup (0.16.0).** Seven steps: Welcome (before, during and after a call), Permissions, Folder, AI (Claude or
+ChatGPT, and "If your AI is out": the other provider, the model on this Mac, then the rules only), What to install
+(the required parts ticked and locked, already installing in the background; the optional ones unticked: the local
+AI model, 16 GB, in the free Ollama app; the call agent, offered only with Claude; the link downloader), Your calls
+(Quick or Expert, tips when useful or only when you ask, call recording off, sound, or sound and screen, the consent
+line) and Ready (the menu bar, the keys, Help improve Pacenote, Try a practice call or Open Home). Every step only sets
+what Settings already has. Help > Welcome tour runs it again.
+
+**Settings > Components (0.16.0).** How much Pacenote takes on this Mac (measured) and what is free. Optional parts
+show their size and Remove... or Install; Remove... says what changes and frees the space it measured. Removing the
+local model moves the jobs set to "On this Mac" to the next AI in the chain and turns that step off; the Ollama app
+stays (move it to the Trash yourself). Removing the call agent leaves Help now with the Meeting Sheet and the folder
+search; removing the link downloader leaves Transcribe a recording with files only. Required parts (speech
+recognition, the local search model, the recorder and tips engine) are locked, with Check again and Repair. Nothing
+is installed or removed during a call. About keeps the app's signature and Manage components.
+
+**What's new (0.16.0).** After an update, once, Pacenote shows what changed since the version you last saw, only
+what applies to you (for example, your AI provider), and a setup step you have not done yet, such as choosing the
+optional add-ons right in the window. Remind me later shows it at the next launch; it never opens during a call or
+after a fresh setup. Every change: Settings > Help > What's new (also Help > What's New in Pacenote). The list is
+`rules/whatsnew.yaml`.
+
+**Updates (0.16.0).** Pacenote updates itself with Sparkle 2. It checks at launch and twice a day, downloads a new
+version in the background and asks before it installs and restarts. Where it shows: Settings > About > Updates (the
+version, what is new, Install and restart, Later, and the two switches: check automatically, download in the
+background), a line on Home, a small blue dot on the menu bar icon, and Pacenote > Check for Updates. Never during a
+call: no checks while a call is live; during a call the button reads Install after the call and the update goes in
+when the call ends. A downloaded update also goes in when you quit Pacenote. Every update is signed with the
+project's EdDSA key, and the app checks the signature before it installs. The feed is
+`https://pacenote.bodco.pm/appcast.xml` (written by `tools/make_appcast.py`). A build without the public key (a
+developer build) has updates off and keeps the manual check against GitHub in About. Versions before 0.16.0 have
+no updater: install 0.16.0 by hand once.
+
 **Windows and navigation.** Pacenote windows never join a tab group. The call page, a series, a transcript and
 Statistics open inside Home; Back (or Command-[) returns. The follow-up email is the right panel of the call page.
 
 **Settings.** The sidebar has four groups: You (Account, General), Calls (Projects, Meeting Sheet, Call recording,
-Transcription), Connections (Integrations, AI) and More (Modules, Usage, Help, About). Settings > AI shows one group
+Transcription), Connections (Integrations, AI) and More (Modules, Components, Usage, Help, About). Settings > AI shows one group
 at a time: Access, Jobs (which AI prepares, tips and writes the notes, and the AI chain), Limits, On this Mac (the
 local model, search, speakers) and Advanced (company research, the agents). Settings > General has three groups:
 Basics (your name, work folder, language, theme, Dock), During calls (the tips window, floating controls, shortcuts)
@@ -2547,9 +2580,8 @@ address", `references/sweep.md`, `references/presentation.md`).
    workspace by itself; other folders that look like workspaces are listed with Add or Ignore). "Add"
    takes any project or workspace folder, also outside the work folder. A Control Tower config and a
    Notion mirror are optional extras: people, Notion pages, the current state.
-35. **Welcome tour.** A new install opens a short onboarding: permissions (microphone, system audio),
-   the work folder and its workspaces, your name on calls, the Claude key, the local install and Notion
-   (optional). The menu bar panel and Help > Welcome tour run it again.
+35. **Welcome tour.** A new install opens a short onboarding (seven steps since 0.16.0): welcome, permissions
+   (microphone, system audio), the work folder and its workspaces, your AI, what to install, your calls, ready. The menu bar panel and Help > Welcome tour run it again.
 36. **Notion page.** The meeting page title starts with the meeting's name ("Weekly sync: export
    plan"); the title and the summary are written in the call's language.
 37. **Links in Call context.** "Prepare now" also reads public web pages you list under "Where to look":

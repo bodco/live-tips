@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { AutoStart.shared.start() }      // Pacenote 0.8: offer to start tips when a call begins
         MainActor.assumeIsolated { MeetingEndWatch.shared.start() } // 2026-11-10 (owner): hanging up in the meeting ends the call
         MainActor.assumeIsolated { SheetReminder.shared.start() }   // 0.10.0 (Meeting Sheet, phase 5): N minutes before a call with gaps
+        UpdateService.shared.start()      // 0.16.0 (D3): Sparkle 2, at launch and twice a day, never during a call
         updateCoreIfNeeded()
         // Up next (2026-10-27): the switch goes on when the old call's recorder has stopped.
         NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in
@@ -82,7 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         else if !callIsLive {
             // 0.8.7.1: Home opens once the saved keys are read off the main thread (an "allow access" prompt after an
             // update froze the whole app while Home read them); the menu bar item works meanwhile.
-            SecretStore.warm(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips") { [weak self] in self?.openHome() }
+            SecretStore.warm(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips") { [weak self] in
+                self?.openHome()
+                // 0.16.0 (D3): What's new after an update, once, never during a call
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated { WhatsNewWindow.showIfNeeded(callIsLive: CallEngine.shared.isRunning) } }
+            }
         }       // 2026-10-27 (owner): Home is the app's main window
         MainActor.assumeIsolated { _ = CalendarService.shared }
     }
@@ -135,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         main.addItem(appItem)
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: L("menubar.about"), action: #selector(openAbout), keyEquivalent: "").target = self
+        appMenu.addItem(withTitle: L("upd.menu"), action: #selector(checkForUpdates), keyEquivalent: "").target = self   // 0.16.0 (D3)
         appMenu.addItem(withTitle: L("menubar.settings"), action: #selector(openSettings), keyEquivalent: ",").target = self
         appMenu.addItem(.separator())
         // Pacenote 0.8 (F1): Home and Start a call are app commands too, not only rows of the menu bar panel.
@@ -165,6 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         main.addItem(helpItem)
         let help = NSMenu(title: L("menu.help"))
         help.addItem(withTitle: L("feat.title"), action: #selector(openFeatures), keyEquivalent: "").target = self   // 0.8.7 (L1): first
+        help.addItem(withTitle: L("wn.menu"), action: #selector(openWhatsNew), keyEquivalent: "").target = self   // 0.16.0 (D3)
         help.addItem(withTitle: L("settings.how.title"), action: #selector(openHowItWorks), keyEquivalent: "").target = self
         help.addItem(withTitle: L("menubar.welcomeTour"), action: #selector(openOnboarding), keyEquivalent: "").target = self   // 0.8.7.1: also in Help
         help.addItem(NSMenuItem.separator())
@@ -194,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fillPanel(st, month: month, cfg: cfg)
             floatingControls?.refresh(st, config: cfg)
         }
-        item?.button?.image = Brand.menuBarImage(recording: st.state == "recording")
+        item?.button?.image = Brand.menuBarImage(recording: st.state == "recording", update: UpdateService.shared.newVersion != nil)
         setClock(st.state == "recording" && !cfg.floatingCallControls)
         // Orange near a spending limit; no red tint while recording: the filled dot and the clock say it.
         // 0.9.6: also a provider at its alert share or limit (Settings > AI > Spending limits); the alerts fire here
@@ -270,6 +277,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openSettings() { MainActor.assumeIsolated { SettingsWindow.show() } }
     @objc func openHowItWorks() { MainActor.assumeIsolated { HowItWorksWindow.show() } }
     @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
+    /// 0.16.0 (D3): Pacenote > Check for Updates…: a version waiting installs (after the call during a call),
+    /// otherwise a check whose answer shows in About > Updates.
+    @objc func checkForUpdates() {
+        let up = UpdateService.shared
+        if up.newVersion != nil { up.install() } else { up.checkNow() }
+        MainActor.assumeIsolated { SettingsWindow.show(tab: "about") }
+    }
     @objc func openSettingsTab() { MainActor.assumeIsolated { SettingsWindow.show() } }
 
     /// Same as the tips window's own controls (the window owns the pause and mic state). Pacenote 0.8 (F2).
@@ -346,6 +360,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showDemo() { UsageLog.log("demo_opened", ["kind": "call"]); openDemo("--prompter-demo") }
     @objc func showDemoPresentation() { UsageLog.log("demo_opened", ["kind": "presentation"]); openDemo("--prompter-demo-presentation") }
     @objc func openFeatures() { MainActor.assumeIsolated { FeaturesWindow.show() } }
+    @objc func openWhatsNew() { MainActor.assumeIsolated { SettingsWindow.show(tab: "help") } }
     func openDemo(_ flag: String) {
         MainActor.assumeIsolated {
             tips?.window?.close()

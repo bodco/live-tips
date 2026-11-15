@@ -44,11 +44,29 @@ about: >-
   The same rows at the end of About > Components, marked "(optional)". They are never red or orange and never change
   the overall readiness. "Install or repair" installs only the required components, never the optional ones.
 onboarding: >-
-  An optional "Optional add-ons" step after the main setup: one row per component with a checkbox and its size,
+  0.16.0 (D3): step 5 "What to install" (required parts ticked and locked, optional ones unticked, "Install N and
+  continue" or "Continue without extras"). Before 0.16: an optional "Optional add-ons" step after the main setup: one row per component with a checkbox and its size,
   nothing ticked by default, "Install selected" and "Skip". The 16 GB model shows a size warning with the free disk
   space.
 dependants: >-
   A control that needs a missing component is disabled, with a small "Install" link next to it that installs at once:
   the Link field of Transcribe a recording without the link downloader; "On this Mac" in the AI route pickers without
   Ollama and the model.
-during_a_call: Install never starts during a live call; the button says "After the call".
+during_a_call: Install and Remove never start during a live call; the button says "After the call".
+# 0.16.0 (D3, Bohdan 15.11, v2): Settings > Components and the onboarding's "What to install".
+rows_v2: >-
+  Three optional rows: Local AI model (the model in Ollama; Ollama is not a row of its own: Install opens its
+  download page when it is missing, then downloads the model), Call agent (offered only with Claude, with what it
+  does and what it costs), Link downloader. The required parts show in three groups: Speech recognition (recorder,
+  whisper), Local search model (localai), Recorder and tips engine (python, core, venv, tips, voices).
+remove: >-
+  Only optional parts. "Remove..." asks first with the size, what changes and "Remove and free <size>". The model
+  goes through Ollama (DELETE /api/delete, the same as `ollama rm`) and the Ollama app stays; the agent and the
+  link downloader through `setup.sh remove agent|linkdl` (pip uninstall in the private venv). Required parts are
+  never removed (setup.sh exits 3). After the model goes, jobs set to "On this Mac" move to the next connected AI
+  in the chain and the chain's local step is switched off (LiveTipsCore ComponentCatalog.afterRemovingLocal).
+sizes: >-
+  Measured, never written from a table: `setup.sh size <step>` prints "SIZE <bytes>" (du), the model from its
+  Ollama manifest. Freed = size before minus size after. The numbers in this file are only what is shown before
+  the first measurement (ComponentCatalog.estimate).
+about_v2: About keeps the app's signature and "Manage components"; the list of parts left it.

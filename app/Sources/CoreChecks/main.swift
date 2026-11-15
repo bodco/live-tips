@@ -2415,6 +2415,110 @@ func sheetPeopleD1b() {
 }
 
 // 0.15.0 (D2): search in Settings
+/// 0.16.0 (D3): Settings > Components. Required parts never removed, the model needs Ollama, the agent only with
+/// Claude, sizes parsed and freed space measured, jobs on the model move to the next AI when it goes, search leads
+/// to the Components pane.
+func componentsD3() {
+    for id in ComponentCatalog.required { expect(!ComponentCatalog.canRemove(id), "d3: required \(id) is never removable") }
+    for id in ComponentCatalog.optional { expect(ComponentCatalog.canRemove(id), "d3: optional \(id) is removable") }
+    expect(!ComponentCatalog.canRemove("ollama") && !ComponentCatalog.canRemove("claude") && !ComponentCatalog.canRemove("x"), "d3: Ollama, Claude Code, unknown: not removable")
+    expect(ComponentCatalog.needs("local_model") == "ollama" && ComponentCatalog.needs("agent") == nil, "d3: the model needs Ollama")
+    expect(ComponentCatalog.setupStep("link_downloader") == "linkdl" && ComponentCatalog.setupStep("agent") == "agent"
+           && ComponentCatalog.setupStep("local_model") == nil && ComponentCatalog.setupStep("whisper") == "whisper", "d3: setup.sh steps")
+    expect(ComponentCatalog.offered("agent", provider: "claude") && !ComponentCatalog.offered("agent", provider: "chatgpt")
+           && ComponentCatalog.offered("local_model", provider: "chatgpt"), "d3: the agent only with Claude")
+    expect(ComponentCatalog.parseSize("SIZE 1048576") == 1_048_576 && ComponentCatalog.parseSize("OK 12") == nil
+           && ComponentCatalog.parseSize("SIZE -1") == nil && ComponentCatalog.parseSize("SIZE") == nil, "d3: parse SIZE")
+    expect(ComponentCatalog.freed(before: 16_000_000_000, after: nil) == 16_000_000_000, "d3: freed, gone entirely")
+    expect(ComponentCatalog.freed(before: 100, after: 140) == 0 && ComponentCatalog.freed(before: nil, after: 5) == 0, "d3: freed never negative or guessed")
+    expect(ComponentCatalog.format(16_000_000_000) == "16 GB" && ComponentCatalog.format(2_500_000_000) == "2.5 GB"
+           && ComponentCatalog.format(1_000_000_000) == "1 GB" && ComponentCatalog.format(320_000_000) == "320 MB", "d3: format sizes")
+    let s = ComponentCatalog.summary(picked: ["agent", "link_downloader", "whisper"], sizes: ["agent": 300_000_000])
+    expect(s.count == 2 && s.bytes == 310_000_000, "d3: summary counts optional parts only, measured first: \(s)")
+    // the model goes: jobs on it move to the next connected AI allowed for the job, local switched off
+    let chain = AIChain.defaults()
+    let r = ComponentCatalog.afterRemovingLocal(prep: "local", tips: "api", after: "local", chain: chain, connected: ["codex", "api"])
+    expect(r.prep == "codex" && r.after == "codex" && r.tips == "api", "d3: jobs move to the next AI: \(r.prep) \(r.after) \(r.tips)")
+    expect(r.chain.first { $0.route == "local" }?.on == false, "d3: the local step is off after removal")
+    let none = ComponentCatalog.afterRemovingLocal(prep: "local", tips: "api", after: "code", chain: chain, connected: [])
+    expect(none.prep == "code" && none.after == "code", "d3: nothing connected: the default route")
+    let agyOnly = ComponentCatalog.afterRemovingLocal(prep: "local", tips: "local", after: "local", chain: chain, connected: ["agy"])
+    expect(agyOnly.prep == "agy" && agyOnly.tips == "api", "d3: tips never move to the Gemini account")
+    // search leads to Components
+    let base = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    func load(_ l: String) -> [String: String] {
+        guard let d = try? Data(contentsOf: base.appendingPathComponent("Resources/i18n/\(l).json")),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return [:] }
+        return o.compactMapValues { $0 as? String }
+    }
+    let en = load("en"), uk = load("uk")
+    let titles: (SettingsSearchEntry) -> [String] = { [en[$0.titleKey] ?? "", uk[$0.titleKey] ?? ""] }
+    expect(SettingsSearch.find("remove", titles: titles).first?.pane == "components", "d3: \"remove\" opens Components")
+    expect(SettingsSearch.find("видалити", titles: titles).first?.pane == "components", "d3: \"видалити\" opens Components")
+    expect(SettingsSearch.find("disk space", titles: titles).first?.id == "comp.disk", "d3: \"disk space\" finds the disk line")
+    for k in ["cmp.impact.local_model", "cmp.impact.agent", "cmp.impact.link_downloader"] { expect(en[k] != nil && uk[k] != nil, "d3: impact \(k)") }
+    // setup.sh: size for every required step and the add-ons, remove only for the add-ons, required refused
+    let sh = (try? String(contentsOf: base.appendingPathComponent("Resources/setup.sh"), encoding: .utf8)) ?? ""
+    for st in ["core", "venv", "whisper", "localai", "voices", "linkdl", "agent"] { expect(sh.contains("  size:\(st)"), "d3: setup.sh size:\(st)") }
+    expect(sh.contains("  remove:linkdl)") && sh.contains("  remove:agent)") && sh.contains("  remove:*) echo"), "d3: setup.sh remove only add-ons")
+    expect(!sh.contains("remove:whisper") && !sh.contains("remove:localai") && !sh.contains("remove:core"), "d3: no remove for required steps")
+}
+
+/// 0.16.0 (D3, rules/whatsnew.yaml): every item in both languages, Try it exists in FeatureRegistry, versions never
+/// go down; the personal filter (versions, conditions, setup done) and a new person sees nothing.
+func whatsNewD3() {
+    let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let text = (try? String(contentsOf: repo.appendingPathComponent("rules/whatsnew.yaml"), encoding: .utf8)) ?? ""
+    let items = WhatsNew.parse(text)
+    expect(items.count >= 3, "d3: whatsnew.yaml parsed: \(items.count)")
+    let features = (try? String(contentsOf: repo.appendingPathComponent("app/Sources/LiveTips/Features.swift"), encoding: .utf8)) ?? ""
+    var prev = "0"
+    for i in items {
+        expect(!i.id.isEmpty && !i.version.isEmpty, "d3: \(i.id) has id and version")
+        expect(!i.titleEN.isEmpty && !i.titleUK.isEmpty && !i.bodyEN.isEmpty && !i.bodyUK.isEmpty, "d3: \(i.id) EN and UK")
+        expect(!(i.titleEN + i.titleUK + i.bodyEN + i.bodyUK).contains("\u{2014}"), "d3: \(i.id) no long dash")
+        if let t = i.tryIt { expect(features.contains("Feature(id: \"\(t)\""), "d3: \(i.id) try \(t) is in FeatureRegistry") }
+        expect(!AppVersion.isNewer(prev, than: i.version), "d3: versions do not go down at \(i.id)")
+        prev = i.version
+    }
+    expect(Set(items.map(\.id)).count == items.count, "d3: whatsnew ids unique")
+    expect(items.first { $0.id == "addons" }?.setupStep == "addons", "d3: the add-ons item is a setup step")
+    let q = WhatsNew.parse("items:\n  - id: a\n    version: 0.16.0\n    title_en: \"Say \\\"hi\\\" # not a comment\"\n    when: provider:claude, module:tracker # c\n  - id: b\n    version: 0.17.0\n")
+    expect(q.count == 2 && q[0].titleEN == "Say \"hi\" # not a comment" && q[0].when == ["provider:claude", "module:tracker"], "d3: parse quotes and comments: \(q)")
+    // the filter
+    var a = WhatsNew.Item(); a.id = "a"; a.version = "0.16.0"
+    var b = WhatsNew.Item(); b.id = "b"; b.version = "0.16.0"; b.when = ["provider:claude"]
+    var c = WhatsNew.Item(); c.id = "c"; c.version = "0.16.0"; c.setupStep = "addons"
+    var d = WhatsNew.Item(); d.id = "d"; d.version = "0.17.0"
+    var e = WhatsNew.Item(); e.id = "e"; e.version = "0.15.0"
+    let all = [e, a, b, c, d]
+    expect(WhatsNew.pending(all, lastSeen: nil, current: "0.16.0", facts: []).map(\.id) == ["a", "c"], "d3: no saved version: since the baseline, conditions and the release")
+    expect(WhatsNew.pending(all, lastSeen: "0.14.0", current: "0.16.0", facts: ["provider:claude", "done:addons"]).map(\.id) == ["a", "b", "e"], "d3: skipped versions merge, done steps hidden")
+    expect(WhatsNew.pending(all, lastSeen: "0.16.0", current: "0.16.0", facts: []).isEmpty, "d3: nothing after seen")
+    expect(WhatsNew.pending(all, lastSeen: "0.16.0", current: "0.17.0", facts: []).map(\.id) == ["d"], "d3: the next version only")
+    expect(!WhatsNew.shouldShow(onboardingDone: false, pending: [a]) && WhatsNew.shouldShow(onboardingDone: true, pending: [a])
+           && !WhatsNew.shouldShow(onboardingDone: true, pending: []), "d3: shown only after onboarding and with something new")
+    let h = WhatsNew.history(all)
+    expect(h.map(\.version) == ["0.17.0", "0.16.0", "0.15.0"] && h[1].items.map(\.id) == ["a", "b", "c"], "d3: history newest first, file order inside")
+    expect(WhatsNew.short("0.16.0") == "0.16" && WhatsNew.short("0.16.1") == "0.16.1", "d3: short version")
+}
+
+/// 0.16.0 (D3, updates): appcast release notes to lines; whatsnew.yaml has the updates item.
+func updatesD3() {
+    expect(AppcastNotes.bullets(nil).isEmpty && AppcastNotes.bullets("").isEmpty, "d3u: empty notes")
+    let li = "<h2>Pacenote 0.16.1</h2><ul><li>Fixes <b>Install</b> &amp; restart</li><li> Faster </li><li></li></ul>"
+    expect(AppcastNotes.bullets(li) == ["Fixes Install & restart", "Faster"], "d3u: li items: \(AppcastNotes.bullets(li))")
+    expect(AppcastNotes.bullets("<p>One</p><p>Two &lt;3</p>") == ["One", "Two <3"], "d3u: paragraphs")
+    let many = "<ul>" + (1...9).map { "<li>\($0)</li>" }.joined() + "</ul>"
+    expect(AppcastNotes.bullets(many).count == 6, "d3u: at most six lines")
+    let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("rules/whatsnew.yaml")
+    let items = WhatsNew.parse((try? String(contentsOf: url, encoding: .utf8)) ?? "")
+    let u = items.first { $0.id == "updates" }
+    expect(u?.version == "0.16.0" && u?.tryIt == nil, "d3u: whatsnew has updates 0.16.0 with no try")
+}
+
 func settingsSearchD2() {
     let base = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     func load(_ l: String) -> [String: String] {
@@ -2424,7 +2528,7 @@ func settingsSearchD2() {
     }
     let en = load("en"), uk = load("uk")
     let es = SettingsSearch.entries
-    let panes: Set<String> = ["account", "general", "projects", "sheet", "recording", "transcription", "integrations", "ai", "modules", "usage", "help", "about"]
+    let panes: Set<String> = ["account", "general", "projects", "sheet", "recording", "transcription", "integrations", "ai", "modules", "components", "usage", "help", "about"]
     expect(Set(es.map(\.id)).count == es.count, "d2: search ids are unique")
     for e in es {
         expect(panes.contains(e.pane), "d2: \(e.id) pane \(e.pane) exists")
@@ -2486,5 +2590,8 @@ callSyncAnalysis0130()
 sheetPeopleD1()
 sheetPeopleD1b()
 settingsSearchD2()
+componentsD3()
+whatsNewD3()
+updatesD3()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

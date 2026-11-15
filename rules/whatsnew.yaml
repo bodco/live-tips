@@ -1,0 +1,47 @@
+# What's new (Pacenote 0.16.0, D3). After the first launch of a new version the app shows the items newer than the
+# last version this person saw, that apply to them (`when`) and, for a setup step, that they have not done yet.
+# A new person does not see the current version's items after the onboarding; the full list is Settings > Help >
+# What's new. Read by LiveTipsCore/WhatsNew.swift (a small YAML subset: one `key: value` per line, plain or
+# double-quoted values, no multi-line values).
+#
+# Fields: id, version (items in order, versions never go down), title_en, title_uk, body_en, body_uk (both
+# languages always), try (a FeatureRegistry id in LiveTips/Features.swift), setup_step (an onboarding step: the item
+# shows while it is not done; "addons" = optional components chosen or installed), when (comma list, all must hold:
+# provider:claude, provider:chatgpt, module:tracker, os:15; empty = everyone).
+# CoreChecks (whatsNewD3): EN and UK for every item, `try` exists in FeatureRegistry, versions do not go down.
+schema_version: 1
+items:
+  - id: settings_search
+    version: 0.15.0
+    title_en: "Settings search"
+    title_uk: "Пошук у Налаштуваннях"
+    body_en: "Press ⌘F in Settings and type \"key\", \"Notion\" or \"language\"."
+    body_uk: "Натисніть ⌘F у Налаштуваннях і введіть «ключ», «Notion» або «мова»."
+    try: settingsSearch
+  - id: components
+    version: 0.16.0
+    title_en: "Settings › Components"
+    title_uk: "Налаштування › Компоненти"
+    body_en: "See what Pacenote installed on this Mac, how much space it takes, and remove what you don't use."
+    body_uk: "Що Pacenote встановив на цей Мак, скільки місця це займає, і як прибрати те, чим ви не користуєтесь."
+    try: components
+  - id: addons
+    version: 0.16.0
+    title_en: "Choose optional add-ons"
+    title_uk: "Оберіть додаткові компоненти"
+    body_en: "Setup now offers the local AI model, the call agent and the link downloader with their sizes. You haven't chosen yet."
+    body_uk: "Перше налаштування тепер пропонує локальну модель AI, агента дзвінка і завантажувач посилань з їхніми розмірами. Ви ще не обирали."
+    setup_step: addons
+  - id: practice
+    version: 0.16.0
+    title_en: "A practice call"
+    title_uk: "Тренувальний дзвінок"
+    body_en: "A short sample conversation in the tips window, so you see where tips appear. Nothing is recorded or saved."
+    body_uk: "Коротка зразкова розмова у вікні підказок, щоб побачити, де зʼявляються підказки. Нічого не записується і не зберігається."
+    try: demo
+  - id: updates
+    version: 0.16.0
+    title_en: "Updates from inside Pacenote"
+    title_uk: "Оновлення всередині Pacenote"
+    body_en: "Pacenote checks twice a day, downloads in the background and asks before it restarts. Never during a call. Settings › About › Updates."
+    body_uk: "Pacenote перевіряє двічі на день, завантажує у фоні і питає перед перезапуском. Ніколи під час дзвінка. Налаштування › Про застосунок › Оновлення."

@@ -29,7 +29,7 @@ Pacenote готує Meeting Sheet перед дзвінком, дає тихі �
   двічі клацніть Pacenote, закрийте попередження, далі System Settings > Privacy & Security > **Open Anyway**. Нова
   завантажена версія може спитати ще раз. У DMG ті самі кроки є у файлі «Read me first».
 - **Claude.** Запис, транскрипт і голоси працюють на Mac без Claude. Підготовка дзвінків (Meeting Sheet)
-  може використовувати **акаунт ChatGPT через Codex CLI** (див. нижче) або **Claude Code**, який застосунок встановлює сам (онбординг або Settings > About > Components), і одного
+  може використовувати **акаунт ChatGPT через Codex CLI** (див. нижче) або **Claude Code**, який застосунок встановлює сам (онбординг або Settings > Components), і одного
   способу оплати: план Claude Pro, Max, Team чи Enterprise або API-ключ у Settings > AI. Безкоштовний план Claude не
   містить Claude Code. Claude Cowork для застосунку не потрібен.
 - **Ваші документи.** Достатньо звичайних папок проєкту: підготовка читає Markdown, текст, Word, PDF, PowerPoint, Excel і CSV; пошук під час

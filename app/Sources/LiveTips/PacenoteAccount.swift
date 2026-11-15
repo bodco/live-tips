@@ -49,13 +49,14 @@ final class PacenoteAccount: ObservableObject {
 
     private init() {
         if SheetShots.active { return }     // 0.11.0 (smoke shots): demo state only, no Keychain, no network
-        // presence first, the value off the main thread (0.8.7.1: a Keychain read can wait on macOS's prompt)
-        if store.has(.pacenoteSession) {
-            let st = store
-            DispatchQueue.global(qos: .userInitiated).async {
-                let s = PacenoteServer.Session.decode(st.get(.pacenoteSession))
-                DispatchQueue.main.async { MainActor.assumeIsolated { PacenoteAccount.shared.loaded(s) } }
-            }
+        // presence and value off the main thread (0.8.7.1: a Keychain read can wait on macOS's prompt). Smoke
+        // 16.11 (0.16.0): even the presence check waited there after a reinstall, while the "allow access" prompt
+        // was open, and froze the whole app (no Home, no Quit); now nothing here touches the Keychain on main.
+        let st = store
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard st.has(.pacenoteSession) else { return }
+            let s = PacenoteServer.Session.decode(st.get(.pacenoteSession))
+            DispatchQueue.main.async { MainActor.assumeIsolated { PacenoteAccount.shared.loaded(s) } }
         }
     }
 

@@ -10,6 +10,12 @@ cd "$HERE" && swift build -c release --scratch-path "$SCRATCH"
 APP="${LIVETIPS_APP_OUT:-$SCRATCH}/LiveTips.app"
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$SCRATCH/release/LiveTips" "$APP/Contents/MacOS/LiveTips"
+# 0.16.0 (D3, updates): Sparkle 2 (SwiftPM binary target) next to the binary, found through @executable_path/../Frameworks
+SPARKLE="$(find "$SCRATCH" -maxdepth 4 -path '*release*' -name Sparkle.framework -type d | head -1)"
+if [ -z "$SPARKLE" ]; then SPARKLE="$(find "$SCRATCH/artifacts" -path '*macos*' -name Sparkle.framework -type d | head -1)"; fi
+[ -n "$SPARKLE" ] || { echo "Sparkle.framework not found in $SCRATCH"; exit 1; }
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$SPARKLE" "$APP/Contents/Frameworks/Sparkle.framework"
 # The tips window (Pacenote 0.8, F2): Resources/tips (index.html, tokens.css, tips.css, feed.js, tips.js).
 # The skill's live-transcriber keeps its own window (recorder/src/prompter.html).
 mkdir -p "$APP/Contents/Resources/tips"
@@ -64,6 +70,20 @@ cp "$HERE/../notion-mirror/"{mirror.py,run.sh,install.sh,README.md,README.uk.md,
 mkdir -p "$APP/Contents/Helpers"
 xcrun swiftc -O -o "$APP/Contents/Helpers/audiocap" "$HERE/Helpers/audiocap.swift"
 codesign --force --sign "$IDENT" --identifier "$BUNDLE_ID.audiocap" "$APP/Contents/Helpers/audiocap"
+# 0.16.0 (D3, updates): the appcast and the public half of the EdDSA key. The key comes from the build machine's
+# environment (PACENOTE_SPARKLE_PUBLIC_KEY, a public value); without it the build has updates off (About keeps the
+# manual check). The private key never enters the repo or the app.
+SPARKLE_KEYS=""
+if [ -n "${PACENOTE_SPARKLE_PUBLIC_KEY:-}" ]; then
+  SPARKLE_KEYS="<key>SUFeedURL</key><string>${PACENOTE_SPARKLE_FEED:-https://pacenote.bodco.pm/appcast.xml}</string>
+<key>SUPublicEDKey</key><string>$PACENOTE_SPARKLE_PUBLIC_KEY</string>
+<key>SUEnableAutomaticChecks</key><true/>
+<key>SUScheduledCheckInterval</key><integer>43200</integer>
+<key>SUAllowsAutomaticUpdates</key><true/>
+<key>SUAutomaticallyUpdate</key><true/>"
+else
+  echo "sparkle: no PACENOTE_SPARKLE_PUBLIC_KEY in the environment, updates are off in this build"
+fi
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -80,6 +100,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleShortVersionString</key><string>$VER</string>
 <key>CFBundleVersion</key><string>$BUILD</string>
 <key>LSMinimumSystemVersion</key><string>14.4</string>
+$SPARKLE_KEYS
 <key>NSCalendarsFullAccessUsageDescription</key><string>Pacenote reads your calendars to suggest and prepare the right call. It never changes them.</string>
 <key>NSCalendarsUsageDescription</key><string>Pacenote reads your calendars to suggest and prepare the right call. It never changes them.</string>
 <key>NSMicrophoneUsageDescription</key><string>Pacenote transcribes your voice on this Mac. Audio never leaves it.</string>
@@ -93,6 +114,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></array>
 </dict></plist>
 PLIST
+# Sparkle's helpers first (inside out), then the framework, then the app
+SF="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+for x in "$SF/XPCServices/Installer.xpc" "$SF/XPCServices/Downloader.xpc" "$SF/Autoupdate" "$SF/Updater.app"; do
+  [ -e "$x" ] && codesign --force --sign "$IDENT" "$x"
+done
+codesign --force --sign "$IDENT" "$APP/Contents/Frameworks/Sparkle.framework"
 codesign --force --sign "$IDENT" --identifier "$BUNDLE_ID" "$APP"
 codesign -dr - "$APP" 2>&1 | tail -1
 echo "built $APP ($VER/$BUILD, identity $IDENT)"

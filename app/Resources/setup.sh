@@ -2,6 +2,8 @@
 # Live Tips setup steps, run by the app's Setup window (one step at a time).
 #   setup.sh check <step>     prints one line: "OK <detail>" or "MISSING <detail>"
 #   setup.sh install <step>   prints progress lines; exit 0 = done
+#   setup.sh size <step>      prints "SIZE <bytes>" (0.16.0, Settings > Components)
+#   setup.sh remove <step>    removes an optional add-on (linkdl, agent); a required step exits 3
 # Env: APPROOT (the app folder), BUNDLE (the app's Resources folder).
 # Nothing here needs admin rights; everything goes into APPROOT (and the Hugging Face cache for Whisper).
 set -u
@@ -26,6 +28,9 @@ vimport() { [ -x "$VPY" ] && "$VPY" -c "$1" >/dev/null 2>&1; }
 # hijacked release is never picked up), and every downloaded model file is checked against its SHA-256.
 sha_ok() { [ "$(shasum -a 256 "$1" | cut -d' ' -f1)" = "$2" ]; }
 pip_in() { "$VPY" -m pip install --progress-bar off "$@" 2>&1 | grep -E "^(Collecting|Installing|Successfully|ERROR)" ; return "${PIPESTATUS[0]}"; }
+# 0.16.0 (D3): the size of files and folders in bytes, measured (du), "SIZE <bytes>"; a missing path counts 0.
+sz() { local t=0 k; for p in "$@"; do [ -e "$p" ] || continue; k=$(du -sk "$p" 2>/dev/null | cut -f1); t=$((t + ${k:-0})); done; echo "SIZE $((t * 1024))"; }
+SITE="$(ls -d "$VENV"/lib/python3*/site-packages 2>/dev/null | head -1)"; SITE="${SITE:-$VENV/none}"
 
 case "$MODE:$STEP" in
   check:python)
@@ -144,5 +149,23 @@ PY
     "$VPY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' || { echo "The call agent needs Python 3.10 or newer"; exit 1; }
     pip_in "claude-agent-sdk>=0.2.170,<=0.2.178" && echo "Call agent ready" ;;
 
-  *) echo "usage: setup.sh check|install python|core|venv|recorder|tips|whisper|localai|voices|claude|linkdl|agent"; exit 2 ;;
+
+  # 0.16.0 (D3, Settings > Components): sizes on disk ("SIZE <bytes>") and removing the optional Python add-ons.
+  # The model in Ollama is measured and removed by the app (LocalLLM), never here. Required parts are never removed.
+  size:core) sz "$APPROOT/src" "$APPROOT/bin" ;;
+  size:venv) sz "$VENV" ;;
+  size:recorder|size:tips|size:python) echo "SIZE 0" ;;
+  size:whisper) sz "$HOME/.cache/huggingface/hub/models--${WHISPER_MODEL//\//--}" ;;
+  size:localai) sz "$APPROOT/models/bge-m3-int8" ;;
+  size:voices) sz "$APPROOT/models/wespeaker_en_voxceleb_resnet34_LM.onnx" ;;
+  size:linkdl) sz "$SITE/yt_dlp" "$SITE"/yt_dlp-*.dist-info ;;
+  size:agent) sz "$SITE/claude_agent_sdk" "$SITE"/claude_agent_sdk-*.dist-info ;;
+  remove:linkdl)
+    "$VPY" -m pip uninstall -y yt-dlp 2>&1 | grep -E "^(Found|Uninstalling|Successfully|WARNING)"; vimport "import yt_dlp" && exit 1
+    echo "Link downloader removed" ;;
+  remove:agent)
+    "$VPY" -m pip uninstall -y claude-agent-sdk 2>&1 | grep -E "^(Found|Uninstalling|Successfully|WARNING)"; vimport "import claude_agent_sdk" && exit 1
+    echo "Call agent removed" ;;
+  remove:*) echo "$STEP is required and cannot be removed"; exit 3 ;;
+  *) echo "usage: setup.sh check|install|size python|core|venv|recorder|tips|whisper|localai|voices|claude|linkdl|agent; setup.sh remove linkdl|agent"; exit 2 ;;
 esac

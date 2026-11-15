@@ -121,4 +121,39 @@ final class LocalLLM: ObservableObject {
             }
         }
     }
+
+    // MARK: 0.16.0 (D3): size and removal (Settings > Components)
+
+    /// The model's size on disk from its Ollama manifest (the config and every layer), nil when it is not downloaded.
+    nonisolated static func sizeOnDisk(_ name: String) -> Int64? {
+        let parts = name.split(separator: ":", maxSplits: 1).map(String.init)
+        let model = parts.first ?? name, tag = parts.count > 1 ? parts[1] : "latest"
+        let base = ProcessInfo.processInfo.environment["OLLAMA_MODELS"] ?? (NSHomeDirectory() + "/.ollama/models")
+        let lib = model.contains("/") ? model : "library/" + model
+        guard let d = FileManager.default.contents(atPath: base + "/manifests/registry.ollama.ai/" + lib + "/" + tag),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return nil }
+        var total: Int64 = ((o["config"] as? [String: Any])?["size"] as? NSNumber)?.int64Value ?? 0
+        for l in (o["layers"] as? [[String: Any]]) ?? [] { total += (l["size"] as? NSNumber)?.int64Value ?? 0 }
+        return total
+    }
+
+    /// Removes a downloaded model through Ollama (the same as `ollama rm`): starts Ollama if needed, then
+    /// DELETE /api/delete. Ollama itself stays: the PM installed it and other apps may use it.
+    func remove(_ name: String) async -> Bool {
+        guard pulling == nil else { return false }
+        if !running { start() }
+        var req = URLRequest(url: URL(string: Self.url + "/api/delete")!)
+        req.httpMethod = "DELETE"; req.timeoutInterval = 120
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["model": name, "name": name])
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for _ in 0..<15 {
+            if let (_, r) = try? await URLSession.shared.data(for: req), let code = (r as? HTTPURLResponse)?.statusCode {
+                if code == 200 { refresh(); return true }
+                if code == 404 { refresh(); return !Self.onDisk(name) }
+                return false
+            }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)      // Ollama may need a few seconds to come up
+        }
+        return false
+    }
 }

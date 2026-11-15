@@ -29,7 +29,7 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
   double-click Pacenote, close the warning, then System Settings > Privacy & Security > **Open Anyway**. A new version
   you download may ask again. The DMG has the same steps in "Read me first".
 - **Claude.** Recording, the transcript and the voices work on the Mac without Claude. Preparing calls (the Meeting
-  Sheet) can use a **ChatGPT account through Codex CLI** (see below), or **Claude Code**, which the app installs for you (onboarding, or Settings > About >
+  Sheet) can use a **ChatGPT account through Codex CLI** (see below), or **Claude Code**, which the app installs for you (onboarding, or Settings >
   Components), and one way to pay: a Claude Pro, Max, Team or Enterprise plan, or an API key in Settings > AI. The
   free Claude plan does not include Claude Code. Claude Cowork is not needed for the app.
 - **Your documents.** Plain project folders are enough: preparation reads Markdown, text, Word, PDF, PowerPoint, Excel and CSV files; the

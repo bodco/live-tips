@@ -168,6 +168,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     titleBlock
                     if let e = auto.suggestion, !live { autoBanner(e) }
+                    UpdateHomeLine()      // 0.16.0 (D3): "Pacenote 0.16.1 is ready · Install"
                     if !note.isEmpty { Text(note).font(PN.Font.body).foregroundStyle(PN.C.onMe) }
                     mainBlock
                     if !firstLaunch && calendarOn { comingUp }

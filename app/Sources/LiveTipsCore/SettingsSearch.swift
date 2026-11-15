@@ -79,6 +79,11 @@ public enum SettingsSearch {
         .init("sh.presets", "sheet", title: "sheet.ui.set.presets", words: "presets template шаблони пресети"),
         .init("acc.head", "account", title: "account.head", words: "account sign in login server акаунт вхід сервер"),
         .init("mod.tracker", "modules", title: "modules.tracker", words: "tracker tasks module трекер задачі модуль"),
+        // Components (0.16.0, D3)
+        .init("comp.disk", "components", title: "cmp.disk", words: "disk space size storage free gb місце диск розмір вільно"),
+        .init("comp.optional", "components", title: "settings.tab.components", words: "components remove uninstall delete add-on ollama gemma local model agent yt-dlp компоненти видалити прибрати додаткові модель агент"),
+        .init("comp.required", "components", title: "cmp.repair", words: "repair reinstall whisper speech required відновити перевстановити мовлення обовʼязкові"),
+        .init("help.whatsnew", "help", title: "wn.history", words: "what's new changes release notes update що нового зміни оновлення"),
         // AI
         .init("ai.claude", "ai", a("access", "claude"), title: "keys.claude.title", words: "claude anthropic api key ключ"),
         .init("ai.openai", "ai", a("access", "chatgpt"), title: "keys.openai.title", words: "openai chatgpt gpt api key ключ"),

@@ -171,15 +171,53 @@ public enum CommitmentRegister {
     /// Returns the new id, or nil for empty text.
     @discardableResult
     public static func add(folder: String, text: String, owner: String = "me", project: String, title: String, call: String,
-                           due: String = "") -> String? {
+                           due: String = "", by: String = "app") -> String? {
         let t = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
         guard !t.isEmpty else { return nil }
         let o = owner.trimmingCharacters(in: .whitespaces).isEmpty ? "me" : owner.trimmingCharacters(in: .whitespaces)
         let id = makeID(call: call, owner: o, text: t)
         append(folder: folder, [["op": "add", "id": id, "text": t, "owner": o, "project": project,
                                  "series": seriesKey(project: project, title: title), "call": (call as NSString).lastPathComponent,
-                                 "t": "", "created": nowISO(), "due": due, "by": "app"]])
+                                 "t": "", "created": nowISO(), "due": due, "by": by]])
         return id
+    }
+
+    // MARK: 0.13.3 (L5): an old call's tasks (the picture before the register) on the call page
+
+    /// `by` of an item the PM added or touched on the call page. Such items do not stand for the call's own register.
+    public static let pageBy = "page"
+
+    /// The register owner of a picture task: "me" for the PM's, else its owner (`them` when the picture names nobody).
+    public static func legacyOwner(_ t: CallLists.Task, them: String) -> String {
+        if t.mine ?? t.owner.trimmingCharacters(in: .whitespaces).isEmpty { return "me" }
+        let o = t.owner.trimmingCharacters(in: .whitespaces)
+        return o.isEmpty ? them : o
+    }
+
+    /// The id a picture task gets when the call page adopts it (the same id `add` writes).
+    public static func legacyID(_ t: CallLists.Task, call: String, them: String) -> String {
+        makeID(call: call, owner: legacyOwner(t, them: them), text: String(t.text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120)))
+    }
+
+    /// The picture tasks the call page still shows as they are. None when the call has its own register items (the
+    /// engine's or the skill's, anything not added on the call page). Otherwise every picture task the PM has not
+    /// touched yet: a touched one (edit, done, owner, due, delete) was adopted into the register and shows from there,
+    /// or, dropped, nowhere. `items`: the register items of this call in every status, dropped included.
+    public static func legacy(_ tasks: [CallLists.Task], items: [Commitment], call: String, them: String) -> [CallLists.Task] {
+        let mine = items.filter { callKey($0.call) == callKey(call) }
+        if mine.contains(where: { $0.by != pageBy }) { return [] }
+        return tasks.filter { t in
+            let id = legacyID(t, call: call, them: them), o = legacyOwner(t, them: them).lowercased()
+            return !mine.contains { $0.id == id || ($0.owner.lowercased() == o && similar($0.text, t.text)) }
+        }
+    }
+
+    /// Adopts a picture task into the register (op add, by page) so an edit, a tick or a drop sticks and the task
+    /// never comes back from the notes. Returns the id to send the PM's op to.
+    @discardableResult
+    public static func adopt(_ t: CallLists.Task, folder: String, project: String, title: String, call: String, them: String) -> String? {
+        add(folder: folder, text: t.text, owner: legacyOwner(t, them: them), project: project, title: title, call: call,
+            due: t.due, by: pageBy)
     }
 
     /// A due date from free text: an ISO date, "31.10", "31.10.2026", "10/31", a weekday (English or Ukrainian,

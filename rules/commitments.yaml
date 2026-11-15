@@ -6,7 +6,7 @@ format: >-
   JSON lines, append only. Each line is an event; the register is the events folded by id.
   Never rewrite or delete lines: a later event wins.
 events:
-  add: '{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill","from":"<id of the item this one replaces, optional>"}'
+  add: '{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill|page","from":"<id of the item this one replaces, optional>"}'
   done: '{"v":1,"op":"done","id":"<id>","at":"<ISO time>","source":"manual|detected|notion","call":"<transcript file name, when closed on a call>"}'
   reopen: '{"v":1,"op":"reopen","id":"<id>","at":"<ISO time>"}'
   drop: '{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}'
@@ -63,5 +63,9 @@ call_page: >-
   0.8.7 (E2): on the call page the PM edits an item in place (op edit: text, owner, due), moves it between On you and
   On them (op edit with owner me or a name), deletes it (op drop) or adds one under "+ Add" (op add, by app, call =
   this call's transcript, owner me for On you; for On them "Name: what" names the owner). Every change is the PM's
-  own action; nothing is guessed.
+  own action; nothing is guessed. 0.13.3 (L5): an old call without its own register items shows its picture tasks
+  (notes, live picture) as plain rows with the same menu (Mark done, move, change owner, due, Delete). The first
+  touch adopts the row (op add, by page, the picture's owner and due), then applies the op, so a deleted row is a drop
+  and never comes back from the notes. "+ Add" there is by page too. Items by page do not count as the call's own
+  register: the untouched picture rows keep showing next to them.
 order: overdue first, then items with a due date (soonest first), then the rest (newest first)

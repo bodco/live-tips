@@ -1462,6 +1462,11 @@ text) stays as it is and only takes the due date from the notes when it had none
 brought back. A call without register items shows the tasks of its notes, else what was caught live. The Pacenote
 server gets the register's tasks with owner, status and due day.
 
+**Tasks of older calls (0.13.3).** Those notes or live tasks have the same menu as the register's (Mark done, Move to On
+you or On them, Change owner, Set due, Delete) and a checkbox. The first change adds that task to the register (marked
+as added on the call page) and applies it there, so a deleted task stays deleted. The call's other older tasks stay on
+the page next to it, also after "+ Add".
+
 **Sales methods.** Sales is an option on top of any call type (Start call > Options > Sales), remembered for the
 series; the default per project is in Settings > Projects. The methods live in `rules/sales.yaml`, a new one is data:
 

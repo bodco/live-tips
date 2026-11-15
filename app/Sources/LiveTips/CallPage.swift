@@ -60,8 +60,14 @@ struct CallPageView: View {
     private var record: CallHistory.Record? { history.records.first { $0.file == file } }
     private var folder: String { (file as NSString).deletingLastPathComponent }
     private var folderRoot: String { (folder as NSString).deletingLastPathComponent }      // <root>/live -> <root>
-    private var items: [Commitment] {
-        register.items(in: folder).filter { CommitmentRegister.callKey($0.call) == CommitmentRegister.callKey(file) && $0.status != "dropped" }
+    /// This call's register items in every status (dropped too: a deleted task must not come back from the notes).
+    private var callItems: [Commitment] {
+        register.items(in: folder).filter { CommitmentRegister.callKey($0.call) == CommitmentRegister.callKey(file) }
+    }
+    private var items: [Commitment] { callItems.filter { $0.status != "dropped" } }
+    /// 0.13.3 (L5): the picture tasks still shown as they are (none once the call has its own register items).
+    private func legacyTasks(_ o: CallOutcome) -> [CallLists.Task] {
+        CommitmentRegister.legacy(o.tasks, items: callItems, call: file, them: L("callEdit.them"))
     }
 
     /// Earlier and later calls of the same meeting (same project, same title key).
@@ -295,7 +301,7 @@ struct CallPageView: View {
 
     /// 2026-11-05 (redesign): the counts are badges on the tabs, not part of the name.
     private func tabCounts(_ o: CallOutcome) -> [String: Int] {
-        ["decisions": decisions(o).count, "tasks": items.isEmpty ? o.tasks.count : items.count, "risks": o.risks.count]
+        ["decisions": decisions(o).count, "tasks": items.count + legacyTasks(o).count, "risks": o.risks.count]
     }
 
     private var trackerNote: some View {
@@ -579,9 +585,11 @@ struct CallPageView: View {
 
     @ViewBuilder private func tasksTab(_ o: CallOutcome, _ proj: Project?, _ ws: Workspace?) -> some View {
         // 0.12.2 (L4): a call without register items shows its one-rule tasks (notes, live picture, older notes)
-        let old = items.isEmpty ? o.tasks : []
-        let mine = PageCard { commitments(items.filter { $0.mine }, mine: true, legacy: old.filter { $0.mine ?? $0.owner.isEmpty }.map(\.text), proj, ws) }
-        let theirs = PageCard { commitments(items.filter { !$0.mine }, mine: false, legacy: old.filter { !($0.mine ?? $0.owner.isEmpty) }.map(\.line), proj, ws) }
+        // 0.13.3 (L5): a picture task the PM touches is adopted into the register (by page), so a delete sticks
+        let old = legacyTasks(o)
+        let isMine: (CallLists.Task) -> Bool = { CommitmentRegister.legacyOwner($0, them: "").lowercased() == "me" }
+        let mine = PageCard { commitments(items.filter { $0.mine }, mine: true, legacy: old.filter(isMine), proj, ws) }
+        let theirs = PageCard { commitments(items.filter { !$0.mine }, mine: false, legacy: old.filter { !isMine($0) }, proj, ws) }
         if wide {
             HStack(alignment: .top, spacing: 16) { mine; theirs }
         } else {
@@ -693,7 +701,7 @@ struct CallPageView: View {
 
     /// On you and On them: register items (ops edit, drop, add). `legacy`: an old call's picture without register items.
     /// 2026-11-05 (redesign): On them is grouped by person, the name once with its initials.
-    @ViewBuilder private func commitments(_ list: [Commitment], mine: Bool, legacy: [String], _ proj: Project?, _ ws: Workspace?) -> some View {
+    @ViewBuilder private func commitments(_ list: [Commitment], mine: Bool, legacy: [CallLists.Task], _ proj: Project?, _ ws: Workspace?) -> some View {
         let section = mine ? "onYou" : "onThem"
         let open = list.filter { $0.status == "open" }.count + legacy.count
         let owners: [String] = mine ? [""] : list.reduce(into: [String]()) { if !$0.contains($1.owner) { $0.append($1.owner) } }
@@ -712,13 +720,24 @@ struct CallPageView: View {
                 }
                 ForEach(list.filter { mine || $0.owner == who }) { c in commitmentRow(c, section: section) }
             }
-            ForEach(legacy, id: \.self) { t in
-                EditableRow(text: t, copy: t, onSave: { v in
+            ForEach(Array(legacy.enumerated()), id: \.offset) { _, t in
+                let shown = mine ? t.text : t.line
+                EditableRow(text: shown, copy: shown, menu: legacyMenu(t, mine: mine, section, proj, ws), onSave: { v in
+                    var v = v.trimmingCharacters(in: .whitespaces)
+                    if !t.due.isEmpty, v.hasSuffix(" (due: " + t.due + ")") { v = String(v.dropLast(t.due.count + 8)) }
                     let parts = v.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-                    if !mine, parts.count == 2, !parts[0].isEmpty, parts[0].count <= 40 { addItem(parts[1], owner: parts[0], proj, ws) }
-                    else { addItem(v, owner: mine ? "me" : L("callEdit.them"), proj, ws) }
-                    changed(section)
-                }) { bullet }
+                    if !mine, parts.count == 2, !parts[0].isEmpty, parts[0].count <= 40 {
+                        adoptLegacy(t, section, proj, ws) { CommitmentRegister.edit(folder: folder, id: $0, text: parts[1], owner: parts[0]) }
+                    } else {
+                        adoptLegacy(t, section, proj, ws) { CommitmentRegister.edit(folder: folder, id: $0, text: v) }
+                    }
+                }) {
+                    Toggle("", isOn: Binding(get: { false }, set: { on in
+                        if on { adoptLegacy(t, section, proj, ws) { CommitmentRegister.mark(folder: folder, id: $0, op: "done") } }
+                    }))
+                    .toggleStyle(.checkbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": t.text]))
+                }
+                .padding(.vertical, 3)
             }
             AddRowField(placeholder: mine ? L("callEdit.addPh") : L("callEdit.addTheirsPh")) { v in
                 if mine { addItem(v, owner: "me", proj, ws) } else {
@@ -768,7 +787,40 @@ struct CallPageView: View {
 
     private func addItem(_ text: String, owner: String, _ proj: Project?, _ ws: Workspace?) {
         let slug = proj?.slug ?? ws?.name ?? record?.project ?? ""
-        register.add(folder: folder, text: text, owner: owner, project: slug, title: Self.title(file), call: file)
+        // 0.13.3 (L5): by page, so an old call's untouched picture tasks keep showing next to it
+        register.add(folder: folder, text: text, owner: owner, project: slug, title: Self.title(file), call: file, by: CommitmentRegister.pageBy)
+    }
+
+    /// 0.13.3 (L5): the PM touched a picture task of an old call: it goes into the register (op add, by page), then
+    /// the PM's op is applied to it. From then on it shows from the register; dropped, it never comes back.
+    private func adoptLegacy(_ t: CallLists.Task, _ section: String, _ proj: Project?, _ ws: Workspace?, _ op: (String) -> Void) {
+        let slug = proj?.slug ?? ws?.name ?? record?.project ?? ""
+        guard let id = CommitmentRegister.adopt(t, folder: folder, project: slug, title: Self.title(file), call: file, them: L("callEdit.them")) else { return }
+        op(id)
+        register.touch(folder)
+        changed(section)
+    }
+
+    /// 0.13.3 (L5): the same menu as a register item's (commitmentMenu), for a picture task of an old call.
+    private func legacyMenu(_ t: CallLists.Task, mine: Bool, _ section: String, _ proj: Project?, _ ws: Workspace?) -> [PageRowAction] {
+        let edit: (String?, String?) -> Void = { owner, due in
+            adoptLegacy(t, section, proj, ws) { CommitmentRegister.edit(folder: folder, id: $0, owner: owner, due: due) }
+        }
+        var m: [PageRowAction] = [PageRowAction(title: L("reg.markDone"), run: { _ in
+            adoptLegacy(t, section, proj, ws) { CommitmentRegister.mark(folder: folder, id: $0, op: "done") } })]
+        if mine {
+            m.append(PageRowAction(title: L("callEdit.moveOnThem"), prompt: .text(title: L("callEdit.moveOnThem"), value: "", placeholder: L("callEdit.ownerPh")),
+                                   run: { v in guard !v.isEmpty else { return }; edit(v, nil) }))
+        } else {
+            m.append(PageRowAction(title: L("callEdit.moveOnYou"), run: { _ in edit("me", nil) }))
+        }
+        m.append(PageRowAction(title: L("callEdit.changeOwner"), prompt: .text(title: L("callEdit.changeOwner"), value: mine ? "" : t.owner, placeholder: L("callEdit.ownerPh")),
+                               run: { v in edit(v.isEmpty ? "me" : v, nil) }))
+        m.append(PageRowAction(title: L("callEdit.setDue"), prompt: .date(value: t.due), run: { v in edit(nil, v) }))
+        m.append(.separator)
+        m.append(PageRowAction(title: L("callEdit.delete"), destructive: true, run: { _ in
+            adoptLegacy(t, section, proj, ws) { CommitmentRegister.mark(folder: folder, id: $0, op: "drop") } }))
+        return m
     }
 
     /// 0.8.7 (E3): the agenda; the state is a chip on the right, a click moves it on and saves a new agenda line.

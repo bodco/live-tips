@@ -57,8 +57,8 @@ final class Register: ObservableObject {
     }
 
     /// 0.8.7 (E2): "+ Add" on the call page.
-    func add(folder: String, text: String, owner: String, project: String, title: String, call: String) {
-        CommitmentRegister.add(folder: folder, text: text, owner: owner, project: project, title: title, call: call)
+    func add(folder: String, text: String, owner: String, project: String, title: String, call: String, by: String = "app") {
+        CommitmentRegister.add(folder: folder, text: text, owner: owner, project: project, title: title, call: call, by: by)
         cache[folder] = nil
         version += 1
     }

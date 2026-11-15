@@ -3,6 +3,14 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.13.3 (2026-11-15)
+
+- **Tasks of older calls: Delete and the full menu (2026-11-15, L5):** a call from before the commitments register
+  shows the tasks of its notes or live picture. Their menu had only Edit and Copy text. They now have the same menu as
+  the other tasks (Mark done, Move to On you or On them, Change owner, Set due, Delete) and a checkbox. The first
+  change puts that task into the register, so a deleted task stays deleted and no longer comes back from the notes.
+  Editing or adding one task no longer hides the call's other older tasks.
+
 ## 0.13.2 (2026-11-15)
 
 - **Moving a call: a clear message when Notion hides the page (2026-11-15):** when a call moves to another project and

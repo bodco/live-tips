@@ -245,6 +245,49 @@ func commitmentsRegister() {
     CommitmentRegister.edit(folder: dir, id: nid ?? "", owner: "me")
     expect(CommitmentRegister.load(folder: dir).first { $0.id == nid }?.mine == true, "move to On you")
     try? FileManager.default.removeItem(atPath: dir)
+    legacyTasksOnTheCallPage()
+}
+
+/// 0.13.3 (L5): an old call's picture tasks get Delete, Done, owner and due; a deleted one never comes back.
+func legacyTasksOnTheCallPage() {
+    let dir = NSTemporaryDirectory() + "pn-legacy-\(getpid())"
+    let call = dir + "/2026-10-01-sync.app.md"
+    let tasks = [CallLists.Task(text: "Send the deck", mine: true),
+                 CallLists.Task(owner: "Mike", text: "Share the export spec", due: "Friday", mine: false),
+                 CallLists.Task(text: "Book the room")]
+    func shown() -> [CallLists.Task] { CommitmentRegister.legacy(tasks, items: CommitmentRegister.load(folder: dir), call: call, them: "Them") }
+    expect(shown().count == 3, "legacy: all picture tasks show while the register has none")
+    expect(CommitmentRegister.legacyOwner(tasks[1], them: "Them") == "Mike" && CommitmentRegister.legacyOwner(tasks[2], them: "Them") == "me", "legacy owner")
+    // Delete: the row is adopted and dropped; it does not come back, the others stay
+    let d = CommitmentRegister.adopt(tasks[0], folder: dir, project: "orbit", title: "Sync", call: call, them: "Them")
+    expect(d == CommitmentRegister.legacyID(tasks[0], call: call, them: "Them"), "legacy: adopt writes the expected id")
+    CommitmentRegister.mark(folder: dir, id: d ?? "", op: "drop")
+    let after = shown()
+    expect(after.count == 2 && !after.contains(tasks[0]), "legacy: a deleted task does not come back from the notes")
+    expect(CommitmentRegister.load(folder: dir).first { $0.id == d }?.status == "dropped", "legacy: the delete is a drop")
+    // Done and a due date on theirs: adopted with its owner and due, shown from the register
+    let m = CommitmentRegister.adopt(tasks[1], folder: dir, project: "orbit", title: "Sync", call: call, them: "Them")
+    CommitmentRegister.mark(folder: dir, id: m ?? "", op: "done")
+    let mc = CommitmentRegister.load(folder: dir).first { $0.id == m }
+    expect(mc?.owner == "Mike" && mc?.due == "Friday" && mc?.status == "done" && mc?.by == CommitmentRegister.pageBy, "legacy: done keeps owner and due")
+    expect(shown() == [tasks[2]], "legacy: only the untouched task stays a picture row")
+    // An edited text still counts as the adopted task (same id)
+    CommitmentRegister.edit(folder: dir, id: m ?? "", text: "Share the new export spec")
+    expect(shown() == [tasks[2]], "legacy: an edited task does not come back")
+    // Every task deleted: the call shows no task at all (the register has only dropped ones)
+    let r = CommitmentRegister.adopt(tasks[2], folder: dir, project: "orbit", title: "Sync", call: call, them: "Them")
+    CommitmentRegister.mark(folder: dir, id: r ?? "", op: "drop")
+    CommitmentRegister.mark(folder: dir, id: m ?? "", op: "drop")
+    expect(shown().isEmpty && CommitmentRegister.load(folder: dir).allSatisfy { $0.status == "dropped" }, "legacy: all deleted, none come back")
+    // A call with its own register items (the engine's) shows no picture rows
+    let dir2 = dir + "-2"
+    CommitmentRegister.append(folder: dir2, [["op": "add", "id": "c-e", "text": "Send the deck", "owner": "me", "call": "2026-10-01-sync.md", "by": "app"]])
+    expect(CommitmentRegister.legacy(tasks, items: CommitmentRegister.load(folder: dir2), call: call, them: "Them").isEmpty, "legacy: none when the register covers the call")
+    // "+ Add" on the page (by page) does not hide the other picture rows
+    let dir3 = dir + "-3"
+    CommitmentRegister.add(folder: dir3, text: "Write the recap", project: "orbit", title: "Sync", call: call, by: CommitmentRegister.pageBy)
+    expect(CommitmentRegister.legacy(tasks, items: CommitmentRegister.load(folder: dir3), call: call, them: "Them").count == 3, "legacy: a page add keeps the picture rows")
+    for x in [dir, dir2, dir3] { try? FileManager.default.removeItem(atPath: x) }
 }
 
 func enginePathsFollowTheApp() {

@@ -459,7 +459,7 @@ final class SheetPrefs: ObservableObject {
     func mode(for m: StartCallModel, preset: SheetPresetInfo?) -> SheetMode {
         if forced == "quick" { return .quick }
         if forced == "expert" { return .expert }
-        let theirs = m.audience == "team" ? [] : SheetDraft.theirPeople(m)
+        let theirs = SheetDraft.theirPeople(m)   // 0.14.0: empty on an internal call
         let known: [String] = SheetFiles.earlier(for: m).flatMap { SheetCache.shared.load($0) }?.participants?.theirs?.compactMap(\.domain) ?? []
         return SheetModeDecider.decide(rules: rules, preset: preset?.id ?? SheetDraft.suggestedPreset(m), presetBase: preset?.base,
                                        presetMode: preset?.mode ?? "quick", earlierSheet: SheetFiles.earlier(for: m) != nil,

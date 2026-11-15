@@ -497,6 +497,7 @@ final class StartCallModel: ObservableObject {
         return text.replacingOccurrences(of: " and ", with: ",").replacingOccurrences(of: " і ", with: ",")
             .split(whereSeparator: { ",;".contains($0) })
             .map { $0.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "-•*"))) }
+            .flatMap(PeopleSides.splitGlued)        // 0.14.0: "Inna B. Anton S." lost its comma: two people
             .filter { n in !n.isEmpty && !me.contains(n.lowercased()) }
     }
     @Published var prep: PrepInfo?

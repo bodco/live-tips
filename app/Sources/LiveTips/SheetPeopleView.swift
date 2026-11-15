@@ -63,7 +63,8 @@ struct SheetPeopleView: View {
     }
 
     private var sourceLine: String {
-        let invite = m.participants.count
+        let invite = PeopleSides.merge(m.participants).count     // 0.14.0: people, not spellings
+        if m.audience == "team" { return L("sheet.people.sourceInternal", ["n": "\(invite)"]) }
         return L("sheet.people.source", ["n": "\(invite)", "project": m.targetName])
     }
 

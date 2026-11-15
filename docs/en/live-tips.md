@@ -2001,7 +2001,9 @@ or always Expert. The first time in a series Quick shows "Suggested" and Pacenot
 **Who is on the call.** Quick (under People > Change) and Expert step 1 show Their side and Our side next to each
 other. Names stay on one line (a long one ends with "…", the full name is in the tooltip) and the chips wrap as whole
 chips. Drag a person to the other side, or click the arrow on the chip; × removes them, the field under each side adds
-one ("Name · company"). You are always on Our side. A move applies to this call.
+one ("Name · company"). You are always on Our side. A move applies to this call. On an internal call (audience: team) everyone is on Our side.
+A team member from the project config is recognized under a short spelling ("Emily C.", "E. Carter"), one person
+written two ways is one chip, and two short names that lost their comma ("Jake T. Mike J.") are two people.
 
 **Sources: what you can add.** One panel for everything:
 

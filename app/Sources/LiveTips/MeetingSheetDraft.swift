@@ -96,7 +96,9 @@ final class SheetDraft: ObservableObject {
         language = mem?.language ?? (model.language.hasPrefix("uk") && model.audience != "client" ? "uk" : "en")
         applyPreset(presetID)
         goal = Self.goalLine(model.cleanContext)
-        ours = [DraftPerson(name: L("sheet.ui.you"), you: true)] + model.peopleTeam.filter { n in model.participants.contains { $0.caseInsensitiveCompare(n) == .orderedSame } }.map { DraftPerson(name: $0) }
+        // 0.14.0 (D1 smoke): an internal call has no other side; a team member is found under any spelling
+        // ("Olena S.", "O. Starodubtseva"), and one person written two ways is one chip.
+        ours = [DraftPerson(name: L("sheet.ui.you"), you: true)] + Self.ourPeople(model).map { DraftPerson(name: $0) }
         theirs = Self.theirPeople(model).map { DraftPerson(name: $0.name, company: $0.company ?? "", domain: $0.domain ?? "") }
         withEvent = model.calEventID != nil
         // The files and folders already added in Start call, and the call's text, are sources from the start.
@@ -133,9 +135,19 @@ final class SheetDraft: ObservableObject {
     /// Their side: names from the call's participants that are not on the team, with the company of the project.
     struct TheirPerson { var name: String; var company: String?; var domain: String? }
 
+    /// 0.14.0 (D1 smoke): the call's people on our side: everyone on an internal call, otherwise the project's team
+    /// under the config's name.
+    static func ourPeople(_ m: StartCallModel) -> [String] {
+        let all = PeopleSides.merge(m.participants)
+        if m.audience == "team" { return all }
+        var out: [String] = []
+        for n in all { if let t = PeopleSides.teamName(for: n, team: m.peopleTeam), !out.contains(t) { out.append(t) } }
+        return out
+    }
+
     static func theirPeople(_ m: StartCallModel) -> [TheirPerson] {
-        let team = Set(m.peopleTeam.map { $0.lowercased() })
-        return m.participants.filter { !team.contains($0.lowercased()) }.map { n in
+        guard m.audience != "team" else { return [] }
+        return PeopleSides.merge(m.participants).filter { PeopleSides.teamName(for: $0, team: m.peopleTeam) == nil }.map { n in
             let domain = n.contains("@") ? String(n.split(separator: "@").last ?? "") : nil
             return TheirPerson(name: n, company: m.project?.crmCompanyName.nilIfEmpty, domain: domain)
         }

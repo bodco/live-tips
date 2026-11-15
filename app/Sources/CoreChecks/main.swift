@@ -2401,6 +2401,19 @@ func sheetPeopleD1() {
     expect(PeopleSides.initials("Christopher Montgomery-Wells") == "CW" && PeopleSides.initials("mike") == "M" && PeopleSides.initials("") == "?", "d1: initials")
 }
 
+func sheetPeopleD1b() {
+    expect(PeopleSides.splitGlued("Jake T. Mike J.") == ["Jake T.", "Mike J."], "d1b: glued short names split")
+    expect(PeopleSides.splitGlued("Emily Carter") == ["Emily Carter"] && PeopleSides.splitGlued("John F. Kennedy") == ["John F. Kennedy"], "d1b: real names stay whole")
+    expect(PeopleSides.samePerson("Emily C.", "E. Carter") && PeopleSides.samePerson("Emily C.", "Emily Carter") && PeopleSides.samePerson("e.carter", "Emily Carter"), "d1b: one person, several spellings")
+    expect(!PeopleSides.samePerson("Emily C.", "Emma C.") && !PeopleSides.samePerson("E. Carter", "E. Cooper") && !PeopleSides.samePerson("Mike J.", "Mike"), "d1b: different people stay apart")
+    expect(PeopleSides.samePerson("Mike", "mike") && !PeopleSides.samePerson("A. S.", "A. S."), "d1b: one word and bare initials")
+    expect(PeopleSides.merge(["Jake T. Mike J.", "Emily C.", "E. Carter", "mike", "Mike Johnson"]) == ["Jake T.", "Mike Johnson", "Emily Carter", "mike"], "d1b: merge splits, joins and keeps order")
+    expect(PeopleSides.merge(["Emily C.", "e.carter"]) == ["Emily Carter"], "d1b: first and last from two spellings")
+    let team = ["Emily Carter", "David Brooks (Dave; D. Brooks)"]
+    expect(PeopleSides.teamName(for: "Emily C.", team: team) == "Emily Carter" && PeopleSides.teamName(for: "Dave", team: team) == "David Brooks", "d1b: team member under a short name or an alias")
+    expect(PeopleSides.teamName(for: "Jake T.", team: team) == nil, "d1b: not on the team")
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -2420,5 +2433,6 @@ callLists0122()
 callConsent0130()
 callSyncAnalysis0130()
 sheetPeopleD1()
+sheetPeopleD1b()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

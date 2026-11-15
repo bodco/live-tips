@@ -131,7 +131,8 @@ struct SheetQuickView: View {
     private var peopleRow: some View {
         let theirs = PeopleSides.summary(draft.theirs.map(\.name)), ours = PeopleSides.summary(draft.ours.map(\.name))
         let line = theirs.isEmpty && ours.isEmpty ? L("sheet.quick.noPeople")
-            : L("sheet.quick.peopleLine", ["theirs": theirs.isEmpty ? "-" : theirs, "ours": ours.isEmpty ? "-" : ours])
+            : theirs.isEmpty ? L("sheet.quick.peopleOurs", ["ours": ours])     // 0.14.0: an internal call, one side
+            : L("sheet.quick.peopleLine", ["theirs": theirs, "ours": ours.isEmpty ? "-" : ours])
         return summaryRow("people", L("sheet.quick.people"), line, ok: true) { SheetPeopleView(draft: draft).padding(.top, 4) }
     }
 
@@ -171,7 +172,7 @@ struct SheetQuickView: View {
                 row(L("sheet.ui.row.preset"), draft.preset?.name ?? draft.presetID,
                     (draft.preset?.blocks ?? []).map { SheetLibrary.shared.title($0) }.prefix(5).joined(separator: ", "), ok: true, fix: nil)
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(L("sheet.ui.row.size")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: 70, alignment: .leading)
+                    Text(L("sheet.ui.row.size")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: Self.quickLabelW, alignment: .leading)
                     Text(L(tooMuch ? "sheet.ui.size.tooMuch" : "sheet.ui.size.fits") + " · " + L("sheet.quick.runsOn", ["route": AIRoute.name(draft.route)]))
                         .font(PN.Font.body).foregroundStyle(tooMuch ? PN.C.pending : PN.C.text)
                         .help(L("sheet.ui.quick.size", ["t": SheetLabels.tokens(total), "route": AIRoute.name(draft.route)]))
@@ -237,6 +238,9 @@ struct SheetQuickView: View {
         }
     }
 
+    /// 0.14.0 (D1 smoke): one label column for the rows under Change; 70 pt wrapped "Meeting name" / "Назва зустрічі".
+    static let quickLabelW: CGFloat = 100
+
     /// 0.10.1 (A5, roadmap п.7): Quick with a minimal setup: name, date and time, people, the same fields as Expert.
     @ViewBuilder private var meetingRows: some View {
         quickField(L("sheet.ui.s1.name")) {
@@ -249,7 +253,7 @@ struct SheetQuickView: View {
 
     private func quickField<C: View>(_ k: String, @ViewBuilder _ c: () -> C) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(k).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: 70, alignment: .leading)
+            Text(k).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: Self.quickLabelW, alignment: .leading)
             c()
             Spacer(minLength: 0)
         }
@@ -259,7 +263,7 @@ struct SheetQuickView: View {
     /// 0.10.1 (A5): no "Ok" when nothing is there to read: what the sheet will rest on, and Add.
     private var noSourcesRow: some View {
         HStack(alignment: .top, spacing: 12) {
-            Text(L("sheet.ui.row.sources")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: 70, alignment: .leading).padding(.top, 2)
+            Text(L("sheet.ui.row.sources")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: Self.quickLabelW, alignment: .leading).padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 Text(L("sheet.ui.quick.noSources")).font(PN.Font.body).foregroundStyle(PN.C.text)
                 Text(L("sheet.ui.quick.noSourcesSub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
@@ -275,7 +279,7 @@ struct SheetQuickView: View {
     /// A1 (2026-11-14): "Start a call now" lands here with no project; the picker is the same as Expert step 1.
     private var projectRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(L("sheet.ui.s1.project")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: 70, alignment: .leading)
+            Text(L("sheet.ui.s1.project")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: Self.quickLabelW, alignment: .leading)
             Picker("", selection: Binding(get: { m.target }, set: { m.target = $0; m.applyProjectDefaults(); draft.note = ""; draft.objectWillChange.send() })) {
                 if m.target.isEmpty { Text(L("call.chooseProject")).tag("") }
                 ForEach(m.registry.workspaces, id: \.name) { w in Text(w.name).tag("workspace:" + w.name) }
@@ -301,7 +305,7 @@ struct SheetQuickView: View {
 
     private func row(_ k: String, _ v: String, _ sub: String, ok: Bool, fix: String?, add: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Text(k).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: 70, alignment: .leading).padding(.top, 2)
+            Text(k).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: Self.quickLabelW, alignment: .leading).padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 Text(v).font(PN.Font.body).foregroundStyle(PN.C.text)
                 if !sub.isEmpty { Text(sub).font(PN.Font.caption).foregroundStyle(ok ? PN.C.text3 : PN.C.pending).fixedSize(horizontal: false, vertical: true) }

@@ -89,8 +89,10 @@ struct SheetQuickView: View {
             Text(t.string(from: m.callDate) + (mins > 0 && mins < 180 ? " · " + L("sheet.ui.inMin", ["n": "\(mins)"]) : ""))
                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.accent)
             Text(m.effectiveTitle).font(.system(size: 26, weight: .bold)).foregroundStyle(PN.C.text)
-            let people = HomeView.peopleLine(m.participants)
-            if !people.isEmpty { Text(L("home.card.with", ["people": people])).font(PN.Font.body).foregroundStyle(PN.C.text2) }
+            if draft.job == nil {
+                Text(problems.isEmpty ? (draft.remembered ? L("sheet.ui.quick.same") : L("sheet.ui.quick.first", ["title": m.effectiveTitle])) : L("sheet.ui.quick.attention"))
+                    .font(PN.Font.body).foregroundStyle(problems.isEmpty ? PN.C.text2 : PN.C.pending).fixedSize(horizontal: false, vertical: true)
+            }
             if draft.live {
                 Label(L("sheet.ui.live.head"), systemImage: "record.circle").font(PN.Font.caption).foregroundStyle(PN.C.rec)
                     .fixedSize(horizontal: false, vertical: true)
@@ -105,51 +107,106 @@ struct SheetQuickView: View {
         return p
     }
 
+    // 0.14.0 (D1, Get Ready redesign): three short lines (people, sources, setup), each opens in place with Change.
+    // Orange only where something needs you; tokens only in a tooltip.
+    @State private var open: String?
+
     private var setup: some View {
-        PageCard(spacing: 10) {
-            HStack(spacing: 8) {
-                Text(L("sheet.ui.quick.title")).font(PN.Font.section)
-                if !draft.remembered { PagePill(text: L("sheet.ui.quick.suggested"), color: PN.C.accent) }
-                Spacer()
+        VStack(alignment: .leading, spacing: 16) {
+            PageCard(spacing: 0) {
+                peopleRow
+                Divider()
+                sourcesRow
+                Divider()
+                setupRow
             }
-            Text(problems.isEmpty ? (draft.remembered ? L("sheet.ui.quick.same") : L("sheet.ui.quick.first", ["title": m.effectiveTitle]))
-                 : L("sheet.ui.quick.attention"))
-                .font(PN.Font.caption).foregroundStyle(problems.isEmpty ? PN.C.text3 : PN.C.pending).fixedSize(horizontal: false, vertical: true)
-            Divider()
-            rows
-            Divider()
             special
             actions
         }
     }
 
-    @ViewBuilder private var rows: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            projectRow
-            meetingRows        // 0.10.1 (A5): the same name, time and people as Expert step 1
-            row(L("sheet.ui.row.preset"), draft.preset?.name ?? draft.presetID,
-                (draft.preset?.blocks ?? []).map { SheetLibrary.shared.title($0) }.prefix(5).joined(separator: ", "), ok: true, fix: nil)
-            let bad = draft.sources.filter { $0.checked && ["denied", "unsupported"].contains($0.access) }
-            if draft.sources.filter(\.checked).isEmpty { noSourcesRow } else {
-            row(L("sheet.ui.row.sources"), L("sheet.ui.quick.sources", ["n": "\(draft.sources.filter(\.checked).count)"]),
-                bad.isEmpty ? draft.sources.filter(\.checked).prefix(3).map { s in
-                    // 0.10.0 (Meeting Sheet, folders): "bink: 12 recent files for the preparation (last 7 days) · 340 searchable"
-                    s.folder.map { s.title + ": " + SheetLabels.folderLine($0) } ?? s.title
-                }.joined(separator: s3Sep) : bad.map { $0.title + ": " + ($0.reason ?? SheetLabels.access(source: $0)) }.joined(separator: "; "),
-                ok: bad.isEmpty, fix: bad.isEmpty ? nil : "sources", add: true)
+    private var total: Int { draft.sources.filter(\.checked).compactMap(\.tokens).reduce(0, +) }
+    private var tooMuch: Bool { total > SheetRoutes.window(draft.route) - 12_000 }
+
+    private var peopleRow: some View {
+        let theirs = PeopleSides.summary(draft.theirs.map(\.name)), ours = PeopleSides.summary(draft.ours.map(\.name))
+        let line = theirs.isEmpty && ours.isEmpty ? L("sheet.quick.noPeople")
+            : L("sheet.quick.peopleLine", ["theirs": theirs.isEmpty ? "-" : theirs, "ours": ours.isEmpty ? "-" : ours])
+        return summaryRow("people", L("sheet.quick.people"), line, ok: true) { SheetPeopleView(draft: draft).padding(.top, 4) }
+    }
+
+    private var sourcesRow: some View {
+        let checked = draft.sources.filter(\.checked)
+        let bad = checked.filter { ["denied", "unsupported"].contains($0.access) }
+        let line = checked.isEmpty ? L("sheet.ui.quick.noSources") : PeopleSides.summary(checked.map(\.title), first: 3)
+        let problem: String? = checked.isEmpty ? L("sheet.ui.quick.noSourcesSub")
+            : bad.isEmpty ? nil : bad.map { $0.title + ": " + ($0.reason ?? SheetLabels.access(source: $0)) }.joined(separator: "; ")
+        return summaryRow("sources", L("sheet.ui.row.sources"), line, ok: problem == nil, problem: problem,
+                          fixLabel: checked.isEmpty ? L("sheet.ui.quick.add") : (bad.isEmpty ? nil : L("sheet.ui.fix")),
+                          fix: { if checked.isEmpty { draft.chooseFiles() } else { draft.mode = .expert; draft.step = 3 } }) {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(checked) { src in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(src.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1).truncationMode(.middle)
+                        if let f = src.folder { Text(SheetLabels.folderLine(f)).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
+                    }
+                }
+                Button(L("sheet.quick.addMore")) { draft.chooseFiles() }.buttonStyle(.pnTertiary)
             }
-            let total = draft.sources.filter(\.checked).compactMap(\.tokens).reduce(0, +)
-            let routeProblem = SheetRoutes.problem(draft.route)
-            row(L("sheet.ui.row.size"), L("sheet.ui.quick.size", ["t": SheetLabels.tokens(total), "route": AIRoute.name(draft.route)]),
-                routeProblem ?? (total > SheetRoutes.window(draft.route) - 12_000 ? L("sheet.ui.size.tooMuch") : L("sheet.ui.size.fits")),
-                ok: routeProblem == nil && total <= SheetRoutes.window(draft.route) - 12_000, fix: routeProblem == nil ? (total > SheetRoutes.window(draft.route) - 12_000 ? "size" : nil) : "route")
-            row(L("sheet.ui.row.live"), liveLine, "", ok: true, fix: nil)
+            .padding(.leading, 94)
         }
+    }
+
+    private var setupRow: some View {
+        let routeProblem = SheetRoutes.problem(draft.route)
+        let project = m.target.isEmpty ? nil : m.targetName
+        let line = ([project, draft.preset?.name ?? draft.presetID, liveLine] as [String?]).compactMap { $0 }.joined(separator: " · ")
+        let problem: String? = m.target.isEmpty ? L("call.chooseProject") : (routeProblem ?? (tooMuch ? L("sheet.ui.size.tooMuch") : nil))
+        return summaryRow("setup", L("sheet.quick.setup"), line, ok: problem == nil, problem: problem,
+                          fixLabel: routeProblem != nil || (tooMuch && !m.target.isEmpty) ? L("sheet.ui.fix") : nil,
+                          fix: { draft.mode = .expert; draft.step = 4 }) {
+            VStack(alignment: .leading, spacing: 8) {
+                projectRow
+                meetingRows
+                row(L("sheet.ui.row.preset"), draft.preset?.name ?? draft.presetID,
+                    (draft.preset?.blocks ?? []).map { SheetLibrary.shared.title($0) }.prefix(5).joined(separator: ", "), ok: true, fix: nil)
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(L("sheet.ui.row.size")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: 70, alignment: .leading)
+                    Text(L(tooMuch ? "sheet.ui.size.tooMuch" : "sheet.ui.size.fits") + " · " + L("sheet.quick.runsOn", ["route": AIRoute.name(draft.route)]))
+                        .font(PN.Font.body).foregroundStyle(tooMuch ? PN.C.pending : PN.C.text)
+                        .help(L("sheet.ui.quick.size", ["t": SheetLabels.tokens(total), "route": AIRoute.name(draft.route)]))
+                }
+            }
+        }
+    }
+
+    private func summaryRow<C: View>(_ id: String, _ label: String, _ line: String, ok: Bool, problem: String? = nil,
+                                     fixLabel: String? = nil, fix: @escaping () -> Void = {}, @ViewBuilder detail: () -> C) -> some View {
+        let on = open == id
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Circle().fill(ok ? PN.C.turn : PN.C.pendingFill).frame(width: 8, height: 8).padding(.top, 6).accessibilityHidden(true)
+                Text(label).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3).frame(width: 64, alignment: .leading).padding(.top, 2)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(line).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1).truncationMode(.tail)
+                    if let problem {
+                        Text(problem).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.pending).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 8)
+                if let fixLabel { Button(fixLabel, action: fix).buttonStyle(.pnSecondary) }
+                Button(L(on ? "sheet.quick.done" : "sheet.quick.change")) { withAnimation(.easeOut(duration: 0.15)) { open = on ? nil : id } }
+                    .buttonStyle(.pnTertiary)
+                    .accessibilityLabel(L(on ? "sheet.quick.done" : "sheet.quick.change") + " " + label)
+            }
+            if on { detail() }
+        }
+        .padding(.vertical, 12)
     }
 
     @ViewBuilder private var special: some View {
         VStack(alignment: .leading, spacing: 4) {
-                Text(L("sheet.ui.quick.special")).font(PN.Font.body.weight(.semibold))
+                Text(L(draft.live ? "sheet.quick.whatChanged" : "sheet.ui.quick.special")).font(PN.Font.body.weight(.semibold))
                 TextField(L("sheet.ui.quick.specialPh"), text: $draft.special).textFieldStyle(.roundedBorder)
                 ForEach(draft.linksInText, id: \.self) { l in SheetLinkSuggestion(draft: draft, link: l) }
         }
@@ -177,12 +234,8 @@ struct SheetQuickView: View {
                     .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(routeProblem != nil || draft.checking)
             }
             .padding(.top, 6)
-            Text(L("sheet.ui.quick.defaults")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
         }
     }
-
-    @State private var newOurs = ""
-    @State private var newTheirs = ""
 
     /// 0.10.1 (A5, roadmap п.7): Quick with a minimal setup: name, date and time, people, the same fields as Expert.
     @ViewBuilder private var meetingRows: some View {
@@ -192,8 +245,6 @@ struct SheetQuickView: View {
         quickField(L("sheet.ui.s1.when")) {
             DatePicker("", selection: Binding(get: { m.callDate }, set: { m.callDate = $0; draft.objectWillChange.send() })).labelsHidden().fixedSize()
         }
-        quickField(L("sheet.ui.s1.theirs")) { SheetPeopleEditor(list: $draft.theirs, new: $newTheirs) }
-        quickField(L("sheet.ui.s1.ours")) { SheetPeopleEditor(list: $draft.ours, new: $newOurs) }
     }
 
     private func quickField<C: View>(_ k: String, @ViewBuilder _ c: () -> C) -> some View {
@@ -450,9 +501,6 @@ struct SheetExpertView: View {
 struct SheetMeetingStep: View {
     @ObservedObject var draft: SheetDraft
     @ObservedObject var lib = SheetLibrary.shared
-    @State private var newOurs = ""
-    @State private var newTheirs = ""
-
     private var m: StartCallModel { draft.model }
 
     var body: some View {
@@ -474,13 +522,12 @@ struct SheetMeetingStep: View {
                 }
                 field(L("sheet.ui.s1.name")) { TextField(m.effectiveTitle, text: Binding(get: { m.title }, set: { m.title = $0 })).textFieldStyle(.roundedBorder) }
                 field(L("sheet.ui.s1.when")) { DatePicker("", selection: Binding(get: { m.callDate }, set: { m.callDate = $0 })).labelsHidden().fixedSize() }
-                people(L("sheet.ui.s1.ours"), $draft.ours, $newOurs)
-                people(L("sheet.ui.s1.theirs"), $draft.theirs, $newTheirs)
                 field(L("sheet.ui.s1.goal")) {
                     TextField(L("sheet.ui.s1.goalPh"), text: $draft.goal, axis: .vertical).textFieldStyle(.roundedBorder).lineLimit(2...4)
                 }
                 ForEach(draft.linksInText, id: \.self) { l in SheetLinkSuggestion(draft: draft, link: l) }
             }
+            PageCard(spacing: 10) { SheetPeopleView(draft: draft) }      // 0.14.0 (D1)
             PageCard(spacing: 10) {
                 PageLabel(text: L("sheet.ui.s1.kind"))
                 Text(L("sheet.ui.s1.kindSub")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -530,10 +577,6 @@ struct SheetMeetingStep: View {
             c()
             Spacer(minLength: 0)
         }
-    }
-
-    private func people(_ t: String, _ list: Binding<[DraftPerson]>, _ new: Binding<String>) -> some View {
-        field(t) { SheetPeopleEditor(list: list, new: new) }
     }
 
     private func presetTile(_ p: SheetPresetInfo) -> some View {
@@ -1135,40 +1178,5 @@ struct SheetBuildProgress: View {
                 }
             }
         }
-    }
-}
-
-/// 0.10.1 (A5): the people chips with an add field, shared by Quick and Expert step 1.
-struct SheetPeopleEditor: View {
-    @Binding var list: [DraftPerson]
-    @Binding var new: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if !list.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(list) { p in
-                        HStack(spacing: 4) {
-                            Text(p.name + (p.company.isEmpty ? "" : " · " + p.company))
-                            Button { list.removeAll { $0.id == p.id } } label: { Image(systemName: "xmark") }.buttonStyle(.plain).accessibilityLabel(L("call.remove"))
-                        }
-                        .font(PN.Font.caption).padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(PN.C.surface2))
-                    }
-                }
-            }
-            HStack(spacing: 6) {
-                TextField(L("sheet.ui.s1.personPh"), text: $new).textFieldStyle(.roundedBorder).frame(maxWidth: 240)
-                    .onSubmit(add)
-                Button(L("sheet.ui.add"), action: add).buttonStyle(.pnTertiary)
-            }
-        }
-    }
-
-    private func add() {
-        // 0.10.0 (Meeting Sheet, hardening): "·" alone used to crash (parts[0] of an empty list)
-        guard let p = SheetPipeline.person(new) else { return }
-        list.append(DraftPerson(name: p.name, company: p.company))
-        new = ""
     }
 }

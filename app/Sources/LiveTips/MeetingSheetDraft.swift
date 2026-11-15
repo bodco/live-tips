@@ -22,6 +22,7 @@ struct DraftPerson: Identifiable, Equatable {
     var role = ""
     var company = ""
     var domain = ""
+    var you = false      // 0.14.0 (D1): you are always on our side and never dragged
 }
 
 struct DraftSource: Identifiable, Equatable {
@@ -95,7 +96,7 @@ final class SheetDraft: ObservableObject {
         language = mem?.language ?? (model.language.hasPrefix("uk") && model.audience != "client" ? "uk" : "en")
         applyPreset(presetID)
         goal = Self.goalLine(model.cleanContext)
-        ours = [DraftPerson(name: L("sheet.ui.you"))] + model.peopleTeam.filter { n in model.participants.contains { $0.caseInsensitiveCompare(n) == .orderedSame } }.map { DraftPerson(name: $0) }
+        ours = [DraftPerson(name: L("sheet.ui.you"), you: true)] + model.peopleTeam.filter { n in model.participants.contains { $0.caseInsensitiveCompare(n) == .orderedSame } }.map { DraftPerson(name: $0) }
         theirs = Self.theirPeople(model).map { DraftPerson(name: $0.name, company: $0.company ?? "", domain: $0.domain ?? "") }
         withEvent = model.calEventID != nil
         // The files and folders already added in Start call, and the call's text, are sources from the start.

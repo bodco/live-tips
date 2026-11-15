@@ -1436,7 +1436,10 @@ another device and back makes the browser reconnect its audio; the "Can't hear t
 **Windows and navigation.** Pacenote windows never join a tab group. The call page, a series, a transcript and
 Statistics open inside Home; Back (or Command-[) returns. The follow-up email is the right panel of the call page.
 
-**Settings.** The sidebar is General, Projects, Integrations, AI, About. Integrations lists Notion, Calendars and
+**Settings.** The sidebar has four groups: You (Account, General), Calls (Projects, Meeting Sheet, Call recording,
+Transcription), Connections (Integrations, AI) and More (Modules, Usage, Help, About). Settings > AI shows one group
+at a time: Access, Jobs (which AI prepares, tips and writes the notes, and the AI chain), Limits, On this Mac (the
+local model, search, speakers) and Advanced (company research, the agents). Integrations lists Notion, Calendars and
 HubSpot as cards with their state; a click opens the page. On the Notion page, Databases holds one Meetings, one
 Tasks and one Risks database for all projects. The project is a property of each page: write its name next to the
 database (Project if empty) and set each project's value in Settings > Projects > In Notion. Fill from project
@@ -1988,12 +1991,17 @@ Internal or presentation, Stand-up, Interview and Blank. **Save as my preset** o
 
 | | Quick | Expert |
 |---|---|---|
-| What | One screen: the series' last setup (preset, sources, size, route, live), "Anything special today?", Prepare | Five clickable steps: Meeting, Blocks, Sources, Size, Build |
+| What | One screen: three lines (People, Sources, Setup), each opens in place with Change; "Anything special today?" ("What changed?" during a call), Prepare | Five clickable steps: Meeting, What to prepare, Sources, Check, Build |
 | Default for | A series that already has a sheet, internal calls, stand-ups, client syncs | A new external domain, a sales intro, a presentation |
-| When something needs you | The row says "Needs you" with Fix, which opens that step in Expert | Each step shows it in place |
+| When something needs you | The line turns orange, says what is wrong and offers Fix (or Add), which opens that step in Expert | Each step shows it in place |
 
 Settings > Meeting Sheet decides which one opens: by the rules (each rule can be turned off or flipped), always Quick
 or always Expert. The first time in a series Quick shows "Suggested" and Pacenote remembers the setup for next time.
+
+**Who is on the call.** Quick (under People > Change) and Expert step 1 show Their side and Our side next to each
+other. Names stay on one line (a long one ends with "…", the full name is in the tooltip) and the chips wrap as whole
+chips. Drag a person to the other side, or click the arrow on the chip; × removes them, the field under each side adds
+one ("Name · company"). You are always on Our side. A move applies to this call.
 
 **Sources: what you can add.** One panel for everything:
 

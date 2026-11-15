@@ -801,22 +801,36 @@ struct SettingsView: View {
         Pane(id: "about", title: "About", symbol: "info.circle", subtitle: "Version, updates and where your data lives."),
     ].map { Pane(id: $0.id, title: L("settings.tab." + $0.id), symbol: $0.symbol, subtitle: L("settings.pane." + $0.id)) } }
 
+    /// 0.14.0 (D2): the sidebar groups. A pane missing here would not show, so CoreChecks-free: keep every pane id listed.
+    static let groups: [(key: String, ids: [String])] = [
+        ("settings.group.you", ["account", "general"]),
+        ("settings.group.calls", ["projects", "sheet", "recording", "transcription"]),
+        ("settings.group.connect", ["integrations", "ai"]),
+        ("settings.group.more", ["modules", "usage", "help", "about"]),
+    ]
+
     // 2026-10-26 (owner): the welcome tour's look: a sidebar of icon tiles, a header per pane, soft cards.
     var body: some View {
         HStack(spacing: 0) {
+            // 0.14.0 (D2, minimal Settings): twelve panes in four short groups instead of one long list
             VStack(alignment: .leading, spacing: 2) {
-                ForEach(Self.panes) { p in
-                    Button { model.tab = p.id } label: {
-                        HStack(spacing: 10) {
-                            IconTile(symbol: p.symbol, size: 26)
-                            Text(p.title)
-                            Spacer(minLength: 0)
+                ForEach(Self.groups, id: \.key) { g in
+                    Text(L(g.key)).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                        .padding(.horizontal, 8).padding(.top, g.key == Self.groups[0].key ? 2 : 12).padding(.bottom, 2)
+                    ForEach(Self.panes.filter { g.ids.contains($0.id) }) { p in
+                        Button { model.tab = p.id } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: p.symbol).font(.system(size: 13)).frame(width: 18)
+                                    .foregroundStyle(model.tab == p.id ? PN.C.accent : PN.C.text2)
+                                Text(p.title)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .contentShape(Rectangle())
+                            .background(RoundedRectangle(cornerRadius: 6).fill(model.tab == p.id ? PN.C.accent.opacity(0.14) : .clear))
                         }
-                        .padding(.horizontal, 8).padding(.vertical, 5)
-                        .contentShape(Rectangle())
-                        .background(RoundedRectangle(cornerRadius: 8).fill(model.tab == p.id ? Color.accentColor.opacity(0.2) : .clear))
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 Spacer()
             }
@@ -827,8 +841,13 @@ struct SettingsView: View {
             VStack(spacing: 0) {
                 let p = Self.panes.first { $0.id == model.tab } ?? Self.panes[0]
                 // 0.8.6 (owner, 30.10): a clear gap and a line between the header and what scrolls under it
-                WindowHeader(symbol: p.symbol, title: p.title, subtitle: p.subtitle)
-                    .padding(.horizontal, 28).padding(.top, 20).padding(.bottom, 14)
+                // 0.14.0 (D2): a plain title and one caption line (was a 44 pt icon tile and a callout)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(p.title).font(.system(size: 20, weight: .semibold))
+                    Text(p.subtitle).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 10)
                 Divider().padding(.horizontal, 20)
                 pane.scrollContentBackground(.hidden).clipped().padding(.top, 4)
             }
@@ -868,8 +887,22 @@ struct SettingsView: View {
     }
 
 
+    // 0.14.0 (D2): the AI pane was one long form of a dozen sections. Now five groups, one shown at a time.
+    @AppStorage("settingsAIGroup") private var aiGroup = "access"
+
     var ai: some View {
+        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 6) {
+            Picker("", selection: $aiGroup) {
+                ForEach(["access", "jobs", "limits", "mac", "more"], id: \.self) { g in Text(L("ai.group." + g)).tag(g) }
+            }
+            .pickerStyle(.segmented).labelsHidden().fixedSize()
+            Text(L("ai.group.sub." + aiGroup)).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+        }
+        .padding(.horizontal, 28).padding(.top, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         aiForm
+        }
     }
 
     var aiForm: some View {
@@ -877,6 +910,7 @@ struct SettingsView: View {
             // 0.8.2 (owner): everything about Claude in one tab. Access once for the whole app, then the way and the
             // models for each job, then the automatic switch between the two ways.
             // 0.9.0 (owner): two providers, two tabs: Claude (account, API key) and ChatGPT (account, OpenAI API key).
+            if aiGroup == "access" {
             Section {
                 Picker("", selection: $aiProvider) {
                     Text("Claude").tag("claude")
@@ -914,6 +948,8 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .onAppear { runner.refreshAuth() }
+            }
+            if aiGroup == "more" {
             // 0.8.7 (H3): company research for sales preparations, on by default, with what goes out
             Section {
                 Toggle(isOn: $model.config.salesWebSearch) {
@@ -923,6 +959,8 @@ struct SettingsView: View {
                     }
                 }
             } header: { Text(L("ai.salesWeb.header")) }
+            }
+            if aiGroup == "mac" {
             Section {
                 // 0.8.6 (E, rules/components.yaml): Ollama and the model as optional components
                 ForEach(OptionalComponents.shared.all.filter { $0.id != "link_downloader" }) { c in ComponentRow(comp: c) }
@@ -935,6 +973,8 @@ struct SettingsView: View {
             } header: { Text(L("local.section")) } footer: {
                 Text(L("local.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
+            }
+            if aiGroup == "jobs" {
             Section {
                 RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withOpenAI: true, withAgy: true, withLocal: true)
                 if model.config.ai.prep == AIRoute.codex {
@@ -1011,6 +1051,8 @@ struct SettingsView: View {
             // 0.10.0 (AI chain, owner 12.11): one fallback chain for every job, reorderable, each AI with its checkbox
             AIChainSection(model: model, checking: $aiChecking, tick: $aiTick)
             .id(aiTick)
+            }
+            if aiGroup == "limits" {
             Section {
                 // Pacenote 0.8 (F4, spec 8): the month's spend and the balance live here, not on Home.
                 LabeledContent(L("ai.thisMonth")) {
@@ -1032,8 +1074,12 @@ struct SettingsView: View {
             }
             ProviderLimitsSection(model: model)
             EconomySection()                 // 0.9.6 Б1: between the limits and the agent
+            }
+            if aiGroup == "more" {
             CallAgentSection(model: model)
             PrepAgentSection(model: model)   // 0.9.6 Б3: the research preparation (beta)
+            }
+            if aiGroup == "mac" {
             Section {
                 Text(L("search.what")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 Toggle(L("set.localAiDefaultFor"), isOn: $model.config.localAI.enabled)
@@ -1140,6 +1186,7 @@ struct SettingsView: View {
             } header: { Text(L("set.speakers")) } footer: {
                 Text(L("set.inTheTipsWindow"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            }
             }
         }
         .formStyle(.grouped)

@@ -3,6 +3,19 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased
+
+- **Get ready, lighter (2026-11-15, D1):** Quick is now three short lines, People, Sources and Setup, each with a dot
+  that turns orange only when something needs you, and Change to open it in place. The size shows as "Fits in one
+  pass" (tokens only in the tooltip), and the long note about Quick and Expert defaults is gone. During a call the
+  one-line field asks "What changed?". Expert steps are Meeting, What to prepare, Sources, Check, Build.
+- **Who is on the call (2026-11-15, D1):** Their side and Our side sit next to each other. Names no longer break into
+  syllables: each chip keeps the name on one line (a long one ends with "…") and chips wrap as whole chips. Drag a
+  person to the other side, or click the arrow on the chip. You stay on Our side.
+- **Settings, minimal (2026-11-15, D2):** the sidebar is grouped (You, Calls, Connections, More) with small icons, the
+  pane header is a title and one line, and Settings > AI shows one group at a time: Access, Jobs, Limits, On this Mac,
+  Advanced.
+
 ## 0.13.3 (2026-11-15)
 
 - **Tasks of older calls: Delete and the full menu (2026-11-15, L5):** a call from before the commitments register

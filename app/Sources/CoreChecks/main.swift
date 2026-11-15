@@ -2388,6 +2388,19 @@ func callSyncAnalysis0130() {
            && CallSync.sheetCheckPath(transcript: "/x/a.md") == "/x/a.sheet-check.json", "sync0130: file names next to the transcript")
 }
 
+func sheetPeopleD1() {
+    struct P { var id: String; var you = false }
+    var theirs = [P(id: "emily"), P(id: "jake")], ours = [P(id: "you", you: true), P(id: "mike")]
+    expect(PeopleSides.move({ $0.id == "jake" }, from: &theirs, to: &ours, locked: { $0.you }), "d1: moved to our side")
+    expect(theirs.map(\.id) == ["emily"] && ours.map(\.id) == ["you", "mike", "jake"], "d1: lists after the move")
+    expect(PeopleSides.move({ $0.id == "jake" }, from: &ours, to: &theirs, locked: { $0.you }) && theirs.map(\.id) == ["emily", "jake"], "d1: and back")
+    expect(!PeopleSides.move({ $0.id == "you" }, from: &ours, to: &theirs, locked: { $0.you }) && ours.first?.id == "you", "d1: you never moves")
+    expect(!PeopleSides.move({ $0.id == "nobody" }, from: &ours, to: &theirs) && ours.count == 2 && theirs.count == 2, "d1: no match, no change")
+    expect(PeopleSides.summary(["Emily Carter", "David Brooks", "Chris", "Jake"]) == "Emily Carter, David Brooks +2", "d1: summary with a count")
+    expect(PeopleSides.summary(["Emily Carter"]) == "Emily Carter" && PeopleSides.summary([" "]) == "", "d1: summary short and empty")
+    expect(PeopleSides.initials("Christopher Montgomery-Wells") == "CW" && PeopleSides.initials("mike") == "M" && PeopleSides.initials("") == "?", "d1: initials")
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -2406,5 +2419,6 @@ pacenoteDriveB7b()
 callLists0122()
 callConsent0130()
 callSyncAnalysis0130()
+sheetPeopleD1()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

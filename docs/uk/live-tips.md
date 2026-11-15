@@ -1442,7 +1442,10 @@ Notion на один проєкт; воркспейс показується о�
 Statistics відкриваються всередині Home; Back (або Command-[) повертає. Лист після дзвінка це права панель
 сторінки дзвінка.
 
-**Settings.** Сайдбар: General, Projects, Integrations, AI, About. Integrations показує Notion, Calendars і
+**Settings.** Сайдбар має чотири групи: You (Account, General), Calls (Projects, Meeting Sheet, Call recording,
+Transcription), Connections (Integrations, AI) і More (Modules, Usage, Help, About). Settings > AI показує одну групу
+за раз: Access, Jobs (який AI готує, підказує і пише нотатки, і ланцюжок AI), Limits, On this Mac (локальна модель,
+пошук, спікери) і Advanced (дослідження компанії, агенти). Integrations показує Notion, Calendars і
 HubSpot картками зі станом; клік відкриває сторінку. На сторінці Notion розділ Databases має одну базу Meetings,
 одну Tasks і одну Risks для всіх проєктів. Проєкт це властивість кожної сторінки: впиши її назву поруч із базою
 (Project, якщо порожньо) і задай значення кожного проєкту в Settings > Projects > In Notion. Fill from project
@@ -2000,12 +2003,17 @@ Meeting Sheet їх можна перейменувати, дублювати і 
 
 | | Quick | Expert |
 |---|---|---|
-| Що | Один екран: останнє налаштування серії (пресет, джерела, розмір, маршрут, live), "Anything special today?", Prepare | П'ять клікабельних кроків: Meeting, Blocks, Sources, Size, Build |
+| Що | Один екран: три рядки (People, Sources, Setup), кожен відкривається на місці через Change; "Anything special today?" ("What changed?" під час дзвінка), Prepare | П'ять клікабельних кроків: Meeting, What to prepare, Sources, Check, Build |
 | За замовчуванням для | Серії, де вже є sheet, внутрішніх дзвінків, стендапів, client sync | Нового зовнішнього домену, sales intro, презентації |
-| Коли щось потребує тебе | Рядок каже "Needs you" з Fix, який відкриває цей крок в Expert | Кожен крок показує це на місці |
+| Коли щось потребує тебе | Рядок стає помаранчевим, каже, що не так, і пропонує Fix (або Add), який відкриває цей крок в Expert | Кожен крок показує це на місці |
 
 Settings > Meeting Sheet вирішує, що відкривається: за правилами (кожне правило можна вимкнути або перемкнути), завжди
 Quick або завжди Expert. Уперше в серії Quick показує "Suggested", і Pacenote запам'ятовує налаштування на наступний раз.
+
+**Хто на дзвінку.** Quick (People > Change) і крок 1 Expert показують Their side і Our side поруч. Імена в один
+рядок (довге закінчується на "…", повне ім'я в підказці), чипи переносяться цілими. Перетягни людину на іншу сторону
+або натисни стрілку на чипі; × прибирає, поле під кожною стороною додає ("Імʼя · компанія"). Ти завжди на Our side.
+Переміщення діє для цього дзвінка.
 
 **Sources: що можна додати.** Одна панель для всього:
 

@@ -2277,7 +2277,10 @@ Pacenote works exactly as before.
 - **What goes there.** Your account and your devices. From 0.12.0 also calls, but only for a project with **Sync to
   Pacenote server** on (Settings > Projects, the project's menu; off by default, available while signed in): the
   call's title, start, length, type and audience, the call notes as the summary, decisions, tasks, risks (0.12.2, server 0.4.0), the
-  Meeting Sheet and links to the recording and transcript in your Drive. **Don't sync this call** in a call page's menu keeps one call off
+  Meeting Sheet and links to the recording and transcript in your Drive; since 0.13.0 also the consent record (said,
+  copied or off, and when) and the call's numbers: tips shown, tips rated useful and not useful (the last rating per
+  tip; "partly" counts as neither), HELP NOW presses, your share of the words, Meeting Sheet questions answered or
+  partly out of all. Participants' names are not sent yet, their emails never. **Don't sync this call** in a call page's menu keeps one call off
   the server. A call goes after it ends and again when its notes or Sheet change (only the changed parts); without a
   network it waits for the next time. The call page shows a line under the header: synced (when), syncing, not synced yet
   or the error (with **Sync now**), not synced for this call, or deleted on another device. **Delete from server…** in a
@@ -2536,6 +2539,12 @@ address", `references/sweep.md`, `references/presentation.md`).
    consent message" speaks a short notice when recording starts (in the call's language), "Copy a consent message
    for the meeting chat" puts it on the clipboard with a reminder to paste it into the call chat. Both texts are
    editable (English and Ukrainian). Recording without consent may be illegal where you or the others are.
+   Since 0.13.0 the app keeps a consent record in the call's files: **said** when macOS has spoken the message,
+   **posted** when the message was copied for the meeting chat, **off** when both are off. The call page shows it
+   under the title ("Consent: said at 10:02"); calls made before 0.13.0 show "not recorded". The record holds only
+   the mode and the time, never the text, and stays on your Mac. The live-tips skill keeps the same record: with
+   `consent.chat: true` in its `settings.yaml` (off by default) it shows the message in the chat at the start for you
+   to paste and records it as posted; it never sends, says or posts the message itself.
 40. **Notion page date.** The date in the meeting page title is the "Date and time" set in Start call,
    not the moment the recording started.
 41. **The skill shows the call picture.** The live-tips skill (v49) writes the same call picture as the app:

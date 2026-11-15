@@ -2249,6 +2249,7 @@
     (items || []).forEach(function (it) {
       if (!it) return;
       if (it.kind === 'situation') { renderSituation(it); return; }
+      if (it.kind === 'consent') return;   // 0.13.0: the consent record, for the app's call page only
       if (it.kind === 'agenda') { renderAgenda(it); return; }
       if (it.kind === 'facts') { facts = it.facts || []; indexFacts(); searchFacts(); return; }
       if (it.kind === 'outline') { outline = it.sections || []; renderNow(); return; }

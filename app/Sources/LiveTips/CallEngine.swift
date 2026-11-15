@@ -715,27 +715,47 @@ final class CallEngine {
         sayConsent(recorded: false)
     }
 
+    /// 0.13.0 (B8 part 2): where the consent lines go: the app's tips file of the live call.
+    private var consentPath: String? {
+        if let t = appTipsFile, !t.isEmpty { return t }
+        if let t = EngineStatus.load(path: statusPath).tipsFile, !t.isEmpty { return t }
+        return lastFile.map { CallPageEdit.tipsFile($0) }
+    }
+
+    /// 0.13.0 (B8 part 2): one consent event in the call's tips file (mode and time only, never the text).
+    private func recordConsent(_ mode: CallConsent.Mode, recorded: Bool, at: Date = Date()) {
+        guard let path = consentPath else { return }
+        CallConsent.record(path: path, mode: mode, at: at, recorded: recorded)
+    }
+
     private func sayConsent(recorded: Bool) {
         let c = config
-        guard c.consentSay || c.consentChat else { return }
-        if recorded { consentRecGiven = true }
         let uk = ((callRequest["me_lang"] as? String) ?? "uk") == "uk"
         let text = recorded ? (uk ? c.consentRecTextUK : c.consentRecTextEN) : (uk ? c.consentTextUK : c.consentTextEN)
-        guard !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        if c.consentChat {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
-            notify(L("eng.consentCopied"))
+        guard c.consentSay || c.consentChat, !text.trimmingCharacters(in: .whitespaces).isEmpty else {
+            recordConsent(.none, recorded: recorded)        // 0.13.0: consent was off for this call
+            return
         }
+        if recorded { consentRecGiven = true }
+        // 0.13.0: the voice starts first, so it is not held back by the alert below; "said" is written once macOS
+        // has spoken the message, with the time it started.
         if c.consentSay {
-            DispatchQueue.global().async {
+            let started = Date()
+            DispatchQueue.global().async { [weak self] in
                 func say(_ args: [String]) -> Int32 {
                     let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/say"); p.arguments = args
                     p.standardError = FileHandle.nullDevice
                     do { try p.run(); p.waitUntilExit(); return p.terminationStatus } catch { return -1 }
                 }
-                if !(uk && say(["-v", "Lesya", text]) == 0) { _ = say([text]) }
+                let ok = (uk && say(["-v", "Lesya", text]) == 0) || say([text]) == 0
+                if ok { DispatchQueue.main.async { self?.recordConsent(.said, recorded: recorded, at: started) } }
             }
+        }
+        if c.consentChat {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            recordConsent(.posted, recorded: recorded)     // 0.13.0 (owner 15.11): copied counts as posted
+            notify(L("eng.consentCopied"))
         }
     }
 

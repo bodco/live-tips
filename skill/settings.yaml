@@ -64,6 +64,11 @@ tips:
   idle_stop_minutes: 6           # no new lines this long -> offer to stop
   hard_cap_minutes: 120
 
+consent:                         # recording consent (Pacenote 0.13.0), off by default; the same texts as the app
+  chat: false                    # true = at the start the skill shows the message in this chat for you to paste into the meeting chat; it never sends it anywhere itself
+  text_en: "Hi all, a note-taking assistant on my computer transcribes this call for my notes. Tell me if you would rather I turn it off."
+  text_uk: "Привіт усім, помічник на моєму комп'ютері транскрибує цей дзвінок для моїх нотаток. Скажіть, якщо краще його вимкнути."
+
 model_hint: >
   Pick the session model before "live tips". Default and recommended: Haiku class
   (Haiku 5.5). Measured on a 14-minute recording (29.10.2026): Haiku $0.05, median 1.6 s,

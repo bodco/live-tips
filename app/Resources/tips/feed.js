@@ -219,6 +219,7 @@
         return true;
       case 'question': return false;                      // heard-question lines are not shown (2026-10-26 review)
       case 'ask': return false;                           // echoes of what the PM typed: the field already shows it
+      case 'consent': return false;                       // 0.13.0: the consent record of the call, for the call page only
       case 'ack': this.toast = { text: this.tr('applied'), kind: 'ok', at: this.now() }; return true;
       case 'notice': this.prep = 'ready'; this.toast = { text: this.tr('prepReady'), kind: 'ok', at: this.now() }; return true;
       case 'deal':

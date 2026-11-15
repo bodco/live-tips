@@ -3,6 +3,30 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.13.0 (2026-11-15)
+
+- **Consent record of a call (2026-11-15, B8 part 2, step 1):** the app now keeps what happened with the recording
+  consent: said (macOS spoke the message), posted (the message was copied for the meeting chat) or off. The call page
+  shows it under the title; older calls show "Consent: not recorded". Only the mode and the time are kept, in the
+  call's tips file on your Mac; nothing goes to the server yet. The spoken message now starts before the copy reminder
+  instead of after it.
+- **Consent in the live-tips skill (2026-11-15):** new `consent` block in the skill's `settings.yaml`, off by default.
+  When on, the skill shows the consent message in the chat at the start for you to paste into the meeting chat and
+  records it as posted; when off, it records off. The skill never sends, says or posts the message itself. The call
+  page shows the skill's record the same way.
+- **Privacy and terms for the next server data (2026-11-15, B8 part 2, step 2):** PRIVACY, TERMS, the website and
+  Settings > Account > What goes to the server now say that, for synced projects, 0.13.0 sends the consent record
+  (said, copied or off, and when; never the message) and the call's numbers (tips shown and rated, HELP NOW, your share
+  of the talking, Meeting Sheet topics that came up; never the text of tips). Participants' names, whether they are
+  from your company and how long each one spoke are not sent yet; their email addresses are never sent. The consent
+  record only notes that a message was said or copied, not that anyone agreed. What goes to the server now lists
+  risks too.
+- **Consent and call numbers on the server (2026-11-15, B8 part 2, step 3):** for projects with Sync to Pacenote server
+  on, a call now also sends its consent record (said, posted or off and when; "unknown" for calls before 0.13.0) and
+  its numbers: tips shown, tips rated useful and not useful (the last rating of each tip), HELP NOW presses, your share
+  of the words (calls over 50 words), and how many Meeting Sheet questions were answered or partly answered out of
+  all. Never a text. Participants are not sent. Calls already on the server send this once with their next sync.
+
 ## 0.12.3 (2026-11-15)
 
 - **Automatic Notion adds follow your edits (2026-11-15):** "Add automatically after each call" for Decisions and

@@ -116,8 +116,15 @@ final class CallSyncService: ObservableObject {
             let start = rec?.start ?? CallHistory.startFromName(t) ?? Date()
             let dur = rec?.minutes.map { Int($0 * 60) } ?? rec?.end.map { Int($0.timeIntervalSince(start)) } ?? 0
             let title = (rec?.title).flatMap { $0.isEmpty ? nil : $0 } ?? ((CallSync.stem(t) as NSString).lastPathComponent)
+            // 0.13.0 (B8 part 2): the consent record and the call's numbers (never a text)
+            let tipsText = CallLists.tipsPaths(transcript: t).compactMap { try? String(contentsOfFile: $0, encoding: .utf8) }.joined(separator: "\n")
+            let analysis = CallSync.analysis(tips: tipsText,
+                                             inbox: (try? String(contentsOfFile: CallSync.inboxPath(transcript: t), encoding: .utf8)) ?? "",
+                                             talkShare: CallMetrics.shared.of(t).talkShare,
+                                             sheetCheck: FileManager.default.contents(atPath: CallSync.sheetCheckPath(transcript: t)))
             let call = CallSync.json(CallSync.callBody(projectID: pid, title: title, start: start, durationS: dur, meta: st.meta,
-                                                       appVersion: PacenoteAccount.appVersion))
+                                                       appVersion: PacenoteAccount.appVersion,
+                                                       consent: CallSync.consent(CallConsent.read(transcript: t)), analysis: analysis))
             if st.callID.isEmpty || st.hashes["call"] != CallSync.hash(call) {
                 let (d, c) = try await PacenoteAccount.shared.api("PUT", "/v1/calls/" + st.clientCallID, body: call)
                 switch CallSync.outcome(status: c, problem: Self.problemText(d, c)) {

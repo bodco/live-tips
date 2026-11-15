@@ -2256,6 +2256,95 @@ func callLists0122() {
     try? FileManager.default.removeItem(atPath: dir)
 }
 
+/// 0.13.0 (B8 part 2, step 1): the consent record of a call in its tips files.
+func callConsent0130() {
+    let t0 = Date(timeIntervalSince1970: 1_763_200_000)
+    let l = CallConsent.line(mode: .said, at: t0, recorded: true)
+    expect((l["kind"] as? String) == "consent" && (l["mode"] as? String) == "said" && (l["recorded"] as? Bool) == true, "consent: line shape")
+    expect(Set(l.keys) == ["kind", "mode", "at", "recorded", "source"], "consent: no text, no names in the line")
+    expect(CallConsent.resolve([]).mode == .unknown && CallConsent.resolve([]).at == nil, "consent: no lines = unknown")
+    let e = { (m: CallConsent.Mode, s: Double) in CallConsent.Event(mode: m, at: t0.addingTimeInterval(s)) }
+    expect(CallConsent.resolve([e(.none, 0)]).mode == .none, "consent: off = none")
+    var r = CallConsent.resolve([e(.posted, 5)])
+    expect(r.mode == .posted && r.at == t0.addingTimeInterval(5), "consent: copied for the chat = posted")
+    r = CallConsent.resolve([e(.posted, 60), e(.said, 9), e(.none, 1)])
+    expect(r.mode == .said && r.at == t0.addingTimeInterval(9) && r.posted == t0.addingTimeInterval(60), "consent: the earliest given wins over none")
+    expect(CallConsent.resolve([CallConsent.Event(mode: .unknown, at: t0)]).mode == .unknown, "consent: an unknown event changes nothing")
+    r = CallConsent.resolve([e(.said, 30), e(.said, 10)])
+    expect(r.said == t0.addingTimeInterval(10), "consent: the first said time")
+    let text = ["{\"kind\":\"tip\",\"text\":\"consent is a word\"}", "not json consent",
+                "{\"kind\":\"consent\",\"mode\":\"weird\",\"at\":\"2026-11-15T10:00:00Z\"}",
+                "{\"kind\":\"consent\",\"mode\":\"said\",\"at\":\"bad\"}",
+                "{\"kind\":\"consent\",\"mode\":\"said\",\"at\":\"2026-11-15T10:02:00.250Z\"}",
+                "{\"kind\":\"consent\",\"mode\":\"copied\",\"at\":\"2026-11-15T10:03:00Z\"}",
+                "{\"kind\":\"consent\",\"mode\":\"unknown\",\"at\":\"2026-11-15T10:03:00Z\"}"].joined(separator: "\n")
+    let ev = CallConsent.events(in: text)
+    expect(ev.count == 1 && ev[0].mode == .said && ev[0].source == "app", "consent: only valid consent lines, fractional seconds read")
+    let dir = NSTemporaryDirectory() + "pn-consent-\(UUID().uuidString)"
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    let tr = dir + "/2026-11-15-1000-sync.app.md"
+    expect(CallConsent.read(transcript: tr).mode == .unknown, "consent: a call without tips files = unknown")
+    try? "{\"kind\":\"situation\",\"decisions\":[\"x\"]}\n".write(toFile: tr + ".tips.jsonl", atomically: true, encoding: .utf8)
+    expect(CallConsent.record(path: tr + ".tips.jsonl", mode: .none, at: t0), "consent: append none")
+    expect(!CallConsent.record(path: tr + ".tips.jsonl", mode: .unknown), "consent: unknown is never written")
+    expect(CallConsent.read(transcript: tr).mode == .none, "consent: read none from the app's tips file")
+    expect(CallConsent.record(path: dir + "/2026-11-15-1000-sync.app.tips.jsonl", mode: .posted, at: t0.addingTimeInterval(40), source: "skill"),
+           "consent: append to the skill's tips file (created)")
+    r = CallConsent.read(transcript: tr)
+    expect(r.mode == .posted && r.at == t0.addingTimeInterval(40), "consent: both tips files are read")
+    let raw = (try? String(contentsOfFile: tr + ".tips.jsonl", encoding: .utf8)) ?? ""
+    expect(raw.hasPrefix("{\"kind\":\"situation\"") && raw.hasSuffix("\n") && raw.split(separator: "\n").count == 2, "consent: appended, the old line kept")
+    expect(CallLists.read(transcript: tr).decisions == ["x"], "consent: call lists still read the call picture")
+    try? FileManager.default.removeItem(atPath: dir)
+}
+
+/// 0.13.0 (B8 part 2, step 3): the consent record and the call's numbers in the call body; never names or texts.
+func callSyncAnalysis0130() {
+    let t0 = Date(timeIntervalSince1970: 1_763_200_000)
+    var s = CallConsent.State(); s.mode = .said; s.at = t0
+    let c = CallSync.consent(s)
+    expect(c["mode"] as? String == "said" && (c["at"] as? String)?.hasSuffix("Z") == true && c.count == 2, "sync0130: consent said with its time")
+    let u = CallSync.consent(CallConsent.State())
+    expect(u["mode"] as? String == "unknown" && u["at"] == nil, "sync0130: an older call = unknown, no time")
+    expect(CallSync.analysis(tips: "", inbox: "", talkShare: nil, sheetCheck: nil) == nil, "sync0130: nothing = no analysis")
+    func line(_ o: [String: Any]) -> String { String(data: try! JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]), encoding: .utf8)! }
+    let tips = [line(["kind": "tip", "uid": "a", "gist": "secret tip text", "partial": true]),
+                line(["kind": "tip", "uid": "a", "gist": "secret tip text"]),
+                line(["kind": "fact", "uid": "b", "gist": "f"]),
+                line(["kind": "answer", "q": "what", "gist": "x"]),
+                line(["kind": "card", "uid": "c", "gist": "gone"]), line(["kind": "retract", "uid": "c"]),
+                line(["kind": "situation", "decisions": ["d"]]), line(["kind": "consent", "mode": "said", "at": "2026-11-15T10:00:00Z"]),
+                "broken {"].joined(separator: "\n")
+    let inbox = [line(["t": "10:00:01", "text": "sos"]), line(["t": "10:00:05", "text": "SOS "]),
+                 line(["t": "10:00:06", "text": "what is the budget"]),
+                 line(["t": "10:01:00", "kind": "setting", "key": "tip_feedback", "value": "not_useful|tip|10:00:02|g|r=late"]),
+                 line(["t": "10:01:30", "kind": "setting", "key": "tip_feedback", "value": "used|tip|10:00:02|g"]),
+                 line(["t": "10:02:00", "kind": "setting", "key": "tip_feedback", "value": "not_useful|fact|10:00:09|f|c=wrong|x"]),
+                 line(["t": "10:02:10", "kind": "setting", "key": "tip_feedback", "value": "partly|card|10:00:11|z"]),
+                 line(["t": "10:02:20", "kind": "setting", "key": "tip_feedback", "value": "maybe|card|10:00:12|z"]),
+                 line(["t": "10:02:30", "kind": "setting", "key": "proactive", "value": "on"])].joined(separator: "\n")
+    let check = try! JSONSerialization.data(withJSONObject: ["questions": [["id": "1", "status": "answered"], ["id": "2", "status": "partly"],
+                                                                          ["id": "3", "status": "not"]], "outcome": [["id": "o", "status": "answered"]]])
+    let a = CallSync.analysis(tips: tips, inbox: inbox, talkShare: 0.4567, sheetCheck: check) ?? [:]
+    expect(a["tips_shown"] as? Int == 3, "sync0130: tips shown once per uid, partial and retracted out (got \(a["tips_shown"] ?? "nil"))")
+    expect(a["tips_rated_useful"] as? Int == 1 && a["tips_not_useful"] as? Int == 1, "sync0130: the last rating per tip, partly in neither")
+    expect(a["ask_now_count"] as? Int == 2, "sync0130: HELP NOW counted, typed asks not")
+    expect(a["talk_ratio_me"] as? Double == 0.46, "sync0130: talk share rounded")
+    expect(a["sheet_topics_hit"] as? Int == 2 && a["sheet_topics_total"] as? Int == 3, "sync0130: sheet questions answered or partly")
+    expect(Set(a.keys) == ["tips_shown", "tips_rated_useful", "tips_not_useful", "ask_now_count", "talk_ratio_me", "sheet_topics_hit", "sheet_topics_total"],
+           "sync0130: only the server's numeric fields")
+    let b = CallSync.analysis(tips: "", inbox: "", talkShare: 1.7, sheetCheck: nil) ?? [:]
+    expect(b["talk_ratio_me"] as? Double == 1 && b["tips_shown"] as? Int == 0, "sync0130: talk share capped at 1")
+    let cb = CallSync.callBody(projectID: "p1", title: "t", start: t0, durationS: 60, meta: [:], appVersion: "0.13.0", consent: c, analysis: a)
+    let body = String(data: CallSync.json(cb), encoding: .utf8) ?? ""
+    expect(cb["participants"] == nil && !body.contains("secret") && !body.contains("budget") && !body.contains("@"), "sync0130: no names, no texts, no emails")
+    expect((cb["consent"] as? [String: Any])?["mode"] as? String == "said" && cb["analysis"] != nil, "sync0130: consent and analysis in the body")
+    let old = CallSync.callBody(projectID: "p1", title: "t", start: t0, durationS: 60, meta: [:], appVersion: "0.13.0")
+    expect(old["consent"] == nil && old["analysis"] == nil, "sync0130: without them the body is as before")
+    expect(CallSync.inboxPath(transcript: "/x/2026-11-15-1000-sync.app.md") == "/x/2026-11-15-1000-sync.app.inbox.jsonl"
+           && CallSync.sheetCheckPath(transcript: "/x/a.md") == "/x/a.sheet-check.json", "sync0130: file names next to the transcript")
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -2272,5 +2361,7 @@ callReassign0101()
 pacenoteAccountB7()
 pacenoteDriveB7b()
 callLists0122()
+callConsent0130()
+callSyncAnalysis0130()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

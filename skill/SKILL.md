@@ -151,6 +151,13 @@ lines (tips only for what is still relevant), back to the loop.
    {me_langs}, дозволені {langs}. Мікрофон: {навушники або системний | мікрофон Мака}.
    Підказки у вікні-суфлері.` plus the detected audience and type and "змінити можна в ⚙".
    Start polling now; everything below runs between polls.
+   **Consent** (Pacenote 0.13.0, the same record as the app): when `settings.consent.chat` is true (missing =
+   false), this message also carries one line `Згода для чату зустрічі (скопіюй і встав):` and the text
+   (`text_uk` when the PM's mic language is uk, else `text_en`), and the first poll's heredoc emits
+   `{"kind":"consent","mode":"posted"}` (copied counts as posted). Otherwise it emits
+   `{"kind":"consent","mode":"none"}`. read_delta stamps the time and the source; the window does not show it.
+   Never send, say or post the message yourself (no Meet, Slack, email, no speech), never turn it on for the PM,
+   never repeat it later in the call. Done when the consent line was emitted.
 5. **Speech** (`references/speech.md`, target: in the window within ~30-40 s): emit `kind:
    speech` (and the agenda strip). Interview: the role's prep item (`hiring.md`). Presentation:
    section titles (`presentation.md`). Done when the speech item was emitted (or skipped with a

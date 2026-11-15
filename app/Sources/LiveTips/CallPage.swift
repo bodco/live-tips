@@ -186,6 +186,7 @@ struct CallPageView: View {
                 .buttonStyle(.plain).foregroundStyle(PN.C.accent)
             }
             CallPageSyncLine(sync: sync)       // 0.8.7 (E5)
+            CallConsentLine(file: file)        // 0.13.0 (B8 part 2): the consent record of the call
             if !meetNote.isEmpty { Text(meetNote).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
             if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.onMe).fixedSize(horizontal: false, vertical: true) }
         }
@@ -968,6 +969,32 @@ struct CallPageView: View {
 }
 
 /// 0.8.7 (E3): an agenda item's state on the call page: discussed (green), raised (orange), not raised (grey).
+/// 0.13.0 (B8 part 2, step 1): one line under the title with the call's consent record (CallConsent, from the tips
+/// files). Local only.
+struct CallConsentLine: View {
+    let file: String
+    @State private var state = CallConsent.State()
+
+    private func time(_ d: Date?) -> String { d.map { CallPageView.fmt("jmm").string(from: $0) } ?? "" }
+
+    private var text: String {
+        switch state.mode {
+        case .said where state.posted != nil, .posted where state.said != nil:
+            return L("consent.page.saidPosted", ["said": time(state.said), "posted": time(state.posted)])
+        case .said: return L("consent.page.said", ["time": time(state.at)])
+        case .posted: return L("consent.page.posted", ["time": time(state.at)])
+        case .none: return L("consent.page.none")
+        case .unknown: return L("consent.page.unknown")
+        }
+    }
+
+    var body: some View {
+        Text(text).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            .fixedSize(horizontal: false, vertical: true)
+            .onAppear { state = CallConsent.read(transcript: file) }
+    }
+}
+
 struct AgendaChip: View {
     let state: String
     let next: () -> Void

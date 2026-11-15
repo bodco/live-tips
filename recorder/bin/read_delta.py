@@ -415,6 +415,11 @@ def main():
                     continue
                 if obj.get("kind") == "ack" and obj.get("key"):
                     acks.add(str(obj.get("key")))
+                if obj.get("kind") == "consent":     # Pacenote 0.13.0: the app's consent line (CallConsent)
+                    if obj.get("mode") not in ("said", "posted", "none"):
+                        raise ValueError("consent mode must be said, posted or none")
+                    obj = {"kind": "consent", "mode": obj["mode"], "recorded": bool(obj.get("recorded", False)),
+                           "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "source": "skill"}
                 obj.setdefault("at", mac_now_at())   # when the tip landed (latency stats)
                 src_s, at_s = _sec(obj.get("src")), _sec(obj.get("at"))
                 if (obj.get("kind") in ("tip", "answer") and obj.get("level") != "info"

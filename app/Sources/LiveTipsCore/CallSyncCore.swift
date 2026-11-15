@@ -2,8 +2,9 @@ import CryptoKit
 import Foundation
 
 /// 0.12.0 (B8b, server ADR 8 and 9): what a call sends to the Pacenote server and how the Mac remembers it.
-/// Only what D27 allows: metadata, the call notes as the summary, decisions, tasks, the Meeting Sheet and Drive links.
-/// Never audio, video, the transcript, speaker names from the transcript or tip texts. The Mac stays the source of
+/// Only what D27 allows: metadata, the call notes as the summary, decisions, tasks, the Meeting Sheet and Drive links;
+/// since 0.13.0 the consent record and the call's numbers. Never audio, video, the transcript, speaker names from the
+/// transcript, participants' emails or tip texts. The Mac stays the source of
 /// truth: every request replaces the server's copy, and a part is sent again only when its body changed.
 /// Off by default: a project sends nothing until its "Sync to Pacenote server" is on (owner, 2026-11-15).
 public enum CallSync {
@@ -73,13 +74,74 @@ public enum CallSync {
 
     static let iso: ISO8601DateFormatter = { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime]; return f }()
 
-    /// PUT /v1/calls/{client_call_id}. No participants and no consent in this version: names stay on the Mac.
+    /// PUT /v1/calls/{client_call_id}. 0.13.0: with the consent record and the call's numbers. No participants: their
+    /// names wait for the lawyer (owner 15.11) and their emails are never sent.
     public static func callBody(projectID: String, title: String, start: Date, durationS: Int, meta: [String: String],
-                                appVersion: String) -> [String: Any] {
+                                appVersion: String, consent: [String: Any]? = nil, analysis: [String: Any]? = nil) -> [String: Any] {
         func m(_ k: String, _ max: Int) -> String { String((meta[k] ?? "").prefix(max)) }
-        return ["project_id": projectID, "title": String(title.prefix(300)), "started_at": iso.string(from: start),
-                "duration_s": max(0, durationS), "call_type": m("call_type", 50), "audience": m("audience", 50),
-                "language": m("language", 10), "app_version": String(appVersion.prefix(40))]
+        var o: [String: Any] = ["project_id": projectID, "title": String(title.prefix(300)), "started_at": iso.string(from: start),
+                                "duration_s": max(0, durationS), "call_type": m("call_type", 50), "audience": m("audience", 50),
+                                "language": m("language", 10), "app_version": String(appVersion.prefix(40))]
+        if let c = consent { o["consent"] = c }
+        if let a = analysis { o["analysis"] = a }
+        return o
+    }
+
+    /// 0.13.0 (B8 part 2): the consent record as the server takes it (said, posted, none, unknown; the time when known).
+    public static func consent(_ s: CallConsent.State) -> [String: Any] {
+        var o: [String: Any] = ["mode": s.mode.rawValue]
+        if let at = s.at { o["at"] = iso.string(from: at) }
+        return o
+    }
+
+    public static func inboxPath(transcript t: String) -> String { stem(t) + ".inbox.jsonl" }
+    public static func sheetCheckPath(transcript t: String) -> String { stem(t) + ".sheet-check.json" }
+
+    /// 0.13.0 (B8 part 2): the call's numbers, never a text. `tips`: the call's tips files; `inbox`: the window's inbox
+    /// (ratings as tip_feedback settings, HELP NOW as the ask "sos"); `talkShare`: the PM's share of the words
+    /// (CallMetrics); `sheetCheck`: <stem>.sheet-check.json. Tips shown: tip, fact, answer and card lines, not partial,
+    /// not retracted, one per uid. Ratings: the last one per tip; useful = used (a check or Said), not useful = a cross,
+    /// partly counts as neither. Sheet topics: the checked questions, hit = answered or partly. nil when there is nothing.
+    public static func analysis(tips: String, inbox: String, talkShare: Double?, sheetCheck: Data?) -> [String: Any]? {
+        func objects(_ text: String) -> [[String: Any]] {
+            text.split(separator: "\n").compactMap { (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [String: Any] }
+        }
+        let t = objects(tips)
+        let retracted = Set(t.filter { ($0["kind"] as? String) == "retract" }.compactMap { $0["uid"] as? String })
+        var seen = Set<String>(), shown = 0
+        for (i, o) in t.enumerated() {
+            guard ["tip", "fact", "answer", "card"].contains((o["kind"] as? String) ?? ""), (o["partial"] as? Bool) != true else { continue }
+            let uid = (o["uid"] as? String) ?? ""
+            if !uid.isEmpty && retracted.contains(uid) { continue }
+            let key = uid.isEmpty ? "#\(i)" : uid
+            if seen.insert(key).inserted { shown += 1 }
+        }
+        var verdicts: [String: String] = [:], helpNow = 0
+        for o in objects(inbox) {
+            if (o["kind"] as? String) == "setting" {
+                guard (o["key"] as? String) == "tip_feedback", let v = o["value"] as? String else { continue }
+                let parts = v.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+                guard parts.count == 2, ["used", "partly", "not_useful"].contains(String(parts[0])) else { continue }
+                var rest = String(parts[1])
+                if let r = rest.range(of: "|c=", options: .backwards) { rest = String(rest[..<r.lowerBound]) }
+                if let r = rest.range(of: "|r=", options: .backwards) { rest = String(rest[..<r.lowerBound]) }
+                verdicts[rest] = String(parts[0])
+            } else if o["kind"] == nil, ((o["text"] as? String) ?? "").trimmingCharacters(in: .whitespaces).lowercased() == "sos" {
+                helpNow += 1
+            }
+        }
+        var hit = 0, total = 0
+        if let d = sheetCheck, let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
+            let qs = (o["questions"] as? [[String: Any]]) ?? []
+            total = qs.count
+            hit = qs.filter { ["answered", "partly"].contains(($0["status"] as? String) ?? "") }.count
+        }
+        if shown == 0, verdicts.isEmpty, helpNow == 0, talkShare == nil, total == 0 { return nil }
+        var a: [String: Any] = ["tips_shown": shown, "tips_rated_useful": verdicts.values.filter { $0 == "used" }.count,
+                                "tips_not_useful": verdicts.values.filter { $0 == "not_useful" }.count,
+                                "ask_now_count": helpNow, "sheet_topics_hit": hit, "sheet_topics_total": total]
+        if let r = talkShare { a["talk_ratio_me"] = (min(1, max(0, r)) * 100).rounded() / 100 }
+        return a
     }
 
     /// The call notes (<stem>.notes.md) are the summary; nil without notes.

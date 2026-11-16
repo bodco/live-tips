@@ -3,6 +3,14 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.16.2 (2026-11-16)
+
+- **Less work for the project index (2026-11-16, hotfix):** when a file changes, Pacenote now embeds again only the
+  parts whose text changed; the rest keep their vectors, and a moved or renamed file costs nothing. Before, one edited
+  line re-embedded the whole file, so busy projects kept the Mac's fans running for hours in the background. The
+  first change of each file after the update still embeds it in full once. The built-in local AI now uses two
+  processor cores instead of four, and indexing runs at background priority, so it gives way to everything you do.
+
 ## 0.16.1 (2026-11-16)
 
 - **First update through Pacenote (2026-11-16):** 0.16.1 is the first version that 0.16.0 installs by itself:

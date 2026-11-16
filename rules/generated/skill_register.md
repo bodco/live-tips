@@ -7,7 +7,7 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - After the call: The call summary gets an "Agenda" section: each item with Discussed, Raised or Not raised. Items not raised go into the "What matters" text of the next call of the same series, as one line "Not raised last time: <item>; <item>".
 
 **Commitments register.** File: `<call folder>/commitments.jsonl`. JSON lines, append only. Each line is an event; the register is the events folded by id. Never rewrite or delete lines: a later event wins.
-- `add`: `{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill","from":"<id of the item this one replaces, optional>"}`
+- `add`: `{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill|page","from":"<id of the item this one replaces, optional>"}`
 - `done`: `{"v":1,"op":"done","id":"<id>","at":"<ISO time>","source":"manual|detected|notion","call":"<transcript file name, when closed on a call>"}`
 - `reopen`: `{"v":1,"op":"reopen","id":"<id>","at":"<ISO time>"}`
 - `drop`: `{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}`

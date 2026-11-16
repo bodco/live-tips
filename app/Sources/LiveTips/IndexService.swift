@@ -192,6 +192,7 @@ final class IndexService: @unchecked Sendable {
         p.executableURL = URL(fileURLWithPath: python)
         p.arguments = [lt, "index", root] + watched.dropFirst().flatMap { ["--extra", $0] }
         p.currentDirectoryURL = URL(fileURLWithPath: appRoot)
+        p.qualityOfService = .background                 // 0.16.2: the index is never urgent
         let logPath = (appRoot as NSString).appendingPathComponent("logs/index.log")
         let log = FileHandle.forAppending(path: logPath)
         log?.write("== \(Date()) lt index \(root)\n".data(using: .utf8)!)

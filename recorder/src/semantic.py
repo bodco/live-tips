@@ -817,7 +817,7 @@ class ProjectIndex:
         so many seconds, so a long first build killed halfway does not start over."""
         t0 = time.time()
         summary = {"new": 0, "changed": 0, "removed": 0, "chunks_added": 0, "files": 0, "chunks": 0,
-                   "remaining_files": 0, "seconds": 0.0, "committed": False}
+                   "remaining_files": 0, "seconds": 0.0, "committed": False, "chunks_reused": 0}
         with IndexLock(self.dir, wait=lock_wait):
             self.load(force=True)
             m = self.manifest if not rebuild else {}
@@ -836,6 +836,13 @@ class ProjectIndex:
                 for a, b in zip(order, order[1:]):
                     rows[self.meta[a]["path"]] = (self.meta[a:b], np.asarray(self.vecs[a:b], dtype=np.float16))
                 del start
+            # 0.16.2: vectors by the hash of the chunk's embed input, so a changed file re-embeds only the chunks
+            # whose text changed and a moved or renamed file none. Rows written before 0.16.2 have no "h" and pay once.
+            reuse: dict[str, np.ndarray] = {}
+            for metas_, vv in rows.values():
+                for r, vrow in zip(metas_, vv):
+                    if r.get("h"):
+                        reuse[r["h"]] = vrow
             files_now = {}
             for ap, rel, st in iter_files(self.roots(), exclude):
                 files_now[ap] = (rel, st)
@@ -853,6 +860,7 @@ class ProjectIndex:
             summary["removed"] = len(removed)
             dim = int(m.get("dim") or 0) or None
             added = 0
+            reused = 0
             dirty = bool(removed) or (rebuild and bool(self.manifest))
             done_files = 0
             last_commit = time.time()
@@ -876,36 +884,44 @@ class ProjectIndex:
                 ch = [(s + body, e + body, h) for s, e, h in chunk_text(text[body:])]
                 title = doc_title(rel)
                 inputs = [f"{title}{' > ' + h if h else ''}\n{text[s:e].strip()}" for s, e, h in ch]
+                keys = [text_hash(t, self.model) for t in inputs]
+                need = [i for i, k in enumerate(keys) if k not in reuse]
                 vec_parts = []
                 try:
-                    for j in range(0, len(inputs), max(1, batch)):
+                    for j in range(0, len(need), max(1, batch)):
                         while should_yield is not None and should_yield():
                             if stop is not None and stop.is_set():
                                 break
                             time.sleep(yield_sleep)
                         if stop is not None and stop.is_set():
                             break
-                        vec_parts.append(self.client.embed(inputs[j:j + batch], timeout=timeout, use_cache=False))
+                        vec_parts.append(self.client.embed([inputs[i] for i in need[j:j + batch]], timeout=timeout,
+                                                           use_cache=False))
                         if pause_s:
                             time.sleep(pause_s)
                 except SemanticError:
                     if dirty or added:
                         self._commit(old_files, rows, dim)
                     raise
-                if stop is not None and stop.is_set() and len(vec_parts) * max(1, batch) < len(inputs):
+                if stop is not None and stop.is_set() and len(vec_parts) * max(1, batch) < len(need):
                     break
                 if ch:
-                    v = np.concatenate(vec_parts).astype(np.float16)
+                    got = np.concatenate(vec_parts).astype(np.float16) if vec_parts else None
+                    fresh = {i: got[n] for n, i in enumerate(need)}
+                    for i, row in fresh.items():
+                        reuse[keys[i]] = row
+                    v = np.stack([fresh[i] if i in fresh else reuse[keys[i]] for i in range(len(ch))]).astype(np.float16)
                     dim = v.shape[1]
                     meta = [{"path": ap, "rel": rel, "start": s, "end": e, "heading": h,
-                             "preview": preview(text[s:e]), "last_edited": le, "mtime": st.st_mtime}
-                            for s, e, h in ch]
+                             "preview": preview(text[s:e]), "last_edited": le, "mtime": st.st_mtime, "h": k}
+                            for (s, e, h), k in zip(ch, keys)]
                     rows[ap] = (meta, v)
                 else:
                     rows.pop(ap, None)
                 info["n"] = len(ch)
                 old_files[ap] = info
-                added += len(ch)
+                added += len(need)                       # chunks actually embedded (the cost)
+                reused += len(ch) - len(need)
                 dirty = True
                 done_files += 1
                 summary["changed" if existed else "new"] += 1
@@ -915,6 +931,7 @@ class ProjectIndex:
                     self._commit(old_files, rows, dim)
                     last_commit = time.time()
             summary["chunks_added"] = added
+            summary["chunks_reused"] = reused
             summary["remaining_files"] = len(todo) - done_files
             if dirty:
                 self._commit(old_files, rows, dim)

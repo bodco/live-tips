@@ -255,7 +255,8 @@ action items), `<title>.polls.jsonl` (every poll), `<title>.tips.jsonl` and
    ```
    ~/work/Tools/live-transcriber/bin/lt index "$HOME/work/Acme Portal"
    ```
-   Later runs only re-embed new or changed files. Details: section 5, "Local semantic layer".
+   Later runs only re-embed new or changed files, and in a changed file only the parts whose text changed.
+   Details: section 5, "Local semantic layer".
 4c. **Updating from an older version.** Re-run `install.sh`: it rebuilds `audiocap` and the
    tips window (`bin/prompter`). The stealth switch and the new window need that rebuild.
 5. **The skill.** Download `live-tips.skill` from the [latest release](https://github.com/bodco/live-tips/releases/latest)
@@ -702,7 +703,8 @@ admin history take?" finds the fact "Admin audit logs: 16 h".
 - **The project index.** `lt index "<project folder>"` embeds the project's text files
   (`.md`, `.txt`, `.csv`, small `.json`), including the local Notion mirror (`_notion/`, made by
   [`notion-mirror`](../../notion-mirror/README.md)),
-  into `<project>/.livetips-index/`. It is incremental (only new or changed files) and
+  into `<project>/.livetips-index/`. It is incremental (only new or changed files; in a changed or
+  moved file only the chunks whose text changed are embedded again, the rest keep their vectors) and
   during a call the recorder indexes fresh files in the background, only while transcription
   is idle. Skipped: `.git`, `repos/`, archives, binaries, files over 2 MB, call artefacts
   (only transcripts are indexed) and anything that looks like a secret (`secrets` folders,
@@ -718,7 +720,9 @@ admin history take?" finds the fact "Admin audit logs: 16 h".
   Display turns it off for a call; when Ollama is not running the layer is `off` with the
   reason and the recorder retries every 30 s.
 - **16 GB Mac.** `bge-m3` takes about 1.2 GB next to Whisper (about 1.6 GB); a call makes
-  about 7 short embedding requests a minute. Pre-index before the call. Under memory
+  about 7 short embedding requests a minute. The built-in engine uses 2 processor threads and
+  indexing runs at background priority (`defaults write io.github.example.livetips embedThreads -int 4`
+  gives the engine more threads). Pre-index before the call. Under memory
   pressure set `index_enabled: false` (no background indexing) or `semantic_enabled: false`
   in `config.json`.
 

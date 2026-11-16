@@ -7,6 +7,7 @@ import LiveTipsCore
 final class LocalAIService: @unchecked Sendable {
     nonisolated(unsafe) static let shared = LocalAIService()
     static let builtinPort = 11435
+    static let defaultThreads = 2
     static var builtinURL: String { "http://127.0.0.1:\(builtinPort)" }
     private(set) var process: Process?
 
@@ -32,7 +33,12 @@ final class LocalAIService: @unchecked Sendable {
         if Self.ping(Self.builtinURL) { return }          // already running (e.g. started by a previous app run)
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
-        p.arguments = ["-m", "livetips_m0.embed_server", "--model-dir", modelDir, "--port", String(Self.builtinPort)]
+        // 0.16.2: 2 threads (was 4) and utility QoS, so background indexing no longer takes four cores for hours;
+        // a live line is short and the indexer is paused during a call. Defaults key `embedThreads` overrides.
+        let threads = UserDefaults.standard.integer(forKey: "embedThreads")
+        p.arguments = ["-m", "livetips_m0.embed_server", "--model-dir", modelDir, "--port", String(Self.builtinPort),
+                       "--threads", String(threads > 0 ? threads : Self.defaultThreads)]
+        p.qualityOfService = .utility
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = ProcessInfo.processInfo.environment
         env["PYTHONDONTWRITEBYTECODE"] = "1"

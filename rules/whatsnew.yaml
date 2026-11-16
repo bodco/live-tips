@@ -45,3 +45,9 @@ items:
     title_uk: "Оновлення всередині Pacenote"
     body_en: "Pacenote checks twice a day, downloads in the background and asks before it restarts. Never during a call. Settings › About › Updates."
     body_uk: "Pacenote перевіряє двічі на день, завантажує у фоні і питає перед перезапуском. Ніколи під час дзвінка. Налаштування › Про застосунок › Оновлення."
+  - id: quiet_index
+    version: 0.16.2
+    title_en: "Quieter in the background"
+    title_uk: "Тихіше у фоні"
+    body_en: "When a file changes, Pacenote re-reads only the parts that changed, on two cores and at low priority. The first change of each file after this update is read in full once."
+    body_uk: "Коли файл змінюється, Pacenote перечитує лише змінені частини, на двох ядрах і з низьким пріоритетом. Першу зміну кожного файлу після оновлення буде прочитано повністю один раз."

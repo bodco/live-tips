@@ -1003,7 +1003,8 @@ def cmd_index(args):
         raise LtError(f"embedding failed: {e.reason} (work done so far is saved; run lt index again)")
     rate = res["chunks_added"] / res["seconds"] if res["seconds"] else 0
     out(f"index {idx.dir}: files={res['files']} chunks={res['chunks']} new={res['new']} changed={res['changed']} "
-        f"removed={res['removed']} embedded_chunks={res['chunks_added']} seconds={res['seconds']} "
+        f"removed={res['removed']} embedded_chunks={res['chunks_added']} reused_chunks={res.get('chunks_reused', 0)} "
+        f"seconds={res['seconds']} "
         f"chunks_per_s={rate:.1f} model={client.model}"
         + (f" stopped=1 remaining_files={res.get('remaining_files', 0)}" if stop.is_set() else ""))
 

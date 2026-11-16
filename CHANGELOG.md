@@ -3,6 +3,12 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.16.1 (2026-11-16)
+
+- **First update through Pacenote (2026-11-16):** 0.16.1 is the first version that 0.16.0 installs by itself:
+  Settings > About > Updates, the line on Home or the dot on the menu bar icon. Nothing else changes for you; the
+  interface strings left over from the old setup are removed.
+
 ## 0.16.0 (2026-11-16)
 
 - **Setup in seven steps (2026-11-15, D3):** the first screen says what Pacenote does before, during and after a

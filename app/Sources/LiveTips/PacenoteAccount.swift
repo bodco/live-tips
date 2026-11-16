@@ -35,6 +35,12 @@ final class PacenoteAccount: ObservableObject {
     @Published private(set) var problem: String?
     /// A one-line notice after signing out or deleting ("Signed out on the server too").
     @Published var notice: String?
+    /// 0.17.0 (B6b): open invites to my email (Home and Settings > Account), and the organization projects I am on
+    /// per organization (Settings > Projects > a project). Posted when the organizations change (joined, left).
+    @Published private(set) var invites: [PacenoteServer.Invite] = []
+    @Published private(set) var orgProjects: [String: [PacenoteServer.OrgProject]] = [:]
+    @Published var inviteProblem: String?
+    static let orgsChanged = Notification.Name("PacenoteOrgsChanged")
 
     var signedIn: Bool { session != nil }
     var base: URL { PacenoteServer.baseURL(override: UserDefaults.standard.string(forKey: "pacenoteServerURL")) }
@@ -64,12 +70,23 @@ final class PacenoteAccount: ObservableObject {
         guard session == nil, let s else { return }
         session = s
         Task { await refreshInfo() }
+        // smoke 16.11 (0.17.0): an invite made while the app runs showed only after a restart or a visit to Settings >
+        // Account. Coming back to the app reads /v1/me again, at most every 10 minutes.
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated {
+                let a = PacenoteAccount.shared
+                guard a.signedIn, !a.busy, Date().timeIntervalSince(a.lastInfo) > 600 else { return }
+                Task { await a.refreshInfo() }
+            }
+        }
     }
+    private var lastInfo = Date.distantPast
 
     /// 0.11.0 (smoke shots, `--render-sheet-shots`): the demo account state for the offscreen screens.
-    func shotState(session: PacenoteServer.Session?, me: PacenoteServer.Me?, devices: [PacenoteServer.Device] = []) {
+    func shotState(session: PacenoteServer.Session?, me: PacenoteServer.Me?, devices: [PacenoteServer.Device] = [],
+                   invites: [PacenoteServer.Invite] = [], orgProjects: [String: [PacenoteServer.OrgProject]] = [:]) {
         guard SheetShots.active else { return }
-        self.session = session; self.me = me; self.devices = devices
+        self.session = session; self.me = me; self.devices = devices; self.invites = invites; self.orgProjects = orgProjects
     }
 
     static var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev" }
@@ -134,10 +151,14 @@ final class PacenoteAccount: ObservableObject {
         if SheetShots.active { return }      // 0.11.0 (smoke shots): no network with the demo session
         guard signedIn else { return }
         busy = true; defer { busy = false }
+        lastInfo = Date()
         do {
             let (md, mc) = try await call("GET", "/v1/me")
             guard mc == 200, let m = PacenoteServer.me(json(md)) else { throw PacenoteAccountError.server(mc, PacenoteServer.problem(md, status: mc)) }
+            let before = me.map { Set($0.orgs.map(\.id)) }
             me = m
+            if let b = before, b != Set(m.orgs.map(\.id)) { NotificationCenter.default.post(name: Self.orgsChanged, object: nil) }
+            if m.pendingInvites > 0 { await loadInvites() } else { invites = [] }
             if var s = session, s.name != m.name || (s.email != m.email && !m.email.isEmpty) {
                 s.name = m.name; s.email = m.email; session = s; _ = store.set(.pacenoteSession, s.encoded())
             }
@@ -195,12 +216,91 @@ final class PacenoteAccount: ObservableObject {
         return b
     }
 
+    // MARK: 0.17.0 (B6b): organizations
+
+    private var meLoad: Task<Void, Never>?
+    /// The account's organizations, loaded once when not known yet (the call sync needs them to pick a call's
+    /// organization right after launch).
+    func meNow() async -> PacenoteServer.Me? {
+        if let m = me { return m }
+        guard signedIn else { return nil }
+        if let t = meLoad { await t.value; return me }
+        let t = Task { @MainActor in await self.refreshInfo() }
+        meLoad = t
+        await t.value
+        meLoad = nil
+        return me
+    }
+
+    /// GET /v1/invites: the open invites to my confirmed email.
+    func loadInvites() async {
+        guard signedIn else { return }
+        do {
+            let (d, c) = try await call("GET", "/v1/invites")
+            guard c == 200 else { return }
+            invites = PacenoteServer.invites(((try? JSONSerialization.jsonObject(with: d)) as? [[String: Any]]) ?? [])
+        } catch {}
+    }
+
+    /// Accepts an invite; by default the organization also becomes where new calls go. Returns the message to show,
+    /// nil when joined.
+    @discardableResult
+    func accept(_ i: PacenoteServer.Invite, makeDefault: Bool) async -> String? {
+        busy = true; defer { busy = false }
+        do {
+            let (_, c) = try await call("POST", "/v1/invites/\(i.id)/accept", body: PacenoteServer.acceptBody(makeDefault: makeDefault))
+            if let key = PacenoteServer.acceptProblem(status: c) {
+                if c == 404 || c == 410 { invites.removeAll { $0.id == i.id } }
+                inviteProblem = L(key, ["org": i.orgName, "code": String(c)])
+                return inviteProblem
+            }
+            invites.removeAll { $0.id == i.id }
+            inviteProblem = nil
+            notice = L("org.invite.joined", ["org": i.orgName])
+            await refreshInfo()
+            NotificationCenter.default.post(name: Self.orgsChanged, object: nil)
+            return nil
+        } catch { inviteProblem = error.localizedDescription; return inviteProblem }
+    }
+
+    func decline(_ i: PacenoteServer.Invite) async {
+        busy = true; defer { busy = false }
+        do {
+            let (_, c) = try await call("POST", "/v1/invites/\(i.id)/decline")
+            if [204, 200, 404, 410].contains(c) { invites.removeAll { $0.id == i.id }; inviteProblem = nil }
+            else { inviteProblem = L("org.invite.err.other", ["code": String(c)]) }
+        } catch { inviteProblem = error.localizedDescription }
+    }
+
+    /// PATCH /v1/me: where new calls go from now on (calls already made stay where they are).
+    func setDefaultOrg(_ orgID: String) async {
+        guard let m = me, m.org(orgID) != nil else { return }
+        busy = true; defer { busy = false }
+        do {
+            let (d, c) = try await call("PATCH", "/v1/me", body: PacenoteServer.defaultOrgBody(orgID, me: m))
+            guard c == 200 || c == 204 else { throw PacenoteAccountError.server(c, PacenoteServer.problem(d, status: c)) }
+            me?.defaultOrgID = orgID
+            problem = nil
+        } catch { problem = error.localizedDescription }
+    }
+
+    /// GET /v1/orgs/{id}/projects: the organization projects I am on (only where flags.org_projects).
+    func loadOrgProjects(_ orgID: String) async {
+        guard signedIn, me?.org(orgID)?.orgProjects == true else { return }
+        do {
+            let (d, c) = try await call("GET", "/v1/orgs/\(orgID)/projects")
+            guard c == 200 else { return }
+            orgProjects[orgID] = PacenoteServer.orgProjects(((try? JSONSerialization.jsonObject(with: d)) as? [[String: Any]]) ?? [],
+                                                            me: me?.userID ?? "")
+        } catch {}
+    }
+
     /// QA (`--account-test`): drops the access token so the next request refreshes.
     func expireAccessForTest() { access = nil }
 
     private func forget() {
         refreshing?.cancel(); refreshing = nil
-        access = nil; session = nil; me = nil; devices = []; problem = nil
+        access = nil; session = nil; me = nil; devices = []; problem = nil; invites = []; orgProjects = [:]
         _ = store.remove(.pacenoteSession)
     }
 
@@ -238,6 +338,11 @@ final class PacenoteAccount: ObservableObject {
         try await call(method, path, body: body)
     }
 
+    /// 0.17.0 (contract 9): with headers (`If-Match` on the organization project card).
+    func api(_ method: String, _ path: String, body: Data? = nil, headers: [String: String]) async throws -> (Data, Int) {
+        try await call(method, path, body: body, headers: headers)
+    }
+
     /// An authorized request; a 401 on a fresh-looking access token gets one refresh and one retry.
     private func call(_ method: String, _ path: String, body: Data? = nil, headers: [String: String] = [:]) async throws -> (Data, Int) {
         let r = try await raw(method, path, body: body, token: try await accessToken(), headers: headers)
@@ -247,7 +352,13 @@ final class PacenoteAccount: ObservableObject {
     }
 
     private func raw(_ method: String, _ path: String, body: Data?, token: String?, headers: [String: String] = [:]) async throws -> (Data, Int) {
-        var r = URLRequest(url: base.appendingPathComponent(String(path.dropFirst())))
+        // 0.17.0: a query ("?org_id=") stays a query, not a part of the path
+        let parts = path.split(separator: "?", maxSplits: 1).map(String.init)
+        var url = base.appendingPathComponent(String(parts[0].dropFirst()))
+        if parts.count == 2, var comp = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            comp.percentEncodedQuery = parts[1]; url = comp.url ?? url
+        }
+        var r = URLRequest(url: url)
         r.httpMethod = method
         r.timeoutInterval = 30
         r.setValue("application/json", forHTTPHeaderField: "Accept")

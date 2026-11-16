@@ -125,6 +125,10 @@ struct HomeView: View {
     @State private var hiddenNow: [String] = []           // 0.9.0: hidden in this session, for Undo
     /// 0.9.0 (phase 3 adds Settings > Modules): the Tracker screen in the navigation; on until the module switch exists.
     @AppStorage("moduleTracker") private var trackerOn = true
+    /// 0.17.0 (B6b, D39): the organization and project filters of Recent calls (shared with All past calls).
+    @AppStorage("callFilterOrg") private var filterOrg = ""
+    @AppStorage("callFilterProject") private var filterProject = ""
+    @ObservedObject private var acct = PacenoteAccount.shared
 
     private var live: Bool { CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(status.state) }
     private var demo: Bool { ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"] != nil }
@@ -169,6 +173,8 @@ struct HomeView: View {
                     titleBlock
                     if let e = auto.suggestion, !live { autoBanner(e) }
                     UpdateHomeLine()      // 0.16.0 (D3): "Pacenote 0.16.1 is ready · Install"
+                    InvitesHomeLine()     // 0.17.0 (B6b): "Mike invited you to Acme · Join…"
+                    OrgSetupHomeLine()    // 0.17.0 (5.3): "Acme is ready. Set it up…" for its owner
                     if !note.isEmpty { Text(note).font(PN.Font.body).foregroundStyle(PN.C.onMe) }
                     mainBlock
                     if !firstLaunch && calendarOn { comingUp }
@@ -182,7 +188,7 @@ struct HomeView: View {
         .background(PN.C.bg)
         .frame(minWidth: 680, minHeight: 560)
         .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents(); register.importOnce(); ntasks.keepFresh()
-                    runner.refreshAuth() }
+                    runner.refreshAuth(); if acct.signedIn { Task { await acct.loadInvites() } } }
         .onDrop(of: [.fileURL], isTargeted: nil) { items in          // 0.8.6 (B): drop a recording on Home
             _ = items.first?.loadObject(ofClass: URL.self) { u, _ in
                 if let u = u, TranscribeWindow.accepts(u) { DispatchQueue.main.async { MainActor.assumeIsolated { TranscribeWindow.show(file: u) } } }
@@ -206,6 +212,8 @@ struct HomeView: View {
             HStack(spacing: 2) {
                 navTab(L("home.nav.home"), selected: true) { nav.path = [] }
                 if trackerOn { navTab(L("home.nav.tracker"), selected: false) { nav.open(.tracker) } }
+                // 0.17.0: the console, for someone who runs something in an organization, or for staff
+                if acct.me?.showsConsole == true { navTab(L("console.tab"), selected: false) { nav.open(.console) } }
             }
             integrationsPill
             AIStatusIcon()            // 0.10.0 (AI chain): the limit status of the AIs the jobs use
@@ -769,10 +777,11 @@ struct HomeView: View {
     // MARK: Recent calls: three cards
 
     private var recentCalls: some View {
-        let rs = Array(history.visible.prefix(3))
+        let rs = Array(CallFilter.apply(history.visible, org: filterOrg, project: filterProject).prefix(3))
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(L("home.recentCalls")).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text)
+                CallFilters(org: $filterOrg, project: $filterProject, records: history.visible)
                 Spacer()
                 if !history.visible.isEmpty { Button(L("home.allPast")) { nav.open(.pastCalls) }.buttonStyle(.pnTertiary) }
             }
@@ -916,30 +925,28 @@ struct RecentCard: View {
     static func summary(_ file: String) -> String? {
         let notes = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
         guard let text = try? String(contentsOfFile: notes, encoding: .utf8) else { return nil }
-        var inSummary = false
-        for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let l = raw.trimmingCharacters(in: .whitespaces)
-            if l.hasPrefix("#") { inSummary = l.lowercased().contains("summary") || l.lowercased().contains("підсумок") || l.lowercased().contains("коротко"); continue }
-            guard inSummary, !l.isEmpty else { continue }
-            var s = l.replacingOccurrences(of: "^[-*•]\\s*", with: "", options: .regularExpression)
-            if let r = s.range(of: "(?<=[.!?])\\s", options: .regularExpression) { s = String(s[..<r.lowerBound]) }
-            return s.isEmpty ? nil : s
-        }
-        return nil
+        return MeetingNotes.homeLine(text)          // 0.17.0: also the TL;DR of the app's own notes
     }
 }
 
 /// 0.9.0: "All past calls": the old Recent list, all visible calls.
 struct PastCallsView: View {
     @ObservedObject var history = CallHistory.shared
+    @AppStorage("callFilterOrg") private var filterOrg = ""          // 0.17.0 (B6b, D39)
+    @AppStorage("callFilterProject") private var filterProject = ""
+    @ObservedObject private var acct = PacenoteAccount.shared
     private var f: DateFormatter {
         let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate("EEEdMMMHHmm"); return f
     }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(L("home.allPast")).font(.system(size: 20, weight: .bold)).foregroundStyle(PN.C.text).padding(.bottom, 12)
-                ForEach(Array(history.visible.enumerated()), id: \.element.id) { i, r in
+                HStack(spacing: 12) {
+                    Text(L("home.allPast")).font(.system(size: 20, weight: .bold)).foregroundStyle(PN.C.text)
+                    CallFilters(org: $filterOrg, project: $filterProject, records: history.visible)
+                }
+                .padding(.bottom, 12)
+                ForEach(Array(CallFilter.apply(history.visible, org: filterOrg, project: filterProject).enumerated()), id: \.element.id) { i, r in
                     if i > 0 { Divider() }
                     RecentRow(r: r, when: f.string(from: r.start), outcome: OutcomeCache.shared.outcome(r.file)?.line ?? "") { history.hide(r) }
                 }

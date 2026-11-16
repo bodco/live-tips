@@ -2569,6 +2569,153 @@ func settingsSearchD2() {
     expect(gen?.group == "basics", "d2: the group of an entry")
 }
 
+func orgsB6b() {
+    // /v1/me of server 0.6.0 (B6b contract 1)
+    let id: (String) -> String = { ["0000000" + $0, "0000", "0000", "0000", "00000000000" + $0].joined(separator: "-") }   // UUID-shaped
+    let u1 = id("1"), o1 = id("a"), o2 = id("b")
+    let mo: [String: Any] = [
+        "user": ["id": u1, "email": "mike@example.com", "name": "Mike"], "default_org_id": o2, "pending_invites": 1,
+        "organizations": [
+            ["id": o1, "name": "Mike's workspace", "kind": "personal", "org_role": "owner", "plan": "solo",
+             "flags": ["teams": false, "c_level": false, "org_projects": false], "quotas": ["seats_max": ["used": 0, "limit": 1]],
+             "policy": ["share_meeting_sheets": true, "allow_private_calls": true],
+             "leads_teams": [], "c_level": false, "heads_departments": [], "visible_to_manager": false, "visible_to": []],
+            ["id": o2, "name": "Acme", "kind": "team", "org_role": "member", "plan": "enterprise", "flags": ["org_projects": true],
+             "policy": ["allow_private_calls": false], "leads_teams": [], "c_level": false, "visible_to_manager": true,
+             "visible_to": ["c_level", "team_lead", "boss"]]]]
+    guard let me = PacenoteServer.me(mo) else { expect(false, "b6b: me parses"); return }
+    expect(me.userID == u1 && me.defaultOrgID == o2 && me.pendingInvites == 1 && me.orgs.count == 2, "b6b: me fields")
+    expect(me.personal?.id == o1 && me.defaultOrg?.id == o2 && me.showsOrgFilter, "b6b: personal, default, filter shown")
+    let acme = me.org(o2)!
+    expect(acme.orgProjects && !acme.allowPrivateCalls && acme.visibleTo == ["c_level", "team_lead"], "b6b: Acme flags, policy, visible_to (unknown dropped)")
+    expect(me.personal!.allowPrivateCalls && !me.personal!.orgProjects && me.personal!.visibleTo.isEmpty, "b6b: personal defaults")
+    expect(PacenoteServer.me(["user": ["email": "a@b.c"], "organizations": [["id": o1, "kind": "personal"]]])?.defaultOrg?.id == o1,
+           "b6b: no default_org_id (old server): the personal one")
+    var gone = me; gone.defaultOrgID = id("d")
+    expect(gone.defaultOrg?.id == o1, "b6b: a default the person left falls back to personal")
+    var one = me; one.orgs = [me.personal!]
+    expect(!one.showsOrgFilter, "b6b: one organization, no filter")
+    // the old field visible_to_manager alone still shows a badge
+    let old = PacenoteServer.me(["user": ["email": "a@b.c"], "organizations": [["id": o2, "kind": "team", "visible_to_manager": true]]])
+    expect(old?.orgs.first?.visibleTo == ["team_lead"], "b6b: visible_to_manager without visible_to")
+    // the badge (contract 1)
+    var o = acme
+    expect(PacenoteServer.visibilityKey(o, isPrivate: false) == "org.visible.both", "b6b: both")
+    o.visibleTo = ["team_lead"]; expect(PacenoteServer.visibilityKey(o, isPrivate: false) == "org.visible.lead", "b6b: lead")
+    o.visibleTo = ["c_level"]; expect(PacenoteServer.visibilityKey(o, isPrivate: false) == "org.visible.leadership", "b6b: leadership")
+    o.visibleTo = []; expect(PacenoteServer.visibilityKey(o, isPrivate: false) == nil, "b6b: nobody")
+    expect(PacenoteServer.visibilityKey(acme, isPrivate: true) == nil && PacenoteServer.visibilityKey(nil, isPrivate: false) == nil, "b6b: private or unknown: no badge")
+    o.shareMeetingSheets = false; o.visibleTo = ["team_lead"]
+    expect(PacenoteServer.visibilityKey(o, isPrivate: false) == "org.visible.lead", "b6b: the badge does not depend on share_meeting_sheets")
+    // Manage organization (contract 6)
+    var m = acme
+    expect(!m.canManage, "b6b: a member does not manage")
+    m.leadsTeams = ["t1"]; expect(m.canManage, "b6b: a lead manages")
+    m.leadsTeams = []; m.cLevel = true; expect(m.canManage, "b6b: C-level manages")
+    m.cLevel = false; m.role = "admin"; expect(m.canManage, "b6b: admin manages")
+    expect(!me.personal!.canManage, "b6b: never the personal space")
+    expect(PacenoteServer.adminURL(orgID: o2).absoluteString == "https://pacenote-admin.bodco.pm/org/" + o2, "b6b: console URL")
+    let lead = PacenoteServer.me(["user": ["email": "a@b.c"], "organizations": [["id": o2, "kind": "team", "leads_teams": [["id": "t9", "name": "Sales"]]]]])
+    expect(lead?.orgs.first?.leadsTeams == ["t9"], "b6b: leads_teams as objects too")
+    // private calls (contract 5)
+    expect(!PacenoteServer.privateAllowed(acme, alreadyPrivate: false) && PacenoteServer.privateAllowed(acme, alreadyPrivate: true), "b6b: policy off, a private call stays private")
+    expect(PacenoteServer.privateAllowed(me.personal, alreadyPrivate: false) && PacenoteServer.privateAllowed(nil, alreadyPrivate: false), "b6b: allowed by default")
+    expect(CallSync.privateRefused(status: 422, problem: "private calls are off in this organization") && !CallSync.privateRefused(status: 422, problem: "invalid fields: project_id"), "b6b: 422 private")
+    // invites (contract 2)
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let inv = PacenoteServer.invites([
+        ["id": "i1", "org_id": o2, "org_name": "Acme", "org_role": "member", "team_name": "Sales", "invited_by_name": "Emily",
+         "created_at": "2027-01-01T00:00:00Z", "expires_at": "2027-02-01T00:00:00.123+00:00"],
+        ["id": "i2", "org_id": o2, "org_name": "Old", "org_role": "member", "team_name": NSNull(), "expires_at": "2020-01-01T00:00:00Z"],
+        ["id": "i3", "org_name": "no org"]], now: now)
+    expect(inv.map(\.id) == ["i1"] && inv[0].teamName == "Sales" && inv[0].invitedBy == "Emily" && inv[0].expires != nil, "b6b: invites, expired and broken dropped")
+    let ab = (try? JSONSerialization.jsonObject(with: PacenoteServer.acceptBody(makeDefault: false))) as? [String: Any]
+    expect(ab?["make_default"] as? Bool == false && ab?.count == 1, "b6b: accept body")
+    expect(PacenoteServer.acceptProblem(status: 200) == nil && PacenoteServer.acceptProblem(status: 404) == "org.invite.err.gone"
+           && PacenoteServer.acceptProblem(status: 410) == "org.invite.err.expired" && PacenoteServer.acceptProblem(status: 402) == "org.invite.err.seats"
+           && PacenoteServer.acceptProblem(status: 500) == "org.invite.err.other", "b6b: accept answers")
+    let dp = (try? JSONSerialization.jsonObject(with: PacenoteServer.defaultOrgBody(o1, me: me))) as? [String: Any]
+    let dt = (try? JSONSerialization.jsonObject(with: PacenoteServer.defaultOrgBody(o2, me: me))) as? [String: Any]
+    expect(dp?["default_org_id"] is NSNull && dt?["default_org_id"] as? String == o2, "b6b: PATCH /v1/me body (personal = null)")
+    // organization projects (contract 4)
+    let ops = PacenoteServer.orgProjects([
+        ["id": "p2", "name": "Zeta", "archived": false, "member_ids": [u1]], ["id": "p1", "name": "Alpha", "member_ids": [u1, "x"]],
+        ["id": "p3", "name": "Not mine", "member_ids": ["x"]], ["id": "p4", "name": "Old", "archived": true, "member_ids": [u1]], ["name": "no id"]], me: u1)
+    expect(ops.map(\.id) == ["p1", "p2"], "b6b: only my projects, not archived, by name")
+    // the organization of a call (D36)
+    expect(PacenoteServer.orgForCall(stored: "", onServer: false, linkedOrg: "", me: me) == o2, "b6b: a new call goes to the default")
+    expect(PacenoteServer.orgForCall(stored: "", onServer: true, linkedOrg: "", me: me) == o1, "b6b: a call synced before 0.17 is personal")
+    expect(PacenoteServer.orgForCall(stored: o1, onServer: true, linkedOrg: o2, me: me) == o1, "b6b: a call keeps its organization")
+    expect(PacenoteServer.orgForCall(stored: "", onServer: false, linkedOrg: o2, me: one) == o1, "b6b: a link to an organization left is ignored")
+    expect(PacenoteServer.orgForCall(stored: o2, onServer: true, linkedOrg: "", me: one) == o1, "b6b: left the organization: the call goes home")
+    expect(PacenoteServer.orgForCall(stored: "", onServer: false, linkedOrg: o2, me: me) == o2, "b6b: a linked project's call goes to its organization")
+    expect(PacenoteServer.orgForCall(stored: "x", onServer: false, linkedOrg: "", me: nil) == "x", "b6b: account not known yet")
+    // what a call sends
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    let pb = CallSync.callBody(projectID: "p", title: "t", start: start, durationS: 1, meta: [:], appVersion: "0.17.0")
+    expect(pb["org_id"] == nil && pb["is_private"] == nil, "b6b: a personal, not private call sends what 0.16 sent")
+    let tb = CallSync.callBody(projectID: "p", title: "t", start: start, durationS: 1, meta: [:], appVersion: "0.17.0", orgID: o2, isPrivate: true)
+    expect(tb["org_id"] as? String == o2 && tb["is_private"] as? Bool == true, "b6b: org_id and is_private")
+    expect(CallSync.orgQuery(o2) == "?org_id=" + o2 && CallSync.orgQuery("") == "" && CallSync.orgQuery("x&y=1") == "", "b6b: org query only for an id")
+    let p0 = CallSync.projectBody(name: "N", slug: "n s", orgID: "", orgProjectID: nil)
+    let pl = CallSync.projectBody(name: "N", slug: "n", orgID: o2, orgProjectID: "op1")
+    let pu = CallSync.projectBody(name: "N", slug: "n", orgID: o2, orgProjectID: "")
+    expect(Set(p0.keys) == ["name", "local_slug"] && p0["local_slug"] as? String == "n-s", "b6b: personal project body as before")
+    expect(pl["org_id"] as? String == o2 && pl["org_project_id"] as? String == "op1" && pu["org_project_id"] is NSNull, "b6b: link and unlink")
+    expect(CallSync.projectKey(email: "m@x", orgID: o1, personal: true, slug: "a b", link: "") == "m@x|a-b", "b6b: personal key unchanged since 0.12")
+    expect(CallSync.projectKey(email: "m@x", orgID: o2, personal: false, slug: "a", link: "op1") == "m@x|" + o2 + "|a|op1", "b6b: organization key")
+    // the sync state: old files load, the new fields round-trip
+    let tmp = NSTemporaryDirectory() + "b6b-\(UUID().uuidString).sync.json"
+    try? Data(#"{"schema":1,"callID":"c1","hashes":{"call":"h"}}"#.utf8).write(to: URL(fileURLWithPath: tmp))
+    var st = CallSync.State.load(tmp)
+    expect(st?.callID == "c1" && st?.orgID == "" && st?.isPrivate == false && st?.serverPrivate == false, "b6b: a 0.16 state loads")
+    st?.orgID = o2; st?.isPrivate = true; st?.serverPrivate = true; st?.save(tmp)
+    let back = CallSync.State.load(tmp)
+    expect(back?.orgID == o2 && back?.isPrivate == true && back?.serverPrivate == true && back?.hashes["call"] == "h", "b6b: state round-trip")
+    try? FileManager.default.removeItem(atPath: tmp)
+    // a project: old files load, the link round-trips
+    let pj = try? JSONDecoder().decode(Project.self, from: Data(#"{"name":"A","slug":"a","root":"/x"}"#.utf8))
+    expect(pj?.orgProjectID == "" && pj?.privateByDefault == false && pj?.linkedToOrgProject == false, "b6b: a 0.16 project loads")
+    var lp = pj!; lp.orgProjectID = "op1"; lp.orgProjectOrg = o2; lp.orgProjectName = "Project 1"; lp.privateByDefault = true
+    let rt = (try? JSONEncoder().encode(lp)).flatMap { try? JSONDecoder().decode(Project.self, from: $0) }
+    expect(rt == lp && rt?.linkedToOrgProject == true, "b6b: project link round-trip")
+    // a moved project (Bohdan 16.11): its new calls go to the organization it was moved to; a link wins
+    var mv = pj!; mv.orgID = o1
+    expect(mv.homeOrg == o1 && PacenoteServer.orgForCall(stored: "", onServer: false, linkedOrg: mv.homeOrg, me: me) == o1, "b6b: moved project's new calls")
+    mv.orgProjectID = "op1"; mv.orgProjectOrg = o2
+    expect(mv.homeOrg == o2, "b6b: the organization project's organization first")
+    let mrt = (try? JSONEncoder().encode(mv)).flatMap { try? JSONDecoder().decode(Project.self, from: $0) }
+    expect(mrt?.orgID == o1 && pj?.homeOrg == "", "b6b: orgID round-trip, empty by default")
+}
+
+func prepSecuritySEC01() {
+    // hosts: only links the PM typed with a scheme, never Google, never a bare domain
+    let ctx = "Read https://northwind.example/pricing and https://docs.google.com/document/d/abc/edit, see x.example.io, " +
+              "https://forms.gle/zz https://sub.drive.google.com/a http://Acme.example/a"
+    expect(PrepSecurity.webHosts(in: ctx) == ["acme.example", "northwind.example"], "sec01: PM hosts only, no Google: \(PrepSecurity.webHosts(in: ctx))")
+    expect(PrepSecurity.webHosts(in: "https://docs.google.com/document/d/x").isEmpty, "sec01: docs.google.com never added")
+    expect(PrepSecurity.webHosts(in: "") == [] && PrepSecurity.webHosts(in: "https://localhost:8000/x").isEmpty, "sec01: nothing, no localhost")
+    expect(PrepSecurity.blocked("webhook.site") && PrepSecurity.blocked("a.ngrok-free.app") && !PrepSecurity.blocked("example.com"), "sec01: blocked hosts")
+    // the sales fetch: the company's own domain only
+    expect(PrepSecurity.salesFetchHosts(company: "https://www.Northwind.example/about") == ["northwind.example", "www.northwind.example"], "sec01: sales domain")
+    expect(PrepSecurity.salesFetchHosts(company: "Northwind Studio").isEmpty && PrepSecurity.salesFetchHosts(company: "").isEmpty, "sec01: a name is no domain")
+    expect(PrepSecurity.salesFetchHosts(company: "google.com").isEmpty, "sec01: never Google")
+    // read denies
+    let d = PrepSecurity.readDenies(home: "/Users/example", workRoot: "/Users/example/work", allowed: ["/Users/example/work/Acme", "/Users/example/.claude/skills/live-tips"],
+                                    otherRoots: ["/Users/example/work/Globex", "/Users/example/work/Acme", "/Users/example/work"])
+    expect(d.contains("Read(//Users/example/.ssh/**)") && d.contains("Grep(//Users/example/.aws/**)") && d.contains("Glob(//Users/example/Library/**)"), "sec01: secret folders denied")
+    expect(d.contains("Read(//Users/example/work/Secrets/**)") && d.contains("Read(//Users/example/work/Globex/**)"), "sec01: Secrets and another project denied")
+    expect(!d.contains("Read(//Users/example/work/Acme/**)") && !d.contains("Read(//Users/example/work/**)"), "sec01: never this project or a folder that holds it")
+    expect(!d.contains("Read(//Users/example/.claude/**)") && d.contains("Read(//Users/example/.claude/.credentials.json)"), "sec01: the skill's parent stays, its credentials not")
+    expect(d.contains("Read(//Users/example/.netrc)") && d.filter { $0 == "Read(//Users/example/.ssh/**)" }.count == 1, "sec01: files, no duplicates")
+    let w = PrepSecurity.readDenies(home: "/Users/example/", workRoot: "", allowed: [], otherRoots: [""])
+    expect(w.contains("Read(//Users/example/.ssh/**)") && !w.contains { $0.contains("(///") || $0.contains("//**") }, "sec01: clean paths")
+    // Claude Code's version
+    expect(PrepSecurity.claudeOK("2.1.170 (Claude Code)") == true && PrepSecurity.claudeOK("2.1.163") == true, "sec01: new enough")
+    expect(PrepSecurity.claudeOK("2.1.162 (Claude Code)") == false && PrepSecurity.claudeOK("1.9.999") == false, "sec01: too old")
+    expect(PrepSecurity.claudeOK("3.0.0") == true && PrepSecurity.claudeOK("unknown") == nil, "sec01: major, unreadable")
+}
+
 deckCapacity097()
 meetingSheet0100()
 meetingSheetUI0100()
@@ -2590,8 +2737,522 @@ callSyncAnalysis0130()
 sheetPeopleD1()
 sheetPeopleD1b()
 settingsSearchD2()
+func projectsWizard0170() {
+    // steps: people only for a new organization project made by someone who may make one
+    expect(ProjectWizardCore.steps(newOrgProject: true, canManage: true) == ProjectWizardCore.Step.allCases, "wiz: 5 steps")
+    expect(ProjectWizardCore.steps(newOrgProject: true, canManage: false).count == 4 && ProjectWizardCore.steps(newOrgProject: false, canManage: true).count == 4, "wiz: 4 steps")
+    expect(ProjectWizardCore.folderName("  ../Acme: site/plan  ") == "Acme site plan", "wiz: folder name \(ProjectWizardCore.folderName("  ../Acme: site/plan  "))")
+    expect(ProjectWizardCore.folderName("...") == "" && ProjectWizardCore.folderName(String(repeating: "a", count: 99)).count == 80, "wiz: empty, 80")
+    expect(ProjectWizardCore.parent(workRoot: "/w", workspaces: []) == "/w/My workspace", "wiz: My workspace")
+    expect(ProjectWizardCore.parent(workRoot: "/w", workspaces: ["/w/Acme", "/w/B"]) == "/w/Acme", "wiz: first workspace")
+    expect(ProjectWizardCore.parent(workRoot: "/w", workspaces: ["/w/Acme"], chosen: "/w/B") == "/w/B", "wiz: chosen")
+    expect(ProjectWizardCore.parent(workRoot: "", workspaces: []) == "", "wiz: no work folder")
+    let taken: Set<String> = ["/w/A/Site", "/w/A/Site 2"]
+    expect(ProjectWizardCore.newFolder(parent: "/w/A", name: "Site", exists: { taken.contains($0) }) == "/w/A/Site 3", "wiz: free name")
+    expect(ProjectWizardCore.newFolder(parent: "", name: "Site", exists: { _ in false }) == "", "wiz: no parent")
+    let ls = ProjectWizardCore.links("https://drive.google.com/drive/folders/abc, https://www.notion.so/x\nftp://x.example/a notalink https://www.notion.so/x <https://brightline.example/a>")
+    expect(ls == ["https://drive.google.com/drive/folders/abc", "https://www.notion.so/x", "https://brightline.example/a"], "wiz: links \(ls)")
+    expect(ProjectWizardCore.links(String(repeating: "https://a.example/x ", count: 1)).count == 1, "wiz: dedupe")
+    expect(ProjectWizardCore.sourceKind(ls[0]) == "drive_folder" && ProjectWizardCore.sourceKind("https://docs.google.com/document/d/1") == "drive_file"
+           && ProjectWizardCore.sourceKind(ls[1]) == "notion_page" && ProjectWizardCore.sourceKind(ls[2]) == "url", "wiz: kinds")
+    expect(ProjectWizardCore.glossary("Brightline, e-bike\nbrightline, ,deposit") == ["Brightline", "e-bike", "deposit"], "wiz: glossary")
+    let b = ProjectWizardCore.orgProjectBody(name: "  Site  ", memberIDs: ["b", "a", "b"])
+    expect(b["name"] as? String == "Site" && b["member_ids"] as? [String] == ["a", "b"], "wiz: org project body")
+    expect(ProjectWizardCore.orgProjectBody(name: "S", memberIDs: [])["member_ids"] == nil, "wiz: no members key")
+    let ms = ProjectWizardCore.members([["user_id": "u1", "name": "Mike", "status": "active"], ["user_id": "me", "name": "Me"],
+                                        ["user_id": "u2", "name": NSNull(), "email": "emily@example.com"],
+                                        ["user_id": "u3", "name": "Gone", "status": "left"]], me: "me")
+    expect(ms.map(\.name) == ["emily@example.com", "Mike"], "wiz: members \(ms.map(\.name))")
+    // the sample project: untouched never syncs; a rename or a card edit makes it the PM's own
+    var sp = SampleProject.make(root: "/w/My workspace/Sample project", workspace: "My workspace")
+    expect(sp.sample && SampleProject.pristine(sp) && SampleProject.blocksSync(sp), "sample: pristine")
+    expect(sp.people.map(\.name) == ["Mike", "Emily", "Sarah"], "sample: American names")
+    sp.serverSync = true
+    expect(SampleProject.blocksSync(sp) && SampleProject.settle(sp).sample, "sample: sync switch alone does not unblock")
+    var renamed = sp; renamed.name = "Brightline"
+    expect(!SampleProject.pristine(renamed) && !SampleProject.settle(renamed).sample && !SampleProject.blocksSync(SampleProject.settle(renamed)), "sample: rename")
+    var edited = sp; edited.goal = "Ship it"
+    expect(!SampleProject.settle(edited).sample, "sample: card edit")
+    var plain = Project(name: "Site", slug: "site", root: "/w/Site"); plain.serverSync = true
+    expect(!SampleProject.blocksSync(plain), "sample: other projects sync as before")
+    let n = MeetingNotes.parse(SampleProject.notes)
+    expect(n?.decisions.count == 1 && n?.actions.count == 1 && n?.decisions.first?.t == "00:01:40", "sample: one decision, one task")
+    expect(SampleProject.callStem(date: Date(timeIntervalSince1970: 0)).hasSuffix("-sample-kickoff.app"), "sample: stem")
+    // the card round-trips through projects.json, old files keep loading
+    var c = Project(name: "Site", slug: "site", root: "/w/Site")
+    c.about = "A"; c.client = "B"; c.goal = "C"; c.glossary = ["x"]; c.links = ["https://a.example"]; c.sample = true
+    let d = (try? JSONEncoder().encode(c)) ?? Data()
+    expect((try? JSONDecoder().decode(Project.self, from: d)) == c, "card: round trip")
+    let old = try? JSONDecoder().decode(Project.self, from: Data(#"{"name":"Old","slug":"old","root":"/o"}"#.utf8))
+    expect(old?.about == "" && old?.links == [] && old?.sample == false, "card: old file")
+    for s in [SampleProject.transcript, SampleProject.notes, SampleProject.task, sp.about, sp.client, sp.goal] {
+        expect(!s.contains("\u{2014}"), "sample: no long dash")
+    }
+}
+
+func itemIDs0170() {
+    // server 0.7.0 (D40, B6b contract 9): stable item ids and revs in PUT /v1/calls/{id}/decisions|tasks|risks
+    var n = 0
+    let mk: () -> String = { n += 1; return "00000000-0000-0000-0000-00000000000\(n)" }
+    var st = CallSync.State()
+    let rows: [[String: Any]] = [["text": "Ship  the beta"], ["text": "Hire Emily"], ["text": "ship the beta"]]
+    let a = CallSync.withIDs(rows, part: "decisions", state: st, newID: mk)
+    expect(a.map { $0["_key"] as? String } == ["ship the beta", "hire emily", "ship the beta#2"], "items: keys (case, spaces, repeats)")
+    expect(Set(a.compactMap { $0["id"] as? String }).count == 3, "items: fresh ids")
+    expect(CallSync.stripKeys(a).allSatisfy { $0["_key"] == nil }, "items: hash body without the local key")
+    let first = CallSync.withRevs(a, part: "decisions", state: st)
+    expect(first.allSatisfy { $0["rev"] == nil && $0["_key"] == nil && $0["id"] != nil }, "items: first PUT, ids without rev")
+    let id0 = a[0]["id"] as! String, id1 = a[1]["id"] as! String, id2 = a[2]["id"] as! String
+    let resp = CallSync.json(["count": 3, "items": [["id": id0, "rev": 1], ["id": id2, "rev": 4]]])   // id1 deleted by a lead
+    CallSync.rememberItems(a, part: "decisions", response: resp, state: &st)
+    expect(st.items["decisions"]?["ship the beta"] == CallSync.ItemRef(id: id0, rev: 1), "items: rev remembered")
+    expect(st.items["decisions"]?["hire emily"] == CallSync.ItemRef(id: id1, rev: nil), "items: skipped by the server keeps its id")
+    // the next sync: same ids, same hash body, revs only in what is sent
+    let b = CallSync.withIDs([["text": "ship the BETA"], ["text": "Hire Emily"], ["text": "Ship the beta"], ["text": "New risk"]],
+                             part: "decisions", state: st, newID: mk)
+    expect(b.prefix(3).map { $0["id"] as? String } == [id0, id1, id2], "items: ids found again")
+    expect(CallSync.hash(CallSync.json(CallSync.stripKeys(Array(a.prefix(2))))) ==
+           CallSync.hash(CallSync.json(CallSync.stripKeys([a[0], b[1]]))), "items: a new rev alone does not change the hash")
+    let sent = CallSync.withRevs(b, part: "decisions", state: st)
+    expect(sent[0]["rev"] as? Int == 1 && sent[1]["rev"] == nil && sent[2]["rev"] as? Int == 4 && sent[3]["rev"] == nil, "items: last rev sent")
+    // an item no longer sent is forgotten; an old server answers without items
+    CallSync.rememberItems([b[0]], part: "decisions", response: CallSync.json(["count": 1]), state: &st)
+    expect(st.items["decisions"]?.count == 1 && st.items["decisions"]?["ship the beta"]?.rev == 1, "items: old server keeps rev, dropped forgotten")
+    CallSync.rememberItems([], part: "decisions", response: CallSync.json(["count": 0]), state: &st)
+    expect(st.items["decisions"] == nil, "items: empty part")
+    // the state file keeps them; an old file reads without them
+    st.items["tasks"] = ["call mike": CallSync.ItemRef(id: id1, rev: 2)]
+    let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+    let back = try? dec.decode(CallSync.State.self, from: enc.encode(st))
+    expect(back?.items == st.items, "items: state round trip")
+    let old = try? dec.decode(CallSync.State.self, from: Data(#"{"callID":"x","hashes":{}}"#.utf8))
+    expect(old?.items == [:] && old?.callID == "x", "items: old state file")
+    expect(CallSync.itemParts == ["decisions", "tasks", "risks"], "items: parts")
+}
+
+// 0.17.0 (server 0.7.0, D40, contract 9 block 2): a colleague's change comes back through /v1/sync
+func pull0170() {
+    let me = "11111111-1111-1111-1111-111111111111", emily = "22222222-2222-2222-2222-222222222222"
+    let page = CallSync.syncPage(CallSync.json(["changed": [["id": "AAA", "owner_id": me.uppercased(), "version": "3"], ["id": "bbb", "owner_id": emily],
+                                                            ["id": "ccc", "owner_id": me], ["id": "aaa", "owner_id": me]],
+                                                "deleted": ["DDD"], "cursor": "MjAyNi0xMS0xNlQxMDowMDowMCswMDowMA==", "more": true]))
+    expect(page?.changed.count == 4 && page?.changed[0].id == "aaa" && page?.deleted == ["ddd"] && page?.more == true, "pull: sync page")
+    expect(CallSync.syncPage(Data("[]".utf8)) == nil, "pull: not a page")
+    expect(CallSync.toRead(page!, me: me, known: ["aaa", "bbb"]) == ["aaa"], "pull: my known calls, once")
+    expect(CallSync.toRead(page!, me: "", known: ["aaa"]).isEmpty, "pull: no user id, nothing")
+    let org = "33333333-3333-3333-3333-333333333333"
+    expect(CallSync.syncPath(orgID: org, cursor: "") == "/v1/sync?org_id=" + org, "pull: first page")
+    expect(CallSync.syncPath(orgID: org, cursor: "ab=") == "/v1/sync?org_id=" + org + "&since=ab%3D", "pull: cursor encoded")
+    expect(CallSync.syncPath(orgID: "", cursor: "x") == "/v1/sync?since=x", "pull: personal")
+
+    let call: [String: Any] = [
+        "decisions": [["id": "D1", "rev": 3, "status": "reverted", "edited_by": emily], ["id": "d9", "rev": 1, "status": "made"]],
+        "tasks": [["id": "t1", "rev": 2, "status": "done", "assignee": "Mike", "due_date": "2026-11-20", "owner_user_id": emily],
+                  ["id": "t2", "rev": 4, "status": "open", "assignee": "Bohdan N.", "due_date": nil, "owner_user_id": me],
+                  ["id": "t3", "rev": 1, "status": "open"]],
+        "risks": [["id": "r1"]]]
+    let rd = CallSync.remoteItems(call, part: "decisions"), rt = CallSync.remoteItems(call, part: "tasks")
+    expect(rd.first == CallSync.RemoteItem(id: "d1", rev: 3, status: "reverted", editedBy: emily), "pull: remote decision")
+    expect(rt[0].due == "2026-11-20" && rt[0].ownerUserID == emily && rt[1].due == "" && CallSync.remoteItems(call, part: "risks").isEmpty, "pull: remote tasks")
+
+    var st = CallSync.State()
+    st.items["decisions"] = ["ship the beta": .init(id: "d1", rev: 1)]
+    st.items["tasks"] = ["send the deck": .init(id: "t1", rev: 1), "call the vendor": .init(id: "t2", rev: 4), "book a room": .init(id: "t3")]
+    let nd = CallSync.newer(rd, part: "decisions", state: st), nt = CallSync.newer(rt, part: "tasks", state: st)
+    expect(nd.map(\.key) == ["ship the beta"], "pull: a newer decision, an unknown one ignored")
+    expect(Set(nt.map(\.key)) == ["send the deck", "book a room"], "pull: newer tasks (same rev skipped, no rev counts as 0)")
+    var st2 = st
+    CallSync.adopt(nd + CallSync.newer([CallSync.RemoteItem(id: "t2", rev: 5, status: "open", assignee: "Bohdan N.", ownerUserID: me)], part: "tasks", state: st),
+                   me: me, myNames: ["Bohdan"], state: &st2)
+    expect(st2.items["decisions"]?["ship the beta"] == .init(id: "d1", rev: 3, status: "reverted"), "pull: decision rev and status kept")
+    expect(st2.items["tasks"]?["call the vendor"]?.assignee == "Bohdan N." && st2.items["tasks"]?["call the vendor"]?.rev == 5, "pull: a task given to me keeps the server name")
+    // the next PUT sends them back
+    let drows = CallSync.withIDs([["text": "Ship the beta"]], part: "decisions", state: st2)
+    let dsent = CallSync.withRevs(drows, part: "decisions", state: st2)
+    expect(dsent[0]["status"] as? String == "reverted" && dsent[0]["rev"] as? Int == 3 && dsent[0]["_key"] == nil, "pull: decision status goes back")
+    let trows = CallSync.withIDs([["text": "Call the vendor", "assignee": "Bohdan", "status": "open", "_mine": true, "_cid": "c-1"],
+                                  ["text": "Send the deck", "assignee": "Mike", "status": "done", "_mine": false]], part: "tasks", state: st2)
+    let tsent = CallSync.withRevs(trows, part: "tasks", state: st2)
+    expect(tsent[0]["assignee"] as? String == "Bohdan N." && tsent[0]["status"] as? String == "open" && tsent[0]["_mine"] == nil && tsent[0]["_cid"] == nil,
+           "pull: my task keeps the server name, no local keys")
+    expect(tsent[1]["assignee"] as? String == "Mike", "pull: their task as it is")
+    expect(CallSync.stripKeys(trows).allSatisfy { $0.keys.allSatisfy { !$0.hasPrefix("_") } }, "pull: hash body without local keys")
+    // rememberItems keeps what a colleague set when the id stays
+    var st3 = st2
+    CallSync.rememberItems(drows, part: "decisions", response: CallSync.json(["count": 1, "items": [["id": "d1", "rev": 3]]]), state: &st3)
+    expect(st3.items["decisions"]?["ship the beta"]?.status == "reverted", "pull: status survives the next PUT")
+
+    // task rows carry their register item; keys like withIDs
+    let ev: [[String: Any]] = [
+        ["op": "add", "id": "c-1", "text": "Send the deck", "owner": "me", "call": "x.app.md", "created": "2026-11-13T10:00:00+02:00", "due": "Friday"],
+        ["op": "add", "id": "c-2", "text": "Book a room", "owner": "Mike", "call": "x.app.md", "created": "2026-11-13T10:00:00+02:00", "due": "2026-11-18"],
+        ["op": "add", "id": "c-3", "text": "Draft the plan", "owner": "me", "call": "x.app.md", "created": "2026-11-13T10:00:00+02:00", "due": "next sprint"]]
+    let reg = CommitmentRegister.fold(ev)
+    let rows = CallSync.tasks(register: reg, lists: CallLists.Lists(), me: "Bohdan")
+    expect(rows[0]["_cid"] as? String == "c-1" && rows[0]["_mine"] as? Bool == true && rows[1]["_mine"] as? Bool == false, "pull: rows know their item")
+    expect(CallSync.taskKeys(rows) == ["send the deck": "c-1", "book a room": "c-2", "draft the plan": "c-3"], "pull: task keys")
+    expect(CallSync.taskKeys([["text": "A", "_cid": "x"], ["text": "a", "_cid": "y"]]) == ["a": "x", "a#2": "y"], "pull: same text twice")
+
+    let at = "2026-11-16T12:00:00+02:00"
+    let done = CallSync.taskEvents(reg[0], server: .init(id: "t1", rev: 2, status: "done", assignee: "Mike", due: "2026-11-20", ownerUserID: emily),
+                                   me: me, myNames: ["Bohdan"], at: at)
+    expect(done.count == 2 && done[0]["op"] as? String == "done" && done[0]["source"] as? String == "server", "pull: done from the server")
+    expect(done[1]["op"] as? String == "edit" && done[1]["owner"] as? String == "Mike" && done[1]["due"] as? String == "2026-11-20", "pull: owner and due")
+    let folded = CommitmentRegister.fold(ev + done)
+    expect(folded[0].status == "done" && folded[0].owner == "Mike" && folded[0].due == "2026-11-20", "pull: the register agrees")
+    expect(CallSync.taskEvents(folded[0], server: .init(id: "t1", rev: 2, status: "done", assignee: "Mike", due: "2026-11-20"), me: me, myNames: [], at: at).isEmpty,
+           "pull: nothing when they agree")
+    let toMe = CallSync.taskEvents(reg[1], server: .init(id: "t3", rev: 2, status: "dropped", assignee: "Bohdan N.", due: "", ownerUserID: me),
+                                   me: me, myNames: [], at: at)
+    expect(toMe[0]["op"] as? String == "drop" && toMe[1]["owner"] as? String == "me" && toMe[1]["due"] as? String == "", "pull: given to me, dropped, no due")
+    let reopen = CallSync.taskEvents(CommitmentRegister.fold(ev + [["op": "done", "id": "c-3"]])[2],
+                                     server: .init(id: "t4", rev: 3, status: "open", assignee: "bohdan", due: ""), me: me, myNames: ["Bohdan"], at: at)
+    expect(reopen.count == 1 && reopen[0]["op"] as? String == "reopen", "pull: reopened; my name; a due text with no day stays")
+
+    // tasks from the notes go into the register first, full text, once each
+    let long = String(repeating: "word ", count: 40) + "end"
+    let lt = [CallLists.Task(owner: "Mike", text: "Send the deck", due: "Friday"), CallLists.Task(text: long, mine: true),
+              CallLists.Task(owner: "Mike", text: "Send the deck"), CallLists.Task(text: "None")]
+    let ad = CommitmentRegister.adoptAllEvents(lt, project: "acme", title: "Weekly", call: "/x/live/2026-11-13 Weekly.app.md", them: "them", at: at)
+    expect(ad.count == 2 && ad.allSatisfy { ($0["by"] as? String) == "sync" && ($0["op"] as? String) == "add" }, "pull: adopt all, once each, nothing lines out")
+    expect((ad[1]["text"] as? String)?.hasSuffix("end") == true && ad[1]["owner"] as? String == "me" && ad[0]["due"] as? String == "Friday",
+           "pull: full text, owner, due")
+    let after = CommitmentRegister.fold(ad)
+    expect(CallSync.taskKeys(CallSync.tasks(register: after, lists: CallLists.Lists(), me: "")).keys.contains(CallSync.itemKey(long)), "pull: the same key after adopting")
+
+    // the state file keeps status and assignee; an older ItemRef reads without them
+    let enc = JSONEncoder(), dec = JSONDecoder()
+    expect((try? dec.decode(CallSync.State.self, from: enc.encode(st2)))?.items == st2.items, "pull: state round trip")
+    let oldRef = try? dec.decode(CallSync.ItemRef.self, from: Data(#"{"id":"x","rev":2}"#.utf8))
+    expect(oldRef == .init(id: "x", rev: 2) && oldRef?.status == nil, "pull: old item ref")
+}
+
+// 0.17.0 (contract 9 block 3): the organization project card
+func orgCard0170() {
+    let emily = "22222222-2222-2222-2222-222222222222", me = "11111111-1111-1111-1111-111111111111"
+    let body: [String: Any] = ["id": "p1", "org_id": "o1", "name": "Project 1", "archived": false,
+        "card": ["description": "Bike rental app", "goal": "Beta in March", "client": ["name": "Brightline Bikes", "site": "https://brightline.example"],
+                 "people": [["name": "Mike", "role": "CTO", "side": "client", "note": "decides"], ["name": ""]],
+                 "glossary": [["term": "BLB", "note": "Brightline Bikes"]], "rules": ["No dates before the estimate"], "languages": ["en"],
+                 "audience": "client", "version": "4", "updated_by": ["id": emily.uppercased(), "name": "Emily"], "updated_at": "2026-11-16T10:00:00Z"],
+        "people": [["user_id": me, "name": "Bohdan"], ["user_id": emily, "name": "Emily"]]]
+    guard let v = OrgCard.parse(CallSync.json(body)) else { expect(false, "card: parse"); return }
+    expect(v.name == "Project 1" && v.version == "4" && v.updatedByID == emily && v.updatedByName == "Emily" && v.members.count == 2, "card: header")
+    expect(v.card.clientName == "Brightline Bikes" && v.card.people == [OrgCard.Person(name: "Mike", role: "CTO", side: "client", note: "decides")]
+           && v.card.glossary == [OrgCard.Term(term: "BLB", note: "Brightline Bikes")] && v.card.rules.count == 1, "card: fields, empty names out")
+    var empty = OrgCard.parse(CallSync.json(["id": "p2", "card": ["description": NSNull(), "client": [:], "version": "1", "updated_by": ["id": NSNull(), "name": ""]]]))
+    expect(empty?.card.isEmpty == true && empty?.updatedByID == "" && empty?.updatedAt == nil, "card: a new empty card")
+    empty?.card.goal = "x"
+    expect(OrgCard.parse(Data("{}".utf8)) == nil, "card: not a card")
+
+    // only what I changed goes
+    var d = v.card
+    d.goal = "Beta in April"; d.rules.append("Never share the price list")
+    let patch = OrgCard.patch(base: v.card, draft: d)
+    expect(Set(patch.keys) == ["goal", "rules"] && (patch["rules"] as? [String])?.count == 2, "card: patch only changed fields")
+    expect(OrgCard.patch(base: v.card, draft: v.card).isEmpty, "card: nothing changed")
+    var long = v.card; long.description = String(repeating: "a", count: 2500)
+    expect((OrgCard.patch(base: v.card, draft: long)["description"] as? String)?.count == 2000, "card: limits")
+    expect(OrgCard.ifMatch("4") == "\"4\"" && OrgCard.ifMatch("\"4\"") == "\"4\"", "card: If-Match")
+
+    // 409: mine on top of theirs, field by field
+    var theirs = v.card; theirs.description = "Bike sharing app"; theirs.goal = "Beta in May"
+    let (merged, conflicts) = OrgCard.rebase(base: v.card, draft: d, server: theirs)
+    expect(merged.description == "Bike sharing app" && merged.goal == "Beta in April" && merged.rules.count == 2, "card: rebase keeps theirs and mine")
+    expect(conflicts == ["goal"], "card: both changed the goal")
+    var same = v.card; same.goal = "Beta in April"
+    expect(OrgCard.rebase(base: v.card, draft: d, server: same).conflicts.isEmpty, "card: the same change is no conflict")
+    expect(OrgCard.outcome(status: 200) == .saved && OrgCard.outcome(status: 409) == .newer && OrgCard.outcome(status: 428) == .newer
+           && OrgCard.outcome(status: 403) == .readOnly && OrgCard.outcome(status: 422, problem: "x") == .invalid("x"), "card: outcomes")
+
+    // the Meeting Sheet line
+    let before = ISO8601DateFormatter().date(from: "2026-11-15T10:00:00Z")!, after = ISO8601DateFormatter().date(from: "2026-11-17T10:00:00Z")!
+    expect(OrgCard.changedSincePrep(v, lastPrep: before, me: me) == "Emily", "card: changed by Emily since my prep")
+    expect(OrgCard.changedSincePrep(v, lastPrep: after, me: me) == nil, "card: not since")
+    expect(OrgCard.changedSincePrep(v, lastPrep: before, me: emily.uppercased()) == nil, "card: my own change")
+    expect(OrgCard.changedSincePrep(v, lastPrep: nil, me: me) == nil, "card: never prepared")
+
+    // editor text forms
+    let ppl = OrgCard.people("Mike | CTO | client | decides\nEmily | PM | team\nSarah | Designer | likes demos\n | nobody")
+    expect(ppl.count == 3 && ppl[1].side == "team" && ppl[2].side == "client" && ppl[2].note == "likes demos", "card: people lines")
+    expect(OrgCard.peopleText([OrgCard.Person(name: "Mike", role: "CTO", side: "client", note: "")]) == "Mike | CTO | client", "card: people text")
+    expect(OrgCard.people(OrgCard.peopleText(v.card.people)) == v.card.people, "card: people round trip")
+    expect(OrgCard.glossary("BLB: Brightline Bikes\nPacenote\n: none") == [OrgCard.Term(term: "BLB", note: "Brightline Bikes"), OrgCard.Term(term: "Pacenote")], "card: glossary lines")
+    expect(OrgCard.languages("en, UK, en, english, pt-br") == ["en", "uk", "pt-br"], "card: languages")
+    let local = OrgCard.fromLocal(about: "a", client: "Acme", goal: "g", glossary: ["BLB"], languages: ["en", ""])
+    expect(local.clientName == "Acme" && local.glossary == [OrgCard.Term(term: "BLB")] && local.languages == ["en"], "card: from this Mac")
+}
+
+// 0.17.0 (spec 5.3): setting up an organization
+func orgSetup0170() {
+    var acme = PacenoteServer.Org(id: "o1", name: "Acme", kind: "team", role: "owner", plan: "team")
+    expect(OrgSetup.steps(acme) == [.name, .projects, .invite, .policy], "orgsetup: no teams without the flag")
+    acme.teams = true
+    expect(OrgSetup.steps(acme) == OrgSetup.Step.allCases, "orgsetup: all steps")
+    expect(OrgSetup.offered(acme, done: []) && !OrgSetup.offered(acme, done: ["o1"]), "orgsetup: offered once")
+    var admin = acme; admin.role = "admin"
+    expect(!OrgSetup.offered(admin, done: []) && OrgSetup.canRun(admin), "orgsetup: admin runs it from Settings")
+    let home = PacenoteServer.Org(id: "o0", name: "Mike's workspace", kind: "personal", role: "owner", plan: "solo")
+    expect(!OrgSetup.offered(home, done: []) && !OrgSetup.canRun(home), "orgsetup: never the personal one")
+    expect(OrgSetup.nameBody("  Acme Inc ")?["name"] as? String == "Acme Inc" && OrgSetup.nameBody(" ") == nil, "orgsetup: name")
+
+    var a = Project(name: "A", slug: "a", root: "/w/A"), b = Project(name: "B", slug: "b", root: "/w/B")
+    var c = Project(name: "C", slug: "c", root: "/w/C"); c.status = "archived"
+    var d = Project(name: "D", slug: "d", root: "/w/D"); d.orgID = "o1"
+    let s = SampleProject.make(root: "/w/S", workspace: "w")
+    b.orgProjectID = "p1"; b.orgProjectOrg = "o2"
+    a.orgID = ""
+    expect(OrgSetup.movable([a, b, c, d, s], into: "o1").map(\.slug) == ["a", "b"], "orgsetup: movable projects")
+
+    let (ok, bad) = OrgSetup.invites("mike@example.com\nEmily@Example.com admin, sarah@example\n<mike@example.com>; joe@example.org member")
+    expect(ok == [.init(email: "mike@example.com", role: "member"), .init(email: "emily@example.com", role: "admin"),
+                  .init(email: "joe@example.org", role: "member")], "orgsetup: invite lines")
+    expect(bad == ["sarah@example"], "orgsetup: not an email")
+    expect(OrgSetup.invites("emily@example.com", defaultRole: "admin").ok.first?.role == "admin", "orgsetup: default role")
+    let ib = OrgSetup.inviteBody(.init(email: "e@x.io", role: "owner"), teamID: "t1")
+    expect(ib["org_role"] as? String == "member" && ib["team_id"] as? String == "t1", "orgsetup: invite body")
+    expect(OrgSetup.inviteBody(.init(email: "e@x.io", role: "admin"), teamID: "")["team_id"] == nil, "orgsetup: no team")
+    expect(OrgSetup.inviteResult(status: 201) == "orgsetup.invite.sent" && OrgSetup.inviteResult(status: 402) == "orgsetup.invite.seats"
+           && OrgSetup.inviteResult(status: 500) == "orgsetup.invite.failed", "orgsetup: invite answers")
+
+    let t = OrgSetup.teams([["id": "t2", "name": "Sales", "lead_user_id": "u1", "member_ids": ["u2"]], ["id": "t1", "name": "Delivery", "lead_user_id": NSNull()], ["name": "x"]])
+    expect(t.map(\.name) == ["Delivery", "Sales"] && t[0].leadID == "" && t[1].memberIDs == ["u2"], "orgsetup: teams")
+    expect(OrgSetup.teamBody(name: " Sales ", leadID: "u1")?["lead_user_id"] as? String == "u1" && OrgSetup.teamBody(name: "", leadID: "") == nil
+           && OrgSetup.teamBody(name: "Ops", leadID: "")?["lead_user_id"] == nil, "orgsetup: team body")
+
+    let p0 = OrgSetup.policy(["allow_private_calls": false, "share_meeting_sheets": true, "require_transcript_in_drive": false])
+    expect(p0 == .init(allowPrivateCalls: false, shareMeetingSheets: true) && OrgSetup.policy([:]) == .init(), "orgsetup: policy")
+    var p1 = p0; p1.allowPrivateCalls = true
+    expect(OrgSetup.policyBody(from: p0, to: p1).keys.sorted() == ["allow_private_calls"] && OrgSetup.policyBody(from: p0, to: p0).isEmpty, "orgsetup: policy body")
+    expect(SettingsSearch.entries.contains { $0.id == "pr.orgCard" }, "orgsetup: the card is in the settings search")
+}
+
+// 0.17.0 (smoke 16.11): the Home card line also from the TL;DR of the app's own notes
+func homeLine0170() {
+    expect(MeetingNotes.homeLine(SampleProject.notes) == "A sample call: the booking page goes live before spring, e-bikes first, design next Tuesday.",
+           "home line: TL;DR of the sample notes")
+    expect(MeetingNotes.homeLine("## Summary\n\n- Mike agreed. Then more.\n\n## Meeting notes\n\n### TL;DR\nOther.") == "Mike agreed.", "home line: a summary section first")
+    expect(MeetingNotes.homeLine("## Summary\n\nNone.\n\n## Meeting notes\n\n### TL;DR\nThe plan is set. More.") == "The plan is set.", "home line: an empty summary falls back")
+    expect(MeetingNotes.homeLine("## Meeting notes\n\n### TL;DR\nНемає.\n") == nil && MeetingNotes.homeLine("") == nil, "home line: nothing")
+    expect(MeetingNotes.homeLine("## Коротко\nДомовились про бюджет. Далі.") == "Домовились про бюджет.", "home line: Ukrainian summary")
+}
+
+// 0.17.0 (contract 9 block 4, spec 4.1): the registers of an organization project
+func orgRegisters0170() {
+    let me = "11111111-1111-1111-1111-111111111111", emily = "22222222-2222-2222-2222-222222222222", lead = "33333333-3333-3333-3333-333333333333"
+    let rows: [[String: Any]] = [
+        ["kind": "task", "id": "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", "text": "Send the estimate", "assignee": "Bohdan", "status": "open", "rev": 3,
+         "edited_by": lead.uppercased(), "edited_at": "2026-11-16T09:00:00Z", "call_id": NSNull(), "call_date": "2026-11-12T14:00:00Z",
+         "call_author": ["id": emily, "name": "Emily"], "mine": false, "can_edit": true, "can_delete": false,
+         "due_date": "2026-11-20", "owner_user_id": me.uppercased()],
+        ["kind": "decision", "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "text": "Beta in March", "made_by": "Mike", "status": "made", "rev": 1,
+         "edited_by": NSNull(), "edited_at": NSNull(), "call_id": "cccccccc-cccc-cccc-cccc-cccccccccccc", "call_date": "2026-11-12T14:00:00.000Z",
+         "call_author": ["id": emily, "name": "Emily"], "mine": false, "can_edit": false, "can_delete": false],
+        ["kind": "risk", "id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "text": "The client may slip", "said_by": "Mike", "status": "open", "rev": 2,
+         "call_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "call_date": "2026-11-10T10:00:00Z",
+         "call_author": ["id": me, "name": "Bohdan"], "mine": true, "can_edit": true, "can_delete": true],
+        ["kind": "note", "id": "x", "text": "not a register kind"], ["kind": "task", "id": "y", "text": "  "]]
+    guard let items = OrgRegister.parse(CallSync.json(rows)) else { expect(false, "registers: parse"); return }
+    expect(items.count == 3, "registers: unknown kinds and empty texts dropped")
+    let t = items[0], d = items[1], r = items[2]
+    expect(t.kind == .task && t.id == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" && t.who == "Bohdan" && t.rev == 3 && t.due == "2026-11-20"
+           && t.ownerUserID == me && t.callID == nil && t.authorName == "Emily" && t.canEdit && !t.canDelete && !t.mine, "registers: a colleague's task given to me")
+    expect(d.who == "Mike" && d.callID == "cccccccc-cccc-cccc-cccc-cccccccccccc" && d.callDate != nil && d.editedBy == "" && !d.canEdit, "registers: a read-only decision")
+    expect(r.who == "Mike" && r.mine && r.canDelete, "registers: my own risk")
+    expect(OrgRegister.parse(Data("{}".utf8)) == nil && OrgRegister.parse(Data("[]".utf8)) == [], "registers: not a list, an empty list")
+    expect(OrgRegister.fromColleagues(items).map(\.id) == [t.id, d.id], "registers: the Tracker adds my colleagues' items only")
+    expect(OrgRegister.givenToMe(t, me: me.uppercased()) && !OrgRegister.givenToMe(d, me: me) && !OrgRegister.givenToMe(t, me: ""), "registers: given to me")
+    expect(OrgRegister.callDay(t, lang: "en") == "Nov 12", "registers: from Emily's call, Nov 12")
+    expect(OrgRegister.closed(OrgRegister.Item(kind: .decision, id: "1", text: "x", status: "reverted")) && !OrgRegister.closed(t), "registers: closed")
+
+    // paths
+    expect(OrgRegister.listPath(org: "o1", project: "p1") == "/v1/orgs/o1/projects/p1/registers", "registers: list path")
+    expect(OrgRegister.listPath(org: "o1", project: "p1", kind: .task, status: "open") == "/v1/orgs/o1/projects/p1/registers?kind=task&status=open", "registers: filters")
+    let since = ISO8601DateFormatter().date(from: "2026-11-01T00:00:00Z")!
+    expect(OrgRegister.listPath(org: "o", project: "p", since: since).hasSuffix("?since=2026-11-01T00%3A00%3A00Z"), "registers: since escaped")
+    expect(OrgRegister.itemPath(org: "o", project: "p", t) == "/v1/orgs/o/projects/p/registers/task/" + t.id && OrgRegister.ifMatch(t) == "\"3\"", "registers: item path, If-Match")
+
+    // the PATCH body: only what changes
+    expect(OrgRegister.patch(t, .init(status: "done")) as NSDictionary == ["status": "done"] as NSDictionary, "registers: status")
+    expect(OrgRegister.patch(t, .init(status: "open")).isEmpty && OrgRegister.patch(t, .init(status: "closed")).isEmpty, "registers: same or a wrong status")
+    let clear = OrgRegister.patch(t, .init(due: "", owner: ""))
+    expect(clear["due_date"] is NSNull && clear["owner_user_id"] is NSNull, "registers: clear due date and owner")
+    expect(OrgRegister.patch(t, .init(due: "2026-11-20", owner: me)).isEmpty, "registers: the same due date and owner")
+    expect(OrgRegister.patch(t, .init(due: "next week")).isEmpty, "registers: not a date")
+    expect(OrgRegister.patch(t, .init(due: "2026-11-25", owner: emily.uppercased())) as NSDictionary == ["due_date": "2026-11-25", "owner_user_id": emily] as NSDictionary, "registers: due date and owner")
+    expect(OrgRegister.patch(d, .init(status: "reverted", due: "2026-11-25", owner: emily)) as NSDictionary == ["status": "reverted"] as NSDictionary, "registers: a decision takes only the status")
+    expect(OrgRegister.patch(r, .init(status: "made")).isEmpty && OrgRegister.statuses(.risk) == ["open", "closed"], "registers: risk statuses")
+
+    // after a saved PATCH
+    let ans = CallSync.json(["kind": "task", "id": t.id, "rev": 4, "changed": ["status", "owner_user_id"]])
+    let n = OrgRegister.applied(t, .init(status: "done", due: "2026-12-01", owner: emily), answer: ans, me: me, ownerName: "Emily")
+    expect(n.rev == 4 && n.status == "done" && n.due == "2026-11-20" && n.ownerUserID == emily && n.who == "Emily" && n.editedBy == me, "registers: applied only what changed")
+    let none = OrgRegister.applied(t, .init(status: "done"), answer: CallSync.json(["rev": 3, "changed": []]), me: me)
+    expect(none == t, "registers: nothing changed")
+    expect(OrgRegister.outcome(status: 204) == .saved && OrgRegister.outcome(status: 409) == .newer && OrgRegister.outcome(status: 403) == .readOnly
+           && OrgRegister.outcome(status: 404) == .gone && OrgRegister.outcome(status: 422, problem: "invalid fields: owner_user_id") == .invalid("invalid fields: owner_user_id"), "registers: outcomes")
+
+    // "changed by" under the row
+    let ppl = [OrgCard.Member(id: emily, name: "Emily"), OrgCard.Member(id: lead, name: "Sarah")]
+    expect(OrgRegister.editedByOther(t, members: ppl) == "Sarah" && OrgRegister.editedByOther(d, members: ppl) == nil, "registers: changed by the lead")
+    var byAuthor = t; byAuthor.editedBy = emily
+    expect(OrgRegister.editedByOther(byAuthor, members: ppl) == nil, "registers: the author's own change says nothing")
+    var byGone = t; byGone.editedBy = "44444444-4444-4444-4444-444444444444"
+    expect(OrgRegister.editedByOther(byGone, members: ppl) == "?" && OrgRegister.name(emily.uppercased(), members: ppl) == "Emily", "registers: names")
+}
+
+func console0170() {
+    func meWith(_ orgs: [[String: Any]], staff: Any? = nil, def: String = "") -> PacenoteServer.Me? {
+        var o: [String: Any] = ["user": ["id": "u1", "email": "mike@example.com", "name": "Mike"], "organizations": orgs, "default_org_id": def]
+        if let staff { o["staff"] = staff }
+        return PacenoteServer.me(o)
+    }
+    let personal: [String: Any] = ["id": "p1", "name": "Mike", "kind": "personal", "org_role": "owner", "plan": "solo"]
+    let member: [String: Any] = ["id": "t1", "name": "Acme", "kind": "team", "org_role": "member", "plan": "enterprise"]
+    let lead: [String: Any] = ["id": "t2", "name": "Beta", "kind": "team", "org_role": "member", "plan": "enterprise", "leads_teams": ["x"]]
+    let admin: [String: Any] = ["id": "t3", "name": "Gamma", "kind": "team", "org_role": "admin", "plan": "team"]
+    let cl: [String: Any] = ["id": "t4", "name": "Delta", "kind": "team", "org_role": "member", "plan": "enterprise", "c_level": true]
+    expect(meWith([personal])?.showsConsole == false && meWith([personal])?.staff == false, "console: personal only, no tab (and no staff field means not staff)")
+    expect(meWith([personal, member])?.showsConsole == false, "console: a plain member sees no tab")
+    expect(meWith([personal, member, lead])?.showsConsole == true && meWith([personal, member, lead])?.consolePath == "/org/t2", "console: a lead, opens their org")
+    expect(meWith([personal, admin])?.consolePath == "/org/t3" && meWith([personal, cl])?.showsConsole == true, "console: admin and C-level")
+    expect(meWith([personal, admin, lead], def: "t2")?.consolePath == "/org/t2", "console: the default org first when the person runs it")
+    expect(meWith([personal, member, admin], def: "t1")?.consolePath == "/org/t3", "console: the default org skipped when the person only belongs")
+    expect(meWith([personal], staff: true)?.showsConsole == true && meWith([personal], staff: true)?.consolePath == "/", "console: staff")
+    expect(meWith([personal], staff: "yes")?.staff == false, "console: staff must be a bool")
+
+    func url(_ s: String) -> Data { CallSync.json(["url": s, "expires_in": 60]) }
+    let good = "https://pacenote-admin.bodco.pm/auth/app?code=pnh_abcDEF123_-x&next=%2Forg%2Ft2"
+    expect(PacenoteServer.consoleHandoffURL(url(good))?.absoluteString == good, "console: handoff link")
+    for bad in ["http://pacenote-admin.bodco.pm/auth/app?code=pnh_a", "https://evil.example/auth/app?code=pnh_a",
+                "https://pacenote-admin.bodco.pm.evil.example/auth/app?code=pnh_a", "https://pacenote-admin.bodco.pm/login?code=pnh_a",
+                "https://pacenote-admin.bodco.pm/auth/app?code=abc", "https://pacenote-admin.bodco.pm/auth/app"] {
+        expect(PacenoteServer.consoleHandoffURL(url(bad)) == nil, "console: rejects \(bad)")
+    }
+    expect(PacenoteServer.consoleHandoffURL(Data("{}".utf8)) == nil && PacenoteServer.consoleHandoffURL(Data()) == nil, "console: empty answers")
+    expect(PacenoteServer.isConsoleURL(URL(string: "https://PACENOTE-ADMIN.bodco.pm/org/x")) && !PacenoteServer.isConsoleURL(URL(string: "https://accounts.google.com/o")),
+           "console: which links stay in the tab")
+    let body = (try? JSONSerialization.jsonObject(with: PacenoteServer.consoleHandoffBody(next: "/org/t2"))) as? [String: String]
+    expect(body == ["next": "/org/t2"], "console: handoff body")
+}
+
+func orgContext0170() {
+    // current state
+    let st = OrgContext.state(CallSync.json(["body_md": "# Acme\nBeta in March", "version": "3", "updated_by": ["id": "AB-1", "name": "Emily"],
+                                             "updated_at": "2026-11-16T09:00:00Z", "changed": true]))
+    expect(st?.body == "# Acme\nBeta in March" && st?.version == "3" && st?.updatedByID == "ab-1" && st?.updatedByName == "Emily"
+           && st?.updatedAt != nil && st?.changed == true && st?.isNew == false, "state: parse")
+    let empty = OrgContext.state(CallSync.json(["body_md": "", "version": "0", "updated_by": NSNull(), "updated_at": NSNull()]))
+    expect(empty?.isNew == true && empty.map(OrgContext.stateHeaders) == [:], "state: the first write has no If-Match")
+    expect(st.map(OrgContext.stateHeaders) == ["If-Match": "\"3\""], "state: later writes carry If-Match")
+    expect(OrgContext.state(Data("[]".utf8)) == nil && OrgContext.state(Data()) == nil, "state: not a state")
+    expect(OrgContext.fits(String(repeating: "a", count: 8192)) && !OrgContext.fits(String(repeating: "a", count: 8193))
+           && !OrgContext.fits(String(repeating: "ї", count: 4097)), "state: 8 KB in UTF-8 bytes")
+    expect(OrgContext.outcome(status: 200) == .saved && OrgContext.outcome(status: 409) == .newer && OrgContext.outcome(status: 428) == .newer
+           && OrgContext.outcome(status: 422, problem: "body_md: 8 KB at most") == .tooLong && OrgContext.outcome(status: 403) == .readOnly,
+           "state: outcomes")
+    let body = (try? JSONSerialization.jsonObject(with: OrgContext.stateBody("x"))) as? [String: String]
+    expect(body == ["body_md": "x"], "state: PUT body")
+
+    // the post-call suggestion
+    let s1 = OrgContext.suggest(current: "# Acme\nGoal: beta", day: "Nov 16", decisions: ["Ship on Friday"], risks: ["The client may slip", " "])
+    expect(s1 == "# Acme\nGoal: beta\n\n## Recent\n- Nov 16: Decision: Ship on Friday\n- Nov 16: Risk: The client may slip\n", "state: suggest adds a Recent part")
+    let s2 = OrgContext.suggest(current: s1, day: "Nov 17", decisions: ["Ship on Friday", "Hire Mike"], risks: [])
+    expect(s2.hasPrefix("# Acme\nGoal: beta\n\n## Recent\n- Nov 17: Decision: Ship on Friday\n- Nov 17: Decision: Hire Mike\n- Nov 16: Decision"),
+           "state: newest first under Recent")
+    let s3 = OrgContext.suggest(current: s1, day: "Nov 16", decisions: ["ship on friday"], risks: [])
+    expect(s3 == s1, "state: the same line twice is kept once")
+    let withTail = OrgContext.suggest(current: "# A\n## Recent\n- old\n## People\nMike", day: "D", decisions: ["x"], risks: [])
+    expect(withTail == "# A\n## Recent\n- D: Decision: x\n- old\n\n## People\nMike\n", "state: parts after Recent stay")
+    let big = OrgContext.suggest(current: "# A\n## Recent\n" + (0..<400).map { "- old line number \($0) with some words" }.joined(separator: "\n"),
+                                 day: "D", decisions: ["new"], risks: [])
+    expect(OrgContext.fits(big) && big.contains("- D: Decision: new") && !big.contains("number 399"), "state: oldest Recent lines go to fit 8 KB")
+    expect(OrgContext.suggest(current: "", day: "D", decisions: ["x"], risks: []) == "## Recent\n- D: Decision: x\n", "state: from empty")
+
+    // diff
+    let d = OrgContext.diff("a\nb\nc", "a\nc\nd")
+    expect(d == [.same("a"), .removed("b"), .same("c"), .added("d")], "state: line diff")
+    expect(OrgContext.diff("", "x") == [.removed(""), .added("x")] || OrgContext.diff("", "x") == [.added("x"), .removed("")], "state: diff from empty")
+    let long = OrgContext.diff((0..<20).map(String.init).joined(separator: "\n"), (0..<20).map { $0 == 10 ? "ten" : String($0) }.joined(separator: "\n"))
+    let c = OrgContext.compact(long, context: 1)
+    expect(c.count == 6 && c.first! == nil && c.last! == nil && c.contains(.some(.removed("10"))) && c.contains(.some(.added("ten"))), "state: compact diff")
+
+    // sources
+    let srcs = OrgContext.sources(CallSync.json([
+        ["id": "S1", "kind": "drive_folder", "ref": "1AbC", "title": "Specs", "note": "", "added_by": ["id": "U1", "name": "Mike"], "added_at": "2026-11-16T09:00:00Z"],
+        ["id": "s2", "kind": "telegram", "ref": "x"], ["id": "s3", "kind": "url", "ref": ""]]))
+    expect(srcs?.count == 1 && srcs?[0].id == "s1" && srcs?[0].kind == .driveFolder && srcs?[0].addedByName == "Mike" && srcs?[0].addedByID == "u1",
+           "sources: parse, unknown kinds and empty refs dropped")
+    let rec: [(String, OrgContext.SourceKind?, String)] = [
+        ("https://drive.google.com/drive/folders/1AbC_d-9?usp=sharing", .driveFolder, "1AbC_d-9"),
+        ("https://drive.google.com/drive/u/1/folders/XyZ", .driveFolder, "XyZ"),
+        ("https://drive.google.com/file/d/F1le/view", .driveFile, "F1le"),
+        ("https://drive.google.com/open?id=Q9", .driveFile, "Q9"),
+        ("https://docs.google.com/document/d/D0c/edit", .driveFile, "D0c"),
+        ("https://www.notion.so/acme/Plan-0123", .notionPage, "https://www.notion.so/acme/Plan-0123"),
+        ("https://www.notion.so/acme/0123?v=456", .notionDB, "https://www.notion.so/acme/0123?v=456"),
+        (" https://example.com/spec ", .url, "https://example.com/spec"),
+        ("http://example.com", nil, ""), ("not a link", nil, ""), ("javascript:alert(1)", nil, "")]
+    for (input, kind, ref) in rec {
+        let r = OrgContext.recognize(input)
+        expect(r?.kind == kind && (kind == nil || r?.ref == ref), "sources: recognize \(input)")
+    }
+    let sb = (try? JSONSerialization.jsonObject(with: OrgContext.sourceBody(kind: .driveFile, ref: "F", title: String(repeating: "t", count: 300), note: "n"))) as? [String: String]
+    expect(sb?["kind"] == "drive_file" && sb?["title"]?.count == 200 && sb?["note"] == "n", "sources: POST body")
+    var fs = OrgContext.Source(); fs.kind = .driveFolder; fs.ref = "1AbC"
+    var us = OrgContext.Source(); us.kind = .url; us.ref = "javascript:x"
+    expect(OrgContext.link(fs)?.absoluteString == "https://drive.google.com/drive/folders/1AbC" && OrgContext.link(us) == nil, "sources: links")
+
+    // file index
+    let files = OrgContext.files(CallSync.json([
+        ["source_ref": "drive/F1", "name": "Spec.pdf", "description": "The spec", "mime": "application/pdf", "modified_time": "2026-11-10T08:00:00Z",
+         "has_embedding": true, "indexed_by": ["id": "U2", "name": "Emily"], "indexed_at": "2026-11-16T09:00:00Z", "score": 0.83],
+        ["source_ref": "F2", "name": NSNull(), "description": NSNull(), "mime": "", "has_embedding": false, "indexed_by": ["id": "u3", "name": ""]],
+        ["name": "no ref"]]))
+    expect(files?.count == 2 && files?[0].name == "Spec.pdf" && files?[0].score == 0.83 && files?[0].hasEmbedding == true
+           && files?[0].indexedByName == "Emily" && files?[0].needsReindex == false && files?[1].needsReindex == true, "index: parse, gone indexer")
+    expect(OrgContext.indexPath("/v1/orgs/o/projects/p", ref: "drive/F 1?x#y") == "/v1/orgs/o/projects/p/index/drive/F%201%3Fx%23y", "index: ref path")
+    let longText = String(repeating: "word ", count: 300)
+    let desc = OrgContext.describe(longText)
+    expect(desc.count <= 600 && desc.hasSuffix("…") && OrgContext.describe("  a\n\n b ") == "a b", "index: description")
+    let vec = Array(repeating: 0.5, count: 1024)
+    let fb = (try? JSONSerialization.jsonObject(with: OrgContext.fileBody(name: "Spec", mime: "text/plain", modified: Date(timeIntervalSince1970: 0), description: "d", embedding: vec))) as? [String: Any]
+    expect((fb?["embedding"] as? [Double])?.count == 1024 && fb?["modified_time"] as? String == "1970-01-01T00:00:00Z" && fb?["name"] as? String == "Spec", "index: PUT body")
+    let fb2 = (try? JSONSerialization.jsonObject(with: OrgContext.fileBody(name: "S", mime: "", modified: nil, description: "", embedding: [1, 2]))) as? [String: Any]
+    expect(fb2?["embedding"] == nil && fb2?["modified_time"] == nil, "index: a wrong-sized embedding is not sent")
+    let q1 = (try? JSONSerialization.jsonObject(with: OrgContext.searchBody(text: "pricing", k: 80))) as? [String: Any]
+    let q2 = (try? JSONSerialization.jsonObject(with: OrgContext.searchBody(text: "pricing", vector: vec))) as? [String: Any]
+    expect(q1?["text"] as? String == "pricing" && q1?["k"] as? Int == 50 && q1?["vector"] == nil && (q2?["vector"] as? [Double])?.count == 1024 && q2?["text"] == nil,
+           "index: search body")
+
+    // history
+    let h = OrgContext.history(CallSync.json([
+        ["id": "12", "at": "2026-11-16T09:00:00Z", "by": ["id": "U1", "name": "Mike"], "entity": "state", "field": "body_md", "ref": "", "old": "# Old", "new": "# New"],
+        ["id": 11, "entity": "source", "field": "", "ref": "s1", "old": NSNull(), "new": ["kind": "url", "ref": "https://x", "title": "Spec"], "by": ["id": NSNull(), "name": ""]],
+        ["id": "10", "entity": "item", "field": "task.deleted", "ref": "t1", "old": ["deleted": false], "new": ["deleted": true]],
+        ["entity": "card"]]))
+    expect(h?.count == 3 && h?[0].byName == "Mike" && h?[0].restorable == true && h?[1].id == "11" && h?[1].old == nil && h?[2].restorable == false, "history: parse")
+    expect(OrgContext.verb(h![1]) == "added" && OrgContext.verb(h![0]) == "changed" && OrgContext.verb(h![2]) == "removed", "history: verbs")
+    expect(OrgContext.short(h![1].new) == "Spec" && OrgContext.short(String(repeating: "x", count: 100), max: 10).count == 10
+           && OrgContext.short(["a", "b"]) == "a, b" && OrgContext.short(nil).isEmpty, "history: short values")
+    let rb = (try? JSONSerialization.jsonObject(with: OrgContext.restoreBody(old: false))) as? [String: String]
+    expect(rb == ["value": "new"], "history: restore body")
+}
+
 componentsD3()
 whatsNewD3()
 updatesD3()
+orgsB6b()
+prepSecuritySEC01()
+projectsWizard0170()
+itemIDs0170()
+pull0170()
+orgCard0170()
+orgSetup0170()
+homeLine0170()
+orgRegisters0170()
+console0170()
+orgContext0170()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

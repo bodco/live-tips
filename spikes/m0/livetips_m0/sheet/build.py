@@ -699,6 +699,43 @@ def claude_files(sources: List[dict], texts: Dict[str, str], cache_dir: str) -> 
     return files
 
 
+MIN_CLAUDE = "2.1.163"
+FETCH_BLOCKED = ("google.com", "googleusercontent.com", "googleapis.com", "forms.gle", "goo.gl", "bit.ly", "tinyurl.com",
+                 "pastebin.com", "webhook.site", "requestbin.com", "ngrok.io", "ngrok-free.app", "pipedream.net")
+
+
+def fetch_blocked(host: str) -> bool:
+    """0.17.0 (SEC-01, PrepSecurity.blocked in the app): Google is read through the accounts, never fetched (a Google
+    Form would collect what the agent read); paste, hook and short-link services never."""
+    h = (host or "").lower()
+    return not h or any(h == b or h.endswith("." + b) for b in FETCH_BLOCKED)
+
+
+_CLAUDE_SEEN: Dict[str, str] = {}
+
+
+def claude_too_old(claude: str, minimum: str = MIN_CLAUDE) -> Optional[str]:
+    """The version of Claude Code when it is older than `minimum`; None when new enough or not readable. Asked once
+    per binary (path and modification time), at most 3 seconds."""
+    try:
+        key = "%s|%d" % (claude, int(os.path.getmtime(claude)))
+    except OSError:
+        return None
+    out = _CLAUDE_SEEN.get(key)
+    if out is None:
+        try:
+            out = subprocess.run([claude, "--version"], capture_output=True, text=True, timeout=3).stdout or ""
+        except Exception:  # noqa: BLE001
+            out = ""
+        _CLAUDE_SEEN[key] = out
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", out or "")
+    n = re.search(r"(\d+)\.(\d+)\.(\d+)", minimum)
+    if not m or not n:
+        return None
+    v, w = tuple(int(x) for x in m.groups()), tuple(int(x) for x in n.groups())
+    return ".".join(map(str, v)) if v < w else None
+
+
 def run_claude(req: dict, prompt: str, files: Dict[str, str], hosts: List[str], emit, sources: List[dict]) -> Tuple[str, dict]:
     """claude -p with least privilege: Read/Grep/Glob, the source folders added, WebFetch only to the sources'
     hosts, everything else denied. Returns (final text, meta {read, cost_usd, turns, model})."""
@@ -707,8 +744,15 @@ def run_claude(req: dict, prompt: str, files: Dict[str, str], hosts: List[str], 
         raise RuntimeError("Claude Code is not installed")
     route = Z.route_key(req.get("route") or "code")
     dirs = sorted({os.path.dirname(p) for p in files.values()})
+    # 0.17.0 (SEC-01): an old Claude Code lets WebFetch carry data out through an allowed host (CVE-2026-54316)
+    old = claude_too_old(claude, req.get("min_claude") or MIN_CLAUDE)
+    if old:
+        raise RuntimeError(f"Claude Code {old} is too old for a safe build; update it (claude update)")
+    hosts = [h for h in hosts if not fetch_blocked(h)]
     allowed = ["Read", "Grep", "Glob"] + [f"WebFetch(domain:{h})" for h in hosts]
     denied = ["Bash", "Write", "Edit", "NotebookEdit", "Task", "WebSearch"] + ([] if hosts else ["WebFetch"])
+    # 0.17.0 (SEC-01): never the folders with keys and tokens, never another project's folder (PrepSecurity in the app)
+    denied += [d for d in (req.get("deny_read") or []) if isinstance(d, str) and d.startswith(("Read(", "Grep(", "Glob("))]
     args = [claude, "-p", prompt, "--model", req.get("model") or "sonnet", "--output-format", "stream-json", "--verbose",
             "--permission-mode", "default", "--allowedTools", ",".join(allowed), "--disallowedTools", ",".join(denied),
             "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}']
@@ -1184,7 +1228,8 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     if use_claude:
         emit(progress=0.13, stage="model", route=route)
         files = claude_files(usable, texts, os.path.join(os.path.dirname(base), ".sheet-cache", os.path.basename(base)))
-        hosts = sorted({urlparse(s["uri"]).hostname for s in usable if s.get("fetch") and s.get("uri")} - {None})
+        # 0.17.0 (SEC-01): only the pages the PM added himself, never one found automatically (LinkedIn Featured)
+        hosts = sorted({urlparse(s["uri"]).hostname for s in usable if s.get("fetch") and s.get("uri") and not s.get("auto")} - {None})
         prompt = PR.agent_prompt(req, blocks_text, usable, files, texts, lang, call_langs)
         try:
             text, meta = run_claude(req, prompt, files, hosts, emit, usable)

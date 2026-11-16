@@ -15,6 +15,7 @@ final class HomeNav: ObservableObject {
         case stats
         case pastCalls                       // 0.9.0: All past calls
         case tracker                         // 0.9.0: the Tracker screen
+        case console                         // 0.17.0: the web console in the app (ConsoleTab.swift)
         case upcoming(String)                // 0.9.0: an upcoming call page (StartCallModel id)
     }
     @Published var path: [Route] = []
@@ -57,6 +58,7 @@ final class HomeNav: ObservableObject {
         case .stats: return L("home.week.detailsTitle")
         case .pastCalls: return L("home.allPast")
         case .tracker: return L("home.nav.tracker")
+        case .console: return L("console.tab")
         case .upcoming(let id): return UpcomingPages.models[id]?.effectiveTitle ?? L("call.title.upcoming")
         }
     }
@@ -122,6 +124,7 @@ struct HomeRouteView: View {
         case .stats: ScrollView { WeekStats().padding(20) }
         case .pastCalls: PastCallsView()
         case .tracker: TrackerView()
+        case .console: ConsoleTabView()
         case .upcoming(let id):
             if let m = UpcomingPages.models[id] { UpcomingCallPage(model: m) } else { Text(L("call.page.empty")).padding() }
         }

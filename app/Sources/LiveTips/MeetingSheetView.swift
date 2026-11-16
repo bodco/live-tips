@@ -55,6 +55,7 @@ struct MeetingSheetTab: View {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 16) {
                         headerLine(s)
+                        OrgCardChangedLine(sheetPath: doc.path)     // 0.17.0 (contract 9 block 3): a colleague changed the card
                         let d = SheetDiffCounts.of(s)
                         if !d.isEmpty { diffBanner(s, d) }
                         if !doc.note.isEmpty { Text(doc.note).font(PN.Font.caption).foregroundStyle(PN.C.pending) }
@@ -89,6 +90,7 @@ struct MeetingSheetTab: View {
         return HStack(spacing: 10) {
             Text(parts.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             SheetReadinessPill(badge: s.readinessBadge)
+            VisibilityBadge(transcript: doc.base + ".md")      // 0.17.0 (B6b): "Visible to your team lead"
             if doc.checking { ProgressView().controlSize(.small) }
             Spacer()
             Button(L("sheet.ui.blocks.edit"), action: onEditBlocks).buttonStyle(.pnTertiary)

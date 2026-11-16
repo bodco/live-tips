@@ -24,13 +24,15 @@ struct TrackerItem: Identifiable, Hashable {
     var callTitle: String = ""
     var local = false                  // kept on this Mac (not in Notion yet)
     var commitment: Commitment? = nil
+    var orgItem: OrgRegister.Item? = nil  // 0.17.0 (block 4): a colleague's item from an organization project's registers
+    var orgProject = ""                   // its organization project
 
-    static func == (a: TrackerItem, b: TrackerItem) -> Bool { a.id == b.id && a.status == b.status }
+    static func == (a: TrackerItem, b: TrackerItem) -> Bool { a.id == b.id && a.status == b.status && a.orgItem == b.orgItem }
     func hash(into h: inout Hasher) { h.combine(id) }
 
     var done: Bool {
         let s = status.lowercased()
-        return ["done", "closed", "resolved", "superseded", "cancelled", "canceled", "mitigated", "готово", "закрито"].contains(s)
+        return ["done", "closed", "resolved", "superseded", "cancelled", "canceled", "mitigated", "dropped", "reverted", "готово", "закрито"].contains(s)
     }
     var dueDate: Date? { CommitmentRegister.dueDate(due, from: Date()) }
 }
@@ -124,6 +126,8 @@ final class TrackerModel: ObservableObject {
 struct TrackerScreen: View {
     @ObservedObject var model = TrackerModel.shared
     @ObservedObject var register = Register.shared
+    @ObservedObject var org = OrgRegisterStore.shared      // 0.17.0 (block 4): my colleagues' items in organization projects
+    @State private var orgSheet: OrgItemSheet.Mode?
     @AppStorage("trackerTab") private var tab = "tasks"
     @AppStorage("trackerWS") private var ws = ""
     @AppStorage("trackerProject") private var project = ""
@@ -145,7 +149,7 @@ struct TrackerScreen: View {
 
     private func list(_ k: TrackerItem.Kind) -> [TrackerItem] {
         let q = find.lowercased()
-        return model.items.filter { i in
+        return allItems.filter { i in
             i.kind == k
                 && (ws.isEmpty || i.workspace.contains(ws))
                 && (project.isEmpty || i.project == project)
@@ -155,6 +159,8 @@ struct TrackerScreen: View {
                 && (q.isEmpty || i.title.lowercased().contains(q) || i.project.lowercased().contains(q))
         }
     }
+
+    private var allItems: [TrackerItem] { model.items + org.trackerItems() }
 
     var body: some View {
         ScrollView {
@@ -180,13 +186,18 @@ struct TrackerScreen: View {
                 PageTabs(tabs: [("tasks", L("page.tab.tasks") + " \(list(.task).count)"), ("decisions", L("page.tab.decisions") + " \(list(.decision).count)"),
                                 ("risks", L("page.tab.risks") + " \(list(.risk).count)")], selection: $tab)
                 filters
+                if !org.note.isEmpty {
+                    Text(org.note).font(PN.Font.caption).foregroundStyle(org.noteIsError ? PN.C.danger : PN.C.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if newOpen { newTaskRow }
                 table
             }
             .padding(24).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)      // centred
         }
-        .onAppear { model.reload() }
+        .onAppear { model.reload(); Task { await org.reload() } }
         .onChange(of: register.version) { model.reload() }
+        .sheet(item: $orgSheet) { m in OrgItemSheet(mode: m) { orgSheet = nil } }
     }
 
     private var subline: String {
@@ -197,13 +208,13 @@ struct TrackerScreen: View {
     }
 
     private var filters: some View {
-        let projects = Array(Set(model.items.map(\.project).filter { !$0.isEmpty })).sorted()
-        let wss = Array(Set(model.items.flatMap { $0.workspace.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }.filter { !$0.isEmpty })).sorted()
-        let calls = Array(Set(model.items.map(\.callTitle).filter { !$0.isEmpty })).sorted()
+        let projects = Array(Set(allItems.map(\.project).filter { !$0.isEmpty })).sorted()
+        let wss = Array(Set(allItems.flatMap { $0.workspace.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }.filter { !$0.isEmpty })).sorted()
+        let calls = Array(Set(allItems.map(\.callTitle).filter { !$0.isEmpty })).sorted()
         return HStack(spacing: 10) {
             Picker(L("tracker.f.workspace"), selection: $ws) { Text(L("tracker.all")).tag(""); ForEach(wss, id: \.self) { Text($0).tag($0) } }.fixedSize()
             Picker(L("call.project"), selection: $project) { Text(L("tracker.all")).tag(""); ForEach(projects, id: \.self) { Text($0).tag($0) } }.fixedSize()
-            Picker(L("tracker.f.call"), selection: $call) { Text(L("tracker.all")).tag(""); ForEach(calls, id: \.self) { Text($0).tag($0) } }.fixedSize()
+            Picker(L("tracker.f.call"), selection: $call) { Text(L("tracker.all")).tag(""); ForEach(calls, id: \.self) { Text($0).tag($0) } }.frame(maxWidth: 220)  // 0.17.0: the longest Notion title stretched the row and hid Owner and Status
             if tab == "tasks" {
                 Picker(L("tracker.f.owner"), selection: $owner) {
                     Text(L("series.me")).tag("me"); Text(L("tracker.anyone")).tag("anyone"); Text(L("tracker.others")).tag("others")
@@ -256,15 +267,24 @@ struct TrackerScreen: View {
 
     private func row(_ r: TrackerItem, danger: Bool) -> some View {
         let third = r.kind == .task ? (isMine(r) ? L("series.me") : r.owner) : r.kind == .decision ? r.date : r.impact
-        let fourth = r.kind == .task ? (r.due.isEmpty ? "" : Register.dueText(r.due)) : r.status
+        let fourth = r.kind == .task ? (r.due.isEmpty ? "" : Register.dueText(r.due))
+            : r.orgItem.map { L("orgreg.st." + $0.kind.rawValue + "." + $0.status) } ?? r.status
         return HStack(spacing: 12) {
             if r.kind == .task {
-                Toggle("", isOn: Binding(get: { r.done }, set: { _ in if let c = r.commitment { register.mark(c) } else if let u = URL(string: r.url) { NSWorkspace.shared.open(u) } }))
+                Toggle("", isOn: Binding(get: { r.done }, set: { on in
+                    if let i = r.orgItem { Task { await org.change(i, orgProject: r.orgProject, .init(status: on ? "done" : "open")) } }
+                    else if let c = r.commitment { register.mark(c) } else if let u = URL(string: r.url) { NSWorkspace.shared.open(u) } }))
                     .toggleStyle(.checkbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": r.title]))
+                    .disabled(r.orgItem.map { !$0.canEdit } ?? false)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(2)
                 if r.local { Text(L("tracker.kept")).font(.system(size: 10)).foregroundStyle(PN.C.text3) }
+                if let i = r.orgItem {      // "from Mike's call, Nov 12", never a link to a colleague's call
+                    Text(r.callTitle + (org.editedBy(i, r.orgProject)
+                        .map { " · " + L("orgreg.changedBy", ["who": $0]) } ?? ""))
+                        .font(.system(size: 10)).foregroundStyle(PN.C.text3).lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(r.project).font(PN.Font.caption).foregroundStyle(PN.C.text2).frame(width: 140, alignment: .leading).lineLimit(1)
@@ -272,7 +292,7 @@ struct TrackerScreen: View {
                 if !r.callFile.isEmpty {
                     Button(r.callTitle.isEmpty ? L("tracker.call") : r.callTitle) { CallPageWindow.show(file: r.callFile) }
                         .buttonStyle(.plain).foregroundStyle(PN.C.accent)
-                } else { Text(r.callTitle).foregroundStyle(PN.C.text3) }
+                } else { Text(r.orgItem == nil ? r.callTitle : "").foregroundStyle(PN.C.text3) }
             }
             .font(PN.Font.caption).frame(width: 140, alignment: .leading).lineLimit(1)
             Text(third).font(PN.Font.caption).foregroundStyle(PN.C.text2).frame(width: 110, alignment: .leading).lineLimit(1)
@@ -282,6 +302,7 @@ struct TrackerScreen: View {
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { if let u = URL(string: r.url), !r.url.isEmpty { NSWorkspace.shared.open(u) } }
         .contextMenu {
+            OrgItemMenu(row: r, sheet: $orgSheet)
             if let u = URL(string: r.url), !r.url.isEmpty { Button(L("ntask.openNotion")) { NSWorkspace.shared.open(u) } }
             if !r.callFile.isEmpty { Button(L("reg.openCall")) { CallPageWindow.show(file: r.callFile) } }
             Button(L("reg.copy")) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(r.title, forType: .string) }

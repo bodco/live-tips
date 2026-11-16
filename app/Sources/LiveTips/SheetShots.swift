@@ -108,7 +108,7 @@ final class SheetShots: NSObject, NSApplicationDelegate {
         }
         let me: (Bool) -> PacenoteServer.Me? = { req in
             PacenoteServer.me(["user": ["email": "mike@example.com", "name": "Mike Carter"], "organizations": [
-                ["id": "o1", "name": "Mike's workspace", "kind": "personal", "org_role": "owner", "plan": "beta"],
+                ["id": "o1", "name": "Mike's workspace", "kind": "personal", "org_role": "owner", "plan": "solo"],
                 ["id": "o2", "name": "Northwind Studio", "kind": "team", "org_role": "member", "plan": "team",
                  "policy": ["require_transcript_in_drive": req]]]])
         }
@@ -406,6 +406,15 @@ final class SheetShots: NSObject, NSApplicationDelegate {
         }, tweak: nil))
         s.append(Scene(name: "d3-help-whatsnew", size: NSSize(width: 720, height: 900), make: {
             AnyView(ScrollView { WhatsNewHistory().padding(24) })
+        }))
+        // 0.17.0: the diff before the project state goes, and the Console tab without a signed-in account
+        s.append(Scene(name: "o17-state-diff", size: NSSize(width: 640, height: 420), make: {
+            let old = "# Lumenfield\nGoal: beta in March\n\n## Recent\n- Nov 12: Decision: Keep the web build"
+            let new = OrgContext.suggest(current: old, day: "Nov 16", decisions: ["Ship the beta on Friday"], risks: ["Northwind may slip the API"])
+            return AnyView(StateDiffView(old: old, new: new).padding(20))
+        }))
+        s.append(Scene(name: "o17-console-tab", size: NSSize(width: 1000, height: 600), make: {
+            AnyView(ConsoleTabView())
         }))
         return s
     }

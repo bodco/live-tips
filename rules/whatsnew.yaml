@@ -51,3 +51,27 @@ items:
     title_uk: "Тихіше у фоні"
     body_en: "When a file changes, Pacenote re-reads only the parts that changed, on two cores and at low priority. The first change of each file after this update is read in full once."
     body_uk: "Коли файл змінюється, Pacenote перечитує лише змінені частини, на двох ядрах і з низьким пріоритетом. Першу зміну кожного файлу після оновлення буде прочитано повністю один раз."
+  - id: organizations
+    version: 0.17.0
+    title_en: "Organizations"
+    title_uk: "Організації"
+    body_en: "Join your team's organization from an invite on Home. Each call says who can see it, and a call can be private. Settings › Account."
+    body_uk: "Приєднуйтесь до організації команди із запрошення на Home. Кожен дзвінок каже, хто його бачить, і дзвінок можна зробити приватним. Налаштування › Акаунт."
+  - id: org_projects
+    version: 0.17.0
+    title_en: "Shared projects"
+    title_uk: "Спільні проєкти"
+    body_en: "A project linked to an organization project shares its card, state, sources and file index, and the Tracker shows colleagues' decisions, tasks and risks. Their calls stay theirs."
+    body_uk: "Проєкт, прив'язаний до проєкту організації, ділиться карткою, станом, джерелами й індексом файлів, а Tracker показує рішення, задачі й ризики колег. Їхні дзвінки лишаються їхніми."
+  - id: console_tab
+    version: 0.17.0
+    title_en: "Console in the app"
+    title_uk: "Консоль у застосунку"
+    body_en: "If you run something in an organization, Console next to Home and Tracker opens its people, teams and projects. No extra sign-in."
+    body_uk: "Якщо ви щось керуєте в організації, Console поруч із Home і Tracker відкриває її людей, команди й проєкти. Без окремого входу."
+  - id: new_project
+    version: 0.17.0
+    title_en: "New project, step by step"
+    title_uk: "Новий проєкт крок за кроком"
+    body_en: "Settings › Projects › Add › New project… asks for the name, where calls go, a folder and a short card. A sample project shows how it all looks."
+    body_uk: "Налаштування › Проєкти › Додати › Новий проєкт… питає назву, куди йдуть дзвінки, папку і коротку картку. Приклад проєкту показує, як це виглядає."

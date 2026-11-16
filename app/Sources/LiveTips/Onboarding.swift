@@ -474,7 +474,7 @@ struct OnboardingView: View {
 
     func primary() {
         switch m.step {
-        case .folder: m.applyFolders(); m.next()
+        case .folder: m.applyFolders(); SampleProjectMaker.makeOnce(settings); m.next()   // 0.17.0 (5.1)
         case .done:
             finish()
             UsageLog.log("practice_call", ["from": "onboarding"])
@@ -486,6 +486,7 @@ struct OnboardingView: View {
     /// Done: the onboarding never comes back by itself, and What's new for this version is not shown to a new person.
     func finish() {
         UserDefaults.standard.set(true, forKey: "onboardingDone")
+        if !settings.config.workRoot.isEmpty { SampleProjectMaker.makeOnce(settings) }    // 0.17.0 (5.1)
         WhatsNewStore.markSeen()
         close()
     }

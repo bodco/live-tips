@@ -111,7 +111,13 @@ final class SettingsModel: ObservableObject {
         moveWork = w
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: w)
     }
-    @Published var registry = ProjectRegistry.load(from: AppPaths.projects) { didSet { if registry != oldValue { saveRegistry() } } }
+    @Published var registry = ProjectRegistry.load(from: AppPaths.projects) {
+        didSet {
+            // 0.17.0 (5.1): a renamed or edited sample project becomes the PM's own (and may sync)
+            if registry.projects.contains(where: { $0.sample && !SampleProject.pristine($0) }) { registry.projects = registry.projects.map(SampleProject.settle) }
+            if registry != oldValue { saveRegistry() }
+        }
+    }
     @Published var keyState: [SecretStore.Key: KeyState] = [:]
     @Published var masks: [SecretStore.Key: String] = [:]
     @Published var mirror = MirrorStatus(result: "", lastRunUTC: nil, pages: nil, mode: "")
@@ -786,6 +792,7 @@ struct SettingsView: View {
     @AppStorage("settingsAIProvider") private var aiProvider = "claude"
     @AppStorage("moduleTracker") private var trackerModule = true      // 0.9.0: Settings > Modules > Tracker     // 0.9.0: the Claude / ChatGPT tab
     @State private var showProjectsInfo = false
+    @State private var showWizard = false          // 0.17.0 (5.2)
     @State private var projectFilter = ""          // 0.15.0 (D2)
     @State private var showCandidates = false
     @AppStorage(SettingsSearch.generalGroupKey) private var generalGroup = "basics"
@@ -1245,12 +1252,20 @@ struct SettingsView: View {
                     .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.2)))
                     Spacer()
                     Menu(L("home.finish.add")) {
+                        Button(L("proj.add.new")) { showWizard = true }          // 0.17.0 (5.2): the wizard
+                        if !model.registry.projects.contains(where: { $0.sample }) {
+                            Button(L("proj.add.sample")) { if let s = SampleProjectMaker.make(model) { model.projectDetail = s } }
+                        }
+                        Divider()
                         Button(L("set.projectFolder")) { model.addProjectFolder() }
                         Button(L("set.workspaceFolder")) { model.addWorkspaceFolder() }
                         Divider()
                         Button(L("set.importControlTowerConfigs")) { model.importProjects() }
                     }
                     .fixedSize().settingsAnchor("pr.import")
+                    .sheet(isPresented: $showWizard) {
+                        ProjectWizardView(settings: model) { slug in showWizard = false; if let s = slug { model.projectDetail = s } }
+                    }
                     Menu {
                         Button(L("set.scanWorkFolder")) { model.scanFolders() }
                             .disabled(model.config.workRoot.isEmpty)

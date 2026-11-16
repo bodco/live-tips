@@ -78,6 +78,7 @@ public enum SettingsSearch {
         .init("sh.timing", "sheet", title: "sheet.ui.set.timing", words: "reminder timing when нагадування коли"),
         .init("sh.presets", "sheet", title: "sheet.ui.set.presets", words: "presets template шаблони пресети"),
         .init("acc.head", "account", title: "account.head", words: "account sign in login server акаунт вхід сервер"),
+        .init("acc.orgs", "account", title: "org.head", words: "organization team invite join manage default private організація команда запрошення приєднатися керувати приватний"),
         .init("mod.tracker", "modules", title: "modules.tracker", words: "tracker tasks module трекер задачі модуль"),
         // Components (0.16.0, D3)
         .init("comp.disk", "components", title: "cmp.disk", words: "disk space size storage free gb місце диск розмір вільно"),
@@ -120,6 +121,14 @@ public enum SettingsSearch {
         .init("pr.ai", "projects", projectPage: true, title: "set.useClaudeForTips", words: "ai tips api allowed підказки"),
         .init("pr.index", "projects", projectPage: true, title: "set.searchThisFolder", words: "index search folder reindex індекс пошук"),
         .init("pr.sync", "projects", projectPage: true, title: "set.syncToServer", words: "sync server account синхронізація сервер"),
+        .init("pr.orgMove", "projects", projectPage: true, title: "proj.org.move", words: "move organization transfer перенести організація"),
+        .init("pr.card", "projects", projectPage: true, title: "proj.card.head", words: "card about client goal terms glossary links sample картка клієнт мета терміни посилання приклад"),
+        .init("pr.orgProject", "projects", projectPage: true, title: "proj.org.project", words: "organization project link private організація проєкт прив'язати приватний"),
+        .init("pr.orgCard", "projects", projectPage: true, title: "orgcard.head", words: "shared card organization project team people rules спільна картка організація проєкт люди правила"),
+        .init("pr.orgState", "projects", projectPage: true, title: "orgctx.state.head", words: "current state status organization project поточний стан статус"),
+        .init("pr.orgSources", "projects", projectPage: true, title: "orgctx.src.head", words: "sources drive notion links folder джерела посилання папка"),
+        .init("pr.orgIndex", "projects", projectPage: true, title: "orgctx.idx.head", words: "file index search files embeddings індекс файлів пошук"),
+        .init("pr.orgHistory", "projects", projectPage: true, title: "orgctx.hist.head", words: "history restore undo changes історія відновити зміни"),
     ]
 
     /// Lower case, no accents, one kind of apostrophe, single spaces.

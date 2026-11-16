@@ -38,12 +38,35 @@ public struct Project: Codable, Equatable {
     /// 0.8.7 (I): the CRM company this project is linked to (id and name; never a key).
     public var crmCompanyId = ""
     public var crmCompanyName = ""
+    /// 0.17.0 (D38, D40.6): the organization project this project is linked to (its id, organization and name as last
+    /// seen); "" when not linked. Linking turns serverSync on; the project's new calls go to that organization.
+    public var orgProjectID = ""
+    public var orgProjectOrg = ""
+    public var orgProjectName = ""
+    /// 0.17.0 (D36): new calls of this project are private (a manager sees only that they happened and how long).
+    public var privateByDefault = false
+    /// 0.17.0 (B6b contract 3, Bohdan 16.11): the organization the project was moved to ("" = where new calls go).
+    public var orgID = ""
+    /// 0.17.0 (5.2, 5.1): the project card the PM keeps on this Mac (what the project is, the client, the goal, terms
+    /// for transcription and preparation, where to look). The server card of an organization project comes later.
+    public var about = ""
+    public var client = ""
+    public var goal = ""
+    public var glossary: [String] = []
+    public var links: [String] = []
+    /// 0.17.0 (5.1): the sample project made at the first start. While it is untouched it never syncs to the server.
+    public var sample = false
+    public var linkedToOrgProject: Bool { !orgProjectID.isEmpty && !orgProjectOrg.isEmpty }
+    /// Where the project's new calls go: its organization project's organization, else the one it was moved to, else
+    /// "" (where new calls go, Settings > Account).
+    public var homeOrg: String { linkedToOrgProject ? orgProjectOrg : orgID }
 
     public init(name: String, slug: String, root: String) { self.name = name; self.slug = slug; self.root = root }
 
     enum CodingKeys: String, CodingKey {
         case name, slug, root, config, status, workspace, defaultLanguage, clientLanguage, audienceDefault, people, aliases,
-             apiAllowed, serverSync, index, notionValue, salesEnabled, salesMethod, crmCompanyId, crmCompanyName
+             apiAllowed, serverSync, index, notionValue, salesEnabled, salesMethod, crmCompanyId, crmCompanyName,
+             orgProjectID, orgProjectOrg, orgProjectName, privateByDefault, orgID, about, client, goal, glossary, links, sample
     }
 
     /// 0.8.7: every field but the name is optional in the file, so new fields never drop a saved project.
@@ -68,6 +91,17 @@ public struct Project: Codable, Equatable {
         salesMethod = (try? c.decode(String.self, forKey: .salesMethod)) ?? ""
         crmCompanyId = (try? c.decode(String.self, forKey: .crmCompanyId)) ?? ""
         crmCompanyName = (try? c.decode(String.self, forKey: .crmCompanyName)) ?? ""
+        orgProjectID = (try? c.decode(String.self, forKey: .orgProjectID)) ?? ""
+        orgProjectOrg = (try? c.decode(String.self, forKey: .orgProjectOrg)) ?? ""
+        orgProjectName = (try? c.decode(String.self, forKey: .orgProjectName)) ?? ""
+        privateByDefault = (try? c.decode(Bool.self, forKey: .privateByDefault)) ?? false
+        orgID = (try? c.decode(String.self, forKey: .orgID)) ?? ""
+        about = (try? c.decode(String.self, forKey: .about)) ?? ""
+        client = (try? c.decode(String.self, forKey: .client)) ?? ""
+        goal = (try? c.decode(String.self, forKey: .goal)) ?? ""
+        glossary = (try? c.decode([String].self, forKey: .glossary)) ?? []
+        links = (try? c.decode([String].self, forKey: .links)) ?? []
+        sample = (try? c.decode(Bool.self, forKey: .sample)) ?? false
     }
 }
 

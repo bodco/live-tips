@@ -21,6 +21,15 @@ public enum CallSync {
         public var removed = false          // 0.12.1: "Delete from server" on this Mac; never re-sent (the server keeps a tombstone)
         public var error = ""
         public var syncedAt: Date?
+        /// 0.17.0 (B6b, D36): the organization the call belongs to on the server ("" before 0.17.0: the personal one).
+        public var orgID = ""
+        /// 0.17.0 (D36): the PM marked the call private (a manager sees only that it happened and how long); and
+        /// whether the server has it private (a private call stays private when the organization turns them off).
+        public var isPrivate = false
+        public var serverPrivate = false
+        /// 0.17.0 (server 0.7.0, D40): decisions, tasks, risks -> item key (CallSync.itemKey) -> the item's stable id and
+        /// the rev the server last answered. Sent with every PUT so a colleague's change in the project registers survives.
+        public var items: [String: [String: ItemRef]] = [:]
         public init() {}
 
         public init(from decoder: Decoder) throws {
@@ -34,6 +43,10 @@ public enum CallSync {
             deletedElsewhere = (try? c.decodeIfPresent(Bool.self, forKey: .deletedElsewhere)) ?? nil ?? false
             removed = (try? c.decodeIfPresent(Bool.self, forKey: .removed)) ?? nil ?? false
             syncedAt = (try? c.decodeIfPresent(Date.self, forKey: .syncedAt)) ?? nil
+            orgID = s(.orgID)
+            isPrivate = (try? c.decodeIfPresent(Bool.self, forKey: .isPrivate)) ?? nil ?? false
+            serverPrivate = (try? c.decodeIfPresent(Bool.self, forKey: .serverPrivate)) ?? nil ?? false
+            items = (try? c.decodeIfPresent([String: [String: ItemRef]].self, forKey: .items)) ?? nil ?? [:]
         }
 
         public static func load(_ path: String) -> State? {
@@ -46,6 +59,86 @@ public enum CallSync {
             let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]; enc.dateEncodingStrategy = .iso8601
             if let d = try? enc.encode(self) { try? d.write(to: URL(fileURLWithPath: path), options: .atomic) }
         }
+    }
+
+    /// 0.17.0 (server 0.7.0, D40): an item's id on the server (a UUID made on this Mac) and the last rev it answered.
+    public struct ItemRef: Codable, Equatable {
+        public var id: String
+        public var rev: Int?
+        /// 0.17.0 (contract 9, block 2): what a colleague set in the project registers, kept so the next PUT sends it
+        /// back instead of the app's default: a decision's or risk's status (the Mac keeps none), and the server's name
+        /// for me on a task given to me (so `owner_user_id` survives). nil when nobody changed them.
+        public var status: String?
+        public var assignee: String?
+        public init(id: String, rev: Int? = nil, status: String? = nil, assignee: String? = nil) {
+            self.id = id; self.rev = rev; self.status = status; self.assignee = assignee
+        }
+    }
+
+    /// The parts whose items carry a stable id and rev (B6b contract 9).
+    public static let itemParts: Set<String> = ["decisions", "tasks", "risks"]
+
+    /// The key that finds an item's id again: its text, case and spacing ignored. An edited text is a new item.
+    public static func itemKey(_ text: String) -> String {
+        text.lowercased().split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    }
+
+    /// The rows with their stable `id` (known ones kept, new ones get a fresh UUID); the same text twice gets "#2".
+    /// The body without revs decides whether the part changed, so a new rev alone never sends it again.
+    public static func withIDs(_ rows: [[String: Any]], part: String, state: State,
+                               newID: () -> String = { UUID().uuidString.lowercased() }) -> [[String: Any]] {
+        let known = state.items[part] ?? [:]
+        var seen: [String: Int] = [:]
+        return rows.map { r in
+            var o = r
+            let base = itemKey(r["text"] as? String ?? "")
+            seen[base, default: 0] += 1
+            let key = seen[base]! > 1 ? base + "#\(seen[base]!)" : base
+            o["id"] = known[key]?.id ?? newID()
+            o["_key"] = key
+            return o
+        }
+    }
+
+    /// What goes to the server: the rows with ids and the rev last seen (B6b contract 9), without the local key.
+    public static func withRevs(_ rows: [[String: Any]], part: String, state: State) -> [[String: Any]] {
+        let known = state.items[part] ?? [:]
+        return rows.map { r in
+            let key = r["_key"] as? String ?? ""
+            let mine = (r["_mine"] as? Bool) == true
+            var o = stripKeys([r])[0]
+            if let rev = known[key]?.rev, rev >= 1 { o["rev"] = rev }
+            // 0.17.0 (block 2): a colleague's status of a decision or risk goes back as it is (the Mac keeps none), and
+            // a task given to me keeps the server's name for me
+            if part != "tasks", let st = known[key]?.status, !st.isEmpty { o["status"] = st }
+            if part == "tasks", mine, let a = known[key]?.assignee, !a.isEmpty { o["assignee"] = a }
+            return o
+        }
+    }
+
+    /// The rows without the local keys ("_key", "_cid", "_mine"), for the change hash.
+    public static func stripKeys(_ rows: [[String: Any]]) -> [[String: Any]] {
+        rows.map { $0.filter { !$0.key.hasPrefix("_") } }
+    }
+
+    /// After a 200: remember each sent item's id and the rev in the answer `{"count", "items": [{"id", "rev"}]}`.
+    /// An item missing from the answer (a lead deleted it in the registers) keeps its id, so the server keeps skipping
+    /// it; a server before 0.7.0 answers without items and the ids stay without a rev. Items no longer sent are dropped.
+    public static func rememberItems(_ rows: [[String: Any]], part: String, response: Data, state: inout State) {
+        let o = (try? JSONSerialization.jsonObject(with: response)) as? [String: Any] ?? [:]
+        var revs: [String: Int] = [:]
+        for i in (o["items"] as? [[String: Any]]) ?? [] {
+            if let id = (i["id"] as? String)?.lowercased(), let r = i["rev"] as? Int { revs[id] = r }
+        }
+        let old = state.items[part] ?? [:]
+        var next: [String: ItemRef] = [:]
+        for r in rows {
+            guard let key = r["_key"] as? String, let id = r["id"] as? String else { continue }
+            let same = old[key]?.id == id
+            next[key] = ItemRef(id: id, rev: revs[id.lowercased()] ?? (same ? old[key]?.rev : nil),
+                                status: same ? old[key]?.status : nil, assignee: same ? old[key]?.assignee : nil)
+        }
+        state.items[part] = next.isEmpty ? nil : next
     }
 
     public static func stem(_ transcript: String) -> String { transcript.hasSuffix(".md") ? String(transcript.dropLast(3)) : transcript }
@@ -77,15 +170,43 @@ public enum CallSync {
     /// PUT /v1/calls/{client_call_id}. 0.13.0: with the consent record and the call's numbers. No participants: their
     /// names wait for the lawyer (owner 15.11) and their emails are never sent.
     public static func callBody(projectID: String, title: String, start: Date, durationS: Int, meta: [String: String],
-                                appVersion: String, consent: [String: Any]? = nil, analysis: [String: Any]? = nil) -> [String: Any] {
+                                appVersion: String, consent: [String: Any]? = nil, analysis: [String: Any]? = nil,
+                                orgID: String = "", isPrivate: Bool = false) -> [String: Any] {
         func m(_ k: String, _ max: Int) -> String { String((meta[k] ?? "").prefix(max)) }
         var o: [String: Any] = ["project_id": projectID, "title": String(title.prefix(300)), "started_at": iso.string(from: start),
                                 "duration_s": max(0, durationS), "call_type": m("call_type", 50), "audience": m("audience", 50),
                                 "language": m("language", 10), "app_version": String(appVersion.prefix(40))]
         if let c = consent { o["consent"] = c }
         if let a = analysis { o["analysis"] = a }
+        // 0.17.0 (B6b): the call's organization (a server before 0.6.0 never sees the new fields from a personal call)
+        if !orgID.isEmpty { o["org_id"] = orgID }
+        if isPrivate { o["is_private"] = true }
         return o
     }
+
+    /// 0.17.0 (B6b): the query for a call's parts and its delete, so they run in the call's organization; "" keeps
+    /// the server's default (the personal organization), as before 0.17.0.
+    public static func orgQuery(_ orgID: String) -> String {
+        orgID.range(of: "^[0-9A-Fa-f-]{36}$", options: .regularExpression) != nil ? "?org_id=" + orgID : ""
+    }
+
+    /// 0.17.0 (B6b): the body of POST /v1/projects in an organization. `orgProjectID`: nil leaves the link as it is (a
+    /// personal organization has no organization projects), "" unlinks, an id links (D38).
+    public static func projectBody(name: String, slug: String, orgID: String, orgProjectID: String?) -> [String: Any] {
+        var o: [String: Any] = ["name": String(name.prefix(200)), "local_slug": localSlug(slug)]
+        if !orgID.isEmpty { o["org_id"] = orgID }
+        if let l = orgProjectID { o["org_project_id"] = l.isEmpty ? NSNull() : l }
+        return o
+    }
+
+    /// 0.17.0: the key of a registered project: one server project per account, organization and local slug (the same
+    /// slug may live in two organizations, B6b contract 3). The personal organization keeps the old key.
+    public static func projectKey(email: String, orgID: String, personal: Bool, slug: String, link: String) -> String {
+        (personal || orgID.isEmpty ? email : email + "|" + orgID) + "|" + localSlug(slug) + (link.isEmpty ? "" : "|" + link)
+    }
+
+    /// 0.17.0 (D36): a 422 that names the private-calls policy.
+    public static func privateRefused(status: Int, problem: String) -> Bool { status == 422 && problem.lowercased().contains("private calls are off") }
 
     /// 0.13.0 (B8 part 2): the consent record as the server takes it (said, posted, none, unknown; the time when known).
     public static func consent(_ s: CallConsent.State) -> [String: Any] {
@@ -177,10 +298,12 @@ public enum CallSync {
     public static func tasks(register: [Commitment], lists: CallLists.Lists, me: String) -> [[String: Any]] {
         let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
-        func row(_ text: String, owner: String, mine: Bool, due: String, from: Date, status: String, notion: String) -> [String: Any]? {
+        func row(_ text: String, owner: String, mine: Bool, due: String, from: Date, status: String, notion: String,
+                 cid: String = "") -> [String: Any]? {
             let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !t.isEmpty, !MeetingNotes.isNothing(t) else { return nil }
-            var o: [String: Any] = ["text": String(t.prefix(2000)), "status": status]
+            var o: [String: Any] = ["text": String(t.prefix(2000)), "status": status, "_mine": mine]
+            if !cid.isEmpty { o["_cid"] = cid }        // 0.17.0 (block 2): the register item, for a colleague's change
             let who = mine ? me : owner
             if !who.isEmpty { o["assignee"] = String(who.prefix(200)) }
             if !due.isEmpty, let d = CommitmentRegister.dueDate(due, from: from) { o["due_date"] = f.string(from: d) }
@@ -190,7 +313,7 @@ public enum CallSync {
         if !register.isEmpty {
             return register.prefix(200).compactMap { c in
                 row(c.text, owner: c.owner, mine: c.mine, due: c.due, from: c.createdDate ?? Date(),
-                    status: ["open", "done", "dropped"].contains(c.status) ? c.status : "open", notion: c.notionPage)
+                    status: ["open", "done", "dropped"].contains(c.status) ? c.status : "open", notion: c.notionPage, cid: c.id)
             }
         }
         return lists.tasks.prefix(200).compactMap { k in
@@ -264,7 +387,7 @@ public enum CallSync {
     public static func afterDelete(_ st: State, status: Int, problem: String = "") -> (State, String?) {
         guard [200, 204, 404, 410].contains(status) else { return (st, problem.isEmpty ? "HTTP \(status)" : problem) }
         var s = st
-        s.removed = true; s.callID = ""; s.version = ""; s.hashes = [:]; s.error = ""; s.syncedAt = nil
+        s.removed = true; s.callID = ""; s.version = ""; s.hashes = [:]; s.items = [:]; s.error = ""; s.syncedAt = nil
         return (s, nil)
     }
 

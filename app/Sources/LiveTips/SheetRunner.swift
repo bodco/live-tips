@@ -297,7 +297,13 @@ final class SheetRunner: ObservableObject {
             "sources": sources, "folders": [String](), "options": ["folder_days": SheetPrefs.storedFolderDays],
             "use_project_folder": r.useProjectFolder, "live": live, "base": j.base, "app_root": appRoot,
             "lt": [c.engine.python, lt], "google": google, "notion": ["connected": false],
-            "auto_pick": 12, "on_too_much": "passes", "timeout": 1500
+            "auto_pick": 12, "on_too_much": "passes", "timeout": 1500,
+            // 0.17.0 (SEC-01): what the build's agent may never read, and the oldest Claude Code it runs with
+            "deny_read": PrepSecurity.readDenies(home: FileManager.default.homeDirectoryForCurrentUser.path,
+                                                 workRoot: (c.workRoot as NSString).expandingTildeInPath,
+                                                 allowed: [r.root, live, r.deck?.info?.dir ?? ""] + r.folders.map { StartCallModel.isDir($0) ? $0 : ($0 as NSString).deletingLastPathComponent },
+                                                 otherRoots: PrepRunner.otherRoots(r)),
+            "min_claude": PrepSecurity.minClaude
         ]
         if let m = r.salesMethod { req["method"] = m == "general" ? "bant" : m }
         if j.route == AIRoute.api, let pa = PrepAgent.plan(c.prepAgent, route: j.route, economy: SpendWatch.economyOn), let b = pa.budgetUSD {
@@ -617,6 +623,7 @@ final class SheetRunner: ObservableObject {
     }
 
     private func end(_ j: Job, ok: Bool, notify: Bool = true) {
+        if ok { OrgCardStore.notePrep(root: j.prep.root) }     // 0.17.0 (block 3): "since your last prep" counts from here
         running = false
         job = nil
         let pr = PrepRunner.shared

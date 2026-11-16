@@ -195,6 +195,7 @@ struct ConsentSection: View {
 enum ProjectMeta {
     @MainActor static func line(_ p: Project, model: SettingsModel) -> String {
         var parts: [String] = []
+        if p.sample { parts.append(L("proj.meta.sample")) }            // 0.17.0 (5.1)
         if p.status == "archived" { parts.append(L("proj.meta.off")) }
         if p.root.isEmpty { parts.append(L("set.noFolder")) }
         if model.isSet(.notionToken) { parts.append(L("proj.meta.notion", ["name": p.notionValue.isEmpty ? p.name : p.notionValue])) }
@@ -205,6 +206,7 @@ enum ProjectMeta {
         if !p.root.isEmpty { let n = AnswerCards.count(root: p.root); if n > 0 { parts.append(L("proj.meta.cards", ["n": "\(n)"])) } }
         if !p.apiAllowed { parts.append(L("proj.meta.aiOff")) }
         if p.serverSync { parts.append(L("proj.meta.sync")) }
+        if p.linkedToOrgProject { parts.append(p.orgProjectName.isEmpty ? L("proj.org.head") : p.orgProjectName) }   // 0.17.0 (D38)
         return parts.joined(separator: " · ")
     }
 }
@@ -215,6 +217,7 @@ struct ProjectSettingsPage: View {
     @ObservedObject var model: SettingsModel
     let slug: String
     @ObservedObject private var account = PacenoteAccount.shared
+    @State private var removing = false          // 0.17.0 (Bohdan 16.11): Remove asks first; the folder stays by default
     var body: some View {
         if let i = model.registry.projects.firstIndex(where: { $0.slug == slug }) {
             let p = model.registry.projects[i]
@@ -232,6 +235,14 @@ struct ProjectSettingsPage: View {
                 }
                 .padding(.horizontal, 28).padding(.top, 4)
                 Form {
+                    ProjectCardSection(model: model, index: i)       // 0.17.0 (5.2, 5.1): name, card, links; the sample note
+                    if p.linkedToOrgProject {
+                        OrgCardSection(model: model, index: i)       // 0.17.0 (contract 9 block 3): the organization project's card
+                        OrgStateSection(project: p)                  // 0.17.0 (contract 9 blocks 5-6): state, sources, index, history
+                        OrgSourcesSection(project: p)
+                        OrgIndexSection(project: p)
+                        OrgHistorySection(project: p)
+                    }
                     Section {
                         Toggle(L("proj.offer"), isOn: Binding(get: { model.registry.projects[i].status != "archived" },
                                                               set: { model.registry.projects[i].status = $0 ? "active" : "archived" }))
@@ -250,6 +261,7 @@ struct ProjectSettingsPage: View {
                         }
                         .help(L("proj.cards.help")).settingsAnchor("pr.cards")
                     }
+                    ProjectOrgSection(model: model, index: i)      // 0.17.0 (B6b, D38): organization, link, private
                     Section {
                         Toggle(L("set.useClaudeForTips"), isOn: $model.registry.projects[i].apiAllowed).settingsAnchor("pr.ai")
                         Toggle(isOn: $model.registry.projects[i].index.enabled) {
@@ -279,11 +291,22 @@ struct ProjectSettingsPage: View {
                             Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p.root)]) }
                                 .buttonStyle(.pnTertiary).disabled(p.root.isEmpty)
                             Spacer()
-                            Button(L("set.removeProjectFromPacenote"), role: .destructive) {
-                                model.projectDetail = nil
-                                model.excludeProject(p.slug)
-                            }
-                            .buttonStyle(.pnTertiary)
+                            Button(L("set.removeProjectFromPacenote"), role: .destructive) { removing = true }
+                                .buttonStyle(.pnTertiary)
+                                .sheet(isPresented: $removing) {
+                                    RemoveProjectSheet(project: p) { trash in
+                                        removing = false
+                                        guard let trash else { return }
+                                        model.projectDetail = nil
+                                        model.excludeProject(p.slug)
+                                        if trash, !p.root.isEmpty {
+                                            NSWorkspace.shared.recycle([URL(fileURLWithPath: p.root)]) { _, err in
+                                                if let err { MainActor.assumeIsolated { model.note = L("proj.remove.trashErr", ["e": err.localizedDescription]) } }
+                                            }
+                                        }
+                                        UsageLog.log("project_removed", ["sample": p.sample, "trash": trash])
+                                    }
+                                }
                         }
                     }
                 }
@@ -293,5 +316,36 @@ struct ProjectSettingsPage: View {
         } else {
             Color.clear.onAppear { model.projectDetail = nil }
         }
+    }
+}
+
+/// 0.17.0 (Bohdan 16.11): "Remove <project> from Pacenote?" The folder on the Mac stays unless the PM ticks "Also move
+/// the folder to the Trash" (off by default). `done(nil)` cancels; `done(true)` removes and moves the folder to the Trash.
+struct RemoveProjectSheet: View {
+    let project: Project
+    var done: (Bool?) -> Void
+    @State private var trash = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L("proj.remove.title", ["name": project.name])).font(.headline)
+            Text(L("proj.remove.sub")).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            if !project.root.isEmpty {
+                Toggle(L("proj.remove.trash"), isOn: $trash).toggleStyle(.checkbox)
+                Text(trash ? L("proj.remove.trashSub", ["path": project.root.replacingOccurrences(of: NSHomeDirectory(), with: "~")])
+                           : L("proj.remove.keepSub", ["path": project.root.replacingOccurrences(of: NSHomeDirectory(), with: "~")]))
+                    .font(PN.Font.caption).foregroundStyle(trash ? PN.C.danger : PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                Button(L("common.cancel")) { done(nil) }.buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
+                if trash {      // moving files to the Trash is never the Return key
+                    Button(L("proj.remove.okTrash"), role: .destructive) { done(true) }.buttonStyle(.pnPrimary)
+                } else {
+                    Button(L("proj.remove.ok")) { done(false) }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+                }
+            }
+        }
+        .padding(20).frame(width: 440)
     }
 }

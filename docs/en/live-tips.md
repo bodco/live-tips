@@ -2378,6 +2378,134 @@ Settings > Call recording > Google Drive.
 - Removing a call from Home only hides it, so its Drive files stay. Asking to move them to the trash comes with real
   deletion of calls, later.
 
+### 14.1z5 Organizations, private calls and a safer preparation (0.17.0, beta, server 0.6.0)
+
+Everything here needs the Pacenote account (14.1z3) and applies only to projects that sync to the server. People,
+teams, organization projects and invites are managed in the Pacenote console, not in the app.
+
+- **Invites.** When someone invites your email to an organization, a line on Home and in Settings > Account says
+  who invited you and where: **Join...** or **Decline**. Joining asks once whether new calls go there ("Use Acme for
+  new calls", on). Calls you already made stay in your personal space. The server sends no emails about invites.
+- **Where calls go.** Settings > Account > Organizations lists your personal space and every organization you are
+  in, with your role and plan, and **New calls go to** (shown with more than one). A call keeps its organization once
+  it is on the server; if you leave an organization (or it is deleted), its calls come back to your personal space.
+- **Who sees a call.** Next to a call (the call page) and its Meeting Sheet a small line says who else sees it:
+  "Visible to your team lead", "Visible to leadership" or both. They see the notes, decisions, tasks and the Meeting
+  Sheet, never the transcript, audio or tips.
+- **Private calls.** On the call page of an organization's call, **Private** keeps it to "it happened, this long" for
+  your team lead and leadership. Settings > Projects > a project > Organization > **New calls are private** marks the
+  project's new calls private when they end. If the organization turned private calls off, the switch is locked; a
+  call that is already private stays private. A call marked private in an organization that does not allow it is
+  never sent visible by itself: the sync line says why.
+- **Organization filter.** Recent calls and All past calls get "All organizations / Mike's workspace / Acme" when you
+  are in more than one; a call that never went to the server counts as your personal space. Next to it, a project
+  filter (when the calls come from more than one project).
+- **Move a project.** Settings > Projects > a project > Organization > **Move...** moves the project to another of
+  your organizations (or back to your personal space). Pacenote asks first: the project's earlier calls on the server
+  move too, not only the new ones, and follow the rules of that organization on who can see calls; private calls stay
+  private, the files on your Mac do not change. A project with the same name there is merged with it.
+- **Manage organization.** For an owner, an admin, C-level and a team lead, Settings > Account opens the Pacenote
+  console for that organization in your browser (you sign in there with Google); the Console tab opens it inside the
+  app (14.1z8).
+- **Organization projects (Enterprise).** Settings > Projects > a project > Organization > **Organization project**
+  links your project to one of the organization's projects you are on. Linking turns the project's sync on, and its
+  new calls go to that organization. Being on a project shows nobody your calls. If you are taken off the project, the
+  page says so and offers Unlink. Decisions, tasks and risks are synced with stable ids, so a colleague's change to a
+  task's status, owner or due date in the project registers is kept on your next sync and comes back to your Mac
+  (14.1z7). The shared project card is on the project's page (14.1z7); colleagues' items are in the Tracker (14.1z7);
+  project state, sources, file index and history are on the project's page (14.1z8).
+- **A safer preparation (SEC-01).** The preparation agent and the Meeting Sheet build may no longer read the folders
+  with keys and tokens (`~/.ssh`, `~/.aws`, `~/.config`, `~/.codex`, `~/Library`, the work folder's `Secrets` and
+  others) or another project's folder, and lost `ls`, `head` and `wc`. WebFetch goes only to the hosts of links you
+  typed in the call context (with `https://`), never to Google (Google Docs, Sheets and Slides are read through your
+  Google account before the preparation) and never to a host found in an invite, a source the Sheet found by itself
+  or a project card. In a sales preparation the web search stays; its WebFetch only reaches the company's own domain
+  from the CRM. The preparation refuses Claude Code older than 2.1.163 and says how to update it.
+
+### 14.1z6 New project and the sample project (0.17.0, beta)
+
+- **New project.** Settings > Projects > Add > **New project...** opens a short window. 1) The name and where the
+  project's calls go: your personal space or a team organization. In an organization with organization projects you
+  can link it to one you are on, or, if you make organization projects (owner, admin, C-level, team lead), start a
+  new one. 2) The folder: a new folder in your workspace (or "My workspace" in the work folder) or one that exists.
+  3) The card: what the project is, the client, the goal, your language and the client's, and terms (spelled right in
+  transcripts). 4) Links to where things are: a Drive folder, Notion pages, web pages. 5) For a new organization
+  project, the people on it. Every step after the first can be skipped. Linking to an organization project turns the
+  project's sync on; otherwise sync stays off until you turn it on.
+- **The card stays on your Mac** and is on the project's page in Settings > Projects (Card: name, what it is,
+  client, goal, terms, links). The links are not added to what the preparation may fetch on its own (SEC-01). A
+  project linked to an organization project also shows the shared card (14.1z7).
+- **Sample project.** The first start makes "Sample project" with a made-up client (Brightline Bikes), three people
+  (Mike, Emily, Sarah), a short sample call with one decision and one task. It is marked Sample, and it never goes to
+  the server, even with sync on, until you rename it or change its card; then it is an ordinary project. **Remove
+  project from Pacenote** takes it out after asking: the folder stays unless you tick "Also move the project folder to
+  the Trash" (this works for every project). Add > **Sample project** makes it again.
+
+### 14.1z7 Colleagues' changes, the shared project card, setting up an organization (0.17.0, server 0.7.0)
+
+- **Colleagues' changes come back.** When someone on the same organization project changes a task's status, owner or
+  due date (or a decision's or risk's status) in the project registers, Pacenote picks it up within about 10 minutes
+  and at launch: the task is ticked, reopened, dropped, given to someone or moved to another day on your call page and
+  on Home, as if you had done it. A task given to you shows as yours. A call whose tasks still came only from its notes
+  takes them into its list first. Only your own calls of organizations with organization projects are read again; an
+  item a team lead deleted stays deleted.
+- **The shared project card.** A project linked to an organization project shows **Organization project card** on its
+  page in Settings > Projects: what the project is, the goal, the client and its site, key people (one a line:
+  `Mike | CTO | client | decides`), terms, rules (what not to promise), languages and audience, who is on the project and
+  who changed the card last. Anyone on the project can change it; owners and admins of the organization only read it.
+  Save sends only the fields you changed. If someone saved meanwhile, your changes stay on top of theirs and the card
+  says which fields you both changed: check and Save again, nothing is overwritten silently. **Copy from this Mac**
+  fills an empty shared card from your own card. For now the preparation still reads your own card, not the shared one.
+- **"Project card changed by Emily since your last prep".** The Meeting Sheet of a linked project says so when
+  someone else changed the shared card after your last preparation of that project, so a changed instruction never goes
+  unnoticed. **Open the card** shows it.
+- **Colleagues' items in the Tracker.** For a project linked to an organization project, the Tracker also shows the
+  decisions, tasks and risks from your colleagues' calls on that project (not their private calls, never their
+  summaries, sheets or transcripts). Each row says whose call it came from ("from Mike's call, Nov 12") and, when
+  someone other than the author changed it, who; there is no link to a colleague's call. Your own items stay where they
+  were. Who may change what is the server's call: a task's owner, the call's author and the author's team lead tick a
+  task and, on right-click, change its **Status**, **Owner** (someone on the project, or no owner) and **Due date...**;
+  the author and the lead change a decision's or risk's status and **Delete for everyone** (after a confirmation;
+  the author's Mac does not bring it back). For everyone else the checkbox is greyed out and the menu says who can
+  change the item. If someone changed the item after the list was read, nothing is overwritten: the Tracker says so,
+  reads the list again, and you try again.
+- **Setting up an organization.** After the upgrade, the owner sees "Acme is ready. Set it up" on Home (and **Set
+  up...** in Settings > Account, also for admins). The steps start from the organization that already exists: 1) its
+  name; 2) projects: tick your projects to move them in with their calls (private calls stay private, the sample
+  project stays on the Mac) or start **New project...**; 3) invites (one email a line, "admin" on a line for an admin,
+  a team if there are teams; people see the invite in Pacenote after they sign in, no email is sent); 4) teams and their
+  leads (plans with teams); 5) policy: private calls and sharing Meeting Sheets with managers. Steps 3 to 5 can wait:
+  **Later**, or **Open the console** for the same settings in the browser. **Not now** hides the line on Home.
+
+### 14.1z8 Console tab, project state, sources, file index, history (0.17.0, server 0.8.0)
+
+- **Console tab.** Next to Home and Tracker, **Console** opens the Pacenote console inside the app, for someone who
+  runs something in a team organization (owner, admin, C-level, team lead) and for Pacenote staff. You are signed in
+  with this Mac's Pacenote account, no Google: the app asks the server for a one-time link (it lives 60 seconds and
+  works once) and the console opens on your organization. The console session lives while Pacenote runs and is not kept
+  on disk; signing out of Pacenote, or removing this Mac from your devices, ends it too. Links that leave the console
+  open in your browser. **Open in browser** shows the console there (the browser asks for Google). The Platform zone
+  for Pacenote staff always asks for Google in the browser, never in the app.
+- **Current state.** A project linked to an organization project shows **Current state** on its page in Settings >
+  Projects: what is true now, the same for everyone on the project (markdown, up to 8 KB). **Edit...** opens the text;
+  **Review changes** shows exactly which lines change before anything is sent, then **Send**. If someone saved
+  meanwhile, their version comes back as the starting point and nothing is overwritten.
+- **"Update the project state?"** After a call with decisions or risks in a linked project, the call page offers it.
+  **Review...** opens the state with this call's decisions and risks added under `## Recent` (newest first, the
+  oldest lines go when it would pass 8 KB), the diff before sending, and you can edit it. **Not now** hides the line
+  for this call.
+- **Sources.** Where to look for this project, for everyone on it: paste a Drive folder or file, a Notion page or
+  database, or another https link, with a title. Each source says who added it; the one who added it and those who
+  manage projects can remove it. Pacenote keeps the link, not the file.
+- **File index.** **Index Drive files** reads the Drive files in Sources with your Google account and sends each file's
+  name, type, date and its first 600 characters, with a search vector made on this Mac when local AI search is on
+  (Settings > Search). Search finds files by meaning with the vector, else by words. A file whose indexer left the
+  organization says **Index again**. Only people on the project see the index.
+- **History.** The last changes of the card, the state and the sources: who, what, when, old and new. **Restore** puts
+  back the value from before a change for everyone (after a confirmation); the restore is in the history too. Register
+  items are changed in the Tracker, not restored here.
+- **Tracker.** The Call filter no longer grows with the longest meeting title, so Owner and Status stay in view.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the

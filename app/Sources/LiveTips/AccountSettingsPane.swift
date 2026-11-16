@@ -77,10 +77,6 @@ struct AccountSettingsPane: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(acct.me?.name.isEmpty == false ? acct.me!.name : (s.name.isEmpty ? s.email : s.name)).font(.headline)
                     if !s.email.isEmpty { Text(s.email).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                    ForEach(acct.me?.orgs ?? []) { o in
-                        Text(L("account.org", ["name": o.name, "role": L("account.role." + (o.role.isEmpty ? "member" : o.role)), "plan": o.plan.capitalized]))
-                            .font(PN.Font.caption).foregroundStyle(PN.C.text2)
-                    }
                 }
                 Spacer()
                 if acct.busy { ProgressView().controlSize(.small) }
@@ -92,6 +88,8 @@ struct AccountSettingsPane: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } header: { Text(L("account.head")).settingsAnchor("acc.head") }
+
+        AccountOrgsSection()       // 0.17.0 (B6b): organizations, where new calls go, invites, Manage organization
 
         Section {
             if acct.devices.isEmpty {

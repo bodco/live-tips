@@ -1,0 +1,173 @@
+// 0.17.0 (server 0.8.0, plan 2026-11-16 item 4): the Console tab. The web console (pacenote-admin.bodco.pm) inside a
+// WKWebView, no separate UI in the app. Shown only to someone who runs something in an organization (owner, admin,
+// C-level, team lead; contract 6) or to Pacenote staff.
+//
+// Sign-in without Google: the app asks POST /v1/console/handoff with its own access token for a one-time link (60 s,
+// one use, bound to this person and this Mac) and opens it; the console sets its usual session cookie. The web view
+// has a non-persistent data store, so the console session lives while the app runs. Signing out of the app, or this
+// Mac being revoked, ends the console session too (the server checks the device on every page). Links that leave the
+// console open in the browser. The Platform zone (staff) still asks for Google there, never in the app.
+import AppKit
+import Combine
+import LiveTipsCore
+import SwiftUI
+import WebKit
+
+@MainActor
+final class ConsoleSession: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
+    static let shared = ConsoleSession()
+
+    enum Phase: Equatable { case idle, opening, ready, failed(String) }
+    @Published private(set) var phase: Phase = .idle
+    @Published private(set) var web: WKWebView
+    private var signedOut: AnyCancellable?
+    private var lastHandoff = Date.distantPast
+
+    private override init() {
+        web = Self.makeWeb()
+        super.init()
+        web.navigationDelegate = self
+        web.uiDelegate = self
+        // Signing out of the app (or deleting the account) drops the console session at once.
+        signedOut = PacenoteAccount.shared.$session.removeDuplicates { ($0 == nil) == ($1 == nil) }.dropFirst()
+            .sink { [weak self] s in if s == nil { self?.reset() } }
+    }
+
+    private static func makeWeb() -> WKWebView {
+        let cfg = WKWebViewConfiguration()
+        cfg.websiteDataStore = .nonPersistent()     // nothing of the console is kept on disk
+        let w = WKWebView(frame: .zero, configuration: cfg)
+        w.customUserAgent = "Pacenote/\(PacenoteAccount.appVersion) (macOS) Console"
+        return w
+    }
+
+    /// A fresh web view and store: the console's cookie is gone.
+    func reset() {
+        web.stopLoading()
+        web = Self.makeWeb()
+        web.navigationDelegate = self
+        web.uiDelegate = self
+        phase = .idle
+    }
+
+    /// Opens the console with a one-time link. `force` asks for a new link even when a page is open.
+    func open(force: Bool = false) async {
+        if phase == .opening || (phase == .ready && !force) { return }
+        guard PacenoteAccount.shared.signedIn, let me = PacenoteAccount.shared.me else {
+            phase = .failed(L("console.err.signIn")); return
+        }
+        phase = .opening
+        lastHandoff = Date()
+        do {
+            let (d, code) = try await PacenoteAccount.shared.api("POST", "/v1/console/handoff",
+                                                                 body: PacenoteServer.consoleHandoffBody(next: me.consolePath))
+            guard code == 200, let url = PacenoteServer.consoleHandoffURL(d) else {
+                phase = .failed(code == 404 ? L("console.err.old") : L("console.err.server", ["code": String(code)])); return
+            }
+            web.load(URLRequest(url: url))
+            phase = .ready
+        } catch {
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    /// The console in the browser (Google sign-in there): the page the tab shows, or the console's start.
+    func openInBrowser() {
+        let u = PacenoteServer.isConsoleURL(web.url) && web.url?.path != "/auth/app" ? web.url! : URL(string: "https://" + PacenoteServer.consoleHost + "/")!
+        NSWorkspace.shared.open(u)
+    }
+
+    // MARK: WKNavigationDelegate
+
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                 decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
+        guard let url = action.request.url else { decisionHandler(.cancel); return }
+        if url.scheme == "about" { decisionHandler(.allow); return }
+        if PacenoteServer.isConsoleURL(url) {
+            // The session ended (8 hours, or Sign out and then Sign in): a new one-time link, not Google in a web view.
+            if url.path == "/login", action.targetFrame?.isMainFrame != false {
+                decisionHandler(.cancel)
+                if Date().timeIntervalSince(lastHandoff) > 5 { Task { await self.open(force: true) } }
+                return
+            }
+            decisionHandler(.allow); return
+        }
+        decisionHandler(.cancel)
+        if url.host?.lowercased() == "accounts.google.com" {
+            // The Platform zone asks for Google: that happens in the browser, on the console's own page
+            NSWorkspace.shared.open(URL(string: "https://" + PacenoteServer.consoleHost + "/platform")!)
+        } else if ["https", "http", "mailto"].contains(url.scheme ?? "") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if (error as NSError).code != NSURLErrorCancelled { phase = .failed(error.localizedDescription) }
+    }
+
+    // target=_blank and window.open: the browser
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let u = action.request.url, ["https", "http", "mailto"].contains(u.scheme ?? "") { NSWorkspace.shared.open(u) }
+        return nil
+    }
+}
+
+/// The web view itself; the same WKWebView stays alive between visits to the tab.
+private struct ConsoleWeb: NSViewRepresentable {
+    let web: WKWebView
+    func makeNSView(context: Context) -> NSView {
+        let host = NSView()
+        attach(web, to: host)
+        return host
+    }
+    func updateNSView(_ host: NSView, context: Context) {
+        if web.superview !== host { host.subviews.forEach { $0.removeFromSuperview() }; attach(web, to: host) }
+    }
+    private func attach(_ w: WKWebView, to host: NSView) {
+        w.removeFromSuperview()
+        w.translatesAutoresizingMaskIntoConstraints = false
+        host.addSubview(w)
+        NSLayoutConstraint.activate([w.leadingAnchor.constraint(equalTo: host.leadingAnchor), w.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+                                     w.topAnchor.constraint(equalTo: host.topAnchor), w.bottomAnchor.constraint(equalTo: host.bottomAnchor)])
+    }
+}
+
+struct ConsoleTabView: View {
+    @ObservedObject var session = ConsoleSession.shared
+    @ObservedObject var acct = PacenoteAccount.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text(L("console.tab")).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text)
+                Text(L("console.note")).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(1)
+                Spacer()
+                Button { session.web.goBack() } label: { Image(systemName: "chevron.left") }
+                    .buttonStyle(.pnTertiary).help(L("console.back")).accessibilityLabel(L("console.back"))
+                Button { Task { await session.open(force: true) } } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(.pnTertiary).help(L("console.reload")).accessibilityLabel(L("console.reload"))
+                Button(L("console.browser")) { session.openInBrowser() }.buttonStyle(.pnTertiary).help(L("console.browser.help"))
+            }
+            .padding(.horizontal, 16).padding(.vertical, 6)
+            Divider()
+            ZStack {
+                ConsoleWeb(web: session.web)
+                switch session.phase {
+                case .idle, .opening:
+                    ProgressView(L("console.opening")).padding(24).background(PN.C.bg)
+                case .failed(let why):
+                    VStack(spacing: 10) {
+                        Text(L("console.failed")).font(PN.Font.section)
+                        Text(why).font(PN.Font.body).foregroundStyle(PN.C.text2).multilineTextAlignment(.center).frame(maxWidth: 420)
+                        Button(L("console.retry")) { Task { await session.open(force: true) } }.buttonStyle(.pnSecondary)
+                    }
+                    .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity).background(PN.C.bg)
+                case .ready:
+                    EmptyView()
+                }
+            }
+        }
+        .task { await session.open() }
+    }
+}

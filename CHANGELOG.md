@@ -3,6 +3,84 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased
+
+- **Organizations in the app (2026-11-16, B6b, server 0.6.0):** invites show on Home and in Settings > Account
+  (Join... asks whether new calls go there, Decline); Settings > Account lists your organizations with your role and
+  plan, where new calls go, who sees your calls there, and Manage organization (the console in your browser) for
+  owners, admins, C-level and team leads. A call keeps its organization; calls of an organization you leave come back to
+  your personal space. Recent calls and All past calls get an organization filter (with more than one) and a project
+  filter.
+- **Who sees a call, private calls (2026-11-16, B6b):** the call page and the Meeting Sheet say "Visible to your team
+  lead", "Visible to leadership" or both. An organization's call can be Private (a manager sees only that it happened
+  and how long), on the call page or for a project's new calls; when the organization turned private calls off the
+  switch is locked, a private call stays private, and a call marked private is never sent visible by itself.
+- **Move a project (2026-11-16):** a project's page moves it with its calls to another of your organizations or back
+  to your personal space, after a warning that its earlier calls move too and follow that organization's rules on who
+  sees calls. Private calls stay private.
+- **Organization projects (2026-11-16, D38, Enterprise):** a project's page links it to an organization project you
+  are on; linking turns its sync on and its new calls go to that organization. Being on a project shows nobody your
+  calls.
+- **Colleagues' changes to decisions, tasks and risks survive the next sync (2026-11-16, D40, server 0.7.0):** every
+  synced decision, task and risk now has a stable id and the version this Mac last saw, so when a colleague on the same
+  organization project changes a task's status, owner or due date in the project registers, your next sync keeps it
+  instead of overwriting it. Each call sends its lists once more after the update; an item a team lead deleted stays
+  deleted.
+- **Colleagues' changes come back to your Mac (2026-11-16, D40, server 0.7.0):** when someone on the same organization
+  project changes a task's status, owner or due date (or a decision's or risk's status) in the project registers,
+  Pacenote picks it up within about 10 minutes and at launch, and your call page and Home show it. A task given to you
+  shows as yours.
+- **Shared organization project card (2026-11-16, D40, server 0.7.0):** a project linked to an organization project
+  shows the shared card on its page: what it is, the goal, the client, key people, terms, rules, languages, audience
+  and who is on the project. Anyone on the project can change it; if someone saved meanwhile, your changes stay on top
+  and nothing is overwritten silently. The Meeting Sheet says "Project card changed by Emily since your last prep" when
+  someone else changed it. The preparation still reads your own card.
+- **Colleagues' decisions, tasks and risks in the Tracker (2026-11-16, D40, server 0.7.0):** for a project linked to
+  an organization project, the Tracker also shows the decisions, tasks and risks from your colleagues' calls on it, each
+  with "from Mike's call, Nov 12" and who changed it last; their calls themselves stay theirs. A task's owner, the
+  call's author and the author's team lead can tick a task, change its status, owner and due date; the author and the
+  lead change a decision's or risk's status and can delete an item for everyone (right-click a row). Everyone else
+  reads. If someone changed the item meanwhile, nothing is overwritten: the list comes back fresh and you try again.
+- **Set up an organization (2026-11-16, D39):** after the upgrade the owner gets "Acme is ready. Set it up" on Home
+  (and Set up... in Settings > Account): the name, moving your projects in or a new one, invites, teams and leads, and
+  the policy; the people steps can wait for the console.
+- **New project (2026-11-16, D39):** Settings > Projects > Add > New project... is a short window: the name and
+  where its calls go (your personal space or a team organization, where you can link it to an organization project
+  you are on or, if you make them, start a new one and pick its people), a new folder in your workspace or one that
+  exists, a project card (what it is, the client, the goal, languages, terms), and links to where things are. Every
+  step after the first can be skipped. A project's page now has the card too.
+- **Sample project (2026-11-16, D39):** the first start makes a "Sample project" with a made-up client, three people,
+  a short sample call with one decision and one task, so Home and the call page are not empty. It never goes to the
+  server until you rename it or change its card; Remove takes it out. Add > Sample project brings it back.
+- **Small fixes (2026-11-16, organizations smoke test):** the Join window's own button no longer has "..."; coming back
+  to the app checks for new invites (at most every 10 minutes), so an invite sent while Pacenote is open shows without
+  a restart.
+- **Remove a project asks first (2026-11-16):** Remove project from Pacenote opens a short window; the project folder
+  stays on your Mac unless you tick "Also move the project folder to the Trash".
+- **Home shows the call's sentence again (2026-11-16):** a Recent calls card said "No notes yet." for calls whose notes
+  have only the TL;DR (the sample call among them); it now shows the TL;DR's first sentence.
+- **Safer preparation (2026-11-16, SEC-01):** the preparation and the Meeting Sheet build can no longer read the
+  folders with keys and tokens or another project's folder, and lost ls, head and wc. Pages are fetched only from links
+  you typed in the call context, never from Google (Google files are read through your account) or from a host found in
+  an invite or a source found automatically; a sales preparation fetches only the company's own domain. Claude Code
+  older than 2.1.163 is refused with how to update it.
+- **Console tab (2026-11-16, server 0.8.0):** owners, admins, C-level and team leads of a team organization (and
+  Pacenote staff) get Console next to Home and Tracker: the web console inside the app, signed in with this Mac's
+  Pacenote account through a one-time link, no Google. The session lives while the app runs and ends when you sign out
+  or this Mac is removed; links that leave the console open in your browser; the staff Platform zone still asks for
+  Google in the browser.
+- **Project state, sources, file index and history (2026-11-16, D40, server 0.7.0):** a project linked to an
+  organization project shows its current state (markdown up to 8 KB, with the exact changed lines shown before you
+  send), its sources (Drive, Notion, links), a file index of the Drive files in Sources with search, and the history
+  of the card, state and sources with Restore. After a call with decisions or risks, the call page offers "Update the
+  project state?" with this call's lines added and the diff before anything goes.
+- **Tracker (2026-11-16):** the Call filter keeps a fixed width, so a long meeting title from Notion no longer pushes
+  Owner and Status off the screen.
+- **Privacy and terms (2026-11-16):** the "Organizations (later)" part now says who will see what: your team lead and,
+  on Enterprise, leadership; people on a linked organization project see the decisions, tasks and risks of your calls
+  in it (never the calls themselves), and share a project card, project state, list of sources and file index with a
+  change history. Private calls and your personal workspace stay private. Department heads are gone (teams only).
+
 ## 0.16.2 (2026-11-16)
 
 - **Less work for the project index (2026-11-16, hotfix):** when a file changes, Pacenote now embeds again only the

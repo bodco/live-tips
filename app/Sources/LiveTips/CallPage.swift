@@ -92,6 +92,8 @@ struct CallPageView: View {
                 header(proj, ws, o)
                 RecordingRow(file: file)       // 0.9.5: the call recording, if there is one
                 ServerSyncRow(file: file)      // 0.12.1 (B8): the call's copy on the Pacenote server
+                CallOrgRow(file: file)         // 0.17.0 (B6b): its organization, who sees it, Private
+                OrgStateUpdateLine(file: file, decisions: decisions(o), risks: o.risks)   // 0.17.0 (contract 9 block 5)
                 if exportOpen {
                     ExportPanel(file: file, title: Self.title(file), outcome: o, commitments: items) { exportOpen = false }
                 }

@@ -25,6 +25,29 @@ public enum MeetingNotes {
 
     public static let heading = "## Meeting notes"
 
+    /// 0.17.0 (smoke 16.11, "No notes yet." with notes there): the one sentence a Home card shows. A summary section
+    /// ("Summary", "Підсумок", "Коротко") first, as before; else the TL;DR of "## Meeting notes", which is what the app's
+    /// own notes have. nil when neither has a sentence (or it only says there is nothing).
+    public static func homeLine(_ text: String) -> String? {
+        func first(_ l: String) -> String? {
+            var s = l.replacingOccurrences(of: "^[-*\u{2022}]\\s*", with: "", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+            if let r = s.range(of: "(?<=[.!?])\\s", options: .regularExpression) { s = String(s[..<r.lowerBound]) }
+            return s.isEmpty || isNothing(s) ? nil : s
+        }
+        var inSummary = false
+        for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let l = raw.trimmingCharacters(in: .whitespaces)
+            if l.hasPrefix("#") {
+                let h = l.lowercased()
+                inSummary = h.contains("summary") || h.contains("підсумок") || h.contains("коротко"); continue
+            }
+            guard inSummary, !l.isEmpty else { continue }
+            if let x = first(l) { return x }
+            break
+        }
+        return parse(text).flatMap { $0.tldr.isEmpty ? nil : first($0.tldr) }
+    }
+
     /// 0.12.1: a line that only says there is nothing ("Немає.", "Жодних рішень не приймалося.", "None", "No decisions
     /// were made"). The notes model writes one under an empty heading; it is not a decision or a task, so the call page
     /// and the server sync both leave it out.

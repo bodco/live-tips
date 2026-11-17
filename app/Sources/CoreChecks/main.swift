@@ -3773,6 +3773,103 @@ func analyticsS4Part2(root: URL) {
     }
 }
 
+// 0.20.0 (B9, server 0.12.0, D47): the team's calls. Series key, who gets the tab, periods, paths, answers.
+func teamCallsB9() {
+    typealias T = TeamCalls
+    let salt = Data(repeating: 7, count: 32)
+    let k1 = T.seriesKey(salt: salt, userID: "U-1", project: "orbit", title: "PM Stand-Up")
+    let k2 = T.seriesKey(salt: salt, userID: "u-1", project: "orbit", title: "pm standup!")
+    expect(k1 != nil && k1 == k2, "team: the series key is stable over case and punctuation")
+    expect(k1?.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil, "team: the series key is 64 hex")
+    expect(!(k1 ?? "").contains("standup") && !(k1 ?? "").contains("orbit"), "team: the series key holds no title or project")
+    expect(T.seriesKey(salt: Data(repeating: 8, count: 32), userID: "u-1", project: "orbit", title: "PM Stand-Up") != k1,
+           "team: another salt, another key")
+    expect(T.seriesKey(salt: salt, userID: "u-1", project: "acme", title: "PM Stand-Up") != k1, "team: another project, another series")
+    expect(T.seriesKey(salt: salt, userID: "u-1", project: "orbit", title: "  !! ") == nil, "team: no title, no series")
+    expect(T.seriesKey(salt: Data(count: 4), userID: "u-1", project: "orbit", title: "x") == nil, "team: a short salt is refused")
+    expect(T.salt(T.newSalt())?.count == 32 && T.newSalt() != T.newSalt(), "team: a new salt is 32 random bytes")
+    let body = CallSync.callBody(projectID: "p", title: "t", start: Date(timeIntervalSince1970: 0), durationS: 1, meta: [:],
+                                 appVersion: "0.20.0", seriesKey: k1)
+    expect(body["series_key"] as? String == k1, "team: the call body carries the series key")
+    expect(CallSync.callBody(projectID: "p", title: "t", start: Date(), durationS: 1, meta: [:], appVersion: "x",
+                             seriesKey: "Weekly sync")["series_key"] == nil, "team: never a title as a series key")
+
+    // the tab: a team lead or C-level of a team organization, with manager_view open
+    var lead = PacenoteServer.Org(id: "o1", name: "Orbit", kind: "team", role: "member", plan: "team"); lead.leadsTeams = ["t1"]
+    var cl = PacenoteServer.Org(id: "o2", name: "Acme", kind: "team", role: "member", plan: "enterprise"); cl.cLevel = true
+    let member = PacenoteServer.Org(id: "o3", name: "Plain", kind: "team", role: "member", plan: "team")
+    var personal = PacenoteServer.Org(id: "o4", name: "Mine", kind: "personal", role: "owner", plan: "solo"); personal.cLevel = true
+    let me = PacenoteServer.Me(email: "mike@example.com", name: "Mike", orgs: [lead, cl, member, personal])
+    expect(T.orgs(me) { _ in true }.map(\.id) == ["o1", "o2"], "team: the tab for a lead and C-level only")
+    expect(T.orgs(me) { $0 != "o1" }.map(\.id) == ["o2"], "team: no tab where manager_view is closed")
+    expect(T.orgs(nil) { _ in true }.isEmpty, "team: signed out, no tab")
+
+    // periods
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+    let now = ISO8601DateFormatter().date(from: "2026-11-17T12:00:00Z")!
+    let (q0, q1) = T.range(.quarter, now: now, calendar: cal)
+    expect(ISO8601DateFormatter().string(from: q0) == "2026-10-01T00:00:00Z" && q1 == now, "team: this quarter starts Oct 1")
+    expect(T.range(.days7, now: now).0 == now.addingTimeInterval(-7 * 86400), "team: 7 days")
+    let a = ISO8601DateFormatter().date(from: "2024-01-01T10:00:00Z")!
+    let (c0, c1) = T.range(.custom, now: now, custom: (now, a), calendar: cal)
+    expect(c1.timeIntervalSince(c0) <= 366 * 86400 && c1 > now, "team: a custom period is whole days, at most 366")
+
+    // paths: encoded values, team scope, no empty filters
+    var f = T.Filter(from: a, to: now); f.person = "p1"; f.recordedOnly = true; f.series = k1 ?? ""
+    let list = T.listPath(org: "o1", filter: f)
+    expect(list.hasPrefix("/v1/calls?org_id=o1&from=2024-01-01T10%3A00%3A00Z") && list.contains("scope=team")
+           && list.contains("owner=p1") && list.contains("has_recording=true") && list.contains("series=") && !list.contains("team=&"),
+           "team: the list path")
+    let sp = T.searchPath(org: "o1", q: " budget & Emily+Q1 ", filter: T.Filter(from: a, to: now))
+    expect(sp.contains("q=budget%20%26%20Emily%2BQ1") && !sp.contains("person="), "team: the search words are encoded")
+    expect(T.searchable("budget") && !T.searchable("x") && !T.searchable("a b c d e f g h i"), "team: the search rule")
+
+    // answers
+    let item: [String: Any] = ["id": "c1", "owner_id": "u2", "owner_name": "Emily", "project_id": "p", "project_name": NSNull(),
+                               "title": NSNull(), "started_at": "2026-11-16T10:00:00+00:00", "duration_s": 1800, "call_type": "client",
+                               "is_private": true, "has_summary": false, "has_sheet": false, "has_recording": false,
+                               "has_transcript": false, "series_key": NSNull()]
+    let pageData = try! JSONSerialization.data(withJSONObject: ["items": [item], "next_cursor": NSNull()])
+    let pg = T.page(pageData)
+    expect(pg?.items.count == 1 && pg?.next == nil && pg?.items.first?.start != nil, "team: a page parses")
+    if let i = pg?.items.first {
+        expect(T.title(i, privateLabel: "Private call", untitled: "Untitled") == "Private call", "team: a private row has no title")
+        expect(i.projectName.isEmpty && i.seriesKey.isEmpty, "team: a private row has no project name")
+    }
+    let ov = try! JSONSerialization.data(withJSONObject: ["people": [["user_id": "u2", "name": "Emily", "calls": 3, "private_calls": 1,
+        "hours": 1.5, "content_calls": 2, "sheet_share": NSNull(), "useful_share": 0.5, "talk_ratio_median": 0.4,
+        "sheet_topics_hit": 3, "sheet_topics_total": 4, "tasks_open": 1, "tasks_closed": 1]],
+        "team": ["calls": 3, "hours": 1.5], "weeks": [["week": "2026-11-16", "calls": 3]]])
+    let o = T.overview(ov)
+    expect(o?.people.first?.n.calls == 3 && o?.people.first?.n.sheetShare == nil && o?.people.first?.n.topicsShare == 0.75
+           && o?.weeks.first?.n.calls == 3 && o?.team.hours == 1.5, "team: the overview parses")
+    expect(T.percent(0.5) == "50%" && T.percent(nil) == "-" && T.hours(1.5) == "1.5" && T.length(5400) == "1 h 30 min",
+           "team: the words for numbers")
+    let sr = try! JSONSerialization.data(withJSONObject: ["items": [["call": item, "field": "tasks", "snippet": "Send the deck"]],
+                                                           "truncated": true])
+    expect(T.search(sr)?.truncated == true && T.search(sr)?.hits.first?.field == "tasks", "team: search results parse")
+    expect(T.section(forField: "tasks") == "tasks" && T.section(forField: "title") == "summary", "team: a hit opens its section")
+    let det = try! JSONSerialization.data(withJSONObject: ["id": "c1", "title": "Weekly sync", "is_private": false,
+        "summary": ["body_md": "Notes"], "tasks": [["id": "t1", "text": "Send the deck", "assignee": "Emily", "status": "open"]],
+        "assets": [["kind": "video", "web_view_link": "https://drive.google.com/file/d/x"],
+                   ["kind": "transcript_md", "web_view_link": "https://evil.example.com/x"]],
+        "analysis": ["tips_shown": 4, "tips_rated_useful": 1, "tips_not_useful": 1]])
+    let d = T.detail(det)
+    expect(d?.summary == "Notes" && d?.tasks.first?.who == "Emily" && d?.recording != nil && d?.transcript == nil
+           && d?.analysis?.usefulShare == 0.5, "team: a colleague's call parses; only Drive links open")
+    let vw = try! JSONSerialization.data(withJSONObject: ["days": 90, "items": [["call_id": "c1", "title": "Weekly sync",
+        "viewer_name": "", "viewer_email": "mike@example.com", "at": "2026-11-17T09:00:00+00:00"]]])
+    expect(T.views(vw)?.first?.viewer == "mike@example.com", "team: who viewed my calls parses")
+    let cat = Analytics.catalog
+    for s in ["team_calls", "team_overview", "team_search", "team_call_page", "call_views"] {
+        expect(cat.screens[s] != nil, "team: screen \(s) in the analytics catalog")
+    }
+    for a in ["open_team_call", "team_search", "open_drive_recording", "open_drive_transcript"] {
+        expect(cat.actions.contains(a), "team: action \(a) in the analytics catalog")
+    }
+}
+
+teamCallsB9()
 entitlementsB3()
 entitlementsB3UI()
 analyticsS4()

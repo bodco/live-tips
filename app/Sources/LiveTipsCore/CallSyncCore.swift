@@ -171,7 +171,7 @@ public enum CallSync {
     /// names wait for the lawyer (owner 15.11) and their emails are never sent.
     public static func callBody(projectID: String, title: String, start: Date, durationS: Int, meta: [String: String],
                                 appVersion: String, consent: [String: Any]? = nil, analysis: [String: Any]? = nil,
-                                orgID: String = "", isPrivate: Bool = false) -> [String: Any] {
+                                orgID: String = "", isPrivate: Bool = false, seriesKey: String? = nil) -> [String: Any] {
         func m(_ k: String, _ max: Int) -> String { String((meta[k] ?? "").prefix(max)) }
         var o: [String: Any] = ["project_id": projectID, "title": String(title.prefix(300)), "started_at": iso.string(from: start),
                                 "duration_s": max(0, durationS), "call_type": m("call_type", 50), "audience": m("audience", 50),
@@ -181,6 +181,8 @@ public enum CallSync {
         // 0.17.0 (B6b): the call's organization (a server before 0.6.0 never sees the new fields from a personal call)
         if !orgID.isEmpty { o["org_id"] = orgID }
         if isPrivate { o["is_private"] = true }
+        // 0.20.0 (B9, server 0.12.0): the series as an opaque HMAC (TeamCalls.seriesKey), never the title or the rule
+        if let k = seriesKey, k.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil { o["series_key"] = k }
         return o
     }
 

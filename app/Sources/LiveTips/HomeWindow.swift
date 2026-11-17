@@ -216,6 +216,8 @@ struct HomeView: View {
                 navTab(L("home.nav.home"), selected: true) { nav.path = [] }
                 if trackerOn { navTab(L("home.nav.tracker"), selected: false) { nav.open(.tracker) } }
                 // 0.17.0: the console, for someone who runs something in an organization, or for staff
+                // 0.20.0 (B9, D47.2): the team's calls, for a team lead or C-level whose plan opens manager_view
+                if TeamStore.visible { navTab(L("team.tab"), selected: false) { nav.open(.team) } }
                 if acct.me?.showsConsole == true { navTab(L("console.tab"), selected: false) { nav.open(.console) } }
             }
             integrationsPill

@@ -17,6 +17,8 @@ final class HomeNav: ObservableObject {
         case tracker                         // 0.9.0: the Tracker screen
         case console                         // 0.17.0: the web console in the app (ConsoleTab.swift)
         case upcoming(String)                // 0.9.0: an upcoming call page (StartCallModel id)
+        case team                            // 0.20.0 (B9): the Team tab (TeamTab.swift)
+        case teamCall(String, String, String) // 0.20.0 (B9): a colleague's call, read only (org, call id, section)
     }
     @Published var path: [Route] = [] {
         // review 17.11: back on Home after a pushed screen (onAppear of Home's root does not fire again there)
@@ -63,6 +65,8 @@ final class HomeNav: ObservableObject {
         case .tracker: return L("home.nav.tracker")
         case .console: return L("console.tab")
         case .upcoming(let id): return UpcomingPages.models[id]?.effectiveTitle ?? L("call.title.upcoming")
+        case .team: return L("team.tab")
+        case .teamCall: return L("team.callPage")
         }
     }
 
@@ -130,6 +134,8 @@ struct HomeRouteView: View {
         case .console: ConsoleTabView()
         case .upcoming(let id):
             if let m = UpcomingPages.models[id] { UpcomingCallPage(model: m) } else { Text(L("call.page.empty")).padding() }
+        case .team: TeamView()
+        case .teamCall(let org, let id, let section): TeamCallPage(orgID: org, callID: id, section: section)
         }
     }
 }

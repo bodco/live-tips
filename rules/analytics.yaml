@@ -48,7 +48,7 @@ enums:
   error_code: [timeout, rate_limit, quota, key_invalid, auth_expired, network, offline, server_5xx, server_4xx,
                not_found, permission, disk_full, parse, cancelled, unsupported, too_large, conflict, crashed, other]
   perf_what: [app_ready, prep_build, sheet_open, first_tip, answer_tip, transcribe_minute, rec_start, notes_after,
-              search, sync_push, sync_pull, index_build, console_open]
+              search, sync_push, sync_pull, index_build, console_open, team_list, team_search]
   update_how: [prompt, background, manual]
 
 # --- screens (scr) and their parts (sub) -------------------------------------------------------------------------------
@@ -84,6 +84,11 @@ screens:
   module_lock: []
   console_tab: []
   plans: []                                             # 0.19.0: Compare plans (switch, start a team)
+  team_calls: []                                        # 0.20.0 (B9): the Team tab, list of the team's calls
+  team_overview: []                                     # 0.20.0 (B9): the Team tab, overview by person and week
+  team_search: []                                       # 0.20.0 (B9): the Team tab, search results
+  team_call_page: [summary, decisions, tasks, risks, sheet, people]   # 0.20.0 (B9): a colleague's call, read only
+  call_views: []                                        # 0.20.0 (B9): Settings > Account > Who viewed my calls
   launch: []                                            # only as `from`
   # the web console (source console): one scr per page group
   console_overview: []
@@ -106,7 +111,8 @@ actions: [start_call, start_now, join_meeting, end_call, prepare, prepare_again,
           connect_google, connect_notion, connect_hubspot, add_project, remove_project, move_project_org, change_project,
           install_component, remove_component, install_update, later_update, theme_change, sign_in, sign_out,
           delete_account, invite, rehearsal_start, presentation_on, show_what_is_sent, privacy_toggle, feature_try_it,
-          console_filter, console_export_csv, console_save, refresh_calendars, change_plan, start_team, open_platform]
+          console_filter, console_export_csv, console_save, refresh_calendars, change_plan, start_team, open_platform,
+          open_team_call, team_search, open_drive_recording, open_drive_transcript]
 
 # --- events -------------------------------------------------------------------------------------------------------------
 # name: {param: type or enum name}. Every event also carries t, s, seq and, where it makes sense, scr (see the spec).

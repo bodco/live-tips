@@ -3,6 +3,18 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.20.0 (not released yet, needs server 0.12.0)
+
+- **Team tab for team leads and C-level (2026-11-17, server 0.12.0):** the calls of the people you see in one list with
+  filters (period, person, team, project, call type, with a recording), the recurring meetings of a person (All calls in
+  this series), search across the titles, summaries, decisions, tasks and risks of the calls that are not private, an
+  overview by person and by week (numbers only), and a colleague's call page, read only, with Open the recording /
+  transcript in Drive. A private call shows only the person, the date and the length. Nothing of the team is written to
+  your Mac.
+- **Who viewed my calls (2026-11-17, server 0.12.0):** Settings > Account lists who opened your calls in the last 90 days.
+- **Series key (2026-11-17):** a synced call carries a coded key of its recurring meeting (made on your Mac with a
+  secret kept in the Keychain), never its title, so a team lead can see one person's series.
+
 ## 0.19.2 (2026-11-17)
 
 - **Product analytics covers the rest of the app (2026-11-17):** the Google file picker, What to record and an

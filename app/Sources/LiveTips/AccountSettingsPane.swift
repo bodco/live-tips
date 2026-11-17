@@ -92,6 +92,7 @@ struct AccountSettingsPane: View {
         AccountOrgsSection()       // 0.17.0 (B6b): organizations, where new calls go, invites, Manage organization
         AccountPlanSection()       // 0.18.0 (B3): the plan of each organization, the beta mark, trial, limits
         AccountUsageSection()      // 0.19.0: my own use (GET /v1/me/usage), also on Solo
+        AccountCallViewsSection()  // 0.20.0 (B9, D47.7): who opened my calls, when a lead or C-level sees them
 
         Section {
             if acct.devices.isEmpty {

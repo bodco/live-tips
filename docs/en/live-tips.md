@@ -2396,6 +2396,24 @@ teams, organization projects and invites are managed in the Pacenote console, no
 - **Who sees a call.** Next to a call (the call page) and its Meeting Sheet a small line says who else sees it:
   "Visible to your team lead", "Visible to leadership" or both. They see the notes, decisions, tasks and the Meeting
   Sheet, never the transcript, audio or tips.
+- **Team tab (0.20.0, server 0.12.0).** A team lead, and C-level on Enterprise, get a **Team** tab in the Home
+  header next to Console (plans with the team view). It lists the calls of the people you see: the members of the
+  teams you lead, or everyone in the organization for C-level. Filters: the period (7, 30 or 90 days, this quarter or
+  your own dates, at most a year), a person, a team, a project, the call type and "With a recording". A private call
+  shows as "Private call" with the person, the date and the length, nothing else. Right-click a call > **All calls in
+  this series** shows that person's recurring meeting (the app sends the server only a coded key of the series, never
+  its title). A click opens the colleague's call page, read only: Summary, Decisions, Tasks, Risks, Meeting Sheet,
+  People and analysis, and **Open the recording in Drive** / **Open the transcript in Drive** when the call has them
+  (they open if the person shared the Drive folder with you). **Overview** shows numbers by person and by week: calls,
+  hours, calls with a Meeting Sheet, tips shown and the share rated useful, Ask now, talk share, Sheet topics
+  covered, decisions, tasks, risks and recorded calls; private calls count only in calls and hours. The search box
+  looks for all its words in the titles, summaries, decisions, tasks and risks of the calls that are not private,
+  in the period you picked (the latest 2000 calls; pick a shorter period for more). The team's calls are kept in
+  memory only and never written to your Mac.
+- **Who viewed my calls (0.20.0).** When a team lead or C-level sees your calls, Settings > Account > **Who viewed my
+  calls** lists who opened which of your calls in the last 90 days. Opening a colleague's call, the team overview
+  (once a day) and each search are recorded on the server; a search is recorded with the number of results, never
+  the words.
 - **Private calls.** On the call page of an organization's call, **Private** keeps it to "it happened, this long" for
   your team lead and leadership. Settings > Projects > a project > Organization > **New calls are private** marks the
   project's new calls private when they end. If the organization turned private calls off, the switch is locked; a

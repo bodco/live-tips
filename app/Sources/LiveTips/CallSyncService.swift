@@ -225,6 +225,20 @@ final class CallSyncService: ObservableObject {
     }
 
     /// The project of a call when it may go to the server now.
+    /// 0.20.0 (B9): the call's series key. The salt is made once and kept in the Keychain (one combined item, so no
+    /// new prompt); nil when it cannot be read or written, then the call goes without a series.
+    static func seriesKey(project: String, title: String) -> String? {
+        guard let uid = PacenoteAccount.shared.session?.userID, !uid.isEmpty, !title.isEmpty else { return nil }
+        let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
+        var salt = TeamCalls.salt(store.get(.seriesSalt))
+        if salt == nil {
+            let s = TeamCalls.newSalt()
+            if store.set(.seriesSalt, s) { salt = TeamCalls.salt(s) }
+        }
+        guard let salt else { return nil }
+        return TeamCalls.seriesKey(salt: salt, userID: uid, project: project, title: title)
+    }
+
     func project(for t: String) -> Project? {
         guard PacenoteAccount.shared.signedIn, let p = PyTool.project(of: t).project, p.serverSync,
               !SampleProject.blocksSync(p) else { return nil }          // 0.17.0 (5.1): an untouched sample stays local
@@ -317,7 +331,8 @@ final class CallSyncService: ObservableObject {
             let call = CallSync.json(CallSync.callBody(projectID: pid, title: title, start: start, durationS: dur, meta: st.meta,
                                                        appVersion: PacenoteAccount.appVersion,
                                                        consent: CallSync.consent(CallConsent.read(transcript: t)), analysis: analysis,
-                                                       orgID: bodyOrg, isPrivate: st.isPrivate))
+                                                       orgID: bodyOrg, isPrivate: st.isPrivate,
+                                                       seriesKey: Self.seriesKey(project: p.slug, title: rec?.title ?? "")))
             if st.callID.isEmpty || st.hashes["call"] != CallSync.hash(call) {
                 let (d, c) = try await PacenoteAccount.shared.api("PUT", "/v1/calls/" + st.clientCallID, body: call)
                 switch CallSync.outcome(status: c, problem: Self.problemText(d, c)) {

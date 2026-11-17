@@ -2046,6 +2046,13 @@ skips them, and the speaker notes of each slide reach the preparation. A text pl
 the talk (was 3). A deck of more than 30 slides is written by Claude in passes of 20. There is no limit on the number of
 slides; above 60 it is not tested.
 
+**A speech for a deck, written ahead (0.21.0).** Ask the live-tips skill in Cowork "write my talk" (or "напиши
+промову") with the deck (PowerPoint, PDF or a Keynote export), your notes, the talk time, the language and who presents
+which slides. It writes `<project>/pacenote/speech/<deck stem>.speech.md`: a section per slide with who presents it,
+its time, what you say (by the same talk rules as Prepare: your own speech in the first person, never a retelling of the
+slide), the numbers and one short sentence. When a Presentation call has a deck of the same name, Prepare takes this
+file first, on every AI, and keeps its wording; Prepare again picks up a newer file.
+
 ### 14.1x Meeting Sheet: the preparation (0.10.0, beta)
 
 **What it is.** Preparing a call gives one document, the **Meeting Sheet**, and a **readiness check**. The sheet is

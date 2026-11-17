@@ -255,6 +255,10 @@ def build(r: dict, previous: Optional[List[Tuple[str, str]]] = None, route: str 
     files = [f for f in (r.get("files") or [])]
     for f in files:
         pinned.append((Item(path=f, label="File the PM added: " + f, kind="file", tier=0, reason="pinned"), read_text(f)))
+    sd = r.get("speech_doc") or ""
+    if r.get("deck") and sd and sd not in files and os.path.exists(sd):     # S1-3 (skill/references/speech-writer.md)
+        pinned.append((Item(path=sd, label="The PM's speech document for this deck: " + sd, kind="file", tier=0,
+                            reason="pinned"), read_text(sd)))
     share = int(budget * PINNED_SHARE)
     need = sum(len(t) for _, t in pinned)
     if need <= share:

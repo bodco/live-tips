@@ -20,6 +20,10 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Meeting Sheet for sales (2026-11-17):** Sales intro and Repeat call add Likely objections, Competitors,
   Stakeholders and the Mutual action plan, read the answer cards and the deal so far of the series, and warn when
   nobody is known as the decider.
+- **A speech for your deck (2026-11-17):** the live-tips skill writes your talk for a deck ahead of the call ("write my
+  talk", "напиши промову"): what you say on every slide, its time, the numbers and a short line, saved as
+  `<project>/pacenote/speech/<deck name>.speech.md`. Prepare for a Presentation call with that deck takes it first and
+  keeps your wording.
 
 ## 0.20.0 (not released yet, needs server 0.12.0)
 

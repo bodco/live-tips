@@ -1,6 +1,6 @@
 ---
 name: "live-tips"
-description: "Live call assistant. Records the call, shows the PM's speech at the start, gives facts and ready phrases during the call in a small prompter window (with HELP NOW, pause and speaker naming), then writes a summary into the Notion Meetings DB. Audience and type are detected automatically (team, client, boss; presentation and interview as custom types with their own prep). Trigger on \"live tips\", \"лайв підказки\", \"я на дзвінку\", \"співбесіда\", \"hiring interview\", \"презентація\", \"фокус\", \"стоп\"."
+description: "Live call assistant. Records the call, shows the PM's speech at the start, gives facts and ready phrases during the call in a small prompter window (with HELP NOW, pause and speaker naming), then writes a summary into the Notion Meetings DB. Audience and type are detected automatically (team, client, boss; presentation and interview as custom types with their own prep). Trigger on \"live tips\", \"лайв підказки\", \"я на дзвінку\", \"співбесіда\", \"hiring interview\", \"презентація\", \"фокус\", \"стоп\". Also writes the PM's speech for a deck before a call: \"напиши промову\", \"промова до слайдів\", \"write my talk\", \"speech for the deck\"."
 ---
 
 # Live Tips
@@ -68,6 +68,7 @@ Older step names used in the modules: Step 0 and Step 1 = `start.md` and "Start"
 | `research.md` (background research team) | at prep, with `workflow-authoring`, when research is on |
 | `presentation.md` | when `call_type=presentation` |
 | `talk.md` (the presentation talk: what the PM says on every slide, `slides.json` `body`) | whenever you write or rewrite `slides.json` (with `presentation.md` 8b, 9) |
+| `speech-writer.md` (a speech document for a deck, outside a call: `<project>/pacenote/speech/<deck stem>.speech.md`) | when the PM asks for a speech or talk to a deck ("напиши промову", "write my talk"); with `talk.md` |
 | `hiring.md` | when `call_type=interview` |
 | `wrapup.md` (Step 4 wrap-up, Step 5 Notion page, Step 6 lessons) | right after the status is `stopped` |
 | `start-chat.md` | only when `settings.start.mode` is `chat` |

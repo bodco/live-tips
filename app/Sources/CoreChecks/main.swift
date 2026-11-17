@@ -582,6 +582,12 @@ func salesBlocksS1() {
     a.type = "price"
     expect(a.markdown.contains("Limit: stale"), "s1 cards: the price card writes its limit")
     expect(AnswerCard(title: "Q", answer: "A").markdown == "## Q\nA\n", "s1 cards: an old card is written as before")
+    // S1-3: the speech document of a deck is found by the deck's name, nothing without a root or a file
+    expect(SpeechDocs.path(root: "/p/orbit", deckFile: "/tmp/decks/Q4 review.key") == "/p/orbit/pacenote/speech/Q4 review.speech.md", "s1 speech: path from the deck name")
+    expect(SpeechDocs.existing(root: "/p/orbit", deckFile: "Q4.pptx", exists: { _ in true }) == "/p/orbit/pacenote/speech/Q4.speech.md" &&
+           SpeechDocs.existing(root: "/p/orbit", deckFile: "Q4.pptx", exists: { _ in false }) == nil &&
+           SpeechDocs.existing(root: "", deckFile: "Q4.pptx", exists: { _ in true }) == nil, "s1 speech: only an existing file")
+    expect(SpeechDocs.promptLine(nil).isEmpty && SpeechDocs.promptLine("/p/a.speech.md").contains("talk.md 6"), "s1 speech: prompt line")
     for (t, title) in [("objections", "Likely objections"), ("competitors", "Competitors"), ("stakeholders", "Stakeholders"), ("mutual_plan", "Mutual action plan")] {
         expect(BlockType.known.contains(BlockType(rawValue: t)) && SheetEdit.blockTitle(BlockType(rawValue: t)) == title, "s1 sheet: block \(t)")
     }

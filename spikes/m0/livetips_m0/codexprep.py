@@ -82,10 +82,14 @@ class Preparation:
             docs = [m["path"] for m in self.manifest if m.get("kind") == "folder_file" and m.get("status") in ("full", "compressed")
                     and re.search(r"speech|спіч|промов|talk|script|slides|deck|презентац|доповід", os.path.basename(m["path"]), re.I)]
             docs = docs[:self.SLIDES_DOCS]
+        sd = request.get("speech_doc") or ""
+        if sd and os.path.exists(sd):     # S1-3: the speech document written for this deck goes first, never squeezed out
+            docs = [sd] + [d for d in docs if d != sd][:self.SLIDES_DOCS - 1]
         room = self.SLIDES_MATERIAL - len(brief) - sum(len(x) for x in parts)
         for d in docs:
             text, _ = prepcontext.compress(prepcontext.read_text(d), max(4000, room // max(1, len(docs))), d)
-            parts.append("## Speech document: " + d + "\n" + text)
+            label = "## Speech document (written for this deck, the PM's words per slide): " if d == sd else "## Speech document: "
+            parts.append(label + d + "\n" + text)
         return "\n\n".join(parts) + "\n\n## The brief\n" + brief
 
     def slides(self, brief, pack):

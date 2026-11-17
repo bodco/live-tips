@@ -487,7 +487,9 @@ final class PrepRunner: ObservableObject {
         """
         // 0.8.5 (rules/presentation.yaml > prepare_again): one previous version is kept; the deck goes to <base>.deck.json.
         let deckTexts = TalkFiles.before(base: base, deck: r.deck)
-        let deckLines = r.deck.map { TalkFiles.prompt(base: base, deck: $0) } ?? ""
+        // S1-3: the PM's speech document for this deck (<project>/pacenote/speech/<deck stem>.speech.md), when there is one
+        let speechDoc = r.deck?.info.flatMap { SpeechDocs.existing(root: r.root, deckFile: $0.file) }
+        let deckLines = r.deck.map { TalkFiles.prompt(base: base, deck: $0) + SpeechDocs.promptLine(speechDoc) } ?? ""
         // 0.8.8 (rules/decisions.yaml > brief, snapshot): the register's active decisions, refreshed from Notion now
         let regProj = ProjectRegistry.load(from: AppPaths.projects).projects.first { $0.slug == r.slug }
         let decFile = ((r.root as NSString).appendingPathComponent("pacenote") as NSString).appendingPathComponent("decisions.md")
@@ -612,6 +614,7 @@ final class PrepRunner: ObservableObject {
         if r.deck?.info != nil, FileManager.default.fileExists(atPath: base + ".deck.json") {
             req["deck"] = base + ".deck.json"
             req["deck_lines"] = deckLines
+            if let sd = speechDoc { req["speech_doc"] = sd }      // S1-3: the packed ways take it first (codexprep)
         }
         let ctxReq = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("prepcontext-request.json")
         if !isPacked, r.refreshBase == nil, let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: ctxReq)) }

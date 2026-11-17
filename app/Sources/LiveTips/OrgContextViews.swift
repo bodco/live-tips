@@ -135,7 +135,8 @@ final class OrgContextStore: ObservableObject {
         let wanted = (sources[p.orgProjectID] ?? []).filter { $0.kind == .driveFile }
         guard !wanted.isEmpty else { return L("orgctx.idx.noDrive") }
         guard let email = GoogleService.shared.accounts.first?.email else { return L("orgctx.idx.noGoogle") }
-        var done = 0, skipped = 0, vectors = 0
+        var done = 0, skipped = 0, vectors = 0, lastCode = ""
+        let t0 = Date()
         defer { indexing[p.orgProjectID] = nil }
         for (n, s) in wanted.enumerated() {
             indexing[p.orgProjectID] = L("orgctx.idx.progress", ["n": "\(n + 1)", "of": "\(wanted.count)"])
@@ -157,11 +158,16 @@ final class OrgContextStore: ObservableObject {
                 let (d, c) = try await PacenoteAccount.shared.api("PUT", OrgContext.indexPath(base(p), ref: s.ref),
                                                                   body: OrgContext.fileBody(name: name, mime: mime, modified: OrgCard.parseDate(m["modifiedTime"]),
                                                                                             description: desc, embedding: vec))
-                if c == 200 || c == 201 { done += 1 } else { skipped += 1; problems[key(p, "index")] = OrgCardStore.problemText(c, d) }
-            } catch { skipped += 1 }
+                if c == 200 || c == 201 { done += 1 } else {
+                    skipped += 1; problems[key(p, "index")] = OrgCardStore.problemText(c, d); lastCode = Analytics.errorCode(status: c)
+                }
+            } catch { skipped += 1; lastCode = Analytics.errorCode(error) }
         }
         await loadFiles(p)
         UsageLog.log("org_index_built", ["files": done, "skipped": skipped, "vectors": vectors])
+        // S5: perf index_build for the whole run, error index with the last failure's code (never a file's name)
+        AnalyticsTracker.shared.perf("index_build", ms: Int(Date().timeIntervalSince(t0) * 1000), provider: "drive", ok: done > 0 || skipped == 0, o: p.orgProjectOrg)
+        if !lastCode.isEmpty { AnalyticsTracker.shared.error("index", lastCode, provider: "drive", o: p.orgProjectOrg) }
         return L("orgctx.idx.done", ["n": "\(done)", "skipped": "\(skipped)", "vectors": "\(vectors)"])
     }
 

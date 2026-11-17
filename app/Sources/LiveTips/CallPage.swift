@@ -156,7 +156,7 @@ struct CallPageView: View {
             AnswerCardForm(card: c, title: L("cards.saveAs"), onSave: { saveCard($0, proj, ws) }, onCancel: { cardDraft = nil })
         }
     }
-        .trackScreen("call_page", sub: tab, o: CallSyncService.shared.orgID(of: file))
+        .trackScreen("call_page", sub: tab, o: CallSyncService.shared.callOrg(of: file))
     }
 
     // MARK: header (2026-11-05 redesign: a card like Home's next call)
@@ -1174,7 +1174,7 @@ struct TranscriptView: View {
         }
         .background(PN.C.surface)
     }
-        .trackScreen("call_page", sub: "transcript", o: CallSyncService.shared.orgID(of: file))
+        .trackScreen("call_page", sub: "transcript", o: CallSyncService.shared.callOrg(of: file))
     }
 
     private func chip(_ t: String, on: Bool, _ tap: @escaping () -> Void) -> some View {

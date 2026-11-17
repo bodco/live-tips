@@ -252,6 +252,7 @@ struct CRMUpdateView: View {
             } catch {
                 undo = done; undoUntil = done.isEmpty ? nil : Date().addingTimeInterval(8)
                 status = (error as? CRMError)?.message ?? error.localizedDescription
+                AnalyticsTracker.shared.error("crm", Analytics.errorCode(message: status), provider: "hubspot")   // S5: code only
             }
             busy = false
         }

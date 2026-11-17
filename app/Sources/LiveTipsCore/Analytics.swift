@@ -398,4 +398,27 @@ public enum Analytics {
         }
         return "other"
     }
+
+    /// S5 (17.11): a code from the fixed list for an error that only comes as a message (a recorder, a sidecar, a CLI).
+    /// The message is read here and never sent.
+    public static func errorCode(message: String) -> String {
+        let m = message.lowercased()
+        func has(_ w: String...) -> Bool { w.contains { m.contains($0) } }
+        if has("timed out", "timeout") { return "timeout" }
+        if has("rate limit", "rate_limit", "429", "too many requests") { return "rate_limit" }
+        if has("quota", "usage limit", "credit") { return "quota" }
+        if has("api key", "invalid key", "invalid_api_key", "invalid x-api-key") { return "key_invalid" }
+        if has("401", "unauthorized", "unauthenticated", "token expired", "expired token", "sign in again") { return "auth_expired" }
+        if has("permission", "not permitted", "not authorized", "denied", "tcc") { return "permission" }
+        if has("no space", "disk full", "out of space") { return "disk_full" }
+        if has("offline", "not connected to the internet", "network connection was lost") { return "offline" }
+        if has("could not connect", "connection refused", "network") { return "network" }
+        if has("not found", "no such file", "404") { return "not_found" }
+        if has("cancelled", "canceled") { return "cancelled" }
+        if has("unsupported", "not supported") { return "unsupported" }
+        if has("too large", "too long", "413") { return "too_large" }
+        if has("crash", "exited with", "signal") { return "crashed" }
+        if has("500", "502", "503", "504", "overloaded", "internal server error") { return "server_5xx" }
+        return "other"
+    }
 }

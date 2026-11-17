@@ -450,6 +450,16 @@ final class CallEngine {
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notes.log"))
         p.standardOutput = log
         p.standardError = log
+        // S5: perf notes_after, the end of the call to its notes on disk; error ai with the exit status as a code
+        let t0 = Date(), prov = Analytics.provider(route: c.ai.after)
+        p.terminationHandler = { proc in
+            let ok = proc.terminationStatus == 0 && FileManager.default.fileExists(atPath: notes)
+            let ms = Int(Date().timeIntervalSince(t0) * 1000), code = proc.terminationReason == .uncaughtSignal ? "crashed" : "other"
+            AnalyticsTracker.onMain {
+                AnalyticsTracker.shared.perf("notes_after", ms: ms, provider: prov, ok: ok)
+                if !ok { AnalyticsTracker.shared.error("ai", code, provider: prov) }
+            }
+        }
         do { try p.run() } catch { return false }
         return true
     }
@@ -563,6 +573,8 @@ final class CallEngine {
                 } else {
                     self.notionResult = "Notion: " + ((d["error"] as? String) ?? L("eng.notionFailed"))
                     self.notify(self.notionResult)
+                    let code = Analytics.errorCode(message: (d["error"] as? String) ?? "")      // S5: the code, never the text
+                    AnalyticsTracker.onMain { AnalyticsTracker.shared.error("notion", code, provider: "notion") }
                 }
             }
         }

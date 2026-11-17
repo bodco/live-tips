@@ -106,9 +106,16 @@ struct MemoryView: View {
         let c = AppConfig.load(from: AppPaths.config)
         let appRoot = c.effectiveAppRoot(appSupport: AppPaths.support.path)
         let lt = (appRoot as NSString).appendingPathComponent("bin/lt")
+        let t0 = Date()      // S5: perf search, the question to its answer
         PyTool.run("memory", ["--root", target, "--q", q, "--lt", c.engine.python, lt, "--model", c.models.classify, "--lang", L10n.lang]) { r in
             busy = false
-            if (r["ok"] as? Bool) == true { answer = r } else { error = L("memory.failed", ["err": r["error"] as? String ?? ""]) }
+            let ok = (r["ok"] as? Bool) == true
+            let ms = Int(Date().timeIntervalSince(t0) * 1000), code = Analytics.errorCode(message: r["error"] as? String ?? "")
+            AnalyticsTracker.onMain {
+                AnalyticsTracker.shared.perf("search", ms: ms, ok: ok)
+                if !ok { AnalyticsTracker.shared.error("ai", code) }
+            }
+            if ok { answer = r } else { error = L("memory.failed", ["err": r["error"] as? String ?? ""]) }
         }
     }
 }

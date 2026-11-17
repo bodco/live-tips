@@ -369,18 +369,26 @@ final class CallRecorder: NSObject, ObservableObject {
         session = ses
         sourceLabel = label
         setState("starting")
+        let t0 = Date()      // S5: perf rec_start, from asking the recorder to the first frame
         ses.start { err in
             DispatchQueue.main.async {
                 guard self.session === ses else { return }
                 if let err = err {
                     self.session = nil; self.setState("off")
                     self.note(L("rec.err.start", ["err": err]))
+                    let ms = Int(Date().timeIntervalSince(t0) * 1000), code = Analytics.errorCode(message: err)
+                    AnalyticsTracker.onMain {
+                        let t = AnalyticsTracker.shared
+                        t.perf("rec_start", ms: ms, ok: false, o: t.callOrg); t.error("record", code, o: t.callOrg)
+                    }
                     CallEngine.shared.recordingNotStarted()
                     return
                 }
                 self.elapsedSec = 0
                 self.setState("recording")
                 UsageLog.log("rec_started", ["kind": self.kind, "source": src == .soundOnly ? "sound" : (label.isEmpty ? "display" : "chosen")])
+                let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                AnalyticsTracker.onMain { AnalyticsTracker.shared.perf("rec_start", ms: ms, o: AnalyticsTracker.shared.callOrg) }
                 self.ticker?.invalidate()
                 self.ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
                     self.elapsedSec = Int(ses.mediaNow()); self.publish()
@@ -389,7 +397,13 @@ final class CallRecorder: NSObject, ObservableObject {
             }
         }
         ses.onFailure = { msg in
-            DispatchQueue.main.async { if self.session === ses { self.note(msg); self.stop() } }
+            DispatchQueue.main.async {
+                if self.session === ses {
+                    let code = Analytics.errorCode(message: msg)
+                    AnalyticsTracker.onMain { AnalyticsTracker.shared.error("record", code, fatal: true, o: AnalyticsTracker.shared.callOrg) }
+                    self.note(msg); self.stop()
+                }
+            }
         }
     }
 

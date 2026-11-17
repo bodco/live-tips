@@ -3697,6 +3697,14 @@ func analyticsS4Part2(root: URL) {
            && A.errorCode(URLError(.timedOut)) == "timeout" && A.errorCode(URLError(.notConnectedToInternet)) == "offline"
            && A.errorCode(NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)) == "disk_full"
            && A.errorCode(NSError(domain: "x", code: 1)) == "other", "analytics: error codes")
+    // S5: a message gives a code from the closed list, the message itself never goes
+    let msgs: [(String, String)] = [("Request timed out", "timeout"), ("429 Too Many Requests", "rate_limit"),
+        ("Invalid API key", "key_invalid"), ("401 Unauthorized", "auth_expired"), ("Screen recording permission denied", "permission"),
+        ("No space left on device", "disk_full"), ("The Internet connection appears to be offline.", "offline"),
+        ("No such file or directory", "not_found"), ("The process exited with code 9", "crashed"), ("503 overloaded", "server_5xx"),
+        ("weird", "other"), ("", "other")]
+    for (m, c) in msgs { expect(A.errorCode(message: m) == c, "analytics: code of message '\(m)' is \(A.errorCode(message: m)), want \(c)") }
+    for (m, _) in msgs { expect((cat.enums["error_code"] ?? []).contains(A.errorCode(message: m)), "analytics: message code in the list") }
     // a scan of the app: what the code names is in the catalog
     let src = root.appendingPathComponent("app/Sources/LiveTips")
     var bad: [String] = []

@@ -311,6 +311,9 @@ struct ProjectSettingsPage: View {
                     }
                 }
                 .formStyle(.grouped)
+                // S5: a project linked to an organization project is that project's page (card, registers, state,
+                // sources, index, history in one scroll, so no part); other projects stay settings > projects
+                .trackScreen("org_project", o: p.orgProjectOrg, on: p.linkedToOrgProject)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {

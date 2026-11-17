@@ -324,6 +324,13 @@ final class BrowserModel: NSObject, ObservableObject, WKNavigationDelegate, WKUI
         decisionHandler(["http", "https", "about", "blob", "data"].contains(scheme) ? .allow : .cancel)
     }
 
+    /// S5: error browser, a page that did not load (the code from the URL error, never the address)
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
+        let n = error as NSError
+        guard !(n.domain == NSURLErrorDomain && n.code == NSURLErrorCancelled) else { return }      // a new page replaced it
+        AnalyticsTracker.shared.error("browser", n.domain == NSURLErrorDomain ? Analytics.errorCode(URLError(URLError.Code(rawValue: n.code))) : "other")
+    }
+
     /// target=_blank opens in this window: one window, one session.
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {

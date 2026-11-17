@@ -172,12 +172,17 @@ final class TranscribeModel: ObservableObject {
                 md = out
                 load()
                 phase = .result
+                // S5: perf transcribe_minute, the wall time per minute of sound (the whole run, download and speakers included)
+                let audioMin = stage >= 2 ? totalS / 60 : 0, ms = Date().timeIntervalSince(started) * 1000
+                if audioMin >= 0.5 { AnalyticsTracker.onMain { AnalyticsTracker.shared.perf("transcribe_minute", ms: Int(ms / audioMin)) } }
                 if !saveTarget.isEmpty { addToProject() }
                 notifyDone()
             } catch is CancellationError {
                 phase = .input
             } catch {
                 phase = .failed(error.localizedDescription)
+                let code = Analytics.errorCode(message: error.localizedDescription)
+                AnalyticsTracker.onMain { AnalyticsTracker.shared.error("transcribe", code) }
             }
             pruneCache()
         }

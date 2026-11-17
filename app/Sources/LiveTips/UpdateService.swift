@@ -139,6 +139,12 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
             self.lastCheck = updater.lastUpdateCheckDate ?? Date()
             if let e = error as NSError?, e.domain != SUSparkleErrorDomain || e.code != Int(SUError.noUpdateError.rawValue) {
                 if case .checking = self.phase { self.phase = .failed(e.localizedDescription) }
+                // S5: error update; "A call is live" (our own refusal) and a check the PM cancelled are not errors
+                if !(e.domain == "Pacenote" && e.code == 1) {
+                    let code = e.domain == NSURLErrorDomain ? Analytics.errorCode(URLError(URLError.Code(rawValue: e.code)))
+                        : e.code == Int(SUError.installationCanceledError.rawValue) ? "cancelled" : Analytics.errorCode(message: e.localizedDescription)
+                    AnalyticsTracker.onMain { AnalyticsTracker.shared.error("update", code) }
+                }
             } else if case .checking = self.phase { self.phase = .idle }
         }
     }

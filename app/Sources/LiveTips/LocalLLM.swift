@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import LiveTipsCore
 
 /// 0.8.5 (owner: "Install Gemma" and local models in every model list): a model on this Mac through Ollama
 /// (rules/ai.yaml > routes.local). Ollama itself comes from ollama.com (the app is not bundled); the app starts it,
@@ -117,6 +118,7 @@ final class LocalLLM: ObservableObject {
                 self.pulling = nil
                 self.note = err.map { L("local.pull.failed", ["err": $0]) } ?? L("local.pull.done")
                 if err == nil { LocalLLM.model = name }
+                if let err { AnalyticsTracker.shared.error("local_llm", Analytics.errorCode(message: err), provider: "local") }   // S5
                 self.refresh()
             }
         }

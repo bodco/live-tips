@@ -416,6 +416,8 @@ final class GoogleService: ObservableObject {
         let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] ?? [:]
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard code == 200, let link = o["webViewLink"] as? String else {
+            let ec = Analytics.errorCode(status: code == 200 ? nil : code)      // S5: error export, the HTTP status as a code
+            AnalyticsTracker.onMain { AnalyticsTracker.shared.error("export", ec, provider: "google") }
             throw GoogleError.http(code, ((o["error"] as? [String: Any])?["message"] as? String) ?? "")
         }
         UsageLog.log("google_export")

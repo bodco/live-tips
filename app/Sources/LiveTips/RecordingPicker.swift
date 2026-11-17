@@ -25,6 +25,7 @@ enum RecordingPicker {
             MainActor.assumeIsolated { if panel === p { panel = nil; let f = onPick; onPick = nil; f?(nil) } }
         }
         panel = p
+        AnalyticsTracker.shared.screen("recording_picker", o: AnalyticsTracker.shared.callOrg)      // S5: an AppKit panel
     }
 
     @MainActor static func close(_ choice: (RecSource, String)?) {

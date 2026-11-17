@@ -786,6 +786,7 @@ enum SheetViewWindow {
 
     static func show(path: String, model m: StartCallModel) {
         if let w = windows[path], w.isVisible { w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
+        AnalyticsTracker.shared.begin("sheet_open")      // S5: perf sheet_open, to the sheet on screen (SheetWindowBody)
         let doc = SheetDoc(path: path)
         let host = NSHostingController(rootView: Localized { SheetWindowBody(doc: doc, model: m) })
         let w = NSWindow(contentViewController: host)
@@ -813,5 +814,6 @@ private struct SheetWindowBody: View {
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in doc.reload() }
     }
         .trackScreen("sheet_view")
+        .onAppear { AnalyticsTracker.shared.end("sheet_open") }
     }
 }

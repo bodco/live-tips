@@ -135,6 +135,7 @@ final class GooglePicker: NSObject, ObservableObject, NSWindowDelegate {
         w.center()
         window = w
         w.makeKeyAndOrderFront(nil)
+        AnalyticsTracker.shared.screen("google_picker")      // S5: an AppKit window, no trackScreen
         NSApp.activate(ignoringOtherApps: true)
     }
 

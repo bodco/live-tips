@@ -90,6 +90,9 @@ enum AIRoute {
 
     /// Never silent: one line per switch (the engine writes the same file, livetips_m0.routing.note_switch).
     static func noteSwitch(job: String, from: String, to: String, reason: String) {
+        // S5: error {area ai, code, provider, fallback_to}; the reason is read for its code and never sent
+        let code = Analytics.errorCode(message: reason), pf = Analytics.provider(route: from), pt = Analytics.provider(route: to)
+        AnalyticsTracker.onMain { AnalyticsTracker.shared.error("ai", code, provider: pf, fallbackTo: pt) }
         let row: [String: Any] = ["at": Date().timeIntervalSince1970, "job": job, "from": from, "to": to, "reason": reason]
         guard let d = try? JSONSerialization.data(withJSONObject: row), var line = String(data: d, encoding: .utf8) else { return }
         line += "\n"

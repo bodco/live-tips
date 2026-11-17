@@ -104,7 +104,7 @@ struct UpcomingCallPage: View {
             Button(L("common.cancel"), role: .cancel) {}
         } message: { Text(L("sheet.ui.refresh.body")) }
     }
-        .trackScreen("upcoming_page", sub: tab)
+        .trackScreen("upcoming_page", sub: tab, o: AnalyticsTracker.orgFor(project: model.project))
     }
 
     // MARK: head: meta, name, project and people, the actions

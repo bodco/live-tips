@@ -306,19 +306,26 @@ final class AnalyticsTracker {
     private var callEndedAt = Date.distantPast
     private var callCounts = (tips: 0, rated: 0, asks: 0)
     private var seenTips = Set<String>()      // review 17.11: a reopened tips window reads the file from the start again
+    private(set) var callProvider = "none"     // S5: the live route's provider, for tip_shown, first_tip and answer_tip
+
+    /// The organization a new call of this project goes to (D36), nil when none or signed out. S5: also the upcoming page's.
+    static func orgFor(project: Project?) -> String? {
+        guard let me = PacenoteAccount.shared.me else { return nil }
+        let o = PacenoteServer.orgForCall(stored: "", onServer: false, linkedOrg: project?.homeOrg ?? "", me: me)
+        return o.isEmpty ? nil : o
+    }
 
     func callStarted(request: [String: Any], tipsRoute: String) {
         let me = PacenoteAccount.shared.me
         let dir = (request["project_dir"] as? String) ?? ""
         let proj = dir.isEmpty ? nil : ProjectRegistry.load(from: AppPaths.projects).projects.first { $0.root == dir }
-        let o = me.map { PacenoteServer.orgForCall(stored: "", onServer: false, linkedOrg: proj?.homeOrg ?? "", me: $0) }
-        callOrg = (o?.isEmpty ?? true) ? nil : o
-        callCounts = (0, 0, 0); seenTips = []
+        callOrg = Self.orgFor(project: proj)
+        callCounts = (0, 0, 0); seenTips = []; callProvider = Analytics.provider(route: tipsRoute)
         let rec = AppConfig.load(from: AppPaths.config).recording.auto
         var p: [String: Any] = ["type": Analytics.callType(request["call_type"] as? String),
                                 "sales": ((request["sales"] as? [String: Any])?["enabled"] as? Bool) ?? false,
                                 "has_brief": !((request["brief"] as? String) ?? "").isEmpty,
-                                "provider": Analytics.provider(route: tipsRoute), "recording": rec]
+                                "provider": callProvider, "recording": rec]
         if let o = callOrg, let org = me?.org(o) { p["org"] = org.isPersonal ? "personal" : "team" }
         track("call_started", p, o: callOrg)
         begin("first_tip")
@@ -327,7 +334,7 @@ final class AnalyticsTracker {
     func callEnded(minutes: Int, recorded: Bool) {
         track("call_ended", ["minutes": min(max(minutes, 0), 1440), "tips": callCounts.tips, "rated": callCounts.rated,
                              "asks": callCounts.asks, "recorded": recorded], o: callOrg)
-        timers["first_tip|"] = nil
+        timers["first_tip|"] = nil; timers["answer_tip|"] = nil
         callEndedAt = Date()          // the organization stays for the call's late events (orgFor), until the next call
     }
 
@@ -341,15 +348,16 @@ final class AnalyticsTracker {
         guard (Analytics.catalog.values["tip_shown.kind"] ?? []).contains(kind), !Self.notCards.contains(kind),
               seenTips.insert(uid).inserted else { return }
         callCounts.tips += 1
-        track("tip_shown", ["kind": kind], o: callOrg)
-        end("first_tip", o: callOrg)
+        track("tip_shown", ["kind": kind, "provider": callProvider], o: callOrg)
+        end("first_tip", provider: callProvider, o: callOrg)
+        if kind == "answer" { end("answer_tip", provider: callProvider, o: callOrg) }   // S5: a typed question or HELP NOW to its answer
     }
 
     /// From the tips window: a question typed, HELP NOW, a rating (the engine logs the first two locally).
     func tipsWindow(_ what: String) {
         switch what {
-        case "ask": callCounts.asks += 1; track("ask_typed", o: callOrg)
-        case "help": track("help_now", o: callOrg); action("help_now", scr: "tips_window", o: callOrg)
+        case "ask": callCounts.asks += 1; track("ask_typed", o: callOrg); begin("answer_tip")
+        case "help": track("help_now", o: callOrg); action("help_now", scr: "tips_window", o: callOrg); begin("answer_tip")
         case "rated": callCounts.rated += 1
         default: break
         }

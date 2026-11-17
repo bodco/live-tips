@@ -3,6 +3,15 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.19.2 (2026-11-17)
+
+- **Product analytics covers the rest of the app (2026-11-17):** the Google file picker, What to record and an
+  organization project's page count as screens; speed now also covers the answer to a question or HELP NOW, starting a
+  recording, a minute of transcription, the notes after a call, search, sync both ways, a project's file index and
+  opening the Meeting Sheet; errors by code now also come from recording, transcription, Notion, the calendars, the
+  local model, HubSpot, the file index, export to Google Docs, the Pacenote browser, updates, and a switch to another AI
+  (with the AI it switched to). A tip says which AI gave it. As before, a code from a fixed list, never the message.
+
 ## 0.19.1 (2026-11-17)
 
 - **A recorded call stops when the meeting ends (2026-11-17):** hanging up in the meeting now ends the call also when

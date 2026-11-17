@@ -100,7 +100,9 @@ final class CalendarService: ObservableObject {
             if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") { NSWorkspace.shared.open(u) }
             return
         }
-        store.requestFullAccessToEvents { [weak self] _, _ in
+        store.requestFullAccessToEvents { [weak self] granted, _ in
+            // S5: macOS said no to the calendars
+            if !granted { AnalyticsTracker.onMain { AnalyticsTracker.shared.error("calendar", "permission", provider: "apple") } }
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.store.reset(); self?.updateAccess(); self?.refresh() } }
         }
     }

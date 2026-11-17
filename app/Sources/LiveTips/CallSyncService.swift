@@ -92,7 +92,11 @@ final class CallSyncService: ObservableObject {
                   !st.deletedElsewhere else { continue }
             byID[st.callID.lowercased()] = r.file
         }
-        var merged = 0
+        var merged = 0, allOK = true
+        let t0 = Date()
+        defer {   // S5: perf sync_pull, every organization read
+            AnalyticsTracker.shared.perf("sync_pull", ms: Int(Date().timeIntervalSince(t0) * 1000), provider: "pacenote", ok: allOK)
+        }
         for o in orgs {
             let key = email + "|" + o.id
             var cursor = cursors[key] ?? "", ok = true, ids: [String] = []
@@ -103,7 +107,7 @@ final class CallSyncService: ObservableObject {
                 cursor = page.cursor
                 if !page.more { break }
             }
-            guard ok else { continue }
+            guard ok else { allOK = false; continue }
             for id in Set(ids) {
                 guard let t = byID[id] else { continue }
                 switch await merge(t, orgID: o.id, me: me) {
@@ -193,6 +197,14 @@ final class CallSyncService: ObservableObject {
     /// it is in the personal space).
     func orgID(of t: String) -> String { CallSync.State.load(CallSync.statePath(transcript: t))?.orgID ?? "" }
 
+    /// S5: the organization the call belongs to by the D36 rule (stored, else the project's, else the default), the same
+    /// as call_started, so a call page's `o` matches its call also before the call is synced.
+    func callOrg(of t: String) -> String {
+        let st = CallSync.State.load(CallSync.statePath(transcript: t)) ?? CallSync.State()
+        return PacenoteServer.orgForCall(stored: st.orgID, onServer: !st.callID.isEmpty,
+                                         linkedOrg: PyTool.project(of: t).project?.homeOrg ?? "", me: PacenoteAccount.shared.me)
+    }
+
     /// 0.17.0 (D36): the call's private mark and what the organization allows (the call page's switch).
     func privacy(_ t: String) -> (isPrivate: Bool, allowed: Bool, org: PacenoteServer.Org?) {
         let st = CallSync.State.load(CallSync.statePath(transcript: t)) ?? CallSync.State()
@@ -231,7 +243,16 @@ final class CallSyncService: ObservableObject {
     func sync(_ t: String) {
         guard !running.contains(t), FileManager.default.fileExists(atPath: t), let p = project(for: t) else { return }
         running.insert(t)
-        Task { await run(t, project: p); running.remove(t) }
+        Task {
+            let path = CallSync.statePath(transcript: t), before = CallSync.State.load(path), t0 = Date()
+            await run(t, project: p); running.remove(t)
+            // S5: perf sync_push when something went to the server or failed; error sync with a code, never the text
+            let after = CallSync.State.load(path)
+            guard let a = after, a.hashes != before?.hashes || (!a.error.isEmpty && a.error != before?.error) else { return }
+            let ok = a.error.isEmpty, o = a.orgID.isEmpty ? nil : a.orgID
+            AnalyticsTracker.shared.perf("sync_push", ms: Int(Date().timeIntervalSince(t0) * 1000), provider: "pacenote", ok: ok, o: o)
+            if !ok { AnalyticsTracker.shared.error("sync", Analytics.errorCode(message: a.error), provider: "pacenote", o: o) }
+        }
     }
 
     /// 0.12.1 (B8): the call page's sync line; nil when the call's project does not sync (or signed out). A call

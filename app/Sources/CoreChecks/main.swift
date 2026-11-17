@@ -2615,8 +2615,16 @@ func orgsB6b() {
     m.cLevel = false; m.role = "admin"; expect(m.canManage, "b6b: admin manages")
     expect(!me.personal!.canManage, "b6b: never the personal space")
     expect(PacenoteServer.adminURL(orgID: o2).absoluteString == "https://pacenote-admin.bodco.pm/org/" + o2, "b6b: console URL")
+    // 0.17.2: Manage organization and Open the console open the Console tab on the organization's page
+    expect(PacenoteServer.orgConsolePath(orgID: o2) == "/org/" + o2, "console link: the organization's path")
+    expect(PacenoteServer.consolePageURL("/org/" + o2)?.absoluteString == "https://pacenote-admin.bodco.pm/org/" + o2, "console link: a page in the tab")
+    expect(PacenoteServer.consolePageURL("//evil.example/x") == nil && PacenoteServer.consolePageURL("org/x") == nil
+           && PacenoteServer.consolePageURL("/a\\b") == nil, "console link: only paths on the console")
     let lead = PacenoteServer.me(["user": ["email": "a@b.c"], "organizations": [["id": o2, "kind": "team", "leads_teams": [["id": "t9", "name": "Sales"]]]]])
     expect(lead?.orgs.first?.leadsTeams == ["t9"], "b6b: leads_teams as objects too")
+    expect(PacenoteServer.consoleOpensInApp(signedIn: true, me: lead), "console link: the tab for someone who runs something")
+    expect(!PacenoteServer.consoleOpensInApp(signedIn: false, me: lead) && !PacenoteServer.consoleOpensInApp(signedIn: true, me: nil),
+           "console link: the browser when signed out or unknown")
     // private calls (contract 5)
     expect(!PacenoteServer.privateAllowed(acme, alreadyPrivate: false) && PacenoteServer.privateAllowed(acme, alreadyPrivate: true), "b6b: policy off, a private call stays private")
     expect(PacenoteServer.privateAllowed(me.personal, alreadyPrivate: false) && PacenoteServer.privateAllowed(nil, alreadyPrivate: false), "b6b: allowed by default")

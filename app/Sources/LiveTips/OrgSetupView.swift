@@ -206,7 +206,7 @@ struct OrgSetupView: View {
             HStack {
                 Button(L("common.cancel")) { done() }.buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 if m.later {
-                    Button(L("orgsetup.console")) { NSWorkspace.shared.open(PacenoteServer.adminURL(orgID: m.orgID)) }
+                    Button(L("orgsetup.console")) { let id = m.orgID; done(); ConsoleLink.openOrg(id) }     // 0.17.2: the Console tab
                         .buttonStyle(.pnTertiary).help(L("orgsetup.console.help"))
                 }
                 Spacer()

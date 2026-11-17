@@ -7,6 +7,8 @@
 // has a non-persistent data store, so the console session lives while the app runs. Signing out of the app, or this
 // Mac being revoked, ends the console session too (the server checks the device on every page). Links that leave the
 // console open in the browser. The Platform zone (staff) still asks for Google there, never in the app.
+// 0.17.2: "Manage organization" (Settings > Account) and "Open the console" (the organization wizard) open this tab on
+// the organization's page (ConsoleLink); the browser only when the app does not show the tab.
 import AppKit
 import Combine
 import LiveTipsCore
@@ -22,6 +24,7 @@ final class ConsoleSession: NSObject, ObservableObject, WKNavigationDelegate, WK
     @Published private(set) var web: WKWebView
     private var signedOut: AnyCancellable?
     private var lastHandoff = Date.distantPast
+    private var wanted: String?       // 0.17.2: the console page asked for (ConsoleLink), opened next
 
     private override init() {
         web = Self.makeWeb()
@@ -47,7 +50,22 @@ final class ConsoleSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         web = Self.makeWeb()
         web.navigationDelegate = self
         web.uiDelegate = self
+        wanted = nil
         phase = .idle
+    }
+
+    /// 0.17.2: the tab on a console page (a path such as /org/<id>). With the console open, the page loads in it; else
+    /// the one-time link goes straight there; while a link is opening, the page loads once it has finished.
+    func show(path: String) {
+        wanted = path
+        HomeNav.shared.open(.console)
+        if phase == .ready { loadWanted() } else if phase != .opening { Task { await open(force: true) } }
+    }
+
+    private func loadWanted() {
+        guard let p = wanted else { return }
+        wanted = nil
+        if let u = PacenoteServer.consolePageURL(p) { web.load(URLRequest(url: u)) }
     }
 
     /// Opens the console with a one-time link. `force` asks for a new link even when a page is open.
@@ -60,7 +78,7 @@ final class ConsoleSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         lastHandoff = Date()
         do {
             let (d, code) = try await PacenoteAccount.shared.api("POST", "/v1/console/handoff",
-                                                                 body: PacenoteServer.consoleHandoffBody(next: me.consolePath))
+                                                                 body: PacenoteServer.consoleHandoffBody(next: takeWanted() ?? me.consolePath))
             guard code == 200, let url = PacenoteServer.consoleHandoffURL(d) else {
                 phase = .failed(code == 404 ? L("console.err.old") : L("console.err.server", ["code": String(code)])); return
             }
@@ -70,6 +88,8 @@ final class ConsoleSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             phase = .failed(error.localizedDescription)
         }
     }
+
+    private func takeWanted() -> String? { defer { wanted = nil }; return wanted.flatMap { PacenoteServer.consolePageURL($0) != nil ? $0 : nil } }
 
     /// The console in the browser (Google sign-in there): the page the tab shows, or the console's start.
     func openInBrowser() {
@@ -106,6 +126,11 @@ final class ConsoleSession: NSObject, ObservableObject, WKNavigationDelegate, WK
         }
     }
 
+    // 0.17.2: a page asked for while the one-time link was opening loads after the console's own page
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if wanted != nil, phase == .ready, PacenoteServer.isConsoleURL(webView.url), webView.url?.path != "/auth/app" { loadWanted() }
+    }
+
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         if (error as NSError).code != NSURLErrorCancelled { phase = .failed(error.localizedDescription) }
     }
@@ -115,6 +140,20 @@ final class ConsoleSession: NSObject, ObservableObject, WKNavigationDelegate, WK
                  for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let u = action.request.url, ["https", "http", "mailto"].contains(u.scheme ?? "") { NSWorkspace.shared.open(u) }
         return nil
+    }
+}
+
+/// 0.17.2: "Manage organization" and "Open the console": the Console tab on the organization's page, or the browser when
+/// the app does not show the tab (signed out, or the person runs nothing there).
+@MainActor
+enum ConsoleLink {
+    static func openOrg(_ orgID: String) {
+        let acct = PacenoteAccount.shared
+        if PacenoteServer.consoleOpensInApp(signedIn: acct.signedIn, me: acct.me) {
+            ConsoleSession.shared.show(path: PacenoteServer.orgConsolePath(orgID: orgID))
+        } else {
+            NSWorkspace.shared.open(PacenoteServer.adminURL(orgID: orgID))
+        }
     }
 }
 

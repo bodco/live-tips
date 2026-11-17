@@ -109,8 +109,8 @@ public enum PacenoteServer {
         public var showsConsole: Bool { staff || orgs.contains { $0.canManage } }
         /// Where the Console tab opens: the default organization when the person runs it, else the first one they run.
         public var consolePath: String {
-            if let d = defaultOrg, d.canManage { return "/org/" + d.id }
-            if let o = orgs.first(where: { $0.canManage }) { return "/org/" + o.id }
+            if let d = defaultOrg, d.canManage { return PacenoteServer.orgConsolePath(orgID: d.id) }
+            if let o = orgs.first(where: { $0.canManage }) { return PacenoteServer.orgConsolePath(orgID: o.id) }
             return "/"
         }
     }
@@ -240,7 +240,20 @@ public enum PacenoteServer {
     public static func privateAllowed(_ org: Org?, alreadyPrivate: Bool) -> Bool { alreadyPrivate || (org?.allowPrivateCalls ?? true) }
 
     /// The console page of an organization ("Manage organization").
-    public static func adminURL(orgID: String) -> URL { URL(string: "https://pacenote-admin.bodco.pm/org/" + orgID)! }
+    public static func adminURL(orgID: String) -> URL { URL(string: "https://" + consoleHost + orgConsolePath(orgID: orgID))! }
+
+    /// 0.17.2: an organization's page in the console, as a path (the tab's `next`, or a page loaded in the tab).
+    public static func orgConsolePath(orgID: String) -> String { "/org/" + orgID }
+
+    /// 0.17.2: a console page by its path; nil unless the path stays on the console (the server's safe_next rule).
+    public static func consolePageURL(_ path: String) -> URL? {
+        guard path.hasPrefix("/"), !path.hasPrefix("//"), !path.contains("\\") else { return nil }
+        return URL(string: "https://" + consoleHost + path)
+    }
+
+    /// 0.17.2: "Manage organization" and "Open the console" open the Console tab when the app shows it (signed in,
+    /// runs something or staff); otherwise the browser, as before.
+    public static func consoleOpensInApp(signedIn: Bool, me: Me?) -> Bool { signedIn && (me?.showsConsole ?? false) }
 
     /// An organization project I can link my project to (GET /v1/orgs/{id}/projects, D38).
     public struct OrgProject: Equatable, Identifiable {

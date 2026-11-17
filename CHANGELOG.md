@@ -3,6 +3,13 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.17.2 (2026-11-17)
+
+- **Manage organization opens the Console tab (2026-11-17):** Manage organization in Settings > Account and Open the
+  console in the organization setup now open the organization's page in the Console tab, already signed in, instead
+  of the browser. Open in browser in the tab still opens it in your browser; when you are signed out of Pacenote the
+  buttons open the browser as before.
+
 ## 0.17.1 (2026-11-17)
 
 - **Stays signed in after the Mac sleeps (2026-11-17, server 0.8.1):** if the Mac went to sleep right after Pacenote

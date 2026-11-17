@@ -102,7 +102,7 @@ struct AccountOrgsSection: View {
                         Spacer()
                         OrgSetupButton(org: o)                 // 0.17.0 (5.3): name, projects, people, policy
                         if o.canManage {
-                            Button(L("org.manage")) { NSWorkspace.shared.open(PacenoteServer.adminURL(orgID: o.id)) }
+                            Button(L("org.manage")) { ConsoleLink.openOrg(o.id) }       // 0.17.2: the Console tab
                                 .buttonStyle(.pnTertiary).help(L("org.manage.help"))
                         }
                     }

@@ -2405,8 +2405,9 @@ teams, organization projects and invites are managed in the Pacenote console, no
   move too, not only the new ones, and follow the rules of that organization on who can see calls; private calls stay
   private, the files on your Mac do not change. A project with the same name there is merged with it.
 - **Manage organization.** For an owner, an admin, C-level and a team lead, Settings > Account opens the Pacenote
-  console for that organization in your browser (you sign in there with Google); the Console tab opens it inside the
-  app (14.1z8).
+  console on that organization's page in the Console tab (14.1z8), with no extra sign-in; **Open in browser** there
+  opens the same page in your browser (you sign in there with Google). Signed out, the button opens the browser
+  (0.17.2).
 - **Organization projects (Enterprise).** Settings > Projects > a project > Organization > **Organization project**
   links your project to one of the organization's projects you are on. Linking turns the project's sync on, and its
   new calls go to that organization. Being on a project shows nobody your calls. If you are taken off the project, the
@@ -2475,7 +2476,8 @@ teams, organization projects and invites are managed in the Pacenote console, no
   project stays on the Mac) or start **New project...**; 3) invites (one email a line, "admin" on a line for an admin,
   a team if there are teams; people see the invite in Pacenote after they sign in, no email is sent); 4) teams and their
   leads (plans with teams); 5) policy: private calls and sharing Meeting Sheets with managers. Steps 3 to 5 can wait:
-  **Later**, or **Open the console** for the same settings in the browser. **Not now** hides the line on Home.
+  **Later**, or **Open the console**: the wizard closes and the Console tab opens on the organization's page with the
+  same settings (0.17.2). **Not now** hides the line on Home.
 
 ### 14.1z8 Console tab, project state, sources, file index, history (0.17.0, server 0.8.0)
 

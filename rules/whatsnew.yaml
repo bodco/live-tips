@@ -81,3 +81,9 @@ items:
     title_uk: "Вхід не злітає після сну"
     body_en: "If your Mac sleeps right while Pacenote renews its sign-in, you stay signed in to the Pacenote server."
     body_uk: "Якщо Мак засинає саме тоді, коли Pacenote оновлює вхід, ви лишаєтесь у Pacenote-акаунті."
+  - id: console_in_app
+    version: 0.17.2
+    title_en: "Manage organization opens in Pacenote"
+    title_uk: "Керування організацією відкривається в Pacenote"
+    body_en: "Manage organization in Settings > Account and Open the console in the organization setup now open the Console tab, already signed in."
+    body_uk: "Керувати організацією в Налаштуваннях > Акаунт і Відкрити консоль у налаштуванні організації тепер відкривають вкладку Консоль, вже з входом."

@@ -6,7 +6,8 @@ import LiveTipsCore
 // one-shot server on 127.0.0.1 and PKCE, like the Google accounts, but with `openid email profile` only and no Google
 // refresh token. Google's ID token goes to the Pacenote server once (POST /v1/auth/google); from then on the app uses
 // the server's tokens. The refresh token (60 days, rotated on every use) is in the Keychain, the access token
-// (15 minutes) only in memory. Optional: without signing in nothing changes. Calls go only for projects with
+// (15 minutes) only in memory. 0.22.0 (B13, D48): email and password next to Google; D50 (Bohdan 18.11): the account
+// is required, the sign-in screen (SignInWindow) comes before onboarding and Home. Calls go only for projects with
 // "Sync to Pacenote server" on (0.12.0, B8b: CallSyncService).
 
 enum PacenoteAccountError: LocalizedError {
@@ -43,6 +44,17 @@ final class PacenoteAccount: ObservableObject {
     static let orgsChanged = Notification.Name("PacenoteOrgsChanged")
 
     var signedIn: Bool { session != nil }
+    /// 0.22.0 (D50): the Keychain has answered (a session or none). Until then the app shows neither the sign-in screen
+    /// nor Home.
+    @Published private(set) var sessionKnown = false
+    /// GET /v1/auth/methods: email sign-in only when the server can send mail.
+    @Published private(set) var methods = PacenoteServer.AuthMethods()
+    /// The last GET /v1/auth/methods reached the server (any answer); false: offline or the server is away.
+    @Published private(set) var serverReachable = true
+    /// 409 `link_required` from Continue with Google: the address has a password account; its password joins the two.
+    struct PendingLink: Equatable { var id: String; var email: String; var expires: Date }
+    @Published var pendingLink: PendingLink?
+    static let sessionChanged = Notification.Name("PacenoteSessionChanged")
     var base: URL { PacenoteServer.baseURL(override: UserDefaults.standard.string(forKey: "pacenoteServerURL")) }
     var store: SecretStore { SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips") }
 
@@ -54,19 +66,19 @@ final class PacenoteAccount: ObservableObject {
     private var pendingRedirect = ""
 
     private init() {
-        if SheetShots.active { return }     // 0.11.0 (smoke shots): demo state only, no Keychain, no network
+        if SheetShots.active { sessionKnown = true; return }     // 0.11.0 (smoke shots): demo state only, no Keychain, no network
         // presence and value off the main thread (0.8.7.1: a Keychain read can wait on macOS's prompt). Smoke
         // 16.11 (0.16.0): even the presence check waited there after a reinstall, while the "allow access" prompt
         // was open, and froze the whole app (no Home, no Quit); now nothing here touches the Keychain on main.
         let st = store
         DispatchQueue.global(qos: .userInitiated).async {
-            guard st.has(.pacenoteSession) else { return }
-            let s = PacenoteServer.Session.decode(st.get(.pacenoteSession))
+            let s = st.has(.pacenoteSession) ? PacenoteServer.Session.decode(st.get(.pacenoteSession)) : nil
             DispatchQueue.main.async { MainActor.assumeIsolated { PacenoteAccount.shared.loaded(s) } }
         }
     }
 
     private func loaded(_ s: PacenoteServer.Session?) {
+        defer { if !sessionKnown { sessionKnown = true; NotificationCenter.default.post(name: Self.sessionChanged, object: nil) } }
         guard session == nil, let s else { return }
         session = s
         Task { await refreshInfo() }
@@ -134,14 +146,30 @@ final class PacenoteAccount: ObservableObject {
     /// as having proved Google now; the session, its tokens and everything else stay. nil when done, else the reason.
     func confirmGoogle() async -> String? {
         guard signedIn else { return L("account.err.notSignedIn") }
-        guard let client = GoogleClientConfig.load() else { return L("google.err.noClient") }
+        confirmingGoogle = true; defer { confirmingGoogle = false }
+        let got = await googleIDToken(hint: session?.email.isEmpty == false ? session?.email : nil,
+                                      okTitle: "Pacenote: Google confirmed, back to the app")
+        guard let idToken = got.token else { return got.error }
+        do {
+            let (d, c) = try await call("POST", "/v1/auth/google/confirm", body: PacenoteServer.googleConfirmBody(idToken: idToken))
+            switch c {
+            case 204, 200: return nil
+            case 403: return L("console.platform.otherAccount")
+            default: return PacenoteServer.problem(d, status: c)
+            }
+        } catch { return error.localizedDescription }
+    }
+
+    /// A Google ID token for this app (`openid email profile`, no refresh token): the system browser, a one-shot server
+    /// on 127.0.0.1 and PKCE. 0.22.0: shared by confirming Google and connecting Google to a password account.
+    private func googleIDToken(hint: String?, okTitle: String) async -> (token: String?, error: String?) {
+        guard let client = GoogleClientConfig.load() else { return (nil, L("google.err.noClient")) }
         confirmReceiver?.cancel()
-        confirmingGoogle = true; defer { confirmingGoogle = false; confirmReceiver = nil }
+        defer { confirmReceiver = nil }
         let state = GoogleOAuth.randomString(16), verifier = GoogleOAuth.randomString(48)
-        let hint = session?.email.isEmpty == false ? session?.email : nil
         let got: (code: String, redirect: String)? = await withCheckedContinuation { (k: CheckedContinuation<(code: String, redirect: String)?, Never>) in
             let r = LoopbackReceiver(); confirmReceiver = r
-            r.okTitle = "Pacenote: Google confirmed, back to the app"
+            r.okTitle = okTitle
             var redirect = "", resumed = false
             let finish: ((code: String, redirect: String)?) -> Void = { v in if !resumed { resumed = true; k.resume(returning: v) } }
             r.start({ port in
@@ -155,19 +183,14 @@ final class PacenoteAccount: ObservableObject {
                 finish((code, redirect))
             })
         }
-        guard let got else { return L("console.platform.cancelled") }
+        guard let got else { return (nil, L("console.platform.cancelled")) }
         do {
             let o = try await GoogleService.shared.tokenCall(["grant_type": "authorization_code", "code": got.code, "code_verifier": verifier,
                                                               "redirect_uri": got.redirect, "client_id": client.clientID,
                                                               "client_secret": client.clientSecret])
-            guard let idToken = o["id_token"] as? String else { return L("console.platform.noToken") }
-            let (d, c) = try await call("POST", "/v1/auth/google/confirm", body: PacenoteServer.googleConfirmBody(idToken: idToken))
-            switch c {
-            case 204, 200: return nil
-            case 403: return L("console.platform.otherAccount")
-            default: return PacenoteServer.problem(d, status: c)
-            }
-        } catch { return error.localizedDescription }
+            guard let idToken = o["id_token"] as? String else { return (nil, L("console.platform.noToken")) }
+            return (idToken, nil)
+        } catch { return (nil, error.localizedDescription) }
     }
 
     func cancelConfirmGoogle() { confirmReceiver?.cancel() }
@@ -182,17 +205,20 @@ final class PacenoteAccount: ObservableObject {
             let body = PacenoteServer.signInBody(idToken: idToken, deviceName: Self.deviceName, appVersion: Self.appVersion,
                                                  machine: AnalyticsTracker.machineID)
             let (d, code) = try await raw("POST", "/v1/auth/google", body: body, token: nil)
-            guard code == 200, let t = PacenoteServer.tokens(json(d)) else { throw PacenoteAccountError.server(code, PacenoteServer.problem(d, status: code)) }
             let email = GoogleOAuth.email(idToken: idToken) ?? ""
-            let s = PacenoteServer.Session(refreshToken: t.refresh, refreshExpires: t.refreshExpires, email: email, name: "")
-            guard store.set(.pacenoteSession, s.encoded()) else { throw PacenoteAccountError.server(0, L("account.err.keychain")) }
-            session = s
-            access = (t.access, t.accessExpires)
-            noteIdentity(t.access)
-            signIn = .idle; problem = nil
-            await refreshInfo()
-            AnalyticsTracker.shared.track("sign_in", ["method": "google"])      // 0.19.0 (S4)
-            Task { await AnalyticsTracker.shared.flush(why: "sign_in", force: true) }
+            if code == 409 {
+                // 0.22.0 (B13, D48.6): nothing is merged silently
+                let p = PacenoteServer.authProblem(d, status: code)
+                if p.type == "link_required", !p.linkID.isEmpty {
+                    pendingLink = PendingLink(id: p.linkID, email: email, expires: Date().addingTimeInterval(Double(p.expiresIn ?? 600)))
+                    signIn = .idle
+                    AnalyticsTracker.shared.track("signin_failed", ["reason": "link_required"])
+                    return
+                }
+                throw failure(p, .google)
+            }
+            guard code == 200, let t = PacenoteServer.tokens(json(d)) else { throw PacenoteAccountError.server(code, PacenoteServer.problem(d, status: code)) }
+            try await adopt(t, email: email, method: "google")
         } catch {
             signIn = .failed(error.localizedDescription)
         }
@@ -359,6 +385,189 @@ final class PacenoteAccount: ObservableObject {
         access = nil; session = nil; me = nil; devices = []; problem = nil; invites = []; orgProjects = [:]
         _ = store.remove(.pacenoteSession)
         EntitlementsStore.shared.signedOut()
+        NotificationCenter.default.post(name: Self.sessionChanged, object: nil)     // 0.22.0 (D50): back to the sign-in screen
+    }
+
+    // MARK: 0.22.0 (B13, D48): email and password
+
+    /// A sign-in error as the interface shows it, with the server's answer when there was one.
+    struct AuthFailure: LocalizedError {
+        var problem: PacenoteServer.AuthProblem?
+        var text: String
+        var errorDescription: String? { text }
+    }
+
+    private var uiLang: String { L10n.lang }
+    private var device: [String: Any] {
+        PacenoteServer.deviceInfo(deviceName: Self.deviceName, appVersion: Self.appVersion, machine: AnalyticsTracker.machineID)
+    }
+
+    /// The text for a server answer; `email` fills {email}. Unknown answers fall back to the generic server line.
+    func failure(_ p: PacenoteServer.AuthProblem, _ ctx: PacenoteServer.AuthContext, email: String = "") -> AuthFailure {
+        AnalyticsTracker.shared.track("signin_failed", ["reason": PacenoteServer.failureCode(p)])
+        if let m = PacenoteServer.authMessage(p, context: ctx) {
+            var a = m.args; a["email"] = email
+            return AuthFailure(problem: p, text: L(m.key, a))
+        }
+        return AuthFailure(problem: p, text: L("account.err.server", ["code": String(p.status), "msg": p.detail.isEmpty ? "HTTP \(p.status)" : p.detail]))
+    }
+
+    /// One anonymous request of the sign-in routes; a network failure becomes an AuthFailure without a problem.
+    private func authCall(_ method: String, _ path: String, body: Data?) async throws -> (Data, Int, [String: String]) {
+        do { return try await rawFull(method, path, body: body, token: nil) }
+        catch {
+            AnalyticsTracker.shared.track("signin_failed", ["reason": "network"])
+            throw AuthFailure(problem: nil, text: error.localizedDescription)
+        }
+    }
+    private func problemOf(_ r: (Data, Int, [String: String])) -> PacenoteServer.AuthProblem {
+        PacenoteServer.authProblem(r.0, status: r.1, retryAfter: r.2["retry-after"])
+    }
+
+    /// GET /v1/auth/methods. No answer (offline, a server before 0.13.0) keeps Google only.
+    func loadMethods() async {
+        if SheetShots.active { return }
+        guard let r = try? await rawFull("GET", "/v1/auth/methods", body: nil, token: nil) else {
+            serverReachable = false; methods = PacenoteServer.authMethods(nil); return
+        }
+        serverReachable = true
+        methods = PacenoteServer.authMethods(r.1 == 200 ? json(r.0) : nil)
+    }
+
+    /// Takes a token pair: the session goes to the Keychain, the access token to memory, then /v1/me.
+    private func adopt(_ t: PacenoteServer.Tokens, email: String, method: String, newAccount: Bool = false) async throws {
+        let s = PacenoteServer.Session(refreshToken: t.refresh, refreshExpires: t.refreshExpires, email: email, name: "")
+        guard store.set(.pacenoteSession, s.encoded()) else { throw PacenoteAccountError.server(0, L("account.err.keychain")) }
+        session = s
+        access = (t.access, t.accessExpires)
+        noteIdentity(t.access)
+        signIn = .idle; problem = nil; notice = nil; pendingLink = nil
+        NotificationCenter.default.post(name: Self.sessionChanged, object: nil)
+        await refreshInfo()
+        var ev: [String: Any] = ["method": method]
+        if newAccount { ev["new_account"] = true }
+        AnalyticsTracker.shared.track("sign_in", ev)      // 0.19.0 (S4)
+        Task { await AnalyticsTracker.shared.flush(why: "sign_in", force: true) }
+    }
+    private func adoptAnswer(_ r: (Data, Int, [String: String]), email: String, method: String, newAccount: Bool = false,
+                             ctx: PacenoteServer.AuthContext) async throws {
+        guard r.1 == 200, let t = PacenoteServer.tokens(json(r.0)) else { throw failure(problemOf(r), ctx, email: email) }
+        try await adopt(t, email: PacenoteServer.cleanEmail(email), method: method, newAccount: newAccount)
+    }
+
+    /// POST /v1/auth/email/login.
+    func signInEmail(email: String, password: String) async throws {
+        let r = try await authCall("POST", "/v1/auth/email/login", body: PacenoteServer.loginBody(email: email, password: password, device: device))
+        try await adoptAnswer(r, email: email, method: "password", ctx: .signIn)
+    }
+
+    /// POST /v1/auth/email/register: the code goes to the address (or a hint, when it has an account already).
+    func register(email: String, password: String, name: String) async throws -> PacenoteServer.CodeStarted {
+        let r = try await authCall("POST", "/v1/auth/email/register",
+                                   body: PacenoteServer.registerBody(email: email, password: password, name: name, locale: uiLang))
+        guard r.1 == 202, let c = PacenoteServer.codeStarted(json(r.0)) else { throw failure(problemOf(r), .signUp, email: PacenoteServer.cleanEmail(email)) }
+        AnalyticsTracker.shared.track("signup_started")
+        return c
+    }
+
+    /// POST /v1/auth/email/verify: the account exists now and this Mac is signed in.
+    func verify(signupID: String, code: String, email: String) async throws {
+        let r = try await authCall("POST", "/v1/auth/email/verify", body: PacenoteServer.verifyBody(signupID: signupID, code: code, device: device))
+        try await adoptAnswer(r, email: email, method: "password", newAccount: true, ctx: .code)
+    }
+
+    /// POST /v1/auth/email/resend (registration or reset). The previous code stops working.
+    func resend(signupID: String? = nil, resetID: String? = nil) async throws {
+        let r = try await authCall("POST", "/v1/auth/email/resend", body: PacenoteServer.resendBody(signupID: signupID, resetID: resetID))
+        guard r.1 == 202 || r.1 == 200 else { throw failure(problemOf(r), .code) }
+    }
+
+    /// POST /v1/auth/password/forgot: always 202 with a reset id, whether or not the address has an account.
+    func forgot(email: String) async throws -> PacenoteServer.CodeStarted {
+        let r = try await authCall("POST", "/v1/auth/password/forgot", body: PacenoteServer.forgotBody(email: email, locale: uiLang))
+        guard r.1 == 202, let c = PacenoteServer.codeStarted(json(r.0)) else { throw failure(problemOf(r), .reset, email: PacenoteServer.cleanEmail(email)) }
+        return c
+    }
+
+    /// POST /v1/auth/password/reset: every other session ends; this Mac signs in with the new password.
+    func reset(resetID: String, code: String, newPassword: String, email: String) async throws {
+        let r = try await authCall("POST", "/v1/auth/password/reset",
+                                   body: PacenoteServer.resetBody(resetID: resetID, code: code, newPassword: newPassword, device: device))
+        try await adoptAnswer(r, email: email, method: "password", ctx: .reset)
+        AnalyticsTracker.shared.track("password_reset_done")
+        notice = L("auth.reset.done")
+    }
+
+    /// POST /v1/auth/google/link after `link_required`: the password joins Google to the account and signs in.
+    func linkGoogle(password: String) async throws {
+        guard let l = pendingLink else { throw AuthFailure(problem: nil, text: L("auth.err.linkExpired")) }
+        guard l.expires > Date() else { pendingLink = nil; throw AuthFailure(problem: nil, text: L("auth.err.linkExpired")) }
+        let r = try await authCall("POST", "/v1/auth/google/link", body: PacenoteServer.linkBody(linkID: l.id, password: password, device: device))
+        if r.1 == 410 { pendingLink = nil }
+        try await adoptAnswer(r, email: l.email, method: "google", ctx: .link)
+        AnalyticsTracker.shared.track("signin_method_changed", ["method": "google", "added": true])
+    }
+
+    func cancelLink() { pendingLink = nil }
+
+    // Sign-in methods in Settings > Account (signed in). A wrong current password is 403, not 401: the session stays.
+
+    private func meCall(_ method: String, _ path: String, body: Data?) async throws -> PacenoteServer.AuthProblem? {
+        let r: (Data, Int)
+        do { r = try await call(method, path, body: body) }
+        catch PacenoteAccountError.notSignedIn { throw AuthFailure(problem: nil, text: L("account.err.notSignedIn")) }
+        catch { throw AuthFailure(problem: nil, text: error.localizedDescription) }
+        return r.1 == 204 || r.1 == 200 ? nil : PacenoteServer.authProblem(r.0, status: r.1)
+    }
+
+    /// Runs a change that may want Google confirmed on this Mac first (`google_reauth`): confirms once, then retries.
+    private func withGoogleIfAsked(_ method: String, _ path: String, body: Data?) async throws {
+        var p = try await meCall(method, path, body: body)
+        if p?.type == "google_reauth" {
+            if let e = await confirmGoogle() { throw AuthFailure(problem: p, text: e) }
+            p = try await meCall(method, path, body: body)
+        }
+        if let p { throw failure(p, .methods, email: session?.email ?? "") }
+    }
+
+    /// PUT /v1/me/password. With `current` it is a change; without it (a Google account adds a password) Google is
+    /// confirmed in the browser first. Other devices are signed out by the server; this Mac stays.
+    func setPassword(current: String?, new: String) async throws {
+        let adding = me?.auth?.password != true
+        if current == nil, let e = await confirmGoogle() { throw AuthFailure(problem: nil, text: e) }
+        try await withGoogleIfAsked("PUT", "/v1/me/password", body: PacenoteServer.setPasswordBody(current: current, new: new))
+        if adding { AnalyticsTracker.shared.track("signin_method_changed", ["method": "password", "added": true]) }
+        notice = L(adding ? "account.methods.added" : "account.methods.changed")
+        await refreshInfo()
+    }
+
+    /// DELETE /v1/me/password: Google must be confirmed on this Mac.
+    func removePassword() async throws {
+        if let e = await confirmGoogle() { throw AuthFailure(problem: nil, text: e) }
+        try await withGoogleIfAsked("DELETE", "/v1/me/password", body: nil)
+        AnalyticsTracker.shared.track("signin_method_changed", ["method": "password", "added": false])
+        notice = nil
+        await refreshInfo()
+    }
+
+    /// PUT /v1/me/google: a Google account with the same verified email, plus the current password.
+    func connectGoogle(currentPassword: String) async throws {
+        let got = await googleIDToken(hint: session?.email.isEmpty == false ? session?.email : nil, okTitle: "Pacenote: Google connected, back to the app")
+        guard let idToken = got.token else { throw AuthFailure(problem: nil, text: got.error ?? "") }
+        if let p = try await meCall("PUT", "/v1/me/google", body: PacenoteServer.connectGoogleBody(idToken: idToken, currentPassword: currentPassword)) {
+            throw failure(p, .methods, email: session?.email ?? "")
+        }
+        AnalyticsTracker.shared.track("signin_method_changed", ["method": "google", "added": true])
+        await refreshInfo()
+    }
+
+    /// DELETE /v1/me/google: the current password keeps the account; Google accounts in Integrations are not touched.
+    func disconnectGoogle(currentPassword: String) async throws {
+        if let p = try await meCall("DELETE", "/v1/me/google", body: PacenoteServer.currentPasswordBody(currentPassword)) {
+            throw failure(p, .methods, email: session?.email ?? "")
+        }
+        AnalyticsTracker.shared.track("signin_method_changed", ["method": "google", "added": false])
+        await refreshInfo()
     }
 
     // MARK: tokens and requests

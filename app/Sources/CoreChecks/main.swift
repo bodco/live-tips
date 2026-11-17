@@ -3896,6 +3896,108 @@ func teamCallsB9() {
     }
 }
 
+// MARK: 0.22.0 (B13, D48, D50): email and password sign-in, the sign-in screen before onboarding
+func emailAuthB13() {
+    typealias S = PacenoteServer
+    func obj(_ d: Data) -> [String: Any] { ((try? JSONSerialization.jsonObject(with: d)) as? [String: Any]) ?? [:] }
+    // methods
+    expect(S.authMethods(["google": true, "email": true]) == S.AuthMethods(google: true, email: true), "b13: methods read")
+    expect(S.authMethods(["google": true]).email == false, "b13: no email field, Google only")
+    expect(S.authMethods(nil) == S.AuthMethods(google: true, email: false), "b13: no answer (old server, offline), Google only")
+    // /v1/me auth
+    let meO: [String: Any] = ["user": ["id": "u", "email": "mike@example.com", "name": "Mike"], "organizations": [],
+                              "auth": ["google": false, "password": true, "password_changed_at": "2026-11-17T10:00:00Z"]]
+    let m = S.me(meO)
+    expect(m?.auth?.password == true && m?.auth?.google == false && m?.auth?.passwordChangedAt != nil, "b13: me.auth read")
+    expect(m?.auth?.canRemovePassword == false && m?.auth?.canDisconnectGoogle == false, "b13: the only way cannot be removed")
+    expect(S.AuthInfo(google: true, password: true).canRemovePassword && S.AuthInfo(google: true, password: true).canDisconnectGoogle,
+           "b13: with both ways either can go")
+    expect(S.me(["user": ["email": "mike@example.com"], "organizations": []])?.auth == nil, "b13: a server before 0.13.0 has no auth")
+    // bodies
+    let dev = S.deviceInfo(deviceName: "  Mike's MacBook Pro ", appVersion: "0.22.0", machine: String(repeating: "a", count: 64))
+    expect(dev["name"] as? String == "Mike's MacBook Pro" && dev["platform"] as? String == "macos" && dev["machine"] != nil, "b13: device info")
+    expect(S.deviceInfo(deviceName: " ", appVersion: "", machine: "nothex")["machine"] == nil
+           && S.deviceInfo(deviceName: " ", appVersion: "", machine: nil)["name"] as? String == "Mac", "b13: device info defaults")
+    let sb = obj(S.signInBody(idToken: "t", deviceName: "Mac", appVersion: "0.22.0"))
+    expect(sb["id_token"] as? String == "t" && (sb["device"] as? [String: Any])?["platform"] as? String == "macos", "b13: Google body unchanged")
+    let rb = obj(S.registerBody(email: " Mike@Example.com ", password: "correct horse 1", name: " Mike ", locale: "uk-UA"))
+    expect(rb["email"] as? String == "Mike@Example.com" && rb["name"] as? String == "Mike" && rb["locale"] as? String == "uk"
+           && rb["password"] as? String == "correct horse 1" && rb.count == 4, "b13: register body")
+    expect(obj(S.registerBody(email: "a@b.co", password: "x", name: "  ", locale: "en"))["name"] == nil, "b13: no empty name")
+    let lb = obj(S.loginBody(email: "mike@example.com", password: "p", device: dev))
+    expect(Set(lb.keys) == ["email", "password", "device"], "b13: login body has only its fields")
+    let vb = obj(S.verifyBody(signupID: "sid", code: "1234 5678", device: dev))
+    expect(vb["code"] as? String == "12345678" && vb["signup_id"] as? String == "sid" && vb.count == 3, "b13: verify body")
+    expect(Set(obj(S.resendBody(signupID: "s")).keys) == ["signup_id"] && Set(obj(S.resendBody(resetID: "r")).keys) == ["reset_id"],
+           "b13: resend carries exactly one id")
+    expect(obj(S.forgotBody(email: "mike@example.com", locale: "en"))["locale"] as? String == "en", "b13: forgot body")
+    let xb = obj(S.resetBody(resetID: "r", code: "1234-5678", newPassword: "n", device: dev))
+    expect(xb["code"] as? String == "12345678" && xb["new_password"] as? String == "n" && xb.count == 4, "b13: reset body")
+    expect(Set(obj(S.linkBody(linkID: "l", password: "p", device: dev)).keys) == ["link_id", "password", "device"], "b13: link body")
+    expect(Set(obj(S.setPasswordBody(current: nil, new: "n")).keys) == ["new_password"]
+           && Set(obj(S.setPasswordBody(current: "c", new: "n")).keys) == ["current_password", "new_password"], "b13: set password body")
+    expect(Set(obj(S.connectGoogleBody(idToken: "t", currentPassword: "c")).keys) == ["id_token", "current_password"]
+           && obj(S.currentPasswordBody("c"))["current_password"] as? String == "c", "b13: Google connect and disconnect bodies")
+    // answers
+    expect(S.codeStarted(["signup_id": "s", "expires_in": 900, "resend_in": 60]) == S.CodeStarted(id: "s", expiresIn: 900, resendIn: 60),
+           "b13: code started")
+    expect(S.codeStarted(["reset_id": "r"])?.id == "r" && S.codeStarted([:]) == nil, "b13: reset id, nothing without an id")
+    func pj(_ o: [String: Any]) -> Data { (try? JSONSerialization.data(withJSONObject: o)) ?? Data() }
+    let p429 = S.authProblem(pj(["type": "locked", "retry_after": 12]), status: 429, retryAfter: "27")
+    expect(p429.type == "locked" && p429.retryAfter == 27, "b13: Retry-After header wins")
+    expect(S.authProblem(pj(["type": "locked", "retry_after": 12]), status: 429).retryAfter == 12, "b13: retry_after from the body")
+    let pc = S.authProblem(pj(["type": "invalid_code", "attempts_left": 3]), status: 400)
+    expect(S.authMessage(pc, context: .code) == S.AuthMessage("auth.err.code", ["n": "3"]), "b13: wrong code with attempts left")
+    expect(S.authMessage(S.authProblem(pj(["type": "invalid_code", "attempts_left": 0]), status: 400), context: .code)?.key == "auth.err.codeSpent",
+           "b13: no attempts left, send a new code")
+    let pl = S.authProblem(pj(["type": "link_required", "link_id": "lid", "expires_in": 600]), status: 409)
+    expect(pl.linkID == "lid" && pl.expiresIn == 600, "b13: link_required carries the link id")
+    expect(S.authProblem(pj(["type": "https://pacenote/problems/code_expired"]), status: 410).type == "code_expired", "b13: a URI type")
+    let cred = S.authProblem(pj(["type": "invalid_credentials"]), status: 401)
+    expect(S.authMessage(cred, context: .signIn)?.key == "auth.err.credentials", "b13: wrong sign-in offers the three ways out")
+    expect(S.authMessage(S.AuthProblem(status: 403, type: "invalid_credentials"), context: .methods)?.key == "account.methods.wrongPassword",
+           "b13: wrong current password in Settings")
+    for (r, k) in [("too_short", "auth.err.weak.short"), ("too_long", "auth.err.weak.long"), ("common", "auth.err.weak.common"),
+                   ("contains_email", "auth.err.weak.email")] {
+        expect(S.authMessage(S.AuthProblem(status: 422, type: "weak_password", reason: r), context: .signUp)?.key == k, "b13: weak \(r)")
+    }
+    for (t, k) in [("code_limit", "auth.err.codeLimit"), ("code_expired", "auth.err.codeExpired"), ("invalid_email", "auth.err.emailFormat"),
+                   ("undeliverable", "auth.err.undeliverable"), ("email_signin_off", "auth.err.off"), ("link_expired", "auth.err.linkExpired"),
+                   ("email_taken", "auth.err.emailTaken"), ("google_reauth", "account.methods.confirmGoogle"),
+                   ("last_method", "account.methods.last"), ("email_mismatch", "account.methods.mismatch"), ("google_taken", "account.methods.taken")] {
+        expect(S.authMessage(S.AuthProblem(status: 400, type: t), context: .methods)?.key == k, "b13: message for \(t)")
+    }
+    expect(S.authMessage(S.AuthProblem(status: 429, type: "", retryAfter: 65), context: .signIn) == S.AuthMessage("auth.err.locked", ["time": "1:05"]),
+           "b13: a bare 429 still counts down")
+    expect(S.authMessage(S.AuthProblem(status: 500, type: ""), context: .signIn) == nil, "b13: other errors use the generic text")
+    expect(S.failureCode(cred) == "invalid_credentials" && S.failureCode(S.AuthProblem(status: 502, type: "x")) == "server_5xx"
+           && S.failureCode(S.AuthProblem(status: 404, type: "")) == "server_4xx", "b13: analytics failure codes are closed")
+    // fields
+    expect(S.emailLooksValid(" mike@example.com ") && S.emailLooksValid("e.m+1@mail.example.co.uk"), "b13: valid emails")
+    expect(!S.emailLooksValid("mike") && !S.emailLooksValid("mike@example") && !S.emailLooksValid("mi ke@example.com")
+           && !S.emailLooksValid("@example.com") && !S.emailLooksValid("a@b@c.com"), "b13: invalid emails")
+    expect(S.passwordProblem("short") == "too_short" && S.passwordProblem("0123456789") == nil
+           && S.passwordProblem(String(repeating: "x", count: 129)) == "too_long", "b13: local password rule")
+    expect(S.passwordProblem("\u{FB01}\u{FB01}\u{FB01}\u{FB01}\u{FB01}") == nil, "b13: length counted after NFKC (ligatures)")
+    expect(S.passwordProblem(String(repeating: "\u{1F1FA}\u{1F1E6}", count: 5)) == nil, "b13: length in code points like the server (5 flags = 10)")
+    expect(S.codeDigits("Your code: 1234 5678") == "12345678" && S.codeDigits("1234-5678-9") == "12345678"
+           && S.codeDigits("١٢٣") == "", "b13: code digits, ASCII only, at most 8")
+    expect(S.formatCode("12345678") == "1234 5678" && S.formatCode("123") == "123" && S.formatCode("12345") == "1234 5", "b13: code format")
+    expect(S.codeComplete("1234 5678") && !S.codeComplete("1234 567"), "b13: code complete")
+    expect(S.countdown(27) == "0:27" && S.countdown(900) == "15:00" && S.countdown(-3) == "0:00", "b13: countdown")
+    let now = Date(timeIntervalSince1970: 1000)
+    expect(S.secondsLeft(until: now.addingTimeInterval(4.2), now: now) == 5 && S.secondsLeft(until: nil, now: now) == 0
+           && S.secondsLeft(until: now.addingTimeInterval(-5), now: now) == 0, "b13: seconds left round up")
+    expect(S.mailLocale("uk") == "uk" && S.mailLocale("en-US") == "en" && S.mailLocale("de") == "en", "b13: mail language")
+    // gate (D50)
+    expect(S.gate(sessionKnown: false, signedIn: false, onboarded: true, callLive: false) == .loading, "b13: nothing before the Keychain answers")
+    expect(S.gate(sessionKnown: true, signedIn: false, onboarded: false, callLive: false) == .signIn, "b13: new person signs in first")
+    expect(S.gate(sessionKnown: true, signedIn: false, onboarded: true, callLive: false) == .signIn, "b13: signed out, sign in again")
+    expect(S.gate(sessionKnown: true, signedIn: false, onboarded: true, callLive: true) == .afterCall, "b13: a live call is never cut")
+    expect(S.gate(sessionKnown: true, signedIn: true, onboarded: false, callLive: false) == .onboarding, "b13: onboarding after sign-in")
+    expect(S.gate(sessionKnown: true, signedIn: true, onboarded: true, callLive: false) == .home, "b13: Home")
+}
+
 teamCallsB9()
 entitlementsB3()
 entitlementsB3UI()
@@ -3917,5 +4019,6 @@ orgRegisters0170()
 console0170()
 orgContext0170()
 salesBlocksS1()
+emailAuthB13()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

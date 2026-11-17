@@ -3,6 +3,22 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.22.0 (not released yet, needs server 0.13.0)
+
+- **Sign in to start (2026-11-18):** Pacenote now needs an account. The sign-in screen comes first, before onboarding
+  and Home, and comes back when the session ends (signed out, signed out by another device, a password change on
+  another Mac, the account deleted). A live call is never cut: the sign-in screen waits until the call ends. Audio and
+  transcripts still stay on this Mac.
+- **Email and password next to Google (2026-11-18, B13):** Continue with Google or Continue with email. One form signs
+  in or creates an account (the address stays when you switch), an 8-digit code from the email finishes a new account,
+  and Forgot password? sets a new one with a code. After too many attempts the button waits with a countdown, and
+  Send the code again waits a minute. The password is never stored on the Mac. Email sign-in shows only when the
+  server can send mail.
+- **One account for Google and the password (2026-11-18):** Continue with Google on an address that already signs in
+  with a password asks for that password once and joins the two; nothing is merged silently.
+- **Sign-in methods in Settings > Account (2026-11-18):** connect or disconnect Google, set, change or remove the
+  password. The last way to sign in cannot be removed. Changing the password signs out your other devices.
+
 ## 0.21.0 (not released yet)
 
 - **More sales methods (2026-11-17):** MEDDPICC, GPCTBA/C&I, SPIN, the Sandler pain funnel and Challenger join

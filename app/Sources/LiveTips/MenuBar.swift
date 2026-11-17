@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var clock: Timer?               // the elapsed time next to the menu bar icon while recording
     var lastStatus = EngineStatus()
     var floatingControls: FloatingCallController?
+    var launchedWindows = false     // 0.22.0 (D50): onboarding or Home opened once since launch
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
@@ -70,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                              lines: n.userInfo?["lines"] as? Int ?? 0, cost: ce.lastCall["tips_usd"] as? Double)
                 SpendDays.add(ce.lastCall["tips_usd"] as? Double ?? 0)
                 self?.finishSwitch()
+                self?.routeSignIn()      // 0.22.0 (D50): a session that ended during the call: the sign-in screen now
             }
         }
         HotKeys.shared.install(help: { [weak self] in self?.helpNow() }, pause: { [weak self] in self?.togglePause() },
@@ -77,6 +79,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                proactive: { [weak self] in self?.pushTips("window.LiveTips && LiveTips.toggleProactive()") },
                                present: { [weak self] k in self?.pushTips("window.LiveTips && LiveTips.presentKey('\(k)')") })
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
+        // 0.22.0 (D50, Bohdan 18.11): Pacenote needs an account. The sign-in screen comes first, then onboarding or Home;
+        // it comes back when the session ends (signed out, revoked, deleted), but never cuts a live call.
+        NotificationCenter.default.addObserver(forName: PacenoteAccount.sessionChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.routeSignIn() }
+        }
+        MainActor.assumeIsolated { routeSignIn() }
+        MainActor.assumeIsolated { _ = CalendarService.shared }
+    }
+
+    /// The first screen after launch (once signed in), and again after signing in on the sign-in screen.
+    private func launchWindows() {
         // 2026-10-26: new users get the onboarding (permissions, folders, Claude, install, Notion optional).
         if !UserDefaults.standard.bool(forKey: "onboardingDone") && !UserDefaults.standard.bool(forKey: "onboarded") {
             UserDefaults.standard.set(true, forKey: "onboarded")
@@ -91,7 +104,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated { WhatsNewWindow.showIfNeeded(callIsLive: CallEngine.shared.isRunning) } }
             }
         }       // 2026-10-27 (owner): Home is the app's main window
-        MainActor.assumeIsolated { _ = CalendarService.shared }
+    }
+
+    /// 0.22.0 (D50): where the app is: still reading the Keychain, the sign-in screen, or in (onboarding or Home).
+    @MainActor func routeSignIn() {
+        let a = PacenoteAccount.shared
+        let onboarded = UserDefaults.standard.bool(forKey: "onboardingDone") || UserDefaults.standard.bool(forKey: "onboarded")
+        switch PacenoteServer.gate(sessionKnown: a.sessionKnown, signedIn: a.signedIn, onboarded: onboarded, callLive: callIsLive) {
+        case .loading, .afterCall:
+            return      // after the call: CallEngine.callEnded routes again
+        case .signIn:
+            HomeWindow.window?.close()
+            SettingsWindow.window?.close()
+            OnboardingWindow.window?.close()
+            SignInWindow.show()
+        case .onboarding, .home:
+            let fromSignIn = SignInWindow.isVisible
+            if fromSignIn { SignInWindow.close() }
+            guard !launchedWindows || fromSignIn else { return }
+            launchedWindows = true
+            launchWindows()
+        }
+    }
+
+    /// 0.22.0 (D50): without a session every way into the app opens the sign-in screen (a live call excepted).
+    @MainActor func gatedToSignIn() -> Bool {
+        let a = PacenoteAccount.shared
+        guard a.sessionKnown, !a.signedIn, !callIsLive else { return false }
+        SignInWindow.show()
+        return true
     }
 
     /// After an app update the recorder core in the app folder is refreshed from the app by itself
@@ -185,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func statusItemClicked(_ sender: Any?) {
+        if MainActor.assumeIsolated({ gatedToSignIn() }) { return }
         refresh()
         MainActor.assumeIsolated { panel?.toggle() }
     }
@@ -257,13 +299,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel?.place()
     }
 
-    @objc func startCall() { MainActor.assumeIsolated { StartCallWindow.startNow(delegate: self) } }      // A1: Meeting Sheet Quick
+    @objc func startCall() { MainActor.assumeIsolated { if gatedToSignIn() { return }; StartCallWindow.startNow(delegate: self) } }      // A1: Meeting Sheet Quick
 
     /// 0.9.6 (owner): the app's theme, "system" follows the Mac. Every window, the tips window included, takes it at once.
     static func applyAppearance(_ v: String) {
         NSApp.appearance = v == "light" ? NSAppearance(named: .aqua) : v == "dark" ? NSAppearance(named: .darkAqua) : nil
     }
     @objc func openHome() {
+        if MainActor.assumeIsolated({ gatedToSignIn() }) { return }
         MainActor.assumeIsolated {
             // 0.8.7.1: Home (menu, Dock, Command-0) on a closed window starts at Home, not on the call page left open
             if HomeWindow.window?.isVisible != true { HomeNav.shared.path = []; HomeNav.shared.followUp = nil }
@@ -275,8 +318,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CallEngine.shared.writeToNotion(file: f)
     }
     @objc func openSetup() { MainActor.assumeIsolated { SetupWindow.show() } }
-    @objc func openOnboarding() { MainActor.assumeIsolated { OnboardingWindow.show() } }
-    @objc func openSettings() { MainActor.assumeIsolated { SettingsWindow.show() } }
+    @objc func openOnboarding() { MainActor.assumeIsolated { if gatedToSignIn() { return }; OnboardingWindow.show() } }
+    @objc func openSettings() { MainActor.assumeIsolated { if gatedToSignIn() { return }; SettingsWindow.show() } }
     @objc func openHowItWorks() { MainActor.assumeIsolated { HowItWorksWindow.show() } }
     @objc func openAbout() { MainActor.assumeIsolated { SettingsWindow.show(tab: "about") } }
     /// 0.16.0 (D3): Pacenote > Check for Updates…: a version waiting installs (after the call during a call),
@@ -777,6 +820,7 @@ extension AppDelegate {
     @MainActor
     func launch(_ model: StartCallModel, openMeeting: Bool = true) -> String? {
         guard ModuleGate.allow("live_tips") else { return L("lock.callClosed") }      // 0.18.0 (B3)
+        if gatedToSignIn() { return L("gate.title") }      // 0.22.0 (D50): no new call without an account
         model.useDefaultTargetIfEmpty()
         if model.chosenPrep == nil { model.adoptExistingPrep() }
         if model.chosenPrep == nil, let b = model.prepBase, let root = model.root {

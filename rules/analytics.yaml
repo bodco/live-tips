@@ -42,7 +42,7 @@ enums:
   org_kind: [personal, team]
   theme: [system, light, dark]
   ui_lang: [en, uk]
-  sign_in_method: [google, console_link]
+  sign_in_method: [google, console_link, password]
   error_area: [ai, transcribe, record, drive, notion, calendar, google, sync, auth, update, entitlements, server,
                local_llm, crm, index, prep, export, browser]
   error_code: [timeout, rate_limit, quota, key_invalid, auth_expired, network, offline, server_5xx, server_4xx,
@@ -56,6 +56,7 @@ enums:
 # never sent; S4 adds a CoreChecks case that every scr used in code is here.
 screens:
   home: [timeline, past, insights]
+  sign_in: [choose, email, code, reset, link]          # 0.22.0 (D50): before onboarding
   past_calls: []
   tracker: [tasks, decisions, risks]
   stats: []
@@ -124,6 +125,12 @@ events:
   app_update: {from: version, to: version, how: update_how}
   sign_in: {method: sign_in_method, new_account: bool}
   sign_out: {}
+  # 0.22.0 (B13, D48): email and password. Never the address; the failure is the server's type from a closed list.
+  auth_method_chosen: {method: sign_in_method}
+  signup_started: {}
+  signin_failed: {reason: code}
+  password_reset_done: {}
+  signin_method_changed: {method: sign_in_method, added: bool}
   crash_prev_session: {}
   settings_snapshot:                                      # once a day, at the first launch of the day
     route_prep: provider
@@ -234,6 +241,9 @@ events:
 # Analytics.snake). The app drops a value outside its list, and so does the server; CoreChecks fails when a `code`
 # parameter has no list. A new value in the code needs its line here first.
 values:
+  signin_failed.reason: [invalid_credentials, locked, code_limit, resend_wait, invalid_code, code_expired, weak_password,
+                         invalid_email, undeliverable, email_signin_off, link_expired, email_taken, google_reauth, last_method,
+                         email_mismatch, google_taken, link_required, server_4xx, server_5xx, network]
   prepare_run.source: [app, sheet]
   slide_sync.variant: [a]
   transcribe_run.source: [file, link]

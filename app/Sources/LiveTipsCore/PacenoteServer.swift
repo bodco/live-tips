@@ -1,6 +1,6 @@
 import Foundation
 
-// B7 (server ADR 5.1, 2026-11-15): the Pacenote account. Optional: without it the app works as before. Sign-in is a
+// B7 (server ADR 5.1, 2026-11-15): the Pacenote account. 0.22.0 (D50): required, the sign-in screen comes first. Sign-in is a
 // separate Google request with `openid email profile` only, so the Pacenote account and the Google accounts that give
 // calendars and Drive stay independent. The app sends Google's ID token to the server once and gets the server's own
 // tokens: access for 15 minutes (memory only), refresh for 60 days with rotation (Keychain only). Pure helpers here
@@ -109,6 +109,8 @@ public enum PacenoteServer {
         public var pendingInvites = 0
         /// 0.17.0 (server 0.8.0): Pacenote staff. The Console tab shows for them too (the Platform zone asks for Google).
         public var staff = false
+        /// 0.22.0 (B13, server 0.13.0): how this person signs in; nil from a server before 0.13.0.
+        public var auth: AuthInfo?
         public init(email: String, name: String, orgs: [Org], userID: String = "", defaultOrgID: String = "", pendingInvites: Int = 0) {
             self.email = email; self.name = name; self.orgs = orgs; self.userID = userID
             self.defaultOrgID = defaultOrgID; self.pendingInvites = pendingInvites
@@ -221,6 +223,7 @@ public enum PacenoteServer {
         var me = Me(email: email, name: (u["name"] as? String) ?? "", orgs: orgs, userID: (u["id"] as? String) ?? "",
                     defaultOrgID: (o["default_org_id"] as? String) ?? "", pendingInvites: (o["pending_invites"] as? Int) ?? 0)
         me.staff = (o["staff"] as? Bool) == true      // a server before 0.8.0 does not say: not staff
+        me.auth = authInfo(o["auth"])
         return me
     }
 
@@ -362,13 +365,9 @@ public enum PacenoteServer {
 
     /// The body of POST /v1/auth/google. The server rejects unknown fields and names over 100 characters.
     public static func signInBody(idToken: String, deviceName: String, appVersion: String, machine: String? = nil) -> Data {
-        let name = String(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
-        var device: [String: Any] = ["name": name.isEmpty ? "Mac" : name, "platform": "macos",
-                                     "app_version": appVersion.isEmpty ? "dev" : String(appVersion.prefix(40))]
         // 0.19.0 (S4, spec 3.1): the same Mac hash as in the analytics header (Analytics.machine), so the server tells
-        // one Mac's devices and events together; the server hashes it once more
-        if let m = machine, m.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil { device["machine"] = m }
-        let o: [String: Any] = ["id_token": idToken, "device": device]
+        // one Mac's devices and events together; the server hashes it once more. 0.22.0: shared with the email bodies.
+        let o: [String: Any] = ["id_token": idToken, "device": deviceInfo(deviceName: deviceName, appVersion: appVersion, machine: machine)]
         return (try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys])) ?? Data()
     }
 

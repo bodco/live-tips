@@ -3,8 +3,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 import LiveTipsCore
 
-/// B7 (server ADR 5.1, 12.2): Settings > Account. Signing in to the Pacenote server is optional; the page says what
-/// goes there and what never does, lists the signed-in devices, signs out here or everywhere and deletes the server
+/// B7 (server ADR 5.1, 12.2): Settings > Account. 0.22.0 (D50): the account is required, signing in happens on the
+/// sign-in screen (SignInWindow) before anything else; the page says what goes to the server and what never does, lists the signed-in devices, signs out here or everywhere and deletes the server
 /// data. The Mac and Google Drive are never touched from here.
 struct AccountSettingsPane: View {
     @ObservedObject private var acct = PacenoteAccount.shared
@@ -16,7 +16,7 @@ struct AccountSettingsPane: View {
 
     var body: some View {
         Form {
-            if let s = acct.session { signedIn(s) } else { signedOut }
+            if let s = acct.session { signedIn(s) }
 
             Section {
                 Text(L("account.what.goes")).fixedSize(horizontal: false, vertical: true)
@@ -45,31 +45,6 @@ struct AccountSettingsPane: View {
         } message: { Text(L("account.everywhere.m")) }
     }
 
-    @ViewBuilder private var signedOut: some View {
-        Section {
-            Text(L("account.intro")).fixedSize(horizontal: false, vertical: true)
-            Text(L("account.optional")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                Button(L("account.signIn")) { acct.startSignIn() }
-                    .buttonStyle(.pnPrimary).disabled(!GoogleService.shared.configured || acct.signIn == .waiting)
-                switch acct.signIn {
-                case .waiting:
-                    ProgressView().controlSize(.small)
-                    Text(L("google.waiting")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    Button(L("common.cancel")) { acct.cancelSignIn() }.buttonStyle(.pnTertiary)
-                case .failed(let e):
-                    Text(e).font(PN.Font.caption).foregroundStyle(PN.C.danger).lineLimit(3).fixedSize(horizontal: false, vertical: true)
-                case .idle: EmptyView()
-                }
-            }
-            if !GoogleService.shared.configured {
-                Label(L("google.err.noClient"), systemImage: "exclamationmark.triangle.fill").foregroundStyle(PN.C.pending)
-            }
-            Text(L("account.signIn.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            if let n = acct.notice { Text(n).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true) }
-        } header: { Text(L("account.head")).settingsAnchor("acc.head") }
-    }
-
     @ViewBuilder private func signedIn(_ s: PacenoteServer.Session) -> some View {
         Section {
             HStack(alignment: .top, spacing: 10) {
@@ -89,6 +64,7 @@ struct AccountSettingsPane: View {
             }
         } header: { Text(L("account.head")).settingsAnchor("acc.head") }
 
+        AccountSignInMethodsSection()   // 0.22.0 (B13): Google and the password, add, change, remove
         AccountOrgsSection()       // 0.17.0 (B6b): organizations, where new calls go, invites, Manage organization
         AccountPlanSection()       // 0.18.0 (B3): the plan of each organization, the beta mark, trial, limits
         AccountUsageSection()      // 0.19.0: my own use (GET /v1/me/usage), also on Solo
@@ -305,5 +281,174 @@ struct AccountUsageSection: View {
     private func load() async {
         guard let r = try? await acct.api("GET", "/v1/me/usage?days=30"), r.1 == 200, let u = SelfServe.usage(r.0) else { failed = true; return }
         usage = u; failed = false
+    }
+}
+
+/// 0.22.0 (B13, D48): Settings > Account > Sign-in methods. Google and the password, each with its action; the last way
+/// to sign in cannot be removed. Changing the password signs out the other devices (the server does it).
+struct AccountSignInMethodsSection: View {
+    @ObservedObject private var acct = PacenoteAccount.shared
+    @State private var sheet: MethodSheet.Kind?
+    @State private var confirmRemove = false
+    @State private var problem: String?
+    @State private var working = false
+
+    var body: some View {
+        if let a = acct.me?.auth {
+            Section {
+                row(icon: "globe", title: L(a.google ? "account.methods.google.on" : "account.methods.google.off")) {
+                    if a.google {
+                        Button(L("account.methods.google.remove")) { sheet = .disconnectGoogle }
+                            .buttonStyle(.pnTertiary).disabled(!a.canDisconnectGoogle || working)
+                            .help(a.canDisconnectGoogle ? "" : L("account.methods.last"))
+                    } else {
+                        Button(L("account.methods.google.connect")) { sheet = .connectGoogle }.buttonStyle(.pnSecondary).disabled(working)
+                    }
+                }
+                row(icon: "key.fill", title: passwordTitle(a)) {
+                    if a.password {
+                        Button(L("account.methods.password.change")) { sheet = .change }.buttonStyle(.pnSecondary).disabled(working)
+                        Button(L("account.methods.password.remove")) { confirmRemove = true }
+                            .buttonStyle(.pnTertiary).disabled(!a.canRemovePassword || working)
+                            .help(a.canRemovePassword ? "" : L("account.methods.last"))
+                    } else {
+                        Button(L("account.methods.password.set")) { sheet = .set }.buttonStyle(.pnSecondary).disabled(working)
+                    }
+                }
+                if !(a.google && a.password) {
+                    Text(L("account.methods.last")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                }
+                if working { HStack(spacing: 8) { ProgressView().controlSize(.small); Text(L("google.waiting")).font(PN.Font.caption).foregroundStyle(PN.C.text2) } }
+                if let p = problem {
+                    Label(p, systemImage: "exclamationmark.circle.fill").font(PN.Font.caption).foregroundStyle(PN.C.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let n = acct.notice {
+                    Label(n, systemImage: "checkmark.circle").font(PN.Font.caption).foregroundStyle(PN.C.text2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .task(id: n) { try? await Task.sleep(nanoseconds: 10_000_000_000); if acct.notice == n { acct.notice = nil } }
+                }
+            } header: { Text(L("account.methods.head")).settingsAnchor("acc.methods") }
+            .sheet(item: $sheet) { k in MethodSheet(kind: k, email: acct.session?.email ?? "") { sheet = nil } }
+            .alert(L("account.methods.remove.q"), isPresented: $confirmRemove) {
+                Button(L("account.methods.password.remove"), role: .destructive) { removePassword() }
+                Button(L("common.cancel"), role: .cancel) {}
+            } message: { Text(L("account.methods.remove.m") + " " + L("account.methods.confirmGoogle")) }
+        }
+    }
+
+    private func passwordTitle(_ a: PacenoteServer.AuthInfo) -> String {
+        guard a.password else { return L("account.methods.password.off") }
+        guard let d = a.passwordChangedAt else { return L("account.methods.password.onNoDate") }
+        let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none; f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US")
+        return L("account.methods.password.on", ["when": f.string(from: d)])
+    }
+
+    @ViewBuilder private func row<B: View>(icon: String, title: String, @ViewBuilder _ buttons: () -> B) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon).foregroundStyle(PN.C.text2).frame(width: 18)
+            Text(title)
+            Spacer()
+            buttons()
+        }
+    }
+
+    private func removePassword() {
+        working = true; problem = nil
+        Task {
+            defer { working = false }
+            do { try await acct.removePassword() } catch { problem = error.localizedDescription }
+        }
+    }
+}
+
+/// The small sheet for one change: the current password and/or a new one. Google steps open the browser.
+struct MethodSheet: View {
+    enum Kind: String, Identifiable { case change, set, connectGoogle, disconnectGoogle; var id: String { rawValue } }
+    let kind: Kind
+    let email: String
+    let done: () -> Void
+    @ObservedObject private var acct = PacenoteAccount.shared
+    @State private var current = ""
+    @State private var new = ""
+    @State private var show = false
+    @State private var busy = false
+    @State private var error: String?
+    @FocusState private var focus: Int?
+
+    private var needsCurrent: Bool { kind != .set }
+    private var needsNew: Bool { kind == .change || kind == .set }
+    private var title: String {
+        switch kind {
+        case .change: return L("account.methods.password.change")
+        case .set: return L("account.methods.password.set")
+        case .connectGoogle: return L("account.methods.google.connect")
+        case .disconnectGoogle: return L("account.methods.disconnect.q")
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PN.Space.x3) {
+            Text(title).font(PN.Font.section)
+            if kind == .disconnectGoogle {
+                Text(L("account.methods.disconnect.m")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            }
+            if kind == .set || kind == .connectGoogle {
+                Text(L("account.methods.confirmGoogle")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            }
+            if needsCurrent { secret(L("account.methods.current"), $current, 0) }
+            if needsNew {
+                secret(L("auth.reset.new"), $new, 1)
+                let ok = PacenoteServer.passwordProblem(new) == nil
+                Label(L("auth.password.rule"), systemImage: ok ? "checkmark.circle.fill" : "circle")
+                    .font(PN.Font.caption).foregroundStyle(ok ? PN.C.turn : PN.C.text3)
+            }
+            if let e = error {
+                Label { Text(e).fixedSize(horizontal: false, vertical: true) } icon: { Image(systemName: "exclamationmark.circle.fill") }
+                    .font(PN.Font.caption).foregroundStyle(PN.C.danger)
+            }
+            HStack {
+                Toggle(L("auth.password.show"), isOn: $show).toggleStyle(.checkbox).font(PN.Font.caption)
+                Spacer()
+                if busy { ProgressView().controlSize(.small) }
+                Button(L("common.cancel"), action: done).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
+                Button(kind == .disconnectGoogle ? L("account.methods.google.remove") : L("account.methods.save"), action: save)
+                    .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(busy)
+            }
+        }
+        .padding(PN.Space.x6)
+        .frame(width: 420)
+        .onAppear { focus = needsCurrent ? 0 : 1 }
+    }
+
+    private func secret(_ label: String, _ t: Binding<String>, _ tag: Int) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(PN.Font.caption).foregroundStyle(PN.C.text2)
+            Group { if show { TextField("", text: t) } else { SecureField("", text: t) } }
+                .textFieldStyle(.roundedBorder).textContentType(.password).focused($focus, equals: tag).accessibilityLabel(label)
+        }
+    }
+
+    private func save() {
+        error = nil
+        if needsCurrent, current.isEmpty { error = L("account.methods.wrongPassword"); focus = 0; return }
+        if needsNew, let r = PacenoteServer.passwordProblem(new) {
+            error = L(PacenoteServer.authMessage(PacenoteServer.AuthProblem(status: 422, type: "weak_password", reason: r), context: .methods)?.key ?? "auth.err.weak.short")
+            focus = 1; return
+        }
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                switch kind {
+                case .change: try await acct.setPassword(current: current, new: new)
+                case .set: try await acct.setPassword(current: nil, new: new)
+                case .connectGoogle: try await acct.connectGoogle(currentPassword: current)
+                case .disconnectGoogle: try await acct.disconnectGoogle(currentPassword: current)
+                }
+                current = ""; new = ""
+                done()
+            } catch { self.error = error.localizedDescription }
+        }
     }
 }

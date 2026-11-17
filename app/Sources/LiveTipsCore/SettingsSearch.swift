@@ -78,6 +78,7 @@ public enum SettingsSearch {
         .init("sh.timing", "sheet", title: "sheet.ui.set.timing", words: "reminder timing when нагадування коли"),
         .init("sh.presets", "sheet", title: "sheet.ui.set.presets", words: "presets template шаблони пресети"),
         .init("acc.head", "account", title: "account.head", words: "account sign in login server акаунт вхід сервер"),
+        .init("acc.methods", "account", title: "account.methods.head", words: "password google sign-in methods change reset пароль спосіб входу змінити"),
         .init("acc.orgs", "account", title: "org.head", words: "organization team invite join manage default private організація команда запрошення приєднатися керувати приватний"),
         .init("acc.plan", "account", title: "plan.head", words: "plan plans compare switch team beta price trial limit seats storage request upgrade план плани порівняти змінити команда бета ціна тріал ліміт місця сховище запит"),
         .init("acc.usage", "account", title: "usage.head", words: "usage use overview calls hours active days використання огляд дзвінки години активні дні"),

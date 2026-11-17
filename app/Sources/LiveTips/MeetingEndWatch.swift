@@ -11,7 +11,7 @@ import LiveTipsCore
 /// objects). Once another app has held it for 10 s during the call, 4 s without it (a device switch takes about 1 s)
 /// show "The meeting has ended? Stopping in 5 s" (2026-11-11, owner: was 10 s) in the tips window and as a notification, both with Keep recording.
 /// The microphone coming back hides it; otherwise the call stops as End call does. Pacenote's own recorder and screen
-/// recording never count; a call with no meeting app (in person) is never stopped. Settings > Integrations >
+/// recording never count (also the macOS capture service replayd, 2026-11-17); a call with no meeting app (in person) is never stopped. Settings > Integrations >
 /// Calendars > "Stop the call when the meeting ends" (on by default).
 @MainActor
 final class MeetingEndWatch {
@@ -119,10 +119,21 @@ final class MeetingEndWatch {
             s = UInt32(MemoryLayout<pid_t>.size)
             a.mSelector = kAudioProcessPropertyPID
             guard AudioObjectGetPropertyData(o, &a, 0, nil, &s, &pid) == noErr else { return true }
-            if pid == me || isOurs(pid, me: me) { continue }
+            if pid == me || isOurs(pid, me: me) || isScreenCapture(pid) { continue }
             return true
         }
         return false
+    }
+
+    /// 2026-11-17 (owner): macOS's screen capture service. While Pacenote records the call (screen, video with sound or
+    /// sound only), ScreenCaptureKit takes the Mac's sound through replayd, and replayd then holds an input for as long
+    /// as the recording runs (checked on the owner's Mac: runs/ms/micdiag_1117.log). It counted as a meeting app, so
+    /// hanging up never ended a recorded call. The same holds for the macOS screen recording (Shift-Cmd-5). It is never
+    /// the meeting itself.
+    nonisolated static func isScreenCapture(_ pid: pid_t) -> Bool {
+        var buf = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &buf, UInt32(buf.count)) > 0 else { return false }
+        return String(cString: buf) == "/usr/libexec/replayd"
     }
 
     /// Pacenote's own processes: a child of the app (the recorder, audiocap) or a binary from its folders.

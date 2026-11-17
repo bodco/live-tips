@@ -3,6 +3,13 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased
+
+- **A recorded call stops when the meeting ends (2026-11-17):** hanging up in the meeting now ends the call also when
+  you record it (screen, video with sound or sound only), started before or during the call, and when the macOS screen
+  recording runs. Before, the system service that captures the Mac's sound held an input for the whole recording and
+  looked like a meeting app that was still on, so the call never stopped by itself.
+
 ## 0.19.0 (2026-11-17)
 
 - **A failed preparation says so during the call (2026-11-17):** when the preparation for the call you just joined

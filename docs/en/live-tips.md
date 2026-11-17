@@ -1275,7 +1275,9 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
   closing the microphone, not silence: while you are in the meeting it keeps the microphone open, also when you are
   muted, quiet or away from the Mac. It counts only after a meeting app held the microphone for 10 seconds during the
   call, and it waits 4 seconds (switching the microphone takes about one). Pacenote's own recorder and screen
-  recording do not count; a call with no meeting app (in person) is never stopped. Settings > Integrations > Calendars
+  recording do not count; a call with no meeting app (in person) is never stopped. Since 2026-11-17 this also works
+  when you record the call (screen, video with sound or sound only) or run the macOS screen recording: the system
+  service that captures the sound no longer looks like a meeting app. Settings > Integrations > Calendars
   > "Stop the call when the meeting ends" (on by default).
 
 ### 14.1e After the call: call page, follow-up email, memory, series, statistics, risks, rehearsal (0.8)

@@ -1,6 +1,6 @@
 # Політика конфіденційності Pacenote
 
-Оновлено 15 листопада 2026. Повний текст на сайті: **[pacenote.bodco.pm/uk/privacy/](https://pacenote.bodco.pm/uk/privacy/)** ([English](PRIVACY.md)).
+Оновлено 17 листопада 2026. Повний текст на сайті: **[pacenote.bodco.pm/uk/privacy/](https://pacenote.bodco.pm/uk/privacy/)** ([English](PRIVACY.md)).
 
 Коротко:
 

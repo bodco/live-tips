@@ -1,6 +1,6 @@
 # Умови використання Pacenote
 
-Оновлено 15 листопада 2026. Повний текст на сайті: **[pacenote.bodco.pm/uk/terms/](https://pacenote.bodco.pm/uk/terms/)** ([English](TERMS.md)).
+Оновлено 17 листопада 2026. Повний текст на сайті: **[pacenote.bodco.pm/uk/terms/](https://pacenote.bodco.pm/uk/terms/)** ([English](TERMS.md)).
 
 Коротко:
 

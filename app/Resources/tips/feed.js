@@ -99,7 +99,7 @@
     if (k === 'answer' || k === 'fact' || k === 'card') return 'docs';
     if (k === 'speech') return 'turn';
     // 0.8.7 (H4): sales tips keep their own kind and label (rules/sales.yaml > tips)
-    if (['objection', 'qualify', 'pain', 'next_step', 'competitor', 'signal'].includes(it.sales)) return it.sales;
+    if (['objection', 'qualify', 'pain', 'next_step', 'competitor', 'signal', 'price_limit', 'stakeholder'].includes(it.sales)) return it.sales;
     if (k === 'status') return 'neutral';
     if (k === 'wrapup') return 'neutral';
     if (/^\s*\u{1F50E}/u.test(g)) return 'docs';
@@ -231,7 +231,16 @@
             what: clean(c.what || ''), quote: clean(c.quote || ''), t: clean(c.t || '') })),
           objections: (it.objections || []).map((o) => clean(typeof o === 'string' ? o : (o.what || ''))).filter(Boolean),
           nextStep: clean(typeof it.next_step === 'string' ? it.next_step : ((it.next_step || {}).what || '')),
-          signals: (it.signals || []).map((o) => clean(typeof o === 'string' ? o : (o.what || ''))).filter(Boolean)
+          signals: (it.signals || []).map((o) => clean(typeof o === 'string' ? o : (o.what || ''))).filter(Boolean),
+          // S1: the deal blocks beyond qualification (rules/sales.yaml > call_picture) and the CRM stage
+          stage: clean(it.stage_name || ''), stageCrm: clean(it.stage_crm || ''),
+          stakeholders: (it.stakeholders || []).filter((p) => p && p.name).map((p) => ({ name: clean(p.name),
+            role: ['decider', 'champion', 'blocker', 'influencer', 'user'].includes(p.role) ? p.role : 'unknown',
+            stance: ['for', 'neutral', 'against'].includes(p.stance) ? p.stance : 'unknown', quote: clean(p.quote || '') })),
+          plan: (it.mutual_plan || []).filter((m) => m && m.step).map((m) => ({ step: clean(m.step), owner: clean(m.owner || ''), due: clean(m.due || '') })),
+          competitors: (it.competitors || []).filter((c) => c && c.name).map((c) => ({ name: clean(c.name), what: clean(c.what || '') })),
+          prices: (it.price_talk || []).filter((p) => p && p.what).map((p) => ({ who: p.who === 'us' ? 'us' : 'them', what: clean(p.what) })),
+          breaches: (it.limit_breach || []).filter((b) => b && b.what).map((b) => ({ what: clean(b.what), limit: clean(b.limit || '') }))
         };
         return true;
       case 'agenda':

@@ -566,6 +566,27 @@ func crm087() async {
     expect(plan.rows.first { $0.id == "transcript" }?.on == false, "the transcript is off by default")
 }
 
+// S1-2 (2026-11-17): answer cards with a type, battlecard lines and a price limit; the deal blocks of the sheet
+func salesBlocksS1() {
+    let txt = "# Answer cards\n\n## Northwind\nThey need a data team.\nType: competitor\nThey win: brand\nWe win: live in two weeks\nTrap: Who runs their models?\n\n## Old one\nOlder card.\nTags: competitor\n\n## Discount\nOffer a pilot instead.\nType: price\nLimit: no more than 20% discount\n\n## Security\nSOC 2 Type II.\n"
+    let doc = AnswerCardsDoc.parse(txt)
+    expect(doc.cards.count == 4, "s1 cards: four cards")
+    let c = doc.cards
+    expect(c[0].kind == "competitor" && c[0].weWin == "live in two weeks" && c[0].theyWin == "brand" && c[0].trap == "Who runs their models?" && c[0].answer == "They need a data team.", "s1 cards: battlecard fields")
+    expect(c[1].type == "" && c[1].kind == "competitor", "s1 cards: Tags competitor still a competitor")
+    expect(c[2].kind == "price" && c[2].limit == "no more than 20% discount", "s1 cards: price limit")
+    expect(c[3].kind == "answer" && c[3].answer == "SOC 2 Type II.", "s1 cards: plain answer keeps Type II in the text")
+    expect(AnswerCardsDoc.parse(AnswerCardsDoc.render(preamble: doc.preamble, cards: c)).cards == c, "s1 cards: round trip with the new lines")
+    var a = AnswerCard(title: "X", answer: "Y", type: "answer", limit: "stale")
+    expect(!a.markdown.contains("Limit:") && a.markdown.contains("Type: answer"), "s1 cards: a limit only on a price card")
+    a.type = "price"
+    expect(a.markdown.contains("Limit: stale"), "s1 cards: the price card writes its limit")
+    expect(AnswerCard(title: "Q", answer: "A").markdown == "## Q\nA\n", "s1 cards: an old card is written as before")
+    for (t, title) in [("objections", "Likely objections"), ("competitors", "Competitors"), ("stakeholders", "Stakeholders"), ("mutual_plan", "Mutual action plan")] {
+        expect(BlockType.known.contains(BlockType(rawValue: t)) && SheetEdit.blockTitle(BlockType(rawValue: t)) == title, "s1 sheet: block \(t)")
+    }
+}
+
 func part2_087() async {
     // H5: the answer cards file as a list; the text above the first card and hand edits stay
     let txt = "# Answer cards\nOne card per question.\n\n## Price is too high\nOrbit pays back in 4 months.\nTags: price, objection\nUse when: budget comes up\n\n## Security\nSOC 2 on request.\n"
@@ -3889,5 +3910,6 @@ homeLine0170()
 orgRegisters0170()
 console0170()
 orgContext0170()
+salesBlocksS1()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

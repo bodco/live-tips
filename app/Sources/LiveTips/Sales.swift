@@ -284,6 +284,20 @@ struct AnswerCardForm: View {
                     .scrollContentBackground(.hidden).padding(4)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.06)))
             }
+            // S1: the card's type; a competitor card is a battlecard, a price card holds a limit our side never crosses
+            field(L("cards.form.type")) {
+                Picker("", selection: Binding(get: { card.kind }, set: { card.type = $0 })) {
+                    ForEach(AnswerCard.types, id: \.self) { Text(L("cards.type." + $0)).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden()
+            }
+            if card.kind == "competitor" {
+                field(L("cards.form.weWin")) { TextField("", text: $card.weWin, prompt: Text(L("cards.form.weWinPh"))).textFieldStyle(.roundedBorder) }
+                field(L("cards.form.theyWin")) { TextField("", text: $card.theyWin, prompt: Text(L("cards.form.theyWinPh"))).textFieldStyle(.roundedBorder) }
+                field(L("cards.form.trap")) { TextField("", text: $card.trap, prompt: Text(L("cards.form.trapPh"))).textFieldStyle(.roundedBorder) }
+            } else if card.kind == "price" {
+                field(L("cards.form.limit")) { TextField("", text: $card.limit, prompt: Text(L("cards.form.limitPh"))).textFieldStyle(.roundedBorder) }
+            }
             field(L("cards.form.tags")) { TextField("", text: $card.tags, prompt: Text(L("cards.form.tagsPh"))).textFieldStyle(.roundedBorder) }
             field(L("cards.form.useWhen")) { TextField("", text: $card.useWhen, prompt: Text(L("cards.form.useWhenPh"))).textFieldStyle(.roundedBorder) }
             if !err.isEmpty { Text(err).font(PN.Font.caption).foregroundStyle(PN.C.danger) }
@@ -292,7 +306,8 @@ struct AnswerCardForm: View {
                 Button(L("common.cancel")) { onCancel() }.buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)
                 Button(L("common.save")) { if let e = onSave(card) { err = e } }
                     .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
-                    .disabled(card.title.trimmingCharacters(in: .whitespaces).isEmpty || card.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(card.title.trimmingCharacters(in: .whitespaces).isEmpty || (card.answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                              (card.weWin + card.theyWin + card.trap + card.limit).trimmingCharacters(in: .whitespaces).isEmpty))
             }
         }
         .padding(18).frame(width: 460)
@@ -327,8 +342,16 @@ struct AnswerCardsList: View {
                     ForEach(cards) { c in
                         HStack(alignment: .top, spacing: 8) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(c.title).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                                HStack(spacing: 6) {
+                                    Text(c.title).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                                    if c.kind != "answer" {      // S1: battlecards and price limits are marked
+                                        Text(L("cards.type." + c.kind)).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3)
+                                            .padding(.horizontal, 6).padding(.vertical, 1).background(Capsule().fill(Color.secondary.opacity(0.12)))
+                                    }
+                                }
                                 Text(c.answer).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(2)
+                                if c.kind == "competitor" && !c.weWin.isEmpty { Text(L("cards.weWinLine", ["v": c.weWin])).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
+                                if c.kind == "price" && !c.limit.isEmpty { Text(L("cards.limitLine", ["v": c.limit])).font(PN.Font.caption).foregroundStyle(PN.C.danger).lineLimit(1) }
                                 if !c.tags.isEmpty { Text(L("cards.tags", ["tags": c.tags])).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                             }
                             Spacer()

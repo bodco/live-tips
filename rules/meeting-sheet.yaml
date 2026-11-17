@@ -121,7 +121,7 @@ blocks:
     live: cards                # checked at the end of the call
   red_lines:
     title: Red lines and risks
-    fields: What not to promise, what not to say
+    fields: What not to promise, what not to say; on a sales call also the price limits (the Limit lines of the answer cards with Type price)
     only_if_data: true
     live: red_lines            # warnings, never repeated back as risks
   structure_roles:
@@ -164,6 +164,27 @@ blocks:
     fields: Must-haves, nice-to-haves, what the team needs
     only_if_data: false
     live: cards
+  # S1: the deal blocks of a sales call (rules/sales.yaml > call_picture); the same blocks are tracked live and after
+  objections:
+    title: Likely objections
+    fields: 3-5 doubts they are likely to raise, each with a short answer (from the answer cards and earlier calls of the series)
+    only_if_data: false
+    live: sales
+  competitors:
+    title: Competitors
+    fields: Competitors or alternatives in play; for each where they win, where we win and a question that shows our strength (from the answer cards with Type competitor and the sources)
+    only_if_data: true
+    live: sales
+  stakeholders:
+    title: Stakeholders
+    fields: People in the decision - name, role (decides, champion, blocker, influencer, user), stance (for, neutral, against), what they care about; who decides is the first thing to know
+    only_if_data: false
+    live: sales
+  mutual_plan:
+    title: Mutual action plan
+    fields: Steps both sides agreed on the way to a decision (pilot, security review, legal, sign-off), each with an owner and a date; from earlier calls of the series
+    only_if_data: true
+    live: sales
 
 # Readiness: each rule is a check kind with params, a gap text, a quick action and a severity.
 # A blocker gap makes the sheet "not_ready", warnings only make it "almost", no gaps = "ready".
@@ -255,6 +276,12 @@ readiness_rules:
     gap: No questions prepared
     action: add_question
     severity: warning
+  decider_known:                # S1: who decides (a stakeholder fact that names the decider)
+    check: block_facts
+    params: {block: stakeholders, min: 1, match: [decide, decides, decider, decision maker, sign, signs, approve, approves, вирішує, підписує, погоджує]}
+    gap: Not known who decides
+    action: add_question
+    severity: warning
   no_open_conflicts:
     check: conflicts
     params: {}
@@ -272,8 +299,8 @@ presets:
   sales_intro:
     name: Sales intro
     mode: expert
-    blocks: [header, my_focus, overview, company, signals, tech_stack, contact, qualification, fit, history, questions, best_outcome, red_lines, gaps]
-    readiness: [goal_set, participants_both, contact_found, qualification_complete, fit_case, no_open_conflicts, no_stale]
+    blocks: [header, my_focus, overview, company, signals, tech_stack, contact, qualification, stakeholders, fit, competitors, objections, history, questions, best_outcome, red_lines, gaps]
+    readiness: [goal_set, participants_both, contact_found, qualification_complete, decider_known, fit_case, no_open_conflicts, no_stale]
   upsell:
     name: Upsell
     mode: quick
@@ -282,8 +309,8 @@ presets:
   repeat_call:
     name: Repeat call
     mode: quick
-    blocks: [header, my_focus, overview, company, signals, contact, qualification, history, questions, best_outcome, gaps]
-    readiness: [goal_set, participants_both, history_found, qualification_complete, no_open_conflicts, no_stale]
+    blocks: [header, my_focus, overview, company, signals, contact, qualification, stakeholders, mutual_plan, competitors, objections, history, questions, best_outcome, gaps]
+    readiness: [goal_set, participants_both, history_found, qualification_complete, decider_known, no_open_conflicts, no_stale]
   client_sync:
     name: Client sync
     mode: quick

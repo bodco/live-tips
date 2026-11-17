@@ -16,11 +16,12 @@ from . import readers
 
 LIVE_FACTS = {"header", "company", "tech_stack", "contact", "history", "project_context", "action_items",
               "interview_candidate", "qualification", "red_lines", "signals", "fit", "overview", "best_outcome",
-              "my_focus", "interview_role", "standup_since", "standup_today", "standup_blockers", "standup_waiting"}
+              "my_focus", "interview_role", "standup_since", "standup_today", "standup_blockers", "standup_waiting",
+              "objections", "competitors", "stakeholders", "mutual_plan"}         # S1: the deal blocks
 # 0.10.0 (Meeting Sheet, round 2): questions live only in the questions checklist (the recorder's "questions" and
 # "Ask now"); no keyword card of their own here
 CARD_BLOCKS = {"my_focus": "yellow", "overview": "yellow", "signals": "yellow", "fit": "green", "best_outcome": "green",
-               "interview_role": "yellow", "red_lines": "red"}
+               "interview_role": "yellow", "red_lines": "red", "objections": "yellow", "competitors": "yellow"}
 SHOWN = ("found", "conflict", "edited", "needs_check", "stale")
 
 

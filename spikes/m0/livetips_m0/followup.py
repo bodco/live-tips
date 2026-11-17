@@ -35,10 +35,29 @@ def build_user(md: Path) -> str:
         open_ = followup_lines(md)
     except Exception:  # noqa: BLE001
         open_ = []
+    plan = sales_plan_lines(md)
+    if plan:      # S1 (rules/sales.yaml > after_call > followup): the mutual action plan goes into the email
+        parts.append("MUTUAL ACTION PLAN (sales call; put it in the email as a short list with owners and dates):\n" + "\n".join(plan))
     if open_:
         parts.append("FROM THE MEETING SHEET CHECK (ask or propose these in the email when they fit):\n" + "\n".join(open_))
     parts.append("TRANSCRIPT:\n" + callinfo.transcript_text(md, 60000))
     return "\n\n".join(parts)
+
+
+def sales_plan_lines(md: Path) -> list:
+    """S1: the mutual action plan and the next step of a sales call, from <stem>.sales.json (edited on the call page)."""
+    p = Path(str(md)[:-3] + ".sales.json" if str(md).endswith(".md") else str(md) + ".sales.json")
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    out = ["- {}{}{}".format(m.get("step", ""), " · owner: " + m["owner"] if m.get("owner") else "",
+                             " · due: " + m["due"] if m.get("due") else "")
+           for m in d.get("mutual_plan") or [] if m.get("step")]
+    ns = d.get("next_step") or {}
+    if out and ns.get("what"):
+        out.append("- Next step: {}{}".format(ns["what"], " · due: " + ns["due"] if ns.get("due") else ""))
+    return out
 
 
 def _due(a: dict) -> str:

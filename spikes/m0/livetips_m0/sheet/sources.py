@@ -435,6 +435,52 @@ def recent_commits(folder: str, since: _dt.date, limit: int = 20) -> str:
         return ""
 
 
+SALES_PRESETS = ("sales_intro", "repeat_call", "upsell")
+
+
+def series_deal_text(live: str, title: str, before: Optional[str] = None, n: int = 3) -> str:
+    """S1 (rules/sales.yaml > prep > where_we_are): the stakeholders, the open steps of the mutual action plan, the
+    competitors and the qualification of the last sales calls of the series, from their <stem>.sales.json."""
+    from ..localprep import previous_calls
+    stakes: Dict[str, dict] = {}
+    plan: Dict[str, dict] = {}
+    comps: Dict[str, str] = {}
+    crit: Dict[str, dict] = {}
+    days = []
+    calls = [p for p in previous_calls(live, title, 8) if not before or os.path.basename(p)[:15] < before][:n]
+    for p in reversed(calls):                    # oldest first, so the newest call wins
+        stem = re.sub(r"(\.named)?\.md$", "", p)
+        try:
+            d = json.loads(open(stem + ".sales.json", encoding="utf-8").read())
+        except (OSError, ValueError):
+            continue
+        days.append(os.path.basename(stem)[:10])
+        for s in d.get("stakeholders") or []:
+            if s.get("name"):
+                stakes[s["name"].lower()] = s
+        for m in d.get("mutual_plan") or []:
+            if m.get("step"):
+                plan[m["step"].lower()] = m
+        for c in d.get("competitors") or []:
+            if c.get("name"):
+                comps[c["name"].lower()] = c["name"] + (": " + c["what"] if c.get("what") else "")
+        for c in d.get("criteria") or []:
+            if c.get("criterion"):
+                crit[c["criterion"]] = c
+    if not days:
+        return ""
+    out = ["From the sales calls of " + ", ".join(days) + " (<stem>.sales.json, edited by the PM on the call page)."]
+    out += ["Stakeholder: {} ({}{}){}".format(s["name"], s.get("role") or "unknown",
+                                              ", " + s["stance"] if s.get("stance") not in (None, "", "unknown") else "",
+                                              ": \"" + s["quote"] + "\"" if s.get("quote") else "") for s in stakes.values()]
+    out += ["Mutual plan: {}{}{}".format(m["step"], " · owner " + m["owner"] if m.get("owner") else "",
+                                         " · due " + m["due"] if m.get("due") else "") for m in plan.values()]
+    out += ["Competitor: " + c for c in comps.values()]
+    out += ["Qualification {}: {}{}".format(k, c.get("state") or "unknown", " · " + c["what"] if c.get("what") else "")
+            for k, c in crit.items()]
+    return "\n".join(out)
+
+
 def auto_sources(req: dict) -> List[dict]:
     """0.10.0 (Meeting Sheet, fix 2026-11-12, owner): what every build reads besides the PM's own sources, each
     ticked (suggested) with a why: the last 1-3 calls of the series (notes first, the transcript without notes; the
@@ -499,6 +545,17 @@ def auto_sources(req: dict) -> List[dict]:
     for p in PC.current_state([os.path.join(r, "_notion") for r in roots] + list(req.get("notion_dirs") or [])):
         out.append(_candidate("project_state", "Current State: " + os.path.basename(p), ["project state"], True,
                               path=p, modified_at=_mtime(p)))
+    # S1: a sales call reads the answer cards (answers, battlecards, price limits) and the deal so far of the series
+    if req.get("sales") or (req.get("options") or {}).get("sales") or req.get("preset") in SALES_PRESETS:
+        for r in roots:
+            ac = os.path.join(r, "pacenote", "answer-cards.md")
+            if os.path.exists(ac):
+                out.append(_candidate("project_state", "Answer cards" + ("" if r == root else ": " + os.path.basename(r)),
+                                      ["sales: answers, battlecards and price limits"], True, path=ac, modified_at=_mtime(ac)))
+        deal = series_deal_text(live, title, stamp) if live and os.path.isdir(live) else ""
+        if deal:
+            out.append(_candidate("text", "Deal so far (earlier calls of the series)",
+                                  ["same meeting series", "stakeholders and the mutual action plan"], True, text=deal))
     # the digest of the project and the recent commits of the folders
     if req.get("lt") and root:
         out.append(_candidate("digest", "Digest of the last 14 days", ["what changed in the project"], True, cmd="digest"))

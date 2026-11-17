@@ -10,6 +10,16 @@ Pacenote. Earlier versions are described in the commit messages and in
   block. The pickers group them into Qualification, Questioning and Approach and show their names. A questioning
   method suggests the next question of its sequence; Challenger follows what you do as the seller (Teach, Tailor,
   Take control) and says what is not done yet, never a score.
+- **The deal beyond qualification (2026-11-17):** in Sales mode Pacenote also follows the stakeholders (role and
+  stance), the mutual action plan (steps with owners and dates), the competitors named and the prices said, in the Deal
+  tab, on the call page, in Notion and in the follow-up email. New tips: who decides is not known yet, a blocker spoke,
+  and a red one when your side offers more than a price limit allows. The HubSpot deal stage sets which criteria are
+  asked first.
+- **Battlecards and price limits in answer cards (2026-11-17):** a card can be an Answer, a Competitor (where they win,
+  where you win, a question that shows your strength) or a Price limit. Older cards keep working.
+- **Meeting Sheet for sales (2026-11-17):** Sales intro and Repeat call add Likely objections, Competitors,
+  Stakeholders and the Mutual action plan, read the answer cards and the deal so far of the series, and warn when
+  nobody is known as the decider.
 
 ## 0.20.0 (not released yet, needs server 0.12.0)
 

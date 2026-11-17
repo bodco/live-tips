@@ -851,9 +851,13 @@ class Engine:
         self.sales = None
         sc = cfg.get("sales") or {}
         if isinstance(sc, dict) and sc.get("enabled"):
-            from .sales import SalesTracker, load_cards
+            from .sales import SalesTracker, load_cards, crm_stage
             self.sales = SalesTracker(*self._sales_config(cfg, rules, sc), load_cards(cfg.get("project_dir") or ""),
                                       float(cfg.get("planned_min") or 30) * 60)
+            try:        # S1: the CRM snapshot's deal stage sets the focus of the sales tips
+                self.sales.set_stage(crm_stage(getattr(getattr(self, "prompt", None), "_brief_path", None)))
+            except Exception:  # noqa: BLE001
+                pass
 
     @staticmethod
     def _sales_config(cfg, rules, sc):

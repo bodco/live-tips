@@ -396,6 +396,15 @@ extension EditableRow where Trailing == EmptyView {
     }
 }
 
+/// S1: a row with no leading label (the Sales blocks of the call page).
+extension EditableRow where Leading == EmptyView, Trailing == EmptyView {
+    init(text: String, sub: String = "", subColor: Color = PN.C.text3, copy: String? = nil, menu: [PageRowAction] = [],
+         onSave: @escaping (String) -> Void) {
+        self.init(text: text, sub: sub, subColor: subColor, subTail: "", done: false, copy: copy, hoverActions: [], menu: menu,
+                  onSave: onSave, leading: { EmptyView() }, trailing: { EmptyView() })
+    }
+}
+
 /// "+ Add" at the bottom of a section: a field opens; Return adds, Esc closes.
 struct AddRowField: View {
     var placeholder = ""

@@ -100,6 +100,8 @@ TXT = {
            "tr": "Транскрипт: {n} рядків, мови {langs}, локальний файл {f}", "summary": "Підсумок", "transcript": "Транскрипт",
            "append": "Pacenote: підсумок ({hhmm})", "tr_app": "Транскрипт (Pacenote)", "write": "Ukrainian", "sales": "Sales",
            "next": "Наступний крок", "objection": "Заперечення", "topics": "Теми", "unclear": "Під питанням",
+           "stage": "Стадія", "stakeholder": "Стейкхолдер", "map": "План дій", "competitor": "Конкурент",
+           "price": "Ціна", "over_limit": "Понад межу", "us": "ми", "them": "вони",
            "footer": "Нотатки Pacenote · транскрибовано на пристрої"},
     "en": {"actions": "Action items", "decisions": "Decisions", "agenda": "Agenda", "commit": "Our commitments",
            "new": "New requests (possible scope changes)", "open": "Open questions", "risks": "Risks",
@@ -108,6 +110,8 @@ TXT = {
            "tr": "Transcript: {n} lines, languages {langs}, local file {f}", "summary": "Summary", "transcript": "Transcript",
            "append": "Pacenote: summary ({hhmm})", "tr_app": "Transcript (Pacenote)", "write": "English", "sales": "Sales",
            "next": "Next step", "objection": "Objection", "topics": "Topics", "unclear": "Unclear",
+           "stage": "Stage", "stakeholder": "Stakeholder", "map": "Mutual plan", "competitor": "Competitor",
+           "price": "Price", "over_limit": "Over the limit", "us": "us", "them": "them",
            "footer": "Notes by Pacenote · transcribed on device"},
 }
 
@@ -361,6 +365,28 @@ def sales_lines(md: Path, T: dict) -> list:
     ns = d.get("next_step") or {}
     if ns.get("what"):
         out.append("{}: {}{}".format(T["next"], ns["what"], (" (" + ns["due"] + ")") if ns.get("due") else ""))
+    return out + block_lines(d, T)
+
+
+def block_lines(d: dict, T: dict) -> list:
+    """S1 (rules/sales.yaml > after_call): stakeholders, the mutual action plan, competitors, prices and the stage."""
+    g = lambda k, en: T.get(k, en)  # noqa: E731
+    who = lambda w: g("us", "us") if w == "us" else g("them", "them") if w == "them" else w  # noqa: E731
+    out = ["{}: {} ({}{}){}".format(g("stakeholder", "Stakeholder"), p.get("name", ""), p.get("role", "unknown"),
+                                    ", " + p["stance"] if p.get("stance") not in (None, "", "unknown") else "",
+                                    (": " + p["quote"]) if p.get("quote") else "")
+           for p in d.get("stakeholders") or [] if p.get("name")]
+    out += ["{}: {}{}{}".format(g("map", "Mutual plan"), m.get("step", ""), (" · " + who(m["owner"])) if m.get("owner") else "",
+                                (" (" + m["due"] + ")") if m.get("due") else "")
+            for m in d.get("mutual_plan") or [] if m.get("step")]
+    out += ["{}: {}{}".format(g("competitor", "Competitor"), c.get("name", ""), (" · " + c["what"]) if c.get("what") else "")
+            for c in d.get("competitors") or [] if c.get("name")]
+    out += ["{}: {} · {}".format(g("over_limit", "Over the limit"), b.get("what", ""), b.get("limit", ""))
+            for b in d.get("limit_breach") or [] if b.get("what")]
+    out += ["{} ({}): {}".format(g("price", "Price"), who(p.get("who", "")), p.get("what", ""))
+            for p in d.get("price_talk") or [] if p.get("what")]
+    if d.get("stage_crm"):
+        out.append("{}: {}".format(g("stage", "Stage"), d["stage_crm"]))
     return out
 
 

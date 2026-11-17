@@ -281,13 +281,23 @@ methods:
         ask: {en: ["Let's agree on the next step and the date now."], uk: ["Давайте зараз домовимося про наступний крок і дату."]}
 states: [unknown, partial, known]
 call_picture:
-  key: '"deal": [{"criterion": "<criterion key>", "state": "unknown|partial|known", "what": "<what is known, max 14 words, call language>", "quote": "<the line, max 20 words>", "t": "<HH:MM:SS>"}], "objections": [{"what": "<the doubt, max 12 words>", "answer": "<how it was answered, or empty>", "t": "<HH:MM:SS>"}], "next_step": {"what": "<agreed next step or empty>", "due": "<date or empty>", "owner": "<name or me>"}, "signals": [{"what": "<buying signal, max 12 words>", "t": "<HH:MM:SS>"}]'
+  key: '"deal": [{"criterion": "<criterion key>", "state": "unknown|partial|known", "what": "<what is known, max 14 words, call language>", "quote": "<the line, max 20 words>", "t": "<HH:MM:SS>"}], "objections": [{"what": "<the doubt, max 12 words>", "answer": "<how it was answered, or empty>", "t": "<HH:MM:SS>"}], "next_step": {"what": "<agreed next step or empty>", "due": "<date or empty>", "owner": "<name or me>"}, "signals": [{"what": "<buying signal, max 12 words>", "t": "<HH:MM:SS>"}], "competitors": [{"name": "<competitor or alternative named>", "what": "<what was said about it, max 12 words>", "t": "<HH:MM:SS>"}], "price_talk": [{"who": "us|them", "what": "<price, discount or terms said, max 14 words>", "t": "<HH:MM:SS>"}], "stakeholders": [{"name": "<person>", "role": "decider|champion|blocker|influencer|user|unknown", "stance": "for|neutral|against|unknown", "quote": "<the line, max 16 words>", "t": "<HH:MM:SS>"}], "mutual_plan": [{"step": "<agreed step, max 12 words>", "owner": "us|them|<name>", "due": "<date or empty>"}]'
+  key_limits: '"limit_breach": [{"what": "<what our side offered, max 14 words>", "limit": "<the PRICE LIMIT it breaks>", "t": "<HH:MM:SS>"}]'
   rule: >-
     deal = the qualification CRITERIA (given with their keys) as heard on this call and before it: known when the client
     said it clearly, partial when only part of it, unknown otherwise; keep the strongest state reached and the line it
     came from. Only the client's words count, never the PM's guesses. objections = doubts of the client and how the PM
     answered. next_step = only a step agreed by both sides; due when a date was said. signals = clear buying signals
     (asking about price, start date, contract, onboarding).
+    S1: competitors = competitors or alternatives the client named (including "build it ourselves"). price_talk =
+    prices, discounts and payment terms said by either side (who: us or them). stakeholders = people who take part in
+    the decision, named on this call or before it: role only when the call shows it (decider signs or approves money,
+    champion pushes for us inside, blocker pushes against, influencer is asked for an opinion, user will use it),
+    stance from their own words. mutual_plan = steps both sides agreed on the way to a decision (pilot, security
+    review, legal, sign-off), each with an owner and a date when said. Empty lists are left out.
+  rule_limits: >-
+    limit_breach = our side (the PM or a colleague) offered a price, a discount or terms that break one of the PRICE
+    LIMITS below. Only a clear offer counts, never a question or the client's ask.
   judge_seller: >-
     This method is an APPROACH (judge = seller): its criteria are what the SELLER does, not what the client tells.
     known when the seller clearly did it and the client reacted (agreed, asked about it, pushed back on it), partial
@@ -303,6 +313,36 @@ tips:
     say: propose a concrete next step with a date
   competitor: a competitor was named; the answer card about it when there is one
   signal: a buying signal; how to lock it in (the step to propose now)
+  price_limit: >-
+    red: our side offered more than a price limit allows (a card with Type price and a Limit line); the limit and a
+    phrase to walk it back without losing face
+  stakeholder:
+    when: after 40% of the planned length nobody is known as the decider; or a blocker (role blocker or stance against) spoke
+    say: who decides is not known yet and a question to find out; for a blocker, a question about what they need to see
+# S1: generic deal stages. A CRM stage (from <stem>.crm.md, "- Stage:" line) is matched by its words; the first stage
+# whose word is in the stage name wins. focus = the criteria asked first and the blocks shown first. No match: no
+# focus, nothing changes.
+stages:
+  discovery:
+    name: {en: Discovery, uk: Знайомство}
+    words: [appointment, discovery, lead, intro, new, contact, знайомство, лід]
+    focus: [situation, pain, problem, surface_problem, identify_pain, goals, need, metrics]
+  qualification:
+    name: {en: Qualification, uk: Кваліфікація}
+    words: [qualif, qualified, кваліфік]
+    focus: [authority, economic_buyer, budget, timeline, decision, decision_process, champion]
+  proposal:
+    name: {en: Proposal, uk: Пропозиція}
+    words: [presentation, proposal, demo, quote, пропоз, демо, презент]
+    focus: [decision_criteria, impact, value, competition, implication, need_payoff, competitors]
+  negotiation:
+    name: {en: Negotiation, uk: Переговори}
+    words: [decision, negotiat, bought, contract, переговор, контракт, рішення]
+    focus: [paper_process, decision_process, economic_buyer, price_talk, stakeholders]
+  closing:
+    name: {en: Closing, uk: Закриття}
+    words: [closing, close, commit, sign, verbal, закрит, підпис]
+    focus: [next_step, paper_process, mutual_plan]
 priority: >-
   The PM triggers stay. In sales mode a sales tip wins over another tip of the same importance. The overall rate does
   not grow: the same limits apply.
@@ -321,7 +361,7 @@ prep:
       "Searched the web for: <name or domain>. Nothing from your files was sent." Settings > AI switch "Research the
       company on the web before sales calls", on by default.
     from_crm: "From CRM: the snapshot <stem>.crm.md (rules/crm.yaml > snapshot) with its age."
-    where_we_are: "Where we are: the qualification from earlier calls of the series and the CRM: known, unknown, who said what."
+    where_we_are: "Where we are: the qualification from earlier calls of the series and the CRM: known, unknown, who said what; S1: the stakeholders (role, stance) and the open steps of the mutual action plan from the earlier calls of the series (<stem>.sales.json)."
     objections: "Likely objections: 3-5 with short answers, from the answer cards and past calls."
     questions: "Questions to ask: the questions that close the gaps."
     goal: "Goal of this call: one desired next step."
@@ -333,8 +373,19 @@ after_call:
     For the PM only: criteria known, the PM's share of talk, open questions, whether there is a next step with a date.
     Facts of the call only, never a rating of people. Kept with the call (<stem>.sales.json); Statistics can filter
     sales calls.
-  followup: a recap of the pain, the value, what was agreed and the next step
+  followup: a recap of the pain, the value, what was agreed, the next step and the mutual action plan (owners, dates)
+  blocks: >-
+    S1: the call page, the Notion Sales section and <stem>.sales.json also hold the stakeholders (role, stance), the
+    mutual action plan, the competitors named, the prices said, any limit breach and the CRM stage. Empty: left out.
 answer_cards:
   file: "<project or workspace root>/pacenote/answer-cards.md"
   format: '"## <question or topic>" then the answer; optional lines "Tags: a, b" and "Use when: ..."'
+  # S1: one file for answers, battlecards and price limits. "Tags: competitor" without Type still means competitor.
+  types: [answer, competitor, price]
+  fields:
+    type: '"Type: answer|competitor|price"'
+    they_win: '"They win: <where the competitor is stronger>" (competitor)'
+    we_win: '"We win: <where we are stronger>" (competitor)'
+    trap: '"Trap: <a question that shows our strength>" (competitor)'
+    limit: '"Limit: <the line our side never crosses, e.g. no more than 20% discount>" (price)'
   index: indexed by the project's local index (.livetips-index/, a new document source, same format)

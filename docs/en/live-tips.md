@@ -1539,11 +1539,27 @@ client reacted, and the tip says "Not done yet: Teach"; it is never a score of t
 
 During the call the Deal tab shows each criterion as unknown, partly or known with what was said; a click changes
 the state. For every method except General sales a chip like "BANT 2/4" sits in the header. Sales tips: objection, qualify,
-pain, next step (5 minutes before the end without a dated step), competitor, buying signal. Answer cards are short
+pain, next step (5 minutes before the end without a dated step), competitor, buying signal, stakeholder, price limit. Answer cards are short
 ready answers per project in `<project>/pacenote/answer-cards.md` ("## question", then the answer), edited in
 Settings > Projects. The preparation adds Company (a web search with the company's name or domain only; switch it off
 in Settings > AI), From CRM, Where we are, Likely objections, Questions to ask and Goal of this call. After the call
 the call page has a Sales section and a scorecard (criteria known, your talk share, open questions).
+
+**The deal beyond qualification (0.21.0).** Sales mode also follows the people in the decision (stakeholders, with a
+role: decides, champion, blocker, influencer, user, and a stance: for, neutral, against), the mutual action plan (the
+steps both sides agreed on the way to a decision, with an owner and a date), the competitors named, and the prices,
+discounts and terms that were said. They show in the Deal tab, on the call page (edited in place like the other rows:
+a stakeholder's menu sets the role, a plan step gets a date and an owner), in the Notion Sales section, and the
+follow-up email lists the plan. Two more tips: Stakeholder (after 40% of the call nobody is known as the decider, or a
+blocker spoke) and Price limit (red: your side offered more than a limit allows, with a phrase to walk it back). When
+the call has a HubSpot snapshot, its deal stage is matched to Discovery, Qualification, Proposal, Negotiation or
+Closing and sets which criteria are asked first; a stage that matches none changes nothing.
+
+Answer cards have a type: Answer, Competitor (a battlecard: "They win:", "We win:", "Trap:" with a question that
+shows your strength) or Price limit ("Limit: no more than 20% discount"). Settings > Projects > Answer cards has the
+type and these fields; older cards with "Tags: competitor" keep working. The Meeting Sheet presets Sales intro and
+Repeat call get the blocks Likely objections, Competitors, Stakeholders and (Repeat call) Mutual action plan, read the
+answer cards and what earlier calls of the series know about the deal, and warn when nobody is known as the decider.
 
 **Connect HubSpot.** In HubSpot: the left navigation's More > Development, then Keys > Service Keys (or open
 app.hubspot.com/service-keys/ followed by your account id) > Create service key; name it Pacenote; Add new scope and choose the ten scopes listed on Settings > Integrations > HubSpot (Copy list copies them);

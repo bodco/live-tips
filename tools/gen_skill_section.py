@@ -99,6 +99,9 @@ def render_sales(rules_dir: Path = RULES) -> str:
     out.append("- Call picture rule: " + sa["call_picture"]["rule"])
     if sa["call_picture"].get("judge_seller"):
         out.append("- Call picture, approach methods: " + sa["call_picture"]["judge_seller"])
+    if sa["call_picture"].get("key_limits"):     # S1: only when the answer cards have price limits
+        out.append("- Call picture with price limits: `{}`; {}".format(sa["call_picture"]["key_limits"],
+                                                                     sa["call_picture"]["rule_limits"].strip()))
     for k, v in sa["tips"].items():
         out.append("- Tip `{}`: {}".format(k, v if isinstance(v, str) else "{} ({})".format(v["say"], v["when"])))
     out.append("- Priority: " + sa["priority"])
@@ -106,9 +109,15 @@ def render_sales(rules_dir: Path = RULES) -> str:
     out.append("- Coach mode: " + sa["coach"])
     for k, v in sa["prep"]["sections"].items():
         out.append("- Preparation, {}: {}".format(k, v))
-    for k in ("section", "scorecard", "followup"):
-        out.append("- After the call, {}: {}".format(k, sa["after_call"][k]))
+    for k in ("section", "scorecard", "followup", "blocks"):
+        if k in sa["after_call"]:
+            out.append("- After the call, {}: {}".format(k, sa["after_call"][k]))
+    for k, st in (sa.get("stages") or {}).items():          # S1: the CRM stage sets the focus
+        out.append("- Stage `{}` {}: matched by {}; asks first {}.".format(k, st["name"]["en"], ", ".join(st["words"]),
+                                                                       ", ".join(st["focus"])))
     out.append("- Answer cards: `{}`; {}".format(sa["answer_cards"]["file"], sa["answer_cards"]["format"]))
+    for k, v in (sa["answer_cards"].get("fields") or {}).items():
+        out.append("- Answer card line {}: {}".format(k, v))
     out.append("")
     out.append("**CRM.** " + cr["link"]["auto"])
     out.append("- Snapshot: `{}`, {}; {}".format(cr["snapshot"]["file"], cr["snapshot"]["when"], cr["snapshot"]["content"]))

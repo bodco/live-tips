@@ -32,10 +32,14 @@ public struct BlockType: SheetValue {
         structureRoles = Self(rawValue: "structure_roles"), overview = Self(rawValue: "overview"), gaps = Self(rawValue: "gaps"),
         standupSince = Self(rawValue: "standup_since"), standupToday = Self(rawValue: "standup_today"),
         standupBlockers = Self(rawValue: "standup_blockers"), standupWaiting = Self(rawValue: "standup_waiting"),
-        interviewCandidate = Self(rawValue: "interview_candidate"), interviewRole = Self(rawValue: "interview_role")
+        interviewCandidate = Self(rawValue: "interview_candidate"), interviewRole = Self(rawValue: "interview_role"),
+        // S1: the deal blocks of a sales call (rules/meeting-sheet.yaml, live: sales)
+        objections = Self(rawValue: "objections"), competitors = Self(rawValue: "competitors"),
+        stakeholders = Self(rawValue: "stakeholders"), mutualPlan = Self(rawValue: "mutual_plan")
     public static let known: [Self] = [header, myFocus, company, signals, techStack, fit, contact, qualification, history,
         projectContext, agenda, actionItems, questions, bestOutcome, redLines, structureRoles, overview, gaps, standupSince,
-        standupToday, standupBlockers, standupWaiting, interviewCandidate, interviewRole]
+        standupToday, standupBlockers, standupWaiting, interviewCandidate, interviewRole, objections, competitors,
+        stakeholders, mutualPlan]
 }
 
 public struct FactStatus: SheetValue {

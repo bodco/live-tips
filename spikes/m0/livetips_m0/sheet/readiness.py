@@ -165,7 +165,10 @@ def _run_rule(sheet: dict, rules: dict, rule_id: str, rule: dict, today, sett) -
         # ("skipped: block hidden"), never a gap the PM cannot fill
         return [], "block_hidden"
     if kind == "block_facts":
-        n = sum(1 for f in block.get("facts") or [] if _has_data(f))
+        # S1: match = words one of the facts must have (decider_known: a stakeholder fact that names who decides)
+        match = [str(w).lower() for w in params.get("match") or []]
+        n = sum(1 for f in block.get("facts") or [] if _has_data(f) and
+                (not match or any(w in (str(f.get("label") or "") + " " + str(f.get("text") or "")).lower() for w in match)))
         return ([] if n >= int(params.get("min", 1)) else [{"text": gap, "block": block["id"]}]), False
     if kind == "qualification":
         out = []

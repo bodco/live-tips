@@ -510,6 +510,11 @@
     "ok": false
    },
    {
+    "rule": "decider_known",
+    "ok": true,
+    "skipped": true
+   },
+   {
     "rule": "fit_case",
     "ok": true
    },

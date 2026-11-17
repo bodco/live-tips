@@ -388,6 +388,30 @@ test('0.8.7 Sales: a deal item gives the Deal state with the chip numbers; witho
   assert.ok(get().cards.some((c) => c.kind === 'objection'), 'a sales tip keeps its kind for the label');
 });
 
+test('S1 Sales: the Deal tab gets stakeholders, the mutual plan, competitors, prices and the stage', () => {
+  const { f, get } = make();
+  f.addItems([{ kind: 'deal', method: 'bant', name: 'BANT', known: 0, total: 4, criteria: [],
+    stage_name: 'Qualification', stage_crm: 'Qualified to buy',
+    stakeholders: [{ name: 'Emily', role: 'decider', stance: 'for', quote: 'I sign it' }, { name: 'Mike', role: 'boss', stance: 'x' }, { role: 'user' }],
+    mutual_plan: [{ step: 'Security review', owner: 'them', due: 'Nov 30' }, { owner: 'us' }],
+    competitors: [{ name: 'Northwind', what: 'in use now' }],
+    price_talk: [{ who: 'us', what: '10% off' }, { who: '?', what: 'Budget 40k' }],
+    limit_breach: [{ what: '30% off', limit: 'no more than 20%' }] }]);
+  const d = get().deal;
+  assert.strictEqual(d.stage, 'Qualification'); assert.strictEqual(d.stageCrm, 'Qualified to buy');
+  assert.deepStrictEqual(d.stakeholders.map((p) => [p.name, p.role, p.stance]), [['Emily', 'decider', 'for'], ['Mike', 'unknown', 'unknown']]);
+  assert.deepStrictEqual(d.plan, [{ step: 'Security review', owner: 'them', due: 'Nov 30' }]);
+  assert.deepStrictEqual(d.prices.map((p) => p.who), ['us', 'them']);
+  assert.strictEqual(d.breaches[0].limit, 'no more than 20%'); assert.strictEqual(d.competitors[0].name, 'Northwind');
+  f.addItems([{ kind: 'deal', method: 'bant', name: 'BANT', criteria: [] }]);
+  assert.deepStrictEqual(get().deal.stakeholders, [], 'an older engine without the blocks still works');
+  f.addItems([{ t: '10:05:00', kind: 'tip', sales: 'price_limit', uid: 'sales-price_limit-30', level: 'red', gist: 'Over the limit', phrase: 'Let me check.' }]);
+  assert.ok(get().cards.some((c) => c.kind === 'price_limit'), 'the new sales tips keep their kind');
+  const src = require('fs').readFileSync(path.join(__dirname, '../Resources/tips/tips.js'), 'utf8');
+  const fn = src.slice(src.indexOf('function renderDeal'), src.indexOf('function renderDeal') + 3000);
+  assert.ok(/t\.deal\.stakeholders/.test(fn) && /t\.deal\.plan/.test(fn) && /t\.deal\.prices/.test(fn), 'the tab renders the blocks');
+});
+
 test('0.8.7 first-call banner: once, not in the demo, remembered through a pref', () => {
   const src = require('fs').readFileSync(path.join(__dirname, '../Resources/tips/tips.js'), 'utf8');
   const fn = src.slice(src.indexOf('function firstCallHint'), src.indexOf('function showToast'));

@@ -279,6 +279,7 @@ struct CallPageView: View {
                 AddRowField(placeholder: L("sales.objection")) { v in
                     var nd = d; nd["objections"] = objections + [["what": v, "answer": "", "t": ""]]; save(nd)
                 }
+                salesBlocks(d, root: root, save: save)
                 Text(L("sales.scorecard", ["known": "\(crit.filter { ($0["state"] as? String) == "known" }.count)", "total": "\(crit.count)",
                                            "open": "\((sc["open_questions"] as? Int) ?? 0)",
                                            "share": (sc["pm_talk_share"] as? Double).map { "\(Int(($0 * 100).rounded()))%" } ?? "-"]))
@@ -286,6 +287,70 @@ struct CallPageView: View {
             }
             .onAppear { sm.load() }
         }
+    }
+
+    /// S1 (rules/sales.yaml > after_call > blocks): stakeholders, the mutual action plan, competitors, prices and the
+    /// CRM stage of <stem>.sales.json. Edited in place like the rows above; empty blocks are not shown, except the plan,
+    /// which can be started here (it goes into the follow-up email).
+    @ViewBuilder private func salesBlocks(_ d: [String: Any], root: String, save: @escaping ([String: Any]) -> Void) -> some View {
+        let rows = { (k: String) -> [[String: Any]] in (d[k] as? [[String: Any]]) ?? [] }
+        let people = rows("stakeholders"), plan = rows("mutual_plan"), comps = rows("competitors")
+        let prices = rows("price_talk"), breaches = rows("limit_breach")
+        let edit = { (k: String, i: Int, f: String, v: String) in var nd = d; var l = rows(k); if i < l.count { l[i][f] = v }; nd[k] = l; save(nd) }
+        let drop = { (k: String, i: Int) in var nd = d; var l = rows(k); if i < l.count { l.remove(at: i) }; nd[k] = l; save(nd) }
+        let del = { (k: String, i: Int) in PageRowAction(title: L("callEdit.delete"), destructive: true, run: { _ in drop(k, i) }) }
+        if let st = d["stage_crm"] as? String, !st.isEmpty {
+            Text(L("sales.stage", ["stage": st])).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.top, 4)
+        }
+        if !people.isEmpty { subheading(L("sales.stakeholders")) }
+        ForEach(Array(people.enumerated()), id: \.offset) { i, p in
+            let role = (p["role"] as? String) ?? "unknown", stance = (p["stance"] as? String) ?? "unknown"
+            let quote = (p["quote"] as? String) ?? ""
+            EditableRow(text: (p["name"] as? String) ?? "",
+                        sub: L("sales.role." + role) + (stance == "unknown" ? "" : " · " + L("sales.stance." + stance)) + (quote.isEmpty ? "" : " · \u{201C}" + quote + "\u{201D}"),
+                        subColor: stance == "against" ? PN.C.onMe : PN.C.text3, copy: (p["name"] as? String) ?? "",
+                        menu: ["decider", "champion", "blocker", "influencer", "user", "unknown"].map { r in
+                                   PageRowAction(title: L("sales.setRole", ["role": L("sales.role." + r)]), run: { _ in edit("stakeholders", i, "role", r) }) }
+                              + [.separator, del("stakeholders", i)],
+                        onSave: { v in edit("stakeholders", i, "name", v) })
+        }
+        subheading(L("sales.plan"))
+        ForEach(Array(plan.enumerated()), id: \.offset) { i, m in
+            let owner = (m["owner"] as? String) ?? "", due = (m["due"] as? String) ?? ""
+            EditableRow(text: (m["step"] as? String) ?? "",
+                        sub: [owner == "us" ? L("sales.owner.us") : owner == "them" ? L("sales.owner.them") : owner, due.isEmpty ? "" : L("sales.due", ["due": due])].filter { !$0.isEmpty }.joined(separator: " · "),
+                        copy: (m["step"] as? String) ?? "",
+                        menu: [PageRowAction(title: L("callEdit.setDue"), prompt: .date(value: due), run: { v in edit("mutual_plan", i, "due", v) }),
+                               PageRowAction(title: L("sales.owner.setUs"), run: { _ in edit("mutual_plan", i, "owner", "us") }),
+                               PageRowAction(title: L("sales.owner.setThem"), run: { _ in edit("mutual_plan", i, "owner", "them") }),
+                               .separator, del("mutual_plan", i)],
+                        onSave: { v in edit("mutual_plan", i, "step", v) })
+        }
+        AddRowField(placeholder: L("sales.planPh")) { v in var nd = d; nd["mutual_plan"] = plan + [["step": v, "owner": "", "due": ""]]; save(nd) }
+        if !comps.isEmpty { subheading(L("sales.competitors")) }
+        ForEach(Array(comps.enumerated()), id: \.offset) { i, c in
+            let name = (c["name"] as? String) ?? "", what = (c["what"] as? String) ?? ""
+            EditableRow(text: name, sub: what, copy: name + (what.isEmpty ? "" : ": " + what),
+                        menu: [PageRowAction(title: L("cards.saveAs"), enabled: !root.isEmpty, note: L("cards.noRoot"),
+                                             run: { _ in cardDraft = AnswerCard(title: name, answer: what, type: "competitor") }),
+                               .separator, del("competitors", i)],
+                        onSave: { v in edit("competitors", i, "name", v) })
+        }
+        if !(prices.isEmpty && breaches.isEmpty) { subheading(L("sales.prices")) }
+        ForEach(Array(breaches.enumerated()), id: \.offset) { i, b in
+            EditableRow(text: (b["what"] as? String) ?? "", sub: L("sales.overLimit", ["limit": (b["limit"] as? String) ?? ""]),
+                        subColor: PN.C.danger, copy: (b["what"] as? String) ?? "", menu: [del("limit_breach", i)],
+                        onSave: { v in edit("limit_breach", i, "what", v) })
+        }
+        ForEach(Array(prices.enumerated()), id: \.offset) { i, p in
+            EditableRow(text: (p["what"] as? String) ?? "", sub: (p["who"] as? String) == "us" ? L("sales.owner.us") : L("sales.owner.them"),
+                        copy: (p["what"] as? String) ?? "", menu: [del("price_talk", i)],
+                        onSave: { v in edit("price_talk", i, "what", v) })
+        }
+    }
+
+    private func subheading(_ s: String) -> some View {
+        Text(s).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2).padding(.top, 6)
     }
 
     // MARK: 0.9.0 tabs

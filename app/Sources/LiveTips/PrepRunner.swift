@@ -288,8 +288,10 @@ final class PrepRunner: ObservableObject {
 
         SALES CALL (method: \(m), see rules/sales.yaml in the skill for its criteria). Add these sections to the brief, in this order:
         ## Company: \(web ? "what they do, size, news of the last 90 days, with links. Use WebSearch and WebFetch ONLY with the company's name or domain (\(r.company.isEmpty ? r.projectName : r.company)); never put anything from the project files, the context or people's names into a search. End the section with the line: \"Searched the web for: \(r.company.isEmpty ? r.projectName : r.company). Nothing from your files was sent.\"" : "from the project files only (web search is off in Settings > AI).")
-        \(crmLine)## Where we are: what is known and unknown for each criterion of the method, from earlier calls of this series\(crmLine.isEmpty ? "" : " and the CRM"), who said what.
+        \(crmLine)## Where we are: what is known and unknown for each criterion of the method, from earlier calls of this series\(crmLine.isEmpty ? "" : " and the CRM"), who said what. Also the stakeholders (name, role, stance) and the open steps of the mutual action plan (owner, date) of those calls: read their <stem>.sales.json files next to the transcripts in the live folder (the PM's edits on the call page are in them).
         ## Likely objections: 3 to 5, each with a short answer; use <project>/pacenote/answer-cards.md when it has a match.
+        ## Competitors: only when a competitor is in play; for each, from the answer cards with Type competitor: where they win, where we win, one question that shows our strength. Leave the section out otherwise.
+        ## Price limits: only when the answer cards have Type price cards; their Limit lines as red lines, never to be crossed on the call. Leave the section out otherwise.
         ## Questions to ask: the questions that close the gaps.
         ## Goal of this call: one wanted next step.
         """

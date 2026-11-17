@@ -57,6 +57,11 @@ def fresh_asks(asks: List[dict], now_s: float, ttl_s: float) -> List[dict]:
     return [a for a in asks if ask_age(a, now_s) <= ttl_s]
 
 
+# S1: the sales keys beyond qualification and the field each item must have
+SALES_BLOCKS = {"competitors": "name", "price_talk": "what", "limit_breach": "what", "stakeholders": "name",
+                "mutual_plan": "step"}
+
+
 def next_situation(obj: dict, prev: dict, pm_words: int, now_s: float, ask_ttl_s: float = ASK_TTL_S) -> dict:
     """The model's answer plus the previous state -> the new state of the call."""
     asks = _dicts_with(obj.get("asks"), "what", limit=6)
@@ -73,4 +78,6 @@ def next_situation(obj: dict, prev: dict, pm_words: int, now_s: float, ask_ttl_s
             **({"deal": _dicts_with(obj.get("deal"), "criterion", limit=12)} if obj.get("deal") is not None else {}),
             **({"objections": _dicts_with(obj.get("objections"), "what", limit=12)} if obj.get("objections") is not None else {}),
             **({"next_step": obj["next_step"]} if isinstance(obj.get("next_step"), dict) else {}),
-            **({"signals": _dicts_with(obj.get("signals"), "what", limit=12)} if obj.get("signals") is not None else {})}
+            **({"signals": _dicts_with(obj.get("signals"), "what", limit=12)} if obj.get("signals") is not None else {}),
+            # S1 (rules/sales.yaml > call_picture): the deal blocks, also only in sales mode
+            **{k: _dicts_with(obj.get(k), f, limit=12) for k, f in SALES_BLOCKS.items() if obj.get(k) is not None}}

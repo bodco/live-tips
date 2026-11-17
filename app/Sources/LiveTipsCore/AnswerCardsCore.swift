@@ -9,11 +9,29 @@ public struct AnswerCard: Equatable, Identifiable {
     public var answer: String
     public var tags: String
     public var useWhen: String
-    public init(title: String, answer: String, tags: String = "", useWhen: String = "") {
+    /// S1 (rules/sales.yaml > answer_cards > fields): answer, competitor (a battlecard) or price (a price limit).
+    /// "" keeps an older card as it was; a card with "Tags: competitor" reads as a competitor.
+    public var type: String = ""
+    public var theyWin: String = ""
+    public var weWin: String = ""
+    public var trap: String = ""
+    public var limit: String = ""
+    public static let types = ["answer", "competitor", "price"]
+    public init(title: String, answer: String, tags: String = "", useWhen: String = "", type: String = "",
+                theyWin: String = "", weWin: String = "", trap: String = "", limit: String = "") {
         self.title = title; self.answer = answer; self.tags = tags; self.useWhen = useWhen
+        self.type = type; self.theyWin = theyWin; self.weWin = weWin; self.trap = trap; self.limit = limit
     }
     public static func == (a: AnswerCard, b: AnswerCard) -> Bool {
-        a.title == b.title && a.answer == b.answer && a.tags == b.tags && a.useWhen == b.useWhen
+        a.title == b.title && a.answer == b.answer && a.tags == b.tags && a.useWhen == b.useWhen && a.type == b.type &&
+            a.theyWin == b.theyWin && a.weWin == b.weWin && a.trap == b.trap && a.limit == b.limit
+    }
+
+    /// S1: the card's kind as the engine reads it (Type, else Tags: competitor, else a Limit line makes it a price card).
+    public var kind: String {
+        if Self.types.contains(type) { return type }
+        if tags.lowercased().split(separator: ",").contains(where: { $0.trimmingCharacters(in: .whitespaces) == "competitor" }) { return "competitor" }
+        return limit.trimmingCharacters(in: .whitespaces).isEmpty ? "answer" : "price"
     }
 
     /// The card as it is written to the file (no long dash, one line per field).
@@ -22,6 +40,13 @@ public struct AnswerCard: Equatable, Identifiable {
         var out = "## " + clean(title).replacingOccurrences(of: "\n", with: " ") + "\n" + clean(answer) + "\n"
         if !clean(tags).isEmpty { out += "Tags: " + clean(tags).replacingOccurrences(of: "\n", with: " ") + "\n" }
         if !clean(useWhen).isEmpty { out += "Use when: " + clean(useWhen).replacingOccurrences(of: "\n", with: " ") + "\n" }
+        // S1: Type only when set; the battlecard lines only on a competitor card, Limit only on a price card
+        if Self.types.contains(type) { out += "Type: " + type + "\n" }
+        let k = kind
+        for (label, v, on) in [("They win", theyWin, "competitor"), ("We win", weWin, "competitor"), ("Trap", trap, "competitor"), ("Limit", limit, "price")]
+            where k == on && !clean(v).isEmpty {
+            out += label + ": " + clean(v).replacingOccurrences(of: "\n", with: " ") + "\n"
+        }
         return out
     }
 }
@@ -42,8 +67,14 @@ public enum AnswerCardsDoc {
                 cur = AnswerCard(title: String(ln.dropFirst(3)).trimmingCharacters(in: .whitespaces), answer: "")
             } else if cur != nil {
                 let low = ln.trimmingCharacters(in: .whitespaces).lowercased()
-                if low.hasPrefix("tags:") { cur?.tags = String(ln.split(separator: ":", maxSplits: 1).last ?? "").trimmingCharacters(in: .whitespaces) }
-                else if low.hasPrefix("use when:") { cur?.useWhen = String(ln.split(separator: ":", maxSplits: 1).last ?? "").trimmingCharacters(in: .whitespaces) }
+                let val = ln.firstIndex(of: ":").map { String(ln[ln.index(after: $0)...]).trimmingCharacters(in: .whitespaces) } ?? ""
+                if low.hasPrefix("tags:") { cur?.tags = val }
+                else if low.hasPrefix("use when:") { cur?.useWhen = val }
+                else if low.hasPrefix("type:") { cur?.type = AnswerCard.types.contains(val.lowercased()) ? val.lowercased() : "" }
+                else if low.hasPrefix("they win:") { cur?.theyWin = val }
+                else if low.hasPrefix("we win:") { cur?.weWin = val }
+                else if low.hasPrefix("trap:") { cur?.trap = val }
+                else if low.hasPrefix("limit:") { cur?.limit = val }
                 else { body.append(ln) }
             } else {
                 pre.append(ln)

@@ -486,9 +486,9 @@ final class SheetLibrary: ObservableObject {
     @Published var note = ""
 
     static let fallback: [SheetPresetInfo] = [
-        .init(id: "sales_intro", name: "Sales intro", mode: "expert", blocks: ["header", "my_focus", "overview", "company", "signals", "tech_stack", "contact", "qualification", "fit", "history", "questions", "best_outcome", "red_lines", "gaps"], readiness: [], source: "shared"),
+        .init(id: "sales_intro", name: "Sales intro", mode: "expert", blocks: ["header", "my_focus", "overview", "company", "signals", "tech_stack", "contact", "qualification", "stakeholders", "fit", "competitors", "objections", "history", "questions", "best_outcome", "red_lines", "gaps"], readiness: [], source: "shared"),
         .init(id: "upsell", name: "Upsell", mode: "quick", blocks: ["header", "my_focus", "overview", "company", "fit", "history", "project_context", "action_items", "questions", "best_outcome", "red_lines", "gaps"], readiness: [], source: "shared"),
-        .init(id: "repeat_call", name: "Repeat call", mode: "quick", blocks: ["header", "my_focus", "overview", "company", "signals", "contact", "qualification", "history", "questions", "best_outcome", "gaps"], readiness: [], source: "shared"),
+        .init(id: "repeat_call", name: "Repeat call", mode: "quick", blocks: ["header", "my_focus", "overview", "company", "signals", "contact", "qualification", "stakeholders", "mutual_plan", "competitors", "objections", "history", "questions", "best_outcome", "gaps"], readiness: [], source: "shared"),
         .init(id: "client_sync", name: "Client sync", mode: "quick", blocks: ["header", "my_focus", "overview", "history", "project_context", "agenda", "action_items", "questions", "best_outcome", "red_lines", "gaps"], readiness: [], source: "shared"),
         .init(id: "internal_presentation", name: "Internal or presentation", mode: "expert", blocks: ["header", "my_focus", "overview", "agenda", "structure_roles", "red_lines", "gaps"], readiness: [], source: "shared"),
         .init(id: "standup", name: "Stand-up", mode: "quick", blocks: ["header", "standup_since", "standup_today", "standup_blockers", "standup_waiting"], readiness: [], source: "shared"),

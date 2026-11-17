@@ -28,9 +28,12 @@
       agendaOpen: 'Show the whole agenda', agendaClose: 'Hide the agenda', agendaHint: 'A click moves an item on:', agendaLegend: ['not raised', 'now', 'done', 'skipped, not relevant'],
       agState: { todo: 'not raised', now: 'now', raised: 'raised, not decided', done: 'done', skip: 'skipped' },
       kinds: { answer: 'Answer', turn: 'Your turn', onme: 'On me', docs: 'From docs', finish: 'min left', neutral: 'Note', answered: 'Answered', risk: 'Risk', decision_conflict: 'Decided earlier',
-        objection: 'Objection', qualify: 'Qualify', pain: 'Pain', next_step: 'Next step', competitor: 'Competitor', signal: 'Buying signal' },
+        objection: 'Objection', qualify: 'Qualify', pain: 'Pain', next_step: 'Next step', competitor: 'Competitor', signal: 'Buying signal', price_limit: 'Price limit', stakeholder: 'Stakeholder' },
       firstHint: (k) => `Press ${k.h} when you need help · ${k.l} proactive tips`,
-      deal: { tab: 'Deal', unknown: 'Unknown', partial: 'Partly', known: 'Known', objections: 'Objections', next: 'Next step', signals: 'Signals', noNext: 'No next step with a date yet', cycle: 'Click to change the state' },
+      deal: { tab: 'Deal', unknown: 'Unknown', partial: 'Partly', known: 'Known', objections: 'Objections', next: 'Next step', signals: 'Signals', noNext: 'No next step with a date yet', cycle: 'Click to change the state',
+        stage: 'Stage', stakeholders: 'Stakeholders', plan: 'Mutual action plan', competitors: 'Competitors', prices: 'Prices said', us: 'us', them: 'them', overLimit: 'Over the limit',
+        role: { decider: 'decides', champion: 'champion', blocker: 'blocker', influencer: 'influencer', user: 'user', unknown: 'role unknown' },
+        stance: { for: 'for', neutral: 'neutral', against: 'against', unknown: '' } },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
       saidIt: 'Said it', collapse: 'Collapse', expand: 'Expand', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel', rateUsed: 'Useful', ratePartly: 'Fine, but off the point', rateNot: 'Not useful', rateWhy: 'What was off?', rateComment: 'A comment, if you like (what to keep, what to change)', rateSave: 'Save', rateSkip: 'Skip', rateThanks: 'Rated: Pacenote learns from it after the call', reasons: { off_topic: 'Off topic', late: 'Late', wrong_fact: 'Wrong fact', too_long: 'Too long', not_now: 'Not now' },
@@ -115,9 +118,12 @@
       agendaOpen: 'Показати всю агенду', agendaClose: 'Сховати агенду', agendaHint: 'Клік по пункту змінює його стан:', agendaLegend: ['не піднято', 'зараз', 'зроблено', 'пропущено, неактуально'],
       agState: { todo: 'не піднято', now: 'зараз', raised: 'піднято, не вирішено', done: 'зроблено', skip: 'пропущено' },
       kinds: { answer: 'Відповідь', turn: 'Твоя черга', onme: 'На мені', docs: 'З документів', finish: 'хв лишилось', neutral: 'Нотатка', answered: 'Відповіли', risk: 'Ризик', decision_conflict: 'Вже вирішено',
-        objection: 'Заперечення', qualify: 'Кваліфікація', pain: 'Біль', next_step: 'Наступний крок', competitor: 'Конкурент', signal: 'Сигнал купівлі' },
+        objection: 'Заперечення', qualify: 'Кваліфікація', pain: 'Біль', next_step: 'Наступний крок', competitor: 'Конкурент', signal: 'Сигнал купівлі', price_limit: 'Межа ціни', stakeholder: 'Стейкхолдер' },
       firstHint: (k) => `Натисніть ${k.h}, коли потрібна допомога · ${k.l} проактивні підказки`,
-      deal: { tab: 'Угода', unknown: 'Невідомо', partial: 'Частково', known: 'Відомо', objections: 'Заперечення', next: 'Наступний крок', signals: 'Сигнали', noNext: 'Ще немає наступного кроку з датою', cycle: 'Клік змінює стан' },
+      deal: { tab: 'Угода', unknown: 'Невідомо', partial: 'Частково', known: 'Відомо', objections: 'Заперечення', next: 'Наступний крок', signals: 'Сигнали', noNext: 'Ще немає наступного кроку з датою', cycle: 'Клік змінює стан',
+        stage: 'Стадія', stakeholders: 'Стейкхолдери', plan: 'Спільний план дій', competitors: 'Конкуренти', prices: 'Ціни, що прозвучали', us: 'ми', them: 'вони', overLimit: 'Понад межу',
+        role: { decider: 'вирішує', champion: 'чемпіон', blocker: 'блокер', influencer: 'впливає', user: 'користувач', unknown: 'роль невідома' },
+        stance: { for: 'за', neutral: 'нейтрально', against: 'проти', unknown: '' } },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
       saidIt: 'Сказав', collapse: 'Згорнути', expand: 'Розгорнути', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати', rateUsed: 'Корисно', ratePartly: 'Ніби ок, але не в тему', rateNot: 'Не корисно', rateWhy: 'Що не так?', rateComment: 'Коментар, якщо хочете (що лишити, що змінити)', rateSave: 'Зберегти', rateSkip: 'Пропустити', rateThanks: 'Оцінено: Pacenote врахує це після дзвінка', reasons: { off_topic: 'Не в тему', late: 'Запізно', wrong_fact: 'Хибний факт', too_long: 'Задовго', not_now: 'Не зараз' },
@@ -1171,7 +1177,14 @@
     const rows = d.criteria.map((c) => `<div class="deal-row ${esc(c.state)}"><button class="seg ${c.state === 'known' ? 'done' : c.state === 'partial' ? 'now' : 'todo'}" type="button" data-act="deal-cycle" data-key="${esc(c.key)}" title="${esc(t.deal.cycle)}" aria-label="${esc(c.name + ': ' + t.deal[c.state])}"></button>
       <span><b>${esc(c.name)}</b> <span class="meta">${esc(t.deal[c.state])}</span>${c.what ? `<br>${esc(c.what)}` : ''}${c.quote ? `<br><span class="meta">"${esc(c.quote)}"${c.t ? ' · ' + esc(c.t) : ''}</span>` : ''}</span></div>`).join('');
     const list = (h, xs) => xs.length ? `<h4 class="grp">${esc(h)}</h4>${xs.map((x) => `<div class="onme-item">${esc(x)}</div>`).join('')}` : '';
-    return `<h4 class="grp">${esc(d.name)}</h4>${rows}${list(t.deal.objections, d.objections)}<h4 class="grp">${esc(t.deal.next)}</h4><div class="onme-item${d.nextStep ? '' : ' meta'}">${esc(d.nextStep || t.deal.noNext)}</div>${list(t.deal.signals, d.signals)}`;
+    // S1: the stage in the head, then stakeholders, the mutual action plan, competitors and prices (empty: left out)
+    const stage = d.stage ? `<div class="meta">${esc(t.deal.stage)}: ${esc(d.stage)}${d.stageCrm && d.stageCrm !== d.stage ? ' (' + esc(d.stageCrm) + ')' : ''}</div>` : '';
+    const people = (d.stakeholders || []).map((p) => `${p.name} · ${t.deal.role[p.role]}${t.deal.stance[p.stance] ? ', ' + t.deal.stance[p.stance] : ''}${p.quote ? ': "' + p.quote + '"' : ''}`);
+    const plan = (d.plan || []).map((m) => m.step + (m.owner ? ' · ' + (m.owner === 'us' ? t.deal.us : m.owner === 'them' ? t.deal.them : m.owner) : '') + (m.due ? ' · ' + m.due : ''));
+    const comps = (d.competitors || []).map((c) => c.name + (c.what ? ': ' + c.what : ''));
+    const prices = (d.breaches || []).map((b) => t.deal.overLimit + ': ' + b.what + (b.limit ? ' (' + b.limit + ')' : ''))
+      .concat((d.prices || []).map((p) => (p.who === 'us' ? t.deal.us : t.deal.them) + ': ' + p.what));
+    return `<h4 class="grp">${esc(d.name)}</h4>${stage}${rows}${list(t.deal.stakeholders, people)}${list(t.deal.objections, d.objections)}<h4 class="grp">${esc(t.deal.next)}</h4><div class="onme-item${d.nextStep ? '' : ' meta'}">${esc(d.nextStep || t.deal.noNext)}</div>${list(t.deal.plan, plan)}${list(t.deal.competitors, comps)}${list(t.deal.prices, prices)}${list(t.deal.signals, d.signals)}`;
   }
 
   function openOnMeCount() {

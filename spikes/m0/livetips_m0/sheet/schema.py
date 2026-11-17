@@ -11,7 +11,7 @@ MODES = ("quick", "expert")
 BLOCK_TYPES = ("header", "my_focus", "company", "signals", "tech_stack", "fit", "contact", "qualification", "history",
                "project_context", "agenda", "action_items", "questions", "best_outcome", "red_lines", "structure_roles",
                "overview", "gaps", "standup_since", "standup_today", "standup_blockers", "standup_waiting",
-               "interview_candidate", "interview_role")
+               "interview_candidate", "interview_role", "objections", "competitors", "stakeholders", "mutual_plan")
 FACT_STATUS = ("found", "not_found", "needs_check", "conflict", "stale", "edited")
 ORIGINS = ("model", "user", "readiness")
 LEVELS = ("green", "yellow", "red", "unknown")

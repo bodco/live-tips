@@ -255,6 +255,10 @@ public enum SheetEdit {
         case .standupWaiting: return "Waiting on others"
         case .interviewCandidate: return "The candidate"
         case .interviewRole: return "The role"
+        case .objections: return "Likely objections"
+        case .competitors: return "Competitors"
+        case .stakeholders: return "Stakeholders"
+        case .mutualPlan: return "Mutual action plan"
         default: return t.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

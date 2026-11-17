@@ -12,8 +12,9 @@ Updated: 17 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 - [x] 0.11-0.13: Account and sync
 - [x] 0.14-0.16: Redesign and updates
 - [x] 0.17: Organizations
-- [>] Now: Plans and security
-- [ ] Next: Teams in depth
+- [x] 0.19: Plans in the app
+- [>] Now: Teams in depth
+- [ ] Next: Email sign-in and security
 - [ ] Later: Paid plans and mobile
 
 [x] shipped, [>] in progress, [ ] planned
@@ -22,16 +23,15 @@ Updated: 17 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ### Now
 
-- **Plans and modules.** Solo, Team and Enterprise with their real limits, free during the beta. The server decides which features a plan opens, the app follows. The server part is live since 17 November: plans with versions, signed access rights and a place for anonymous usage counts. The app starts following them next. Since server 0.10.0 a plan can also have a trial; during the beta the plan simply goes on after it, free.
-- **Security hardening.** Fixes from our own security review of the app and the update channel, before the team version grows.
+- **Team calls in depth.** A shared list of the team's calls, search across them and call analysis for team leads.
+- **More sales tools.** More qualification methods next to BANT, objections and answers, competitors, stakeholder map, next step with a date.
 - **Better briefs and tips.** Every call is reviewed after it ends: which tips helped, which were noise, what was missed. The prompts change from that.
 
 ### Next
 
 - **Sign in with email.** An email and password next to Google, then two-factor sign-in with any authenticator app.
+- **Security hardening.** Fixes from our own security review of the app and the update channel, before the team version grows.
 - **Signed and notarized by Apple.** No more "Open Anyway" on first launch and no Keychain prompt after an update.
-- **Team calls in depth.** A shared list of the team's calls, search across them and call analysis for team leads.
-- **More sales tools.** More qualification methods next to BANT, objections and answers, competitors, stakeholder map, next step with a date.
 
 ### Later
 
@@ -41,6 +41,7 @@ Updated: 17 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ## What shipped
 
+- **17 Nov · 0.19. Plans in the app.** Compare plans and switch an organization's plan in Settings, start a team from Solo, a trial on every plan, your own use for the last 30 days, a Console page for everyone signed in. Product analytics you can turn off: screens, errors by code and speed, never what is said in a call. A recorded call stops by itself when the meeting ends.
 - **16-17 Nov · 0.17. Organizations.** Invites, teams with a lead, private calls, organization projects with shared decisions, tasks and risks, the admin console inside the app.
 - **15-16 Nov · 0.14-0.16. A calmer app.** New Get Ready, Settings in groups with search, onboarding where you pick what to install, removable add-ons, automatic updates and "What's new".
 - **15 Nov · 0.11-0.13. Account and sync.** Sign in to Pacenote, recordings and transcripts in your Google Drive, call notes synced per project (off by default), one list of decisions, tasks and risks everywhere.

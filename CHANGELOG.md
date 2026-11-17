@@ -3,7 +3,7 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## Unreleased
+## 0.19.1 (2026-11-17)
 
 - **A recorded call stops when the meeting ends (2026-11-17):** hanging up in the meeting now ends the call also when
   you record it (screen, video with sound or sound only), started before or during the call, and when the macOS screen

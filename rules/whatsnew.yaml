@@ -111,3 +111,9 @@ items:
     title_uk: "Оновити календарі вручну"
     body_en: "A round arrow next to Coming up on Home (also Command R) and in the menu bar panel reads your calendars again at once, so a meeting added a minute ago shows up in time."
     body_uk: "Кругла стрілка біля Coming up на Home (також Command R) і в панелі меню миттєво перечитує календарі, тож зустріч, додана хвилину тому, з'являється вчасно."
+  - id: recorded_call_stops
+    version: 0.19.1
+    title_en: "A recorded call stops when the meeting ends"
+    title_uk: "Дзвінок із записом зупиняється, коли мітинг закінчився"
+    body_en: "Hang up in the meeting and Pacenote ends the call by itself, also when you record the screen, video with sound or sound only, or run the macOS screen recording."
+    body_uk: "Поклали трубку в мітингу, і Pacenote сам завершує дзвінок, також коли ви записуєте екран, відео зі звуком або лише звук чи вмикаєте запис екрана macOS."

@@ -52,6 +52,7 @@ final class OrgContextStore: ObservableObject {
                 let s = OrgContext.state(d) ?? OrgContext.State(body: body, version: from.version)
                 states[p.orgProjectID] = s
                 UsageLog.log("org_state_saved", ["bytes": body.utf8.count])
+                await loadHistory(p)      // 0.17.1: the history under it shows the change at once
                 return .saved(s)
             case .newer: return .newer(await loadState(p))
             case .tooLong: return .failed(L("orgctx.state.tooLong"))
@@ -76,7 +77,7 @@ final class OrgContextStore: ObservableObject {
             let (d, c) = try await PacenoteAccount.shared.api("POST", base(p) + "/sources",
                                                               body: OrgContext.sourceBody(kind: r.kind, ref: r.ref, title: title, note: note))
             guard c == 200 || c == 201 else { return c == 409 ? L("orgctx.src.full") : OrgCardStore.problemText(c, d) }
-            await loadSources(p)
+            await loadSources(p); await loadHistory(p)
             return nil
         } catch { return error.localizedDescription }
     }
@@ -85,7 +86,7 @@ final class OrgContextStore: ObservableObject {
         do {
             let (d, c) = try await PacenoteAccount.shared.api("DELETE", base(p) + "/sources/" + s.id)
             guard c == 204 || c == 404 else { return c == 403 ? L("orgctx.src.notYours") : OrgCardStore.problemText(c, d) }
-            await loadSources(p)
+            await loadSources(p); await loadHistory(p)
             return nil
         } catch { return error.localizedDescription }
     }
@@ -451,7 +452,9 @@ struct OrgHistorySection: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(line(c)).lineLimit(1)
-                        let o = OrgContext.short(c.old), n = OrgContext.short(c.new)
+                        let people = OrgCardStore.shared.cards[project.orgProjectID]?.members ?? []
+                        let o = OrgContext.short(OrgContext.named(c.old, field: c.field, members: people)),
+                            n = OrgContext.short(OrgContext.named(c.new, field: c.field, members: people))
                         if c.entity != "source", !(o.isEmpty && n.isEmpty) {
                             Text((o.isEmpty ? "∅" : o) + "  →  " + (n.isEmpty ? "∅" : n)).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                         }

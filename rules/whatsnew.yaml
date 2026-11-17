@@ -75,3 +75,9 @@ items:
     title_uk: "Новий проєкт крок за кроком"
     body_en: "Settings › Projects › Add › New project… asks for the name, where calls go, a folder and a short card. A sample project shows how it all looks."
     body_uk: "Налаштування › Проєкти › Додати › Новий проєкт… питає назву, куди йдуть дзвінки, папку і коротку картку. Приклад проєкту показує, як це виглядає."
+  - id: stay_signed_in
+    version: 0.17.1
+    title_en: "Stays signed in after sleep"
+    title_uk: "Вхід не злітає після сну"
+    body_en: "If your Mac sleeps right while Pacenote renews its sign-in, you stay signed in to the Pacenote server."
+    body_uk: "Якщо Мак засинає саме тоді, коли Pacenote оновлює вхід, ви лишаєтесь у Pacenote-акаунті."

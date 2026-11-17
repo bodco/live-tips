@@ -2505,6 +2505,8 @@ teams, organization projects and invites are managed in the Pacenote console, no
   back the value from before a change for everyone (after a confirmation); the restore is in the history too. Register
   items are changed in the Tracker, not restored here.
 - **Tracker.** The Call filter no longer grows with the longest meeting title, so Owner and Status stay in view.
+- **Signed in after sleep (0.17.1, server 0.8.1).** If the Mac sleeps right while Pacenote renews its sign-in, the
+  server accepts the previous sign-in once within 15 minutes instead of ending this Mac's session.
 
 ### 14.2 After the call: the meeting page in Notion
 

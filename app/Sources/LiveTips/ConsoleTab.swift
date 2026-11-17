@@ -87,7 +87,12 @@ final class ConsoleSession: NSObject, ObservableObject, WKNavigationDelegate, WK
             // The session ended (8 hours, or Sign out and then Sign in): a new one-time link, not Google in a web view.
             if url.path == "/login", action.targetFrame?.isMainFrame != false {
                 decisionHandler(.cancel)
-                if Date().timeIntervalSince(lastHandoff) > 5 { Task { await self.open(force: true) } }
+                if PacenoteServer.consoleLoginWantsPlatform(url) {
+                    // 0.17.1: the Platform zone asks for Google, in the browser (a session from the app never opens it)
+                    NSWorkspace.shared.open(URL(string: "https://" + PacenoteServer.consoleHost + "/platform")!)
+                } else if Date().timeIntervalSince(lastHandoff) > 5 {
+                    Task { await self.open(force: true) }
+                }
                 return
             }
             decisionHandler(.allow); return

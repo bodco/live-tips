@@ -3,7 +3,19 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## Unreleased
+## 0.17.1 (2026-11-17)
+
+- **Stays signed in after the Mac sleeps (2026-11-17, server 0.8.1):** if the Mac went to sleep right after Pacenote
+  renewed its sign-in, the server could see the old sign-in come back and sign this Mac out ("The server ended this
+  session"). The server now accepts it once within 15 minutes and keeps you signed in.
+- **Console tab: Platform opens in the browser (2026-11-17):** for Pacenote staff, the Platform link in the Console tab
+  now opens the console's Platform zone in your browser (it asks for Google there) instead of quietly coming back to
+  your organization.
+- **Project state, sources and history (2026-11-17, smoke test):** the history under the project state and sources
+  shows your own change at once, without Reload; an owner change in a register item shows the person's name, not an
+  id; the diff of a first project state no longer shows an empty removed line.
+
+## 0.17.0 (2026-11-16)
 
 - **Organizations in the app (2026-11-16, B6b, server 0.6.0):** invites show on Home and in Settings > Account
   (Join... asks whether new calls go there, Decline); Settings > Account lists your organizations with your role and

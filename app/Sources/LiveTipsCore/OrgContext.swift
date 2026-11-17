@@ -100,7 +100,8 @@ public enum OrgContext {
     /// A line diff (longest common subsequence) for the preview before sending.
     public enum DiffLine: Equatable { case same(String), added(String), removed(String) }
     public static func diff(_ old: String, _ new: String) -> [DiffLine] {
-        let a = old.components(separatedBy: "\n"), b = new.components(separatedBy: "\n")
+        // 0.17.1: an empty text has no lines (it showed a removed empty line before the first state)
+        let a = old.isEmpty ? [] : old.components(separatedBy: "\n"), b = new.isEmpty ? [] : new.components(separatedBy: "\n")
         let n = a.count, m = b.count
         guard n * m <= 400_000 else { return a.map { .removed($0) } + b.map { .added($0) } }
         var t = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
@@ -291,6 +292,12 @@ public enum OrgContext {
         }
         let flat = s.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
         return flat.count > max ? String(flat.prefix(max - 1)) + "…" : flat
+    }
+
+    /// 0.17.1: an owner change in a register item holds a person's id; show their name from the project's people.
+    public static func named(_ v: Any?, field: String, members: [OrgCard.Member]) -> Any? {
+        guard field.hasSuffix("owner_user_id"), let id = v as? String, !id.isEmpty else { return v }
+        return members.first { $0.id.lowercased() == id.lowercased() }.map { $0.name.isEmpty ? "?" : $0.name } ?? "?"
     }
 
     /// What the row says happened: "added", "removed" or "changed".

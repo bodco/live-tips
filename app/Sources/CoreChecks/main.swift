@@ -3173,7 +3173,18 @@ func orgContext0170() {
     // diff
     let d = OrgContext.diff("a\nb\nc", "a\nc\nd")
     expect(d == [.same("a"), .removed("b"), .same("c"), .added("d")], "state: line diff")
-    expect(OrgContext.diff("", "x") == [.removed(""), .added("x")] || OrgContext.diff("", "x") == [.added("x"), .removed("")], "state: diff from empty")
+    expect(OrgContext.diff("", "x\ny") == [.added("x"), .added("y")] && OrgContext.diff("x", "") == [.removed("x")], "state: diff from and to empty")
+    let ppl17 = [OrgCard.Member(id: "AB-1", name: "Mike")]
+    expect(OrgContext.named("ab-1", field: "task.owner_user_id", members: ppl17) as? String == "Mike"
+           && OrgContext.named("zz", field: "owner_user_id", members: ppl17) as? String == "?"
+           && OrgContext.named("open", field: "task.status", members: ppl17) as? String == "open"
+           && OrgContext.named(nil, field: "owner_user_id", members: ppl17) == nil, "history: owner ids become names")
+    expect(PacenoteServer.consoleLoginWantsPlatform(URL(string: "https://pacenote-admin.bodco.pm/login?next=%2Fplatform")!)
+           && PacenoteServer.consoleLoginWantsPlatform(URL(string: "https://pacenote-admin.bodco.pm/login?next=/platform/people")!)
+           && !PacenoteServer.consoleLoginWantsPlatform(URL(string: "https://pacenote-admin.bodco.pm/login?next=%2Forg%2Fx")!)
+           && !PacenoteServer.consoleLoginWantsPlatform(URL(string: "https://pacenote-admin.bodco.pm/login")!)
+           && !PacenoteServer.consoleLoginWantsPlatform(URL(string: "https://evil.example/login?next=/platform")!)
+           && !PacenoteServer.consoleLoginWantsPlatform(URL(string: "https://pacenote-admin.bodco.pm/login?next=/platformx")!), "console: Platform goes to the browser")
     let long = OrgContext.diff((0..<20).map(String.init).joined(separator: "\n"), (0..<20).map { $0 == 10 ? "ten" : String($0) }.joined(separator: "\n"))
     let c = OrgContext.compact(long, context: 1)
     expect(c.count == 6 && c.first! == nil && c.last! == nil && c.contains(.some(.removed("10"))) && c.contains(.some(.added("ten"))), "state: compact diff")

@@ -125,6 +125,15 @@ public enum PacenoteServer {
         return u.host?.lowercased() == consoleHost
     }
 
+    /// 0.17.1: the console sent the tab to /login because a page needs Google (the Platform zone), not because the
+    /// session ended: `next` points into /platform.
+    public static func consoleLoginWantsPlatform(_ u: URL) -> Bool {
+        guard isConsoleURL(u), u.path == "/login",
+              let next = URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "next" })?.value
+        else { return false }
+        return next == "/platform" || next.hasPrefix("/platform/")
+    }
+
     /// The body of POST /v1/console/handoff.
     public static func consoleHandoffBody(next: String) -> Data {
         (try? JSONSerialization.data(withJSONObject: ["next": next])) ?? Data()

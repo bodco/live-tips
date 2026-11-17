@@ -9,12 +9,22 @@ import LiveTipsCore
 final class SalesMethods: ObservableObject {
     static let shared = SalesMethods()
     struct Criterion: Identifiable, Hashable { let key: String; let name: String; let explain: String; var id: String { key } }
-    struct Method: Identifiable, Hashable { let key: String; let name: String; let desc: String; let chip: Bool; let criteria: [Criterion]; var id: String { key } }
+    /// S1: kind = general, qualification, questioning or approach (the picker's groups); judge = client or seller.
+    struct Method: Identifiable, Hashable {
+        let key: String; let name: String; let desc: String; let chip: Bool; let criteria: [Criterion]
+        var kind = "qualification"; var kindName = ""; var judge = "client"
+        var id: String { key }
+    }
     @Published var methods: [Method] = [
-        Method(key: "general", name: "General sales", desc: "", chip: false, criteria: []),
+        Method(key: "general", name: "General sales", desc: "", chip: false, criteria: [], kind: "general"),
         Method(key: "bant", name: "BANT", desc: "", chip: true, criteria: []),
         Method(key: "spiced", name: "SPICED", desc: "", chip: true, criteria: []),
         Method(key: "meddic", name: "MEDDIC", desc: "", chip: true, criteria: []),
+        Method(key: "meddpicc", name: "MEDDPICC", desc: "", chip: true, criteria: []),
+        Method(key: "gpctba", name: "GPCTBA/C&I", desc: "", chip: true, criteria: []),
+        Method(key: "spin", name: "SPIN", desc: "", chip: true, criteria: [], kind: "questioning"),
+        Method(key: "sandler", name: "Sandler pain funnel", desc: "", chip: true, criteria: [], kind: "questioning"),
+        Method(key: "challenger", name: "Challenger", desc: "", chip: true, criteria: [], kind: "approach", judge: "seller"),
     ]
     @Published var defaultKey = "general"
     private var loadedLang = ""
@@ -30,12 +40,27 @@ final class SalesMethods: ObservableObject {
                 Method(key: m["key"] as? String ?? "", name: m["name"] as? String ?? "", desc: m["desc"] as? String ?? "",
                        chip: m["chip"] as? Bool ?? false,
                        criteria: ((m["criteria"] as? [[String: Any]]) ?? []).map {
-                           Criterion(key: $0["key"] as? String ?? "", name: $0["name"] as? String ?? "", explain: $0["explain"] as? String ?? "") })
+                           Criterion(key: $0["key"] as? String ?? "", name: $0["name"] as? String ?? "", explain: $0["explain"] as? String ?? "") },
+                       kind: m["kind"] as? String ?? "qualification", kindName: m["kind_name"] as? String ?? "",
+                       judge: m["judge"] as? String ?? "client")
             }
         }
     }
 
     func name(_ key: String) -> String { methods.first { $0.key == key }?.name ?? methods.first { $0.key == defaultKey }?.name ?? key }
+
+    /// S1: the method's own name, or its key when the engine does not know it (never another method's name).
+    func label(_ key: String) -> String { methods.first { $0.key == key }?.name ?? key.uppercased() }
+
+    /// S1: the methods grouped by kind in the order of rules/sales.yaml (General, Qualification, Questioning, Approach).
+    var groups: [(kind: String, name: String, methods: [Method])] {
+        var out: [(kind: String, name: String, methods: [Method])] = []
+        for m in methods {
+            if let i = out.firstIndex(where: { $0.kind == m.kind }) { out[i].methods.append(m) }
+            else { out.append((m.kind, m.kindName.isEmpty ? L("sales.kind." + m.kind) : m.kindName, [m])) }
+        }
+        return out
+    }
 }
 
 /// The method picker with a short description of each (Start call popover and Settings > Projects).
@@ -44,7 +69,9 @@ struct SalesMethodPicker: View {
     @ObservedObject var sm = SalesMethods.shared
     var body: some View {
         Picker(L("sales.method"), selection: $selection) {
-            ForEach(sm.methods) { m in Text(m.name).tag(m.key) }
+            ForEach(sm.groups, id: \.kind) { g in      // S1: grouped by kind
+                Section(g.name) { ForEach(g.methods) { m in Text(m.name).tag(m.key) } }
+            }
         }
         .help(sm.methods.first { $0.key == selection }?.desc ?? "")
         .onAppear { sm.load(); if selection.isEmpty { selection = sm.defaultKey } }

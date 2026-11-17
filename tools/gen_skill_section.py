@@ -92,9 +92,13 @@ def render_sales(rules_dir: Path = RULES) -> str:
     out.append("**Methods** (default `{}`):".format(sa["default_method"]))
     for k, m in sa["methods"].items():
         crit = ", ".join("`{}` {}".format(c["key"], c["name"]["en"]) for c in m["criteria"])
-        out.append("- `{}` {}: {} Criteria: {}.".format(k, m["name"]["en"], m["desc"]["en"], crit))
+        kind = m.get("kind") or "qualification"
+        judge = " Judged on the seller's actions." if m.get("judge") == "seller" else ""
+        out.append("- `{}` {} ({}): {} Criteria: {}.{}".format(k, m["name"]["en"], kind, m["desc"]["en"], crit, judge))
     out.append("- Call picture keys: `{}`".format(sa["call_picture"]["key"]))
     out.append("- Call picture rule: " + sa["call_picture"]["rule"])
+    if sa["call_picture"].get("judge_seller"):
+        out.append("- Call picture, approach methods: " + sa["call_picture"]["judge_seller"])
     for k, v in sa["tips"].items():
         out.append("- Tip `{}`: {}".format(k, v if isinstance(v, str) else "{} ({})".format(v["say"], v["when"])))
     out.append("- Priority: " + sa["priority"])

@@ -3,9 +3,16 @@
 # method is added here as data, without code.
 schema_version: 1
 default_method: general
+# S1: picker groups (kind of a method); a method without kind is a qualification method.
+kinds:
+  general: {en: General, uk: Загальне}
+  qualification: {en: Qualification, uk: Кваліфікація}
+  questioning: {en: Questioning, uk: Питання}
+  approach: {en: Approach, uk: Підхід}
 methods:
   general:
     name: {en: General sales, uk: Загальний продаж}
+    kind: general
     desc:
       en: No formal qualification. Pacenote follows the client's pain, the value for them, objections, and whether there is a next step with a date.
       uk: Без формальної кваліфікації. Pacenote стежить за болем клієнта, цінністю для нього, запереченнями і тим, чи є наступний крок з датою.
@@ -29,6 +36,7 @@ methods:
         ask: {en: ["Shall we put the next call in the calendar now?"], uk: ["Поставимо наступну зустріч у календар зараз?"]}
   bant:
     name: {en: BANT, uk: BANT}
+    kind: qualification
     desc:
       en: "Budget, Authority, Need, Timeline: is there money, the person who decides, a real need and a time frame."
       uk: "Budget, Authority, Need, Timeline: чи є гроші, людина, що вирішує, реальна потреба і терміни."
@@ -52,6 +60,7 @@ methods:
         ask: {en: ["When would you like this to be live?"], uk: ["Коли ви хочете це запустити?"]}
   spiced:
     name: {en: SPICED, uk: SPICED}
+    kind: qualification
     desc:
       en: "Situation, Pain, Impact, Critical event, Decision: the client's context, what hurts, what it costs, the deadline that forces a decision and how they decide."
       uk: "Situation, Pain, Impact, Critical event, Decision: контекст клієнта, що болить, скільки коштує, подія, що змушує вирішити, і як вони вирішують."
@@ -79,6 +88,7 @@ methods:
         ask: {en: ["How do you usually make decisions like this?"], uk: ["Як ви зазвичай ухвалюєте такі рішення?"]}
   meddic:
     name: {en: MEDDIC, uk: MEDDIC}
+    kind: qualification
     desc:
       en: "Metrics, Economic buyer, Decision criteria, Decision process, Identify pain, Champion: for larger deals with several people involved."
       uk: "Metrics, Economic buyer, Decision criteria, Decision process, Identify pain, Champion: для більших угод, де бере участь кілька людей."
@@ -108,6 +118,167 @@ methods:
         name: {en: Champion, uk: Чемпіон}
         explain: {en: Someone inside who wants this to happen and will push for it., uk: Людина всередині, яка хоче цього і проштовхуватиме.}
         ask: {en: ["Who on your side would benefit most from this?"], uk: ["Кому з вашого боку це найбільше допоможе?"]}
+  # S1 (2026-11-17): more methods. kind: qualification (what the client must have told), questioning (a sequence of
+  # questions, the criteria are its steps in order), approach (how the seller leads the talk). judge: client (only
+  # the client's words count, the default) or seller (approach: done when the seller clearly did it and the client
+  # reacted). Method names belong to their authors; the descriptions here are our own.
+  meddpicc:
+    name: {en: MEDDPICC, uk: MEDDPICC}
+    kind: qualification
+    desc:
+      en: "MEDDIC plus Paper process and Competition: for complex deals with procurement, legal review and rival vendors."
+      uk: "MEDDIC плюс Paper process і Competition: для складних угод із закупівлями, юристами і конкурентами."
+    chip: true
+    criteria:
+      - key: metrics
+        name: {en: Metrics, uk: Метрики}
+        explain: {en: The measurable result the client expects., uk: Вимірюваний результат, якого чекає клієнт.}
+        ask: {en: ["How will you measure success?"], uk: ["Як ви виміряєте успіх?"]}
+      - key: economic_buyer
+        name: {en: Economic buyer, uk: Той, хто платить}
+        explain: {en: The person who controls the budget and gives the final yes., uk: Людина, що керує бюджетом і дає остаточне так.}
+        ask: {en: ["Who signs off on the budget?"], uk: ["Хто погоджує бюджет?"]}
+      - key: decision_criteria
+        name: {en: Decision criteria, uk: Критерії рішення}
+        explain: {en: What they will compare vendors on., uk: За чим вони порівнюватимуть постачальників.}
+        ask: {en: ["What matters most when you choose?"], uk: ["Що найважливіше при виборі?"]}
+      - key: decision_process
+        name: {en: Decision process, uk: Процес рішення}
+        explain: {en: The steps, people and dates from here to a decision., uk: Кроки, люди і дати від сьогодні до рішення.}
+        ask: {en: ["What are the steps from here to a decision?"], uk: ["Які кроки звідси до рішення?"]}
+      - key: paper_process
+        name: {en: Paper process, uk: Оформлення}
+        explain: {en: "How the contract gets signed: procurement, legal, security review, who signs and how long it takes.", uk: "Як підписується договір: закупівлі, юристи, перевірка безпеки, хто підписує і скільки це триває."}
+        ask: {en: ["Once you say yes, what does the paperwork look like on your side?"], uk: ["Коли ви скажете так, як виглядає оформлення з вашого боку?"]}
+      - key: identify_pain
+        name: {en: Identify pain, uk: Біль}
+        explain: {en: The business pain behind the project., uk: Бізнес-біль за проєктом.}
+        ask: {en: ["What made you look for a solution now?"], uk: ["Що змусило шукати рішення зараз?"]}
+      - key: champion
+        name: {en: Champion, uk: Чемпіон}
+        explain: {en: Someone inside who wants this to happen and will push for it., uk: Людина всередині, яка хоче цього і проштовхуватиме.}
+        ask: {en: ["Who on your side would benefit most from this?"], uk: ["Кому з вашого боку це найбільше допоможе?"]}
+      - key: competition
+        name: {en: Competition, uk: Конкуренти}
+        explain: {en: "Who else they consider, including building it themselves or doing nothing.", uk: "Кого ще вони розглядають, включно з тим, щоб зробити самим або нічого не робити."}
+        ask: {en: ["What other options are you looking at?"], uk: ["Які ще варіанти ви розглядаєте?"]}
+  gpctba:
+    name: {en: GPCTBA/C&I, uk: GPCTBA/C&I}
+    kind: qualification
+    desc:
+      en: "Goals, Plans, Challenges, Timeline, Budget, Authority, Negative consequences, Positive implications: starts from the client's goals rather than from money."
+      uk: "Goals, Plans, Challenges, Timeline, Budget, Authority, Negative consequences, Positive implications: починає з цілей клієнта, а не з грошей."
+    chip: true
+    criteria:
+      - key: goals
+        name: {en: Goals, uk: Цілі}
+        explain: {en: "The client's goals, ideally with a number.", uk: "Цілі клієнта, краще з цифрою."}
+        ask: {en: ["What are you trying to reach this year?"], uk: ["Чого ви хочете досягти цього року?"]}
+      - key: plans
+        name: {en: Plans, uk: Плани}
+        explain: {en: How they plan to reach the goals now., uk: Як вони зараз планують досягти цілей.}
+        ask: {en: ["How are you planning to get there?"], uk: ["Як ви плануєте цього досягти?"]}
+      - key: challenges
+        name: {en: Challenges, uk: Перешкоди}
+        explain: {en: What stands in the way of the plan., uk: Що заважає плану.}
+        ask: {en: ["What could get in the way?"], uk: ["Що може завадити?"]}
+      - key: timeline
+        name: {en: Timeline, uk: Терміни}
+        explain: {en: When they want results., uk: Коли вони хочуть результату.}
+        ask: {en: ["By when do you need this working?"], uk: ["До коли це має запрацювати?"]}
+      - key: budget
+        name: {en: Budget, uk: Бюджет}
+        explain: {en: Money set aside or how it would be found., uk: Виділені гроші або як їх знайдуть.}
+        ask: {en: ["How do you usually fund projects like this?"], uk: ["Як ви зазвичай фінансуєте такі проєкти?"]}
+      - key: authority
+        name: {en: Authority, uk: Повноваження}
+        explain: {en: Who decides and who else is involved., uk: Хто вирішує і хто ще бере участь.}
+        ask: {en: ["Who else needs to be part of this?"], uk: ["Хто ще має бути долучений?"]}
+      - key: negative_consequences
+        name: {en: Negative consequences, uk: Наслідки бездіяльності}
+        explain: {en: What happens if they miss the goal., uk: Що буде, якщо ціль не досягнуть.}
+        ask: {en: ["What happens if you do not reach it?"], uk: ["Що буде, якщо не досягнете?"]}
+      - key: positive_implications
+        name: {en: Positive implications, uk: Виграш}
+        explain: {en: What reaching the goal gives them and the people involved., uk: Що дасть досягнення цілі їм і людям, яких це стосується.}
+        ask: {en: ["What would reaching it mean for you?"], uk: ["Що означатиме для вас досягти цього?"]}
+  spin:
+    name: {en: SPIN, uk: SPIN}
+    kind: questioning
+    desc:
+      en: "Situation, Problem, Implication, Need-payoff: a sequence of questions that lets the client say the value in their own words."
+      uk: "Situation, Problem, Implication, Need-payoff: послідовність питань, після якої клієнт сам формулює цінність."
+    chip: true
+    criteria:
+      - key: situation
+        name: {en: Situation, uk: Ситуація}
+        explain: {en: Facts about how they work today. Few questions here, the client gets tired of them., uk: Факти про те, як вони працюють зараз. Таких питань небагато, вони втомлюють клієнта.}
+        ask: {en: ["How does this work on your side today?"], uk: ["Як це влаштовано у вас зараз?"]}
+      - key: problem
+        name: {en: Problem, uk: Проблема}
+        explain: {en: A difficulty or dissatisfaction the client admits., uk: Труднощі або незадоволення, які визнає клієнт.}
+        ask: {en: ["Where does it fall short?"], uk: ["Де це не працює як слід?"]}
+      - key: implication
+        name: {en: Implication, uk: Наслідки}
+        explain: {en: "What the problem leads to: cost, delays, risk, other teams affected.", uk: "До чого веде проблема: гроші, затримки, ризик, інші команди."}
+        ask: {en: ["What does that lead to further down the line?"], uk: ["До чого це призводить далі?"]}
+      - key: need_payoff
+        name: {en: Need-payoff, uk: Цінність рішення}
+        explain: {en: The client says in their own words what solving it would give them., uk: Клієнт своїми словами каже, що дасть рішення.}
+        ask: {en: ["If that were solved, what would it change for you?"], uk: ["Якби це було вирішено, що б це змінило для вас?"]}
+  sandler:
+    name: {en: Sandler pain funnel, uk: Воронка болю Sandler}
+    kind: questioning
+    desc:
+      en: "Goes from the surface problem down to its cost and what it means to the person, then checks they want to fix it now."
+      uk: "Веде від поверхневої проблеми до її ціни і того, що вона означає для людини, потім перевіряє, чи хочуть вирішити зараз."
+    chip: true
+    criteria:
+      - key: surface_problem
+        name: {en: Surface problem, uk: Проблема}
+        explain: {en: The problem as the client first names it., uk: Проблема, як клієнт її спершу називає.}
+        ask: {en: ["Tell me more about that."], uk: ["Розкажіть про це більше."]}
+      - key: specifics
+        name: {en: Specifics, uk: Конкретика}
+        explain: {en: A concrete example of the problem., uk: Конкретний приклад проблеми.}
+        ask: {en: ["Can you give me an example?"], uk: ["Можете навести приклад?"]}
+      - key: history
+        name: {en: History, uk: Історія}
+        explain: {en: How long it has been a problem and what they already tried., uk: Як довго це проблема і що вже пробували.}
+        ask: {en: ["How long has it been like this, and what have you tried?"], uk: ["Як довго так триває і що ви вже пробували?"]}
+      - key: cost
+        name: {en: Cost, uk: Ціна}
+        explain: {en: "What the problem costs them: money, time, people.", uk: "Скільки коштує проблема: гроші, час, люди."}
+        ask: {en: ["What has it cost you so far?"], uk: ["Скільки це вам уже коштувало?"]}
+      - key: personal_impact
+        name: {en: Personal impact, uk: Для людини}
+        explain: {en: What it means for the person you talk to., uk: Що це означає для людини, з якою ви говорите.}
+        ask: {en: ["How does it affect you personally?"], uk: ["Як це впливає особисто на вас?"]}
+      - key: commitment
+        name: {en: Commitment, uk: Готовність}
+        explain: {en: They want to fix it now rather than live with it., uk: Вони хочуть вирішити це зараз, а не жити з цим.}
+        ask: {en: ["Is this something you want to fix now, or can it wait?"], uk: ["Ви хочете вирішити це зараз чи це може почекати?"]}
+  challenger:
+    name: {en: Challenger, uk: Challenger}
+    kind: approach
+    judge: seller
+    desc:
+      en: "Teach, Tailor, Take control: the seller brings an insight that changes how the client sees the problem, fits it to this person and leads to a decision."
+      uk: "Teach, Tailor, Take control: продавець приносить інсайт, що змінює погляд клієнта на проблему, підлаштовує його під цю людину і веде до рішення."
+    chip: true
+    criteria:
+      - key: teach
+        name: {en: Teach, uk: Інсайт}
+        explain: {en: "The seller shared an insight the client did not have, and the client reacted to it.", uk: "Продавець поділився інсайтом, якого клієнт не мав, і клієнт на нього відреагував."}
+        ask: {en: ["What we see in companies like yours is that the real cost is somewhere else. Can I show you?"], uk: ["У схожих компаніях ми бачимо, що справжні витрати в іншому місці. Можна покажу?"]}
+      - key: tailor
+        name: {en: Tailor, uk: Під людину}
+        explain: {en: "The message was tied to this person's role, goals or metrics.", uk: "Меседж прив'язано до ролі, цілей або метрик цієї людини."}
+        ask: {en: ["For your team specifically, that would mean what?"], uk: ["Для вашої команди конкретно це означало б що?"]}
+      - key: take_control
+        name: {en: Take control, uk: Веде розмову}
+        explain: {en: "The seller led to a concrete step and talked openly about money and dates.", uk: "Продавець привів до конкретного кроку і відкрито говорив про гроші й терміни."}
+        ask: {en: ["Let's agree on the next step and the date now."], uk: ["Давайте зараз домовимося про наступний крок і дату."]}
 states: [unknown, partial, known]
 call_picture:
   key: '"deal": [{"criterion": "<criterion key>", "state": "unknown|partial|known", "what": "<what is known, max 14 words, call language>", "quote": "<the line, max 20 words>", "t": "<HH:MM:SS>"}], "objections": [{"what": "<the doubt, max 12 words>", "answer": "<how it was answered, or empty>", "t": "<HH:MM:SS>"}], "next_step": {"what": "<agreed next step or empty>", "due": "<date or empty>", "owner": "<name or me>"}, "signals": [{"what": "<buying signal, max 12 words>", "t": "<HH:MM:SS>"}]'
@@ -117,6 +288,10 @@ call_picture:
     came from. Only the client's words count, never the PM's guesses. objections = doubts of the client and how the PM
     answered. next_step = only a step agreed by both sides; due when a date was said. signals = clear buying signals
     (asking about price, start date, contract, onboarding).
+  judge_seller: >-
+    This method is an APPROACH (judge = seller): its criteria are what the SELLER does, not what the client tells.
+    known when the seller clearly did it and the client reacted (agreed, asked about it, pushed back on it), partial
+    when the seller did it and there was no reaction, unknown otherwise. Never a rating of the seller.
 tips:
   objection: the doubt in one line and 1-2 sentences of answer; from an answer card when one matches
   qualify:

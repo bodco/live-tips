@@ -36,7 +36,7 @@ settings:
 # rules/sales.yaml; bant is the default of the block.
 qualification:
   default_method: bant
-  methods: [bant, spiced, meddic, general]
+  methods: [bant, spiced, meddic, meddpicc, gpctba, spin, sandler, challenger, general]
   levels: [green, yellow, red, unknown]
 
 # The fields of a block are a description for the model and the designer, not a fixed form.

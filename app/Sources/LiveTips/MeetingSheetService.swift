@@ -480,7 +480,7 @@ final class SheetLibrary: ObservableObject {
     @Published var presets: [SheetPresetInfo] = SheetLibrary.fallback
     @Published var blockTitles: [String: String] = [:]
     @Published var blockFields: [String: String] = [:]
-    @Published var methods: [String] = ["bant", "spiced", "meddic", "general"]
+    @Published var methods: [String] = ["bant", "spiced", "meddic", "meddpicc", "gpctba", "spin", "sandler", "challenger", "general"]   // S1
     @Published var ruleGaps: [String: String] = [:]
     @Published var loaded = false
     @Published var note = ""

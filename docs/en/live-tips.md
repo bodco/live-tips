@@ -1527,9 +1527,18 @@ series; the default per project is in Settings > Projects. The methods live in `
 | BANT | Budget, Authority, Need, Timeline |
 | SPICED | Situation, Pain, Impact, Critical event, Decision |
 | MEDDIC | Metrics, Economic buyer, Decision criteria, Decision process, Identify pain, Champion |
+| MEDDPICC | MEDDIC plus Paper process (procurement, legal, who signs) and Competition (including doing nothing) |
+| GPCTBA/C&I | Goals, Plans, Challenges, Timeline, Budget, Authority, Negative consequences, Positive implications |
+| SPIN (questioning) | Situation, Problem, Implication, Need-payoff, asked in this order |
+| Sandler pain funnel (questioning) | Surface problem, Specifics, History, Cost, Personal impact, Commitment, from the top down |
+| Challenger (approach) | Teach, Tailor, Take control: what you do as the seller, not what the client tells |
+
+The pickers group the methods into Qualification, Questioning and Approach (0.21.0). A questioning method suggests
+the next question of its sequence. Challenger tracks your own moves: a step counts as done when you made it and the
+client reacted, and the tip says "Not done yet: Teach"; it is never a score of the seller.
 
 During the call the Deal tab shows each criterion as unknown, partly or known with what was said; a click changes
-the state. For BANT, SPICED and MEDDIC a chip like "BANT 2/4" sits in the header. Sales tips: objection, qualify,
+the state. For every method except General sales a chip like "BANT 2/4" sits in the header. Sales tips: objection, qualify,
 pain, next step (5 minutes before the end without a dated step), competitor, buying signal. Answer cards are short
 ready answers per project in `<project>/pacenote/answer-cards.md` ("## question", then the answer), edited in
 Settings > Projects. The preparation adds Company (a web search with the company's name or domain only; switch it off
@@ -2124,7 +2133,7 @@ fewer repeats and empty blocks, the same share of the call's topics covered.
 
 **Editing and Refresh.** Click a fact to edit it; it becomes Edited. The block menu adds a fact, regenerates the
 block, hides it, moves it up or down, or removes it. The qualification block has its method in the header (BANT by
-default, SPICED, MEDDIC, general). **Refresh** rebuilds the sheet from the sources again and **never touches what you
+default, or any method of Sales, shown by name). **Refresh** rebuilds the sheet from the sources again and **never touches what you
 edited**. A banner then says how many facts are new, changed and gone, with Accept all and Compare with version N.
 **Versions** keeps every earlier sheet; Open shows one read-only, **Use this version** makes it current again (the
 current one is kept as a version, nothing is deleted).

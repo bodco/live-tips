@@ -677,8 +677,8 @@ struct SheetBlocksStep: View {
             Spacer()
             if b.wrappedValue.type == "qualification" {
                 Picker("", selection: Binding(get: { b.wrappedValue.method ?? "bant" }, set: { b.wrappedValue.method = $0 })) {
-                    ForEach(lib.methods, id: \.self) { Text($0.uppercased()).tag($0) }
-                }.labelsHidden().fixedSize()
+                    ForEach(lib.methods, id: \.self) { Text(SalesMethods.shared.label($0)).tag($0) }   // S1: names, not keys
+                }.labelsHidden().fixedSize().onAppear { SalesMethods.shared.load() }
             }
             Toggle(L("sheet.ui.s2.onlyIfData"), isOn: b.onlyIfData).toggleStyle(.checkbox).font(PN.Font.caption)
             Button { b.wrappedValue.visible.toggle() } label: {

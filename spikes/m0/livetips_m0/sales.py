@@ -100,6 +100,7 @@ class SalesTracker:
         methods = self.rules.get("methods") or {}
         self.method = method if method in methods else self.rules.get("default_method", "general")
         self.spec = methods.get(self.method) or {"criteria": []}
+        self.judge = "seller" if self.spec.get("judge") == "seller" else "client"     # S1
         self.lang = "en" if lang == "en" else "uk"
         self.cards = cards or []
         self.planned_s = max(300.0, float(planned_s or 1800))
@@ -118,7 +119,10 @@ class SalesTracker:
 
     def extra(self) -> tuple:
         cp = self.rules.get("call_picture") or {}
-        return cp.get("key", ""), cp.get("rule", "") + "\nQUALIFICATION CRITERIA (" + self.method + "; key | name | meaning):\n" + self.criteria_text()
+        rule = cp.get("rule", "")
+        if self.judge == "seller":        # S1: an approach (Challenger) tracks what the seller does
+            rule += "\n" + cp.get("judge_seller", "")
+        return cp.get("key", ""), rule + "\nQUALIFICATION CRITERIA (" + self.method + "; key | name | meaning):\n" + self.criteria_text()
 
     def update(self, sit: dict) -> None:
         for d in sit.get("deal") or []:
@@ -183,9 +187,14 @@ class SalesTracker:
                 if self.deal.get(c["key"], {}).get("state") == "unknown" and c["key"] != "next_step":
                     q = (c.get("ask") or {}).get(self.lang) or (c.get("ask") or {}).get("en") or [""]
                     name = c["name"].get(self.lang) or c["name"]["en"]
-                    out.append(self._tip("qualify", c["key"], ("Ще не зʼясовано: " if uk else "Not clear yet: ") + name, q[0], ""))
+                    if self.judge == "seller":      # S1: Challenger, a step of the seller not done yet
+                        head = "Ще не зроблено: " if uk else "Not done yet: "
+                    else:
+                        head = "Ще не зʼясовано: " if uk else "Not clear yet: "
+                    out.append(self._tip("qualify", c["key"], head + name, q[0], ""))
                     break        # one qualify tip at a time
-        pain = self.deal.get("pain") or self.deal.get("identify_pain")
+        # S1: the pain criterion of each method (SPIN problem, Sandler surface problem)
+        pain = next((self.deal[k] for k in ("pain", "identify_pain", "problem", "surface_problem") if k in self.deal), None)
         if pain and pain["state"] == "partial":
             out.append(self._tip("pain", "pain", ("Біль без масштабу: " if uk else "Pain without its size: ") + pain["what"],
                                  "Що буде, якщо нічого не змінювати?" if uk else "What happens if nothing changes?", pain["t"]))
@@ -217,7 +226,10 @@ def methods_json(rules, lang: str = "en") -> dict:
     pick = lambda d: (d or {}).get(lang) or (d or {}).get("en") or ""  # noqa: E731
     out = []
     for key, m in (s.get("methods") or {}).items():
+        kind = m.get("kind") or "qualification"
         out.append({"key": key, "name": pick(m.get("name")), "desc": pick(m.get("desc")), "chip": bool(m.get("chip")),
+                    "kind": kind, "kind_name": pick((s.get("kinds") or {}).get(kind)) or kind,
+                    "judge": "seller" if m.get("judge") == "seller" else "client",
                     "criteria": [{"key": c["key"], "name": pick(c.get("name")), "explain": pick(c.get("explain"))}
                                  for c in m.get("criteria") or []]})
     return {"ok": True, "default": s.get("default_method", "general"), "methods": out}

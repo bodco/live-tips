@@ -259,11 +259,12 @@ struct SheetBlockCard: View {
             PageLabel(text: block.title) {
                 HStack(spacing: 8) {
                     if block.type == .qualification {
-                        Menu(L("sheet.ui.method", ["m": (block.method ?? "bant").uppercased()])) {
+                        Menu(L("sheet.ui.method", ["m": SalesMethods.shared.label(block.method ?? "bant")])) {   // S1: names, not keys
                             ForEach(lib.methods, id: \.self) { m in
-                                Button(m.uppercased()) { doc.change { SheetEdit.setMethod(&$0, blockID: block.id, method: m) } }
+                                Button(SalesMethods.shared.label(m)) { doc.change { SheetEdit.setMethod(&$0, blockID: block.id, method: m) } }
                             }
                         }
+                        .onAppear { SalesMethods.shared.load() }
                         .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
                     }
                     if block.editedByUser { Label(L("sheet.ui.status.edited"), systemImage: "pencil").font(PN.Font.caption).foregroundStyle(PN.C.docs) }

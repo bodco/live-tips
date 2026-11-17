@@ -3,6 +3,14 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.21.0 (not released yet)
+
+- **More sales methods (2026-11-17):** MEDDPICC, GPCTBA/C&I, SPIN, the Sandler pain funnel and Challenger join
+  General sales, BANT, SPICED and MEDDIC, in Start call, Settings > Projects and the Meeting Sheet's qualification
+  block. The pickers group them into Qualification, Questioning and Approach and show their names. A questioning
+  method suggests the next question of its sequence; Challenger follows what you do as the seller (Teach, Tailor,
+  Take control) and says what is not done yet, never a score.
+
 ## 0.20.0 (not released yet, needs server 0.12.0)
 
 - **Team tab for team leads and C-level (2026-11-17, server 0.12.0):** the calls of the people you see in one list with

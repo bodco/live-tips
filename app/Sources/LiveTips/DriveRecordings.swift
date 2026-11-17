@@ -91,6 +91,9 @@ final class DriveRecordings: ObservableObject {
     /// Uploads every part of this call's recording that has no Drive copy yet.
     func upload(transcript t: String, auto: Bool = false) {
         guard !running.contains(t) else { return }
+        // 0.18.0 (B3): Drive upload is a module; the automatic upload never opens a window
+        if auto { guard EntitlementsStore.shared.rights.can("drive", org: ModuleGate.org) else { errors[t] = L("lock.driveClosed"); return } }
+        else { guard ModuleGate.allow("drive") else { return } }
         guard let acct = account else { errors[t] = L("rec.drive.noAccount"); return }
         let mp = RecordingFiles.metaPath(transcript: t)
         guard let meta = RecordingMeta.load(mp), !meta.notUploaded.isEmpty else {
@@ -122,6 +125,8 @@ final class DriveRecordings: ObservableObject {
                 } catch {
                     gone = error is FolderUnavailable
                     failed = error.localizedDescription
+                    let code = gone ? "not_found" : Analytics.errorCode(error)          // 0.19.0 (S4)
+                    AnalyticsTracker.onMain { AnalyticsTracker.shared.error("drive", code, provider: "drive") }
                     var m = RecordingMeta.load(mp) ?? meta
                     if let i = m.parts.firstIndex(where: { $0.file == part.file }) { m.parts[i].driveError = gone ? RecordingMeta.Part.folderUnavailable : (failed ?? "") }
                     m.save(mp)

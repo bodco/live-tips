@@ -138,9 +138,12 @@ struct HomeView: View {
     @ObservedObject var nav = HomeNav.shared
 
     var body: some View {
+        Group {
         NavigationStack(path: $nav.path) {
             homeBody.navigationDestination(for: HomeNav.Route.self) { r in HomeRouteView(route: r) }
         }
+    }
+        .trackScreen("home")
     }
 
     // MARK: states (rules: what the PM has connected)
@@ -476,7 +479,9 @@ struct HomeView: View {
         let stem = (status.file ?? "").hasSuffix(".md") ? String((status.file ?? "").dropLast(3)) : (status.file ?? "")
         let hasBrief = !stem.isEmpty && FileManager.default.fileExists(atPath: stem + ".brief.md")
         let preparing = runner.running && runner.joinsCurrentCall
-        let briefText = preparing ? L("home.live.briefPreparing") : hasBrief ? L("home.brief.ready") : L("home.live.noBrief")
+        let failed = !preparing && !hasBrief && runner.joinsCurrentCall ? runner.failure : nil      // 2026-11-17 (owner)
+        let briefText = preparing ? L("home.live.briefPreparing") : hasBrief ? L("home.brief.ready")
+            : failed.map { L("home.live.prepFailed", ["why": $0]) } ?? L("home.live.noBrief")
         let waiting = status.state == "standby"
         return heroCard {
             VStack(alignment: .leading, spacing: 8) {
@@ -505,10 +510,11 @@ struct HomeView: View {
             HStack(spacing: 14) {
                 if !preparing {
                     link(hasBrief ? L("talk.prepareAgain") : L("bb.prepareNow")) {
+                        AnalyticsTracker.shared.action("prepare_again", scr: "home", o: AnalyticsTracker.shared.callOrg)   // 0.19.0 (S4)
                         if let e = LivePrep.openSheet() { note = e }      // 0.10.1 (A4): the Meeting Sheet in live mode
                     }
                 }
-                link(L("menubar.endCall")) { app.endCall() }
+                link(L("menubar.endCall")) { AnalyticsTracker.shared.action("end_call", scr: "home", o: AnalyticsTracker.shared.callOrg); app.endCall() }
             }
         }
     }
@@ -647,6 +653,7 @@ struct HomeView: View {
                     Button(L("ntask.undo")) { undoHide() }.buttonStyle(.pnTertiary)
                 }
                 Spacer()
+                CalendarRefreshButton(place: "home", shortcut: true)
                 if cal.access == .granted {
                     Button(L("home.calendars")) { pickCalendars = true }.buttonStyle(.pnTertiary)
                         .popover(isPresented: $pickCalendars, arrowEdge: .bottom) { CalendarPicker() }
@@ -939,6 +946,7 @@ struct PastCallsView: View {
         let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate("EEEdMMMHHmm"); return f
     }
     var body: some View {
+        Group {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
@@ -954,11 +962,13 @@ struct PastCallsView: View {
             .padding(24).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)
         }
     }
+        .trackScreen("past_calls")
+    }
 }
 
 /// 0.9.0: the Tracker screen (Tracker.swift). The old On you list stays reachable from its Tasks tab data.
 struct TrackerView: View {
-    var body: some View { TrackerScreen() }
+    var body: some View { TrackerScreen().trackScreen("tracker") }
 }
 
 

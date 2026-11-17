@@ -96,7 +96,7 @@
       speakerN: (o) => `Speaker ${o.n}`, yourTurn: 'Your turn: give your update', me: 'Me', them: 'Unknown voice', lineWhoTip: 'The voice was not recognised. Click to say who said this line.', lineWhoSaved: 'Saved: the transcript shows it after the call',
       briefReady: (o) => o.at ? `Brief ready · ${o.at}` : 'Brief ready', briefPreparing: 'Preparing the brief…', briefFailed: 'The brief could not be prepared', noBrief: 'No brief yet',
       bbReady: (o) => o.made ? `Brief · made ${o.made}${o.before ? ', before the call' : ''}` : 'Brief', bbReadySub: 'Uses what was said so far, plus the project files',
-      bbAgain: 'Prepare again', bbNone: 'No brief · tips use only the call so far', bbNow: 'Prepare now', bbRunning: 'Preparing in the background…',
+      bbFailed: 'The brief could not be prepared', bbRetry: 'Try again', bbAgain: 'Prepare again', bbNone: 'No brief · tips use only the call so far', bbNow: 'Prepare now', bbRunning: 'Preparing in the background…',
       bbRunningSub: 'Recording and tips keep going. The new brief takes over when it is ready, about 1 min.', bbCancel: 'Cancel'
     },
     uk: {
@@ -181,7 +181,7 @@
       speakerN: (o) => `Спікер ${o.n}`, yourTurn: 'Твоя черга: розкажи свій апдейт', me: 'Я', them: 'Невідомий голос', lineWhoTip: 'Голос не розпізнано. Клацніть, щоб вказати, хто сказав цей рядок.', lineWhoSaved: 'Збережено: у транскрипті буде після дзвінка',
       briefReady: (o) => o.at ? `Бриф готовий · ${o.at}` : 'Бриф готовий', briefPreparing: 'Готую бриф…', briefFailed: 'Бриф не вдалося підготувати', noBrief: 'Брифу ще немає',
       bbReady: (o) => o.made ? `Бриф · зроблено ${o.made}${o.before ? ', до дзвінка' : ''}` : 'Бриф', bbReadySub: 'Враховує сказане досі і файли проєкту',
-      bbAgain: 'Підготувати ще раз', bbNone: 'Брифу немає · підказки лише з того, що сказано', bbNow: 'Підготувати зараз', bbRunning: 'Готую у фоні…',
+      bbFailed: 'Бриф не вдалося підготувати', bbRetry: 'Спробувати ще раз', bbAgain: 'Підготувати ще раз', bbNone: 'Брифу немає · підказки лише з того, що сказано', bbNow: 'Підготувати зараз', bbRunning: 'Готую у фоні…',
       bbRunningSub: 'Запис і підказки не зупиняються. Новий бриф підхопиться, щойно буде готовий, приблизно за 1 хв.', bbCancel: 'Скасувати'
     }
   };
@@ -311,6 +311,13 @@
       const pct = Math.round((info.progress || 0) * 100);
       html = `<div class="bb-main"><span class="bb-t">${esc(t.bbRunning)}</span><span class="bb-s">${esc(t.bbRunningSub)}</span>`
         + `<span class="bb-prog"><span style="width:${pct}%"></span></span></div><button class="ghost" type="button" data-act="liveprep-cancel">${esc(t.bbCancel)}</button>`;
+    } else if (p === 'failed') {
+      // 2026-11-17 (owner): the preparation for this call failed; why, and Try again (never "No brief, Prepare now")
+      // kept: Prepare again during the call failed and the earlier brief still serves the call (only the reason, as before)
+      html = info.kept
+        ? `<div class="bb-main"><span class="bb-t">${esc(info.note || '')}</span></div><button class="ghost" type="button" data-act="liveprep">${esc(t.bbAgain)}</button>`
+        : `<div class="bb-main"><span class="bb-t">${esc(t.bbFailed)}</span><span class="bb-s">${esc(info.note || info.stage || '')}</span></div>`
+          + `<button class="btn1" type="button" data-act="liveprep">${esc(t.bbRetry)}</button>`;
     } else if (p === 'ready') {
       html = `<div class="bb-main"><span class="bb-t">${esc(t.bbReady(info))}</span><span class="bb-s">${esc(t.bbReadySub)}</span></div>`
         + `<button class="ghost" type="button" data-act="liveprep">${esc(t.bbAgain)}</button>`;

@@ -129,6 +129,12 @@ final class SettingsModel: ObservableObject {
         }
     }
     @Published var integration: String? = nil
+    /// 0.19.0 (S4): the pane as `settings` screen_view names it (an Integrations page with its own name where the
+    /// catalog has one).
+    static func trackedPane(_ tab: String, _ integration: String?) -> String {
+        if tab == "integrations", let i = integration, ["calendars", "notion", "keys"].contains(i) { return i }
+        return tab
+    }
     /// 0.15.0 (D2): the project whose own page is open under Settings > Projects.
     @Published var projectDetail: String? = nil
     /// 0.15.0 (D2): the search query in the sidebar and the row a result marks for a moment.
@@ -828,6 +834,7 @@ struct SettingsView: View {
 
     // 2026-10-26 (owner): the welcome tour's look: a sidebar of icon tiles, a header per pane, soft cards.
     var body: some View {
+        Group {
         HStack(spacing: 0) {
             // 0.14.0 (D2, minimal Settings): twelve panes in four short groups instead of one long list
             VStack(alignment: .leading, spacing: 2) {
@@ -887,6 +894,8 @@ struct SettingsView: View {
         }
         .frame(minWidth: 900, minHeight: 600)
         .onChange(of: model.tab) { SettingsWindow.window?.title = SettingsWindow.title(for: model.tab) }
+    }
+        .trackScreen("settings", sub: SettingsModel.trackedPane(model.tab, model.integration))
     }
 
     /// A project's page or an integration's page: they carry a back link and their own title.
@@ -1656,6 +1665,11 @@ struct SettingsView: View {
                     if model.config.shareUsage { DispatchQueue.main.asyncAfter(deadline: .now() + 1) { TelemetrySender.tick() } }
                 }
                 .settingsAnchor("gen.telemetry")
+                // 0.19.0 (D45): organizations that share usage for work there whatever this switch says, always named
+                ForEach(AnalyticsOrgLine.orgs, id: \.self) { name in
+                    Label(L("telemetry.orgOn", ["org": name]), systemImage: "building.2")
+                        .font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                }
                 HStack {
                     Spacer()
                     Button(L("telemetry.preview")) { TelemetrySender.preview() }.buttonStyle(.pnTertiary)

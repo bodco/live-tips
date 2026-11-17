@@ -1,5 +1,6 @@
 // Core checks without a test framework: the Command Line Tools ship neither XCTest nor
 // swift-testing, and the app must build without Xcode. Run: swift run -c release CoreChecks
+import CryptoKit
 import Foundation
 import LiveTipsCore
 
@@ -3121,13 +3122,15 @@ func console0170() {
     let lead: [String: Any] = ["id": "t2", "name": "Beta", "kind": "team", "org_role": "member", "plan": "enterprise", "leads_teams": ["x"]]
     let admin: [String: Any] = ["id": "t3", "name": "Gamma", "kind": "team", "org_role": "admin", "plan": "team"]
     let cl: [String: Any] = ["id": "t4", "name": "Delta", "kind": "team", "org_role": "member", "plan": "enterprise", "c_level": true]
-    expect(meWith([personal])?.showsConsole == false && meWith([personal])?.staff == false, "console: personal only, no tab (and no staff field means not staff)")
-    expect(meWith([personal, member])?.showsConsole == false, "console: a plain member sees no tab")
-    expect(meWith([personal, member, lead])?.showsConsole == true && meWith([personal, member, lead])?.consolePath == "/org/t2", "console: a lead, opens their org")
-    expect(meWith([personal, admin])?.consolePath == "/org/t3" && meWith([personal, cl])?.showsConsole == true, "console: admin and C-level")
+    // 0.19.0: the tab for everyone signed in; someone who runs nothing opens their own page
+    expect(meWith([personal])?.showsConsole == true && meWith([personal])?.runsSomething == false && meWith([personal])?.staff == false
+           && meWith([personal])?.consolePath == "/me", "console: personal only, their own page (and no staff field means not staff)")
+    expect(meWith([personal, member])?.runsSomething == false && meWith([personal, member])?.consolePath == "/me", "console: a plain member, their own page")
+    expect(meWith([personal, member, lead])?.runsSomething == true && meWith([personal, member, lead])?.consolePath == "/org/t2", "console: a lead, opens their org")
+    expect(meWith([personal, admin])?.consolePath == "/org/t3" && meWith([personal, cl])?.runsSomething == true, "console: admin and C-level")
     expect(meWith([personal, admin, lead], def: "t2")?.consolePath == "/org/t2", "console: the default org first when the person runs it")
     expect(meWith([personal, member, admin], def: "t1")?.consolePath == "/org/t3", "console: the default org skipped when the person only belongs")
-    expect(meWith([personal], staff: true)?.showsConsole == true && meWith([personal], staff: true)?.consolePath == "/", "console: staff")
+    expect(meWith([personal], staff: true)?.runsSomething == true && meWith([personal], staff: true)?.consolePath == "/me", "console: staff")
     expect(meWith([personal], staff: "yes")?.staff == false, "console: staff must be a bool")
 
     func url(_ s: String) -> Data { CallSync.json(["url": s, "expires_in": 60]) }
@@ -3259,6 +3262,514 @@ func orgContext0170() {
     expect(rb == ["value": "new"], "history: restore body")
 }
 
+// MARK: 0.18.0 (B3): signed entitlements, the cache, offline rules, plan answers, telemetry to the server
+
+
+func b64u(_ d: Data) -> String { d.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") }
+func jwsSign(_ payload: [String: Any], key: Curve25519.Signing.PrivateKey, kid: String = "t-1") -> String {
+    let h = b64u(try! JSONSerialization.data(withJSONObject: ["alg": "EdDSA", "kid": kid, "typ": "pn-ent"], options: [.sortedKeys]))
+    let b = b64u(try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]))
+    return h + "." + b + "." + b64u(try! key.signature(for: Data((h + "." + b).utf8)))
+}
+
+func entitlementsB3() {
+    typealias E = Entitlements
+    // a token signed by the server's code (Python, cryptography) with a test seed 1..32: cross-implementation check
+    let pyX = "ebVWLo_mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ"
+    let py = "eyJhbGciOiJFZERTQSIsImtpZCI6InRlc3QtMSIsInR5cCI6InBuLWVudCJ9.eyJjYW5fcmVxdWVzdF9wbGFuIjp0cnVlLCJjYXRhbG9nX3ZlcnNpb24iOjEsImRldmljZV9pZCI6IjIyMjIyMjIyLTIyMjItMjIyMi0yMjIyLTIyMjIyMjIyMjIyMiIsImV4cCI6MTc5NjIwOTYwMCwiaWF0IjoxNzk1MDAwMDAwLCJtb2R1bGVzIjp7ImNfbGV2ZWwiOnsibGV2ZWwiOiJvZmYiLCJyZXF1aXJlZF9wbGFuIjoiZW50ZXJwcmlzZSIsInNvdXJjZSI6InBsYW4ifSwibWVldGluZ19zaGVldCI6eyJsZXZlbCI6ImV4cGVydCIsInNvdXJjZSI6ImNhdGFsb2cifSwicmVjb3JkaW5nIjp7ImxldmVsIjoiYXVkaW8iLCJzb3VyY2UiOiJvdmVycmlkZSJ9LCJ0ZWFtcyI6eyJsZXZlbCI6Im9uIiwic291cmNlIjoicGxhbiJ9fSwibm90ZSI6ItCf0YDQuNCy0ZbRgiIsIm9yZ19pZCI6IjZmMWMwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMSIsInBsYW4iOnsiZGlzcGxheV9hcyI6IlRlYW0iLCJpZCI6InRlYW0iLCJsYXRlc3RfdmVyc2lvbiI6MywibmFtZSI6IlRlYW0iLCJwbGFubmVkX3ByaWNlIjp7ImFtb3VudF9jZW50cyI6MTIwMCwiY3VycmVuY3kiOiJVU0QiLCJtaW5fc2VhdHMiOjEsInBlciI6InNlYXRfbW9udGgifSwidmVyc2lvbiI6M30sInF1b3RhcyI6eyJoaXN0b3J5X21vbnRocyI6eyJsaW1pdCI6bnVsbCwic3RhdGUiOiJvayIsInVzZWQiOjB9LCJzZWF0cyI6eyJsaW1pdCI6MjUsInN0YXRlIjoib2siLCJ1c2VkIjo0fSwic3RvcmFnZV9tYiI6eyJsaW1pdCI6ODAwMCwicGVyX3NlYXQiOjIwMDAsInN0YXRlIjoib2siLCJ1c2VkIjozMTIuNX0sInRpcF9taW51dGVzIjp7ImJhbGFuY2UiOjAsImxpbWl0IjoyNDAwLCJwZXJpb2QiOiJtb250aCIsInJlc2V0c19hdCI6IjIwMjYtMTItMDFUMDA6MDA6MDBaIiwic3RhdGUiOiJ3YXJuIiwidXNlZCI6MjAxMH19LCJzY2hlbWFfdmVyc2lvbiI6MSwic3ViIjoiMTExMTExMTEtMTExMS0xMTExLTExMTEtMTExMTExMTExMTExIn0.nWyPjzVGXSk3iX15dVIBu9XwBGuhKYrKjHCLp8BMMXgWm6IoJJTLtYy7MOs_N8WVAAFEcSdi8KCEA2tO4XY1Cg"
+    let p = E.verify(py, keys: ["test-1": pyX])
+    expect(p != nil, "ent: verifies a token signed by the server's code")
+    expect(p?["note"] as? String == "Привіт", "ent: canonical UTF-8 payload")
+    let rec = p.flatMap(E.record)
+    expect(rec?.plan.id == "team" && rec?.plan.displayAs == "Team" && rec?.plan.plannedPrice?.amountCents == 1200 && rec?.canRequestPlan == true, "ent: record plan")
+    expect(rec?.modules["recording"] == E.Module(level: "audio", source: "override") && rec?.modules["c_level"]?.requiredPlan == "enterprise", "ent: record modules")
+    expect(rec?.quotas["history_months"]?.limit == nil && rec?.quotas["storage_mb"]?.used == 312.5 && rec?.quotas["storage_mb"]?.perSeat == 2000
+           && rec?.quotas["tip_minutes"]?.state == "warn" && rec?.quotas["tip_minutes"]?.resetsAt != nil, "ent: record quotas")
+    expect(rec?.sub == "11111111-1111-1111-1111-111111111111" && rec?.expires.timeIntervalSince(rec!.issued) == 14 * 86400, "ent: sub and exp")
+    // tampering, unknown key, the built-in production key
+    var parts = py.split(separator: ".").map(String.init)
+    let forged = b64u(Data("{\"sub\":\"x\"}".utf8))
+    expect(E.verify([parts[0], forged, parts[2]].joined(separator: "."), keys: ["test-1": pyX]) == nil, "ent: a changed payload fails")
+    parts[2] = String(parts[2].reversed())
+    expect(E.verify(parts.joined(separator: "."), keys: ["test-1": pyX]) == nil && E.verify("a.b", keys: ["test-1": pyX]) == nil, "ent: bad signature, malformed")
+    expect(E.verify(py, keys: ["other": pyX]) == nil && E.verify(py) == nil, "ent: unknown kid; production key does not take a test token")
+    expect(E.builtInKeys["pn-ent-1"] == "1VxOKsFcBMYehhiPLSEPQLCUbBqO83CNDaCaBTO8LoA", "ent: production key pn-ent-1 built in")
+
+    // resolve (spec 6.3) with tokens signed here
+    let key = Curve25519.Signing.PrivateKey(), keys = ["t-1": b64u(key.publicKey.rawRepresentation)]
+    let user = "AAAAAAAA-0000-0000-0000-000000000001", dev = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", org = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    func payload(sub: String = user, device: String = dev, iat: Double = 1_800_000_000 - 3600, org o: String = org,
+                 storage: String = "ok") -> [String: Any] {
+        ["org_id": o, "sub": sub.lowercased(), "device_id": device, "iat": iat, "exp": iat + 14 * 86400, "can_request_plan": true,
+         "plan": ["id": "team", "name": "Team", "version": 1, "latest_version": 1, "display_as": "Team", "planned_price": NSNull()],
+         "modules": ["recording": ["level": "audio", "source": "override"], "server_sync": ["level": "on", "source": "plan"],
+                     "teams": ["level": "on", "source": "plan"], "c_level": ["level": "off", "source": "plan", "required_plan": "enterprise"],
+                     "meeting_sheet": ["level": "expert", "source": "catalog"]],
+         "quotas": ["storage_mb": ["limit": 2000, "used": storage == "exhausted" ? 2000 : 1700, "state": storage, "per_seat": 2000]]]
+    }
+    var c = E.Cache(); c.fetchedAt = now.addingTimeInterval(-3600); c.orgs = [jwsSign(payload(), key: key)]
+    let out = E.resolve(c, userID: nil, deviceID: nil, now: now, keys: keys)
+    expect(out.basis == .signedOut && out.can("recording", "video") && out.can("live_tips") && !out.can("server_sync") && out.records.isEmpty, "ent: signed out = catalog defaults")
+    let r = E.resolve(c, userID: user, deviceID: dev, now: now, keys: keys)
+    expect(r.basis == .live && !r.needsRefresh, "ent: live")
+    expect(r.level("recording", org: org) == "audio" && r.can("recording", "audio", org: org) && !r.can("recording", "video", org: org), "ent: override level")
+    expect(r.can("teams", org: org.uppercased()) && r.level("presentation", org: org) == "on" && r.level("pacenote_ai_tips", org: org) == "off", "ent: plan, catalog default, unavailable")
+    expect(r.level("nope", org: org) == "off" && !r.can("nope"), "ent: an unknown module is off")
+    expect(r.state("c_level", org: org) == .lockedPlan(requiredPlan: "enterprise", canRequest: true), "ent: locked by plan")
+    expect(r.state("teams", org: org, policyOff: true) == .policyOff && r.state("teams", org: org) == .open, "ent: policy off, open")
+    expect(r.quota("storage_mb", org: org)?.limit == 2000 && r.quota("seats", org: org) == nil, "ent: quota")
+    var cw = c; cw.orgs = [jwsSign(payload(storage: "warn"), key: key)]
+    if case .quotaWarn(let id, _) = E.resolve(cw, userID: user, deviceID: dev, now: now, keys: keys).state("server_sync", org: org) { expect(id == "storage_mb", "ent: warn id") } else { expect(false, "ent: quota warn") }
+    var cx = c; cx.orgs = [jwsSign(payload(storage: "exhausted"), key: key)]
+    if case .quotaExhausted(let id, let q) = E.resolve(cx, userID: user, deviceID: dev, now: now, keys: keys).state("server_sync", org: org) {
+        expect(id == "storage_mb" && q.used == 2000, "ent: exhausted quota")
+    } else { expect(false, "ent: quota exhausted") }
+    // another person, another Mac, no device id, an edited file: Solo fallback and a fetch now
+    expect(E.resolve(c, userID: "dddddddd-dddd-dddd-dddd-dddddddddddd", deviceID: dev, now: now, keys: keys).basis == .soloFallback, "ent: other person")
+    expect(E.resolve(c, userID: user, deviceID: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", now: now, keys: keys).basis == .soloFallback, "ent: other Mac")
+    let noDev = E.resolve(c, userID: user, deviceID: nil, now: now, keys: keys)
+    expect(noDev.basis == .soloFallback && noDev.needsRefresh && !noDev.can("server_sync") && noDev.can("recording", "video"), "ent: no device id, built-in Solo")
+    var ce = c; ce.orgs = [c.orgs[0].replacingOccurrences(of: ".", with: ".x", options: [], range: c.orgs[0].range(of: "."))]
+    expect(E.resolve(ce, userID: user, deviceID: dev, now: now, keys: keys).basis == .soloFallback, "ent: edited cache")
+    var c2 = c; c2.orgs.append(jwsSign(payload(sub: "dddddddd-dddd-dddd-dddd-dddddddddddd", org: "ffffffff-ffff-ffff-ffff-ffffffffffff"), key: key))
+    expect(E.resolve(c2, userID: user, deviceID: dev, now: now, keys: keys).basis == .soloFallback, "ent: one foreign record spoils the cache")
+    // past exp: kept, never taken away
+    let late = now.addingTimeInterval(20 * 86400)
+    let st = E.resolve(c, userID: user, deviceID: dev, now: late, keys: keys)
+    expect(st.basis == .stale(days: 20) && st.level("recording", org: org) == "audio" && st.can("teams", org: org), "ent: stale keeps the rights")
+    // Solo levels from a signed catalog
+    let catP: [String: Any] = ["catalog_version": 1,
+        "modules": [["id": "recording", "kind": "local", "levels": ["off", "audio", "video"], "default": "video", "available": true],
+                    ["id": "server_sync", "kind": "server", "levels": ["off", "on"], "default": "off", "available": true]],
+        "quotas": [["id": "storage_mb", "module": "server_sync"]],
+        "fallback": ["plan": "solo", "version": 1, "modules": ["recording": "audio", "server_sync": "on"], "quotas": ["storage_mb": ["limit": 500]]]]
+    var cs = E.Cache(); cs.catalog = jwsSign(catP, key: key)
+    let solo = E.resolve(cs, userID: user, deviceID: dev, now: now, keys: keys)
+    expect(solo.basis == .soloFallback && solo.level("recording") == "audio" && solo.can("server_sync") && solo.quota("storage_mb")?.limit == 500, "ent: Solo from the signed catalog")
+    expect(E.resolve(cs, userID: nil, deviceID: nil, now: now, keys: keys).level("recording") == "video", "ent: signed out ignores the Solo fallback")
+    var cbad = cs; cbad.catalog += "x"
+    expect(E.resolve(cbad, userID: user, deviceID: dev, now: now, keys: keys).catalog == E.builtInCatalog, "ent: a bad catalog falls back to the built-in one")
+    // the cache file
+    var cc = E.cache(from: ["offline_grace_days": 7, "beta": ["all_plans_free": true, "billing_notice_days": 30],
+                            "orgs": [["org_id": org.uppercased(), "etag": "W/\"e-1\"", "signed": c.orgs[0]]]], etag: "W/\"all\"", now: now, keeping: cs)
+    expect(cc.orgs == c.orgs && cc.catalog == cs.catalog && cc.offlineGraceDays == 7 && cc.orgETags == [org: "W/\"e-1\""] && cc.etag == "W/\"all\"", "ent: cache from an answer")
+    expect(E.Cache.decode(cc.encoded()) == cc && E.Cache.decode(Data("{".utf8)) == nil, "ent: cache round trip")
+    expect(!E.due(cc, now: now.addingTimeInterval(60)) && E.due(cc, now: now.addingTimeInterval(6 * 3600)) && E.due(nil, now: now), "ent: due every 6 hours")
+    expect(E.due(cc, now: now, meETags: [org: "W/\"e-2\""]) && !E.due(cc, now: now, meETags: [org: "W/\"e-1\"", "x": ""]), "ent: due when /v1/me etag changed")
+    cc.orgs = []
+    expect(E.due(cc, now: now), "ent: due with no records")
+
+    // who the session is, from the access token
+    let tok = "pna_" + b64u(Data("\(user)|\(dev)|1800000900".utf8)) + "." + b64u(Data("sig".utf8))
+    let id = PacenoteServer.accessIdentity(tok)
+    expect(id?.user == user.lowercased() && id?.device == dev, "ent: identity from the access token")
+    expect(PacenoteServer.accessIdentity("xyz") == nil && PacenoteServer.accessIdentity("pna_" + b64u(Data("a|b".utf8)) + ".s") == nil, "ent: no identity")
+    let oldS = PacenoteServer.Session.decode("{\"refreshToken\":\"r\",\"refreshExpires\":\"2026-12-01T00:00:00Z\",\"email\":\"e\",\"name\":\"n\",\"signedIn\":\"2026-11-01T00:00:00Z\"}")
+    expect(oldS != nil && oldS?.deviceID == nil, "ent: a session from before 0.18.0 still loads")
+    var ns = oldS!; ns.userID = "u"; ns.deviceID = "d"
+    expect(PacenoteServer.Session.decode(ns.encoded())?.deviceID == "d", "ent: session keeps the ids")
+    let meO: [String: Any] = ["user": ["email": "e", "id": "u"], "organizations": [["id": "O1", "kind": "personal", "entitlements_etag": "W/\"x\""]]]
+    expect(PacenoteServer.me(meO)?.entitlementsETags == ["o1": "W/\"x\""], "ent: /v1/me etags")
+
+    // plan and quota answers (contract 4)
+    func pj(_ o: [String: Any]) -> Data { try! JSONSerialization.data(withJSONObject: o) }
+    let p403 = pj(["type": "plan", "status": 403, "detail": "plan", "module": "teams", "level_required": "on", "level_have": "off", "required_plan": "team", "flag": "teams"])
+    expect(PacenoteServer.planProblem(p403, status: 403) == PacenoteServer.PlanProblem(type: "plan", module: "teams", levelRequired: "on", requiredPlan: "team"), "ent: 403 plan")
+    let q402 = pj(["type": "quota", "status": 402, "quota": "storage_mb", "limit": 2000, "used": 1999.6, "resets_at": NSNull()])
+    let qp = PacenoteServer.planProblem(q402, status: 402)
+    expect(qp?.type == "quota" && qp?.quota == "storage_mb" && qp?.limit == 2000 && qp?.used == 1999.6 && PacenoteServer.quota(q402, status: 402)?.limit == 2000, "ent: 402 quota")
+    expect(PacenoteServer.planProblem(pj(["type": "storage", "quota": "storage_mb", "limit": 500, "used_mb": 499.9]), status: 402)?.used == 499.9, "ent: old 402 storage")
+    expect(PacenoteServer.isPlan(pj(["detail": "teams", "flag": "teams"]), status: 402), "ent: old 402 plan")
+    expect(PacenoteServer.planProblem(pj(["detail": "no"]), status: 403) == nil && PacenoteServer.planProblem(p403, status: 404) == nil
+           && !PacenoteServer.refreshesEntitlements(Data(), status: 402), "ent: other answers are not plan answers")
+    expect(OrgCard.outcome(status: 403, problem: "plan") == .plan && OrgCard.outcome(status: 403) == .readOnly
+           && OrgContext.outcome(status: 403, problem: "plan") == .plan && OrgContext.outcome(status: 403) == .readOnly, "ent: 403 plan in card and context")
+
+    // telemetry: the server first, the Worker when it is down
+    expect(Telemetry.next(serverStatus: 202) == .sent && Telemetry.next(serverStatus: 503) == .tryWorker && Telemetry.next(serverStatus: 0) == .tryWorker
+           && Telemetry.next(serverStatus: 429) == .later && Telemetry.next(serverStatus: 400) == .later, "telemetry: server answers")
+    expect(Telemetry.sent(workerStatus: 200) && !Telemetry.sent(workerStatus: 500)
+           && Telemetry.serverURL(base: URL(string: "https://pacenote-api.bodco.pm")!).absoluteString == "https://pacenote-api.bodco.pm/v1/telemetry/batch", "telemetry: worker, url")
+    expect(UsageLog.events["telemetry_sent"] == ["lines", "to"] && UsageLog.events["entitlements_refresh"] == ["ok", "why"], "telemetry: events allowed")
+}
+
+/// 0.18.0 (B3 session 2, D42): trial in the record, the entries' modules, the beta price, the strings of the four states.
+func entitlementsB3UI() {
+    typealias E = Entitlements
+    let base: [String: Any] = ["org_id": "6F1C", "sub": "U1", "device_id": "D1", "iat": 1_795_000_000, "exp": 1_796_209_600,
+                               "plan": ["id": "solo", "name": "Solo", "version": 1, "display_as": "Solo",
+                                        "planned_price": ["amount_cents": 900, "currency": "USD", "per": "seat_month", "min_seats": 1],
+                                        "trial": ["days": 14, "started_at": "2026-12-01T10:00:00Z", "ends_at": "2026-12-15T10:00:00Z", "state": "active"]]]
+    let r = E.record(base)
+    let t = r?.plan.trial
+    expect(t?.days == 14 && t?.ended == false && t?.startedAt != nil, "b3ui: trial parsed")
+    let ends = t?.endsAt ?? Date()
+    expect(t?.daysLeft(now: ends.addingTimeInterval(-86400 * 3 - 60)) == 4 && t?.daysLeft(now: ends.addingTimeInterval(10)) == 0
+           && t?.daysLeft(now: ends.addingTimeInterval(-86400)) == 1, "b3ui: trial days left")
+    var noTrial = base; var pl = base["plan"] as! [String: Any]; pl["trial"] = NSNull(); noTrial["plan"] = pl
+    expect(E.record(noTrial)?.plan.trial == nil, "b3ui: no trial (server 0.9.0)")
+    pl["trial"] = ["days": 7, "ends_at": "2026-12-08T00:00:00Z", "state": "weird"]; noTrial["plan"] = pl
+    expect(E.record(noTrial)?.plan.trial?.state == "active", "b3ui: unknown trial state reads active")
+    pl["trial"] = ["days": 7, "state": "ended"]; noTrial["plan"] = pl
+    expect(E.record(noTrial)?.plan.trial == nil, "b3ui: trial without ends_at ignored")
+    pl = base["plan"] as! [String: Any]; pl["display_as"] = "Custom"; pl["id"] = NSNull(); pl["name"] = NSNull(); noTrial["plan"] = pl
+    expect(E.record(noTrial)?.plan.label == "Custom" && r?.plan.label == "Solo", "b3ui: plan label")
+    // the entries of What Pacenote can do name modules and levels the catalog has
+    for (f, m) in E.featureModules {
+        let c = E.builtInCatalog.modules[m.module]
+        expect(c != nil && c?.kind == "local" && (m.level == nil || c!.levels.contains(m.level!)), "b3ui: feature \(f) -> \(m.module)")
+    }
+    expect(E.featureModules["demo"] == nil && E.featureModules["components"] == nil && E.featureModules["settingsSearch"] == nil, "b3ui: not modules")
+    // the beta price
+    let p = E.Price(amountCents: 1200, currency: "USD", per: "seat_month", minSeats: 1)
+    expect(E.priceText(p) == "$12" && E.priceText(E.Price(amountCents: 1250, currency: "USD", per: "", minSeats: 1)) == "$12.50"
+           && E.zeroText("USD") == "$0", "b3ui: price text \(E.priceText(p))")
+    expect(E.priceText(E.Price(amountCents: 900, currency: "EUR", per: "", minSeats: 1)).contains("9"), "b3ui: other currency")
+    // every local entry is open on every plan today (D41.1), signed in or not
+    let out = E.resolve(nil, userID: nil, deviceID: nil)
+    for (_, m) in E.featureModules { expect(out.state(m.module, m.level) == .open, "b3ui: open signed out: \(m.module)") }
+    // the strings the UI needs, in both languages
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources/i18n")
+    for l in ["en", "uk"] {
+        guard let d = try? Data(contentsOf: dir.appendingPathComponent("\(l).json")),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { expect(false, "b3ui: i18n \(l)"); continue }
+        for (id, m) in E.builtInCatalog.modules where m.available {
+            expect(o["module." + id] != nil && o["module." + id + ".what"] != nil, "b3ui: \(l) module.\(id)")
+        }
+        for q in E.builtInCatalog.quotaModule.keys { expect(o["quota." + q] != nil, "b3ui: \(l) quota.\(q)") }
+        for k in ["lock.plan", "lock.request", "lock.askOwner", "lock.policy", "lock.window", "quota.usedMonth", "quota.resets",
+                  "plan.head", "plan.beta", "plan.beta.note", "plan.free", "plan.stale", "plan.trial.left", "plan.trial.endedBeta"] {
+            expect(o[k] != nil, "b3ui: \(l) \(k)")
+        }
+    }
+    expect(UsageLog.events["module_locked"] == ["module", "state"] && UsageLog.events["plan_request_opened"] == ["from"], "b3ui: events allowed")
+    expect(UsageLog.events["calendar_refresh"] == ["from", "new"]
+           && UsageLog.line("calendar_refresh", ["from": "home", "new": 1]) != nil, "calendar refresh: event allowed")
+    // S1 finding (spec 13): the 19 calls the app makes since 0.15-0.18 are written now, with every parameter they pass
+    expect(UsageLog.line("project_wizard", ["org": "personal", "folder": "new", "card": true, "links": 2]) != nil
+           && UsageLog.line("whatsnew_closed", ["seen": true]) != nil
+           && UsageLog.line("provider_limit_alert", ["provider": "claude_api"]) != nil
+           && UsageLog.line("provider_limit_capped", ["provider": "openai_api"]) != nil
+           && UsageLog.line("org_index_built", ["files": 3, "skipped": 0, "vectors": 40]) != nil
+           && UsageLog.line("addons_chosen", ["n": 2, "where": "onboarding"]) != nil
+           && ["component_removed", "project_removed", "transcript_drive", "whatsnew_shown", "practice_call", "sync_pull",
+               "org_card_saved", "org_register_changed", "org_register_deleted", "org_state_saved", "org_change_restored",
+               "org_setup_invites", "org_setup_done"].allSatisfy { UsageLog.events[$0] != nil }, "usage: lost events allowed")
+    expect(SettingsSearch.entries.contains { $0.id == "acc.plan" }, "b3ui: settings search Plan")
+}
+
+/// 0.19.0 (server 0.11.0, migration 0014): plans for everyone, the personal overview, the Console tab for everyone.
+func selfServe0190() {
+    typealias S = SelfServe
+    let j: [String: Any] = ["beta": true, "plans": [
+        ["id": "solo", "name": "Solo", "price": NSNull(), "trial_days": 0, "teams": false,
+         "included": [["id": "server_sync", "label": "Sync", "level": ""]], "missing": [["id": "teams", "label": "Teams", "level": ""]],
+         "quotas": [["id": "storage_mb", "label": "Storage", "limit": 1000, "period": "", "per": "org"]]],
+        ["id": "team", "name": "Team", "price": ["amount_cents": 1200, "currency": "USD", "per": "seat_month", "min_seats": 1],
+         "trial_days": 14, "teams": true,
+         "included": [["id": "server_sync", "label": "Sync", "level": ""], ["id": "teams", "label": "Teams", "level": ""],
+                      ["id": "org_policy", "label": "Policy", "level": "basic"]], "missing": [],
+         "quotas": [["id": "seats", "label": "Seats", "limit": NSNull(), "period": ""]]],
+        ["id": "enterprise", "name": "Enterprise", "teams": true,
+         "included": [["id": "server_sync", "label": "Sync", "level": ""], ["id": "teams", "label": "Teams", "level": ""],
+                      ["id": "org_policy", "label": "Policy", "level": "full"]]],
+        ["name": "no id"]]]
+    let d = try! JSONSerialization.data(withJSONObject: j)
+    let r = S.plans(d)
+    expect(r.beta && r.plans.map(\.id) == ["solo", "team", "enterprise"], "selfserve: plans parsed in order, no id dropped")
+    let solo = r.plans[0], team = r.plans[1], ent = r.plans[2]
+    expect(solo.price == nil && team.price?.amountCents == 1200 && team.trialDays == 14 && team.teams && !solo.teams
+           && team.quotas.first?.limit == nil && solo.quotas.first?.limit == 1000, "selfserve: price, trial, teams, quotas")
+    let up = S.changes(from: solo, to: team), down = S.changes(from: team, to: solo)
+    expect(up.gained == ["Teams", "Policy"] && up.lost.isEmpty && down.lost == ["Teams", "Policy"] && down.gained.isEmpty,
+           "selfserve: changes up and down")
+    let lvl = S.changes(from: team, to: ent), lvlDown = S.changes(from: ent, to: team)
+    expect(lvl.gained == ["Policy"] && lvl.lost.isEmpty && lvlDown.lost == ["Policy"] && lvlDown.gained.isEmpty, "selfserve: a level up is gained")
+    expect(S.changes(from: nil, to: team).gained.count == 3, "selfserve: from a custom plan lists what the target has")
+    // who may do what (mirrors the server: personal space only plans without teams; owner or admin of a team)
+    let personal = PacenoteServer.Org(id: "P", name: "", kind: "personal", role: "owner", plan: "solo")
+    let owned = PacenoteServer.Org(id: "T", name: "Acme", kind: "team", role: "admin", plan: "team")
+    let member = PacenoteServer.Org(id: "T", name: "Acme", kind: "team", role: "member", plan: "team")
+    expect(S.action(org: personal, currentPlan: "solo", customPlan: false, plan: solo) == .current
+           && S.action(org: personal, currentPlan: "solo", customPlan: false, plan: team) == .startTeam
+           && S.action(org: owned, currentPlan: "team", customPlan: false, plan: ent) == .choose
+           && S.action(org: owned, currentPlan: "team", customPlan: false, plan: team) == .current
+           && S.action(org: member, currentPlan: "team", customPlan: false, plan: ent) == .askOwner
+           && S.action(org: owned, currentPlan: nil, customPlan: true, plan: team) == .custom, "selfserve: actions")
+    // bodies and answers
+    let tb = S.teamBody(name: "  Acme  ", plan: "team").flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] }
+    expect(tb == ["name": "Acme", "plan": "team"] && S.teamBody(name: "   ", plan: "team") == nil
+           && S.teamBody(name: String(repeating: "x", count: 101), plan: "team") == nil, "selfserve: team body")
+    expect((try? JSONSerialization.jsonObject(with: S.chooseBody("enterprise")) as? [String: String]) == ["plan": "enterprise"], "selfserve: choose body")
+    let mis = try! JSONSerialization.data(withJSONObject: ["status": 409, "type": "fit", "misfit": [["id": "seats", "label": "Seats", "used": 3, "limit": 1],
+                                                                                                      ["id": "storage_mb", "label": "Storage", "used": 1200.5, "limit": 1000]]])
+    expect(S.misfit(mis, status: 409) == ["Seats: 3 / 1", "Storage: 1200.5 / 1000"] && S.misfit(mis, status: 400).isEmpty
+           && S.misfit(Data("{}".utf8), status: 409).isEmpty, "selfserve: misfit lines")
+    let created = try! JSONSerialization.data(withJSONObject: ["id": "abc", "plan": "team"])
+    expect(S.createdOrg(created, status: 201) == "abc" && S.createdOrg(created, status: 200) == nil, "selfserve: created org")
+    let u = S.usage(try! JSONSerialization.data(withJSONObject: ["days": 30, "active_days": 4, "calls": 6, "call_minutes": 90, "sessions": 9,
+                                                                "features": ["call"], "by_day": [["day": "2026-11-16", "calls": 2], ["day": "2026-11-17", "calls": 4]]]))
+    expect(u?.calls == 6 && u?.hoursText == "1.5" && u?.callsByDay == [2, 4] && u?.activeDays == 4 && S.usage(Data("{}".utf8)) == nil, "selfserve: usage")
+    // the Console tab for everyone: someone who runs nothing opens their own page
+    let solo1 = PacenoteServer.Me(email: "m@example.com", name: "Mike", orgs: [personal])
+    expect(solo1.showsConsole && solo1.consolePath == "/me" && !solo1.runsSomething
+           && PacenoteServer.consoleNoteKey(solo1) == "console.note.me", "selfserve: console for Solo opens /me")
+    var lead = owned; lead.role = "owner"
+    let boss = PacenoteServer.Me(email: "e@example.com", name: "Emily", orgs: [personal, lead], defaultOrgID: "T")
+    expect(boss.consolePath == "/org/T" && PacenoteServer.consoleNoteKey(boss) == "console.note", "selfserve: console for an owner")
+    expect(PacenoteServer.consoleOpensInApp(signedIn: true, me: solo1) && !PacenoteServer.consoleOpensInApp(signedIn: false, me: solo1),
+           "selfserve: console opens in the app when signed in")
+    expect(UsageLog.line("plans_opened", ["from": "lock"]) != nil && UsageLog.line("plan_chosen", ["plan": "team", "from": "solo"]) != nil
+           && UsageLog.line("org_team_started", ["plan": "team"]) != nil, "selfserve: events allowed")
+    expect(SettingsSearch.entries.contains { $0.id == "acc.usage" }, "selfserve: settings search Your use")
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources/i18n")
+    for l in ["en", "uk"] {
+        let o = (try? JSONSerialization.jsonObject(with: Data(contentsOf: dir.appendingPathComponent("\(l).json")))) as? [String: Any] ?? [:]
+        for k in ["plans.window", "plans.switch", "plans.startTeam", "plans.confirm.q", "plans.confirm.gained", "plans.confirm.lost",
+                  "plans.misfit", "plans.team.create", "plans.compare", "plans.change", "usage.head", "usage.line", "usage.open",
+                  "console.note.me", "plans.level.basic", "plans.level.full", "plans.level.shared", "plans.level.index"] {
+            expect(o[k] != nil, "selfserve: \(l) \(k)")
+        }
+    }
+}
+
+/// 0.19.0 (server 0.11.0, Bohdan 17.11): staff open Platform in the Console tab; Google again in the app after 12 hours.
+func consolePlatform0190() {
+    let pb = (try? JSONSerialization.jsonObject(with: PacenoteServer.consoleHandoffBody(next: "/platform", platform: true))) as? [String: Any]
+    expect(pb?["platform"] as? Bool == true && pb?["next"] as? String == "/platform", "platform: handoff body asks for Platform")
+    let ob = (try? JSONSerialization.jsonObject(with: PacenoteServer.consoleHandoffBody(next: "/me"))) as? [String: Any]
+    expect(ob?["platform"] == nil, "platform: a plain handoff does not ask")
+    let re = CallSync.json(["type": "google_reauth", "status": 409, "detail": "older than 12 hours"])
+    expect(PacenoteServer.needsGoogleAgain(re, status: 409) && !PacenoteServer.needsGoogleAgain(re, status: 403)
+           && !PacenoteServer.needsGoogleAgain(CallSync.json(["type": "fit"]), status: 409), "platform: Google again only on google_reauth")
+    let cb = (try? JSONSerialization.jsonObject(with: PacenoteServer.googleConfirmBody(idToken: "eyJ.x.y"))) as? [String: String]
+    expect(cb == ["id_token": "eyJ.x.y"], "platform: confirm body")
+    let login = URL(string: "https://pacenote-admin.bodco.pm/login?next=%2Fplatform%2Fpeople")!
+    expect(PacenoteServer.platformNext(login) == "/platform/people"
+           && PacenoteServer.platformNext(URL(string: "https://pacenote-admin.bodco.pm/login?next=%2Forg%2Fx")!) == nil
+           && PacenoteServer.platformNext(URL(string: "https://evil.example/login?next=%2Fplatform")!) == nil, "platform: next from /login")
+    expect(PacenoteServer.isPlatformPath("/platform") && PacenoteServer.isPlatformPath("/platform/analytics")
+           && !PacenoteServer.isPlatformPath("/platformx") && !PacenoteServer.isPlatformPath("/org/x"), "platform: zone of a path")
+    expect(UsageLog.line("console_platform", ["google": true]) != nil, "platform: event allowed")
+    let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Resources/i18n")
+    for l in ["en", "uk"] {
+        let o = (try? JSONSerialization.jsonObject(with: Data(contentsOf: dir.appendingPathComponent("\(l).json")))) as? [String: Any] ?? [:]
+        for k in ["console.zone.org", "console.zone.platform", "console.platform.google", "console.platform.google.sub",
+                  "console.platform.cancelled", "console.platform.otherAccount", "console.platform.retry"] {
+            expect(o[k] != nil, "platform: \(l) \(k)")
+        }
+    }
+}
+
+/// 0.19.0 (S4, D43, D45; spec 3, 4, 9.4, 11.3): product analytics v2 in the app.
+func analyticsS4() {
+    typealias A = Analytics
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()       // .../app (the repository)
+    // the embedded catalog is the YAML (tools/gen_analytics_catalog.py), and the server's copy is the same file
+    if let y = try? Data(contentsOf: root.appendingPathComponent("rules/analytics.yaml")) {
+        let h = SHA256.hash(data: y).map { String(format: "%02x", $0) }.joined()
+        expect(h == A.catalogSHA256, "analytics: embedded catalog is current (run tools/gen_analytics_catalog.py)")
+        let server = root.deletingLastPathComponent().appendingPathComponent("server/src/pacenote_server/analytics_events.yaml")
+        if let sv = try? Data(contentsOf: server) { expect(sv == y, "analytics: server catalog equals rules/analytics.yaml") }
+    } else { expect(false, "analytics: rules/analytics.yaml") }
+    let cat = A.catalog
+    expect(cat.events.count >= 80 && cat.screens["plans"] != nil && cat.actions.contains("refresh_calendars")
+           && cat.events["plan_chosen"] == ["plan": "code", "from": "code"], "analytics: catalog parsed")
+    // typed values, as the server checks them (bool is not an int and an int is not a bool)
+    expect(A.valid("call_ended", "minutes", "minutes", 30, scr: nil) && !A.valid("call_ended", "minutes", "minutes", 2000, scr: nil)
+           && !A.valid("call_ended", "minutes", "minutes", true, scr: nil) && !A.valid("call_ended", "minutes", "minutes", 1.5, scr: nil)
+           && A.valid("call_ended", "recorded", "bool", true, scr: nil) && !A.valid("call_ended", "recorded", "bool", 1, scr: nil),
+           "analytics: ints and bools")
+    expect(A.valid("call_started", "type", "call_type", "sales", scr: nil) && !A.valid("call_started", "type", "call_type", "Acme call", scr: nil),
+           "analytics: enums")
+    expect(A.valid("prepare_run", "model", "model", "gpt-5.4", scr: nil) && !A.valid("prepare_run", "model", "model", "GPT 5", scr: nil)
+           && A.valid("app_update", "to", "version", "0.19.0", scr: nil) && !A.valid("app_update", "to", "version", "dev", scr: nil),
+           "analytics: patterns")
+    expect(A.valid("auto_added", "kind", "code", "risks", scr: nil) && !A.valid("auto_added", "kind", "code", "task", scr: nil)
+           && !A.valid("auto_added", "kind", "code", "Mike's task", scr: nil), "analytics: codes are closed lists")
+    expect(A.valid("screen_view", "sub", "screen_sub", "brief", scr: "call_page") && !A.valid("screen_view", "sub", "screen_sub", "brief", scr: "home")
+           && A.valid("action", "name", "action", "start_call", scr: "home") && !A.valid("action", "name", "action", "launch_rockets", scr: "home"),
+           "analytics: screens, parts, actions")
+    // clean: unknown event out; a bad parameter loses only itself; a screen event needs a known screen
+    expect(A.clean("no_such_event", [:], scr: nil) == nil && A.clean("screen_view", ["from": "home"], scr: nil) == nil
+           && A.clean("screen_view", [:], scr: "nowhere") == nil, "analytics: events dropped whole")
+    let c = A.clean("call_ended", ["minutes": 30, "title": "Acme renewal", "tips": -1], scr: nil)
+    expect(c?.p.count == 1 && c?.p["minutes"] as? Int == 30 && c?.dropped == 2, "analytics: no free text survives")
+    // sessions: new at launch and after 30 minutes idle, seq from 1
+    var ss = A.Sessions(); let t0 = Date(timeIntervalSince1970: 1_795_000_000)
+    ss.launch(now: t0)
+    let a = ss.next(now: t0), b = ss.next(now: t0.addingTimeInterval(29 * 60)), d = ss.next(now: t0.addingTimeInterval(29 * 60 + 31 * 60))
+    expect(a.seq == 1 && b.seq == 2 && a.s == b.s && d.s != b.s && d.seq == 1, "analytics: sessions and seq")
+    // D45: the personal switch, or an organization whose policy is on
+    expect(A.mayGo(o: nil, defaultOrg: nil, personalOn: true, orgPolicy: [:])
+           && !A.mayGo(o: nil, defaultOrg: nil, personalOn: false, orgPolicy: ["t1": "on"])
+           && A.mayGo(o: "T1", defaultOrg: nil, personalOn: false, orgPolicy: ["t1": "on"])
+           && A.mayGo(o: nil, defaultOrg: "t1", personalOn: false, orgPolicy: ["t1": "on"])
+           && !A.mayGo(o: "t2", defaultOrg: "t1", personalOn: false, orgPolicy: ["t1": "on", "t2": "member_choice"]), "analytics: D45")
+    // the header the server takes
+    let h = A.Header(install: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", machine: A.machine(platformUUID: "1234-ABCD"), appVersion: "dev",
+                     build: "190", osVersion: "14.6", arch: "arm64", uiLang: "de", rulesVersion: "0.17.0")
+    let body = A.body(h, batch: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", events: [], sentAt: t0)
+    expect(body["schema"] as? Int == 2 && body["app_version"] as? String == "0.0.0" && body["ui_lang"] as? String == "en"
+           && (body["machine"] as? String)?.count == 64 && body["build"] as? String == "190" && body["rules_version"] as? String == "0.17.0"
+           && body["sent_at"] as? String == "2026-11-18T11:06:40Z", "analytics: header \(body)")
+    expect(A.machine(platformUUID: " 1234-abcd ") == A.machine(platformUUID: "1234-ABCD") && A.machine(platformUUID: "") == nil, "analytics: machine hash")
+    let sb = (try? JSONSerialization.jsonObject(with: PacenoteServer.signInBody(idToken: "x", deviceName: "Mac", appVersion: "0.19.0",
+                                                                              machine: A.machine(platformUUID: "1234-ABCD")))) as? [String: Any]
+    expect(((sb?["device"] as? [String: Any])?["machine"] as? String) == A.machine(platformUUID: "1234-ABCD"), "analytics: sign-in carries the machine")
+    expect(A.outcome(status: 202) == .done && A.outcome(status: 200) == .done && A.outcome(status: 400) == .drop
+           && A.outcome(status: 401) == .retry && A.outcome(status: 429) == .retry && A.outcome(status: 0) == .retry, "analytics: outcomes")
+    expect(A.backoff(failures: 1) == 60 && A.backoff(failures: 3) == 240 && A.backoff(failures: 20) == 3600, "analytics: backoff")
+    let many = (1...5002).map { ["e": "help_now", "seq": $0] as [String: Any] }
+    expect(A.chunks(many).map(\.count) == [5000, 2], "analytics: batches of at most 5000")
+    expect(A.bucket(0) == "0" && A.bucket(4) == "2-5" && A.bucket(101) == "100+" && A.bucketPct(80) == "75-100", "analytics: buckets")
+    // the queue: open events become batch files by route; the anonymous one loses `o`
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pn-analytics-\(UUID().uuidString)")
+    let q = A.Queue(dir: dir)
+    q.append(A.Event(e: "help_now", t: t0, s: "s1", seq: 1, scr: nil, p: [:], ms: nil, o: "t1"), signedIn: true)
+    q.append(A.Event(e: "help_now", t: t0, s: "s1", seq: 2, scr: nil, p: [:], ms: nil, o: "t1"), signedIn: false)
+    expect(q.seal(h, now: t0) == 2 && q.batches.count == 2, "analytics: sealed into two batches")
+    let routes = q.batches.compactMap { q.read($0) }
+    let anon = routes.first { $0.route == "batch" }, signed = routes.first { $0.route == "events" }
+    expect(((anon?.body["events"] as? [[String: Any]])?.first?["o"]) == nil
+           && ((signed?.body["events"] as? [[String: Any]])?.first?["o"] as? String) == "t1", "analytics: o only when signed in")
+    q.clear(); expect(q.batches.isEmpty, "analytics: clear")
+    // every UsageLog.log("...") in the app's code is an allowed event (spec 13: the lost events must not happen again)
+    let src = root.appendingPathComponent("app/Sources/LiveTips")
+    var unknown: [String] = []
+    for f in (try? FileManager.default.contentsOfDirectory(atPath: src.path)) ?? [] where f.hasSuffix(".swift") {
+        guard let t = try? String(contentsOf: src.appendingPathComponent(f), encoding: .utf8) else { continue }
+        for pat in [#"UsageLog\.log\("([a-z0-9_]+)""#, #"\.track\("([a-z0-9_]+)""#] {
+            let re = try! NSRegularExpression(pattern: pat)
+            for m in re.matches(in: t, range: NSRange(t.startIndex..., in: t)) {
+                let name = String(t[Range(m.range(at: 1), in: t)!])
+                // a name ending in "_" is a prefix built in code (provider_limit_ + level): some allowed event must start with it
+                let ok = pat.hasPrefix("Usage")
+                    ? (name.hasSuffix("_") ? UsageLog.events.keys.contains { $0.hasPrefix(name) } : UsageLog.events[name] != nil)
+                    : cat.events[name] != nil
+                if !ok { unknown.append(f + ": " + name) }
+            }
+        }
+    }
+    expect(unknown.isEmpty, "analytics: every logged event is allowed \(unknown)")
+    analyticsS4Part2(root: root)
+    // v1 events that the app logs and v2 knows keep their name; the four new 0.19.0 events are in both
+    for e in ["plans_opened", "plan_chosen", "org_team_started", "console_platform"] {
+        expect(UsageLog.events[e] != nil && cat.events[e] != nil, "analytics: \(e) in both catalogs")
+    }
+}
+
+/// S4, part 2 (app 0.19.0): closed `code` lists, the helpers that turn app values into catalog values, and a scan of
+/// the app's code: every screen, part, action, timer and error area or code it names is in the catalog.
+func analyticsS4Part2(root: URL) {
+    typealias A = Analytics
+    let cat = A.catalog
+    // every `code` parameter has its closed list, and no list is left without a parameter
+    let codes = cat.events.flatMap { e, ps in ps.filter { $0.value == "code" }.map { "\(e).\($0.key)" } }
+    expect(Set(codes) == Set(cat.values.keys), "analytics: a values list for every code parameter \(Set(codes).symmetricDifference(cat.values.keys).sorted())")
+    expect(cat.values.values.allSatisfy { $0.allSatisfy { $0.range(of: #"^[a-z0-9_]{1,40}$"#, options: .regularExpression) != nil } },
+           "analytics: values are codes")
+    // helpers
+    expect(A.snake("onYou") == "on_you" && A.snake("prevSlide") == "prev_slide" && A.snake("add30") == "add30"
+           && A.snake("notionTasks") == "notion_tasks" && A.snake("live_tips") == "live_tips" && A.snake("a b") == "a_b", "analytics: snake")
+    expect(A.callType(nil) == "general" && A.callType("auto") == "general" && A.callType("presentation") == "presentation"
+           && A.callType("coach") == "other" && A.callType("Interview") == "interview", "analytics: call types")
+    for t in ["auto", "presentation", "interview", "coach", "transcript", "x"] { expect((cat.enums["call_type"] ?? []).contains(A.callType(t)), "analytics: call type \(t)") }
+    for r in ["code", "plan", "api", "codex", "openai", "gemini", "agy", "local", "", "other"] {
+        expect((cat.enums["provider"] ?? []).contains(A.provider(route: r)), "analytics: provider of \(r)")
+    }
+    expect(A.provider(route: "plan") == "claude" && A.provider(route: "api") == "claude_api" && A.provider(route: "agy") == "gemini", "analytics: providers")
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "Europe/Kyiv")!
+    let d0 = Date(timeIntervalSince1970: 1_795_000_000)
+    expect(A.snapshotDue(last: nil, now: d0, calendar: cal) && !A.snapshotDue(last: d0, now: d0.addingTimeInterval(3600), calendar: cal)
+           && A.snapshotDue(last: d0, now: d0.addingTimeInterval(86400), calendar: cal)
+           && !A.snapshotDue(last: d0, now: d0.addingTimeInterval(-86400), calendar: cal), "analytics: settings_snapshot once a day")
+    expect(A.launchFacts(lastVersion: "0.17.2", cleanQuit: true, current: "0.19.0") == .init(updatedFrom: "0.17.2", crashed: false)
+           && A.launchFacts(lastVersion: "0.19.0", cleanQuit: false, current: "0.19.0") == .init(updatedFrom: nil, crashed: true)
+           && A.launchFacts(lastVersion: nil, cleanQuit: nil, current: "0.19.0") == .init(updatedFrom: nil, crashed: false)
+           && A.launchFacts(lastVersion: "dev", cleanQuit: true, current: "0.19.0").updatedFrom == nil, "analytics: update and crash at launch")
+    expect(A.errorCode(status: 429) == "rate_limit" && A.errorCode(status: 503) == "server_5xx" && A.errorCode(status: 401) == "auth_expired"
+           && A.errorCode(URLError(.timedOut)) == "timeout" && A.errorCode(URLError(.notConnectedToInternet)) == "offline"
+           && A.errorCode(NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)) == "disk_full"
+           && A.errorCode(NSError(domain: "x", code: 1)) == "other", "analytics: error codes")
+    // a scan of the app: what the code names is in the catalog
+    let src = root.appendingPathComponent("app/Sources/LiveTips")
+    var bad: [String] = []
+    func each(_ pat: String, in t: String, _ f: ([String]) -> Void) {
+        let re = try! NSRegularExpression(pattern: pat)
+        for m in re.matches(in: t, range: NSRange(t.startIndex..., in: t)) {
+            f((1..<m.numberOfRanges).map { Range(m.range(at: $0), in: t).map { String(t[$0]) } ?? "" })
+        }
+    }
+    let errArea = Set(cat.enums["error_area"] ?? []), errCode = Set(cat.enums["error_code"] ?? []), perfWhat = Set(cat.enums["perf_what"] ?? [])
+    var screensSeen = Set<String>()
+    for f in (try? FileManager.default.contentsOfDirectory(atPath: src.path)) ?? [] where f.hasSuffix(".swift") {
+        guard let t = try? String(contentsOf: src.appendingPathComponent(f), encoding: .utf8) else { continue }
+        each(#"(?:trackScreen|\.screen)\("([a-z_]+)"(?:, sub: "([a-z0-9_]+)")?"#, in: t) { g in
+            screensSeen.insert(g[0])
+            if cat.screens[g[0]] == nil { bad.append(f + ": screen " + g[0]) }
+            if !g[1].isEmpty, !(cat.screens[g[0]] ?? []).contains(g[1]) { bad.append(f + ": part " + g[0] + "." + g[1]) }
+        }
+        each(#"\.action\("([a-z_]+)""#, in: t) { g in if !cat.actions.contains(g[0]) { bad.append(f + ": action " + g[0]) } }
+        each(#"\.(?:begin|end|perf)\("([a-z_]+)""#, in: t) { g in if !perfWhat.contains(g[0]) { bad.append(f + ": perf " + g[0]) } }
+        each(#"\.error\("([a-z_]+)", "([a-z_0-9]+)""#, in: t) { g in
+            if !errArea.contains(g[0]) { bad.append(f + ": error area " + g[0]) }
+            if !errCode.contains(g[1]) { bad.append(f + ": error code " + g[1]) }
+        }
+        each(#"\.error\("([a-z_]+)""#, in: t) { g in if !errArea.contains(g[0]) { bad.append(f + ": error area " + g[0]) } }
+        // literal code values in the local log lines go to v2 as snake_case and must be on their list
+        each(#"UsageLog\.log\("([a-z0-9_]+)", \[([^\]]*)\]"#, in: t) { g in
+            guard let spec = cat.events[g[0]] else { return }
+            each(#""([a-z_]+)": "([A-Za-z0-9_]+)""#, in: g[1]) { kv in
+                guard spec[kv[0]] == "code" else { return }
+                if !(cat.values[g[0] + "." + kv[0]] ?? []).contains(A.snake(kv[1])) { bad.append(f + ": value " + g[0] + "." + kv[0] + "=" + kv[1]) }
+            }
+        }
+        // the buttons behind feature events
+        if f == "AnalyticsTracker.swift", let r = t.range(of: "static let actionFor"), let end = t[r.upperBound...].range(of: "]\n") {
+            each(#""([a-z_]+)": "([a-z_]+)""#, in: String(t[r.upperBound..<end.lowerBound])) { kv in
+                if cat.events[kv[0]] == nil { bad.append("actionFor event " + kv[0]) }
+                if !cat.actions.contains(kv[1]) { bad.append("actionFor action " + kv[1]) }
+            }
+        }
+    }
+    expect(bad.isEmpty, "analytics: the app names only catalog screens, parts, actions, timers and errors \(bad)")
+    for s in ["home", "call_page", "upcoming_page", "settings", "onboarding", "plans", "console_tab", "tips_window", "get_ready",
+              "sheet_expert", "menu_bar_panel", "module_lock"] { expect(screensSeen.contains(s), "analytics: \(s) is marked") }
+    // review 17.11: the queue keeps only what may still go (sign-out drops the old account's events; the switch off
+    // with an organization's policy on keeps only that organization's)
+    let qd = FileManager.default.temporaryDirectory.appendingPathComponent("pn-analytics-f-\(UUID().uuidString)")
+    let fq = A.Queue(dir: qd), t0 = Date(timeIntervalSince1970: 1_795_000_000)
+    let hh = A.Header(install: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", machine: nil, appVersion: "0.19.0", build: "1",
+                      osVersion: "14.6", arch: "arm64", uiLang: "en", rulesVersion: "0.3.0")
+    fq.append(A.Event(e: "help_now", t: t0, s: "s1", seq: 1, scr: nil, p: [:], ms: nil, o: "t1"), signedIn: true)
+    fq.append(A.Event(e: "help_now", t: t0, s: "s1", seq: 2, scr: nil, p: [:], ms: nil, o: nil), signedIn: true)
+    fq.append(A.Event(e: "help_now", t: t0, s: "s1", seq: 3, scr: nil, p: [:], ms: nil, o: nil), signedIn: false)
+    _ = fq.seal(hh, now: t0)
+    let dropped = fq.filter { r, ev in r == "events" && (ev["o"] as? String) == "t1" }
+    let left = fq.batches.compactMap { fq.read($0) }
+    expect(dropped == 2 && left.count == 1 && left[0].route == "events" && (left[0].body["events"] as? [[String: Any]])?.count == 1,
+           "analytics: queue filter keeps only what may go")
+    fq.filter { r, _ in r != "events" }
+    expect(fq.batches.isEmpty, "analytics: sign-out drops the signed-in batches")
+    fq.clear()
+    // the camelCase values the code logs reach v2 on their lists (hotkeys, features, call page sections, onboarding steps)
+    for (k, v) in [("hotkey.name", "prevSlide"), ("feature_try_it.feature", "notionTasks"), ("call_page_edited.section", "onYou"),
+                   ("onboarding_step.step", "welcome"), ("feature_try_it.feature", "demoPresentation")] {
+        expect((cat.values[k] ?? []).contains(A.snake(v)), "analytics: \(k) has \(A.snake(v))")
+    }
+}
+
+entitlementsB3()
+entitlementsB3UI()
+analyticsS4()
+selfServe0190()
+consolePlatform0190()
 componentsD3()
 whatsNewD3()
 updatesD3()

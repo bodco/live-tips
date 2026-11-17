@@ -103,6 +103,7 @@ struct FloatingCallControls: View {
     @State private var hover: String?
 
     var body: some View {
+        Group {
         VStack(spacing: 4) {
             PacenoteSymbol(height: 26, dot: dotColor)
                 .frame(width: 36, height: 34)
@@ -136,6 +137,8 @@ struct FloatingCallControls: View {
         .foregroundStyle(PN.C.text2)
         .background(PN.C.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
+    }
+        .trackScreen("floating_controls", o: AnalyticsTracker.shared.callOrg)
     }
 
     private var sep: some View { Rectangle().fill(Color.primary.opacity(0.1)).frame(width: 26, height: 1).padding(.vertical, 3) }

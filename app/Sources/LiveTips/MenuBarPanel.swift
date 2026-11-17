@@ -143,6 +143,7 @@ struct MenuBarPanel: View {
             PacenoteSymbol(height: 18)
             Text(L("app.name")).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text)
             Spacer()
+            if CalendarService.shared.hasSource { CalendarRefreshButton(place: "menu_bar") }
             Button { model.run { $0.openSettings() } } label: { Image(systemName: "gearshape").foregroundStyle(PN.C.text2) }
                 .buttonStyle(.borderless).keyboardShortcut(",")
                 .help(L("menubar.settings") + " ⌘,").accessibilityLabel(L("menubar.settings"))
@@ -446,6 +447,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
     }
 
     func show() {
+        AnalyticsTracker.shared.screen("menu_bar_panel")      // 0.19.0 (S4)
         model.showDev = NSEvent.modifierFlags.contains(.option)
         let p = panel ?? make()
         place(p)

@@ -78,6 +78,7 @@ enum SpendWatch {
         n.title = L(level == .capped ? "limit.capped.title" : "limit.alert.title", vars)
         n.body = L(level == .capped ? "limit.capped.body" : "limit.alert.body", vars)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "pn-limit-" + p + "-" + level.rawValue, content: n, trigger: nil))
-        UsageLog.log("provider_limit_" + level.rawValue, ["provider": p])
+        if level == .capped { UsageLog.log("provider_limit_capped", ["provider": p]) }
+        else { UsageLog.log("provider_limit_alert", ["provider": p]) }
     }
 }

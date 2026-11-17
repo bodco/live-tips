@@ -562,7 +562,7 @@
 
   Feed.prototype.setPrep = function (p) {
     // 0.10.0 (Meeting Sheet, round 2): note = why Prepare again failed (the call keeps its previous sheet)
-    if (p && p.state) { this.prep = p.state; this.prepInfo = { made: p.made || '', before: !!p.before, progress: +p.progress || 0, note: clean(p.note || '') }; this.emit(); }
+    if (p && p.state) { this.prep = p.state; this.prepInfo = { made: p.made || '', before: !!p.before, progress: +p.progress || 0, note: clean(p.note || ''), kept: !!p.kept }; this.emit(); }
   };
 
   Feed.prototype.setUpNext = function (list) {

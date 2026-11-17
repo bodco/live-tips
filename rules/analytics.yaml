@@ -1,0 +1,274 @@
+# Pacenote product analytics v2 (D43, plan research/pacenote-analytics-plan-2026-11-17.md, spec
+# research/pacenote-analytics-spec-2026-11-17.md). Contract for S2 (server), S3 (console) and S4 (app).
+# Since S4 (app 0.19.0) the master is app/rules/analytics.yaml; server/src/pacenote_server/analytics_events.yaml and
+# research/pacenote-usage-v2-2026-11-17.yaml are byte-for-byte copies (checked by pytest and CoreChecks). The app embeds
+# it (LiveTipsCore/AnalyticsCatalog.swift, made by tools/gen_analytics_catalog.py). rules/usage.yaml stays schema 1:
+# the local usage log and Settings > Show what is sent.
+#
+# Rule (unchanged from schema 1, now typed): never the words of a call, names of people, projects, clients or files,
+# titles, emails, ids of content, error messages or any free text. Only the event name, the time, the session and the
+# parameters listed below, each of a declared type. Anything else is dropped (by the app, and again by the server, which
+# counts what it dropped and why).
+schema_version: 2
+
+# --- parameter types ---------------------------------------------------------------------------------------------------
+# A parameter is one of these. Strings are always from a closed list (enum); there is no free string type in v2.
+types:
+  bool: {kind: bool}
+  count: {kind: int, min: 0, max: 100000}
+  small: {kind: int, min: 0, max: 100}
+  code: {kind: code, re: '^[a-z0-9_]{1,40}$'}                     # a short fixed value from the code; closed in `values` by S4
+  minutes: {kind: int, min: 0, max: 1440}
+  seconds: {kind: int, min: 0, max: 86400}
+  ms: {kind: int, min: 0, max: 3600000}
+  mb: {kind: int, min: 0, max: 1000000}
+  score: {kind: int, min: 0, max: 100}
+  version: {kind: pattern, re: '^\d{1,3}(\.\d{1,3}){0,3}$'}          # an app version, like 0.18.0
+  model: {kind: pattern, re: '^[a-z0-9][a-z0-9.:-]{0,39}$'}          # a model id as the provider names it (gpt-5.4, sonnet-4.5)
+  bucket_n: {kind: enum, values: ['0', '1', '2-5', '6-20', '21-100', '100+']}
+  bucket_pct: {kind: enum, values: ['0-25', '25-50', '50-75', '75-100']}
+  screen: {kind: list, of: screens}                                # a key of `screens`
+  screen_sub: {kind: list, of: screens.sub}                        # a part listed under that screen
+  action: {kind: list, of: actions}
+# Any other name used as a type is a key of `enums`.
+
+# --- closed lists ------------------------------------------------------------------------------------------------------
+enums:
+  provider: [claude, claude_api, openai, openai_api, codex, gemini, local, whisper, apple, pacenote, google, notion,
+             hubspot, drive, none]
+  call_type: [general, sales, interview, presentation, standup, transcript, rehearsal, other]
+  sheet_mode: [quick, expert, none]
+  start_from: [home, menu_bar, calendar, upcoming_page, call_page, notification, hotkey, sheet, onboarding, shortcut]
+  org_kind: [personal, team]
+  theme: [system, light, dark]
+  ui_lang: [en, uk]
+  sign_in_method: [google, console_link]
+  error_area: [ai, transcribe, record, drive, notion, calendar, google, sync, auth, update, entitlements, server,
+               local_llm, crm, index, prep, export, browser]
+  error_code: [timeout, rate_limit, quota, key_invalid, auth_expired, network, offline, server_5xx, server_4xx,
+               not_found, permission, disk_full, parse, cancelled, unsupported, too_large, conflict, crashed, other]
+  perf_what: [app_ready, prep_build, sheet_open, first_tip, answer_tip, transcribe_minute, rec_start, notes_after,
+              search, sync_push, sync_pull, index_build, console_open]
+  update_how: [prompt, background, manual]
+
+# --- screens (scr) and their parts (sub) -------------------------------------------------------------------------------
+# screen_view {scr, sub, from}. `from` is the previous scr of the session (or `launch`). A screen not in this list is
+# never sent; S4 adds a CoreChecks case that every scr used in code is here.
+screens:
+  home: [timeline, past, insights]
+  past_calls: []
+  tracker: [tasks, decisions, risks]
+  stats: []
+  series: []
+  call_page: [setup, brief, summary, discussed, tasks, decisions, risks, earlier, transcript, recording, sales]
+  upcoming_page: [setup, sheet, readiness, sources, versions, tasks, earlier, brief, people]   # S4: the tabs as the app has them
+  get_ready: [start, prepare, plan]                     # CallSetupMode
+  sheet_quick: []
+  sheet_expert: ['1', '2', '3', '4', '5']               # Meeting, What to prepare, Sources, Check, Build
+  sheet_view: [readiness, blocks, sources, export]
+  tips_window: [feed, main_card_hidden, presentation, split]
+  floating_controls: []
+  menu_bar_panel: []
+  transcribe_window: []
+  rehearsal: []
+  recording_picker: []
+  reassign_panel: []
+  google_picker: []
+  settings: [account, general, projects, ai, recording, transcription, integrations, usage, help, modules, sheet,
+             components, calendars, notion, keys, how, about]
+  onboarding: [welcome, permissions, folder, ai, install, calls, done]
+  project_wizard: [name, folder, card, sources, people]
+  org_setup: [name, projects, invite, teams, policy]
+  org_project: [card, registers, state, sources, files, history]
+  whats_new: []
+  module_lock: []
+  console_tab: []
+  plans: []                                             # 0.19.0: Compare plans (switch, start a team)
+  launch: []                                            # only as `from`
+  # the web console (source console): one scr per page group
+  console_overview: []
+  console_people: [list, person]
+  console_orgs: [list, org]
+  console_plans: [matrix, plan]
+  console_inactive: []
+  console_telemetry: []
+  console_analytics: [overview, features, funnels, paths, errors, performance, retention, people, devices, explorer]
+  console_audit: []
+  console_org: [overview, members, teams, invites, projects, policy, plan, usage, audit, export]
+
+# --- actions (action {scr, name}) --------------------------------------------------------------------------------------
+# Buttons and menu items worth knowing whether they are pressed. "Seen but not pressed" = screen_view without the action.
+actions: [start_call, start_now, join_meeting, end_call, prepare, prepare_again, open_sheet, build_sheet, check_readiness,
+          add_source, remove_source, next_step, back_step, skip_step, export, copy, open_tips, toggle_main_card,
+          rate_tip, help_now, ask, record_start, record_pause, record_resume, record_stop, upload_drive, open_transcript,
+          name_speaker, merge_speakers, add_task, close_task, add_decision, add_risk, followup_write, followup_copy,
+          followup_mail, search, filter_org, filter_project, open_call_page, open_settings, open_console, request_plan,
+          connect_google, connect_notion, connect_hubspot, add_project, remove_project, move_project_org, change_project,
+          install_component, remove_component, install_update, later_update, theme_change, sign_in, sign_out,
+          delete_account, invite, rehearsal_start, presentation_on, show_what_is_sent, privacy_toggle, feature_try_it,
+          console_filter, console_export_csv, console_save, refresh_calendars, change_plan, start_team, open_platform]
+
+# --- events -------------------------------------------------------------------------------------------------------------
+# name: {param: type or enum name}. Every event also carries t, s, seq and, where it makes sense, scr (see the spec).
+# `ms` on an event is the length of the thing it ends (timers). Groups follow the plan, section 4.
+events:
+  # 1. life cycle
+  app_launch: {cold: bool, ms_to_ready: ms, after_update: bool}
+  app_quit: {session_min: minutes}
+  app_update: {from: version, to: version, how: update_how}
+  sign_in: {method: sign_in_method, new_account: bool}
+  sign_out: {}
+  crash_prev_session: {}
+  settings_snapshot:                                      # once a day, at the first launch of the day
+    route_prep: provider
+    route_live: provider
+    route_notes: provider
+    route_sheet: provider
+    fallback_chain: small
+    sheet_on: bool
+    tracker_on: bool
+    recording_auto: bool
+    server_sync: bool
+    local_llm: bool
+    theme: theme
+    ui_lang: ui_lang
+    projects: bucket_n
+    orgs: bucket_n
+    google: bool
+    notion: bool
+    hubspot: bool
+    drive: bool
+    calendars: bucket_n
+  # 2. screens and 3. actions
+  screen_view: {scr: screen, sub: screen_sub, from: screen}
+  action: {scr: screen, name: action}
+  # 4. features (schema 1 events, with sharper parameters)
+  call_started: {type: call_type, sales: bool, has_brief: bool, sheet: sheet_mode, from: start_from, provider: provider,
+                 org: org_kind, recording: bool, consent: bool}
+  call_ended: {minutes: minutes, tips: count, rated: count, asks: count, cpu_peak: bucket_pct, recorded: bool}
+  prepare_run: {type: call_type, source: code, seconds: seconds, provider: provider, model: model, sheet: sheet_mode,
+                ok: bool}
+  prepare_again: {sheet: sheet_mode}
+  presentation_mode_on: {split: bool}
+  slide_sync: {variant: code}
+  rehearsal_started: {}
+  rehearsal_finished: {score: score}
+  transcribe_run: {source: code, minutes: minutes, provider: provider}
+  search_calls: {results: bucket_n}
+  followup_written: {provider: provider}
+  followup_copied: {}
+  followup_open_mail: {}
+  notion_page_written: {}
+  notion_task_ticked: {}
+  risk_added: {}
+  decision_added: {}
+  decision_superseded: {}
+  auto_added: {kind: code, n: count}
+  series_opened: {}
+  call_page_edited: {section: code}
+  tip_shown: {kind: code, provider: provider}
+  tip_action: {kind: code, action: code}
+  help_now: {}
+  ask_typed: {}
+  hotkey: {name: code}
+  update_crm: {fields: count}
+  answer_card_saved: {}
+  feature_try_it: {feature: code}
+  demo_opened: {kind: code}
+  onboarding_step: {step: code, skipped: bool}
+  google_connect: {}
+  google_links_read: {n: count}
+  google_export: {}
+  google_meet: {transcript: bool}
+  google_picker_copy: {}
+  tip_rated: {kind: code, verdict: code, reason: code}
+  speakers_merged: {aliases: small}
+  meet_participants: {n: count, named: count}
+  telemetry_sent: {lines: count, to: code}
+  entitlements_refresh: {ok: bool, why: code}
+  module_locked: {module: code, state: code}
+  plan_request_opened: {from: code}
+  plans_opened: {from: code}                              # 0.19.0: Compare plans (account, lock, quota)
+  plan_chosen: {plan: code, from: code}                   # 0.19.0: an owner or admin switched the plan (plan ids)
+  org_team_started: {plan: code}                          # 0.19.0: a team organization started from Solo
+  console_platform: {google: bool}                        # 0.19.0: staff opened Platform in the app (google: asked again)
+  rec_started: {kind: code, source: code}
+  rec_paused: {}
+  rec_saved: {kind: code, minutes: minutes}
+  rec_uploaded: {minutes: minutes, auto: bool}
+  call_reassign: {when: code, files: count}
+  call_reassign_notion: {kind: code}
+  meeting_end: {action: code}
+  calendar_refresh: {from: code, new: count}              # 2026-11-17: Refresh calendars by hand
+  # logged by the app since 0.15-0.18 but missing from schema 1 (18 events), so never written (finding of S1, spec section 13)
+  whatsnew_shown: {from: version, to: version}
+  whatsnew_closed: {seen: bool}
+  addons_chosen: {n: small, where: code}
+  component_removed: {id: code, freed_mb: mb}
+  provider_limit: {level: code, provider: provider}      # schema 1: provider_limit_alert and provider_limit_capped; v2: one event
+  project_wizard: {org: code, folder: code, card: bool, links: count}
+  project_removed: {sample: bool, trash: bool}
+  transcript_drive: {shared_drive: bool}
+  practice_call: {from: code}
+  sync_pull: {items: count}
+  org_card_saved: {fields: small}
+  org_register_changed: {kind: code}
+  org_register_deleted: {kind: code}
+  org_state_saved: {bytes: count}
+  org_index_built: {files: count, skipped: count, vectors: count}
+  org_change_restored: {entity: code}
+  org_setup_invites: {n: small}
+  org_setup_done: {org_teams: bool}
+  # 6. errors and 7. speed
+  error: {area: error_area, code: error_code, provider: provider, retry: small, fallback_to: provider, fatal: bool}
+  perf: {what: perf_what, ms: ms, provider: provider, ok: bool}
+
+# `code` parameters (kind, action, source, step, section...) were short strings in schema 1. In v2 each is a closed list
+# (S4, app 0.19.0): the exact values from the code, as the app sends them (camelCase in the code goes as snake_case, see
+# Analytics.snake). The app drops a value outside its list, and so does the server; CoreChecks fails when a `code`
+# parameter has no list. A new value in the code needs its line here first.
+values:
+  prepare_run.source: [app, sheet]
+  slide_sync.variant: [a]
+  transcribe_run.source: [file, link]
+  auto_added.kind: [risks, decisions]
+  call_page_edited.section: [sales, agenda, open, risks, decisions, on_you, on_them]
+  tip_shown.kind: [tip, answer, agenda, coach_money, coach_question, commitment_done, context_reset, decision_conflict,
+                    interviewer_clarify, notice, observer_question, presentation_qa, retract, risk, speech, wrapup]
+  tip_action.kind: [tip, answer, agenda, coach_money, coach_question, commitment_done, context_reset, decision_conflict,
+                    interviewer_clarify, notice, observer_question, presentation_qa, retract, risk, speech, wrapup]
+  tip_action.action: [say, hide, pin]
+  tip_rated.kind: [tip, answer, agenda, coach_money, coach_question, commitment_done, context_reset, decision_conflict,
+                    interviewer_clarify, notice, observer_question, presentation_qa, retract, risk, speech, wrapup]
+  tip_rated.verdict: [used, partly, not_useful]
+  tip_rated.reason: [off_topic, late, wrong_fact, too_long, not_now]
+  hotkey.name: [help, pause, mute, proactive, presentation, prev_slide, next_slide, add30, other]
+  feature_try_it.feature: [start, prepare, presentation, rehearse, upnext, transcribe, search, followup, series, notion_tasks,
+                           sales, demo, demo_presentation, components, settings_search]
+  demo_opened.kind: [call, presentation]
+  onboarding_step.step: [welcome, permissions, folder, ai, install, calls, done]
+  telemetry_sent.to: [server, worker]
+  entitlements_refresh.why: [signature, same, new, network]
+  module_locked.module: [drive, followup, live_tips, meeting_sheet, notion, presentation, recording, search, series, transcribe]
+  module_locked.state: [open, plan, warn, quota, policy]
+  plan_request_opened.from: [account, lock, quota, plans]
+  plans_opened.from: [account, lock, quota]
+  plan_chosen.plan: [solo, team, enterprise]
+  plan_chosen.from: [solo, team, enterprise, none]
+  org_team_started.plan: [solo, team, enterprise]
+  rec_started.kind: [audio, video]
+  rec_started.source: [sound, display, chosen]
+  rec_saved.kind: [audio, video]
+  call_reassign.when: [live, after]
+  call_reassign_notion.kind: [meetings, new_page]
+  meeting_end.action: [keep, stop, ask]
+  calendar_refresh.from: [home, menu_bar]
+  addons_chosen.where: [whatsnew, onboarding]
+  component_removed.id: [local_model, agent, link_downloader]
+  provider_limit.level: [alert, capped]
+  project_wizard.org: [personal, none, join, create]
+  project_wizard.folder: [new, existing]
+  practice_call.from: [onboarding]
+  org_register_changed.kind: [decision, task, risk]
+  org_register_deleted.kind: [decision, task, risk]
+  org_change_restored.entity: [card, state, source]

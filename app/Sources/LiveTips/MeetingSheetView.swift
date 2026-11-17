@@ -804,11 +804,14 @@ private struct SheetWindowBody: View {
     @ObservedObject var doc: SheetDoc
     let model: StartCallModel
     var body: some View {
+        Group {
         ScrollView {
             MeetingSheetTab(doc: doc, onRefresh: {}, onEditBlocks: { SheetPrepWindow.show(model, mode: .expert, step: 2) })
                 .padding(20)
         }
         .background(PN.C.bg)
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in doc.reload() }
+    }
+        .trackScreen("sheet_view")
     }
 }

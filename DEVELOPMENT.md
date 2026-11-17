@@ -343,6 +343,24 @@ keep calendars and Drive on another. The server checks the ID token's `aud` agai
 deploy takes from `PACENOTE_GOOGLE_CLIENT_ID`, the same value `bundle.sh` writes into `google_oauth.json`. Nothing
 about calls is sent yet (B8).
 
+## Plans and entitlements (0.19.0, B3; server 0.9.0, D41, D42)
+
+What a plan opens comes from the server signed; the app only shows it. Spec: `research/pacenote-b2-entitlements-spec-2026-11-17.md`
+(Project docs), contract: `claude/b6-entitlements-contract.md`.
+
+| Part | File | What it does |
+|---|---|---|
+| Core | `LiveTipsCore/Entitlements.swift` | Built-in public keys (`pn-ent-1`), JWS EdDSA check (CryptoKit), the record of an organization (plan, `trial`, modules, quotas), the catalog (built-in version 1 and the signed `/v1/catalog`), the cache `<app root>/state/entitlements.json` (the signed strings as they came), `resolve` by spec 6.3 (`signedOut`, `live`, `stale(days)`, `soloFallback`), `Rights.level/can/quota/state` with the four states, `due`, `featureModules` (What Pacenote can do -> module), `priceText`. CoreChecks `entitlementsB3` |
+| Store | `LiveTips/EntitlementsStore.swift` | Fetches `/v1/catalog` and `/v1/entitlements` with `If-None-Match` at launch, after sign-in, when organizations change, every 6 hours, after a 402/403 plan or quota answer and when `entitlements_etag` in `/v1/me` differs. A new cache is taken only when it resolves `live` |
+| Requests | `LiveTips/PacenoteAccount.swift` | Every request carries `Pacenote-Problems: 2` (403 `type: plan`, 402 `type: quota`); the user and device ids from the access token go into the session |
+| Gates | `LiveTips/ModuleGate.swift` | `ModuleGate.allow(module, level)` at the entries of spec 2.1: Meeting Sheet (Quick, Expert), call start (`live_tips`), recording (audio, video), Drive upload, transcribe, search, series, follow-up, rehearsal, Notion ticks, and Try it in What Pacenote can do. Local modules are judged by the organization new calls go to. A closed entry opens `LockedModuleWindow` and logs `module_locked`; `ModuleBadge` marks entries in lists |
+| Settings | `LiveTips/AccountSettingsPane.swift` (`AccountPlanSection`) | Plan per organization (`display_as`, Custom for a hidden plan), the beta mark (planned price struck through, 0, `billing_notice_days`), trial, limits, Request another plan (console `/org/{id}/plan`), stale and fallback lines |
+| Telemetry | `LiveTips/TelemetrySender.swift` | The weekly batch goes to `<server>/v1/telemetry/batch` (202), on no answer or 5xx to the Worker (200) |
+
+Not gated yet (inline, no single entry): `registers`, `learning`, `call_agent`, `sales` inside the Meeting Sheet; they
+get a gate when a plan first closes one of them. Server modules are still checked by the server; `Org.teams` and
+`Org.orgProjects` still come from `/v1/me` flags (the server derives them from the same plan).
+
 ## Screenshots for the website
 
 The pictures on the Pacenote pages are made by the app itself, on demo data:

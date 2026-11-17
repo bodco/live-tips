@@ -83,6 +83,7 @@ struct CallPageView: View {
     private var wide: Bool { width >= 860 }
 
     var body: some View {
+        Group {
         let o = CallOutcome.read(transcript: file) ?? CallOutcome()
         let agenda = StartCallModel.agenda(transcript: file)
         let pw = PyTool.project(of: file)
@@ -154,6 +155,8 @@ struct CallPageView: View {
         .sheet(item: $cardDraft) { c in
             AnswerCardForm(card: c, title: L("cards.saveAs"), onSave: { saveCard($0, proj, ws) }, onCancel: { cardDraft = nil })
         }
+    }
+        .trackScreen("call_page", sub: tab, o: CallSyncService.shared.orgID(of: file))
     }
 
     // MARK: header (2026-11-05 redesign: a card like Home's next call)
@@ -1107,6 +1110,7 @@ struct TranscriptView: View {
     }
 
     var body: some View {
+        Group {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 HStack(spacing: 6) {
@@ -1170,6 +1174,8 @@ struct TranscriptView: View {
         }
         .background(PN.C.surface)
     }
+        .trackScreen("call_page", sub: "transcript", o: CallSyncService.shared.orgID(of: file))
+    }
 
     private func chip(_ t: String, on: Bool, _ tap: @escaping () -> Void) -> some View {
         Button(action: tap) {
@@ -1189,6 +1195,7 @@ struct TranscriptView: View {
 @MainActor
 enum FollowUpWindow {
     static func show(file: String) {
+        guard ModuleGate.allow("followup") else { return }          // 0.18.0 (B3)
         HomeNav.shared.open(.call(file))
         HomeNav.shared.followUp = file
     }

@@ -1651,7 +1651,7 @@ Home answers two questions: what is next and what already happened. Tasks, decis
 | Header | Home and Tracker, a pill only when something needs you (Claude, calendar, Notion copy, spending limit, speech model, your name on calls; a click opens the right Settings pane), Search calls (Command-F), Transcribe a recording, Start a call now (Command-N; its arrow has Plan a call), Settings |
 | The sentence on top | "Next call in 37 minutes", "Start a call whenever you are ready" without a calendar, "Welcome to Pacenote" on the first launch |
 | Next call | Time, platform, project, the call name (opens the call), "with Emily R., Jake T. and Sarah M." and the brief state. One main button and one link: no brief: Get ready and "Start without a brief"; a ready brief: Start call and "Prepare again"; no Claude: Start call (records only) and "Connect Claude for a brief and tips". A call that overlaps shows "Overlaps with ..." and Hide it |
-| Coming up | The rest of today and tomorrow on one line, with a TOMORROW mark. Each call: time and project, the name (opens the call), Ready or Not ready and a "..." menu (Get ready or Prepare again, "Not my call, hide it"). No Start buttons here. A hidden call can be brought back with Undo. "All N calls" opens the full list with the same menu |
+| Coming up | The rest of today and tomorrow on one line, with a TOMORROW mark. Each call: time and project, the name (opens the call), Ready or Not ready and a "..." menu (Get ready or Prepare again, "Not my call, hide it"). No Start buttons here. A hidden call can be brought back with Undo. "All N calls" opens the full list with the same menu. The round arrow (or ⌘R) refreshes the calendars at once, for a meeting added a minute ago; the same arrow is in the menu bar panel |
 | Recent calls | The last 3 calls as cards: day, time and length, one sentence from the call notes, the number of decisions and tasks. A click opens the call page; right-click has Notion, the transcript, the follow-up email, the series, Finder and "Remove from this list". "All past calls" lists the rest |
 
 Colours follow the call's state, never the project: not ready (orange), ready (green), preparing (blue), live (red), recorded (dark blue), no transcript (grey). A call started without a project goes to the app's own folder (the workspace "My calls", `~/Library/Application Support/LiveTips/live`); its preparation never reads that folder. This week's numbers moved to Settings > Usage, the feature list to Settings > Help, On you to the Tracker screen. Not ready is orange.
@@ -1676,7 +1676,9 @@ commitments kept on this Mac. Settings > Modules turns it off.
 **AI.** Settings > AI and the onboarding have a Claude tab and a ChatGPT tab; the OpenAI API can now prepare calls too.
 
 **During the call.** The brief strip under the tips window header: "Prepare now" or "Prepare again" remakes the brief
-in the background from the call so far (rules/live_prep.yaml); recording and tips never stop.
+in the background from the call so far (rules/live_prep.yaml); recording and tips never stop. A preparation for this
+call that is still running shows its progress there; one that failed says so and why, with Try again (also on Home's
+live card), instead of "No brief".
 
 ### 14.1n Google accounts and a resizable tips window (0.9.1, beta)
 
@@ -1688,7 +1690,7 @@ Remove, which also revokes Pacenote's access at Google.
 
 | What | How it works |
 |---|---|
-| Calendars | The main calendar of each account is on; tick the others. Events from 3 hours ago to 36 hours ahead, refreshed every 5 minutes. The same event that macOS also shows (Internet Accounts) appears once. Outlook and other calendars still come through macOS |
+| Calendars | The main calendar of each account is on; tick the others. Events from 3 hours ago to 36 hours ahead, refreshed every 5 minutes, or at once with the round arrow on Home. The same event that macOS also shows (Internet Accounts) appears once. Outlook and other calendars still come through macOS |
 | Links for the brief | A Google Docs, Sheets or Slides link in What matters or the call context, and a document attached to the invitation, is read through the first account that can open it, also when it is private. A Markdown copy goes to `<project>/live/google/`; the brief reads the copy. Other Drive files (PDF, Word) are not read, except one you confirm with Confirm in Google in the Meeting Sheet's Sources (Google Picker, 0.10.0) |
 | Export | Export on a past call has Google Docs: a new doc in the chosen account, opened in the browser |
 | Google Meet | On a past call, "..." > Google Meet record saves the participants and, if transcription was on in Meet, the Meet transcript as `<call>.meet.md` next to the call. Your own transcript does not change |
@@ -2509,6 +2511,63 @@ teams, organization projects and invites are managed in the Pacenote console, no
 - **Tracker.** The Call filter no longer grows with the longest meeting title, so Owner and Status stay in view.
 - **Signed in after sleep (0.17.1, server 0.8.1).** If the Mac sleeps right while Pacenote renews its sign-in, the
   server accepts the previous sign-in once within 15 minutes instead of ending this Mac's session.
+
+### 14.1z9 Your plan, the beta, and what a closed feature looks like (0.19.0, beta, server 0.9.0)
+
+- **Settings > Account > Plan** shows the plan of your personal space and of each organization you are in. During the
+  beta every plan is free: the planned price is struck through, next to it "$0 until further notice", and we promise to
+  tell you 30 days before any plan costs money. A plan Pacenote gave an organization by hand reads "Custom". The limits
+  of the plan (seats, storage, organization projects) are listed under it.
+- **Trial.** When a plan comes with a trial, the same place says "Trial: N days left". During the beta nothing changes
+  when the trial ends: the plan simply continues for free.
+- **Request another plan.** An owner or an admin of an organization sees **Request another plan**: it opens the
+  organization's Plan page in the console, where the request goes to Pacenote. Everyone else is asked to talk to their
+  organization owner.
+- **A closed feature is never hidden.** If your plan does not include a feature, its entry stays where it is with a
+  lock and the plan that has it ("Team plan"); opening it explains what it does and what to do, instead of starting.
+  A limit close to running out shows in orange and still works; a limit that ran out says how much was used and when
+  it resets. "Turned off by your organization" means a rule of the organization, not the plan. For now every feature
+  on your Mac is open on every plan.
+- **The plan info is signed.** Pacenote takes it from the server signed, keeps it on the Mac and checks the signature
+  every time it reads it, so editing the file does not open anything. It asks again at launch, after sign-in, every
+  6 hours and right after the server answers that a plan or a limit closed something.
+- **Offline nothing is taken away.** Without a connection the last plan info stays as long as you are offline; after
+  14 days a quiet line says "Plan info last updated N days ago". If the plan info on this Mac cannot be trusted (another
+  account, another Mac, a damaged file) and there is no connection, the Solo plan applies until Pacenote reaches the
+  server. Without signing in, everything on your Mac works as before.
+
+### 14.1z10 Plans for everyone, your use, Platform in the Console tab, product analytics (0.19.0, beta, server 0.11.0)
+
+- **Compare plans.** Settings > Account > Plan has **Compare plans** (and **Change plan** next to each organization you
+  can change): every plan with its planned price (struck through, $0 during the beta), its trial, what it includes and
+  what it does not, and its limits. Everything on your Mac (tips, Meeting Sheet, recording) is in every plan.
+- **Switch plan.** An owner or an admin of an organization switches it here. Before it applies, Pacenote says what the
+  new plan adds and what it turns off. A smaller plan applies only when the organization fits it (seats with open
+  invites, storage, organization projects, indexed files); otherwise it names what does not fit, and nothing is removed
+  for you. It applies at once; during the beta nothing is charged. A custom plan is changed by Pacenote on request.
+- **Start a team.** On Solo, a plan with teams shows **Start a team on Team** (or Enterprise): give the organization a
+  name, you become its owner, and the organization setup opens right away (projects, people, policy). Your personal
+  space stays as it is.
+- **A closed feature leads to the plans.** Opening a feature your plan does not include now offers the plans in the app
+  instead of the console page.
+- **Your use.** Settings > Account > Your use shows your own last 30 days (active days, calls, hours of calls) and
+  **Open my overview**, the same in the Console tab by day. Only your own numbers, and only what Help improve Pacenote
+  sent.
+- **The Console tab for everyone signed in.** Someone who runs nothing in an organization (Solo included) gets their own
+  page there: their use, their plan and the plans.
+- **Platform in the app (Pacenote staff).** Staff see two tabs in the Console, **Organization** and **Platform**.
+  Platform opens in the app only on a Mac that is not revoked and signed in with Google within the last 12 hours.
+  When it is older, Pacenote asks Google again itself, the same sign-in as the first one with your account picked
+  already, and Platform opens right after; no error page and no Platform in the browser. Cancelled, the organization
+  stays open with a line that says why.
+- **Help improve Pacenote, product analytics.** The switch in Settings > General > Privacy now sends which screens and
+  features you use, errors by fixed code and how fast things are, every hour instead of once a week; never the words of
+  a call, names, titles or files. Every event is checked against a fixed list before it is written (rules/analytics.yaml,
+  the same list the server checks). Signed in, it is linked to your account, so your organization's owner and admins see
+  your usage totals, never the events themselves. An organization can turn it on for work in that organization; the
+  same place then names it ("Acme: usage is shared with your organization"). **Show what is sent** shows the batches
+  waiting to go, as they will go. For now the weekly count of earlier versions goes too, next to it. When you join an
+  organization, the join window says it in one line: the organization can see your usage totals, not your calls.
 
 ### 14.2 After the call: the meeting page in Notion
 

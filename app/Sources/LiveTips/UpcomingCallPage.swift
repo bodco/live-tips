@@ -66,6 +66,7 @@ struct UpcomingCallPage: View {
     private var briefPath: String? { PrepDocWindow.path(for: model) }
 
     var body: some View {
+        Group {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 head
@@ -102,6 +103,8 @@ struct UpcomingCallPage: View {
             Button(L("sheet.ui.refresh")) { refresh() }
             Button(L("common.cancel"), role: .cancel) {}
         } message: { Text(L("sheet.ui.refresh.body")) }
+    }
+        .trackScreen("upcoming_page", sub: tab)
     }
 
     // MARK: head: meta, name, project and people, the actions

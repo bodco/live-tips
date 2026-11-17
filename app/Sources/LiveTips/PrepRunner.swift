@@ -17,6 +17,9 @@ final class PrepRunner: ObservableObject {
     /// 0.10.0 (Meeting Sheet, round 2): Prepare again during the call failed; the call keeps its previous sheet and the
     /// tips window says so (cleared when the next preparation starts).
     @Published var liveFailure: String?
+    /// 2026-11-17 (owner): the last preparation failed, with its reason in one line (nil while one runs, after a stop
+    /// and after a success). The tips window and Home say so with Try again instead of "No brief, Prepare now".
+    @Published var failure: String?
     @Published var target = ""            // the prep base name being written
     /// 2026-10-27 (owner, Up next): the call this preparation is for (StartCallModel.id). It joins a live call
     /// only when that call has the same id, so a preparation for an upcoming call never lands in the live one.
@@ -329,6 +332,7 @@ final class PrepRunner: ObservableObject {
         running = false
         stopWait()
         result = L("prep.stopped")
+        failure = nil
         UpNext.shared.prepFinished(id: callID, base: nil, ok: false, stopped: true)
     }
 
@@ -787,6 +791,20 @@ final class PrepRunner: ObservableObject {
                     self.resultMeta["context"] = ctx
                 }
                 Self.ledger(job: r.refreshOf == nil ? "prep" : "prep_refresh", route: routeName, usd: self.costUSD, meta: meta, ok: ok)
+                // 0.19.0 (S4): v2 prepare_run (call type and provider, not the route name), its time, and the error area
+                let secs = Int(Date().timeIntervalSince(self.startedAt ?? Date()))
+                let prov = Analytics.provider(route: routeName)
+                var pr: [String: Any] = ["type": Analytics.callType(r.callType), "source": "app", "seconds": min(max(secs, 0), 86400),
+                                         "provider": prov, "sheet": "none", "ok": ok]
+                if !runModel.isEmpty, !isLocal { pr["model"] = runModel.lowercased() }   // a local model's name is the PM's own
+                AnalyticsTracker.shared.track(r.refreshBase == nil ? "prepare_run" : "prepare_again", r.refreshBase == nil ? pr : ["sheet": "none"])
+                AnalyticsTracker.shared.perf("prep_build", ms: secs * 1000, provider: prov, ok: ok)
+                if !ok {
+                    let low = (errText + " " + logText).lowercased()
+                    let code = low.contains("usage limit") || low.contains("rate limit") ? "rate_limit"
+                        : low.contains("authenticate") || low.contains("log in") ? "auth_expired" : low.contains("timed out") ? "timeout" : "other"
+                    AnalyticsTracker.shared.error("prep", code, provider: prov)
+                }
                 if r.refreshBase == nil {
                     var run = meta
                     run["route"] = routeName; run["ok"] = ok; run["title"] = r.title
@@ -814,6 +832,7 @@ final class PrepRunner: ObservableObject {
                 self.stopWait()
                 self.process = nil
                 UpNext.shared.prepFinished(id: forID, base: base, ok: ok)
+                self.failure = nil                                    // set below with the reason when it failed
                 let mins = Int((Date().timeIntervalSince(self.startedAt ?? Date())) / 60)
                 let tail = (try? String(contentsOfFile: (logs as NSString).appendingPathComponent("prep-claude.log"), encoding: .utf8))
                     .map { String($0.suffix(600)) } ?? ""
@@ -830,6 +849,9 @@ final class PrepRunner: ObservableObject {
                     self.result = ok ? L("prep.readyIn", ["min": "\(max(1, mins))"]) + cost : L("prep.failedExit", ["code": "\(proc.terminationStatus)"])
                     if ok { UsageLog.log("prepare_run", ["type": isLocal ? "local" : (isCodex ? "codex" : isOpenAI ? "openai" : isGemini ? "gemini" : isAgy ? "agy" : useAPI ? "api" : "code"), "source": "app", "seconds": mins * 60]) }
                 }
+                if !ok, self.result != L("prep.stopped") {
+                    self.failure = String(self.result.prefix(160))     // 2026-11-17 (owner): the tips window and Home say why
+                }
             }
         }
         do { try p.run() } catch { return L("prep.err.cantStart", ["err": error.localizedDescription]) }
@@ -840,6 +862,7 @@ final class PrepRunner: ObservableObject {
         target = (base as NSString).lastPathComponent
         callID = r.callID
         forTitle = r.title; forDate = r.date
+        failure = nil
         result = ""
         stopWait(); progress = 0.02; stage = L("prep.st.starting"); detail = ""; filesRead = 0; lineBuf = Data(); costUSD = nil; resultMeta = [:]; readFiles = []
         return nil

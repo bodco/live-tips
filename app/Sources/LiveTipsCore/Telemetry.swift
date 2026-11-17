@@ -5,7 +5,23 @@ import Foundation
 /// author once a week. Times become days; one random install id tells the users apart (it goes when sharing is off); the server checks the same rules
 /// again (telemetry/worker.js). The batch can be seen before it goes (Settings > General > Privacy > Show what is sent).
 public enum Telemetry {
-    public static let endpoint = "https://pacenote-telemetry.neymet-bogdan.workers.dev/v1/batch"
+    /// 0.18.0 (B3, contract 5): the batch goes to the Pacenote server (`POST /v1/telemetry/batch`, no sign-in, the
+    /// same body); the Cloudflare Worker stays the fallback while the move lasts.
+    public static let serverPath = "/v1/telemetry/batch"
+    public static let workerEndpoint = "https://pacenote-telemetry.neymet-bogdan.workers.dev/v1/batch"
+    public static func serverURL(base: URL) -> URL { base.appendingPathComponent(String(serverPath.dropFirst())) }
+
+    /// What one answer means: the server says 202, the Worker 200. No answer or 5xx from the server: try the Worker
+    /// now. 4xx (a malformed batch, too big, 429): keep the days and try at the next check.
+    public enum Next: Equatable { case sent, tryWorker, later }
+    public static func next(serverStatus: Int) -> Next {
+        switch serverStatus {
+        case 200, 202: return .sent
+        case 0, 500...599: return .tryWorker
+        default: return .later
+        }
+    }
+    public static func sent(workerStatus: Int) -> Bool { workerStatus == 200 || workerStatus == 202 }
     public static let everyDays = 7
 
     /// <app root>/state/telemetry.json: {"install", "month", "since", "sent_until", "sent_at"}.

@@ -14,6 +14,11 @@ enum SheetPrepWindow {
 
     /// Get ready: Quick or Expert by the default rules (mode nil), or the one asked for; step for Expert.
     static func show(_ m: StartCallModel, mode: SheetMode? = nil, step: Int = 1, live: Bool = false) {
+        // 0.18.0 (B3): Quick needs meeting_sheet, Expert its expert level; with Expert closed the default rules fall to Quick
+        var mode = mode
+        if mode == .expert { guard ModuleGate.allow("meeting_sheet", "expert") else { return } }
+        else { guard ModuleGate.allow("meeting_sheet") else { return } }
+        if mode == nil, !EntitlementsStore.shared.rights.can("meeting_sheet", "expert", org: ModuleGate.org) { mode = .quick }
         SheetLibrary.shared.reload()
         let d = SheetDraft(model: m)
         d.live = live
@@ -73,6 +78,7 @@ struct SheetQuickView: View {
     private var m: StartCallModel { draft.model }
 
     var body: some View {
+        Group {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 head
@@ -80,6 +86,8 @@ struct SheetQuickView: View {
             }
             .padding(24).frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity)
         }
+    }
+        .trackScreen("sheet_quick")
     }
 
     private var head: some View {
@@ -448,6 +456,7 @@ struct SheetExpertView: View {
     @ObservedObject var draft: SheetDraft
 
     var body: some View {
+        Group {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -483,6 +492,8 @@ struct SheetExpertView: View {
                 .padding(.horizontal, 24).padding(.vertical, 12).background(PN.C.bg)
             }
         }
+    }
+        .trackScreen("sheet_expert", sub: "\(draft.step)")
     }
 
     @ViewBuilder private var next: some View {

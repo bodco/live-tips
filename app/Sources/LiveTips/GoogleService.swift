@@ -192,6 +192,8 @@ final class GoogleService: ObservableObject {
             await refreshAll()
         } catch {
             signIn = .failed(error.localizedDescription)
+            let code = Analytics.errorCode(error)                                      // 0.19.0 (S4)
+            AnalyticsTracker.onMain { AnalyticsTracker.shared.error("google", code, provider: "google") }
         }
     }
 

@@ -395,6 +395,7 @@ final class SheetRunner: ObservableObject {
         pr.runRoute = j.route
         pr.result = ""
         pr.liveFailure = nil
+        pr.failure = nil
         pr.costUSD = nil
         set(0.02, L("sheet.st.sources"))
     }
@@ -566,6 +567,13 @@ final class SheetRunner: ObservableObject {
             let mins = max(1, Int(Date().timeIntervalSince(startedAt) / 60))
             result = L("sheet.ready", ["min": "\(mins)", "state": (o["readiness"] as? String) ?? ""])
             UsageLog.log("prepare_run", ["type": routeName, "source": "sheet", "seconds": mins * 60])
+            // 0.19.0 (S4): v2 prepare_run and the sheet's build time
+            let secs = Int(Date().timeIntervalSince(startedAt))
+            var ar: [String: Any] = ["type": Analytics.callType(j.prep.callType), "source": "sheet", "seconds": min(max(secs, 0), 86400),
+                                     "provider": Analytics.provider(route: routeName), "ok": true]
+            if let m = o["model"] as? String, !m.isEmpty, routeName != AIRoute.local { ar["model"] = m.lowercased() }   // a local model's name is the PM's own
+            AnalyticsTracker.shared.track("prepare_run", ar)
+            AnalyticsTracker.shared.perf("prep_build", ms: secs * 1000, provider: Analytics.provider(route: routeName), ok: true)
             set(1, L("prep.st.done"))
             let pr = PrepRunner.shared
             if pr.joinsCurrentCall, CallEngine.shared.isRunning, let f = CallEngine.shared.lastFile {
@@ -606,6 +614,14 @@ final class SheetRunner: ObservableObject {
             }
         }
         PrepRunner.ledger(job: j.refresh ? "prep_refresh" : "prep", route: routeName, usd: usd, meta: meta, ok: ok)
+        if !ok {     // 0.19.0 (S4): the failed build in v2 (never the error text)
+            let secs = Int(Date().timeIntervalSince(startedAt)), prov = Analytics.provider(route: j.route)
+            AnalyticsTracker.shared.track("prepare_run", ["type": Analytics.callType(j.prep.callType), "source": "sheet",
+                                                          "seconds": min(max(secs, 0), 86400), "provider": prov, "ok": false])
+            AnalyticsTracker.shared.perf("prep_build", ms: secs * 1000, provider: prov, ok: false)
+            let low = result.lowercased()
+            AnalyticsTracker.shared.error("prep", low.contains("limit") ? "rate_limit" : low.contains("timed out") ? "timeout" : "other", provider: prov)
+        }
         // 0.10.0 (round 2, L5): a failed refresh during the call leaves the call's sheet as it was (the sidecar writes
         // nothing on failure) and the tips window says so; never an old brief instead.
         if SheetPipeline.liveOutcome(ok: ok, duringCall: j.live && CallEngine.shared.isRunning) == .keepPrevious {
@@ -616,6 +632,13 @@ final class SheetRunner: ObservableObject {
 
     private func fail(_ j: Job, _ err: String) {
         result = err
+        // 0.19.0 (S4): the failed build in v2 (never the error text)
+        let secs = Int(Date().timeIntervalSince(startedAt)), prov = Analytics.provider(route: j.route)
+        AnalyticsTracker.shared.track("prepare_run", ["type": Analytics.callType(j.prep.callType), "source": "sheet",
+                                                      "seconds": min(max(secs, 0), 86400), "provider": prov, "ok": false])
+        AnalyticsTracker.shared.perf("prep_build", ms: secs * 1000, provider: prov, ok: false)
+        let low = err.lowercased()
+        AnalyticsTracker.shared.error("prep", low.contains("limit") ? "rate_limit" : low.contains("timed out") ? "timeout" : "other", provider: prov)
         if SheetPipeline.liveOutcome(ok: false, duringCall: j.live && CallEngine.shared.isRunning) == .keepPrevious {
             PrepRunner.shared.liveFailure = L("sheet.live.refreshFailed", ["err": String(err.prefix(160))])
         }
@@ -629,6 +652,14 @@ final class SheetRunner: ObservableObject {
         let pr = PrepRunner.shared
         pr.running = false
         pr.result = result
+        // 2026-11-17 (owner): a final failure (not a switch to the next AI, not a stop) is shown as such, with its reason,
+        // and written to logs/sheet-build.log (the sidecar's error came only on stdout, so the log had no trace of it)
+        if notify && !ok {
+            let why = String((result.isEmpty ? L("sheet.ui.err.noResult") : result).prefix(160))
+            pr.failure = why
+            let logPath = ((CallEngine.shared.appRoot as NSString).appendingPathComponent("logs") as NSString).appendingPathComponent("sheet-build.log")
+            FileHandle.forAppending(path: logPath)?.write("!!!! \(Date()) failed after \(Int(Date().timeIntervalSince(startedAt))) s (\(j.route)): \(why)\n".data(using: .utf8)!)
+        } else if ok { pr.failure = nil }
         if notify { UpNext.shared.prepFinished(id: j.prep.callID, base: ok ? j.base : nil, ok: ok) }
     }
 

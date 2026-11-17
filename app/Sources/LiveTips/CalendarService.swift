@@ -125,6 +125,30 @@ final class CalendarService: ObservableObject {
         events = Self.dedup(Self.merge(ek: ek, google: GoogleService.shared.events))
     }
 
+    /// 2026-11-17 (owner): Refresh by hand. A meeting added a minute ago may start in a few minutes and needs preparing,
+    /// so nobody should have to wait for the automatic refresh (Mac calendars when macOS syncs them, Google accounts
+    /// every 5 minutes). macOS is asked to sync its calendar accounts now, the connected Google accounts are read again,
+    /// the list is rebuilt, and once more a few seconds later, because macOS finishes its sync after the call returns.
+    @Published private(set) var syncing = false
+    @Published private(set) var lastSync: Date?
+
+    func syncNow(from place: String) {
+        guard !syncing, demo == nil else { return }
+        syncing = true
+        if access == .granted { store.refreshSourcesIfNecessary() }
+        let before = Set(events.map(\.id))
+        Task { @MainActor in
+            if GoogleService.shared.connected { await GoogleService.shared.refreshEvents() }
+            refresh()
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if access == .granted { store.refreshSourcesIfNecessary() }
+            refresh()
+            lastSync = Date()
+            syncing = false
+            UsageLog.log("calendar_refresh", ["from": place, "new": events.filter { !before.contains($0.id) }.count])
+        }
+    }
+
     /// rules/google.yaml > calendar.merge: one row per occurrence; the EventKit row stays and takes the Google details.
     nonisolated static func merge(ek: [CalEvent], google: [CalEvent]) -> [CalEvent] {
         guard !google.isEmpty else { return ek }
@@ -378,5 +402,33 @@ struct CalendarPicker: View {
         }
         .padding(14)
         .frame(width: 340, height: 400)
+    }
+}
+
+
+/// 2026-11-17 (owner): the Refresh calendars button (Home > Coming up, the menu bar panel). A spinner while it works;
+/// the tooltip says when it last refreshed by hand.
+struct CalendarRefreshButton: View {
+    @ObservedObject private var cal = CalendarService.shared
+    let place: String
+    var shortcut = false
+
+    var body: some View {
+        let b = Button { cal.syncNow(from: place) } label: {
+            if cal.syncing { ProgressView().controlSize(.small).frame(width: 14, height: 14) }
+            else { Image(systemName: "arrow.clockwise").foregroundStyle(PN.C.text2) }
+        }
+        .buttonStyle(.borderless).disabled(cal.syncing)
+        .help(help).accessibilityLabel(L("cal.refreshNow"))
+        if shortcut { b.keyboardShortcut("r", modifiers: .command) } else { b }
+    }
+
+    private var help: String {
+        var t = L("cal.refreshNow.help") + (shortcut ? " ⌘R" : "")
+        if let d = cal.lastSync {
+            let f = DateFormatter(); f.dateFormat = "HH:mm"
+            t += "\n" + L("cal.refreshNow.last", ["t": f.string(from: d)])
+        }
+        return t
     }
 }

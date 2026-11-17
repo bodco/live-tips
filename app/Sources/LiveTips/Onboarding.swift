@@ -109,6 +109,7 @@ struct OnboardingView: View {
     var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.8" }
 
     var body: some View {
+        Group {
         VStack(spacing: 0) {
             GeometryReader { g in
                 ZStack(alignment: .leading) {
@@ -171,6 +172,8 @@ struct OnboardingView: View {
             if m.step == .permissions { m.refreshPermissions(); installInBackground() }
             if m.step == .folder { m.defaultWorkFolder() }
         }
+    }
+        .trackScreen("onboarding", sub: "\(m.step)")
     }
 
     /// Speech recognition and the local search model install while the PM goes through the steps (spec 7).

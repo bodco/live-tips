@@ -243,6 +243,9 @@ final class CallRecorder: NSObject, ObservableObject {
     /// Starts recording the live call (kind "audio" or "video"); for video the source follows Settings (and the picker).
     func begin(transcript t: String, kind k: String, title: String, project: String, source chosen: (RecSource, String)? = nil) {
         guard !isActive, state != "choosing", !t.isEmpty else { publish(); return }
+        // 0.18.0 (B3): the plan may close recording, or video only (spec 2.1); the gate is main-thread UI
+        let level = k == "audio" ? "audio" : "video"
+        if Thread.isMainThread, !MainActor.assumeIsolated({ ModuleGate.allow("recording", level) }) { publish(); return }
         transcript = t; kind = k == "audio" ? "audio" : "video"; self.title = title; self.project = project
         lastNote = ""
         guard ScreenPermission.granted() else {

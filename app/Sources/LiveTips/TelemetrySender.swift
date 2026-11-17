@@ -3,8 +3,12 @@ import LiveTipsCore
 
 /// 0.9.4 (owner, rules/usage.yaml > telemetry): sends the weekly batch when Help improve Pacenote is on.
 /// Checked at launch and every 6 hours; a failed send is tried again at the next check. Nothing else is sent.
+/// 0.19.0 (S4, D43): product analytics v2 (AnalyticsTracker) goes every hour; the weekly schema 1 batch keeps going next
+/// to it for now (Bohdan 17.11), so the console's Telemetry page has no gap and S5 can check v2 against the old counts.
+/// It stops after S5 (`sendsSchema1`). Show what is sent shows both.
 @MainActor enum TelemetrySender {
     private static var timer: Timer?
+    static let sendsSchema1 = true      // Bohdan 17.11: in parallel with v2 until S5 checks v2 against it
 
     static var statePath: String {
         let c = AppConfig.load(from: AppPaths.config)
@@ -40,6 +44,7 @@ import LiveTipsCore
         var s = load()
         if on { if s.since.isEmpty { s.since = Telemetry.day(Date()) } } else { s = .init() }
         save(s)
+        if on { AnalyticsTracker.shared.switchedOn() } else { AnalyticsTracker.shared.switchedOff() }     // 0.19.0: the v2 queue goes too (unless D45 keeps it)
     }
 
     static func batch(from: String, to: String, state: Telemetry.State) -> [String: Any] {
@@ -52,10 +57,14 @@ import LiveTipsCore
 
     /// Writes the batch that would go next (or the last 7 days when nothing is due) and shows it in Finder.
     static func preview() {
-        let s = Telemetry.ensured(load(), now: Date())
-        let to = Telemetry.day(Date().addingTimeInterval(-86400))
-        let w = Telemetry.due(s, now: Date().addingTimeInterval(Double(Telemetry.everyDays) * 86400)) ?? (Telemetry.day(Date().addingTimeInterval(-7 * 86400)), to)
-        let b = batch(from: w.from, to: w.to, state: s)
+        AnalyticsTracker.shared.action("show_what_is_sent", scr: "settings")      // 0.19.0 (S4), before the open events are sealed
+        var b = AnalyticsTracker.shared.preview()       // 0.19.0: the v2 batches waiting, as they will go
+        if sendsSchema1 {                               // and the weekly count, while it still goes
+            let s = Telemetry.ensured(load(), now: Date())
+            let to = Telemetry.day(Date().addingTimeInterval(-86400))
+            let w = Telemetry.due(s, now: Date().addingTimeInterval(Double(Telemetry.everyDays) * 86400)) ?? (Telemetry.day(Date().addingTimeInterval(-7 * 86400)), to)
+            b["weekly_counts"] = batch(from: w.from, to: w.to, state: s)
+        }
         let url = FeatureRegistry.usageDir.appendingPathComponent("next-batch.json")
         try? FileManager.default.createDirectory(at: FeatureRegistry.usageDir, withIntermediateDirectories: true)
         if let d = try? JSONSerialization.data(withJSONObject: b, options: [.prettyPrinted, .sortedKeys]) { try? d.write(to: url, options: .atomic) }
@@ -65,23 +74,40 @@ import LiveTipsCore
     static func tick() {
         let c = AppConfig.load(from: AppPaths.config)
         guard c.shareUsage, c.usageLog else { return }
+        var s0 = Telemetry.ensured(load(), now: Date())       // the install id, used by the v2 header
+        if s0.since.isEmpty { s0.since = Telemetry.day(Date()) }
+        save(s0)
+        if Self.sendsSchema1 == false { return }          // 0.19.0: v2 only (AnalyticsTracker)
         var s = Telemetry.ensured(load(), now: Date())
         if s.since.isEmpty { s.since = Telemetry.day(Date()) }
         save(s)
-        guard let w = Telemetry.due(s, now: Date()), let url = URL(string: Telemetry.endpoint) else { return }
+        guard let w = Telemetry.due(s, now: Date()), let worker = URL(string: Telemetry.workerEndpoint) else { return }
         let b = batch(from: w.from, to: w.to, state: s)
         let n = (b["events"] as? [Any])?.count ?? 0
         guard let body = try? JSONSerialization.data(withJSONObject: b) else { return }
-        var req = URLRequest(url: url, timeoutInterval: 20)
-        req.httpMethod = "POST"; req.httpBody = body
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("Pacenote", forHTTPHeaderField: "User-Agent")
+        // 0.18.0 (B3, contract 5): the Pacenote server first (no sign-in, the same batch), the Worker when it is down
+        let server = Telemetry.serverURL(base: PacenoteAccount.shared.base)
+        func post(_ url: URL) async -> Int {
+            var req = URLRequest(url: url, timeoutInterval: 20)
+            req.httpMethod = "POST"; req.httpBody = body
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue("Pacenote", forHTTPHeaderField: "User-Agent")
+            guard let (_, resp) = try? await URLSession.shared.data(for: req) else { return 0 }
+            return (resp as? HTTPURLResponse)?.statusCode ?? 0
+        }
         Task { @MainActor in
-            guard let (_, resp) = try? await URLSession.shared.data(for: req), (resp as? HTTPURLResponse)?.statusCode == 200 else { return }
+            var to = "server"
+            switch Telemetry.next(serverStatus: await post(server)) {
+            case .sent: break
+            case .later: return
+            case .tryWorker:
+                guard Telemetry.sent(workerStatus: await post(worker)) else { return }
+                to = "worker"
+            }
             var s2 = load()
             s2.sentUntil = w.to; s2.sentAt = ISO8601DateFormatter().string(from: Date())
             save(s2)
-            UsageLog.log("telemetry_sent", ["lines": n])
+            UsageLog.log("telemetry_sent", ["lines": n, "to": to])
         }
     }
 }

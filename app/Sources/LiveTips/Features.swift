@@ -8,7 +8,12 @@ import LiveTipsCore
 
 @MainActor
 enum FeatureRegistry {
-    struct Feature: Identifiable { let id: String; let event: String; let hasWhen: Bool; let tryIt: () -> Void }
+    struct Feature: Identifiable {
+        let id: String; let event: String; let hasWhen: Bool; let tryIt: () -> Void
+        /// 0.18.0 (B3): the module (and level) this entry needs; nil = not a module, never closes (spec 2.1).
+        var module: (module: String, level: String?)? { Entitlements.featureModules[id] }
+        @MainActor var state: Entitlements.State { module.map { ModuleGate.state($0.module, $0.level) } ?? .open }
+    }
 
     static var app: AppDelegate? { NSApp.delegate as? AppDelegate }
 
@@ -46,6 +51,7 @@ enum FeatureRegistry {
     }
 
     static func tryIt(_ f: Feature) {
+        if let m = f.module, !ModuleGate.allow(m.module, m.level) { return }
         UsageLog.log("feature_try_it", ["feature": f.id])
         f.tryIt()
     }
@@ -57,6 +63,7 @@ enum FeatureRegistry {
 }
 
 struct FeaturesView: View {
+    @ObservedObject private var ents = EntitlementsStore.shared      // 0.18.0 (B3): a lock appears when the plan changes
     var compact = false
     var onClose: (() -> Void)? = nil
     @State private var counts: [String: Int] = [:]
@@ -78,6 +85,7 @@ struct FeaturesView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(L("feat." + f.id)).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                            ModuleBadge(state: f.state)
                             Text(n == 0 ? L("feat.notTried") : L("feat.used", ["n": "\(n)"])).font(PN.Font.caption)
                                 .padding(.horizontal, 6).background(Capsule().fill(Color.secondary.opacity(0.12))).foregroundStyle(PN.C.text3)
                         }

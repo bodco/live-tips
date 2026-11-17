@@ -69,6 +69,7 @@ final class OrgCardStore: ObservableObject {
     }
 
     static func problemText(_ c: Int, _ d: Data) -> String {
+        if PacenoteServer.isPlan(d, status: c) { return L("orgcard.err.plan") }     // 0.18.0: 403 `type: plan`
         switch c {
         case 403: return L("orgcard.err.noAccess")
         case 404: return L("orgcard.err.gone")

@@ -53,6 +53,7 @@ struct ReassignPickerView: View {
     var done: () -> Void = {}
 
     var body: some View {
+        Group {
         let live = CallReassignService.shared.isLive(file)
         VStack(alignment: .leading, spacing: 8) {
             Text(L("reassign.title")).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
@@ -65,6 +66,8 @@ struct ReassignPickerView: View {
         }
         .padding(12)
         .frame(width: 340, height: 380)
+    }
+        .trackScreen("reassign_panel")
     }
 }
 

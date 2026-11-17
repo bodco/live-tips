@@ -144,7 +144,7 @@ public enum OrgCard {
         switch status {
         case 200: return .saved
         case 409, 428: return .newer             // 428 only when the version was not known: read it again
-        case 403: return .readOnly
+        case 403: return problem == "plan" ? .plan : .readOnly      // 0.18.0: 403 `type: plan` (server 0.9.0)
         case 404: return .gone
         case 402: return .plan
         case 422: return .invalid(problem)

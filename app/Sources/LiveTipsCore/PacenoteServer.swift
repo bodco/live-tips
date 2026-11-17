@@ -27,6 +27,10 @@ public enum PacenoteServer {
         public var email: String
         public var name: String
         public var signedIn: Date
+        /// 0.18.0 (B3): who and which Mac, read from the access token, so a cached entitlements record can be checked
+        /// offline (`sub`, `device_id`). Nil in a session saved before 0.18.0 until the next token.
+        public var userID: String?
+        public var deviceID: String?
         public init(refreshToken: String, refreshExpires: Date, email: String, name: String, signedIn: Date = Date()) {
             self.refreshToken = refreshToken; self.refreshExpires = refreshExpires; self.email = email; self.name = name
             self.signedIn = signedIn
@@ -40,6 +44,16 @@ public enum PacenoteServer {
             let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
             return try? dec.decode(Session.self, from: d)
         }
+    }
+
+    /// 0.18.0 (B3): the user and device ids inside the server's access token (`pna_` + base64url `user|device|exp`).
+    /// Not a check of the token (the server does that); only who this session is, for the entitlements cache.
+    public static func accessIdentity(_ token: String) -> (user: String, device: String)? {
+        guard token.hasPrefix("pna_"), let b = token.dropFirst(4).split(separator: ".").first,
+              let d = Entitlements.unb64url(b), let t = String(data: d, encoding: .utf8) else { return nil }
+        let p = t.split(separator: "|").map(String.init)
+        guard p.count == 3, p[0].count >= 32, p[1].count >= 32 else { return nil }
+        return (p[0].lowercased(), p[1].lowercased())
     }
 
     public struct Tokens: Equatable {
@@ -74,6 +88,8 @@ public enum PacenoteServer {
         public var cLevel = false               // I am C-level here (D37)
         public var leadsTeams: [String] = []    // teams I lead here
         public var visibleTo: [String] = []     // who sees my calls here: team_lead and/or c_level
+        /// 0.18.0 (B3, server 0.9.0): changes when the organization's rights change; compared with the entitlements cache.
+        public var entitlementsETag = ""
         public init(id: String, name: String, kind: String, role: String, plan: String, requireTranscriptInDrive: Bool = false) {
             self.id = id; self.name = name; self.kind = kind; self.role = role; self.plan = plan
             self.requireTranscriptInDrive = requireTranscriptInDrive
@@ -105,17 +121,28 @@ public enum PacenoteServer {
         public var defaultOrg: Org? { org(defaultOrgID) ?? personal }
         /// The organization filter on Home is shown only with more than one organization.
         public var showsOrgFilter: Bool { orgs.count > 1 }
-        /// 0.17.0: the Console tab in the header, only for someone who runs something (contract 6) or for staff.
-        public var showsConsole: Bool { staff || orgs.contains { $0.canManage } }
-        /// Where the Console tab opens: the default organization when the person runs it, else the first one they run.
+        /// 0.18.0 (B3): organization id -> `entitlements_etag` (empty from a server before 0.9.0).
+        public var entitlementsETags: [String: String] {
+            Dictionary(orgs.map { ($0.id.lowercased(), $0.entitlementsETag) }, uniquingKeysWith: { a, _ in a })
+        }
+        /// 0.17.0: the Console tab in the header. 0.19.0 (server 0.11.0, Bohdan 17.11): for everyone signed in; someone
+        /// who runs nothing gets their own page there (/me: their use, their plan, the plans).
+        public var showsConsole: Bool { true }
+        /// Runs something in a team organization (contract 6), or is staff.
+        public var runsSomething: Bool { staff || orgs.contains { $0.canManage } }
+        /// Where the Console tab opens: the default organization when the person runs it, else the first one they run,
+        /// else their own page.
         public var consolePath: String {
             if let d = defaultOrg, d.canManage { return PacenoteServer.orgConsolePath(orgID: d.id) }
             if let o = orgs.first(where: { $0.canManage }) { return PacenoteServer.orgConsolePath(orgID: o.id) }
-            return "/"
+            return "/me"
         }
     }
 
     // MARK: 0.17.0 (server 0.8.0): the Console tab
+
+    /// 0.19.0: the line beside the Console tab's title: the organization's console, or the person's own page.
+    public static func consoleNoteKey(_ me: Me) -> String { me.runsSomething ? "console.note" : "console.note.me" }
 
     /// The console's host. The tab's web view stays on it; any other link opens in the browser.
     public static let consoleHost = "pacenote-admin.bodco.pm"
@@ -134,10 +161,33 @@ public enum PacenoteServer {
         return next == "/platform" || next.hasPrefix("/platform/")
     }
 
-    /// The body of POST /v1/console/handoff.
-    public static func consoleHandoffBody(next: String) -> Data {
-        (try? JSONSerialization.data(withJSONObject: ["next": next])) ?? Data()
+    /// The body of POST /v1/console/handoff. 0.19.0: `platform` asks for the Platform zone (staff, Google <= 12 h).
+    public static func consoleHandoffBody(next: String, platform: Bool = false) -> Data {
+        let o: [String: Any] = platform ? ["next": next, "platform": true] : ["next": next]
+        return (try? JSONSerialization.data(withJSONObject: o)) ?? Data()
     }
+
+    /// 0.19.0 (server 0.11.0): the handoff for Platform answered that this Mac's Google is older than 12 hours.
+    public static func needsGoogleAgain(_ d: Data, status: Int) -> Bool {
+        guard status == 409, let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (o["type"] as? String) == "google_reauth"
+    }
+
+    /// POST /v1/auth/google/confirm.
+    public static func googleConfirmBody(idToken: String) -> Data {
+        (try? JSONSerialization.data(withJSONObject: ["id_token": idToken])) ?? Data()
+    }
+
+    /// 0.19.0: the console path the Platform zone wants (from /login?next=/platform/...), else nil.
+    public static func platformNext(_ u: URL) -> String? {
+        guard consoleLoginWantsPlatform(u),
+              let n = URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "next" })?.value
+        else { return nil }
+        return n
+    }
+
+    /// 0.19.0: which tab of the Console a page belongs to (Platform for /platform and below).
+    public static func isPlatformPath(_ path: String) -> Bool { path == "/platform" || path.hasPrefix("/platform/") }
 
     /// The one-time link from POST /v1/console/handoff: only an https link to the console's /auth/app with a code.
     public static func consoleHandoffURL(_ d: Data) -> URL? {
@@ -161,6 +211,7 @@ public enum PacenoteServer {
             org.orgProjects = (flags["org_projects"] as? Bool) == true && org.kind == "team"   // never in the personal one (0.6.0)
             org.teams = (flags["teams"] as? Bool) == true
             org.cLevel = (g["c_level"] as? Bool) == true
+            org.entitlementsETag = (g["entitlements_etag"] as? String) ?? ""
             org.leadsTeams = ((g["leads_teams"] as? [Any]) ?? []).compactMap { ($0 as? String) ?? (($0 as? [String: Any])?["id"] as? String) }
             // heads_departments is deprecated (always []) and not read (D37)
             let vis = ((g["visible_to"] as? [String]) ?? []).filter { ["team_lead", "c_level"].contains($0) }
@@ -310,11 +361,14 @@ public enum PacenoteServer {
     }
 
     /// The body of POST /v1/auth/google. The server rejects unknown fields and names over 100 characters.
-    public static func signInBody(idToken: String, deviceName: String, appVersion: String) -> Data {
+    public static func signInBody(idToken: String, deviceName: String, appVersion: String, machine: String? = nil) -> Data {
         let name = String(deviceName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
-        let o: [String: Any] = ["id_token": idToken,
-                                "device": ["name": name.isEmpty ? "Mac" : name, "platform": "macos",
-                                           "app_version": appVersion.isEmpty ? "dev" : String(appVersion.prefix(40))]]
+        var device: [String: Any] = ["name": name.isEmpty ? "Mac" : name, "platform": "macos",
+                                     "app_version": appVersion.isEmpty ? "dev" : String(appVersion.prefix(40))]
+        // 0.19.0 (S4, spec 3.1): the same Mac hash as in the analytics header (Analytics.machine), so the server tells
+        // one Mac's devices and events together; the server hashes it once more
+        if let m = machine, m.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil { device["machine"] = m }
+        let o: [String: Any] = ["id_token": idToken, "device": device]
         return (try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys])) ?? Data()
     }
 
@@ -335,6 +389,42 @@ public enum PacenoteServer {
               let n = o["quota"] as? String, !n.isEmpty else { return nil }
         return Quota(name: n, limit: (o["limit"] as? Int) ?? 0)
     }
+
+    /// 0.18.0 (B3, contract 4): a plan or quota answer in the shape the app asks for (`Pacenote-Problems: 2`):
+    /// 403 `type: plan` names the module, 402 `type: quota` the quota. A 402 without `type` (server before 0.9.0, or
+    /// a place that still answers the old way) with a `flag` or `quota` counts too.
+    public struct PlanProblem: Equatable {
+        public var type: String            // plan / quota
+        public var module = ""
+        public var levelRequired = ""
+        public var requiredPlan: String?
+        public var quota = ""
+        public var limit: Double?
+        public var used: Double?
+        public var resetsAt: Date?
+        public init(type: String, module: String = "", levelRequired: String = "", requiredPlan: String? = nil, quota: String = "",
+                    limit: Double? = nil, used: Double? = nil, resetsAt: Date? = nil) {
+            self.type = type; self.module = module; self.levelRequired = levelRequired; self.requiredPlan = requiredPlan
+            self.quota = quota; self.limit = limit; self.used = used; self.resetsAt = resetsAt
+        }
+    }
+    public static func planProblem(_ data: Data, status: Int) -> PlanProblem? {
+        guard status == 402 || status == 403, let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        let t = (o["type"] as? String) ?? ""
+        if t == "plan" || (status == 402 && t.isEmpty && o["flag"] is String) {
+            return PlanProblem(type: "plan", module: (o["module"] as? String) ?? (o["flag"] as? String) ?? "",
+                               levelRequired: (o["level_required"] as? String) ?? "on", requiredPlan: o["required_plan"] as? String)
+        }
+        if status == 402, t == "quota" || t == "storage" || (t.isEmpty && o["quota"] is String) {
+            return PlanProblem(type: "quota", quota: (o["quota"] as? String) ?? "", limit: Entitlements.num(o["limit"]),
+                               used: Entitlements.num(o["used"]) ?? Entitlements.num(o["used_mb"]), resetsAt: Entitlements.date(o["resets_at"]))
+        }
+        return nil
+    }
+    /// The plan closes this (403 `type: plan`, or the old 402 of organizations and project context).
+    public static func isPlan(_ data: Data, status: Int) -> Bool { planProblem(data, status: status)?.type == "plan" }
+    /// After any plan or quota answer the app asks for its entitlements again (contract 2).
+    public static func refreshesEntitlements(_ data: Data, status: Int) -> Bool { planProblem(data, status: status) != nil }
 
     /// What the app does after a failed refresh: 401 means the session ended on the server (signed out elsewhere,
     /// revoked, deleted): forget it here. Anything else (no network, 5xx, 429) keeps it and tries again later.

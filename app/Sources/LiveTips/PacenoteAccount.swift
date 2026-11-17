@@ -123,6 +123,55 @@ final class PacenoteAccount: ObservableObject {
 
     func cancelSignIn() { receiver?.cancel(); signIn = .idle }
 
+    // MARK: 0.19.0 (server 0.11.0, Bohdan 17.11): Google again for this Mac, for the Platform zone in the Console tab
+
+    /// True while the Google confirm runs (the Console tab shows it over the page).
+    @Published private(set) var confirmingGoogle = false
+    private var confirmReceiver: LoopbackReceiver?
+
+    /// The same Google sign-in as the first one (the system browser, a one-shot server on 127.0.0.1, PKCE, the
+    /// signed-in account preselected), but the ID token goes to POST /v1/auth/google/confirm: the server stamps this Mac
+    /// as having proved Google now; the session, its tokens and everything else stay. nil when done, else the reason.
+    func confirmGoogle() async -> String? {
+        guard signedIn else { return L("account.err.notSignedIn") }
+        guard let client = GoogleClientConfig.load() else { return L("google.err.noClient") }
+        confirmReceiver?.cancel()
+        confirmingGoogle = true; defer { confirmingGoogle = false; confirmReceiver = nil }
+        let state = GoogleOAuth.randomString(16), verifier = GoogleOAuth.randomString(48)
+        let hint = session?.email.isEmpty == false ? session?.email : nil
+        let got: (code: String, redirect: String)? = await withCheckedContinuation { (k: CheckedContinuation<(code: String, redirect: String)?, Never>) in
+            let r = LoopbackReceiver(); confirmReceiver = r
+            r.okTitle = "Pacenote: Google confirmed, back to the app"
+            var redirect = "", resumed = false
+            let finish: ((code: String, redirect: String)?) -> Void = { v in if !resumed { resumed = true; k.resume(returning: v) } }
+            r.start({ port in
+                guard let port else { finish(nil); return }
+                redirect = "http://127.0.0.1:\(port)"
+                NSWorkspace.shared.open(GoogleOAuth.authURL(client: client.clientID, redirect: redirect, scopes: GoogleScopes.signIn,
+                                                            state: state, challenge: GoogleOAuth.challenge(verifier), hint: hint, offline: false))
+            }, received: { target in
+                NSApp?.activate(ignoringOtherApps: true)
+                guard let target, case .code(let code) = GoogleOAuth.callback(target, state: state) else { finish(nil); return }
+                finish((code, redirect))
+            })
+        }
+        guard let got else { return L("console.platform.cancelled") }
+        do {
+            let o = try await GoogleService.shared.tokenCall(["grant_type": "authorization_code", "code": got.code, "code_verifier": verifier,
+                                                              "redirect_uri": got.redirect, "client_id": client.clientID,
+                                                              "client_secret": client.clientSecret])
+            guard let idToken = o["id_token"] as? String else { return L("console.platform.noToken") }
+            let (d, c) = try await call("POST", "/v1/auth/google/confirm", body: PacenoteServer.googleConfirmBody(idToken: idToken))
+            switch c {
+            case 204, 200: return nil
+            case 403: return L("console.platform.otherAccount")
+            default: return PacenoteServer.problem(d, status: c)
+            }
+        } catch { return error.localizedDescription }
+    }
+
+    func cancelConfirmGoogle() { confirmReceiver?.cancel() }
+
     private func finishSignIn(code: String, verifier: String, client: GoogleClient) async {
         do {
             let o = try await GoogleService.shared.tokenCall(["grant_type": "authorization_code", "code": code, "code_verifier": verifier,
@@ -130,7 +179,8 @@ final class PacenoteAccount: ObservableObject {
                                                               "client_secret": client.clientSecret])
             guard let idToken = o["id_token"] as? String else { throw PacenoteAccountError.server(0, "no ID token from Google") }
             // the Google access token of this exchange is not kept: Pacenote needs nothing from Google here
-            let body = PacenoteServer.signInBody(idToken: idToken, deviceName: Self.deviceName, appVersion: Self.appVersion)
+            let body = PacenoteServer.signInBody(idToken: idToken, deviceName: Self.deviceName, appVersion: Self.appVersion,
+                                                 machine: AnalyticsTracker.machineID)
             let (d, code) = try await raw("POST", "/v1/auth/google", body: body, token: nil)
             guard code == 200, let t = PacenoteServer.tokens(json(d)) else { throw PacenoteAccountError.server(code, PacenoteServer.problem(d, status: code)) }
             let email = GoogleOAuth.email(idToken: idToken) ?? ""
@@ -138,8 +188,11 @@ final class PacenoteAccount: ObservableObject {
             guard store.set(.pacenoteSession, s.encoded()) else { throw PacenoteAccountError.server(0, L("account.err.keychain")) }
             session = s
             access = (t.access, t.accessExpires)
+            noteIdentity(t.access)
             signIn = .idle; problem = nil
             await refreshInfo()
+            AnalyticsTracker.shared.track("sign_in", ["method": "google"])      // 0.19.0 (S4)
+            Task { await AnalyticsTracker.shared.flush(why: "sign_in", force: true) }
         } catch {
             signIn = .failed(error.localizedDescription)
         }
@@ -157,6 +210,7 @@ final class PacenoteAccount: ObservableObject {
             guard mc == 200, let m = PacenoteServer.me(json(md)) else { throw PacenoteAccountError.server(mc, PacenoteServer.problem(md, status: mc)) }
             let before = me.map { Set($0.orgs.map(\.id)) }
             me = m
+            EntitlementsStore.shared.meLoaded(m)        // 0.18.0 (B3): a changed entitlements_etag asks again
             if let b = before, b != Set(m.orgs.map(\.id)) { NotificationCenter.default.post(name: Self.orgsChanged, object: nil) }
             if m.pendingInvites > 0 { await loadInvites() } else { invites = [] }
             if var s = session, s.name != m.name || (s.email != m.email && !m.email.isEmpty) {
@@ -174,6 +228,8 @@ final class PacenoteAccount: ObservableObject {
     /// Signs this Mac out (or every device). Forgets the session here even if the server cannot be reached.
     func signOut(everywhere: Bool) async {
         busy = true; defer { busy = false }
+        AnalyticsTracker.shared.track("sign_out")      // 0.19.0 (S4)
+        await AnalyticsTracker.shared.signingOut()       // review 17.11: this account's events go now or never
         var reached = false
         if signedIn {
             let body = try? JSONSerialization.data(withJSONObject: ["everywhere": everywhere])
@@ -302,9 +358,20 @@ final class PacenoteAccount: ObservableObject {
         refreshing?.cancel(); refreshing = nil
         access = nil; session = nil; me = nil; devices = []; problem = nil; invites = []; orgProjects = [:]
         _ = store.remove(.pacenoteSession)
+        EntitlementsStore.shared.signedOut()
     }
 
     // MARK: tokens and requests
+
+    /// 0.18.0 (B3): who and which Mac this session is (from the access token), kept with the session so a cached
+    /// entitlements record can be checked offline. Written only when it changes.
+    private func noteIdentity(_ token: String) {
+        guard var s = session, let id = PacenoteServer.accessIdentity(token), s.userID != id.user || s.deviceID != id.device else { return }
+        s.userID = id.user; s.deviceID = id.device
+        _ = store.set(.pacenoteSession, s.encoded())
+        session = s
+        EntitlementsStore.shared.reload()
+    }
 
     func accessToken() async throws -> String {
         if let a = access, a.expires > Date() { return a.token }
@@ -320,6 +387,7 @@ final class PacenoteAccount: ObservableObject {
                 _ = self.store.set(.pacenoteSession, n.encoded())
                 if self.session != nil { self.session = n }
                 self.access = (t.access, t.accessExpires)
+                self.noteIdentity(t.access)
                 return t.access
             }
             if PacenoteServer.refreshEndsSession(status: c) {
@@ -343,6 +411,13 @@ final class PacenoteAccount: ObservableObject {
         try await call(method, path, body: body, headers: headers)
     }
 
+    /// 0.18.0 (B3): with the answer's headers (`ETag` of /v1/entitlements and /v1/catalog).
+    func apiWithHeaders(_ method: String, _ path: String, headers: [String: String] = [:]) async throws -> (Data, Int, [String: String]) {
+        var r = try await rawFull(method, path, body: nil, token: try await accessToken(), headers: headers)
+        if r.1 == 401 { access = nil; r = try await rawFull(method, path, body: nil, token: try await accessToken(), headers: headers) }
+        return r
+    }
+
     /// An authorized request; a 401 on a fresh-looking access token gets one refresh and one retry.
     private func call(_ method: String, _ path: String, body: Data? = nil, headers: [String: String] = [:]) async throws -> (Data, Int) {
         let r = try await raw(method, path, body: body, token: try await accessToken(), headers: headers)
@@ -352,6 +427,11 @@ final class PacenoteAccount: ObservableObject {
     }
 
     private func raw(_ method: String, _ path: String, body: Data?, token: String?, headers: [String: String] = [:]) async throws -> (Data, Int) {
+        let r = try await rawFull(method, path, body: body, token: token, headers: headers)
+        return (r.0, r.1)
+    }
+
+    private func rawFull(_ method: String, _ path: String, body: Data?, token: String?, headers: [String: String] = [:]) async throws -> (Data, Int, [String: String]) {
         // 0.17.0: a query ("?org_id=") stays a query, not a part of the path
         let parts = path.split(separator: "?", maxSplits: 1).map(String.init)
         var url = base.appendingPathComponent(String(parts[0].dropFirst()))
@@ -364,11 +444,20 @@ final class PacenoteAccount: ObservableObject {
         r.setValue("application/json", forHTTPHeaderField: "Accept")
         r.setValue("Pacenote/\(Self.appVersion) (macOS)", forHTTPHeaderField: "User-Agent")
         if let token { r.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
+        // 0.18.0 (B3, contract 4): plan answers as 403 `type: plan`, quotas as 402 `type: quota`
+        r.setValue(Entitlements.problemsHeader.value, forHTTPHeaderField: Entitlements.problemsHeader.name)
         for (k, v) in headers { r.setValue(v, forHTTPHeaderField: k) }
         if let body { r.httpBody = body; r.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         do {
             let (d, resp) = try await URLSession.shared.data(for: r)
-            return (d, (resp as? HTTPURLResponse)?.statusCode ?? 0)
+            let h = resp as? HTTPURLResponse, code = h?.statusCode ?? 0
+            // contract 2: any plan or quota answer means the rights changed; ask for them again
+            if PacenoteServer.refreshesEntitlements(d, status: code), !path.hasPrefix(Entitlements.entitlementsPath) {
+                EntitlementsStore.shared.planAnswer()
+            }
+            var hs: [String: String] = [:]
+            for (k, v) in h?.allHeaderFields ?? [:] { if let k = k as? String, let v = v as? String { hs[k.lowercased()] = v } }
+            return (d, code, hs)
         } catch { throw PacenoteAccountError.network(error.localizedDescription) }
     }
 }

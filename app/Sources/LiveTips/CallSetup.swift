@@ -40,6 +40,7 @@ struct CallSetupView: View {
     private var saved: Bool { upnext.contains(model) }
 
     var body: some View {
+        Group {
         VStack(spacing: 0) {
             ScrollView {
                 if mode == .page { pageForm.padding(20) } else {
@@ -75,6 +76,8 @@ struct CallSetupView: View {
         .onAppear { model.refreshTemplate(); model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
         .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false; if !model.target.isEmpty { model.note = "" } }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
+    }
+        .trackScreen("get_ready", sub: "\(mode)", on: mode != .page)
     }
 
     private var header: some View {
@@ -735,6 +738,7 @@ final class StartCallWindow {
             window?.close()
         }, onPrepare: {
             // 0.10.0 (Meeting Sheet, phase 4): Prepare opens Quick or Expert for this call
+            AnalyticsTracker.shared.action("prepare", scr: "get_ready")       // 0.19.0 (S4)
             UpNext.shared.save(model)
             window?.close()
             SheetPrepWindow.show(model)

@@ -51,6 +51,7 @@ struct WhatsNewView: View {
     }
 
     var body: some View {
+        Group {
         VStack(spacing: 12) {
             Text(L("wn.updated", ["v": WhatsNewStore.current])).font(PN.Font.label).foregroundStyle(PN.C.text3).padding(.top, 16)
             PacenoteSymbol(height: 44)
@@ -70,6 +71,8 @@ struct WhatsNewView: View {
         .padding(.horizontal, 24)
         .frame(width: 760, height: 680)
         .background(PN.C.bg)
+    }
+        .trackScreen("whats_new")
     }
 
     func card(_ i: WhatsNew.Item) -> some View {

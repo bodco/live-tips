@@ -147,6 +147,8 @@ final class CallEngine {
         if config.localAI.enabled { _ = LocalAIService.shared.waitReady(timeout: 6) }
         callContext = (request["context"] as? String) ?? ""
         callRequest = request
+        let tipsRoute = config.ai.tips
+        AnalyticsTracker.onMain { AnalyticsTracker.shared.callStarted(request: request, tipsRoute: tipsRoute) }     // 0.19.0 (S4): v2 call_started
         sidecarRestarts = 0
         projectRoot = (request["project_dir"] as? String) ?? ""
         projectConfig = (request["project_config"] as? String) ?? ""
@@ -786,7 +788,11 @@ final class CallEngine {
     }
 
     func stop() {
-        if let s = usageStart { UsageLog.log("call_ended", ["minutes": Int(Date().timeIntervalSince(s) / 60)]); usageStart = nil }
+        if let s = usageStart {
+            let mins = Int(Date().timeIntervalSince(s) / 60)
+            UsageLog.log("call_ended", ["minutes": mins]); usageStart = nil
+            AnalyticsTracker.onMain { AnalyticsTracker.shared.callEnded(minutes: mins, recorded: CallRecorder.shared.state != "off") }
+        }
         lastCallSummary = ""
         let control = (appRoot as NSString).appendingPathComponent("control")
         FileManager.default.createFile(atPath: (control as NSString).appendingPathComponent("stop"), contents: Data())

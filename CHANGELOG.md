@@ -3,6 +3,62 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.19.0 (2026-11-17)
+
+- **A failed preparation says so during the call (2026-11-17):** when the preparation for the call you just joined
+  fails, the tips window and the live card on Home now say "The brief could not be prepared" with the reason and Try
+  again, instead of "No brief, Prepare now" as if none had been started. The reason also goes to the build log.
+- **Compare plans and change plan in the app (2026-11-17, server 0.11.0):** Settings > Account > Plan opens every plan
+  with its planned price (struck through, $0 in the beta), trial, what it includes and its limits. Owners and admins
+  switch an organization's plan there, after a step that says what is added and what turns off; a smaller plan applies
+  only when the organization fits and otherwise names what does not fit. On Solo, **Start a team** creates a team
+  organization on Team or Enterprise and opens its setup. A closed feature now leads to these plans.
+- **Your use (2026-11-17, server 0.11.0):** Settings > Account > Your use shows your own last 30 days (active days,
+  calls, hours) with Open my overview in the Console tab.
+- **Console tab for everyone signed in (2026-11-17):** someone who runs nothing in an organization, Solo included, gets
+  their own page there (use, plan, plans).
+- **Platform in the Console tab for Pacenote staff (2026-11-17, server 0.11.0):** two tabs, Organization and Platform.
+  Platform opens in the app on a Mac signed in with Google within 12 hours; older, the app asks Google again itself and
+  opens Platform right after, instead of sending you to the browser.
+- **Product analytics (2026-11-17, server 0.11.0):** Help improve Pacenote sends which screens and features you use,
+  errors by code and speed every hour instead of a weekly count, each event checked against a fixed list
+  (rules/analytics.yaml, the same as the server's). Signed in, it is linked to your account; your organization's owner
+  and admins see your usage totals, never the events. An organization can turn it on for its work, and Settings >
+  General > Privacy names it. The weekly count of earlier versions keeps going next to it for now. Show what is sent shows both. Sign-in now sends a hash of the Mac's
+  hardware id, the same as in analytics. Joining an organization says in one line that it can see your usage totals, not
+  your calls. PRIVACY updated.
+
+- **Refresh calendars by hand (2026-11-17):** a round arrow next to Coming up on Home (also ⌘R) and in the menu bar
+  panel refreshes the calendars at once: macOS is asked to sync its calendar accounts now and connected Google accounts
+  are read again, so a meeting added a minute before it starts shows up in time to get ready. Calendars still refresh
+  by themselves (Google every 5 minutes, Mac calendars when macOS syncs them).
+- **Usage log counts what it missed (2026-11-17):** 19 events the app already tried to log were not on the list of
+  allowed events, so they were never written: optional components picked or removed, projects added with the wizard or
+  removed, What's new shown and closed, the practice call, spending alerts per provider, calls pulled from the server,
+  a transcript copied to Drive, and the organization project card, registers, current state, file index, history and
+  wizard. They are written now, with the same rule as every other event: names and small numbers only, never the words
+  of a call, names or titles.
+- **Signed plan info (2026-11-17, B3, server 0.9.0):** Pacenote now gets what your plan opens in each of your
+  organizations from the server, signed by the server, keeps it on your Mac and checks the signature every time it
+  reads it: a plan file edited on the Mac or copied from another Mac or account does not count. It asks again at
+  launch, after you sign in, when your organizations change, every 6 hours and right after the server answers that a
+  plan or a quota closed something. Offline nothing is taken away: the last plan info stays. Nothing changes in the app
+  yet: on every plan all features on your Mac stay open.
+- **Your plan in Settings > Account (2026-11-17, B3):** a new Plan section shows the plan of your personal space and
+  of each organization, the beta mark (planned price struck through, $0 until further notice, 30 days' notice before
+  anything costs money), a trial when the plan has one, and the plan's limits. Owners and admins get **Request another
+  plan**, which opens the organization's Plan page in the console. A quiet line says when the plan info is old.
+- **A closed feature shows why (2026-11-17, B3):** if a plan ever closes a feature, its entry stays with a lock and
+  the plan that has it, and opening it explains what to do instead of starting; a limit close to running out shows in
+  orange, a limit that ran out says when it resets, and "Turned off by your organization" marks a rule of the
+  organization. Today every feature on your Mac is open on every plan, so nothing looks different.
+- **Plan and quota answers (2026-11-17, server 0.9.0):** the app asks the server for the new shape of plan and quota
+  answers, so the organization card, project context, policy and teams still say "needs another plan" when the plan
+  closes them.
+- **Help improve Pacenote goes to the Pacenote server (2026-11-17):** the weekly batch goes to the Pacenote server
+  without signing in, not linked to your account; when the server cannot be reached it goes to the Cloudflare Worker
+  as before. What is sent does not change. PRIVACY updated.
+
 ## 0.17.2 (2026-11-17)
 
 - **Manage organization opens the Console tab (2026-11-17):** Manage organization in Settings > Account and Open the

@@ -57,7 +57,7 @@ public enum OrgContext {
         case 409, 412, 428: return .newer
         case 413: return .tooLong
         case 422: return problem.contains("8 KB") ? .tooLong : .failed(problem)
-        case 403: return .readOnly
+        case 403: return problem == "plan" ? .plan : .readOnly      // 0.18.0: 403 `type: plan` (server 0.9.0)
         case 404: return .gone
         case 402: return .plan
         default: return .failed(problem.isEmpty ? "HTTP \(status)" : problem)

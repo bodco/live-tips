@@ -8,6 +8,7 @@ import LiveTipsCore
 enum MemoryWindow {
     static var window: NSWindow?
     static func show(project: String? = nil) {
+        guard ModuleGate.allow("search") else { return }            // 0.18.0 (B3)
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { MemoryView(initial: project).frame(minWidth: 560, minHeight: 420) }))
             w.setContentSize(NSSize(width: 640, height: 520))      // 0.8.7 (A6)
@@ -118,7 +119,10 @@ struct MemoryView: View {
 /// time, the decisions of every call, the series' commitments and the questions that stay open call after call.
 @MainActor
 enum SeriesWindow {
-    static func show(record: CallHistory.Record) { UsageLog.log("series_opened"); HomeNav.shared.open(.series(record.file)) }   // 0.8.7 (A2)
+    static func show(record: CallHistory.Record) {
+        guard ModuleGate.allow("series") else { return }            // 0.18.0 (B3)
+        UsageLog.log("series_opened"); HomeNav.shared.open(.series(record.file))
+    }   // 0.8.7 (A2)
 
     /// Questions open at the end of the latest calls, how many calls in a row and since when (newest call first).
     static func lingering(_ calls: [CallHistory.Record]) -> [(text: String, calls: Int, since: Date)] {
@@ -139,6 +143,7 @@ struct SeriesView: View {
     @ObservedObject var register = Register.shared
 
     var body: some View {
+        Group {
         let calls = CallPageView.series(of: record)
         let df = CallPageView.fmt("EEEdMMM")
         let folder = (record.file as NSString).deletingLastPathComponent
@@ -190,6 +195,8 @@ struct SeriesView: View {
             .padding(24).frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(PN.C.bg)
+    }
+        .trackScreen("series")
     }
 
     /// 0.8.7 (D2): open commitments grouped by owner (Me first, then people A-Z), the name once per group;

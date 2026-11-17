@@ -27,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UsageLog.enabled = AppConfig.load(from: AppPaths.config).usageLog
         MainActor.assumeIsolated { AppSignature.shared.check() }     // 2026-10-29: onboarding and About show it
         MainActor.assumeIsolated { TelemetrySender.start() }         // 0.9.4: Help improve Pacenote (off by default)
+        MainActor.assumeIsolated { EntitlementsStore.shared.start() } // 0.18.0 (B3): signed plan info, checked on every read
+        MainActor.assumeIsolated { AnalyticsTracker.shared.start() }  // 0.19.0 (S4, D43): product analytics v2, hourly
         MainActor.assumeIsolated { AIStatusModel.shared.start() }    // 0.10.0 (status fix): limits known from launch
         MainActor.assumeIsolated { AIUsageProbe.shared.start() }     // 0.10.0 (owner 12.11): account usage numbers, 60 s after launch
         // 0.9.5: recordings that were on their way to Google Drive when the app quit go on (after the accounts load)
@@ -329,6 +331,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         CallRecorder.shared.stopAndWait()              // 0.9.5: a recording is saved before the app quits
+        MainActor.assumeIsolated { AnalyticsTracker.shared.quit() }   // 0.19.0: app_quit, the queue sealed for next launch
         MainActor.assumeIsolated { LocalAIService.shared.stop() }
         tips?.setSplit(false, animate: false)          // keep the saved tips window at its normal width
     }
@@ -773,6 +776,7 @@ extension AppDelegate {
     /// being written joins the call when done. Returns an error line, or nil.
     @MainActor
     func launch(_ model: StartCallModel, openMeeting: Bool = true) -> String? {
+        guard ModuleGate.allow("live_tips") else { return L("lock.callClosed") }      // 0.18.0 (B3)
         model.useDefaultTargetIfEmpty()
         if model.chosenPrep == nil { model.adoptExistingPrep() }
         if model.chosenPrep == nil, let b = model.prepBase, let root = model.root {

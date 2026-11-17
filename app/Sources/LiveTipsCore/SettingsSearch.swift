@@ -79,6 +79,8 @@ public enum SettingsSearch {
         .init("sh.presets", "sheet", title: "sheet.ui.set.presets", words: "presets template шаблони пресети"),
         .init("acc.head", "account", title: "account.head", words: "account sign in login server акаунт вхід сервер"),
         .init("acc.orgs", "account", title: "org.head", words: "organization team invite join manage default private організація команда запрошення приєднатися керувати приватний"),
+        .init("acc.plan", "account", title: "plan.head", words: "plan plans compare switch team beta price trial limit seats storage request upgrade план плани порівняти змінити команда бета ціна тріал ліміт місця сховище запит"),
+        .init("acc.usage", "account", title: "usage.head", words: "usage use overview calls hours active days використання огляд дзвінки години активні дні"),
         .init("mod.tracker", "modules", title: "modules.tracker", words: "tracker tasks module трекер задачі модуль"),
         // Components (0.16.0, D3)
         .init("comp.disk", "components", title: "cmp.disk", words: "disk space size storage free gb місце диск розмір вільно"),

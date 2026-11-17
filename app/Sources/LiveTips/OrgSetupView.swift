@@ -127,7 +127,7 @@ final class OrgSetupModel: ObservableObject {
                 guard !b.isEmpty else { return true }
                 let (d, c) = try await acct.api("PATCH", "/v1/orgs/\(orgID)/policy", body: body(b))
                 guard c == 200 else {
-                    error = c == 402 ? L("orgsetup.policy.plan") : L("orgsetup.err", ["e": PacenoteServer.problem(d, status: c)]); return false
+                    error = PacenoteServer.isPlan(d, status: c) ? L("orgsetup.policy.plan") : L("orgsetup.err", ["e": PacenoteServer.problem(d, status: c)]); return false
                 }
                 policyLoaded = policy
                 await acct.refreshInfo()
@@ -162,7 +162,7 @@ final class OrgSetupModel: ObservableObject {
         do {
             let (d, c) = try await acct.api("POST", "/v1/orgs/\(orgID)/teams", body: body(b))
             guard c == 201 || c == 200 else {
-                error = c == 402 ? L("orgsetup.teams.plan") : L("orgsetup.err", ["e": PacenoteServer.problem(d, status: c)]); return
+                error = PacenoteServer.isPlan(d, status: c) ? L("orgsetup.teams.plan") : L("orgsetup.err", ["e": PacenoteServer.problem(d, status: c)]); return
             }
             teamName = ""; teamLead = ""
             await loadFor(.teams)
@@ -183,6 +183,7 @@ struct OrgSetupView: View {
     }
 
     var body: some View {
+        Group {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(L("orgsetup.title", ["org": m.org?.name ?? m.name])).font(.headline)
@@ -230,6 +231,8 @@ struct OrgSetupView: View {
         .sheet(isPresented: $showWizard) {
             ProjectWizardView(settings: settings, orgID: m.orgID) { _ in showWizard = false }
         }
+    }
+        .trackScreen("org_setup", sub: m.step.rawValue)
     }
 
     private func caption(_ s: String) -> some View {

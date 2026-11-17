@@ -9,6 +9,7 @@ import LiveTipsCore
 @MainActor
 enum RehearsalWindow {
     static func show(base: String, title: String, call: StartCallModel? = nil) {
+        guard ModuleGate.allow("presentation") else { return }      // 0.18.0 (B3)
         let w = NSWindow(contentViewController: NSHostingController(rootView: Localized {
             RehearsalView(base: base, title: title, call: call).frame(minWidth: 620, minHeight: 600)
         }))
@@ -100,6 +101,7 @@ struct RehearsalView: View {
     }
 
     var body: some View {
+        Group {
         VStack(alignment: .leading, spacing: 14) {
             switch phase {
             case .intro: intro
@@ -115,6 +117,8 @@ struct RehearsalView: View {
         .background(PN.C.bg)
         .onAppear { steps = RehearsalWindow.steps(base: base) }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now = $0 }
+    }
+        .trackScreen("rehearsal")
     }
 
     // MARK: A. intro

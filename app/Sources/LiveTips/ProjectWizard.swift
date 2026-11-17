@@ -162,6 +162,7 @@ struct ProjectWizardView: View {
     }
 
     var body: some View {
+        Group {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(L("wiz.title")).font(.headline)
@@ -198,6 +199,8 @@ struct ProjectWizardView: View {
         }
         .padding(20).frame(width: 520, height: 470)
         .task { for o in m.teamOrgs where o.orgProjects { await acct.loadOrgProjects(o.id) } }
+    }
+        .trackScreen("project_wizard", sub: "\(m.step)")
     }
 
     private func caption(_ s: String) -> some View {

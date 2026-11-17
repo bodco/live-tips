@@ -52,10 +52,22 @@ public enum UsageLog {
         "feature_try_it": ["feature"], "demo_opened": ["kind"], "onboarding_step": ["step", "skipped"],
         "google_connect": [], "google_links_read": ["n"], "google_export": [], "google_meet": ["transcript"],
         "tip_rated": ["kind", "verdict", "reason"], "speakers_merged": ["aliases"], "meet_participants": ["n", "named"],
-        "telemetry_sent": ["lines"],
+        "telemetry_sent": ["lines", "to"],
+        "entitlements_refresh": ["ok", "why"],
+        "module_locked": ["module", "state"], "plan_request_opened": ["from"],
+        "plans_opened": ["from"], "console_platform": ["google"], "plan_chosen": ["plan", "from"], "org_team_started": ["plan"],
         // 0.10.1 (A6 audit): events the app already logged but this list did not have, so they were never written
         "rec_started": ["kind", "source"], "rec_paused": [], "rec_saved": ["kind", "minutes"], "rec_uploaded": ["minutes", "auto"],
         "call_reassign": ["when", "files"], "call_reassign_notion": ["kind"], "meeting_end": ["action"], "google_picker_copy": [],
+        "calendar_refresh": ["from", "new"],   // 2026-11-17 (owner): Refresh calendars by hand
+        // 2026-11-17 (S1 finding, spec 13): logged by the app since 0.15-0.18 but missing here, so they were never written
+        "addons_chosen": ["n", "where"], "component_removed": ["id", "freed_mb"], "provider_limit_alert": ["provider"],
+        "provider_limit_capped": ["provider"], "project_wizard": ["org", "folder", "card", "links"],
+        "project_removed": ["sample", "trash"], "transcript_drive": ["shared_drive"], "whatsnew_shown": ["from", "to"],
+        "whatsnew_closed": ["seen"], "practice_call": ["from"], "sync_pull": ["items"], "org_card_saved": ["fields"],
+        "org_register_changed": ["kind"], "org_register_deleted": ["kind"], "org_state_saved": ["bytes"],
+        "org_index_built": ["files", "skipped", "vectors"], "org_change_restored": ["entity"],
+        "org_setup_invites": ["n"], "org_setup_done": ["org_teams"],
     ]
     public static var sink: UsageSink?
     public static var enabled = true
@@ -77,7 +89,12 @@ public enum UsageLog {
         return ["t": ISO8601DateFormatter().string(from: at), "e": event, "p": p]
     }
 
+    /// 0.19.0 (S4): every logged event also goes to product analytics v2 (AnalyticsTracker decides, with the
+    /// organization's policy, whether it is kept). Called before the local switch: D45 may send for an organization.
+    public static var onLog: ((String, [String: Any]) -> Void)?
+
     public static func log(_ event: String, _ params: [String: Any] = [:]) {
+        onLog?(event, params)
         guard enabled, let s = sink, let l = line(event, params) else { return }
         s.write(l)
     }

@@ -55,6 +55,8 @@ struct InviteJoinSheet: View {
             Text(L("org.join.title", ["org": invite.orgName])).font(.headline)
             Text(InviteText.line(invite)).font(PN.Font.body).foregroundStyle(PN.C.text2)
             Text(L("org.join.what")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            // 0.19.0 (D45 5): one line among what the organization sees, no separate confirmation
+            Text(L("org.join.usage", ["org": invite.orgName])).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             Toggle(L("org.join.default", ["org": invite.orgName]), isOn: $makeDefault)
             Text(L("org.join.defaultSub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             if let e = error { Text(e).font(PN.Font.caption).foregroundStyle(PN.C.danger).fixedSize(horizontal: false, vertical: true) }
@@ -90,7 +92,8 @@ struct AccountOrgsSection: View {
                                 if o.id == me.defaultOrg?.id { Text(L("org.newCallsHere")).font(PN.Font.caption).foregroundStyle(PN.C.turn) }
                             }
                             Text(L("account.org", ["name": o.isPersonal ? L("org.personal") : L("org.team"),
-                                                   "role": L("account.role." + (o.role.isEmpty ? "member" : o.role)), "plan": o.plan.capitalized]))
+                                                   "role": L("account.role." + (o.role.isEmpty ? "member" : o.role)),
+                                                   "plan": EntitlementsStore.shared.rights.record(o.id)?.plan.label ?? o.plan.capitalized]))
                                 .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                             if let k = PacenoteServer.visibilityKey(o, isPrivate: false) {
                                 Label(L(k), systemImage: "eye").font(PN.Font.caption).foregroundStyle(PN.C.text2)

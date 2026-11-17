@@ -87,3 +87,27 @@ items:
     title_uk: "Керування організацією відкривається в Pacenote"
     body_en: "Manage organization in Settings > Account and Open the console in the organization setup now open the Console tab, already signed in."
     body_uk: "Керувати організацією в Налаштуваннях > Акаунт і Відкрити консоль у налаштуванні організації тепер відкривають вкладку Консоль, вже з входом."
+  - id: plans_in_app
+    version: 0.19.0
+    title_en: "Compare and change plans in Pacenote"
+    title_uk: "Порівняння і зміна планів у Pacenote"
+    body_en: "Settings > Account > Plan shows every plan with what it includes and its limits. Owners and admins can switch the organization's plan there. Everything is free in the beta."
+    body_uk: "Налаштування > Акаунт > План показує кожен план, що він містить і які в нього ліміти. Власники й адміністратори можуть там змінити план організації. У бета все безкоштовно."
+  - id: product_analytics
+    version: 0.19.0
+    title_en: "Help improve Pacenote counts screens and errors"
+    title_uk: "Допомога покращити Pacenote рахує екрани і помилки"
+    body_en: "Pacenote sends which screens and features are used, errors by code and speed, never the words of a call. You can turn it off in Settings > General > Privacy, and Show what is sent lists exactly what goes out."
+    body_uk: "Pacenote надсилає, які екрани й функції використовують, помилки за кодом і швидкість, ніколи не слова дзвінка. Вимкнути можна в Налаштуваннях > Загальні > Приватність, а Показати, що надсилається, перелічує все до дрібниць."
+  - id: prep_failed_says_so
+    version: 0.19.0
+    title_en: "A failed preparation says so"
+    title_uk: "Збій підготовки більше не мовчить"
+    body_en: "If the brief for the call you just joined cannot be prepared, the tips window and Home show the reason and Try again, instead of saying no brief was started."
+    body_uk: "Якщо бриф для дзвінка, до якого ви щойно приєднались, не вдалось підготувати, вікно підказок і Home показують причину і Спробувати ще раз, а не кажуть, що брифу не було."
+  - id: refresh_calendars
+    version: 0.19.0
+    title_en: "Refresh calendars by hand"
+    title_uk: "Оновити календарі вручну"
+    body_en: "A round arrow next to Coming up on Home (also Command R) and in the menu bar panel reads your calendars again at once, so a meeting added a minute ago shows up in time."
+    body_uk: "Кругла стрілка біля Coming up на Home (також Command R) і в панелі меню миттєво перечитує календарі, тож зустріч, додана хвилину тому, з'являється вчасно."

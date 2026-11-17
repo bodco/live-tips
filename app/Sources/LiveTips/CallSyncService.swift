@@ -142,6 +142,7 @@ final class CallSyncService: ObservableObject {
             st.save(path)
             return changes.count
         } catch {
+            if !(error is PacenoteAccountError) { AnalyticsTracker.shared.error("sync", Analytics.errorCode(error), provider: "pacenote") }   // 0.19.0 (S4)
             return nil
         }
     }

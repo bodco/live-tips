@@ -500,6 +500,7 @@ enum TranscribeWindow {
     static let notificationId = "pacenote-transcribe-done"
 
     static func show(file: URL? = nil) {
+        guard ModuleGate.allow("transcribe") else { return }        // 0.18.0 (B3)
         let m = TranscribeModel.shared
         if let f = file, m.phase != .running, m.phase != .waiting { m.reset(); m.file = f }
         else if m.langs.isEmpty { m.reset() }
@@ -529,6 +530,7 @@ struct TranscribeView: View {
 
     var body: some View {
         Group {
+        Group {
             switch m.phase {
             case .input, .failed: input
             case .waiting, .running: progress
@@ -537,6 +539,8 @@ struct TranscribeView: View {
         }
         .frame(minWidth: 760, minHeight: 560)
         .background(PN.C.bg)
+    }
+        .trackScreen("transcribe_window")
     }
 
     // MARK: 1. input

@@ -113,6 +113,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     init(args: PrompterArgs) { self.args = args }
 
     func show() {
+        if !args.demo { AnalyticsTracker.shared.screen("tips_window", sub: "feed", o: AnalyticsTracker.shared.callOrg) }   // 0.19.0 (S4)
 
         let uc = WKUserContentController()
         uc.add(self, name: "liveTips")
@@ -211,6 +212,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         if let t = tips {
             let lines = t.newLines().filter(isJSONObject)
             if !lines.isEmpty { push("window.addItems([" + lines.joined(separator: ",") + "])") }
+            if !args.demo {      // 0.19.0 (S4): tip_shown and first_tip in v2 (the engine logs tip_shown locally)
+                for l in lines { if let d = (try? JSONSerialization.jsonObject(with: Data(l.utf8))) as? [String: Any] { AnalyticsTracker.shared.tipLine(d) } }
+            }
         }
         ticks += 1
         if presentingNow && ticks % 4 == 0 { pollSlides() }
@@ -246,7 +250,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 if r.running && mine {
                     d = ["state": "running", "stage": r.stage, "detail": r.detail, "progress": r.progress]
                 } else if mine, let lf = r.liveFailure {
-                    d = ["state": "failed", "stage": lf, "note": lf]   // 0.10.0 (round 2): the previous sheet stays, say why
+                    d = ["state": "failed", "stage": lf, "note": lf, "kept": true]   // 0.10.0 (round 2): the previous sheet stays, say why
                 } else if !transcriptPath.isEmpty, FileManager.default.fileExists(atPath: String(transcriptPath.dropLast(3)) + ".brief.md") {
                     // 0.9.0: when the brief was made, and whether before the call (the brief strip)
                     let bp = String(transcriptPath.dropLast(3)) + ".brief.md"
@@ -255,8 +259,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                     let hf = DateFormatter(); hf.dateFormat = "HH:mm"
                     d = ["state": "ready", "made": made.map { hf.string(from: $0) } ?? "",
                          "before": (made != nil && started != nil && made! < started!)]
-                } else if mine, r.result.lowercased().contains("fail") {
-                    d = ["state": "failed", "stage": r.result]
+                } else if mine, let f = r.failure {
+                    // 2026-11-17 (owner): the preparation for this call failed: say so and why, with Try again, instead of
+                    // "No brief, Prepare now" (it used to look for "fail" in the text, which a localized error never has)
+                    d = ["state": "failed", "stage": f, "note": f]
                 }
                 let data = (try? JSONSerialization.data(withJSONObject: d)) ?? Data("{}".utf8)
                 return String(data: data, encoding: .utf8) ?? "{}"
@@ -798,6 +804,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     }
 
     @objc func endCallClicked() {
+        if !args.demo { AnalyticsTracker.shared.action("end_call", scr: "tips_window", o: AnalyticsTracker.shared.callOrg) }   // 0.19.0 (S4)
         // 2026-10-26: End call did nothing on a live call. The app had lost track of the recorder
         // process, and a modal alert can open behind this floating window. Now: the recorder's own
         // status decides, and the question is a sheet on this window.
@@ -892,9 +899,10 @@ extension PrompterController {
             if let h = try? FileHandle(forWritingTo: url) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
             else { try? Data(line.utf8).write(to: url) }
         case "ask":
-            if let t = d["text"] as? String { handle("ask", t) }
+            if let t = d["text"] as? String { handle("ask", t); if !args.demo { AnalyticsTracker.shared.tipsWindow("ask") } }
         case "help":
             handle("ask", "sos")                                   // HELP NOW, as before
+            if !args.demo { AnalyticsTracker.shared.tipsWindow("help") }
         case "correct-context":
             guard let text = d["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             MainActor.assumeIsolated {
@@ -910,6 +918,9 @@ extension PrompterController {
         case "liveprep":
             // 0.9.0 (rules/live_prep.yaml): Prepare now / Prepare again / Cancel from the brief strip
             MainActor.assumeIsolated {
+                if (d["a"] as? String) != "cancel" {      // 0.19.0 (S4): the button, when pressed
+                    AnalyticsTracker.shared.action("prepare_again", scr: "tips_window", o: AnalyticsTracker.shared.callOrg)
+                }
                 if (d["a"] as? String) == "cancel" { LivePrep.cancel() }
                 else if (d["a"] as? String) == "open" {      // 0.10.1 (A4): the Meeting Sheet in live mode, no modal
                     if let e = LivePrep.openSheet() { push("window.toastMsg && window.toastMsg(" + jsString(e) + ")") }
@@ -927,6 +938,7 @@ extension PrompterController {
             // The engine and the skill get it as tip_feedback (the last line for a tip wins); EditLog keeps it for learning.
             let v = d["verdict"] as? String ?? ""
             guard ["used", "partly", "not_useful"].contains(v), let key = d["key"] as? String, !key.isEmpty else { return }
+            if !args.demo { AnalyticsTracker.shared.tipsWindow("rated") }
             let reasons = (d["reasons"] as? [String] ?? []).filter { ["off_topic", "late", "wrong_fact", "too_long", "not_now"].contains($0) }
             let comment = (d["comment"] as? String ?? "").replacingOccurrences(of: "|", with: "/").trimmingCharacters(in: .whitespacesAndNewlines)
             var val = v + "|" + key
@@ -1041,6 +1053,7 @@ extension PrompterController {
         case "presenting":
             presentingNow = d["on"] as? Bool ?? false
             HotKeys.shared.setPresenting(presentingNow)
+            if !args.demo { AnalyticsTracker.shared.screen("tips_window", sub: presentingNow ? "presentation" : "feed", o: AnalyticsTracker.shared.callOrg) }
             if presentingNow { pushThumbs() }
         case "stop-follow":
             slideSync.stopped = true

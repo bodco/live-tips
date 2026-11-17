@@ -18,7 +18,10 @@ final class HomeNav: ObservableObject {
         case console                         // 0.17.0: the web console in the app (ConsoleTab.swift)
         case upcoming(String)                // 0.9.0: an upcoming call page (StartCallModel id)
     }
-    @Published var path: [Route] = []
+    @Published var path: [Route] = [] {
+        // review 17.11: back on Home after a pushed screen (onAppear of Home's root does not fire again there)
+        didSet { if path.isEmpty && !oldValue.isEmpty { AnalyticsTracker.shared.screen("home") } }
+    }
     @Published var followUp: String?         // the call page whose follow-up panel is open (A3)
     private var reassigned: Any?
 
@@ -121,7 +124,7 @@ struct HomeRouteView: View {
         case .series(let f):
             if let r = CallHistory.shared.records.first(where: { $0.file == f }) { SeriesView(record: r) } else { Text(L("call.page.empty")).padding() }
         case .transcript(let f, let at): TranscriptView(file: f, at: at)
-        case .stats: ScrollView { WeekStats().padding(20) }
+        case .stats: ScrollView { WeekStats().padding(20) }.trackScreen("stats")
         case .pastCalls: PastCallsView()
         case .tracker: TrackerView()
         case .console: ConsoleTabView()

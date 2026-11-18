@@ -75,8 +75,8 @@ struct WeekStats: View {
         return VStack(alignment: .leading, spacing: 10) {
             // 2026-10-28: one line when there is room, the pickers under the title in a narrow column.
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { Text(L("stats.title")).font(.headline).fixedSize(); Spacer(); pickers(sc) }
-                VStack(alignment: .leading, spacing: 6) { Text(L("stats.title")).font(.headline); HStack(spacing: 8) { pickers(sc) } }
+                HStack(spacing: 8) { Text(L("stats.title")).font(PN.sys(.headline, 13, .semibold)).fixedSize(); Spacer(); pickers(sc) }
+                VStack(alignment: .leading, spacing: 6) { Text(L("stats.title")).font(PN.sys(.headline, 13, .semibold)); HStack(spacing: 8) { pickers(sc) } }
             }
             if period == "custom" && day == nil {
                 HStack(spacing: 6) {
@@ -126,7 +126,7 @@ struct WeekStats: View {
                 .frame(height: compact ? 96 : 160)
                 .help(L("stats.clickDay"))
             } else {
-                Text(L("stats.empty")).font(.callout).foregroundStyle(PN.C.text3)
+                Text(L("stats.empty")).font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3)
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) { facts(longest, busiest, this, mins, spend) }
@@ -198,7 +198,7 @@ struct WeekStats: View {
             Section(L("stats.projects")) { ForEach(sc.projects, id: \.key) { Text($0.name).tag("p:" + $0.key) } }
         }
         .labelsHidden().fixedSize()
-        Toggle(L("stats.salesOnly"), isOn: $salesOnly).toggleStyle(.checkbox).fixedSize()
+        Toggle(L("stats.salesOnly"), isOn: $salesOnly).toggleStyle(.pnCheckbox).fixedSize()
     }
 
     static let dayFmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "EEE d MMM"; return f }()

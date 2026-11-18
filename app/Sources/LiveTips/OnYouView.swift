@@ -67,7 +67,7 @@ struct OnYouView: View {
     }
 
     private func badge(_ text: String) -> some View {
-        Text(text).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.text2)
+        Text(text).font(PN.sys(10, .bold)).foregroundStyle(PN.C.text2)
             .padding(.horizontal, 4).padding(.vertical, 1)
             .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(4)))
     }
@@ -132,7 +132,7 @@ struct OnYouView: View {
             let dueS = c.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": Register.dueText(c.due)]) : L("reg.due", ["due": Register.dueText(c.due)]))
             HStack(alignment: .top, spacing: 8) {
                 Toggle("", isOn: Binding(get: { false }, set: { _ in register.mark(c) }))
-                    .toggleStyle(.checkbox).labelsHidden()
+                    .toggleStyle(.pnCheckbox).labelsHidden()
                     .accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -166,7 +166,7 @@ struct OnYouView: View {
             let dueS = t.due.isEmpty ? "" : (overdue ? L("reg.overdue", ["due": Register.dueText(t.due)]) : L("reg.due", ["due": Register.dueText(t.due)]))
             HStack(alignment: .top, spacing: 8) {
                 Toggle("", isOn: Binding(get: { false }, set: { _ in ntasks.tick(t) }))
-                    .toggleStyle(.checkbox).labelsHidden()
+                    .toggleStyle(.pnCheckbox).labelsHidden()
                     .accessibilityLabel(L("reg.markDoneA11y", ["text": t.title]))
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {

@@ -122,7 +122,7 @@ struct PlansView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text(L("plans.window")).font(.system(size: 20, weight: .bold)).foregroundStyle(PN.C.text)
+                Text(L("plans.window")).font(PN.sys(20, .bold)).foregroundStyle(PN.C.text)
                 Spacer()
                 if let me = acct.me, me.orgs.count > 1 {
                     Picker(L("plans.for"), selection: $m.orgID) {
@@ -191,7 +191,7 @@ struct PlansView: View {
         let a = m.action(p)
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(p.name).font(.system(size: 17, weight: .bold)).foregroundStyle(PN.C.text)
+                Text(p.name).font(PN.sys(17, .bold)).foregroundStyle(PN.C.text)
                 Spacer()
                 if a == .current { Text(L("plans.current")).pnLabel().foregroundStyle(PN.C.turn) }
             }

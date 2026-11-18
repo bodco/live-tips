@@ -49,11 +49,10 @@ struct SheetPrepView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Picker("", selection: $draft.mode) {
-                    Text(L("sheet.ui.quick")).tag(SheetMode.quick)
-                    Text(L("sheet.ui.expert")).tag(SheetMode.expert)
-                }
-                .labelsHidden().pickerStyle(.segmented).fixedSize()
+                PNSegmented(selection: $draft.mode, options: [
+                    (SheetMode.quick, L("sheet.ui.quick")),
+                    (SheetMode.expert, L("sheet.ui.expert"))
+                ]).labelsHidden().fixedSize()
                 if draft.mode == .expert { SheetStepBar(draft: draft) }
                 Spacer()
             }
@@ -95,8 +94,8 @@ struct SheetQuickView: View {
         let mins = Int(m.callDate.timeIntervalSinceNow / 60)
         return VStack(alignment: .leading, spacing: 6) {
             Text(t.string(from: m.callDate) + (mins > 0 && mins < 180 ? " · " + L("sheet.ui.inMin", ["n": "\(mins)"]) : ""))
-                .font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.accent)
-            Text(m.effectiveTitle).font(.system(size: 26, weight: .bold)).foregroundStyle(PN.C.text)
+                .font(PN.sys(13, .semibold)).foregroundStyle(PN.C.accent)
+            Text(m.effectiveTitle).font(PN.sys(26, .bold)).foregroundStyle(PN.C.text)
             if draft.job == nil {
                 Text(problems.isEmpty ? (draft.remembered ? L("sheet.ui.quick.same") : L("sheet.ui.quick.first", ["title": m.effectiveTitle])) : L("sheet.ui.quick.attention"))
                     .font(PN.Font.body).foregroundStyle(problems.isEmpty ? PN.C.text2 : PN.C.pending).fixedSize(horizontal: false, vertical: true)
@@ -439,7 +438,7 @@ struct SheetStepBar: View {
                     if n == 4 { draft.checkSize() }
                 } label: {
                     HStack(spacing: 5) {
-                        Text("\(n)").font(.system(size: 11, weight: .bold)).foregroundStyle(on ? .white : PN.C.text2)
+                        Text("\(n)").font(PN.sys(11, .bold)).foregroundStyle(on ? .white : PN.C.text2)
                             .frame(width: 18, height: 18).background(Circle().fill(on ? PN.C.accentFill : PN.C.surface2))
                         Text(L("sheet.ui.step.\(n)")).font(PN.Font.caption.weight(on ? .semibold : .regular)).foregroundStyle(on ? PN.C.text : PN.C.text2)
                     }
@@ -521,15 +520,14 @@ struct SheetMeetingStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(L("sheet.ui.s1.title")).font(.system(size: 24, weight: .bold))
+                Text(L("sheet.ui.s1.title")).font(PN.sys(24, .bold))
                 Text(L("sheet.ui.s1.sub")).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             }
             PageCard(spacing: 10) {
-                Picker("", selection: $draft.withEvent) {
-                    Text(L("sheet.ui.s1.fromCalendar")).tag(true)
-                    Text(L("sheet.ui.s1.noEvent")).tag(false)
-                }
-                .labelsHidden().pickerStyle(.segmented).fixedSize().disabled(m.calEventID == nil)
+                PNSegmented(selection: $draft.withEvent, options: [
+                    (true, L("sheet.ui.s1.fromCalendar")),
+                    (false, L("sheet.ui.s1.noEvent"))
+                ]).labelsHidden().fixedSize().disabled(m.calEventID == nil)
                 if draft.withEvent, m.calEventID != nil {
                     Label(L("sheet.ui.s1.event"), systemImage: "calendar").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else {
@@ -569,18 +567,15 @@ struct SheetMeetingStep: View {
                     }.labelsHidden().fixedSize()
                 }
                 field(L("sheet.ui.s1.language")) {
-                    Picker("", selection: $draft.language) {
-                        Text(L("sheet.ui.lang.en")).tag("en")
-                        Text(L("sheet.ui.lang.uk")).tag("uk")
-                    }.labelsHidden().pickerStyle(.segmented).fixedSize()
+                    PNSegmented(selection: $draft.language, options: [
+                        ("en", L("sheet.ui.lang.en")),
+                        ("uk", L("sheet.ui.lang.uk"))
+                    ]).labelsHidden().fixedSize()
                 }
                 field(L("sheet.ui.s1.remind")) {
-                    Picker("", selection: $draft.remind) {
-                        Text(L("sheet.ui.remind.30")).tag(30)
-                        Text(L("sheet.ui.remind.60")).tag(60)
-                        Text(L("sheet.ui.remind.off")).tag(0)
-                        if ![0, 30, 60].contains(draft.remind) { Text(L("sheet.ui.remind.n", ["n": "\(draft.remind)"])).tag(draft.remind) }
-                    }.labelsHidden().pickerStyle(.segmented).fixedSize()
+                    PNSegmented(selection: $draft.remind, options: [(30, L("sheet.ui.remind.30")), (60, L("sheet.ui.remind.60")), (0, L("sheet.ui.remind.off"))]
+                        + ([0, 30, 60].contains(draft.remind) ? [] : [(draft.remind, L("sheet.ui.remind.n", ["n": "\(draft.remind)"]))]))
+                    .labelsHidden().fixedSize()
                 }
             }
         }
@@ -628,7 +623,7 @@ struct SheetBlocksStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(L("sheet.ui.s2.title")).font(.system(size: 24, weight: .bold))
+                Text(L("sheet.ui.s2.title")).font(PN.sys(24, .bold))
                 Text(L("sheet.ui.s2.sub", ["name": draft.preset?.name ?? draft.presetID])).font(PN.Font.body).foregroundStyle(PN.C.text2)
             }
             PageCard(spacing: 0) {
@@ -680,7 +675,7 @@ struct SheetBlocksStep: View {
                     ForEach(lib.methods, id: \.self) { Text(SalesMethods.shared.label($0)).tag($0) }   // S1: names, not keys
                 }.labelsHidden().fixedSize().onAppear { SalesMethods.shared.load() }
             }
-            Toggle(L("sheet.ui.s2.onlyIfData"), isOn: b.onlyIfData).toggleStyle(.checkbox).font(PN.Font.caption)
+            Toggle(L("sheet.ui.s2.onlyIfData"), isOn: b.onlyIfData).toggleStyle(.pnCheckbox).font(PN.Font.caption)
             Button { b.wrappedValue.visible.toggle() } label: {
                 Image(systemName: b.wrappedValue.visible ? "eye" : "eye.slash").foregroundStyle(b.wrappedValue.visible ? PN.C.text2 : PN.C.pending)
             }
@@ -697,7 +692,7 @@ struct SheetBlocksStep: View {
             Text(L("sheet.ui.s2.save")).pnSection()
             TextField(L("sheet.ui.s2.name"), text: $presetName).textFieldStyle(.roundedBorder)
             Text(L("sheet.ui.s2.saveNote", ["n": "\(draft.blocks.filter(\.visible).count)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            Toggle(L("sheet.ui.s2.suggestNew"), isOn: $suggestNew).toggleStyle(.checkbox)
+            Toggle(L("sheet.ui.s2.suggestNew"), isOn: $suggestNew).toggleStyle(.pnCheckbox)
             if !saveNote.isEmpty { Text(saveNote).font(PN.Font.caption).foregroundStyle(PN.C.pending) }
             HStack {
                 Spacer()
@@ -729,7 +724,7 @@ struct SheetSourcesStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(L("sheet.ui.s3.title")).font(.system(size: 24, weight: .bold))
+                Text(L("sheet.ui.s3.title")).font(PN.sys(24, .bold))
                 Text(L("sheet.ui.s3.sub")).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             }
             ForEach(draft.linksInText, id: \.self) { l in SheetLinkSuggestion(draft: draft, link: l) }
@@ -764,7 +759,7 @@ struct SheetSourcesStep: View {
 
     private var dropZone: some View {
         VStack(spacing: 4) {
-            Image(systemName: "tray.and.arrow.down").font(.system(size: 20)).foregroundStyle(dropping ? PN.C.accent : PN.C.text3)
+            Image(systemName: "tray.and.arrow.down").font(PN.sys(20)).foregroundStyle(dropping ? PN.C.accent : PN.C.text3)
             Text(L("sheet.ui.s3.drop")).font(PN.Font.body.weight(.medium))
             Text(L("sheet.ui.s3.dropSub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).multilineTextAlignment(.center)
         }
@@ -794,7 +789,7 @@ struct SheetSourcesStep: View {
             ForEach(list) { c in
                 let i = draft.candidates.firstIndex { $0.id == c.id }
                 HStack(alignment: .top, spacing: 8) {
-                    if let i { Toggle("", isOn: $draft.candidates[i].checked).toggleStyle(.checkbox).labelsHidden() }
+                    if let i { Toggle("", isOn: $draft.candidates[i].checked).toggleStyle(.pnCheckbox).labelsHidden() }
                     VStack(alignment: .leading, spacing: 1) {
                         Text(c.title).font(PN.Font.body)
                         Text(([SheetLabels.tokens(c.tokens)] + c.why).filter { !$0.isEmpty }.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -829,7 +824,7 @@ struct SheetDraftSourceRow: View {
         let st = SourceType(rawValue: source.type)
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top, spacing: 10) {
-                Toggle("", isOn: $source.checked).toggleStyle(.checkbox).labelsHidden()
+                Toggle("", isOn: $source.checked).toggleStyle(.pnCheckbox).labelsHidden()
                 Image(systemName: SheetLabels.icon(st)).foregroundStyle(PN.C.text3).frame(width: 18)
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 6) {
@@ -862,7 +857,7 @@ struct SheetDraftSourceRow: View {
                 .padding(.leading, 52)
             }
             if draft.model.callType == "presentation" && ["pptx", "pdf", "key"].contains(((source.path ?? "") as NSString).pathExtension.lowercased()) {
-                Toggle(L("sheet.ui.s3.isDeck"), isOn: $source.deck).toggleStyle(.checkbox).font(PN.Font.caption).padding(.leading, 52)
+                Toggle(L("sheet.ui.s3.isDeck"), isOn: $source.deck).toggleStyle(.pnCheckbox).font(PN.Font.caption).padding(.leading, 52)
                 if source.deck {
                     // The deck row carries its slide owners, minutes and Q&A: the same DeckBlock as Start call (0.8.5).
                     DeckBlock(model: draft.model).padding(.leading, 52)
@@ -1015,7 +1010,7 @@ struct SheetSizeStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(L("sheet.ui.s4.title")).font(.system(size: 24, weight: .bold))
+                Text(L("sheet.ui.s4.title")).font(PN.sys(24, .bold))
                 Text(L("sheet.ui.s4.sub")).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             }
             PageCard(spacing: 8) {
@@ -1141,7 +1136,7 @@ struct SheetBuildProgress: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(L("sheet.ui.s5.title")).font(.system(size: 24, weight: .bold))
+                Text(L("sheet.ui.s5.title")).font(PN.sys(24, .bold))
                 Spacer()
                 if !job.done && job.failed == nil {
                     Button(L("call.stop")) { job.stop() }.buttonStyle(.pnTertiary)

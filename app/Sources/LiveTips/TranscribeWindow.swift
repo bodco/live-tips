@@ -555,7 +555,7 @@ struct TranscribeView: View {
         return VStack(alignment: .leading, spacing: 16) {
             WindowHeader(symbol: "waveform", title: L("tr.window"), subtitle: L("tr.subtitle"))
             VStack(spacing: 10) {
-                Image(systemName: "arrow.down.doc").font(.system(size: 28)).foregroundStyle(PN.C.text3)
+                Image(systemName: "arrow.down.doc").font(PN.sys(28)).foregroundStyle(PN.C.text3)
                 Text(m.file?.lastPathComponent ?? L("tr.drop")).font(PN.Font.body).foregroundStyle(m.file == nil ? PN.C.text3 : PN.C.text)
                 Button(L("tr.choose")) { choose() }.buttonStyle(.pnSecondary)
                 Text(L("tr.types")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -741,7 +741,7 @@ struct TranscribeView: View {
                         }
                         .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
                         Toggle(L("tr.remember"), isOn: Binding(get: { s.remember }, set: { m.edit(["--remember", s.id + "=" + ($0 ? "on" : "off")]) }))
-                            .toggleStyle(.checkbox).font(PN.Font.caption).disabled(s.name == nil)
+                            .toggleStyle(.pnCheckbox).font(PN.Font.caption).disabled(s.name == nil)
                     }
                 }
                 .padding(10)
@@ -757,7 +757,7 @@ struct TranscribeView: View {
             Text(L("tr.save")).pnSection()
             TextField(L("tr.title"), text: $m.title).textFieldStyle(.roundedBorder)
             HStack {
-                Toggle(L("tr.date"), isOn: Binding(get: { m.date != nil }, set: { m.date = $0 ? (m.date ?? Date()) : nil })).toggleStyle(.checkbox)
+                Toggle(L("tr.date"), isOn: Binding(get: { m.date != nil }, set: { m.date = $0 ? (m.date ?? Date()) : nil })).toggleStyle(.pnCheckbox)
                 if m.date != nil {
                     DatePicker("", selection: Binding(get: { m.date ?? Date() }, set: { m.date = $0 })).labelsHidden()
                 }

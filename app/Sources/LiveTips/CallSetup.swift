@@ -83,7 +83,7 @@ struct CallSetupView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(mode == .prepare ? L("call.title.prepare") : mode == .plan ? L("call.title.plan") : saved ? L("call.title.upcoming") : L("call.title.start"))
-                .font(.system(size: 22, weight: .bold)).foregroundStyle(PN.C.text)
+                .font(PN.sys(22, .bold)).foregroundStyle(PN.C.text)
             if mode != .start {
                 Text(mode == .prepare ? L("call.sub.prepare") : L("call.sub.plan")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
@@ -141,7 +141,7 @@ struct CallSetupView: View {
         VStack(alignment: .leading, spacing: 6) {
             fieldLabel(L("call.name"))
             TextField("", text: $model.title, prompt: Text(L("call.namePlaceholder")))
-                .textFieldStyle(.roundedBorder).font(.system(size: 15))
+                .textFieldStyle(.roundedBorder).font(PN.sys(15))
                 .focused($titleFocus)
                 .onChange(of: model.title) { model.scanPrep(); copied = false }
             if let e = model.rememberedForTitle {
@@ -218,20 +218,20 @@ struct CallSetupView: View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
             GridRow {
                 fieldLabel(L("start.callType"))
-                Picker("", selection: $model.callType) {
-                    Text(L("start.type.regular")).tag("auto")
-                    Text(L("start.type.presentation")).tag("presentation")
-                    Text(L("callSettings.type.interview")).tag("interview")
-                    Text(L("callSettings.type.transcript")).tag("transcript")
-                }.labelsHidden().pickerStyle(.segmented).fixedSize()
+                PNSegmented(selection: $model.callType, options: [
+                    ("auto", L("start.type.regular")),
+                    ("presentation", L("start.type.presentation")),
+                    ("interview", L("callSettings.type.interview")),
+                    ("transcript", L("callSettings.type.transcript"))
+                ]).labelsHidden().fixedSize()
             }
             GridRow {
                 fieldLabel(L("start.audience"))
-                Picker("", selection: $model.audience) {
-                    Text(L("callSettings.audience.auto")).tag("auto")
-                    Text(L("callSettings.audience.client")).tag("client")
-                    Text(L("callSettings.audience.team")).tag("team")
-                }.labelsHidden().pickerStyle(.segmented).fixedSize()
+                PNSegmented(selection: $model.audience, options: [
+                    ("auto", L("callSettings.audience.auto")),
+                    ("client", L("callSettings.audience.client")),
+                    ("team", L("callSettings.audience.team"))
+                ]).labelsHidden().fixedSize()
             }
             GridRow {
                 fieldLabel(L("start.language"))
@@ -534,7 +534,7 @@ struct CallSetupView: View {
                     Button(L("call.prepSettings")) { SettingsWindow.show(tab: "ai") }.buttonStyle(.pnTertiary)
                 }
             }
-            .formStyle(.grouped)
+            .formStyle(.grouped).toggleStyle(.pnSwitch)
         } label: {
             Text(L("call.options")).pnSection().foregroundStyle(PN.C.text)
         }
@@ -555,16 +555,16 @@ struct CallSetupView: View {
     @ViewBuilder private var pageForm: some View {
         VStack(alignment: .leading, spacing: 20) {
             question(L("page.q.kind")) {
-                Picker("", selection: $model.callType) {
-                    Text(L("start.type.regular")).tag("auto")
-                    Text(L("start.type.presentation")).tag("presentation")
-                    Text(L("callSettings.type.interview")).tag("interview")
-                    Text(L("callSettings.type.transcript")).tag("transcript")
-                }.labelsHidden().pickerStyle(.segmented).fixedSize()
+                PNSegmented(selection: $model.callType, options: [
+                    ("auto", L("start.type.regular")),
+                    ("presentation", L("start.type.presentation")),
+                    ("interview", L("callSettings.type.interview")),
+                    ("transcript", L("callSettings.type.transcript"))
+                ]).labelsHidden().fixedSize()
                 Toggle(isOn: Binding(get: { model.salesEnabled }, set: { model.salesEnabled = $0; model.salesTouched = true })) {
                     Text(L("page.salesMode")).font(PN.Font.body)
                 }
-                .toggleStyle(.checkbox)
+                .toggleStyle(.pnCheckbox)
                 if model.callType != "auto" { typeSection }
             }
             question(L("page.q.matters")) { contextBox }
@@ -602,7 +602,7 @@ struct CallSetupView: View {
     }
 
     @ViewBuilder private var pageButtons: some View {
-        Toggle(L("page.useForSeries", ["title": model.effectiveTitle]), isOn: $useForSeries).toggleStyle(.checkbox)
+        Toggle(L("page.useForSeries", ["title": model.effectiveTitle]), isOn: $useForSeries).toggleStyle(.pnCheckbox)
             .help(L("page.useForSeries.help"))
         Spacer()
         Button(L("common.cancel"), action: onCancel).buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)

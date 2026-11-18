@@ -17,12 +17,11 @@ struct AppearanceBlock: View {
                     StyleCard(style: s, selected: PNStyle(config: style) == s) { style = s.rawValue }
                 }
             }
-            Picker(L("set.appearance.mode"), selection: $mode) {
-                Text(L("set.theme.system")).tag("system")
-                Text(L("set.theme.light")).tag("light")
-                Text(L("set.theme.dark")).tag("dark")
-            }
-            .pickerStyle(.segmented)
+            PNSegmented(L("set.appearance.mode"), selection: $mode, options: [
+                ("system", L("set.theme.system")),
+                ("light", L("set.theme.light")),
+                ("dark", L("set.theme.dark"))
+            ])
             Text(L("set.appearance.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
         }
         .padding(.vertical, 4)
@@ -49,9 +48,9 @@ struct StyleCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 preview(t)
                 HStack(spacing: 6) {
-                    Text(name).font(.system(size: 13, weight: .semibold)).foregroundStyle(yellow ? Color(pnHex: 0x0D0D0B) : PN.C.text)
+                    Text(name).font(PN.sys(13, .semibold)).foregroundStyle(yellow ? Color(pnHex: 0x0D0D0B) : PN.C.text)
                     if style == PNStyle.buildDefault {
-                        Text(L("set.appearance.default")).font(.system(size: 11)).foregroundStyle(yellow ? Color(pnHex: 0x0D0D0B) : PN.C.text3)
+                        Text(L("set.appearance.default")).font(PN.sys(11)).foregroundStyle(yellow ? Color(pnHex: 0x0D0D0B) : PN.C.text3)
                     }
                 }
                 Text(detail).font(PN.Font.caption).foregroundStyle(yellow ? Color(pnHex: 0x0D0D0B) : PN.C.text2)

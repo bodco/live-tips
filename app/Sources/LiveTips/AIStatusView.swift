@@ -177,7 +177,7 @@ struct AIStatusIcon: View {
     var body: some View {
         Button { open.toggle() } label: {
             Image(systemName: AIStatus.symbol(m.level))
-                .font(.system(size: 14, weight: .semibold))
+                .font(PN.sys(14, .semibold))
                 .foregroundStyle(Self.color(m.level))
                 .frame(width: 26, height: 26).contentShape(Rectangle())
         }

@@ -77,7 +77,7 @@ private struct FlashFrame: View {
     let label: String
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(PN.C.onAccent).lineLimit(1)
+            Text(label).font(PN.sys(12, .semibold)).foregroundStyle(PN.C.onAccent).lineLimit(1)
                 .padding(.horizontal, 9).padding(.vertical, 4)
                 .background(PN.C.accentFill, in: RoundedRectangle(cornerRadius: PN.r(6)))
             RoundedRectangle(cornerRadius: PN.r(10)).stroke(PN.C.accentFill, lineWidth: 4)
@@ -102,11 +102,10 @@ struct RecordingPickerView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Picker("", selection: $tab) {
-                        Text(L("rec.pick.windows")).tag("windows")
-                        Text(L("rec.pick.screens")).tag("screens")
-                    }
-                    .pickerStyle(.segmented).labelsHidden().frame(width: 220)
+                    PNSegmented(selection: $tab, options: [
+                        ("windows", L("rec.pick.windows")),
+                        ("screens", L("rec.pick.screens"))
+                    ]).labelsHidden().frame(width: 220)
                     ScrollView {
                         VStack(spacing: 2) {
                             if tab == "windows" {
@@ -117,7 +116,7 @@ struct RecordingPickerView: View {
                                 }
                             } else {
                                 ForEach(displays) { d in
-                                    row("d\(d.id)", icon: AnyView(Image(systemName: "display").font(.system(size: 18)).foregroundStyle(PN.C.accent).frame(width: 26, height: 26)),
+                                    row("d\(d.id)", icon: AnyView(Image(systemName: "display").font(PN.sys(18)).foregroundStyle(PN.C.accent).frame(width: 26, height: 26)),
                                         title: d.name, sub: d.main ? L("rec.display.main") : "", call: false)
                                 }
                             }
@@ -159,7 +158,7 @@ struct RecordingPickerView: View {
                 }
                 Spacer(minLength: 4)
                 if call {
-                    Text(L("rec.pick.call")).font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.turn)
+                    Text(L("rec.pick.call")).font(PN.sys(11, .semibold)).foregroundStyle(PN.C.turn)
                         .padding(.horizontal, 6).padding(.vertical, 2).background(PN.C.turn.opacity(0.12), in: RoundedRectangle(cornerRadius: PN.r(5)))
                 }
             }

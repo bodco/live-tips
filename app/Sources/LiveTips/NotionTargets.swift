@@ -311,7 +311,7 @@ struct NotionDBRow: View {
                 }
                 if let autoAdd {
                     Toggle(isOn: autoAdd) { InfoLabel(title: L("ntset.autoAddRow"), info: L("ntset.autoAddRow." + kind + ".i")) }
-                        .toggleStyle(.checkbox).controlSize(.small)
+                        .toggleStyle(.pnCheckbox).controlSize(.small)
                         .disabled(id.wrappedValue.isEmpty)
                 }
             }

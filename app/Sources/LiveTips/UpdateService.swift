@@ -307,7 +307,7 @@ struct UpdateHomeLine: View {
     var body: some View {
         if let v = up.newVersion {
             HStack(spacing: 12) {
-                Image(systemName: "arrow.down.circle.fill").font(.system(size: 22)).foregroundStyle(PN.C.accent).accessibilityHidden(true)
+                Image(systemName: "arrow.down.circle.fill").font(PN.sys(22)).foregroundStyle(PN.C.accent).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L(isReady ? "upd.home.ready" : "upd.home.available", ["v": v])).pnSection().foregroundStyle(PN.C.text)
                     Text(L("upd.youHave", ["v": mine])).font(PN.Font.caption).foregroundStyle(PN.C.text2)

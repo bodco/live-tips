@@ -61,10 +61,8 @@ struct AIUsageView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L("aiusage.title")).pnSection()
             Text(L("aiusage.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            Picker("", selection: $period) {
-                ForEach(Self.periods, id: \.self) { p in Text(L("aiusage.period." + p)).tag(p) }
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420)
+            PNSegmented(selection: $period, options: Self.periods.map { ($0, L("aiusage.period." + $0)) })
+            .labelsHidden().frame(maxWidth: 420)
             if period == "custom" {
                 HStack(spacing: 12) {
                     DatePicker(L("aiusage.from"), selection: $from, displayedComponents: .date)

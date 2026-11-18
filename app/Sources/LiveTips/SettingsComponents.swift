@@ -62,7 +62,7 @@ struct SettingsComponentsPane: View {
             Section {
                 ForEach(RequiredGroup.all) { g in
                     HStack(spacing: 10) {
-                        Image(systemName: "lock").font(.system(size: 11)).foregroundStyle(PN.C.text3).accessibilityHidden(true)
+                        Image(systemName: "lock").font(PN.sys(11)).foregroundStyle(PN.C.text3).accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(g.title)
                             Text(g.why).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
@@ -89,7 +89,7 @@ struct SettingsComponentsPane: View {
                 Text(L("cmp.required.foot")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear {
             oc.refresh()
             Task {

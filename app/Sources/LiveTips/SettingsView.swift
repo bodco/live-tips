@@ -849,14 +849,17 @@ struct SettingsView: View {
                     ForEach(Self.panes.filter { g.ids.contains($0.id) }) { p in
                         Button { model.tab = p.id; model.integration = nil; model.projectDetail = nil } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: p.symbol).font(.system(size: 13)).frame(width: 18)
-                                    .foregroundStyle(model.tab == p.id ? PN.C.accent : PN.C.text2)
+                                Image(systemName: p.symbol).font(PN.sys(13)).frame(width: 18)
+                                    .foregroundStyle(model.tab == p.id ? PNSelect.icon : PN.C.text2)
+                                // 0.23.0: the selected row on the style's selection plate (Roadbook highlight, Broadsheet ink)
                                 Text(p.title)
+                                    .fontWeight(model.tab == p.id && PNThemeModel.shared.style != .classic ? .bold : nil)
+                                    .foregroundStyle(model.tab == p.id ? PNSelect.ink : PN.C.text)
                                 Spacer(minLength: 0)
                             }
                             .padding(.horizontal, 8).padding(.vertical, 4)
                             .contentShape(Rectangle())
-                            .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(model.tab == p.id ? PN.C.accent.opacity(0.14) : .clear))
+                            .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(model.tab == p.id ? PNSelect.fill : .clear))
                         }
                         .buttonStyle(.plain)
                     }
@@ -874,7 +877,7 @@ struct SettingsView: View {
                 // 0.14.0 (D2): a plain title and one caption line (was a 44 pt icon tile and a callout)
                 if !innerPage {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(p.title).font(.system(size: 20, weight: .semibold))
+                    Text(p.title).font(PN.sys(20, .semibold))
                     Text(p.subtitle).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -922,7 +925,7 @@ struct SettingsView: View {
                 }
                 .settingsAnchor("mod.tracker")
             }
-        }.formStyle(.grouped)
+        }.formStyle(.grouped).toggleStyle(.pnSwitch)
         case "usage": ScrollView { VStack(alignment: .leading, spacing: 16) { WeekSummaryView(); WeekStats(); AIUsageView() }.padding(20) }   // 0.9.3: AI through API keys
         case "help": ScrollView { VStack(alignment: .leading, spacing: 12) {
             Button(L("settings.how.title")) { model.tab = "how" }.buttonStyle(.pnSecondary)
@@ -957,12 +960,11 @@ struct SettingsView: View {
             // 0.9.0 (owner): two providers, two tabs: Claude (account, API key) and ChatGPT (account, OpenAI API key).
             if aiGroup == "access" {
             Section {
-                Picker("", selection: $aiProvider) {
-                    Text("Claude").tag("claude")
-                    Text("ChatGPT").tag("chatgpt")
-                    Text("Gemini").tag("gemini")
-                }
-                .pickerStyle(.segmented).labelsHidden()
+                PNSegmented(selection: $aiProvider, options: [
+                    ("claude", "Claude"),
+                    ("chatgpt", "ChatGPT"),
+                    ("gemini", "Gemini")
+                ]).labelsHidden()
                 if aiProvider == "claude" {
                 LabeledContent(L("ai.access.account")) {
                     HStack(spacing: 8) {
@@ -1234,7 +1236,7 @@ struct SettingsView: View {
             }
             }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
     }
 
     // 0.15.0 (D2): a short list. A row is the tick, the name and one line; a click opens the project's own page
@@ -1252,7 +1254,7 @@ struct SettingsView: View {
                 HStack(spacing: 8) {
                     // 0.15.0 (D2 smoke): labelsHidden, or the grouped Form puts the field in the value column
                     HStack(spacing: 4) {
-                        Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(PN.C.text3)
+                        Image(systemName: "magnifyingglass").font(PN.sys(12)).foregroundStyle(PN.C.text3)
                         TextField("", text: $projectFilter, prompt: Text(L("proj.filter")))
                             .textFieldStyle(.plain).labelsHidden()
                     }
@@ -1359,28 +1361,28 @@ struct SettingsView: View {
                 } header: { Text(model.registry.workspaces.isEmpty ? L("settings.tab.projects") : L("set.otherProjects")) }
             }
             if !projectFilter.isEmpty && !model.registry.projects.contains(where: { projectMatches($0.slug) }) {
-                Section { Text(L("proj.noMatch")).font(.callout).foregroundStyle(PN.C.text3) }
+                Section { Text(L("proj.noMatch")).font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3) }
             }
             if model.registry.projects.isEmpty && model.registry.workspaces.isEmpty && model.folderCandidates.isEmpty {
                 Section {
                     Text(L("set.noProjectsYetScan2"))
-                        .font(.callout).foregroundStyle(PN.C.text3)
+                        .font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3)
                 }
             }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
     }
 
     /// 2026-10-27 (owner): plain words instead of the long text on top of the tab.
     var projectsInfo: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("set.howProjectsWork")).font(.headline)
+            Text(L("set.howProjectsWork")).font(PN.sys(.headline, 13, .semibold))
             Text(L("set.eachProjectIsA"))
             Text(L("set.tickAProjectTo"))
             Text(L("set.removesAProjectOr"))
             Text(L("set.optionalExtrasComeFrom"))
         }
-        .font(.callout).fixedSize(horizontal: false, vertical: true)
+        .font(PN.sys(.callout, 12)).fixedSize(horizontal: false, vertical: true)
         .padding(16).frame(width: 380)
     }
 
@@ -1390,7 +1392,7 @@ struct SettingsView: View {
             HStack(alignment: .center, spacing: 10) {
                 Toggle("", isOn: Binding(get: { model.registry.projects[i].status != "archived" },
                                          set: { model.registry.projects[i].status = $0 ? "active" : "archived" }))
-                    .toggleStyle(.checkbox).labelsHidden()
+                    .toggleStyle(.pnCheckbox).labelsHidden()
                     .help(L("set.activeOfferedInStart"))
                 Button { model.projectDetail = p.slug } label: {
                     HStack(spacing: 10) {
@@ -1408,7 +1410,7 @@ struct SettingsView: View {
                             }
                         }
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.text3)
+                        Image(systemName: "chevron.right").font(PN.sys(11, .semibold)).foregroundStyle(PN.C.text3)
                     }
                     .contentShape(Rectangle())
                 }
@@ -1515,7 +1517,7 @@ struct SettingsView: View {
             }
             }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
         }
     }
 
@@ -1688,7 +1690,7 @@ struct SettingsView: View {
                 LabeledContent {
                     HStack {
                         Text(model.config.effectiveAppRoot(appSupport: AppPaths.support.path))
-                            .font(.callout).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
+                            .font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
                         Spacer()
                         Button(L("onboarding.folder.choose")) { if let p = model.chooseFolder(L("set.chooseApp")) { model.config.appRoot = p } }
                         if !model.config.appRoot.isEmpty { Button(L("set.default")) { model.config.appRoot = "" } }
@@ -1709,7 +1711,7 @@ struct SettingsView: View {
             }
             }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
     }
 
     @ViewBuilder var mirrorLine: some View {
@@ -1776,14 +1778,14 @@ struct HowItWorksView: View {
                 row("exclamationmark.triangle", L("how.33"), L("how.34"))
             } header: { Text(L("set.whatToExpect")) }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
     }
 
     var arrow: some View { Image(systemName: "arrow.right").foregroundStyle(PN.C.text3) }
 
     func box(_ title: String, _ sub: String, _ color: Color) -> some View {
         VStack(spacing: 2) {
-            Text(title).font(.callout).bold()
+            Text(title).font(PN.sys(.callout, 12)).bold()
             Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1798,7 +1800,7 @@ struct HowItWorksView: View {
             Image(systemName: icon).frame(width: 20).foregroundStyle(PN.C.text3)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).bold()
-                Text(text).font(.callout).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                Text(text).font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -1848,7 +1850,7 @@ struct AboutView: View {
                     Image(nsImage: Brand.appIcon).resizable().interpolation(.high).frame(width: 88, height: 88).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 8) {
                         PacenoteWordmark(height: 26)
-                        Text(L("settings.about.byline")).font(.system(size: 15)).foregroundStyle(PN.C.text2)
+                        Text(L("settings.about.byline")).font(PN.sys(15)).foregroundStyle(PN.C.text2)
                         Text(versionLine).font(PN.Font.caption).foregroundStyle(PN.C.text3).textSelection(.enabled)
                     }
                     Spacer()
@@ -1861,7 +1863,7 @@ struct AboutView: View {
                 }
                 if !updateNote.isEmpty {
                     HStack {
-                        Text(updateNote).font(.callout).foregroundStyle(updateURL != nil ? PN.C.accent : PN.C.text3)
+                        Text(updateNote).font(PN.sys(.callout, 12)).foregroundStyle(updateURL != nil ? PN.C.accent : PN.C.text3)
                         if let u = updateURL { Button(L("settings.about.download")) { NSWorkspace.shared.open(u) }.buttonStyle(.pnTertiary) }
                     }
                 }
@@ -1876,7 +1878,7 @@ struct AboutView: View {
             // 2026-10-27 (owner): privacy policy and terms of use, published on the website.
             Section {
                 Text(L("settings.about.dataBody"))
-                    .font(.callout).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    .font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 16) {
                     Link(L("settings.about.privacy"), destination: URL(string: "https://tower.bodco.pm/pacenote/privacy/")!)
                     Link(L("settings.about.terms"), destination: URL(string: "https://tower.bodco.pm/pacenote/terms/")!)
@@ -1906,7 +1908,7 @@ struct AboutView: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear { AppSignature.shared.check(); if setup.steps.allSatisfy({ $0.state == .unknown }) { Task { await setup.checkAll() } } }
     }
 
@@ -2110,7 +2112,7 @@ struct AIChainSection: View {
                             Text(note(e.route, connected: connected.contains(e.route))).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
                     }
-                    .toggleStyle(.checkbox)
+                    .toggleStyle(.pnCheckbox)
                     Spacer()
                     Button { model.config.ai.chain = AIChain.move(model.config.ai.chain, route: e.route, by: -1) } label: { Image(systemName: "chevron.up") }
                         .buttonStyle(.borderless).disabled(i == 0).help(L("ai.chain.up")).accessibilityLabel(L("ai.chain.up"))

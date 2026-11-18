@@ -48,12 +48,11 @@ struct SheetExportView: View {
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     PageLabel(text: L("sheet.ui.export.blocks"))
-                    Picker("", selection: $template) {
-                        Text(L("sheet.ui.export.all")).tag("all")
-                        Text(L("sheet.ui.export.colleague")).tag("colleague")
-                        Text(L("sheet.ui.export.pick")).tag("pick")
-                    }
-                    .labelsHidden().pickerStyle(.segmented).fixedSize()
+                    PNSegmented(selection: $template, options: [
+                        ("all", L("sheet.ui.export.all")),
+                        ("colleague", L("sheet.ui.export.colleague")),
+                        ("pick", L("sheet.ui.export.pick"))
+                    ]).labelsHidden().fixedSize()
                     if template == "colleague" { Text(L("sheet.ui.export.colleagueNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
                     if template == "pick", let s = doc.sheet {
                         ScrollView {
@@ -61,7 +60,7 @@ struct SheetExportView: View {
                                 ForEach(s.shownBlocks) { b in
                                     Toggle(b.title + (SheetExportOptions.internalBlocks.contains(b.type) ? " · " + L("sheet.ui.export.internal") : ""),
                                            isOn: Binding(get: { picked.contains(b.id) }, set: { if $0 { picked.insert(b.id) } else { picked.remove(b.id) } }))
-                                        .toggleStyle(.checkbox)
+                                        .toggleStyle(.pnCheckbox)
                                 }
                             }
                         }

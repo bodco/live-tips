@@ -189,6 +189,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         // Redesign block 1: Settings > General > Appearance changed the style: the page sets data-style at once
         NotificationCenter.default.addObserver(forName: .pnStyleChanged, object: nil, queue: .main) { [weak self] _ in
             self?.web?.evaluateJavaScript("window.LiveTips && LiveTips.setStyle('\(PNThemeModel.shared.style.rawValue)')", completionHandler: nil)
+            MainActor.assumeIsolated { self?.reapplyAppearance() }     // 0.23.0: the title bar buttons follow the style too
         }
 
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
@@ -199,7 +200,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         window.contentView = web
         let url = URL(fileURLWithPath: args.html)
         pageURL = url
-        web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent().deletingLastPathComponent())   // Resources: tips/ and Fonts/ (@font-face)
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -581,25 +582,64 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     }
     /// 2026-10-27 (owner): the call buttons in the same style as the rest of the app: a soft pill,
     /// blue to start, red to end, both say "call".
-    func pillButton(_ title: String, color: NSColor, filled: Bool, action: Selector) -> NSButton {
+    func pillButton(_ title: String, role: PillRole, action: Selector) -> NSButton {
         let b = NSButton(title: title, target: self, action: action)
         b.isBordered = false
         b.wantsLayer = true
-        b.layer?.cornerRadius = Self.pillH / 2
-        setLayerColor(b, filled ? color : color.withAlphaComponent(0.18))
-        b.attributedTitle = NSAttributedString(string: title, attributes: [
-            .foregroundColor: filled ? NSColor.white : color, .font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
-        let size = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .semibold)])
-        b.frame = NSRect(x: 0, y: 0, width: ceil(size.width) + Self.pillPad * 2, height: Self.pillH)
+        applyPill(b, title, role)
         return b
     }
 
-    func restylePill(_ b: NSButton, _ title: String, color: NSColor) {
-        let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        b.attributedTitle = NSAttributedString(string: title, attributes: [.foregroundColor: color, .font: font])
-        setLayerColor(b, color.withAlphaComponent(0.18))
-        let w = ceil((title as NSString).size(withAttributes: [.font: font]).width) + Self.pillPad * 2
-        b.frame.size = NSSize(width: w, height: Self.pillH)
+    /// 0.23.0 (review 18.11): what a title bar button is for, so its look follows the style and is redrawn on a change.
+    enum PillRole { case end, start, ended(saved: Bool), next }
+    var pillRoles: [ObjectIdentifier: (NSButton, String, PillRole)] = [:]
+
+    /// Classic: the soft pill as before (red End, blue Start, green or orange Ended). Roadbook and Broadsheet
+    /// (LA-TipsLive r10, _tw.title.html): square; End call on the rec fill with a stop square, Start on the accent,
+    /// Ended as a mono label, New call / Start next framed in ruleStrong; labels in the display face.
+    func applyPill(_ b: NSButton, _ title: String, _ role: PillRole) {
+        pillRoles[ObjectIdentifier(b)] = (b, title, role)
+        let style = PNThemeModel.shared.style
+        let ap = window?.effectiveAppearance ?? NSApp.effectiveAppearance
+        let t = PNTheme.resolve(style, dark: ap.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+        func c(_ v: UInt32) -> NSColor { NSColor(pnHex: v) }
+        var fg: NSColor, bg: NSColor, border: NSColor? = nil
+        var font: NSFont, text = title, track: CGFloat = 0, stop = false
+        if style == .classic {
+            font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+            switch role {
+            case .end: fg = .systemRed; bg = NSColor.systemRed.withAlphaComponent(0.18)
+            case .start, .next: fg = .white; bg = .controlAccentColor
+            case .ended(let saved): let k: NSColor = saved ? .systemGreen : .systemOrange; fg = k; bg = k.withAlphaComponent(0.18)
+            }
+            b.layer?.cornerRadius = Self.pillH / 2
+        } else {
+            _ = PNFonts.once
+            func face(_ f: PNFace, _ size: CGFloat, _ w: Font.Weight) -> NSFont {
+                f == .system ? NSFont.systemFont(ofSize: size, weight: w == .heavy ? .heavy : .semibold)
+                    : (NSFont(name: PNFonts.postScriptName(f, w), size: size) ?? NSFont.systemFont(ofSize: size, weight: .semibold))
+            }
+            font = face(t.display, 14, .heavy); text = t.cased(title); track = 14 * t.bTrack
+            switch role {
+            case .end: bg = c(t.rec); fg = t.rec == 0xE5131D ? .white : c(0x0D0D0B); stop = true
+            case .start: bg = c(t.accent); fg = c(t.onAccent)
+            case .next: bg = .clear; fg = c(t.ink); border = c(t.ruleStrong)
+            case .ended(let saved):
+                bg = .clear; fg = c(saved ? t.readyText : t.notreadyText)
+                font = face(t.mono, 11, .semibold); track = 11 * t.lblTrack
+            }
+            b.layer?.cornerRadius = 0
+        }
+        let s = NSMutableAttributedString(string: stop ? "\u{25A0}  " + text : text,
+                                          attributes: [.foregroundColor: fg, .font: font, .kern: track])
+        if stop {
+            s.addAttributes([.font: NSFont.systemFont(ofSize: 9), .baselineOffset: 1.5], range: NSRange(location: 0, length: 1))
+        }
+        b.attributedTitle = s
+        setLayerColor(b, bg)
+        b.layer?.borderWidth = border == nil ? 0 : 1.5
+        if let k = border { ap.performAsCurrentDrawingAppearance { b.layer?.borderColor = k.cgColor } }
+        b.frame.size = NSSize(width: ceil(s.size().width) + Self.pillPad * 2, height: Self.pillH)
         layoutTitleButtons()
     }
 
@@ -623,7 +663,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         var x = h.frame.width - right
         for v in views.reversed() {
             if abs(v.frame.height - Self.pillH) > 0.5 { v.frame.size.height = Self.pillH }
-            v.layer?.cornerRadius = Self.pillH / 2
+            v.layer?.cornerRadius = PNThemeModel.shared.style == .classic ? Self.pillH / 2 : 0     // 0.23.0: square in Roadbook and Broadsheet
             x -= v.frame.width
             v.frame.origin = NSPoint(x: x, y: (centerY - v.frame.height / 2).rounded())
             x -= gap
@@ -648,10 +688,20 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         guard let p = pinButton else { return }
         let on = Self.onTop
         p.image = NSImage(systemSymbolName: on ? "pin.fill" : "pin.slash", accessibilityDescription: L("tw.onTop"))
-        p.contentTintColor = on ? Self.pacenoteBlue : .secondaryLabelColor
-        setLayerColor(p, on ? Self.pacenoteBlue.withAlphaComponent(0.18) : NSColor.controlBackgroundColor)
-        p.layer?.borderWidth = on ? 0 : 1
-        window.effectiveAppearance.performAsCurrentDrawingAppearance { p.layer?.borderColor = NSColor.separatorColor.cgColor }
+        if PNThemeModel.shared.style == .classic {
+            p.layer?.cornerRadius = Self.pillH / 2
+            p.contentTintColor = on ? Self.pacenoteBlue : .secondaryLabelColor
+            setLayerColor(p, on ? Self.pacenoteBlue.withAlphaComponent(0.18) : NSColor.controlBackgroundColor)
+            p.layer?.borderWidth = on ? 0 : 1
+            window.effectiveAppearance.performAsCurrentDrawingAppearance { p.layer?.borderColor = NSColor.separatorColor.cgColor }
+        } else {
+            // 0.23.0 (LA-TipsLive r10): a bare pin, the link colour when on, ink3 when off; no plate, no frame
+            let t = PNTheme.resolve(PNThemeModel.shared.style, dark: window.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+            p.layer?.cornerRadius = 0
+            p.contentTintColor = NSColor(pnHex: on ? t.link : t.ink3)
+            setLayerColor(p, .clear)
+            p.layer?.borderWidth = 0
+        }
         p.toolTip = on ? L("tw.onTopOn") : L("tw.onTopOff")
         p.setAccessibilityLabel(L("tw.onTop"))
     }
@@ -670,6 +720,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     }
     func reapplyAppearance() {
         for (_, vc) in layerColors { setLayerColor(vc.0, vc.1) }
+        for (_, r) in pillRoles { applyPill(r.0, r.1, r.2) }
         styleOnTop()
     }
 
@@ -736,10 +787,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     }
 
     func addEndCallButton() {
-        let b = pillButton(L("menubar.endCall"), color: .systemRed, filled: false, action: #selector(endCallClicked))
+        let b = pillButton(L("menubar.endCall"), role: .end, action: #selector(endCallClicked))
         b.toolTip = L("tips.endCall.tooltip")
         // Start call while the window waits for the call (standby); it also starts by itself when the other side speaks.
-        let g = pillButton(L("home.startCall"), color: .controlAccentColor, filled: true, action: #selector(startClicked))
+        let g = pillButton(L("home.startCall"), role: .start, action: #selector(startClicked))
         g.toolTip = L("tw.startNowTip")
         g.isHidden = true
         // 0.8.6 (A1): the pin is back in the title bar in every state, next to Start and End (right to left: End, Start, pin).
@@ -748,7 +799,6 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         pin.wantsLayer = true
         pin.imagePosition = .imageOnly
         pin.frame = NSRect(x: 0, y: 0, width: Self.pillH, height: Self.pillH)
-        pin.layer?.cornerRadius = Self.pillH / 2
         pinButton = pin
         styleOnTop()
         let w = pin.frame.width + g.frame.width + b.frame.width + 50
@@ -798,7 +848,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     /// Up next switch: the call is being ended by the app, not by this window's button.
     func markEnding() {
-        if let b = endButton { restylePill(b, L("tw.ending"), color: .systemRed); b.isEnabled = false }
+        if let b = endButton { applyPill(b, L("tw.ending"), .end); b.isEnabled = false }
         push("window.setEnding && window.setEnding()")
     }
 
@@ -833,7 +883,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             MainActor.assumeIsolated {
                 let owned = CallEngine.shared.isRunning
                 CallEngine.shared.stop()
-                if let b = self?.endButton { self?.restylePill(b, L("tw.ending"), color: .systemRed) }
+                if let b = self?.endButton { self?.applyPill(b, L("tw.ending"), .end) }
                 self?.endButton?.isEnabled = false
                 if !owned {
                     CallEngine.shared.finishOrphan { file, saved in
@@ -857,7 +907,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             }
         }
         if let b = endButton {                  // 2026-10-27: same pill style, green when saved (sizeToFit broke the shape)
-            restylePill(b, saved ? L("tw.endedSaved") : L("tw.ended"), color: saved ? .systemGreen : .systemOrange)
+            applyPill(b, saved ? L("tw.endedSaved") : L("tw.ended"), .ended(saved: saved))
             b.isEnabled = true                  // a click now closes the window
             b.toolTip = L("tw.close")
         }
@@ -867,10 +917,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             callEnded = true
             let next: StartCallModel? = MainActor.assumeIsolated { UpNext.shared.first }
             let label = next == nil ? L("tw.newCall") : L("tw.startNext")
-            restylePill(g, label, color: .controlAccentColor)
-            let font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-            g.attributedTitle = NSAttributedString(string: label, attributes: [.foregroundColor: NSColor.white, .font: font])
-            setLayerColor(g, .controlAccentColor)
+            applyPill(g, label, .next)
             g.action = #selector(newCallClicked)
             g.target = self
             g.toolTip = next.map { n in L("tw.startNextTip", ["title": MainActor.assumeIsolated { n.effectiveTitle }]) } ?? L("tw.closeOpen")

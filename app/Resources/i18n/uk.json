@@ -100,7 +100,7 @@
  "onboarding.projects.empty": "Папок проєктів не знайдено. Додайте їх пізніше в Налаштування > Проєкти.",
  "onboarding.name.title": "Як вас звуть на дзвінках",
  "onboarding.name.body": "Щоб Pacenote знав, коли питання до вас. Додайте імена і короткі форми, якими вас звуть на дзвінках.",
- "onboarding.name.placeholder": "наприклад, Олександр, Саша, Alex",
+ "onboarding.name.placeholder": "наприклад, Майк, Michael, Mikey",
  "onboarding.claude.title": "Підключи свій AI",
  "onboarding.claude.body": "Обери Claude або акаунт ChatGPT через Codex. Провайдера для кожної роботи можна змінити в Налаштування > AI.",
  "onboarding.claude.saved": "Ключ збережено, вставте новий, щоб замінити",

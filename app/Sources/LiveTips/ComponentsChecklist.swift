@@ -105,7 +105,7 @@ struct ComponentsChecklist: View {
             ForEach(RequiredGroup.all) { g in
                 Divider()
                 HStack(spacing: 12) {
-                    Toggle("", isOn: .constant(true)).toggleStyle(.checkbox).labelsHidden().disabled(true)
+                    Toggle("", isOn: .constant(true)).toggleStyle(.pnCheckbox).labelsHidden().disabled(true)
                         .accessibilityLabel(L("cl.req.a11y", ["name": g.title]))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(g.title)
@@ -120,7 +120,7 @@ struct ComponentsChecklist: View {
             }
             Divider()
             HStack(spacing: 8) {
-                Image(systemName: "lock").font(.system(size: 11)).foregroundStyle(PN.C.text3).accessibilityHidden(true)
+                Image(systemName: "lock").font(PN.sys(11)).foregroundStyle(PN.C.text3).accessibilityHidden(true)
                 Text(L("cl.req.locked")).font(PN.Font.caption).foregroundStyle(PN.C.text2)
                 Spacer()
                 let py = setup.steps.first { $0.id == "python" }?.state
@@ -152,7 +152,7 @@ struct ComponentsChecklist: View {
                             }
                         }
                     }
-                    .toggleStyle(.checkbox).disabled(installed || !allowed)
+                    .toggleStyle(.pnCheckbox).disabled(installed || !allowed)
                     Spacer()
                     Text(ComponentCatalog.format(oc.sizes[c.id] ?? ComponentCatalog.estimate(c.id)))
                         .font(PN.Font.caption).foregroundStyle(PN.C.text3).frame(width: 64, alignment: .trailing)

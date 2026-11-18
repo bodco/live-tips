@@ -141,8 +141,8 @@ struct OnboardingView: View {
                 } else {
                     PacenoteSymbol(height: 44)      // the brand symbol above each step's title
                 }
-                Text(title).font(.title.weight(.semibold)).multilineTextAlignment(.center).foregroundStyle(PN.C.text)
-                Text(subtitle).font(.body).foregroundStyle(PN.C.text2).multilineTextAlignment(.center)
+                Text(title).font(PN.sys(.title.weight(.semibold), 22, .bold)).multilineTextAlignment(.center).foregroundStyle(PN.C.text)
+                Text(subtitle).font(PN.sys(.body, 13)).foregroundStyle(PN.C.text2).multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 560)
                 if m.step == .folder {      // smoke 15.11: What to install scrolls too, so a long language never clips the header
                     content.frame(maxWidth: 620)
@@ -326,7 +326,7 @@ struct OnboardingView: View {
                                              set: { if $0 { m.picked.insert(c.dir) } else { m.picked.remove(c.dir) }; m.applyFolders() })) {
                             Text((c.dir as NSString).lastPathComponent + "  ·  " + L("onboarding.folder.projectFolders", ["n": "\(c.projects)"]))
                         }
-                        .toggleStyle(.checkbox)
+                        .toggleStyle(.pnCheckbox)
                     }
                 }
                 // Merged with the projects step (spec 7): the projects found, ticked = active.
@@ -391,11 +391,10 @@ struct OnboardingView: View {
     /// Claude or ChatGPT, as before 0.16 (the provider row, the API key behind a disclosure, ChatGPT through Codex).
     @ViewBuilder var aiAccess: some View {
         VStack(spacing: 8) {
-            Picker("", selection: $provider) {
-                Text("Claude").tag("claude")
-                Text("ChatGPT").tag("chatgpt")
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 280)
+            PNSegmented(selection: $provider, options: [
+                ("claude", "Claude"),
+                ("chatgpt", "ChatGPT")
+            ]).labelsHidden().frame(maxWidth: 280)
             if provider == "claude" {
             // 2026-10-29 (owner): preparing calls always needs Claude Code, whichever way pays (plan or API key).
             if let cc = setup.steps.first(where: { $0.id == "claude" }) {
@@ -444,7 +443,7 @@ struct OnboardingView: View {
 
     func beat(_ symbol: String, _ id: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: symbol).font(.system(size: 18)).foregroundStyle(PN.C.accent).accessibilityHidden(true)
+            Image(systemName: symbol).font(PN.sys(18)).foregroundStyle(PN.C.accent).accessibilityHidden(true)
             Text(L("onb.beat.\(id).when")).pnLabel().foregroundStyle(PN.C.text3).padding(.top, 4)
             Text(L("onb.beat.\(id).head")).pnSection().foregroundStyle(PN.C.text)
             Text(L("onb.beat.\(id).body", ["help": HotKeys.shared.combo(.help).display])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
@@ -501,7 +500,7 @@ struct OnboardingView: View {
                                      set: { settings.registry.projects[i].status = $0 ? "active" : "archived" })) {
                     Text(settings.registry.projects[i].name)
                 }
-                .toggleStyle(.checkbox)
+                .toggleStyle(.pnCheckbox)
             }
         }
     }
@@ -608,25 +607,15 @@ struct OnboardingCallsStep: View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(spacing: 0) {
                 row(L("onb.calls.sheet"), sheetMode.wrappedValue == "quick" ? L("onb.calls.sheet.quick") : L("onb.calls.sheet.expert")) {
-                    Picker("", selection: sheetMode) {
-                        Text(L("sheet.ui.quick")).tag("quick")
-                        Text(L("sheet.ui.expert")).tag("expert")
-                    }
+                    PNSegmented(selection: sheetMode, options: [("quick", L("sheet.ui.quick")), ("expert", L("sheet.ui.expert"))])
                 }
                 Divider()
                 row(L("onb.calls.tips"), proactive ? L("onb.calls.tips.useful.sub") : L("onb.calls.tips.ask.sub", ["help": HotKeys.shared.combo(.help).display])) {
-                    Picker("", selection: tips) {
-                        Text(L("onb.calls.tips.useful")).tag("useful")
-                        Text(L("onb.calls.tips.ask")).tag("ask")
-                    }
+                    PNSegmented(selection: tips, options: [("useful", L("onb.calls.tips.useful")), ("ask", L("onb.calls.tips.ask"))])
                 }
                 Divider()
                 row(L("onb.calls.rec"), recordSub) {
-                    Picker("", selection: record) {
-                        Text(L("onb.calls.rec.off")).tag("off")
-                        Text(L("onb.calls.rec.sound")).tag("sound")
-                        Text(L("onb.calls.rec.screen")).tag("screen")
-                    }
+                    PNSegmented(selection: record, options: [("off", L("onb.calls.rec.off")), ("sound", L("onb.calls.rec.sound")), ("screen", L("onb.calls.rec.screen"))])
                 }
                 if record.wrappedValue == "screen" && !screenOK {
                     HStack {
@@ -647,7 +636,7 @@ struct OnboardingCallsStep: View {
                             .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
-                    Toggle("", isOn: $settings.config.consentChat).toggleStyle(.switch).labelsHidden()
+                    Toggle("", isOn: $settings.config.consentChat).toggleStyle(.pnSwitch).labelsHidden()
                         .accessibilityLabel(L("onb.calls.consent"))
                 }
                 .padding(.vertical, 12)
@@ -673,7 +662,7 @@ struct OnboardingCallsStep: View {
                 Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            picker().pickerStyle(.segmented).labelsHidden().fixedSize()
+            picker().labelsHidden().fixedSize()
         }
         .padding(.vertical, 10)
     }
@@ -721,12 +710,12 @@ struct SystemAudioSettingsPicture: View {
                 .padding(6).frame(width: 150, alignment: .leading)
                 .background(PN.C.surface2.opacity(0.6))
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(L("onboarding.pic.pane")).font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.text)
+                    Text(L("onboarding.pic.pane")).font(PN.sys(11, .semibold)).foregroundStyle(PN.C.text)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 8) {
                         RoundedRectangle(cornerRadius: PN.r(4)).fill(PN.C.accent).frame(width: 16, height: 16)
-                            .overlay(Image(systemName: "waveform").font(.system(size: 9, weight: .bold)).foregroundStyle(.white))
-                        Text("Pacenote").font(.system(size: 11)).foregroundStyle(PN.C.text)
+                            .overlay(Image(systemName: "waveform").font(PN.sys(9, .bold)).foregroundStyle(.white))
+                        Text("Pacenote").font(PN.sys(11)).foregroundStyle(PN.C.text)
                         Spacer()
                         // the switch, on, with a highlight ring
                         Capsule().fill(PN.C.accent).frame(width: 26, height: 15)
@@ -756,8 +745,8 @@ struct SystemAudioSettingsPicture: View {
 
     private func sidebarRow(_ icon: String, _ t: String, selected: Bool) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: icon).font(.system(size: 9)).frame(width: 12)
-            Text(t).font(.system(size: 10)).lineLimit(1)
+            Image(systemName: icon).font(PN.sys(9)).frame(width: 12)
+            Text(t).font(PN.sys(10)).lineLimit(1)
         }
         .foregroundStyle(selected ? Color.white : PN.C.text2)
         .padding(.horizontal, 5).padding(.vertical, 3)
@@ -778,7 +767,7 @@ struct OnboardingTelemetryRow: View {
                 Text(L("telemetry.onb.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
         }
-        .toggleStyle(.switch)
+        .toggleStyle(.pnSwitch)
         .onChange(of: on) {
             var c = AppConfig.load(from: AppPaths.config)
             c.shareUsage = on

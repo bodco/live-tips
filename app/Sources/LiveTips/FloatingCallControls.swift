@@ -153,7 +153,7 @@ struct FloatingCallControls: View {
 
     private var tipsButton: some View {
         Button { model.app?.showTips() } label: {
-            Image(systemName: "text.bubble.fill").font(.system(size: 15, weight: .semibold))
+            Image(systemName: "text.bubble.fill").font(PN.sys(15, .semibold))
                 .foregroundStyle(PN.C.onAccent)
                 .frame(width: 38, height: 38)
                 .background(RoundedRectangle(cornerRadius: PN.r(11)).fill(PN.C.accentFill.opacity(hover == "tips" ? 0.85 : 1)))
@@ -199,7 +199,7 @@ struct FloatingCallControls: View {
     private func control(_ id: String, _ symbol: String, _ label: String, tint: Color? = nil, size: CGFloat = 14,
                          weight: Font.Weight = .medium, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: size, weight: weight))
+            Image(systemName: symbol).font(PN.sys(size, weight))
                 .foregroundStyle(tint ?? PN.C.text2)
                 .frame(width: 36, height: 36)
                 .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(tint == PN.C.pending ? PN.C.pendingFill.opacity(0.16) : (hover == id ? Color.primary.opacity(0.07) : .clear)))

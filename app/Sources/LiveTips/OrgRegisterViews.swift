@@ -149,7 +149,7 @@ struct OrgItemSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             switch mode {
             case .due(let r):
-                Text(L("orgreg.due.title")).font(.headline)
+                Text(L("orgreg.due.title")).font(PN.sys(.headline, 13, .semibold))
                 Text(r.title).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(3)
                 DatePicker(L("orgreg.due.label"), selection: $day, displayedComponents: .date).datePickerStyle(.field)
                 HStack {
@@ -162,7 +162,7 @@ struct OrgItemSheet: View {
                     Button(L("common.save")) { run { await save(r, Self.iso.string(from: day)) } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                 }
             case .delete(let r):
-                Text(L("orgreg.delete.title")).font(.headline)
+                Text(L("orgreg.delete.title")).font(PN.sys(.headline, 13, .semibold))
                 Text(r.title).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(3)
                 Text(L("orgreg.delete.sub", ["who": r.orgItem?.authorName ?? "?"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     .fixedSize(horizontal: false, vertical: true)

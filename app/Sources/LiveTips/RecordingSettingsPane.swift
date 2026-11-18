@@ -127,7 +127,7 @@ struct RecordingSettingsPane: View {
             // 0.15.0 (D2): the consent message lives here now (was General)
             ConsentSection(model: model)
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear {
             permission = ScreenPermission.granted(); displays = RecTargets.displays()
             if let a = driveAccount { drive.refreshRoot(account: a) }

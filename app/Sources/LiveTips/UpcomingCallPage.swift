@@ -142,11 +142,11 @@ struct UpcomingCallPage: View {
         let people = HomeView.peopleLine(model.participants)
         let info = VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(d.string(from: model.callDate) + " · " + t.string(from: model.callDate)).font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.accent)
+                Text(d.string(from: model.callDate) + " · " + t.string(from: model.callDate)).font(PN.sys(13, .semibold)).foregroundStyle(PN.C.accent)
                 if let b = doc?.sheet?.readinessBadge, state != .preparing { SheetReadinessPill(badge: b) } else { StatePill(state: state) }
                 if !model.target.isEmpty { PagePill(text: model.targetName, color: PN.C.answer) }
             }
-            Text(model.effectiveTitle).font(.system(size: 28, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2)
+            Text(model.effectiveTitle).font(PN.sys(28, .bold)).foregroundStyle(PN.C.text).lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             if !people.isEmpty { Text(L("home.card.with", ["people": people])).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(2) }
             if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.pending).fixedSize(horizontal: false, vertical: true) }
@@ -454,7 +454,7 @@ struct UpcomingCallPage: View {
                         Text(RecentCard.summary(r.file) ?? (OutcomeCache.shared.outcome(r.file)?.line ?? r.title))
                             .font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.text3).padding(.top, 3)
+                        Image(systemName: "chevron.right").font(PN.sys(11, .semibold)).foregroundStyle(PN.C.text3).padding(.top, 3)
                     }
                     .contentShape(Rectangle())
                 }
@@ -477,7 +477,7 @@ struct PageTabs: View {
                     HStack(spacing: 6) {
                         Text(t.1).font(PN.Font.body.weight(on ? .semibold : .regular))
                         if let n = counts[t.0], n > 0 {
-                            Text("\(n)").font(.system(size: 11, weight: .semibold).monospacedDigit())
+                            Text("\(n)").font(PN.sys(11, .semibold).monospacedDigit())
                                 .foregroundStyle(on ? PN.C.answer : PN.C.text2)
                                 .padding(.horizontal, 5).frame(minWidth: 18, minHeight: 18)
                                 .background(Capsule().fill(on ? PN.C.accent.opacity(0.14) : Color.primary.opacity(0.07)))

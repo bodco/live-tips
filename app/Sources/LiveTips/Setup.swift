@@ -166,7 +166,7 @@ struct SetupView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 1) {
                             ForEach(Array(model.log.enumerated()), id: \.offset) { i, l in
-                                Text(l).font(.system(size: 12, design: .monospaced)).textSelection(.enabled).id(i)
+                                Text(l).font(PN.sys(12, mono: true)).textSelection(.enabled).id(i)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
                     }
@@ -175,7 +175,7 @@ struct SetupView: View {
                     .onChange(of: model.log.count) { proxy.scrollTo(model.log.count - 1) }
                 }
             }
-            .font(.callout).foregroundStyle(PN.C.text3)
+            .font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3)
             if !showLog, let last = model.log.last {
                 Text(last).font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text3).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             }

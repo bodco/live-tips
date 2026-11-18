@@ -52,7 +52,7 @@ struct InviteJoinSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L("org.join.title", ["org": invite.orgName])).font(.headline)
+            Text(L("org.join.title", ["org": invite.orgName])).font(PN.sys(.headline, 13, .semibold))
             Text(InviteText.line(invite)).font(PN.Font.body).foregroundStyle(PN.C.text2)
             Text(L("org.join.what")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             // 0.19.0 (D45 5): one line among what the organization sees, no separate confirmation
@@ -247,7 +247,7 @@ struct CallOrgRow: View {
                 Spacer()
                 Toggle(L("org.private.toggle"), isOn: Binding(get: { pv.isPrivate },
                                                               set: { sync.setPrivate($0, transcript: file); tick += 1 }))
-                    .toggleStyle(.switch).controlSize(.small)
+                    .toggleStyle(.pnSwitch).controlSize(.small)
                     .disabled(!pv.isPrivate && !pv.allowed)
                     .help(pv.allowed ? L("org.private.help") : L("org.privateOff", ["org": org.name]))
             }

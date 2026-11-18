@@ -272,16 +272,15 @@ struct ConsoleTabView: View {
         Group {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Text(L("console.tab")).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text)
+                Text(L("console.tab")).font(PN.sys(15, .semibold)).foregroundStyle(PN.C.text)
                 if acct.me?.staff == true {
                     // 0.19.0: staff, two tabs (Platform asks Google again in the app after 12 hours)
-                    Picker("", selection: Binding(get: { session.zone }, set: { z in
+                    PNSegmented(selection: Binding(get: { session.zone }, set: { z in
                         if z == .platform { Task { await session.openPlatform() } } else { session.openOrganization() }
-                    })) {
-                        Text(L("console.zone.org")).tag(ConsoleSession.Zone.organization)
-                        Text(L("console.zone.platform")).tag(ConsoleSession.Zone.platform)
-                    }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize().disabled(session.platformBusy)
+                    }), options: [
+                        (ConsoleSession.Zone.organization, L("console.zone.org")),
+                        (ConsoleSession.Zone.platform, L("console.zone.platform"))
+                    ]).labelsHidden().fixedSize().disabled(session.platformBusy)
                     .accessibilityLabel(L("console.zone"))
                     if session.platformBusy { PNSpinner(size: 16) }
                 } else {

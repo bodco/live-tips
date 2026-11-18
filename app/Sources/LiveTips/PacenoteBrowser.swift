@@ -407,7 +407,7 @@ struct PacenoteBrowserView: View {
             }
             Spacer(minLength: 0)
         }
-        .font(.callout)
+        .font(PN.sys(.callout, 12))
         .lineLimit(2)
         .padding(.horizontal, 12).padding(.vertical, 6)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -415,15 +415,15 @@ struct PacenoteBrowserView: View {
 
     private var planSheet: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L("sheet.browser.plan.title")).font(.headline)
-            Text(model.address).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            Text(L("sheet.browser.plan.title")).font(PN.sys(.headline, 13, .semibold))
+            Text(model.address).font(PN.sys(.callout, 12)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             Text(L("sheet.browser.plan.sections"))
             ForEach(LinkedInSection.all, id: \.self) { s in
                 Toggle(L("sheet.browser.section." + s), isOn: Binding(get: { model.sections.contains(s) },
                                                                       set: { if $0 { model.sections.insert(s) } else { model.sections.remove(s) } }))
             }
-            Text(planText).font(.callout).fixedSize(horizontal: false, vertical: true)
-            Text(L("sheet.browser.session")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(planText).font(PN.sys(.callout, 12)).fixedSize(horizontal: false, vertical: true)
+            Text(L("sheet.browser.session")).font(PN.sys(.caption, 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
                 Button(L("sheet.browser.cancel")) { model.phase = .browsing }.keyboardShortcut(.cancelAction)

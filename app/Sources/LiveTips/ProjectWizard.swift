@@ -165,11 +165,11 @@ struct ProjectWizardView: View {
         Group {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(L("wiz.title")).font(.headline)
+                Text(L("wiz.title")).font(PN.sys(.headline, 13, .semibold))
                 Spacer()
                 Text(L("onb.stepOf", ["n": "\(m.stepNumber)", "total": "\(m.steps.count)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            Text(L("wiz.\(m.step).title")).font(.system(size: 15, weight: .semibold))
+            Text(L("wiz.\(m.step).title")).font(PN.sys(15, .semibold))
             Group {
                 switch m.step {
                 case .name: nameStep
@@ -302,7 +302,7 @@ struct ProjectWizardView: View {
                     ForEach(m.members) { p in
                         Toggle(p.name, isOn: Binding(get: { m.picked.contains(p.id) },
                                                      set: { if $0 { m.picked.insert(p.id) } else { m.picked.remove(p.id) } }))
-                            .toggleStyle(.checkbox)
+                            .toggleStyle(.pnCheckbox)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

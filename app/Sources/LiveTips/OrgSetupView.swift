@@ -186,12 +186,12 @@ struct OrgSetupView: View {
         Group {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(L("orgsetup.title", ["org": m.org?.name ?? m.name])).font(.headline)
+                Text(L("orgsetup.title", ["org": m.org?.name ?? m.name])).font(PN.sys(.headline, 13, .semibold))
                 Spacer()
                 Text(L("onb.stepOf", ["n": "\((m.steps.firstIndex(of: m.step) ?? 0) + 1)", "total": "\(m.steps.count)"]))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            Text(L("orgsetup.\(m.step.rawValue).title")).font(.system(size: 15, weight: .semibold))
+            Text(L("orgsetup.\(m.step.rawValue).title")).font(PN.sys(15, .semibold))
             Group {
                 switch m.step {
                 case .name: nameStep
@@ -262,7 +262,7 @@ struct OrgSetupView: View {
                                 }
                             }
                         }
-                        .toggleStyle(.checkbox)
+                        .toggleStyle(.pnCheckbox)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

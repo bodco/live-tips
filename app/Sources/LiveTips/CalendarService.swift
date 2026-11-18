@@ -359,7 +359,7 @@ struct CalendarsPane: View {
                 }
             }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear { cal.refresh(); remembered = SeriesMemory.shared.count }
     }
 }
@@ -386,7 +386,7 @@ struct CalendarList: View {
                             Text(c.title).lineLimit(1)
                         }
                     }
-                    .toggleStyle(.checkbox)
+                    .toggleStyle(.pnCheckbox)
                 }
             }
         }
@@ -397,7 +397,7 @@ struct CalendarList: View {
 struct CalendarPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("cal.calendarsWithYourCalls")).font(.headline)
+            Text(L("cal.calendarsWithYourCalls")).font(PN.sys(.headline, 13, .semibold))
             Text(L("cal.onlyTheTickedOnes")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             ScrollView { VStack(alignment: .leading, spacing: 10) { CalendarList() } }
             Button(L("cal.moreInSettingsCalendars")) { SettingsWindow.show(tab: "calendars") }.buttonStyle(.pnTertiary).font(PN.Font.caption)

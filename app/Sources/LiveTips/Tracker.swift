@@ -167,7 +167,7 @@ struct TrackerScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(L("home.nav.tracker")).font(.system(size: 24, weight: .bold)).foregroundStyle(PN.C.text)
+                        Text(L("home.nav.tracker")).font(PN.sys(24, .bold)).foregroundStyle(PN.C.text)
                         Text(subline).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                     Spacer()
@@ -274,16 +274,16 @@ struct TrackerScreen: View {
                 Toggle("", isOn: Binding(get: { r.done }, set: { on in
                     if let i = r.orgItem { Task { await org.change(i, orgProject: r.orgProject, .init(status: on ? "done" : "open")) } }
                     else if let c = r.commitment { register.mark(c) } else if let u = URL(string: r.url) { NSWorkspace.shared.open(u) } }))
-                    .toggleStyle(.checkbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": r.title]))
+                    .toggleStyle(.pnCheckbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": r.title]))
                     .disabled(r.orgItem.map { !$0.canEdit } ?? false)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(2)
-                if r.local { Text(L("tracker.kept")).font(.system(size: 10)).foregroundStyle(PN.C.text3) }
+                if r.local { Text(L("tracker.kept")).font(PN.sys(10)).foregroundStyle(PN.C.text3) }
                 if let i = r.orgItem {      // "from Mike's call, Nov 12", never a link to a colleague's call
                     Text(r.callTitle + (org.editedBy(i, r.orgProject)
                         .map { " · " + L("orgreg.changedBy", ["who": $0]) } ?? ""))
-                        .font(.system(size: 10)).foregroundStyle(PN.C.text3).lineLimit(1)
+                        .font(PN.sys(10)).foregroundStyle(PN.C.text3).lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

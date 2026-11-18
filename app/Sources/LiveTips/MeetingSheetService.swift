@@ -652,9 +652,9 @@ struct SheetReadinessPill: View {
     var body: some View {
         let l = SheetLabels.readiness(badge)
         Label(SheetLabels.readinessLine(badge), systemImage: badge.symbol)
-            .font(.system(size: 11, weight: .semibold)).foregroundStyle(l.color)
+            .font(PN.sys(11, .semibold)).foregroundStyle(l.color)
             .padding(.horizontal, 7).padding(.vertical, 2)
-            .background(l.fill.opacity(0.16), in: Capsule())
+            .background(l.fill.opacity(0.16), in: RoundedRectangle(cornerRadius: PN.r(99)))
             .lineLimit(1).fixedSize()
     }
 }

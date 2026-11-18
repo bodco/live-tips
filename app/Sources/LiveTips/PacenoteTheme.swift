@@ -88,6 +88,19 @@ enum PN {
     enum Space  { static let x1: CGFloat = 4; static let x2: CGFloat = 8; static let x3: CGFloat = 12
                   static let x4: CGFloat = 16; static let x5: CGFloat = 20; static let x6: CGFloat = 24 }
 
+    /// Redesign review (18.11): a literal size and weight that follows the style. Classic: exactly the system font it
+    /// replaced. Roadbook and Broadsheet: the style's text face (mono for monospaced), the display face for big bold titles.
+    static func sys(_ size: CGFloat, _ weight: SwiftUI.Font.Weight = .regular, mono: Bool = false) -> SwiftUI.Font {
+        if classicLook { return mono ? .system(size: size, weight: weight, design: .monospaced) : .system(size: size, weight: weight) }
+        if mono { return theme.font(.mono, size, weight) }
+        let heavy = weight == .bold || weight == .heavy || weight == .black
+        return theme.font(size >= 20 && heavy ? .display : .text, size, weight)
+    }
+    /// The same for a text style (.headline, .callout): Classic keeps the text style itself.
+    static func sys(_ classic: SwiftUI.Font, _ size: CGFloat, _ weight: SwiftUI.Font.Weight = .regular) -> SwiftUI.Font {
+        classicLook ? classic : sys(size, weight)
+    }
+
     enum Font {
         static var caption: SwiftUI.Font { PN.classicLook ? .system(size: 12) : PN.theme.font(.text, 12) }          // minimum size anywhere
         static var body: SwiftUI.Font    { PN.classicLook ? .system(size: 14) : PN.theme.font(.text, 14) }

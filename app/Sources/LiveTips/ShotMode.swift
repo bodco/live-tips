@@ -134,7 +134,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "p092" { p092(theme); continue }    // 0.9.2: the site hero (Home + a live call)
             if env["LT_SHOTS_ONLY"] == "callpage" { callPageShots(theme); continue }   // 2026-11-05: the call page redesign, every tab
             if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }
-            if env["LT_SHOTS_ONLY"] == "redesign" { if lang == "en" || theme == "light" { redesignShots(theme) }; continue }   // redesign 0.23.0: every style   // 0.10.0: co-driver cards for the site
+            if env["LT_SHOTS_ONLY"] == "redesign" { if lang == "en" || theme == "light" { redesignShots(theme, uk: lang == "uk") }; continue }   // redesign 0.23.0: every style   // 0.10.0: co-driver cards for the site
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
@@ -309,9 +309,15 @@ final class ShotMode: NSObject, NSApplicationDelegate {
 
     /// Redesign 0.23.0 (blocks 1-7): Home, Settings, the menu-bar panel and the tips window in its states, once per style.
     /// Files: <screen>-<style>-<mode>.png (Ukrainian: light only, to check the fallback of Barlow for Cyrillic).
-    func redesignShots(_ theme: String) {
+    func redesignShots(_ theme: String, uk: Bool = false) {
+        // review 18.11: are the bundled faces resolvable by PostScript name in this process?
+        _ = PNFonts.once
+        log("fonts: " + ["BarlowCondensed-ExtraBold", "Barlow-Regular", "InterTight-Black", "JetBrainsMono-SemiBold"]
+            .map { "\($0)=\(NSFont(name: $0, size: 12) != nil)" }.joined(separator: " "))
         let base = "window.setStatus({state:'recording',title:'Orbit weekly with the client',started_at:new Date(Date.now()-18*60000).toISOString()";
-        for st in PNStyle.allCases {
+        // The Ukrainian pass hung twice right after Roadbook (18.11, cause not found): it covers Classic and Roadbook only
+        // (Roadbook is where Barlow falls back for Cyrillic).
+        for st in PNStyle.allCases where !(uk && st == .broadsheet) {
             let t = st.rawValue + "-" + theme
             steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
             steps.append { [unowned self] in HomeView.shotState = ""; self.home(t) }

@@ -55,9 +55,9 @@ struct WhatsNewView: View {
         VStack(spacing: 12) {
             Text(L("wn.updated", ["v": WhatsNewStore.current])).pnLabel().foregroundStyle(PN.C.text3).padding(.top, 16)
             PacenoteSymbol(height: 44)
-            Text(L("wn.title", ["v": WhatsNew.short(WhatsNewStore.current)])).font(.title.weight(.semibold)).foregroundStyle(PN.C.text)
+            Text(L("wn.title", ["v": WhatsNew.short(WhatsNewStore.current)])).font(PN.sys(.title.weight(.semibold), 22, .bold)).foregroundStyle(PN.C.text)
             Text(items.contains { $0.setupStep != nil } ? L("wn.sub.setup", ["from": from]) : L("wn.sub", ["from": from]))
-                .font(.body).foregroundStyle(PN.C.text2).multilineTextAlignment(.center).frame(maxWidth: 560)
+                .font(PN.sys(.body, 13)).foregroundStyle(PN.C.text2).multilineTextAlignment(.center).frame(maxWidth: 560)
             ScrollView {
                 VStack(spacing: 10) { ForEach(items, id: \.id) { card($0) } }.frame(width: 620)
             }
@@ -80,7 +80,7 @@ struct WhatsNewView: View {
         let stepDone = i.setupStep.map { doneSteps.contains($0) } ?? false
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: icon(i)).font(.system(size: 16)).foregroundStyle(PN.C.accent).frame(width: 20).accessibilityHidden(true)
+                Image(systemName: icon(i)).font(PN.sys(16)).foregroundStyle(PN.C.accent).frame(width: 20).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Text(i.title(lang)).pnSection().foregroundStyle(PN.C.text)

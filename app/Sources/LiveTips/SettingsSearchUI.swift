@@ -88,7 +88,7 @@ struct SettingsSearchField: View {
     @FocusState private var focused: Bool
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(PN.C.text3)
+            Image(systemName: "magnifyingglass").font(PN.sys(12)).foregroundStyle(PN.C.text3)
             TextField("", text: $model.search, prompt: Text(L("search.placeholder")))
                 .textFieldStyle(.plain).focused($focused)
                 .onSubmit { if let e = model.searchResults.first { model.jump(e) } }
@@ -118,13 +118,14 @@ struct SettingsSearchResults: View {
                 ForEach(rs, id: \.id) { e in
                     Button { model.jump(e) } label: {
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(L(e.titleKey)).lineLimit(2)
-                            Text(model.searchPath(e)).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
+                            Text(L(e.titleKey)).lineLimit(2).foregroundStyle(model.highlight == e.id ? PNSelect.ink : PN.C.text)
+                            Text(model.searchPath(e)).font(PN.Font.caption)
+                                .foregroundStyle(model.highlight == e.id ? PNSelect.ink.opacity(0.75) : PN.C.text3).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .contentShape(Rectangle())
-                        .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(model.highlight == e.id ? PN.C.accent.opacity(0.14) : .clear))
+                        .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(model.highlight == e.id ? PNSelect.fill : .clear))
                     }
                     .buttonStyle(.plain)
                 }
@@ -146,10 +147,8 @@ struct SettingsSegments: View {
     var caption = true
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Picker("", selection: $selection) {
-                ForEach(groups, id: \.self) { g in Text(L(prefix + g)).tag(g) }
-            }
-            .pickerStyle(.segmented).labelsHidden().fixedSize()
+            PNTabs(selection: $selection, options: groups.map { ($0, L(prefix + $0)) })
+            .labelsHidden().fixedSize()
             if caption { Text(L(prefix + "sub." + selection)).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -229,7 +228,7 @@ struct ProjectSettingsPage: View {
                 .help(L("nav.back.help"))
                 .padding(.horizontal, 20).padding(.top, 8)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(p.name).font(.system(size: 20, weight: .semibold))
+                    Text(p.name).font(PN.sys(20, .semibold))
                     Text(p.root.isEmpty ? L("set.noFolder") : p.root).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         .lineLimit(1).truncationMode(.middle)
                 }
@@ -310,7 +309,7 @@ struct ProjectSettingsPage: View {
                         }
                     }
                 }
-                .formStyle(.grouped)
+                .formStyle(.grouped).toggleStyle(.pnSwitch)
                 // S5: a project linked to an organization project is that project's page (card, registers, state,
                 // sources, index, history in one scroll, so no part); other projects stay settings > projects
                 .trackScreen("org_project", o: p.orgProjectOrg, on: p.linkedToOrgProject)
@@ -331,10 +330,10 @@ struct RemoveProjectSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L("proj.remove.title", ["name": project.name])).font(.headline)
+            Text(L("proj.remove.title", ["name": project.name])).font(PN.sys(.headline, 13, .semibold))
             Text(L("proj.remove.sub")).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             if !project.root.isEmpty {
-                Toggle(L("proj.remove.trash"), isOn: $trash).toggleStyle(.checkbox)
+                Toggle(L("proj.remove.trash"), isOn: $trash).toggleStyle(.pnCheckbox)
                 Text(trash ? L("proj.remove.trashSub", ["path": project.root.replacingOccurrences(of: NSHomeDirectory(), with: "~")])
                            : L("proj.remove.keepSub", ["path": project.root.replacingOccurrences(of: NSHomeDirectory(), with: "~")]))
                     .font(PN.Font.caption).foregroundStyle(trash ? PN.C.danger : PN.C.text3).fixedSize(horizontal: false, vertical: true)

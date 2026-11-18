@@ -232,11 +232,10 @@ struct SignInView: View {
     }
 
     @ViewBuilder private var emailForm: some View {
-        Picker("", selection: $m.creating) {
-            Text(L("auth.tab.signIn")).tag(false)
-            Text(L("auth.tab.create")).tag(true)
-        }
-        .pickerStyle(.segmented).labelsHidden()
+        PNSegmented(selection: $m.creating, options: [
+            (false, L("auth.tab.signIn")),
+            (true, L("auth.tab.create"))
+        ]).labelsHidden()
         .onChange(of: m.creating) { _, _ in m.error = nil; m.errorField = nil }
         field(L("auth.email"), .email) {
             TextField("name@example.com", text: $m.email).textContentType(.username).focused($focus, equals: .email)
@@ -370,7 +369,7 @@ struct SignInView: View {
     private var codeField: some View {
         field(L("auth.code.field"), .code) {
             TextField("1234 5678", text: Binding(get: { m.code }, set: { m.codeTyped($0) }))
-                .font(.system(size: 22, weight: .semibold, design: .monospaced))
+                .font(PN.sys(22, .semibold, mono: true))
                 .textContentType(.oneTimeCode).focused($focus, equals: .code)
                 .onSubmit { if m.step == .code { m.verify() } }
         }

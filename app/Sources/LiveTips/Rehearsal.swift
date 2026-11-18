@@ -126,7 +126,7 @@ struct RehearsalView: View {
     private var intro: some View {
         let mins = max(5, (plan + 4 * 60) / 60)
         return VStack(alignment: .leading, spacing: 16) {
-            Text(L("reh.title")).font(.system(size: 22, weight: .bold))
+            Text(L("reh.title")).font(PN.sys(22, .bold))
             Text(L("reh.meta", ["t": "\(mins) " + L("deck.min")])).font(PN.Font.body).foregroundStyle(PN.C.text2)
             stepRow(1, L("reh.step1"), L("reh.step1Hint", ["n": "\(steps.count)", "name": colleague.isEmpty ? L("deck.colleague") : colleague]))
             stepRow(2, L("reh.step2"), client.isEmpty ? L("reh.step2Hint", ["name": "#"]).replacingOccurrences(of: ", #,", with: ",") : L("reh.step2Hint", ["name": client]))
@@ -170,16 +170,16 @@ struct RehearsalView: View {
             Spacer()
             Text(L("reh.slideCount", ["n": "\(st.n)", "k": "\(index + 1)", "m": "\(steps.count)"])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
         }
-        Text(st.title).font(.system(size: 22, weight: .bold))
+        Text(st.title).font(PN.sys(22, .bold))
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(TalkTime.clock(el)).font(.system(size: 30, weight: .semibold).monospacedDigit()).foregroundStyle(el > st.secs ? PN.C.danger : PN.C.text)
+            Text(TalkTime.clock(el)).font(PN.sys(30, .semibold).monospacedDigit()).foregroundStyle(el > st.secs ? PN.C.danger : PN.C.text)
             Text(el > st.secs ? L("reh.overBy", ["plan": TalkTime.clock(st.secs), "diff": TalkTime.clock(el - st.secs)])
                               : L("reh.overBy", ["plan": TalkTime.clock(st.secs), "diff": "0:00"]).components(separatedBy: " · ").first ?? "")
                 .font(PN.Font.body).foregroundStyle(PN.C.text2)
         }
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(st.say.enumerated()), id: \.offset) { _, line in Text(line).font(.system(size: 17)).fixedSize(horizontal: false, vertical: true) }
+                ForEach(Array(st.say.enumerated()), id: \.offset) { _, line in Text(line).font(PN.sys(17)).fixedSize(horizontal: false, vertical: true) }
                 if !st.numbers.isEmpty { Text(st.numbers.joined(separator: " · ")).font(PN.Font.body.weight(.semibold)) }
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -214,7 +214,7 @@ struct RehearsalView: View {
                 Text(L("reh.stepOf", ["i": "2", "n": "4"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Text(L("reh.asks", ["name": client.isEmpty ? (L10n.lang == "uk" ? "Клієнт" : "The client") : client])).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.accent)
-            Text(it["q"] as? String ?? "").font(.system(size: 19, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
+            Text(it["q"] as? String ?? "").font(PN.sys(19, .semibold)).fixedSize(horizontal: false, vertical: true)
             if let why = it["why"] as? String, !why.isEmpty {
                 Text(L("reh.why", ["reason": why])).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
@@ -281,7 +281,7 @@ struct RehearsalView: View {
             Spacer()
         }
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(L("reh.score", ["s": String(format: avg == avg.rounded() ? "%.0f" : "%.1f", avg)])).font(.system(size: 28, weight: .bold))
+            Text(L("reh.score", ["s": String(format: avg == avg.rounded() ? "%.0f" : "%.1f", avg)])).font(PN.sys(28, .bold))
             Text(overall).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
         }
         if ran > plan, !overSlides.isEmpty {

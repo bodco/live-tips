@@ -471,13 +471,13 @@ struct DeckBlock: View {
                     } else {
                         RoundedRectangle(cornerRadius: PN.r(4)).fill(PN.C.surface2).frame(width: 64, height: 40)
                     }
-                    Text("\(n)").font(.system(size: 10, weight: .semibold)).padding(.horizontal, 4).background(PN.C.bg.opacity(0.85), in: RoundedRectangle(cornerRadius: PN.r(3))).padding(2)
+                    Text("\(n)").font(PN.sys(10, .semibold)).padding(.horizontal, 4).background(PN.C.bg.opacity(0.85), in: RoundedRectangle(cornerRadius: PN.r(3))).padding(2)
                 }
                 .overlay(RoundedRectangle(cornerRadius: PN.r(4)).stroke(tint, lineWidth: 1.5))
                 // 0.8.7 (G5): the first words of the slide, so a tile is recognisable without the thumbnail
-                Text(DeckSetup.firstWords(d.info?.slides.first { $0.n == n })).font(.system(size: 10)).foregroundStyle(PN.C.text2)
+                Text(DeckSetup.firstWords(d.info?.slides.first { $0.n == n })).font(PN.sys(10)).foregroundStyle(PN.C.text2)
                     .lineLimit(2).multilineTextAlignment(.center).frame(width: 64, height: 26, alignment: .top)
-                Text(DeckSetup.label(o).split(separator: " ").first.map(String.init) ?? "").font(.system(size: 10, weight: .medium)).foregroundStyle(tint).lineLimit(1)
+                Text(DeckSetup.label(o).split(separator: " ").first.map(String.init) ?? "").font(PN.sys(10, .medium)).foregroundStyle(tint).lineLimit(1)
             }
             .frame(width: 66)
         }
@@ -490,19 +490,18 @@ struct DeckBlock: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 label(L("deck.duration")).frame(width: 90, alignment: .leading)
-                Picker("", selection: Binding(get: { d.durationFromCalendar && model.calendarMinutes != nil },
-                                              set: { model.deck.durationFromCalendar = $0; if $0, let m = model.calendarMinutes { model.deck.duration = m } })) {
-                    if let m = model.calendarMinutes { Text(L("start.fromCalendar", ["app": model.calendarApp ?? ""]) + " · \(m) " + L("deck.min")).tag(true) }
-                    Text(L("deck.custom")).tag(false)
-                }
-                .labelsHidden().pickerStyle(.segmented).fixedSize()
+                PNSegmented(selection: Binding(get: { d.durationFromCalendar && model.calendarMinutes != nil },
+                                              set: { model.deck.durationFromCalendar = $0; if $0, let m = model.calendarMinutes { model.deck.duration = m } }),
+                            options: (model.calendarMinutes.map { m in [(true, L("start.fromCalendar", ["app": model.calendarApp ?? ""]) + " · \(m) " + L("deck.min"))] } ?? [])
+                                + [(false, L("deck.custom"))])
+                .labelsHidden().fixedSize()
                 if !(d.durationFromCalendar && model.calendarMinutes != nil) {
                     Stepper(value: $model.deck.duration, in: 5...240, step: 5) { Text("\(d.duration) " + L("deck.min")).monospacedDigit() }.fixedSize()
                 }
             }
             HStack(spacing: 12) {
                 label(L("deck.questions")).frame(width: 90, alignment: .leading)
-                Toggle(L("deck.qaEnd"), isOn: $model.deck.qaOn).toggleStyle(.checkbox)
+                Toggle(L("deck.qaEnd"), isOn: $model.deck.qaOn).toggleStyle(.pnCheckbox)
                 if d.qaOn { Stepper(value: $model.deck.qaMin, in: 1...60) { Text("\(d.qaMin) " + L("deck.min")).monospacedDigit() }.fixedSize() }
             }
             Text(L("deck.talkTime", ["t": "\(d.talkMin) " + L("deck.min"), "d": "\(d.duration) " + L("deck.min"), "q": "\(d.qaOn ? d.qaMin : 0) " + L("deck.min")]))

@@ -138,13 +138,12 @@ struct ExportPanel: View {
                 Spacer()
                 Button { onClose() } label: { Image(systemName: "xmark") }.buttonStyle(.borderless).accessibilityLabel(L("common.close"))
             }
-            Picker(L("export.format"), selection: $format) {
-                Text("Word (.docx)").tag("docx")
-                Text("Markdown (.md)").tag("md")
-                Text("Notion page").tag("notion")
-                Text("Google Docs").tag("gdoc")
-            }
-            .pickerStyle(.segmented).fixedSize()
+            PNSegmented(L("export.format"), selection: $format, options: [
+                ("docx", "Word (.docx)"),
+                ("md", "Markdown (.md)"),
+                ("notion", "Notion page"),
+                ("gdoc", "Google Docs")
+            ]).fixedSize()
             HStack(spacing: 14) {
                 Text(L("export.include")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
                 Toggle(hasMeeting ? L("page.mn.label") : L("export.summary"), isOn: $incSummary)
@@ -154,7 +153,7 @@ struct ExportPanel: View {
                 Toggle(L("page.tab.risks"), isOn: $incRisks)
                 Toggle(L("call.page.transcript"), isOn: $incTranscript)
             }
-            .toggleStyle(.checkbox).font(PN.Font.caption)
+            .toggleStyle(.pnCheckbox).font(PN.Font.caption)
             if format == "notion" {
                 Text(notionReady ? L("export.notionTo", ["db": L("export.meetings")]) : L("export.notionConnect"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -170,11 +169,10 @@ struct ExportPanel: View {
             HStack(spacing: 12) {
                 Text(L("export.edit")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
                 if format != "md" {
-                    Picker("", selection: $preview) {
-                        Text(L("export.preview")).tag(true)
-                        Text(L("export.editMd")).tag(false)
-                    }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    PNSegmented(selection: $preview, options: [
+                        (true, L("export.preview")),
+                        (false, L("export.editMd"))
+                    ]).labelsHidden().fixedSize()
                     if preview { Text(L("export.previewNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                 }
             }
@@ -186,7 +184,7 @@ struct ExportPanel: View {
                     .environment(\.colorScheme, .light)
             } else {
                 TextEditor(text: Binding(get: { text }, set: { text = $0; touched = true }))
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(PN.sys(12, mono: true))
                     .scrollContentBackground(.hidden).padding(6).frame(height: 360)
                     .background(PN.C.bg, in: RoundedRectangle(cornerRadius: PN.Radius.s))
                     .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(Color.primary.opacity(0.12)))
@@ -347,13 +345,13 @@ struct DocPreview: View {
         case .h4: Text(Self.text(b.runs, size: 13.5, weight: .semibold)).padding(.top, first ? 0 : 10).padding(.bottom, 3)
         case .bullet(let lv):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(["\u{2022}", "\u{25E6}", "\u{25AA}"][min(lv, 2)]).font(.system(size: 13))
+                Text(["\u{2022}", "\u{25E6}", "\u{25AA}"][min(lv, 2)]).font(PN.sys(13))
                 Text(Self.text(b.runs, size: 13)).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
             }
             .padding(.leading, 18 + CGFloat(lv) * 20).padding(.vertical, 2)
         case .todo(let on):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: on ? "checkmark.square" : "square").font(.system(size: 12))
+                Image(systemName: on ? "checkmark.square" : "square").font(PN.sys(12))
                 Text(Self.text(b.runs, size: 13)).lineSpacing(2).fixedSize(horizontal: false, vertical: true)
             }
             .padding(.vertical, 2)

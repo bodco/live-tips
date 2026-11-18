@@ -261,14 +261,14 @@ struct TalkView: View {
         let other = model.slides.filter { $0.who == "other" }.count
         let made = model.mtime.map { $0.formatted(date: Calendar.current.isDateInToday($0) ? .omitted : .abbreviated, time: .shortened) } ?? ""
         return VStack(alignment: .leading, spacing: 8) {
-            Text(L("talk.title")).font(.system(size: 22, weight: .bold)).foregroundStyle(PN.C.text)
+            Text(L("talk.title")).font(PN.sys(22, .bold)).foregroundStyle(PN.C.text)
             Text(L("talk.meta", ["n": "\(model.slides.count)", "m": "\(mine)", "name": model.speakerName.isEmpty ? L("deck.colleague") : model.speakerName,
                                  "k": "\(other)", "s": "\(shared)", "time": made]))
                 .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-            Picker("", selection: $mineOnly) {
-                Text(L("talk.allSlides")).tag(false)
-                Text(L("talk.mine")).tag(true)
-            }.labelsHidden().pickerStyle(.segmented).fixedSize()
+            PNSegmented(selection: $mineOnly, options: [
+                (false, L("talk.allSlides")),
+                (true, L("talk.mine"))
+            ]).labelsHidden().fixedSize()
         }
     }
 
@@ -374,7 +374,7 @@ struct TalkView: View {
             label(L("talk.short"))
             TextField("", text: b.short).textFieldStyle(.roundedBorder)
             HStack(spacing: 16) {
-                Toggle(L("talk.canSkip"), isOn: b.skip).toggleStyle(.checkbox)
+                Toggle(L("talk.canSkip"), isOn: b.skip).toggleStyle(.pnCheckbox)
                 Stepper(value: b.sec, in: 10...1800, step: 15) { Text(L("talk.budget") + " " + TalkTime.clock(b.wrappedValue.sec)).monospacedDigit() }.fixedSize()
             }
         }
@@ -493,7 +493,7 @@ struct PrepareAgainSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(L("again.title")).font(.system(size: 18, weight: .bold))
+            Text(L("again.title")).font(PN.sys(18, .bold))
             reasons
             if let c = call, c.callType == "presentation" { DeckLine(model: c) }
             VStack(alignment: .leading, spacing: 10) {

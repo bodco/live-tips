@@ -141,7 +141,7 @@ struct MenuBarPanel: View {
     private var header: some View {
         HStack(spacing: 8) {
             PacenoteSymbol(height: 18)
-            Text(L("app.name")).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text)
+            Text(L("app.name")).font(PN.sys(15, .bold)).foregroundStyle(PN.C.text)
             Spacer()
             if CalendarService.shared.hasSource { CalendarRefreshButton(place: "menu_bar") }
             Button { model.run { $0.openSettings() } } label: { Image(systemName: "gearshape").foregroundStyle(PN.C.text2) }
@@ -178,7 +178,7 @@ struct MenuBarPanel: View {
     private func kicker(_ t: String, _ c: Color) -> some View {
         HStack(spacing: 6) {
             Circle().fill(c).frame(width: 7, height: 7).accessibilityHidden(true)
-            Text(t.uppercased()).font(.system(size: 11, weight: .semibold)).kerning(0.3).foregroundStyle(c).lineLimit(1)
+            Text(t.uppercased()).font(PN.sys(11, .semibold)).kerning(0.3).foregroundStyle(c).lineLimit(1)
         }
     }
 
@@ -191,7 +191,7 @@ struct MenuBarPanel: View {
                     badge(n.state)
                 }
                 Button { openPage(n) } label: {
-                    Text(n.title).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
+                    Text(n.title).font(PN.sys(15, .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
                 }.buttonStyle(.plain).help(L("home.openCall.help")).padding(.top, 2)
                 if !n.note.isEmpty { Text(n.note).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
                 // 0.9.0: the same rule as Home: one main button and one more next to it
@@ -226,7 +226,7 @@ struct MenuBarPanel: View {
             ForEach(rows) { c in
                 Button { openPage(c) } label: {
                     HStack(spacing: 10) {
-                        Text(Self.time(c.startsAt)).font(.system(size: 12, weight: .semibold)).monospacedDigit().foregroundStyle(PN.C.accent)
+                        Text(Self.time(c.startsAt)).font(PN.sys(12, .semibold)).monospacedDigit().foregroundStyle(PN.C.accent)
                             .frame(width: 58, alignment: .leading)
                         Text(c.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1)
                         Spacer(minLength: 6)
@@ -246,7 +246,7 @@ struct MenuBarPanel: View {
             : recOn ? (RecordingMenu.label(recording), PN.C.rec) : (L("floating.transcribing"), PN.C.turn)
         return card {
             kicker(txt, col)
-            Text(model.liveTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).padding(.top, 2)
+            Text(model.liveTitle).font(PN.sys(15, .bold)).foregroundStyle(PN.C.text).lineLimit(2).padding(.top, 2)
             if model.warning {
                 EmptyView()
             } else if let f = model.liveFile, !model.liveProject.isEmpty {
@@ -255,7 +255,7 @@ struct MenuBarPanel: View {
                     Button { model.run { _ in ReassignPanel.show(file: f) } } label: {
                         HStack(spacing: 2) {
                             Text(model.liveProject).underline()
-                            Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+                            Image(systemName: "chevron.down").font(PN.sys(8, .semibold))
                         }
                         .font(PN.Font.caption).foregroundStyle(PN.C.accent)
                     }
@@ -275,7 +275,7 @@ struct MenuBarPanel: View {
                             Circle().stroke(recOn ? PN.C.rec : PN.C.text2, lineWidth: 1.5).frame(width: 11, height: 11)
                             Circle().fill(recOn ? PN.C.rec : PN.C.text2).frame(width: 5, height: 5)
                         }
-                        Text(L(recOn ? "rec.short.on" : "rec.short.off")).font(.system(size: 12, weight: .medium))
+                        Text(L(recOn ? "rec.short.on" : "rec.short.off")).font(PN.sys(12, .medium))
                     }
                     .foregroundStyle(recOn ? PN.C.rec : PN.C.text2)
                     .frame(maxWidth: .infinity).frame(height: 30)
@@ -293,7 +293,7 @@ struct MenuBarPanel: View {
 
     private func wide(_ t: String, primary: Bool = false, danger: Bool = false, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            Text(t).font(.system(size: 12, weight: primary ? .semibold : .medium)).lineLimit(1).minimumScaleFactor(0.85)
+            Text(t).font(PN.sys(12, primary ? .semibold : .medium)).lineLimit(1).minimumScaleFactor(0.85)
                 .foregroundStyle(primary ? PN.C.onAccent : danger ? PN.C.danger : PN.C.text2)
                 .frame(maxWidth: .infinity).frame(height: 30)
                 .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(primary ? PN.C.accentFill : danger ? PN.C.danger.opacity(0.1) : PN.C.surface2))
@@ -353,7 +353,7 @@ struct MenuBarPanel: View {
     private func row(_ title: String, _ key: String, icon: String, _ action: @escaping (AppDelegate) -> Void) -> some View {
         Button { model.run(action) } label: {
             HStack(spacing: 10) {
-                Image(systemName: icon).font(.system(size: 12, weight: .medium)).foregroundStyle(PN.C.accent)
+                Image(systemName: icon).font(PN.sys(12, .medium)).foregroundStyle(PN.C.accent)
                     .frame(width: 24, height: 24)
                     .background(RoundedRectangle(cornerRadius: PN.r(7)).fill(PN.C.surface))
                     .overlay(RoundedRectangle(cornerRadius: PN.r(7)).stroke(Color.primary.opacity(0.08)))

@@ -54,7 +54,7 @@ struct GooglePage: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: "person.crop.circle").foregroundStyle(PN.C.text2)
-                Text(a.email).font(.headline)
+                Text(a.email).font(PN.sys(.headline, 13, .semibold))
                 Spacer()
                 if let e = g.lastError[a.email] {
                     Text(e).font(PN.Font.caption).foregroundStyle(PN.C.pending).lineLimit(1)
@@ -76,7 +76,7 @@ struct GooglePage: View {
                     if open { openCalendars.remove(a.email) } else { openCalendars.insert(a.email) }
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: open ? "chevron.down" : "chevron.right").font(.caption2.weight(.semibold))
+                        Image(systemName: open ? "chevron.down" : "chevron.right").font(PN.sys(.caption2.weight(.semibold), 11, .semibold))
                         Text(L("google.calendars")).font(PN.Font.caption.weight(.semibold))
                         Text(L("google.calendarsOn", ["n": String(cals.filter { g.isOn($0) }.count), "total": String(cals.count)]))
                             .font(PN.Font.caption)
@@ -95,7 +95,7 @@ struct GooglePage: View {
                             if c.primary { Text(L("google.primary")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                         }
                     }
-                    .toggleStyle(.checkbox)
+                    .toggleStyle(.pnCheckbox)
                 } }
             }
         }

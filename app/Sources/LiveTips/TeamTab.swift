@@ -177,7 +177,7 @@ struct TeamView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Text(L("team.tab")).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text)
+            Text(L("team.tab")).font(PN.sys(15, .semibold)).foregroundStyle(PN.C.text)
             if TeamStore.orgs.count > 1 {
                 Picker("", selection: Binding(get: { store.orgID }, set: { id in Task { await store.switchOrg(id) } })) {
                     ForEach(TeamStore.orgs, id: \.id) { Text($0.name).tag($0.id) }
@@ -187,11 +187,10 @@ struct TeamView: View {
             Text(L(store.people?.wholeOrg == true ? "team.note.org" : "team.note.lead")).font(PN.Font.caption)
                 .foregroundStyle(PN.C.text2).lineLimit(1)
             Spacer()
-            Picker("", selection: Binding(get: { store.mode }, set: { m in store.mode = m; Task { await store.reload() } })) {
-                Text(L("team.mode.calls")).tag(TeamStore.Mode.calls)
-                Text(L("team.mode.overview")).tag(TeamStore.Mode.overview)
-            }
-            .pickerStyle(.segmented).labelsHidden().fixedSize().accessibilityLabel(L("team.mode"))
+            PNSegmented(selection: Binding(get: { store.mode }, set: { m in store.mode = m; Task { await store.reload() } }), options: [
+                (TeamStore.Mode.calls, L("team.mode.calls")),
+                (TeamStore.Mode.overview, L("team.mode.overview"))
+            ]).labelsHidden().fixedSize().accessibilityLabel(L("team.mode"))
             if store.loading { PNSpinner(size: 16) }
         }
     }
@@ -241,7 +240,7 @@ struct TeamView: View {
                         ForEach(store.types, id: \.self) { Text($0).tag($0) }
                     }
                     .fixedSize()
-                    Toggle(L("team.f.recorded"), isOn: $store.recordedOnly).toggleStyle(.checkbox)
+                    Toggle(L("team.f.recorded"), isOn: $store.recordedOnly).toggleStyle(.pnCheckbox)
                     if !store.series.isEmpty {
                         Button { store.series = "" } label: { Label(L("team.f.seriesOff"), systemImage: "xmark.circle") }
                             .buttonStyle(.pnTertiary)
@@ -460,10 +459,8 @@ struct TeamCallPage: View {
                     Text(L("team.private.page")).font(PN.Font.body).foregroundStyle(PN.C.text2).padding(20)
                     Spacer()
                 } else {
-                    Picker("", selection: $section) {
-                        ForEach(sections, id: \.self) { Text(L("team.sec." + $0)).tag($0) }
-                    }
-                    .pickerStyle(.segmented).labelsHidden().padding(.horizontal, 20).padding(.bottom, 8)
+                    PNSegmented(selection: $section, options: sections.map { ($0, L("team.sec." + $0)) })
+                        .labelsHidden().padding(.horizontal, 20).padding(.bottom, 8)
                     Divider()
                     ScrollView { content(d).frame(maxWidth: .infinity, alignment: .leading).padding(20) }
                 }
@@ -490,7 +487,7 @@ struct TeamCallPage: View {
 
     private func head(_ d: TeamCalls.Detail) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(d.title ?? L("team.private")).font(.system(size: 18, weight: .semibold)).foregroundStyle(PN.C.text)
+            Text(d.title ?? L("team.private")).font(PN.sys(18, .semibold)).foregroundStyle(PN.C.text)
             HStack(spacing: 8) {
                 if let s = d.start { Text(s.formatted(date: .abbreviated, time: .shortened)) }
                 Text(TeamCalls.length(d.durationS))

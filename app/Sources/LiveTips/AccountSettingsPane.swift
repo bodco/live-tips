@@ -29,7 +29,7 @@ struct AccountSettingsPane: View {
                 .font(PN.Font.caption)
             } header: { Text(L("account.what.head")) }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear { if acct.signedIn { Task { await acct.refreshInfo() } } }
         .alert(L("account.delete.q1"), isPresented: $confirmDelete) {
             Button(L("account.delete.continue"), role: .destructive) { confirmDeleteAgain = true }
@@ -48,9 +48,9 @@ struct AccountSettingsPane: View {
     @ViewBuilder private func signedIn(_ s: PacenoteServer.Session) -> some View {
         Section {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "person.crop.circle.fill").font(.title2).foregroundStyle(PN.C.text2)
+                Image(systemName: "person.crop.circle.fill").font(PN.sys(.title2, 17)).foregroundStyle(PN.C.text2)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(acct.me?.name.isEmpty == false ? acct.me!.name : (s.name.isEmpty ? s.email : s.name)).font(.headline)
+                    Text(acct.me?.name.isEmpty == false ? acct.me!.name : (s.name.isEmpty ? s.email : s.name)).font(PN.sys(.headline, 13, .semibold))
                     if !s.email.isEmpty { Text(s.email).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                 }
                 Spacer()
@@ -408,7 +408,7 @@ struct MethodSheet: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.danger)
             }
             HStack {
-                Toggle(L("auth.password.show"), isOn: $show).toggleStyle(.checkbox).font(PN.Font.caption)
+                Toggle(L("auth.password.show"), isOn: $show).toggleStyle(.pnCheckbox).font(PN.Font.caption)
                 Spacer()
                 if busy { PNSpinner(size: 16) }
                 Button(L("common.cancel"), action: done).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)

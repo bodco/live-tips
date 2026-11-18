@@ -144,13 +144,12 @@ struct CallSettingsView: View {
                             .onSubmit { rename() }
                         Button(L("callSettings.rename")) { rename() }.buttonStyle(.pnTertiary)
                     }
-                    Picker(L("callSettings.opacity"), selection: $model.opacity) {
-                        Text("100%").tag(1.0)
-                        Text("94%").tag(0.94)
-                        Text("80%").tag(0.8)
-                        Text("65%").tag(0.65)
-                    }
-                    .pickerStyle(.segmented)
+                    PNSegmented(L("callSettings.opacity"), selection: $model.opacity, options: [
+                        (1.0, "100%"),
+                        (0.94, "94%"),
+                        (0.8, "80%"),
+                        (0.65, "65%")
+                    ])
                     .onChange(of: model.opacity) { model.tips?.setOpacity(model.opacity) }
                     Toggle(L("callSettings.onTop"), isOn: $model.onTop)
                         .onChange(of: model.onTop) { model.tips?.setOnTop(model.onTop) }
@@ -172,7 +171,7 @@ struct CallSettingsView: View {
                     Text(L("callSettings.textSize")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } header: { Text(L("callSettings.section.window")) }
             }
-            .formStyle(.grouped)
+            .formStyle(.grouped).toggleStyle(.pnSwitch)
             .frame(minHeight: 520, idealHeight: 640)       // 0.8 (owner): a Form has no height of its own; without this the window was empty
             // 0.8.5 (owner): the Done bar sits apart from the scrolled form: a divider and its own padding.
             Divider()

@@ -124,11 +124,10 @@ struct AnswerCardsEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Picker("", selection: $tab) {
-                Text(L("cards.tab.list")).tag("list")
-                Text(L("cards.tab.file")).tag("file")
-            }
-            .pickerStyle(.segmented).labelsHidden().fixedSize()
+            PNSegmented(selection: $tab, options: [
+                ("list", L("cards.tab.list")),
+                ("file", L("cards.tab.file"))
+            ]).labelsHidden().fixedSize()
             .onChange(of: tab) {
                 if tab == "file" { text = (try? String(contentsOf: AnswerCards.url(root: root), encoding: .utf8)) ?? AnswerCards.template; saved = FileManager.default.fileExists(atPath: AnswerCards.url(root: root).path) }
                 else { listID = UUID() }
@@ -286,10 +285,9 @@ struct AnswerCardForm: View {
             }
             // S1: the card's type; a competitor card is a battlecard, a price card holds a limit our side never crosses
             field(L("cards.form.type")) {
-                Picker("", selection: Binding(get: { card.kind }, set: { card.type = $0 })) {
-                    ForEach(AnswerCard.types, id: \.self) { Text(L("cards.type." + $0)).tag($0) }
-                }
-                .pickerStyle(.segmented).labelsHidden()
+                PNSegmented(selection: Binding(get: { card.kind }, set: { card.type = $0 }),
+                                options: AnswerCard.types.map { ($0, L("cards.type." + $0)) })
+                    .labelsHidden()
             }
             if card.kind == "competitor" {
                 field(L("cards.form.weWin")) { TextField("", text: $card.weWin, prompt: Text(L("cards.form.weWinPh"))).textFieldStyle(.roundedBorder) }

@@ -36,7 +36,7 @@ struct TranscriptionSettingsPane: View {
             }
             .onChange(of: model.config.dictionary) { LocalAIService.shared.writeCoreConfig() }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
     }
 }
 

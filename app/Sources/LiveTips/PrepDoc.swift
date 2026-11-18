@@ -52,7 +52,7 @@ struct PrepDocView: View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 17, weight: .semibold)).foregroundStyle(PN.C.text).lineLimit(2)
+                    Text(title).font(PN.sys(17, .semibold)).foregroundStyle(PN.C.text).lineLimit(2)
                     Text(times).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
                 Spacer()
@@ -72,7 +72,7 @@ struct PrepDocView: View {
             .padding(.horizontal, 18).padding(.vertical, 12)
             Divider()
             if editingAll {
-                TextEditor(text: $text).font(.system(size: 13, design: .monospaced)).padding(8)
+                TextEditor(text: $text).font(PN.sys(13, mono: true)).padding(8)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 5) {
@@ -87,7 +87,7 @@ struct PrepDocView: View {
                                 Toggle(isOn: Binding(get: { done }, set: { toggle(i, $0) })) {
                                     MarkdownBlocks(text: Self.checkboxText(raw))
                                 }
-                                .toggleStyle(.checkbox)
+                                .toggleStyle(.pnCheckbox)
                             } else {
                                 MarkdownBlocks(text: raw)
                                     .contentShape(Rectangle())
@@ -199,9 +199,9 @@ struct MarkdownBlocks: View {
         } else if t.hasPrefix("### ") {
             inline(String(t.dropFirst(4))).font(.callout.weight(.semibold)).padding(.top, 4)
         } else if t.hasPrefix("## ") {
-            inline(String(t.dropFirst(3))).font(.headline).padding(.top, 8)
+            inline(String(t.dropFirst(3))).font(PN.sys(.headline, 13, .semibold)).padding(.top, 8)
         } else if t.hasPrefix("# ") {
-            inline(String(t.dropFirst(2))).font(.title3.weight(.semibold))
+            inline(String(t.dropFirst(2))).font(PN.sys(.title3.weight(.semibold), 15, .semibold))
         } else if t.range(of: "^[-*•]\\s+", options: .regularExpression) != nil {
             let lead = raw.prefix { $0 == " " }.count
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -217,7 +217,7 @@ struct MarkdownBlocks: View {
         } else if t.hasPrefix("|") {
             if t.range(of: "^\\|?\\s*:?-{2,}", options: .regularExpression) == nil {
                 Text(t.trimmingCharacters(in: CharacterSet(charactersIn: "|")).replacingOccurrences(of: "|", with: "  ·  "))
-                    .font(.callout)
+                    .font(PN.sys(.callout, 12))
             }
         } else {
             inline(t)

@@ -1,3 +1,22 @@
+/* Redesign review (18.11): the bundled faces (Resources/Fonts, SIL OFL), no network fonts. */
+@font-face{font-family:'Barlow Condensed';font-weight:600;font-style:normal;src:url('../Fonts/BarlowCondensed-SemiBold.ttf') format('truetype');}
+@font-face{font-family:'Barlow Condensed';font-weight:700;font-style:normal;src:url('../Fonts/BarlowCondensed-Bold.ttf') format('truetype');}
+@font-face{font-family:'Barlow Condensed';font-weight:800;font-style:normal;src:url('../Fonts/BarlowCondensed-ExtraBold.ttf') format('truetype');}
+@font-face{font-family:'Barlow';font-weight:400;font-style:normal;src:url('../Fonts/Barlow-Regular.ttf') format('truetype');}
+@font-face{font-family:'Barlow';font-weight:500;font-style:normal;src:url('../Fonts/Barlow-Medium.ttf') format('truetype');}
+@font-face{font-family:'Barlow';font-weight:600;font-style:normal;src:url('../Fonts/Barlow-SemiBold.ttf') format('truetype');}
+@font-face{font-family:'Barlow';font-weight:700;font-style:normal;src:url('../Fonts/Barlow-Bold.ttf') format('truetype');}
+@font-face{font-family:'Inter Tight';font-weight:400;font-style:normal;src:url('../Fonts/InterTight-Regular.ttf') format('truetype');}
+@font-face{font-family:'Inter Tight';font-weight:500;font-style:normal;src:url('../Fonts/InterTight-Medium.ttf') format('truetype');}
+@font-face{font-family:'Inter Tight';font-weight:600;font-style:normal;src:url('../Fonts/InterTight-SemiBold.ttf') format('truetype');}
+@font-face{font-family:'Inter Tight';font-weight:700;font-style:normal;src:url('../Fonts/InterTight-Bold.ttf') format('truetype');}
+@font-face{font-family:'Inter Tight';font-weight:800;font-style:normal;src:url('../Fonts/InterTight-ExtraBold.ttf') format('truetype');}
+@font-face{font-family:'Inter Tight';font-weight:900;font-style:normal;src:url('../Fonts/InterTight-Black.ttf') format('truetype');}
+@font-face{font-family:'JetBrains Mono';font-weight:400;font-style:normal;src:url('../Fonts/JetBrainsMono-Regular.ttf') format('truetype');}
+@font-face{font-family:'JetBrains Mono';font-weight:600;font-style:normal;src:url('../Fonts/JetBrainsMono-SemiBold.ttf') format('truetype');}
+@font-face{font-family:'IBM Plex Mono';font-weight:400;font-style:normal;src:url('../Fonts/IBMPlexMono-Regular.ttf') format('truetype');}
+@font-face{font-family:'IBM Plex Mono';font-weight:500;font-style:normal;src:url('../Fonts/IBMPlexMono-Medium.ttf') format('truetype');}
+
 /* Pacenote, tips window, Concept A "Focus". Requires tokens.css. App copy of design/pacenote-0.8/tips-window (F2). */
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -702,3 +721,20 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 [data-style] .ratebox .chip,[data-style] .ratebox input{border-radius:var(--pn-radius-button)}
 [data-style] .seg{border-radius:0}
 [data-style] .agenda-list .st,[data-style] .rec.ready{border-radius:var(--pn-status-radius)}
+/* 0.23.0 (review 18.11): the side pane by style (LA-TipsLive, LB-TipsStates r10): the window ground, text tabs with a
+   3 px line under the picked one, the Speakers head in the display face. Classic keeps the capsules above. */
+[data-style] .pane{background:var(--pn-bg);border-left-color:var(--pn-rule)}
+[data-style] .tabs{display:flex;gap:18px;padding:0 12px;margin:0;border-radius:0;background:transparent;border-bottom:1px solid var(--pn-rule)}
+[data-style] .tab{flex:none;border-radius:0;padding:9px 0 7px;border-bottom:3px solid transparent;background:transparent;box-shadow:none;color:var(--pn-ink2);font-family:var(--pn-font-display);font-size:15px;font-weight:600;text-transform:var(--pn-caps)}
+[data-style] .tab[aria-selected="true"]{background:transparent;box-shadow:none;color:var(--pn-ink);font-weight:800;border-bottom-color:var(--pn-link)}
+[data-style="roadbook"] .tab{letter-spacing:.05em}
+[data-style] .tab:focus-visible{outline:2px solid var(--pn-link);outline-offset:-2px}
+[data-style] .spkbar{border-radius:0;background:transparent;margin:0;padding:0 12px 8px;border-bottom:1px solid var(--pn-rule)}
+[data-style] .spkbar.collapsed{padding:0 12px}
+[data-style] .spkbar .spks-h{min-height:38px}
+[data-style] .spkbar .spks-h b{font-family:var(--pn-font-display);font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--pn-ink)}
+[data-style="broadsheet"] .spkbar .spks-h b{letter-spacing:.06em}
+[data-style] .spkbar .spk-count{font-size:13px;color:var(--pn-ink3)}
+[data-style] .spkbar .spk-count.todo{color:var(--pn-notready-text)}
+[data-style] .spkbar .spk-chev{border-radius:0}
+[data-style] .spk-chip{border-radius:0}

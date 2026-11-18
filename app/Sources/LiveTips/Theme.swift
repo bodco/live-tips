@@ -21,7 +21,7 @@ struct IconTile: View {
             Image(nsImage: image).resizable().interpolation(.high).frame(width: size, height: size)
         } else {
             Image(systemName: symbol)
-                .font(.system(size: size * 0.5, weight: .regular))
+                .font(PN.sys(size * 0.5, .regular))
                 .foregroundStyle(tint)
                 .frame(width: size, height: size)
                 .background(RoundedRectangle(cornerRadius: size * 0.25).fill(LT.tileFill))
@@ -42,9 +42,9 @@ struct WindowHeader: View {
             HStack(alignment: .center, spacing: 14) {
                 IconTile(symbol: symbol, image: image, size: 44)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.title2.weight(.semibold))
+                    Text(title).font(PN.sys(.title2.weight(.semibold), 17, .semibold))
                     if !subtitle.isEmpty {
-                        Text(subtitle).font(.callout).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                        Text(subtitle).font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 0)
@@ -52,7 +52,7 @@ struct WindowHeader: View {
         } else {
             VStack(spacing: 14) {
                 IconTile(symbol: symbol, image: image)
-                Text(title).font(.title.weight(.semibold)).multilineTextAlignment(.center)
+                Text(title).font(PN.sys(.title.weight(.semibold), 22, .bold)).multilineTextAlignment(.center)
                 if !subtitle.isEmpty {
                     Text(subtitle).foregroundStyle(PN.C.text3).multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 520)

@@ -118,19 +118,19 @@ struct SheetPeopleView: View {
         let other = L(ours ? "sheet.ui.s1.theirs" : "sheet.ui.s1.ours")
         return HStack(spacing: 6) {
             Text(p.you ? String(p.name.prefix(1)).uppercased() : PeopleSides.initials(p.name))
-                .font(.system(size: 10, weight: .bold)).foregroundStyle(tint)
+                .font(PN.sys(10, .bold)).foregroundStyle(tint)
                 .frame(width: 22, height: 22).background(Circle().fill(tint.opacity(0.14)))
                 .accessibilityHidden(true)
-            Text(p.name).font(.system(size: 13, weight: .medium)).foregroundStyle(PN.C.text)
+            Text(p.name).font(PN.sys(13, .medium)).foregroundStyle(PN.C.text)
                 .lineLimit(1).truncationMode(.tail).frame(maxWidth: 190, alignment: .leading).fixedSize(horizontal: false, vertical: true)
             if !p.company.isEmpty {
                 Text(p.company).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).fixedSize()
             }
             if p.you {
-                Text(L("sheet.people.always")).font(.system(size: 11)).foregroundStyle(PN.C.text3).lineLimit(1).fixedSize().padding(.trailing, 4)
+                Text(L("sheet.people.always")).font(PN.sys(11)).foregroundStyle(PN.C.text3).lineLimit(1).fixedSize().padding(.trailing, 4)
             } else {
                 Button { _ = move(p.id, toOurs: !ours) } label: {
-                    Image(systemName: "arrow.left.arrow.right").font(.system(size: 11, weight: .semibold)).frame(width: 20, height: 20)
+                    Image(systemName: "arrow.left.arrow.right").font(PN.sys(11, .semibold)).frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain).foregroundStyle(PN.C.text2)
                 .help(L("sheet.people.move", ["name": p.name, "side": other]))
@@ -138,7 +138,7 @@ struct SheetPeopleView: View {
                 Button {
                     if ours { draft.ours.removeAll { $0.id == p.id } } else { draft.theirs.removeAll { $0.id == p.id } }
                 } label: {
-                    Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).frame(width: 20, height: 20)
+                    Image(systemName: "xmark").font(PN.sys(10, .semibold)).frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain).foregroundStyle(PN.C.text3)
                 .help(L("call.remove")).accessibilityLabel(L("call.remove"))

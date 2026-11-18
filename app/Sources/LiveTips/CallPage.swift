@@ -174,12 +174,12 @@ struct CallPageView: View {
         let series = record.map { Self.series(of: $0).count } ?? 0
         let info = VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                if !whenText.isEmpty { Text(whenText).font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.accent) }
+                if !whenText.isEmpty { Text(whenText).font(PN.sys(13, .semibold)).foregroundStyle(PN.C.accent) }
                 // 0.10.1 (A3): the project is a picker: the call, its tasks, series and Notion pages move to another one
                 Button { reassigning = true } label: {
                     HStack(spacing: 4) {
                         PagePill(text: projName.isEmpty ? L("reassign.noProject") : projName, color: PN.C.answer)
-                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(PN.C.text3)
+                        Image(systemName: "chevron.down").font(PN.sys(9, .semibold)).foregroundStyle(PN.C.text3)
                     }
                 }
                 .buttonStyle(.plain).help(L("reassign.help")).accessibilityLabel(L("reassign.help"))
@@ -188,7 +188,7 @@ struct CallPageView: View {
                     Text(L("call.page.minutes", ["n": "\(Int(m.rounded()))"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
             }
-            Text(Self.title(file)).font(.system(size: 28, weight: .bold)).foregroundStyle(PN.C.text)
+            Text(Self.title(file)).font(PN.sys(28, .bold)).foregroundStyle(PN.C.text)
                 .fixedSize(horizontal: false, vertical: true)
             if series > 1, let r = record {
                 Button { SeriesWindow.show(record: r) } label: {
@@ -432,7 +432,7 @@ struct CallPageView: View {
             }
             .padding(.bottom, 10)
             if !m.tldr.isEmpty {
-                Text(CallNotes.md(m.tldr)).font(.system(size: 15)).lineSpacing(3).foregroundStyle(PN.C.text)
+                Text(CallNotes.md(m.tldr)).font(PN.sys(15)).lineSpacing(3).foregroundStyle(PN.C.text)
                     .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             }
             if !m.topics.isEmpty {
@@ -553,7 +553,7 @@ struct CallPageView: View {
             }
             if !short.isEmpty {
                 PageLabel(text: L("page.sum.inShort")).padding(.bottom, 10)
-                Text(CallNotes.md(short.joined(separator: " "))).font(.system(size: 15)).lineSpacing(3).foregroundStyle(PN.C.text)
+                Text(CallNotes.md(short.joined(separator: " "))).font(PN.sys(15)).lineSpacing(3).foregroundStyle(PN.C.text)
                     .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             }
             if !short.isEmpty && !topics.isEmpty { Divider().padding(.vertical, 20) }
@@ -805,7 +805,7 @@ struct CallPageView: View {
                     Toggle("", isOn: Binding(get: { false }, set: { on in
                         if on { adoptLegacy(t, section, proj, ws) { CommitmentRegister.mark(folder: folder, id: $0, op: "done") } }
                     }))
-                    .toggleStyle(.checkbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": t.text]))
+                    .toggleStyle(.pnCheckbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": t.text]))
                 }
                 .padding(.vertical, 3)
             }
@@ -831,7 +831,7 @@ struct CallPageView: View {
                     menu: commitmentMenu(c, section),
                     onSave: { v in register.edit(c, text: v); changed(section) }) {
             Toggle("", isOn: Binding(get: { c.status == "done" }, set: { register.mark(c, $0 ? "done" : "reopen") }))
-                .toggleStyle(.checkbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
+                .toggleStyle(.pnCheckbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
         }
         .padding(.vertical, 3)
     }
@@ -1364,7 +1364,7 @@ struct PagePill: View {
     let text: String
     let color: Color
     var body: some View {
-        Text(text).font(.system(size: 12, weight: .semibold)).foregroundStyle(color).lineLimit(1)
+        Text(text).font(PN.sys(12, .semibold)).foregroundStyle(color).lineLimit(1)
             .padding(.horizontal, 8).padding(.vertical, 2)
             .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: PN.r(6)))
     }
@@ -1376,7 +1376,7 @@ struct PageAvatar: View {
     var body: some View {
         let parts = name.split(whereSeparator: { $0 == " " || $0 == "." }).prefix(2)
         let ini = parts.compactMap { $0.first.map(String.init) }.joined().uppercased()
-        Text(ini.isEmpty ? "?" : ini).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.answer)
+        Text(ini.isEmpty ? "?" : ini).font(PN.sys(10, .bold)).foregroundStyle(PN.C.answer)
             .frame(width: 22, height: 22).background(Circle().fill(PN.C.accent.opacity(0.13)))
             .accessibilityHidden(true)
     }
@@ -1387,7 +1387,7 @@ struct PageIconTile: View {
     let icon: String
     let color: Color
     var body: some View {
-        Image(systemName: icon).font(.system(size: 11, weight: .semibold)).foregroundStyle(color)
+        Image(systemName: icon).font(PN.sys(11, .semibold)).foregroundStyle(color)
             .frame(width: 22, height: 22).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: PN.r(6)))
             .accessibilityHidden(true)
     }
@@ -1400,7 +1400,7 @@ struct PageEmpty: View {
     let text: String
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon).font(.system(size: 14, weight: .medium)).foregroundStyle(PN.C.text3)
+            Image(systemName: icon).font(PN.sys(14, .medium)).foregroundStyle(PN.C.text3)
                 .frame(width: 34, height: 34).background(Circle().fill(PN.C.surface2)).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)

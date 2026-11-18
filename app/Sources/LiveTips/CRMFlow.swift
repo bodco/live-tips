@@ -183,7 +183,7 @@ struct CRMUpdateView: View {
                             if !p.rows[i].detail.isEmpty { Text(p.rows[i].detail).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                         }
                     }
-                    .toggleStyle(.checkbox)
+                    .toggleStyle(.pnCheckbox)
                     .disabled(p.rows[i].id == "deal" && (l.dealId.isEmpty || l.dealId == "none"))
                 }
                 TextField(L("crm.stage"), text: $stage, prompt: Text(L("crm.stage.prompt"))).help(L("crm.stage.help"))

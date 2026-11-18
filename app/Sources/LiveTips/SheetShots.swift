@@ -374,7 +374,7 @@ final class SheetShots: NSObject, NSApplicationDelegate {
             }.padding(24))
         }))
         s.append(Scene(name: "settings-meeting-sheet", size: NSSize(width: 720, height: 1100), make: {
-            AnyView(MeetingSheetSettingsPane().formStyle(.grouped))
+            AnyView(MeetingSheetSettingsPane().formStyle(.grouped).toggleStyle(.pnSwitch))
         }))
         s.append(Scene(name: "export-sheet", size: NSSize(width: 600, height: 700), make: { [unowned self] in
             let doc = SheetDoc(path: sheetPath)

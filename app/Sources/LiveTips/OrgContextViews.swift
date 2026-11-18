@@ -222,7 +222,7 @@ struct StateDiffView: View {
                     }
                 }
             }
-            .font(.system(size: 12, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            .font(PN.sys(12, mono: true)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -248,7 +248,7 @@ struct StateEditSheet: View {
                 Text(L("orgctx.state.review")).font(PN.Font.caption).foregroundStyle(PN.C.text2)
                 StateDiffView(old: base.body, new: draft).frame(minHeight: 260)
             } else {
-                TextEditor(text: $draft).font(.system(size: 12, design: .monospaced)).frame(minHeight: 260)
+                TextEditor(text: $draft).font(PN.sys(12, mono: true)).frame(minHeight: 260)
                     .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(PN.C.text3.opacity(0.3)))
             }
             HStack {
@@ -300,7 +300,7 @@ struct OrgStateSection: View {
                 if s.body.isEmpty {
                     Text(L("orgctx.state.empty")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else {
-                    Text(s.body).font(.system(size: 12, design: .monospaced)).foregroundStyle(PN.C.text2).lineLimit(12)
+                    Text(s.body).font(PN.sys(12, mono: true)).foregroundStyle(PN.C.text2).lineLimit(12)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 HStack(spacing: 8) {

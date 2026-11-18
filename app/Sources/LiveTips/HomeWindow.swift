@@ -100,10 +100,20 @@ extension CallState {
 struct StatePill: View {
     let state: CallState
     var text: String? = nil
+    @Environment(\.pnTheme) private var t
     var body: some View {
-        Text(text ?? state.text).font(.system(size: 11, weight: .semibold)).foregroundStyle(state.color)
-            .padding(.horizontal, 7).padding(.vertical, 2)
-            .background(state.dot.opacity(0.16), in: Capsule())
+        // Redesign review (18.11): "not ready" is the NotReadyLabel of the style (Light: ink on the orange plate,
+        // Dark: orange text, no plate); Roadbook and Broadsheet set the pill square in the mono label face.
+        let nr = state == .notReady || state == .noBrief || state == .failed
+        let fg = nr ? Color(pnHex: t.notreadyText) : state.color
+        let bg = nr ? (t.nrBg.map { Color(pnHex: $0) } ?? .clear) : state.dot.opacity(0.16)
+        let classic = t.style == .classic
+        Text(t.cased(text ?? state.text))
+            .font(classic ? .system(size: 11, weight: .semibold) : t.font(.mono, 11, .semibold))
+            .tracking(classic ? 0 : t.lblTrack * 11)
+            .foregroundStyle(fg)
+            .padding(.horizontal, nr && t.nrBg == nil && !classic ? 0 : 7).padding(.vertical, 2)
+            .background(bg, in: RoundedRectangle(cornerRadius: classic ? 99 : 0))
             .lineLimit(1).fixedSize()
     }
 }
@@ -254,7 +264,7 @@ struct HomeView: View {
                 // 0.9.1 (owner): one split button, the arrow is part of the blue button, not a loose chevron
                 HStack(spacing: 0) {
                     Button { StartCallWindow.startNow(delegate: app) } label: {
-                        Text(L("home.startCallNow")).font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.onAccent)
+                        Text(L("home.startCallNow")).font(PN.sys(13, .semibold)).foregroundStyle(PN.C.onAccent)
                             .padding(.leading, 14).padding(.trailing, 12).frame(height: 32).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain).keyboardShortcut("n", modifiers: .command)
@@ -262,7 +272,7 @@ struct HomeView: View {
                     Menu {
                         Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
                     } label: {
-                        Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.onAccent)
+                        Image(systemName: "chevron.down").font(PN.sys(10, .bold)).foregroundStyle(PN.C.onAccent)
                             .frame(width: 28, height: 32).contentShape(Rectangle())
                     }
                     .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
@@ -333,7 +343,7 @@ struct HomeView: View {
         df.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
         return VStack(alignment: .leading, spacing: 4) {
             Text(df.string(from: now)).font(PN.Font.body).foregroundStyle(PN.C.text3)
-            Text(titleText).font(.system(size: 26, weight: .bold)).foregroundStyle(PN.C.text)
+            Text(titleText).font(PN.sys(26, .bold)).foregroundStyle(PN.C.text)
         }
     }
 
@@ -419,7 +429,7 @@ struct HomeView: View {
     private var seeYourDay: some View {
         card {
             VStack(alignment: .leading, spacing: 10) {
-                Text(L("home.seeDay.title")).font(.system(size: 17, weight: .semibold)).foregroundStyle(PN.C.text)
+                Text(L("home.seeDay.title")).font(PN.sys(17, .semibold)).foregroundStyle(PN.C.text)
                 Text(L("home.seeDay.body")).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button(L("home.connectCalendar")) { cal.connect() }.buttonStyle(.pnPrimary)
@@ -445,7 +455,7 @@ struct HomeView: View {
         let notion = SettingsWindow.model.isSet(.notionToken)
         return card {
             VStack(alignment: .leading, spacing: 14) {
-                Text(L("home.steps.title")).font(.system(size: 17, weight: .semibold)).foregroundStyle(PN.C.text)
+                Text(L("home.steps.title")).font(PN.sys(17, .semibold)).foregroundStyle(PN.C.text)
                 step(1, L("home.steps.claude"), L("home.steps.claude.sub"), done: aiReady) { SettingsWindow.show(tab: "ai") }
                 step(2, L("home.steps.calendar"), L("home.steps.calendar.sub"), done: calendarOn) { cal.connect() }
                 step(3, L("home.steps.notion"), L("home.steps.notion.sub"), done: notion) { SettingsWindow.show(tab: "notion") }
@@ -458,7 +468,7 @@ struct HomeView: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(done ? PN.C.turn.opacity(0.15) : PN.C.surface2).frame(width: 26, height: 26)
-                if done { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(PN.C.turn) }
+                if done { Image(systemName: "checkmark").font(PN.sys(11, .bold)).foregroundStyle(PN.C.turn) }
                 else { Text("\(n)").pnSection().foregroundStyle(PN.C.text2) }
             }
             .accessibilityHidden(true)
@@ -492,18 +502,18 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Circle().fill(PN.C.danger).frame(width: 8, height: 8).accessibilityHidden(true)
-                    Text(waiting ? L("menubar.status.waiting") : L("home.live")).font(.system(size: 14, weight: .semibold)).foregroundStyle(PN.C.danger)
+                    Text(waiting ? L("menubar.status.waiting") : L("home.live")).font(PN.sys(14, .semibold)).foregroundStyle(PN.C.danger)
                     if let s = since, status.state == "recording" {
                         Text("·").foregroundStyle(PN.C.text3)
-                        Text(s, style: .timer).monospacedDigit().font(.system(size: 14, weight: .semibold)).foregroundStyle(PN.C.danger)
+                        Text(s, style: .timer).monospacedDigit().font(PN.sys(14, .semibold)).foregroundStyle(PN.C.danger)
                     }
                     if status.lines > 0 {
                         Text("·").foregroundStyle(PN.C.text3)
-                        Text(L("home.live.counts", ["lines": "\(status.lines)", "tips": "\(status.tips)"])).font(.system(size: 14)).foregroundStyle(PN.C.text3)
+                        Text(L("home.live.counts", ["lines": "\(status.lines)", "tips": "\(status.tips)"])).font(PN.sys(14)).foregroundStyle(PN.C.text3)
                     }
                 }
                 Button { app.showTips() } label: {
-                    Text(title).font(.system(size: 30, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
+                    Text(title).font(PN.sys(30, .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain).help(L("menubar.showTips"))
                 Text([project, people.isEmpty ? "" : L("home.card.with", ["people": people])].filter { !$0.isEmpty }.joined(separator: " · ") + " · ")
@@ -581,11 +591,11 @@ struct HomeView: View {
         return heroCard {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text(meta1).font(.system(size: 14, weight: .semibold)).foregroundStyle(PN.C.accent)
+                    Text(meta1).font(PN.sys(14, .semibold)).foregroundStyle(PN.C.accent)
                     StatePill(state: SheetBadges.state(r.model, st), text: SheetBadges.text(r.model, st))
                 }
                 Button { openCall(r) } label: {
-                    Text(r.title).font(.system(size: 30, weight: .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
+                    Text(r.title).font(PN.sys(30, .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain).help(L("home.openCall.help"))
                 (Text(withPeople).foregroundStyle(PN.C.text2) + Text(briefText).foregroundStyle(briefOK ? PN.C.turn : PN.C.pending))
@@ -652,7 +662,7 @@ struct HomeView: View {
         let near = rest.filter { Calendar.current.isDateInToday($0.start) || Calendar.current.isDateInTomorrow($0.start) || $0.start < now }
         return card { VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
-                Text(L("home.comingUp")).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text)
+                Text(L("home.comingUp")).font(PN.sys(15, .semibold)).foregroundStyle(PN.C.text)
                 if !hiddenNow.isEmpty {
                     Text(L("home.hiddenUndo", ["n": "\(hiddenNow.count)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     Button(L("ntask.undo")) { undoHide() }.buttonStyle(.pnTertiary)
@@ -792,7 +802,7 @@ struct HomeView: View {
         let rs = Array(CallFilter.apply(history.visible, org: filterOrg, project: filterProject).prefix(3))
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(L("home.recentCalls")).font(.system(size: 15, weight: .semibold)).foregroundStyle(PN.C.text)
+                Text(L("home.recentCalls")).font(PN.sys(15, .semibold)).foregroundStyle(PN.C.text)
                 CallFilters(org: $filterOrg, project: $filterProject, records: history.visible)
                 Spacer()
                 if !history.visible.isEmpty { Button(L("home.allPast")) { nav.open(.pastCalls) }.buttonStyle(.pnTertiary) }
@@ -873,7 +883,7 @@ struct RecentCard: View {
                 Text(Self.when(r)).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                 Spacer(minLength: 0)
                 if let src = r.source {
-                    Text(L(src == "link" ? "tr.mark.link" : "tr.mark.file")).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.text2)
+                    Text(L(src == "link" ? "tr.mark.link" : "tr.mark.file")).font(PN.sys(10, .bold)).foregroundStyle(PN.C.text2)
                         .padding(.horizontal, 4).padding(.vertical, 1).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(4)))
                 }
             }
@@ -955,7 +965,7 @@ struct PastCallsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
-                    Text(L("home.allPast")).font(.system(size: 20, weight: .bold)).foregroundStyle(PN.C.text)
+                    Text(L("home.allPast")).font(PN.sys(20, .bold)).foregroundStyle(PN.C.text)
                     CallFilters(org: $filterOrg, project: $filterProject, records: history.visible)
                 }
                 .padding(.bottom, 12)
@@ -995,7 +1005,7 @@ struct RecentRow: View {
             HStack(spacing: 6) {
                 Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1)
                 if let src = r.source {          // 0.8.6 (B): a transcribed recording, not a call
-                    Text(L(src == "link" ? "tr.mark.link" : "tr.mark.file")).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.text2)
+                    Text(L(src == "link" ? "tr.mark.link" : "tr.mark.file")).font(PN.sys(10, .bold)).foregroundStyle(PN.C.text2)
                         .padding(.horizontal, 4).padding(.vertical, 1).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(4)))
                 }
             }
@@ -1060,7 +1070,7 @@ struct RemoveButton: View {
     let run: () -> Void
     @State private var hover = false
     var body: some View {
-        Button(action: run) { Image(systemName: "trash").font(.system(size: 11)) }
+        Button(action: run) { Image(systemName: "trash").font(PN.sys(11)) }
             .buttonStyle(.plain).foregroundStyle(PN.C.text3)
             .opacity(hover ? 1 : 0.0001)
             .onHover { hover = $0 }

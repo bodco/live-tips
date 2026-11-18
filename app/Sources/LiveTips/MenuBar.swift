@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false      // 0.8.7 (A1): "Prefer tabs" never glues the windows together
-        PNFonts.register()                                  // redesign block 1: Barlow, Inter Tight, JetBrains Mono, IBM Plex Mono (Resources/Fonts)
+        _ = PNFonts.once                                    // redesign block 1: Barlow, Inter Tight, JetBrains Mono, IBM Plex Mono (Resources/Fonts)
         // 0.8.7 (M): the local usage log, on unless Settings > General > Privacy turned it off
         UsageLog.sink = LocalFileSink(dir: FeatureRegistry.usageDir)
         UsageLog.enabled = AppConfig.load(from: AppPaths.config).usageLog

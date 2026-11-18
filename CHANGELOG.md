@@ -5,6 +5,18 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.23.0 (not released yet)
 
+- **The console and the service emails in the three styles (2026-11-18, server, redesign block 8):** the web console
+  and every email the server sends (codes, password and sign-in notices) use one style and mode, set by Pacenote staff
+  in Platform > Style (Roadbook, dark by default). Emails get a heading, a large code, the facts in a table and the
+  "if that was not you" note in a box; Auto shows the dark version in mail apps that are in dark mode. The mark is
+  part of the email, so it shows without loading remote images and nothing tells us an email was opened.
+
+- **pacenote.bodco.pm in the same style (2026-11-18, site, redesign block 8c):** the site follows the style and mode
+  set in Platform > Style, like the console and the emails, with no switch on the page. The home page opens with
+  "Your co-driver on calls." and a live picture of the tips window instead of a screenshot; the sections, the pricing,
+  compare, roadmap and legal pages, the 404 page and the phone menu use the style's type, lines and corners. On a phone,
+  where Pacenote cannot be installed, the home page offers to email you the link. Motion stops with Reduce motion.
+
 - **A new version says so (2026-11-18):** when a new Pacenote is out, a window shows the version, what is new, Later and
   Install and restart. It comes back on every launch until you update (once per launch), never before the sign-in or
   the onboarding and never during a call (it waits for the call to end). Home has a banner at the top: the version,
@@ -15,7 +27,14 @@ Pacenote. Earlier versions are described in the commit messages and in
   style cards and a Mode (Same as the Mac, Light, Dark); Roadbook is the default. The style changes at once in every
   window, the menu bar panel and the tips window. Buttons, badges, cards, corners, section heads, labels and page titles
   take the style's shape and fonts (Roadbook and Broadsheet are square, with lines instead of shadows); the fonts travel
-  inside the app. Classic looks as before.
+  inside the app. Classic looks as before. All text follows the style's typeface now, not only titles and buttons, and
+  the tips window uses the same fonts. In Roadbook the mark sits on its yellow plate (Home, the menu bar panel, the
+  floating panel). The "Not ready" pill, in every style including Classic: ink on an orange plate in Light, orange
+  text in Dark. Segmented choices, switches, checkboxes and the selected row in the Settings sidebar are drawn in the
+  style too (Roadbook: square, the picked one on the yellow plate; Broadsheet: the picked one in ink, round switches);
+  the Settings groups (Basics, During calls, Data) are text tabs with a line under the picked one. In the tips window
+  the side panel (Transcript, On me, Brief tabs and the Speakers head) and the title bar (End call, Start, New call,
+  the pin) follow the style. Classic keeps the system controls.
 - **The mark and motion (2026-11-18, redesign):** the Route P mark in every style; its dot is blue with no call, red
   while Pacenote listens, orange while the tips are paused (also on the floating panel). A new spinner draws the P
   instead of the system wheel. The menu bar icon lost its clock and shows its states (waiting for the call, recording,

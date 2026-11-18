@@ -70,7 +70,7 @@ struct IntegrationsPane<NotionPage: View>: View {
                         if let it = IntegrationRegistry.items.first(where: { $0.id == id }) {
                             let st = IntegrationRegistry.status(id, model)
                             HStack(spacing: 10) {
-                                Text(it.title).font(.system(size: 20, weight: .semibold))
+                                Text(it.title).font(PN.sys(20, .semibold))
                                 IntegrationStatus(text: st.0, ok: st.1)
                             }
                             .padding(.horizontal, 28).padding(.top, 4)
@@ -98,7 +98,7 @@ struct IntegrationsPane<NotionPage: View>: View {
                         if n > 0 { Divider().padding(.leading, 40) }
                         Button { model.integration = it.id } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: it.symbol).font(.system(size: 15)).frame(width: 20).foregroundStyle(PN.C.text2)
+                                Image(systemName: it.symbol).font(PN.sys(15)).frame(width: 20).foregroundStyle(PN.C.text2)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(it.title).fontWeight(.semibold)
                                     Text(it.subtitle).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
@@ -111,7 +111,7 @@ struct IntegrationsPane<NotionPage: View>: View {
                                         .padding(.horizontal, 9).padding(.vertical, 3)
                                         .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(PN.C.accent))
                                 }
-                                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.text3)
+                                Image(systemName: "chevron.right").font(PN.sys(11, .semibold)).foregroundStyle(PN.C.text3)
                             }
                             .padding(.horizontal, 14).padding(.vertical, 10).contentShape(Rectangle())
                         }
@@ -247,7 +247,7 @@ struct HubSpotPage: View {
                             let missing = model.config.crm.missingScopes.contains(s)
                             let tested = !model.config.crm.lastTest.isEmpty
                             Image(systemName: missing ? "xmark.circle.fill" : (tested ? "checkmark.circle.fill" : "circle"))
-                                .foregroundStyle(missing ? PN.C.danger : (tested ? PN.C.turn : PN.C.text3)).font(.caption)
+                                .foregroundStyle(missing ? PN.C.danger : (tested ? PN.C.turn : PN.C.text3)).font(PN.sys(.caption, 11))
                             Text(s).font(PN.Font.caption.monospaced())
                         }
                     }
@@ -279,7 +279,7 @@ struct HubSpotPage: View {
             }
             if g == "qual" { qualification }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
         }
         .onAppear { if model.isSet(.hubspotKey) { loadLists() } }
     }
@@ -312,7 +312,7 @@ struct HubSpotPage: View {
         Section {
             ForEach(["deals", "contacts", "activity", "tasks"], id: \.self) { k in
                 HStack(spacing: 8) {
-                    Image(systemName: "eye").foregroundStyle(PN.C.text3).font(.caption)
+                    Image(systemName: "eye").foregroundStyle(PN.C.text3).font(PN.sys(.caption, 11))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(L("int.hubspot.read." + k))
                         Text(L("int.hubspot.read." + k + ".sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3)

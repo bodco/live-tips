@@ -141,15 +141,26 @@ struct PacenoteSymbol: View {
     /// 2026-11-05: the dot can carry a state (the floating call controls: green, orange, red).
     var dot: Color? = nil
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.pnTheme) private var t
 
     var body: some View {
+        // Redesign review (18.11): Roadbook sets the mark on its yellow plate (RM-RouteMark r15), the line in markFg.
+        if dark == nil, t.markBg != nil {
+            RouteMark(size: height * 1.15, dot: dot)
+        } else {
+            symbol
+        }
+    }
+
+    private var symbol: some View {
         let isDark = dark ?? (scheme == .dark)
         let box = Brand.markBox
-        Canvas { ctx, size in
+        let ink = dark == nil && t.style != .classic ? Color(pnHex: t.markFg) : (isDark ? Brand.paper : Brand.ink)
+        return Canvas { ctx, size in
             let s = size.height / box.height
             let t = CGAffineTransform(scaleX: s, y: s).translatedBy(x: -box.minX, y: -box.minY)
             let line = Path(SVGPath.cgPath(Brand.markD)).applying(t)
-            ctx.stroke(line, with: .color(isDark ? Brand.paper : Brand.ink),
+            ctx.stroke(line, with: .color(ink),
                        style: StrokeStyle(lineWidth: Brand.markStroke * s, lineCap: .round, lineJoin: .round))
             let c = Brand.dot.center.applying(t), r = Brand.dot.radius * s
             ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)),

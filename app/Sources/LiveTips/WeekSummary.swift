@@ -52,7 +52,7 @@ struct WeekSummaryView: View {
 
     private func number(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.system(size: 17, weight: .semibold)).monospacedDigit().foregroundStyle(PN.C.text).lineLimit(1).minimumScaleFactor(0.7)
+            Text(value).font(PN.sys(17, .semibold)).monospacedDigit().foregroundStyle(PN.C.text).lineLimit(1).minimumScaleFactor(0.7)
             Text(label).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

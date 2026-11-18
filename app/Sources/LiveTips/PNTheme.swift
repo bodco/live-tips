@@ -111,6 +111,7 @@ struct PNTheme {
         if f == .system {
             return role == .mono ? .system(size: size, weight: weight, design: .monospaced) : .system(size: size, weight: weight)
         }
+        _ = PNFonts.once
         return .custom(PNFonts.postScriptName(f, weight), size: size)
     }
 
@@ -191,6 +192,10 @@ extension NSColor {
 /// The bundled faces (Resources/Fonts, SIL OFL): registered for this process at start, so no install is needed.
 /// Barlow and Barlow Condensed have no Cyrillic: Ukrainian text in Roadbook falls back to the system font for those faces.
 enum PNFonts {
+    /// Registered once on first use: the shot modes (--shots, --render-sheet-shots) have their own app delegate and never
+    /// reach AppDelegate's launch, so the custom faces fell back to the system font there (review 18.11).
+    static let once: Void = register()
+
     static func register() {
         let fm = FileManager.default
         var dirs: [URL] = []

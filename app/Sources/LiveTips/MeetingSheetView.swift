@@ -214,7 +214,7 @@ struct SheetOnThisSheet: View {
                     PageLabel(text: L("sheet.ui.sources.report")) { EmptyView() }
                     ForEach(sheet.sources.sorted { $0.n < $1.n }.prefix(8)) { src in
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text("\(src.n)").font(.system(size: 10, weight: .bold).monospacedDigit()).foregroundStyle(PN.C.answer).frame(width: 14, alignment: .trailing)
+                            Text("\(src.n)").font(PN.sys(10, .bold).monospacedDigit()).foregroundStyle(PN.C.answer).frame(width: 14, alignment: .trailing)
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(src.title).font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1).truncationMode(.tail)
                                 let a = SheetLabels.access(src)
@@ -359,7 +359,7 @@ struct SheetFactRow: View {
     private var line: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             if let d = fact.diff {
-                Text(L("sheet.ui.diff." + d.rawValue)).font(.system(size: 10, weight: .bold)).foregroundStyle(diffColor ?? PN.C.text3)
+                Text(L("sheet.ui.diff." + d.rawValue)).font(PN.sys(10, .bold)).foregroundStyle(diffColor ?? PN.C.text3)
                     .padding(.horizontal, 4).background(Capsule().stroke(diffColor ?? PN.C.text3))
             }
             // 0.10.0 (Meeting Sheet, polish): "Budget:" + the Not found chip, without the "Not found" text repeated.
@@ -435,7 +435,7 @@ struct SheetSourceNumber: View {
     let fact: SheetFact
     var body: some View {
         Button { SheetOpen.source(source, locator: fact.locator) } label: {
-            Text("\(source.n)").font(.system(size: 10, weight: .bold).monospacedDigit()).foregroundStyle(PN.C.answer)
+            Text("\(source.n)").font(PN.sys(10, .bold).monospacedDigit()).foregroundStyle(PN.C.answer)
                 .frame(minWidth: 16, minHeight: 16).background(Circle().fill(PN.C.accent.opacity(0.13)))
         }
         .buttonStyle(.plain)
@@ -474,8 +474,8 @@ struct SheetReadinessTab: View {
             VStack(alignment: .leading, spacing: 16) {
                 PageCard(spacing: 8) {
                     HStack(spacing: 10) {
-                        Image(systemName: b.symbol).font(.system(size: 22)).foregroundStyle(SheetLabels.readiness(b).color)
-                        Text(SheetLabels.readiness(b).text).font(.system(size: 22, weight: .bold)).foregroundStyle(SheetLabels.readiness(b).color)
+                        Image(systemName: b.symbol).font(PN.sys(22)).foregroundStyle(SheetLabels.readiness(b).color)
+                        Text(SheetLabels.readiness(b).text).font(PN.sys(22, .bold)).foregroundStyle(SheetLabels.readiness(b).color)
                         if doc.checking { PNSpinner(size: 16) }
                         Spacer()
                         Button(L("home.startCall"), action: onStart).buttonStyle(.pnPrimary)
@@ -637,7 +637,7 @@ struct SheetSourceReportRow: View {
     var body: some View {
         let a = SheetLabels.access(source)
         HStack(alignment: .top, spacing: 10) {
-            Text("\(source.n)").font(.system(size: 11, weight: .bold).monospacedDigit()).foregroundStyle(PN.C.answer)
+            Text("\(source.n)").font(PN.sys(11, .bold).monospacedDigit()).foregroundStyle(PN.C.answer)
                 .frame(width: 20, height: 20).background(Circle().fill(PN.C.accent.opacity(0.13)))
             Image(systemName: SheetLabels.icon(source.type)).foregroundStyle(PN.C.text3).frame(width: 18)
             VStack(alignment: .leading, spacing: 2) {

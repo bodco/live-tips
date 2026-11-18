@@ -30,13 +30,12 @@ struct MeetingSheetSettingsPane: View {
                             Toggle(isOn: Binding(get: { r.off != true }, set: { r.off = $0 ? nil : true })) {
                                 Text(ruleText(r)).font(PN.Font.body)
                             }
-                            .toggleStyle(.checkbox)
+                            .toggleStyle(.pnCheckbox)
                             Spacer()
-                            Picker("", selection: $r.mode) {
-                                Text(L("sheet.ui.quick")).tag("quick")
-                                Text(L("sheet.ui.expert")).tag("expert")
-                            }
-                            .labelsHidden().pickerStyle(.segmented).fixedSize().disabled(r.off == true)
+                            PNSegmented(selection: $r.mode, options: [
+                                ("quick", L("sheet.ui.quick")),
+                                ("expert", L("sheet.ui.expert"))
+                            ]).labelsHidden().fixedSize().disabled(r.off == true)
                         }
                     }
                     Text(L("sheet.ui.set.rulesNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
@@ -102,7 +101,7 @@ struct MeetingSheetSettingsPane: View {
                 if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.pending) }
             } header: { Text(L("sheet.ui.set.presets")).settingsAnchor("sh.presets") }
         }
-        .formStyle(.grouped)
+        .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear { lib.reload() }
         .confirmationDialog(L("sheet.ui.set.deleteQ", ["name": deleting?.name ?? ""]), isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
             Button(L("sheet.ui.set.delete"), role: .destructive) {

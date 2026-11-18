@@ -153,6 +153,12 @@ items:
     title_uk: "Pacenote тепер потребує акаунта"
     body_en: "The sign-in screen comes first and comes back when the session ends, never during a call. Audio and transcripts still stay on this Mac."
     body_uk: "Екран входу зʼявляється першим і повертається, коли сесія закінчилась, ніколи під час дзвінка. Аудіо і транскрипти, як і раніше, лишаються на цьому Маку."
+  - id: three_looks
+    version: 0.23.0
+    title_en: "Three looks: Classic, Roadbook and Broadsheet"
+    title_uk: "Три вигляди: Classic, Roadbook і Broadsheet"
+    body_en: "Pick a style and a mode (Same as the Mac, Light or Dark) in Settings › General › Appearance. Colors, fonts, buttons and the tips window change at once; the new screen layouts come in the next releases."
+    body_uk: "Оберіть стиль і режим (Як на Маку, Світла чи Темна) у Налаштування › Загальні › Вигляд. Кольори, шрифти, кнопки і вікно підказок змінюються одразу; нові розкладки екранів прийдуть у наступних релізах."
   - id: update_window
     version: 0.23.0
     title_en: "A new version says so"

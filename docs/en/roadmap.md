@@ -13,8 +13,10 @@ Updated: 18 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 - [x] 0.14-0.16: Redesign and updates
 - [x] 0.17: Organizations
 - [x] 0.19: Plans in the app
-- [>] Now: Teams in depth
-- [ ] Next: Email sign-in and security
+- [x] 0.20-0.22: Team calls, sales, email sign-in
+- [x] 0.23: Three looks
+- [>] Now: New screen layouts
+- [ ] Next: Two-factor sign-in and emails
 - [ ] Later: Paid plans and mobile
 
 [x] shipped, [>] in progress, [ ] planned
@@ -23,14 +25,14 @@ Updated: 18 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ### Now
 
-- **Team calls in depth.** A shared list of the team's calls, search across them and call analysis for team leads.
-- **More sales tools.** More qualification methods next to BANT, objections and answers, competitors, stakeholder map, next step with a date.
+- **New screen layouts (0.24).** Home, the call pages, Meeting Sheet, Tracker, Settings and onboarding move to the new design, screen by screen, in all three styles.
 - **Better briefs and tips.** Every call is reviewed after it ends: which tips helped, which were noise, what was missed. The prompts change from that.
 
 ### Next
 
-- **Multi-theme redesign (0.23.0).** A new look for the whole app, with themes to choose from.
-- **Sign in with email.** An email and password next to Google, then two-factor sign-in with any authenticator app.
+- **Two-factor sign-in.** A code from any authenticator app, backup codes, and an organization policy that makes it required. Touch ID or a passcode when you sign in.
+- **Email sign-in in the console and service emails.** Sign in to the web console with your email and password. Emails for invites, a sign-in from a new device and getting back into two-factor sign-in.
+- **Call analysis against a standard.** Presets by team type (Sales, PM, Recruiting and more), a scorecard for each kind of call, a score after the call and an overview for team leads.
 - **Security hardening.** Fixes from our own security review of the app and the update channel, before the team version grows.
 - **Signed and notarized by Apple.** No more "Open Anyway" on first launch and no Keychain prompt after an update.
 
@@ -39,9 +41,12 @@ Updated: 18 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 - **Live tips without your own key.** Tip hours included in a plan, with top-ups. Your own AI key stays an option on every plan.
 - **Paid plans.** Billing after the beta, with 30 days' notice to everyone in the beta. Solo stays free.
 - **On your phone.** A web app for the phone: calendar, Meeting Sheet, notes after the call, tasks.
+- **The download link by email.** On a phone, the site sends you the link itself once our service mail is on. Until then it opens your mail app with the link ready.
 
 ## What shipped
 
+- **18 Nov · 0.23. Three looks.** Classic, Roadbook and Broadsheet, each light or dark, in Settings > General > Appearance. The new Pacenote mark and motion, the tips window shows its state in the style, and a window and a banner tell you when a new version is out. On the site: plans on Pricing and a Download page.
+- **17-18 Nov · 0.20-0.22. Team calls, sales, email sign-in.** The Team tab for team leads, more sales methods and deal blocks, a speech writer for a deck, and sign-in with email and password next to Google. An account is now required.
 - **17 Nov · 0.19. Plans in the app.** Compare plans and switch an organization's plan in Settings, start a team from Solo, a trial on every plan, your own use for the last 30 days, a Console page for everyone signed in. Product analytics you can turn off: screens, errors by code and speed, never what is said in a call. A recorded call stops by itself when the meeting ends.
 - **16-17 Nov · 0.17. Organizations.** Invites, teams with a lead, private calls, organization projects with shared decisions, tasks and risks, the admin console inside the app.
 - **15-16 Nov · 0.14-0.16. A calmer app.** New Get Ready, Settings in groups with search, onboarding where you pick what to install, removable add-ons, automatic updates and "What's new".

@@ -3,19 +3,21 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.23.0 (not released yet)
+## 0.23.0 (2026-11-18)
 
-- **The console and the service emails in the three styles (2026-11-18, server, redesign block 8):** the web console
-  and every email the server sends (codes, password and sign-in notices) use one style and mode, set by Pacenote staff
-  in Platform > Style (Roadbook, dark by default). Emails get a heading, a large code, the facts in a table and the
-  "if that was not you" note in a box; Auto shows the dark version in mail apps that are in dark mode. The mark is
-  part of the email, so it shows without loading remote images and nothing tells us an email was opened.
-
-- **pacenote.bodco.pm in the same style (2026-11-18, site, redesign block 8c):** the site follows the style and mode
-  set in Platform > Style, like the console and the emails, with no switch on the page. The home page opens with
+- **pacenote.bodco.pm in the same style (2026-11-18, site, redesign block 8c):** the site has one style and mode
+  (Roadbook, dark), with no switch on the page. The home page opens with
   "Your co-driver on calls." and a live picture of the tips window instead of a screenshot; the sections, the pricing,
   compare, roadmap and legal pages, the 404 page and the phone menu use the style's type, lines and corners. On a phone,
   where Pacenote cannot be installed, the home page offers to email you the link. Motion stops with Reduce motion.
+
+- **Plans on the Pricing page and a Download page (2026-11-18, site):** Pricing opens with "Free while in beta. You pay
+  only for the AI you use." and the three plans as in the app: Solo ($0, free after the beta too), Team and Enterprise
+  ($0 in beta, then $12 and $29 a seat a month, with 30 days' notice), what each includes and its limits; the AI costs
+  follow unchanged. The new page /download/ (and /uk/download/) shows the latest version, its size and date from the
+  update feed, the four steps to install, what you need and the SHA-256 checksums; while it looks the version up it
+  shows the Pacenote spinner, and without it the button still downloads the latest .dmg. Every Download button of the
+  site (header, home page, footer, 404) now opens this page. On a phone it offers to email you the link.
 
 - **A new version says so (2026-11-18):** when a new Pacenote is out, a window shows the version, what is new, Later and
   Install and restart. It comes back on every launch until you update (once per launch), never before the sign-in or
@@ -34,7 +36,10 @@ Pacenote. Earlier versions are described in the commit messages and in
   style too (Roadbook: square, the picked one on the yellow plate; Broadsheet: the picked one in ink, round switches);
   the Settings groups (Basics, During calls, Data) are text tabs with a line under the picked one. In the tips window
   the side panel (Transcript, On me, Brief tabs and the Speakers head) and the title bar (End call, Start, New call,
-  the pin) follow the style. Classic keeps the system controls.
+  the pin) follow the style. Classic keeps the system controls. This release changes how the screens look, not how
+  they are laid out: Home, the call pages, Meeting Sheet, Settings and the rest keep their current layout, and the new
+  layouts from the design follow screen by screen in the next releases. In Roadbook the answer card's list and the
+  text on yellow buttons (Help, Start, Resume, the slide number) are dark, so they read on the yellow.
 - **The mark and motion (2026-11-18, redesign):** the Route P mark in every style; its dot is blue with no call, red
   while Pacenote listens, orange while the tips are paused (also on the floating panel). A new spinner draws the P
   instead of the system wheel. The menu bar icon lost its clock and shows its states (waiting for the call, recording,

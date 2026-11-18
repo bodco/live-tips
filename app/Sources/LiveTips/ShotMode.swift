@@ -134,6 +134,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "p092" { p092(theme); continue }    // 0.9.2: the site hero (Home + a live call)
             if env["LT_SHOTS_ONLY"] == "callpage" { callPageShots(theme); continue }   // 2026-11-05: the call page redesign, every tab
             if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }
+            if env["LT_SHOTS_ONLY"] == "site023" { siteShots(theme); continue }   // 0.23.0: the site pictures in Roadbook
             if env["LT_SHOTS_ONLY"] == "redesign" { if lang == "en" || theme == "light" { redesignShots(theme, uk: lang == "uk") }; continue }   // redesign 0.23.0: every style   // 0.10.0: co-driver cards for the site
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
@@ -516,6 +517,28 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if st == OnboardingModel.Step.allCases.last { OnboardingWindow.window?.close() }
             next()
         }
+    }
+
+    /// 0.23.0: the pictures for pacenote.bodco.pm in Roadbook (the site's default style): the co-driver card,
+    /// the presentation window, the tips window during a call and Home. Files site-*-<theme>(-uk).png.
+    func siteShots(_ theme: String) {
+        let rb = "LiveTips.setStyle('roadbook');"
+        let answered = "{kind:'answer', uid:'cd3', t:hms(1), at:hms(1), level:'info', trigger:'heard_answer', who:'Emily', q:'Does the pilot include the mobile app?', gist:'\u{1F50E} Web only in the pilot, mobile in phase 2', phrase:'Not in the pilot: it is the web app only. Mobile comes in phase 2, from January.', items:['Scope call 14 Oct: mobile moved to phase 2'], note:'Sources: scope-call-notes.md'}"
+        let live = "window.setStatus({state:'recording',title:'Orbit weekly with the client',started_at:new Date(Date.now()-18*60000).toISOString()});"
+        steps.append { [unowned self] in PNThemeModel.shared.style = .roadbook; self.next(after: 0.6) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: rb + Self.codriverJS + answered + "]);", name: "site-codriver", size: NSSize(width: 560, height: 760)) }
+        let talk = """
+          LiveTips.openTab('transcript');
+          window.setSpeakers({clusters:{S1:{name:'Emily C.',seconds:40,side:'client'},S2:{name:'David K.',seconds:22,side:'client'}},
+            roster:[{name:'Emily C.',side:'client'},{name:'David K.',side:'client'},{name:'Sarah L.',side:'team'}]});
+          window.addTranscript(['- Channels: Me = microphone, Other = system audio',
+            '[10:31:02] Me (en): Thanks for joining. In 25 minutes we cover where the pilot is and the rollout plan.',
+            '[10:31:20] Emily C. [S1] (en): Great. Can we start with what the pilot showed?',
+            '[10:31:26] Me (en): Sure, slide two has the numbers.']);
+          """
+        steps.append { [unowned self] in self.tipsExtra(theme, js: rb + talk, name: "site-tips-presentation", size: NSSize(width: 1040, height: 560), presentation: true) }
+        steps.append { [unowned self] in self.tipsExtra(theme, js: rb + live + Self.p092JS, name: "site-tips-live", size: NSSize(width: 1040, height: 640)) }
+        steps.append { [unowned self] in HomeView.shotState = ""; self.home("site-" + theme) }
     }
 
     func tips(_ theme: String, presentation: Bool) {

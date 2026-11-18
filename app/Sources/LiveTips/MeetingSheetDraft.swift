@@ -275,7 +275,7 @@ final class SheetDraft: ObservableObject {
             "project": ["slug": model.project?.slug ?? model.workspace?.name.lowercased() ?? "", "root": model.root ?? ""],
             "meeting": meeting, "preset": presetID, "mode": mode.rawValue, "language": language, "route": route,
             "blocks": blockList,
-            "sources": src, "focus": SheetPrefs.shared.focus, "goal": goal,
+            "sources": src, "focus": SheetPrefs.shared.focus, "goal": goal.isEmpty ? Self.goalLine(model.cleanContext) : goal,
             "participants": people,
             "call_type": model.callType, "audience": model.audience, "app_root": SheetCLI.appRoot,
             "options": options, "plan": plan.isEmpty ? "one" : plan,

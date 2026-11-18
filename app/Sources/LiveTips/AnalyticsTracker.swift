@@ -267,9 +267,10 @@ final class AnalyticsTracker {
     }
 
     /// Once a day, at the first launch of the day: how the app is set up, as types and buckets (spec 6.2).
-    func snapshotIfDue(now: Date = Date()) {
+    /// 0.24.1 (F7): also right after every finished install and every change of the AI (`force`).
+    func snapshotIfDue(now: Date = Date(), force: Bool = false) {
         let d = UserDefaults.standard
-        guard Analytics.snapshotDue(last: d.object(forKey: Self.kSnapshot) as? Date, now: now) else { return }
+        guard force || Analytics.snapshotDue(last: d.object(forKey: Self.kSnapshot) as? Date, now: now) else { return }
         let c = AppConfig.load(from: AppPaths.config)
         let reg = ProjectRegistry.load(from: AppPaths.projects)
         let secrets = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")   // presence only, no Keychain prompt
@@ -325,15 +326,18 @@ final class AnalyticsTracker {
         var p: [String: Any] = ["type": Analytics.callType(request["call_type"] as? String),
                                 "sales": ((request["sales"] as? [String: Any])?["enabled"] as? Bool) ?? false,
                                 "has_brief": !((request["brief"] as? String) ?? "").isEmpty,
-                                "provider": callProvider, "recording": rec]
+                                "provider": callProvider, "recording": rec, "ready": CallEngine.shared.startReady]
         if let o = callOrg, let org = me?.org(o) { p["org"] = org.isPersonal ? "personal" : "team" }
         track("call_started", p, o: callOrg)
         begin("first_tip")
     }
 
-    func callEnded(minutes: Int, recorded: Bool) {
-        track("call_ended", ["minutes": min(max(minutes, 0), 1440), "tips": callCounts.tips, "rated": callCounts.rated,
-                             "asks": callCounts.asks, "recorded": recorded], o: callOrg)
+    func callEnded(minutes: Int, recorded: Bool, lines: Int? = nil, stopMs: Int? = nil) {
+        var p: [String: Any] = ["minutes": min(max(minutes, 0), 1440), "tips": callCounts.tips, "rated": callCounts.rated,
+                                "asks": callCounts.asks, "recorded": recorded]
+        if let l = lines { p["lines"] = min(max(l, 0), 100_000) }            // 0.24.1 (F7): 0 = nothing was recorded
+        if let s = stopMs { p["stop_ms"] = min(max(s, 0), 3_600_000) }
+        track("call_ended", p, o: callOrg)
         timers["first_tip|"] = nil; timers["answer_tip|"] = nil
         callEndedAt = Date()          // the organization stays for the call's late events (orgFor), until the next call
     }

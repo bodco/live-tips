@@ -2708,6 +2708,52 @@ teams, organization projects and invites are managed in the Pacenote console, no
   waiting to go, as they will go. For now the weekly count of earlier versions goes too, next to it. When you join an
   organization, the join window says it in one line: the organization can see your usage totals, not your calls.
 
+### 14.1z11 First run and readiness of a call (0.24.1, beta)
+
+**One install for the whole base.** Pacenote downloads its own Python 3.13 into the app folder (about 25 MB, its
+SHA-256 pinned in the app); a Python already on the Mac (3.10 to 3.14) is only the fallback when that download fails.
+Then, with one Install: the recorder core, a private Python environment, speech recognition (MLX Whisper), the
+Whisper model (about 1.6 GB), the tips engine modules, the meaning search model bge-m3 (about 590 MB) and speaker
+identification. The Python libraries come from lock files inside the app with exact versions and hashes; when a new
+Pacenote has new locks, Settings > Components shows the parts as out of date and Install brings them in line. A part
+that fails does not stop the rest: the parts that need it say so ("Waits for Python"), the others install, and the
+reason of each failure is on its row with Retry. The loader shows the part, MB of MB, the percent and the time left.
+
+**Accounts.** Claude Code and Codex are not components. Connect a Claude account (Settings > AI or the onboarding) and
+Pacenote installs Claude Code with Anthropic's installer, then runs its sign-in from the app: your browser opens, and
+if the program asks for a code, paste it in the field Pacenote shows. A ChatGPT account installs OpenAI's Codex
+release for this Mac (pinned version and hash) the same way. The Gemini account (Antigravity) is not installed by
+Pacenote yet. With an API key nothing is installed: the preparation and the Meeting Sheet talk to the API directly.
+
+**Readiness of a call.** One check decides for every start (Home, the call page, the menu bar, the hot key, Up next):
+
+| Missing | The call |
+|---|---|
+| Python, recorder core, environment, MLX Whisper, the Whisper model, tips engine modules | Does not start; the reason and Install with the loader in place |
+| Any connected AI | Recording and transcript only, with Connect AI |
+| The chosen account's program or its sign-in | As above, with Connect or an API key |
+| bge-m3 or speaker identification | Starts; Pacenote offers to install it |
+
+End call while the speech model is loading stops at once. A call with no transcript line says "Nothing was
+recorded" with why: the model was still loading, the recorder did not start, or no speech was heard.
+
+**Logs and diagnostics.** logs/app.log is the app's journal, logs/setup.log the full output of every install step;
+every run of a log starts with a header (date and time zone, app, Python and packages, macOS, the call), lines carry
+the date, files are appended and rotated by size. Help > Export diagnostics saves a zip of logs/ and state/ with the
+versions and the components; the home folder is written as ~ and anything that looks like a key is cut.
+
+**A participant's voice is named right away.** When a voice matches a person in the voice library closely (cosine
+0.72 or more, clearly ahead of the next person) and that person is a participant of this call (Start call or the
+calendar event; a calendar spelling with the same first letter and surname initial counts when only one participant
+fits), the speaker is named after about 4 seconds of speech (`speaker_auto_s`). Without participants, only names used on
+the same meeting series are named this way, as before. Anyone else, an unsure match or a name already on this call is
+asked. The library does not learn from a name given this way until you confirm or rename it.
+
+**The speaker model.** setup.sh downloads `wespeaker_en_voxceleb_resnet34_LM.onnx` from Pacenote's own release
+(bodco/live-tips, models-wespeaker-1), the upstream sherpa-onnx file only as a fallback, and checks the same SHA-256 for
+both. The upstream file was re-uploaded without its `feature_normalize_type` metadata, which changes the voice prints.
+The model is WeSpeaker ResNet34-LM trained on VoxCeleb, CC BY 4.0.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the

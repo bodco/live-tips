@@ -37,6 +37,11 @@ final class CallEngine {
     /// 2026-10-23: a visible confirmation that the call ended and the transcript is saved (menu, tips window).
     var lastCallSummary = ""
     var lastLines = 0
+    // 0.24.1 (F6, F7): the readiness answer of the call being started, End call time, the model load at the start
+    var startReady = true
+    private var stopAt: Date?
+    private var loadingSince: Date?
+    private var sawLoading = false, sawRecording = false
     var liveSpent = 0.0, liveTips = 0
     var renamed: String?          // a new title given during the call (tips window)
     /// 2026-10-26 (owner): what the last call cost, for the menu: the tips engine during the call plus the
@@ -59,6 +64,21 @@ final class CallEngine {
         return L("menubar.lastCall.detail", ["tips": String(format: "%.2f", tips), "notes": String(format: "%.2f", notes)])
     }
     static let callEnded = Notification.Name("LiveTipsCallEnded")
+
+    /// 0.24.1 (F6): the base set's missing steps, from its files (fast; setup.sh check is the exact one).
+    var baseMissing: [String] {
+        let fm = FileManager.default
+        return BaseFiles.missing(appRoot: appRoot, home: NSHomeDirectory(), exists: { fm.fileExists(atPath: $0) },
+                                 list: { (try? fm.contentsOfDirectory(atPath: $0)) ?? [] })
+    }
+    /// Everything a call needs is in place (onboarding resume, F2).
+    var baseLikelyReady: Bool { baseMissing.allSatisfy { !SetupPlan.callBlocking.contains($0) } }
+
+    /// 0.24.1 (F6, decision 9): one readiness answer for every start point (AppDelegate.launch, Home, the call page).
+    @MainActor func readiness() -> CallReadiness.Verdict {
+        let c = AIRoute.effective(config)
+        return CallReadiness.check(missing: baseMissing, connected: AIRoute.connected(), routes: [c.ai.prep, c.ai.tips, c.ai.after])
+    }
 
     func problems() -> [String] {
         let c = config
@@ -172,6 +192,10 @@ final class CallEngine {
         p.executableURL = URL(fileURLWithPath: c.engine.python)
         p.arguments = [(appRoot as NSString).appendingPathComponent("src/transcriber.py"), "--from-control"]
         p.currentDirectoryURL = URL(fileURLWithPath: appRoot)
+        // 0.24.1 (F7): every run starts with a header (versions, Python and packages, macOS, time zone)
+        AppLog.header("recorder.log", "call start", extra: AppLog.runtimeExtra + [("ready", startReady ? "yes" : "no")])
+        AppLog.app("call: start (ready=\(startReady))")
+        stopAt = nil; loadingSince = nil; sawLoading = false; sawRecording = false; lastLines = 0
         let log = FileHandle.forAppending(path: (logs as NSString).appendingPathComponent("recorder.log"))
         p.standardOutput = log
         p.standardError = log
@@ -188,6 +212,16 @@ final class CallEngine {
             guard let self = self else { t.invalidate(); return }
             let st = EngineStatus.load(path: self.statusPath)
             if let f = st.file { self.lastFile = f }
+            // 0.24.1 (F7): how long the speech model took to load at the start (the first outside user: 2 min 29 s)
+            if st.state == "loading_model" {
+                if self.loadingSince == nil { self.loadingSince = Date(); self.sawLoading = true; AppLog.app("call: loading the speech model") }
+            } else if ["recording", "standby"].contains(st.state), let since = self.loadingSince {
+                let secs = Int(Date().timeIntervalSince(since).rounded())
+                self.loadingSince = nil
+                AppLog.app("call: speech model loaded in \(secs) s")
+                AnalyticsTracker.onMain { AnalyticsTracker.shared.track("rec_model_load", ["seconds": secs, "ok": true]) }
+            }
+            if st.state == "recording" { self.sawRecording = true }
             if st.lines > 0 { self.lastLines = st.lines }
             if st.callSpentUSD > self.liveSpent { self.liveSpent = st.callSpentUSD }
             if st.tips > self.liveTips { self.liveTips = st.tips }
@@ -210,6 +244,7 @@ final class CallEngine {
             }
             if !(self.recorder?.isRunning ?? false) {
                 t.invalidate()
+                self.recorderEnded(file: st.file ?? self.lastFile)
                 CallRecorder.shared.callEnded()       // 0.9.5: the recording ends with the call (and goes to Drive if set)
                 // The tips engine ends by itself a few seconds after the recorder and writes the call summary
                 // card; it is stopped only if it hangs (P2 26.10).
@@ -294,6 +329,7 @@ final class CallEngine {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.python)
         p.arguments = [lt, "prep-check", file] + (auto ? ["--adopt-prep"] : [])
+        AppLog.header("prep.log", "prep", extra: [("call", AppLog.stem(lastFile))] + AppLog.runtimeExtra)     // 0.24.1 (F7): date, versions, call id
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/prep.log"))
         p.standardOutput = log
         p.standardError = log
@@ -396,6 +432,7 @@ final class CallEngine {
         env["PYTHONDONTWRITEBYTECODE"] = "1"     // the engine may live inside the signed app bundle; the key goes to the child only, never written or logged
         if c.usageLog { env["LT_USAGE_DIR"] = FeatureRegistry.usageDir.path }     // 0.8.7 (M): event names only
         p.environment = env
+        AppLog.header("tips-engine.log", "tips-engine", extra: [("call", AppLog.stem(lastFile))] + AppLog.runtimeExtra)     // 0.24.1 (F7): date, versions, call id
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/tips-engine.log"))
         p.standardOutput = log
         p.standardError = log
@@ -447,6 +484,7 @@ final class CallEngine {
         env["LT_AI_STAGE"] = "after_notes"
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         p.environment = env
+        AppLog.header("notes.log", "notes", extra: [("call", AppLog.stem(lastFile))] + AppLog.runtimeExtra)     // 0.24.1 (F7): date, versions, call id
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notes.log"))
         p.standardOutput = log
         p.standardError = log
@@ -455,9 +493,11 @@ final class CallEngine {
         p.terminationHandler = { proc in
             let ok = proc.terminationStatus == 0 && FileManager.default.fileExists(atPath: notes)
             let ms = Int(Date().timeIntervalSince(t0) * 1000), code = proc.terminationReason == .uncaughtSignal ? "crashed" : "other"
+            // 0.24.1 (F7): the AI that really wrote the notes (after a switch), the chosen one as fallback_to's origin
+            let actual = AIRoute.switchedTo(job: "after_notes", since: t0).map { Analytics.provider(route: $0) }
             AnalyticsTracker.onMain {
-                AnalyticsTracker.shared.perf("notes_after", ms: ms, provider: prov, ok: ok)
-                if !ok { AnalyticsTracker.shared.error("ai", code, provider: prov) }
+                AnalyticsTracker.shared.perf("notes_after", ms: ms, provider: actual ?? prov, ok: ok)
+                if !ok { AnalyticsTracker.shared.error("ai", code, provider: prov, fallbackTo: actual) }
             }
         }
         do { try p.run() } catch { return false }
@@ -508,9 +548,10 @@ final class CallEngine {
         // 0.8.5: the call notes do not depend on Notion; they are written even when no meeting page is (once per call).
         let notesComing = writeCallNotes(file: file, config: c,
                                          hasConfig: !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig))
-        guard c.notionWriteSummary else { return }
+        guard c.notionWriteSummary else { AppLog.app("notion: not written (meeting pages are off) call=\(AppLog.stem(file))"); return }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         guard AIRoute.canRun(job: "after", config: c), let notionToken = store.get(.notionToken) else {
+            AppLog.app("notion: not written (\(AIRoute.canRun(job: "after", config: c) ? "no token" : "no AI for after the call")) call=\(AppLog.stem(file))")
             notionResult = "Notion: add the Notion token in Settings > Notion"; notify(notionResult, settingsTab: "notion"); return
         }
         let hasConfig = !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig)
@@ -519,6 +560,7 @@ final class CallEngine {
         let proj = ProjectRegistry.load(from: AppPaths.projects).projects.first { $0.slug == slug }
         let meetingsDB = c.notionMeetingsDB      // 0.8.7 (F3): one Meetings database; the project is a property
         guard hasConfig || !meetingsDB.isEmpty else {
+            AppLog.app("notion: not written (no meetings database) call=\(AppLog.stem(file))")
             notionResult = "Notion: choose where meeting pages go (Settings > Notion). Then use Send last call to Notion in the menu."; notify(notionResult, settingsTab: "notion"); return
         }
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
@@ -800,14 +842,42 @@ final class CallEngine {
     }
 
     func stop() {
-        if let s = usageStart {
-            let mins = Int(Date().timeIntervalSince(s) / 60)
-            UsageLog.log("call_ended", ["minutes": mins]); usageStart = nil
-            AnalyticsTracker.onMain { AnalyticsTracker.shared.callEnded(minutes: mins, recorded: CallRecorder.shared.state != "off") }
-        }
+        stopAt = Date()
+        AppLog.app("call: End call pressed (state \(EngineStatus.load(path: statusPath).state))")
         lastCallSummary = ""
         let control = (appRoot as NSString).appendingPathComponent("control")
         FileManager.default.createFile(atPath: (control as NSString).appendingPathComponent("stop"), contents: Data())
+        // 0.24.1 (F6): End call while the speech model is still loading stops at once (the recorder reads the stop file
+        // only after the load: the first outside user waited minutes on "Ending…"). Nothing was recorded yet anyway.
+        if EngineStatus.load(path: statusPath).state == "loading_model", let r = recorder, r.isRunning {
+            AppLog.app("call: stopped during the model load")
+            r.terminate()
+        }
+    }
+
+    /// 0.24.1 (F6, F7): the recorder ended. call_ended with the lines and the time from End call; with no line the
+    /// reason goes next to the transcript (the call page shows "Nothing was recorded" with it).
+    private func recorderEnded(file: String?) {
+        let stopMs = stopAt.map { Int(Date().timeIntervalSince($0) * 1000) }
+        if let since = loadingSince {
+            let secs = Int(Date().timeIntervalSince(since).rounded())
+            AnalyticsTracker.onMain { AnalyticsTracker.shared.track("rec_model_load", ["seconds": secs, "ok": false]) }
+            loadingSince = nil
+        }
+        let lines = lastLines
+        if let s = usageStart {
+            let mins = Int(Date().timeIntervalSince(s) / 60)
+            UsageLog.log("call_ended", ["minutes": mins]); usageStart = nil
+            AnalyticsTracker.onMain { AnalyticsTracker.shared.callEnded(minutes: mins, recorded: CallRecorder.shared.state != "off", lines: lines, stopMs: stopMs) }
+        }
+        AppLog.app("call: ended, \(lines) lines" + (stopMs.map { ", \($0) ms after End call" } ?? ""))
+        if lines == 0, let f = file {
+            let why = NothingRecorded.reason(sawLoading: sawLoading, sawRecording: sawRecording)
+            let d = try? JSONSerialization.data(withJSONObject: ["reason": why, "at": ISO8601DateFormatter().string(from: Date())])
+            try? d?.write(to: URL(fileURLWithPath: NothingRecorded.path(transcript: f)))
+            AppLog.app("call: nothing was recorded (\(why))")
+        }
+        stopAt = nil
     }
 }
 

@@ -73,14 +73,8 @@ struct SettingsComponentsPane: View {
                         ComponentStatePill(status: g.status(setup, checking: true)).frame(width: 100, alignment: .trailing)
                     }
                 }
-                // Claude Code: installed like the rest but optional; preparing a call needs it (2026-10-29, owner)
-                if let cc = setup.steps.first(where: { $0.id == "claude" }), cc.state != .ok, cc.state != .unknown {
-                    HStack {
-                        Text(L("setup.step.claude.title")).foregroundStyle(PN.C.text2)
-                        Spacer()
-                        Button(L("onboarding.claude.install")) { Task { await setup.installOne("claude") } }.buttonStyle(.pnSecondary).disabled(setup.busy)
-                    }
-                }
+                // 0.24.1 (F1, decision 10): Claude Code is no row here; it comes with a Claude account (Settings > AI).
+                SetupLoader(model: setup)
                 HStack {
                     Button(L("about.components.check")) { Task { await setup.checkAll(); await oc.measureAll() } }.buttonStyle(.pnTertiary).disabled(setup.busy)
                     Button(L("cmp.repair")) { SetupWindow.show() }.buttonStyle(.pnTertiary)

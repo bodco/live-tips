@@ -333,6 +333,7 @@ struct MenuBarPanel: View {
             Menu(L("menubar.helpAbout")) {
                 Button(L("menubar.setup")) { model.run { $0.openSetup() } }
                 Button(L("menubar.welcomeTour")) { model.run { $0.openOnboarding() } }
+                Button(L("diag.menu")) { model.run { _ in Diagnostics.export() } }      // 0.24.1 (F7)
                 Button(L("feat.title")) { model.run { _ in FeaturesWindow.show() } }
                 Button(L("settings.how.title")) { model.run { _ in HowItWorksWindow.show() } }
                 Divider()

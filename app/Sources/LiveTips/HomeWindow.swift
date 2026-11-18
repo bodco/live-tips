@@ -333,7 +333,8 @@ struct HomeView: View {
         guard !demo, !firstLaunch else { return [] }
         let cfg = AppConfig.load(from: AppPaths.config)
         var out: [Problem] = []
-        if !CallEngine.shared.problems().isEmpty { out.append(Problem(id: "install", text: L("home.finish.install"), run: { SetupWindow.show() })) }
+        // 0.24.1 (F6): the same readiness answer as every start button
+        if !CallEngine.shared.problems().isEmpty || CallReadyState.shared.blocked { out.append(Problem(id: "install", text: L("home.finish.install"), run: { SetupWindow.show() })) }
         if !aiReady { out.append(Problem(id: "ai", text: L("home.pill.claude"), run: { SettingsWindow.show(tab: "ai") })) }
         if !calendarOn { out.append(Problem(id: "cal", text: L("home.status.noCalendars"), run: { SettingsWindow.show(tab: "calendars") })) }
         if !cfg.workRoot.isEmpty, SettingsWindow.model.isSet(.notionToken), MirrorStatus.load(workRoot: cfg.workRoot).health() != "ok" {

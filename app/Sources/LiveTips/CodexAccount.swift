@@ -40,25 +40,19 @@ final class CodexAccount: ObservableObject {
         }
     }
 
-    func login() {
-        guard let cli = Self.cliPath else { return }
-        let command = CodexCLI.loginCommand(cli: cli)
-        let escaped = command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", "tell application \"Terminal\"\nactivate\ndo script \"" + escaped + "\"\nend tell"]
-        try? process.run()
-    }
+    /// 0.24.1 (F1): the sign-in runs from the app (AccountLogin), never Terminal.
+    func login() { AccountLogin.shared.connect("codex") }
 }
 
 struct CodexAccountRow: View {
     @ObservedObject private var account = CodexAccount.shared
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
         LabeledContent(L("ai.codex.account")) {
             HStack(spacing: 8) {
                 if CodexAccount.cliPath == nil {
                     Text(L("ai.codex.missing")).foregroundStyle(PN.C.text3)
-                    Link(L("ai.codex.install"), destination: URL(string: "https://learn.chatgpt.com/docs/cli")!)
+                    Button(L("acct.connect")) { account.login() }          // 0.24.1 (F1): installs Codex, then signs in
                 } else {
                     Text(account.checking ? L("set.cc.checking") : account.signedIn == true ? L("ai.codex.connected") : L("ai.codex.notSignedIn"))
                         .foregroundStyle(PN.C.text3)
@@ -66,6 +60,8 @@ struct CodexAccountRow: View {
                     Button(L("set.check")) { account.refresh() }.disabled(account.checking)
                 }
             }
+        }
+        AccountLoginStatus(kind: "codex")
         }
         .onAppear { account.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in account.refresh() }

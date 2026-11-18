@@ -289,6 +289,8 @@ OUT_REASONS = [
 def out_reason(route: str, err: Optional[str]) -> Optional[str]:
     """Why a route is out (worth switching), or None for a passing error (timeout, overload: hedging helps)."""
     e = (err or "").lower()
+    if route == "api" and "claude code" in e and "not installed" in e:
+        return None         # 0.24.1 (F4): a missing Claude Code says nothing about the API key
     for only, reason, words in OUT_REASONS:
         if e and only in (None, route) and any(w in e for w in words):
             return reason

@@ -177,3 +177,15 @@ items:
     title_uk: "Оновлення одним кліком"
     body_en: "A new version opens its window within the hour, also while Pacenote is running. Install and restart now works with one click: a spinner while it downloads and installs, then Pacenote opens again."
     body_uk: "Нова версія відкриває своє вікно протягом години, навіть коли Pacenote вже працює. Install and restart тепер працює одним кліком: спінер, поки оновлення завантажується і ставиться, потім Pacenote відкривається знову."
+  - id: one_install
+    version: 0.24.1
+    title_en: "Setup in one go"
+    title_uk: "Встановлення за один раз"
+    body_en: "One Install puts everything a call needs in place, with its own Python and one loader with MB and time left. Accounts install their program when you connect them, without Terminal."
+    body_uk: "Один Install ставить усе, що потрібно дзвінку, з власним Python і одним лоадером з МБ і часом, що лишився. Акаунти ставлять свою програму, коли ви їх підключаєте, без Терміналу."
+  - id: call_ready
+    version: 0.24.1
+    title_en: "Calls start only when they can work"
+    title_uk: "Дзвінок стартує, лише коли може працювати"
+    body_en: "If speech recognition or the tips engine is missing, the start button says so and installs it in place. Help > Export diagnostics saves the logs for support."
+    body_uk: "Якщо бракує розпізнавання мовлення чи рушія підказок, кнопка старту каже про це і ставить їх на місці. Help > Експорт діагностики зберігає логи для підтримки."

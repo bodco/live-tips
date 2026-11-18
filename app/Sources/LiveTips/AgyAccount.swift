@@ -46,15 +46,8 @@ final class AgyAccount: ObservableObject {
         }
     }
 
-    func login() {
-        guard let cli = Self.cliPath else { return }
-        let command = AgyCLI.loginCommand(cli: cli)
-        let escaped = command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", "tell application \"Terminal\"\nactivate\ndo script \"" + escaped + "\"\nend tell"]
-        try? process.run()
-    }
+    /// 0.24.1 (F1): the sign-in runs from the app (AccountLogin), never Terminal.
+    func login() { AccountLogin.shared.connect("agy") }
 }
 
 struct AgyAccountRow: View {

@@ -404,6 +404,12 @@ public enum Analytics {
     public static func errorCode(message: String) -> String {
         let m = message.lowercased()
         func has(_ w: String...) -> Bool { w.contains { m.contains($0) } }
+        // 0.24.1 (F7): what the first outside user's logs had to be read for, before the generic words below
+        if has("no module named", "modulenotfounderror", "importerror", "cannot import name") { return "module_missing" }
+        if has("model is not installed", "model not found", "no whisper model", "model is missing") { return "model_missing" }
+        if has("is not installed", "not installed yet", "command not found") { return "not_installed" }
+        if has("no database", "no destination", "no meetings database", "notion is off", "no notion token") { return "no_destination" }
+        if has("python 3.15", "requires-python", "no matching distribution", "python is too new", "unsupported python") { return "python_unsupported" }
         if has("timed out", "timeout") { return "timeout" }
         if has("rate limit", "rate_limit", "429", "too many requests") { return "rate_limit" }
         if has("quota", "usage limit", "credit") { return "quota" }

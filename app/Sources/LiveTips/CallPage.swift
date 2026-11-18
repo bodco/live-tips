@@ -1404,7 +1404,15 @@ struct TranscriptView: View {
                             .background(first.me ? PN.C.surface2 : Color.clear)
                         }
                         if lines.isEmpty {
-                            Text(L("transcript.empty")).font(t.homeText(15)).foregroundStyle(PN.C.text3).padding(PageMetrics.side)
+                            // 0.24.1 (F6): a call with no line says "Nothing was recorded" and why
+                            if let why = NothingRecordedNote.reason(file) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(L("transcript.nothing.title")).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
+                                    Text(L("transcript.nothing.\(why)")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                                }.padding(PageMetrics.side)
+                            } else {
+                                Text(L("transcript.empty")).font(t.homeText(15)).foregroundStyle(PN.C.text3).padding(PageMetrics.side)
+                            }
                         }
                     }
                     .padding(.vertical, 6)
@@ -1775,5 +1783,16 @@ struct PageTabBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+
+/// 0.24.1 (F6): the reason CallEngine left next to a transcript with no line (model_loading, not_started, silence).
+enum NothingRecordedNote {
+    static func reason(_ transcript: String) -> String? {
+        guard let d = FileManager.default.contents(atPath: NothingRecorded.path(transcript: transcript)),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let r = o["reason"] as? String,
+              ["model_loading", "not_started", "silence"].contains(r) else { return nil }
+        return r
     }
 }

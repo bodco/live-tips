@@ -135,6 +135,9 @@ public struct AppConfig: Codable, Equatable {
         /// default (sending call text to another provider is fine, PM 12.11); `autoSwitch` turns the chain off.
         /// The model on this Mac follows `localFallback` when an older config has no chain.
         public var chain: [AIChain.Entry] = AIChain.defaults()
+        /// 0.24.1 (F3, owner 18.11): the AIs that were connected the last time the routes followed them (AIDefaults);
+        /// nil until the first look, so an update never takes over a choice.
+        public var seen: [String]? = nil
         public func order(_ job: String, connected: Set<String>) -> [String] {
             AIChain.order(job: job, chosen: route(job), chain: chain, connected: connected, auto: autoSwitch)
         }
@@ -158,6 +161,7 @@ public struct AppConfig: Codable, Equatable {
             agyAfter = (try? c.decodeIfPresent(String.self, forKey: .agyAfter)) ?? d.agyAfter
             // 0.10.0 (AI chain): an older config has no chain: the default order, the local step as it was
             chain = AIChain.normalized((try? c.decodeIfPresent([AIChain.Entry].self, forKey: .chain)) ?? AIChain.defaults(localOn: localFallback))
+            seen = try? c.decodeIfPresent([String].self, forKey: .seen)
         }
         public func openaiModel(_ job: String) -> String { job == "prep" ? openaiPrep : job == "tips" ? openaiTips : openaiAfter }
         public func geminiModel(_ job: String) -> String { job == "prep" ? geminiPrep : job == "tips" ? geminiTips : geminiAfter }

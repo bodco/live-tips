@@ -60,6 +60,38 @@ enum AIRoute {
         return out
     }
 
+    /// 0.24.1 (F3): what is surely connected: an account once its sign-in was checked and is on, a key that is saved,
+    /// a downloaded model on this Mac. The routes follow this set (AIDefaults), so an unchecked account never wins.
+    @MainActor static func confirmed() -> Set<String> {
+        var out = Set<String>()
+        let p = PrepRunner.shared
+        if PrepRunner.claudePath != nil && p.loggedIn == true { out.insert(code) }
+        if CodexAccount.cliPath != nil && CodexAccount.shared.signedIn == true { out.insert(codex) }
+        if p.hasAPIKey { out.insert(api) }
+        if p.hasOpenAIKey { out.insert(openai) }
+        if p.hasGeminiKey { out.insert(gemini) }
+        if AgyAccount.cliPath != nil && AgyAccount.shared.signedIn == true { out.insert(agy) }
+        if !LocalLLM.downloaded().isEmpty { out.insert(local) }
+        return out
+    }
+
+    /// 0.24.1 (F3, owner 18.11): the AI of every job follows what is connected (AIDefaults.apply) and is saved, so
+    /// Settings > AI shows the AI that really runs. Called at launch, when an account's sign-in changes and when a
+    /// key is saved or removed.
+    @MainActor static func autoAssign() {
+        let conn = confirmed()
+        if let m = SettingsModel.live {
+            let n = AIDefaults.apply(m.config.ai, connected: conn)
+            if n != m.config.ai { m.config.ai = n }        // the model saves the file
+            return
+        }
+        var c = AppConfig.load(from: AppPaths.config)
+        let n = AIDefaults.apply(c.ai, connected: conn)
+        guard n != c.ai else { return }
+        c.ai = n
+        try? c.save(to: AppPaths.config)
+    }
+
     /// The enabled AIs for the engine, the model on this Mac only when one is downloaded (the engine treats every AI
     /// it has a key or a tool for as connected).
     static func chainForEngine(_ c: AppConfig) -> [String] {
@@ -160,8 +192,16 @@ enum AIRoute {
     /// (to the child only, never written or logged) and the Claude Code tool.
     /// 0.9.6 Б1: the settings the jobs run with (economy mode on: EconomyPlan; an account counts when its tool is
     /// installed, a signed-out account falls to the other way through auto-switch as before).
-    static func effective(_ c: AppConfig) -> AppConfig {
-        EconomyPlan.apply(c, on: Economy.isOn(stateDir: (statePath as NSString).deletingLastPathComponent),
+    static func effective(_ c0: AppConfig) -> AppConfig {
+        // 0.24.1 (F3): a job never starts on an AI that is not there: the chosen one when it can run, else the first
+        // that can (AIDefaults.pick over the AIs with a key or a tool), the same rule Settings saves.
+        var c = c0
+        let avail = Set(([api, code, codex, openai, gemini, agy] as [String]).filter { available($0) }
+                        + (LocalLLM.downloaded().isEmpty ? [] : [local]))
+        c.ai.prep = AIDefaults.pick(job: "prep", chosen: c.ai.prep, connected: avail)
+        c.ai.after = AIDefaults.pick(job: "after", chosen: c.ai.after, connected: avail)
+        c.ai.tips = AIDefaults.pick(job: "tips", chosen: c.ai.tips, connected: avail)
+        return EconomyPlan.apply(c, on: Economy.isOn(stateDir: (statePath as NSString).deletingLastPathComponent),
                           accounts: EconomyPlan.Accounts(claude: PrepRunner.claudePath != nil, chatgpt: CodexAccount.cliPath != nil))
     }
 

@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastStatus = EngineStatus()
     var floatingControls: FloatingCallController?
     var launchedWindows = false     // 0.22.0 (D50): onboarding or Home opened once since launch
+    var aiRouteWatch: AnyCancellable?     // 0.24.1 (F3): the AI of every job follows the accounts' sign-in
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
@@ -36,6 +37,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 0.9.5: recordings that were on their way to Google Drive when the app quit go on (after the accounts load)
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { MainActor.assumeIsolated { DriveRecordings.shared.resumeQueue(); CallSyncService.shared.start() } }
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
+        // 0.24.1 (F3, owner 18.11): the AI of each job follows what is connected: keys now, accounts once their
+        // sign-in is checked (and again whenever it changes)
+        MainActor.assumeIsolated {
+            AIRoute.autoAssign()
+            aiRouteWatch = PrepRunner.shared.$loggedIn.removeDuplicates()
+                .combineLatest(CodexAccount.shared.$signedIn.removeDuplicates(), AgyAccount.shared.$signedIn.removeDuplicates())
+                .dropFirst()
+                .debounce(for: .seconds(1), scheduler: RunLoop.main)
+                .sink { _ in MainActor.assumeIsolated { AIRoute.autoAssign() } }
+            PrepRunner.shared.refreshAuth()
+            CodexAccount.shared.refresh()
+            AgyAccount.shared.refresh()
+        }
         installMainMenu()
         NSApp.setActivationPolicy(config.showInDock ? .regular : .accessory)
         Self.applyAppearance(config.appearance)     // 0.9.6: Settings > General > Appearance (mode)

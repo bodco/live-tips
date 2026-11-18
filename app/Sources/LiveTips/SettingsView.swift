@@ -83,6 +83,9 @@ enum KeyTester {
 
 @MainActor
 final class SettingsModel: ObservableObject {
+    /// 0.24.1 (F3): the model Settings and the onboarding show, so AIRoute.autoAssign changes it instead of a file
+    /// the model would write over.
+    static weak var live: SettingsModel?
     @Published var config = AppConfig.load(from: AppPaths.config) {
         didSet {
             guard config != oldValue else { return }
@@ -305,6 +308,7 @@ final class SettingsModel: ObservableObject {
         refreshMirror()
         aliasesText = config.nameAliases.joined(separator: ", ")
         for k in [SecretStore.Key.claudeAPIKey, .openaiAPIKey, .geminiAPIKey, .notionToken] where store.has(k) { test(k) }
+        if Self.live == nil { Self.live = self }
     }
 
     func saveAliases() {
@@ -350,12 +354,14 @@ final class SettingsModel: ObservableObject {
         guard store.set(key, v) else { keyState[key] = .failed(L("keys.err.keychain")); return }
         refreshMasks()
         test(key)
+        AIRoute.autoAssign()        // 0.24.1 (F3): a new AI key does the jobs whose AI is not there
     }
 
     func remove(_ key: SecretStore.Key) {
         store.remove(key)
         keyState[key] = .notSet
         refreshMasks()
+        AIRoute.autoAssign()        // 0.24.1 (F3): the jobs move to an AI that is still connected
     }
 
     func test(_ key: SecretStore.Key) {

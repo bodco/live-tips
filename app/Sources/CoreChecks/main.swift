@@ -4038,6 +4038,49 @@ func updatePromptR() {
     expect(!show("0.23.1", other: true), "up: not over another first-run window")
 }
 
+// MARK: 2026-11-18 (0.24.1, F3): the AI of every job follows what is connected
+func aiDefaultsF3() {
+    var r = AppConfig.AIRoutes()          // prep code, tips api, after code (the old defaults)
+    // the first user: only the Claude API key, never looked before (the update): the jobs move to the key
+    var n = AIDefaults.apply(r, connected: ["api"])
+    expect(n.prep == "api" && n.after == "api" && n.tips == "api", "f3: only the API key does every job")
+    expect(n.seen == ["api"], "f3: what was connected is remembered")
+    // later the Claude account is connected: it becomes the preparation and after-the-call AI, tips stay on the key
+    n = AIDefaults.apply(n, connected: ["api", "code"])
+    expect(n.prep == "code" && n.after == "code" && n.tips == "api", "f3: a new account takes prep and after")
+    // the PM picks the API for prep again: it stays while both are connected
+    n.prep = "api"
+    n = AIDefaults.apply(n, connected: ["api", "code"])
+    expect(n.prep == "api" && n.after == "code", "f3: a choice the PM made stays while its AI is connected")
+    // the ChatGPT account arrives later: it is adopted too (the newest account)
+    n = AIDefaults.apply(n, connected: ["api", "code", "codex"])
+    expect(n.prep == "codex" && n.after == "codex", "f3: a newly connected ChatGPT account becomes the default")
+    // the key is removed: tips go to what is left (an account), never to the model on this Mac or agy
+    n = AIDefaults.apply(n, connected: ["code", "codex", "local", "agy"])
+    expect(n.tips == "code", "f3: tips go to a connected account, never local or agy")
+    // an update with accounts already connected and a working choice: nothing is taken over
+    r = AppConfig.AIRoutes(); r.prep = "api"; r.after = "api"
+    n = AIDefaults.apply(r, connected: ["api", "code"])
+    expect(n.prep == "api" && n.after == "api", "f3: the first look adopts nothing")
+    // nothing connected: the choice stays as it is
+    n = AIDefaults.apply(AppConfig.AIRoutes(), connected: [])
+    expect(n.prep == "code" && n.tips == "api", "f3: nothing connected, nothing moves")
+    // only ChatGPT through the API key: every job on it
+    n = AIDefaults.apply(AppConfig.AIRoutes(), connected: ["openai"])
+    expect(n.prep == "openai" && n.after == "openai" && n.tips == "openai", "f3: only an OpenAI key does every job")
+    // only the Gemini account: prep and after on it, tips cannot (too slow), the choice stays and the engine says why
+    n = AIDefaults.apply(AppConfig.AIRoutes(), connected: ["agy"])
+    expect(n.prep == "agy" && n.after == "agy" && n.tips == "api", "f3: the Gemini account never runs tips")
+    expect(AIDefaults.pick(job: "prep", chosen: "gemini", connected: ["gemini", "code"]) == "gemini", "f3: pick keeps a connected choice")
+    // the config keeps `seen` across a save, an older config without it reads as nil
+    if let d = try? JSONEncoder().encode(n), let back = try? JSONDecoder().decode(AppConfig.AIRoutes.self, from: d) {
+        expect(back.seen == ["agy"], "f3: seen is saved")
+    } else { expect(false, "f3: routes encode") }
+    if let old = try? JSONDecoder().decode(AppConfig.AIRoutes.self, from: Data("{\"prep\":\"api\"}".utf8)) {
+        expect(old.seen == nil && old.prep == "api", "f3: an older config has no seen")
+    } else { expect(false, "f3: older routes decode") }
+}
+
 itemIDs0170()
 pull0170()
 orgCard0170()
@@ -4050,5 +4093,6 @@ salesBlocksS1()
 emailAuthB13()
 appearanceStyleR1()
 updatePromptR()
+aiDefaultsF3()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

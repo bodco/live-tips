@@ -35,6 +35,8 @@ enum PN {
         static var accent: Color     { .pnRole { $0.link } }            // links, the selected tab
         static var accentFill: Color { .pnRole { $0.accent } }          // the fill of the main button (text on it: onAccent)
         static var onAccent: Color   { .pnRole { $0.onAccent } }
+        static var actEdge: Color    { .pnRole { $0.actEdge } }         // the frame of the main button (theme pass)
+        static var focus: Color      { .pnRole { $0.focus } }           // the surface of what has the attention (theme pass)
         static var onLink: Color     { .pnRole { $0.onLink } }
         static var brand: Color      { .pnRole { $0.markDot } }         // the mark's start dot, progress, selection
         static let ink       = Color(red: 0x1C/255, green: 0x1D/255, blue: 0x21/255)
@@ -136,6 +138,7 @@ struct PNPrimaryButtonStyle: ButtonStyle {
             .foregroundStyle(PN.C.onAccent)
             .padding(.horizontal, 14).frame(height: 32)
             .background(PN.C.accentFill.opacity(configuration.isPressed ? 0.85 : 1))
+            .overlay(shape.strokeBorder(t.framedAccent ? PN.C.actEdge : Color.clear, lineWidth: 2))
             .clipShape(shape)
             .contentShape(shape)
             .opacity(isEnabled ? 1 : 0.45)
@@ -216,6 +219,7 @@ struct PNHeroButtonStyle: ButtonStyle {
             .foregroundStyle(PN.C.onAccent)
             .padding(.horizontal, 26).frame(height: 48)
             .background(PN.C.accentFill.opacity(enabled ? (configuration.isPressed ? 0.85 : 1) : 0.4), in: shape)
+            .overlay(shape.strokeBorder(t.framedAccent ? PN.C.actEdge.opacity(enabled ? 1 : 0.4) : Color.clear, lineWidth: 2))
             .contentShape(shape)
     }
 }

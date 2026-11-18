@@ -5,6 +5,19 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.25.0 (unreleased)
 
+- **Roadbook and Broadsheet redrawn, Home acts on the brief (2026-11-19, theme pass, stage 1):** Roadbook moves to a
+  warm paper ground in Light and a warm graphite in Dark, and its yellow now fills only the main button (framed in ink in
+  Light), so the countdown on Home stands out by its size instead of a yellow plate. Broadsheet gets a lighter graphite
+  Dark with a brighter violet for the main button and a lighter one for links. "Not ready" is orange text with a mark,
+  without the orange plate. Classic is no longer offered in Settings > General > Appearance; whoever was on it starts on
+  Roadbook. On Home the main button of the next call follows the brief, not the clock: without a brief it is "Prepare
+  brief" (with how long a preparation usually takes, once there are a few) and "Start without prep" next to it; while
+  the brief is prepared the button shows its progress and "Start call now" stays one click away (the brief joins the
+  call when it is ready); with the brief ready it is "View brief" and "Start call"; once the meeting has begun it is
+  "Start call" with what it opens, for example "Google Meet and live tips". Prepare brief still opens Get ready. In
+  Broadsheet the next call's name is the headline, with the countdown and readiness on the line under it. Later today
+  shows quiet marks. The header's "Call now" is now a quiet "New call ⌘N", which opens Get ready for an untitled call.
+  On first launch the AI step is marked "Start here" with Connect AI, and a call that starts right now has a button.
 - **Settings: what is needed on top, the rest under Advanced (2026-11-18, layouts R5):** every Settings pane now shows
   only what most people need, with everything else in one collapsed Advanced at the bottom. Each pane remembers
   whether its Advanced is open, and the search in Settings still finds every setting, opening Advanced when it has to.

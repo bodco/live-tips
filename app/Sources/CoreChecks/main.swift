@@ -4028,6 +4028,18 @@ updatesD3()
 orgsB6b()
 prepSecuritySEC01()
 projectsWizard0170()
+// MARK: 2026-11-19 (theme pass, stage 1): the preparation estimate on Home ("Prepare brief · ~40 s")
+func prepEstimateTP1() {
+    let l = [#"{"job":"prep","error":false,"duration_s":38}"#, #"{"job":"prep","error":true,"duration_s":400}"#,
+             #"{"job":"prep_refresh","error":false,"duration_s":900}"#, #"{"job":"prep","error":false,"duration_s":44}"#,
+             #"{"job":"prep","error":false,"duration_s":41.0}"#, "not json"].joined(separator: "\n")
+    expect(PrepEstimate.seconds(ledger: l) == 41, "tp1: the median of the successful prep runs only")
+    expect(PrepEstimate.seconds(ledger: #"{"job":"prep","error":false,"duration_s":38}"#) == nil, "tp1: one run is no estimate")
+    expect(PrepEstimate.seconds(ledger: "") == nil, "tp1: no ledger, no estimate")
+    expect(PrepEstimate.rounded(41) == (40, false) && PrepEstimate.rounded(4) == (10, false), "tp1: seconds round to 10, at least 10")
+    expect(PrepEstimate.rounded(170) == (3, true), "tp1: from 90 s whole minutes")
+}
+
 // MARK: 2026-11-18 (redesign block 1): the style setting (Settings > General > Appearance)
 func appearanceStyleR1() {
     let d = AppConfig()
@@ -4038,6 +4050,9 @@ func appearanceStyleR1() {
     var c = AppConfig(); c.appearanceStyle = "broadsheet"; c.appearance = "light"
     let back = (try? JSONEncoder().encode(c)).flatMap { try? JSONDecoder().decode(AppConfig.self, from: $0) }
     expect(back?.appearanceStyle == "broadsheet" && back?.appearance == "light", "r1: style and mode round-trip")
+    // theme pass (19.11): Classic is out of the picker, a config on Classic reads as Roadbook and keeps its mode
+    let cl = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"appearanceStyle\":\"classic\",\"appearance\":\"dark\"}".utf8))
+    expect(cl?.appearanceStyle == "roadbook" && cl?.appearance == "dark", "theme pass: a config on Classic moves to Roadbook, keeps its mode")
 }
 
 // MARK: 2026-11-18 (0.23.0): the update window on every launch, once per launch and version
@@ -4108,6 +4123,7 @@ orgContext0170()
 salesBlocksS1()
 emailAuthB13()
 appearanceStyleR1()
+prepEstimateTP1()
 updatePromptR()
 aiDefaultsF3()
 print("core checks: \(passed) passed, \(failures) failed")

@@ -88,8 +88,8 @@ def swift_theme(name, style, dark, t):
         f"        style: .{style}, dark: {'true' if dark else 'false'},",
         f"        bg: {req(t,'bg')}, surface: {req(t,'surface')}, surface2: {req(t,'surface2')}, frame: {req(t,'frame')},",
         f"        ink: {req(t,'ink')}, ink2: {req(t,'ink2')}, ink3: {req(t,'ink3')},",
-        f"        rule: {req(t,'rule')}, ruleStrong: {req(t,'ruleStrong')}, field: {req(t,'field')},",
-        f"        accent: {req(t,'accent')}, onAccent: {req(t,'onAccent')}, link: {req(t,'link')},",
+        f"        rule: {req(t,'rule')}, ruleStrong: {req(t,'ruleStrong')}, field: {req(t,'field')}, focus: {req(t,'focus')},",
+        f"        accent: {req(t,'accent')}, onAccent: {req(t,'onAccent')}, actEdge: {req(t,'actEdge')}, link: {req(t,'link')},",
         f"        hlBg: {opt(t,'hlBg')}, hlFg: {req(t,'hlFg')},",
         f"        markBg: {opt(t,'markBg')}, markFg: {req(t,'markFg')}, markDot: {req(t,'markDot')}, spDot: {hexv(derived(t))},",
         f"        ready: {req(t,'ready')}, readyText: {req(t,'readyText')},",
@@ -118,8 +118,8 @@ def css_block(style, mode, t):
     c = lambda k: t[k] if t.get(k) and t[k] != "transparent" else "transparent"
     v = []
     add = lambda n, val: v.append(f"  --pn-{n}:{val};")
-    for k in ("bg", "surface", "surface2", "frame", "ink", "ink2", "ink3", "rule", "ruleStrong", "field", "accent", "onAccent",
-              "link", "hlBg", "hlFg", "markBg", "markFg", "markDot", "ready", "readyText", "notready", "notreadyText", "nrBg",
+    for k in ("bg", "surface", "surface2", "frame", "ink", "ink2", "ink3", "rule", "ruleStrong", "field", "focus", "accent", "onAccent",
+              "actEdge", "link", "hlBg", "hlFg", "markBg", "markFg", "markDot", "ready", "readyText", "notready", "notreadyText", "nrBg",
               "rec", "recText", "answer", "docs", "edge"):
         add(re.sub(r"([A-Z])", lambda m: "-" + m.group(1).lower(), k), c(k))
     add("sp-dot", derived(t))

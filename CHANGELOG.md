@@ -12,7 +12,8 @@ Pacenote. Earlier versions are described in the commit messages and in
   screen when calls are recorded with the screen, Notion's meeting database and the components, with Fix next to
   anything that is missing. Settings > AI is three cards, Claude, ChatGPT and Gemini, each with Connect, and one line
   that says which AI Pacenote really uses (a job no connected AI can do, like the tips with only the AI on this Mac, says
-  "nothing connected" and the card asks you to fix it). An invitation waiting for you shows the organizations at the top
+  "nothing connected" and the card asks you to fix it). Under Advanced, Runs on shows the AI that really does each job,
+  marks the best connected one as recommended and greys out the ones that are not connected. An invitation waiting for you shows the organizations at the top
   of Account. When you connect Notion, Pacenote asks right away which database the
   meeting notes go to, so a call no longer ends without a place to write its page. Transcription now sets the
   languages new calls start in and holds Who is speaking (moved from AI). HubSpot is under Integrations > Advanced.

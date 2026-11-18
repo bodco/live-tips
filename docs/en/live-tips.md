@@ -1508,8 +1508,7 @@ calls, devices and the data on the server under Advanced; an invite waiting for 
 microphone, the sound of the call, the screen when calls are recorded with the screen, Notion's meeting database,
 components; Fix next to what is missing), your name on calls, the language and the look (Dock, the tips window during
 screen sharing, call controls, shortcuts, folders and data under Advanced); AI, a card each for Claude, ChatGPT and
-Gemini with Connect and one line "Pacenote uses: ...", the AI that really runs by what is connected, or "nothing connected" for a job no connected AI can do, e.g. the tips with only the AI on this Mac (the AI of each
-job, the fallback chain, models, limits and spending, the AI on this Mac, Ollama and the agents under Advanced);
+Gemini with Connect and one line "Pacenote uses: ...", the AI that really runs by what is connected, or "nothing connected" for a job no connected AI can do, e.g. the tips with only the AI on this Mac (the AI of each job, where Runs on shows the AI that really does it, the best connected one marked recommended and the rest greyed out until connected; the fallback chain, models, limits and spending, the AI on this Mac, Ollama and the agents under Advanced);
 Projects, the list and Add (found folders, workspaces, scanning and the index under Advanced); Integrations,
 Notion, Calendars and Google (HubSpot under Advanced); Call recording, the switch and sound or screen (the picture,
 quality, Google Drive, the screen permission and the consent message under Advanced); Transcription, the languages

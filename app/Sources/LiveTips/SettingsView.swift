@@ -684,6 +684,9 @@ struct GeminiModelPicker: View {
 
 struct RoutePicker: View {
     @Binding var selection: String
+    /// 0.25 (R5, owner 18.11): the job decides what the picker shows: the AI that really runs it (AIDefaults.pick over
+    /// what is connected), "(recommended)" on the best connected one, the AIs that are not connected greyed out.
+    var job: String
     var recommended: String
     var discouraged: String? = nil
     var withOpenAI = false
@@ -698,8 +701,9 @@ struct RoutePicker: View {
         if withLocal { r.append(AIRoute.local) }
         return r
     }
-    private func label(_ r: String) -> String {
-        let mark: String = r == recommended ? L("ai.route.recommended") : (r == discouraged ? L("ai.route.notRecommended") : "")
+    private func label(_ r: String, best: String?, on: Bool) -> String {
+        guard on else { return AIRoute.name(r) + L("ai.route.notConnected") }
+        let mark: String = r == (best ?? recommended) ? L("ai.route.recommended") : (r == discouraged ? L("ai.route.notRecommended") : "")
         return AIRoute.name(r) + mark
     }
     var withLocal = false          // 0.8.5: the preparation can also run on this Mac (Ollama)
@@ -708,15 +712,31 @@ struct RoutePicker: View {
     var body: some View {
         // 0.8.6 (E > dependants): "On this Mac" needs Ollama and the model; without them it is disabled, with Install next to it
         let localOK = oc.isInstalled("ollama") && oc.isInstalled("local_model")
+        let conn = AIRoute.confirmed()
+        let ok: (String) -> Bool = { conn.contains($0) && AIChain.allowed($0, job: job) && ($0 != AIRoute.local || localOK) }
+        let best = AIDefaults.preference(job: job).first { routes.contains($0) && ok($0) }
+        let runs = RoutePicker.runs(job: job, chosen: selection, connected: conn)
+        let shown = Binding<String>(get: { runs.flatMap { ok($0) ? $0 : nil } ?? "" }, set: { if !$0.isEmpty { selection = $0 } })
         VStack(alignment: .trailing, spacing: 2) {
-            Picker(L("ai.route"), selection: $selection) {
+            Picker(L("ai.route"), selection: shown) {
+                if shown.wrappedValue.isEmpty { Text(L("ai.route.none")).tag("") }
                 ForEach(routes, id: \.self) { r in
-                    Text(label(r)).tag(r)
-                        .selectionDisabled(r == AIRoute.local && !localOK)
+                    Text(label(r, best: best, on: ok(r))).tag(r)
+                        .selectionDisabled(!ok(r))
                 }
             }
             if withLocal && !localOK { NeedsComponent(id: oc.isInstalled("ollama") ? "local_model" : "ollama") }
         }
+    }
+}
+
+extension RoutePicker {
+    /// The AI that really runs the job: the chosen one while it is connected, else the best connected one; nil when
+    /// no connected AI may do the job. The sections under the picker (models, warnings) follow this, not the choice.
+    @MainActor static func runs(job: String, chosen: String, connected: Set<String>? = nil) -> String? {
+        let conn = connected ?? AIRoute.confirmed()
+        let r = AIDefaults.pick(job: job, chosen: chosen, connected: conn)
+        return conn.contains(r) && AIChain.allowed(r, job: job) ? r : nil
     }
 }
 
@@ -952,6 +972,12 @@ struct SettingsView: View {
 
     var ai: some View { aiForm }
 
+    /// 0.25 (R5): the AI that really runs a job ("" when none may), for the rows under the Runs on pickers.
+    private func run(_ job: String) -> String {
+        let chosen = job == "prep" ? model.config.ai.prep : job == "tips" ? model.config.ai.tips : model.config.ai.after
+        return RoutePicker.runs(job: job, chosen: chosen) ?? ""
+    }
+
     var aiForm: some View {
         Form {
             AIUsesSection(model: model)
@@ -962,68 +988,70 @@ struct SettingsView: View {
             if aiAdv == "1" {
             Group {
             Section {
-                RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withOpenAI: true, withAgy: true, withLocal: true)
-                if model.config.ai.prep == AIRoute.codex {
+                RoutePicker(selection: $model.config.ai.prep, job: "prep", recommended: AIRoute.code, withOpenAI: true, withAgy: true, withLocal: true)
+                if run("prep") == AIRoute.codex {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                } else if model.config.ai.prep == AIRoute.local {
+                } else if run("prep") == AIRoute.local {
                     LocalModelRow()
-                } else if model.config.ai.prep == AIRoute.openai {
+                } else if run("prep") == AIRoute.openai {
                     OpenAIModelPicker(selection: $model.config.ai.openaiPrep, job: "prep")
-                } else if model.config.ai.prep == AIRoute.gemini {
+                } else if run("prep") == AIRoute.gemini {
                     GeminiModelPicker(selection: $model.config.ai.geminiPrep, job: "prep")
-                } else if model.config.ai.prep == AIRoute.agy {
+                } else if run("prep") == AIRoute.agy {
                     AgyTermsWarning()
                     AgyModelPicker(selection: $model.config.ai.agyPrep)
-                } else {
+                } else if !run("prep").isEmpty {      // nothing connected for the job: no models to pick
                     Picker(L("set.model"), selection: $runner.model) {
                         ForEach(PrepRunner.models, id: \.id) { m in Text(m.label).tag(m.id) }
                     }
                     .help(L("set.sonnetReadsTheFiles"))
                 }
             } header: { Text(L("ai.job.prep")).settingsAnchor("ai.prep") } footer: {
-                Text(L("set.cc.builds")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                if run("prep") == AIRoute.code { Text(L("set.cc.builds")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }   // about Claude Code only
             }
             Section {
-                RoutePicker(selection: $model.config.ai.tips, recommended: AIRoute.api, discouraged: AIRoute.code, withOpenAI: true)
+                RoutePicker(selection: $model.config.ai.tips, job: "tips", recommended: AIRoute.api, discouraged: AIRoute.code, withOpenAI: true)
                     .help(L("ai.tips.codeWhy"))
-                if model.config.ai.tips == AIRoute.code {
+                if run("tips") == AIRoute.code {
                     Text(L("ai.tips.codeWhy")).font(PN.Font.caption).foregroundStyle(PN.C.onMe)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if model.config.ai.tips == AIRoute.codex {
+                if run("tips") == AIRoute.codex {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                } else if model.config.ai.tips == AIRoute.openai {
+                } else if run("tips") == AIRoute.openai {
                     OpenAIModelPicker(selection: $model.config.ai.openaiTips, job: "tips")
-                } else if model.config.ai.tips == AIRoute.gemini {
+                } else if run("tips") == AIRoute.gemini {
                     GeminiModelPicker(selection: $model.config.ai.geminiTips, job: "tips")
-                } else {
+                } else if !run("tips").isEmpty {      // nothing connected for the job: no models to pick
                     ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices).help(L("set.decidesIfATip"))
                     ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices).help(L("set.writesTheTipYou"))
                 }
                 Toggle(L("set.answerQuestionsToAnyone"), isOn: $model.config.answerAny)
                     .help(L("set.aQuestionAskedTo"))
-                if ![AIRoute.openai, AIRoute.codex, AIRoute.gemini].contains(model.config.ai.tips) {
+                if [AIRoute.api, AIRoute.code].contains(run("tips")) {      // Claude runs the tips
                     Toggle(L("set.secondRequestWhenClaude"), isOn: $model.config.hedgeEnabled)
                         .help(L("set.ifClaudeShowsNo"))
                 }
             } header: { Text(L("ai.job.tips")).settingsAnchor("ai.tips") } footer: {
-                Text(model.config.knownModels.isEmpty ? L("set.modelsTest") : L("set.modelsKnown"))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                if run("tips") == AIRoute.api {      // the Claude key's models only
+                    Text(model.config.knownModels.isEmpty ? L("set.modelsTest") : L("set.modelsKnown"))
+                        .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
             }
             Section {
-                RoutePicker(selection: $model.config.ai.after, recommended: AIRoute.code, withOpenAI: true, withAgy: true, withLocal: true)
-                if model.config.ai.after == AIRoute.codex {
+                RoutePicker(selection: $model.config.ai.after, job: "after", recommended: AIRoute.code, withOpenAI: true, withAgy: true, withLocal: true)
+                if run("after") == AIRoute.codex {
                     Text(L("ai.codex.model")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                } else if model.config.ai.after == AIRoute.openai {
+                } else if run("after") == AIRoute.openai {
                     OpenAIModelPicker(selection: $model.config.ai.openaiAfter, job: "after")
-                } else if model.config.ai.after == AIRoute.gemini {
+                } else if run("after") == AIRoute.gemini {
                     GeminiModelPicker(selection: $model.config.ai.geminiAfter, job: "after")
-                } else if model.config.ai.after == AIRoute.agy {
+                } else if run("after") == AIRoute.agy {
                     AgyTermsWarning()
                     AgyModelPicker(selection: $model.config.ai.agyAfter)
-                } else if model.config.ai.after == AIRoute.local {
+                } else if run("after") == AIRoute.local {
                     LocalModelRow()
-                } else {
+                } else if !run("after").isEmpty {      // nothing connected for the job: no models to pick
                     ModelPicker(title: L("set.model"), selection: $model.config.models.analysis, choices: model.modelChoices).help(L("set.summaryAndAnalysisNot"))
                 }
                 Toggle(L("set.rateTipsAfterEach"), isOn: $model.config.judgeAfterCall)

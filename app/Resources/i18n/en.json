@@ -1023,6 +1023,8 @@
  "ai.route.code": "Claude account",
  "ai.route.recommended": " (recommended)",
  "ai.route.notRecommended": " (not recommended)",
+ "ai.route.none": "Nothing connected",
+ "ai.route.notConnected": " (not connected)",
  "ai.tips.codeWhy": "Not recommended for tips: each request through Claude Code starts a few seconds later than through the key, without prompt caching or a second request when Claude is slow, and an hour of a call is hundreds of requests from your plan's limits. A tip that comes late is no use. Good as a backup when the API credit runs out.",
  "ai.after.footer": "Summary and Notion page, follow-up email, call memory, rehearsal and the tip judge. Not time-critical, so your Claude account is a good fit.",
  "ai.auto.header": "Switching",

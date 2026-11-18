@@ -35,6 +35,11 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
     @Published private(set) var installAfterCall = false
     /// "Later" hides the dot and the Home line for this version until the next launch.
     @Published var dismissedVersion: String?
+    /// 0.24 (Bohdan 18.11): "Install and restart" was pressed: a spinner until Pacenote restarts. One click: an update that
+    /// is not downloaded yet downloads first and installs as soon as it is ready, without a second click.
+    @Published private(set) var installing = false
+    private var installWhenReady = false
+    private var hourly: Timer?
     /// 0.23.0: versions whose update window was shown in this launch (it comes back at the next launch).
     private(set) var promptedThisLaunch: Set<String> = []
     func markPrompted(_ v: String) { promptedThisLaunch.insert(v) }
@@ -75,10 +80,19 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
         }
         // 0.23.0: a quiet check a little after every launch (when automatic checks are on), so a version found before
         // shows its window again; Sparkle's own schedule only checks every 12 hours.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in
-            guard let u = self?.updater, u.automaticallyChecksForUpdates, u.canCheckForUpdates, !Self.callIsLive else { return }
-            u.checkForUpdatesInBackground()
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.quietCheck() }
+        // 0.24 (Bohdan 18.11): updates always download in the background (the one-click install needs the file on
+        // disk; nothing installs without "Install and restart" or a quit), and while Pacenote runs it looks every hour,
+        // so a release published during the day opens the update window the same hour, not after Sparkle's 12 hours.
+        updater?.automaticallyDownloadsUpdates = true
+        hourly = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.quietCheck() }
+    }
+
+    /// A background check when automatic checks are on, no call is live and nothing is downloaded and waiting already.
+    private func quietCheck() {
+        guard let u = updater, u.automaticallyChecksForUpdates, u.canCheckForUpdates, !Self.callIsLive, !installing else { return }
+        if case .ready = phase { return }
+        u.checkForUpdatesInBackground()
     }
 
     /// 0.23.0: open the update window if it is due (UpdatePromptWindow decides).
@@ -106,13 +120,32 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
         u.checkForUpdatesInBackground()
     }
 
-    /// "Install and restart" (About, Home, the menu). Downloaded: installs now, or after the call. Not downloaded yet:
-    /// Sparkle's window with the release notes takes it from there.
+    /// "Install and restart" (About, Home, the menu, the update window): one click. Downloaded: installs and restarts
+    /// now (after the call during a call). Not downloaded yet: downloads in the background with a spinner, then installs
+    /// and restarts at once (0.24, Bohdan 18.11: the first click used to start a download nobody could see).
     func install() {
         if Self.callIsLive { installAfterCall = true; return }
-        if let go = installNow { installNow = nil; go(); return }
-        controller?.checkForUpdates(nil)
+        guard !installing else { return }
+        installing = true
+        if let go = installNow {
+            installNow = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { go() }      // let the spinner draw first
+            return
+        }
+        installWhenReady = true
+        guard let u = updater else { stopInstalling(); return }
+        u.automaticallyDownloadsUpdates = true
+        if u.canCheckForUpdates { u.checkForUpdatesInBackground() }
+        // A check already running downloads too and ends in willInstallUpdateOnQuit. If nothing is ready in 3 minutes,
+        // Sparkle's own window takes over, so the click is never lost.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 180) { [weak self] in
+            guard let self, self.installWhenReady else { return }
+            self.stopInstalling()
+            self.controller?.checkForUpdates(nil)
+        }
     }
+
+    private func stopInstalling() { installing = false; installWhenReady = false }
 
     func later() { dismissedVersion = newVersion }
 
@@ -157,6 +190,7 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
             self.lastCheck = updater.lastUpdateCheckDate ?? Date()
             if let e = error as NSError?, e.domain != SUSparkleErrorDomain || e.code != Int(SUError.noUpdateError.rawValue) {
                 if case .checking = self.phase { self.phase = .failed(e.localizedDescription) }
+                if self.installWhenReady, !(e.domain == "Pacenote" && e.code == 1) { self.stopInstalling(); self.phase = .failed(e.localizedDescription) }
                 // S5: error update; "A call is live" (our own refusal) and a check the PM cancelled are not errors
                 if !(e.domain == "Pacenote" && e.code == 1) {
                     let code = e.domain == NSURLErrorDomain ? Analytics.errorCode(URLError(URLError.Code(rawValue: e.code)))
@@ -170,9 +204,11 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
     /// Downloaded in the background: Pacenote shows it and installs on "Install and restart" (or when it quits).
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationBlock: @escaping () -> Void) -> Bool {
         DispatchQueue.main.async {
-            self.installNow = immediateInstallationBlock
             self.notes = Self.bullets(item.itemDescription)
             self.phase = .ready(item.displayVersionString)
+            // 0.24: "Install and restart" was pressed before the download ended: install now, no second click
+            if self.installWhenReady && !Self.callIsLive { self.installWhenReady = false; immediateInstallationBlock(); return }
+            self.installNow = immediateInstallationBlock
             if self.installAfterCall && !Self.callIsLive { self.installAfterCall = false; self.install(); return }
             self.maybePrompt()
         }
@@ -251,9 +287,8 @@ struct UpdatesSection: View {
                             .background(PN.C.onMe.opacity(0.13), in: RoundedRectangle(cornerRadius: PN.Radius.m))
                     }
                     HStack(spacing: 8) {
-                        Button(live ? L("upd.installAfter") : L("upd.install")) { up.install() }
-                            .buttonStyle(.pnPrimary).disabled(up.installAfterCall)
-                        Button(L("upd.later")) { up.later() }.buttonStyle(.pnSecondary)
+                        UpdateInstallButton(live: live)
+                        Button(L("upd.later")) { up.later() }.buttonStyle(.pnSecondary).disabled(up.installing)
                     }
                 }
                 .padding(.vertical, 4)
@@ -274,12 +309,6 @@ struct UpdatesSection: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("upd.auto"))
                     Text(L("upd.auto.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Toggle(isOn: Binding(get: { up.backgroundDownload }, set: { up.backgroundDownload = $0 })) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("upd.bg"))
-                    Text(L("upd.bg.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 }
             }
         } header: { Text(L("upd.title")) }
@@ -306,23 +335,14 @@ struct UpdateHomeLine: View {
     var mine: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0" }
     var body: some View {
         if let v = up.newVersion {
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.down.circle.fill").font(PN.sys(22)).foregroundStyle(PN.C.accent).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L(isReady ? "upd.home.ready" : "upd.home.available", ["v": v])).pnSection().foregroundStyle(PN.C.text)
-                    Text(L("upd.youHave", ["v": mine])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
-                }
-                Spacer(minLength: 8)
-                if !up.notes.isEmpty { Button(L("upd.home.details")) { UpdatePromptWindow.show(version: v) }.buttonStyle(.pnTertiary) }
-                Button(L("upd.later")) { up.later() }.buttonStyle(.pnTertiary)
-                Button(live ? L("upd.installAfter") : L("upd.home.install")) { up.install() }
-                    .buttonStyle(.pnPrimary).disabled(up.installAfterCall)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: PN.Radius.m))
-            .overlay(RoundedRectangle(cornerRadius: PN.Radius.m).stroke(PN.C.accent.opacity(0.35), lineWidth: 1))
-            .accessibilityElement(children: .contain)
-            .onReceive(Timer.publish(every: 3, on: .main, in: .common).autoconnect()) { _ in live = UpdateService.callIsLive }
+            // 0.24 (R1, board HB): one of the Home banners
+            HomeBanner(icon: "↑", title: L(isReady ? "upd.home.ready" : "upd.home.available", ["v": v]), sub: L("upd.youHave", ["v": mine]),
+                       edge: PN.C.accent, iconFill: PN.C.accentFill, iconInk: PN.C.onAccent,
+                       extra: up.notes.isEmpty ? nil : (L("upd.home.details"), { UpdatePromptWindow.show(version: v) }),
+                       later: (L("upd.later"), { up.later() }),
+                       go: up.installing ? L(isReady ? "upd.installing" : "upd.downloading") : live ? L("upd.installAfter") : L("upd.home.install"),
+                       goDisabled: up.installAfterCall || up.installing, busy: up.installing) { up.install() }
+                .onReceive(Timer.publish(every: 3, on: .main, in: .common).autoconnect()) { _ in live = UpdateService.callIsLive }
         }
     }
     var isReady: Bool { if case .ready = up.phase { return true }; return false }
@@ -371,9 +391,9 @@ struct UpdatePromptView: View {
             }
             HStack(spacing: 8) {
                 Spacer()
-                Button(L("upd.later")) { close() }.buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)
-                Button(live ? L("upd.installAfter") : L("upd.install")) { up.install(); close() }
-                    .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(up.installAfterCall)
+                Button(L("upd.later")) { close() }.buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction).disabled(up.installing)
+                // 0.24: the window stays with a spinner until Pacenote restarts (during a call it closes: install after the call)
+                UpdateInstallButton(live: live) { if live { close() } }.keyboardShortcut(.defaultAction)
             }
         }
         .padding(24)
@@ -412,5 +432,29 @@ enum UpdatePromptWindow {
         w.center()
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+/// 0.24 (Bohdan 18.11): "Install and restart" with one click. While it works, a spinner and what is happening
+/// (Downloading… or Installing…) instead of the label, and the button cannot be pressed again.
+struct UpdateInstallButton: View {
+    @ObservedObject var up = UpdateService.shared
+    let live: Bool
+    var after: () -> Void = {}
+    var isReady: Bool { if case .ready = up.phase { return true }; return false }
+    var body: some View {
+        Button { up.install(); after() } label: {
+            if up.installing {
+                HStack(spacing: 8) {
+                    PNSpinner(size: 14, line: PN.C.onAccent, track: PN.C.onAccent.opacity(0.3))
+                    Text(L(isReady ? "upd.installing" : "upd.downloading"))
+                }
+            } else {
+                Text(live ? L("upd.installAfter") : L("upd.install"))
+            }
+        }
+        .buttonStyle(.pnPrimary)
+        .disabled(up.installAfterCall || up.installing)
+        .accessibilityLabel(up.installing ? L(isReady ? "upd.installing" : "upd.downloading") : (live ? L("upd.installAfter") : L("upd.install")))
     }
 }

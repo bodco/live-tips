@@ -1479,6 +1479,12 @@ you update, once per launch, and never opens before the sign-in or the onboardin
 new, Later (hides it and the menu bar dot until the next launch) and Install. With automatic checks on, Pacenote also
 checks quietly about 20 seconds after every launch.
 
+**One click to update (0.24).** While Pacenote runs it looks for a new version every hour (with automatic checks on),
+so a version published during the day opens the update window within the hour, also when Pacenote has been open since
+the morning. Updates always download in the background (the switch for it is gone). Install and restart is one click:
+the button shows a spinner with Downloading… or Installing…, and Pacenote restarts into the new version by itself; if
+the download is still running, it installs as soon as it ends. The window stays open until the restart.
+
 **Three looks: Classic, Roadbook, Broadsheet (0.23.0).** Settings > General > Appearance has three style cards and a
 Mode (Same as the Mac, Light, Dark). Classic is the look Pacenote had before; Roadbook (the default) is square, with
 condensed capitals and a yellow plate under the mark; Broadsheet is square, with a heavy black type and lines instead of
@@ -1700,6 +1706,19 @@ Home answers two questions: what is next and what already happened. Tasks, decis
 | Recent calls | The last 3 calls as cards: day, time and length, one sentence from the call notes, the number of decisions and tasks. A click opens the call page; right-click has Notion, the transcript, the follow-up email, the series, Finder and "Remove from this list". "All past calls" lists the rest |
 
 Colours follow the call's state, never the project: not ready (orange), ready (green), preparing (blue), live (red), recorded (dark blue), no transcript (grey). A call started without a project goes to the app's own folder (the workspace "My calls", `~/Library/Application Support/LiveTips/live`); its preparation never reads that folder. This week's numbers moved to Settings > Usage, the feature list to Settings > Help, On you to the Tracker screen. Not ready is orange.
+
+**Home layout (0.24).** Home is laid out as the boards of the three looks: the header (Home, Tracker, Team or
+Console, the organization filter, "AI ok" or in its place the pill of things to set up, search, transcribe, refresh,
+Settings, Plan a call, Call now Command-N); then the banners (start tips for this call, a new version, an invitation,
+an organization to set up), each a band with Later and one button; then the next call over a heavy line: "Next call in
+37 min" (in Roadbook on the yellow plate, in Broadsheet a large number), the call name, the people, Ready or Not ready
+with what that means, one big button, one bordered button and one link, and on the right the rest of today and
+tomorrow with See the whole week (Coming up: every call on a line and the full list, with Show less). Under it Recent
+calls (the last five rows with the state of their notes and a project filter) next to This week (calls, hours on
+calls, prepared, AI spend this month, account limits, calls not transcribed yet, Statistics). The live call shows the
+time on the call on a red plate, Show tips, the Meeting Sheet and End the call. Without calls ahead Home says "Clear
+until tomorrow"; without a calendar it offers to connect one and lists the calls planned by hand; the first launch
+shows three steps. In a narrow window the columns go one under the other. Classic uses the same layout.
 
 **Call pages.** An upcoming call opens as a page with Setup, Brief, Tasks and Earlier calls; its Setup changes
 apply only on Save. A past call has Summary (Meeting notes since 0.9.5.2, 14.1t), What was discussed, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this

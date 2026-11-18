@@ -25,7 +25,7 @@ Updated: 18 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ### Now
 
-- **New screen layouts (0.24).** Home, the call pages, Meeting Sheet, Tracker, Settings and onboarding move to the new design, screen by screen, in all three styles.
+- **New screen layouts (0.24 and on).** Home has the new layout since 0.24; the call pages, Meeting Sheet, Tracker, Settings and onboarding follow, screen by screen, in all three styles.
 - **Better briefs and tips.** Every call is reviewed after it ends: which tips helped, which were noise, what was missed. The prompts change from that.
 
 ### Next

@@ -20,7 +20,7 @@ final class HomeWindow {
         w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
         w.title = L("home.window.title")
         w.styleMask.insert(.resizable)
-        w.setContentSize(NSSize(width: 1120, height: 760))
+        w.setContentSize(NSSize(width: 1280, height: 860))      // 0.24 (R1): the width of the boards
         w.contentMinSize = NSSize(width: 640, height: 480)     // 0.8.7.1: narrower, the call page was cut on the right
         w.isReleasedWhenClosed = false
         _ = w.setFrameAutosaveName("LiveTipsHome")
@@ -177,31 +177,42 @@ struct HomeView: View {
     private var calendarOn: Bool { demo ? !["nocal", "first"].contains(Self.shotState) : cal.hasSource }
     private var firstLaunch: Bool { demo ? Self.shotState == "first" : (!aiReady && !calendarOn && history.records.isEmpty) }
 
+    // MARK: layout (0.24, R1: boards HM-Home, HS-HomeStates, HB-HomeBanners)
+    // The header, then the banners, then the hero over a heavy line (the next call with the rest of the day on the
+    // right, or the state of the day), then Recent calls next to This week. The same layout in every style.
+
+    @Environment(\.pnTheme) private var t
+    @ObservedObject private var updates = UpdateService.shared
+
+    /// Something shows in the banner band over the hero (the hero then takes its short form, board HB).
+    private var bannersOn: Bool {
+        if demo && Self.shotState == "banners" { return true }
+        if !note.isEmpty || updates.newVersion != nil || (auto.suggestion != nil && !live) { return true }
+        guard acct.signedIn else { return false }
+        if !acct.invites.isEmpty { return true }
+        let done = OrgSetupMemory.done
+        return acct.me?.orgs.contains { OrgSetup.offered($0, done: done) } ?? false
+    }
+
     private var homeBody: some View {
         VStack(spacing: 0) {
-            header.padding(.horizontal, 24).padding(.vertical, 12)
-            Divider()
+            header
+            Rectangle().fill(PN.C.rule).frame(height: 1)
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    UpdateHomeLine()      // 0.23.0 (Bohdan 18.11): the update banner at the top (0.16.0: a line under the title)
-                    titleBlock
-                    if let e = auto.suggestion, !live { autoBanner(e) }
-                    InvitesHomeLine()     // 0.17.0 (B6b): "Mike invited you to Acme · Join…"
-                    OrgSetupHomeLine()    // 0.17.0 (5.3): "Acme is ready. Set it up…" for its owner
-                    if !note.isEmpty { Text(note).font(PN.Font.body).foregroundStyle(PN.C.onMe) }
-                    mainBlock
-                    if !firstLaunch && calendarOn { comingUp }
-                    if !firstLaunch { recentCalls }
+                VStack(alignment: .leading, spacing: 0) {
+                    if bannersOn { banners }
+                    hero
+                    if showAllCalls && calendarOn && !firstLaunch { comingUp }
+                    if !firstLaunch { lower }
                 }
-                .padding(24)
-                .frame(maxWidth: 1100, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .center)      // 0.9.0 (owner): centred on a wide window
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .background(PN.C.bg)
         .frame(minWidth: 680, minHeight: 560)
         .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents(); register.importOnce(); ntasks.keepFresh()
                     runner.refreshAuth(); if acct.signedIn { Task { await acct.loadInvites() } }
+                    if demo && Self.shotState == "coming" { showAllCalls = true }
                     UpdateService.shared.maybePrompt() }      // 0.23.0: the update window, once Home is up
         .onDrop(of: [.fileURL], isTargeted: nil) { items in          // 0.8.6 (B): drop a recording on Home
             _ = items.first?.loadObject(ofClass: URL.self) { u, _ in
@@ -218,12 +229,13 @@ struct HomeView: View {
         status = EngineStatus.load(path: CallEngine.shared.statusPath)
     }
 
-    // MARK: header: logo, Home / Tracker, the integrations pill, search, transcribe, Start a call now, Settings
+    // MARK: header (HM): the mark, Home / Tracker / Team / Console, the organization filter, AI ok or the problems
+    // pill, search, transcribe, refresh, Settings, Plan a call, Call now
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 14) {
-            PacenoteSymbol(height: 20).accessibilityLabel(L("app.name"))
-            HStack(spacing: 2) {
+        HStack(alignment: .center, spacing: 12) {
+            PacenoteSymbol(height: 26).accessibilityLabel(L("app.name"))
+            HStack(spacing: 22) {
                 navTab(L("home.nav.home"), selected: true) { nav.path = [] }
                 if trackerOn { navTab(L("home.nav.tracker"), selected: false) { nav.open(.tracker) } }
                 // 0.17.0: the console, for someone who runs something in an organization, or for staff
@@ -231,69 +243,90 @@ struct HomeView: View {
                 if TeamStore.visible { navTab(L("team.tab"), selected: false) { nav.open(.team) } }
                 if acct.me?.showsConsole == true { navTab(L("console.tab"), selected: false) { nav.open(.console) } }
             }
-            integrationsPill
-            AIStatusIcon()            // 0.10.0 (AI chain): the limit status of the AIs the jobs use
+            .padding(.leading, 10)
+            .frame(maxHeight: .infinity)
+            orgFilter.padding(.leading, 10)
             Spacer(minLength: 8)
+            statusPill
             ViewThatFits(in: .horizontal) { headerButtons(icons: false); headerButtons(icons: true) }
         }
+        .padding(.leading, 32).padding(.trailing, 20)
+        .frame(height: 56)
     }
 
+    /// A tab of the main navigation: the display face, a 3 pt line in the link colour under the open one.
     private func navTab(_ title: String, selected: Bool, run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            Text(title).font(PN.Font.body.weight(selected ? .semibold : .regular))
+            Text(t.cased(title))
+                .font(t.style == .classic ? .system(size: 15, weight: selected ? .semibold : .regular) : t.font(.display, t.tabSize, selected ? .heavy : .semibold))
+                .tracking(t.style == .classic ? 0 : t.bTrack * t.tabSize)
                 .foregroundStyle(selected ? PN.C.text : PN.C.text2)
-                .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(selected ? PN.C.surface2 : Color.clear, in: RoundedRectangle(cornerRadius: PN.r(7)))
+                .frame(maxHeight: .infinity)
+                .overlay(alignment: .bottom) { Rectangle().fill(selected ? PN.C.accent : Color.clear).frame(height: 3) }
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    @ViewBuilder private func headerButtons(icons: Bool) -> some View {
-        HStack(spacing: 10) {
-            if history.records.isEmpty {
-                Button { StartCallWindow.show(delegate: app) } label: { headerLabel(L("memory.button"), "magnifyingglass", icons) }
-                    .buttonStyle(.pnTertiary).opacity(0.5).help(L("memory.afterFirst"))
-            } else {
-                Button { MemoryWindow.show() } label: { headerLabel(L("memory.button"), "magnifyingglass", icons) }
-                    .buttonStyle(.pnTertiary).keyboardShortcut("f", modifiers: .command).help(L("memory.help")).fixedSize()
+    /// The organization filter of the boards sits in the header; it filters Recent calls (shared with All past calls).
+    @ViewBuilder private var orgFilter: some View {
+        if let me = acct.me, me.showsOrgFilter {
+            Menu {
+                Button(L("org.filter.all")) { filterOrg = "" }
+                Divider()
+                ForEach(me.orgs) { o in Button(o.name) { filterOrg = o.id } }
+            } label: {
+                HomeField(text: filterOrg.isEmpty ? L("org.filter.all") : (me.org(filterOrg)?.name ?? L("org.filter.all")))
             }
-            // 0.8.6 (B), owner 2026-11-03: Transcribe stays in the header, next to search
-            Button { TranscribeWindow.show() } label: { headerLabel(L("tr.window"), "waveform", icons) }
-                .buttonStyle(.pnTertiary).help(L("tr.subtitle")).fixedSize()
-            if !live {
-                // 0.9.1 (owner): one split button, the arrow is part of the blue button, not a loose chevron
-                HStack(spacing: 0) {
-                    Button { StartCallWindow.startNow(delegate: app) } label: {
-                        Text(L("home.startCallNow")).font(PN.sys(13, .semibold)).foregroundStyle(PN.C.onAccent)
-                            .padding(.leading, 14).padding(.trailing, 12).frame(height: 32).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain).keyboardShortcut("n", modifiers: .command)
-                    Rectangle().fill(PN.C.onAccent.opacity(0.35)).frame(width: 1, height: 18)
-                    Menu {
-                        Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
-                    } label: {
-                        Image(systemName: "chevron.down").font(PN.sys(10, .bold)).foregroundStyle(PN.C.onAccent)
-                            .frame(width: 28, height: 32).contentShape(Rectangle())
-                    }
-                    .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
-                    .help(L("home.planCall.help")).accessibilityLabel(L("home.planCall"))
-                }
-                .background(PN.C.accentFill, in: RoundedRectangle(cornerRadius: PN.r(7)))
-                .fixedSize()
-            }
-            Button { SettingsWindow.show() } label: { Image(systemName: "gearshape") }
-                .buttonStyle(.pnTertiary).help(L("home.settings")).accessibilityLabel(L("home.settings"))
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+            .help(L("org.filter.help"))
         }
     }
 
-    @ViewBuilder private func headerLabel(_ title: String, _ symbol: String, _ icons: Bool) -> some View {
-        if icons { Image(systemName: symbol).accessibilityLabel(title) } else { Label(title, systemImage: symbol) }
+    private func headerButtons(icons: Bool) -> some View {
+        HStack(spacing: 8) {
+        HStack(spacing: 2) {
+            if history.records.isEmpty {
+                HomeIconButton(symbol: "magnifyingglass", label: L("memory.afterFirst")) { StartCallWindow.show(delegate: app) }.opacity(0.5)
+            } else {
+                HomeIconButton(symbol: "magnifyingglass", label: L("memory.help")) { MemoryWindow.show() }.keyboardShortcut("f", modifiers: .command)
+            }
+            // 0.8.6 (B), owner 2026-11-03: Transcribe stays in the header, next to search
+            HomeIconButton(symbol: "waveform", label: L("tr.window")) { TranscribeWindow.show() }
+            if calendarOn { CalendarRefreshButton(place: "home", shortcut: true).frame(width: 32, height: 32) }
+            HomeIconButton(symbol: "slider.horizontal.3", label: L("home.settings")) { SettingsWindow.show() }
+        }
+        if !live {
+            HStack(spacing: 8) {
+                if icons {
+                    HomeIconButton(symbol: "calendar.badge.plus", label: L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
+                } else {
+                    Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
+                        .buttonStyle(PNOutlineButtonStyle()).help(L("home.planCall.help")).fixedSize()
+                }
+                Button { StartCallWindow.startNow(delegate: app) } label: {
+                    HStack(spacing: 8) {
+                        Text(L("home.callNow"))
+                        if !icons { Text("⌘N").font(t.homeMono(11)).foregroundStyle(PN.C.text3).textCase(nil) }
+                    }
+                }
+                .buttonStyle(PNOutlineButtonStyle()).keyboardShortcut("n", modifiers: .command).help(L("home.startCallNow")).fixedSize()
+            }
+            .padding(.leading, 6)
+        }
+        }
+        .fixedSize()
     }
 
     /// 0.9.0: what the old status line and Finish setup said, as one pill shown only when something needs the PM.
     private struct Problem: Identifiable { var id: String; var text: String; var run: () -> Void }
 
     private var problems: [Problem] {
+        if demo && Self.shotState == "pill" {
+            return [Problem(id: "install", text: L("home.finish.install"), run: {}), Problem(id: "notion", text: L("home.status.notionStale"), run: {}),
+                    Problem(id: "limit", text: L("home.status.limit"), run: {})]
+        }
         if demo && !Self.shotState.isEmpty && !firstLaunch {
             return (aiReady ? [] : [Problem(id: "ai", text: L("home.pill.claude"), run: {})]) + (calendarOn ? [] : [Problem(id: "cal", text: L("home.status.noCalendars"), run: {})])
         }
@@ -315,53 +348,59 @@ struct HomeView: View {
         return out
     }
 
-    @ViewBuilder private var integrationsPill: some View {
+    /// "AI ok" (HM), or in its place the problems pill (HB row 2): one problem is a button, several open a menu.
+    @ViewBuilder private var statusPill: some View {
         let ps = problems
-        if ps.count == 1, let p = ps.first {
-            Button(action: p.run) { pillLabel(p.text) }.buttonStyle(.plain)
-        } else if ps.count > 1 {
-            Menu { ForEach(ps) { p in Button(p.text, action: p.run) } } label: { pillLabel(L("home.pill.n", ["n": "\(ps.count)"])) }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        if ps.isEmpty {
+            HomeAIStatus()
+        } else if ps.count == 1, let p = ps.first {
+            Button(action: p.run) { HomeProblemPill(text: p.text) }.buttonStyle(.plain).fixedSize()
+        } else {
+            Menu { ForEach(ps) { p in Button(p.text, action: p.run) } } label: { HomeProblemPill(text: L("home.pill.n", ["n": "\(ps.count)"]) + " ▾") }
+                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                .accessibilityLabel(L("home.pill.n", ["n": "\(ps.count)"]))
         }
     }
 
-    private func pillLabel(_ text: String) -> some View {
-        HStack(spacing: 5) {
-            Circle().fill(PN.C.pendingFill).frame(width: 6, height: 6).accessibilityHidden(true)
-            Text(text).lineLimit(1)
+    // MARK: banners (HB row 1): auto-start, the update, an invitation, an organization to set up
+
+    private var banners: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if demo && Self.shotState == "banners" { demoBanners }
+            if let e = auto.suggestion, !live { autoBanner(e) }
+            UpdateHomeLine()      // 0.23.0 (Bohdan 18.11): the update banner at the top
+            InvitesHomeLine()     // 0.17.0 (B6b): "Mike invited you to Acme · Join…"
+            OrgSetupHomeLine()    // 0.17.0 (5.3): "Acme is ready. Set it up…" for its owner
+            if !note.isEmpty { Text(note).font(t.homeText(14)).foregroundStyle(PN.C.notreadyText) }
         }
-        .font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.pending)
-        .padding(.horizontal, 9).padding(.vertical, 3)
-        .background(PN.C.pendingFill.opacity(0.16), in: Capsule())
+        .padding(.horizontal, 32).padding(.top, 20)
     }
 
-    // MARK: the sentence on top
-
-    private var titleBlock: some View {
-        let df = DateFormatter()
-        df.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US")
-        df.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
-        return VStack(alignment: .leading, spacing: 4) {
-            Text(df.string(from: now)).font(PN.Font.body).foregroundStyle(PN.C.text3)
-            Text(titleText).font(PN.sys(26, .bold)).foregroundStyle(PN.C.text)
-        }
+    /// Pacenote 0.8 (idea 08): "Start tips for Orbit weekly?" when a meeting app is on at a calendar call.
+    private func autoBanner(_ e: CalendarService.CalEvent) -> some View {
+        let m = auto.model(for: e)
+        return HomeBanner(icon: "◉", title: L("auto.title", ["title": e.title]),
+                          sub: m.target.isEmpty ? L("auto.chooseProject") : L("auto.body", ["project": m.targetName]),
+                          edge: PN.C.rec, iconFill: PN.C.rec, iconInk: .white,
+                          later: (L("auto.notNow"), { auto.dismiss() }), go: L("home.startTips")) { auto.accept() }
     }
 
-    private var titleText: String {
-        if firstLaunch { return L("home.title.welcome") }
-        if live { return L("home.title.live") }
-        guard calendarOn || !upnext.visible.isEmpty, let n = nextCall else { return L("home.title.whenReady") }
-        let tf = DateFormatter(); tf.dateFormat = "HH:mm"
-        let m = Int((n.start.timeIntervalSince(now) / 60).rounded())
-        if m <= 0 { return n.title }
-        if m < 90 { return L("home.title.nextIn", ["n": "\(m)"]) }
-        if Calendar.current.isDateInTomorrow(n.start) { return L("home.title.nextTomorrow", ["t": tf.string(from: n.start)]) }
-        return L("home.title.nextAt", ["t": tf.string(from: n.start)])
+    /// Shot mode only: the four banners of the board, on demo data.
+    @ViewBuilder private var demoBanners: some View {
+        HomeBanner(icon: "◉", title: L("auto.title", ["title": "Northwind discovery call"]), sub: L("auto.body", ["project": "Northwind"]),
+                   edge: PN.C.rec, iconFill: PN.C.rec, iconInk: .white, later: (L("auto.notNow"), {}), go: L("home.startTips")) {}
+        HomeBanner(icon: "↑", title: L("upd.home.ready", ["v": "0.24.0"]), sub: L("upd.youHave", ["v": "0.23.0"]),
+                   edge: PN.C.accent, iconFill: PN.C.accentFill, iconInk: PN.C.onAccent, later: (L("upd.later"), {}), go: L("upd.home.install")) {}
+        HomeBanner(icon: "+", title: "Mike Reed invited you to Acme (team Delivery)", sub: L("org.invite.more", ["n": "1"]),
+                   edge: PN.C.answer, iconFill: PN.C.answer, iconInk: PN.C.bg, later: (L("org.invite.decline"), {}), go: L("org.invite.join")) {}
+        HomeBanner(icon: "◆", title: L("orgsetup.home", ["org": "Acme"]), sub: L("orgsetup.homeSub"),
+                   edge: PN.C.text3, iconFill: PN.C.text, iconInk: PN.C.bg, later: (L("orgsetup.notNow"), {}), go: L("orgsetup.start")) {}
     }
 
     // MARK: calls ahead
 
     private var ahead: [Ahead] {
+        if demo && Self.shotState == "empty" { return [] }
         var rows: [Ahead] = []
         var used = Set<ObjectIdentifier>()
         let ce = CallEngine.shared
@@ -382,156 +421,9 @@ struct HomeView: View {
     /// The next call: an Up next call, or an event that began less than 5 minutes ago.
     private var nextCall: Ahead? { live ? nil : ahead.first { $0.event == nil || $0.start > now.addingTimeInterval(-5 * 60) } }
 
-    @ViewBuilder private var mainBlock: some View {
-        if live { liveCard }
-        else if firstLaunch { stepsCard }
-        else if !calendarOn {
-            seeYourDay
-            if let n = nextCall { upNextCard(n, overlaps: []) }      // a call planned by hand still shows
-        }
-        else if let n = nextCall { upNextCard(n, overlaps: overlaps(n, ahead)) }
-        else { nothingAhead }
-    }
-
     private func overlaps(_ r: Ahead, _ rows: [Ahead]) -> [CalendarService.CalEvent] {
         guard let e = r.event else { return [] }
         return rows.compactMap(\.event).filter { $0.id != e.id && e.overlaps($0) }
-    }
-
-    /// 0.9.0 (mockup "Home"): a white card, 20 pt corners, a soft shadow, roomy padding.
-    private func card<C: View>(@ViewBuilder _ c: () -> C) -> some View {
-        c().padding(.horizontal, 32).padding(.vertical, 28).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.r(20)))
-            .shadow(color: (Color.black.opacity(0.05)).opacity(PN.depth), radius: 12, y: 4)
-            // Roadbook and Broadsheet: no shadow, a frame line instead (redesign block 4)
-            .overlay(Rectangle().stroke(PN.C.rule, lineWidth: 1 - PN.depth))
-    }
-
-    /// The call card of the mockup: what the call is on the left, one big action and one link on the right;
-    /// in a narrow window the actions go under it.
-    private func heroCard<L: View, R: View>(@ViewBuilder left: () -> L, @ViewBuilder right: () -> R) -> some View {
-        let l = left(), r = right()
-        return card {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: 24) {
-                    l.frame(minWidth: 320, maxWidth: .infinity, alignment: .leading)
-                    VStack(alignment: .trailing, spacing: 8) { r }.fixedSize()
-                }
-                VStack(alignment: .leading, spacing: 18) {
-                    l
-                    VStack(alignment: .leading, spacing: 8) { r }
-                }
-            }
-        }
-    }
-
-    /// No calendar: the day cannot be shown; a call can still be started or planned by hand.
-    private var seeYourDay: some View {
-        card {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(L("home.seeDay.title")).font(PN.sys(17, .semibold)).foregroundStyle(PN.C.text)
-                Text(L("home.seeDay.body")).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 8) {
-                    Button(L("home.connectCalendar")) { cal.connect() }.buttonStyle(.pnPrimary)
-                    Button(L("home.planByHand")) { StartCallWindow.show(delegate: app, planOnly: true) }.buttonStyle(.pnSecondary)
-                }
-                .padding(.top, 4)
-            }
-        }
-    }
-
-    private var nothingAhead: some View {
-        card {
-            HStack(spacing: 10) {
-                Text(L("home.nothingAhead")).font(PN.Font.body).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }.buttonStyle(.pnTertiary)
-            }
-        }
-    }
-
-    /// First launch: three steps instead of a call card; Coming up and Recent calls stay hidden.
-    private var stepsCard: some View {
-        let notion = SettingsWindow.model.isSet(.notionToken)
-        return card {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(L("home.steps.title")).font(PN.sys(17, .semibold)).foregroundStyle(PN.C.text)
-                step(1, L("home.steps.claude"), L("home.steps.claude.sub"), done: aiReady) { SettingsWindow.show(tab: "ai") }
-                step(2, L("home.steps.calendar"), L("home.steps.calendar.sub"), done: calendarOn) { cal.connect() }
-                step(3, L("home.steps.notion"), L("home.steps.notion.sub"), done: notion) { SettingsWindow.show(tab: "notion") }
-            }
-        }
-        .frame(maxWidth: 680)      // 0.9.0 (owner): a compact card, not the full width of a wide window
-    }
-
-    private func step(_ n: Int, _ title: String, _ sub: String, done: Bool, run: @escaping () -> Void) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(done ? PN.C.turn.opacity(0.15) : PN.C.surface2).frame(width: 26, height: 26)
-                if done { Image(systemName: "checkmark").font(PN.sys(11, .bold)).foregroundStyle(PN.C.turn) }
-                else { Text("\(n)").pnSection().foregroundStyle(PN.C.text2) }
-            }
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
-                Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-            }
-            Spacer(minLength: 8)
-            if done { Text(L("home.steps.done")).font(PN.Font.caption).foregroundStyle(PN.C.turn) }
-            else { Button(L("home.finish.connect"), action: run).buttonStyle(.pnSecondary) }
-        }
-    }
-
-    private var liveCard: some View {
-        let ce = CallEngine.shared
-        let req = ce.callRequest
-        let title = ce.renamed ?? (req["title"] as? String) ?? status.project ?? L("app.name")
-        let since = status.startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
-        let reg = ProjectRegistry.load(from: AppPaths.projects)
-        let slug = (req["slug"] as? String) ?? status.slug ?? ""
-        let project = reg.projects.first { $0.slug == slug }?.name ?? reg.workspaces.first { $0.name.lowercased() == slug.lowercased() }?.name ?? status.project ?? ""
-        let people = Self.peopleLine(((req["participants"] as? [String]) ?? []).filter { !$0.isEmpty })
-        let stem = (status.file ?? "").hasSuffix(".md") ? String((status.file ?? "").dropLast(3)) : (status.file ?? "")
-        let hasBrief = !stem.isEmpty && FileManager.default.fileExists(atPath: stem + ".brief.md")
-        let preparing = runner.running && runner.joinsCurrentCall
-        let failed = !preparing && !hasBrief && runner.joinsCurrentCall ? runner.failure : nil      // 2026-11-17 (owner)
-        let briefText = preparing ? L("home.live.briefPreparing") : hasBrief ? L("home.brief.ready")
-            : failed.map { L("home.live.prepFailed", ["why": $0]) } ?? L("home.live.noBrief")
-        let waiting = status.state == "standby"
-        return heroCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Circle().fill(PN.C.danger).frame(width: 8, height: 8).accessibilityHidden(true)
-                    Text(waiting ? L("menubar.status.waiting") : L("home.live")).font(PN.sys(14, .semibold)).foregroundStyle(PN.C.danger)
-                    if let s = since, status.state == "recording" {
-                        Text("·").foregroundStyle(PN.C.text3)
-                        Text(s, style: .timer).monospacedDigit().font(PN.sys(14, .semibold)).foregroundStyle(PN.C.danger)
-                    }
-                    if status.lines > 0 {
-                        Text("·").foregroundStyle(PN.C.text3)
-                        Text(L("home.live.counts", ["lines": "\(status.lines)", "tips": "\(status.tips)"])).font(PN.sys(14)).foregroundStyle(PN.C.text3)
-                    }
-                }
-                Button { app.showTips() } label: {
-                    Text(title).font(PN.sys(30, .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
-                }
-                .buttonStyle(.plain).help(L("menubar.showTips"))
-                Text([project, people.isEmpty ? "" : L("home.card.with", ["people": people])].filter { !$0.isEmpty }.joined(separator: " · ") + " · ")
-                    .font(PN.Font.body).foregroundStyle(PN.C.text2)
-                    + Text(briefText).font(PN.Font.body).foregroundStyle(hasBrief || preparing ? PN.C.turn : PN.C.pending)
-            }
-        } right: {
-            Button(L("menubar.showTips")) { app.showTips() }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
-            HStack(spacing: 14) {
-                if !preparing {
-                    link(hasBrief ? L("talk.prepareAgain") : L("bb.prepareNow")) {
-                        AnalyticsTracker.shared.action("prepare_again", scr: "home", o: AnalyticsTracker.shared.callOrg)   // 0.19.0 (S4)
-                        if let e = LivePrep.openSheet() { note = e }      // 0.10.1 (A4): the Meeting Sheet in live mode
-                    }
-                }
-                link(L("menubar.endCall")) { AnalyticsTracker.shared.action("end_call", scr: "home", o: AnalyticsTracker.shared.callOrg); app.endCall() }
-            }
-        }
     }
 
     private func platform(_ e: CalendarService.CalEvent?) -> String {
@@ -567,132 +459,522 @@ struct HomeView: View {
         }
     }
 
-    /// One main button and one text link under it (rules of the mockup, 1.2).
-    private func upNextCard(_ r: Ahead, overlaps: [CalendarService.CalEvent]) -> some View {
-        let m = r.model
-        let st = state(of: r)
-        let fresh = m.flatMap { Freshness.check($0) }
-        let tf = DateFormatter(); tf.dateFormat = "HH:mm"
-        let people = Self.peopleLine(r.event?.attendees ?? m?.participants ?? [])
-        let meta1 = [tf.string(from: r.start) + (r.end.map { "-" + tf.string(from: $0) } ?? ""), platform(r.event), m.map { $0.target.isEmpty ? "" : $0.targetName } ?? ""]
-            .filter { !$0.isEmpty }.joined(separator: " · ")
-        let briefText: String = {
-            switch st {
-            case .ready: return fresh?.stale == true ? fresh!.line : L("home.brief.ready")
-            case .preparing: return L("home.check.preparing", ["p": "\(Int(runner.progress * 100))"])
-            case .queued: return L("badge.queued")
-            case .failed: return L("badge.failed")
-            case .noBrief: return L("home.recordsOnly")
-            default: return L("home.brief.notReady")
+    private func tag(_ r: Ahead, _ st: CallState) -> (HomeTag, String) {
+        let s = SheetBadges.state(r.model, st)
+        return (HomeTag.of(s), SheetBadges.text(r.model, st) ?? s.text)
+    }
+
+    private static func hhmm(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: d) }
+
+    /// "Tue 17 Nov, 10:23"
+    private var todayLine: String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US")
+        df.setLocalizedDateFormatFromTemplate("EEEdMMM")
+        return df.string(from: now) + ", " + Self.hhmm(now)
+    }
+
+    // MARK: hero (HM, HS): one state of the day over a heavy line
+
+    @ViewBuilder private var hero: some View {
+        if live { heroGrid { liveHero } aside: { laterAside } }
+        else if firstLaunch { welcome }
+        else if !calendarOn { noCalendar }
+        else if let n = nextCall {
+            if bannersOn || showAllCalls { shortHero(n) } else { heroGrid { callHero(n) } aside: { laterAside } }
+        }
+        else { emptyHero }
+    }
+
+    /// The hero on the left, the rest of the day on the right (430 pt); in a narrow window the day goes under it.
+    private func heroGrid<A: View, B: View>(@ViewBuilder _ left: () -> A, @ViewBuilder aside: () -> B) -> some View {
+        let l = left(), r = aside()
+        return VStack(spacing: 0) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 0) {
+                    l.padding(.horizontal, 32).padding(.top, 28).padding(.bottom, 30)
+                        .frame(minWidth: 500, maxWidth: .infinity, alignment: .topLeading)
+                    r.padding(.leading, 28).padding(.trailing, 32).padding(.top, 28).padding(.bottom, 24)
+                        .frame(width: 430, alignment: .topLeading).frame(maxHeight: .infinity, alignment: .top)
+                        .background(PN.C.surface2)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 0) {
+                    l.padding(.horizontal, 32).padding(.top, 28).padding(.bottom, 30).frame(maxWidth: .infinity, alignment: .leading)
+                    r.padding(.horizontal, 32).padding(.vertical, 22).frame(maxWidth: .infinity, alignment: .leading).background(PN.C.surface2)
+                }
             }
-        }()
-        let briefOK = st == .ready && fresh?.stale != true
-        let withPeople = people.isEmpty ? "" : L("home.card.with", ["people": people]) + " · "
-        return heroCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Text(meta1).font(PN.sys(14, .semibold)).foregroundStyle(PN.C.accent)
-                    StatePill(state: SheetBadges.state(r.model, st), text: SheetBadges.text(r.model, st))
-                }
-                Button { openCall(r) } label: {
-                    Text(r.title).font(PN.sys(30, .bold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
-                }
-                .buttonStyle(.plain).help(L("home.openCall.help"))
-                (Text(withPeople).foregroundStyle(PN.C.text2) + Text(briefText).foregroundStyle(briefOK ? PN.C.turn : PN.C.pending))
-                    .font(PN.Font.body).lineLimit(2)
-                ForEach(overlaps, id: \.id) { e in
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.circle").foregroundStyle(PN.C.pending).accessibilityHidden(true)
-                        Text(L("home.check.overlaps", ["title": e.title])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
-                        link(L("home.overlap.hide")) { hide(e.id) }
-                    }
-                    .padding(.top, 2)
-                }
-            }
-        } right: {
-            mainAction(r, st)
+            heavyRule
         }
     }
 
-    @ViewBuilder private func mainAction(_ r: Ahead, _ st: CallState) -> some View {
+    private var heavyRule: some View { Rectangle().fill(PN.C.ruleStrong).frame(height: t.ruleHeavy) }
+
+    /// "Next call in" + "37 min": in Roadbook one line as large as the number, the number on the yellow plate;
+    /// in Broadsheet and Classic a small line over a large number.
+    private func countdownView(pre: String, num: String, unit: String, fill: Color? = nil, ink: Color? = nil, timer: Date? = nil) -> some View {
+        let c = t.countdown
+        let w = t.heroWeight
+        let numFont = t.homeDisplay(c.num, w), unitFont = t.homeDisplay(c.unit, w)
+        let track = t.numTrack * c.num
+        let plate = HStack(alignment: .firstTextBaseline, spacing: 0) {
+            if let d = timer { Text(d, style: .timer).monospacedDigit().font(numFont).tracking(track) }
+            else { Text(num).font(numFont).tracking(track) }
+            if !unit.isEmpty { Text(" " + t.cased(unit)).font(unitFont) }
+        }
+        .foregroundStyle(ink ?? Color(pnHex: t.hlFg))
+        .padding(.horizontal, (fill ?? t.hlBg.map { Color(pnHex: $0) }) == nil ? 0 : max(t.plateInset, 8))
+        .background(fill ?? t.hlBg.map { Color(pnHex: $0) } ?? .clear)
+        .lineLimit(1).minimumScaleFactor(0.4)
+        let preText = Text(t.cased(pre)).font(t.homeDisplay(c.pre, w)).tracking(t.style == .broadsheet ? -0.02 * c.pre : 0).foregroundStyle(PN.C.text)
+        return Group {
+            if c.preOwnLine {
+                VStack(alignment: .leading, spacing: 4) { preText; plate }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 18) { preText.fixedSize(); plate.fixedSize() }
+                    VStack(alignment: .leading, spacing: 0) { preText.lineLimit(1).minimumScaleFactor(0.5); plate }
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func heroTitle(_ text: String, help: String, run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            Text(text).font(t.homeDisplay(t.titleSize, t.titleWeight)).tracking(t.dTrack * t.titleSize)
+                .foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .buttonStyle(.plain).help(help)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func heroPrimary(_ title: String, glyph: String = "↵", run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            HStack(spacing: 10) { Text(title); Text(glyph).font(t.homeMono(11)).textCase(nil) }
+        }
+        .buttonStyle(PNHeroButtonStyle()).fixedSize()
+    }
+
+    private func countdown(_ r: Ahead) -> (pre: String, num: String, unit: String) {
+        let m = Int((r.start.timeIntervalSince(now) / 60).rounded())
+        let at = Self.hhmm(r.start)
+        if m <= 0 { return (L("home.hero.now"), at, "") }
+        if m <= 5 { return (L("home.hero.startsIn"), "\(m)", L("home.hero.min")) }
+        if m < 90 { return (L("home.hero.nextIn"), "\(m)", L("home.hero.min")) }
+        if Calendar.current.isDateInToday(r.start) { return (L("home.hero.nextAt"), at, "") }
+        if Calendar.current.isDateInTomorrow(r.start) { return (L("home.hero.tomorrowAt"), at, "") }
+        let df = DateFormatter(); df.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); df.setLocalizedDateFormatFromTemplate("EEEdMMM")
+        return (L("home.hero.on", ["d": df.string(from: r.start)]), at, "")
+    }
+
+    /// "Tue 17 Nov, 10:23 · next: 11:00-11:30 · Orbit · Google Meet"
+    private func metaLine(_ r: Ahead) -> String {
+        let times = Self.hhmm(r.start) + (r.end.map { "-" + Self.hhmm($0) } ?? "")
+        let proj = r.model.map { $0.target.isEmpty ? "" : $0.targetName } ?? ""
+        return [todayLine, L("home.meta.next", ["t": times]), proj, platform(r.event)].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    private func briefLine(_ r: Ahead, _ st: CallState) -> String {
+        let fresh = r.model.flatMap { Freshness.check($0) }
         switch st {
-        case .noBrief:
-            Button { start(r) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
-            link(L("home.connectClaude")) { SettingsWindow.show(tab: "ai") }
-        case .ready, .live:
-            Button { start(r) } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
-            if st == .ready { link(L("talk.prepareAgain")) { prepare(r) } }
-            else { link(L("home.getReady")) { prepare(r) } }
-        case .preparing, .queued:
-            Button { start(r) } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
-            link(L("common.cancel")) { if st == .preparing { runner.cancel() } else if let m = r.model { upnext.unqueue(m) } }
-        default:
-            Button(L("home.getReady")) { prepare(r) }.buttonStyle(PNHeroButtonStyle()).keyboardShortcut(.defaultAction)
-            link(L("home.startWithout")) { start(r) }
+        case .ready: return fresh?.stale == true ? fresh!.line : L("home.brief.ready")
+        case .preparing: return L("home.check.preparing", ["p": "\(Int(runner.progress * 100))"])
+        case .queued: return L("badge.queued")
+        case .failed: return L("badge.failed")
+        case .noBrief: return L("home.recordsOnly")
+        case .live: return L("home.hero.inProgress")
+        default: return L("home.hero.takes")
         }
     }
 
-    private func link(_ t: String, run: @escaping () -> Void) -> some View {
-        Button(action: run) { Text(t).font(PN.Font.body).foregroundStyle(PN.C.accent) }.buttonStyle(.plain)
+    private func overlapLines(_ r: Ahead) -> some View {
+        ForEach(overlaps(r, ahead), id: \.id) { e in
+            HStack(spacing: 10) {
+                HomeTagView(kind: .notReady, text: L("home.tag.overlap"))
+                Text(L("home.check.overlaps", ["title": e.title]) + ", " + Self.hhmm(e.start) + "-" + Self.hhmm(e.end))
+                    .font(t.homeText(14)).foregroundStyle(PN.C.text2).lineLimit(1)
+                HomeLink(L("home.overlap.hide")) { hide(e.id) }
+            }
+        }
     }
 
-    /// Pacenote 0.8 (idea 08): "Start tips for Orbit weekly?" when a meeting app is on at a calendar call.
-    private func autoBanner(_ e: CalendarService.CalEvent) -> some View {
-        let m = auto.model(for: e)
-        return HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "waveform").foregroundStyle(PN.C.accent).frame(width: 18).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(L("auto.title", ["title": e.title])).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
-                Text(m.target.isEmpty ? L("auto.chooseProject") : L("auto.body", ["project": m.targetName]))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+    /// The next call (HM; HS row 1): when, how long until it, what it is, who is on it, whether it is ready,
+    /// one big button, one bordered button and one link.
+    private func callHero(_ r: Ahead) -> some View {
+        let st = state(of: r)
+        let (k, txt) = tag(r, st)
+        let c = countdown(r)
+        let people = Self.peopleLine(r.event?.attendees ?? r.model?.participants ?? [])
+        return VStack(alignment: .leading, spacing: 14) {
+            HomeMeta(text: metaLine(r))
+            countdownView(pre: c.pre, num: c.num, unit: c.unit)
+            heroTitle(r.title, help: L("home.openCall.help")) { openCall(r) }
+            if !people.isEmpty { Text(L("home.hero.people", ["people": people])).font(t.homeText(15)).foregroundStyle(PN.C.text2) }
+            HomeTagView(kind: k, text: txt, big: true, sub: "· " + briefLine(r, st))
+            overlapLines(r)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { heroButtons(r, st, link: true) }
+                VStack(alignment: .leading, spacing: 10) { HStack(spacing: 12) { heroButtons(r, st, link: false) }; heroLink(r, st) }
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    /// The buttons of the hero for each state (rules of the mockup 1.2: one main action, the rest quieter).
+    @ViewBuilder private func heroButtons(_ r: Ahead, _ st: CallState, link: Bool) -> some View {
+        switch st {
+        case .ready:
+            heroPrimary(L("home.startCall")) { start(r) }.keyboardShortcut(.defaultAction)
+            Button(L("home.hero.openSheet")) { openCall(r) }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+        case .live:
+            heroPrimary(live ? L("home.switch") : L("home.startCall")) { start(r) }.keyboardShortcut(.defaultAction)
+            Button(L("home.getReady")) { prepare(r) }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+        case .preparing, .queued:
+            heroPrimary(L("home.startCall")) { start(r) }.keyboardShortcut(.defaultAction)
+            Button(L("common.cancel")) { if st == .preparing { runner.cancel() } else if let m = r.model { upnext.unqueue(m) } }
+                .buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+        case .noBrief:
+            heroPrimary(L("home.startCall")) { start(r) }.keyboardShortcut(.defaultAction)
+            Button(L("home.hero.connectAI")) { SettingsWindow.show(tab: "ai") }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+        default:
+            heroPrimary(L("home.getReady")) { prepare(r) }.keyboardShortcut(.defaultAction)
+            Button(L("home.startWithout")) { start(r) }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+        }
+        if link { heroLink(r, st).padding(.leading, 8) }
+    }
+
+    @ViewBuilder private func heroLink(_ r: Ahead, _ st: CallState) -> some View {
+        if st == .ready { HomeLink(L("talk.prepareAgain"), size: 15) { prepare(r) } }
+        else { HomeLink(L("home.hero.openPage"), size: 15) { openCall(r) } }
+    }
+
+    /// The short hero (HB): over banners or with Coming up open, the next call on one line.
+    private func shortHero(_ r: Ahead) -> some View {
+        let st = state(of: r)
+        let (k, txt) = tag(r, st)
+        let c = countdown(r)
+        let w = t.heroWeight
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) { HomeMeta(text: metaLine(r)); HomeTagView(kind: k, text: txt) }
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 14) {
+                        Text(t.cased(c.pre)).font(t.homeDisplay(44, w)).tracking(t.dTrack * 44).fixedSize()
+                        HomePlate(text: t.cased(c.num + (c.unit.isEmpty ? "" : " " + c.unit)), font: t.homeDisplay(56, w), tracking: t.numTrack * 56).fixedSize()
+                        heroTitleLine(r)
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 14) {
+                            Text(t.cased(c.pre)).font(t.homeDisplay(44, w)).fixedSize()
+                            HomePlate(text: t.cased(c.num + (c.unit.isEmpty ? "" : " " + c.unit)), font: t.homeDisplay(56, w), tracking: t.numTrack * 56).fixedSize()
+                        }
+                        heroTitleLine(r)
+                    }
+                }
+                .foregroundStyle(PN.C.text)
+                .accessibilityElement(children: .combine)
+                overlapLines(r)
+                HStack(spacing: 12) {
+                    Button(st == .notReady || st == .failed ? L("home.getReady") : L("home.startCall")) { st == .notReady || st == .failed ? prepare(r) : start(r) }
+                        .buttonStyle(PNSolidButtonStyle(height: 40)).keyboardShortcut(.defaultAction).fixedSize()
+                    Button(L("home.hero.openSheet")) { openCall(r) }.buttonStyle(PNOutlineButtonStyle(height: 40)).fixedSize()
+                }
+                .padding(.top, 4)
+            }
+            .padding(.horizontal, 32).padding(.top, 22).padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            heavyRule
+        }
+    }
+
+    private func heroTitleLine(_ r: Ahead) -> some View {
+        Button { openCall(r) } label: {
+            Text(r.title).font(t.homeText(24, .bold)).foregroundStyle(PN.C.text).lineLimit(1)
+        }
+        .buttonStyle(.plain).help(L("home.openCall.help"))
+    }
+
+    /// The live call (HS row 2): the time on the call on the red plate, Show tips, the Meeting Sheet, End the call.
+    private var liveHero: some View {
+        let ce = CallEngine.shared
+        let req = ce.callRequest
+        let title = ce.renamed ?? (req["title"] as? String) ?? status.project ?? L("app.name")
+        let since = status.startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+        let reg = ProjectRegistry.load(from: AppPaths.projects)
+        let slug = (req["slug"] as? String) ?? status.slug ?? ""
+        let project = reg.projects.first { $0.slug == slug }?.name ?? reg.workspaces.first { $0.name.lowercased() == slug.lowercased() }?.name ?? status.project ?? ""
+        let people = Self.peopleLine(((req["participants"] as? [String]) ?? []).filter { !$0.isEmpty })
+        let stem = (status.file ?? "").hasSuffix(".md") ? String((status.file ?? "").dropLast(3)) : (status.file ?? "")
+        let hasBrief = !stem.isEmpty && FileManager.default.fileExists(atPath: stem + ".brief.md")
+        let preparing = runner.running && runner.joinsCurrentCall
+        let failed = !preparing && !hasBrief && runner.joinsCurrentCall ? runner.failure : nil      // 2026-11-17 (owner)
+        let briefText = preparing ? L("home.live.briefPreparing") : hasBrief ? L("home.brief.ready")
+            : failed.map { L("home.live.prepFailed", ["why": $0]) } ?? L("home.live.noBrief")
+        let waiting = status.state == "standby"
+        let meta = [since.map { L("home.hero.started", ["t": Self.hhmm($0)]) } ?? "", project].filter { !$0.isEmpty }.joined(separator: " · ")
+        let counts = status.lines > 0 ? " · " + L("home.live.counts", ["lines": "\(status.lines)", "tips": "\(status.tips)"]) : ""
+        return VStack(alignment: .leading, spacing: 14) {
+            if !meta.isEmpty { HomeMeta(text: meta) }
+            if let s = since, status.state == "recording" {
+                countdownView(pre: L("home.hero.onCallFor"), num: "", unit: "", fill: PN.C.rec, ink: .white, timer: s)
+            } else {
+                countdownView(pre: L("home.hero.onCall"), num: waiting ? L("menubar.status.waiting") : L("home.live"), unit: "", fill: PN.C.rec, ink: .white)
+            }
+            heroTitle(title, help: L("menubar.showTips")) { app.showTips() }
+            if !people.isEmpty { Text(L("home.hero.people", ["people": people])).font(t.homeText(15)).foregroundStyle(PN.C.text2) }
+            HomeTagView(kind: hasBrief || preparing ? .ready : .notReady, text: waiting ? L("menubar.status.waiting") : L("home.hero.listening"), big: true, sub: "· " + briefText + counts)
+            HStack(spacing: 12) {
+                heroPrimary(L("menubar.showTips")) { app.showTips() }.keyboardShortcut(.defaultAction)
+                if !preparing {
+                    Button(hasBrief ? L("home.hero.openSheet") : L("bb.prepareNow")) {
+                        AnalyticsTracker.shared.action("prepare_again", scr: "home", o: AnalyticsTracker.shared.callOrg)   // 0.19.0 (S4)
+                        if let e = LivePrep.openSheet() { note = e }      // 0.10.1 (A4): the Meeting Sheet in live mode
+                    }
+                    .buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+                }
+                HomeLink(L("home.hero.endCall"), size: 15, color: PN.C.recText) {
+                    AnalyticsTracker.shared.action("end_call", scr: "home", o: AnalyticsTracker.shared.callOrg); app.endCall()
+                }
+                .padding(.leading, 8)
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    /// The rest of today and tomorrow, next to the hero (HM aside): time, title, state; See the whole week opens Coming up.
+    private var laterAside: some View {
+        let first = nextCall?.id
+        let rest = ahead.filter { $0.id != first }
+        let today = rest.filter { Calendar.current.isDateInToday($0.start) }
+        let tomorrow = rest.filter { Calendar.current.isDateInTomorrow($0.start) }
+        return VStack(alignment: .leading, spacing: 0) {
+            if today.isEmpty && tomorrow.isEmpty {
+                asideHead(L("home.laterToday"), notReady: 0, top: 0)
+                Text(L("home.later.empty")).font(t.homeText(14)).foregroundStyle(PN.C.text3).padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+            }
+            if !today.isEmpty {
+                asideHead(L("home.laterToday"), notReady: today.filter { [.notReady, .failed, .noBrief].contains(state(of: $0)) }.count, top: 0)
+                ForEach(today.prefix(4)) { r in asideRow(r) }
+            }
+            if !tomorrow.isEmpty {
+                asideHead(L("home.tomorrowHead"), notReady: 0, top: today.isEmpty ? 0 : 22)
+                ForEach(tomorrow.prefix(3)) { r in asideRow(r) }
+            }
+            if !rest.isEmpty {
+                HomeLink(L("home.seeWeek")) { showAllCalls = true }.padding(.top, 14)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L("home.laterToday"))
+    }
+
+    private func asideHead(_ title: String, notReady: Int, top: CGFloat) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title).pnSection().foregroundStyle(PN.C.text).accessibilityAddTraits(.isHeader)
+            if notReady > 0 {
+                Text(L("home.nNotReady", ["n": "\(notReady)"])).font(t.homeMono(11, .semibold)).foregroundStyle(PN.C.notreadyText)
+                    .padding(.horizontal, t.nrBg == nil ? 0 : 5).background(PN.C.notreadyPlate)
+            }
+        }
+        .padding(.top, top).padding(.bottom, 8)
+    }
+
+    private func asideRow(_ r: Ahead) -> some View {
+        let st = state(of: r)
+        let (k, txt) = tag(r, st)
+        return Button { openCall(r) } label: {
+            HStack(spacing: 10) {
+                Text(Self.hhmm(r.start)).font(t.homeMono(13, .semibold)).foregroundStyle(PN.C.text).frame(width: 50, alignment: .leading)
+                Text(r.title).font(t.homeText(15, .semibold)).foregroundStyle(PN.C.text).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                HomeTagView(kind: k, text: txt)
+            }
+            .padding(.vertical, 10)
+            .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).help(L("home.openCall.help"))
+        .contextMenu { callMenuItems(r, st) }
+    }
+
+    /// Nothing else today (HS row 3): a call can start without a calendar event.
+    private var emptyHero: some View {
+        let sync = cal.lastSync.map { L("home.empty.synced", ["t": Self.hhmm($0)]) } ?? ""
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
+                HomeMeta(text: [todayLine, sync].filter { !$0.isEmpty }.joined(separator: " · "))
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    HomePlate(text: t.cased(L("home.empty.clear")), font: t.homeDisplay(t.bigNum, t.heroWeight), tracking: t.numTrack * t.bigNum)
+                    Text(" " + t.cased(L("home.empty.until"))).font(t.homeDisplay(t.bigNum, t.heroWeight)).tracking(t.numTrack * t.bigNum)
+                }
+                .foregroundStyle(PN.C.text).lineLimit(1).minimumScaleFactor(0.4)
+                Text(L("home.empty.body")).font(t.homeText(17)).foregroundStyle(PN.C.text2).frame(maxWidth: 720, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 12) {
+                    heroPrimary(L("home.startCallNow"), glyph: "⌘N") { StartCallWindow.startNow(delegate: app) }
+                    Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+                    HomeLink(L("home.empty.transcribe"), size: 15) { TranscribeWindow.show() }.padding(.leading, 8)
+                }
+                .padding(.top, 4)
+            }
+            .padding(.horizontal, 32).padding(.top, 32).padding(.bottom, 34)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            heavyRule
+        }
+    }
+
+    /// No calendar (HS row 4): see your day here, connect a calendar or plan by hand; calls planned by hand on the right.
+    private var noCalendar: some View {
+        let planned = upnext.visible.sorted { $0.callDate < $1.callDate }
+        let left = VStack(alignment: .leading, spacing: 14) {
+            HomeMeta(text: todayLine + " · " + L("home.nocal.meta"))
+            Text(t.cased(L("home.seeDay.title"))).font(t.homeDisplay(t.bigNum, t.heroWeight)).tracking(t.numTrack * t.bigNum)
+                .foregroundStyle(PN.C.text).lineLimit(2).minimumScaleFactor(0.5)
+            Text(L("home.seeDay.body")).font(t.homeText(17)).foregroundStyle(PN.C.text2).frame(maxWidth: 640, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                heroPrimary(L("home.connectCalendar"), glyph: "") { cal.connect() }
+                Button(L("home.planByHand")) { StartCallWindow.show(delegate: app, planOnly: true) }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+            }
+            .padding(.top, 4)
+        }
+        let right = VStack(alignment: .leading, spacing: 0) {
+            Text(L("home.planned")).pnSection().foregroundStyle(PN.C.text).padding(.bottom, 8).accessibilityAddTraits(.isHeader)
+            ForEach(planned, id: \.id) { m in
+                let r = Ahead(id: m.id.uuidString, event: nil, model: m, start: m.callDate)
+                plannedRow(r)
+            }
+            Text(L("home.planned.note")).font(t.homeText(13)).foregroundStyle(PN.C.text3).padding(.top, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+        }
+        return VStack(spacing: 0) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 40) { left.frame(minWidth: 420, maxWidth: .infinity, alignment: .leading); right.frame(width: 430) }
+                VStack(alignment: .leading, spacing: 28) { left; right }
+            }
+            .padding(.horizontal, 32).padding(.top, 32).padding(.bottom, 34)
+            heavyRule
+        }
+    }
+
+    private func plannedRow(_ r: Ahead) -> some View {
+        let st = state(of: r)
+        let (k, txt) = tag(r, st)
+        let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.dateFormat = Calendar.current.isDateInToday(r.start) ? "HH:mm" : "EEE HH:mm"
+        return Button { openCall(r) } label: {
+            HStack(spacing: 10) {
+                Text(f.string(from: r.start)).font(t.homeMono(13, .semibold)).foregroundStyle(PN.C.text).frame(width: 86, alignment: .leading)
+                Text(r.title).font(t.homeText(15, .semibold)).foregroundStyle(PN.C.text).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                HomeTagView(kind: k, text: txt)
+            }
+            .padding(.vertical, 10)
+            .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).contextMenu { callMenuItems(r, st) }
+    }
+
+    /// First launch (HS row 5): welcome, what Pacenote does, three steps; Recent calls and This week stay hidden.
+    private var welcome: some View {
+        let notion = SettingsWindow.model.isSet(.notionToken)
+        let done = [aiReady, calendarOn, notion]
+        let firstOpen = done.firstIndex(of: false)
+        let left = VStack(alignment: .leading, spacing: 14) {
+            HomeMeta(text: L("home.first.meta"))
+            // two lines, as on the board: the words, then the name on the plate
+            VStack(alignment: .leading, spacing: 4) {
+                Text(t.cased(L("home.welcome.pre"))).font(t.homeDisplay(t.bigNum, t.heroWeight)).tracking(t.numTrack * t.bigNum)
+                HomePlate(text: t.cased(L("app.name")), font: t.homeDisplay(t.bigNum, t.heroWeight), tracking: t.numTrack * t.bigNum)
+            }
+            .foregroundStyle(PN.C.text).lineLimit(1).minimumScaleFactor(0.4)
+            Text(L("home.welcome.body")).font(t.homeText(17)).foregroundStyle(PN.C.text2).frame(maxWidth: 560, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 4) {
+                Text(L("home.welcome.anyway")).font(t.homeText(15)).foregroundStyle(PN.C.text2)
+                HomeLink(L("home.welcome.anywayLink")) { StartCallWindow.startNow(delegate: app) }
+            }
+            .padding(.top, 6)
+        }
+        let right = VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(L("home.steps.title")).pnSection().foregroundStyle(PN.C.text).accessibilityAddTraits(.isHeader)
+                Spacer()
+                Text(L("home.steps.nOf", ["n": "\(done.filter { $0 }.count)"])).font(t.homeMono(11)).foregroundStyle(PN.C.text3)
+            }
+            .padding(.top, 10).padding(.bottom, 8)
+            .overlay(alignment: .top) { Rectangle().fill(PN.C.ruleStrong).frame(height: t.ruleHeavy) }
+            step(1, L("home.steps.claude"), L("home.steps.claude.sub"), done: done[0], main: firstOpen == 0) { SettingsWindow.show(tab: "ai") }
+            step(2, L("home.steps.calendar"), L("home.steps.calendar.sub"), done: done[1], main: firstOpen == 1) { cal.connect() }
+            step(3, L("home.steps.notion"), L("home.steps.notion.sub"), done: done[2], main: firstOpen == 2) { SettingsWindow.show(tab: "notion") }
+        }
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 48) { left.frame(minWidth: 380, maxWidth: .infinity, alignment: .leading); right.frame(width: 560) }
+            VStack(alignment: .leading, spacing: 28) { left; right }
+        }
+        .padding(.horizontal, 32).padding(.top, 32).padding(.bottom, 34)
+    }
+
+    private func step(_ n: Int, _ title: String, _ sub: String, done: Bool, main: Bool, run: @escaping () -> Void) -> some View {
+        HStack(spacing: 14) {
+            Text(done ? "✓" : "\(n)").font(t.homeDisplay(17, .heavy))
+                .foregroundStyle(done ? Color(pnHex: t.dark ? t.bg : t.ink) : (main ? PN.C.text : PN.C.text2))
+                .frame(width: 32, height: 32)
+                .background(done ? PN.C.ready : Color.clear, in: RoundedRectangle(cornerRadius: t.statusSquare ? 0 : 16))
+                .overlay(RoundedRectangle(cornerRadius: t.statusSquare ? 0 : 16).strokeBorder(done ? PN.C.ready : (main ? PN.C.ruleStrong : PN.C.field), lineWidth: 1.5))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(t.homeText(17, .semibold)).foregroundStyle(PN.C.text)
+                Text(sub).font(t.homeText(14)).foregroundStyle(PN.C.text3)
             }
             Spacer(minLength: 8)
-            Button(L("auto.notNow")) { auto.dismiss() }.buttonStyle(.pnTertiary)
-            Button(L("home.startTips")) { auto.accept() }.buttonStyle(.pnPrimary)
+            if done { Text(t.caps ? L("home.steps.done").uppercased() : L("home.steps.done")).font(t.homeMono(12, .semibold)).foregroundStyle(PN.C.readyText) }
+            else if main { Button(L("home.finish.connect"), action: run).buttonStyle(.pnPrimary).fixedSize() }
+            else { Button(L("home.finish.connect"), action: run).buttonStyle(PNOutlineButtonStyle()).fixedSize() }
         }
-        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+        .padding(.vertical, 14)
+        .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+        .accessibilityElement(children: .combine)
     }
 
-    // MARK: Coming up: the rest of today and tomorrow on one line
+    // MARK: Coming up (HB row 3): every call of today and tomorrow on a line, then the full list
 
     private var comingUp: some View {
         let first = nextCall?.id
         let rest = ahead.filter { $0.id != first }
         let near = rest.filter { Calendar.current.isDateInToday($0.start) || Calendar.current.isDateInTomorrow($0.start) || $0.start < now }
-        return card { VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 10) {
-                Text(L("home.comingUp")).font(PN.sys(15, .semibold)).foregroundStyle(PN.C.text)
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Text(L("home.comingUp")).pnSection().foregroundStyle(PN.C.text).accessibilityAddTraits(.isHeader)
                 if !hiddenNow.isEmpty {
-                    Text(L("home.hiddenUndo", ["n": "\(hiddenNow.count)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    Button(L("ntask.undo")) { undoHide() }.buttonStyle(.pnTertiary)
+                    Text(L("home.hiddenUndo", ["n": "\(hiddenNow.count)"])).font(t.homeText(13)).foregroundStyle(PN.C.text3)
+                    HomeLink(L("ntask.undo"), size: 13) { undoHide() }
                 }
                 Spacer()
-                CalendarRefreshButton(place: "home", shortcut: true)
                 if cal.access == .granted {
-                    Button(L("home.calendars")) { pickCalendars = true }.buttonStyle(.pnTertiary)
+                    HomeLink(L("home.calendars")) { pickCalendars = true }
                         .popover(isPresented: $pickCalendars, arrowEdge: .bottom) { CalendarPicker() }
                 }
-                if !rest.isEmpty {
-                    Button(showAllCalls ? L("ntask.showLess") : L("home.allCalls", ["n": "\(ahead.count)"])) { showAllCalls.toggle() }.buttonStyle(.pnTertiary)
-                }
+                Button(L("ntask.showLess")) { showAllCalls = false }.buttonStyle(PNOutlineButtonStyle(height: 28)).fixedSize()
             }
-            if near.isEmpty && !showAllCalls {
-                Text(L("home.later.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
-            } else if !near.isEmpty {
+            if near.isEmpty {
+                Text(L("home.later.empty")).font(t.homeText(14)).foregroundStyle(PN.C.text3)
+            } else {
                 timeline(near)
             }
-            if showAllCalls && !rest.isEmpty {
+            if !rest.isEmpty {
                 VStack(spacing: 0) {
-                    ForEach(Array(rest.enumerated()), id: \.element.id) { i, r in
-                        if i > 0 { Divider() }
-                        listRow(r)
-                    }
+                    ForEach(Array(rest.enumerated()), id: \.element.id) { i, r in listRow(r, first: i == 0) }
                 }
-                .padding(.horizontal, 6)
-                .background(PN.C.bg, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+                .padding(.horizontal, 16).padding(.vertical, 4)
+                .background(PN.C.surface2)
             }
-        } }
+        }
+        .padding(.horizontal, 32).padding(.top, 18).padding(.bottom, 28)
+        .overlay(alignment: .bottom) { Rectangle().fill(PN.C.rule).frame(height: 1) }
     }
 
     private func timeline(_ rows: [Ahead]) -> some View {
@@ -701,52 +983,49 @@ struct HomeView: View {
             HStack(alignment: .top, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { i, r in
                     if i == firstTomorrow {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
                             ZStack(alignment: .leading) {
-                                Rectangle().fill(PN.C.accent.opacity(0.25)).frame(height: 2)
+                                Rectangle().fill(PN.C.rule).frame(height: 2)
                                 Rectangle().fill(PN.C.accent).frame(width: 2, height: 14)
                             }
                             .frame(height: 14)
-                            Text(L("home.tomorrowCaps")).pnLabel().foregroundStyle(PN.C.accent)
+                            Text(L("home.tomorrowCaps")).font(t.homeMono(11, .semibold)).foregroundStyle(PN.C.accent)
                         }
-                        .frame(width: 92, alignment: .leading)
+                        .frame(width: 110, alignment: .leading)
                     }
                     node(r)
                 }
             }
             .padding(.bottom, 4)
         }
+        .accessibilityLabel(L("home.comingUp"))
     }
 
     private func node(_ r: Ahead) -> some View {
         let st = state(of: r)
-        let tf = DateFormatter(); tf.dateFormat = "HH:mm"
+        let (k, _) = tag(r, st)
         let proj = r.model.map { $0.target.isEmpty ? "" : $0.targetName } ?? ""
         return VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .leading) {
-                Rectangle().fill(PN.C.accent.opacity(0.25)).frame(height: 2)
-                Circle().fill(st.dot).frame(width: 12, height: 12)
-                    .overlay(Circle().stroke(PN.C.bg, lineWidth: 2))
+                Rectangle().fill(PN.C.rule).frame(height: 2)
+                HomeDot(color: k.dot(t), size: 12)
             }
             .frame(height: 14)
-            Text([tf.string(from: r.start), proj].filter { !$0.isEmpty }.joined(separator: " · "))
-                .font(PN.Font.caption.weight(.semibold)).foregroundStyle(st.color).lineLimit(1)
+            Text([Self.hhmm(r.start), proj].filter { !$0.isEmpty }.joined(separator: " · "))
+                .font(t.homeMono(11, .semibold)).foregroundStyle(k.text(t))
+                .padding(.horizontal, k.plate(t) == nil ? 0 : 5).background(k.plate(t) ?? .clear).lineLimit(1)
             Button { openCall(r) } label: {
-                Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
+                Text(r.title).font(t.homeText(15, .semibold)).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
             }
             .buttonStyle(.plain).help(L("home.openCall.help"))
-            HStack(spacing: 6) {
-                StatePill(state: SheetBadges.state(r.model, st), text: SheetBadges.text(r.model, st))
-                callMenu(r, st)
-            }
         }
-        .frame(width: 200, alignment: .leading)
-        .padding(.trailing, 12)
+        .frame(width: 210, alignment: .leading)
+        .padding(.trailing, 16)
         .contextMenu { callMenuItems(r, st) }
     }
 
     private func callMenu(_ r: Ahead, _ st: CallState) -> some View {
-        Menu { callMenuItems(r, st) } label: { Image(systemName: "ellipsis") }
+        Menu { callMenuItems(r, st) } label: { Image(systemName: "ellipsis").foregroundStyle(PN.C.text2) }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             .accessibilityLabel(L("home.more"))
     }
@@ -762,26 +1041,29 @@ struct HomeView: View {
         else { Button(L("home.removeUpNext")) { if let m = r.model { upnext.remove(m) } } }
     }
 
-    /// The full list behind "All N calls": the same row as the timeline node, in a list.
-    private func listRow(_ r: Ahead) -> some View {
+    /// The full list of Coming up: when, the title with its project and people, the state, the "…" menu.
+    private func listRow(_ r: Ahead, first: Bool) -> some View {
         let st = state(of: r)
-        let f = DateFormatter(); f.dateFormat = Calendar.current.isDateInToday(r.start) ? "HH:mm" : "EEE d MMM HH:mm"
-        f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US")
+        let (k, txt) = tag(r, st)
+        let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US")
+        f.dateFormat = "EEE HH:mm"
+        let when = Calendar.current.isDateInToday(r.start) ? L("home.today") + " " + Self.hhmm(r.start) : f.string(from: r.start)
         let m = r.model
         let people = (r.event?.attendees ?? m?.participants ?? []).prefix(3).joined(separator: ", ")
-        let sub = [m.map { $0.target.isEmpty ? "" : $0.targetName } ?? "", people].filter { !$0.isEmpty }.joined(separator: " · ")
+        let over = overlaps(r, ahead).first.map { L("home.check.overlaps", ["title": $0.title]) } ?? ""
+        let sub = [m.map { $0.target.isEmpty ? "" : $0.targetName } ?? "", people, over].filter { !$0.isEmpty }.joined(separator: " · ")
         return HStack(alignment: .center, spacing: 12) {
-            Circle().fill(st.dot).frame(width: 8, height: 8).accessibilityHidden(true)
-            Text(f.string(from: r.start)).font(PN.Font.body.monospacedDigit()).foregroundStyle(PN.C.text3).frame(width: 120, alignment: .leading)
-            VStack(alignment: .leading, spacing: 2) {
-                Button { openCall(r) } label: { Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1) }.buttonStyle(.plain)
-                if !sub.isEmpty { Text(sub).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1) }
+            Text(when).font(t.homeMono(12, .semibold)).foregroundStyle(PN.C.text3).frame(width: 130, alignment: .leading)
+            VStack(alignment: .leading, spacing: 1) {
+                Button { openCall(r) } label: { Text(r.title).font(t.homeText(15, .semibold)).foregroundStyle(PN.C.text).lineLimit(1) }.buttonStyle(.plain)
+                if !sub.isEmpty { Text(sub).font(t.homeText(12)).foregroundStyle(PN.C.text3).lineLimit(1) }
             }
-            Spacer(minLength: 8)
-            StatePill(state: SheetBadges.state(r.model, st), text: SheetBadges.text(r.model, st))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            HomeTagView(kind: k, text: txt)
             callMenu(r, st)
         }
-        .padding(.horizontal, 8).padding(.vertical, 8)
+        .padding(.vertical, 9)
+        .overlay(alignment: .top) { Rectangle().fill(first ? Color.clear : PN.C.rule).frame(height: 1) }
         .contentShape(Rectangle())
         .contextMenu { callMenuItems(r, st) }
     }
@@ -796,23 +1078,96 @@ struct HomeView: View {
         _ = cal.hidden.remove(id)
     }
 
-    // MARK: Recent calls: three cards
+    // MARK: Recent calls and This week (HM): two columns, one under the other in a narrow window
+
+    private var lower: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 40) {
+                recentCalls.frame(minWidth: 360, maxWidth: .infinity, alignment: .topLeading)
+                thisWeek.frame(minWidth: 360, maxWidth: .infinity, alignment: .topLeading)
+            }
+            VStack(alignment: .leading, spacing: 30) { recentCalls; thisWeek }
+        }
+        .padding(.horizontal, 32).padding(.top, 26).padding(.bottom, 34)
+    }
 
     private var recentCalls: some View {
-        let rs = Array(CallFilter.apply(history.visible, org: filterOrg, project: filterProject).prefix(3))
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(L("home.recentCalls")).font(PN.sys(15, .semibold)).foregroundStyle(PN.C.text)
-                CallFilters(org: $filterOrg, project: $filterProject, records: history.visible)
-                Spacer()
-                if !history.visible.isEmpty { Button(L("home.allPast")) { nav.open(.pastCalls) }.buttonStyle(.pnTertiary) }
+        let projects = CallFilter.projects(in: history.visible)
+        // A remembered project that is not among these calls (archived, another Mac) shows as All projects, so it
+        // must not filter either: the list would be empty under "All projects".
+        let project = projects.contains { $0.root == filterProject } ? filterProject : ""
+        let org = acct.me?.org(filterOrg) != nil ? filterOrg : ""
+        let rs = Array(CallFilter.apply(history.visible, org: org, project: project).prefix(5))
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 14) {
+                Text(L("home.recentCalls")).pnSection().foregroundStyle(PN.C.text).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                if projects.count > 1 {
+                    Menu {
+                        Button(L("proj.filter.all")) { filterProject = "" }
+                        Divider()
+                        ForEach(projects, id: \.root) { p in Button(CallFilter.label(p)) { filterProject = p.root } }
+                    } label: {
+                        HomeField(text: filterProject.isEmpty ? L("proj.filter.all") : (projects.first { $0.root == filterProject }.map(CallFilter.label) ?? L("proj.filter.all")), height: 28)
+                    }
+                    .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize().help(L("proj.filter.help"))
+                }
+                if !history.visible.isEmpty { HomeLink(L("home.allPast")) { nav.open(.pastCalls) } }
             }
+            .padding(.bottom, 8)
             if rs.isEmpty {
-                Text(L("home.recent.empty")).font(PN.Font.body).foregroundStyle(PN.C.text3)
-            } else {
-                // 2026-11-05 (owner): three cards at most, so three equal columns across the full width of the blocks above
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3), alignment: .leading, spacing: 14) {
-                    ForEach(rs) { r in RecentCard(r: r, aiReady: aiReady) { history.hide(r) } }
+                Text(L("home.recent.empty")).font(t.homeText(14)).foregroundStyle(PN.C.text3).padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+            }
+            ForEach(rs) { r in HomeRecentRow(r: r) { history.hide(r) } }
+        }
+    }
+
+    /// This week (HM): calls, hours on calls and prepared calls as three numbers, then AI spend this month,
+    /// the account limits and the calls not transcribed yet.
+    private var thisWeek: some View {
+        let recs = CallStats.calls(from: CallStats.weekStart(now), to: now.addingTimeInterval(1))
+        let tot = CallStats.totals(recs)
+        let mins = Int(tot.minutes.rounded())
+        let cfg = AppConfig.load(from: AppPaths.config)
+        let spent = SpendLedger.monthSpent()
+        let limits = AIStatusModel.shared.rows.filter { $0.usage.contains("%") && $0.usage.count <= 24 }.map { $0.name + " " + $0.usage }.joined(separator: " · ")
+        let notTr = history.visible.filter { ($0.lines ?? 1) == 0 }
+        let stats: [(String, String)] = [("\(tot.calls)", L("home.week.calls")), (String(format: "%d:%02d", mins / 60, mins % 60), L("home.week.hoursOnCalls")),
+                                         ("\(tot.prepared)/\(tot.calls)", L("home.week.prepared"))]
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 14) {
+                Text(L("home.week")).pnSection().foregroundStyle(PN.C.text).accessibilityAddTraits(.isHeader)
+                Spacer()
+                HomeLink(L("home.week.detailsTitle")) { nav.open(.stats) }
+            }
+            .padding(.bottom, 8)
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(stats, id: \.1) { s in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(s.0).font(t.homeDisplay(t.style == .classic ? 44 : 60, t.heroWeight)).tracking(t.numTrack * 60)
+                            .foregroundStyle(PN.C.text).lineLimit(1).minimumScaleFactor(0.5)
+                        Text(t.caps ? s.1.uppercased() : s.1).font(t.homeMono(12, t.labelWeight)).foregroundStyle(PN.C.text3)
+                    }
+                    .padding(.vertical, 14).padding(.trailing, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+            HomeFactRow(key: L("home.week.spend")) {
+                Text(L("home.week.preparedOf", ["x": String(format: "$%.2f", spent), "y": String(format: "$%.0f", cfg.budget.monthlyHardUSD)]))
+                    .font(t.homeMono(13, .semibold)).foregroundStyle(PN.C.text)
+            }
+            if !limits.isEmpty {
+                HomeFactRow(key: L("home.week.limits")) { Text(limits).font(t.homeMono(13, .semibold)).foregroundStyle(PN.C.text).lineLimit(1) }
+            }
+            if let first = notTr.first {
+                HomeFactRow(key: L("home.week.notTranscribed")) {
+                    HomeLink(L(notTr.count == 1 ? "home.week.notTranscribed.one" : "home.week.notTranscribed.many", ["n": "\(notTr.count)"])) {
+                        CallPageWindow.show(file: first.file)
+                    }
                 }
             }
         }

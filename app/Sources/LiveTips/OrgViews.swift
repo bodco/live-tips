@@ -14,22 +14,13 @@ struct InvitesHomeLine: View {
 
     var body: some View {
         if acct.signedIn, let i = acct.invites.first {
-            HStack(spacing: 10) {
-                Circle().fill(PN.C.brand).frame(width: 8, height: 8).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(InviteText.line(i)).font(PN.Font.body).foregroundStyle(PN.C.text)
-                    if acct.invites.count > 1 {
-                        Text(L("org.invite.more", ["n": "\(acct.invites.count - 1)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    }
-                    if let p = acct.inviteProblem { Text(p).font(PN.Font.caption).foregroundStyle(PN.C.pending) }
-                }
-                Spacer(minLength: 8)
-                Button(L("org.invite.decline")) { Task { await acct.decline(i) } }.buttonStyle(.pnTertiary).disabled(acct.busy)
-                Button(L("org.invite.join")) { joining = i }.buttonStyle(.pnPrimary).disabled(acct.busy)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
-            .sheet(item: $joining) { inv in InviteJoinSheet(invite: inv) { joining = nil } }
+            // 0.24 (R1, board HB): one of the Home banners
+            HomeBanner(icon: "+", title: InviteText.line(i),
+                       sub: acct.invites.count > 1 ? L("org.invite.more", ["n": "\(acct.invites.count - 1)"]) : "",
+                       edge: PN.C.answer, iconFill: PN.C.answer, iconInk: PN.C.bg, problem: acct.inviteProblem,
+                       later: (L("org.invite.decline"), { Task { await acct.decline(i) } }),
+                       go: L("org.invite.join"), goDisabled: acct.busy) { joining = i }
+                .sheet(item: $joining) { inv in InviteJoinSheet(invite: inv) { joining = nil } }
         }
     }
 }

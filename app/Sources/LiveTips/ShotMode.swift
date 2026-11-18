@@ -135,6 +135,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "callpage" { callPageShots(theme); continue }   // 2026-11-05: the call page redesign, every tab
             if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }
             if env["LT_SHOTS_ONLY"] == "site023" { siteShots(theme); continue }   // 0.23.0: the site pictures in Roadbook
+            if env["LT_SHOTS_ONLY"] == "home024" { if lang == "en" { home024(theme) }; continue }   // 0.24 (R1): Home by the boards HM, HS, HB
             if env["LT_SHOTS_ONLY"] == "redesign" { if lang == "en" || theme == "light" { redesignShots(theme, uk: lang == "uk") }; continue }   // redesign 0.23.0: every style   // 0.10.0: co-driver cards for the site
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
@@ -305,6 +306,54 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if let w = SettingsWindow.window { capture(w, "settings-\(tab)-\(theme)") }
             if tab == "projects" { SettingsWindow.window?.close() }
             next()
+        }
+    }
+
+    /// 0.24 (R1): Home in the states of the boards HM, HS and HB, once per style and mode (English only).
+    /// Files: home024-<state>-<style>-<mode>.png; the main state also narrow (home024-narrow-...).
+    func home024(_ theme: String) {
+        _ = PNFonts.once
+        for st in PNStyle.allCases {
+            let t = st.rawValue + "-" + theme
+            steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
+            for s in ["", "empty", "nocal", "first", "banners", "pill", "coming"] {
+                steps.append { [unowned self] in HomeView.shotState = s; self.homeR1(t, state: s.isEmpty ? "main" : s, narrow: s.isEmpty) }
+            }
+        }
+        steps.append { [unowned self] in HomeView.shotState = ""; PNThemeModel.shared.style = PNStyle.buildDefault; self.next() }
+    }
+
+    /// One picture of Home on the demo day of home(): 1280 pt wide like the boards, and 820 pt for the narrow layout.
+    func homeR1(_ theme: String, state: String, narrow: Bool) {
+        let now = Date()
+        let hour = StartCallModel.nextFullHour()
+        func ev(_ id: String, _ t: String, _ s: Date, _ mins: Double, _ acc: String, _ cal: String, _ c: NSColor, _ rec: Bool, _ who: [String]) -> CalendarService.CalEvent {
+            .init(id: id, seriesKey: rec ? "cal:" + id : "title:" + StartCallModel.slugify(t), title: t, start: s, end: s.addingTimeInterval(mins * 60),
+                  calendar: cal, account: acc, color: c, attendees: who, link: nil, recurring: rec)
+        }
+        let evs = [ev("e1", "Northwind all-hands", now.addingTimeInterval(-10 * 60), 40, "mike@northwind.example", "Northwind", .systemPurple, true, []),
+                   ev("e2", "Orbit weekly with the client", now.addingTimeInterval(5 * 60), 30, "mike.johnson@gmail.example", "Work", .systemBlue, true, ["Emily Clark", "David Kim"]),
+                   ev("e3", "Team retro", hour, 45, "mike@northwind.example", "Northwind", .systemPurple, false, ["Sarah Lee"]),
+                   ev("e4", "Orbit pilot review", Calendar.current.date(byAdding: .day, value: 1, to: hour) ?? hour, 30, "mike.johnson@gmail.example", "Work", .systemBlue, true, ["Emily Clark"])]
+        CalendarService.shared.useDemo(evs)
+        planned.calEventID = "e3"
+        UpNext.shared.save(planned)
+        CallHistory.shared.scan()
+        HomeNav.shared.path = []
+        HomeWindow.window?.close(); HomeWindow.window = nil
+        HomeWindow.show(delegate: AppDelegate())
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
+            guard let w = HomeWindow.window else { next(); return }
+            w.setContentSize(NSSize(width: 1280, height: 900))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [self] in
+                capture(w, "home024-\(state)-\(theme)")
+                if narrow { w.setContentSize(NSSize(width: 820, height: 1240)) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + (narrow ? 0.9 : 0.1)) { [self] in
+                    if narrow { capture(w, "home024-narrow-\(theme)") }
+                    w.close(); HomeWindow.window = nil
+                    next()
+                }
+            }
         }
     }
 

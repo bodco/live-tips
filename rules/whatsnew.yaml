@@ -165,3 +165,15 @@ items:
     title_uk: "Нова версія повідомляє про себе"
     body_en: "When a new Pacenote is out, a window with what is new opens at launch, and a banner at the top of Home offers Install. Never during a call."
     body_uk: "Коли виходить новий Pacenote, під час запуску відкривається вікно з тим, що нового, а плашка вгорі Home пропонує Встановити. Ніколи під час дзвінка."
+  - id: home_layout
+    version: 0.24.0
+    title_en: "A new Home"
+    title_uk: "Новий Home"
+    body_en: "Home has the new layout in every style: your next call large on top with Get ready or Start call, the rest of today and tomorrow next to it, then Recent calls and This week. Banners and things to set up sit in one place."
+    body_uk: "Home має нову розкладку в кожному стилі: наступний дзвінок великим блоком угорі з Get ready або Start call, поруч решта сьогодні і завтра, нижче Recent calls і This week. Банери і те, що треба налаштувати, в одному місці."
+  - id: update_one_click
+    version: 0.24.0
+    title_en: "Updates in one click"
+    title_uk: "Оновлення одним кліком"
+    body_en: "A new version opens its window within the hour, also while Pacenote is running. Install and restart now works with one click: a spinner while it downloads and installs, then Pacenote opens again."
+    body_uk: "Нова версія відкриває своє вікно протягом години, навіть коли Pacenote вже працює. Install and restart тепер працює одним кліком: спінер, поки оновлення завантажується і ставиться, потім Pacenote відкривається знову."

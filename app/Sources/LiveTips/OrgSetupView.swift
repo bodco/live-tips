@@ -25,20 +25,13 @@ struct OrgSetupHomeLine: View {
 
     var body: some View {
         if acct.signedIn, let o = acct.me?.orgs.first(where: { OrgSetup.offered($0, done: done) }) {
-            HStack(spacing: 10) {
-                Image(systemName: "building.2").foregroundStyle(PN.C.brand).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("orgsetup.home", ["org": o.name])).font(PN.Font.body).foregroundStyle(PN.C.text)
-                    Text(L("orgsetup.homeSub")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                }
-                Spacer(minLength: 8)
-                Button(L("orgsetup.notNow")) { OrgSetupMemory.mark(o.id) }.buttonStyle(.pnTertiary).help(L("orgsetup.notNow.help"))
-                Button(L("orgsetup.start")) { running = o }.buttonStyle(.pnPrimary)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
-            .sheet(item: $running) { org in OrgSetupView(org: org) { running = nil } }
-            .onReceive(NotificationCenter.default.publisher(for: OrgSetupMemory.changed)) { _ in done = OrgSetupMemory.done }
+            // 0.24 (R1, board HB): one of the Home banners
+            HomeBanner(icon: "◆", title: L("orgsetup.home", ["org": o.name]), sub: L("orgsetup.homeSub"),
+                       edge: PN.C.text3, iconFill: PN.C.text, iconInk: PN.C.bg,
+                       later: (L("orgsetup.notNow"), { OrgSetupMemory.mark(o.id) }), go: L("orgsetup.start")) { running = o }
+                .help(L("orgsetup.notNow.help"))
+                .sheet(item: $running) { org in OrgSetupView(org: org) { running = nil } }
+                .onReceive(NotificationCenter.default.publisher(for: OrgSetupMemory.changed)) { _ in done = OrgSetupMemory.done }
         }
     }
 }

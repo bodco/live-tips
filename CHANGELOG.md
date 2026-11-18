@@ -3,6 +3,25 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.24.0 (2026-11-18)
+
+- **Updates: a window while Pacenote runs, one click to install (2026-11-18):** Pacenote now looks for a new version
+  every hour while it runs (not only at launch and every 12 hours), so a new release opens the update window within
+  the hour. Install and restart works with one click: a spinner shows Downloading… and then Installing…, and Pacenote
+  restarts into the new version by itself; before, the first click only started a download you could not see and a
+  second click was needed. Updates always download in the background, so that switch is gone from About.
+
+- **Home laid out like the boards (2026-11-18, layouts R1):** Home now follows the Home boards in every look, Classic
+  included. The header has the tabs with a line under the open one, the organization filter, "AI ok" (a click shows
+  the AI limits) or, when something needs you, the pill of things to set up, then search, transcribe, refresh,
+  Settings, Plan a call and Call now (Command-N). The next call is the large block on top: when, "Next call in 37 min",
+  the call, the people, Ready or Not ready with what that means, Get ready or Start call, a second bordered button and
+  one link; the rest of today and tomorrow sits next to it, and See the whole week opens Coming up with every call.
+  Banners (start tips for this call, a new version, an invitation, an organization to set up) stack over it in one
+  shape. Under it Recent calls and This week (calls, hours on calls, prepared, AI spend this month, account limits,
+  calls not transcribed yet). The live call, an empty day ("Clear until tomorrow"), no calendar and the first launch
+  each have their own block. In a narrow window the columns go one under the other.
+
 ## 0.23.0 (2026-11-18)
 
 - **pacenote.bodco.pm in the same style (2026-11-18, site, redesign block 8c):** the site has one style and mode

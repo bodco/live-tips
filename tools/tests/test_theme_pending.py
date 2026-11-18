@@ -4,12 +4,13 @@ import colorsys
 import re
 from pathlib import Path
 
-THEME = Path(__file__).absolute().parents[2] / "app" / "Sources" / "LiveTips" / "PacenoteTheme.swift"
+# 2026-11-18 (redesign block 1): the Classic values live in PNTheme.classic (PNTheme.swift): `pending: p(0xE8590C, 0xFFA940)`.
+THEME = Path(__file__).absolute().parents[2] / "app" / "Sources" / "LiveTips" / "PNTheme.swift"
 
 
 def colors(name):
-    m = re.search(r"static let " + name + r"\s*=\s*Color\.pn\(0x([0-9A-Fa-f]{6}),\s*0x([0-9A-Fa-f]{6})", THEME.read_text())
-    assert m, name + " not found in PacenoteTheme.swift"
+    m = re.search(name + r":\s*p\(0x([0-9A-Fa-f]{6}),\s*0x([0-9A-Fa-f]{6})", THEME.read_text())
+    assert m, name + " not found in PNTheme.swift (PNTheme.classic)"
     return m.group(1), m.group(2)
 
 

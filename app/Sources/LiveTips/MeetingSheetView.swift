@@ -91,7 +91,7 @@ struct MeetingSheetTab: View {
             Text(parts.joined(separator: " · ")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             SheetReadinessPill(badge: s.readinessBadge)
             VisibilityBadge(transcript: doc.base + ".md")      // 0.17.0 (B6b): "Visible to your team lead"
-            if doc.checking { ProgressView().controlSize(.small) }
+            if doc.checking { PNSpinner(size: 16) }
             Spacer()
             Button(L("sheet.ui.blocks.edit"), action: onEditBlocks).buttonStyle(.pnTertiary)
         }
@@ -344,7 +344,7 @@ struct SheetFactRow: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, fact.diff == nil ? 0 : 6)
-        .background(diffColor.map { RoundedRectangle(cornerRadius: 6).fill($0.opacity(0.08)) })
+        .background(diffColor.map { RoundedRectangle(cornerRadius: PN.r(6)).fill($0.opacity(0.08)) })
     }
 
     private var diffColor: Color? {
@@ -424,7 +424,7 @@ struct SheetFactRow: View {
                 }
             }
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8).fill(PN.C.pendingFill.opacity(0.08)))
+            .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(PN.C.pendingFill.opacity(0.08)))
         }
     }
 }
@@ -476,7 +476,7 @@ struct SheetReadinessTab: View {
                     HStack(spacing: 10) {
                         Image(systemName: b.symbol).font(.system(size: 22)).foregroundStyle(SheetLabels.readiness(b).color)
                         Text(SheetLabels.readiness(b).text).font(.system(size: 22, weight: .bold)).foregroundStyle(SheetLabels.readiness(b).color)
-                        if doc.checking { ProgressView().controlSize(.small) }
+                        if doc.checking { PNSpinner(size: 16) }
                         Spacer()
                         Button(L("home.startCall"), action: onStart).buttonStyle(.pnPrimary)
                     }
@@ -689,7 +689,7 @@ struct SheetVersionsTab: View {
                 if let n = open, let f = files.first(where: { $0.n == n }) {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text(L("sheet.ui.versions.viewing", ["n": "\(n)"])).font(PN.Font.section)
+                            Text(L("sheet.ui.versions.viewing", ["n": "\(n)"])).pnSection()
                             Spacer()
                             Button(L("common.close")) { open = nil }.buttonStyle(.pnTertiary)
                         }

@@ -279,7 +279,7 @@ struct NotionTasksSection: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.onMe)
             }
             Spacer()
-            if tasks.busy || m.busy { ProgressView().controlSize(.small) }
+            if tasks.busy || m.busy { PNSpinner(size: 16) }
             Button(L("ntset.refresh")) { m.load(force: true); tasks.refresh() }.disabled(!nt.ready)
         }
         if !tasks.error.isEmpty { Text(tasks.error).font(PN.Font.caption).foregroundStyle(PN.C.danger) }

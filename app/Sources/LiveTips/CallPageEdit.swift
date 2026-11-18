@@ -190,7 +190,7 @@ struct CallPageSyncLine: View {
                     HStack(spacing: 6) {
                         switch sync.state {
                         case .pending, .syncing:
-                            ProgressView().controlSize(.small); Text(L("callEdit.syncing"))
+                            PNSpinner(size: 16); Text(L("callEdit.syncing"))
                         case .ok:
                             Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn).accessibilityHidden(true)
                             Text(L("callEdit.syncedAgo", ["ago": Self.ago(sync.at, ctx.date)]))
@@ -332,7 +332,7 @@ struct EditableRow<Leading: View, Trailing: View>: View {
     @ViewBuilder private var promptView: some View {
         if let a = prompt {
             VStack(alignment: .leading, spacing: 10) {
-                Text(a.title).font(PN.Font.section)
+                Text(a.title).pnSection()
                 switch a.prompt {
                 case .date?:
                     DatePicker("", selection: $promptDate, displayedComponents: .date).datePickerStyle(.graphical).labelsHidden()

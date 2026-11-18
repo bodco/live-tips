@@ -201,7 +201,7 @@ struct SetupView: View {
         case .ok: Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
         case .missing: Image(systemName: "circle").foregroundStyle(PN.C.text3)
         case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(PN.C.danger)
-        case .checking, .installing: ProgressView().controlSize(.small)
+        case .checking, .installing: PNSpinner(size: 16)
         case .unknown: Image(systemName: "circle.dotted").foregroundStyle(PN.C.text3)
         }
     }

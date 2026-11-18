@@ -20,6 +20,9 @@ ditto "$SPARKLE" "$APP/Contents/Frameworks/Sparkle.framework"
 # The skill's live-transcriber keeps its own window (recorder/src/prompter.html).
 mkdir -p "$APP/Contents/Resources/tips"
 cp "$HERE/Resources/tips/"{index.html,tokens.css,tips.css,feed.js,speakers.js,tips.js} "$APP/Contents/Resources/tips/"
+# Redesign block 1: the bundled faces (Barlow, Inter Tight, JetBrains Mono, IBM Plex Mono; SIL OFL), registered at start by PNFonts
+mkdir -p "$APP/Contents/Resources/Fonts"
+cp "$HERE/Resources/Fonts/"*.ttf "$HERE/Resources/Fonts/"OFL-*.txt "$APP/Contents/Resources/Fonts/"
 # Interface strings (en, uk) and the macOS names and permission texts per language (Pacenote 0.8)
 mkdir -p "$APP/Contents/Resources/i18n"
 cp "$HERE/Resources/i18n/"*.json "$APP/Contents/Resources/i18n/"

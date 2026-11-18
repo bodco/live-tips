@@ -207,7 +207,7 @@ struct CallSetupView: View {
             Text("\(n)").font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3)
                 .frame(width: 20, height: 20).background(Circle().fill(PN.C.surface2)).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 14) {
-                if let t = title { Text(t).font(PN.Font.section).foregroundStyle(PN.C.text) }
+                if let t = title { Text(t).pnSection().foregroundStyle(PN.C.text) }
                 content()
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -249,7 +249,7 @@ struct CallSetupView: View {
             DeckBlock(model: model, onNeedPrep: { if !needProject() { prepareNow() } })
         case "interview":
             VStack(alignment: .leading, spacing: 6) {
-                Text(L("callSettings.type.interview")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("callSettings.type.interview")).pnSection().foregroundStyle(PN.C.text)
                 Picker(L("callSettings.role"), selection: $model.hiringRole) {
                     Text(L("callSettings.role.observer")).tag("observer")
                     Text(L("callSettings.role.interviewer")).tag("interviewer")
@@ -261,14 +261,14 @@ struct CallSetupView: View {
         case "transcript":
             // rules/meeting.yaml > call_type.transcript: no tips, the summary and the follow-up after the call
             VStack(alignment: .leading, spacing: 4) {
-                Text(L("callSettings.type.transcript")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("callSettings.type.transcript")).pnSection().foregroundStyle(PN.C.text)
                 Text(L("start.transcriptHint")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             }
             .padding(14).frame(maxWidth: .infinity, alignment: .leading)
             .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
         default:
             VStack(alignment: .leading, spacing: 4) {
-                Text(L("start.type.regular")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("start.type.regular")).pnSection().foregroundStyle(PN.C.text)
                 Text(L("start.regularHint")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             }
             .padding(14).frame(maxWidth: .infinity, alignment: .leading)
@@ -536,7 +536,7 @@ struct CallSetupView: View {
             }
             .formStyle(.grouped)
         } label: {
-            Text(L("call.options")).font(PN.Font.section).foregroundStyle(PN.C.text)
+            Text(L("call.options")).pnSection().foregroundStyle(PN.C.text)
         }
     }
 
@@ -581,7 +581,7 @@ struct CallSetupView: View {
                     options
                 }
                 .padding(.top, 8)
-            } label: { Text(L("page.more")).font(PN.Font.section).foregroundStyle(PN.C.text) }
+            } label: { Text(L("page.more")).pnSection().foregroundStyle(PN.C.text) }
         }
     }
 

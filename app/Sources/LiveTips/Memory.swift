@@ -55,7 +55,7 @@ struct MemoryView: View {
                 }
             }
             Text(L("memory.note")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-            if busy { HStack(spacing: 8) { ProgressView().controlSize(.small); Text(L("memory.searching")).foregroundStyle(PN.C.text2) } }
+            if busy { HStack(spacing: 8) { PNSpinner(size: 16); Text(L("memory.searching")).foregroundStyle(PN.C.text2) } }
             if !error.isEmpty { Text(error).font(PN.Font.caption).foregroundStyle(PN.C.danger) }
             if !answer.isEmpty { result }
             Spacer()
@@ -171,7 +171,7 @@ struct SeriesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(record.title).font(PN.Font.title).foregroundStyle(PN.C.text)
+                    Text(record.title).pnTitle().foregroundStyle(PN.C.text)
                     Text(L("series.sub", ["n": "\(calls.count)", "project": record.project])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 }
                 block(L("series.sinceLast"), sinceLast)
@@ -186,7 +186,7 @@ struct SeriesView: View {
                     block(L("series.register"), reg.prefix(10).map { $0.date + " · " + $0.title + ($0.who.isEmpty ? "" : " (" + $0.who + ")") })
                 }
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(L("series.timeline")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                    Text(L("series.timeline")).pnSection().foregroundStyle(PN.C.text)
                     ForEach(calls) { c in
                         let d = CallOutcome.read(transcript: c.file)?.decisions ?? []
                         VStack(alignment: .leading, spacing: 3) {
@@ -214,7 +214,7 @@ struct SeriesView: View {
             let groups: [(String, [Commitment])] = (list.contains { $0.mine } ? [(L("series.me"), list.filter { $0.mine })] : [])
                 + owners.map { o in (o, list.filter { !$0.mine && ($0.owner.isEmpty ? "?" : $0.owner) == o }) }
             VStack(alignment: .leading, spacing: 8) {
-                Text(L("series.commitments")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("series.commitments")).pnSection().foregroundStyle(PN.C.text)
                 ForEach(groups, id: \.0) { g in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(g.0).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3)
@@ -237,7 +237,7 @@ struct SeriesView: View {
     @ViewBuilder private func block(_ title: String, _ rows: [String]) -> some View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(title).pnSection().foregroundStyle(PN.C.text)
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
                     Text("• " + r).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
                 }

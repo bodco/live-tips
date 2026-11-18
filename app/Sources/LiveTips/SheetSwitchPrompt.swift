@@ -20,7 +20,7 @@ struct SheetSwitchPrompt: View {
                 }
             }
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8).fill(PN.C.pending.opacity(0.10)))
+            .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(PN.C.pending.opacity(0.10)))
         } else if let n = runner.switchNotice, callID == nil || runner.callID == callID {
             Label(n, systemImage: "arrow.triangle.swap").font(PN.Font.caption).foregroundStyle(PN.C.text2)
                 .fixedSize(horizontal: false, vertical: true)

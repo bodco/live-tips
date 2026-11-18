@@ -140,7 +140,7 @@ struct OrgCardSection: View {
                             .font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                     Spacer()
-                    if busy { ProgressView().controlSize(.small) }
+                    if busy { PNSpinner(size: 16) }
                     if b.card.isEmpty && !dirty && hasLocal {
                         Button(L("orgcard.copyLocal")) { copyLocal() }.buttonStyle(.pnTertiary).help(L("orgcard.copyLocal.help"))
                     }
@@ -154,7 +154,7 @@ struct OrgCardSection: View {
                     Button(L("orgcard.reload")) { Task { await reload(keepDraft: false) } }.buttonStyle(.pnTertiary)
                 }
             } else {
-                HStack(spacing: 8) { ProgressView().controlSize(.small); Text(L("orgcard.loading")).foregroundStyle(PN.C.text3) }
+                HStack(spacing: 8) { PNSpinner(size: 16); Text(L("orgcard.loading")).foregroundStyle(PN.C.text3) }
             }
             if !note.isEmpty {
                 Text(note).font(PN.Font.caption).foregroundStyle(noteIsError ? PN.C.danger : PN.C.text2).fixedSize(horizontal: false, vertical: true)

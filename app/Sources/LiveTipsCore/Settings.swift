@@ -198,7 +198,10 @@ public struct AppConfig: Codable, Equatable {
     public var uiLanguage = "en"           // en | uk
     public var stealthDefault = true
     public var showInDock = true
-    public var appearance = "system"       // 0.9.6 (owner): system | light | dark, Settings > General
+    public var appearance = "system"       // 0.9.6 (owner): system | light | dark, Settings > General (the mode)
+    /// Redesign block 1 (2026-11-18): classic | roadbook | broadsheet, Settings > General > Appearance. The Pacenote build
+    /// starts on Roadbook; an unknown value reads as the default (PNStyle in the app).
+    public var appearanceStyle = "roadbook"
     public var floatingCallControls = true
     public var notionWriteSummary = false
     /// 2026-10-26: where meeting pages go when the project has no Control Tower config (a data source id
@@ -293,6 +296,7 @@ public struct AppConfig: Codable, Equatable {
         stealthDefault = (try? c.decode(Bool.self, forKey: .stealthDefault)) ?? d.stealthDefault
         showInDock = (try? c.decode(Bool.self, forKey: .showInDock)) ?? d.showInDock
         appearance = (try? c.decode(String.self, forKey: .appearance)) ?? d.appearance
+        appearanceStyle = (try? c.decode(String.self, forKey: .appearanceStyle)) ?? d.appearanceStyle
         floatingCallControls = (try? c.decode(Bool.self, forKey: .floatingCallControls)) ?? d.floatingCallControls
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
         notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB

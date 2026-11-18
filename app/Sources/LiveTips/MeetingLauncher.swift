@@ -228,7 +228,7 @@ struct LaunchPanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(model.ctx.event.title).font(PN.Font.section).foregroundStyle(PN.C.text).lineLimit(1)
+                Text(model.ctx.event.title).pnSection().foregroundStyle(PN.C.text).lineLimit(1)
                 Spacer()
                 Button(action: close) { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(PN.C.text3)
                     .accessibilityLabel(L("common.close"))

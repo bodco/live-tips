@@ -381,7 +381,7 @@ struct UpcomingCallPage: View {
             label(L("page.tasks.waiting"), theirs.count)
             if theirs.isEmpty { none }
             ForEach(owners, id: \.self) { who in
-                HStack(spacing: 8) { PageAvatar(name: who); Text(who).font(PN.Font.section).foregroundStyle(PN.C.text2) }
+                HStack(spacing: 8) { PageAvatar(name: who); Text(who).pnSection().foregroundStyle(PN.C.text2) }
                     .padding(.top, who == owners.first ? 2 : 12).padding(.bottom, 2)
                 ForEach(theirs.filter { $0.owner == who }) { c in taskRow(c, action: L("page.tasks.gotIt")) { register.mark(c) } }
             }
@@ -485,14 +485,14 @@ struct PageTabs: View {
                     }
                     .foregroundStyle(on ? PN.C.text : PN.C.text2)
                     .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(on ? PN.C.surface : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-                    .shadow(color: .black.opacity(on ? 0.06 : 0), radius: 1, y: 1)
+                    .background(on ? PN.C.surface : Color.clear, in: RoundedRectangle(cornerRadius: PN.r(8)))
+                    .shadow(color: (Color.black.opacity(on ? 0.06 : 0)).opacity(PN.depth), radius: 1, y: 1)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(3)
-        .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 10))
+        .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(10)))
     }
 }

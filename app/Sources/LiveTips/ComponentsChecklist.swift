@@ -55,7 +55,7 @@ struct ComponentStatePill: View {
         }()
         Text(t).font(PN.Font.caption.weight(.semibold)).foregroundStyle(c)
             .padding(.horizontal, 8).padding(.vertical, 2)
-            .background(c.opacity(0.13), in: RoundedRectangle(cornerRadius: 6))
+            .background(c.opacity(0.13), in: RoundedRectangle(cornerRadius: PN.r(6)))
     }
 }
 
@@ -101,7 +101,7 @@ struct ComponentsChecklist: View {
 
     var requiredCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(L("cl.req.head")).font(PN.Font.label).foregroundStyle(PN.C.text3).frame(minHeight: 30)
+            Text(L("cl.req.head")).pnLabel().foregroundStyle(PN.C.text3).frame(minHeight: 30)
             ForEach(RequiredGroup.all) { g in
                 Divider()
                 HStack(spacing: 12) {
@@ -135,7 +135,7 @@ struct ComponentsChecklist: View {
 
     var optionalCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !compact { Text(L("cl.opt.head")).font(PN.Font.label).foregroundStyle(PN.C.text3).frame(minHeight: 30) }
+            if !compact { Text(L("cl.opt.head")).pnLabel().foregroundStyle(PN.C.text3).frame(minHeight: 30) }
             ForEach(Array(offered.enumerated()), id: \.element.id) { i, c in
                 if !compact || i > 0 { Divider() }
                 let installed = oc.isInstalled(c.id)

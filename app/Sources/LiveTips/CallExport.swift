@@ -134,7 +134,7 @@ struct ExportPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(L("export.title")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("export.title")).pnSection().foregroundStyle(PN.C.text)
                 Spacer()
                 Button { onClose() } label: { Image(systemName: "xmark") }.buttonStyle(.borderless).accessibilityLabel(L("common.close"))
             }

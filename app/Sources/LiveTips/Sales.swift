@@ -143,7 +143,7 @@ struct AnswerCardsEditor: View {
             Text(L("cards.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             TextEditor(text: $text).font(.body.monospaced()).onChange(of: text) { saved = false }
                 .scrollContentBackground(.hidden).padding(6)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+                .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(Color.secondary.opacity(0.06)))
             HStack {
                 Text(note.isEmpty ? L("cards.count", ["n": "\(text.components(separatedBy: "\n").filter { $0.hasPrefix("## ") }.count)"]) : note)
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -175,7 +175,7 @@ struct SalesMethodInfo: View {
     var body: some View {
         let m = sm.methods.first { $0.key == key } ?? sm.methods.first { $0.key == sm.defaultKey }
         VStack(alignment: .leading, spacing: 8) {
-            Text(m?.name ?? "").font(PN.Font.section)
+            Text(m?.name ?? "").pnSection()
             Text(m?.desc ?? "").font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             ForEach(m?.criteria ?? []) { c in
                 VStack(alignment: .leading, spacing: 1) {
@@ -276,13 +276,13 @@ struct AnswerCardForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(PN.Font.section)
+            Text(title).pnSection()
             Text(L("cards.form.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             field(L("cards.form.question")) { TextField("", text: $card.title, prompt: Text(L("cards.form.questionPh"))).textFieldStyle(.roundedBorder) }
             field(L("cards.form.answer")) {
                 TextEditor(text: $card.answer).font(PN.Font.body).frame(minHeight: 90)
                     .scrollContentBackground(.hidden).padding(4)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.06)))
+                    .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(Color.secondary.opacity(0.06)))
             }
             // S1: the card's type; a competitor card is a battlecard, a price card holds a limit our side never crosses
             field(L("cards.form.type")) {
@@ -361,7 +361,7 @@ struct AnswerCardsList: View {
                                 .buttonStyle(.borderless).help(L("callEdit.delete")).accessibilityLabel(L("callEdit.delete"))
                         }
                         .padding(8)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+                        .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(Color.secondary.opacity(0.06)))
                     }
                 }
             }

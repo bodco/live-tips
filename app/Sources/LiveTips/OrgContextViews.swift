@@ -241,7 +241,7 @@ struct StateEditSheet: View {
     var body: some View {
         let base = from ?? start
         VStack(alignment: .leading, spacing: 10) {
-            Text(L("orgctx.state.head")).font(PN.Font.section)
+            Text(L("orgctx.state.head")).pnSection()
             Text(L("orgctx.state.sub", ["project": project.orgProjectName.isEmpty ? project.name : project.orgProjectName]))
                 .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             if reviewing {
@@ -257,7 +257,7 @@ struct StateEditSheet: View {
                     .font(PN.Font.caption).foregroundStyle(OrgContext.fits(draft) ? PN.C.text3 : PN.C.danger)
                 if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.danger).lineLimit(2) }
                 Spacer()
-                if busy { ProgressView().controlSize(.small) }
+                if busy { PNSpinner(size: 16) }
                 Button(L("common.cancel")) { onDone(false) }.buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 if reviewing {
                     Button(L("orgctx.state.edit")) { reviewing = false }.buttonStyle(.pnTertiary)
@@ -316,7 +316,7 @@ struct OrgStateSection: View {
             } else if let e = store.problem(project, "state") {
                 Text(e).font(PN.Font.caption).foregroundStyle(PN.C.pending)
             } else {
-                HStack(spacing: 8) { ProgressView().controlSize(.small); Text(L("orgcard.loading")).foregroundStyle(PN.C.text3) }
+                HStack(spacing: 8) { PNSpinner(size: 16); Text(L("orgcard.loading")).foregroundStyle(PN.C.text3) }
             }
         } header: { Text(L("orgctx.state.head")).settingsAnchor("pr.orgState") }
         .task(id: project.orgProjectID) { await store.loadState(project) }
@@ -426,7 +426,7 @@ struct OrgIndexSection: View {
                 }
             }
             HStack(spacing: 8) {
-                if let line = store.indexing[project.orgProjectID] { ProgressView().controlSize(.small); Text(line).font(PN.Font.caption).foregroundStyle(PN.C.text2) }
+                if let line = store.indexing[project.orgProjectID] { PNSpinner(size: 16); Text(line).font(PN.Font.caption).foregroundStyle(PN.C.text2) }
                 else if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(2) }
                 Spacer()
                 Button(L("orgctx.idx.build")) { Task { note = await store.indexDriveFiles(project) } }

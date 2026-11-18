@@ -173,9 +173,9 @@ struct HomeView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    UpdateHomeLine()      // 0.23.0 (Bohdan 18.11): the update banner at the top (0.16.0: a line under the title)
                     titleBlock
                     if let e = auto.suggestion, !live { autoBanner(e) }
-                    UpdateHomeLine()      // 0.16.0 (D3): "Pacenote 0.16.1 is ready · Install"
                     InvitesHomeLine()     // 0.17.0 (B6b): "Mike invited you to Acme · Join…"
                     OrgSetupHomeLine()    // 0.17.0 (5.3): "Acme is ready. Set it up…" for its owner
                     if !note.isEmpty { Text(note).font(PN.Font.body).foregroundStyle(PN.C.onMe) }
@@ -191,7 +191,8 @@ struct HomeView: View {
         .background(PN.C.bg)
         .frame(minWidth: 680, minHeight: 560)
         .onAppear { tick(); cal.refresh(); history.scan(); upnext.pruneHeld(); upnext.adoptPreparedEvents(); register.importOnce(); ntasks.keepFresh()
-                    runner.refreshAuth(); if acct.signedIn { Task { await acct.loadInvites() } } }
+                    runner.refreshAuth(); if acct.signedIn { Task { await acct.loadInvites() } }
+                    UpdateService.shared.maybePrompt() }      // 0.23.0: the update window, once Home is up
         .onDrop(of: [.fileURL], isTargeted: nil) { items in          // 0.8.6 (B): drop a recording on Home
             _ = items.first?.loadObject(ofClass: URL.self) { u, _ in
                 if let u = u, TranscribeWindow.accepts(u) { DispatchQueue.main.async { MainActor.assumeIsolated { TranscribeWindow.show(file: u) } } }
@@ -232,7 +233,7 @@ struct HomeView: View {
             Text(title).font(PN.Font.body.weight(selected ? .semibold : .regular))
                 .foregroundStyle(selected ? PN.C.text : PN.C.text2)
                 .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(selected ? PN.C.surface2 : Color.clear, in: RoundedRectangle(cornerRadius: 7))
+                .background(selected ? PN.C.surface2 : Color.clear, in: RoundedRectangle(cornerRadius: PN.r(7)))
         }
         .buttonStyle(.plain)
     }
@@ -253,21 +254,21 @@ struct HomeView: View {
                 // 0.9.1 (owner): one split button, the arrow is part of the blue button, not a loose chevron
                 HStack(spacing: 0) {
                     Button { StartCallWindow.startNow(delegate: app) } label: {
-                        Text(L("home.startCallNow")).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        Text(L("home.startCallNow")).font(.system(size: 13, weight: .semibold)).foregroundStyle(PN.C.onAccent)
                             .padding(.leading, 14).padding(.trailing, 12).frame(height: 32).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain).keyboardShortcut("n", modifiers: .command)
-                    Rectangle().fill(Color.white.opacity(0.35)).frame(width: 1, height: 18)
+                    Rectangle().fill(PN.C.onAccent.opacity(0.35)).frame(width: 1, height: 18)
                     Menu {
                         Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
                     } label: {
-                        Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                        Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.onAccent)
                             .frame(width: 28, height: 32).contentShape(Rectangle())
                     }
                     .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
                     .help(L("home.planCall.help")).accessibilityLabel(L("home.planCall"))
                 }
-                .background(PN.C.accentFill, in: RoundedRectangle(cornerRadius: 7))
+                .background(PN.C.accentFill, in: RoundedRectangle(cornerRadius: PN.r(7)))
                 .fixedSize()
             }
             Button { SettingsWindow.show() } label: { Image(systemName: "gearshape") }
@@ -390,8 +391,10 @@ struct HomeView: View {
     /// 0.9.0 (mockup "Home"): a white card, 20 pt corners, a soft shadow, roomy padding.
     private func card<C: View>(@ViewBuilder _ c: () -> C) -> some View {
         c().padding(.horizontal, 32).padding(.vertical, 28).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: 20))
-            .shadow(color: .black.opacity(0.05), radius: 12, y: 4)
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.r(20)))
+            .shadow(color: (Color.black.opacity(0.05)).opacity(PN.depth), radius: 12, y: 4)
+            // Roadbook and Broadsheet: no shadow, a frame line instead (redesign block 4)
+            .overlay(Rectangle().stroke(PN.C.rule, lineWidth: 1 - PN.depth))
     }
 
     /// The call card of the mockup: what the call is on the left, one big action and one link on the right;
@@ -456,7 +459,7 @@ struct HomeView: View {
             ZStack {
                 Circle().fill(done ? PN.C.turn.opacity(0.15) : PN.C.surface2).frame(width: 26, height: 26)
                 if done { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(PN.C.turn) }
-                else { Text("\(n)").font(PN.Font.section).foregroundStyle(PN.C.text2) }
+                else { Text("\(n)").pnSection().foregroundStyle(PN.C.text2) }
             }
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
@@ -694,7 +697,7 @@ struct HomeView: View {
                                 Rectangle().fill(PN.C.accent).frame(width: 2, height: 14)
                             }
                             .frame(height: 14)
-                            Text(L("home.tomorrowCaps")).font(PN.Font.label).foregroundStyle(PN.C.accent)
+                            Text(L("home.tomorrowCaps")).pnLabel().foregroundStyle(PN.C.accent)
                         }
                         .frame(width: 92, alignment: .leading)
                     }
@@ -871,7 +874,7 @@ struct RecentCard: View {
                 Spacer(minLength: 0)
                 if let src = r.source {
                     Text(L(src == "link" ? "tr.mark.link" : "tr.mark.file")).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.text2)
-                        .padding(.horizontal, 4).padding(.vertical, 1).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 4))
+                        .padding(.horizontal, 4).padding(.vertical, 1).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(4)))
                 }
             }
             Text(r.title).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text).lineLimit(2)
@@ -993,7 +996,7 @@ struct RecentRow: View {
                 Text(r.title).font(PN.Font.body.weight(.medium)).foregroundStyle(PN.C.text).lineLimit(1)
                 if let src = r.source {          // 0.8.6 (B): a transcribed recording, not a call
                     Text(L(src == "link" ? "tr.mark.link" : "tr.mark.file")).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.text2)
-                        .padding(.horizontal, 4).padding(.vertical, 1).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 4))
+                        .padding(.horizontal, 4).padding(.vertical, 1).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(4)))
                 }
             }
             HStack(spacing: 6) {
@@ -1007,7 +1010,7 @@ struct RecentRow: View {
                     .buttonStyle(.plain).focused($focus, equals: 9)
                     .popover(isPresented: $why, arrowEdge: .bottom) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(L("series.why")).font(PN.Font.section)
+                            Text(L("series.why")).pnSection()
                             Text(L("series.whyText")).font(PN.Font.body).fixedSize(horizontal: false, vertical: true)
                             Button(L("series.open")) { why = false; SeriesWindow.show(record: r) }.buttonStyle(.pnSecondary)
                         }

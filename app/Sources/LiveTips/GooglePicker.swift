@@ -219,7 +219,7 @@ private struct GooglePickerView: View {
             .padding(10)
             if !p.status.isEmpty {
                 HStack(spacing: 8) {
-                    if p.busy { ProgressView().controlSize(.small) }
+                    if p.busy { PNSpinner(size: 16) }
                     Text(p.status).font(PN.Font.caption).foregroundStyle(p.busy ? PN.C.text2 : PN.C.pending).lineLimit(2)
                     Spacer()
                 }

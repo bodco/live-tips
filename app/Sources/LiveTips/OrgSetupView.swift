@@ -211,7 +211,7 @@ struct OrgSetupView: View {
                         .buttonStyle(.pnTertiary).help(L("orgsetup.console.help"))
                 }
                 Spacer()
-                if m.busy { ProgressView().controlSize(.small) }
+                if m.busy { PNSpinner(size: 16) }
                 if m.step != .name { Button(L("onboarding.back")) { m.go(-1) }.buttonStyle(.pnTertiary) }
                 if m.later && !m.isLast { Button(L("orgsetup.later")) { m.go(1) }.buttonStyle(.pnTertiary) }
                 Button(L(m.isLast ? "orgsetup.finish" : "common.continue")) {

@@ -107,7 +107,7 @@ struct RehearsalView: View {
             case .intro: intro
             case .run: run
             case .question: question
-            case .scoring: HStack(spacing: 8) { ProgressView().controlSize(.small); Text(L("rehearse.thinking")).foregroundStyle(PN.C.text2) }
+            case .scoring: HStack(spacing: 8) { PNSpinner(size: 16); Text(L("rehearse.thinking")).foregroundStyle(PN.C.text2) }
             case .result: result
             }
             if !error.isEmpty { Text(error).font(PN.Font.caption).foregroundStyle(PN.C.danger) }
@@ -205,7 +205,7 @@ struct RehearsalView: View {
 
     @ViewBuilder private var question: some View {
         if items.isEmpty {
-            HStack(spacing: 8) { if busy { ProgressView().controlSize(.small) }; Text(L("rehearse.thinking")).foregroundStyle(PN.C.text2) }
+            HStack(spacing: 8) { if busy { PNSpinner(size: 16) }; Text(L("rehearse.thinking")).foregroundStyle(PN.C.text2) }
         } else {
             let it = items[qi]
             HStack {

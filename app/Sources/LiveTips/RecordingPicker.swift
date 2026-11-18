@@ -77,12 +77,12 @@ private struct FlashFrame: View {
     let label: String
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+            Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(PN.C.onAccent).lineLimit(1)
                 .padding(.horizontal, 9).padding(.vertical, 4)
-                .background(PN.C.accentFill, in: RoundedRectangle(cornerRadius: 6))
-            RoundedRectangle(cornerRadius: 10).stroke(PN.C.accentFill, lineWidth: 4)
-                .background(RoundedRectangle(cornerRadius: 10).fill(PN.C.accentFill.opacity(0.08)))
-                .shadow(color: PN.C.accentFill.opacity(0.35), radius: 6)
+                .background(PN.C.accentFill, in: RoundedRectangle(cornerRadius: PN.r(6)))
+            RoundedRectangle(cornerRadius: PN.r(10)).stroke(PN.C.accentFill, lineWidth: 4)
+                .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(PN.C.accentFill.opacity(0.08)))
+                .shadow(color: (PN.C.accentFill.opacity(0.35)).opacity(PN.depth), radius: 6)
         }
     }
 }
@@ -124,7 +124,7 @@ struct RecordingPickerView: View {
                         }
                         .padding(6)
                     }
-                    .background(RoundedRectangle(cornerRadius: 12).fill(PN.C.surface))
+                    .background(RoundedRectangle(cornerRadius: PN.r(12)).fill(PN.C.surface))
                 }
                 .frame(width: 300)
                 previewPane
@@ -160,12 +160,12 @@ struct RecordingPickerView: View {
                 Spacer(minLength: 4)
                 if call {
                     Text(L("rec.pick.call")).font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.turn)
-                        .padding(.horizontal, 6).padding(.vertical, 2).background(PN.C.turn.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
+                        .padding(.horizontal, 6).padding(.vertical, 2).background(PN.C.turn.opacity(0.12), in: RoundedRectangle(cornerRadius: PN.r(5)))
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 8).fill(on ? PN.C.accent.opacity(0.10) : Color.clear))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? PN.C.accent : Color.clear, lineWidth: 1.5))
+            .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(on ? PN.C.accent.opacity(0.10) : Color.clear))
+            .overlay(RoundedRectangle(cornerRadius: PN.r(8)).stroke(on ? PN.C.accent : Color.clear, lineWidth: 1.5))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -174,14 +174,14 @@ struct RecordingPickerView: View {
     private var previewPane: some View {
         VStack(alignment: .leading, spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8).fill(PN.C.surface2)
+                RoundedRectangle(cornerRadius: PN.r(8)).fill(PN.C.surface2)
                 if let p = preview {
                     Image(decorative: p, scale: 1).resizable().aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(PN.C.accent, lineWidth: 2))
+                        .clipShape(RoundedRectangle(cornerRadius: PN.r(6)))
+                        .overlay(RoundedRectangle(cornerRadius: PN.r(6)).stroke(PN.C.accent, lineWidth: 2))
                         .padding(6)
                 } else if loading {
-                    ProgressView().controlSize(.small)
+                    PNSpinner(size: 16)
                 } else {
                     Text(L("rec.pick.noPreview")).font(PN.Font.caption).foregroundStyle(PN.C.text3).multilineTextAlignment(.center).padding(20)
                 }
@@ -197,7 +197,7 @@ struct RecordingPickerView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(PN.C.surface))
+        .background(RoundedRectangle(cornerRadius: PN.r(12)).fill(PN.C.surface))
     }
 
     private var detail: String {

@@ -135,28 +135,29 @@ struct FloatingCallControls: View {
         .padding(.vertical, 8)
         .frame(width: Self.width)
         .foregroundStyle(PN.C.text2)
-        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
+        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.r(16)))
+        .overlay(RoundedRectangle(cornerRadius: PN.r(16)).stroke(Color.primary.opacity(0.12), lineWidth: 0.5))
     }
         .trackScreen("floating_controls", o: AnalyticsTracker.shared.callOrg)
     }
 
     private var sep: some View { Rectangle().fill(Color.primary.opacity(0.1)).frame(width: 26, height: 1).padding(.vertical, 3) }
 
-    /// Green: transcribing, orange: paused, red: the call is recorded, grey: waiting for the call.
+    /// Redesign block 4 (handoff, section 3): the mark's dot says the state. Listening: the recording colour;
+    /// tips paused: "not ready" orange; no call yet: the mark's own blue. The word is in the tooltip and the label.
     private var dotColor: Color {
-        if ["recording", "paused", "starting"].contains(recording.state) { return PN.C.rec }
-        if model.status.transcriptPaused { return PN.C.pending }
-        return model.status.state == "recording" ? Color(red: 0x16 / 255, green: 0xA3 / 255, blue: 0x4A / 255) : PN.C.text3
+        if model.status.transcriptPaused { return PN.C.notready }
+        if ["recording", "paused", "starting"].contains(recording.state) || model.status.state == "recording" { return PN.C.rec }
+        return PN.C.markDot
     }
 
     private var tipsButton: some View {
         Button { model.app?.showTips() } label: {
             Image(systemName: "text.bubble.fill").font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(PN.C.onAccent)
                 .frame(width: 38, height: 38)
-                .background(RoundedRectangle(cornerRadius: 11).fill(PN.C.accentFill.opacity(hover == "tips" ? 0.85 : 1)))
-                .shadow(color: PN.C.accentFill.opacity(0.35), radius: 4, y: 1)
+                .background(RoundedRectangle(cornerRadius: PN.r(11)).fill(PN.C.accentFill.opacity(hover == "tips" ? 0.85 : 1)))
+                .shadow(color: (PN.C.accentFill.opacity(0.35)).opacity(PN.depth), radius: 4, y: 1)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain).onHover { hover = $0 ? "tips" : (hover == "tips" ? nil : hover) }
@@ -175,7 +176,7 @@ struct FloatingCallControls: View {
                     .opacity(recording.state == "paused" ? 0.4 : 1)
             }
             .frame(width: 36, height: 36)
-            .background(RoundedRectangle(cornerRadius: 10).fill(on ? PN.C.rec.opacity(0.13) : (hover == "rec" ? Color.primary.opacity(0.07) : .clear)))
+            .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(on ? PN.C.rec.opacity(0.13) : (hover == "rec" ? Color.primary.opacity(0.07) : .clear)))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -201,7 +202,7 @@ struct FloatingCallControls: View {
             Image(systemName: symbol).font(.system(size: size, weight: weight))
                 .foregroundStyle(tint ?? PN.C.text2)
                 .frame(width: 36, height: 36)
-                .background(RoundedRectangle(cornerRadius: 10).fill(tint == PN.C.pending ? PN.C.pendingFill.opacity(0.16) : (hover == id ? Color.primary.opacity(0.07) : .clear)))
+                .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(tint == PN.C.pending ? PN.C.pendingFill.opacity(0.16) : (hover == id ? Color.primary.opacity(0.07) : .clear)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain).onHover { hover = $0 ? id : (hover == id ? nil : hover) }

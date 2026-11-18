@@ -50,7 +50,7 @@ struct SheetPeopleView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(L("sheet.people.title").uppercased()).font(PN.Font.label).kerning(0.4).foregroundStyle(PN.C.text3)
+                Text(L("sheet.people.title").uppercased()).pnLabel().kerning(0.4).foregroundStyle(PN.C.text3)
                 Text(L("sheet.people.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 Spacer(minLength: 0)
             }
@@ -76,7 +76,7 @@ struct SheetPeopleView: View {
         let org = ours ? m.targetName : (draft.theirs.first { !$0.company.isEmpty }?.company ?? m.project?.crmCompanyName ?? "")
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text(L(ours ? "sheet.ui.s1.ours" : "sheet.ui.s1.theirs")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L(ours ? "sheet.ui.s1.ours" : "sheet.ui.s1.theirs")).pnSection().foregroundStyle(PN.C.text)
                 if !org.isEmpty { PagePill(text: org, color: ours ? PN.C.answer : PN.C.docs) }
                 Spacer(minLength: 0)
                 Text(L(list.count == 1 ? "sheet.people.one" : "sheet.people.n", ["n": "\(list.count)"]))

@@ -185,7 +185,7 @@ struct ProjectWizardView: View {
             HStack {
                 Button(L("common.cancel")) { done(nil) }.buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 Spacer()
-                if m.busy { ProgressView().controlSize(.small) }
+                if m.busy { PNSpinner(size: 16) }
                 if m.step != .name { Button(L("onboarding.back")) { m.back() }.buttonStyle(.pnTertiary) }
                 if m.step != .name && !m.isLast { Button(L("wiz.skip")) { m.next() }.buttonStyle(.pnTertiary) }
                 if m.isLast {

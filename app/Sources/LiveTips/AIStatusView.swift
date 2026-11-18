@@ -205,7 +205,7 @@ struct AIStatusList: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: AIStatus.symbol(m.level)).foregroundStyle(AIStatusIcon.color(m.level))
-                Text(m.title).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(m.title).pnSection().foregroundStyle(PN.C.text)
             }
             if m.rows.isEmpty {
                 Text(L("ai.status.none")).font(PN.Font.caption).foregroundStyle(PN.C.text3)

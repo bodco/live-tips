@@ -367,7 +367,7 @@ struct SheetQuickDone: View {
         PageCard(spacing: 10) {
             if job.done, let p = job.sheetPath, let s = SheetCache.shared.load(p) {
                 HStack {
-                    Text(s.title).font(PN.Font.section)
+                    Text(s.title).pnSection()
                     SheetReadinessPill(badge: s.readinessBadge)
                     Spacer()
                 }
@@ -422,7 +422,7 @@ struct SheetLinkSuggestion: View {
             Button(L("sheet.ui.link.move")) { draft.add(pasted: link) }.buttonStyle(.pnSecondary)
             Button(L("sheet.ui.link.keep")) { draft.keptLink.insert(link) }.buttonStyle(.pnTertiary)
         }
-        .padding(8).background(RoundedRectangle(cornerRadius: 8).fill(PN.C.accent.opacity(0.06)))
+        .padding(8).background(RoundedRectangle(cornerRadius: PN.r(8)).fill(PN.C.accent.opacity(0.06)))
     }
 }
 
@@ -606,8 +606,8 @@ struct SheetMeetingStep: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 10).fill(on ? PN.C.accent.opacity(0.1) : PN.C.surface))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(on ? PN.C.accent : Color.primary.opacity(0.12), lineWidth: on ? 2 : 1))
+            .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(on ? PN.C.accent.opacity(0.1) : PN.C.surface))
+            .overlay(RoundedRectangle(cornerRadius: PN.r(10)).stroke(on ? PN.C.accent : Color.primary.opacity(0.12), lineWidth: on ? 2 : 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -694,7 +694,7 @@ struct SheetBlocksStep: View {
 
     private var saveSheet: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L("sheet.ui.s2.save")).font(PN.Font.section)
+            Text(L("sheet.ui.s2.save")).pnSection()
             TextField(L("sheet.ui.s2.name"), text: $presetName).textFieldStyle(.roundedBorder)
             Text(L("sheet.ui.s2.saveNote", ["n": "\(draft.blocks.filter(\.visible).count)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             Toggle(L("sheet.ui.s2.suggestNew"), isOn: $suggestNew).toggleStyle(.checkbox)
@@ -742,7 +742,7 @@ struct SheetSourcesStep: View {
                             Button(L("sheet.ui.s3.choose")) { draft.chooseFiles() }.buttonStyle(.pnSecondary)
                         }
                         dropZone
-                        if draft.checking { HStack(spacing: 6) { ProgressView().controlSize(.small); Text(L("common.checking")).font(PN.Font.caption) } }
+                        if draft.checking { HStack(spacing: 6) { PNSpinner(size: 16); Text(L("common.checking")).font(PN.Font.caption) } }
                         ForEach($draft.sources) { $s in SheetDraftSourceRow(draft: draft, source: $s) }
                         if !draft.hasLinkedIn {
                             Label(L("sheet.ui.s3.noLinkedIn"), systemImage: "person.crop.square").font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
@@ -769,7 +769,7 @@ struct SheetSourcesStep: View {
             Text(L("sheet.ui.s3.dropSub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity).padding(16)
-        .background(RoundedRectangle(cornerRadius: 10).strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5])).foregroundStyle(dropping ? PN.C.accent : Color.primary.opacity(0.2)))
+        .background(RoundedRectangle(cornerRadius: PN.r(10)).strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [5])).foregroundStyle(dropping ? PN.C.accent : Color.primary.opacity(0.2)))
         .onDrop(of: [UTType.fileURL], isTargeted: $dropping) { items in
             for it in items {
                 _ = it.loadObject(ofClass: URL.self) { u, _ in
@@ -871,7 +871,7 @@ struct SheetDraftSourceRow: View {
             if pasting {
                 VStack(alignment: .leading, spacing: 6) {
                     TextEditor(text: $pasted).font(PN.Font.body).frame(height: 90)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.15)))
+                        .overlay(RoundedRectangle(cornerRadius: PN.r(6)).stroke(Color.primary.opacity(0.15)))
                     HStack {
                         Spacer()
                         Button(L("common.cancel")) { pasting = false }.buttonStyle(.pnTertiary)
@@ -956,7 +956,7 @@ struct SheetLinkedInCard: View {
                 Text(L("sheet.ui.li.pdfHow")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 Button(L("sheet.ui.s3.choose")) { draft.chooseFiles() }.buttonStyle(.pnSecondary)
             case "paste":
-                TextEditor(text: $pasted).font(PN.Font.body).frame(height: 100).overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.15)))
+                TextEditor(text: $pasted).font(PN.Font.body).frame(height: 100).overlay(RoundedRectangle(cornerRadius: PN.r(6)).stroke(Color.primary.opacity(0.15)))
                 Button(L("sheet.ui.s3.saveText")) { saveManual(pasted) }.buttonStyle(.pnSecondary).disabled(pasted.isEmpty)
             case "hand":
                 TextField(L("sheet.ui.li.role"), text: $role).textFieldStyle(.roundedBorder)
@@ -1041,7 +1041,7 @@ struct SheetSizeStep: View {
                     }
                 }
             }
-            if let s = draft.size { scale(s) } else if draft.checking { ProgressView() }
+            if let s = draft.size { scale(s) } else if draft.checking { PNSpinner(size: 24) }
             biggest
         }
         .onAppear { if draft.size == nil { draft.checkSize() } }
@@ -1094,7 +1094,7 @@ struct SheetTooMuch: View {
     var done: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L("sheet.ui.size.tooMuch")).font(PN.Font.section)
+            Text(L("sheet.ui.size.tooMuch")).pnSection()
             Text(L("sheet.ui.s4.tooMuchSub")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             option("passes", icon: "square.split.2x1") { draft.plan = "passes" }
             option("compress", icon: "text.redaction") { draft.plan = "compress" }
@@ -1117,7 +1117,7 @@ struct SheetTooMuch: View {
                 }
                 Spacer()
             }
-            .padding(10).background(RoundedRectangle(cornerRadius: 10).fill(PN.C.surface)).contentShape(Rectangle())
+            .padding(10).background(RoundedRectangle(cornerRadius: PN.r(10)).fill(PN.C.surface)).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

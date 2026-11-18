@@ -668,7 +668,7 @@ struct TranscribeView: View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text(m.title).font(PN.Font.section).lineLimit(1)
+                    Text(m.title).pnSection().lineLimit(1)
                     Spacer()
                     TextField(L("tr.search"), text: $query).textFieldStyle(.roundedBorder).frame(width: 200)
                 }
@@ -707,7 +707,7 @@ struct TranscribeView: View {
     private var speakersCard: some View {
         let team = ProjectRegistry.load(from: AppPaths.projects).projects.first { "project:" + $0.slug == m.saveTarget }?.people.map(\.name) ?? []
         return VStack(alignment: .leading, spacing: 10) {
-            HStack { Text(L("tr.speakers")).font(PN.Font.section); Spacer(); if m.busy { ProgressView().controlSize(.small) } }
+            HStack { Text(L("tr.speakers")).pnSection(); Spacer(); if m.busy { PNSpinner(size: 16) } }
             ForEach(m.speakers) { s in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
@@ -754,7 +754,7 @@ struct TranscribeView: View {
     private var saveCard: some View {
         let reg = ProjectRegistry.load(from: AppPaths.projects)
         return VStack(alignment: .leading, spacing: 10) {
-            Text(L("tr.save")).font(PN.Font.section)
+            Text(L("tr.save")).pnSection()
             TextField(L("tr.title"), text: $m.title).textFieldStyle(.roundedBorder)
             HStack {
                 Toggle(L("tr.date"), isOn: Binding(get: { m.date != nil }, set: { m.date = $0 ? (m.date ?? Date()) : nil })).toggleStyle(.checkbox)

@@ -127,7 +127,7 @@ struct OnboardingView: View {
                     Spacer()
                     if m.step != .welcome {
                         Text(L("onb.stepOf", ["n": "\(m.step.rawValue)", "total": "\(OnboardingModel.Step.allCases.count - 1)"]))
-                            .font(PN.Font.label).foregroundStyle(PN.C.text3)
+                            .pnLabel().foregroundStyle(PN.C.text3)
                     }
                     Spacer()
                     if m.step != .done { Button(L("onb.later")) { close() }.buttonStyle(.pnTertiary) } else { Color.clear.frame(width: 16, height: 16) }
@@ -368,7 +368,7 @@ struct OnboardingView: View {
                 VStack(spacing: 0) {
                     HStack(spacing: 10) {
                         Image(nsImage: Brand.menuBarImage(recording: false))
-                            .padding(6).background(RoundedRectangle(cornerRadius: 6).fill(PN.C.surface2))
+                            .padding(6).background(RoundedRectangle(cornerRadius: PN.r(6)).fill(PN.C.surface2))
                         Text(L("onb.done.menubar")).font(PN.Font.body).foregroundStyle(PN.C.text)
                         Spacer()
                     }
@@ -406,7 +406,7 @@ struct OnboardingView: View {
                         Text(cc.state == .ok ? cc.detail : L("setup.step.claude.why")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
                     }
                     Spacer()
-                    if cc.state == .installing { ProgressView().controlSize(.small) }
+                    if cc.state == .installing { PNSpinner(size: 16) }
                     else if cc.state != .ok { Button(L("onboarding.claude.install")) { Task { await setup.installOne("claude") } }.buttonStyle(.pnSecondary).disabled(setup.busy) }
                 }
                 .padding(10).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
@@ -445,14 +445,14 @@ struct OnboardingView: View {
     func beat(_ symbol: String, _ id: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Image(systemName: symbol).font(.system(size: 18)).foregroundStyle(PN.C.accent).accessibilityHidden(true)
-            Text(L("onb.beat.\(id).when")).font(PN.Font.label).foregroundStyle(PN.C.text3).padding(.top, 4)
-            Text(L("onb.beat.\(id).head")).font(PN.Font.section).foregroundStyle(PN.C.text)
+            Text(L("onb.beat.\(id).when")).pnLabel().foregroundStyle(PN.C.text3).padding(.top, 4)
+            Text(L("onb.beat.\(id).head")).pnSection().foregroundStyle(PN.C.text)
             Text(L("onb.beat.\(id).body", ["help": HotKeys.shared.combo(.help).display])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(16).frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
-        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: 14))
+        .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.r(14)))
         .accessibilityElement(children: .combine)
     }
 
@@ -461,7 +461,7 @@ struct OnboardingView: View {
             Text(action).foregroundStyle(PN.C.text)
             Spacer()
             Text(keys).font(PN.Font.caption.monospaced()).foregroundStyle(PN.C.text2)
-                .padding(.horizontal, 6).padding(.vertical, 2).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 6))
+                .padding(.horizontal, 6).padding(.vertical, 2).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(6)))
         }
         .padding(.vertical, 10)
     }
@@ -554,7 +554,7 @@ struct OnboardingAIChain: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L("onb.chain.title")).font(PN.Font.section).foregroundStyle(PN.C.text)
+            Text(L("onb.chain.title")).pnSection().foregroundStyle(PN.C.text)
             Text(L("onb.chain.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 6) {
                 ForEach(links) { l in
@@ -565,7 +565,7 @@ struct OnboardingAIChain: View {
                     .fixedSize()
                     .foregroundStyle(l.on && l.id != "4" ? PN.C.turn : PN.C.text2)
                     .padding(.horizontal, 8).padding(.vertical, 5)
-                    .background((l.on && l.id != "4" ? PN.C.turn.opacity(0.13) : PN.C.surface2), in: RoundedRectangle(cornerRadius: 6))
+                    .background((l.on && l.id != "4" ? PN.C.turn.opacity(0.13) : PN.C.surface2), in: RoundedRectangle(cornerRadius: PN.r(6)))
                     .accessibilityElement(children: .combine)
                     if l.id != "4" { Text("›").foregroundStyle(PN.C.text3).accessibilityHidden(true) }
                 }
@@ -724,7 +724,7 @@ struct SystemAudioSettingsPicture: View {
                     Text(L("onboarding.pic.pane")).font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.text)
                         .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 8) {
-                        RoundedRectangle(cornerRadius: 4).fill(PN.C.accent).frame(width: 16, height: 16)
+                        RoundedRectangle(cornerRadius: PN.r(4)).fill(PN.C.accent).frame(width: 16, height: 16)
                             .overlay(Image(systemName: "waveform").font(.system(size: 9, weight: .bold)).foregroundStyle(.white))
                         Text("Pacenote").font(.system(size: 11)).foregroundStyle(PN.C.text)
                         Spacer()
@@ -734,22 +734,22 @@ struct SystemAudioSettingsPicture: View {
                             .padding(3)
                             .overlay(Capsule().stroke(PN.C.onMe, lineWidth: 2))
                     }
-                    .padding(6).background(PN.C.surface, in: RoundedRectangle(cornerRadius: 6))
+                    .padding(6).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.r(6)))
                     HStack(spacing: 8) {
-                        RoundedRectangle(cornerRadius: 4).fill(PN.C.text3.opacity(0.35)).frame(width: 16, height: 16)
-                        RoundedRectangle(cornerRadius: 2).fill(PN.C.text3.opacity(0.25)).frame(width: 60, height: 6)
+                        RoundedRectangle(cornerRadius: PN.r(4)).fill(PN.C.text3.opacity(0.35)).frame(width: 16, height: 16)
+                        RoundedRectangle(cornerRadius: PN.r(2)).fill(PN.C.text3.opacity(0.25)).frame(width: 60, height: 6)
                         Spacer()
                         Capsule().fill(PN.C.text3.opacity(0.3)).frame(width: 26, height: 15)
                             .overlay(Circle().fill(.white).frame(width: 12, height: 12).offset(x: -5.5)).padding(3)
                     }
-                    .padding(6).background(PN.C.surface, in: RoundedRectangle(cornerRadius: 6))
+                    .padding(6).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.r(6)))
                 }
                 .padding(10).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(width: 400)
-        .background(PN.C.bg, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(PN.C.text3.opacity(0.25), lineWidth: 1))
+        .background(PN.C.bg, in: RoundedRectangle(cornerRadius: PN.r(10)))
+        .overlay(RoundedRectangle(cornerRadius: PN.r(10)).stroke(PN.C.text3.opacity(0.25), lineWidth: 1))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L("onboarding.pic.a11y"))
     }
@@ -762,7 +762,7 @@ struct SystemAudioSettingsPicture: View {
         .foregroundStyle(selected ? Color.white : PN.C.text2)
         .padding(.horizontal, 5).padding(.vertical, 3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(selected ? PN.C.accent : Color.clear, in: RoundedRectangle(cornerRadius: 4))
+        .background(selected ? PN.C.accent : Color.clear, in: RoundedRectangle(cornerRadius: PN.r(4)))
     }
 }
 

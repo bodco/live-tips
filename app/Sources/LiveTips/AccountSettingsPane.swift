@@ -54,7 +54,7 @@ struct AccountSettingsPane: View {
                     if !s.email.isEmpty { Text(s.email).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
                 }
                 Spacer()
-                if acct.busy { ProgressView().controlSize(.small) }
+                if acct.busy { PNSpinner(size: 16) }
                 Button(L("account.signOut")) { Task { await acct.signOut(everywhere: false) } }.buttonStyle(.pnSecondary).disabled(acct.busy)
             }
             Text(L("account.syncLater")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
@@ -253,7 +253,7 @@ struct AccountUsageSection: View {
                 } else if failed {
                     Text(L("usage.failed")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else {
-                    ProgressView().controlSize(.small)
+                    PNSpinner(size: 16)
                 }
                 Text(L("usage.note")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 HStack {
@@ -270,7 +270,7 @@ struct AccountUsageSection: View {
         let top = max(v.max() ?? 0, 1)
         return HStack(alignment: .bottom, spacing: 2) {
             ForEach(Array(v.enumerated()), id: \.offset) { _, n in
-                RoundedRectangle(cornerRadius: 1).fill(n > 0 ? PN.C.brand : PN.C.surface2)
+                RoundedRectangle(cornerRadius: PN.r(1)).fill(n > 0 ? PN.C.brand : PN.C.surface2)
                     .frame(width: 6, height: max(2, 28 * CGFloat(n) / CGFloat(top)))
             }
         }
@@ -318,7 +318,7 @@ struct AccountSignInMethodsSection: View {
                 if !(a.google && a.password) {
                     Text(L("account.methods.last")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 }
-                if working { HStack(spacing: 8) { ProgressView().controlSize(.small); Text(L("google.waiting")).font(PN.Font.caption).foregroundStyle(PN.C.text2) } }
+                if working { HStack(spacing: 8) { PNSpinner(size: 16); Text(L("google.waiting")).font(PN.Font.caption).foregroundStyle(PN.C.text2) } }
                 if let p = problem {
                     Label(p, systemImage: "exclamationmark.circle.fill").font(PN.Font.caption).foregroundStyle(PN.C.danger)
                         .fixedSize(horizontal: false, vertical: true)
@@ -389,7 +389,7 @@ struct MethodSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PN.Space.x3) {
-            Text(title).font(PN.Font.section)
+            Text(title).pnSection()
             if kind == .disconnectGoogle {
                 Text(L("account.methods.disconnect.m")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             }
@@ -410,7 +410,7 @@ struct MethodSheet: View {
             HStack {
                 Toggle(L("auth.password.show"), isOn: $show).toggleStyle(.checkbox).font(PN.Font.caption)
                 Spacer()
-                if busy { ProgressView().controlSize(.small) }
+                if busy { PNSpinner(size: 16) }
                 Button(L("common.cancel"), action: done).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 Button(kind == .disconnectGoogle ? L("account.methods.google.remove") : L("account.methods.save"), action: save)
                     .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(busy)

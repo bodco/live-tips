@@ -115,7 +115,7 @@ struct HomeRouteView: View {
                     .sheet(isPresented: Binding(get: { narrow && nav.followUp == f }, set: { if !$0 { nav.followUp = nil } })) {
                         VStack(spacing: 0) {
                             HStack {
-                                Text(L("call.page.followup")).font(PN.Font.section)
+                                Text(L("call.page.followup")).pnSection()
                                 Spacer()
                                 Button(L("common.close")) { nav.followUp = nil }.buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)
                             }

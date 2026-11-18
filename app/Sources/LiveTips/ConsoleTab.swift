@@ -283,7 +283,7 @@ struct ConsoleTabView: View {
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize().disabled(session.platformBusy)
                     .accessibilityLabel(L("console.zone"))
-                    if session.platformBusy { ProgressView().controlSize(.small) }
+                    if session.platformBusy { PNSpinner(size: 16) }
                 } else {
                     Text(L(acct.me.map(PacenoteServer.consoleNoteKey) ?? "console.note")).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(1)
                 }
@@ -309,10 +309,10 @@ struct ConsoleTabView: View {
                 ConsoleWeb(web: session.web)
                 switch session.phase {
                 case .idle, .opening:
-                    ProgressView(L("console.opening")).padding(24).background(PN.C.bg)
+                    VStack(spacing: 12) { PNSpinner(size: 40); Text(L("console.opening")).foregroundStyle(PN.C.text2) }.padding(24).background(PN.C.bg)
                 case .failed(let why):
                     VStack(spacing: 10) {
-                        Text(L("console.failed")).font(PN.Font.section)
+                        Text(L("console.failed")).pnSection()
                         Text(why).font(PN.Font.body).foregroundStyle(PN.C.text2).multilineTextAlignment(.center).frame(maxWidth: 420)
                         Button(L("console.retry")) { Task { await session.open(force: true) } }.buttonStyle(.pnSecondary)
                     }
@@ -323,8 +323,8 @@ struct ConsoleTabView: View {
                 if acct.confirmingGoogle {
                     // over the Console while Google is asked again (the same sign-in as the first one)
                     VStack(spacing: 10) {
-                        ProgressView()
-                        Text(L("console.platform.google")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                        PNSpinner(size: 40)
+                        Text(L("console.platform.google")).pnSection().foregroundStyle(PN.C.text)
                         Text(L("console.platform.google.sub")).font(PN.Font.body).foregroundStyle(PN.C.text2)
                             .multilineTextAlignment(.center).frame(maxWidth: 420)
                         Button(L("common.cancel")) { acct.cancelConfirmGoogle() }.buttonStyle(.pnSecondary)

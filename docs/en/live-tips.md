@@ -1472,6 +1472,24 @@ project's EdDSA key, and the app checks the signature before it installs. The fe
 developer build) has updates off and keeps the manual check against GitHub in About. Versions before 0.16.0 have
 no updater: install 0.16.0 by hand once.
 
+**A new version says so (0.23.0).** When a new version is found, Pacenote opens a small update window: the version,
+what is new, Later and Install and restart (Install after the call during a call). It comes back on every launch until
+you update, once per launch, and never opens before the sign-in or the onboarding, over What's new, or during a call
+(a version found during a call opens it when the call ends). Home shows a banner at the top with the version, What's
+new, Later (hides it and the menu bar dot until the next launch) and Install. With automatic checks on, Pacenote also
+checks quietly about 20 seconds after every launch.
+
+**Three looks: Classic, Roadbook, Broadsheet (0.23.0).** Settings > General > Appearance has three style cards and a
+Mode (Same as the Mac, Light, Dark). Classic is the look Pacenote had before; Roadbook (the default) is square, with
+condensed capitals and a yellow plate under the mark; Broadsheet is square, with a heavy black type and lines instead of
+shadows. The style changes at once in every window, the menu bar panel and the tips window, without a restart. The
+fonts of Roadbook and Broadsheet travel inside the app (SIL OFL); Barlow has no Cyrillic, so Ukrainian text in Roadbook
+uses the system font for those faces. The Pacenote mark is the same in every style; its dot says the state: blue with
+no call, red with a ring while it listens, orange while the tips are paused. The menu bar icon has no clock any more,
+only its states (waiting for the call, recording, update, near a spending limit). The tips window header shows the
+state in the style: Listening (a ring and five sound level bars), Paused (the word on an orange plate), Mic off, Ready.
+Everything that moves stops under Reduce motion.
+
 **Windows and navigation.** Pacenote windows never join a tab group. The call page, a series, a transcript and
 Statistics open inside Home; Back (or Command-[) returns. The follow-up email is the right panel of the call page.
 

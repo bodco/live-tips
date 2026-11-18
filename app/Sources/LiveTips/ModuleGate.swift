@@ -86,7 +86,7 @@ struct LockedModuleView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: icon).foregroundStyle(tint)
-                Text(L("module." + module)).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("module." + module)).pnSection().foregroundStyle(PN.C.text)
             }
             Text(L("module." + module + ".what")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             switch state {

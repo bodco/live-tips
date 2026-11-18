@@ -13,7 +13,7 @@
   // ---------- i18n (Ukrainian is about 30% longer; the layout must survive it) ----------
   const STR = {
     en: {
-      listening: 'Listening', paused: 'Paused', muted: 'Mic off', ended: 'Call ended', ending: 'Ending the call…', starting: 'Starting…',
+      listening: 'Listening', soundLevel: 'Sound level', paused: 'Paused', muted: 'Mic off', ended: 'Call ended', ending: 'Ending the call…', starting: 'Starting…',
       rec: { start: 'Record the call', sound: 'Record the sound', screen: 'Record the sound and the screen', rec: 'Rec', paused: 'Paused',
         pause: 'Pause the recording', resume: 'Resume the recording', stop: 'Stop and save the recording', source: 'Record another window or screen',
         settings: 'Recording settings', choosing: 'Choose what to record…', starting: 'Starting the recording…', menu: 'Recording',
@@ -103,7 +103,7 @@
       bbRunningSub: 'Recording and tips keep going. The new brief takes over when it is ready, about 1 min.', bbCancel: 'Cancel'
     },
     uk: {
-      listening: 'Слухаю', paused: 'Пауза', muted: 'Мікрофон вимкнено', ended: 'Дзвінок завершено', ending: 'Завершую дзвінок…', starting: 'Запускаю…',
+      listening: 'Слухаю', soundLevel: 'Рівень звуку', paused: 'Пауза', muted: 'Мікрофон вимкнено', ended: 'Дзвінок завершено', ending: 'Завершую дзвінок…', starting: 'Запускаю…',
       rec: { start: 'Записати дзвінок', sound: 'Записати звук', screen: 'Записати звук і екран', rec: 'Запис', paused: 'Пауза',
         pause: 'Призупинити запис', resume: 'Продовжити запис', stop: 'Зупинити і зберегти запис', source: 'Записувати інше вікно чи екран',
         settings: 'Налаштування запису', choosing: 'Оберіть, що записувати…', starting: 'Запускаю запис…', menu: 'Запис',
@@ -196,6 +196,7 @@
   const PREFS = window.LT_PREFS || {};
   const S = {
     lang: PREFS.ui_lang === 'uk' ? 'uk' : 'en', theme: 'auto',
+    style: ['classic', 'roadbook', 'broadsheet'].includes(PREFS.ui_style) ? PREFS.ui_style : 'roadbook',     // redesign block 1: Settings > General > Appearance
     call: { title: '', state: 'live', startedAt: null, paused: false, micOff: false, minutesLeft: null, mode: 'normal', recap: '', briefLine: '', alert: null },
     agenda: [], questions: [], cards: [], onMe: [], next: null, deal: null,
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
@@ -301,6 +302,8 @@
     person: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true" style="color:var(--accent)"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 14c.6-2.8 2.6-4.2 5-4.2s4.4 1.4 5 4.2"/></svg>',
     x: '<svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"/></svg>'
   };
+  // Redesign block 3: the mark of the empty Listening state: the dot is the recording color and a ring leaves it (the ring is off under Reduce motion)
+  const LMARK = '<svg class="mark lm" viewBox="320 206 460 626" aria-hidden="true"><path d="M400 742V404C400 312 466 262 556 262C664 262 724 330 724 412C724 500 662 560 556 560H500" fill="none" stroke="currentColor" stroke-width="92" stroke-linecap="round" stroke-linejoin="round"/><circle class="lm-ping" cx="400" cy="752" r="70" fill="var(--rec)"/><circle cx="400" cy="752" r="70" fill="var(--rec)"/></svg>';
   const MARK = '<svg class="mark" viewBox="320 206 460 626" aria-hidden="true"><path d="M400 742V404C400 312 466 262 556 262C664 262 724 330 724 412C724 500 662 560 556 560H500" fill="none" stroke="currentColor" stroke-width="92" stroke-linecap="round" stroke-linejoin="round"/><circle cx="400" cy="752" r="70" fill="var(--brand)"/></svg>';
 
   // ---------- Render ----------
@@ -426,8 +429,12 @@
   function renderNow() {
     const t = T();
     document.documentElement.lang = S.lang;
-    if (S.theme === 'auto') document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', S.theme);
+    // Redesign block 1: the style (data-style) and the mode (data-theme). Classic is the :root of tokens.css (no attribute);
+    // Roadbook and Broadsheet have a block per mode, so the mode must be explicit: 'auto' follows the Mac here.
+    const doc = document.documentElement, dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (S.style === 'classic') doc.removeAttribute('data-style'); else doc.setAttribute('data-style', S.style);
+    if (S.theme === 'auto' && S.style === 'classic') doc.removeAttribute('data-theme');
+    else doc.setAttribute('data-theme', S.theme === 'auto' ? (dark ? 'dark' : 'light') : S.theme);
     const app = $('app');
     // 0.10.0 (Meeting Sheet, phase 7): a stand-up opens in the small window once (my update, today, whom to ask);
     // the PM's own switch back to the full window wins for the rest of the call.
@@ -437,13 +444,22 @@
 
     // header: dot, timer, status (or the one problem that matters), On me, menu
     const isReady = S.call.state === 'ready', ended = S.call.state === 'ended';
-    $('rec').classList.toggle('paused', !!S.call.paused || ended);
-    $('rec').classList.toggle('ready', isReady);
+    // Redesign block 3: the header states (Pacenote redesign handoff, section 3). Listening: dot with a ring, bars, the word in the
+    // recording color. Paused: hollow dot, the word on a plate, no ring, no bars. Mic off: the ring stays, no bars. Presenting: the word
+    // in ink2. Not recording, Ready, Call ended: no ring and no bars.
+    const idle = isReady || ended, pausedNow = !!S.call.paused && !ended, micOffNow = !!S.call.micOff, live = !idle && !pausedNow;
+    $('rec').classList.toggle('paused', pausedNow);
+    $('rec').classList.toggle('ready', idle);
+    $('rec').classList.toggle('ring', live);
+    $('lvl').classList.toggle('on', live && !micOffNow);
+    $('lvl').setAttribute('aria-label', t.soundLevel || STR.en.soundLevel);
     $('timer').style.display = isReady || !S.call.startedAt ? 'none' : '';
     const al = S.call.alert;
     const st = $('status');
     st.textContent = al ? al.text : isReady ? t.readyStatus : ended ? t.ended : S.call.paused ? t.paused : (S.call.micOff ? t.muted : t.listening);
     st.classList.toggle('warn', !!(al && al.level === 'warn'));
+    const stKind = al || idle ? '' : pausedNow ? 'st-paused' : micOffNow ? 'st-mic' : presenting() ? 'st-pres' : 'st-live';
+    ['st-live', 'st-paused', 'st-mic', 'st-pres'].forEach((k) => st.classList.toggle(k, k === stKind));
     guard('ai', () => renderAI());
     const openOnMe = openOnMeCount();
     $('onmeLbl').textContent = t.onMe; $('onmeN').textContent = openOnMe;
@@ -601,7 +617,7 @@
         <div class="foot">${esc(t.onDevice)}</div>`;
     } else {
       const off = S.call.tipsOff && S.call.state !== 'ended';     // 0.8.5: Tips off or a Transcript call
-      el.innerHTML = `<div class="ring">${MARK}</div><div class="t1">${esc(S.call.state === 'ended' ? t.ended : off ? t.tipsOffTitle : t.listeningTitle)}</div>` +
+      el.innerHTML = `<div class="lmark">${S.call.state === 'ended' ? `<span class="pl">${MARK}</span>` : `<span class="pl">${LMARK}</span><span class="lvl big pn-lv on" role="img" aria-label="${esc(t.soundLevel)}"><i></i><i></i><i></i><i></i><i></i></span>`}</div><div class="t1">${esc(S.call.state === 'ended' ? t.ended : off ? t.tipsOffTitle : t.listeningTitle)}</div>` +
         (S.call.state === 'ended' ? '' : `<div class="t2">${esc(off ? t.tipsOffSub : t.listeningSub(S.keys.help))}</div>`);
     }
     return true;
@@ -1740,6 +1756,7 @@
     },
     setLang(l) { S.lang = STR[l] ? l : 'en'; if (feed) feed.emit(); render(); post('setting', { key: 'ui_lang', value: S.lang }); },
     setTheme(th) { S.theme = th; render(); },
+    setStyle(st) { if (['classic', 'roadbook', 'broadsheet'].includes(st)) { S.style = st; render(); } },     // redesign block 1: the app's style changed
     setOpacity(v) { document.documentElement.style.setProperty('--fade', String(Math.max(0.35, Math.min(1, +v || 1)))); },
     setMode,
     setKeys(k) { S.keys = Object.assign({}, S.keys, k); render(); },
@@ -1791,6 +1808,8 @@
   if (PREFS.keys) S.keys = Object.assign({}, S.keys, PREFS.keys);
   render();
   if (inApp) { post('setting', { key: 'ui_lang', value: S.lang }); post('ready'); }
+
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.theme === 'auto' && S.style !== 'classic') render(); });
 
   // ---------- Demo data when opened in a browser (?state=ready|empty, ?lang=uk, ?theme=dark, ?mode=presentation, ?left=4, ?spk=open) ----------
   if (!inApp) {

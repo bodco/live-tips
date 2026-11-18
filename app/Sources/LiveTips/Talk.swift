@@ -302,7 +302,7 @@ struct TalkView: View {
     private func ownerTag(_ s: TalkSlide) -> some View {
         Text(s.who == "me" ? L("deck.me") : s.who == "shared" ? L("deck.all") : s.speaker)
             .font(PN.Font.caption.weight(.medium)).foregroundStyle(s.who == "me" ? PN.C.accent : PN.C.text2)
-            .padding(.horizontal, 6).padding(.vertical, 2).background(RoundedRectangle(cornerRadius: 4).fill(PN.C.surface2))
+            .padding(.horizontal, 6).padding(.vertical, 2).background(RoundedRectangle(cornerRadius: PN.r(4)).fill(PN.C.surface2))
     }
 
     private func card(_ s: TalkSlide) -> some View {

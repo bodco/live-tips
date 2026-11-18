@@ -58,7 +58,7 @@ public enum SettingsSearch {
         .init("gen.name", "general", g("basics"), title: "set.yourNameOnCalls", words: "name alias me імʼя ім'я псевдонім"),
         .init("gen.folder", "general", g("basics"), title: "set.workFolder", words: "folder work root тека папка робоча"),
         .init("gen.lang", "general", g("basics"), title: "callSettings.uiLang", words: "language english ukrainian мова англійська українська"),
-        .init("gen.theme", "general", g("basics"), title: "set.theme", words: "theme dark light appearance тема темна світла"),
+        .init("gen.theme", "general", g("basics"), title: "set.appearance", words: "appearance style mode theme dark light classic roadbook broadsheet вигляд стиль режим тема темна світла"),
         .init("gen.dock", "general", g("basics"), title: "settings.general.dock", words: "dock icon док іконка"),
         .init("gen.stealth", "general", g("calls"), title: "set.hideTheTipsWindow", words: "stealth hide screen sharing tips window приховати вікно підказок"),
         .init("gen.floating", "general", g("calls"), title: "floating.setting", words: "floating controls call buttons кнопки дзвінка"),

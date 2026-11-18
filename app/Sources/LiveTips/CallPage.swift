@@ -495,7 +495,7 @@ struct CallPageView: View {
             HStack(spacing: 12) {
                 Button(making ? L("page.mn.making") : L("page.mn.make")) { makeMeeting() }
                     .buttonStyle(.pnPrimary).disabled(making)
-                if making { ProgressView().controlSize(.small) }
+                if making { PNSpinner(size: 16) }
                 Text(L(hasNotes ? "page.mn.cost" : "page.mn.costFull")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             .padding(.top, 4)
@@ -784,7 +784,7 @@ struct CallPageView: View {
                 if !mine {
                     HStack(spacing: 8) {
                         PageAvatar(name: who)
-                        Text(who).font(PN.Font.section).foregroundStyle(PN.C.text2)
+                        Text(who).pnSection().foregroundStyle(PN.C.text2)
                     }
                     .padding(.horizontal, 6).padding(.top, who == owners.first ? 2 : 12).padding(.bottom, 2)
                 }
@@ -917,7 +917,7 @@ struct CallPageView: View {
     @ViewBuilder private func section(_ title: String, _ rows: [Text]) -> some View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(title).pnSection().foregroundStyle(PN.C.text)
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, t in
                     HStack(alignment: .top, spacing: 8) {
                         Text("•").foregroundStyle(PN.C.text3)
@@ -1011,7 +1011,7 @@ struct CallPageView: View {
                                         Text(L("dec.inRegister")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                                     }
                                 } else if adding.contains(d) {
-                                    ProgressView().controlSize(.small)
+                                    PNSpinner(size: 16)
                                 }
                             })
                 if let s = supersede[d] { supersedeRow(d, s) }
@@ -1187,7 +1187,7 @@ struct TranscriptView: View {
                     }
                 }
                 .padding(.horizontal, 10).frame(height: 30)
-                .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 8))
+                .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(8)))
                 .frame(maxWidth: 360)
                 if speakers.count > 1 {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -1285,7 +1285,7 @@ struct FollowUpView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L("followup.note")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             if model.busy {
-                HStack(spacing: 8) { ProgressView().controlSize(.small); Text(L("followup.writing")).foregroundStyle(PN.C.text2) }
+                HStack(spacing: 8) { PNSpinner(size: 16); Text(L("followup.writing")).foregroundStyle(PN.C.text2) }
             }
             if !model.error.isEmpty { Text(model.error).font(PN.Font.caption).foregroundStyle(PN.C.danger) }
             // 0.8.7 (J1): the draft is written as soon as the panel opens; no Write draft button
@@ -1349,7 +1349,7 @@ struct PageLabel<Trailing: View>: View {
     @ViewBuilder var trailing: () -> Trailing
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(text.uppercased()).font(PN.Font.label).kerning(0.4).foregroundStyle(color)
+            Text(text.uppercased()).pnLabel().kerning(0.4).foregroundStyle(color)
             Spacer(minLength: 8)
             trailing()
         }
@@ -1366,7 +1366,7 @@ struct PagePill: View {
     var body: some View {
         Text(text).font(.system(size: 12, weight: .semibold)).foregroundStyle(color).lineLimit(1)
             .padding(.horizontal, 8).padding(.vertical, 2)
-            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: PN.r(6)))
     }
 }
 
@@ -1388,7 +1388,7 @@ struct PageIconTile: View {
     let color: Color
     var body: some View {
         Image(systemName: icon).font(.system(size: 11, weight: .semibold)).foregroundStyle(color)
-            .frame(width: 22, height: 22).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+            .frame(width: 22, height: 22).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: PN.r(6)))
             .accessibilityHidden(true)
     }
 }

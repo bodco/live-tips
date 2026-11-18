@@ -385,7 +385,7 @@ struct PacenoteBrowserView: View {
                 Image(systemName: "lock.shield").foregroundStyle(.secondary)
                 Text(L("sheet.browser.session")).foregroundStyle(.secondary)
             case .working(let s):
-                ProgressView().controlSize(.small)
+                PNSpinner(size: 16)
                 Text(s)
                 Spacer()
                 Button(L("sheet.browser.cancel")) { model.cancel() }

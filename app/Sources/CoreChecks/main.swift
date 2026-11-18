@@ -2584,7 +2584,9 @@ func settingsSearchD2() {
     expect(["ai.claude", "ai.openai", "ai.gemini", "int.notion.token", "int.hubspot.key"].allSatisfy(key.contains), "d2: \"key\" finds the keys: \(key.sorted())")
     expect(Set(SettingsSearch.find("ключ", titles: titles).map(\.id)).isSuperset(of: ["ai.claude", "int.hubspot.key"]), "d2: \"ключ\" finds the keys")
     expect(SettingsSearch.find("мова", titles: titles).first?.id == "gen.lang", "d2: \"мова\" opens Language first")
-    expect(SettingsSearch.find("Theme", titles: titles).first?.id == "gen.theme", "d2: a title prefix ranks first")
+    expect(SettingsSearch.find("Appearance", titles: titles).first?.id == "gen.theme", "d2: a title prefix ranks first")
+    expect(SettingsSearch.find("Theme", titles: titles).map(\.id).contains("gen.theme"), "d2: the old word \"theme\" still finds Appearance")
+    expect(SettingsSearch.find("roadbook", titles: titles).first?.id == "gen.theme", "redesign: a style name opens Appearance")
     expect(SettingsSearch.find("notion key", titles: titles).first?.id == "int.notion.token", "d2: two words narrow it down")
     expect(SettingsSearch.find("bant", titles: titles).map(\.id).contains("pr.sales"), "d2: synonyms find the setting")
     expect(SettingsSearch.find("zzqx", titles: titles).isEmpty, "d2: nothing for nonsense")
@@ -4010,6 +4012,32 @@ updatesD3()
 orgsB6b()
 prepSecuritySEC01()
 projectsWizard0170()
+// MARK: 2026-11-18 (redesign block 1): the style setting (Settings > General > Appearance)
+func appearanceStyleR1() {
+    let d = AppConfig()
+    expect(d.appearanceStyle == "roadbook" && d.appearance == "system", "r1: a fresh config starts on Roadbook, mode follows the Mac")
+    // an old config.json has no style: it reads as the default, the mode is kept
+    let old = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"appearance\":\"dark\"}".utf8))
+    expect(old?.appearanceStyle == "roadbook" && old?.appearance == "dark", "r1: an old config gets the default style, keeps its mode")
+    var c = AppConfig(); c.appearanceStyle = "broadsheet"; c.appearance = "light"
+    let back = (try? JSONEncoder().encode(c)).flatMap { try? JSONDecoder().decode(AppConfig.self, from: $0) }
+    expect(back?.appearanceStyle == "broadsheet" && back?.appearance == "light", "r1: style and mode round-trip")
+}
+
+// MARK: 2026-11-18 (0.23.0): the update window on every launch, once per launch and version
+func updatePromptR() {
+    func show(_ v: String?, shown: Set<String> = [], signedIn: Bool = true, onboarded: Bool = true, live: Bool = false, other: Bool = false) -> Bool {
+        UpdatePrompt.shouldShow(newVersion: v, shownThisLaunch: shown, signedIn: signedIn, onboarded: onboarded, callLive: live, otherWindowUp: other)
+    }
+    expect(show("0.23.1"), "up: a new version opens the window")
+    expect(!show(nil) && !show(""), "up: nothing new, no window (also after Later on Home)")
+    expect(!show("0.23.1", shown: ["0.23.1"]), "up: once per launch")
+    expect(show("0.23.2", shown: ["0.23.1"]), "up: a newer version found later opens it again")
+    expect(!show("0.23.1", signedIn: false) && !show("0.23.1", onboarded: false), "up: not before the sign-in or the onboarding")
+    expect(!show("0.23.1", live: true), "up: never during a call")
+    expect(!show("0.23.1", other: true), "up: not over another first-run window")
+}
+
 itemIDs0170()
 pull0170()
 orgCard0170()
@@ -4020,5 +4048,7 @@ console0170()
 orgContext0170()
 salesBlocksS1()
 emailAuthB13()
+appearanceStyleR1()
+updatePromptR()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

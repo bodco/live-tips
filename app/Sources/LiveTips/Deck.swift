@@ -272,7 +272,7 @@ struct DeckBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(L("deck.title")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("deck.title")).pnSection().foregroundStyle(PN.C.text)
                 if d.phase == .ready { Text(L("deck.ready")).font(PN.Font.caption).foregroundStyle(PN.C.turn) }
                 Spacer()
             }
@@ -319,7 +319,7 @@ struct DeckBlock: View {
                 Button(L("common.cancel")) { model.deck = DeckSetup(speakers: d.speakers, duration: d.duration, durationFromCalendar: d.durationFromCalendar, qaOn: d.qaOn, qaMin: d.qaMin) }
                     .buttonStyle(.pnTertiary)
             }
-            if n > 0 { ProgressView(value: Double(i), total: Double(n)) } else { ProgressView().controlSize(.small) }
+            if n > 0 { ProgressView(value: Double(i), total: Double(n)) } else { PNSpinner(size: 16) }
             Text(L("deck.readingHint")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -469,11 +469,11 @@ struct DeckBlock: View {
                     if let info = d.info, let img = NSImage(contentsOfFile: info.thumb(n)) {
                         Image(nsImage: img).resizable().aspectRatio(16 / 10, contentMode: .fill).frame(width: 64, height: 40).clipped()
                     } else {
-                        RoundedRectangle(cornerRadius: 4).fill(PN.C.surface2).frame(width: 64, height: 40)
+                        RoundedRectangle(cornerRadius: PN.r(4)).fill(PN.C.surface2).frame(width: 64, height: 40)
                     }
-                    Text("\(n)").font(.system(size: 10, weight: .semibold)).padding(.horizontal, 4).background(PN.C.bg.opacity(0.85), in: RoundedRectangle(cornerRadius: 3)).padding(2)
+                    Text("\(n)").font(.system(size: 10, weight: .semibold)).padding(.horizontal, 4).background(PN.C.bg.opacity(0.85), in: RoundedRectangle(cornerRadius: PN.r(3))).padding(2)
                 }
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(tint, lineWidth: 1.5))
+                .overlay(RoundedRectangle(cornerRadius: PN.r(4)).stroke(tint, lineWidth: 1.5))
                 // 0.8.7 (G5): the first words of the slide, so a tile is recognisable without the thumbnail
                 Text(DeckSetup.firstWords(d.info?.slides.first { $0.n == n })).font(.system(size: 10)).foregroundStyle(PN.C.text2)
                     .lineLimit(2).multilineTextAlignment(.center).frame(width: 64, height: 26, alignment: .top)
@@ -515,7 +515,7 @@ struct DeckBlock: View {
 
     private var pasteSheet: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L("deck.pasteText")).font(PN.Font.section)
+            Text(L("deck.pasteText")).pnSection()
             Text(L("deck.pasteHint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             TextEditor(text: $pasted).font(PN.Font.body).frame(minHeight: 260)
                 .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(Color.primary.opacity(0.12)))

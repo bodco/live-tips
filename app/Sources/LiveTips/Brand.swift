@@ -25,42 +25,69 @@ enum Brand {
     static let blue = Color(red: 0x0A / 255, green: 0x6C / 255, blue: 0xFF / 255)
     static let blueLight = Color(red: 0x4D / 255, green: 0x9D / 255, blue: 0xFF / 255)
 
-    /// The menu bar image: a template (macOS tints it for the menu bar), drawn as vectors.
-    /// 2026-11-05 (owner): while recording the P stays the same and only its small dot turns red and filled. A red
-    /// dot cannot be a template, so that image draws the line in the menu bar's own text colour (light or dark bar).
-    /// 0.16.0 (D3): `update` adds a small blue dot at the top right when a new version is there (not while recording).
-    static func menuBarImage(recording: Bool, update: Bool = false) -> NSImage {
-        let update = update && !recording
+    /// The states of the menu bar icon (board MI-MenuIcon r15). The menu bar belongs to macOS, so the icon is the same in
+    /// Classic, Roadbook and Broadsheet: the 18 pt drawing, no plate, system red, blue and orange, no clock beside it.
+    enum MenuIconState {
+        case idle         // open dot, a template (macOS tints it)
+        case waiting      // armed, not recording yet: the dot filled in the colour of the bar text (a template)
+        case recording    // the dot turns red and filled; no tint, no blinking
+        case update       // a blue dot at the top right; never while recording
+        case nearLimit    // the whole icon orange: the call's soft limit, 90% of the month, or a provider alert
+    }
+
+    /// Redesign block 2: the menu bar image for a state. A template (macOS tints it for a light or a dark bar) when it
+    /// uses no colour; the others draw their line in the bar's own text colour (light or dark bar).
+    static func menuBarImage(_ state: MenuIconState) -> NSImage {
         let img = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             let m = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua, .vibrantLight, .vibrantDark])
             let dark = m == .darkAqua || m == .vibrantDark
-            let line = (recording || update) ? (dark ? NSColor.white : NSColor.black) : NSColor.black
+            let text = dark ? NSColor.white : NSColor.black
+            let orange = NSColor(srgbRed: 1, green: 0x95 / 255, blue: 0, alpha: 1)      // system orange of the board
+            let line: NSColor = state == .nearLimit ? orange : text
             ctx.setStrokeColor(line.cgColor)
             ctx.setLineCap(.round)
             ctx.setLineJoin(.round)
             ctx.setLineWidth(2)
             ctx.addPath(SVGPath.cgPath(barIdleD))
             ctx.strokePath()
-            if recording {
+            switch state {
+            case .recording:
                 let r: CGFloat = 2.3
                 ctx.setFillColor(NSColor(srgbRed: 1, green: 0x3B / 255, blue: 0x30 / 255, alpha: 1).cgColor)   // PN.C.rec
                 ctx.fillEllipse(in: CGRect(x: 6 - r, y: 15 - r, width: 2 * r, height: 2 * r))
-            } else {
+            case .waiting:
+                let r: CGFloat = 2.3
+                ctx.setFillColor(line.cgColor)
+                ctx.fillEllipse(in: CGRect(x: 6 - r, y: 15 - r, width: 2 * r, height: 2 * r))
+            case .idle, .update, .nearLimit:
                 let r: CGFloat = 1.75
                 ctx.setLineWidth(1.4)
                 ctx.strokeEllipse(in: CGRect(x: 6 - r, y: 15 - r, width: 2 * r, height: 2 * r))
             }
-            if update {
+            if state == .update {
                 let r: CGFloat = 2.6
-                ctx.setFillColor(NSColor(srgbRed: 0x0A / 255, green: 0x6C / 255, blue: 1, alpha: 1).cgColor)   // PN.C.brand
+                ctx.setFillColor(NSColor(srgbRed: 0x0A / 255, green: 0x6C / 255, blue: 1, alpha: 1).cgColor)   // the Classic blue
                 ctx.fillEllipse(in: CGRect(x: 15 - r, y: 3 - r, width: 2 * r, height: 2 * r))
             }
             return true
         }
-        img.isTemplate = !recording && !update
-        img.accessibilityDescription = recording ? "Pacenote, recording" : update ? "Pacenote, update available" : "Pacenote"
+        img.isTemplate = state == .idle || state == .waiting
+        switch state {
+        case .idle: img.accessibilityDescription = "Pacenote"
+        case .waiting: img.accessibilityDescription = "Pacenote, waiting for the call"
+        case .recording: img.accessibilityDescription = "Pacenote, recording"
+        case .update: img.accessibilityDescription = "Pacenote, update available"
+        case .nearLimit: img.accessibilityDescription = "Pacenote, near a spending limit"
+        }
         return img
+    }
+
+    /// The older call (recording or an update dot), kept for the onboarding screen and the screenshot mode.
+    /// 2026-11-05 (owner): while recording the P stays the same and only its small dot turns red and filled.
+    /// 0.16.0 (D3): `update` adds a small blue dot at the top right when a new version is there (not while recording).
+    static func menuBarImage(recording: Bool, update: Bool = false) -> NSImage {
+        menuBarImage(recording ? .recording : update ? .update : .idle)
     }
 
     /// The app icon (from AppIcon.icns in the bundle; the generic icon when run outside the bundle).

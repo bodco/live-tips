@@ -19,7 +19,7 @@ struct SettingsComponentsPane: View {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text(L("cmp.uses", ["size": ComponentCatalog.format(requiredBytes + optionalBytes)])).font(PN.Font.section)
+                        Text(L("cmp.uses", ["size": ComponentCatalog.format(requiredBytes + optionalBytes)])).pnSection()
                         Spacer()
                         Text(L("cmp.free", ["size": ComponentCatalog.format(DiskSpace.free)])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
@@ -31,7 +31,7 @@ struct SettingsComponentsPane: View {
                             Rectangle().fill(PN.C.brand).frame(width: g.size.width * Double(optionalBytes) / scale)
                             Spacer(minLength: 0)
                         }
-                        .background(PN.C.surface2).clipShape(RoundedRectangle(cornerRadius: 4))
+                        .background(PN.C.surface2).clipShape(RoundedRectangle(cornerRadius: PN.r(4)))
                     }
                     .frame(height: 8).accessibilityHidden(true)
                     HStack(spacing: 16) {
@@ -108,7 +108,7 @@ struct SettingsComponentsPane: View {
 
     func legend(_ c: Color, _ t: String) -> some View {
         HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 2).fill(c).frame(width: 8, height: 8).accessibilityHidden(true)
+            RoundedRectangle(cornerRadius: PN.r(2)).fill(c).frame(width: 8, height: 8).accessibilityHidden(true)
             Text(t).font(PN.Font.caption).foregroundStyle(PN.C.text2)
         }
     }
@@ -126,7 +126,7 @@ struct SettingsComponentsPane: View {
             Text(installed ? (oc.sizes[c.id].map(ComponentCatalog.format) ?? "…") : L("cmp.notInstalled"))
                 .font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(1).fixedSize().frame(minWidth: 90, alignment: .trailing)
             Group {
-                if case .removing = oc.state(c.id) { ProgressView().controlSize(.small) }
+                if case .removing = oc.state(c.id) { PNSpinner(size: 16) }
                 else if installed {
                     Button(oc.duringCall ? L("comp.afterCall") : L("cmp.remove")) { confirm = c.id }
                         .buttonStyle(.pnSecondary).disabled(oc.duringCall)

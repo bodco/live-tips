@@ -121,6 +121,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         var prefs = UserDefaults.standard.dictionary(forKey: "prompterPrefs") ?? [:]
         // 2026-10-27 (owner): one interface language for the whole app: the window follows Settings > General.
         prefs["ui_lang"] = MainActor.assumeIsolated { AppConfig.load(from: AppPaths.config).uiLanguage == "uk" ? "uk" : "en" }
+        prefs["ui_style"] = PNThemeModel.shared.style.rawValue     // redesign block 1: the window starts in the app's style
         prefs["keys"] = ["help": HotKeys.shared.combo(.help).display, "pause": HotKeys.shared.combo(.pause).display,
                          "mute": HotKeys.shared.combo(.mute).display,
                          "proactive": HotKeys.shared.combo(.proactive).display, "present": HotKeys.shared.combo(.presentation).display,
@@ -184,6 +185,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         // 0.9.5: the call recording's state in the top bar (record, pause, stop)
         NotificationCenter.default.addObserver(forName: CallRecorder.changed, object: nil, queue: .main) { [weak self] _ in
             self?.pushRecording()
+        }
+        // Redesign block 1: Settings > General > Appearance changed the style: the page sets data-style at once
+        NotificationCenter.default.addObserver(forName: .pnStyleChanged, object: nil, queue: .main) { [weak self] _ in
+            self?.web?.evaluateJavaScript("window.LiveTips && LiveTips.setStyle('\(PNThemeModel.shared.style.rawValue)')", completionHandler: nil)
         }
 
         web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)

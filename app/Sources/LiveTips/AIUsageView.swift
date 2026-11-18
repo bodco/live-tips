@@ -59,7 +59,7 @@ struct AIUsageView: View {
         let stages = AIUsage.byStage(sel)
         let total = AIUsage.total(sel)
         VStack(alignment: .leading, spacing: 12) {
-            Text(L("aiusage.title")).font(PN.Font.section)
+            Text(L("aiusage.title")).pnSection()
             Text(L("aiusage.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             Picker("", selection: $period) {
                 ForEach(Self.periods, id: \.self) { p in Text(L("aiusage.period." + p)).tag(p) }
@@ -79,7 +79,7 @@ struct AIUsageView: View {
                                              "in": Self.tok(total.input), "out": Self.tok(total.output)]))
                     .font(PN.Font.body.weight(.semibold)).monospacedDigit()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(L("aiusage.byStage")).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                    Text(L("aiusage.byStage")).pnLabel().foregroundStyle(PN.C.text3)
                     cells(Self.headCells(shown), header: true)
                     ForEach(AIUsage.stages, id: \.self) { s in
                         cells(Self.stageCells(s, stages[s] ?? [:], shown))
@@ -87,7 +87,7 @@ struct AIUsageView: View {
                     cells(Self.totalCells(sel, shown, total), header: true)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(L("aiusage.byModel")).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                    Text(L("aiusage.byModel")).pnLabel().foregroundStyle(PN.C.text3)
                     cells([L("aiusage.model"), L("aiusage.requests"), L("aiusage.input"), L("aiusage.output"), "$"], header: true)
                     if models.isEmpty {
                         Text(L("aiusage.none")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -100,7 +100,7 @@ struct AIUsageView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(Color.secondary.opacity(0.06)))
         .task { await reload() }
     }
 

@@ -69,7 +69,7 @@ struct OnYouView: View {
     private func badge(_ text: String) -> some View {
         Text(text).font(.system(size: 10, weight: .bold)).foregroundStyle(PN.C.text2)
             .padding(.horizontal, 4).padding(.vertical, 1)
-            .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 4))
+            .background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(4)))
     }
 
     private var onYouSection: some View {
@@ -78,7 +78,7 @@ struct OnYouView: View {
         df.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US")
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(L("home.onYou")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("home.onYou")).pnSection().foregroundStyle(PN.C.text)
                 if !items.isEmpty { Text("\(items.count)").font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.onMe) }
                 Spacer()
                 onYouFilterMenu

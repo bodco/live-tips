@@ -157,7 +157,7 @@ struct OrgItemSheet: View {
                         Button(L("orgreg.due.clear")) { run { await save(r, "") } }.buttonStyle(.pnTertiary)
                     }
                     Spacer()
-                    if busy { ProgressView().controlSize(.small) }
+                    if busy { PNSpinner(size: 16) }
                     Button(L("common.cancel")) { close() }.buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                     Button(L("common.save")) { run { await save(r, Self.iso.string(from: day)) } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                 }
@@ -168,7 +168,7 @@ struct OrgItemSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Spacer()
-                    if busy { ProgressView().controlSize(.small) }
+                    if busy { PNSpinner(size: 16) }
                     Button(L("common.cancel")) { close() }.buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                     Button(L("orgreg.delete.ok"), role: .destructive) {        // deleting is never the Return key
                         run { if let i = r.orgItem { await OrgRegisterStore.shared.delete(i, orgProject: r.orgProject) } }

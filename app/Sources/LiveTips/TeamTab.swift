@@ -192,7 +192,7 @@ struct TeamView: View {
                 Text(L("team.mode.overview")).tag(TeamStore.Mode.overview)
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize().accessibilityLabel(L("team.mode"))
-            if store.loading { ProgressView().controlSize(.small) }
+            if store.loading { PNSpinner(size: 16) }
         }
     }
 
@@ -311,7 +311,7 @@ struct TeamView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         TeamCallRow(item: h.call)
                         HStack(alignment: .top, spacing: 6) {
-                            Text(L("team.field." + h.field)).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                            Text(L("team.field." + h.field)).pnLabel().foregroundStyle(PN.C.text3)
                             Text(h.snippet).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(2)
                         }
                     }
@@ -336,7 +336,7 @@ struct TeamCallRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(item.ownerName.isEmpty ? L("team.someone") : item.ownerName).font(PN.Font.section).foregroundStyle(PN.C.text)
+                    Text(item.ownerName.isEmpty ? L("team.someone") : item.ownerName).pnSection().foregroundStyle(PN.C.text)
                     Text(TeamCalls.title(item, privateLabel: L("team.private"), untitled: L("team.untitled")))
                         .font(PN.Font.body).foregroundStyle(item.isPrivate && item.title == nil ? PN.C.text3 : PN.C.text)
                         .lineLimit(1)
@@ -430,7 +430,7 @@ struct TeamOverviewView: View {
         let top = max(w.map(\.n.calls).max() ?? 0, 1)
         return HStack(alignment: .bottom, spacing: 4) {
             ForEach(w) { x in
-                RoundedRectangle(cornerRadius: 2).fill(PN.C.brand)
+                RoundedRectangle(cornerRadius: PN.r(2)).fill(PN.C.brand)
                     .frame(width: 14, height: max(2, 40 * CGFloat(x.n.calls) / CGFloat(top)))
                     .help(L("team.week.help", ["week": x.week, "calls": "\(x.n.calls)", "hours": TeamCalls.hours(x.n.hours)]))
             }
@@ -471,7 +471,7 @@ struct TeamCallPage: View {
                 Text(p).font(PN.Font.body).foregroundStyle(PN.C.danger).padding(20)
                 Spacer()
             } else {
-                ProgressView().padding(20)
+                PNSpinner(size: 24).padding(20)
                 Spacer()
             }
         }
@@ -558,7 +558,7 @@ struct TeamCallPage: View {
                 if let g = s.goal, !g.isEmpty { Text(g).font(PN.Font.body) }
                 ForEach(s.blocks.filter(\.visible).sorted { $0.order < $1.order }) { b in
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(b.title).font(PN.Font.section)
+                        Text(b.title).pnSection()
                         ForEach(b.facts) { f in
                             Text((f.label.map { $0 + ": " } ?? "") + f.text).font(PN.Font.body).textSelection(.enabled)
                         }
@@ -615,7 +615,7 @@ struct AccountCallViewsSection: View {
                     } else if failed {
                         Text(L("usage.failed")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     } else {
-                        ProgressView().controlSize(.small)
+                        PNSpinner(size: 16)
                     }
                 } else {
                     HStack {

@@ -12,7 +12,7 @@ struct GooglePage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Google").font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text("Google").pnSection().foregroundStyle(PN.C.text)
                 Text(L("google.intro")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 if !g.configured {
                     Label(L("google.err.noClient"), systemImage: "exclamationmark.triangle.fill").foregroundStyle(PN.C.pending)
@@ -23,7 +23,7 @@ struct GooglePage: View {
                         .buttonStyle(.pnPrimary).disabled(!g.configured || g.signIn == .waiting)
                     switch g.signIn {
                     case .waiting:
-                        ProgressView().controlSize(.small)
+                        PNSpinner(size: 16)
                         Text(L("google.waiting")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         Button(L("common.cancel")) { g.cancelSignIn() }.buttonStyle(.pnTertiary)
                     case .failed(let e):
@@ -100,6 +100,6 @@ struct GooglePage: View {
             }
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(Color.secondary.opacity(0.06)))
     }
 }

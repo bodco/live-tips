@@ -524,7 +524,7 @@ struct StateIcon: View {
             switch state {
             case .notSet: Image(systemName: "circle.dashed").foregroundStyle(PN.C.text3).help(L("callSettings.role.none"))
             case .untested: Image(systemName: "circle.fill").foregroundStyle(.yellow).help(L("set.savedChecking"))
-            case .testing: ProgressView().controlSize(.small)
+            case .testing: PNSpinner(size: 16)
             case .ok(let m): Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn).help(m)
             case .failed(let m): Image(systemName: "xmark.octagon.fill").foregroundStyle(PN.C.danger).help(m)
             }
@@ -844,7 +844,7 @@ struct SettingsView: View {
                     SettingsSearchResults(model: model)
                 } else {
                 ForEach(Self.groups, id: \.key) { g in
-                    Text(L(g.key)).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                    Text(L(g.key)).pnLabel().foregroundStyle(PN.C.text3)
                         .padding(.horizontal, 8).padding(.top, g.key == Self.groups[0].key ? 2 : 12).padding(.bottom, 2)
                     ForEach(Self.panes.filter { g.ids.contains($0.id) }) { p in
                         Button { model.tab = p.id; model.integration = nil; model.projectDetail = nil } label: {
@@ -856,7 +856,7 @@ struct SettingsView: View {
                             }
                             .padding(.horizontal, 8).padding(.vertical, 4)
                             .contentShape(Rectangle())
-                            .background(RoundedRectangle(cornerRadius: 6).fill(model.tab == p.id ? PN.C.accent.opacity(0.14) : .clear))
+                            .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(model.tab == p.id ? PN.C.accent.opacity(0.14) : .clear))
                         }
                         .buttonStyle(.plain)
                     }
@@ -1257,8 +1257,8 @@ struct SettingsView: View {
                             .textFieldStyle(.plain).labelsHidden()
                     }
                     .padding(.horizontal, 7).frame(maxWidth: 220, minHeight: 24)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(Color(nsColor: .textBackgroundColor)))
-                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(0.2)))
+                    .background(RoundedRectangle(cornerRadius: PN.r(7)).fill(Color(nsColor: .textBackgroundColor)))
+                    .overlay(RoundedRectangle(cornerRadius: PN.r(7)).stroke(Color.secondary.opacity(0.2)))
                     Spacer()
                     Menu(L("home.finish.add")) {
                         Button(L("proj.add.new")) { showWizard = true }          // 0.17.0 (5.2): the wizard
@@ -1463,7 +1463,7 @@ struct SettingsView: View {
                 NotionDBRow(kind: "decisions", model: model)      // 0.8.8 (rules/decisions.yaml)
                 NotionFillChoices(model: model)
                 HStack {
-                    if dest.busy { ProgressView().controlSize(.small) }
+                    if dest.busy { PNSpinner(size: 16) }
                     Text(dest.note).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
                     Spacer()
                     Button(L("ntset.fillFromConfigs")) { fillFromConfigs() }.buttonStyle(.pnTertiary)
@@ -1588,13 +1588,11 @@ struct SettingsView: View {
                     Text("Українська").tag("uk")
                 }
                 .settingsAnchor("gen.lang")
-                Picker(L("set.theme"), selection: $model.config.appearance) {
-                    Text(L("set.theme.system")).tag("system")
-                    Text(L("set.theme.light")).tag("light")
-                    Text(L("set.theme.dark")).tag("dark")
-                }
-                .onChange(of: model.config.appearance) { AppDelegate.applyAppearance(model.config.appearance) }
-                .settingsAnchor("gen.theme")
+                // Redesign block 1: the style (Classic, Roadbook, Broadsheet) and the mode, both applied at once
+                AppearanceBlock(style: $model.config.appearanceStyle, mode: $model.config.appearance)
+                    .onChange(of: model.config.appearance) { AppDelegate.applyAppearance(model.config.appearance) }
+                    .onChange(of: model.config.appearanceStyle) { AppDelegate.applyStyle(model.config.appearanceStyle) }
+                    .settingsAnchor("gen.theme")
                 Toggle(L("settings.general.dock"), isOn: $model.config.showInDock)
                     .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
                     .settingsAnchor("gen.dock")
@@ -1791,8 +1789,8 @@ struct HowItWorksView: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.12)))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(color.opacity(0.4)))
+        .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(color.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: PN.r(8)).stroke(color.opacity(0.4)))
     }
 
     func row(_ icon: String, _ title: String, _ text: String) -> some View {
@@ -1989,7 +1987,7 @@ struct NotionSeesLine: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             Spacer()
-            if m.busy { ProgressView().controlSize(.small) }
+            if m.busy { PNSpinner(size: 16) }
             Button(L("set.check")) { m.find() }.disabled(m.busy)
         }
         .onAppear { if !m.searched && !m.busy { m.find() } }

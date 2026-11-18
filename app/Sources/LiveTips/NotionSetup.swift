@@ -191,7 +191,7 @@ struct NotionDestinationView: View {
                 HStack {
                     Text(L("nset.whereMeetingPagesGo")).font(.callout.weight(.medium))
                     Spacer()
-                    if m.busy { ProgressView().controlSize(.small) }
+                    if m.busy { PNSpinner(size: 16) }
                     Button(m.searched ? L("nset.findAgain") : L("nset.find")) { m.find() }.controlSize(.small)
                         .disabled(m.busy || !settings.isSet(.notionToken))
                 }
@@ -235,7 +235,7 @@ struct DestRow: View {
             }
             .padding(.horizontal, 8).padding(.vertical, 5)
             .contentShape(Rectangle())
-            .background(RoundedRectangle(cornerRadius: 6).fill(hover ? Color.accentColor.opacity(0.12) : .clear))
+            .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(hover ? Color.accentColor.opacity(0.12) : .clear))
         }
         .buttonStyle(.plain).disabled(disabled)
         .onHover { hover = $0 }

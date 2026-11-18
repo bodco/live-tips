@@ -13,7 +13,9 @@
     <header class="bar">
       <span class="rec" id="rec" aria-hidden="true"></span>
       <span class="timer" id="timer">00:00</span>
-      <span class="status" id="status"></span>
+      <span class="status" id="status" aria-live="polite"></span>
+      <!-- redesign block 3: the sound level (5 bars), only while listening -->
+      <span class="lvl pn-lv" id="lvl" role="img"><i></i><i></i><i></i><i></i><i></i></span>
       <!-- 0.10.0 (AI chain): the limit status of the AIs the jobs use; hover or click lists them -->
       <span class="aist" id="aiSt"></span>
       <span class="spacer"></span>

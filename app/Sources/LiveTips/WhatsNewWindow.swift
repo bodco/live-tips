@@ -53,7 +53,7 @@ struct WhatsNewView: View {
     var body: some View {
         Group {
         VStack(spacing: 12) {
-            Text(L("wn.updated", ["v": WhatsNewStore.current])).font(PN.Font.label).foregroundStyle(PN.C.text3).padding(.top, 16)
+            Text(L("wn.updated", ["v": WhatsNewStore.current])).pnLabel().foregroundStyle(PN.C.text3).padding(.top, 16)
             PacenoteSymbol(height: 44)
             Text(L("wn.title", ["v": WhatsNew.short(WhatsNewStore.current)])).font(.title.weight(.semibold)).foregroundStyle(PN.C.text)
             Text(items.contains { $0.setupStep != nil } ? L("wn.sub.setup", ["from": from]) : L("wn.sub", ["from": from]))
@@ -83,16 +83,16 @@ struct WhatsNewView: View {
                 Image(systemName: icon(i)).font(.system(size: 16)).foregroundStyle(PN.C.accent).frame(width: 20).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
-                        Text(i.title(lang)).font(PN.Font.section).foregroundStyle(PN.C.text)
+                        Text(i.title(lang)).pnSection().foregroundStyle(PN.C.text)
                         Text(WhatsNew.short(i.version)).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
-                            .padding(.horizontal, 6).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: 6))
+                            .padding(.horizontal, 6).background(PN.C.surface2, in: RoundedRectangle(cornerRadius: PN.r(6)))
                     }
                     Text(i.body(lang)).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 if stepDone {
                     Text(L("wn.stepDone")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.turn)
-                        .padding(.horizontal, 8).padding(.vertical, 2).background(PN.C.turn.opacity(0.13), in: RoundedRectangle(cornerRadius: 6))
+                        .padding(.horizontal, 8).padding(.vertical, 2).background(PN.C.turn.opacity(0.13), in: RoundedRectangle(cornerRadius: PN.r(6)))
                 } else if i.setupStep != nil {
                     Button(open == i.id ? L("wn.hide") : L("wn.choose")) { open = open == i.id ? nil : i.id }.buttonStyle(.pnPrimary)
                 } else if let t = i.tryIt, let f = FeatureRegistry.all.first(where: { $0.id == t }) {
@@ -144,6 +144,7 @@ enum WhatsNewWindow {
             if seen { WhatsNewStore.markSeen() }
             UsageLog.log("whatsnew_closed", ["seen": seen])
             window?.close()
+            UpdateService.shared.maybePrompt()      // 0.23.0: the update window waits for What's new
         } }))
         w.tabbingMode = .disallowed
         w.title = L("wn.window")
@@ -161,10 +162,10 @@ struct WhatsNewHistory: View {
     var body: some View {
         let lang = L10n.lang
         VStack(alignment: .leading, spacing: 10) {
-            Text(L("wn.history")).font(PN.Font.title).foregroundStyle(PN.C.text)
+            Text(L("wn.history")).pnTitle().foregroundStyle(PN.C.text)
             ForEach(WhatsNew.history(WhatsNewStore.items), id: \.version) { g in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Pacenote " + g.version).font(PN.Font.section).foregroundStyle(PN.C.text)
+                    Text("Pacenote " + g.version).pnSection().foregroundStyle(PN.C.text)
                     ForEach(g.items, id: \.id) { i in
                         HStack(alignment: .top, spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {

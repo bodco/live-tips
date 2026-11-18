@@ -183,7 +183,7 @@ struct ComponentStateLine: View {
         case .missing, .unknown:
             Text(id == "local_model" && !llm.installed ? L("comp.needsOllama") : L("comp.notInstalled")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
         case .installing(let p):
-            if let p = p { ProgressView(value: p).frame(maxWidth: 220) } else { ProgressView().controlSize(.small) }
+            if let p = p { ProgressView(value: p).frame(maxWidth: 220) } else { PNSpinner(size: 16) }
         case .removing: Text(L("comp.removing")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
         case .failed(let e): Text(e).font(PN.Font.caption).foregroundStyle(PN.C.danger).lineLimit(1)
         }

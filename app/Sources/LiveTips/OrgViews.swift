@@ -276,7 +276,7 @@ struct ProjectOrgSection: View {
                 LabeledContent(L("proj.org.newCalls")) {
                     HStack(spacing: 8) {
                         Text(target?.name ?? "-").foregroundStyle(PN.C.text2)
-                        if moving { ProgressView().controlSize(.small) }
+                        if moving { PNSpinner(size: 16) }
                         Menu(L("proj.org.move")) {
                             ForEach(me.orgs.filter { $0.id != target?.id }) { o in Button(o.name) { moveTo = o } }
                         }

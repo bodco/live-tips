@@ -3,6 +3,30 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.23.0 (not released yet)
+
+- **A new version says so (2026-11-18):** when a new Pacenote is out, a window shows the version, what is new, Later and
+  Install and restart. It comes back on every launch until you update (once per launch), never before the sign-in or
+  the onboarding and never during a call (it waits for the call to end). Home has a banner at the top: the version,
+  What's new, Later (until the next launch) and Install. Pacenote also checks quietly a little after every launch when
+  automatic checks are on.
+
+- **Three looks: Classic, Roadbook and Broadsheet (2026-11-18, redesign):** Settings > General > Appearance has three
+  style cards and a Mode (Same as the Mac, Light, Dark); Roadbook is the default. The style changes at once in every
+  window, the menu bar panel and the tips window. Buttons, badges, cards, corners, section heads, labels and page titles
+  take the style's shape and fonts (Roadbook and Broadsheet are square, with lines instead of shadows); the fonts travel
+  inside the app. Classic looks as before.
+- **The mark and motion (2026-11-18, redesign):** the Route P mark in every style; its dot is blue with no call, red
+  while Pacenote listens, orange while the tips are paused (also on the floating panel). A new spinner draws the P
+  instead of the system wheel. The menu bar icon lost its clock and shows its states (waiting for the call, recording,
+  update, near a spending limit).
+- **The tips window header shows the state in its style (2026-11-18, redesign block 3):** Listening is a dot with a ring, the
+  word in the recording color and five level bars; Paused is a hollow dot and the word on an orange plate, no ring and no
+  bars; Mic off keeps the ring and drops the bars; Ready and Call ended have neither. The empty Listening state has the
+  Pacenote mark with a ring from its dot and the bars beside it. In Roadbook and Broadsheet the answer card, On me, Resume
+  and the mic switch take the style's shape and fonts. In a narrow window the bars go first, then the Deal chip. Everything
+  that moves stops under Reduce motion.
+
 ## 0.22.0 (2026-11-18)
 
 - **Sign in to start (2026-11-18):** Pacenote now needs an account. The sign-in screen comes first, before onboarding

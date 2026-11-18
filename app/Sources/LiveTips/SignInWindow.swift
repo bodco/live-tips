@@ -191,7 +191,7 @@ struct SignInView: View {
     // MARK: steps
 
     @ViewBuilder private var choose: some View {
-        Text(L("gate.title")).font(PN.Font.title)
+        Text(L("gate.title")).pnTitle()
         Text(L("gate.intro")).font(PN.Font.body).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
         VStack(alignment: .leading, spacing: PN.Space.x2) {
             Button(action: m.google) { Text(L("account.signIn")).frame(maxWidth: .infinity) }
@@ -201,7 +201,7 @@ struct SignInView: View {
             switch acct.signIn {
             case .waiting:
                 HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
+                    PNSpinner(size: 16)
                     Text(L("google.waiting")).font(PN.Font.caption).foregroundStyle(PN.C.text2)
                     Spacer()
                     Button(L("auth.cancel")) { acct.cancelSignIn() }.buttonStyle(.pnTertiary)
@@ -258,7 +258,7 @@ struct SignInView: View {
             Button(L("auth.code.back")) { m.restart() }.buttonStyle(.pnTertiary)
             if !m.creating { Button(L("auth.forgot"), action: m.forgot).buttonStyle(.pnTertiary) }
             Spacer()
-            if m.busy { ProgressView().controlSize(.small) }
+            if m.busy { PNSpinner(size: 16) }
             Button(L(m.creating ? "auth.submit.create" : "auth.submit.signIn"), action: m.submitEmail)
                 .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(m.locked)
         }
@@ -266,7 +266,7 @@ struct SignInView: View {
     }
 
     @ViewBuilder private var codeStep: some View {
-        Text(L("auth.code.title")).font(PN.Font.title)
+        Text(L("auth.code.title")).pnTitle()
         Text(L("auth.code.sent", ["email": m.codeEmail])).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
         codeField
         lockedLine
@@ -277,13 +277,13 @@ struct SignInView: View {
             Button(L("auth.code.other"), action: m.otherEmail).buttonStyle(.pnTertiary)
             Button(L("auth.code.back")) { m.restart() }.buttonStyle(.pnTertiary)
             Spacer()
-            if m.busy { ProgressView().controlSize(.small) }
+            if m.busy { PNSpinner(size: 16) }
         }
         .onAppear { focus = .code }
     }
 
     @ViewBuilder private var resetAsk: some View {
-        Text(L("auth.reset.title")).font(PN.Font.title)
+        Text(L("auth.reset.title")).pnTitle()
         Text(L("auth.reset.intro")).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
         field(L("auth.email"), .email) {
             TextField("name@example.com", text: $m.email).textContentType(.username).focused($focus, equals: .email)
@@ -293,14 +293,14 @@ struct SignInView: View {
         HStack {
             Button(L("auth.code.back")) { m.step = .email }.buttonStyle(.pnTertiary)
             Spacer()
-            if m.busy { ProgressView().controlSize(.small) }
+            if m.busy { PNSpinner(size: 16) }
             Button(L("auth.reset.send"), action: m.sendReset).buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(m.locked)
         }
         .onAppear { focus = .email }
     }
 
     @ViewBuilder private var resetCode: some View {
-        Text(L("auth.reset.title")).font(PN.Font.title)
+        Text(L("auth.reset.title")).pnTitle()
         Text(L("auth.code.sent", ["email": m.codeEmail])).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
         codeField
         passwordField(L("auth.reset.new"), $m.newPassword, .newPassword)
@@ -312,14 +312,14 @@ struct SignInView: View {
         HStack {
             Button(L("auth.code.back")) { m.restart() }.buttonStyle(.pnTertiary)
             Spacer()
-            if m.busy { ProgressView().controlSize(.small) }
+            if m.busy { PNSpinner(size: 16) }
             Button(L("auth.reset.submit"), action: m.submitReset).buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(m.locked)
         }
         .onAppear { focus = .code }
     }
 
     @ViewBuilder private var linkStep: some View {
-        Text(L("auth.link.title")).font(PN.Font.title).fixedSize(horizontal: false, vertical: true)
+        Text(L("auth.link.title")).pnTitle().fixedSize(horizontal: false, vertical: true)
         Text(L("auth.link.body", ["email": acct.pendingLink?.email ?? ""])).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
         passwordField(L("auth.password"), $m.linkPassword, .linkPassword)
         lockedLine
@@ -328,7 +328,7 @@ struct SignInView: View {
             Button(L("auth.cancel"), action: m.cancelLink).buttonStyle(.pnTertiary)
             Button(L("auth.forgot"), action: m.linkForgot).buttonStyle(.pnTertiary)
             Spacer()
-            if m.busy { ProgressView().controlSize(.small) }
+            if m.busy { PNSpinner(size: 16) }
             Button(L("auth.link.submit"), action: m.submitLink).buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(m.locked)
         }
         .onAppear { focus = .linkPassword }
@@ -339,7 +339,7 @@ struct SignInView: View {
     /// A label above the field and the error under it, with an icon (never colour alone).
     @ViewBuilder private func field<F: View>(_ label: String, _ f: SignInModel.Field, @ViewBuilder _ content: () -> F) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(PN.Font.section)
+            Text(label).pnSection()
             content().textFieldStyle(.roundedBorder).accessibilityLabel(label)
             if m.errorField == f, let e = m.error { errorLine(e) }
         }

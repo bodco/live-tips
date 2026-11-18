@@ -624,3 +624,81 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 .aipop .j{color:var(--text-2)}
 .aipop .u{color:var(--text-3)}
 .aipop .sw{margin-top:6px;padding-top:6px;border-top:1px solid var(--separator,rgba(0,0,0,.06));color:var(--text-2)}
+
+/* ================= Redesign block 3: the tips window (styles Classic, Roadbook, Broadsheet) =================
+   Tokens: tokens.css. Roadbook and Broadsheet set data-style on <html> and define --pn-*; Classic has no data-style, so it gets
+   its own values here (":root:not([data-style])" is never true for the other two, so these can not override them). */
+:root:not([data-style]){--pn-notready:#E8590C;--pn-notready-text:#1D1D1F;--pn-nr-bg:#E8590C;--pn-nr-pad:0 5px;--pn-rec-text:var(--danger-text);
+  --pn-ring:1.6s cubic-bezier(.3,0,.2,1);--pn-bar-ease:ease-in-out;--pn-bar-radius:1.5px;--pn-status-radius:50%}
+@media (prefers-color-scheme: dark){:root:not([data-style]):not([data-theme="light"]){--pn-notready:#FFB340;--pn-notready-text:#FFB340;--pn-nr-bg:transparent;--pn-nr-pad:0}}
+:root:not([data-style])[data-theme="dark"]{--pn-notready:#FFB340;--pn-notready-text:#FFB340;--pn-nr-bg:transparent;--pn-nr-pad:0}
+
+/* the style sets the shape, the fonts and the lines through the variables the rest of this file already uses */
+[data-style]{--radius-s:var(--pn-radius-button);--radius-m:var(--pn-radius-card);--radius-l:var(--pn-radius-card);--font:var(--pn-font-text);--font-mono:var(--pn-font-mono)}
+[data-style] .bar{border-bottom:1px solid var(--pn-rule)}
+[data-style] .timer{font-family:var(--pn-font-mono)}
+[data-style] .kind,[data-style] .meta,[data-style] .row .m{font-family:var(--pn-font-mono)}
+[data-style] .kind{text-transform:uppercase;letter-spacing:var(--pn-l-track)}
+
+/* header dot: the status shape (square in Roadbook, a circle in Classic and Broadsheet), the ring leaves it while listening */
+.bar .rec{position:relative;width:10px;height:10px;box-sizing:border-box;border:1.5px solid var(--rec);border-radius:var(--pn-status-radius,50%)}
+.bar .rec::before{content:"";position:absolute;inset:-1.5px;border-radius:inherit;background:var(--rec);opacity:0;pointer-events:none}
+.bar .rec.ring::before{animation:pn-ping var(--pn-ring,1.6s cubic-bezier(.3,0,.2,1)) infinite}
+.bar .rec.paused{background:transparent;border-color:var(--pn-notready)}
+.bar .rec.ready{background:transparent;border-color:var(--text-3);box-shadow:none}
+@media (prefers-reduced-motion:reduce){.bar .rec.ring::before{animation:none}}
+/* the state word: a color and a weight on top of the word itself (never the color alone) */
+.status.st-live,.status.st-mic{color:var(--pn-rec-text,var(--danger-text));font-weight:600}
+.status.st-pres{color:var(--text-2);font-weight:600}
+.status.st-paused{color:var(--pn-notready-text);background:var(--pn-nr-bg,transparent);padding:var(--pn-nr-pad,0);font-weight:600}
+.status.warn{background:transparent;padding:0}
+.timer.paused{color:var(--text-3)}
+
+/* the sound level: 5 bars from the bottom (decorative cycle; Reduce motion: still, at their start heights) */
+.lvl{display:none;flex:none;align-items:flex-end;gap:2px;height:14px}
+.lvl.on{display:flex}
+.lvl i{display:block;width:3px;height:100%;background:var(--rec);border-radius:var(--pn-bar-radius,1.5px);transform-origin:50% 100%;transform:scaleY(var(--h,.5));
+  animation:pn-bar var(--d,1s) var(--pn-bar-ease,ease-in-out) infinite;animation-delay:calc(var(--i,0) * -.17s)}
+.lvl i:nth-child(1){--h:.5;--d:.9s;--i:0}
+.lvl i:nth-child(2){--h:.9;--d:1.1s;--i:1}
+.lvl i:nth-child(3){--h:.35;--d:1.3s;--i:2}
+.lvl i:nth-child(4){--h:.75;--d:1.0s;--i:3}
+.lvl i:nth-child(5){--h:.55;--d:1.2s;--i:4}
+.lvl.big{height:40px;gap:4px}
+.lvl.big i{width:6px}
+@media (prefers-reduced-motion:reduce){.lvl i{animation:none}}
+/* narrow window: the bars go first, then the Deal chip; On me stays */
+@container app (max-width: 560px){.lvl:not(.big){display:none}}
+@container app (max-width: 480px){#dealBtn{display:none}}
+
+/* header tools in Roadbook and Broadsheet: the state reads as a line or a plate, not as a tint */
+[data-style] .icon-btn.mic.off{background:transparent;border:1.5px solid var(--rec);color:var(--pn-rec-text)}
+[data-style] .icon-btn.pause.resume{background:var(--pn-notready);color:#0D0D0B;font-family:var(--pn-font-display);font-weight:800;text-transform:var(--pn-caps);letter-spacing:calc(var(--pn-l-track,0) / 2)}
+[data-style] .icon-btn.pause.resume:hover{background:var(--pn-notready)}
+[data-style] .onme{background:transparent;border:1.5px solid var(--pn-notready);color:var(--text);font-family:var(--pn-font-display);font-weight:800;text-transform:var(--pn-caps);letter-spacing:calc(var(--pn-l-track,0) / 2);font-size:14px}
+[data-style] .onme .n{background:var(--pn-notready);color:#0D0D0B;font-family:var(--pn-font-mono);font-size:11px;border-radius:0}
+[data-style] .icon-btn.bulb.on{background:transparent}
+
+/* the empty Listening state: the mark (52 px, on a plate in Roadbook), the ring from its dot, the bars beside it */
+.lmark{display:flex;align-items:flex-end;gap:14px;margin-bottom:4px}
+.lmark .pl{width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:var(--pn-mark-bg,transparent);color:var(--pn-mark-fg,var(--text))}
+.lmark .pl svg{height:52px;width:auto;overflow:visible}
+[data-style="roadbook"] .lmark .pl svg{height:38px}
+.lmark .lm-ping{transform-box:fill-box;transform-origin:center;opacity:0;animation:pn-ping var(--pn-ring,1.6s cubic-bezier(.3,0,.2,1)) infinite}
+@media (prefers-reduced-motion:reduce){.lmark .lm-ping{animation:none}}
+[data-style] .empty .t1{font-family:var(--pn-font-display);font-size:30px;font-weight:800;line-height:1;text-transform:var(--pn-caps);letter-spacing:var(--pn-d-track)}
+[data-style="broadsheet"] .empty .t1{font-weight:900}
+
+/* the answer card by style. Roadbook: the "now" fill, no shadow, the speech on a black block. Broadsheet: a heavy rule on top, the speech with a bar */
+[data-style] .hero{border-radius:0;box-shadow:none}
+[data-style] .hero .say{font-family:var(--pn-font-display);letter-spacing:var(--pn-d-track);text-transform:none}
+[data-style="roadbook"] .hero{background:var(--pn-hl-bg);color:var(--pn-hl-fg);animation:none}
+[data-style="roadbook"] .hero .kind,[data-style="roadbook"] .hero .why,[data-style="roadbook"] .hero .q{color:var(--pn-hl-fg)}
+[data-style="roadbook"] .hero .meta,[data-style="roadbook"] .hero .src,[data-style="roadbook"] .hero .ghost{color:rgba(13,13,11,.68)}
+[data-style="roadbook"] .hero .ghost:hover{background:rgba(13,13,11,.12);color:#0D0D0B}
+[data-style="roadbook"] .hero .say{background:#0D0D0B;color:#F1EDE3;padding:10px 12px}
+[data-style="broadsheet"] .hero{background:transparent;border-top:var(--pn-rule-heavy) solid var(--pn-rule-strong);animation:none}
+[data-style="broadsheet"] .hero .say{border-left:4px solid var(--pn-accent);padding:10px 12px}
+[data-style] .ratebox .chip,[data-style] .ratebox input{border-radius:var(--pn-radius-button)}
+[data-style] .seg{border-radius:0}
+[data-style] .agenda-list .st,[data-style] .rec.ready{border-radius:var(--pn-status-radius)}

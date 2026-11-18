@@ -102,7 +102,7 @@ struct CRMCallRow: View {
                         .accessibilityLabel(L("crm.changeDeal"))
                 }
                 Spacer()
-                if busy { ProgressView().controlSize(.small) }
+                if busy { PNSpinner(size: 16) }
                 Button(L("crm.refresh")) { refresh() }.buttonStyle(.pnTertiary).disabled(busy || base == nil)
                     .help(base == nil ? L("crm.refresh.needBase") : L("crm.refresh.help"))
             }

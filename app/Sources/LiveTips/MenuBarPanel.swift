@@ -152,7 +152,7 @@ struct MenuBarPanel: View {
     }
 
     private func label(_ t: String) -> some View {
-        Text(t.uppercased()).font(PN.Font.label).kerning(0.4).foregroundStyle(PN.C.text3)
+        Text(t.uppercased()).pnLabel().kerning(0.4).foregroundStyle(PN.C.text3)
             .padding(.horizontal, 6).padding(.top, 14).padding(.bottom, 4)
     }
 
@@ -171,8 +171,8 @@ struct MenuBarPanel: View {
         VStack(alignment: .leading, spacing: 3) { c() }
             .padding(.horizontal, 14).padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.06)))
+            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.r(12)))
+            .overlay(RoundedRectangle(cornerRadius: PN.r(12)).stroke(Color.primary.opacity(0.06)))
     }
 
     private func kicker(_ t: String, _ c: Color) -> some View {
@@ -279,7 +279,7 @@ struct MenuBarPanel: View {
                     }
                     .foregroundStyle(recOn ? PN.C.rec : PN.C.text2)
                     .frame(maxWidth: .infinity).frame(height: 30)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(recOn ? PN.C.rec.opacity(0.12) : PN.C.surface2))
+                    .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(recOn ? PN.C.rec.opacity(0.12) : PN.C.surface2))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -294,9 +294,9 @@ struct MenuBarPanel: View {
     private func wide(_ t: String, primary: Bool = false, danger: Bool = false, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
             Text(t).font(.system(size: 12, weight: primary ? .semibold : .medium)).lineLimit(1).minimumScaleFactor(0.85)
-                .foregroundStyle(primary ? Color.white : danger ? PN.C.danger : PN.C.text2)
+                .foregroundStyle(primary ? PN.C.onAccent : danger ? PN.C.danger : PN.C.text2)
                 .frame(maxWidth: .infinity).frame(height: 30)
-                .background(RoundedRectangle(cornerRadius: 8).fill(primary ? PN.C.accentFill : danger ? PN.C.danger.opacity(0.1) : PN.C.surface2))
+                .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(primary ? PN.C.accentFill : danger ? PN.C.danger.opacity(0.1) : PN.C.surface2))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -355,8 +355,8 @@ struct MenuBarPanel: View {
             HStack(spacing: 10) {
                 Image(systemName: icon).font(.system(size: 12, weight: .medium)).foregroundStyle(PN.C.accent)
                     .frame(width: 24, height: 24)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(PN.C.surface))
-                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.primary.opacity(0.08)))
+                    .background(RoundedRectangle(cornerRadius: PN.r(7)).fill(PN.C.surface))
+                    .overlay(RoundedRectangle(cornerRadius: PN.r(7)).stroke(Color.primary.opacity(0.08)))
                 Text(title).foregroundStyle(PN.C.text).lineLimit(1)
                 Spacer()
                 Text(key).foregroundStyle(PN.C.text3)
@@ -517,7 +517,7 @@ private struct MenuRowStyle: ButtonStyle {
         @State private var on = false
         var body: some View {
             configuration.label
-                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(configuration.isPressed ? 0.1 : on ? 0.06 : 0)))
+                .background(RoundedRectangle(cornerRadius: PN.r(7)).fill(Color.primary.opacity(configuration.isPressed ? 0.1 : on ? 0.06 : 0)))
                 .onHover { on = $0 }
         }
     }

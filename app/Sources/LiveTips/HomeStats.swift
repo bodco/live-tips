@@ -219,7 +219,7 @@ struct WeekStats: View {
         }
         .padding(compact ? 7 : 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
+        .background(RoundedRectangle(cornerRadius: PN.r(8)).fill(Color.secondary.opacity(0.08)))
     }
 
     private func fact(_ label: String, _ value: String) -> some View {

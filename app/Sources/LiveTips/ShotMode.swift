@@ -133,7 +133,8 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "p090" { p090(theme); continue }    // 0.9.0: Home in its integration states
             if env["LT_SHOTS_ONLY"] == "p092" { p092(theme); continue }    // 0.9.2: the site hero (Home + a live call)
             if env["LT_SHOTS_ONLY"] == "callpage" { callPageShots(theme); continue }   // 2026-11-05: the call page redesign, every tab
-            if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }   // 0.10.0: co-driver cards for the site
+            if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }
+            if env["LT_SHOTS_ONLY"] == "redesign" { if lang == "en" || theme == "light" { redesignShots(theme) }; continue }   // redesign 0.23.0: every style   // 0.10.0: co-driver cards for the site
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
             steps.append { [unowned self] in self.startCall(theme) }
@@ -304,6 +305,24 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if tab == "projects" { SettingsWindow.window?.close() }
             next()
         }
+    }
+
+    /// Redesign 0.23.0 (blocks 1-7): Home, Settings, the menu-bar panel and the tips window in its states, once per style.
+    /// Files: <screen>-<style>-<mode>.png (Ukrainian: light only, to check the fallback of Barlow for Cyrillic).
+    func redesignShots(_ theme: String) {
+        let base = "window.setStatus({state:'recording',title:'Orbit weekly with the client',started_at:new Date(Date.now()-18*60000).toISOString()";
+        for st in PNStyle.allCases {
+            let t = st.rawValue + "-" + theme
+            steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
+            steps.append { [unowned self] in HomeView.shotState = ""; self.home(t) }
+            steps.append { [unowned self] in self.settings("general", t) }
+            steps.append { [unowned self] in SettingsWindow.window?.close(); self.menuPanel(t, live: true) }
+            steps.append { [unowned self] in self.tipsExtra(t, js: "LiveTips.setStyle('\(st.rawValue)');" + base + "});", name: "rd-tips-live", size: NSSize(width: 1040, height: 640)) }
+            steps.append { [unowned self] in self.tipsExtra(t, js: "LiveTips.setStyle('\(st.rawValue)');" + base + ",tips_paused:'on'});", name: "rd-tips-paused", size: NSSize(width: 560, height: 620)) }
+            steps.append { [unowned self] in self.tipsExtra(t, js: "LiveTips.setStyle('\(st.rawValue)');" + base + ",mic:'muted'});", name: "rd-tips-micoff", size: NSSize(width: 560, height: 620)) }
+            steps.append { [unowned self] in self.tipsExtra(t, js: "LiveTips.setStyle('\(st.rawValue)');window.setStatus({state:'standby',title:'Orbit weekly with the client'});", name: "rd-tips-ready", size: NSSize(width: 560, height: 620)) }
+        }
+        steps.append { [unowned self] in PNThemeModel.shared.style = PNStyle.buildDefault; self.next() }
     }
 
     /// The tips window in a given state and size (Pacenote 0.8: 380, 560, 1000 px, ready, menu, brief).

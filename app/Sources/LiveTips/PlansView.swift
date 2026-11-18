@@ -144,7 +144,7 @@ struct PlansView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if m.loading && m.plans.isEmpty {
-                ProgressView(L("plans.loading")).frame(maxWidth: .infinity, minHeight: 200)
+                VStack(spacing: 12) { PNSpinner(size: 40); Text(L("plans.loading")).foregroundStyle(PN.C.text2) }.frame(maxWidth: .infinity, minHeight: 200)
             } else {
                 ScrollView(.horizontal) {
                     HStack(alignment: .top, spacing: 12) { ForEach(m.plans) { card($0) } }.padding(.bottom, 4)
@@ -193,7 +193,7 @@ struct PlansView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(p.name).font(.system(size: 17, weight: .bold)).foregroundStyle(PN.C.text)
                 Spacer()
-                if a == .current { Text(L("plans.current")).font(PN.Font.label).foregroundStyle(PN.C.turn) }
+                if a == .current { Text(L("plans.current")).pnLabel().foregroundStyle(PN.C.turn) }
             }
             priceLine(p)
             if p.trialDays > 0 { Text(L("plans.trial", ["n": "\(p.trialDays)"])).font(PN.Font.caption).foregroundStyle(PN.C.turn) }
@@ -269,7 +269,7 @@ struct PlansView: View {
 
     @ViewBuilder private func teamForm(_ p: SelfServe.Plan) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(L("plans.startTeam", ["plan": p.name])).font(PN.Font.section)
+            Text(L("plans.startTeam", ["plan": p.name])).pnSection()
             Text(L("plans.team.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 TextField(L("plans.team.name"), text: $m.teamName).textFieldStyle(.roundedBorder).frame(maxWidth: 320)
@@ -277,7 +277,7 @@ struct PlansView: View {
                 Button(L("plans.team.create")) { Task { await m.startTeam(p) } }
                     .buttonStyle(.pnPrimary).disabled(m.busy || m.teamName.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button(L("common.cancel")) { m.teamPlan = nil }.buttonStyle(.pnTertiary)
-                if m.busy { ProgressView().controlSize(.small) }
+                if m.busy { PNSpinner(size: 16) }
             }
         }
         .padding(12).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))

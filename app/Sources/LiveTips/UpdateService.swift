@@ -12,8 +12,10 @@ import SwiftUI
 /// has updates off and keeps the manual "Check for updates" against GitHub in About.
 ///
 /// Sparkle's own window shows only when the person asks to install an update that is not downloaded yet (it shows the
-/// release notes and the download); scheduled finds never pop up a window (gentle reminders): the dot, Home and About
-/// say it instead.
+/// release notes and the download); scheduled finds never pop up Sparkle's window (gentle reminders).
+/// 0.23.0 (Bohdan 18.11): a found version opens Pacenote's own update window (UpdatePromptWindow) on every launch,
+/// once per launch, after the sign-in and the onboarding and never during a call, and a banner at the top of Home;
+/// the dot and About say it too. A quiet check runs a little after every launch, so the window comes back.
 final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUStandardUserDriverDelegate {
     static let shared = UpdateService()
 
@@ -33,6 +35,9 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
     @Published private(set) var installAfterCall = false
     /// "Later" hides the dot and the Home line for this version until the next launch.
     @Published var dismissedVersion: String?
+    /// 0.23.0: versions whose update window was shown in this launch (it comes back at the next launch).
+    private(set) var promptedThisLaunch: Set<String> = []
+    func markPrompted(_ v: String) { promptedThisLaunch.insert(v) }
 
     private var controller: SPUStandardUpdaterController?
     private var installNow: (() -> Void)?
@@ -68,6 +73,17 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
         NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] _ in
             self?.callEnded()
         }
+        // 0.23.0: a quiet check a little after every launch (when automatic checks are on), so a version found before
+        // shows its window again; Sparkle's own schedule only checks every 12 hours.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in
+            guard let u = self?.updater, u.automaticallyChecksForUpdates, u.canCheckForUpdates, !Self.callIsLive else { return }
+            u.checkForUpdatesInBackground()
+        }
+    }
+
+    /// 0.23.0: open the update window if it is due (UpdatePromptWindow decides).
+    func maybePrompt() {
+        DispatchQueue.main.async { MainActor.assumeIsolated { UpdatePromptWindow.showIfNeeded() } }
     }
 
     // MARK: switches (About > Updates)
@@ -102,7 +118,8 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
 
     private func callEnded() {
         if let go = postponedRelaunch { postponedRelaunch = nil; go(); return }
-        if installAfterCall { installAfterCall = false; install() }
+        if installAfterCall { installAfterCall = false; install(); return }
+        maybePrompt()       // 0.23.0: a version found during the call opens its window now
     }
 
     // MARK: SPUUpdaterDelegate
@@ -127,6 +144,7 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
             self.notes = Self.bullets(item.itemDescription)
             if case .ready = self.phase { return }
             self.phase = .available(item.displayVersionString)
+            self.maybePrompt()
         }
     }
 
@@ -155,7 +173,8 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
             self.installNow = immediateInstallationBlock
             self.notes = Self.bullets(item.itemDescription)
             self.phase = .ready(item.displayVersionString)
-            if self.installAfterCall && !Self.callIsLive { self.installAfterCall = false; self.install() }
+            if self.installAfterCall && !Self.callIsLive { self.installAfterCall = false; self.install(); return }
+            self.maybePrompt()
         }
         return true
     }
@@ -186,6 +205,7 @@ final class UpdateService: NSObject, ObservableObject, SPUUpdaterDelegate, SPUSt
             self.notes = Self.bullets(update.itemDescription)
             if case .ready = self.phase { return }
             self.phase = .available(update.displayVersionString)
+            self.maybePrompt()
         }
     }
 
@@ -211,7 +231,7 @@ struct UpdatesSection: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
                         Circle().fill(PN.C.brand).frame(width: 8, height: 8).accessibilityHidden(true)
-                        Text(L(isReady ? "upd.ready" : "upd.available", ["v": v])).font(PN.Font.section)
+                        Text(L(isReady ? "upd.ready" : "upd.available", ["v": v])).pnSection()
                         Spacer()
                         Text(L("upd.youHave", ["v": mine])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
@@ -277,22 +297,120 @@ struct UpdatesSection: View {
     }
 }
 
-/// Home: one line when a new version is there (mockup: "Pacenote 0.16.0 is ready · Install").
+/// Home: a banner at the top when a new version is there (0.23.0, Bohdan 18.11; was one line since 0.16.0):
+/// "Pacenote 0.23.1 is ready", You have 0.23.0, What's new (the update window), Later (until the next launch), Install
+/// (Install after the call during a call).
 struct UpdateHomeLine: View {
     @ObservedObject var up = UpdateService.shared
+    @State private var live = UpdateService.callIsLive
+    var mine: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0" }
     var body: some View {
         if let v = up.newVersion {
-            HStack(spacing: 10) {
-                Circle().fill(PN.C.brand).frame(width: 8, height: 8).accessibilityHidden(true)
-                Text(L(isReady ? "upd.home.ready" : "upd.home.available", ["v": v])).font(PN.Font.body).foregroundStyle(PN.C.text)
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.down.circle.fill").font(.system(size: 22)).foregroundStyle(PN.C.accent).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L(isReady ? "upd.home.ready" : "upd.home.available", ["v": v])).pnSection().foregroundStyle(PN.C.text)
+                    Text(L("upd.youHave", ["v": mine])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
+                }
                 Spacer(minLength: 8)
+                if !up.notes.isEmpty { Button(L("upd.home.details")) { UpdatePromptWindow.show(version: v) }.buttonStyle(.pnTertiary) }
                 Button(L("upd.later")) { up.later() }.buttonStyle(.pnTertiary)
-                Button(UpdateService.callIsLive ? L("upd.installAfter") : L("upd.home.install")) { up.install() }
+                Button(live ? L("upd.installAfter") : L("upd.home.install")) { up.install() }
                     .buttonStyle(.pnPrimary).disabled(up.installAfterCall)
             }
-            .padding(.horizontal, 14).padding(.vertical, 10).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            .padding(.horizontal, 16).padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
+            .background(PN.C.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            .overlay(RoundedRectangle(cornerRadius: PN.Radius.m).stroke(PN.C.accent.opacity(0.35), lineWidth: 1))
+            .accessibilityElement(children: .contain)
+            .onReceive(Timer.publish(every: 3, on: .main, in: .common).autoconnect()) { _ in live = UpdateService.callIsLive }
         }
     }
     var isReady: Bool { if case .ready = up.phase { return true }; return false }
+}
+
+/// 0.23.0 (Bohdan 18.11): the update window. Opens on every launch while a new version is there (UpdatePrompt), and
+/// from What's new on Home's banner. The version, what is new (the appcast notes), Later and Install and restart.
+struct UpdatePromptView: View {
+    @ObservedObject var up = UpdateService.shared
+    let version: String
+    var close: () -> Void
+    @State private var live = UpdateService.callIsLive
+    var mine: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0" }
+    var isReady: Bool { if case .ready = up.phase { return true }; return false }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                PacenoteSymbol(height: 32).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L(isReady ? "upd.ready" : "upd.available", ["v": version])).pnTitle().foregroundStyle(PN.C.text)
+                    Text(L("upd.youHave", ["v": mine])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                }
+            }
+            if !up.notes.isEmpty {
+                Text(L("upd.prompt.notes")).pnLabel().foregroundStyle(PN.C.text3)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(up.notes, id: \.self) { n in
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text("•").foregroundStyle(PN.C.text3).accessibilityHidden(true)
+                                Text(n).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 220)
+            }
+            if live || up.installAfterCall {
+                Text(L("upd.afterCall.note")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.onMe)
+                    .padding(.horizontal, 12).padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(PN.C.onMe.opacity(0.13), in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            } else {
+                Text(L("upd.prompt.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Spacer()
+                Button(L("upd.later")) { close() }.buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)
+                Button(live ? L("upd.installAfter") : L("upd.install")) { up.install(); close() }
+                    .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(up.installAfterCall)
+            }
+        }
+        .padding(24)
+        .frame(width: 480)
+        .background(PN.C.bg)
+        .onReceive(Timer.publish(every: 3, on: .main, in: .common).autoconnect()) { _ in live = UpdateService.callIsLive }
+    }
+}
+
+@MainActor
+enum UpdatePromptWindow {
+    static var window: NSWindow?
+
+    /// Every launch while a new version is there, once per launch and version (LiveTipsCore/UpdatePrompt).
+    static func showIfNeeded() {
+        guard ProcessInfo.processInfo.environment["LT_SUPPORT_DIR"] == nil, window?.isVisible != true else { return }
+        let up = UpdateService.shared, d = UserDefaults.standard
+        let other = SignInWindow.isVisible || OnboardingWindow.window?.isVisible == true || WhatsNewWindow.window?.isVisible == true
+        guard UpdatePrompt.shouldShow(newVersion: up.newVersion, shownThisLaunch: up.promptedThisLaunch,
+                                      signedIn: PacenoteAccount.shared.signedIn,
+                                      onboarded: d.bool(forKey: "onboardingDone") || d.bool(forKey: "onboarded"),
+                                      callLive: UpdateService.callIsLive, otherWindowUp: other),
+              let v = up.newVersion else { return }
+        up.markPrompted(v)
+        show(version: v)
+    }
+
+    static func show(version: String) {
+        if let w = window, w.isVisible { w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
+        let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { UpdatePromptView(version: version) { window?.close() } }))
+        w.tabbingMode = .disallowed
+        w.title = L("upd.prompt.window")
+        w.styleMask.remove(.resizable)
+        w.isReleasedWhenClosed = false
+        window = w
+        w.center()
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
 }

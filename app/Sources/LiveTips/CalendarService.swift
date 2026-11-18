@@ -417,7 +417,7 @@ struct CalendarRefreshButton: View {
 
     var body: some View {
         let b = Button { cal.syncNow(from: place) } label: {
-            if cal.syncing { ProgressView().controlSize(.small).frame(width: 14, height: 14) }
+            if cal.syncing { PNSpinner(size: 16).frame(width: 14, height: 14) }
             else { Image(systemName: "arrow.clockwise").foregroundStyle(PN.C.text2) }
         }
         .buttonStyle(.borderless).disabled(cal.syncing)

@@ -191,7 +191,7 @@ struct NotionDBSearchPopover: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    if list.isEmpty && dest.busy { ProgressView().controlSize(.small).padding(.vertical, 4) }   // 0.8.7.1: not "No database" while looking
+                    if list.isEmpty && dest.busy { PNSpinner(size: 16).padding(.vertical, 4) }   // 0.8.7.1: not "No database" while looking
                     else if list.isEmpty { Text(L("ntset.noDbMatch")).font(PN.Font.caption).foregroundStyle(PN.C.text3).padding(.vertical, 4) }
                 }
             }

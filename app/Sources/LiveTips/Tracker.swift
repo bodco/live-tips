@@ -171,7 +171,7 @@ struct TrackerScreen: View {
                         Text(subline).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                     Spacer()
-                    if model.loading { ProgressView().controlSize(.small) }
+                    if model.loading { PNSpinner(size: 16) }
                     Button(L(tab == "tasks" ? "tracker.newTask" : tab == "decisions" ? "tracker.newDecision" : "tracker.newRisk")) { newItem() }
                         .buttonStyle(.pnPrimary)
                 }
@@ -254,7 +254,7 @@ struct TrackerScreen: View {
     @ViewBuilder private func groupView(_ title: String, _ rows: [TrackerItem], danger: Bool) -> some View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-                Text(title.uppercased() + " · \(rows.count)").font(PN.Font.label).foregroundStyle(danger ? PN.C.danger : PN.C.text3)
+                Text(title.uppercased() + " · \(rows.count)").pnLabel().foregroundStyle(danger ? PN.C.danger : PN.C.text3)
                     .padding(.horizontal, 12).padding(.vertical, 8)
                 ForEach(rows.sorted { ($0.dueDate ?? .distantFuture, $0.title) < ($1.dueDate ?? .distantFuture, $1.title) }) { r in
                     Divider()

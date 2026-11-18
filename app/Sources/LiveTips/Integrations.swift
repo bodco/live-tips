@@ -107,9 +107,9 @@ struct IntegrationsPane<NotionPage: View>: View {
                                 Spacer(minLength: 8)
                                 IntegrationStatus(text: st.0, ok: st.1).fixedSize()
                                 if st.1 == nil {
-                                    Text(L("int.connect")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(.white)
+                                    Text(L("int.connect")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.onLink)
                                         .padding(.horizontal, 9).padding(.vertical, 3)
-                                        .background(RoundedRectangle(cornerRadius: 6).fill(PN.C.accent))
+                                        .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(PN.C.accent))
                                 }
                                 Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(PN.C.text3)
                             }
@@ -119,7 +119,7 @@ struct IntegrationsPane<NotionPage: View>: View {
                         .accessibilityLabel(it.title + ", " + st.0)
                     }
                 }
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
+                .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(Color.secondary.opacity(0.06)))
                 Text(L("int.keysNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             .padding(20)
@@ -218,7 +218,7 @@ struct HubSpotPage: View {
                         switch crm.state {
                         case .ok(let s): Label(L("int.connectedTo", ["name": s]), systemImage: "checkmark.circle.fill").foregroundStyle(PN.C.turn)
                         case .failed(let e): Label(e, systemImage: "exclamationmark.triangle.fill").foregroundStyle(PN.C.danger)
-                        case .testing: ProgressView().controlSize(.small); Text(L("common.checking")).foregroundStyle(PN.C.text3)
+                        case .testing: PNSpinner(size: 16); Text(L("common.checking")).foregroundStyle(PN.C.text3)
                         case .idle: Text(model.config.crm.account.isEmpty ? L("int.hubspot.untested") : L("int.connectedTo", ["name": model.config.crm.account])).foregroundStyle(PN.C.text3)
                         }
                         Spacer()

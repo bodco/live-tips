@@ -41,7 +41,7 @@ struct ProjectTargetList: View {
             }
             .padding(.horizontal, 6).padding(.vertical, 5)
             .contentShape(Rectangle())
-            .background(RoundedRectangle(cornerRadius: 6).fill(current == tag ? PN.C.accent.opacity(0.12) : .clear))
+            .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(current == tag ? PN.C.accent.opacity(0.12) : .clear))
         }
         .buttonStyle(.plain)
     }

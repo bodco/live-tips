@@ -70,7 +70,7 @@ struct SettingsAnchor: ViewModifier {
         content
             .id(id)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: PN.r(6))
                     .fill(Color.yellow.opacity(model.highlight == id ? 0.28 : 0))
                     .padding(-4)
                     .animation(.easeOut(duration: 0.3), value: model.highlight)
@@ -99,8 +99,8 @@ struct SettingsSearchField: View {
             }
         }
         .padding(.horizontal, 7).frame(height: 26)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Color(nsColor: .textBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.secondary.opacity(focused ? 0.5 : 0.2)))
+        .background(RoundedRectangle(cornerRadius: PN.r(7)).fill(Color(nsColor: .textBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: PN.r(7)).stroke(Color.secondary.opacity(focused ? 0.5 : 0.2)))
         .background(Button("") { focused = true }.keyboardShortcut("f", modifiers: .command).opacity(0).frame(width: 0, height: 0))
         .padding(.bottom, 6)
     }
@@ -113,7 +113,7 @@ struct SettingsSearchResults: View {
         let rs = model.searchResults
         ScrollView {
             VStack(alignment: .leading, spacing: 1) {
-                Text(L("search.results", ["n": "\(rs.count)"])).font(PN.Font.label).foregroundStyle(PN.C.text3)
+                Text(L("search.results", ["n": "\(rs.count)"])).pnLabel().foregroundStyle(PN.C.text3)
                     .padding(.horizontal, 8).padding(.bottom, 2)
                 ForEach(rs, id: \.id) { e in
                     Button { model.jump(e) } label: {
@@ -124,7 +124,7 @@ struct SettingsSearchResults: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .contentShape(Rectangle())
-                        .background(RoundedRectangle(cornerRadius: 6).fill(model.highlight == e.id ? PN.C.accent.opacity(0.14) : .clear))
+                        .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(model.highlight == e.id ? PN.C.accent.opacity(0.14) : .clear))
                     }
                     .buttonStyle(.plain)
                 }

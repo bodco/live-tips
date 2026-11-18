@@ -153,3 +153,9 @@ items:
     title_uk: "Pacenote тепер потребує акаунта"
     body_en: "The sign-in screen comes first and comes back when the session ends, never during a call. Audio and transcripts still stay on this Mac."
     body_uk: "Екран входу зʼявляється першим і повертається, коли сесія закінчилась, ніколи під час дзвінка. Аудіо і транскрипти, як і раніше, лишаються на цьому Маку."
+  - id: update_window
+    version: 0.23.0
+    title_en: "A new version says so"
+    title_uk: "Нова версія повідомляє про себе"
+    body_en: "When a new Pacenote is out, a window with what is new opens at launch, and a banner at the top of Home offers Install. Never during a call."
+    body_uk: "Коли виходить новий Pacenote, під час запуску відкривається вікно з тим, що нового, а плашка вгорі Home пропонує Встановити. Ніколи під час дзвінка."

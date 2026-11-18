@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false      // 0.8.7 (A1): "Prefer tabs" never glues the windows together
+        PNFonts.register()                                  // redesign block 1: Barlow, Inter Tight, JetBrains Mono, IBM Plex Mono (Resources/Fonts)
         // 0.8.7 (M): the local usage log, on unless Settings > General > Privacy turned it off
         UsageLog.sink = LocalFileSink(dir: FeatureRegistry.usageDir)
         UsageLog.enabled = AppConfig.load(from: AppPaths.config).usageLog
@@ -37,7 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
         installMainMenu()
         NSApp.setActivationPolicy(config.showInDock ? .regular : .accessory)
-        Self.applyAppearance(config.appearance)     // 0.9.6: Settings > General > Theme
+        Self.applyAppearance(config.appearance)     // 0.9.6: Settings > General > Appearance (mode)
+        Self.applyStyle(config.appearanceStyle)     // redesign block 1: and the style
         let it = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         it.button?.image = Brand.menuBarImage(recording: false)     // Pacenote 0.8: the brand template
         it.button?.imagePosition = .imageLeft
@@ -245,12 +247,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fillPanel(st, month: month, cfg: cfg)
             floatingControls?.refresh(st, config: cfg)
         }
-        item?.button?.image = Brand.menuBarImage(recording: st.state == "recording", update: UpdateService.shared.newVersion != nil)
-        setClock(st.state == "recording" && !cfg.floatingCallControls)
-        // Orange near a spending limit; no red tint while recording: the filled dot and the clock say it.
+        // Redesign block 2 (MI-MenuIcon r15): the icon says the state: idle, waiting for the call (standby), recording, update
+        // available, near a spending limit. No clock beside it any more: the elapsed time lives in the panel and the floating controls.
+        // Orange near a spending limit, but never over a recording: the red dot says that.
         // 0.9.6: also a provider at its alert share or limit (Settings > AI > Spending limits); the alerts fire here
         let providerAlert = MainActor.assumeIsolated { () -> Bool in SpendWatch.check(config: cfg); return SpendWatch.anyAlert(config: cfg) }
-        item?.button?.contentTintColor = (st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9 || providerAlert) ? .systemOrange : nil
+        let nearLimit = st.callSpentUSD >= cfg.budget.callSoftUSD || month >= cfg.budget.monthlyHardUSD * 0.9 || providerAlert
+        let icon: Brand.MenuIconState = st.state == "recording" ? .recording
+            : nearLimit ? .nearLimit
+            : UpdateService.shared.newVersion != nil ? .update
+            : st.state == "standby" ? .waiting : .idle
+        item?.button?.image = Brand.menuBarImage(icon)
+        item?.button?.contentTintColor = nil
+        setClock(st.state == "recording")      // ticks the panel's elapsed time; nothing is written next to the icon
     }
 
     /// The menu bar panel's data (Pacenote 0.8, F1).
@@ -304,6 +313,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 0.9.6 (owner): the app's theme, "system" follows the Mac. Every window, the tips window included, takes it at once.
     static func applyAppearance(_ v: String) {
         NSApp.appearance = v == "light" ? NSAppearance(named: .aqua) : v == "dark" ? NSAppearance(named: .darkAqua) : nil
+    }
+    /// Redesign block 1: the app's style (Classic, Roadbook, Broadsheet). Views that read a theme colour redraw at once;
+    /// the tips window (a web view) hears PNStyleChanged and sets data-style.
+    static func applyStyle(_ v: String) {
+        PNThemeModel.shared.style = PNStyle(config: v)
     }
     @objc func openHome() {
         if MainActor.assumeIsolated({ gatedToSignIn() }) { return }
@@ -938,7 +952,7 @@ extension AppDelegate {
                          : String(format: "%02d:%02d", t / 60, t % 60)
     }
 
-    /// While recording, the elapsed time sits next to the menu bar icon and ticks every second.
+    /// While recording, the panel's elapsed time ticks every second. (Redesign block 2: no clock next to the menu bar icon.)
     func setClock(_ on: Bool) {
         if on {
             if clock == nil {
@@ -949,13 +963,11 @@ extension AppDelegate {
             clock?.invalidate()
             clock = nil
             item?.button?.title = ""
+            item?.button?.attributedTitle = NSAttributedString(string: "")      // clears a clock left by an older version
         }
     }
 
     func tickClock() {
         MainActor.assumeIsolated { panel?.model.elapsed = Self.elapsed(lastStatus) }
-        guard let b = item?.button else { return }
-        b.attributedTitle = NSAttributedString(string: " " + Self.elapsed(lastStatus),
-                                               attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
     }
 }

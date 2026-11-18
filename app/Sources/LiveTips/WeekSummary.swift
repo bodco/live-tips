@@ -24,7 +24,7 @@ struct WeekSummaryView: View {
         let top = max(30, days.map(\.1).max() ?? 0)
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(L("home.week")).font(PN.Font.section).foregroundStyle(PN.C.text)
+                Text(L("home.week")).pnSection().foregroundStyle(PN.C.text)
                 Spacer()
             }
             HStack(alignment: .top, spacing: 12) {
@@ -35,7 +35,7 @@ struct WeekSummaryView: View {
             HStack(alignment: .bottom, spacing: 8) {
                 ForEach(Array(days.enumerated()), id: \.offset) { _, d in
                     VStack(spacing: 4) {
-                        RoundedRectangle(cornerRadius: 3).fill(d.1 > 0 ? PN.C.brand : PN.C.surface2)
+                        RoundedRectangle(cornerRadius: PN.r(3)).fill(d.1 > 0 ? PN.C.brand : PN.C.surface2)
                             .frame(height: max(4, CGFloat(d.1 / top) * 44))
                         Text(d.0).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }

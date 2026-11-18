@@ -26,7 +26,7 @@ struct SheetExportView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(L("sheet.ui.export.title", ["title": doc.sheet?.title ?? ""])).font(PN.Font.section)
+            Text(L("sheet.ui.export.title", ["title": doc.sheet?.title ?? ""])).pnSection()
             HStack(alignment: .top, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
                     PageLabel(text: L("sheet.ui.export.format"))
@@ -72,7 +72,7 @@ struct SheetExportView: View {
             Text(L("sheet.ui.export.nothingSent")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true) }
             HStack {
-                if busy { ProgressView().controlSize(.small) }
+                if busy { PNSpinner(size: 16) }
                 Spacer()
                 Button(L("common.cancel"), action: done).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 Button(L("sheet.ui.export.go")) { run() }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(busy || doc.sheet == nil)

@@ -20,7 +20,8 @@ GENERIC = [
     (chr(0x2014), "long dash"),
 ]
 SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", "runs", "venv", ".venv", ".metrics", "target",   # + quality-gate output (ub-mode)
-             "Claude outputs"}   # the owner's private working folder, ignored by git
+             "Claude outputs",   # the owner's private working folder, ignored by git
+             ".build"}           # SwiftPM build output (app/.build), ignored by git
 SKIP_FILES = {"LICENSE", ".coverage"}          # the copyright line names the author on purpose
 # Made-up IDs in self-tests (all one digit, or 0-9a-f in order) are not real IDs.
 FAKE_ID = re.compile(r"^(?:([0-9a-f])\1*|(?:0123456789abcdef)+)$")

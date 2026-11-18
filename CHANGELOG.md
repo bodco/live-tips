@@ -3,6 +3,22 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.25.0 (unreleased)
+
+- **Call pages laid out like the boards (2026-11-18, layouts R2):** the page of a past call and of an upcoming call now
+  follow the call page boards in every look, Classic included. On top a bar with Back, what the page is ("Past call ·
+  3rd in this series", "Upcoming call") and the actions: Ask about this call and Export on a past call; when the call
+  starts, Start without prep and Get ready (or Start call) on an upcoming one. Then the date line, the call's name, the
+  project, how the call ended or whether it is ready, and the people. A past call lists its state in lines under the
+  name: Notion, consent, recording, the Pacenote server and the organization (with the Private switch), each with its
+  own actions. The tabs have a line under the open one and their counts. Sections have a heavy line over their name
+  instead of cards. Summary shows In short and Topics next to Decisions, On you, On them and Risks, every time a link
+  into the transcript. The follow-up email is now a tab of the call page (Option-Command-I still opens it), with who it
+  goes to and what it is written from. A call without notes says what it has and makes them with one button. The
+  Sales tab shows the qualification, the next step and the objections side by side. On an upcoming call, Setup has
+  The call, People, Preparation and More settings; a call without a Meeting Sheet shows Quick prep and Expert prep side
+  by side; Tasks and Earlier calls follow the same layout.
+
 ## 0.24.0 (2026-11-18)
 
 - **Updates: a window while Pacenote runs, one click to install (2026-11-18):** Pacenote now looks for a new version

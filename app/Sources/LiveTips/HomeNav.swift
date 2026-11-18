@@ -82,6 +82,8 @@ struct HomeRouteView: View {
     var body: some View {
         let i = nav.path.firstIndex(of: route) ?? 0
         VStack(spacing: 0) {
+            // 0.25 (R2): the call pages draw their own bar (‹ Home, what the page is, the actions; boards CP, UP)
+            if !ownBar {
             HStack(spacing: 6) {
                 Button { nav.back() } label: {
                     HStack(spacing: 4) {
@@ -96,10 +98,15 @@ struct HomeRouteView: View {
             }
             .padding(.horizontal, 16).padding(.vertical, 8)
             Divider()
+            }
             content
         }
         .navigationBarBackButtonHidden(true)
         .background(PN.C.bg)
+    }
+
+    private var ownBar: Bool {
+        switch route { case .call, .upcoming: return true; default: return false }
     }
 
     @ViewBuilder private var content: some View {

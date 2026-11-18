@@ -183,30 +183,24 @@ extension CallPageSync {
 struct CallPageSyncLine: View {
     @ObservedObject var sync: CallPageSync
 
+    // 0.25 (R2, board SL): the Notion status line under the call's title (synced and when, syncing, the error and Retry)
     var body: some View {
-        if sync.notionURL != nil && sync.state != .idle {
+        if let url = sync.notionURL {
             TimelineView(.periodic(from: .now, by: 5)) { ctx in
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        switch sync.state {
-                        case .pending, .syncing:
-                            PNSpinner(size: 16); Text(L("callEdit.syncing"))
-                        case .ok:
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn).accessibilityHidden(true)
-                            Text(L("callEdit.syncedAgo", ["ago": Self.ago(sync.at, ctx.date)]))
-                        case .failed(let e):
-                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(PN.C.onMe).accessibilityHidden(true)
-                            Text(L("callEdit.notSynced", ["err": e])).lineLimit(2)
-                            Button(L("callEdit.retry")) { sync.run() }.buttonStyle(.pnTertiary)
-                        case .idle: EmptyView()
-                        }
+                let (kind, value, err): (HomeTag, String, Bool) = {
+                    switch sync.state {
+                    case .pending, .syncing: return (.answer, L("callEdit.syncing"), false)
+                    case .ok: return (.ready, L("callEdit.syncedAgo", ["ago": Self.ago(sync.at, ctx.date)]), false)
+                    case .failed(let e): return (.notReady, L("callEdit.notSynced", ["err": e]), true)
+                    case .idle: return (.ready, L("callEdit.inNotion"), false)
                     }
-                    if !sync.appended.isEmpty {
-                        Text(L("callEdit.appended", ["list": sync.appended.joined(separator: ", ")]))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                }()
+                PageStatusLine(key: "Notion", kind: kind, value: value,
+                               sub: sync.appended.isEmpty ? "" : L("callEdit.appended", ["list": sync.appended.joined(separator: ", ")])) {
+                    if case .syncing = sync.state { PNSpinner(size: 14) }
+                    if let u = URL(string: url) { PageLineLink(L("callEdit.openPage")) { NSWorkspace.shared.open(u) } }
+                    if err { Button(L("callEdit.retry")) { sync.run() }.buttonStyle(.pnRow) }
                 }
-                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
     }
@@ -262,9 +256,11 @@ struct EditableRow<Leading: View, Trailing: View>: View {
     @State private var promptDate = Date()
     @FocusState private var rowFocus: Bool
     @FocusState private var fieldFocus: Bool
+    @Environment(\.pageFlat) private var flat       // 0.25 (R2): a row of a flat section (boards CT, SL)
+    @Environment(\.pnTheme) private var t
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: flat ? .firstTextBaseline : .top, spacing: flat ? 10 : 8) {
             leading()
             if editing {
                 TextField("", text: $draft, axis: .vertical)
@@ -275,12 +271,12 @@ struct EditableRow<Leading: View, Trailing: View>: View {
                     .accessibilityLabel(L("callEdit.edit"))
             } else {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(text).font(PN.Font.body).foregroundStyle(done ? PN.C.text3 : PN.C.text).strikethrough(done)
+                    Text(text).font(flat ? t.homeText(16) : PN.Font.body).foregroundStyle(done ? PN.C.text3 : PN.C.text).strikethrough(done)
                         .fixedSize(horizontal: false, vertical: true)
                     if !sub.isEmpty || !subTail.isEmpty {
                         (subTail.isEmpty ? Text(sub).foregroundColor(subColor)
                          : Text(sub).foregroundColor(PN.C.text3) + Text((sub.isEmpty ? "" : " · ") + subTail).foregroundColor(subColor))
-                            .font(PN.Font.caption)
+                            .font(flat ? t.homeText(13) : PN.Font.caption)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -300,9 +296,11 @@ struct EditableRow<Leading: View, Trailing: View>: View {
                 trailing()
             }
         }
-        .padding(.vertical, 3).padding(.horizontal, 6)
-        .background(RoundedRectangle(cornerRadius: PN.Radius.s)
-            .fill(rowFocus && !editing ? PN.C.accent.opacity(0.10) : (hover ? PN.C.surface2.opacity(0.6) : Color.clear)))
+        .padding(.vertical, flat ? 9 : 3).padding(.horizontal, flat ? 8 : 6)
+        .background(RoundedRectangle(cornerRadius: flat && t.style != .classic ? 0 : PN.Radius.s)
+            .fill(rowFocus && !editing ? PN.C.accent.opacity(0.10) : (hover ? PN.C.surface2.opacity(flat ? 1 : 0.6) : Color.clear)))
+        .overlay(alignment: .top) { if flat { Rectangle().fill(PN.C.rule).frame(height: 1) } }
+        .padding(.horizontal, flat ? -8 : 0)
         .focusable(!editing)
         .focused($rowFocus)
         .focusEffectDisabled()
@@ -412,9 +410,18 @@ struct AddRowField: View {
     @State private var open = false
     @State private var text = ""
     @FocusState private var focus: Bool
+    @Environment(\.pageFlat) private var flat
 
     var body: some View {
-        if open {
+        if flat {
+            // 0.25 (R2, boards CT, SL): always there, a dashed field under the rows; Return adds the line
+            PageAddField(placeholder: placeholder.isEmpty ? L("page.add.ph") : placeholder, text: $text) {
+                let t = text.replacingOccurrences(of: "\u{2014}", with: "-").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !t.isEmpty { onAdd(t) }
+                text = ""
+            }
+            .pageRow(10)
+        } else if open {
             TextField("", text: $text, prompt: Text(placeholder), axis: .vertical)
                 .textFieldStyle(.roundedBorder).lineLimit(1...4).font(PN.Font.body)
                 .focused($focus)

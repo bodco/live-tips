@@ -36,14 +36,22 @@ struct CallSetupView: View {
     @State private var confirmAgain = false
     @State private var rehearseInfo = false
     @FocusState private var titleFocus: Bool
+    @Environment(\.pnTheme) private var t
 
     private var saved: Bool { upnext.contains(model) }
 
     var body: some View {
         Group {
+        if mode == .page {
+            // 0.25 (R2, board UP): the page scrolls itself; the form is flat sections with Save under them
+            pageForm
+                .onAppear { model.refreshTemplate(); model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
+                .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false; if !model.target.isEmpty { model.note = "" } }
+                .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
+        } else {
         VStack(spacing: 0) {
             ScrollView {
-                if mode == .page { pageForm.padding(20) } else {
+                Group {
                 VStack(alignment: .leading, spacing: 16) {
                     header
                     if live { liveBanner }
@@ -76,6 +84,7 @@ struct CallSetupView: View {
         .onAppear { model.refreshTemplate(); model.scanPrep(); model.loadMicInputs(); PrepRunner.shared.refreshAuth() }
         .onChange(of: model.target) { model.applyProjectDefaults(); model.scanPrep(); copied = false; if !model.target.isEmpty { model.note = "" } }
         .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in model.scanPrep() }
+        }
     }
         .trackScreen("get_ready", sub: "\(mode)", on: mode != .page)
     }
@@ -552,37 +561,138 @@ struct CallSetupView: View {
         }
     }
 
+    /// 0.25 (R2, board UP): the Setup tab of the upcoming call page as flat sections in two columns: The call and
+    /// People on the left, Preparation and More settings on the right; Save and Cancel under them.
     @ViewBuilder private var pageForm: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            question(L("page.q.kind")) {
-                PNSegmented(selection: $model.callType, options: [
-                    ("auto", L("start.type.regular")),
-                    ("presentation", L("start.type.presentation")),
-                    ("interview", L("callSettings.type.interview")),
-                    ("transcript", L("callSettings.type.transcript"))
-                ]).labelsHidden().fixedSize()
-                Toggle(isOn: Binding(get: { model.salesEnabled }, set: { model.salesEnabled = $0; model.salesTouched = true })) {
-                    Text(L("page.salesMode")).font(PN.Font.body)
+        VStack(alignment: .leading, spacing: 0) {
+            PageColumns {
+                VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        PageSectionHead(title: L("page.sec.call"))
+                        setupRow(L("call.project")) {
+                            Button { search = ""; picking = true } label: {
+                                HomeField(text: model.project?.name ?? model.workspace?.name ?? L("call.chooseProject"), height: 32)
+                            }
+                            .buttonStyle(.plain).accessibilityLabel(L("call.project"))
+                            .popover(isPresented: $picking, arrowEdge: .bottom) { projectPicker }
+                        }
+                        setupRow(L("call.name")) {
+                            TextField("", text: $model.title, prompt: Text(L("call.namePlaceholder"))).labelsHidden().pageField(32)
+                                .onChange(of: model.title) { model.scanPrep(); copied = false }
+                        }
+                        setupRow(L("page.row.when")) {
+                            DatePicker("", selection: $model.callDate, displayedComponents: [.date, .hourAndMinute]).labelsHidden()
+                                .datePickerStyle(.field).fixedSize()
+                                .onChange(of: model.callDate) { copied = false }
+                        }
+                        setupRow(L("page.row.kind")) {
+                            menuField(kinds.first { $0.0 == model.callType }?.1 ?? L("start.type.regular")) {
+                                ForEach(kinds, id: \.0) { k in Button(k.1) { model.callType = k.0 } }
+                            }
+                        }
+                        setupRow(L("start.audience")) {
+                            menuField(audiences.first { $0.0 == model.audience }?.1 ?? L("callSettings.audience.auto")) {
+                                ForEach(audiences, id: \.0) { k in Button(k.1) { model.audience = k.0 } }
+                            }
+                        }
+                        setupRow(L("start.language")) {
+                            LanguageMenu(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
+                                                        set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
+                        }
+                        setupRow(L("page.row.sales")) {
+                            Toggle(isOn: Binding(get: { model.salesEnabled }, set: { model.salesEnabled = $0; model.salesTouched = true })) {
+                                Text(L("page.salesMode")).font(t.homeText(15))
+                            }
+                            .toggleStyle(.pnCheckbox)
+                        }
+                        if model.callType != "auto" { typeSection.pageRow(12) }
+                    }
+                    if !model.participants.isEmpty {
+                        VStack(alignment: .leading, spacing: 0) {
+                            PageSectionHead(title: L("page.sec.people"))
+                            FlowLayout(spacing: 8, lineSpacing: 8) {
+                                ForEach(model.participants, id: \.self) { p in
+                                    Text(p).font(t.homeText(15, .medium)).foregroundStyle(PN.C.text)
+                                        .padding(.horizontal, 10).frame(height: 32)
+                                        .background(PN.C.surface)
+                                        .overlay(RoundedRectangle(cornerRadius: t.style == .classic ? 6 : 0).strokeBorder(PN.C.field, lineWidth: 1.5))
+                                }
+                            }
+                            .pageRow(10)
+                            Text(L("page.people.note")).font(t.homeText(13)).foregroundStyle(PN.C.text3).pageRow(10)
+                        }
+                    }
                 }
-                .toggleStyle(.pnCheckbox)
-                if model.callType != "auto" { typeSection }
+            } right: {
+                VStack(alignment: .leading, spacing: 28) {
+                    if model.callType != "transcript" {
+                        VStack(alignment: .leading, spacing: 0) {
+                            PageSectionHead(title: L("sheet.ui.setup.prep")) {
+                                HomeLink(L("page.prep.expert")) {
+                                    if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .expert) }
+                                }
+                            }
+                            briefLine.pageRow(10)
+                            VStack(alignment: .leading, spacing: 6) {
+                                (Text(L("page.q.special")) + Text("  " + L("page.q.specialSub")).foregroundColor(PN.C.text3))
+                                    .font(t.homeText(15)).foregroundStyle(PN.C.text2)
+                                contextBox
+                            }
+                            .pageRow(12)
+                            HStack(spacing: 10) {
+                                Button(L("sheet.ui.quickPrep")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .quick) } }
+                                    .buttonStyle(.pnBar).disabled(!canPrepare)
+                                Button(L("sheet.ui.expertPrep")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .expert) } }
+                                    .buttonStyle(.pnBar).disabled(!canPrepare)
+                            }
+                            .pageRow(10)
+                            Text(L("sheet.ui.setup.prepNote")).font(t.homeText(13)).foregroundStyle(PN.C.text3)
+                                .fixedSize(horizontal: false, vertical: true).pageRow(10)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        PageSectionHead(title: L("page.more"))
+                        options.pageRow(8)
+                        Text(L("page.files.note")).font(t.homeText(13)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true).pageRow(10)
+                        if let h = problemHint {
+                            Text(h).font(t.homeText(13)).foregroundStyle(PN.C.notreadyText).fixedSize(horizontal: false, vertical: true).pageRow(10)
+                        }
+                    }
+                }
             }
-            question(L("page.q.matters")) { contextBox }
-            // 0.10.0 (Meeting Sheet, phase 4): the preparation is the Meeting Sheet; the text and files above feed it
-            if model.callType != "transcript" { prepSection(buttons: true) }
-            Text(L("page.files.note")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            if let h = problemHint { Label(h, systemImage: "info.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
-            DisclosureGroup(isExpanded: $pageMore) {
-                VStack(alignment: .leading, spacing: 14) {
-                    projectRow
-                    titleRow
-                    timeRow
-                    typeRow
-                    options
-                }
-                .padding(.top, 8)
-            } label: { Text(L("page.more")).pnSection().foregroundStyle(PN.C.text) }
+            HStack(spacing: 10) { pageButtons }
+                .padding(.top, 14)
+                .overlay(alignment: .top) { Rectangle().fill(PN.C.ruleStrong).frame(height: t.ruleHeavy) }
+                .padding(.top, 28)
         }
+    }
+
+    private var kinds: [(String, String)] {
+        [("auto", L("start.type.regular")), ("presentation", L("start.type.presentation")),
+         ("interview", L("callSettings.type.interview")), ("transcript", L("callSettings.type.transcript"))]
+    }
+    private var audiences: [(String, String)] {
+        [("auto", L("callSettings.audience.auto")), ("client", L("callSettings.audience.client")), ("team", L("callSettings.audience.team"))]
+    }
+
+    /// One row of The call (board UP): the name in a 130 pt column, the control after it.
+    private func setupRow<C: View>(_ label: String, @ViewBuilder _ c: () -> C) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(label).font(t.homeText(15)).foregroundStyle(PN.C.text2).frame(width: 130, alignment: .leading)
+            c().frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .pageRow()
+    }
+
+    /// A menu that looks like the boards' field: the value and ▾ in a 1.5 pt frame.
+    private func menuField<C: View>(_ value: String, @ViewBuilder _ items: () -> C) -> some View {
+        Menu { items() } label: {
+            Text(value + " ▾").font(t.homeText(15, .medium)).foregroundStyle(PN.C.text)
+                .padding(.horizontal, 10).frame(height: 32)
+                .background(PN.C.surface)
+                .overlay(RoundedRectangle(cornerRadius: t.style == .classic ? 6 : 0).strokeBorder(PN.C.field, lineWidth: 1.5))
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
     }
 
     /// 0.10.0 (Meeting Sheet): the preparation block, the same on the call page and in Start / Plan / Prepare.

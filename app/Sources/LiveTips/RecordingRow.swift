@@ -20,53 +20,31 @@ struct RecordingRow: View {
             let link = linked?.driveLink
             let linkAccount = (linked?.driveAccount).flatMap { $0.isEmpty ? nil : $0 } ?? drive.account
             let gone = meta.parts.contains { $0.driveError == RecordingMeta.Part.folderUnavailable }
-            HStack(spacing: 8) {
-                Image(systemName: meta.parts.contains { $0.kind == "video" } ? "video" : "waveform").foregroundStyle(PN.C.text3)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("rec.page.title")).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
-                    Text(summary(meta)).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    if let p = drive.progress[file] { Text(p).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                    if gone && !uploading {
-                        Text(L("rec.drive.folderGone")).font(PN.Font.caption).foregroundStyle(PN.C.onMe).lineLimit(2)
-                    } else if let e = drive.errors[file] ?? meta.parts.first(where: { !$0.driveError.isEmpty })?.driveError, !uploading {
-                        Text(L("rec.drive.failed", ["err": e])).font(PN.Font.caption).foregroundStyle(PN.C.onMe).lineLimit(2)
-                    }
-                }
-                Spacer()
-                Button(L("rec.page.play")) { if let p = paths.first(where: { FileManager.default.fileExists(atPath: $0) }) { NSWorkspace.shared.open(URL(fileURLWithPath: p)) } }
-                    .buttonStyle(.pnSecondary)
-                Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) }) }
-                    .buttonStyle(.pnTertiary)
+            // 0.25 (R2, board SL): one status line under the title: what the recording is, its problem, its actions
+            let problem: String? = gone && !uploading ? L("rec.drive.folderGone")
+                : (drive.errors[file] ?? meta.parts.first(where: { !$0.driveError.isEmpty })?.driveError).flatMap { uploading ? nil : L("rec.drive.failed", ["err": $0]) }
+            PageStatusLine(key: L("rec.page.title"), kind: problem == nil ? .ready : .notReady,
+                           value: problem.map { _ in L("rec.line.notUploaded") } ?? summary(meta),
+                           sub: problem ?? (drive.progress[file] ?? "")) {
+                PageLineLink(L("rec.page.play")) { if let p = paths.first(where: { FileManager.default.fileExists(atPath: $0) }) { NSWorkspace.shared.open(URL(fileURLWithPath: p)) } }
+                PageLineLink(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) }) }
+                if let l = link { PageLineLink(L("rec.page.openDrive")) { MeetingLauncher.shared.openGoogle(l, account: linkAccount) } }
+                if let l = drive.transcriptLink(file) { PageLineLink(L("rec.page.openTranscript")) { MeetingLauncher.shared.openGoogle(l, account: drive.transcriptAccount(file)) } }
                 if gone && !uploading && !(rec.isActive && rec.transcript == file) {
                     Button(L("rec.drive.newFolder")) { drive.recreateFolder(transcript: file); tick += 1 }
-                        .buttonStyle(.pnSecondary).help(L("rec.drive.newFolder.help"))
+                        .buttonStyle(.pnRow).help(L("rec.drive.newFolder.help"))
                 } else if !meta.notUploaded.isEmpty && !(rec.isActive && rec.transcript == file) {
                     Button(uploading ? L("rec.page.uploading") : L("rec.page.upload")) { drive.upload(transcript: file); tick += 1 }
-                        .buttonStyle(.pnSecondary).disabled(uploading)
+                        .buttonStyle(.pnRow).disabled(uploading)
                         .help(drive.account.map { L("rec.page.uploadTo", ["email": $0]) } ?? L("rec.drive.noAccount"))
                 }
-                if let l = link {
-                    Button(L("rec.page.openDrive")) { MeetingLauncher.shared.openGoogle(l, account: linkAccount) }.buttonStyle(.pnTertiary)
-                }
-                if let l = drive.transcriptLink(file) {
-                    Button(L("rec.page.openTranscript")) { MeetingLauncher.shared.openGoogle(l, account: drive.transcriptAccount(file)) }.buttonStyle(.pnTertiary)
-                }
             }
-            .padding(.horizontal, 24).padding(.vertical, 14)          // the call page's cards (PageCard), one line high
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PageStyle.radius))
             .onReceive(drive.objectWillChange) { _ in DispatchQueue.main.async { tick += 1 } }
         } else if let l = drive.transcriptLink(file) {
             // 0.11.0 (B7b): a call without a recording whose transcript is in Drive ("For every call").
-            HStack(spacing: 8) {
-                Image(systemName: "doc.text").foregroundStyle(PN.C.text3)
-                Text(L("rec.page.transcriptInDrive")).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.text)
-                Spacer()
-                Button(L("rec.page.openTranscript")) { MeetingLauncher.shared.openGoogle(l, account: drive.transcriptAccount(file)) }.buttonStyle(.pnTertiary)
+            PageStatusLine(key: L("rec.page.title"), kind: .neutral, value: L("rec.page.transcriptInDrive")) {
+                PageLineLink(L("rec.page.openTranscript")) { MeetingLauncher.shared.openGoogle(l, account: drive.transcriptAccount(file)) }
             }
-            .padding(.horizontal, 24).padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PageStyle.radius))
             .onReceive(drive.objectWillChange) { _ in DispatchQueue.main.async { tick += 1 } }
         }
     }

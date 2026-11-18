@@ -58,6 +58,7 @@ struct UpcomingCallPage: View {
     @State private var confirmAgain = false
     @State private var newTask = ""
     @State private var width: CGFloat = 1000      // 2026-11-05 (redesign): side by side on a wide window
+    @Environment(\.pnTheme) private var t
 
     private var wide: Bool { width >= 860 }
 
@@ -67,28 +68,38 @@ struct UpcomingCallPage: View {
 
     var body: some View {
         Group {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                head
-                PageTabs(tabs: tabs, selection: $tab, counts: ["tasks": series.count, "earlier": earlier.count,
-                    "readiness": doc?.sheet?.readinessBadge.gaps ?? 0, "sources": doc?.sheet?.sources.count ?? 0,
-                    "versions": doc.map { SheetFiles.versions(of: $0.path).count + 1 } ?? 0]).padding(.top, 4)
-                switch tab {
-                case "sheet", "brief": sheetTab
-                case "readiness": sheetOr { SheetReadinessTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }, onStart: { start() }) }
-                case "sources": sheetOr { SheetSourcesTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }, root: model.root) }    // 0.10.0 (Meeting Sheet, polish): root for Confirm in Google
-                case "versions": sheetOr { SheetVersionsTab(doc: $0, initialOpen: compareN) }
-                case "tasks": tasksTab
-                case "earlier": card { earlierTab }
-                default: card { setupTab }
+        // 0.25 (R2, boards UP, UT): the bar with when it starts and the actions, the title with the big status, the tabs
+        VStack(spacing: 0) {
+            PageBackBar(crumb: crumb) { barRight }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    head
+                    PageTabBar(tabs: tabs, selection: $tab, counts: ["tasks": series.count, "earlier": earlier.count,
+                        "readiness": doc?.sheet?.readinessBadge.gaps ?? 0, "sources": doc?.sheet?.sources.count ?? 0,
+                        "versions": doc.map { SheetFiles.versions(of: $0.path).count + 1 } ?? 0],
+                               badges: doc == nil && jobs.job(for: model.id) == nil ? ["sheet": L("page.sheet.notBuilt")] : [:],
+                               warn: doc == nil ? ["sheet"] : [])
+                    Group {
+                        switch tab {
+                        case "sheet", "brief": sheetTab
+                        case "readiness": sheetOr { SheetReadinessTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }, onStart: { start() }) }
+                        case "sources": sheetOr { SheetSourcesTab(doc: $0, onAddSource: { getReady(.expert, step: 3) }, root: model.root) }    // 0.10.0 (Meeting Sheet, polish): root for Confirm in Google
+                        case "versions": sheetOr { SheetVersionsTab(doc: $0, initialOpen: compareN) }
+                        case "tasks": tasksTab
+                        case "earlier": earlierTab
+                        default: setupTab
+                        }
+                    }
+                    .padding(.horizontal, PageMetrics.side).padding(.top, 28).padding(.bottom, 36)
                 }
+                .environment(\.pageFlat, true)
+                .environment(\.pageWide, width >= 900)
+                .background(GeometryReader { g in
+                    Color.clear.onAppear { width = g.size.width }.onChange(of: g.size.width) { _, w in width = w }
+                })
             }
-            .padding(24).frame(maxWidth: 1100, alignment: .leading)
-            .background(GeometryReader { g in
-                Color.clear.onAppear { width = g.size.width }.onChange(of: g.size.width) { _, w in width = w }
-            })
-            .frame(maxWidth: .infinity)      // centred
         }
+        .onReceive(NotificationCenter.default.publisher(for: .pnShotTab)) { n in if let s = n.object as? String { tab = s } }
         .textSelection(.enabled)      // 2026-11-10 (owner): the call's title and every text on the page can be selected and copied
         .background(PN.C.bg)
         .onAppear {
@@ -107,14 +118,40 @@ struct UpcomingCallPage: View {
         .trackScreen("upcoming_page", sub: tab, o: AnalyticsTracker.orgFor(project: model.project))
     }
 
+    /// "Upcoming call · weekly series" (board UP).
+    private var crumb: String {
+        guard let e = model.calEventID.flatMap({ CalendarService.shared.event($0) }), e.recurring else {
+            return earlier.isEmpty ? L("page.crumb.upcoming") : L("page.crumb.upcomingSeries", ["cadence": L("page.cadence.repeating")])
+        }
+        return L("page.crumb.upcomingSeries", ["cadence": L("page.cadence.weekly")])
+    }
+
+    /// "Starts in 37 min" on the highlight plate, then the actions (board UP header).
+    private var barRight: some View {
+        HStack(spacing: 10) {
+            TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                let m = Int((model.callDate.timeIntervalSince(ctx.date) / 60).rounded(.up))
+                if m > 0 && m < 12 * 60 {
+                    HomePlate(text: t.cased(m < 60 ? L("page.startsIn.min", ["n": "\(m)"]) : L("page.startsIn.hm", ["h": "\(m / 60)", "m": "\(m % 60)"])),
+                              font: t.homeMono(12, .semibold))
+                } else if m <= 0 && m > -120 {
+                    HomePlate(text: t.cased(L("page.started", ["n": "\(-m)"])), font: t.homeMono(12, .semibold))
+                }
+            }
+            primary
+            more
+        }
+    }
+
     // MARK: head: meta, name, project and people, the actions
 
     private var tabs: [(String, String)] {
         // 2026-11-05 (redesign): the counts are badges, as on the past call page
         // 0.10.0 (Meeting Sheet, phase 5): Setup / Meeting Sheet / Readiness / Sources / Versions / Tasks / Earlier
-        [("setup", L("page.tab.setup")), ("sheet", L("sheet.ui.tab.sheet")), ("readiness", L("sheet.ui.tab.readiness")),
-         ("sources", L("sheet.ui.tab.sources")), ("versions", L("sheet.ui.tab.versions")),
-         ("tasks", L("page.tab.tasks")), ("earlier", L("page.tab.earlier"))]
+        // 0.25 (R2, board UT): Readiness, Sources and Versions only once there is a sheet
+        [("setup", L("page.tab.setup")), ("sheet", L("sheet.ui.tab.sheet"))]
+            + (doc == nil ? [] : [("readiness", L("sheet.ui.tab.readiness")), ("sources", L("sheet.ui.tab.sources")), ("versions", L("sheet.ui.tab.versions"))])
+            + [("tasks", L("page.tab.tasks")), ("earlier", L("page.tab.earlier"))]
     }
 
     private var state: CallState {
@@ -135,71 +172,56 @@ struct UpcomingCallPage: View {
             .clipShape(RoundedRectangle(cornerRadius: PageStyle.radius))
     }
 
-    /// 2026-11-05 (redesign): a header card like Home's next call and the past call page.
+    /// 0.25 (R2, board UP): the meta line (when, the project, the meeting app), the name, the big status.
     private var head: some View {
-        let d = DateFormatter(); d.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); d.setLocalizedDateFormatFromTemplate("EEEMMMd")
-        let t = DateFormatter(); t.locale = d.locale; t.setLocalizedDateFormatFromTemplate("HHmm")
+        let d = DateFormatter(); d.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); d.setLocalizedDateFormatFromTemplate("EEEdMMM")
+        let tf = DateFormatter(); tf.locale = d.locale; tf.setLocalizedDateFormatFromTemplate("HHmm")
+        let ev = model.calEventID.flatMap { CalendarService.shared.event($0) }
+        let when = d.string(from: model.callDate) + " · " + tf.string(from: model.callDate) + (ev.map { "-" + tf.string(from: $0.end) } ?? "")
+        let meta = [when, model.target.isEmpty ? "" : model.targetName].filter { !$0.isEmpty }.joined(separator: " · ")
         let people = HomeView.peopleLine(model.participants)
-        let info = VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(d.string(from: model.callDate) + " · " + t.string(from: model.callDate)).font(PN.sys(13, .semibold)).foregroundStyle(PN.C.accent)
-                if let b = doc?.sheet?.readinessBadge, state != .preparing { SheetReadinessPill(badge: b) } else { StatePill(state: state) }
-                if !model.target.isEmpty { PagePill(text: model.targetName, color: PN.C.answer) }
+        let st = state
+        let (kind, text, sub): (HomeTag, String, String) = {
+            if doc != nil && st != .preparing { return (.ready, st.text, L("page.sub.sheetBuilt")) }
+            switch st {
+            case .preparing: return (.answer, st.text, L("home.check.preparing", ["p": "\(Int(runner.progress * 100))"]))
+            case .queued: return (.answer, st.text, L("badge.queued"))
+            case .noBrief: return (.notReady, st.text, L("home.recordsOnly"))
+            case .ready: return (.ready, st.text, L("home.brief.ready"))
+            default: return (HomeTag.of(st), st.text, L("page.sub.noSheet"))
             }
-            Text(model.effectiveTitle).font(PN.sys(28, .bold)).foregroundStyle(PN.C.text).lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            if !people.isEmpty { Text(L("home.card.with", ["people": people])).font(PN.Font.body).foregroundStyle(PN.C.text2).lineLimit(2) }
-            if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.pending).fixedSize(horizontal: false, vertical: true) }
+        }()
+        return PageTitleBlock(meta: meta, title: model.effectiveTitle) {
+            if !people.isEmpty { Text(L("home.card.with", ["people": people])).font(t.homeText(15)).foregroundStyle(PN.C.text2).lineLimit(2) }
+            HomeTagView(kind: kind, text: text, big: true, sub: "· " + sub)
+            if !note.isEmpty { Text(note).font(t.homeText(13)).foregroundStyle(PN.C.notreadyText).fixedSize(horizontal: false, vertical: true) }
         }
-        return VStack(alignment: .leading, spacing: 0) {
-            if wide {
-                HStack(alignment: .top, spacing: 20) {
-                    info.frame(maxWidth: .infinity, alignment: .leading)
-                    HStack(alignment: .top, spacing: 8) {
-                        VStack(alignment: .trailing, spacing: 8) { primary }
-                        more
-                    }
-                    .padding(.top, 2)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 16) {
-                    info
-                    HStack(spacing: 12) { primary; more }
-                }
-            }
-        }
-        .padding(.horizontal, 28).padding(.vertical, 24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: PageStyle.radius).fill(PN.C.surface))
     }
 
     /// 0.10.0 (Meeting Sheet, phase 4): Get ready opens Quick or Expert by the default rules; Start without prep;
     /// once the sheet is built: Start call, Refresh, Export.
+    /// 0.25 (R2, board UP): in the bar, the second choice bordered first, the main one filled after it.
     @ViewBuilder private var primary: some View {
         let live = app?.callIsLive ?? false
         if let j = jobs.job(for: model.id) {
-            Button { start() } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
-            Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(PN.Font.caption).foregroundStyle(PN.C.text2)
-            link(L("call.stop")) { j.stop() }
-            SheetSwitchPrompt(callID: model.id)      // 0.10.0 (Meeting Sheet, hardening): the route question inline
+            Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(t.homeMono(12, .semibold)).foregroundStyle(PN.C.text2)
+            Button(L("call.stop")) { j.stop() }.buttonStyle(.pnBar)
+            Button(L("home.startCall")) { start() }.buttonStyle(.pnPrimary)
         } else if doc != nil {
-            Button { start() } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
-            HStack(spacing: 14) {
-                link(L("sheet.ui.refresh")) { confirmAgain = true }
-                link(L("sheet.ui.export")) { exporting = true }
-            }
+            Button(L("sheet.ui.refresh")) { confirmAgain = true }.buttonStyle(.pnBar)
+            Button(live ? L("home.switch") : L("home.startCall")) { start() }.buttonStyle(.pnPrimary)
         } else if state == .preparing || state == .queued {
-            Button { start() } label: { Label(L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
-            link(L("common.cancel")) { if state == .preparing { runner.cancel() } else { upnext.unqueue(model) } }
+            Button(L("common.cancel")) { if state == .preparing { runner.cancel() } else { upnext.unqueue(model) } }.buttonStyle(.pnBar)
+            Button(L("home.startCall")) { start() }.buttonStyle(.pnPrimary)
         } else if state == .ready {
             // 0.10.0 (Meeting Sheet, hardening): a call prepared in 0.9.7 (a brief, no sheet) starts with that brief:
             // Start call stays the main button, Get ready (build a sheet) is the second choice.
-            Button { start() } label: { Label(live ? L("home.switch") : L("home.startCall"), systemImage: "play.fill") }.buttonStyle(.pnPrimary)
-            link(L("home.getReady")) { getReady(nil) }
+            Button(L("home.getReady")) { getReady(nil) }.buttonStyle(.pnBar)
+            Button(live ? L("home.switch") : L("home.startCall")) { start() }.buttonStyle(.pnPrimary)
         } else {
+            if !SheetRoutes.ready(SheetRoutes.preferred) && SheetRoutes.firstReady() == nil { HomeLink(L("home.connectClaude")) { SettingsWindow.show(tab: "ai") } }
+            Button(L("sheet.ui.startWithout")) { start() }.buttonStyle(.pnBar)
             Button(L("home.getReady")) { getReady(nil) }.buttonStyle(.pnPrimary)
-            link(L("sheet.ui.startWithout")) { start() }
-            if !SheetRoutes.ready(SheetRoutes.preferred) && SheetRoutes.firstReady() == nil { link(L("home.connectClaude")) { SettingsWindow.show(tab: "ai") } }
         }
     }
 
@@ -211,8 +233,8 @@ struct UpcomingCallPage: View {
             Button(L("sheet.ui.expertPrep")) { getReady(.expert) }
             if doc != nil { Button(L("sheet.ui.export")) { exporting = true } }
             Button(L("call.copyCowork")) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(model.prepPhrase, forType: .string) }
-        } label: { Image(systemName: "ellipsis") }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().frame(height: 32).accessibilityLabel(L("home.more"))
+        } label: { Image(systemName: "ellipsis").foregroundStyle(PN.C.text2) }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().frame(width: 32, height: 32).accessibilityLabel(L("home.more"))
     }
 
     private func link(_ t: String, run: @escaping () -> Void) -> some View {
@@ -248,7 +270,7 @@ struct UpcomingCallPage: View {
     }
 
     @ViewBuilder private func sheetOr<C: View>(@ViewBuilder _ c: (SheetDoc) -> C) -> some View {
-        if let d = doc { c(d) } else { card { noSheet } }
+        if let d = doc { c(d).environment(\.pageFlat, false) } else { noSheet }
     }
 
     /// The Meeting Sheet tab: the sheet; for a call prepared before 0.10.0 its brief, read only; else Get ready.
@@ -266,31 +288,71 @@ struct UpcomingCallPage: View {
                 }
             }
             MeetingSheetTab(doc: d, onRefresh: {}, onEditBlocks: { getReady(.expert, step: 2) }, onCompare: { compareN = $0; tab = "versions" })
+                .environment(\.pageFlat, false)       // 0.25 (R2): the built sheet keeps its look (board MS, a later block)
         } else if briefPath != nil {
             VStack(alignment: .leading, spacing: 8) {
                 Label(L("sheet.ui.legacy"), systemImage: "doc.text").font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 card { briefTab }
             }
         } else {
-            card { noSheet }
+            noSheet
         }
     }
 
+    /// 0.25 (R2, board UT row 1): no sheet yet: what Get ready builds, Quick prep and Expert prep side by side,
+    /// and "No time? Start without prep".
     private var noSheet: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            PageEmpty(icon: "doc.text.magnifyingglass", title: L("sheet.ui.none"), text: L("sheet.ui.none.body"))
+        VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(t.cased(L("sheet.ui.none"))).font(t.homeDisplay(t.style == .classic ? 36 : 48, t.heroWeight)).tracking(t.dTrack * 48)
+                    .foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+                Text(L("sheet.ui.none.body")).font(t.homeText(17)).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: 760, alignment: .leading)
             if let j = jobs.job(for: model.id) {
-                Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(PN.Font.body).foregroundStyle(PN.C.text2)
+                HStack(spacing: 10) {
+                    PNSpinner(size: 18)
+                    Text(L("sheet.ui.building", ["p": "\(Int(j.progress * 100))"])).font(t.homeText(16)).foregroundStyle(PN.C.text2)
+                }
                 SheetSwitchPrompt(callID: model.id)
             } else {
-                HStack(spacing: 10) {
-                    Button(L("home.getReady")) { getReady(nil) }.buttonStyle(.pnPrimary)
-                    Button(L("sheet.ui.quickPrep")) { getReady(.quick) }.buttonStyle(.pnSecondary)
-                    Button(L("sheet.ui.expertPrep")) { getReady(.expert) }.buttonStyle(.pnSecondary)
+                PageColumns {
+                    VStack(alignment: .leading, spacing: 0) {
+                        PageSectionHead(title: L("sheet.ui.quickPrep")) { PageCount(text: L("page.quick.sub")) }
+                        Text(L("page.quick.same")).font(t.homeText(16)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true).pageRow(10)
+                        VStack(alignment: .leading, spacing: 6) {
+                            (Text(L("page.q.special")) + Text("  " + L("page.q.specialSub")).foregroundColor(PN.C.text3)).font(t.homeText(15)).foregroundStyle(PN.C.text2)
+                            TextField("", text: $model.context, prompt: Text(L("page.q.specialPh"))).labelsHidden().pageField(36)
+                        }
+                        .pageRow(12)
+                        HStack(spacing: 14) {
+                            Button(L("page.quick.build")) { getReady(.quick) }.buttonStyle(PNSolidButtonStyle(height: 40))
+                            HomeLink(L("page.quick.sources")) { getReady(.expert, step: 3) }
+                        }
+                        .pageRow(14)
+                    }
+                } right: {
+                    VStack(alignment: .leading, spacing: 0) {
+                        PageSectionHead(title: L("page.expert.title")) { PageCount(text: L("page.expert.sub")) }
+                        ForEach(Array(["page.expert.s1", "page.expert.s2", "page.expert.s3", "page.expert.s4", "page.expert.s5"].enumerated()), id: \.offset) { i, k in
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Text(String(format: "%02d", i + 1)).font(t.homeMono(12, .semibold)).foregroundStyle(PN.C.text3).frame(width: 34, alignment: .leading)
+                                (Text(L(k)).fontWeight(.semibold) + Text(" " + L(k + ".sub")).foregroundColor(PN.C.text3))
+                                    .font(t.homeText(15)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+                            }
+                            .pageRow(8)
+                        }
+                        Button(L("page.expert.open")) { getReady(.expert) }.buttonStyle(PNOutlineButtonStyle(height: 40)).pageRow(14)
+                    }
                 }
             }
+            HStack(spacing: 4) {
+                Text(L("page.notime")).font(t.homeText(14)).foregroundStyle(PN.C.text3)
+                HomeLink(L("sheet.ui.startWithout")) { start() }
+                Text(L("page.notime.tail")).font(t.homeText(14)).foregroundStyle(PN.C.text3)
+            }
+            .pageRow(14)
         }
-        .padding(.horizontal, 24).padding(.vertical, 22)
     }
 
     private func save() {
@@ -313,7 +375,6 @@ struct UpcomingCallPage: View {
 
     private var setupTab: some View {
         CallSetupView(model: model, mode: .page, onStart: { start() }, onCancel: { snap?.restore(model) }, onSave: { save() })
-            .frame(minHeight: 560)
     }
 
     @ViewBuilder private var briefTab: some View {
@@ -361,71 +422,74 @@ struct UpcomingCallPage: View {
         return history.visible.filter { $0.start < model.callDate && EditLog.seriesKey($0.title) == key }
     }
 
-    /// 2026-11-05 (redesign): On you and Waiting on others side by side (others grouped by person), what was decided
-    /// last time below; the same cards as the past call page.
+    /// 0.25 (R2, board UT row 2): On you on the left (with Add); Waiting on others and Decided last time on the right.
     @ViewBuilder private var tasksTab: some View {
         let mine = series.filter { $0.mine }, theirs = series.filter { !$0.mine }
         let decided = earlier.first.flatMap { OutcomeCache.shared.outcome($0.file)?.decisions } ?? []
-        let onYou = PageCard(spacing: 2) {
-            label(L("page.tasks.onYou"), mine.count)
-            if mine.isEmpty { none }
-            ForEach(mine) { c in taskRow(c, action: L("page.tasks.done")) { register.mark(c) } }
-            HStack(spacing: 8) {
-                TextField(L("page.tasks.addPh"), text: $newTask).textFieldStyle(.roundedBorder).onSubmit(addTask)
-                Button(L("page.tasks.add"), action: addTask).buttonStyle(.pnSecondary).disabled(newTask.trimmingCharacters(in: .whitespaces).isEmpty || model.root == nil)
-            }
-            .padding(.top, 10)
-        }
-        let owners = theirs.reduce(into: [String]()) { if !$0.contains($1.owner) { $0.append($1.owner) } }
-        let waiting = PageCard(spacing: 2) {
-            label(L("page.tasks.waiting"), theirs.count)
-            if theirs.isEmpty { none }
-            ForEach(owners, id: \.self) { who in
-                HStack(spacing: 8) { PageAvatar(name: who); Text(who).pnSection().foregroundStyle(PN.C.text2) }
-                    .padding(.top, who == owners.first ? 2 : 12).padding(.bottom, 2)
-                ForEach(theirs.filter { $0.owner == who }) { c in taskRow(c, action: L("page.tasks.gotIt")) { register.mark(c) } }
-            }
-        }
-        VStack(alignment: .leading, spacing: 16) {
-            if wide { HStack(alignment: .top, spacing: 16) { onYou; waiting } } else { onYou; waiting }
-            PageCard(spacing: 2) {
-                label(L("page.tasks.decided"), decided.count)
-                if decided.isEmpty { none }
-                ForEach(Array(decided.enumerated()), id: \.offset) { _, d in
-                    HStack(alignment: .top, spacing: 10) {
-                        PageIconTile(icon: "checkmark", color: PN.C.turn)
-                        Text(d).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true).padding(.top, 2)
-                    }
-                    .padding(.vertical, 5)
+        PageColumns {
+            VStack(alignment: .leading, spacing: 0) {
+                PageSectionHead(title: L("call.page.onYou"), count: mine.isEmpty ? "" : L("page.tasks.open", ["n": "\(mine.count)"]), warn: !mine.isEmpty) {
+                    if trackerOn { HomeLink(L("page.tasks.openTracker")) { HomeNav.shared.open(.tracker) } }
                 }
+                if mine.isEmpty { none }
+                ForEach(mine) { c in taskRow(c) }
+                HStack(spacing: 10) {
+                    TextField("", text: $newTask, prompt: Text(L("page.tasks.addPh"))).labelsHidden().pageField(34).onSubmit(addTask)
+                    Button(L("page.tasks.add"), action: addTask).buttonStyle(PNOutlineButtonStyle(height: 34))
+                        .disabled(newTask.trimmingCharacters(in: .whitespaces).isEmpty || model.root == nil)
+                }
+                .pageRow(10)
             }
-            if trackerOn {
-                HStack { Spacer(); link(L("page.tasks.openTracker")) { HomeNav.shared.open(.tracker) } }
+        } right: {
+            VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 0) {
+                    PageSectionHead(title: L("page.tasks.waitingT"), count: theirs.isEmpty ? "" : L("page.tasks.open", ["n": "\(theirs.count)"]))
+                    if theirs.isEmpty { none }
+                    ForEach(theirs) { c in taskRow(c) }
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    PageSectionHead(title: L("page.tasks.decidedT"), count: earlier.first.map { HomeRecentRow.day($0.start) } ?? "")
+                    if decided.isEmpty { none }
+                    ForEach(Array(decided.enumerated()), id: \.offset) { _, d in
+                        Text(d).font(t.homeText(16, .semibold)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true).pageRow()
+                    }
+                }
+                Text(L("page.tasks.seriesNote")).font(t.homeText(13)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-
-    private func label(_ t: String, _ n: Int) -> some View {
-        PageLabel(text: t) { if n > 0 { Text(L("page.tasks.open", ["n": "\(n)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3) } }.padding(.bottom, 6)
     }
 
     private var none: some View {
-        Text(L("page.tasks.none")).font(PN.Font.body).foregroundStyle(PN.C.text3).padding(.vertical, 4)
+        Text(L("page.tasks.none")).font(t.homeText(15)).foregroundStyle(PN.C.text3).pageRow()
     }
 
-    private func taskRow(_ c: Commitment, action: String, run: @escaping () -> Void) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(c.text).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
-                if !c.due.isEmpty {
-                    Text(L("reg.due", ["due": Register.dueText(c.due)])).font(PN.Font.caption)
-                        .foregroundStyle(CommitmentRegister.isOverdue(c) ? PN.C.danger : PN.C.text3)
-                }
+    /// A task of the series (board UT): on you a check box, the text, where it came from, the due date (red when late);
+    /// on someone else "Name: text" and the due date.
+    private func taskRow(_ c: Commitment) -> some View {
+        let late = CommitmentRegister.isOverdue(c)
+        let from: String = {
+            if c.call.isEmpty { return L("page.tasks.byHand") }
+            if let r = history.records.first(where: { CommitmentRegister.callKey($0.file) == CommitmentRegister.callKey(c.call) }) {
+                return L("page.tasks.from", ["date": HomeRecentRow.day(r.start)])
             }
-            Spacer(minLength: 8)
-            Button(action, action: run).buttonStyle(.pnTertiary)
+            return ""
+        }()
+        return HStack(alignment: .firstTextBaseline, spacing: 10) {
+            if c.mine {
+                Toggle("", isOn: Binding(get: { false }, set: { if $0 { register.mark(c) } }))
+                    .toggleStyle(.pnCheckbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                (c.mine ? Text(c.text) : Text(c.owner + ": ").fontWeight(.semibold) + Text(c.text))
+                    .font(t.homeText(16)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+                if c.mine && !from.isEmpty { Text(from).font(t.homeText(13)).foregroundStyle(PN.C.text3) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(c.due.isEmpty ? L("page.tasks.noDate") : Register.dueText(c.due))
+                .font(t.homeMono(12)).foregroundStyle(late ? PN.C.recText : PN.C.text3).lineLimit(1).fixedSize()
+            if !c.mine { Button(L("page.tasks.gotIt")) { register.mark(c) }.buttonStyle(.pnTertiary) }
         }
-        .padding(.vertical, 5)
+        .pageRow()
     }
 
     private func addTask() {
@@ -437,29 +501,39 @@ struct UpcomingCallPage: View {
         newTask = ""
     }
 
+    /// 0.25 (R2, board UT row 3): the earlier calls of this meeting: the date, the title, the gist, what came out, the state.
     private var earlierTab: some View {
-        let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate("EEEdMMMyyyy")
-        return VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
+            PageSectionHead(title: L("page.earlier.title"), count: earlier.isEmpty ? "" : "\(earlier.count)") {
+                if let r = earlier.first { HomeLink(L("page.earlier.series")) { SeriesWindow.show(record: r) } }
+            }
             if earlier.isEmpty {
                 PageEmpty(icon: "clock.arrow.circlepath", title: L("page.earlier.none"), text: L("series.after2"))
-                    .padding(.horizontal, 18).padding(.vertical, 16)
             }
-            ForEach(Array(earlier.enumerated()), id: \.element.id) { i, r in
-                if i > 0 { Divider() }
+            ForEach(earlier) { r in
+                let o = OutcomeCache.shared.outcome(r.file)
+                let notes = RecentCard.summary(r.file)
                 Button { CallPageWindow.show(file: r.file) } label: {
-                    // 2026-11-05 (redesign): the date in its own column, the gist, a chevron to the call page
                     HStack(alignment: .top, spacing: 14) {
-                        Text(f.string(from: r.start)).font(PN.Font.caption.weight(.medium)).foregroundStyle(PN.C.accent)
-                            .frame(width: 110, alignment: .leading).padding(.top, 1)
-                        Text(RecentCard.summary(r.file) ?? (OutcomeCache.shared.outcome(r.file)?.line ?? r.title))
-                            .font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Image(systemName: "chevron.right").font(PN.sys(11, .semibold)).foregroundStyle(PN.C.text3).padding(.top, 3)
+                        Text(HomeRecentRow.day(r.start)).font(t.homeMono(12)).foregroundStyle(PN.C.text3)
+                            .frame(width: 110, alignment: .leading).padding(.top, 3)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(r.title).font(t.homeText(17, .semibold)).foregroundStyle(PN.C.text).lineLimit(1)
+                            if let s = notes ?? o?.line, !s.isEmpty {
+                                Text(s).font(t.homeText(15)).foregroundStyle(PN.C.text2).lineLimit(2).multilineTextAlignment(.leading)
+                            }
+                            let counts = RecentCard.counts(o)
+                            if !counts.isEmpty { Text(counts).font(t.homeMono(12)).foregroundStyle(PN.C.text3) }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        HomeTagView(kind: notes != nil ? .ready : .neutral, text: L(notes != nil ? "home.tag.notesReady" : "home.tag.transcriptOnly"))
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain).padding(.horizontal, 24).padding(.vertical, 14)
+                .buttonStyle(.plain)
+                .pageRow(14)
             }
+            Text(L("page.earlier.note")).font(t.homeText(13)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true).pageRow(12)
         }
     }
 }

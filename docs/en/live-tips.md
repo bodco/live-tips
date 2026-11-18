@@ -1497,7 +1497,7 @@ state in the style: Listening (a ring and five sound level bars), Paused (the wo
 Everything that moves stops under Reduce motion.
 
 **Windows and navigation.** Pacenote windows never join a tab group. The call page, a series, a transcript and
-Statistics open inside Home; Back (or Command-[) returns. The follow-up email is the right panel of the call page.
+Statistics open inside Home; Back (or Command-[) returns. The follow-up email is a tab of the call page (0.25).
 
 **Settings.** The sidebar has four groups: You (Account, General), Calls (Projects, Meeting Sheet, Call recording,
 Transcription), Connections (Integrations, AI) and More (Modules, Components, Usage, Help, About). Settings > AI shows one group
@@ -1719,6 +1719,21 @@ calls, prepared, AI spend this month, account limits, calls not transcribed yet,
 time on the call on a red plate, Show tips, the Meeting Sheet and End the call. Without calls ahead Home says "Clear
 until tomorrow"; without a calendar it offers to connect one and lists the calls planned by hand; the first launch
 shows three steps. In a narrow window the columns go one under the other. Classic uses the same layout.
+
+**Call pages (0.25).** The past and the upcoming call page are laid out as the call page boards of the three looks. A
+bar on top: Back, what the page is ("Past call · 3rd in this series", "Upcoming call · weekly series") and the actions
+(a past call: Ask about this call, Export and the "..." menu; an upcoming call: how soon it starts, Start without prep
+and Get ready, or Start call once it is prepared). Then the date line, the name and a row of facts: the project (a
+click moves the call to another one), how the call ended (Ended · screen recorded, Transcript only, Ended · not
+synced), the people and the series. Under it a past call has one line per state: Notion (synced when, Retry), Consent,
+Recording (Play, Show in Finder, Open in Drive), Server (Sync now, Don't sync this call) and Organization (who sees it,
+Private). The tabs: Summary, What was discussed, Decisions, Tasks, Risks, Follow-up, Transcript, and Sales for a call
+in Sales mode. Summary puts In short and Topics next to Decisions, On you, On them and Risks; a time is a link into the
+transcript. Follow-up is the follow-up email as a tab (Option-Command-I opens it from anywhere on the page). A call
+with no notes says what it has (transcript, recording) and writes the notes with Make meeting notes. On an upcoming
+call, Setup has The call (project, name, when, kind of call, audience, language, Sales mode), People (from the
+invite), Preparation (what Get ready uses, "Anything special today?", Quick prep and Expert prep) and More settings;
+Meeting Sheet without a sheet offers Quick prep and the five steps of Expert prep side by side.
 
 **Call pages.** An upcoming call opens as a page with Setup, Brief, Tasks and Earlier calls; its Setup changes
 apply only on Save. A past call has Summary (Meeting notes since 0.9.5.2, 14.1t), What was discussed, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this

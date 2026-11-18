@@ -231,19 +231,18 @@ struct CallOrgRow: View {
     var body: some View {
         let pv = sync.privacy(file)
         if sync.project(for: file) != nil, let org = pv.org, !org.isPersonal {
-            HStack(spacing: 10) {
-                Image(systemName: "building.2").foregroundStyle(PN.C.text3)
-                Text(org.name).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                VisibilityBadge(transcript: file).id(tick)
-                Spacer()
+            // 0.25 (R2, board SL): a status line: the organization, who sees the call, and the Private switch
+            let vk = PacenoteServer.visibilityKey(org, isPrivate: pv.isPrivate)
+            let who = pv.isPrivate ? L("org.private.badge") : vk.map { L($0) } ?? ""
+            PageStatusLine(key: L("org.line.key"), kind: .neutral, value: who.isEmpty ? org.name : org.name + " · " + who,
+                           sub: pv.isPrivate ? L("org.private.help") : L("org.line.visibleSub")) {
                 Toggle(L("org.private.toggle"), isOn: Binding(get: { pv.isPrivate },
                                                               set: { sync.setPrivate($0, transcript: file); tick += 1 }))
                     .toggleStyle(.pnSwitch).controlSize(.small)
                     .disabled(!pv.isPrivate && !pv.allowed)
                     .help(pv.allowed ? L("org.private.help") : L("org.privateOff", ["org": org.name]))
             }
-            .padding(.horizontal, 24).padding(.vertical, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .id(tick)
         }
     }
 }

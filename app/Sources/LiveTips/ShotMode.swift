@@ -136,6 +136,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }
             if env["LT_SHOTS_ONLY"] == "site023" { siteShots(theme); continue }   // 0.23.0: the site pictures in Roadbook
             if env["LT_SHOTS_ONLY"] == "home024" { if lang == "en" { home024(theme) }; continue }   // 0.24 (R1): Home by the boards HM, HS, HB
+            if env["LT_SHOTS_ONLY"] == "r2" { if lang == "en" { r2(theme) }; continue }   // 0.25 (R2): the call pages by the boards CP, CT, UP, UT, SL
             if env["LT_SHOTS_ONLY"] == "redesign" { if lang == "en" || theme == "light" { redesignShots(theme, uk: lang == "uk") }; continue }   // redesign 0.23.0: every style   // 0.10.0: co-driver cards for the site
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
@@ -321,6 +322,104 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             }
         }
         steps.append { [unowned self] in HomeView.shotState = ""; PNThemeModel.shared.style = PNStyle.buildDefault; self.next() }
+    }
+
+    /// 0.25 (R2): the past and the upcoming call page by the boards CP, CT, UP, UT, SL, once per style and mode (English).
+    /// Files: r2-past-<tab>-<style>-<mode>.png and r2-up-<tab>-<style>-<mode>.png, 1280 pt wide like the boards.
+    func r2(_ theme: String) {
+        _ = PNFonts.once
+        steps.append { [unowned self] in
+            if let r = self.demoCall { Self.writeDemoNotes(r.file); Self.r2Demo(r.file) }
+            self.next(after: 0.2)
+        }
+        for st in PNStyle.allCases {
+            let tt = st.rawValue + "-" + theme
+            steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
+            for tab in ["summary", "discussed", "decisions", "tasks", "risks", "followup", "transcript", "sales", "none"] {
+                steps.append { [unowned self] in self.r2Past(tab, tt) }
+            }
+            for tab in ["setup", "sheet", "tasks", "earlier"] {
+                steps.append { [unowned self] in self.r2Up(tab, tt) }
+            }
+        }
+        steps.append { [unowned self] in PNThemeModel.shared.style = PNStyle.buildDefault; self.next() }
+    }
+
+    static func r2Stem(_ f: String) -> String { f.hasSuffix(".md") ? String(f.dropLast(3)) : f }
+
+    /// A demo follow-up draft (no AI in shot mode) and the Sales picture written only for the Sales shot. Demo names only.
+    static func r2Demo(_ file: String) {
+        let m = FollowUpModel.of(file)
+        m.subject = "Orbit weekly, Nov 17: the export screen and the pilot"
+        m.body = """
+        Hi Emily,
+
+        Thanks for the time today. A short recap so we stay on the same page:
+
+        - The export screen goes to production on Tuesday.
+        - The pilot starts on November 10 with five users, once David sends the test accounts by Friday.
+        - The CSV download and scheduled emails go through a change request; I will send the options this week.
+
+        One open question on our side: who signs off the change request with you?
+
+        Best,
+        Mike
+        """
+    }
+
+    static let r2Sales: [String: Any] = [
+        "method": "bant",
+        "criteria": [
+            ["criterion": "budget", "what": "", "quote": "", "state": "unknown"],
+            ["criterion": "authority", "what": "Emily decides on the pilot; David signs off security. A contract over $50K goes to their CFO.", "quote": "Anything past fifty goes to our CFO. (David Kim, 10:22)", "state": "known"],
+            ["criterion": "need", "what": "Reporting takes two people a full day each week; they want it under an hour.", "quote": "Mondays are just gone for two of my people. (Emily Clark, 10:08)", "state": "known"],
+            ["criterion": "timeline", "what": "A pilot in Q1 is likely; the exact start depends on the security review.", "quote": "If security is happy, January works. (Emily Clark, 10:31)", "state": "partial"]
+        ],
+        "objections": [
+            ["what": "We tried a reporting tool in 2024 and nobody used it.", "answer": "the pilot starts with one team and the users in the loop from week one."],
+            ["what": "Our data can't leave the US.", "answer": "hosting in the US region; Mike sends the security pack."],
+            ["what": "The price looks high for 40 seats.", "answer": ""]
+        ],
+        "next_step": ["what": "Pilot scoping call with Emily and David", "due": "Thu 19 Nov, 15:00"],
+        "scorecard": ["open_questions": 2, "pm_talk_share": 0.38]
+    ]
+
+    /// One past call shot: the tab, with the Sales picture for "sales" and the notes moved away for "none".
+    func r2Past(_ tab: String, _ tt: String) {
+        guard let r = demoCall else { next(); return }
+        let fm = FileManager.default
+        let sales = Self.r2Stem(r.file) + ".sales.json"
+        let notes = CallNotes.path(r.file), aside = notes + ".r2aside"
+        if tab == "sales", let d = try? JSONSerialization.data(withJSONObject: Self.r2Sales, options: [.prettyPrinted]) { try? d.write(to: URL(fileURLWithPath: sales)) }
+        if tab == "none", fm.fileExists(atPath: notes) { try? fm.moveItem(atPath: notes, toPath: aside) }
+        CallPageView.shotTab = tab == "none" ? "summary" : tab
+        HomeNav.shared.path = []; HomeNav.shared.followUp = nil
+        if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }
+        HomeWindow.window?.setContentSize(NSSize(width: 1280, height: tab == "transcript" ? 900 : 1100))
+        CallPageWindow.show(file: r.file)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { NotificationCenter.default.post(name: .pnShotTab, object: tab == "none" ? "summary" : tab) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [self] in
+            if let win = HomeWindow.window { capture(win, "r2-past-\(tab)-\(tt)") }
+            CallPageView.shotTab = nil
+            if tab == "sales" { try? fm.removeItem(atPath: sales) }
+            if tab == "none", fm.fileExists(atPath: aside) { try? fm.moveItem(atPath: aside, toPath: notes) }
+            next()
+        }
+    }
+
+    /// One upcoming call shot (the planned demo call, no Meeting Sheet).
+    func r2Up(_ tab: String, _ tt: String) {
+        UpcomingCallPage.shotTab = tab
+        HomeNav.shared.path = []; HomeNav.shared.followUp = nil
+        if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }
+        HomeWindow.window?.setContentSize(NSSize(width: 1280, height: 1000))
+        UpcomingPages.open(planned)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { NotificationCenter.default.post(name: .pnShotTab, object: tab) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [self] in
+            if let win = HomeWindow.window { capture(win, "r2-up-\(tab)-\(tt)") }
+            UpcomingCallPage.shotTab = nil
+            next()
+        }
     }
 
     /// One picture of Home on the demo day of home(): 1280 pt wide like the boards, and 820 pt for the narrow layout.

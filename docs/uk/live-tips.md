@@ -1445,8 +1445,8 @@ Notion на один проєкт; воркспейс показується о�
 ### 14.1i Pacenote 0.8.7: Integrations, редагована сторінка дзвінка, режим продажу, HubSpot
 
 **Вікна і навігація.** Вікна Pacenote ніколи не злипаються в таби. Сторінка дзвінка, серія, транскрипт і
-Statistics відкриваються всередині Home; Back (або Command-[) повертає. Лист після дзвінка це права панель
-сторінки дзвінка.
+Statistics відкриваються всередині Home; Back (або Command-[) повертає. Лист після дзвінка це вкладка
+сторінки дзвінка (0.25).
 
 **Налаштування застосунку (0.16.0).** Сім кроків: Welcome (до, під час і після дзвінка), Permissions, Folder, AI
 (Claude чи ChatGPT і "If your AI is out": інший провайдер, модель на цьому Маку, далі лише правила), What to install
@@ -1725,6 +1725,21 @@ Ready чи Not ready з поясненням, одна велика кнопка
 час дзвінка на червоній плашці, Show tips, Meeting Sheet і End the call. Без дзвінків попереду Home пише "Clear until
 tomorrow"; без календаря пропонує підключити його і показує дзвінки, заплановані вручну; перший запуск показує три
 кроки. У вузькому вікні колонки стають одна під одною. Classic має ту саму розкладку.
+
+**Сторінки дзвінка (0.25).** Сторінка минулого і майбутнього дзвінка зібрані за бордами сторінки дзвінка трьох стилів.
+Згори смуга: Back, що це за сторінка ("Past call · 3rd in this series", "Upcoming call · weekly series") і дії
+(минулий дзвінок: Ask about this call, Export і меню "..."; майбутній: скільки до початку, Start without prep і Get ready,
+або Start call, коли дзвінок підготовлено). Далі рядок дати, назва і рядок фактів: проєкт (клік переносить дзвінок в
+інший), як дзвінок завершився (Ended · screen recorded, Transcript only, Ended · not synced), учасники і серія. Під
+ними в минулого дзвінка по рядку на кожен стан: Notion (коли синхронізовано, Retry), згода, запис (Play, Show in
+Finder, Open in Drive), сервер (Sync now, Don't sync this call) і організація (хто бачить, Private). Вкладки: Summary,
+What was discussed, Decisions, Tasks, Risks, Follow-up, Transcript, і Sales для дзвінка в режимі продажу. Summary
+ставить In short і Topics поруч із Decisions, On you, On them і Risks; час це посилання в транскрипт. Follow-up це лист
+після дзвінка як вкладка (Option-Command-I відкриває її з будь-якого місця сторінки). Дзвінок без нотаток показує, що в
+нього є (транскрипт, запис), і пише нотатки кнопкою Make meeting notes. У майбутнього дзвінка Setup має The call
+(проєкт, назва, коли, тип дзвінка, аудиторія, мова, режим продажу), People (із запрошення), Preparation (що бере Get
+ready, "Anything special today?", Quick prep і Expert prep) і More settings; Meeting Sheet без sheet пропонує Quick prep
+і п'ять кроків Expert prep поруч.
 
 **Сторінки дзвінків.** Майбутній дзвінок відкривається сторінкою з вкладками Setup, Brief, Tasks і Earlier calls;
 зміни в Setup застосовуються лише після Save. Минулий дзвінок має Summary (з 0.9.5.2 Meeting notes, 14.1t), What was discussed, Decisions, Tasks, Risks,

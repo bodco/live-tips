@@ -16,25 +16,38 @@ final class SetupModel: ObservableObject {
         enum State { case unknown, checking, ok, missing, installing, failed }
     }
 
-    @Published var steps: [Step] = [
-        Step(id: "python", optional: false),
-        Step(id: "core", optional: false),
-        Step(id: "venv", optional: false),
-        Step(id: "recorder", optional: false),
-        Step(id: "tips", optional: false),
-        Step(id: "whisper", optional: false),
-        Step(id: "localai", optional: false),
-        Step(id: "voices", optional: false),
-        // 2026-10-29 (owner): installed like the rest, but optional: recording works without it, preparing does not.
-        Step(id: "claude", optional: true),
-    ]
+    /// 0.24.1 (F1, decisions 10 and 11): the base set, all of it installed by one Install (bge-m3 and voices too).
+    @Published var steps: [Step] = SetupPlan.base.map { Step(id: $0, optional: false) }
+    /// The command line tools of the accounts (Claude Code, Codex): not components, installed when an account is connected.
+    @Published var tools: [Step] = SetupPlan.accountTools.map { Step(id: $0, optional: true) }
     @Published var log: [String] = []
     @Published var busy = false
+    // The one loader (0.24.1, F1): what runs, its fraction and bytes, the whole run's progress and time left.
+    @Published var running: String?
+    @Published var stepFraction = 0.0
+    @Published var stepBytes: (done: Int64, total: Int64)?
+    @Published var runSteps: [String] = []
+    @Published var runDone: Set<String> = []
+    @Published var runStarted: Date?
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
     var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
     var script: String { Bundle.main.path(forResource: "setup", ofType: "sh") ?? "" }
     var allRequiredOK: Bool { steps.allSatisfy { $0.optional || $0.state == .ok } }
+    /// What a call cannot start without (decision 9).
+    var callBlockingMissing: [String] { steps.filter { SetupPlan.callBlocking.contains($0.id) && $0.state != .ok }.map(\.id) }
+    var checked: Bool { !steps.contains { $0.state == .unknown || $0.state == .checking } }
+
+    var overall: Double {
+        SetupPlan.overall(steps: runSteps, done: runDone, running: running, fraction: stepFraction)
+    }
+    var etaSeconds: TimeInterval? { runStarted.flatMap { SetupPlan.eta(fraction: overall, elapsed: Date().timeIntervalSince($0)) } }
+
+    func step(_ id: String) -> Step? { steps.first { $0.id == id } ?? tools.first { $0.id == id } }
+    func update(_ id: String, _ f: (inout Step) -> Void) {
+        if let i = steps.firstIndex(where: { $0.id == id }) { f(&steps[i]) }
+        else if let i = tools.firstIndex(where: { $0.id == id }) { f(&tools[i]) }
+    }
 
     func run(_ mode: String, _ step: String, onLine: @escaping (String) -> Void) async -> Int32 {
         let script = self.script, root = appRoot, res = Bundle.main.resourcePath ?? ""
@@ -67,55 +80,103 @@ final class SetupModel: ObservableObject {
         }
     }
 
+    private func setState(_ id: String, from out: String) {
+        update(id) {
+            $0.state = out.hasPrefix("OK") ? .ok : .missing
+            $0.detail = String(out.split(separator: " ", maxSplits: 1).dropFirst().first ?? "")
+        }
+    }
+
     func checkAll() async {
-        for i in steps.indices {
-            steps[i].state = .checking
+        for id in steps.map(\.id) + tools.map(\.id) {
+            update(id) { $0.state = .checking }
             var out = ""
-            _ = await run("check", steps[i].id) { out = $0 }
-            steps[i].state = out.hasPrefix("OK") ? .ok : .missing
-            steps[i].detail = String(out.split(separator: " ", maxSplits: 1).dropFirst().first ?? "")
+            _ = await run("check", id) { out = $0 }
+            setState(id, from: out)
         }
         if allRequiredOK { applyEngineSettings() }
+        AppLog.app("components checked: " + steps.map { "\($0.id)=\($0.state == .ok ? "ok" : "missing")" }.joined(separator: " "))
     }
 
-    /// One component on request (Claude Code is installed only when the PM presses Install).
-    func installOne(_ id: String) async {
-        guard let i = steps.firstIndex(where: { $0.id == id }), !busy else { return }
-        busy = true
-        defer { busy = false }
-        steps[i].state = .installing
-        log.append("> " + steps[i].title)
-        _ = await run("install", id) { [weak self] l in self?.log.append(l) }
+    /// One install step with its output in the window, in logs/setup.log, and the loader's numbers. Returns ok.
+    @discardableResult
+    private func install(_ id: String) async -> Bool {
+        guard let title = step(id)?.title else { return false }
+        update(id) { $0.state = .installing }
+        running = id; stepFraction = 0; stepBytes = nil
+        log.append("> " + title)
+        AppLog.setup("> install \(id)")
+        let t0 = Date()
+        var lines: [String] = []
+        let rc = await run("install", id) { [weak self] l in
+            guard let self else { return }
+            if let p = SetupPlan.parse(l) {
+                self.stepFraction = p.fraction
+                if let b = p.bytes, let t = p.total { self.stepBytes = (b, t) }
+                return                                  // progress lines stay out of the log
+            }
+            self.log.append(l); lines.append(l)
+            if self.log.count > 400 { self.log.removeFirst(100) }
+            AppLog.setup("  " + l)
+        }
         var out = ""
         _ = await run("check", id) { out = $0 }
-        steps[i].state = out.hasPrefix("OK") ? .ok : .failed
-        steps[i].detail = String(out.split(separator: " ", maxSplits: 1).dropFirst().first ?? "")
+        setState(id, from: out)
+        let ok = out.hasPrefix("OK")
+        if !ok { update(id) { $0.state = .failed } }
+        let secs = Int(Date().timeIntervalSince(t0).rounded())
+        let code = ok ? "" : SetupPlan.errorCode(step: id, log: lines)
+        AppLog.setup("< \(id) rc=\(rc) \(ok ? "ok" : "failed " + code) \(secs)s check: \(out)")
+        AppLog.app("install \(id): \(ok ? "ok" : "failed (\(code))") in \(secs) s")
+        var props: [String: Any] = ["step": id, "ok": ok, "seconds": secs]
+        if !ok { props["code"] = code }
+        AnalyticsTracker.shared.track("install_component", props)
+        runDone.insert(id); running = nil; stepFraction = 0; stepBytes = nil
+        return ok
     }
 
-    func installMissing(includeOptional: Bool) async {
+    /// One component or account tool on request (the CLI of an account when it is connected).
+    func installOne(_ id: String) async {
+        guard step(id) != nil, !busy else { return }
         busy = true
-        defer { busy = false }
-        for i in steps.indices where steps[i].state != .ok && (includeOptional || !steps[i].optional) {
-            steps[i].state = .installing
-            log.append("> " + steps[i].title)
-            let rc = await run("install", steps[i].id) { [weak self] l in
-                self?.log.append(l)
-                if (self?.log.count ?? 0) > 400 { self?.log.removeFirst(100) }
+        defer { busy = false; running = nil }
+        runSteps = [id]; runDone = []; runStarted = Date()
+        AppLog.header("setup.log", "install \(id)", extra: AppLog.runtimeExtra)
+        await install(id)
+        if allRequiredOK { applyEngineSettings() }
+        AnalyticsTracker.shared.snapshotIfDue(force: true)
+    }
+
+    /// 0.24.1 (F1): installs every missing part of the base set. A failure no longer stops the run: the steps that need
+    /// the failed one are marked with why, the others still install (the first outside user's install stopped at the
+    /// tips engine and never reached Whisper).
+    func installMissing(includeOptional: Bool = true) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false; running = nil }
+        let todo = steps.filter { $0.state != .ok }.map(\.id)
+        runSteps = todo; runDone = []; runStarted = Date()
+        AppLog.header("setup.log", "install \(todo.joined(separator: ","))", extra: AppLog.runtimeExtra)
+        var failed = Set<String>()
+        for id in todo {
+            if let b = SetupPlan.blockedBy(id, failed: failed) {
+                let need = step(b)?.title ?? b
+                update(id) { $0.state = .failed; $0.detail = L("setup.blocked", ["step": need]) }
+                failed.insert(id); runDone.insert(id)
+                log.append(L("setup.blocked", ["step": need]) + ": " + (step(id)?.title ?? id))
+                AnalyticsTracker.shared.track("install_component", ["step": id, "ok": false, "seconds": 0, "code": "blocked"])
+                continue
             }
-            var out = ""
-            _ = await run("check", steps[i].id) { out = $0 }
-            steps[i].state = out.hasPrefix("OK") ? .ok : .failed
-            steps[i].detail = String(out.split(separator: " ", maxSplits: 1).dropFirst().first ?? "")
-            if steps[i].state != .ok && !steps[i].optional {
-                log.append(rc == 0 ? L("setup.log.notFinished") : L("setup.log.stopped"))
-                return
-            }
+            if !(await install(id)) { failed.insert(id) }
         }
         if allRequiredOK {
             applyEngineSettings()
             LocalAIService.shared.apply()
             log.append(L("setup.log.allSet"))
+        } else if !failed.isEmpty {
+            log.append(L("setup.log.someFailed", ["n": "\(failed.count)"]))
         }
+        AnalyticsTracker.shared.snapshotIfDue(force: true)
     }
 
     /// Points the app at what setup installed, unless the PM set other engines on purpose.
@@ -152,7 +213,6 @@ struct SetupView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(s.title)
                             Text(s.why).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                            if s.id == "python" && (s.state == .missing || s.state == .failed) { PythonInstallHint() }   // 0.8.7 (L3.5)
                         }
                         Spacer()
                         Text(s.detail).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
@@ -161,6 +221,7 @@ struct SetupView: View {
                 }
             }
             .ltCard()
+            SetupLoader(model: model, showButton: false)
             DisclosureGroup(L("home.week.details"), isExpanded: $showLog) {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -183,7 +244,7 @@ struct SetupView: View {
             VStack(spacing: 8) {
                 LTPrimaryButton(title: model.allRequiredOK ? L("setup.allInstalled") : (model.busy ? L("setup.installing") : L("setup.installAll")),
                                 symbol: model.allRequiredOK ? "checkmark" : (model.busy ? nil : "arrow.down")) {
-                    Task { await model.installMissing(includeOptional: true) }
+                    Task { await model.installMissing() }
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.busy || model.allRequiredOK)
@@ -207,15 +268,68 @@ struct SetupView: View {
     }
 }
 
-/// 0.8.7 (L3.5): no Python on this Mac. One way out instead of a red line: the official python.org installer page and
-/// what to click there; Check again after it is installed.
-struct PythonInstallHint: View {
-    static let url = URL(string: "https://www.python.org/downloads/macos/")!
+/// 0.24.1 (F1, decision 3): one loader for the whole base set, wherever it is installed from (onboarding, the
+/// Setup window, a call that cannot start yet): the part that is installing, MB of MB for downloads, percent of the
+/// whole run and time left; what failed with its reason and one Retry. Never a browser or Terminal.
+struct SetupLoader: View {
+    @ObservedObject var model: SetupModel
+    var showButton = true
+    var compact = false
+
+    var failed: [SetupModel.Step] { model.steps.filter { $0.state == .failed } }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button(L("setup.python.install")) { NSWorkspace.shared.open(Self.url) }
-                .buttonStyle(.pnSecondary)
-            Text(L("setup.python.how")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            if model.busy {
+                ProgressView(value: model.overall).tint(PN.C.brand)
+                    .accessibilityLabel(L("setup.loader.a11y", ["pct": "\(Int(model.overall * 100))"]))
+                HStack(spacing: 6) {
+                    Text(nowLine).font(PN.Font.caption).foregroundStyle(PN.C.text2).lineLimit(1)
+                    Spacer()
+                    Text(rightLine).font(PN.Font.caption.monospacedDigit()).foregroundStyle(PN.C.text3).lineLimit(1)
+                }
+            } else if !failed.isEmpty {
+                ForEach(failed) { s in
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(PN.C.danger).accessibilityHidden(true)
+                        Text(s.title + (s.detail.isEmpty ? "" : ": " + s.detail)).font(PN.Font.caption).foregroundStyle(PN.C.text2)
+                            .lineLimit(compact ? 1 : 3).fixedSize(horizontal: false, vertical: !compact)
+                    }
+                }
+                Button(L("setup.retry")) { Task { await model.installMissing() } }.buttonStyle(.pnSecondary)
+            } else if showButton && model.checked && !model.allRequiredOK {
+                Button(L("setup.installAll")) { Task { await model.installMissing() } }.buttonStyle(.pnPrimary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in if model.busy { model.objectWillChange.send() } }
+    }
+
+    var nowLine: String {
+        guard let id = model.running, let s = model.step(id) else { return L("setup.installing") }
+        let n = model.runSteps.firstIndex(of: id).map { $0 + 1 } ?? 1
+        return L("setup.loader.now", ["step": s.title, "n": "\(n)", "total": "\(model.runSteps.count)"])
+    }
+
+    var rightLine: String {
+        var parts: [String] = []
+        if let b = model.stepBytes, b.total > 0 {
+            parts.append(L("setup.loader.mb", ["done": "\(b.done / 1_000_000)", "total": "\(b.total / 1_000_000)"]))
+        }
+        parts.append("\(Int(model.overall * 100)) %")
+        if let e = model.etaSeconds { parts.append(L("setup.loader.eta", ["t": SetupPlan.etaText(e)])) }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// 0.24.1 (F1): no Python on this Mac is no longer the PM's problem: Pacenote downloads its own (about 25 MB). The
+/// python.org page and its steps are gone (decision 2: the PM never leaves the onboarding).
+struct PythonInstallHint: View {
+    @ObservedObject var setup = SetupWindow.model
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L("setup.python.own")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            Button(L("setup.installAll")) { Task { await setup.installMissing() } }.buttonStyle(.pnSecondary).disabled(setup.busy)
         }
         .padding(.top, 4)
     }

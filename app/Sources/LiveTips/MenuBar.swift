@@ -107,9 +107,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The first screen after launch (once signed in), and again after signing in on the sign-in screen.
     private func launchWindows() {
         // 2026-10-26: new users get the onboarding (permissions, folders, Claude, install, Notion optional).
-        if !UserDefaults.standard.bool(forKey: "onboardingDone") && !UserDefaults.standard.bool(forKey: "onboarded") {
-            UserDefaults.standard.set(true, forKey: "onboarded")
-            MainActor.assumeIsolated { OnboardingWindow.show() }
+        // 0.24.1 (F2, decision 5): "onboarded" is no longer set when the window shows; only Done ends the onboarding,
+        // and an unfinished one comes back at its step after a restart.
+        let d = UserDefaults.standard
+        if OnboardingResume.shouldShow(done: d.bool(forKey: "onboardingDone"), legacyShown: d.bool(forKey: "onboarded"),
+                                       baseLikelyReady: CallEngine.shared.baseLikelyReady) {
+            AppLog.app("onboarding: shown (not finished, step \(d.integer(forKey: OnboardingModel.stepKey)))")
+            MainActor.assumeIsolated { OnboardingWindow.show(resume: true) }
         } else if !CallEngine.shared.problems().isEmpty { MainActor.assumeIsolated { SetupWindow.show() } }
         else if !callIsLive {
             // 0.8.7.1: Home opens once the saved keys are read off the main thread (an "allow access" prompt after an
@@ -126,6 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor func routeSignIn() {
         let a = PacenoteAccount.shared
         let onboarded = UserDefaults.standard.bool(forKey: "onboardingDone") || UserDefaults.standard.bool(forKey: "onboarded")
+        // (the gate only tells onboarding from Home after sign-in; launchWindows decides whether onboarding opens)
         switch PacenoteServer.gate(sessionKnown: a.sessionKnown, signedIn: a.signedIn, onboarded: onboarded, callLive: callIsLive) {
         case .loading, .afterCall:
             return      // after the call: CallEngine.callEnded routes again
@@ -233,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         help.addItem(withTitle: L("wn.menu"), action: #selector(openWhatsNew), keyEquivalent: "").target = self   // 0.16.0 (D3)
         help.addItem(withTitle: L("settings.how.title"), action: #selector(openHowItWorks), keyEquivalent: "").target = self
         help.addItem(withTitle: L("menubar.welcomeTour"), action: #selector(openOnboarding), keyEquivalent: "").target = self   // 0.8.7.1: also in Help
+        help.addItem(withTitle: L("diag.menu"), action: #selector(exportDiagnostics), keyEquivalent: "").target = self   // 0.24.1 (F7)
         help.addItem(NSMenuItem.separator())
         help.addItem(withTitle: L("menubar.demo"), action: #selector(showDemo), keyEquivalent: "").target = self
         help.addItem(withTitle: L("menubar.demoPresentation"), action: #selector(showDemoPresentation), keyEquivalent: "").target = self
@@ -346,6 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CallEngine.shared.writeToNotion(file: f)
     }
     @objc func openSetup() { MainActor.assumeIsolated { SetupWindow.show() } }
+    @objc func exportDiagnostics() { MainActor.assumeIsolated { Diagnostics.export() } }
     @objc func openOnboarding() { MainActor.assumeIsolated { if gatedToSignIn() { return }; OnboardingWindow.show() } }
     @objc func openSettings() { MainActor.assumeIsolated { if gatedToSignIn() { return }; SettingsWindow.show() } }
     @objc func openHowItWorks() { MainActor.assumeIsolated { HowItWorksWindow.show() } }
@@ -849,6 +856,23 @@ extension AppDelegate {
     func launch(_ model: StartCallModel, openMeeting: Bool = true) -> String? {
         guard ModuleGate.allow("live_tips") else { return L("lock.callClosed") }      // 0.18.0 (B3)
         if gatedToSignIn() { return L("gate.title") }      // 0.22.0 (D50): no new call without an account
+        // 0.24.1 (F6, decision 9): no call without the base set (no transcript, tips or notes would come); without any AI
+        // a call is recording and transcript only. The same answer for every start point.
+        let verdict = CallEngine.shared.readiness()
+        switch verdict {
+        case .blocked(let missing):
+            AppLog.app("call: not started, missing " + missing.joined(separator: ","))
+            AnalyticsTracker.shared.track("call_blocked", ["reason": "base_missing"])
+            SetupWindow.show()
+            return L("ready.blocked", ["parts": missing.compactMap { SetupWindow.model.step($0)?.title }.joined(separator: ", ")])
+        case .transcriptOnly(let why):
+            AppLog.app("call: transcript only (\(why))")
+            AnalyticsTracker.shared.track("call_blocked", ["reason": why])
+            if model.callType != "transcript" { model.callType = "transcript" }
+            CallEngine.shared.startReady = false
+        case .ready:
+            CallEngine.shared.startReady = true
+        }
         model.useDefaultTargetIfEmpty()
         if model.chosenPrep == nil { model.adoptExistingPrep() }
         if model.chosenPrep == nil, let b = model.prepBase, let root = model.root {

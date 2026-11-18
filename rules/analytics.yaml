@@ -46,7 +46,10 @@ enums:
   error_area: [ai, transcribe, record, drive, notion, calendar, google, sync, auth, update, entitlements, server,
                local_llm, crm, index, prep, export, browser]
   error_code: [timeout, rate_limit, quota, key_invalid, auth_expired, network, offline, server_5xx, server_4xx,
-               not_found, permission, disk_full, parse, cancelled, unsupported, too_large, conflict, crashed, other]
+               not_found, permission, disk_full, parse, cancelled, unsupported, too_large, conflict, crashed, other,
+               # 0.24.1 (F7): what the first outside user's logs had to be read for
+               not_installed, module_missing, model_missing, no_destination, python_unsupported, checksum, blocked,
+               install_failed]
   perf_what: [app_ready, prep_build, sheet_open, first_tip, answer_tip, transcribe_minute, rec_start, notes_after,
               search, sync_push, sync_pull, index_build, console_open, team_list, team_search]
   update_how: [prompt, background, manual]
@@ -58,6 +61,7 @@ screens:
   home: [timeline, past, insights]
   sign_in: [choose, email, code, reset, link]          # 0.22.0 (D50): before onboarding
   past_calls: []
+  setup_window: []                                     # 0.24.1 (F7): Pacenote components (the Setup window)
   tracker: [tasks, decisions, risks]
   stats: []
   series: []
@@ -98,6 +102,7 @@ screens:
   console_plans: [matrix, plan]
   console_inactive: []
   console_telemetry: []
+  console_mail: []                                     # 0.24.1 (app F7): Platform > Mail
   console_analytics: [overview, features, funnels, paths, errors, performance, retention, people, devices, explorer]
   console_audit: []
   console_org: [overview, members, teams, invites, projects, policy, plan, usage, audit, export]
@@ -157,8 +162,14 @@ events:
   action: {scr: screen, name: action}
   # 4. features (schema 1 events, with sharper parameters)
   call_started: {type: call_type, sales: bool, has_brief: bool, sheet: sheet_mode, from: start_from, provider: provider,
-                 org: org_kind, recording: bool, consent: bool}
-  call_ended: {minutes: minutes, tips: count, rated: count, asks: count, cpu_peak: bucket_pct, recorded: bool}
+                 org: org_kind, recording: bool, consent: bool, ready: bool}
+  call_ended: {minutes: minutes, tips: count, rated: count, asks: count, cpu_peak: bucket_pct, recorded: bool,
+               lines: count, stop_ms: ms}               # 0.24.1 (F7): lines 0 = nothing was recorded; End call to the end
+  # 0.24.1 (F6, F7): a start refused by the readiness check, and the recorder's model load at the start of a call
+  call_blocked: {reason: code, from: start_from}
+  rec_model_load: {seconds: seconds, ok: bool}
+  # 0.24.1 (F7): one install step (the base set or an account's tool), its time and the error code when it failed
+  install_component: {step: code, ok: bool, seconds: seconds, code: error_code}
   prepare_run: {type: call_type, source: code, seconds: seconds, provider: provider, model: model, sheet: sheet_mode,
                 ok: bool}
   prepare_again: {sheet: sheet_mode}
@@ -285,6 +296,8 @@ values:
   project_wizard.org: [personal, none, join, create]
   project_wizard.folder: [new, existing]
   practice_call.from: [onboarding]
+  install_component.step: [python, core, venv, recorder, tips, whisper, localai, voices, claude, codex]
+  call_blocked.reason: [base_missing, no_ai, account_tool]
   org_register_changed.kind: [decision, task, risk]
   org_register_deleted.kind: [decision, task, risk]
   org_change_restored.entity: [card, state, source]

@@ -976,6 +976,7 @@ struct SettingsView: View {
                     HStack(spacing: 8) {
                         if PrepRunner.claudePath == nil {
                             Text(L("set.cc.notInstalled")).foregroundStyle(PN.C.text3)
+                            Button(L("acct.connect")) { AccountLogin.shared.connect("claude") }       // 0.24.1 (F1): installs Claude Code, then signs in
                         } else {
                             Image(systemName: runner.loggedIn == true ? "checkmark.circle.fill" : (runner.loggedIn == false ? "exclamationmark.triangle.fill" : "circle.dotted"))
                                 .foregroundStyle(runner.loggedIn == true ? PN.C.turn : (runner.loggedIn == false ? PN.C.onMe : PN.C.text3))
@@ -988,6 +989,7 @@ struct SettingsView: View {
                     }
                 }
                 .help(L("ai.access.accountHelp"))
+                AccountLoginStatus(kind: "claude")
                 KeyRow(title: L("keys.claude.title"), hint: L("keys.claude.hint"), key: .claudeAPIKey, model: model).settingsAnchor("ai.claude")
                 } else if aiProvider == "chatgpt" {
                 CodexAccountRow()

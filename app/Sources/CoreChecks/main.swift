@@ -4093,6 +4093,116 @@ salesBlocksS1()
 emailAuthB13()
 appearanceStyleR1()
 updatePromptR()
+/// 0.24.1 (F1, F7): the base set and its loader, Pacenote's own Python, locked packages, sign-in without Terminal, logs.
+func hotfixF1() {
+    let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    // the base set: bge-m3 and voices in it, Claude Code not (decisions 10, 11)
+    expect(SetupPlan.base.contains("localai") && SetupPlan.base.contains("voices"), "f1: bge-m3 and voices are in the base set")
+    expect(!SetupPlan.base.contains("claude") && SetupPlan.accountTools.contains("claude") && SetupPlan.accountTools.contains("codex"), "f1: account tools are not components")
+    expect(SetupPlan.base == ComponentCatalog.required, "f1: the base set is what Components calls required")
+    expect(Set(SetupPlan.callBlocking).isSubset(of: Set(SetupPlan.base)) && !SetupPlan.callBlocking.contains("localai") && !SetupPlan.callBlocking.contains("voices"), "f1: bge-m3 and voices do not block a call")
+    // a failure does not stop independent steps
+    expect(SetupPlan.blockedBy("whisper", failed: ["tips"]) == nil, "f1: Whisper still installs when the tips engine failed")
+    expect(SetupPlan.blockedBy("localai", failed: ["python"]) == nil && SetupPlan.blockedBy("core", failed: ["python"]) == nil, "f1: curl steps need no Python")
+    expect(SetupPlan.blockedBy("whisper", failed: ["python"]) == "python" && SetupPlan.blockedBy("tips", failed: ["venv"]) == "venv", "f1: a step waits for what it needs")
+    // the loader
+    expect(SetupPlan.parse("PROGRESS 50 200 B") == SetupPlan.Progress(fraction: 0.25, bytes: 50, total: 200), "f1: progress in bytes")
+    expect(SetupPlan.parse("PROGRESS 3 4 pkg")?.fraction == 0.75 && SetupPlan.parse("PROGRESS 3 4 pkg")?.bytes == nil, "f1: progress in packages")
+    expect(SetupPlan.parse("PROGRESS 1 0 B") == nil && SetupPlan.parse("Collecting numpy") == nil && SetupPlan.parse("PROGRESS 9 4 B")?.fraction == 1, "f1: bad progress lines")
+    let all = ["python", "whisper"]
+    let o = SetupPlan.overall(steps: all, done: ["python"], running: "whisper", fraction: 0.5)
+    expect(abs(o - (25e6 + 810e6) / 1_645e6) < 0.001, "f1: overall weighs steps by size")
+    expect(SetupPlan.overall(steps: [], done: [], running: nil, fraction: 0) == 0, "f1: empty run")
+    expect(SetupPlan.eta(fraction: 0.01, elapsed: 60) == nil && SetupPlan.eta(fraction: 0.5, elapsed: 3) == nil, "f1: no early ETA")
+    expect(SetupPlan.eta(fraction: 0.25, elapsed: 60) == 180, "f1: ETA from the speed so far")
+    expect(SetupPlan.etaText(180) == "3 min" && SetupPlan.etaText(50) == "1 min" && SetupPlan.etaText(12) == "10 s", "f1: ETA text")
+    expect(SetupPlan.errorCode(step: "tips", log: ["ERROR: No matching distribution found for onnxruntime"]) == "python_unsupported", "f1: python_unsupported")
+    expect(SetupPlan.errorCode(step: "python", log: ["ERROR could not download Python."]) == "network", "f1: network")
+    expect(SetupPlan.errorCode(step: "whisper", log: ["Traceback"]) == "model_missing", "f1: model_missing")
+    // setup.sh: Pacenote's own Python, pinned and checked; no browser, no python.org; packages from hashed locks
+    let sh = (try? String(contentsOf: app.appendingPathComponent("Resources/setup.sh"), encoding: .utf8)) ?? ""
+    expect(sh.contains("PY_SHA=\"") && sh.contains("python-build-standalone") && sh.contains("sha_ok \"$t\" \"$PY_SHA\""), "f1: Python is pinned and checked")
+    expect(!sh.contains("python.org") && !sh.contains("open \"https"), "f1: setup never opens a browser")
+    expect(sh.contains("(3, 10) <= sys.version_info[:2] <= (3, 14)"), "f1: system Python only 3.10 to 3.14")
+    expect(sh.contains("pip_lock recorder") && sh.contains("pip_lock tips") && sh.contains("pip_lock voices") && sh.contains("--require-hashes"), "f1: packages from the locks")
+    expect(!sh.contains("pip_in \"anthropic") && !sh.contains("pip_in \"mlx-whisper"), "f1: no unpinned base packages")
+    expect(sh.contains("install:codex)") && sh.contains("CX_SHA=\""), "f1: Codex pinned by hash")
+    for g in ["recorder", "tips", "voices"] {
+        let lock = (try? String(contentsOf: app.appendingPathComponent("Resources/python/\(g).lock"), encoding: .utf8)) ?? ""
+        let pins = lock.split(separator: "\n").filter { $0.first?.isLetter == true }
+        expect(!pins.isEmpty && pins.allSatisfy { $0.contains("==") }, "f1: \(g).lock pins exact versions")
+        expect(lock.components(separatedBy: "--hash=sha256:").count - 1 >= pins.count, "f1: \(g).lock has hashes")
+    }
+    let bundle = (try? String(contentsOf: app.appendingPathComponent("buildtools/bundle.sh"), encoding: .utf8)) ?? ""
+    expect(bundle.contains("Resources/python/\"*.lock"), "f1: the app carries the locks")
+    // sign-in from the app
+    expect(CLILogin.arguments("claude") == ["auth", "login"] && CLILogin.arguments("codex").last == "login", "f1: sign-in arguments")
+    expect(CLILogin.event("Open this URL: https://claude.ai/oauth/authorize?code=1&x=2 ") == .url("https://claude.ai/oauth/authorize?code=1&x=2"), "f1: sign-in URL")
+    expect(CLILogin.event("Paste code here if prompted >") == .askCode && CLILogin.event("Enter the code shown") == .askCode, "f1: asks for a code")
+    expect(CLILogin.event("Successfully logged in") == .done && CLILogin.event("working...") == nil, "f1: sign-in done")
+    // logs (F7)
+    let d0 = Date(timeIntervalSince1970: 1_795_000_000), z = TimeZone(identifier: "Europe/Kyiv")!
+    let fakeHome = "/" + "Users" + "/mike", fakeKey = "sk-" + "ant-" + "api03-ABCDEFGHIJKLMNOPQRSTUV"     // built here: the repo scan
+    let ln = LogFile.line("rec at \(fakeHome)/work key \(fakeKey)", at: d0, zone: z, home: fakeHome)
+    expect(ln.hasPrefix("2026-") && ln.contains("+0200") && ln.contains("~/work") && !ln.contains(fakeHome) && !ln.contains("QRSTUV"), "f7: log line dated, home as ~, key cut")
+    let h = LogFile.header("call x", app: "0.24.1", build: "241", os: "15.4", extra: [("python", "3.13.18"), ("empty", "")], at: d0, zone: z)
+    expect(h.hasPrefix("=== call x | 2026-") && h.contains("Pacenote 0.24.1 (241)") && h.contains("python=3.13.18") && !h.contains("empty="), "f7: run header")
+    let tmp = NSTemporaryDirectory() + "pn-log-\(UUID().uuidString)/a.log"
+    for i in 0..<30 { LogFile.append(String(repeating: "x", count: 40) + "\(i)", to: tmp, maxBytes: 200, keep: 2) }
+    let fm = FileManager.default
+    expect(fm.fileExists(atPath: tmp) && fm.fileExists(atPath: tmp + ".1") && fm.fileExists(atPath: tmp + ".2") && !fm.fileExists(atPath: tmp + ".3"), "f7: logs rotate by size")
+    expect(((try? String(contentsOfFile: tmp, encoding: .utf8)) ?? "").contains("x29"), "f7: logs are appended")
+    try? fm.removeItem(atPath: (tmp as NSString).deletingLastPathComponent)
+}
+
 aiDefaultsF3()
+/// 0.24.1 (F2, F6, F7): an unfinished onboarding comes back; one readiness answer for every start; error codes.
+func hotfixF2F6() {
+    expect(OnboardingResume.shouldShow(done: false, legacyShown: false, baseLikelyReady: false), "f2: a new person sees the onboarding")
+    expect(OnboardingResume.shouldShow(done: false, legacyShown: false, baseLikelyReady: true), "f2: not finished: shown again even when installed")
+    expect(!OnboardingResume.shouldShow(done: true, legacyShown: false, baseLikelyReady: false), "f2: done is done")
+    expect(!OnboardingResume.shouldShow(done: false, legacyShown: true, baseLikelyReady: true), "f2: an older Set up later with all installed is not asked again")
+    expect(OnboardingResume.shouldShow(done: false, legacyShown: true, baseLikelyReady: false), "f2: an older Set up later without the base comes back")
+    expect(OnboardingResume.step(saved: 1, count: 7) == 1 && OnboardingResume.step(saved: nil, count: 7) == 0 && OnboardingResume.step(saved: 9, count: 7) == 6, "f2: resume step")
+    // readiness (decision 9): the first outside user had no tips modules and no Whisper model, and a working API key
+    typealias R = CallReadiness
+    expect(R.check(missing: ["tips", "whisper"], connected: ["api"], routes: ["api", "api", "api"]) == .blocked(["whisper", "tips"]), "f6: no base, no call")
+    expect(R.check(missing: ["localai", "voices"], connected: ["api"], routes: ["api"]) == .ready, "f6: bge-m3 and voices do not block")
+    expect(R.check(missing: [], connected: [], routes: ["api", "api", "api"]) == .transcriptOnly("no_ai"), "f6: no AI: transcript only")
+    expect(R.check(missing: [], connected: [], routes: ["code", "api", "code"]) == .transcriptOnly("account_tool"), "f6: an account without its tool")
+    expect(R.degraded(missing: ["voices", "tips"]) == ["voices"] && R.reason(.blocked(["tips"])) == "base_missing" && R.reason(.ready) == nil, "f6: degraded and reasons")
+    // the base by its files
+    let root = "/A", home = "/H", site = "/A/.venv/lib/python3.13/site-packages"
+    var files: Set<String> = ["/A/python/bin/python3", "/A/src/transcriber.py", "/A/.venv/bin/python",
+                              site + "/mlx_whisper", site + "/numpy", site + "/anthropic", site + "/yaml", site + "/jsonschema",
+                              site + "/onnxruntime", site + "/tokenizers", site + "/sherpa_onnx",
+                              "/A/models/bge-m3-int8/model_quantized.onnx", "/A/models/wespeaker_en_voxceleb_resnet34_LM.onnx"]
+    let hub = "/H/.cache/huggingface/hub/models--mlx-community--whisper-large-v3-turbo/snapshots"
+    var dirs: [String: [String]] = ["/A/.venv/lib": ["python3.13"], hub: ["abc"]]
+    func miss() -> [String] { BaseFiles.missing(appRoot: root, home: home, exists: { files.contains($0) }, list: { dirs[$0] ?? [] }) }
+    expect(miss().isEmpty, "f6: everything in place \(miss())")
+    files.remove(site + "/jsonschema"); dirs[hub] = []
+    expect(miss() == ["tips", "whisper"], "f6: the first user's case \(miss())")
+    dirs["/A/.venv/lib"] = []
+    expect(miss().contains("recorder") && miss().contains("voices"), "f6: no venv packages without site-packages")
+    expect(NothingRecorded.reason(sawLoading: true, sawRecording: false) == "model_loading" && NothingRecorded.reason(sawLoading: false, sawRecording: false) == "not_started"
+           && NothingRecorded.reason(sawLoading: true, sawRecording: true) == "silence", "f6: why nothing was recorded")
+    expect(NothingRecorded.path(transcript: "/x/a.app.md") == "/x/a.app.md.norec.json", "f6: the reason file")
+    // error codes (F7)
+    typealias A = Analytics
+    expect(A.errorCode(message: "No module named 'jsonschema'") == "module_missing", "f7: module_missing")
+    expect(A.errorCode(message: "failed after 0 s (api): Claude Code is not installed") == "not_installed", "f7: not_installed")
+    expect(A.errorCode(message: "The meaning search model is not installed") == "model_missing", "f7: model_missing")
+    expect(A.errorCode(message: "Notion: no meetings database for this project") == "no_destination", "f7: no_destination")
+    expect(A.errorCode(message: "ERROR: No matching distribution found for onnxruntime") == "python_unsupported", "f7: python_unsupported")
+    for c in ["not_installed", "module_missing", "model_missing", "no_destination", "python_unsupported"] {
+        expect(A.catalog.enums["error_code"]?.contains(c) == true, "f7: \(c) in the catalog")
+    }
+    for e in ["install_component", "rec_model_load", "call_blocked"] { expect(A.catalog.events[e] != nil, "f7: \(e) in the catalog") }
+    expect(A.catalog.events["call_ended"]?["lines"] != nil && A.catalog.events["call_started"]?["ready"] != nil, "f7: call_ended lines, call_started ready")
+}
+
+hotfixF1()
+hotfixF2F6()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

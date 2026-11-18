@@ -1225,6 +1225,11 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     src_ids = {s["id"] for s in srcs}
     failures = []
     use_claude = route in CLAUDE and responder is None
+    if use_claude and route == "api" and not find_claude(req.get("claude")):
+        # 0.24.1 (F4): the Claude API key needs no Claude Code: without it the build is packed passes on the key
+        # (Asker -> AnthropicProvider). Before, "Claude Code is not installed" marked the working key as out.
+        use_claude = False
+        notes.append("Claude Code is not installed: built through the Claude API key in packed passes.")
     if use_claude:
         emit(progress=0.13, stage="model", route=route)
         files = claude_files(usable, texts, os.path.join(os.path.dirname(base), ".sheet-cache", os.path.basename(base)))

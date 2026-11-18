@@ -72,6 +72,7 @@ struct SheetPrepView: View {
 struct SheetQuickView: View {
     @ObservedObject var draft: SheetDraft
     @ObservedObject var jobs = SheetJobs.shared
+    @ObservedObject var ready = CallReadyState.shared        // 0.24.1 (F6)
     @State private var fixing: String?
 
     private var m: StartCallModel { draft.model }
@@ -214,15 +215,21 @@ struct SheetQuickView: View {
 
     @ViewBuilder private var special: some View {
         VStack(alignment: .leading, spacing: 4) {
-                Text(L(draft.live ? "sheet.quick.whatChanged" : "sheet.ui.quick.special")).font(PN.Font.body.weight(.semibold))
+            if draft.live {
+                Text(L("sheet.quick.whatChanged")).font(PN.Font.body.weight(.semibold))
                 TextField(L("sheet.ui.quick.specialPh"), text: $draft.special).textFieldStyle(.roundedBorder)
-                ForEach(draft.linksInText, id: \.self) { l in SheetLinkSuggestion(draft: draft, link: l) }
+            } else {
+                // 0.24.1 (F5, decision 6): the same "What matters on this call" as the Start call form, the call's context
+                WhatMattersField(model: m, draft: draft)
+            }
+            ForEach(draft.linksInText, id: \.self) { l in SheetLinkSuggestion(draft: draft, link: l) }
         }
     }
 
     @ViewBuilder private var actions: some View {
         let routeProblem = SheetRoutes.problem(draft.route)
         VStack(alignment: .leading, spacing: 8) {
+            CallReadyBanner()        // 0.24.1 (F6): no start without the base set; transcript only without an AI
             if !draft.remembered {
                 Label(L("sheet.ui.quick.remember", ["title": m.effectiveTitle]), systemImage: "arrow.triangle.2.circlepath").font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
@@ -237,6 +244,7 @@ struct SheetQuickView: View {
                     }.buttonStyle(.pnSecondary).help(L("sheet.ui.live.sameHelp"))
                 } else {
                     Button(L("sheet.ui.startWithout")) { startCall() }.buttonStyle(.pnSecondary)
+                        .disabled(ready.blocked)
                 }
                 Button(L("sheet.ui.quick.prepare", ["n": "\(draft.estimateSeconds)"])) { if let e = draft.build() { draft.note = e } }
                     .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(routeProblem != nil || draft.checking)
@@ -535,9 +543,8 @@ struct SheetMeetingStep: View {
                 }
                 field(L("sheet.ui.s1.name")) { TextField(m.effectiveTitle, text: Binding(get: { m.title }, set: { m.title = $0 })).textFieldStyle(.roundedBorder) }
                 field(L("sheet.ui.s1.when")) { DatePicker("", selection: Binding(get: { m.callDate }, set: { m.callDate = $0 })).labelsHidden().fixedSize() }
-                field(L("sheet.ui.s1.goal")) {
-                    TextField(L("sheet.ui.s1.goalPh"), text: $draft.goal, axis: .vertical).textFieldStyle(.roundedBorder).lineLimit(2...4)
-                }
+                // 0.24.1 (F5, decision 6): one field for the goal and what matters, the call's context (as in Start call)
+                WhatMattersField(model: m, draft: draft)
                 ForEach(draft.linksInText, id: \.self) { l in SheetLinkSuggestion(draft: draft, link: l) }
             }
             PageCard(spacing: 10) { SheetPeopleView(draft: draft) }      // 0.14.0 (D1)
@@ -1187,6 +1194,27 @@ struct SheetBuildProgress: View {
                     Button(L("sheet.ui.build.again")) { draft.job = nil; draft.step = 4 }.buttonStyle(.pnSecondary)
                 }
             }
+        }
+    }
+}
+
+
+/// 0.24.1 (F5, decision 6): "What matters on this call" in the Meeting Sheet (Quick and Expert step 1), bound to the
+/// call's context like the Start call form (CallSetup), so the brief and the tips get it. The goal for the build is
+/// read from it (SheetDraft.goalLine), no second field.
+struct WhatMattersField: View {
+    @ObservedObject var model: StartCallModel
+    @ObservedObject var draft: SheetDraft
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(L("call.whatMatters")).font(PN.Font.body.weight(.semibold))
+            TextField(L("call.whatMatters.placeholder"), text: Binding(get: { model.context }, set: {
+                model.context = $0
+                draft.goal = SheetDraft.goalLine(model.cleanContext)
+                draft.objectWillChange.send()
+            }), axis: .vertical)
+            .textFieldStyle(.roundedBorder).lineLimit(3...6)
+            .accessibilityLabel(L("call.whatMatters"))
         }
     }
 }

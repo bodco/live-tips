@@ -5,6 +5,44 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.24.1 (unreleased)
 
+- **Setup installs everything in one go, with no Terminal or browser (2026-11-18):** Pacenote now downloads its own
+  Python 3.13 (about 25 MB, checked by its SHA-256) instead of using whatever Python is on the Mac; a Python you
+  already have (3.10 to 3.14) is used only when that download fails. Before, a Mac with Python 3.15 from the Python
+  website could not install the tips engine at all. The libraries install at exact versions checked by hash, and a new
+  Pacenote version brings them up to date by itself. One Install puts the whole base in place: speech recognition,
+  the Whisper model, the tips engine, the meaning search model (bge-m3) and speaker identification. A part that fails
+  no longer stops the parts after it, and the window says which package failed and why. One loader shows the part
+  being installed, MB of MB, the percent and the time left, in the onboarding, the Components window and wherever a
+  call waits for it.
+- **Accounts install their own program when you connect them (2026-11-18):** Claude Code is no longer in the list of
+  components. Connect a Claude account and Pacenote installs Claude Code and opens the sign-in in your browser;
+  connect a ChatGPT account and it installs Codex the same way. The sign-in runs from the app, never in Terminal; if
+  the program asks for a code, a field in Pacenote takes it. With an API key nothing extra is installed.
+- **The onboarding goes on where you left it (2026-11-18):** an onboarding you did not finish (for example after a
+  restart for a permission) opens again at the same step at the next launch, and the install keeps going.
+- **Preparation and notes on an API key without Claude Code (2026-11-18):** with a Claude API key and no Claude Code,
+  the preparation and the Meeting Sheet now run on the key. Before, they failed with "Claude Code is not installed"
+  and the working key was then marked as out.
+- **What matters on this call, in the Meeting Sheet too (2026-11-18):** Quick and the first step of Expert have the same
+  "What matters on this call" field as Start call, so the goal, the people and the open questions reach the brief and
+  the tips.
+- **A call starts only when it can work (2026-11-18):** without speech recognition, the Whisper model or the tips
+  engine a call does not start: every start button says what is missing and offers Install with the loader in place.
+  With no AI connected a call is recording and transcript only, with Connect AI next to it. End call while the speech
+  model is still loading stops at once, and a call with no line says "Nothing was recorded" with the reason. The
+  meaning search model and speaker identification only make a call better: when one is missing, Pacenote offers it
+  without getting in the way.
+- **Logs a support look can read (2026-11-18):** the app keeps its own journal (logs/app.log: calls started and ended,
+  the readiness answer, onboarding steps, AI switches, installs, Notion pages that were not written and why) and the
+  full output of every install (logs/setup.log). Every run starts with a header (date and time zone, versions, Python
+  and its packages, macOS, the call), logs are appended and rotated by size. Help > Export diagnostics saves one zip
+  with the logs, the state, the versions and the components to a folder you choose, with the home folder written as
+  ~ and nothing that looks like a key. The anonymous usage data now also says which install step failed and why,
+  how long the speech model took to load, whether a call recorded any line, and which AI really did a job after a
+  switch; never call text.
+- **"Ollama is not running" was not about Ollama (2026-11-18):** the meaning search model built into Pacenote now says
+  that it is not installed or still starting, instead of an Ollama message.
+
 - **The AI of each job follows what is connected (2026-11-18):** with only one AI connected, for example a Claude API
   key, the preparation, the tips and the work after the call now all run on it. Before, the preparation and the
   notes stayed on the Claude account even when it was not connected, so a new user with just an API key saw the

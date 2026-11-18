@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 # Characters, not bytes: Cyrillic is two bytes a letter but about the same tokens per character as Latin.
-BUDGETS = {"local": 120_000, "codex": 280_000, "openai": 280_000, "gemini": 280_000, "agy": 280_000}
+BUDGETS = {"local": 120_000, "codex": 280_000, "openai": 280_000, "gemini": 280_000, "agy": 280_000, "api": 280_000}
 PINNED_SHARE = 0.55          # the pinned sources may take up to this share of the budget before they are compressed
 FOLDER_FILE_CAP = 12_000     # one folder file at most (compressed by sections above it)
 STATE_CAPS = {"config": 14_000, "decisions": 6_000, "current_state": 12_000, "digest": 8_000}

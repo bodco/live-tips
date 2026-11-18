@@ -193,16 +193,8 @@ final class PrepRunner: ObservableObject {
         }
     }
 
-    /// Opens Terminal with `claude auth login` (the sign-in needs a browser and sometimes a pasted code).
-    func openLogin() {
-        guard let claude = Self.claudePath else { return }
-        let cmd = "'" + claude + "' auth login"
-        let script = "tell application \"Terminal\"\n activate\n do script \"" + cmd.replacingOccurrences(of: "\"", with: "\\\"") + "\"\nend tell"
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        p.arguments = ["-e", script]
-        try? p.run()
-    }
+    /// 0.24.1 (F1): the sign-in runs from the app (AccountLogin), never Terminal; installs Claude Code first if needed.
+    func openLogin() { AccountLogin.shared.connect("claude") }
 
     /// The `claude` command line tool (Claude Code).
     nonisolated static var claudePath: String? {
@@ -378,7 +370,10 @@ final class PrepRunner: ObservableObject {
             }
         }
         if forced == nil { switchedOnce = false; localTried = false; geminiTried = false; chainTried = [] }
-        let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini, AIRoute.agy].contains(forced ?? AIRoute.effective(AppConfig.load(from: AppPaths.config)).ai.prep)
+        let first = forced ?? AIRoute.effective(AppConfig.load(from: AppPaths.config)).ai.prep
+        // 0.24.1 (F4): the Claude API key needs no Claude Code: without it the API key prepares a packed pass (apiprep)
+        let wantsLocal = [AIRoute.local, AIRoute.codex, AIRoute.openai, AIRoute.gemini, AIRoute.agy].contains(first)
+            || (Self.claudePath == nil && (first == AIRoute.api || hasAPIKey))
         guard let claude = Self.claudePath ?? (wantsLocal ? "/usr/bin/true" : nil) else { return L("prep.err.noClaude") }
         let c = AIRoute.effective(AppConfig.load(from: AppPaths.config))   // 0.9.6 Б1: economy mode, from the next job
         guard let skill = Self.skillDir(workRoot: c.workRoot) else { return L("prep.err.noSkill") }
@@ -509,7 +504,7 @@ final class PrepRunner: ObservableObject {
         // 0.8.2: the way from Settings > AI; with auto-switch the other one when this one cannot run at all.
         let routes = c.ai
         var route = forced ?? routes.prep
-        let usable0: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.openai ? self.hasOpenAIKey : $0 == AIRoute.gemini ? self.hasGeminiKey : $0 == AIRoute.agy ? (AgyAccount.cliPath != nil && AgyAccount.shared.signedIn != false) : $0 == AIRoute.api ? self.hasAPIKey : self.loggedIn != false }
+        let usable0: (String) -> Bool = { $0 == AIRoute.codex ? CodexAccount.cliPath != nil : $0 == AIRoute.openai ? self.hasOpenAIKey : $0 == AIRoute.gemini ? self.hasGeminiKey : $0 == AIRoute.agy ? (AgyAccount.cliPath != nil && AgyAccount.shared.signedIn != false) : $0 == AIRoute.api ? self.hasAPIKey : Self.claudePath != nil && self.loggedIn != false }   // 0.24.1 (F4): no Claude Code, no account way
         // 0.9.6 (owner): a provider at its monthly limit is not usable (Settings > AI > Spending limits)
         let usable: (String) -> Bool = { usable0($0) && !SpendWatch.capped(route: $0, config: c) }
         // 0.10.0 (AI chain, owner 12.11): the chosen AI cannot run or is out until its reset time: the next AI of the
@@ -542,7 +537,8 @@ final class PrepRunner: ObservableObject {
         let isOpenAI = route == AIRoute.openai      // 0.9.0 (owner): the preparation through the OpenAI API
         let isGemini = route == AIRoute.gemini      // 0.9.3 (owner): the preparation through the Gemini API
         let isAgy = route == AIRoute.agy            // 0.9.3 (owner): the preparation through the Gemini account
-        let isPacked = isLocal || isCodex || isOpenAI || isGemini || isAgy
+        let isAPIPacked = useAPI && Self.claudePath == nil      // 0.24.1 (F4): the API key without Claude Code
+        let isPacked = isLocal || isCodex || isOpenAI || isGemini || isAgy || isAPIPacked
         // 0.17.0 (SEC-01): Claude Code before 2.1.163 lets WebFetch carry data out through an allowed host
         if !isPacked, let e = Self.claudeVersionProblem(claude) { return e }
         // 0.9.6 Б3 (rules/prep.yaml): the research preparation's features, only on the Claude ways; economy trims them
@@ -622,7 +618,7 @@ final class PrepRunner: ObservableObject {
             let reqPath = ((appRoot as NSString).appendingPathComponent("state") as NSString).appendingPathComponent("localprep-request.json")
             if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
             p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
-            p.arguments = ["-m", isCodex ? "livetips_m0.codexprep" : isOpenAI ? "livetips_m0.openaiprep" : isGemini ? "livetips_m0.geminiprep" : isAgy ? "livetips_m0.agyprep" : "livetips_m0.localprep", "--request", reqPath]
+            p.arguments = ["-m", isCodex ? "livetips_m0.codexprep" : isOpenAI ? "livetips_m0.openaiprep" : isGemini ? "livetips_m0.geminiprep" : isAgy ? "livetips_m0.agyprep" : isAPIPacked ? "livetips_m0.apiprep" : "livetips_m0.localprep", "--request", reqPath]
         }
         p.currentDirectoryURL = URL(fileURLWithPath: isPacked ? c.engine.sidecarDir : (r.useProjectFolder ? r.root : live))
         // 0.8.5 (owner: "lt digest" and "lt prep-check" were refused to Claude in every run): the app makes the digest
@@ -720,7 +716,7 @@ final class PrepRunner: ObservableObject {
                 // plan limit, a bad key): the preparation runs once on Gemini, before the model on this Mac. The packed
                 // routes say their error in the result, not in the log.
                 let errText = (self.resultMeta["error"] as? String) ?? logText
-                let packedOut = !ok && (isOpenAI || isCodex) && AIRoute.outReason(route, errText) != nil
+                let packedOut = !ok && (isOpenAI || isCodex || isAPIPacked) && AIRoute.outReason(route, errText) != nil
                 // 0.10.0 (AI chain, owner 12.11): any AI out at run time (a limit, no credit, a bad key, signed out):
                 // marked until its reset time, the preparation runs again on the next AI of the chain, each AI once
                 let outText = isPacked ? errText : logText

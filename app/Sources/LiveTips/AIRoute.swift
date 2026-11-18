@@ -82,14 +82,22 @@ enum AIRoute {
         let conn = confirmed()
         if let m = SettingsModel.live {
             let n = AIDefaults.apply(m.config.ai, connected: conn)
-            if n != m.config.ai { m.config.ai = n }        // the model saves the file
+            if n != m.config.ai { logSwitch(m.config.ai, n); m.config.ai = n }        // the model saves the file
             return
         }
         var c = AppConfig.load(from: AppPaths.config)
         let n = AIDefaults.apply(c.ai, connected: conn)
         guard n != c.ai else { return }
+        logSwitch(c.ai, n)
         c.ai = n
         try? c.save(to: AppPaths.config)
+    }
+
+    /// 0.24.1 (F7): an AI switch in logs/app.log and a fresh settings_snapshot.
+    @MainActor static func logSwitch(_ a: AppConfig.AIRoutes, _ b: AppConfig.AIRoutes) {
+        let jobs = [("prep", a.prep, b.prep), ("tips", a.tips, b.tips), ("after", a.after, b.after)].filter { $0.1 != $0.2 }
+        AppLog.app("AI switched: " + jobs.map { "\($0.0) \($0.1) -> \($0.2)" }.joined(separator: ", "))
+        DispatchQueue.main.async { MainActor.assumeIsolated { AnalyticsTracker.shared.snapshotIfDue(force: true) } }
     }
 
     /// The enabled AIs for the engine, the model on this Mac only when one is downloaded (the engine treats every AI
@@ -110,6 +118,17 @@ enum AIRoute {
     static func due(_ r: String) -> Bool { AIOut.due(outStates()[r], now: Date().timeIntervalSince1970) }
 
     static var accountsPath: String { ((statePath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("ai-accounts.json") }
+    /// 0.24.1 (F7): the AI a job really ended on: the last switch of `job` (LT_AI_STAGE) written since `since`, else nil.
+    static func switchedTo(job: String, since: Date) -> String? {
+        guard let t = try? String(contentsOfFile: switchesPath, encoding: .utf8) else { return nil }
+        for line in t.split(separator: "\n").suffix(50).reversed() {
+            guard let o = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],
+                  (o["job"] as? String) == job, let at = o["at"] as? Double, at >= since.timeIntervalSince1970 else { continue }
+            return o["to"] as? String
+        }
+        return nil
+    }
+
     static var switchesPath: String { ((statePath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("ai-switches.jsonl") }
 
     /// The latest limits an account reported (Claude Code's rate_limit_event, Codex's rate_limits), per account.

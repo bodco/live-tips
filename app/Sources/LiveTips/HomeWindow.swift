@@ -1307,32 +1307,149 @@ struct RecentCard: View {
 }
 
 /// 0.9.0: "All past calls": the old Recent list, all visible calls.
+/// 0.25 (R4, board PC-PastCalls): the bar, how many calls since when, the title, the filters and Find on the right;
+/// the calls grouped by week (This week, Last week) and then by month, each row with its date, what came out of it
+/// and the state of its notes; on hover Summary, Follow-up and Series.
 struct PastCallsView: View {
     @ObservedObject var history = CallHistory.shared
     @AppStorage("callFilterOrg") private var filterOrg = ""          // 0.17.0 (B6b, D39)
     @AppStorage("callFilterProject") private var filterProject = ""
     @ObservedObject private var acct = PacenoteAccount.shared
-    private var f: DateFormatter {
-        let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); f.setLocalizedDateFormatFromTemplate("EEEdMMMHHmm"); return f
+    @State private var find = ""
+    @Environment(\.pnTheme) private var t
+
+    private var shown: [CallHistory.Record] {
+        let q = find.lowercased()
+        return CallFilter.apply(history.visible, org: filterOrg, project: filterProject)
+            .filter { q.isEmpty || $0.title.lowercased().contains(q) || $0.project.lowercased().contains(q) }
     }
+
+    /// This week, Last week, then one group a month ("October 2026").
+    private var groups: [(String, [CallHistory.Record])] {
+        let cal = Calendar.current
+        let now = Date()
+        let weekStart = cal.dateInterval(of: .weekOfYear, for: now)?.start ?? now
+        let lastStart = cal.date(byAdding: .day, value: -7, to: weekStart) ?? weekStart
+        let mf = DateFormatter(); mf.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US"); mf.setLocalizedDateFormatFromTemplate("LLLLyyyy")
+        var out: [(String, [CallHistory.Record])] = []
+        for r in shown.sorted(by: { $0.start > $1.start }) {
+            let key = r.start >= weekStart ? L("past.g.thisWeek") : r.start >= lastStart ? L("past.g.lastWeek") : mf.string(from: r.start).capitalized
+            if let i = out.firstIndex(where: { $0.0 == key }) { out[i].1.append(r) } else { out.append((key, [r])) }
+        }
+        return out
+    }
+
     var body: some View {
         Group {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 12) {
-                    Text(L("home.allPast")).font(PN.sys(20, .bold)).foregroundStyle(PN.C.text)
-                    CallFilters(org: $filterOrg, project: $filterProject, records: history.visible)
+        VStack(spacing: 0) {
+            PageBackBar(crumb: L("past.crumb"))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    let all = history.visible
+                    let since = all.map(\.start).min()
+                    HStack(alignment: .bottom, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HomeMeta(text: since.map { L("past.meta", ["n": "\(all.count)", "date": HomeRecentRow.day($0)]) } ?? L("past.metaNone"))
+                            Text(t.cased(L("home.allPast"))).font(t.homeDisplay(t.style == .classic ? 32 : 40, t.titleWeight))
+                                .tracking(t.dTrack * 40).foregroundStyle(PN.C.text)
+                        }
+                        Spacer(minLength: 8)
+                        CallFilters(org: $filterOrg, project: $filterProject, records: all)
+                        TextField("", text: $find, prompt: Text(L("past.find"))).labelsHidden().pageField(30).frame(width: 200)
+                    }
+                    .padding(.horizontal, PageMetrics.side).padding(.top, 24).padding(.bottom, 18)
+                    if !filterOrg.isEmpty || !filterProject.isEmpty {
+                        HStack(spacing: 10) {
+                            Text(L("past.showing", ["n": "\(shown.count)"])).font(t.homeText(14)).foregroundStyle(PN.C.text2)
+                            HomeLink(L("past.clear")) { filterOrg = ""; filterProject = "" }
+                        }
+                        .padding(.horizontal, PageMetrics.side).padding(.bottom, 10)
+                    }
+                    VStack(alignment: .leading, spacing: 22) {
+                        if shown.isEmpty { Text(L("past.none")).font(t.homeText(15)).foregroundStyle(PN.C.text3).pageRow(10) }
+                        ForEach(groups, id: \.0) { g in
+                            VStack(alignment: .leading, spacing: 0) {
+                                PageSectionHead(title: g.0, count: "\(g.1.count)")
+                                ForEach(g.1) { r in PastCallRow(r: r) { history.hide(r) } }
+                            }
+                        }
+                        Text(L("past.foot")).font(t.homeText(13)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, PageMetrics.side).padding(.top, 8).padding(.bottom, 36)
                 }
-                .padding(.bottom, 12)
-                ForEach(Array(CallFilter.apply(history.visible, org: filterOrg, project: filterProject).enumerated()), id: \.element.id) { i, r in
-                    if i > 0 { Divider() }
-                    RecentRow(r: r, when: f.string(from: r.start), outcome: OutcomeCache.shared.outcome(r.file)?.line ?? "") { history.hide(r) }
-                }
+                .environment(\.pageFlat, true)
             }
-            .padding(24).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)
         }
+        .background(PN.C.bg)
     }
         .trackScreen("past_calls")
+    }
+}
+
+/// One row of All past calls (board PC): the date and time, the title (a mark when it came from a file), the project,
+/// the length and the series, what came out of it; the state of the notes, or on hover Summary, Follow-up, Series.
+struct PastCallRow: View {
+    let r: CallHistory.Record
+    var onHide: () -> Void
+    @State private var hover = false
+    @Environment(\.pnTheme) private var t
+
+    var body: some View {
+        let transcribed = (r.lines ?? 1) > 0
+        let o = OutcomeCache.shared.outcome(r.file)
+        let notes = transcribed && RecentCard.summary(r.file) != nil
+        let kind: HomeTag = !transcribed ? .notReady : notes ? .ready : .neutral
+        let tag = L(!transcribed ? "home.tag.notTranscribed" : notes ? "home.tag.notesReady" : "home.tag.transcriptOnly")
+        let series = CallPageView.series(of: r).count
+        let mins = r.minutes.map { L("call.page.minutes", ["n": "\(max(1, Int($0.rounded())))"]) } ?? ""
+        let sub = [r.project, mins].filter { !$0.isEmpty }.joined(separator: " · ")
+        let counts = RecentCard.counts(o)
+        let outcome = !transcribed ? L("past.notTranscribed") : notes ? (counts.isEmpty ? L("past.noDecisions") : counts) : L("past.transcriptOnly")
+        let df = CallPageView.fmt("EEEdMMMHHmm")
+        HStack(alignment: .top, spacing: 14) {
+            Text(df.string(from: r.start)).font(t.homeMono(12)).foregroundStyle(PN.C.text3).frame(width: 150, alignment: .leading).padding(.top, 3)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(r.title).font(t.homeText(17, .semibold)).foregroundStyle(PN.C.text).lineLimit(1)
+                    if r.source != nil {
+                        Text(t.caps ? L("past.fromFile").uppercased() : L("past.fromFile")).font(t.homeMono(10, .semibold)).foregroundStyle(PN.C.text2)
+                            .padding(.horizontal, 4).overlay(Rectangle().strokeBorder(PN.C.field, lineWidth: 1)).fixedSize()
+                    }
+                }
+                HStack(spacing: 4) {
+                    Text(sub).font(t.homeText(13)).foregroundStyle(PN.C.text2)
+                    if series > 1 { HomeLink("· " + L("past.seriesN", ["n": "\(series)"]), size: 13) { SeriesWindow.show(record: r) } }
+                }
+                Text(outcome).font(t.homeMono(12)).foregroundStyle(PN.C.text3).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if hover {
+                HStack(spacing: 8) {
+                    Button(L("past.btn.summary")) { CallPageWindow.show(file: r.file) }.buttonStyle(.pnRow)
+                    if transcribed { Button(L("past.btn.followup")) { FollowUpWindow.show(file: r.file) }.buttonStyle(.pnRow) }
+                    if series > 1 { Button(L("past.btn.series")) { SeriesWindow.show(record: r) }.buttonStyle(.pnRow) }
+                }
+                .fixedSize()
+            } else {
+                HomeTagView(kind: kind, text: tag)
+            }
+        }
+        .pageRow(11)
+        .background(hover ? PN.C.surface2 : Color.clear)
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
+        .onTapGesture { CallPageWindow.show(file: r.file) }
+        .contextMenu {
+            if let u = r.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
+            Button(L("home.recent.transcript")) { TranscriptWindow.show(file: r.file) }
+            Button(L("call.page.followup")) { FollowUpWindow.show(file: r.file) }
+            if series > 1 { Button(L("call.page.series", ["n": "\(series)"])) { SeriesWindow.show(record: r) } }
+            Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.file)]) }
+            Button(L("reassign.menu")) { ReassignPanel.show(file: r.file) }
+            Divider()
+            Button(L("home.recent.hide"), action: onHide)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

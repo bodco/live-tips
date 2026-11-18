@@ -1749,6 +1749,26 @@ What was discussed, Decisions, Tasks, Risks, Follow-up, Transcript, і Sales д�
 (проєкт, назва, коли, тип дзвінка, аудиторія, мова, режим продажу), People (із запрошення), Preparation (що бере Get
 ready, "Anything special today?", Quick prep і Expert prep) і More settings; Meeting Sheet без sheet пропонує Quick prep
 і п'ять кроків Expert prep поруч.
+Setup також каже, де відкриється дзвінок (застосунок зустрічі і профіль браузера чи застосунок), показує Our side і
+Their side з Change the sides (відкриває Quick prep), розділ Recording (записувати цей дзвінок, відео чи аудіо, якість,
+Upload to Google Drive, Recording settings) і Runs on: AI підготовки, підказок і підсумку. У минулого дзвінка термін
+зобов'язання стоїть праворуч у його рядку, Add з'являється на рішенні чи ризику під курсором, а додавання ризику в
+реєстр проєкту спершу питає підтвердження.
+
+**Tracker, Past calls і Series (0.25).** Tracker іде за своїм бордом: Back, рядок синхронізації (або "Kept on this Mac"
+з Connect Notion), заголовок із New task, вкладки Tasks, Decisions і Risks з лічильниками, фільтри (workspace, project,
+call, owner, status) і Find, далі групи: Overdue, This week і Later для задач, відкриті і Closed для рішень і ризиків.
+All past calls групує дзвінки за тижнями: дата, назва, проєкт і серія, з чим закінчився дзвінок і стан його нотаток;
+Summary, Follow-up і Series з'являються на рядку під курсором. Сторінка серії показує наступний дзвінок, Since last time,
+відкриті зобов'язання серії (хто, що, скільки дзвінків відкрите, дзвінок, де пообіцяли), Questions that stay open,
+Decisions call by call і реєстр рішень.
+
+**Statistics (0.25).** Home > This week > Statistics відкриває сторінку: кнопки періоду (Today, This week, Last week,
+This month, Last 30 days, Dates…) і проєкти або workspace (перемикач Sales calls у тому ж меню), чотири великі числа проти
+попереднього періоду (дзвінки, час на дзвінках, підготовлені, найзавантаженіший день), хвилини на дзвінках по днях
+стовпцями за проєктами і дзвінки вибірки. Клік по стовпцю дня показує цей день, повторний клік повертає весь період;
+дзвінок у списку відкриває свою сторінку. Праворуч: How the calls went, період коротко і AI this month з посиланням на
+Settings > Usage. Приховані дзвінки ніколи не рахуються.
 
 **Сторінки дзвінків.** Майбутній дзвінок відкривається сторінкою з вкладками Setup, Brief, Tasks і Earlier calls;
 зміни в Setup застосовуються лише після Save. Минулий дзвінок має Summary (з 0.9.5.2 Meeting notes, 14.1t), What was discussed, Decisions, Tasks, Risks,

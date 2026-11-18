@@ -30,6 +30,31 @@ Pacenote. Earlier versions are described in the commit messages and in
   Sales tab shows the qualification, the next step and the objections side by side. On an upcoming call, Setup has
   The call, People, Preparation and More settings; a call without a Meeting Sheet shows Quick prep and Expert prep side
   by side; Tasks and Earlier calls follow the same layout.
+- **Upcoming call Setup, tasks and risks finished (2026-11-18, layouts R2):** Setup on an upcoming call now says where
+  the call opens (Google Meet, Zoom or Teams and the browser profile or app), lists both sides of the call, with a link
+  to change them in Quick prep, has its own Recording section (record this call, video or audio, the quality, upload to
+  Google Drive) and shows above Save which AI runs the preparation, the tips and the summary. On a past call, Tasks shows
+  the due date of each commitment on the right, Decisions and Risks show Add on the row you point at, and adding a risk
+  to the project register asks first.
+- **Tracker, Past calls and Series laid out like the boards (2026-11-18, layouts R4):** the Tracker has a Back bar, the
+  sync line, a large title with New task, tabs with counts, the filters as bordered menus (workspace, project, call,
+  owner, status), Find, column heads and groups (Overdue, This week, Later; on Decisions and Risks the open ones, then
+  Closed), each with a short line on where the data lives. All past calls lists the calls by week: the date, the name
+  with its project and series, what came out of the call and the state of its notes, with Summary, Follow-up and Series
+  on the row you point at. A series page shows the next call, what changed since last time, the open commitments of the
+  series with how long they are open, the questions that stay open, the decisions call by call and the decision
+  register.
+- **Statistics laid out like its board (2026-11-18, layouts R4):** Home > This week > Statistics is now a full page:
+  the period (today, this week, last week, this month, 30 days or your own dates) as one row of buttons, the projects
+  or a workspace, and four big numbers against the period before: calls, time on calls, prepared calls (and how many
+  started without a Meeting Sheet) and the busiest day. Minutes on calls are bars by day, stacked by project; click a
+  day to see only its calls, click it again to go back. On the right: how the calls went (your share of the words,
+  calls without a decision, questions left open, decisions per call with and without a Meeting Sheet), the period in
+  short (average and longest call, sales calls) and AI this month (API spend against your monthly limit and the
+  accounts' usage). A call in the list opens its page.
+- **Tracker fixes (2026-11-18):** a task kept on this Mac whose call transcript is gone now shows the call's name
+  ("Release checklist review"), not a run-together key. Without Notion, the Decisions and Risks tabs no longer offer
+  New decision or New risk and say that they need Notion; decision dates read "18 Nov".
 
 ## 0.24.1 (unreleased)
 

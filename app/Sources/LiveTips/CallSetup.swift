@@ -599,6 +599,10 @@ struct CallSetupView: View {
                             LanguageMenu(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
                                                         set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
                         }
+                        setupRow(L("page.row.opensIn")) {
+                            Text(opensIn).font(t.homeText(15)).foregroundStyle(opensIn == L("page.opensIn.none") ? PN.C.text3 : PN.C.text)
+                                .lineLimit(1)
+                        }
                         setupRow(L("page.row.sales")) {
                             Toggle(isOn: Binding(get: { model.salesEnabled }, set: { model.salesEnabled = $0; model.salesTouched = true })) {
                                 Text(L("page.salesMode")).font(t.homeText(15))
@@ -607,20 +611,16 @@ struct CallSetupView: View {
                         }
                         if model.callType != "auto" { typeSection.pageRow(12) }
                     }
-                    if !model.participants.isEmpty {
-                        VStack(alignment: .leading, spacing: 0) {
-                            PageSectionHead(title: L("page.sec.people"))
-                            FlowLayout(spacing: 8, lineSpacing: 8) {
-                                ForEach(model.participants, id: \.self) { p in
-                                    Text(p).font(t.homeText(15, .medium)).foregroundStyle(PN.C.text)
-                                        .padding(.horizontal, 10).frame(height: 32)
-                                        .background(PN.C.surface)
-                                        .overlay(RoundedRectangle(cornerRadius: t.style == .classic ? 6 : 0).strokeBorder(PN.C.field, lineWidth: 1.5))
-                                }
-                            }
-                            .pageRow(10)
-                            Text(L("page.people.note")).font(t.homeText(13)).foregroundStyle(PN.C.text3).pageRow(10)
+                    VStack(alignment: .leading, spacing: 0) {
+                        PageSectionHead(title: L("page.sec.people"))
+                        sideRow(L("sheet.ui.s1.ours"), [L("sheet.ui.you")] + SheetDraft.ourPeople(model))
+                        sideRow(L("sheet.ui.s1.theirs"), SheetDraft.theirPeople(model).map { p in (p.company ?? "").isEmpty ? p.name : p.name + " · " + (p.company ?? "") })
+                        HStack(spacing: 16) {
+                            Text(L("page.people.note2")).font(t.homeText(13)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            HomeLink(L("page.people.change")) { if !needProject() { upnext.save(model); SheetPrepWindow.show(model, mode: .quick) } }
                         }
+                        .pageRow(10)
                     }
                 }
             } right: {
@@ -651,6 +651,33 @@ struct CallSetupView: View {
                         }
                     }
                     VStack(alignment: .leading, spacing: 0) {
+                        PageSectionHead(title: L("page.sec.recording"))
+                        HStack(spacing: 10) {
+                            Toggle(isOn: Binding(get: { model.recording != "off" },
+                                                 set: { model.recording = $0 ? (recCfg.kind == "audio" ? "audio" : "video") : "off" })) {
+                                Text(L("page.rec.this")).font(t.homeText(16))
+                            }
+                            .toggleStyle(.pnCheckbox)
+                            Spacer(minLength: 8)
+                            if model.recording != "off" {
+                                menuField(L(model.recording == "audio" ? "rec.kind.audio" : "rec.kind.video")) {
+                                    Button(L("rec.kind.video")) { model.recording = "video" }
+                                    Button(L("rec.kind.audio")) { model.recording = "audio" }
+                                }
+                                if model.recording == "video" {
+                                    Text(t.caps ? recQuality.uppercased() : recQuality).font(t.homeMono(12)).foregroundStyle(PN.C.text3).lineLimit(1)
+                                }
+                            }
+                        }
+                        .pageRow(10)
+                        HStack(spacing: 16) {
+                            Text(L(recCfg.drive == "auto" ? "page.rec.driveAuto" : "page.rec.driveManual")).font(t.homeText(15)).foregroundStyle(PN.C.text)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            HomeLink(L("page.rec.settings")) { SettingsWindow.show(tab: "recording") }
+                        }
+                        .pageRow(10)
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
                         PageSectionHead(title: L("page.more"))
                         options.pageRow(8)
                         Text(L("page.files.note")).font(t.homeText(13)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true).pageRow(10)
@@ -660,11 +687,77 @@ struct CallSetupView: View {
                     }
                 }
             }
+            // 0.25 (R2 tail, board UP): which AI does each job of this call, from Settings > AI
+            VStack(alignment: .leading, spacing: 0) {
+                PageSectionHead(title: L("page.sec.runsOn")) {
+                    Text(L("page.runs.note")).font(t.homeText(13)).foregroundStyle(PN.C.text3)
+                    Spacer()
+                    HomeLink(L("page.runs.change")) { SettingsWindow.show(tab: "ai") }
+                }
+                HStack(spacing: 40) {
+                    ForEach([("prep", L("page.runs.prep")), ("tips", L("page.runs.tips")), ("after", L("page.runs.after"))], id: \.0) { job, name in
+                        HStack(spacing: 12) {
+                            Text(name).font(t.homeText(15)).foregroundStyle(PN.C.text2)
+                            let r = runsOn(job)
+                            Text(r.map { AIRoute.name($0) } ?? L("ai.route.none")).font(t.homeText(15, .medium))
+                                .foregroundStyle(r == nil ? PN.C.notreadyText : PN.C.text)
+                                .padding(.horizontal, 10).frame(height: 32)
+                                .background(PN.C.surface)
+                                .overlay(RoundedRectangle(cornerRadius: t.style == .classic ? 6 : 0).strokeBorder(PN.C.field, lineWidth: 1.5))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .pageRow(12)
+            }
+            .padding(.top, 28)
             HStack(spacing: 10) { pageButtons }
                 .padding(.top, 14)
                 .overlay(alignment: .top) { Rectangle().fill(PN.C.ruleStrong).frame(height: t.ruleHeavy) }
                 .padding(.top, 28)
         }
+    }
+
+    private var recCfg: RecordingSettings { AppConfig.load(from: AppPaths.config).recording }
+    /// "Light (1280 px)": the quality of the screen recording from Settings > Call recording.
+    private var recQuality: String {
+        let p = recCfg.preset
+        return L("rec.quality." + p.id) + " (\(p.maxWidth) px)"
+    }
+
+    /// The AI that really does a job of this call (Settings > AI, F3), nil when none may.
+    private func runsOn(_ job: String) -> String? {
+        let ai = AppConfig.load(from: AppPaths.config).ai
+        return RoutePicker.runs(job: job, chosen: job == "prep" ? ai.prep : job == "tips" ? ai.tips : ai.after)
+    }
+
+    /// Where the meeting opens (board UP "Opens in"): the platform of the invite's link and the way Pacenote opens it.
+    private var opensIn: String {
+        guard let e = model.calEventID.flatMap({ cal.event($0) }), let link = e.link, !link.isEmpty else { return L("page.opensIn.none") }
+        let p = MeetingPlatform.of(link)
+        let name = L("page.platform." + p.rawValue)
+        guard let w = MeetingLauncher.shared.environment().ways(for: p, invited: e.accounts).first else { return name }
+        return name + ", " + MeetingLauncher.label(w)
+    }
+
+    /// One side of People (board UP): the side's name in the 130 pt column, the people as chips.
+    private func sideRow(_ label: String, _ people: [String]) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(label).font(t.homeText(15)).foregroundStyle(PN.C.text2).frame(width: 130, alignment: .leading).padding(.top, 5)
+            if people.isEmpty {
+                Text(L("page.people.none")).font(t.homeText(15)).foregroundStyle(PN.C.text3).padding(.top, 5)
+            } else {
+                FlowLayout(spacing: 8, lineSpacing: 8) {
+                    ForEach(people, id: \.self) { p in
+                        Text(p).font(t.homeText(15, .medium)).foregroundStyle(PN.C.text).lineLimit(1)
+                            .padding(.horizontal, 10).frame(height: 32)
+                            .background(PN.C.surface)
+                            .overlay(RoundedRectangle(cornerRadius: t.style == .classic ? 6 : 0).strokeBorder(PN.C.field, lineWidth: 1.5))
+                    }
+                }
+            }
+        }
+        .pageRow(10)
     }
 
     private var kinds: [(String, String)] {

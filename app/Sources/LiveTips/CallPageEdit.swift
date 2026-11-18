@@ -244,6 +244,8 @@ struct EditableRow<Leading: View, Trailing: View>: View {
     var copy: String? = nil
     var hoverActions: [PageRowAction] = []
     var menu: [PageRowAction] = []
+    /// 0.25 (R2 tail, board CT): a bordered button shown while the pointer is on the row ("Add to Tracker").
+    var hoverButton: PageRowAction? = nil
     let onSave: (String) -> Void
     @ViewBuilder var leading: () -> Leading
     @ViewBuilder var trailing: () -> Trailing
@@ -293,6 +295,11 @@ struct EditableRow<Leading: View, Trailing: View>: View {
                 }
                 .foregroundStyle(PN.C.text3)
                 .opacity(hover || rowFocus ? 1 : 0)
+                if let hb = hoverButton {
+                    Button(hb.title) { trigger(hb) }.buttonStyle(.pnRow).disabled(!hb.enabled)
+                        .help(hb.enabled ? hb.title : (hb.note.isEmpty ? hb.title : hb.note))
+                        .opacity(hover || rowFocus ? 1 : 0).fixedSize()
+                }
                 trailing()
             }
         }

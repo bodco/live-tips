@@ -270,3 +270,32 @@ extension Notification.Name {
     /// Shot mode only: the tab a call page shows now (object: the tab's id).
     static let pnShotTab = Notification.Name("PNShotTab")
 }
+
+/// A risk waiting for the confirmation sheet.
+struct RiskAsk: Identifiable { let text: String; var id: String { text } }
+
+/// 0.25 (R2 tail, board CT row 4): a confirmation in the style: a display title, what happens, Cancel and the action.
+struct PageConfirmSheet: View {
+    let title: String
+    let text: String
+    let go: String
+    let onCancel: () -> Void
+    let onGo: () -> Void
+    @Environment(\.pnTheme) private var t
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(t.cased(title)).font(t.homeDisplay(24, t.titleWeight)).tracking(t.dTrack * 24).foregroundStyle(PN.C.text)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(text).font(t.homeText(15)).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Spacer()
+                Button(L("common.cancel"), action: onCancel).buttonStyle(.pnBar).keyboardShortcut(.cancelAction)
+                Button(go, action: onGo).buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
+            }
+            .padding(.top, 6)
+        }
+        .padding(.horizontal, 24).padding(.top, 22).padding(.bottom, 20)
+        .frame(width: 460)
+        .background(PN.C.bg)
+    }
+}

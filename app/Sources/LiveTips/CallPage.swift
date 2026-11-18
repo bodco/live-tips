@@ -35,6 +35,7 @@ struct CallPageView: View {
     @State private var confirmServerDelete = false  // 0.12.1 (B8): "Delete from server"
     @State private var serverDeleteError = ""
     @ObservedObject private var nav = HomeNav.shared       // 0.25 (R2): Follow-up is a tab of the page
+    @State private var riskAsk: RiskAsk?                    // 0.25 (R2 tail): the risk waiting for "Add to Tracker"
     @Environment(\.pnTheme) private var t
 
     /// Shot mode only: the tab the page opens on.
@@ -161,6 +162,10 @@ struct CallPageView: View {
         } message: { Text(serverDeleteError) }
         .sheet(item: $cardDraft) { c in
             AnswerCardForm(card: c, title: L("cards.saveAs"), onSave: { saveCard($0, proj, ws) }, onCancel: { cardDraft = nil })
+        }
+        .sheet(item: $riskAsk) { r in
+            PageConfirmSheet(title: L("risk.confirm.title"), text: L("risk.confirm.body", ["risk": r.text, "project": proj?.name ?? ""]),
+                             go: L("risk.add"), onCancel: { riskAsk = nil }, onGo: { riskAsk = nil; addRiskNow(r.text, proj) })
         }
     }
         .trackScreen("call_page", sub: tab, o: CallSyncService.shared.callOrg(of: file))
@@ -988,15 +993,20 @@ struct CallPageView: View {
         let overdue = c.status == "open" && CommitmentRegister.isOverdue(c)
         // 0.8.7 (J4): only the due date is red when overdue, never the owner
         // 0.8.8: an item sent to the Notion tasks (by a click or the automatic add) says so
-        EditableRow(text: c.text, sub: c.mine && !c.notionPage.isEmpty ? L("call.page.inNotionTasks") : "", subColor: overdue ? PN.C.danger : PN.C.text3,
-                    subTail: c.due.isEmpty ? "" : L("reg.due", ["due": Register.dueText(c.due)]), done: c.status == "done",
+        // 0.25 (R2 tail, board CT row 3): the due date in its own column on the right, red only when late
+        EditableRow(text: c.text, sub: c.mine && !c.notionPage.isEmpty ? L("call.page.inNotionTasks") : "", subColor: PN.C.text3,
+                    subTail: "", done: c.status == "done",
                     copy: (c.mine ? "" : c.owner + ": ") + c.text + (c.due.isEmpty ? "" : " (" + Register.dueText(c.due) + ")"),
                     menu: commitmentMenu(c, section),
-                    onSave: { v in register.edit(c, text: v); changed(section) }) {
-            Toggle("", isOn: Binding(get: { c.status == "done" }, set: { register.mark(c, $0 ? "done" : "reopen") }))
-                .toggleStyle(.pnCheckbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
-        }
-        .padding(.vertical, 3)
+                    onSave: { v in register.edit(c, text: v); changed(section) },
+                    leading: {
+                        Toggle("", isOn: Binding(get: { c.status == "done" }, set: { register.mark(c, $0 ? "done" : "reopen") }))
+                            .toggleStyle(.pnCheckbox).labelsHidden().accessibilityLabel(L("reg.markDoneA11y", ["text": c.text]))
+                    },
+                    trailing: {
+                        Text(c.status == "done" ? L("page.tasks.doneWord") : c.due.isEmpty ? L("page.tasks.noDate") : Register.dueText(c.due))
+                            .font(t.homeMono(12, .semibold)).foregroundStyle(overdue ? PN.C.recText : PN.C.text3).lineLimit(1).fixedSize()
+                    })
     }
 
     private func commitmentMenu(_ c: Commitment, _ section: String) -> [PageRowAction] {
@@ -1105,9 +1115,9 @@ struct CallPageView: View {
                 let addAction = PageRowAction(title: L("risk.add"), icon: "exclamationmark.shield", enabled: hasDB, note: L("risk.noDB"),
                                               run: { _ in addRisk(r, proj) })
                 EditableRow(text: r, copy: r,
-                            hoverActions: inRegister ? [] : [addAction],
                             menu: (inRegister ? [] : [addAction]) + [.separator, PageRowAction(title: L("callEdit.delete"), destructive: true, run: { _ in
                                 var l = o.risks; if i < l.count { l.remove(at: i) }; saveLists(o, risks: l, section: "risks") })],
+                            hoverButton: inRegister ? nil : addAction,
                             onSave: { v in var l = o.risks; if i < l.count { l[i] = v }; saveLists(o, risks: l, section: "risks") },
                             leading: { PageIconTile(icon: "exclamationmark.triangle", color: PN.C.onMe) },
                             trailing: {
@@ -1157,10 +1167,10 @@ struct CallPageView: View {
                 let add = PageRowAction(title: L("dec.add"), icon: "checkmark.seal", enabled: hasDB && !adding.contains(d), note: reason,
                                         run: { _ in addDecisions([d], proj) })
                 EditableRow(text: d, copy: d,
-                            hoverActions: url == nil ? [add] : [],
                             menu: (url == nil ? [add] : []) + [saveCardAction("", d, root: root), .separator,
                                   PageRowAction(title: L("callEdit.delete"), destructive: true, run: { _ in
                                       var l = decs; if i < l.count { l.remove(at: i) }; set(l) })],
+                            hoverButton: url == nil ? add : nil,
                             onSave: { v in var l = decs; if i < l.count { l[i] = v }; set(l) },
                             leading: { PageIconTile(icon: "checkmark", color: PN.C.turn) },
                             trailing: {
@@ -1234,14 +1244,14 @@ struct CallPageView: View {
         }
     }
 
+    /// 0.25 (R2 tail, board CT row 4): asks in a sheet in the style first; addRiskNow writes it.
     private func addRisk(_ text: String, _ proj: Project?) {
+        guard proj != nil else { return }
+        riskAsk = RiskAsk(text: text)
+    }
+
+    private func addRiskNow(_ text: String, _ proj: Project?) {
         guard let p = proj else { return }
-        let a = NSAlert()
-        a.messageText = L("risk.confirm.title")
-        a.informativeText = L("risk.confirm.body", ["risk": text, "project": p.name])
-        a.addButton(withTitle: L("risk.add"))
-        a.addButton(withTitle: L("hk.cancel"))
-        guard a.runModal() == .alertFirstButtonReturn else { return }
         let when = record.map { DateFormatter.localizedString(from: $0.start, dateStyle: .medium, timeStyle: .short) } ?? ""
         note = L("risk.adding")
         let c = SettingsWindow.model.config

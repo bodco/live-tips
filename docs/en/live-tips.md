@@ -1743,6 +1743,26 @@ with no notes says what it has (transcript, recording) and writes the notes with
 call, Setup has The call (project, name, when, kind of call, audience, language, Sales mode), People (from the
 invite), Preparation (what Get ready uses, "Anything special today?", Quick prep and Expert prep) and More settings;
 Meeting Sheet without a sheet offers Quick prep and the five steps of Expert prep side by side.
+Setup also says where the call opens (the meeting app and the browser profile or app), shows Our side and Their side
+with Change the sides (it opens Quick prep), a Recording section (record this call, video or audio, the quality, Upload
+to Google Drive, Recording settings) and Runs on: the AI of the preparation, the tips and the summary. On a past call
+the due date of a commitment sits at the right of its row, Add appears on the decision or risk you point at, and adding
+a risk to the project register asks first.
+
+**Tracker, Past calls and Series (0.25).** The Tracker follows its board: Back, the sync line (or "Kept on this Mac"
+with Connect Notion), the title with New task, the Tasks, Decisions and Risks tabs with counts, the filters (workspace,
+project, call, owner, status) and Find, then the groups: Overdue, This week and Later for tasks, open and Closed for
+decisions and risks. All past calls groups the calls by week, with the date, the name, the project and series, what
+came out of the call and the state of its notes; Summary, Follow-up and Series show on the row you point at. A series
+page shows the next call, Since last time, the open commitments of the series (who, what, open for how many calls, the
+call where it was promised), Questions that stay open, Decisions call by call and the decision register.
+
+**Statistics (0.25).** Home > This week > Statistics opens a page: the period buttons (Today, This week, Last week,
+This month, Last 30 days, Dates…) and the projects or a workspace (the Sales calls switch is in the same menu), four big
+numbers against the period before (calls, time on calls, prepared, the busiest day), minutes on calls by day stacked by
+project, and the calls of the selection. Click a day's bar to see that day, click it again for the whole period; a call
+in the list opens its page. On the right: How the calls went, the period in short and AI this month with a link to
+Settings > Usage. Hidden calls never count.
 
 **Call pages.** An upcoming call opens as a page with Setup, Brief, Tasks and Earlier calls; its Setup changes
 apply only on Save. A past call has Summary (Meeting notes since 0.9.5.2, 14.1t), What was discussed, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this

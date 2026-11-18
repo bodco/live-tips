@@ -106,7 +106,7 @@ struct HomeRouteView: View {
     }
 
     private var ownBar: Bool {
-        switch route { case .call, .upcoming: return true; default: return false }
+        switch route { case .call, .upcoming, .tracker, .pastCalls, .series, .stats: return true; default: return false }      // 0.25 (R4): Tracker, All past calls
     }
 
     @ViewBuilder private var content: some View {
@@ -135,7 +135,7 @@ struct HomeRouteView: View {
         case .series(let f):
             if let r = CallHistory.shared.records.first(where: { $0.file == f }) { SeriesView(record: r) } else { Text(L("call.page.empty")).padding() }
         case .transcript(let f, let at): TranscriptView(file: f, at: at)
-        case .stats: ScrollView { WeekStats().padding(20) }.trackScreen("stats")
+        case .stats: StatsScreen().trackScreen("stats")      // 0.25 (R4, board ST)
         case .pastCalls: PastCallsView()
         case .tracker: TrackerView()
         case .console: ConsoleTabView()

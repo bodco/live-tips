@@ -3,7 +3,7 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.22.0 (not released yet, needs server 0.13.0)
+## 0.22.0 (2026-11-18)
 
 - **Sign in to start (2026-11-18):** Pacenote now needs an account. The sign-in screen comes first, before onboarding
   and Home, and comes back when the session ends (signed out, signed out by another device, a password change on
@@ -19,7 +19,7 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **Sign-in methods in Settings > Account (2026-11-18):** connect or disconnect Google, set, change or remove the
   password. The last way to sign in cannot be removed. Changing the password signs out your other devices.
 
-## 0.21.0 (not released yet)
+## 0.21.0 (shipped in 0.22.0)
 
 - **More sales methods (2026-11-17):** MEDDPICC, GPCTBA/C&I, SPIN, the Sandler pain funnel and Challenger join
   General sales, BANT, SPICED and MEDDIC, in Start call, Settings > Projects and the Meeting Sheet's qualification
@@ -41,7 +41,7 @@ Pacenote. Earlier versions are described in the commit messages and in
   `<project>/pacenote/speech/<deck name>.speech.md`. Prepare for a Presentation call with that deck takes it first and
   keeps your wording.
 
-## 0.20.0 (not released yet, needs server 0.12.0)
+## 0.20.0 (shipped in 0.22.0)
 
 - **Team tab for team leads and C-level (2026-11-17, server 0.12.0):** the calls of the people you see in one list with
   filters (period, person, team, project, call type, with a recording), the recurring meetings of a person (All calls in

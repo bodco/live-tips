@@ -117,3 +117,39 @@ items:
     title_uk: "Дзвінок із записом зупиняється, коли мітинг закінчився"
     body_en: "Hang up in the meeting and Pacenote ends the call by itself, also when you record the screen, video with sound or sound only, or run the macOS screen recording."
     body_uk: "Поклали трубку в мітингу, і Pacenote сам завершує дзвінок, також коли ви записуєте екран, відео зі звуком або лише звук чи вмикаєте запис екрана macOS."
+  - id: team_tab
+    version: 0.20.0
+    title_en: "Team tab for team leads"
+    title_uk: "Вкладка Команда для лідів"
+    body_en: "Team leads, and C-level on Enterprise, see their people's calls in one list with filters, search and an overview by week. Private calls show only the person, the date and the length."
+    body_uk: "Ліди команд, а на Enterprise і C-level, бачать дзвінки своїх людей в одному списку з фільтрами, пошуком і оглядом по тижнях. Приватні дзвінки показують лише людину, дату і тривалість."
+  - id: who_viewed
+    version: 0.20.0
+    title_en: "Who viewed my calls"
+    title_uk: "Хто переглядав мої дзвінки"
+    body_en: "Settings > Account lists who opened your calls in the last 90 days."
+    body_uk: "Налаштування > Акаунт показує, хто відкривав ваші дзвінки за останні 90 днів."
+  - id: sales_methods
+    version: 0.21.0
+    title_en: "More sales methods"
+    title_uk: "Більше методів продажу"
+    body_en: "MEDDPICC, GPCTBA/C&I, SPIN, Sandler and Challenger join BANT, SPICED and MEDDIC. In Sales mode Pacenote also follows stakeholders, the mutual action plan, competitors and prices."
+    body_uk: "MEDDPICC, GPCTBA/C&I, SPIN, Sandler і Challenger поруч із BANT, SPICED і MEDDIC. У режимі продажу Pacenote також стежить за стейкхолдерами, спільним планом дій, конкурентами і цінами."
+  - id: speech_writer
+    version: 0.21.0
+    title_en: "A speech for your deck"
+    title_uk: "Промова до вашого деку"
+    body_en: "Ask the live-tips skill \"write my talk\": what to say on every slide, with its time. Prepare for a Presentation call with that deck keeps your wording."
+    body_uk: "Попросіть скіл live-tips \"напиши промову\": що казати на кожному слайді і скільки часу. Підготовка до дзвінка Presentation з цим деком зберігає ваші слова."
+  - id: email_sign_in
+    version: 0.22.0
+    title_en: "Sign in with email and password"
+    title_uk: "Вхід через email і пароль"
+    body_en: "Sign in with email and password next to Google. A new account is confirmed with an 8-digit code from the email, and Forgot password? sets a new one. Settings > Account > Sign-in methods."
+    body_uk: "Вхід через email і пароль поруч із Google. Новий акаунт підтверджується 8-значним кодом із листа, а Забули пароль? задає новий. Налаштування > Акаунт > Способи входу."
+  - id: sign_in_first
+    version: 0.22.0
+    title_en: "Pacenote now needs an account"
+    title_uk: "Pacenote тепер потребує акаунта"
+    body_en: "The sign-in screen comes first and comes back when the session ends, never during a call. Audio and transcripts still stay on this Mac."
+    body_uk: "Екран входу зʼявляється першим і повертається, коли сесія закінчилась, ніколи під час дзвінка. Аудіо і транскрипти, як і раніше, лишаються на цьому Маку."

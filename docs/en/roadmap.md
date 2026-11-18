@@ -2,7 +2,7 @@
 
 Where Pacenote has been and where it is going: what shipped, what we build now, what comes next. Updated with every release.
 
-Updated: 17 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
+Updated: 18 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ## The route
 
@@ -29,6 +29,7 @@ Updated: 17 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ### Next
 
+- **Multi-theme redesign (0.23.0).** A new look for the whole app, with themes to choose from.
 - **Sign in with email.** An email and password next to Google, then two-factor sign-in with any authenticator app.
 - **Security hardening.** Fixes from our own security review of the app and the update channel, before the team version grows.
 - **Signed and notarized by Apple.** No more "Open Anyway" on first launch and no Keychain prompt after an update.

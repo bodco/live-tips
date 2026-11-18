@@ -1500,23 +1500,33 @@ Everything that moves stops under Reduce motion.
 Statistics open inside Home; Back (or Command-[) returns. The follow-up email is a tab of the call page (0.25).
 
 **Settings.** The sidebar has four groups: You (Account, General), Calls (Projects, Meeting Sheet, Call recording,
-Transcription), Connections (Integrations, AI) and More (Modules, Components, Usage, Help, About). Settings > AI shows one group
-at a time: Access, Jobs (which AI prepares, tips and writes the notes, and the AI chain), Limits, On this Mac (the
-local model, search, speakers) and Advanced (company research, the agents). Settings > General has three groups:
-Basics (your name, work folder, language, theme, Dock), During calls (the tips window, floating controls, shortcuts)
-and Data (usage log, Help improve Pacenote, add-ons, app folder). Recording consent is under Settings > Call
-recording. **Search** sits on top of the sidebar (Command-F): type a word in English or Ukrainian ("key", "мова",
-"Notion") and the sidebar lists the settings as "Name / Pane › Group"; a click (or Return for the first one) opens
-the pane and the group and marks the row for a moment. Settings > Projects is a short list: the tick offers a
-project in Start call, the line under the name says Notion, Sales, answer cards and what is off; a click opens the
-project's page (In Notion, Sales, answer cards, and what leaves this Mac: AI tips, search in the folder, sync to your
-account); Back or Command-[ returns. Integrations is one list of connections with their state and Connect for the
-ones not set up; a click opens the page. The Notion page has four groups: Connection, Databases, After the call
-(meeting pages, your tasks) and Local copy; HubSpot has Connection, Matching, Reads and writes, Qualification.
-Without a token or key only Connection shows. In Databases, one Meetings, one Tasks and one Risks database serve all
-projects. The project is a property of each page: write its name next to the database (Project if empty) and set
-each project's value on the project's page, In Notion. Fill from project configs takes the databases most of your
-Control Tower configs name.
+Transcription), Connections (Integrations, AI) and More (Modules, Components, Usage, Help, About). Since 0.25 every
+pane shows only what is needed on top and keeps the rest in one collapsed **Advanced** at the bottom; each pane
+remembers whether its Advanced is open, and the search finds what is under Advanced too (it opens Advanced and marks
+the row). On top: Account, who is signed in and the plan (sign-in methods, organizations, your use, who opened your
+calls, devices and the data on the server under Advanced; an invite waiting for your answer shows the organizations on top); General, the **Pacenote is ready** card (account, AI,
+microphone, the sound of the call, the screen when calls are recorded with the screen, Notion's meeting database,
+components; Fix next to what is missing), your name on calls, the language and the look (Dock, the tips window during
+screen sharing, call controls, shortcuts, folders and data under Advanced); AI, a card each for Claude, ChatGPT and
+Gemini with Connect and one line "Pacenote uses: ...", the AI that really runs by what is connected, or "nothing connected" for a job no connected AI can do, e.g. the tips with only the AI on this Mac (the AI of each
+job, the fallback chain, models, limits and spending, the AI on this Mac, Ollama and the agents under Advanced);
+Projects, the list and Add (found folders, workspaces, scanning and the index under Advanced); Integrations,
+Notion, Calendars and Google (HubSpot under Advanced); Call recording, the switch and sound or screen (the picture,
+quality, Google Drive, the screen permission and the consent message under Advanced); Transcription, the languages
+new calls start in (your dictionary, who is speaking and the voice library under Advanced); Meeting Sheet, Quick or
+Expert (My focus, old facts, reminders and presets under Advanced). **Search** sits on top of the sidebar
+(Command-F): type a word in English or Ukrainian ("key", "мова", "Notion") and the sidebar lists the settings as
+"Name / Pane › Advanced"; a click (or Return for the first one) opens the pane and marks the row for a moment.
+Settings > Projects: the tick offers a project in Start call, the line under the name says Notion, Sales, answer
+cards and what is off; a click opens the project's page (In Notion, Sales, answer cards, and what leaves this Mac: AI
+tips, search in the folder, sync to your account); Back or Command-[ returns. Integrations is a list of connections
+with their state and Connect for the ones not set up; a click opens the page. On the Notion page, as soon as the
+token is in, Pacenote looks for the database for meeting notes and asks you to pick it (Notion connected without
+it is a problem in the list and on the ready card); the other databases, My tasks and the local copy are under
+Advanced. HubSpot has Connection, Matching, Reads and writes, Qualification. Without a token or key only Connection
+shows. One Meetings, one Tasks and one Risks database serve all projects. The project is a property of each page:
+write its name next to the database (Project if empty) and set each project's value on the project's page, In
+Notion. Fill from project configs takes the databases most of your Control Tower configs name.
 
 **Editing the call page.** Edit (Command-E) turns decisions, items on you and on them (text and due date), open
 questions and risks into fields; Save writes a new call picture and the register's `edit` events. When the call

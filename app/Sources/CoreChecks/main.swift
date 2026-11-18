@@ -2561,16 +2561,19 @@ func settingsSearchD2() {
     for e in es {
         expect(panes.contains(e.pane), "d2: \(e.id) pane \(e.pane) exists")
         expect(en[e.titleKey] != nil && uk[e.titleKey] != nil, "d2: \(e.id) title \(e.titleKey) in en and uk")
-        if let g = e.defaults[SettingsSearch.generalGroupKey] { expect(SettingsSearch.generalGroups.contains(g) && e.pane == "general", "d2: \(e.id) general group") }
-        if let g = e.defaults[SettingsSearch.aiGroupKey] { expect(SettingsSearch.aiGroups.contains(g) && e.pane == "ai", "d2: \(e.id) ai group") }
-        if let g = e.defaults[SettingsSearch.notionGroupKey] { expect(SettingsSearch.notionGroups.contains(g) && e.integration == "notion", "d2: \(e.id) notion group") }
+        for k in e.defaults.keys where k.hasPrefix(SettingsSearch.advancedPrefix) {
+            let scope = String(k.dropFirst(SettingsSearch.advancedPrefix.count))
+            expect(SettingsSearch.advancedScopes.contains(scope), "r5: \(e.id) Advanced scope \(scope) exists")
+            expect(scope == e.pane || (scope == "notion" && e.integration == "notion") || (scope == "integrations" && e.pane == "integrations"),
+                   "r5: \(e.id) opens the Advanced of its own pane")
+            expect(e.defaults[k] == "1", "r5: \(e.id) opens Advanced")
+        }
         if let g = e.defaults[SettingsSearch.hubspotGroupKey] { expect(SettingsSearch.hubspotGroups.contains(g) && e.integration == "hubspot", "d2: \(e.id) hubspot group") }
         if e.integration != nil { expect(e.pane == "integrations", "d2: \(e.id) integration lives under Integrations") }
         if e.projectPage { expect(e.pane == "projects", "d2: \(e.id) project page lives under Projects") }
         for k in ["gen.group.", "ai.group.", "ntn.group.", "hs.group."] { _ = k }
     }
-    for (p, gs) in [("gen.group.", SettingsSearch.generalGroups), ("ai.group.", SettingsSearch.aiGroups),
-                    ("ntn.group.", SettingsSearch.notionGroups), ("hs.group.", SettingsSearch.hubspotGroups)] {
+    for (p, gs) in [("hs.group.", SettingsSearch.hubspotGroups)] {
         for g in gs { expect(en[p + g] != nil && uk[p + g] != nil && en[p + "sub." + g] != nil && uk[p + "sub." + g] != nil, "d2: group strings \(p)\(g)") }
     }
     // every target the search jumps to carries its anchor in the app (pages that are a target as a whole need none)
@@ -2596,7 +2599,20 @@ func settingsSearchD2() {
     expect(SettingsSearch.score("ab", titles: ["Abc"], extra: "") > SettingsSearch.score("ab", titles: ["x ab"], extra: ""), "d2: prefix beats inside")
     expect(SettingsSearch.score("q", titles: ["x"], extra: "q") == 1, "d2: extra words still match")
     let gen = SettingsSearch.entries.first { $0.id == "gen.lang" }
-    expect(gen?.group == "basics", "d2: the group of an entry")
+    expect(gen?.group == nil && gen?.advanced == false, "r5: Language sits on top of General")
+    // 0.25 (R5): what is needed on top, the rest under one Advanced that the search opens
+    let dock = SettingsSearch.entries.first { $0.id == "gen.dock" }
+    expect(dock?.advanced == true && dock?.group == "advanced", "r5: Dock sits under General's Advanced")
+    expect(SettingsSearch.find("dock", titles: titles).first?.id == "gen.dock", "r5: the search still finds what is under Advanced")
+    for id in ["ai.claude", "ai.openai", "ai.gemini", "int.notion.token", "int.notion.meetDB", "rec.what", "tr.lang", "sh.mode", "acc.head", "acc.plan", "pr.import"] {
+        expect(SettingsSearch.entries.first { $0.id == id }?.advanced == false, "r5: \(id) is on top of its pane")
+    }
+    for id in ["ai.prep", "ai.chain", "ai.spend", "ai.local", "tr.dict", "tr.speakers", "sh.focus", "acc.devices", "acc.delete", "int.notion.local", "int.notion.tasks", "pr.scan", "rec.drive"] {
+        expect(SettingsSearch.entries.first { $0.id == id }?.advanced == true, "r5: \(id) is under Advanced")
+    }
+    expect(SettingsSearch.entries.first { $0.id == "int.hubspot.key" }?.group == "conn", "r5: a HubSpot tab still names its group")
+    expect(en["set.advanced"] != nil && uk["set.advanced"] != nil, "r5: the Advanced label in en and uk")
+    for sc in SettingsSearch.advancedScopes { expect(en["adv.sum." + sc] != nil && uk["adv.sum." + sc] != nil, "r5: Advanced summary of \(sc) in en and uk") }
 }
 
 func orgsB6b() {

@@ -5,6 +5,17 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.25.0 (unreleased)
 
+- **Settings: what is needed on top, the rest under Advanced (2026-11-18, layouts R5):** every Settings pane now shows
+  only what most people need, with everything else in one collapsed Advanced at the bottom. Each pane remembers
+  whether its Advanced is open, and the search in Settings still finds every setting, opening Advanced when it has to.
+  General starts with a "Pacenote is ready" card: the account, the AI, the microphone, the sound of the call, the
+  screen when calls are recorded with the screen, Notion's meeting database and the components, with Fix next to
+  anything that is missing. Settings > AI is three cards, Claude, ChatGPT and Gemini, each with Connect, and one line
+  that says which AI Pacenote really uses (a job no connected AI can do, like the tips with only the AI on this Mac, says
+  "nothing connected" and the card asks you to fix it). An invitation waiting for you shows the organizations at the top
+  of Account. When you connect Notion, Pacenote asks right away which database the
+  meeting notes go to, so a call no longer ends without a place to write its page. Transcription now sets the
+  languages new calls start in and holds Who is speaking (moved from AI). HubSpot is under Integrations > Advanced.
 - **Call pages laid out like the boards (2026-11-18, layouts R2):** the page of a past call and of an upcoming call now
   follow the call page boards in every look, Classic included. On top a bar with Back, what the page is ("Past call ·
   3rd in this series", "Upcoming call") and the actions: Ask about this call and Export on a past call; when the call

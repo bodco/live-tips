@@ -6,11 +6,30 @@ import LiveTipsCore
 /// words go to Whisper's prompt before the brief's terms; the "heard as" variants are replaced in the transcript (whole
 /// words, any case) before a line is shown, saved or sent to the tips model, in live calls and in recordings
 /// transcribed after the call. Saved in the app's config.json and copied to the recorder's config.json.
+/// 0.25 (R5): also the languages new calls start with, and Who is speaking (moved from AI).
 struct TranscriptionSettingsPane: View {
     @ObservedObject var model: SettingsModel
+    @AppStorage(SettingsSearch.advancedKey("transcription")) private var adv = "0"      // 0.25 (R5)
 
+    /// The languages new calls start with ("" = Ukrainian, as before 0.25); a project whose client speaks English
+    /// still starts in English, and Start call can change it for any call.
+    private var callLanguages: Binding<[String]> {
+        Binding(get: { (model.config.callLanguage.isEmpty ? "uk" : model.config.callLanguage).split(separator: "+").map(String.init) },
+                set: { model.config.callLanguage = Array($0.prefix(5)).joined(separator: "+") })
+    }
+
+    // 0.25 (R5, owner 18.11): the call languages on top; the dictionary, who is speaking and the voice library under
+    // Advanced.
     var body: some View {
         Form {
+            Section {
+                LabeledContent(L("tr.lang.row")) { LanguageMenu(codes: callLanguages).fixedSize() }
+                    .settingsAnchor("tr.lang")
+            } header: { Text(L("tr.lang.head")) } footer: {
+                Text(L("tr.lang.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            }
+            SettingsAdvancedHeader("transcription", summary: L("adv.sum.transcription"))
+            if adv == "1" {
             Section {
                 if model.config.dictionary.isEmpty {
                     Text(L("dict.empty")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -35,6 +54,8 @@ struct TranscriptionSettingsPane: View {
                 Text(L("dict.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             .onChange(of: model.config.dictionary) { LocalAIService.shared.writeCoreConfig() }
+            SpeakersSection(model: model)
+            }
         }
         .formStyle(.grouped).toggleStyle(.pnSwitch)
     }

@@ -136,6 +136,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }
             if env["LT_SHOTS_ONLY"] == "site023" { siteShots(theme); continue }   // 0.23.0: the site pictures in Roadbook
             if env["LT_SHOTS_ONLY"] == "home024" { if lang == "en" { home024(theme) }; continue }   // 0.24 (R1): Home by the boards HM, HS, HB
+            if env["LT_SHOTS_ONLY"] == "r5" { if lang == "en" || theme == "light" { r5(theme, uk: lang == "uk") }; continue }   // 0.25 (R5): Settings with Advanced closed and open
             if env["LT_SHOTS_ONLY"] == "r2" { if lang == "en" { r2(theme) }; continue }   // 0.25 (R2): the call pages by the boards CP, CT, UP, UT, SL
             if env["LT_SHOTS_ONLY"] == "redesign" { if lang == "en" || theme == "light" { redesignShots(theme, uk: lang == "uk") }; continue }   // redesign 0.23.0: every style   // 0.10.0: co-driver cards for the site
             if !tipsOnly {
@@ -343,6 +344,45 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             }
         }
         steps.append { [unowned self] in PNThemeModel.shared.style = PNStyle.buildDefault; self.next() }
+    }
+
+    /// 0.25 (R5): every Settings pane with Advanced closed (960 x 660, as it opens) and open (a tall window, the whole pane),
+    /// once per style and mode in English; Ukrainian: Roadbook light only (the Cyrillic fallback). Files: r5-<pane>-<adv|top>-<style>-<mode>.png.
+    /// The Advanced flags are the app's own UserDefaults: saved before and put back after.
+    func r5(_ theme: String, uk: Bool = false) {
+        _ = PNFonts.once
+        let all = ["account", "general", "ai", "projects", "integrations", "recording", "transcription", "sheet"]
+        let only = (ProcessInfo.processInfo.environment["LT_R5_PANES"] ?? "").split(separator: ",").map(String.init)
+        let panes = only.isEmpty ? all : all.filter { only.contains($0) }      // LT_R5_PANES=ai,general: a re-check
+        let keys = panes.map { SettingsSearch.advancedKey($0) }
+        let saved = keys.map { UserDefaults.standard.string(forKey: $0) }
+        func flags(_ v: String) { for k in keys { UserDefaults.standard.set(v, forKey: k) } }
+        for st in PNStyle.allCases where !uk || st == .roadbook {
+            let tt = st.rawValue + "-" + theme
+            steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
+            for pane in panes {
+                for open in [false, true] {
+                    steps.append { [unowned self] in
+                        flags(open ? "1" : "0")
+                        SettingsWindow.show(tab: pane)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
+                            guard let w = SettingsWindow.window else { next(); return }
+                            w.setContentSize(NSSize(width: 960, height: open ? 1500 : 660))
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [self] in
+                                capture(w, "r5-\(pane)-\(open ? "adv" : "top")-\(tt)")
+                                w.setContentSize(NSSize(width: 960, height: 660))
+                                next()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        steps.append { [unowned self] in
+            SettingsWindow.window?.close()
+            for (k, v) in zip(keys, saved) { if let v = v { UserDefaults.standard.set(v, forKey: k) } else { UserDefaults.standard.removeObject(forKey: k) } }
+            PNThemeModel.shared.style = PNStyle.buildDefault; self.next()
+        }
     }
 
     static func r2Stem(_ f: String) -> String { f.hasSuffix(".md") ? String(f.dropLast(3)) : f }

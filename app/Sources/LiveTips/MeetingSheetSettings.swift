@@ -15,6 +15,7 @@ struct MeetingSheetSettingsPane: View {
     @State private var newName = ""
     @State private var deleting: SheetPresetInfo?
     @State private var note = ""
+    @AppStorage(SettingsSearch.advancedKey("sheet")) private var adv = "0"      // 0.25 (R5)
 
     var body: some View {
         Form {
@@ -42,6 +43,9 @@ struct MeetingSheetSettingsPane: View {
                     Button(L("sheet.ui.set.resetRules")) { prefs.rules = SheetModeRule.defaults }.buttonStyle(.pnTertiary)
                 }
             } header: { Text(L("sheet.ui.set.modeTitle")).settingsAnchor("sh.mode") }
+            // 0.25 (R5, owner 18.11): Quick or Expert on top; My focus, old facts, reminders and presets under Advanced
+            SettingsAdvancedHeader("sheet", summary: L("adv.sum.sheet"))
+            if adv == "1" {
 
             Section {
                 ForEach(Array(prefs.focus.enumerated()), id: \.offset) { i, f in
@@ -100,6 +104,7 @@ struct MeetingSheetSettingsPane: View {
                 Text(L("sheet.ui.set.presetsNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 if !note.isEmpty { Text(note).font(PN.Font.caption).foregroundStyle(PN.C.pending) }
             } header: { Text(L("sheet.ui.set.presets")).settingsAnchor("sh.presets") }
+            }
         }
         .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear { lib.reload() }

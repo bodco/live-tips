@@ -13,6 +13,7 @@ struct RecordingSettingsPane: View {
     @State private var confirmDefault = false
     @State private var permission = ScreenPermission.granted()
     @State private var displays = RecTargets.displays()
+    @AppStorage(SettingsSearch.advancedKey("recording")) private var adv = "0"      // 0.25 (R5)
 
     private var r: Binding<RecordingSettings> { $model.config.recording }
     private var accounts: [GoogleAccount] { Self.shotAccounts ?? google.accounts.filter { $0.has(GoogleScopes.export) } }
@@ -41,6 +42,32 @@ struct RecordingSettingsPane: View {
                 Text(L("rec.set.where")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
 
+            // 0.25 (R5, owner 18.11): on top the switch and sound or screen (and the screen permission while it is
+            // missing for a screen recording); the picture, quality, Drive, the permission and consent under Advanced.
+            let screenMissing = model.config.recording.kind == "video" && !permission
+            if screenMissing {
+            Section {
+                HStack {
+                    Image(systemName: permission ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(permission ? PN.C.turn : PN.C.onMe)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("rec.set.permission"))
+                        Text(L(permission ? "rec.set.permission.on" : "rec.set.permission.off")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    if !permission {
+                        Button(L("rec.set.permission.allow")) {
+                            if !ScreenPermission.request() { ScreenPermission.openSettings() }
+                            permission = ScreenPermission.granted()
+                        }
+                    }
+                }
+            } header: { Text(L("rec.set.privacy")).settingsAnchor("rec.privacy") }
+            }
+            SettingsAdvancedHeader("recording", summary: L("adv.sum.recording"))
+            if adv == "1" {
+            Group {
             if model.config.recording.kind == "video" {
                 Section {
                     Picker(L("rec.set.source"), selection: r.source) {
@@ -63,7 +90,7 @@ struct RecordingSettingsPane: View {
                         }
                         Text(L("rec.set.window.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                     }
-                } header: { Text(L("rec.set.picture")) }
+                } header: { Text(L("rec.set.picture")).settingsAnchor("rec.picture") }
 
                 Section {
                     Picker(L("rec.set.quality"), selection: r.quality) {
@@ -75,7 +102,7 @@ struct RecordingSettingsPane: View {
                         Text(L("rec.codec.h264")).tag("h264")
                         Text(L("rec.codec.hevc")).tag("hevc")
                     }
-                } header: { Text(L("rec.set.qualityHead")) }
+                } header: { Text(L("rec.set.qualityHead")).settingsAnchor("rec.quality") }
             } else {
                 Section {
                     Text(L("rec.set.audioSize", ["mb": Self.size(RecordingPreset.audioMBPerHour)]))
@@ -102,10 +129,13 @@ struct RecordingSettingsPane: View {
                     if let a = driveAccount { folderRow(a) }
                     transcriptRow
                 }
-            } header: { Text("Google Drive") } footer: {
+            } header: { Text("Google Drive").settingsAnchor("rec.drive") } footer: {
                 Text(L("rec.set.drive.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
 
+            }
+            Group {
+            if !screenMissing {
             Section {
                 HStack {
                     Image(systemName: permission ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
@@ -124,8 +154,10 @@ struct RecordingSettingsPane: View {
                     }
                 }
             } header: { Text(L("rec.set.privacy")).settingsAnchor("rec.privacy") }
-            // 0.15.0 (D2): the consent message lives here now (was General)
+            }
             ConsentSection(model: model)
+            }
+            }
         }
         .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear {

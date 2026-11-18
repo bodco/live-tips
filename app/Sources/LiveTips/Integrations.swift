@@ -16,6 +16,9 @@ enum IntegrationRegistry {
         Item(id: "hubspot", title: "HubSpot", symbol: "briefcase", subtitle: L("int.hubspot.sub")),
     ] }
 
+    /// 0.25 (R5): the connections listed under the Integrations pane's Advanced.
+    static let advancedIds: Set<String> = ["hubspot"]
+
     /// One line under the card's title and whether it is connected (nil = not set up).
     /// `short`: the list row shows "Connected" without the account name, so the row's description keeps its room.
     static func status(_ id: String, _ m: SettingsModel, short: Bool = false) -> (String, Bool?) {
@@ -23,6 +26,8 @@ enum IntegrationRegistry {
         case "notion":
             guard m.isSet(.notionToken) else { return (L("int.notConnected"), nil) }
             if case .failed(let e) = m.keyState[.notionToken] ?? .untested { return (e, false) }
+            // 0.25 (R5): connected without a database for meeting notes is a problem to fix (the first user's bug)
+            if m.config.notionMeetingsDB.isEmpty { return (L("int.notion.noDB"), false) }
             let dbs = [m.config.notionMeetingsDB, m.config.notionTasks.database, m.config.notionRisksDB].filter { !$0.isEmpty }.count
             return (L("int.notion.status", ["n": "\(dbs)"]), true)
         case "calendars":
@@ -88,39 +93,52 @@ struct IntegrationsPane<NotionPage: View>: View {
         }
     }
 
-    // 0.15.0 (D2): one card of rows, small symbols; a connection that is not set up has a Connect button
+    // 0.15.0 (D2): one card of rows, small symbols; a connection that is not set up has a Connect button.
+    // 0.25 (R5, owner 18.11): calendars, Google and Notion on top; the CRM (HubSpot) under Advanced.
+    @AppStorage(SettingsSearch.advancedKey("integrations")) private var adv = "0"
+
+    private func rows(_ items: [IntegrationRegistry.Item]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { n, it in
+                let st = IntegrationRegistry.status(it.id, model, short: true)
+                if n > 0 { Divider().padding(.leading, 40) }
+                Button { model.integration = it.id } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: it.symbol).font(PN.sys(15)).frame(width: 20).foregroundStyle(PN.C.text2)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(it.title).fontWeight(.semibold)
+                            Text(it.subtitle).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 8)
+                        IntegrationStatus(text: st.0, ok: st.1).fixedSize()
+                        if st.1 == nil {
+                            Text(L("int.connect")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.onLink)
+                                .padding(.horizontal, 9).padding(.vertical, 3)
+                                .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(PN.C.accent))
+                        }
+                        Image(systemName: "chevron.right").font(PN.sys(11, .semibold)).foregroundStyle(PN.C.text3)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 10).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(it.title + ", " + st.0)
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(Color.secondary.opacity(0.06)))
+    }
+
     private var list: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
+                rows(IntegrationRegistry.items.filter { !IntegrationRegistry.advancedIds.contains($0.id) })
+                Text(L("int.keysNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 VStack(spacing: 0) {
-                    ForEach(Array(IntegrationRegistry.items.enumerated()), id: \.element.id) { n, it in
-                        let st = IntegrationRegistry.status(it.id, model, short: true)
-                        if n > 0 { Divider().padding(.leading, 40) }
-                        Button { model.integration = it.id } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: it.symbol).font(PN.sys(15)).frame(width: 20).foregroundStyle(PN.C.text2)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(it.title).fontWeight(.semibold)
-                                    Text(it.subtitle).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                Spacer(minLength: 8)
-                                IntegrationStatus(text: st.0, ok: st.1).fixedSize()
-                                if st.1 == nil {
-                                    Text(L("int.connect")).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.onLink)
-                                        .padding(.horizontal, 9).padding(.vertical, 3)
-                                        .background(RoundedRectangle(cornerRadius: PN.r(6)).fill(PN.C.accent))
-                                }
-                                Image(systemName: "chevron.right").font(PN.sys(11, .semibold)).foregroundStyle(PN.C.text3)
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 10).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(it.title + ", " + st.0)
-                    }
+                    SettingsAdvancedHeader("integrations", summary: L("adv.sum.integrations"), inForm: false)
                 }
                 .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(Color.secondary.opacity(0.06)))
-                Text(L("int.keysNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                .padding(.top, 8)
+                if adv == "1" { rows(IntegrationRegistry.items.filter { IntegrationRegistry.advancedIds.contains($0.id) }) }
             }
             .padding(20)
         }

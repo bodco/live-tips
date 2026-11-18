@@ -207,6 +207,9 @@ public struct AppConfig: Codable, Equatable {
     /// starts on Roadbook; an unknown value reads as the default (PNStyle in the app).
     public var appearanceStyle = "roadbook"
     public var floatingCallControls = true
+    /// 0.25 (R5): the languages new calls start with ("uk", "en", "uk+en"; the first is the main one). Empty is
+    /// Ukrainian, as before; a project whose client speaks English still starts in English.
+    public var callLanguage = ""
     public var notionWriteSummary = false
     /// 2026-10-26: where meeting pages go when the project has no Control Tower config (a data source id
     /// chosen or created in Settings or the welcome tour) and its name for the UI.
@@ -302,6 +305,7 @@ public struct AppConfig: Codable, Equatable {
         appearance = (try? c.decode(String.self, forKey: .appearance)) ?? d.appearance
         appearanceStyle = (try? c.decode(String.self, forKey: .appearanceStyle)) ?? d.appearanceStyle
         floatingCallControls = (try? c.decode(Bool.self, forKey: .floatingCallControls)) ?? d.floatingCallControls
+        callLanguage = (try? c.decode(String.self, forKey: .callLanguage)) ?? d.callLanguage
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
         notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB
         notionMeetingsName = (try? c.decode(String.self, forKey: .notionMeetingsName)) ?? d.notionMeetingsName

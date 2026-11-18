@@ -801,14 +801,14 @@ struct FolderRow: View {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var runner = PrepRunner.shared
-    @AppStorage("settingsAIProvider") private var aiProvider = "claude"
     @AppStorage("moduleTracker") private var trackerModule = true      // 0.9.0: Settings > Modules > Tracker     // 0.9.0: the Claude / ChatGPT tab
     @State private var showProjectsInfo = false
     @State private var showWizard = false          // 0.17.0 (5.2)
     @State private var projectFilter = ""          // 0.15.0 (D2)
     @State private var showCandidates = false
-    @AppStorage(SettingsSearch.generalGroupKey) private var generalGroup = "basics"
-    @AppStorage(SettingsSearch.notionGroupKey) private var notionGroup = "conn"
+    @AppStorage(SettingsSearch.advancedKey("general")) private var genAdv = "0"      // 0.25 (R5)
+    @AppStorage(SettingsSearch.advancedKey("notion")) private var notionAdv = "0"
+    @AppStorage(SettingsSearch.advancedKey("projects")) private var projectsAdv = "0"
     @State private var aiChecking = false     // 0.8.2: Check now on the ways that are out
     @State private var aiTick = 0
     @ObservedObject var dest = NotionDestinationModel.shared
@@ -945,89 +945,22 @@ struct SettingsView: View {
     }
 
 
-    // 0.14.0 (D2): the AI pane was one long form of a dozen sections. Now five groups, one shown at a time.
-    @AppStorage("settingsAIGroup") private var aiGroup = "access"
+    // 0.25 (R5, owner 18.11): the three providers on top with one "Pacenote uses" line (F3); the AI of each job, the
+    // fallback chain, the models, the limits, the AI on this Mac and the agents under Advanced. Who is speaking moved
+    // to Transcription.
+    @AppStorage(SettingsSearch.advancedKey("ai")) private var aiAdv = "0"
 
-    var ai: some View {
-        VStack(spacing: 0) {
-        VStack(alignment: .leading, spacing: 6) {
-            SettingsSegments(selection: $aiGroup, groups: SettingsSearch.aiGroups, prefix: "ai.group.")
-        }
-        .padding(.horizontal, 28).padding(.top, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        aiForm
-        }
-    }
+    var ai: some View { aiForm }
 
     var aiForm: some View {
         Form {
-            // 0.8.2 (owner): everything about Claude in one tab. Access once for the whole app, then the way and the
-            // models for each job, then the automatic switch between the two ways.
-            // 0.9.0 (owner): two providers, two tabs: Claude (account, API key) and ChatGPT (account, OpenAI API key).
-            if aiGroup == "access" {
-            Section {
-                PNSegmented(selection: $aiProvider, options: [
-                    ("claude", "Claude"),
-                    ("chatgpt", "ChatGPT"),
-                    ("gemini", "Gemini")
-                ]).labelsHidden()
-                if aiProvider == "claude" {
-                LabeledContent(L("ai.access.account")) {
-                    HStack(spacing: 8) {
-                        if PrepRunner.claudePath == nil {
-                            Text(L("set.cc.notInstalled")).foregroundStyle(PN.C.text3)
-                        } else {
-                            Image(systemName: runner.loggedIn == true ? "checkmark.circle.fill" : (runner.loggedIn == false ? "exclamationmark.triangle.fill" : "circle.dotted"))
-                                .foregroundStyle(runner.loggedIn == true ? PN.C.turn : (runner.loggedIn == false ? PN.C.onMe : PN.C.text3))
-                            Text(runner.loggedIn == true ? L("set.cc.signedIn") + (runner.authInfo.isEmpty ? "" : " (\(runner.authInfo))")
-                                 : runner.loggedIn == false ? L("set.cc.notSignedIn") : L("set.cc.checking"))
-                                .foregroundStyle(PN.C.text3)
-                            if runner.loggedIn == false { Button(L("set.logIn")) { runner.openLogin() } }
-                            Button(L("set.check")) { runner.refreshAuth() }
-                        }
-                    }
-                }
-                .help(L("ai.access.accountHelp"))
-                KeyRow(title: L("keys.claude.title"), hint: L("keys.claude.hint"), key: .claudeAPIKey, model: model).settingsAnchor("ai.claude")
-                } else if aiProvider == "chatgpt" {
-                CodexAccountRow()
-                KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: model).settingsAnchor("ai.openai")
-                } else {
-                AgyAccountRow()
-                KeyRow(title: L("keys.gemini.title"), hint: L("keys.gemini.hint"), key: .geminiAPIKey, model: model).settingsAnchor("ai.gemini")
-                }
-            } header: { Text(L("ai.access")) } footer: {
-                Text(L(aiProvider == "claude" ? "ai.access.footer.claude" : aiProvider == "chatgpt" ? "ai.access.footer.chatgpt" : "ai.access.footer.gemini")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .onAppear { runner.refreshAuth() }
-            }
-            if aiGroup == "more" {
-            // 0.8.7 (H3): company research for sales preparations, on by default, with what goes out
-            Section {
-                Toggle(isOn: $model.config.salesWebSearch) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L("ai.salesWeb"))
-                        Text(L("ai.salesWeb.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            } header: { Text(L("ai.salesWeb.header")).settingsAnchor("ai.salesWeb") }
-            }
-            if aiGroup == "mac" {
-            Section {
-                // 0.8.6 (E, rules/components.yaml): Ollama and the model as optional components
-                ForEach(OptionalComponents.shared.all.filter { $0.id != "link_downloader" }) { c in ComponentRow(comp: c) }
-                LocalStatus(local: LocalLLM.shared)
-                // 0.10.0 (AI chain): the same switch as the model on this Mac's checkbox in the AI chain
-                Toggle(L("local.fallback"), isOn: Binding(
-                    get: { model.config.ai.chain.first { $0.route == AIRoute.local }?.on ?? true },
-                    set: { on in model.config.ai.chain = AIChain.setOn(model.config.ai.chain, route: AIRoute.local, on: on); model.config.ai.localFallback = on }))
-                    .help(L("local.fallback.help"))
-            } header: { Text(L("local.section")).settingsAnchor("ai.local") } footer: {
-                Text(L("local.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-            }
-            }
-            if aiGroup == "jobs" {
+            AIUsesSection(model: model)
+            AIProviderCard(provider: "claude", model: model)
+            AIProviderCard(provider: "chatgpt", model: model)
+            AIProviderCard(provider: "gemini", model: model)
+            SettingsAdvancedHeader("ai", summary: L("adv.sum.ai"))
+            if aiAdv == "1" {
+            Group {
             Section {
                 RoutePicker(selection: $model.config.ai.prep, recommended: AIRoute.code, withOpenAI: true, withAgy: true, withLocal: true)
                 if model.config.ai.prep == AIRoute.codex {
@@ -1105,7 +1038,7 @@ struct SettingsView: View {
             AIChainSection(model: model, checking: $aiChecking, tick: $aiTick)
             .id(aiTick)
             }
-            if aiGroup == "limits" {
+            Group {
             Section {
                 // Pacenote 0.8 (F4, spec 8): the month's spend and the balance live here, not on Home.
                 LabeledContent(L("ai.thisMonth")) {
@@ -1128,11 +1061,19 @@ struct SettingsView: View {
             ProviderLimitsSection(model: model)
             EconomySection()                 // 0.9.6 Б1: between the limits and the agent
             }
-            if aiGroup == "more" {
-            CallAgentSection(model: model)
-            PrepAgentSection(model: model)   // 0.9.6 Б3: the research preparation (beta)
+            Group {
+            Section {
+                // 0.8.6 (E, rules/components.yaml): Ollama and the model as optional components
+                ForEach(OptionalComponents.shared.all.filter { $0.id != "link_downloader" }) { c in ComponentRow(comp: c) }
+                LocalStatus(local: LocalLLM.shared)
+                // 0.10.0 (AI chain): the same switch as the model on this Mac's checkbox in the AI chain
+                Toggle(L("local.fallback"), isOn: Binding(
+                    get: { model.config.ai.chain.first { $0.route == AIRoute.local }?.on ?? true },
+                    set: { on in model.config.ai.chain = AIChain.setOn(model.config.ai.chain, route: AIRoute.local, on: on); model.config.ai.localFallback = on }))
+                    .help(L("local.fallback.help"))
+            } header: { Text(L("local.section")).settingsAnchor("ai.local") } footer: {
+                Text(L("local.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
-            if aiGroup == "mac" {
             Section {
                 Text(L("search.what")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
                 Toggle(L("set.localAiDefaultFor"), isOn: $model.config.localAI.enabled)
@@ -1170,75 +1111,19 @@ struct SettingsView: View {
             }
             .onChange(of: model.config.localAI) { LocalAIService.shared.apply(); model.refreshLocalAI(after: 2) }
             .onAppear { model.refreshLocalAI() }
+            }
+            Group {
+            // 0.8.7 (H3): company research for sales preparations, on by default, with what goes out
             Section {
-                Toggle(L("set.identifySpeakers"), isOn: $model.config.speakersEnabled)
-                    .help(L("set.tellsTheVoicesOn"))
-                    .onChange(of: model.config.speakersEnabled) { LocalAIService.shared.apply() }
-                LabeledContent(L("set.status")) {
-                    let st = LocalAIService.shared.speakersLine()
-                    HStack(spacing: 6) {
-                        Image(systemName: st.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
-                            .foregroundStyle(st.ok ? PN.C.turn : (model.config.speakersEnabled ? PN.C.onMe : PN.C.text3))
-                        Text(st.text).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                        Spacer()
-                        Button(L("set.voiceLibrary")) {
-                            NSWorkspace.shared.open(URL(fileURLWithPath: (CallEngine.shared.appRoot as NSString).appendingPathComponent("voices")))
-                        }.controlSize(.small)
+                Toggle(isOn: $model.config.salesWebSearch) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("ai.salesWeb"))
+                        Text(L("ai.salesWeb.sub")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                DisclosureGroup(L("set.voiceLibraryN", ["n": "\(model.voices.count)"])) {
-                    if model.voices.isEmpty { Text(L("set.nobodyYetNamesYou")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                    ForEach(model.voices) { v in
-                        HStack {
-                            Text(v.name)
-                            Spacer()
-                            Menu(v.side == "team" ? L("set.sideTeam") : (v.side == "client" ? L("set.sideClient") : L("set.sideUnknown"))) {
-                                Button { model.setVoiceSide(v.name, "team") } label: { v.side == "team" ? Label(L("set.teamOurs"), systemImage: "checkmark") : Label(L("set.teamOurs"), systemImage: "person.2") }
-                                Button { model.setVoiceSide(v.name, "client") } label: { v.side == "client" ? Label(L("set.clientSide"), systemImage: "checkmark") : Label(L("set.clientSide"), systemImage: "building.2") }
-                            }
-                            .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
-                            .foregroundStyle(v.side == "team" ? Color.accentColor : .primary)
-                            .disabled(CallEngine.shared.isRunning)
-                            .help(L("set.whichSideThisPerson"))
-                            Menu(SettingsModel.whereLabel(v.wherer)) {
-                                ForEach(model.voiceWheres, id: \.tag) { sc in
-                                    Button { model.toggleVoiceWhere(v.name, sc.tag) } label: {
-                                        if v.wherer.contains(sc.tag) { Label(sc.label, systemImage: "checkmark") } else { Text(sc.label) }
-                                    }
-                                }
-                            }
-                            .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
-                            .disabled(CallEngine.shared.isRunning)
-                            .help(L("set.theCallsThisVoice"))
-                            Text("\(v.calls) call\(v.calls == 1 ? "" : "s")").font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                            Menu(L("set.mergeInto")) {
-                                ForEach(model.voices.filter { $0.name != v.name }) { o in
-                                    Button(o.name) { model.mergeAsk = .init(a: v.name, b: o.name) }
-                                }
-                            }
-                            .menuStyle(.borderlessButton).fixedSize().font(PN.Font.caption)
-                            .disabled(CallEngine.shared.isRunning || model.voices.count < 2)
-                            .help(L("set.mergeHelp", ["name": v.name]))
-                            Button(L("people.names")) { model.personSheet = v.name }.controlSize(.small).disabled(CallEngine.shared.isRunning)
-                                .help(L("people.namesHelp", ["name": v.name]))
-                            Button(L("set.forget")) { model.forgetVoice(v.name) }.controlSize(.small).disabled(CallEngine.shared.isRunning)
-                                .help(L("set.removesThisPersonS"))
-                        }
-                    }
-                let al = model.voiceAliases
-                if !al.isEmpty {
-                    Text(L("set.aliases", ["list": al.sorted { $0.key < $1.key }.map { "\($0.key) → \($0.value)" }.joined(separator: ", ")]))
-                        .font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                }
-                }
-                .onAppear { model.loadVoices() }
-                .sheet(item: $model.mergeAsk) { ask in MergeNameSheet(model: model, ask: ask) }
-                .sheet(item: Binding(get: { model.personSheet.map { PersonName(name: $0) } }, set: { model.personSheet = $0?.name })) { p in
-                    PersonNamesSheet(model: model, name: p.name)
-                }
-            } header: { Text(L("set.speakers")).settingsAnchor("ai.speakers") } footer: {
-                Text(L("set.inTheTipsWindow"))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
+            } header: { Text(L("ai.salesWeb.header")).settingsAnchor("ai.salesWeb") }
+            CallAgentSection(model: model)
+            PrepAgentSection(model: model)   // 0.9.6 Б3: the research preparation (beta)
             }
             }
         }
@@ -1283,16 +1168,6 @@ struct SettingsView: View {
                     .sheet(isPresented: $showWizard) {
                         ProjectWizardView(settings: model) { slug in showWizard = false; if let s = slug { model.projectDetail = s } }
                     }
-                    Menu {
-                        Button(L("set.scanWorkFolder")) { model.scanFolders() }
-                            .disabled(model.config.workRoot.isEmpty)
-                            .help(L("set.addsTheProjectFolders"))
-                        Button(L("set.reindexAll")) { IndexService.shared.reindexAll() }
-                            .help(L("set.rebuildTheSearchIndex"))
-                    } label: { Image(systemName: "ellipsis.circle") }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    .accessibilityLabel(L("proj.more"))
-                    .settingsAnchor("pr.scan")
                     Button { showProjectsInfo.toggle() } label: { Image(systemName: "info.circle") }
                         .buttonStyle(.borderless).accessibilityLabel(L("set.aboutProjects"))
                         .popover(isPresented: $showProjectsInfo, arrowEdge: .bottom) { projectsInfo }
@@ -1301,7 +1176,26 @@ struct SettingsView: View {
                     Text(L("set.setTheWorkFolder")).font(PN.Font.caption).foregroundStyle(PN.C.onMe)
                 }
                 if !model.note.isEmpty { Text(model.note).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                // found folders: one line until the PM opens them
+            }
+            // 0.25 (R5): one list of every project on top; the workspaces they come from are under Advanced
+            let all = model.registry.projects.filter { projectMatches($0.slug) }
+            if !all.isEmpty {
+                Section {
+                    ForEach(all, id: \.slug) { p in projectRow(p.slug) }
+                } header: { Text(L("settings.tab.projects")) }
+            }
+            if !projectFilter.isEmpty && !model.registry.projects.contains(where: { projectMatches($0.slug) }) {
+                Section { Text(L("proj.noMatch")).font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3) }
+            }
+            if model.registry.projects.isEmpty && model.registry.workspaces.isEmpty && model.folderCandidates.isEmpty {
+                Section {
+                    Text(L("set.noProjectsYetScan2"))
+                        .font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3)
+                }
+            }
+            SettingsAdvancedHeader("projects", summary: L("adv.sum.projects"))
+            if projectsAdv == "1" {
+            Section {
                 let cands = model.folderCandidates
                 if !cands.isEmpty {
                     HStack(spacing: 8) {
@@ -1324,9 +1218,19 @@ struct SettingsView: View {
                                 Button(L("set.ignore")) { model.ignoreFolder(c.dir) }
                             }
                         }
-                        Text(L("set.aWorkspaceSSubfolders")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                     }
                 }
+                HStack {
+                    Button(L("set.scanWorkFolder")) { model.scanFolders() }
+                        .disabled(model.config.workRoot.isEmpty)
+                        .help(L("set.addsTheProjectFolders"))
+                    Button(L("set.reindexAll")) { IndexService.shared.reindexAll() }
+                        .help(L("set.rebuildTheSearchIndex"))
+                    Spacer()
+                }
+                .settingsAnchor("pr.scan")
+            } header: { Text(L("proj.adv.folders")) } footer: {
+                Text(L("set.aWorkspaceSSubfolders")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             ForEach(model.registry.workspaces, id: \.name) { w in
                 let members = model.registry.projects.filter { w.projects.contains($0.slug) && projectMatches($0.slug) }
@@ -1339,8 +1243,8 @@ struct SettingsView: View {
                         }
                         .help(L("ws.inNotion.help"))
                     }
-                    if members.isEmpty { Text(L("set.noProjectsYetScan")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                    ForEach(members, id: \.slug) { p in projectRow(p.slug) }
+                    Text(members.isEmpty ? L("set.noProjectsYetScan") : L("proj.ws.members", ["n": "\(members.count)", "names": members.prefix(4).map(\.name).joined(separator: ", ")]))
+                        .font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
                 } header: {
                     HStack(spacing: 6) {
                         Text(w.name)
@@ -1359,21 +1263,6 @@ struct SettingsView: View {
                 }
                 }
             }
-            let inWs = Set(model.registry.workspaces.flatMap(\.projects))
-            let others = model.registry.projects.filter { !inWs.contains($0.slug) && projectMatches($0.slug) }
-            if !others.isEmpty {
-                Section {
-                    ForEach(others, id: \.slug) { p in projectRow(p.slug) }
-                } header: { Text(model.registry.workspaces.isEmpty ? L("settings.tab.projects") : L("set.otherProjects")) }
-            }
-            if !projectFilter.isEmpty && !model.registry.projects.contains(where: { projectMatches($0.slug) }) {
-                Section { Text(L("proj.noMatch")).font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3) }
-            }
-            if model.registry.projects.isEmpty && model.registry.workspaces.isEmpty && model.folderCandidates.isEmpty {
-                Section {
-                    Text(L("set.noProjectsYetScan2"))
-                        .font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3)
-                }
             }
         }
         .formStyle(.grouped).toggleStyle(.pnSwitch)
@@ -1433,16 +1322,12 @@ struct SettingsView: View {
 
     // 2026-10-27 (owner): everything about Notion in one place (it was hidden under General > Behaviour).
     /// 0.8.6 (C): everything about Notion on one tab: Connection, Meeting pages, My tasks in On you, Local copy.
+    // 0.25 (R5, owner 18.11): Notion shows the token and, as soon as it is connected, where meeting notes go (the
+    // first user's bug: Notion connected without a database, so a call could not finish its page); the other
+    // databases, My tasks and the local copy are under Advanced. (0.15.0 had four groups, one at a time.)
     var notion: some View {
-        // 0.15.0 (D2): four groups, one at a time. Without a token only Connection shows (as on the HubSpot page).
         let connected = model.isSet(.notionToken)
-        let group = connected ? notionGroup : "conn"
-        return VStack(spacing: 0) {
-            if connected {
-                SettingsSegments(selection: $notionGroup, groups: SettingsSearch.notionGroups, prefix: "ntn.group.")
-                    .padding(.horizontal, 28).padding(.top, 10)
-            }
-        Form {
+        return Form {
             if !model.config.notionMigrationNote.isEmpty {
                 Section {
                     HStack(alignment: .top) {
@@ -1455,15 +1340,23 @@ struct SettingsView: View {
                     }
                 }
             }
-            if group == "conn" {
             Section {
                 KeyRow(title: L("keys.notion.title"), hint: L("keys.notion.hint"), key: .notionToken, model: model)
                     .settingsAnchor("int.notion.token")
                 if model.isSet(.notionToken) { NotionSeesLine() }
             } header: { Text(L("set.connection")) }
+            if connected {
+            Section {
+                NotionDestinationView(compact: true)
+                Toggle(L("set.writeAMeetingPage"), isOn: $model.config.notionWriteSummary)
+                    .settingsAnchor("int.notion.pages")
+            } header: { Text(L("nset.whereMeetingPagesGo")).settingsAnchor("int.notion.meetDB") } footer: {
+                Text(L(model.config.notionMeetingsDB.isEmpty ? "ntn.meet.need" : "set.afterTheCallA"))
+                    .font(PN.Font.caption).foregroundStyle(model.config.notionMeetingsDB.isEmpty ? PN.C.onMe : PN.C.text3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            // 0.8.7 (F3): one database per kind for all projects; the project is a property of each page
-            if group == "dbs" {
+            SettingsAdvancedHeader("notion", summary: L("adv.sum.notion"))
+            if notionAdv == "1" {
             Section {
                 NotionDBRow(kind: "meetings", model: model)
                 NotionDBRow(kind: "tasks", model: model)
@@ -1481,18 +1374,7 @@ struct SettingsView: View {
             } header: { Text(L("ntset.databases")).settingsAnchor("int.notion.dbs") } footer: {
                 Text(L("ntset.databases.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
-            }
-            if group == "after" {
-            Section {
-                Toggle(L("set.writeAMeetingPage"), isOn: $model.config.notionWriteSummary)
-                if model.config.notionMeetingsDB.isEmpty { NotionDestinationView(compact: true) }
-            } header: { Text(L("set.meetingPages")).settingsAnchor("int.notion.pages") } footer: {
-                Text(L("set.afterTheCallA"))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3)
-            }
             NotionTasksSection(model: model)
-            }
-            if group == "local" {
             Section {
                 LabeledContent {
                     VStack(alignment: .leading, spacing: 4) {
@@ -1522,8 +1404,14 @@ struct SettingsView: View {
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             }
+            }
         }
         .formStyle(.grouped).toggleStyle(.pnSwitch)
+        .onAppear { if connected && model.config.notionMeetingsDB.isEmpty && !dest.searched && !dest.busy { dest.find() } }
+        .onChange(of: model.isSet(.notionToken)) { _, on in
+            // the database is picked right when Notion gets connected
+            // (R5, item 3) "Write a meeting page" turns on when the database is picked (NotionDestination.choose), not on the token
+            if on && model.config.notionMeetingsDB.isEmpty && !dest.busy { dest.find() }
         }
     }
 
@@ -1565,19 +1453,14 @@ struct SettingsView: View {
         if (filled > 0 || differ > 0) && dest.items.isEmpty { dest.find() }
     }
 
-    // 0.15.0 (D2): General in three groups, one shown at a time (was seven sections in one form). The recording
-    // consent moved to Call recording.
-    var general: some View {
-        VStack(spacing: 0) {
-            SettingsSegments(selection: $generalGroup, groups: SettingsSearch.generalGroups, prefix: "gen.group.")
-                .padding(.horizontal, 28).padding(.top, 10)
-            generalForm
-        }
-    }
+    // 0.25 (R5, owner 18.11): General shows the "Pacenote is ready" card, the name on calls, the language and the
+    // look on top; the Dock, the tips window during screen sharing, the call controls, the shortcuts, the folders and
+    // the data under Advanced. (0.15.0 had three groups, one at a time.)
+    var general: some View { generalForm }
 
     var generalForm: some View {
         Form {
-            if generalGroup == "basics" {
+            PacenoteReadyCard(model: model)
             Section {
                 LabeledContent(L("set.yourNameOnCalls")) {
                     TextField("", text: $model.aliasesText, prompt: Text(L("onboarding.name.placeholder")))
@@ -1586,11 +1469,6 @@ struct SettingsView: View {
                 }
                 .help(L("set.everyFormPeopleUse"))
                 .settingsAnchor("gen.name")
-                FolderRow(title: L("set.workFolder"),
-                          hint: L("set.workFolderHint"),
-                          path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder(L("set.chooseWork")) })
-                    .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
-                    .settingsAnchor("gen.folder")
                 Picker(L("callSettings.uiLang"), selection: $model.config.uiLanguage) {
                     Text("English").tag("en")
                     Text("Українська").tag("uk")
@@ -1601,9 +1479,6 @@ struct SettingsView: View {
                     .onChange(of: model.config.appearance) { AppDelegate.applyAppearance(model.config.appearance) }
                     .onChange(of: model.config.appearanceStyle) { AppDelegate.applyStyle(model.config.appearanceStyle) }
                     .settingsAnchor("gen.theme")
-                Toggle(L("settings.general.dock"), isOn: $model.config.showInDock)
-                    .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
-                    .settingsAnchor("gen.dock")
             } footer: {
                 HStack {
                     Text(L("set.settingsSaveAutomaticallyAnd"))
@@ -1611,9 +1486,13 @@ struct SettingsView: View {
                 }
                 .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            }
-            if generalGroup == "calls" {
+            SettingsAdvancedHeader("general", summary: L("adv.sum.general"))
+            if genAdv == "1" {
+            Group {
             Section {
+                Toggle(L("settings.general.dock"), isOn: $model.config.showInDock)
+                    .onChange(of: model.config.showInDock) { NSApp.setActivationPolicy(model.config.showInDock ? .regular : .accessory) }
+                    .settingsAnchor("gen.dock")
                 Toggle(L("set.hideTheTipsWindow"), isOn: $model.config.stealthDefault)
                     .help(L("set.defaultForNewCalls"))
                     .settingsAnchor("gen.stealth")
@@ -1626,7 +1505,7 @@ struct SettingsView: View {
                 .help(L("floating.settingHelp"))
                 .onChange(of: model.config.floatingCallControls) { (NSApp.delegate as? AppDelegate)?.refresh() }
                 .settingsAnchor("gen.floating")
-            }
+            } header: { Text(L("gen.group.calls")) }
             Section {
                 ShortcutRow(action: .help)
                 ShortcutRow(action: .pause)
@@ -1642,8 +1521,36 @@ struct SettingsView: View {
                 Text(L("set.theyWorkFromAny"))
                     .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
+            Section {
+                FolderRow(title: L("set.workFolder"),
+                          hint: L("set.workFolderHint"),
+                          path: $model.config.workRoot, placeholder: "~/work", choose: { model.chooseFolder(L("set.chooseWork")) })
+                    .onChange(of: model.config.workRoot) { model.refreshMirror(); model.rescanWorkspaces() }
+                    .settingsAnchor("gen.folder")
+                LabeledContent {
+                    HStack {
+                        Text(model.config.effectiveAppRoot(appSupport: AppPaths.support.path))
+                            .font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Button(L("onboarding.folder.choose")) { if let p = model.chooseFolder(L("set.chooseApp")) { model.config.appRoot = p } }
+                        if !model.config.appRoot.isEmpty { Button(L("set.default")) { model.config.appRoot = "" } }
+                    }
+                } label: {
+                    Text(L("set.appFolder")).help(L("set.whereTheAppKeeps"))
+                }
+                .settingsAnchor("gen.appfolder")
+            } header: { Text(L("gen.folders")) } footer: {
+                HStack {
+                    Text(L("set.yourCorrectionsCardsOn"))
+                    Button(L("set.showLog")) {
+                        if !FileManager.default.fileExists(atPath: EditLog.url.path) { FileManager.default.createFile(atPath: EditLog.url.path, contents: nil) }
+                        NSWorkspace.shared.activateFileViewerSelecting([EditLog.url])
+                    }.buttonStyle(.pnTertiary)
+                }
+                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            if generalGroup == "data" {
+            }
+            Group {
             // 0.8.7 (M, rules/usage.yaml): the local usage log
             Section {
                 Toggle(isOn: $model.config.usageLog) {
@@ -1692,28 +1599,6 @@ struct SettingsView: View {
             } header: { Text(L("comp.addons")).settingsAnchor("gen.addons") } footer: {
                 Text(L("comp.addonsFoot")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
-            Section {
-                LabeledContent {
-                    HStack {
-                        Text(model.config.effectiveAppRoot(appSupport: AppPaths.support.path))
-                            .font(PN.sys(.callout, 12)).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.middle)
-                        Spacer()
-                        Button(L("onboarding.folder.choose")) { if let p = model.chooseFolder(L("set.chooseApp")) { model.config.appRoot = p } }
-                        if !model.config.appRoot.isEmpty { Button(L("set.default")) { model.config.appRoot = "" } }
-                    }
-                } label: {
-                    Text(L("set.appFolder")).help(L("set.whereTheAppKeeps"))
-                }
-                .settingsAnchor("gen.appfolder")
-            } header: { Text(L("set.advanced")) } footer: {
-                HStack {
-                    Text(L("set.yourCorrectionsCardsOn"))
-                    Button(L("set.showLog")) {
-                        if !FileManager.default.fileExists(atPath: EditLog.url.path) { FileManager.default.createFile(atPath: EditLog.url.path, contents: nil) }
-                        NSWorkspace.shared.activateFileViewerSelecting([EditLog.url])
-                    }.buttonStyle(.pnTertiary)
-                }
-                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             }
         }

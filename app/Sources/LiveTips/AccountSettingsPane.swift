@@ -14,20 +14,11 @@ struct AccountSettingsPane: View {
     @State private var exporting = false          // 0.12.1 (B8): Export server data
     @State private var exportNote = ""
 
+    @AppStorage(SettingsSearch.advancedKey("account")) private var adv = "0"      // 0.25 (R5)
+
     var body: some View {
         Form {
-            if let s = acct.session { signedIn(s) }
-
-            Section {
-                Text(L("account.what.goes")).fixedSize(horizontal: false, vertical: true)
-                Text(L("account.what.never")).fixedSize(horizontal: false, vertical: true)
-                Text(L("account.what.where")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 14) {
-                    Link(L("account.privacy"), destination: URL(string: "https://pacenote.bodco.pm/privacy/")!)
-                    Link(L("account.terms"), destination: URL(string: "https://pacenote.bodco.pm/terms/")!)
-                }
-                .font(PN.Font.caption)
-            } header: { Text(L("account.what.head")) }
+            if let s = acct.session { signedIn(s) } else { whatGoes }
         }
         .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear { if acct.signedIn { Task { await acct.refreshInfo() } } }
@@ -45,6 +36,22 @@ struct AccountSettingsPane: View {
         } message: { Text(L("account.everywhere.m")) }
     }
 
+    /// What goes to the server and what never does.
+    private var whatGoes: some View {
+            Section {
+                Text(L("account.what.goes")).fixedSize(horizontal: false, vertical: true)
+                Text(L("account.what.never")).fixedSize(horizontal: false, vertical: true)
+                Text(L("account.what.where")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 14) {
+                    Link(L("account.privacy"), destination: URL(string: "https://pacenote.bodco.pm/privacy/")!)
+                    Link(L("account.terms"), destination: URL(string: "https://pacenote.bodco.pm/terms/")!)
+                }
+                .font(PN.Font.caption)
+            } header: { Text(L("account.what.head")) }
+    }
+
+    // 0.25 (R5, owner 18.11): who is signed in and the plan on top; the sign-in methods, organizations, your use, who
+    // opened your calls, the devices, the data on the server and what goes there under Advanced.
     @ViewBuilder private func signedIn(_ s: PacenoteServer.Session) -> some View {
         Section {
             HStack(alignment: .top, spacing: 10) {
@@ -64,11 +71,17 @@ struct AccountSettingsPane: View {
             }
         } header: { Text(L("account.head")).settingsAnchor("acc.head") }
 
-        AccountSignInMethodsSection()   // 0.22.0 (B13): Google and the password, add, change, remove
-        AccountOrgsSection()       // 0.17.0 (B6b): organizations, where new calls go, invites, Manage organization
         AccountPlanSection()       // 0.18.0 (B3): the plan of each organization, the beta mark, trial, limits
+        // 0.25 (R5, item 5): an invite waiting for an answer brings the organizations up from Advanced, once.
+        if !acct.invites.isEmpty { AccountOrgsSection() }
+        SettingsAdvancedHeader("account", summary: L("adv.sum.account"))
+        if adv == "1" {
+        Group {
+        AccountSignInMethodsSection()   // 0.22.0 (B13): Google and the password, add, change, remove
+        if acct.invites.isEmpty { AccountOrgsSection() }   // 0.17.0 (B6b): organizations, where new calls go, invites, Manage organization
         AccountUsageSection()      // 0.19.0: my own use (GET /v1/me/usage), also on Solo
         AccountCallViewsSection()  // 0.20.0 (B9, D47.7): who opened my calls, when a lead or C-level sees them
+        }
 
         Section {
             if acct.devices.isEmpty {
@@ -95,7 +108,7 @@ struct AccountSettingsPane: View {
                 Spacer()
                 Button(L("account.refresh")) { Task { await acct.refreshInfo() } }.buttonStyle(.pnTertiary).disabled(acct.busy)
             }
-        } header: { Text(L("account.devices.head")) }
+        } header: { Text(L("account.devices.head")).settingsAnchor("acc.devices") }
 
         Section {
             HStack(alignment: .top) {
@@ -112,7 +125,9 @@ struct AccountSettingsPane: View {
                 Spacer()
                 Button(L("account.delete")) { confirmDelete = true }.buttonStyle(.pnSecondary).disabled(acct.busy)
             }
-        } header: { Text(L("account.delete.head")) }
+        } header: { Text(L("account.delete.head")).settingsAnchor("acc.delete") }
+        whatGoes
+        }
     }
 
     /// 0.12.1 (B8): downloads the export zip and asks where to keep it.

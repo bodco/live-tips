@@ -783,7 +783,9 @@ final class StartCallModel: ObservableObject {
         }
         // QA 26.10: the language follows the project (English client -> English) until the PM picks one.
         guard !languageTouched else { return }
-        language = (project?.clientLanguage.lowercased().hasPrefix("english") ?? false) ? "en" : "uk"
+        // 0.25 (R5): otherwise the languages of Settings > Transcription (Ukrainian when not set)
+        let own = AppConfig.load(from: AppPaths.config).callLanguage
+        language = (project?.clientLanguage.lowercased().hasPrefix("english") ?? false) ? "en" : (own.isEmpty ? "uk" : own)
     }
 
     func requestJSON() -> [String: Any]? {

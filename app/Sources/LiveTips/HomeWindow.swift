@@ -343,7 +343,7 @@ struct HomeView: View {
             out.append(Problem(id: "limit", text: L("home.status.limit"), run: { SettingsWindow.show(tab: "ai") }))
         }
         if SettingsWindow.model.config.nameAliases.isEmpty {
-            out.append(Problem(id: "name", text: L("home.finish.name"), run: { UserDefaults.standard.set("basics", forKey: SettingsSearch.generalGroupKey); SettingsWindow.show(tab: "general") }))
+            out.append(Problem(id: "name", text: L("home.finish.name"), run: { SettingsWindow.show(tab: "general") }))
         }
         return out
     }

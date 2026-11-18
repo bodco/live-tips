@@ -3,6 +3,15 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.24.1 (unreleased)
+
+- **The AI of each job follows what is connected (2026-11-18):** with only one AI connected, for example a Claude API
+  key, the preparation, the tips and the work after the call now all run on it. Before, the preparation and the
+  notes stayed on the Claude account even when it was not connected, so a new user with just an API key saw the
+  wrong AI in Settings > AI. When you connect an account (Claude or ChatGPT) later, it becomes the AI for the
+  preparation and the work after the call; tips stay on an API key while you have one. A choice you make yourself
+  stays while its AI is connected.
+
 ## 0.24.0 (2026-11-18)
 
 - **Updates: a window while Pacenote runs, one click to install (2026-11-18):** Pacenote now looks for a new version

@@ -2271,6 +2271,12 @@ Gemini account, model on this Mac. Every connected AI is in the list by default,
 another provider when the chosen one is out. **Switch to the next AI automatically** turns the chain off: then a job
 on an AI that is out stops with the reason, as before.
 
+**The AI of each job follows what is connected (0.24.1).** A job never sits on an AI you have not connected: with
+only a Claude API key, the preparation, the tips and the work after the call all run on it. When you connect an
+account later (Claude or ChatGPT), it becomes the AI for the preparation and the work after the call; the tips stay on
+an API key while you have one. A choice you make in Settings > AI stays as long as its AI is connected. An account
+counts once Pacenote has checked that you are signed in.
+
 - Tips during a call never go to the model on this Mac (19-59 seconds an answer) or to the Gemini account (20-30
   seconds); when every cloud AI is out, the instant cards and facts keep working.
 - For the preparation (the Meeting Sheet build), the work after the call and typed questions, the model on this Mac

@@ -200,10 +200,17 @@ PY
   install:voices)
     pip_lock voices || exit 1
     n=wespeaker_en_voxceleb_resnet34_LM.onnx; out="$APPROOT/models/$n"; h=ce2c5db3fb2c438f1d58de35577c951bc27ea0d41ef74968de4a480a1a59e39b
+    # 0.24.1: sherpa-onnx re-uploaded this file without its feature_normalize_type metadata (other embeddings, saved
+    # voices stop matching), so Pacenote's own copy of the pinned file comes first; the original is the fallback.
     if ! { [ -s "$out" ] && sha_ok "$out" "$h"; }; then
-      dl "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/$n" "$out.part" || exit 1
-      sha_ok "$out.part" "$h" || { rm -f "$out.part"; echo "checksum mismatch for $n: refused"; exit 1; }
-      mv "$out.part" "$out"
+      for u in "https://github.com/bodco/live-tips/releases/download/models-wespeaker-1/$n" \
+               "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/$n"; do
+        rm -f "$out.part"
+        dl "$u" "$out.part" 26530589 && sha_ok "$out.part" "$h" && { mv "$out.part" "$out"; break; }
+        echo "$n from $u: download failed or checksum mismatch, refused"
+      done
+      rm -f "$out.part"
+      [ -s "$out" ] && sha_ok "$out" "$h" || { echo "ERROR checksum mismatch for $n: refused"; exit 1; }
     fi
     echo "Speaker identification ready" ;;
 

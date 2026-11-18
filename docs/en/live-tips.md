@@ -2698,6 +2698,18 @@ every run of a log starts with a header (date and time zone, app, Python and pac
 the date, files are appended and rotated by size. Help > Export diagnostics saves a zip of logs/ and state/ with the
 versions and the components; the home folder is written as ~ and anything that looks like a key is cut.
 
+**A participant's voice is named right away.** When a voice matches a person in the voice library closely (cosine
+0.72 or more, clearly ahead of the next person) and that person is a participant of this call (Start call or the
+calendar event; a calendar spelling with the same first letter and surname initial counts when only one participant
+fits), the speaker is named after about 4 seconds of speech (`speaker_auto_s`). Without participants, only names used on
+the same meeting series are named this way, as before. Anyone else, an unsure match or a name already on this call is
+asked. The library does not learn from a name given this way until you confirm or rename it.
+
+**The speaker model.** setup.sh downloads `wespeaker_en_voxceleb_resnet34_LM.onnx` from Pacenote's own release
+(bodco/live-tips, models-wespeaker-1), the upstream sherpa-onnx file only as a fallback, and checks the same SHA-256 for
+both. The upstream file was re-uploaded without its `feature_normalize_type` metadata, which changes the voice prints.
+The model is WeSpeaker ResNet34-LM trained on VoxCeleb, CC BY 4.0.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the

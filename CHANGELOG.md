@@ -42,6 +42,15 @@ Pacenote. Earlier versions are described in the commit messages and in
   switch; never call text.
 - **"Ollama is not running" was not about Ollama (2026-11-18):** the meaning search model built into Pacenote now says
   that it is not installed or still starting, instead of an Ollama message.
+- **A known voice of a participant is named right away (2026-11-18):** when a voice on the call clearly matches a person
+  in your voice library and that person is a participant of this call (typed in Start call or on the calendar event,
+  also in another spelling such as "M. Turner" for "Mike T."), Pacenote names the speaker by itself after about 4
+  seconds of speech, instead of asking after 15 seconds or only for names used earlier on the same meeting series. A
+  voice of someone who is not on the call, an unsure match or a name already given on this call is still asked.
+- **Speaker identification installs again for new users (2026-11-18):** the speaker model was replaced upstream by a
+  copy without part of its settings, which gave different voice prints, so the install refused it as a checksum
+  mismatch. Pacenote now downloads its own copy of the original model (github.com/bodco/live-tips, release
+  models-wespeaker-1), with the upstream file only as a fallback; saved voices keep matching.
 
 - **The AI of each job follows what is connected (2026-11-18):** with only one AI connected, for example a Claude API
   key, the preparation, the tips and the work after the call now all run on it. Before, the preparation and the

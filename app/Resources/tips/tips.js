@@ -36,7 +36,7 @@
         stance: { for: 'for', neutral: 'neutral', against: 'against', unknown: '' } },
       afterCall: 'What next', callPage: 'Call page', followup: 'Draft follow-up email',
       asked: (w) => `${w} asked`, now: 'now', ago: (m) => `${m}m`,
-      saidIt: 'Said it', collapse: 'Collapse', expand: 'Expand', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel', rateUsed: 'Useful', ratePartly: 'Fine, but off the point', rateNot: 'Not useful', rateWhy: 'What was off?', rateComment: 'A comment, if you like (what to keep, what to change)', rateSave: 'Save', rateSkip: 'Skip', rateThanks: 'Rated: Pacenote learns from it after the call', reasons: { off_topic: 'Off topic', late: 'Late', wrong_fact: 'Wrong fact', too_long: 'Too long', not_now: 'Not now' },
+      from: 'from', endCall: 'End call', endCallTip: 'End the call: Pacenote stops listening and writes the notes', saidIt: 'Said it', collapse: 'Collapse', expand: 'Expand', notByVoice: 'On this meeting, not matched by voice', del: 'Delete', delConfirm: 'Click again to delete', delTip: 'Delete this line from the transcript', restore: 'Restore', lineDeleted: 'Line deleted: it leaves the transcript after the call', backAuto: 'Back to latest', shorter: 'Shorter', hide: 'Hide', pin: 'Pin', unpin: 'Unpin', edit: 'Edit', save: 'Save', cancel: 'Cancel', rateUsed: 'Useful', ratePartly: 'Fine, but off the point', rateNot: 'Not useful', rateWhy: 'What was off?', rateComment: 'A comment, if you like (what to keep, what to change)', rateSave: 'Save', rateSkip: 'Skip', rateThanks: 'Rated: Pacenote learns from it after the call', reasons: { off_topic: 'Off topic', late: 'Late', wrong_fact: 'Wrong fact', too_long: 'Too long', not_now: 'Not now' },
       unverified: 'Not verified against documents',
       next: (t, m) => `${t} in ${m} min`, notPrepared: 'not prepared', ready: 'brief ready', preparing: 'preparing', prepare: 'Prepare', open: 'Open',
       ask: 'Ask about this project', help: 'Help',
@@ -126,7 +126,7 @@
         stance: { for: 'за', neutral: 'нейтрально', against: 'проти', unknown: '' } },
       afterCall: 'Що далі', callPage: 'Сторінка дзвінка', followup: 'Чернетка листа-підсумку',
       asked: (w) => `${w} питає`, now: 'щойно', ago: (m) => `${m} хв`,
-      saidIt: 'Сказав', collapse: 'Згорнути', expand: 'Розгорнути', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати', rateUsed: 'Корисно', ratePartly: 'Ніби ок, але не в тему', rateNot: 'Не корисно', rateWhy: 'Що не так?', rateComment: 'Коментар, якщо хочете (що лишити, що змінити)', rateSave: 'Зберегти', rateSkip: 'Пропустити', rateThanks: 'Оцінено: Pacenote врахує це після дзвінка', reasons: { off_topic: 'Не в тему', late: 'Запізно', wrong_fact: 'Хибний факт', too_long: 'Задовго', not_now: 'Не зараз' },
+      from: 'джерело:', endCall: 'Завершити', endCallTip: 'Завершити дзвінок: Pacenote перестане слухати і напише нотатки', saidIt: 'Сказав', collapse: 'Згорнути', expand: 'Розгорнути', notByVoice: 'Є на цій зустрічі, не за голосом', del: 'Видалити', delConfirm: 'Клацніть ще раз, щоб видалити', delTip: 'Видалити репліку з транскрипту', restore: 'Повернути', lineDeleted: 'Репліку видалено: її не буде в транскрипті після дзвінка', backAuto: 'До останньої', shorter: 'Коротше', hide: 'Сховати', pin: 'Закріпити', unpin: 'Відкріпити', edit: 'Виправити', save: 'Зберегти', cancel: 'Скасувати', rateUsed: 'Корисно', ratePartly: 'Ніби ок, але не в тему', rateNot: 'Не корисно', rateWhy: 'Що не так?', rateComment: 'Коментар, якщо хочете (що лишити, що змінити)', rateSave: 'Зберегти', rateSkip: 'Пропустити', rateThanks: 'Оцінено: Pacenote врахує це після дзвінка', reasons: { off_topic: 'Не в тему', late: 'Запізно', wrong_fact: 'Хибний факт', too_long: 'Задовго', not_now: 'Не зараз' },
       unverified: 'Не звірено з документами',
       next: (t, m) => `${t} за ${m} хв`, notPrepared: 'не підготовлено', ready: 'бриф готовий', preparing: 'готується', prepare: 'Підготувати', open: 'Відкрити',
       ask: 'Запитай про проєкт', help: 'Допоможи',
@@ -577,6 +577,7 @@
 
     $('askLbl').textContent = t.ask; $('askInput').placeholder = t.ask;
     $('helpLbl').textContent = t.help; $('helpKey').textContent = S.keys.help;
+    const eb = $('endBtn'); eb.textContent = t.endCall; eb.title = t.endCallTip; eb.hidden = ended || S.call.state === 'ending';
 
     guard('pane', () => renderPane($('pane'), S.ui.paneTab, false));
     // A sheet opened in a narrow window becomes the side pane when the window gets wide (no double tabs).
@@ -667,13 +668,17 @@
   function renderHero(c) {
     const el = $('hero'), t = T();
     if (!c) { el.hidden = true; el.dataset.id = ''; return; }
-    if (S.ui.editing === c.id && el.dataset.id === c.id && el.querySelector('.say[contenteditable="true"]')) return;   // the PM is typing
+    if (S.ui.editing === c.id && el.dataset.id === c.id && el.querySelector('[data-edit][contenteditable="true"]')) return;   // the PM is typing
     if (S.ui.rateOpen === c.id && el.dataset.id === c.id && el.contains(document.activeElement) && document.activeElement.matches('.ratebox input')) return;   // 0.9.4: typing a rating comment
     if (el.dataset.id !== c.id) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
     el.hidden = false; el.dataset.id = c.id;
     el.classList.toggle('finish', c.kind === 'finish');
     // 2026-11-05 (owner): a long phrase gets a smaller font so the card does not fill the window.
-    const len = String(c.say || '').length + String(c.why || '').length / 2;
+    // Theme pass stage 3 (2026-11-19): key / detail / phrase / source. Cards built here (finish, Done?) keep say.
+    const kl = c.key != null && !c.commit && c.kind !== 'finish';
+    const keyText = kl ? c.key : c.say, line = kl ? c.line : '', qText = c.commit ? t.doneQ : kl ? c.qline : c.question;
+    const editKey = !kl || c.sayIsKey !== false;
+    const len = String(keyText || '').length + String(c.why || '').length / 2;
     el.classList.toggle('long', len > 130 && len <= 210);
     el.classList.toggle('xlong', len > 210);
     const meta = [c.meta || (c.who ? t.asked(c.who) : ''), rel(c.at)].filter(Boolean).join(' · ');
@@ -681,12 +686,13 @@
     const ptsEl = el.querySelector('.items.pts'), ptsTop = ptsEl && ptsEl.dataset.card === c.id ? ptsEl.scrollTop : 0;
     el.innerHTML = `
       <div class="head"><span class="kind k-${c.kind === 'finish' ? 'onme' : c.kind}">${esc(kindLabel(c))}</span>${c.kind === 'finish' ? '' : `<span class="meta"${c.unverified ? ` title="${esc(t.unverified)}"` : ''}>${esc(meta)}</span>`}${S.ui.heroOverride === c.id ? `<button class="ghost backauto" type="button" data-act="hero-auto" title="Esc">${esc(t.backAuto)}</button>` : ''}</div>
-      ${(c.commit ? t.doneQ : c.question) ? `<div class="q">${esc(c.commit ? t.doneQ : c.question)}</div>` : ''}
+      ${qText ? `<div class="q">${esc(qText)}</div>` : ''}
       ${c.kind === 'finish' && (c.finishItems || []).length ? `<ul class="items fin">${c.finishItems.map((x) => `<li>${esc(x)}</li>`).join('')}${c.finishMore ? `<li class="more"><button class="ghost" type="button" data-act="agenda-toggle">${esc(c.finishMore)}</button></li>` : ''}</ul>` : ''}
+      ${keyText ? `<div class="say key"${editKey ? ` data-edit="1"${editing ? ' contenteditable="true" spellcheck="false"' : ''}` : ''}>${esc(keyText)}</div>` : ''}
       ${c.why && !c.commit ? `<div class="why">${esc(c.why)}</div>` : ''}
-      ${c.say ? `<div class="say"${editing ? ' contenteditable="true" spellcheck="false"' : ''}>${esc(c.say)}</div>` : ''}
+      ${line ? `<div class="phrase"${!editKey ? ` data-edit="1"${editing ? ' contenteditable="true" spellcheck="false"' : ''}` : ''}>${esc(line)}</div>` : ''}
       ${(c.items || []).length && c.kind !== 'finish' && !S.ui.heroMin[c.id] ? itemsHtml(c) : ''}
-      ${c.source ? `<div class="src">${ICON.doc}<span>${esc(c.source)}</span></div>` : ''}
+      ${c.source ? `<div class="src">${ICON.doc}<span>${esc(t.from)} <b>${esc(c.source)}</b></span></div>` : ''}
       ${c.commit ? `<div class="acts">${c.state === 'done' ? `<span class="meta">${esc(t.closed)}</span>` : `<button class="btn1" type="button" data-act="commit-done" data-id="${esc(c.id)}">${esc(t.markDone)}</button>`}
         <button class="ghost" type="button" data-act="hide" data-id="${esc(c.id)}">${esc(t.hide)}</button></div>` : c.kind === 'finish' ? '' : editing ? `<div class="acts">
         <button class="btn1" type="button" data-act="edit-save" data-id="${esc(c.id)}">${esc(t.save)}</button>
@@ -700,7 +706,7 @@
         ${rateHtml(c)}
       </div>${rateBoxHtml(c)}`}`;
     if (ptsTop) { const p = el.querySelector('.items.pts'); if (p) p.scrollTop = ptsTop; }
-    if (editing) { const s = el.querySelector('.say'); if (s) { s.focus(); document.getSelection().selectAllChildren(s); } }
+    if (editing) { const s = el.querySelector('[data-edit]'); if (s) { s.focus(); document.getSelection().selectAllChildren(s); } }
   }
 
   function renderEarlier(list) {
@@ -1470,7 +1476,7 @@
       case 'edit': S.ui.editing = id; break;
       case 'edit-cancel': S.ui.editing = null; break;
       case 'edit-save': {
-        const el = $('hero').querySelector('.say');
+        const el = $('hero').querySelector('[data-edit]');
         const v = el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
         S.ui.editing = null;
         if (card && v && v !== card.say) {
@@ -1478,7 +1484,7 @@
           post('edit', { id, card: card.card || '', kind: raw.kind || 'tip', t: card.t || '',
                          before: { gist: raw.gist || '', phrase: raw.phrase || '', items: raw.items || [] },
                          after: { gist: raw.gist || '', phrase: v, items: raw.items || [] } });
-          card.say = v; if (feed) feed.edit(id, v);
+          card.say = v; if (card.sayIsKey === false) card.line = v; else if (card.key != null) card.key = v; if (feed) feed.edit(id, v);
         }
         break;
       }
@@ -1503,6 +1509,7 @@
       case 'sheetq': if (feed && feed.toggleQuestion) feed.toggleQuestion(id); break;   // 0.10.0: the PM ticks a sheet question
       case 'theirs-toggle': S.ui.theirsOpen = !(b.getAttribute('aria-expanded') === 'true'); break;
       case 'home': post('menu', { item: 'home' }); return;
+      case 'end-call': post('menu', { item: 'end-call' }); return;
       case 'project-change': post('menu', { item: 'project' }); return;   // 0.10.1 (A3)
       case 'hero-min': S.ui.heroMin[id] = !S.ui.heroMin[id]; break;   // 2026-11-02: the speech card folds to its first line
       case 'agenda': {

@@ -294,7 +294,7 @@ The PM may remember nothing about the call. Three kinds of cards, on top of the 
 - **Topic primer.** When the talk moves to a new topic and stays there, one info card "📌 {topic}: where it stands by
   the sources" with up to 3 short lines (status, numbers, owners, what was agreed, what is open) and one thing to say
   or ask. Always 📌. Skip when the sources hold nothing on the topic beyond what was said aloud. At most one a minute.
-- **Language and names (2026-11-14).** Gist, why and lines are in the tips window language (a Ukrainian window gets
+- **Language and names (2026-11-14).** Gist, detail and lines are in the tips window language (a Ukrainian window gets
   Ukrainian topic cards); the phrase is in the call language. Write every name exactly as the transcript or the
   participants list spells it: never shortened, translated, or replaced by a name from the examples.
 - These three are not held by the 45 s rate of the tip diet below, but count toward the 10-minute caps.
@@ -451,7 +451,7 @@ Generated from `rules/decisions.yaml`; do not edit here.
 - **The call's language.** Phrase and fact lines in the language spoken on this call, never an
   English template on a Ukrainian call.
 
-- **Short, but human.** One gist sentence, one short `why`, then at most ONE phrase or ONE fact line. Longer only: the speech,
+- **Short, but human.** One gist sentence, one short `detail`, then at most ONE phrase or ONE fact line. Longer only: the speech,
   "Your turn", the agenda, `catch me up`, `@@SOS`. One tip per topic; never repeat a tip in
   `tips_given` unless the situation changed; never what a card or the fact book already showed.
 - **Live topic, not the plan.** Before a tip, check its topic against the last ~60 s. When the
@@ -481,7 +481,10 @@ Generated from `rules/decisions.yaml`; do not edit here.
 
 ### Tip format (a small window under the camera, read at a glance)
 
-One JSON line per item: `{"t":"HH:MM:SS","src":"<HH:MM:SS of the trigger line>","kind":"tip","level":"red|orange|info","gist":"🔴 ...","why":"...","phrase":"...","items":["..."],"note":"<source, date>"}`.
+One JSON line per item: `{"t":"HH:MM:SS","src":"<HH:MM:SS of the trigger line>","kind":"tip","level":"red|orange|info","gist":"🔴 ...","detail":"...","phrase":"...","items":["..."],"source":"<document · date>"}`.
+Both windows read a tip as **key / detail / source** (Pacenote 0.25, theme pass): the gist is the key line, the
+strongest text on the card; the detail is the quieter line under it; the phrase follows in quotes; the source sits
+at the bottom ("from Release plan · Nov 14"). Older items with `why` and `note` still show.
 `src` is required on every tip and answer (the window shows the delay). Kinds: `tip`, `answer`
 (add `"q"`), `fact`, `speech`, `checklist`, `agenda`, `status`, `wrapup`, `ack`, `info`.
 **How a tip sounds** (2026-11-05, owner: tips read like telegrams and had to be re-read): a
@@ -495,15 +498,16 @@ the phrase.
    language). When the window language (`@@SET ui_lang`) differs, the window offers a switch and the
    PM's choice arrives as `@@SET tips_lang` (`uk` or `en`), echoed in status as `tips_lang`; it wins
    until the call ends. Notes follow the same language.
-2. **Why** (`why`): 1-2 plain sentences, max 35 words, in the tips language: what exactly is
+2. **Detail** (`detail`, before 0.25 `why`): 1-2 plain sentences, max 35 words, in the tips language: what exactly is
    asked or claimed, what the brief or the fact book says, what to avoid (a trap, a promise the
    PM does not own). Empty when the gist already says it all.
 3. **Phrase**: what the PM can say, in `answer_lang` (the language the PM is
    expected to speak now; switches when someone asks the PM to say it in another language,
    details in `window.md`). 1-3 natural spoken sentences: the answer first, then one reason or
    next step. English: simple everyday words, active voice, no idioms, max 40 words. Russian is never used.
-4. **Facts**: max 3 lines of max 16 words, full sentences with numbers. **Source**: one short `note`
-   (`ліміти, 14.10`).
+4. **Facts**: max 3 lines of max 16 words, full sentences with numbers. **Source** (`source`, before 0.25
+   `note`): the document or call the tip comes from and its date, short (`Release plan · Nov 14`, `ліміти · 14.10`);
+   omit it when the tip comes only from what was said on this call.
 Max ~70 characters per line, max 9 lines; no tables, headings, links, abbreviations or ticket
 keys (name the topic). Examples:
 

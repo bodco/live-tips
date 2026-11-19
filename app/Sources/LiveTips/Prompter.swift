@@ -1125,6 +1125,7 @@ extension PrompterController {
         case "menu":
             switch d["item"] as? String ?? "" {
             case "clear-speakers": sendSetting("speakers_clear", true)
+            case "end-call": endCallClicked()   // theme pass stage 3: End call in the window's header
             case "open-sheet":
                 // 0.10.0 (owner, 11.12): the Meeting Sheet of the running call in its own window, the call goes on
                 MainActor.assumeIsolated {

@@ -37,10 +37,10 @@ Context discipline (most common failures, check every time):
 - Numbers, names and dates come only from the brief, the fact book, the cards or the transcript. Never a number you did not see there.
 - "tips_given" lists what the PM already saw, with the numbers shown: a tip that repeats a number or a gist from it is noise, even in other words.
 
-Tip diet: one gist sentence, one short why, then one phrase or up to {fact_lines} fact lines of max {fact_words} words. One tip per topic, never repeat a tip already given. The topic must be what is discussed in the last {live_topic}s.
+Tip diet: one gist sentence (the key line), one short detail, then one phrase or up to {fact_lines} fact lines of max {fact_words} words. One tip per topic, never repeat a tip already given. The topic must be what is discussed in the last {live_topic}s.
 How a tip sounds (2026-11-05, owner: tips read like telegrams and had to be re-read): write as a colleague who whispers to the PM, in full plain sentences with verbs, never a label or a noun pile. The PM must understand the situation in one read and be able to build his own answer from the tip, even without the phrase.
 - gist: who does what and what it means for the PM ("Mike asks who signs off security", "Emily thinks the pilot starts Monday, it is the 10th"), never a topic title ("Security sign-off owner").
-- why: what the PM needs to know to answer: what exactly is asked or claimed, what the brief or the facts say, and what to watch for (a trap, a commitment to avoid). Plain words, no abbreviations.
+- detail: the quieter line under the gist, what the PM needs to know to answer: what exactly is asked or claimed, what the brief or the facts say, and what to watch for (a trap, a commitment to avoid). Plain words, no abbreviations.
 - phrase: what the PM can say, as people talk: a short answer first, then one sentence of reason or next step.
 
 Output formats are given in the task at the end of each request.
@@ -68,7 +68,7 @@ When someone needs something from the PM (a question, a request, a "what did you
 Before writing, decide what is NEW: a fact, number, owner, date or sentence that nobody has said aloud yet and that is not in tips_given. If nothing is new, or the PM already answered the question, skip. Skip is the normal outcome; a shown tip is the exception.
 Facts marked unverified, "(verify)", "to confirm" or similar are never stated as facts: at most "перевірити: ..." in items.
 Tip format (JSON, keys in this order, gist first):
-{{"gist": "<emoji + one plain sentence: who says or asks what and what it means for the PM, max {gist_words} words, in the tips language>", "level": "red|orange|info", "topic": "<2-5 words>", "new": "<what in this tip was not said aloud yet, max 8 words>", "why": "<1-2 plain sentences in the tips language: the context the PM needs to answer (what exactly is asked, what the brief or facts say, what to avoid), max {why_words} words; empty when the gist says it all>", "phrase": "<what the PM can say now, in the answer language, 1-3 natural spoken sentences: the answer first, then a reason or next step; English: simple words, max {phrase_words} words>", "items": ["<fact with number>"], "note": "<source, date>", "trigger": "<trigger id>", "fact_ids": ["<ids from the fact book used>"]}}
+{{"gist": "<emoji + one plain sentence: who says or asks what and what it means for the PM, max {gist_words} words, in the tips language>", "level": "red|orange|info", "topic": "<2-5 words>", "new": "<what in this tip was not said aloud yet, max 8 words>", "detail": "<1-2 plain sentences in the tips language: the context the PM needs to answer (what exactly is asked, what the brief or facts say, what to avoid), max {detail_words} words; empty when the gist says it all>", "phrase": "<what the PM can say now, in the answer language, 1-3 natural spoken sentences: the answer first, then a reason or next step; English: simple words, max {phrase_words} words>", "items": ["<fact with number>"], "source": "<the document or call it comes from and its date, short, like 'Release plan · Nov 14'; empty when it comes only from what was said on this call>", "trigger": "<trigger id>", "fact_ids": ["<ids from the fact book used>"]}}
 Emoji: red = 🔴 (direct question: 🎯), orange = 🟠, info = 🟢.
 Tips language: {tips_lang}. Answer language (phrase and items): the language the PM is expected to speak right now; on a call in one language only ({langs}) always that language, never English templates.
 Return JSON only, gist first."""
@@ -225,7 +225,7 @@ class PromptBuilder:
         self.rules = rules
         lim = rules.diet["limits"]
         self.fmt = {"tips_lang": call_meta.get("tips_lang", "uk"), "gist_words": lim["gist_words_max"],
-                    "phrase_words": lim["phrase_words_max_en"], "why_words": lim.get("why_words_max", 35), "langs": "+".join(call_meta.get("langs", [])) or "uk"}
+                    "phrase_words": lim["phrase_words_max_en"], "detail_words": lim.get("detail_words_max", lim.get("why_words_max", 35)), "langs": "+".join(call_meta.get("langs", [])) or "uk"}
         self.meta = dict(call_meta)
         self._brief = _read(brief_path, 40000) or "(no brief)"
         self._brief_path = brief_path
@@ -239,6 +239,32 @@ class PromptBuilder:
     def corpus(self) -> str:
         """Brief, facts and cards text, for the engine's number validation."""
         return (self._brief or "") + " " + (self.blocks[2]["text"] if len(self.blocks) > 2 else "")
+
+    def fact_sources(self, ids: List[str]) -> str:
+        """Theme pass stage 3 (2026-11-19): the sources of the facts and cards a tip used, for its source line
+        ("Release plan · Nov 14; Status report · Nov 14"), at most two, in the order of the ids."""
+        fp, cp = self._facts
+        key = files_key(fp, cp)
+        if getattr(self, "_src_key", None) != key or not hasattr(self, "_src_map"):
+            m = {}
+            for p, kind in ((fp, "fact"), (cp, "card")):
+                data = _json_file(p)
+                if data is None:
+                    continue
+                items = data if isinstance(data, list) else data.get(kind + "s", data.get("items", []))
+                for it in items if isinstance(items, list) else []:
+                    if isinstance(it, dict) and it.get("id") is not None:
+                        src = str(it.get("source") or it.get("note") or "").strip()
+                        if src:
+                            m.setdefault(str(it["id"]), src)
+                            m.setdefault(kind + ":" + str(it["id"]), src)
+            self._src_map, self._src_key = m, key
+        out = []
+        for i in ids:
+            src = self._src_map.get(str(i).strip())
+            if src and src not in out:
+                out.append(src)
+        return "; ".join(out[:2])
 
     def refresh_facts(self) -> bool:
         """The prep can land after the start (lt prep-check adopts it): reload the fact book and the

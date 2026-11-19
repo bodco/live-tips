@@ -231,3 +231,9 @@ items:
     title_uk: "Одна шапка у вікні підказок"
     body_en: "The timer, On me, the tools and End call sit in one header across the whole window, and Who said this? on an unknown voice offers names right away."
     body_uk: "Таймер, On me, інструменти і End call тепер в одній шапці на всю ширину вікна, а Who said this? на невідомому голосі одразу пропонує імена."
+  - id: meeting_recap
+    version: 0.26.1
+    title_en: "What happened on the call"
+    title_uk: "Що було на дзвінку"
+    body_en: "The Summary of a past call starts with a short numbered list of what happened, told the way you would retell it to a colleague who missed the call."
+    body_uk: "Summary минулого дзвінка починається з короткого пронумерованого списку того, що було, так, як ви б переказали це колезі, що пропустив дзвінок."

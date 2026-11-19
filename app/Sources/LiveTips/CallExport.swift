@@ -44,7 +44,7 @@ enum CallNotes {
     static var meetingLabels: MeetingNotes.Labels {
         MeetingNotes.Labels(title: "", tldr: L("page.mn.tldr"), decisions: L("page.tab.decisions"), actions: L("page.mn.actions"),
                             open: L("page.mn.open"), topics: L("page.mn.topics"), unclear: L("page.mn.unclear"))
-            .withRisks(L("page.tab.risks"))
+            .withRisks(L("page.tab.risks")).withRecap(L("page.mn.recap"))
     }
 
     /// The Meeting notes as Markdown for Copy: the call's name, when and project, then the sections.

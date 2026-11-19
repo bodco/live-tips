@@ -28,7 +28,9 @@ meeting_notes: |
   overloaded"). One more request after the full notes (callnotes.MEETING_SYS, the full notes and the transcript with
   times) writes the "## Meeting notes" section at the top of the notes, before "## Summary"; written again, it is
   replaced, never added twice. Fixed English headings (the app reads them), the text in the call's language:
-  ### TL;DR (2-3 sentences), ### Decisions ("**Who decided**: the decision", the name only when it is clear), ### Action items ("**Owner**: what (due: when)"), ### Open questions,
+  ### TL;DR (2-3 sentences), ### Recap (0.26.1, owner: "what happened on the call?": 3-6 numbered points told as
+  the PM would retell the call to a teammate, "1. **Title.** 2-4 sentences", no times, an optional closing line without
+  a number), ### Decisions ("**Who decided**: the decision", the name only when it is clear), ### Action items ("**Owner**: what (due: when)"), ### Open questions,
   ### Risks (schema 3, 0.12.2: conditional threats as in rules/risks.yaml > model_rule, at most 5), ### Topics (4-8, "#### Title [HH:MM:SS]", "Outcome: one line", 2-4 points), ### Unclear (doubtful names or facts,
   never "heard" in the text). Every item starts with its transcript time "[HH:MM:SS]"; on the call page a time opens
   the transcript there. Readers: the app (MeetingNotes.parse, the Summary tab, Copy, Export) and the Notion meeting

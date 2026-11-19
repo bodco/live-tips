@@ -84,14 +84,20 @@ Rules:
   at most 5 risks, 2-4 points per topic, one line each. A detail that does not change what a reader does or knows stays in the full notes.
 - Never write "heard", "unclear", "(heard ...)" or "inaudible" inside the notes. Speech recognition garbles names: write
   the real name (use the names below and the full notes); what stays doubtful goes once into ### Unclear at the end.
-- Every item starts with the time of the transcript line where it was said, copied as [HH:MM:SS].
+- Every item starts with the time of the transcript line where it was said, copied as [HH:MM:SS] (not in ### Recap).
 - Use EXACTLY these headings in English (the app reads them), the text under them in {LANG}. Leave out a heading
-  that has nothing under it, except TL;DR and Topics.
+  that has nothing under it, except TL;DR, Recap and Topics.
 {NAMES}
 Format:
 ## Meeting notes
 ### TL;DR
 2-3 sentences: what the call was about and what came out of it.
+### Recap
+3-6 numbered points that answer a colleague who missed the call and asks "what happened on the call?". Tell it the
+way the PM would retell it to a teammate: plain spoken words, from the PM's side ("I asked", "they said" is fine), in
+the order of the call. Each point: "1. **Short title.** 2-4 sentences: what was said or asked, what came of it, the
+numbers and names that matter, and who now waits for what from whom." No times here. You may end with one line
+without a number on where things stand overall (for example: no blockers, moving on).
 ### Decisions
 - [HH:MM:SS] **Who decided**: the decision (the person who made or confirmed it, several names joined with ", "; when
   nobody is clear, write the decision alone, without a name)
@@ -155,8 +161,8 @@ def _item(s: str) -> dict:
 def parse_meeting(notes: str) -> dict:
     """The section as data: tldr, decisions, actions, open, risks (schema 3), topics [{title, t, outcome, points}],
     unclear. The same reading as the app's MeetingNotes.parse (LiveTipsCore)."""
-    out = {"tldr": "", "decisions": [], "actions": [], "open": [], "risks": [], "topics": [], "unclear": []}
-    keys = {"tl;dr": "tldr", "decisions": "decisions", "action items": "actions", "open questions": "open",
+    out = {"tldr": "", "recap": [], "recap_note": "", "decisions": [], "actions": [], "open": [], "risks": [], "topics": [], "unclear": []}
+    keys = {"tl;dr": "tldr", "recap": "recap", "decisions": "decisions", "action items": "actions", "open questions": "open",
             "risks": "risks", "ризики": "risks", "topics": "topics", "unclear": "unclear"}
     cur = None
     for raw in meeting_text(notes).split("\n")[1:]:
@@ -176,6 +182,12 @@ def parse_meeting(notes: str) -> dict:
         bullet = body != l
         if cur == "tldr":
             out["tldr"] = (out["tldr"] + " " + body).strip()
+        elif cur == "recap":   # 0.26.1: numbered points; a line without a number is the closing note
+            n = re.match(r"^\d{1,2}[.)]\s+", body)
+            if n or bullet:
+                out["recap"].append(body[n.end():].strip() if n else body)
+            else:
+                out["recap_note"] = (out["recap_note"] + " " + body).strip()
         elif cur == "topics" and out["topics"]:
             tp = out["topics"][-1]
             m = re.match(r"^(?:\*\*)?(?:Outcome|Підсумок|Результат)(?:\*\*)?:\s*(?:\*\*)?\s*", body, re.I)

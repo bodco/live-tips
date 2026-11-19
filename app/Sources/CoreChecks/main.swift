@@ -4447,7 +4447,31 @@ func notionINT3() {
     expect(NotionMirrorPacenote.mode(mg) == "pacenote" && NotionMirrorPacenote.mode(["work_root": "/w"]) == "control_tower", "int3: mode")
 }
 
+func meetingRecap0261() {
+    let notes = """
+    ## Meeting notes
+    ### TL;DR
+    The export is merged.
+    ### Recap
+    1. **Prod.** I wanted to show it, but they had tested it already.
+    2) **Priority.** Transactions first; affinity groups wait.
+    - **Table.** A separate one.
+    Overall no blockers.
+    ### Decisions
+    - [10:04:10] Export goes to production on Tuesday.
+    """
+    guard let m = MeetingNotes.parse(notes) else { expect(false, "0.26.1: recap section read"); return }
+    expect(m.recap == ["**Prod.** I wanted to show it, but they had tested it already.", "**Priority.** Transactions first; affinity groups wait.", "**Table.** A separate one."], "0.26.1: recap points \(m.recap)")
+    expect(m.recapNote == "Overall no blockers." && m.decisions.count == 1 && m.tldr == "The export is merged.", "0.26.1: recap note, the rest unchanged")
+    let lab = MeetingNotes.Labels(title: "", tldr: "Summary", decisions: "Decisions", actions: "A", open: "O", topics: "T", unclear: "U")
+    let md = MeetingNotes.markdown(m, lab.withRecap("What happened"))
+    expect(md.contains("## What happened\n\n1. **Prod.**") && md.contains("3. **Table.**") && md.contains("Overall no blockers."), "0.26.1: recap in Markdown")
+    expect(md.range(of: "## Summary")!.lowerBound < md.range(of: "## What happened")!.lowerBound, "0.26.1: recap after the summary")
+    expect(!MeetingNotes.markdown(m, lab).contains("What happened"), "0.26.1: no recap without its label")
+}
+
 notionOAuthINT2()
 notionINT3()
+meetingRecap0261()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

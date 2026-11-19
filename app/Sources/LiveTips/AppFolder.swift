@@ -38,25 +38,23 @@ enum AppFolderMover {
     /// Runs the move with the local engine stopped, then tells the PM what happened.
     static func relocate(from old: String, to new: String) {
         if CallEngine.shared.isRunning {
-            alert(L("af.notMoved"), L("af.callRunning"))
+            say(L("af.notMoved"), L("af.callRunning"), level: .error)
             return
         }
         LocalAIService.shared.stop()
         let r = move(from: old, to: new)
         LocalAIService.shared.apply()
-        if let e = r.error { alert(L("af.notMoved"), e); return }
+        if let e = r.error { say(L("af.notMoved"), e, level: .error); return }
         if r.moved.isEmpty && r.skipped.isEmpty { return }
         var text = L("af.movedTo", ["path": new]) + (r.moved.isEmpty ? L("af.nothing") : r.moved.joined(separator: ", ")) + "."
         if !r.skipped.isEmpty {
             text += "\n\n" + L("af.leftIn", ["path": old]) + r.skipped.joined(separator: ", ") + "."
         }
-        alert(L("af.moved"), text)
+        say(L("af.moved"), text, level: r.skipped.isEmpty ? .info : .warning, folder: new)
     }
 
-    static func alert(_ title: String, _ text: String) {
-        let a = NSAlert()
-        a.messageText = title
-        a.informativeText = text
-        a.runModal()
+    /// 0.26.0 (block 3): a notice in the app (Settings is open), not an alert; Show in Finder for the new folder.
+    static func say(_ title: String, _ text: String, level: NoticeLevel, folder: String? = nil) {
+        NoticeCenter.post(title + ". " + text, level: level, action: folder.map { .finder($0) })
     }
 }

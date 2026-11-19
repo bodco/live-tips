@@ -118,7 +118,8 @@ public enum SettingsSearch {
         .init("int.notion.local", "integrations", adv("notion"), integration: "notion", title: "set.localCopyOfNotion", words: "notion mirror local copy sync копія дзеркало"),
         .init("int.calendars", "integrations", integration: "calendars", title: "settings.tab.calendars", words: "calendar events календар"),
         .init("int.google", "integrations", integration: "google", title: "search.google", words: "google drive docs account гугл диск"),
-        .init("int.hubspot.key", "integrations", h("conn").merging(adv("integrations")) { a, _ in a }, integration: "hubspot", title: "search.hubspotKey", words: "hubspot crm key connect ключ"),
+        // 0.26.0 (INT6): HubSpot is on the list's first level, not under Advanced
+        .init("int.hubspot.key", "integrations", h("conn"), integration: "hubspot", title: "search.hubspotKey", words: "hubspot crm key connect ключ"),
         .init("int.hubspot.match", "integrations", h("match"), integration: "hubspot", title: "int.hubspot.matching", words: "hubspot owner company domain власник"),
         .init("int.hubspot.write", "integrations", h("data"), integration: "hubspot", title: "int.hubspot.canWrite", words: "hubspot write note deal task запис"),
         .init("int.hubspot.qual", "integrations", h("qual"), integration: "hubspot", title: "int.hubspot.qualification", words: "hubspot bant qualification кваліфікація"),

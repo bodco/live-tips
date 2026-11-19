@@ -99,6 +99,8 @@ struct MenuBarPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header.padding(.bottom, 10)
+            AskPanelSection(relayout: { model.app?.panel?.place() })         // 0.26.0 (block 2): End call? asked here
+            NoticePanelSection(relayout: { model.app?.panel?.place() })      // 0.26.0: the app's notices wait here
             if model.micMissing { micBanner.padding(.bottom, 10) }
             if model.isLive { liveCard } else { nextCard }
             let rows = model.isLive ? ([model.next].compactMap { $0 } + model.later) : model.later
@@ -114,7 +116,7 @@ struct MenuBarPanel: View {
                         row(L("menubar.pause"), model.pauseKey, icon: "pause") { $0.togglePause() }
                         // 0.10.1 (A4): Prepare again = Get ready, the Meeting Sheet in live mode
                         row(L("talk.prepareAgain") + "…", "", icon: "arrow.clockwise") { _ in
-                            MainActor.assumeIsolated { if let e = LivePrep.openSheet() { CallEngine.shared.notify(e) } }
+                            MainActor.assumeIsolated { if let e = LivePrep.openSheet() { CallEngine.shared.notify(e, level: .error) } }
                         }
                     }
                     row(L("menubar.planCall"), "⌘N", icon: "plus") { $0.startCall() }.keyboardShortcut("n")
@@ -284,8 +286,8 @@ struct MenuBarPanel: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(recording.state == "choosing" || !model.isRecording && !recOn)
-                // End call asks for confirmation first (AppDelegate.endCall / the tips window).
-                wide(L("menubar.endCall"), danger: true) { model.run { $0.endCall() } }
+                // End call asks first, here in the panel (0.26.0: inline, no alert).
+                wide(L("menubar.endCall"), danger: true) { model.app?.askEndCall(from: .panel) }
             }
             .padding(.top, 8)
         }
@@ -384,7 +386,7 @@ struct MenuBarPanel: View {
     private func start(_ c: MenuBarModel.Call) {
         model.run { app in
             let m = c.ahead.setup()
-            if let e = app.launch(m) { CallEngine.shared.notify(e) }
+            if let e = app.launch(m) { CallEngine.shared.notify(e, level: .error) }
         }
     }
 
@@ -451,6 +453,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         AnalyticsTracker.shared.screen("menu_bar_panel")      // 0.19.0 (S4)
         model.showDev = NSEvent.modifierFlags.contains(.option)
         let p = panel ?? make()
+        NoticeCenter.shared.panelOpened()      // 0.26.0: the notices in the panel have been seen, the icon's dot goes
         place(p)
         p.makeKeyAndOrderFront(nil)
         monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -462,6 +465,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         guard let p = panel, p.isVisible else { return }
         p.orderOut(nil)
         closedAt = Date()
+        AskCenter.shared.panelClosed()        // 0.26.0: a question asked in the panel goes with it (as Cancel)
         if let m = monitor { NSEvent.removeMonitor(m); monitor = nil }
     }
 

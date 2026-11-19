@@ -4029,20 +4029,24 @@ class SpeakerTracker:
         """2026-10-27 (owner): the people to pick from on this call, with their side: this call's participants
         and the project's people (start.json), then the voice library visible on this project; no duplicates."""
         out, seen = [], set()
+        invited = {p.casefold() for p in (self.participants or [])}
 
-        def add(name, side):
+        # 0.26.0 (owner 19.11): `src` says why a name is offered (call, invited, project, library), so the window can
+        # offer the roster on "Who said this?" for a line even before any "Who is speaking?" ask came.
+        def add(name, side, src):
             k = short_name(name).casefold() if name else ""
             if k and k not in seen:
                 seen.add(k)
-                out.append({"name": name, "side": side or None})
+                out.append({"name": name, "side": side or None, "src": src})
         for c in self.clusters.values():
             if c["name"]:
-                add(c["name"], c.get("side") or (self.lib.side(c["name"]) if self.lib is not None else "") or self._roster_side(c["name"]))
+                add(c["name"], c.get("side") or (self.lib.side(c["name"]) if self.lib is not None else "") or self._roster_side(c["name"]), "call")
         for x in list(self.participants or []) + list(self.people or []):
-            add(x, (self.lib.side(x) if self.lib is not None and x in self.lib.people else "") or self._roster_side(x))
+            add(x, (self.lib.side(x) if self.lib is not None and x in self.lib.people else "") or self._roster_side(x),
+                "invited" if x.casefold() in invited else "project")
         if self.lib is not None:
             for name in self.lib.frequent(40):
-                add(name, self.lib.side(name))
+                add(name, self.lib.side(name), "library")
         return out[:60]
 
     def known_names(self, n: int = 8) -> list[str]:
@@ -4790,6 +4794,20 @@ def auto_prompt(cfg: dict) -> None:
     cfg["prompt"] = cfg["prompt_uk"] if main == "uk" else cfg["prompt_en"] if main == "en" else ""
 
 
+def standby_begin(cfg: dict, control: Path, since: float | None = None) -> dict:
+    """0.26.0 (C): the standby state of a new call. A Start (control/go) left from a previous call must not count;
+    one written after this, while the model loads, is this call's Start and goes live once recording begins.
+    `since` (review 4): when this call's request was written (control/start.json, now active.json). A Start written
+    at or after it belongs to this call, even if the PM pressed it before the recorder came up, and is kept."""
+    go = control / "go"
+    try:
+        if since is None or go.stat().st_mtime < since:
+            go.unlink()
+    except OSError:
+        pass
+    return {"on": bool(cfg.get("standby")), "heard": [], "buf": []}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--from-control", action="store_true")
@@ -4855,8 +4873,15 @@ def main() -> int:
     mute_file = CONTROL / "mic_muted"     # created / removed by the mute button in the tips window
     if mute_file.exists():
         mute_file.unlink()                # every call starts unmuted
+    # 0.26.0 (C): standby is known and a stale Start is gone before the model loads (a cold start takes a while),
+    # so a Start pressed while the model loads is kept and the window shows Ready, not Recording.
+    try:
+        req_at = (CONTROL / "active.json").stat().st_mtime if args.from_control else None
+    except OSError:
+        req_at = None
+    standby = standby_begin(cfg, CONTROL, since=req_at)
 
-    status = {"state": "loading_model", "pid": os.getpid(), "file": str(out), "title": title,
+    status = {"state": "loading_model", "standby": standby["on"], "pid": os.getpid(), "file": str(out), "title": title,
               "slug": cfg.get("slug"), "started_at": dt.datetime.fromtimestamp(started).astimezone().isoformat(timespec="seconds"),
               "timezone": mac_timezone(),
               "langs": cfg["langs"], "me_lang": cfg["me_lang"], "me_langs": cfg["me_langs"],
@@ -5152,11 +5177,7 @@ def main() -> int:
 
     # Standby (2026-10-22): the window opens before the call; nothing is transcribed or written until
     # the PM presses Start (window button, control/go) or the other side speaks for standby_auto_s.
-    standby = {"on": bool(cfg.get("standby")), "heard": [], "buf": []}
-    try:
-        (CONTROL / "go").unlink()        # a Start from a previous call must not count
-    except OSError:
-        pass
+    # (standby_begin ran before the model loaded: control/go written since then is this call's Start.)
 
     def go_live(why: str) -> None:
         if not standby["on"]:

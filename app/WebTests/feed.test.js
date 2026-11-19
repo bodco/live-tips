@@ -134,6 +134,26 @@ test('status: standby is ready, recording is live, problems become one alert', (
   assert.strictEqual(get().call.title, 'New name');
 });
 
+test('0.26.0 (C): a cold standby start is Ready with "Getting ready", Start pressed then is Starting', () => {
+  const { f, get } = make();
+  f.setStatus({ state: 'loading_model', standby: true, started_at: '2026-10-28T10:00:00+02:00' });
+  assert.strictEqual(get().call.state, 'ready');
+  assert.strictEqual(get().call.alert.text, 'gettingReady');
+  f.starting = NOW; f.emit();                       // Start pressed while the model loads
+  assert.strictEqual(get().call.state, 'live');
+  assert.strictEqual(get().call.alert.text, 'Starting');
+  f.setStatus({ state: 'recording' });
+  assert.strictEqual(f.starting, 0);
+  assert.strictEqual(get().call.alert, null);
+  const b = make();                                  // not a standby call: loading is Starting, as before
+  b.f.setStatus({ state: 'loading_model', standby: false });
+  assert.strictEqual(b.get().call.state, 'live');
+  assert.strictEqual(b.get().call.alert.text, 'Starting');
+  const c = make();                                  // an older recorder without the standby field
+  c.f.setStatus({ state: 'loading_model' });
+  assert.strictEqual(c.get().call.state, 'live');
+});
+
 test('transcript: channels, clusters and unknown voices', () => {
   const { f, get } = make();
   f.addTranscript(['- Channels: Me = microphone, Other = system audio', '[10:31:02] Emily C. [S1] (en): When is the export live?',
@@ -293,6 +313,13 @@ test('speakers: the voice library suggestions of a speaker_ask are kept for one-
   assert.deepStrictEqual(st.speakers.S4.suggestions, [{ name: 'Anton S.', score: 0.85 }]);
   assert.strictEqual(st.rosterSide['Anton S.'], 'team');
   assert.deepStrictEqual(st.knownNames, ['Anton S.', 'Olena S.']);
+});
+
+test('0.26: the roster reaches the window with why each name is there, before any speaker_ask', () => {
+  const { f, get } = make();
+  f.setSpeakers({ clusters: { S2: { name: null, seconds: 8 } }, roster: [{ name: 'Mike R.', side: 'team', src: 'invited' }, { name: 'Emily C.', src: 'library' }, { name: 'Old' }] });
+  assert.deepStrictEqual(get().roster, [{ name: 'Mike R.', src: 'invited' }, { name: 'Emily C.', src: 'library' }, { name: 'Old', src: 'library' }]);
+  assert.deepStrictEqual(get().knownNames, []);
 });
 
 test('brief: numbered points, paragraphs, wrapped lines and tables are kept (each point keeps its sentences)', () => {

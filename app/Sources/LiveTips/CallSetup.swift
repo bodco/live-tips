@@ -1009,7 +1009,7 @@ final class StartCallWindow {
             window?.close()
             SheetPrepWindow.show(model)
         })
-        let host = NSHostingController(rootView: Localized { view })
+        let host = NSHostingController(rootView: Localized { view.askBar() })   // 0.26.0: End and start asked inline
         let w = window ?? NSWindow(contentViewController: host)
         w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
         w.contentViewController = host
@@ -1018,6 +1018,7 @@ final class StartCallWindow {
         w.title = mode == .prepare ? L("call.title.prepare") : mode == .plan ? L("call.title.plan") : L("call.title.start")
         w.isReleasedWhenClosed = false
         window = w
+        AskCenter.watch(w)      // 0.26.0 (review 1)
         w.center()
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

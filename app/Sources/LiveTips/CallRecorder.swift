@@ -267,13 +267,13 @@ final class CallRecorder: NSObject, ObservableObject {
             if s.windowPick == "auto", let w = RecTargets.meetingWindow(in: list) {
                 self.setState("off"); self.open(.window(w.id), label: w.label); return
             }
-            if s.windowPick == "auto" { self.note(L("rec.noCallWindow")) }
+            if s.windowPick == "auto" { self.note(L("rec.noCallWindow"), .info) }
             RecordingPicker.show(windows: list, preselect: RecTargets.meetingWindow(in: list)?.id) { choice in
                 guard self.state == "choosing" else { return }
                 self.setState("off")
                 // never start after the call is over (the picker can stay open past End call)
                 guard let choice = choice, CallEngine.shared.isRunning else {
-                    self.note(L("rec.cancelled")); CallEngine.shared.recordingNotStarted(); return
+                    self.note(L("rec.cancelled"), .warning); CallEngine.shared.recordingNotStarted(); return
                 }
                 self.open(choice.0, label: choice.1)
             }
@@ -289,7 +289,7 @@ final class CallRecorder: NSObject, ObservableObject {
                 guard let choice = choice else { return }
                 ses.switchSource(choice.0) { ok in
                     DispatchQueue.main.async {
-                        if ok { self.sourceLabel = choice.1 } else { self.note(L("rec.err.source")) }
+                        if ok { self.sourceLabel = choice.1 } else { self.note(L("rec.err.source"), .warning) }
                         self.publish()
                     }
                 }
@@ -421,7 +421,7 @@ final class CallRecorder: NSObject, ObservableObject {
     }
 
     private func setState(_ s: String) { state = s; publish() }
-    private func note(_ s: String) { lastNote = s; CallEngine.shared.notify(s); publish() }
+    private func note(_ s: String, _ level: NoticeLevel = .error) { lastNote = s; CallEngine.shared.notify(s, level: level); publish() }
     func publish() { NotificationCenter.default.post(name: Self.changed, object: nil) }
 }
 

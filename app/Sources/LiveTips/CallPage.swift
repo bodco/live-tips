@@ -897,6 +897,8 @@ struct CallPageView: View {
                     Divider()
                 }
                 if let u = record?.notionURL.flatMap({ URL(string: $0) }) { Button(L("home.recent.notion")) { NSWorkspace.shared.open(u) } }
+                // 0.26.0: why there is no Notion page: too short to write one (info, not a failure)
+                else if let r = record, r.source == nil, r.end != nil, NotionGate.tooShort(lines: r.lines) { Text(L("notion.tooShort")) }
                 Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }
                 Button(L("reassign.menu")) { reassigning = true }       // 0.10.1 (A3)
                 // 0.12.0 (B8b): one call kept off the server in a project that syncs

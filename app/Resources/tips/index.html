@@ -8,35 +8,37 @@
 <link rel="stylesheet" href="tips.css">
 </head>
 <body>
+<!-- 0.26.0 (owner 19.11): the header spans the whole window, above the tips and the side panel -->
+<div class="shell" id="shell">
+  <header class="bar">
+    <span class="rec" id="rec" aria-hidden="true"></span>
+    <span class="timer" id="timer">00:00</span>
+    <span class="status" id="status" aria-live="polite"></span>
+    <!-- redesign block 3: the sound level (5 bars), only while listening -->
+    <span class="lvl pn-lv" id="lvl" role="img"><i></i><i></i><i></i><i></i><i></i></span>
+    <!-- 0.10.0 (AI chain): the limit status of the AIs the jobs use; hover or click lists them -->
+    <span class="aist" id="aiSt"></span>
+    <span class="spacer"></span>
+    <button class="onme deal" id="dealBtn" type="button" hidden></button>
+    <button class="onme" id="onmeBtn" type="button"><span id="onmeLbl"></span><span class="n" id="onmeN">0</span></button>
+    <span class="tools" role="group">
+      <button class="icon-btn tool mic" id="micBtn" type="button" aria-pressed="false"></button>
+      <button class="icon-btn tool pause" id="pauseBtn" type="button" aria-pressed="false"></button>
+      <button class="icon-btn tool bulb" id="bulbBtn" type="button" aria-pressed="false"></button>
+    </span>
+    <!-- 0.9.5: the call recording: Record, then the time with Pause and Stop -->
+    <span class="recc" id="recCtl" role="group"></span>
+    <!-- theme pass stage 3 (2026-11-19): End call in the header, a red outline, the same question as the floating controls -->
+    <button class="endcall" id="endBtn" type="button" data-act="end-call" hidden></button>
+    <button class="icon-btn tool home" id="homeBtn" type="button" data-act="home" aria-label="Home" title="Home (⌘0)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.8 7.3 8 2.9l5.2 4.4v5.5c0 .7-.5 1.2-1.2 1.2H10V10.4H6V14H4c-.7 0-1.2-.5-1.2-1.2z"/></svg>
+    </button>
+    <button class="icon-btn" id="moreBtn" type="button" aria-haspopup="menu" aria-label="More">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="4" cy="9" r="1.5" fill="currentColor"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/><circle cx="14" cy="9" r="1.5" fill="currentColor"/></svg>
+    </button>
+  </header>
 <div class="app" id="app">
   <div class="main">
-    <header class="bar">
-      <span class="rec" id="rec" aria-hidden="true"></span>
-      <span class="timer" id="timer">00:00</span>
-      <span class="status" id="status" aria-live="polite"></span>
-      <!-- redesign block 3: the sound level (5 bars), only while listening -->
-      <span class="lvl pn-lv" id="lvl" role="img"><i></i><i></i><i></i><i></i><i></i></span>
-      <!-- 0.10.0 (AI chain): the limit status of the AIs the jobs use; hover or click lists them -->
-      <span class="aist" id="aiSt"></span>
-      <span class="spacer"></span>
-      <button class="onme deal" id="dealBtn" type="button" hidden></button>
-      <button class="onme" id="onmeBtn" type="button"><span id="onmeLbl"></span><span class="n" id="onmeN">0</span></button>
-      <span class="tools" role="group">
-        <button class="icon-btn tool mic" id="micBtn" type="button" aria-pressed="false"></button>
-        <button class="icon-btn tool pause" id="pauseBtn" type="button" aria-pressed="false"></button>
-        <button class="icon-btn tool bulb" id="bulbBtn" type="button" aria-pressed="false"></button>
-      </span>
-      <!-- 0.9.5: the call recording: Record, then the time with Pause and Stop -->
-      <span class="recc" id="recCtl" role="group"></span>
-      <!-- theme pass stage 3 (2026-11-19): End call in the header, a red outline, the same question as the floating controls -->
-      <button class="endcall" id="endBtn" type="button" data-act="end-call" hidden></button>
-      <button class="icon-btn tool home" id="homeBtn" type="button" data-act="home" aria-label="Home" title="Home (⌘0)">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.8 7.3 8 2.9l5.2 4.4v5.5c0 .7-.5 1.2-1.2 1.2H10V10.4H6V14H4c-.7 0-1.2-.5-1.2-1.2z"/></svg>
-      </button>
-      <button class="icon-btn" id="moreBtn" type="button" aria-haspopup="menu" aria-label="More">
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="4" cy="9" r="1.5" fill="currentColor"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/><circle cx="14" cy="9" r="1.5" fill="currentColor"/></svg>
-      </button>
-    </header>
 
     <!-- 0.9.0 (rules/live_prep.yaml): the brief strip: Prepare now / Prepare again without stopping the call -->
     <div class="briefbar" id="briefBar" hidden></div>
@@ -74,6 +76,7 @@
 
   <div class="split" id="split" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize the side panel" title="Drag to resize. Double-click: default width"></div>
   <aside class="pane" id="pane" aria-label="Side panel"></aside>
+</div>
 </div>
 
 <!-- theme pass stage 4 (2026-11-19): the small card under the camera (body.card); the same page, one tip at a time -->

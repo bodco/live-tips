@@ -366,14 +366,22 @@ struct UpcomingCallPage: View {
         snap = SetupSnap(model)
     }
 
-    /// Leaving with unsaved Setup changes: ask, never drop them silently.
+    /// Leaving with unsaved Setup changes: ask, never drop them silently. 0.26.0 (block 3): a bar on top of the
+    /// window instead of an alert. Save or Discard only; a question that goes away unanswered (replaced, its window
+    /// closed) saves, so nothing the PM typed is lost.
     private func askToSave() {
         guard dirty, let s = snap else { return }
-        let a = NSAlert()
-        a.messageText = L("page.unsaved.title", ["title": model.effectiveTitle])
-        a.informativeText = L("page.unsaved.body")
-        a.addButton(withTitle: L("common.save")); a.addButton(withTitle: L("page.unsaved.discard"))
-        if a.runModal() == .alertFirstButtonReturn { save() } else { s.restore(model) }
+        let m = model, store = upnext
+        let keep = { m.useDefaultTargetIfEmpty(); store.save(m) }
+        // 0.26.0 (review 1): the window is closing (or gone): there is no place for the bar, just save.
+        if AskCenter.windowClosing || HomeWindow.window?.isVisible != true { AppLog.app("ask: unsaved saved on close"); keep(); return }
+        AskCenter.shared.ask(kind: "unsaved", origin: .window, title: L("page.unsaved.title", ["title": m.effectiveTitle]),
+                             info: L("page.unsaved.body"),
+                             choices: [Ask.Choice(id: "save", title: L("common.save"), role: .primary),
+                                       Ask.Choice(id: "discard", title: L("page.unsaved.discard"), role: .danger)],
+                             cancelled: keep) { id in
+            if id == "save" { keep() } else { s.restore(m) }
+        }
     }
 
     // MARK: tabs

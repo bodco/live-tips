@@ -16,7 +16,7 @@ final class HomeWindow {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { HomeView(app: delegate) }))
+        let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { HomeView(app: delegate).noticeBanner() }))
         w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
         w.title = L("home.window.title")
         w.styleMask.insert(.resizable)
@@ -25,6 +25,7 @@ final class HomeWindow {
         w.isReleasedWhenClosed = false
         _ = w.setFrameAutosaveName("LiveTipsHome")
         window = w
+        AskCenter.watch(w)
         w.center()
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -810,7 +811,7 @@ struct HomeView: View {
                     .buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
                 }
                 HomeLink(L("home.hero.endCall"), size: 15, color: PN.C.recText) {
-                    AnalyticsTracker.shared.action("end_call", scr: "home", o: AnalyticsTracker.shared.callOrg); app.endCall()
+                    AnalyticsTracker.shared.action("end_call", scr: "home", o: AnalyticsTracker.shared.callOrg); app.askEndCall(from: .window)
                 }
                 .padding(.leading, 8)
             }

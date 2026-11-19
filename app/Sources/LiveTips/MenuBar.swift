@@ -66,6 +66,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             panel = MenuBarPanelController(app: self, button: it.button)
             floatingControls = FloatingCallController(app: self)
+            // 0.26.0 (block 1): the app's notices: the tips window shows them during a call, the icon gets a dot otherwise
+            NoticeCenter.tipsVisible = { [weak self] in self?.tips?.window?.isVisible == true }
+            NoticeCenter.changed = { [weak self] in
+                self?.tips?.pushNotice()
+                DispatchQueue.main.async { self?.refresh() }       // not inside the refresh that posted it
+            }
+            // 0.26.0 (block 2): questions inline where the PM clicked; the panel opens when that place is not on screen
+            AskCenter.tipsVisible = { [weak self] in self?.tips?.window?.isVisible == true }
+            AskCenter.showPanel = { [weak self] in if self?.panel?.isOpen != true { self?.panel?.show() } }
+            AskCenter.changed = { [weak self] in self?.tips?.pushAsk() }
         }
         refresh()
         MainActor.assumeIsolated { LocalAIService.shared.apply() }
@@ -277,7 +287,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             : nearLimit ? .nearLimit
             : UpdateService.shared.newVersion != nil ? .update
             : st.state == "standby" ? .waiting : .idle
-        item?.button?.image = Brand.menuBarImage(icon)
+        item?.button?.image = Brand.menuBarImage(icon, notice: MainActor.assumeIsolated { NoticeCenter.shared.unread })
         item?.button?.contentTintColor = nil
         setClock(st.state == "recording")      // ticks the panel's elapsed time; nothing is written next to the icon
     }
@@ -397,14 +407,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// End call from the hot key, the menu or the floating controls: asked in the tips when they are open, otherwise
+    /// in an open Pacenote window or the menu bar panel.
     @objc func endCall() {
-        if let t = tips { MainActor.assumeIsolated { t.window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); t.endCallClicked() }; return }
-        let a = NSAlert()
-        a.messageText = L("alert.endCall.title")
-        a.informativeText = L("alert.endCall.body")
-        a.addButton(withTitle: L("menubar.endCall"))
-        a.addButton(withTitle: L("common.cancel"))
-        if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop() }
+        MainActor.assumeIsolated {
+            if let t = tips, t.window?.isVisible == true { t.window.orderFront(nil); askEndCall(from: .tips) }
+            else { askEndCall(from: .window) }
+        }
+    }
+
+    /// 0.26.0 (block 2): "End the call?" inline (no alert): End call, End and start <next> (Up next), Cancel.
+    @MainActor
+    func askEndCall(from origin: AskOrigin) {
+        let st = EngineStatus.load(path: CallEngine.shared.statusPath)
+        guard AskRules.isLive(running: CallEngine.shared.isRunning, state: st.state) else {
+            if origin == .tips { tips?.window?.close() }      // the call is over: End call only closes the window
+            return
+        }
+        let next = UpNext.shared.first
+        let choices: [Ask.Choice] = AskRules.endCallButtons(hasNext: next != nil).map { id in
+            switch id {
+            case "end": return Ask.Choice(id: id, title: L("menubar.endCall"), role: .danger)
+            case "end-start": return Ask.Choice(id: id, title: L("tw.endAndStart", ["title": next?.effectiveTitle ?? ""]), role: .primary)
+            default: return .cancel()
+            }
+        }
+        AskCenter.shared.ask(kind: "end-call", origin: origin, title: L("tw.endQ"),
+                             info: L(tips != nil ? "tw.endInfo" : "alert.endCall.body"), choices: choices) { [weak self] id in
+            guard let self = self else { return }
+            let now = EngineStatus.load(path: CallEngine.shared.statusPath)
+            guard AskRules.isLive(running: CallEngine.shared.isRunning, state: now.state) else { return }   // it ended meanwhile
+            if id == "end-start", let n = next { self.performSwitch(to: n) } else { self.endCallNow() }
+        }
+    }
+
+    /// Ends the live call; a recorder the app does not own any more is finished as an orphan (the tips show Call ended).
+    @MainActor
+    func endCallNow() {
+        let owned = CallEngine.shared.isRunning
+        CallEngine.shared.stop()
+        guard let t = tips else { return }
+        t.markEnding()
+        if !owned {
+            CallEngine.shared.finishOrphan { [weak t] file, saved in
+                t?.showCallEnded(["saved": saved, "file": file, "lines": EngineStatus.load(path: CallEngine.shared.statusPath).lines])
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -414,15 +462,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         tips?.setSplit(false, animate: false)          // keep the saved tips window at its normal width
     }
 
+    /// 0.26.0 (block 3): Quit during a call asks in the menu bar panel (no alert) and answers later; every way the
+    /// question closes (Cancel, the panel closed, another question) answers too, so Quit never hangs.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard CallEngine.shared.isRunning else { return .terminateNow }
-        let a = NSAlert()
-        a.messageText = L("alert.quit.title")
-        a.informativeText = L("alert.quit.body")
-        a.addButton(withTitle: L("alert.quit.confirm"))
-        a.addButton(withTitle: L("common.cancel"))
-        if a.runModal() == .alertFirstButtonReturn { CallEngine.shared.stop(); return .terminateNow }
-        return .terminateCancel
+        // 0.26.0 (review 5): a recorder the app no longer owns (an orphan after a restart) is a live call too
+        let live = AskRules.isLive(running: CallEngine.shared.isRunning, state: EngineStatus.load(path: CallEngine.shared.statusPath).state)
+        guard live else { return .terminateNow }
+        MainActor.assumeIsolated {
+            AskCenter.shared.ask(kind: "quit", origin: .panel, title: L("alert.quit.title"), info: L("alert.quit.body"),
+                                 choices: [Ask.Choice(id: "quit", title: L("alert.quit.confirm"), role: .danger), .cancel()],
+                                 cancelled: { NSApp.reply(toApplicationShouldTerminate: false) }) { _ in
+                // the stop file ends an orphan recorder too; it saves its transcript on its own
+                if AskRules.isLive(running: CallEngine.shared.isRunning, state: EngineStatus.load(path: CallEngine.shared.statusPath).state) {
+                    CallEngine.shared.stop()
+                }
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        return .terminateLater
     }
     @objc func requestMic() { AVCaptureDevice.requestAccess(for: .audio) { _ in } }
 
@@ -907,7 +964,7 @@ extension AppDelegate {
         return nil
     }
 
-    /// "End current call and start this…": one question, then the switch.
+    /// "End current call and start this…": one question, inline in the window that asked (0.26.0), then the switch.
     @MainActor
     func confirmSwitch(to model: StartCallModel, on window: NSWindow?) {
         guard callIsLive else {
@@ -916,8 +973,6 @@ extension AppDelegate {
         }
         let cur = CallEngine.shared.renamed ?? (CallEngine.shared.callRequest["title"] as? String) ?? L("sw.current")
         let next = model.effectiveTitle
-        let a = NSAlert()
-        a.messageText = L("sw.title", ["cur": cur, "next": next])
         var info = L("sw.stops")
         info += model.standby ? L("sw.standby", ["next": next]) : L("sw.now", ["next": next])
         switch UpNext.shared.prepState(model) {
@@ -927,15 +982,10 @@ extension AppDelegate {
         case .none: info += "\n\n" + L("sw.prepNone")
         case .ready: break
         }
-        a.informativeText = info
-        a.addButton(withTitle: L("sw.endStart"))
-        a.addButton(withTitle: L("hk.cancel"))
-        let go: () -> Void = { [weak self] in self?.performSwitch(to: model) }
-        if let w = window, w.isVisible {
-            a.beginSheetModal(for: w) { r in if r == .alertFirstButtonReturn { MainActor.assumeIsolated { go() } } }
-        } else {
-            NSApp.activate(ignoringOtherApps: true)
-            if a.runModal() == .alertFirstButtonReturn { go() }
+        let origin: AskOrigin = window != nil && window === tips?.window ? .tips : .window
+        AskCenter.shared.ask(kind: "switch", origin: origin, title: L("sw.title", ["cur": cur, "next": next]), info: info,
+                             choices: [Ask.Choice(id: "go", title: L("sw.endStart"), role: .primary), .cancel()]) { [weak self] _ in
+            self?.performSwitch(to: model)
         }
     }
 
@@ -978,12 +1028,8 @@ extension AppDelegate {
     @MainActor
     func notifySwitchFailed(_ text: String, _ model: StartCallModel) {
         UpNext.shared.save(model)
-        let a = NSAlert()
-        a.messageText = "\u{201C}\(model.effectiveTitle)\u{201D} did not start"
-        a.informativeText = text + "\n\nIt stays in Up next."
-        a.addButton(withTitle: "OK")
-        NSApp.activate(ignoringOtherApps: true)
-        a.runModal()
+        // 0.26.0 (block 2): a notice, not an alert; the call stays in Up next
+        NoticeCenter.shared.post(L("sw.failed", ["title": model.effectiveTitle, "why": text]), level: .error)
     }
 }
 

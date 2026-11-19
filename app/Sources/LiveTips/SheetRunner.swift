@@ -58,9 +58,9 @@ final class SheetRunner: ObservableObject {
     @Published var lastOutcome: [String: Any] = [:]
     @Published var pendingSwitch: PendingSwitch?
     @Published var callID: UUID?
-    /// 0.10.0 (Meeting Sheet, hardening): the UI shows `pendingSwitch` itself (SheetSwitchPrompt in the build views
-    /// and on the call page); never a modal alert (during a call it would sit over everything).
-    static var uiHandlesSwitch = true
+    // 0.10.0 (Meeting Sheet, hardening): the UI shows `pendingSwitch` itself (SheetSwitchPrompt in the build views
+    // and on the call page); never a modal alert (during a call it would sit over everything). 0.26.0 (block 3): the
+    // unused alert fallback is gone.
     /// 0.10.0 (Meeting Sheet, hardening): a route switched without asking (during a call, or queued with nobody there);
     /// shown as a line in the build views and as a notification banner, never a modal. The report has it too.
     @Published var switchNotice: String?
@@ -213,17 +213,9 @@ final class SheetRunner: ObservableObject {
         pendingSwitch = p
         result = L("sheet.switch.waiting")
         UpNext.shared.prepFinished(id: p.job.prep.callID, base: nil, ok: false, stopped: true)
-        guard !Self.uiHandlesSwitch else { return }
-        let a = NSAlert()
-        a.messageText = L("sheet.switch.title")
-        a.informativeText = L("sheet.switch.body", ["from": AIRoute.name(p.from), "to": AIRoute.name(p.to), "why": p.reason])
-        a.addButton(withTitle: L("sheet.switch.ok", ["to": AIRoute.name(p.to)]))
-        a.addButton(withTitle: L("sheet.switch.cancel"))
-        NSApp.activate(ignoringOtherApps: true)
-        if a.runModal() == .alertFirstButtonReturn { acceptSwitch() } else { declineSwitch() }
     }
 
-    /// The person agreed to run this build on the other route (the UI's button, or the alert).
+    /// The person agreed to run this build on the other route (SheetSwitchPrompt's button).
     func acceptSwitch() {
         guard var j = pendingSwitch?.job, let p = pendingSwitch else { return }
         // 0.10.0 (Meeting Sheet, hardening): Up next may have started another preparation while the question was open

@@ -266,7 +266,7 @@ final class CallEngine {
                                                            "audience": (self.callRequest["audience"] as? String) ?? "",
                                                            "language": (self.callRequest["me_lang"] as? String) ?? ""])
                 if let file = st.file ?? self.lastFile, apiAllowed {
-                    self.writeToNotion(file: file)
+                    self.writeToNotion(file: file, lines: self.lastLines)
                     self.runJudge(file: file)          // background, optional: never blocks the UI or the call
                     self.notionTasksAfterCall(file: file)
                 }
@@ -472,6 +472,8 @@ final class CallEngine {
     /// 0.9.5.2: true when the notes are being written (the meeting page then waits for their Meeting notes).
     @discardableResult func writeCallNotes(file: String, config c: AppConfig, hasConfig: Bool) -> Bool {
         let notes = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
+        // 0.26.0 (review 2): Try again on a Notion notice must not start the same notes twice; the page waits for them.
+        if Self.notesInWork.contains(notes) { AppLog.app("notes: already in work call=\(AppLog.stem(file))"); return true }
         guard !FileManager.default.fileExists(atPath: notes), AIRoute.canRun(job: "after", config: c),
               !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return false }
         let p = Process()
@@ -491,6 +493,7 @@ final class CallEngine {
         // S5: perf notes_after, the end of the call to its notes on disk; error ai with the exit status as a code
         let t0 = Date(), prov = Analytics.provider(route: c.ai.after)
         p.terminationHandler = { proc in
+            Self.notesInWork.remove(notes)
             let ok = proc.terminationStatus == 0 && FileManager.default.fileExists(atPath: notes)
             let ms = Int(Date().timeIntervalSince(t0) * 1000), code = proc.terminationReason == .uncaughtSignal ? "crashed" : "other"
             // 0.24.1 (F7): the AI that really wrote the notes (after a switch), the chosen one as fallback_to's origin
@@ -500,9 +503,13 @@ final class CallEngine {
                 if !ok { AnalyticsTracker.shared.error("ai", code, provider: prov, fallbackTo: actual) }
             }
         }
-        do { try p.run() } catch { return false }
+        Self.notesInWork.insert(notes)
+        do { try p.run() } catch { Self.notesInWork.remove(notes); return false }
         return true
     }
+
+    /// 0.26.0 (review 2): the .notes.md files being written now (the termination handler runs off the main thread).
+    static let notesInWork = LockedSet()
 
     /// 0.9.5.2 (rules/notes.yaml, schema 2): Make meeting notes on an older call's page: only the ## Meeting notes
     /// section when the notes exist (one request), else the full notes with it. On the "After the call" way.
@@ -543,16 +550,24 @@ final class CallEngine {
         do { try p.run() } catch { done(error.localizedDescription) }
     }
 
-    func writeToNotion(file: String) {
+    /// `lines`: the real transcript lines when known (the call just ended); a call under NotionGate.minLines gets no page.
+    func writeToNotion(file: String, lines: Int? = nil) {
         let c = config
         // 0.8.5: the call notes do not depend on Notion; they are written even when no meeting page is (once per call).
         let notesComing = writeCallNotes(file: file, config: c,
                                          hasConfig: !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig))
         guard c.notionWriteSummary else { AppLog.app("notion: not written (meeting pages are off) call=\(AppLog.stem(file))"); return }
+        // 0.26.0 (owner 19.11): a call this short is not a failure: an info line, Notion is not started
+        if NotionGate.tooShort(lines: lines) {
+            AppLog.app("notion: not written (\(lines ?? 0) lines) call=\(AppLog.stem(file))")
+            notionResult = L("notion.tooShort"); notify(notionResult); return
+        }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        guard AIRoute.canRun(job: "after", config: c), let notionToken = store.get(.notionToken) else {
-            AppLog.app("notion: not written (\(AIRoute.canRun(job: "after", config: c) ? "no token" : "no AI for after the call")) call=\(AppLog.stem(file))")
-            notionResult = "Notion: add the Notion token in Settings > Notion"; notify(notionResult, settingsTab: "notion"); return
+        let aiOK = AIRoute.canRun(job: "after", config: c)
+        guard aiOK, let notionToken = store.get(.notionToken) else {
+            AppLog.app("notion: not written (\(aiOK ? "no token" : "no AI for after the call")) call=\(AppLog.stem(file))")
+            notionResult = L(aiOK ? "notion.err.noToken" : "notion.err.noAI")
+            notify(notionResult, level: .error, settingsTab: aiOK ? "notion" : "ai"); return
         }
         let hasConfig = !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig)
         // 0.8.6 (C): a project without a config may send its pages to its own database (Settings > Notion)
@@ -561,7 +576,7 @@ final class CallEngine {
         let meetingsDB = c.notionMeetingsDB      // 0.8.7 (F3): one Meetings database; the project is a property
         guard hasConfig || !meetingsDB.isEmpty else {
             AppLog.app("notion: not written (no meetings database) call=\(AppLog.stem(file))")
-            notionResult = "Notion: choose where meeting pages go (Settings > Notion). Then use Send last call to Notion in the menu."; notify(notionResult, settingsTab: "notion"); return
+            notionResult = L("notion.err.noDatabase"); notify(notionResult, level: .error, settingsTab: "notion"); return
         }
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else { return }
         rememberLastCall(file: file)
@@ -595,7 +610,7 @@ final class CallEngine {
         p.standardOutput = out
         let log = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notion.log"))
         p.standardError = log
-        notionResult = "Notion: writing the meeting page…"
+        notionResult = L("notion.writing")
         p.terminationHandler = { [weak self] proc in
             let data = out.fileHandleForReading.readDataToEndOfFile()
             log?.write(data)
@@ -613,14 +628,29 @@ final class CallEngine {
                     MainActor.assumeIsolated { CallHistory.shared.setNotion(file: file, url: url) }
                     // 2026-11-10 (owner): no modal on success; it stole focus after every call. The link is on the call page.
                 } else {
-                    self.notionResult = "Notion: " + ((d["error"] as? String) ?? L("eng.notionFailed"))
-                    self.notify(self.notionResult)
+                    self.notionFailed((d["error"] as? String) ?? "", file: file)
                     let code = Analytics.errorCode(message: (d["error"] as? String) ?? "")      // S5: the code, never the text
                     AnalyticsTracker.onMain { AnalyticsTracker.shared.error("notion", code, provider: "notion") }
                 }
             }
         }
-        do { try p.run() } catch { notionResult = "Notion: could not start (\(error.localizedDescription))" }
+        do { try p.run() } catch {
+            notionResult = L("notion.err.start", ["why": error.localizedDescription])
+            notify(notionResult, level: .error, retry: { [weak self] in self?.writeToNotion(file: file) })
+        }
+    }
+
+    /// 0.26.0: the writer's raw error ("RuntimeError: POST ... -> 401: ...") as a cause in words with the one action that helps.
+    /// The raw text stays in logs/notion.log and app.log.
+    func notionFailed(_ raw: String, file: String) {
+        let k = NotionFailure.classify(raw)
+        AppLog.app("notion: failed (\(k.rawValue)) call=\(AppLog.stem(file)) \(raw.prefix(300))")
+        notionResult = L(k == .tooShort ? "notion.tooShort" : "notion.err." + k.rawValue)
+        switch k.fix {
+        case .settings: notify(notionResult, level: k.level, settingsTab: "notion")
+        case .retry: notify(notionResult, level: k.level, retry: { [weak self] in self?.writeToNotion(file: file) })
+        case .none: notify(notionResult, level: k.level)
+        }
     }
 
     /// 0.8.6 (rules/notion-tasks.yaml > after_call): the PM's open commitments of this call go to his Notion tasks when
@@ -678,16 +708,14 @@ final class CallEngine {
         do { try p.run(); judgeRunning = p } catch { judgeResult = L("eng.judgeFailed") }
     }
 
-    func notify(_ text: String, url: String? = nil, settingsTab: String? = nil) {
-        let a = NSAlert()
-        a.messageText = L("notification.title")
-        a.informativeText = text
-        a.addButton(withTitle: url != nil ? L("common.openInNotion") : (settingsTab != nil ? L("common.openSettings") : L("common.ok")))
-        if url != nil || settingsTab != nil { a.addButton(withTitle: L("common.later")) }
-        NSApp.activate(ignoringOtherApps: true)
-        guard a.runModal() == .alertFirstButtonReturn else { return }
-        if let u = url, let link = URL(string: u) { NSWorkspace.shared.open(link) }
-        if let tab = settingsTab { MainActor.assumeIsolated { SettingsWindow.show(tab: tab) } }
+    /// 0.26.0 (block 1): a notice of the app (NoticeCenter), never a modal alert: a line in the tips window during a call,
+    /// a banner in an open Pacenote window, otherwise a dot on the menu bar icon. One action at most: the link, a
+    /// Settings tab or Try again.
+    func notify(_ text: String, level: NoticeLevel = .info, url: String? = nil, urlTitle: String? = nil,
+                settingsTab: String? = nil, retry: (() -> Void)? = nil) {
+        let action: Notice.Action? = url.map { .url($0, title: urlTitle ?? L("common.openInNotion")) }
+            ?? settingsTab.map { .settings($0) } ?? (retry != nil ? .retry : nil)
+        NoticeCenter.post(text, level: level, action: action, retry: retry)
     }
 
     /// 2026-10-26: the app was restarted during a call (an update), so it no longer owns the recorder.
@@ -722,7 +750,7 @@ final class CallEngine {
             }
             let api = ProjectRegistry.load(from: AppPaths.projects).projects.first { $0.slug == st.slug }?.apiAllowed ?? true
             if saved && api {
-                self.writeToNotion(file: file)
+                self.writeToNotion(file: file, lines: st.lines > 0 ? st.lines : nil)
                 self.runJudge(file: file)
                 self.notionTasksAfterCall(file: file)
             }
@@ -888,4 +916,13 @@ extension FileHandle {
         _ = try? h?.seekToEnd()
         return h
     }
+}
+
+/// 0.26.0 (review 2): a small thread-safe set of strings.
+final class LockedSet: @unchecked Sendable {
+    private var items = Set<String>()
+    private let lock = NSLock()
+    func contains(_ s: String) -> Bool { lock.lock(); defer { lock.unlock() }; return items.contains(s) }
+    func insert(_ s: String) { lock.lock(); items.insert(s); lock.unlock() }
+    func remove(_ s: String) { lock.lock(); items.remove(s); lock.unlock() }
 }

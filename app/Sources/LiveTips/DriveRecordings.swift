@@ -136,11 +136,11 @@ final class DriveRecordings: ObservableObject {
             running.remove(t); progress[t] = nil
             if let f = failed {
                 errors[t] = f
-                if !(gone && wasGone && auto) { CallEngine.shared.notify(L("rec.drive.failed", ["err": f])) }   // once, not at every launch
+                if !(gone && wasGone && auto) { CallEngine.shared.notify(L("rec.drive.failed", ["err": f]), level: .error, settingsTab: "recording") }   // once, not at every launch
             } else {
                 dequeue(t)
                 let link = RecordingMeta.load(mp)?.parts.last?.driveLink ?? ""
-                CallEngine.shared.notify(L("rec.drive.done"), url: link.isEmpty ? nil : link)
+                CallEngine.shared.notify(L("rec.drive.done"), url: link.isEmpty ? nil : link, urlTitle: L("rec.page.openDrive"))
                 if transcriptMode != .off { syncTranscript(t, create: true) }
             }
             objectWillChange.send()

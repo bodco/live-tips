@@ -500,6 +500,8 @@
     const s = this.status, rec = s.state === 'recording', tr = this.tr;
     if (this.ending || s.state === 'stopping') return { text: tr('ending'), level: 'info' };
     if (s.state === 'stopped') return { text: tr('ended'), level: 'info' };
+    // 0.26.0 (C): a standby call on a cold start is Ready while the model loads; Start pressed then is kept.
+    if (s.state === 'loading_model' && s.standby === true && !this.starting) return { text: tr('gettingReady'), level: 'info' };
     if (s.state === 'loading_model' || this.starting) return { text: tr('starting'), level: 'info' };
     const streak = +s.mic_stall_streak || 0;
     if (rec && s.mic !== 'muted' && (s.mic === 'stalled' || streak >= 3)) return { text: tr('micStalled'), level: 'warn' };
@@ -550,6 +552,8 @@
     // The roster's sides, so a suggested name keeps its side (team or client) when picked with one click.
     this.rosterSide = {};
     for (const r of d.roster || []) if (r && r.name && r.side) this.rosterSide[clean(r.name)] = r.side;
+    // 0.26.0 (owner 19.11): the roster itself, with why each name is there, for "Who said this?" on a line
+    this.roster = (d.roster || []).filter((r) => r && r.name).map((r) => ({ name: clean(r.name), src: String(r.src || 'library') })).slice(0, 60);
     for (const a of Object.keys(d.merged || {})) {
       const to = d.merged[a]; if (this.speakers[to]) this.speakers[a] = Object.assign({}, this.speakers[to]);
     }
@@ -641,7 +645,7 @@
 
   Feed.prototype.state = function () {
     const s = this.status, st = s.state || '';
-    const ready = st === 'standby' && !this.starting;
+    const ready = (st === 'standby' || st === 'loading_model' && s.standby === true) && !this.starting;
     const steps = this.presentation();
     const presType = String(s.call_type || '') === 'presentation';
     const presenting = presType && steps.length > 0;
@@ -666,7 +670,7 @@
       onMe: this.onMe(),
       next: this.next,
       speakers: Object.assign({ me: { name: this.tr('me'), side: 'team' }, other: { name: this.tr('them'), side: '' } }, this.speakers),
-      rosterSide: this.rosterSide || {}, knownNames: this.known || [], knownSrc: this.knownSrc || {},
+      rosterSide: this.rosterSide || {}, roster: this.roster || [], knownNames: this.known || [], knownSrc: this.knownSrc || {},
       transcript: this.transcript.slice(-400),
       brief: this.brief, briefText: this.briefText,
       steps,

@@ -1876,12 +1876,13 @@ final class SettingsWindow {
         model.tab = tab                                   // 0.8.7 (F1): notion, keys, calendars open under Integrations
         window?.title = title(for: model.tab)
         if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { SettingsView(model: model) }))
+            let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { SettingsView(model: model).noticeBanner() }))
             w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
             w.title = title(for: model.tab)
             w.setContentSize(NSSize(width: 960, height: 660))
             w.isReleasedWhenClosed = false
             window = w
+            AskCenter.watch(w)
         }
         window?.makeKeyAndOrderFront(nil)
         DispatchQueue.main.async { window?.makeFirstResponder(nil) }   // 0.8.7 (F6): no field is focused on open

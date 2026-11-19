@@ -10,14 +10,16 @@ import LiveTipsCore
 enum IntegrationRegistry {
     struct Item: Identifiable { let id: String; let title: String; let symbol: String; let subtitle: String }
     static var items: [Item] { [
+        // 0.26.0 (INT6, owner 19.11): the two work tools first and side by side, then Google, then the Mac's own Calendar
         Item(id: "notion", title: "Notion", symbol: "doc.text", subtitle: L("int.notion.sub")),
-        Item(id: "calendars", title: L("settings.tab.calendars"), symbol: "calendar", subtitle: L("int.calendars.sub")),
-        Item(id: "google", title: "Google", symbol: "globe", subtitle: L("int.google.sub")),
         Item(id: "hubspot", title: "HubSpot", symbol: "briefcase", subtitle: L("int.hubspot.sub")),
+        Item(id: "google", title: "Google", symbol: "globe", subtitle: L("int.google.sub")),
+        Item(id: "calendars", title: L("settings.tab.calendars"), symbol: "calendar", subtitle: L("int.calendars.sub")),
     ] }
 
-    /// 0.25 (R5): the connections listed under the Integrations pane's Advanced.
-    static let advancedIds: Set<String> = ["hubspot"]
+    /// 0.25 (R5): the connections listed under the Integrations pane's Advanced. 0.26.0 (INT6): none, HubSpot is on
+    /// the same level as Notion; the Advanced block shows again when a connection is listed here.
+    static let advancedIds: Set<String> = []
 
     /// One line under the card's title and whether it is connected (nil = not set up).
     /// `short`: the list row shows "Connected" without the account name, so the row's description keeps its room.
@@ -133,12 +135,14 @@ struct IntegrationsPane<NotionPage: View>: View {
             VStack(alignment: .leading, spacing: 8) {
                 rows(IntegrationRegistry.items.filter { !IntegrationRegistry.advancedIds.contains($0.id) })
                 Text(L("int.keysNote")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                if !IntegrationRegistry.advancedIds.isEmpty {
                 VStack(spacing: 0) {
                     SettingsAdvancedHeader("integrations", summary: L("adv.sum.integrations"), inForm: false)
                 }
                 .background(RoundedRectangle(cornerRadius: PN.r(10)).fill(Color.secondary.opacity(0.06)))
                 .padding(.top, 8)
                 if adv == "1" { rows(IntegrationRegistry.items.filter { IntegrationRegistry.advancedIds.contains($0.id) }) }
+                }
             }
             .padding(20)
         }

@@ -14,7 +14,7 @@
   // ---------- i18n (Ukrainian is about 30% longer; the layout must survive it) ----------
   const STR = {
     en: {
-      listening: 'Listening', soundLevel: 'Sound level', paused: 'Paused', muted: 'Mic off', ended: 'Call ended', ending: 'Ending the call…', starting: 'Starting…',
+      listening: 'Listening', soundLevel: 'Sound level', paused: 'Paused', muted: 'Mic off', ended: 'Call ended', ending: 'Ending the call…', starting: 'Starting…', gettingReady: 'Getting ready…',
       rec: { start: 'Record the call', sound: 'Record the sound', screen: 'Record the sound and the screen', rec: 'Rec', paused: 'Paused',
         pause: 'Pause the recording', resume: 'Resume the recording', stop: 'Stop and save the recording', source: 'Record another window or screen',
         settings: 'Recording settings', choosing: 'Choose what to record…', starting: 'Starting the recording…', menu: 'Recording',
@@ -105,7 +105,7 @@
       bbRunningSub: 'Recording and tips keep going. The new brief takes over when it is ready, about 1 min.', bbCancel: 'Cancel'
     },
     uk: {
-      listening: 'Слухаю', soundLevel: 'Рівень звуку', paused: 'Пауза', muted: 'Мікрофон вимкнено', ended: 'Дзвінок завершено', ending: 'Завершую дзвінок…', starting: 'Запускаю…',
+      listening: 'Слухаю', soundLevel: 'Рівень звуку', paused: 'Пауза', muted: 'Мікрофон вимкнено', ended: 'Дзвінок завершено', ending: 'Завершую дзвінок…', starting: 'Запускаю…', gettingReady: 'Готуюсь…',
       rec: { start: 'Записати дзвінок', sound: 'Записати звук', screen: 'Записати звук і екран', rec: 'Запис', paused: 'Пауза',
         pause: 'Призупинити запис', resume: 'Продовжити запис', stop: 'Зупинити і зберегти запис', source: 'Записувати інше вікно чи екран',
         settings: 'Налаштування запису', choosing: 'Оберіть, що записувати…', starting: 'Запускаю запис…', menu: 'Запис',
@@ -206,7 +206,7 @@
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
     keys: { help: '⌃⌥H', pause: '⌃⌥P', mute: '⌃⌥M', present: '⌃⌥S', prev: '⌃⌥←', next: '⌃⌥→', add30: '⌃⌥=' },
     rec: { state: 'off', kind: 'video', elapsed: 0, source: '', note: '' },
-    pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, meetEnd: null, rosterSide: {}, knownNames: [], knownSrc: {}, tipsLang: null,
+    pres: { slide: null, slideRx: 0, timeline: null, moveAsk: null, follow: null }, thumbs: {}, syncA: null, extra: {}, after: null, sys: null, meetEnd: null, notice: null, ask: null, rosterSide: {}, roster: [], knownNames: [], knownSrc: {}, tipsLang: null,
     openItems: [], notionItems: [], notionProject: '', minePending: [], mineN: 0, spkPrompt: 15,
     ui: { spkOpen: null, spkCard: null, spkSnooze: {}, spkCollapsed: PREFS.spk_collapsed !== '0',   // 0.10.0: collapsed by default, remembered
           lineWho: {}, lineDel: {}, delArm: null, openPts: {}, heroMin: {}, paneTab: 'transcript', sheet: null, menuOpen: false, heroOverride: null, follow: true, editing: null, rateOpen: null, briefEdit: false,
@@ -561,6 +561,8 @@
     app.classList.toggle('sysview', sysOn);
     renderSys(sysOn);
     renderMeetEnd(!!(S.meetEnd && !ended));   // 2026-11-10 (owner): the meeting app let go of the microphone
+    renderNotice();                           // 0.26.0: the app's notices instead of a modal alert
+    renderAsk();                              // 0.26.0 (block 2): End the call? and the other questions, inline
 
     // 2026-11-02 (owner, live call): an error in one part stopped render() before the side pane, so the tabs
     // did not switch and the transcript stayed empty. Each part now fails on its own and is reported to the app.
@@ -649,6 +651,7 @@
     const pg = pager ? pager(visibleCards(), { pin: S.ui.cardPin, seen: S.ui.cardSeen }) : { card: null, total: 0 };
     if (S.ui.cardPin && (!pg.card || pg.card.id !== S.ui.cardPin)) { S.ui.cardPin = null; S.ui.cardSeen = null; }   // that tip was hidden
     S.ui.cardPage = pg;
+    // 0.26.0 (E): End call is on the card in Ready too (a standby call can be ended before it starts)
     const bar = `<div class="tc-bar">
       <span class="tc-rec ${recCls}"><span class="dot" aria-hidden="true"></span><span>${esc(recLbl)}</span></span>
       <span class="tc-time" id="cTimer"${isReady || !S.call.startedAt ? ' hidden' : ''}></span>
@@ -657,13 +660,15 @@
       <button class="tc-b${paused ? ' on' : ''}" type="button" data-act="card-pause" aria-pressed="${paused}" aria-label="${esc(paused ? t.menu.resume : t.ariaPause)}" title="${esc((paused ? t.menu.resume : t.menu.pause) + key('pause'))}">${paused ? PLAY : PAUSE}</button>
       <button class="tc-b tc-help" type="button" data-act="card-help" title="${esc(c2.help + key('help'))}">${esc(c2.help)}</button>`}
       <button class="tc-b" type="button" data-act="card-expand" aria-label="${esc(c2.expand)}" title="${esc(c2.expand)}">${EXPAND}</button>
-      ${idle ? '' : `<button class="tc-end" type="button" data-act="end-call" title="${esc(t.endCallTip)}">${esc(t.endCall)}</button>`}
+      ${ended ? '' : `<button class="tc-end" type="button" data-act="end-call" title="${esc(t.endCallTip)}">${esc(t.endCall)}</button>`}
     </div>`;
     let note = '';
     // 0.25 (review): the meeting-ended countdown shows on the card too, or the call would stop with no way to keep it
     const me = T().meetEnd;
-    if (S.meetEnd && !ended) note = `<div class="tc-alert warn" role="alert"><span>${esc(me.q({ n: S.meetEnd.left }))}</span><button class="tc-link" type="button" data-act="meetend-keep">${esc(me.keep)}</button><button class="tc-link" type="button" data-act="meetend-stop">${esc(me.stop)}</button></div>`;
+    if (S.ask) note = askCard(S.ask);         // 0.26.0 (block 2): the PM's own click comes first
+    else if (S.meetEnd && !ended) note = `<div class="tc-alert warn" role="alert"><span>${esc(me.q({ n: S.meetEnd.left }))}</span><button class="tc-link" type="button" data-act="meetend-keep">${esc(me.keep)}</button><button class="tc-link" type="button" data-act="meetend-stop">${esc(me.stop)}</button></div>`;
     else if (S.sys && !ended) note = `<div class="tc-alert warn" role="status"><span>${esc(c2.problem)}</span><button class="tc-link" type="button" data-act="card-expand">${esc(c2.open)}</button></div>`;
+    else if (S.notice) note = noticeCard(S.notice);   // 0.26.0: the app's notice (Notion, recording, Drive...), also after the call
     else if (al && al.text) note = `<div class="tc-alert${al.level === 'warn' ? ' warn' : ''}" role="status">${esc(al.text)}</div>`;
     const c = pg.card;
     let body;
@@ -1105,6 +1110,58 @@
         <button class="sbtn ghostish" type="button" data-act="meetend-stop">${esc(t.stop)}</button></div>`;
   }
 
+  // ---------- 0.26.0 (block 1): the app's notices (NoticeCenter): {id, level: info|warning|error, text, act?, close} ----------
+  function noticeCard(n) {
+    const lv = n.level === 'info' ? '' : ' warn';
+    return `<div class="tc-alert${lv}" role="${n.level === 'error' ? 'alert' : 'status'}"><span class="tc-ntext">${esc(n.text)}</span>`
+      + (n.act ? `<button class="tc-link" type="button" data-act="notice-act">${esc(n.act)}</button>` : '')
+      + `<button class="tc-link tc-x" type="button" data-act="notice-close" aria-label="${esc(n.close || 'Close')}" title="${esc(n.close || 'Close')}">×</button></div>`;
+  }
+  function renderNotice() {
+    let el = $('notice');
+    if (!el) {
+      el = document.createElement('section'); el.id = 'notice'; el.className = 'sys notice';
+      const bar = document.querySelector('header.bar'); if (!bar) return;
+      bar.parentNode.insertBefore(el, bar.nextSibling);
+    }
+    const n = S.notice;
+    el.hidden = !n;
+    if (!n) { el.innerHTML = ''; return; }
+    el.className = 'sys notice lv-' + (n.level || 'info');
+    el.setAttribute('role', n.level === 'error' ? 'alert' : 'status');
+    el.innerHTML = `<div class="strip"><span class="st">${esc(n.text)}</span>`
+      + (n.act ? `<button class="sbtn" type="button" data-act="notice-act">${esc(n.act)}</button>` : '')
+      + `<button class="sbtn ghostish" type="button" data-act="notice-close" aria-label="${esc(n.close || 'Close')}">${esc(n.close || 'Close')}</button></div>`;
+  }
+
+  // ---------- 0.26.0 (block 2): a question to the PM (AskCenter): {id, text, info, buttons: [{id, label, role}]} ----------
+  function askBtnsCard(a) {
+    return (a.buttons || []).map((b) => `<button class="tc-link${b.role === 'danger' ? ' tc-danger' : b.role === 'cancel' ? ' tc-cancel' : ''}" type="button" data-act="ask-b" data-b="${esc(b.id)}">${esc(b.label)}</button>`).join('');
+  }
+  function askCard(a) {
+    return `<div class="tc-alert tc-ask" role="alertdialog" aria-label="${esc(a.text)}"><span class="tc-ntext">${esc(a.text)}</span>${askBtnsCard(a)}</div>`;
+  }
+  function renderAsk() {
+    let el = $('ask');
+    if (!el) {
+      const bar = document.querySelector('header.bar'); if (!bar) return;
+      el = document.createElement('section'); el.id = 'ask'; el.className = 'sys ask'; el.setAttribute('role', 'alertdialog');
+      bar.parentNode.insertBefore(el, bar.nextSibling);
+    }
+    const a = S.ask;
+    el.hidden = !a;
+    if (!a) { el.innerHTML = ''; return; }
+    el.setAttribute('aria-label', a.text);
+    el.innerHTML = `<div class="strip"><span class="st"><b>${esc(a.text)}</b>${a.info ? `<span class="ai">${esc(a.info)}</span>` : ''}</span>`
+      + (a.buttons || []).map((b) => `<button class="sbtn${b.role === 'danger' ? ' danger' : b.role === 'cancel' ? ' ghostish' : ''}" type="button" data-act="ask-b" data-b="${esc(b.id)}">${esc(b.label)}</button>`).join('')
+      + '</div>';
+  }
+  function answerAsk(b) {
+    if (!S.ask) return;
+    post('ask', { id: S.ask.id, b });
+    S.ask = null; render();
+  }
+
   // ---------- 0.8.5 recording problems (P8; rules/recording.yaml) ----------
   function renderSys(on) {
     let el = $('sys');
@@ -1361,14 +1418,15 @@
   function openLinePopover(i, anchor) {
     const l = S.transcript[+i];
     if (!l || !l.t) return;
-    openWhoSheet({ line: l, anchor });
+    // 0.26.0 (owner 19.11): a line of an unnamed voice offers that voice's matches too
+    openWhoSheet({ line: l, anchor, voice: l.speakerId && S.speakers[l.speakerId] });
   }
 
   function openNamePopover(sid, anchor) { openWhoSheet({ sid, anchor }); }
 
   /** 2026-11-05 (owner): one sheet for naming a voice or a line: the name with the people of this meeting as a list
    *  inside the sheet (no system dropdown over the controls), and Team / Client always there, chosen on purpose. */
-  function openWhoSheet({ sid, line, anchor }) {
+  function openWhoSheet({ sid, line, anchor, voice }) {
     const t = T(), pop = $('pop'), sp = sid ? (S.speakers[sid] || {}) : {};
     const r = anchor.getBoundingClientRect();
     const sideOf = (n) => { const x = Object.values(S.speakers).find((v) => v && v.name === n); return (x && x.side) || (S.rosterSide && S.rosterSide[n]) || ''; };
@@ -1378,7 +1436,10 @@
     const addP = (name, score, why) => { if (!name || name === t.me || name === t.them || people.some((p) => p.name === name)) return; people.push({ name, score, why }); };
     (sp.suggestions || []).forEach((x) => addP(x.name, x.score, x.score == null ? ((S.knownSrc || {})[x.name] || 'invited') : 'voice'));
     Object.entries(S.speakers).forEach(([k, v]) => v && k !== sid && addP(v.name, null, 'call'));
+    if (!sid && voice && !voice.name) (voice.suggestions || []).forEach((x) => addP(x.name, x.score, x.score == null ? 'invited' : 'voice'));
     (S.knownNames || []).forEach((n) => addP(n, null, (S.knownSrc || {})[n] || 'project'));
+    // 0.26.0 (owner 19.11): the call's roster (invited, project, voice library) even when no "Who is speaking?" came yet
+    (S.roster || []).forEach((r) => addP(r.name, null, ['call', 'invited', 'project', 'library'].includes(r.src) ? r.src : 'library'));
     let libOpen = false;
     let name = sid ? (sp.name || '') : (S.ui.lineWho[lineKey(line)] || '');
     let side = sid ? (sp.side === 'team' || sp.side === 'client' ? sp.side : (name ? sideOf(name) : '')) : (name ? sideOf(name) : '');
@@ -1722,6 +1783,9 @@
         const cur = tl.current || tl.meeting; tl.current = cur === 'uk' ? 'en' : 'uk';
         post('setting', { key: 'tips_lang', value: tl.current }); render(); return;
       }
+      case 'ask-b': answerAsk(b.dataset.b); return;
+      case 'notice-act': if (S.notice) post('notice', { id: S.notice.id, item: 'act' }); S.notice = null; render(); return;
+      case 'notice-close': if (S.notice) post('notice', { id: S.notice.id, item: 'close' }); S.notice = null; render(); return;
       case 'meetend-stop': post('meetend', { item: 'stop' }); S.meetEnd = null; render(); return;
       case 'meetend-keep': post('meetend', { item: 'keep' }); S.meetEnd = null; render(); return;
       case 'sys-restart': post('sys', { item: 'restart' }); return;
@@ -1767,6 +1831,7 @@
     }
   });
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && S.ask) { e.preventDefault(); answerAsk('cancel'); return; }   // 0.26.0: Esc = Cancel
     if (e.target && e.target.matches && e.target.matches('.ratebox input')) {   // 0.9.4: the rating comment
       if (e.key === 'Enter') { e.preventDefault(); const sb = e.target.closest('.ratebox').querySelector('[data-act=rate-save]'); if (sb) sb.click(); }
       else if (e.key === 'Escape') { S.ui.rateOpen = null; render(); }
@@ -1871,6 +1936,10 @@
     setFollow(f) { S.syncA = f && f.n ? { app: String(f.app || ''), n: +f.n } : null; if (S.syncA && !DK.list.length) renderPresentation(); if (S.syncA) goSlide(S.syncA.n, String(f.app || '').toLowerCase().includes('power') ? 'powerpoint' : 'keynote'); else render(); },
     setThumbs(t) { S.thumbs = t || {}; render(); },
     /** 2026-11-10: {left: seconds} while the call is about to stop because the meeting ended; null hides it. */
+    /** 0.26.0: the newest open notice of the app, {id, level, text, act, close}; null hides it. */
+    setNotice(n) { S.notice = n && n.text ? n : null; render(); },
+    /** 0.26.0 (block 2): the open question asked in the tips, {id, text, info, buttons}; null hides it. */
+    setAsk(a) { S.ask = a && a.text ? a : null; render(); },
     setMeetEnd(m) { S.meetEnd = m && m.left != null ? { left: +m.left } : null; render(); },
     /** 0.8.5 (P7): the after-call screen: outcome, series, the follow-up draft. */
     setAfter(a) { S.after = a || null; render(); },

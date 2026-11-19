@@ -3,6 +3,62 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.26.0 (unreleased)
+
+- **Meeting Sheet: blocks explained (2026-11-19):** the Blocks step (Expert, step 2) says what a block is, what happens
+  to a block that is hidden or not added, and what "Only if there is data" does. Every block shows what the
+  preparation puts in it, under its title, and Add a block lists every free block with what it holds instead of a
+  menu of titles. Step 1 has more room between its sections.
+
+- **Settings > Integrations in a clearer order (2026-11-19):** Notion and HubSpot are on the same level at the top
+  (HubSpot is no longer under Advanced), then Google, then **Mac Calendar**, the former Calendars: the Calendar app of
+  this Mac with the accounts added to macOS, so it is clear that nothing is signed in there.
+
+- **Tips window header, speaker names and buttons (2026-11-19):** the header of the tips window (timer, On me, the
+  tools, End call) spans the whole window instead of stopping at the side panel, and wraps to a second row in a narrow
+  window so no button is cut off. End call is only in the header while the call runs (no second one in the title
+  bar, which shows Ending… and Ended). "Who said this?" on a line of an unknown voice offers names again: that voice's
+  matches, the people invited to the call, the project's people and voices from earlier calls. In Roadbook and
+  Broadsheet buttons are one family everywhere: square corners, the button face of On me, no frame on a button filled
+  with a colour (the yellow main button loses its ink line) and no fill on a framed one.
+
+- **No pop-up alerts: notices inside Pacenote (2026-11-19):** messages after a call (Notion, recording, Google Drive,
+  moving a call to another project, diagnostics, the app folder) no longer open a system alert on some screen. They are
+  notices with a level (information, warning, error) and at most one action (Open in Notion, Open in Drive, Open
+  Settings, Try again, Show in Finder). During a call and on the after-call screen a notice is a line on the card or a
+  strip under the header of the tips window; outside a call it is a banner at the top of Home and Settings; with no
+  Pacenote window open, a dot on the menu bar icon (red for an error, orange for a warning) and the notice in the menu
+  bar panel. Information goes away by itself after 8 s, an error stays until you close it, and the panel keeps the
+  last 20 under "Earlier notices". A Notion failure says what went wrong in plain words (the token, access to the
+  Meetings database, its layout, no database chosen, Notion busy or down, no connection, the AI summary) and how to fix
+  it; the raw error stays in logs/notion.log. A finished Drive upload offers "Open in Drive" (it said "Open in Notion").
+
+- **Too short for Notion (2026-11-19):** a call with fewer than 5 transcript lines writes no Notion page and says "Too
+  short for a Notion page: nothing was written." as information, not as an error. The call page says the same in its
+  actions menu.
+
+- **Questions where you clicked (2026-11-19):** End the call? (End call, End and start the next call from Up next,
+  Cancel), Switch to the next call, Remove from Up next, unsaved changes on a call page, moving a Notion task to the
+  Trash and "Write a meeting page in the new project's database?" are asked inline: a line on the card, a strip in the
+  tips window, a bar in Home or Start call, or a row in the menu bar panel. When that place is not visible, the menu bar
+  panel opens. Nothing modal takes the focus from your meeting app; Cancel is always the last button. A question whose
+  window is closed moves to the menu bar panel. Quit during a recorded call asks in the menu bar panel (Stop and quit or
+  Cancel), also for a recording left running from before a restart, and closing the panel cancels the quit. Unsaved
+  changes that get no answer (the window was closed) are saved, so nothing you typed is lost. A call from Up next that
+  did not start says why in a notice and stays in Up next.
+
+- **Expand and Call ended open on the card's screen (2026-11-19):** the full tips window keeps its saved size (or
+  520 x 420, never larger than the screen) and its saved place only when that place is on the screen of the card;
+  otherwise it opens at the top centre of that screen. A window saved on an external monitor no longer opens there
+  while the card is on the MacBook.
+
+- **The first call after launch (2026-11-19):** while the speech model loads on a call that waits for Start, the card
+  and the window say Ready with "Getting ready…" instead of a red Recording and a running timer. Start pressed while the
+  model loads is no longer lost: the call goes live as soon as the model is ready.
+
+- **End call in Ready (2026-11-19):** the card shows End call before the call starts too, so a waiting call can be
+  ended from the card.
+
 ## 0.25.0 (2026-11-19)
 
 - **Release QA fixes (2026-11-19):** the compact card now shows a risk and "Decided earlier" like a tip (the quiet

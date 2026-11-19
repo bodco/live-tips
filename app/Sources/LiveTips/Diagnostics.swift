@@ -22,14 +22,12 @@ enum Diagnostics {
             await setup.checkAll()
             let info = summary(setup)
             let out = await Task.detached(priority: .utility) { build(into: dir, info: info) }.value
-            let a = NSAlert()
+            // 0.26.0 (block 3): a notice with Show in Finder, not an alert.
             if let z = out {
-                a.messageText = L("diag.done")
-                a.informativeText = (z.path as NSString).abbreviatingWithTildeInPath
-                a.addButton(withTitle: L("diag.show")); a.addButton(withTitle: L("common.ok"))
-                if a.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.activateFileViewerSelecting([z]) }
+                NoticeCenter.shared.post(L("diag.done") + ": " + (z.path as NSString).abbreviatingWithTildeInPath,
+                                         level: .info, action: .finder(z.path))
             } else {
-                a.messageText = L("diag.failed"); a.runModal()
+                NoticeCenter.shared.post(L("diag.failed"), level: .error)
             }
         }
     }

@@ -668,7 +668,7 @@ struct SheetMeetingStep: View {
     private var m: StartCallModel { draft.model }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 36) {      // 0.26.0 (owner 19.11): more room between the sections
             VStack(alignment: .leading, spacing: 16) {
                 PrepPageHead(title: L("sheet.ui.s1.title"), sub: L("sheet.ui.s1.sub"))
                 HStack(alignment: .center, spacing: 14) {
@@ -805,6 +805,9 @@ struct SheetBlocksStep: View {
     @State private var suggestNew = false
     @State private var saveNote = ""
     @State private var saved = ""
+    @State private var adding = false
+    /// 0.26.0 (owner 19.11): a row with the block's title and what the preparation puts in it (rules/meeting-sheet.yaml fields)
+    private static let rowH: CGFloat = 60
 
     /// The header and My focus are not rows on the board: the header is always there, My focus has its own plate.
     private static let fixed: Set<String> = ["header", "my_focus"]
@@ -815,8 +818,11 @@ struct SheetBlocksStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             PrepPageHead(title: L("sheet.ui.s2.title"), sub: L("sheet.ui.s2.sub", ["name": draft.preset?.name ?? draft.presetID]))
+            // 0.26.0 (owner 19.11): what a block is, what happens to one that is hidden or not added, what "Only if there is data" does
+            Text(L("sheet.ui.s2.how")).font(th.homeText(14)).foregroundStyle(PN.C.text2)
+                .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 680, alignment: .leading)
             HStack(alignment: .top, spacing: 28) {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 28) {
                     focusPlate
                     shownList
                     if !hidden.isEmpty { hiddenList }
@@ -877,16 +883,21 @@ struct SheetBlocksStep: View {
                 .onMove { moveShown($0, $1) }
             }
             .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true)
-            .environment(\.defaultMinListRowHeight, 43)
-            .frame(height: CGFloat(max(1, list.count)) * 43)
+            .environment(\.defaultMinListRowHeight, Self.rowH + 1)
+            .frame(height: CGFloat(max(1, list.count)) * (Self.rowH + 1))
         }
     }
 
     private func blockRow(_ b: Binding<DraftBlock>) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "line.3.horizontal").font(PN.sys(11)).foregroundStyle(PN.C.text3).accessibilityHidden(true)
-            Text(b.wrappedValue.title).font(th.homeText(15, .semibold)).foregroundStyle(PN.C.text).lineLimit(1)
-                .help(lib.blockFields[b.wrappedValue.type] ?? "")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(b.wrappedValue.title).font(th.homeText(15, .semibold)).foregroundStyle(PN.C.text).lineLimit(1)
+                if let f = lib.blockFields[b.wrappedValue.type], !f.isEmpty {
+                    Text(f).font(th.homeText(12)).foregroundStyle(PN.C.text3).lineLimit(2).help(f)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 8)
             if b.wrappedValue.type == "qualification" {
                 PrepMenuField(value: SalesMethods.shared.label(b.wrappedValue.method ?? "bant")) {
@@ -895,12 +906,13 @@ struct SheetBlocksStep: View {
                 .onAppear { SalesMethods.shared.load() }
             }
             Toggle(L("sheet.ui.s2.onlyIfData"), isOn: b.onlyIfData).toggleStyle(.pnCheckbox).font(th.homeText(13)).foregroundStyle(PN.C.text2)
+                .fixedSize().help(L("sheet.ui.s2.onlyIfDataHelp"))
             Button { b.wrappedValue.visible = false } label: {
                 Image(systemName: "eye").foregroundStyle(PN.C.text2).frame(width: 22, height: 22)
             }
             .buttonStyle(.plain).help(L("sheet.ui.s2.hide")).accessibilityLabel(L("sheet.ui.s2.hide") + ": " + b.wrappedValue.title)
         }
-        .frame(height: 42)
+        .frame(height: Self.rowH)
         .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
     }
 
@@ -909,31 +921,64 @@ struct SheetBlocksStep: View {
             PrepSectionHead(number: nil, title: L("sheet.ui.s2.hidden"), note: "\(hidden.count)", mono: true)
             ForEach(hidden) { b in
                 HStack(spacing: 10) {
-                    Text(b.title).font(th.homeText(15)).strikethrough().foregroundStyle(PN.C.text3).lineLimit(1)
-                        .padding(.leading, 21)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(b.title).font(th.homeText(15)).strikethrough().foregroundStyle(PN.C.text3).lineLimit(1)
+                        if let f = lib.blockFields[b.type], !f.isEmpty {
+                            Text(f).font(th.homeText(12)).foregroundStyle(PN.C.text3).lineLimit(2).help(f)
+                        }
+                    }
+                    .padding(.leading, 21)
                     Spacer(minLength: 8)
                     Button { bind(b.id).wrappedValue.visible = true } label: {
                         Image(systemName: "eye.slash").foregroundStyle(PN.C.text3).frame(width: 22, height: 22)
                     }
                     .buttonStyle(.plain).help(L("sheet.ui.s2.show")).accessibilityLabel(L("sheet.ui.s2.show") + ": " + b.title)
                 }
-                .frame(height: 42)
+                .frame(height: Self.rowH)
                 .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
             }
         }
     }
 
+    /// 0.26.0 (owner 19.11): Add a block lists every free block with what it holds (a menu showed titles only).
     private var addBlock: some View {
-        let free = BlockType.known.map(\.rawValue).filter { t in !draft.blocks.contains { $0.type == t } }
-        return Menu {
-            ForEach(free, id: \.self) { t in
-                Button(lib.title(t)) { draft.blocks.append(DraftBlock(type: t, title: lib.title(t), method: t == "qualification" ? "bant" : nil)) }
-            }
-        } label: {
+        let free = BlockType.known.map(\.rawValue).filter { t in !Self.fixed.contains(t) && !draft.blocks.contains { $0.type == t } }
+        return Button { adding = true } label: {
             Text("+ " + L("sheet.ui.s2.add")).font(th.homeText(13, .semibold)).underline().foregroundStyle(PN.C.text)
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .buttonStyle(.plain).fixedSize()
         .disabled(free.isEmpty)
+        .popover(isPresented: $adding, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(L("sheet.ui.s2.addHint")).font(th.homeText(12)).foregroundStyle(PN.C.text3)
+                    .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 14).padding(.vertical, 10)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(free, id: \.self) { t in
+                            Button {
+                                draft.blocks.append(DraftBlock(type: t, title: lib.title(t), method: t == "qualification" ? "bant" : nil))
+                                adding = false
+                            } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(lib.title(t)).font(th.homeText(14, .semibold)).foregroundStyle(PN.C.text)
+                                    Text(lib.blockFields[t] ?? "").font(th.homeText(12)).foregroundStyle(PN.C.text2)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 14).padding(.vertical, 9)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+                            .accessibilityLabel(lib.title(t) + ". " + (lib.blockFields[t] ?? ""))
+                        }
+                    }
+                }
+                .frame(maxHeight: 440)
+            }
+            .frame(width: 420)
+            .background(PN.C.bg)
+        }
     }
 
     @ViewBuilder private var readyMeans: some View {

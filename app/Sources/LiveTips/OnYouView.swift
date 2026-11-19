@@ -195,15 +195,14 @@ struct OnYouView: View {
 
     /// rules/notion-tasks.yaml > remove: a task made by hand in Notion asks once; one from a call does not.
     private func confirmRemove(_ t: NotionTask, _ c: Commitment?) {
-        if c == nil {
-            let a = NSAlert()
-            a.messageText = L("ntask.trashQ", ["title": t.title])
-            a.informativeText = L("ntask.trashInfo")
-            a.addButton(withTitle: L("ntask.moveToTrash"))
-            a.addButton(withTitle: L("hk.cancel"))
-            guard a.runModal() == .alertFirstButtonReturn else { return }
+        guard c == nil else { ntasks.remove(pageId: t.id, title: t.title, commitment: c); return }
+        // 0.26.0 (block 3): asked in the bar on top of the window, not an alert.
+        let store = ntasks
+        AskCenter.shared.ask(kind: "trash", origin: .window, title: L("ntask.trashQ", ["title": t.title]),
+                             info: L("ntask.trashInfo"),
+                             choices: [Ask.Choice(id: "trash", title: L("ntask.moveToTrash"), role: .danger), .cancel()]) { _ in
+            store.remove(pageId: t.id, title: t.title, commitment: nil)
         }
-        ntasks.remove(pageId: t.id, title: t.title, commitment: c)
     }
 
 }

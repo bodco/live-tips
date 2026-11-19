@@ -129,7 +129,9 @@ struct PNTheme {
         }
     }
     /// The main button draws a frame only when it differs from its fill (Roadbook Light: yellow in an ink frame).
-    var framedAccent: Bool { actEdge != accent }
+    /// 0.26.0 (owner 19.11): a button filled with a colour never gets a frame (the yellow with an ink line looked heavy);
+    /// a frame is for a button on the page's own background. actEdge still frames a switched-on toggle and checkbox.
+    var framedAccent: Bool { false }
 
     /// Letter case of buttons, labels and section heads (Roadbook sets them in capitals).
     func cased(_ s: String) -> String { caps ? s.uppercased() : s }

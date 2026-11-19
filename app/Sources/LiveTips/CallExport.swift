@@ -126,7 +126,7 @@ struct ExportPanel: View {
     @State private var note = ""
     @State private var busy = false
 
-    private var notionReady: Bool { SettingsWindow.model.isSet(.notionToken) }
+    private var notionReady: Bool { SettingsWindow.model.notionConnected }
     @ObservedObject private var google = GoogleService.shared
     @State private var googleAccount = ""
     private var googleAccounts: [GoogleAccount] { google.accounts.filter { $0.has(GoogleScopes.export) } }
@@ -282,7 +282,7 @@ struct ExportPanel: View {
     /// A page in the meetings database (Settings > Integrations > Notion), blocks of at most 2000 characters, 100
     /// per request. Only on the PM's click.
     static func toNotion(_ md: String, title: String, file: String) async -> String {
-        guard let tok = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken) else { return L("nset.saveToken") }
+        guard let tok = NotionAuth.token() else { return L("nset.saveToken") }
         let db = AppConfig.load(from: AppPaths.config).notionMeetingsDB
         guard !db.isEmpty else { return L("tr.noMeetingsDb") }
         let blocks = DocMD.notion(DocMD.parse(md))   // 0.9.5.2: ### headings, bold, nested lists as Notion has them

@@ -43,7 +43,7 @@ Both share the same rules (`rules/`) and the same recorder, so tips behave the s
 - **Back-to-back calls (Up next):** plan and prepare the next calls while one is live, then switch with one question: the current call ends properly and the next starts with its preparation.
 - **Call recording (optional):** the sound, or the sound and the screen (a whole screen or the call's window), saved on your Mac for watching a call again, for example to read the other side's reactions; start, pause and stop it in the call window, or record every call. Upload to your own Google Drive by a click or after every call, to share it.
 - **Any language in, one language out:** set the call to one language and every speaker is written in it (Ukrainian on an English call comes out in English).
-- **After the call:** full call notes in the project folder after every call, with or without Notion; with Notion connected, also a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page. A follow-up email is only a draft: nothing is sent to clients by itself.
+- **After the call:** full call notes in the project folder after every call, with or without Notion; with Notion connected (**Connect with Notion** in Settings > Integrations: you pick the pages in Notion's own consent, Pacenote makes its own Meetings database, and no key to paste), also a Notion page in the call's language (summary, decisions, our commitments, new requests, open questions, risks, action items) with the whole transcript as a sub-page. A follow-up email is only a draft: nothing is sent to clients by itself.
 
 How it compares with Fireflies and Fathom (price, recording, live help, preparation, summary, CRM, data): [Pacenote vs Fireflies vs Fathom](https://pacenote.bodco.pm/compare/).
 
@@ -105,7 +105,7 @@ not built: [docs/team](docs/team/README.md).
 | `skill/` | The Cowork skill: `SKILL.md`, `references/`, `settings.yaml` |
 | `spikes/m0/` | The tips engine (Python) and its tests |
 | `rules/` | Shared rules for the app and the skill |
-| `notion-mirror/` | Optional local copy of Notion pages for facts and search |
+| `notion-mirror/` | Optional local copy of Notion pages for facts and search, with or without PM Control Tower |
 | `telemetry/` | The Cloudflare Worker behind the optional Help improve Pacenote (event names and numbers only) |
 | `keepalive/` | Optional Cowork plugin that keeps the skill listening during a call |
 | `docs/` | The full guide: [English](docs/en/live-tips.md), [українською](docs/uk/live-tips.md); the team design in [`docs/team/`](docs/team/README.md) |

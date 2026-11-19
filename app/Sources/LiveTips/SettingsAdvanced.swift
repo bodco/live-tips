@@ -110,7 +110,7 @@ struct PacenoteReadyCard: View {
                            screen = ScreenPermission.granted()
                        }))
         }
-        if model.isSet(.notionToken) {
+        if model.notionConnected {
             out.append(model.config.notionMeetingsDB.isEmpty
                        ? Item(id: "notion", title: "Notion", detail: L("int.notion.noDB"), ok: false, fix: { model.tab = "integrations"; model.integration = "notion" })
                        : Item(id: "notion", title: "Notion", detail: L("ready.notion.ok", ["name": model.config.notionMeetingsName.isEmpty ? "Notion" : model.config.notionMeetingsName]), ok: true))

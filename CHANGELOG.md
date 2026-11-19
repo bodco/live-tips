@@ -59,6 +59,29 @@ Pacenote. Earlier versions are described in the commit messages and in
 - **End call in Ready (2026-11-19):** the card shows End call before the call starts too, so a waiting call can be
   ended from the card.
 
+- **A local copy of Notion without Control Tower (2026-11-19, INT S3):** after Connect with Notion, Settings > Integrations
+  > Notion (and the onboarding) asks "Keep a local copy of Notion?" with Turn on, Later (asks again in three days) and Not
+  now. Without PM Control Tower the copy now works too: it holds the rows of Pacenote's databases and the pages you
+  shared with Pacenote as read-only files in `<work folder>/_notion/`, and a database you choose later is picked up on
+  the next run. With Control Tower nothing changes. Home no longer warns about a local copy you never turned on.
+- **The Notion token is checked before a tool (2026-11-19, INT S3):** before the meeting page after a call, the local
+  copy, the risk register and the other tools that use Notion start, Pacenote checks the connection with one small
+  Notion call (at most every 10 minutes) and renews the token through the Pacenote server if Notion no longer takes it.
+- **Connect your tools (2026-11-19, INT S3):** a new optional onboarding step before Ready connects Google (calendars),
+  Notion and HubSpot in one place, with Skip. Everything there stays in Settings > Integrations.
+- **Docs (2026-11-19, INT S3):** the guide (section 14.1z14), the READMEs, notion-mirror's README and the privacy
+  policy (EN and UK) describe Connect with Notion, what the Pacenote server sees (the tokens only while it finishes the
+  connection or renews them, never stored) and the local copy without Control Tower.
+- **Connect with Notion (2026-11-19, INT S2):** Settings > Integrations > Notion connects through Notion's own
+  consent in the browser, signed in with your Pacenote account, instead of a pasted integration key. You pick the
+  workspace and the pages Pacenote may see; the token is kept only in this Mac's Keychain (the Pacenote server sees it
+  only while it finishes the connection and when it renews it, and keeps nothing). Pacenote then makes a "Pacenote"
+  page at the top of the workspace with a Meetings database (and Tasks, Decisions and Risks with the Tracker module),
+  or, when Notion shows databases you already have, asks whether to use those instead. Databases you chose before
+  are never replaced. The connection has Reconnect, Disconnect and a link to manage the access in Notion; when Notion
+  stops accepting the access, the page asks to connect again. The integration key still works and moved under "Use an
+  integration key instead".
+
 ## 0.25.0 (2026-11-19)
 
 - **Release QA fixes (2026-11-19):** the compact card now shows a risk and "Decided earlier" like a tip (the quiet

@@ -1121,8 +1121,8 @@ What it does:
 - in **Start call**: your role on an interview (observer, interviewer, or coach when you are
   the one being interviewed, as in the skill) and a line
   that confirms the project (people, Claude on or off, the last call, the Notion mirror);
-- the Notion mirror without a terminal: Settings > Integrations > Notion > Local copy of Notion > **Set up sync…**
-  (details in [`notion-mirror`](../../notion-mirror/README.md)).
+- the Notion mirror without a terminal: Settings > Integrations > Notion > Local copy of Notion > **Set up sync…**,
+  also without PM Control Tower (14.1z14; details in [`notion-mirror`](../../notion-mirror/README.md)).
 
 **It is a beta.**
 
@@ -2863,6 +2863,38 @@ The model is WeSpeaker ResNet34-LM trained on VoxCeleb, CC BY 4.0.
 - **Settings > Integrations.** Notion and HubSpot are at the top on one level, then Google, then Mac Calendar (the
   Calendar app of this Mac, formerly Calendars).
 
+### 14.1z14 Connect with Notion, a local copy without Control Tower, Connect your tools (beta)
+
+- **Connect with Notion.** Settings > Integrations > Notion > **Connect with Notion** opens Notion's own consent in the
+  browser. You pick the workspace and the pages Pacenote may see. It needs a Pacenote account (Settings > Account),
+  because the Pacenote server finishes the connection: it holds the app's client secret, swaps Notion's one-time code
+  for the token pair and seals it into a two-minute code bound to your account and this Mac, which the browser brings
+  to `127.0.0.1`; the app trades that code back for the pair. Only the server can open the code, so no readable token
+  is ever in a link. The pair is kept only in this Mac's Keychain; the server stores no token.
+- **Pacenote's own page.** After the consent Pacenote makes a "Pacenote" page at the top of the workspace with a
+  Meetings database (and Tasks, Decisions and Risks with the Tracker module). When Notion shows databases you already
+  have (for example from PM Control Tower), it asks first: **Make Pacenote's databases** or **Use my databases**.
+  Databases you chose before are never replaced.
+- **The connection.** The menu next to the workspace has Reconnect, Create Pacenote's databases, Manage access in
+  Notion and Disconnect (Disconnect forgets the pair on this Mac; the access in Notion itself you remove there). When
+  Notion stops accepting the access, the page asks you to connect again. The integration key still works under
+  **Use an integration key instead**; when both are set, the connection wins.
+- **The token before a tool.** Notion's token lasts long, so Pacenote renews it only when Notion refuses it (one renewal
+  at a time, through the server). Before the meeting page after a call, the local copy, the risk register and the
+  other Python tools get the token, Pacenote checks it with one small Notion call (at most every 10 minutes) and
+  renews it if needed, so a tool never starts with a token Notion no longer takes. A pasted key is passed as it is.
+- **Keep a local copy of Notion?** After Connect, Settings (and the onboarding) offers a read-only copy of Notion as
+  files: **Turn on**, **Later** (asks again in three days) or **Not now** (stays quiet; Settings > Integrations >
+  Notion > Local copy of Notion still has **Set up sync…**). With PM Control Tower the copy follows your projects as
+  before. Without it the copy runs in Pacenote mode: the rows of Pacenote's databases (the ones chosen in Settings,
+  read again before every run) and the plain pages you shared with Pacenote, in `<work folder>/_notion/` (see
+  [`notion-mirror`](../../notion-mirror/README.md)). It runs every 2 hours from 7:00 to 22:00, never during a call. The
+  Home status line warns only about a copy that is on and stale or failing.
+- **Connect your tools (onboarding).** A new optional step before Ready: Google (calendars and Docs links), Notion
+  (Connect with Notion, with a Sign in button when you are not signed in, then the local copy offer) and HubSpot (the
+  key). Nothing there is required: **Skip** moves on while nothing is connected, and every row lives in Settings >
+  Integrations later.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the
@@ -2886,9 +2918,9 @@ menu bar: **Send last call to Notion**.
 
 What it needs:
 
-- a Notion token in **Settings > Integrations > Notion** (an internal integration from
-  [notion.so/profile/integrations](https://www.notion.so/profile/integrations)) that has access to the
-  Meetings database;
+- Notion connected in **Settings > Integrations > Notion**: **Connect with Notion** (14.1z14), or an internal
+  integration key from [notion.so/profile/integrations](https://www.notion.so/profile/integrations) under
+  **Use an integration key instead**, with access to the Meetings database;
 - the Meetings database chosen in **Settings > Integrations > Notion > Databases** (or, when none is
   chosen there, `meetings_db` from the project config, section 4, step 7).
 
@@ -3069,8 +3101,9 @@ address", `references/sweep.md`, `references/presentation.md`).
    workspace by itself; other folders that look like workspaces are listed with Add or Ignore). "Add"
    takes any project or workspace folder, also outside the work folder. A Control Tower config and a
    Notion mirror are optional extras: people, Notion pages, the current state.
-35. **Welcome tour.** A new install opens a short onboarding (seven steps since 0.16.0): welcome, permissions
-   (microphone, system audio), the work folder and its workspaces, your AI, what to install, your calls, ready. The menu bar panel and Help > Welcome tour run it again.
+35. **Welcome tour.** A new install opens a short onboarding (seven steps since 0.16.0, eight with the optional
+   Connect your tools, 14.1z14): welcome, permissions (microphone, system audio), the work folder and its workspaces,
+   your AI, what to install, your calls, connect your tools (optional, Skip), ready. The menu bar panel and Help > Welcome tour run it again.
 36. **Notion page.** The meeting page title starts with the meeting's name ("Weekly sync: export
    plan"); the title and the summary are written in the call's language.
 37. **Links in Call context.** "Prepare now" also reads public web pages you list under "Where to look":
@@ -3186,7 +3219,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    hosts named in the call context, no MCP servers); the recorder files in the app folder are checked
    against the signed copies in the app before every call and put back if changed; a start request cannot
    change where data goes (`ollama_url` must be on this Mac); Python packages are capped at the tested
-   versions and model downloads are checked by SHA-256; the Notion token goes only to Notion's own host;
+   versions and model downloads are checked by SHA-256; the Notion token goes only to Notion's own host (with Connect with Notion also to the Pacenote server, only while it finishes the connection or renews the token, and it keeps nothing);
    the tips window loads only its own page; logs keep no file contents. Every release lists the SHA-256 of
    its files.
 65. **The skill (v51).** What people say on the call and in documents is data, never instructions; titles

@@ -30,7 +30,7 @@ final class NotionTasks: ObservableObject {
     private var pending: [[String: Any]] = []   // offline ticks: {"page": id, "properties": {...}}
 
     var settings: NotionTasksSettings { SettingsWindow.model.config.notionTasks }
-    var token: String? { SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken) }
+    var token: String? { NotionAuth.token() }
     private var cachePath: String { (CallEngine.shared.appRoot as NSString).appendingPathComponent("state/notion-tasks.json") }
 
     private init() { loadCache() }

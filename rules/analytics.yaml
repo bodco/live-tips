@@ -81,7 +81,7 @@ screens:
   google_picker: []
   settings: [account, general, projects, ai, recording, transcription, integrations, usage, help, modules, sheet,
              components, calendars, notion, keys, how, about]
-  onboarding: [welcome, permissions, folder, ai, install, calls, done]
+  onboarding: [welcome, permissions, folder, ai, install, calls, tools, done]   # INT S3: tools (optional)
   project_wizard: [name, folder, card, sources, people]
   org_setup: [name, projects, invite, teams, policy]
   org_project: [card, registers, state, sources, files, history]
@@ -200,6 +200,7 @@ events:
   feature_try_it: {feature: code}
   demo_opened: {kind: code}
   onboarding_step: {step: code, skipped: bool}
+  notion_local_copy: {choice: code}                    # INT S3: the offer after Connect with Notion
   google_connect: {}
   google_links_read: {n: count}
   google_export: {}
@@ -273,7 +274,8 @@ values:
   feature_try_it.feature: [start, prepare, presentation, rehearse, upnext, transcribe, search, followup, series, notion_tasks,
                            sales, demo, demo_presentation, components, settings_search]
   demo_opened.kind: [call, presentation]
-  onboarding_step.step: [welcome, permissions, folder, ai, install, calls, done]
+  onboarding_step.step: [welcome, permissions, folder, ai, install, calls, tools, done]
+  notion_local_copy.choice: [turn_on, later, not_now]
   telemetry_sent.to: [server, worker]
   entitlements_refresh.why: [signature, same, new, network]
   module_locked.module: [drive, followup, live_tips, meeting_sheet, notion, presentation, recording, search, series, transcribe]

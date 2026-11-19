@@ -26,8 +26,9 @@ enum IntegrationRegistry {
     static func status(_ id: String, _ m: SettingsModel, short: Bool = false) -> (String, Bool?) {
         switch id {
         case "notion":
-            guard m.isSet(.notionToken) else { return (L("int.notConnected"), nil) }
-            if case .failed(let e) = m.keyState[.notionToken] ?? .untested { return (e, false) }
+            guard m.notionConnected else { return (L("int.notConnected"), nil) }
+            // INT S2: the OAuth connection wins over a pasted key (NotionOAuthCore.pick)
+            if case .failed(let e) = m.keyState[NotionAuth.viaOAuth ? .notionOAuth : .notionToken] ?? .untested { return (e, false) }
             // 0.25 (R5): connected without a database for meeting notes is a problem to fix (the first user's bug)
             if m.config.notionMeetingsDB.isEmpty { return (L("int.notion.noDB"), false) }
             let dbs = [m.config.notionMeetingsDB, m.config.notionTasks.database, m.config.notionRisksDB].filter { !$0.isEmpty }.count

@@ -343,6 +343,8 @@ final class SettingsModel: ObservableObject {
     func refreshMasks() { for k in SecretStore.Key.allCases { masks[k] = maskedSecret(store.get(k)) } }
     func refreshMask(_ k: SecretStore.Key) { if masks[k] == nil { masks[k] = maskedSecret(store.get(k)) } }     // 0.8.7.1
     func isSet(_ k: SecretStore.Key) -> Bool { store.has(k) }     // 0.8.7.1: presence only
+    /// INT S2: Notion is connected, through OAuth (Connect with Notion) or a key pasted under Advanced.
+    var notionConnected: Bool { store.has(.notionOAuth) || store.has(.notionToken) }
 
     func refreshMirror() {
         mirror = config.workRoot.isEmpty ? MirrorStatus(result: "", lastRunUTC: nil, pages: nil, mode: "") : MirrorStatus.load(workRoot: config.workRoot)
@@ -1265,7 +1267,7 @@ struct SettingsView: View {
                 if projectFilter.isEmpty || !members.isEmpty {
                 Section {
                     // 0.8.8: the workspace's value in the Notion Workspace properties (as for a project, never an id)
-                    if model.isSet(.notionToken), let wi = model.registry.workspaces.firstIndex(where: { $0.name == w.name }) {
+                    if model.notionConnected, let wi = model.registry.workspaces.firstIndex(where: { $0.name == w.name }) {
                         LabeledContent(L("proj.inNotion")) {
                             NotionValuePicker(value: $model.registry.workspaces[wi].notionValue, fallback: w.name, model: model, workspace: true)
                         }
@@ -1354,7 +1356,7 @@ struct SettingsView: View {
     // first user's bug: Notion connected without a database, so a call could not finish its page); the other
     // databases, My tasks and the local copy are under Advanced. (0.15.0 had four groups, one at a time.)
     var notion: some View {
-        let connected = model.isSet(.notionToken)
+        let connected = model.notionConnected
         return Form {
             if !model.config.notionMigrationNote.isEmpty {
                 Section {
@@ -1369,9 +1371,9 @@ struct SettingsView: View {
                 }
             }
             Section {
-                KeyRow(title: L("keys.notion.title"), hint: L("keys.notion.hint"), key: .notionToken, model: model)
-                    .settingsAnchor("int.notion.token")
-                if model.isSet(.notionToken) { NotionSeesLine() }
+                // INT S2: Connect with Notion through the Pacenote server; the pasted key stays as the advanced way
+                NotionConnectSection(model: model)
+                if model.notionConnected { NotionSeesLine() }
             } header: { Text(L("set.connection")) }
             if connected {
             Section {
@@ -1385,6 +1387,11 @@ struct SettingsView: View {
             }
             SettingsAdvancedHeader("notion", summary: L("adv.sum.notion"))
             if notionAdv == "1" {
+            if NotionAuth.viaOAuth && model.isSet(.notionToken) {
+                Section {
+                    KeyRow(title: L("keys.notion.title"), hint: L("ntauth.manual.unused"), key: .notionToken, model: model)
+                }
+            }
             Section {
                 NotionDBRow(kind: "meetings", model: model)
                 NotionDBRow(kind: "tasks", model: model)
@@ -1423,6 +1430,10 @@ struct SettingsView: View {
                         } else if NotionMirrorService.mode(workRoot: model.config.workRoot) == "managed" {
                             Text(L("set.pacenoteRunsItEvery")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                         }
+                        // INT5: without Control Tower the copy holds Pacenote's databases and the shared pages
+                        if NotionMirrorService.layout(workRoot: model.config.workRoot) == "pacenote" {
+                            Text(L("nlc.mode.pacenote")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 } label: {
                     Text(L("set.notionMirror")).help(L("set.aReadOnlyCopy"))
@@ -1436,7 +1447,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped).toggleStyle(.pnSwitch)
         .onAppear { if connected && model.config.notionMeetingsDB.isEmpty && !dest.searched && !dest.busy { dest.find() } }
-        .onChange(of: model.isSet(.notionToken)) { _, on in
+        .onChange(of: model.notionConnected) { _, on in
             // the database is picked right when Notion gets connected
             // (R5, item 3) "Write a meeting page" turns on when the database is picked (NotionDestination.choose), not on the token
             if on && model.config.notionMeetingsDB.isEmpty && !dest.busy { dest.find() }

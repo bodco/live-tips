@@ -1155,7 +1155,7 @@ struct CallPageView: View {
     /// Risks (rules/risks.yaml > after_call): "Add to risk register" is a hover action and a menu item; it writes one
     /// Notion page after the PM confirms. Without a Risks database or Notion it is greyed out with the reason.
     @ViewBuilder private func risks(_ o: CallOutcome, _ proj: Project?) -> some View {
-        let hasDB = SettingsWindow.model.isSet(.notionToken) && !NotionTargets.risksDB(SettingsWindow.model.config, proj).isEmpty && proj != nil
+        let hasDB = SettingsWindow.model.notionConnected && !NotionTargets.risksDB(SettingsWindow.model.config, proj).isEmpty && proj != nil
         PageCard(spacing: 2) {
             PageSectionHead(title: L("call.page.risks"), count: o.risks.isEmpty ? "" : "\(o.risks.count)")
             let _ = links.n
@@ -1191,7 +1191,7 @@ struct CallPageView: View {
     /// Greyed out with the reason (and Settings) without Notion, a project or a Decisions database.
     @ViewBuilder private func decisionsSection(_ o: CallOutcome, _ proj: Project?, _ ws: Workspace?) -> some View {
         let c = SettingsWindow.model.config
-        let token = SettingsWindow.model.isSet(.notionToken)
+        let token = SettingsWindow.model.notionConnected
         let hasDB = token && proj != nil && !NotionTargets.decisionsDB(c, proj).isEmpty
         let reason = !token ? L("dec.noNotion") : proj == nil ? L("dec.noProject") : L("dec.noDB")
         let _ = links.n

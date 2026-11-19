@@ -13,6 +13,7 @@ public struct SecretStore {
         case googleAccounts = "google_accounts"     // 0.9.1: JSON list of the connected Google accounts (refresh tokens)
         case pacenoteSession = "pacenote_session"   // B7: the Pacenote server session (refresh token, who signed in)
         case seriesSalt = "series_salt"             // 0.20.0 (B9): the salt of the series key sent with a call (TeamCalls)
+        case notionOAuth = "notion_oauth"           // INT S2: the Notion OAuth pair and workspace (NotionOAuthRecord JSON)
     }
 
     public let service: String

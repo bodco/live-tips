@@ -551,7 +551,12 @@ final class CallEngine {
     }
 
     /// `lines`: the real transcript lines when known (the call just ended); a call under NotionGate.minLines gets no page.
+    /// INT S3: the OAuth token is checked (and refreshed on a 401) before wrapup_notion gets it.
     func writeToNotion(file: String, lines: Int? = nil) {
+        NotionAuth.ensureFresh { [weak self] _ in self?.writeToNotionNow(file: file, lines: lines) }
+    }
+
+    private func writeToNotionNow(file: String, lines: Int?) {
         let c = config
         // 0.8.5: the call notes do not depend on Notion; they are written even when no meeting page is (once per call).
         let notesComing = writeCallNotes(file: file, config: c,
@@ -564,7 +569,7 @@ final class CallEngine {
         }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
         let aiOK = AIRoute.canRun(job: "after", config: c)
-        guard aiOK, let notionToken = store.get(.notionToken) else {
+        guard aiOK, let notionToken = NotionAuth.token() else {
             AppLog.app("notion: not written (\(aiOK ? "no token" : "no AI for after the call")) call=\(AppLog.stem(file))")
             notionResult = L(aiOK ? "notion.err.noToken" : "notion.err.noAI")
             notify(notionResult, level: .error, settingsTab: aiOK ? "notion" : "ai"); return

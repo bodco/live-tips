@@ -3,6 +3,16 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.26.1 (2026-11-19)
+
+- **What happened, at the top of the Summary (2026-11-19):** the Meeting notes of a call now start with a short
+  numbered list that answers "what happened on the call?" for a colleague who missed it: each point says what was said
+  or asked, what came of it, the numbers that matter and who now waits for what, the way you would retell it, in the
+  call's language. It is on the Summary tab under In short, in Copy and Export, and on the Notion meeting page under
+  the summary. What was discussed stays as it is.
+- **What was discussed is easier to read (2026-11-19):** the points of a topic have half a line between them instead
+  of running together.
+
 ## 0.26.0 (2026-11-19)
 
 - **Meeting Sheet: blocks explained (2026-11-19):** the Blocks step (Expert, step 2) says what a block is, what happens

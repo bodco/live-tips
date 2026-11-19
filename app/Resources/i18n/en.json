@@ -1896,6 +1896,7 @@
  "page.mn.jump": "Open the transcript at this moment",
  "page.mn.jumpTo": "Transcript at {time}",
  "page.mn.tldr": "Summary",
+ "page.mn.recap": "What happened",
  "page.mn.topics": "Topics",
  "page.mn.actions": "Action items",
  "page.mn.open": "Open questions",

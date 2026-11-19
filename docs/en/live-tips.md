@@ -2013,6 +2013,10 @@ People need something else: short notes they can read in a minute and send on. S
 **Summary** tab is these **Meeting notes**:
 
 - **Summary** (TL;DR): two or three sentences on what the call was about and what came out of it.
+- **What happened** (0.26.1): three to six numbered points that answer "what happened on the call?" for a colleague
+  who missed it, told the way you would retell it: what was said or asked, what came of it, the numbers that matter
+  and who now waits for what. It can end with one line on where things stand overall. Copy, Export and the Notion
+  meeting page have it under the summary. Notes made before 0.26.1 have no such list until you make them again.
 - **Decisions**, **Action items** (owner, what, by when as said), **Open questions** and **Risks** (what may go wrong
   and what it depends on; notes made since 0.12.2), each item with its time.
 - **Topics**: four to eight, in the call's order, each with its time, a one-line outcome and two to four points (who,

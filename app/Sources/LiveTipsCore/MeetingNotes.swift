@@ -16,6 +16,10 @@ public enum MeetingNotes {
     public struct Topic: Equatable { public var title: String; public var t: String; public var outcome = ""; public var points: [Item] = [] }
     public struct Notes: Equatable {
         public var tldr = ""
+        /// 0.26.1 (owner: "what happened on the call?"): "### Recap", numbered points told as to a colleague, and the
+        /// closing line without a number.
+        public var recap: [String] = []
+        public var recapNote = ""
         public var decisions: [Item] = []
         public var actions: [Item] = []
         public var open: [Item] = []
@@ -91,7 +95,7 @@ public enum MeetingNotes {
         guard let lines = section(notes) else { return nil }
         var n = Notes()
         var cur = ""
-        let keys = ["tl;dr": "tldr", "decisions": "decisions", "action items": "actions", "open questions": "open",
+        let keys = ["tl;dr": "tldr", "recap": "recap", "decisions": "decisions", "action items": "actions", "open questions": "open",
                     "topics": "topics", "unclear": "unclear", "risks": "risks", "ризики": "risks"]
         for raw in lines {
             let l = raw.trimmingCharacters(in: .whitespaces)
@@ -115,6 +119,11 @@ public enum MeetingNotes {
             let bullet = body != l
             switch cur {
             case "tldr": n.tldr = (n.tldr + " " + body).trimmingCharacters(in: .whitespaces)
+            case "recap":
+                if let r = body.range(of: "^[0-9]{1,2}[.)]\\s+", options: .regularExpression) {
+                    n.recap.append(String(body[r.upperBound...]).trimmingCharacters(in: .whitespaces))
+                } else if bullet { n.recap.append(body) }
+                else { n.recapNote = (n.recapNote + " " + body).trimmingCharacters(in: .whitespaces) }
             case "topics":
                 guard !n.topics.isEmpty else { continue }
                 if !bullet, let r = body.range(of: "^(\\*\\*)?(Outcome|Підсумок|Результат)(\\*\\*)?:\\s*(\\*\\*)?\\s*", options: [.regularExpression, .caseInsensitive]) {
@@ -137,11 +146,13 @@ public enum MeetingNotes {
     public struct Labels {
         public var title, tldr, decisions, actions, open, topics, unclear: String
         public var risks = ""      // 0.12.2 (L3): "### Risks" is written only when this label is set
+        public var recap = ""      // 0.26.1: the Recap is written only when this label is set
         public init(title: String, tldr: String, decisions: String, actions: String, open: String, topics: String, unclear: String) {
             self.title = title; self.tldr = tldr; self.decisions = decisions; self.actions = actions; self.open = open
             self.topics = topics; self.unclear = unclear
         }
         public func withRisks(_ r: String) -> Labels { var l = self; l.risks = r; return l }
+        public func withRecap(_ r: String) -> Labels { var l = self; l.recap = r; return l }
     }
 
     /// Markdown for Copy and Export: "#" title (when given), "##" sections, "###" topics, "- " items with their time.
@@ -151,6 +162,10 @@ public enum MeetingNotes {
         var md = L.title.isEmpty ? "" : String(repeating: "#", count: level - 1) + " " + L.title + "\n"
         if !when.isEmpty { md += "\n" + when + "\n" }
         if !n.tldr.isEmpty { md += "\n" + h + L.tldr + "\n\n" + n.tldr + "\n" }
+        if !L.recap.isEmpty && !n.recap.isEmpty {
+            md += "\n" + h + L.recap + "\n\n" + n.recap.enumerated().map { "\($0.offset + 1). " + $0.element }.joined(separator: "\n") + "\n"
+            if !n.recapNote.isEmpty { md += "\n" + n.recapNote + "\n" }
+        }
         for (title, items) in [(L.decisions, n.decisions), (L.actions, n.actions), (L.open, n.open), (L.risks, n.risks)]
             where !items.isEmpty && !title.isEmpty {
             md += "\n" + h + title + "\n\n" + items.map(line).joined(separator: "\n") + "\n"

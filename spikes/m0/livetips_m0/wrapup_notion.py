@@ -99,7 +99,7 @@ TXT = {
            "prep": "Підготовка: ", "prep_yes": "використана", "prep_no": "не було",
            "tr": "Транскрипт: {n} рядків, мови {langs}, локальний файл {f}", "summary": "Підсумок", "transcript": "Транскрипт",
            "append": "Pacenote: підсумок ({hhmm})", "tr_app": "Транскрипт (Pacenote)", "write": "Ukrainian", "sales": "Sales",
-           "next": "Наступний крок", "objection": "Заперечення", "topics": "Теми", "unclear": "Під питанням",
+           "next": "Наступний крок", "objection": "Заперечення", "topics": "Теми", "unclear": "Під питанням", "recap": "Що було",
            "stage": "Стадія", "stakeholder": "Стейкхолдер", "map": "План дій", "competitor": "Конкурент",
            "price": "Ціна", "over_limit": "Понад межу", "us": "ми", "them": "вони",
            "footer": "Нотатки Pacenote · транскрибовано на пристрої"},
@@ -109,7 +109,7 @@ TXT = {
            "prep": "Preparation: ", "prep_yes": "used", "prep_no": "none",
            "tr": "Transcript: {n} lines, languages {langs}, local file {f}", "summary": "Summary", "transcript": "Transcript",
            "append": "Pacenote: summary ({hhmm})", "tr_app": "Transcript (Pacenote)", "write": "English", "sales": "Sales",
-           "next": "Next step", "objection": "Objection", "topics": "Topics", "unclear": "Unclear",
+           "next": "Next step", "objection": "Objection", "topics": "Topics", "unclear": "Unclear", "recap": "What happened",
            "stage": "Stage", "stakeholder": "Stakeholder", "map": "Mutual plan", "competitor": "Competitor",
            "price": "Price", "over_limit": "Over the limit", "us": "us", "them": "them",
            "footer": "Notes by Pacenote · transcribed on device"},
@@ -277,6 +277,11 @@ def meeting_blocks(m: dict, md: Path, stats: dict, prep_used: bool, lang: str = 
     action items as to-dos, open questions, risks (0.12.2), the topics with their outcome and points; then the agenda, Sales, Pacenote."""
     T = TXT[lang]
     b = [para(m["tldr"])] if m.get("tldr") else []
+    if m.get("recap"):   # 0.26.1: "what happened on the call?" right under the TL;DR
+        b.append(h(3, T["recap"]))
+        b += [{"type": "numbered_list_item", "numbered_list_item": {"rich_text": rt_md(x)}} for x in m["recap"]]
+        if m.get("recap_note"):
+            b.append({"type": "paragraph", "paragraph": {"rich_text": rt_md(m["recap_note"])}})
     for title, key, kind in ((T["decisions"], "decisions", "bulleted_list_item"), (T["actions"], "actions", "to_do"),
                              (T["open"], "open", "bulleted_list_item"), (T["risks"], "risks", "bulleted_list_item")):
         if m.get(key):

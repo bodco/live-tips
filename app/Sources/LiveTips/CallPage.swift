@@ -513,6 +513,24 @@ struct CallPageView: View {
                     .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             }
         }
+        if !m.recap.isEmpty {     // 0.26.1 (owner): "what happened on the call?", numbered, under In short
+            VStack(alignment: .leading, spacing: 0) {
+                PageSectionHead(title: L("page.mn.recap")) { EmptyView() }
+                ForEach(Array(m.recap.enumerated()), id: \.offset) { i, r in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text("\(i + 1).").font(t.homeMono(13)).foregroundStyle(PN.C.text3).frame(width: 24, alignment: .leading)
+                        Text(CallNotes.md(r)).font(t.homeText(16)).lineSpacing(3).foregroundStyle(PN.C.text)
+                            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .pageRow(10)
+                }
+                if !m.recapNote.isEmpty {
+                    Text(CallNotes.md(m.recapNote)).font(t.homeText(16)).lineSpacing(3).foregroundStyle(PN.C.text2)
+                        .textSelection(.enabled).fixedSize(horizontal: false, vertical: true).padding(.top, 10)
+                }
+            }
+        }
         if !m.topics.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 PageSectionHead(title: L("page.mn.topics")) { HomeLink(L("page.mn.seeDiscussed")) { tab = "discussed" } }
@@ -803,11 +821,14 @@ struct CallPageView: View {
                     Text(CallNotes.md(tp.title)).font(t.homeDisplay(20, t.titleWeight)).tracking(t.dTrack * 20).foregroundStyle(PN.C.text)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                ForEach(Array(tp.body.enumerated()), id: \.offset) { _, b in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("·").font(t.homeText(15)).foregroundStyle(PN.C.text3).accessibilityHidden(true)
-                        Text(CallNotes.md(b)).font(t.homeText(15)).lineSpacing(2).foregroundStyle(PN.C.text2)
-                            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                // 0.26.1 (owner: "the points run together"): half a line between the points of a topic
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(Array(tp.body.enumerated()), id: \.offset) { _, b in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("·").font(t.homeText(15)).foregroundStyle(PN.C.text3).accessibilityHidden(true)
+                            Text(CallNotes.md(b)).font(t.homeText(15)).lineSpacing(2).foregroundStyle(PN.C.text2)
+                                .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
                 if !tp.quotes.isEmpty {

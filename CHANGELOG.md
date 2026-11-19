@@ -5,6 +5,15 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.25.0 (unreleased)
 
+- **Live tips read as key, detail and source (2026-11-19, theme pass, stage 3):** a tip now has one strong key line,
+  a quieter line of detail under it, the ready phrase in quotes and, at the bottom, where it comes from ("from Release
+  plan · Nov 14"). The AI writes the source with each tip, and when it leaves it out Pacenote names the documents of the
+  facts the tip used. In the tips window the newest tip sits on a lighter surface with a yellow mark on the left in
+  Roadbook (a rule on top in Broadsheet) and slides in, unless Reduce motion is on; the transcript reads quieter than
+  the tip, Help now is an outlined button, and End call is in the window's header with the same question as before.
+  When someone asks a question, the question is the small line and the answer is the key. The live-tips skill's window
+  shows the same order. Tips written before this version still show their context and source.
+
 - **Who decided, next to each decision; Get ready and the call page redrawn (2026-11-19, theme pass, stage 2):** the
   call notes now name who made each decision ("**Emily Clark**: the export ships on Tuesday"), and the call page, the
   export, the server and the Notion decision register (Stated by) carry the name; older notes without names read as

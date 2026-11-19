@@ -12,10 +12,15 @@
           "minLength": 2,
           "maxLength": 160
         },
+        "detail": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Theme pass stage 3 (2026-11-19): 1-2 plain sentences of context under the key line. Replaces why."
+        },
         "why": {
           "type": "string",
           "maxLength": 300,
-          "description": "1-2 plain sentences of context the PM needs to build an answer (2026-11-05)."
+          "description": "Legacy name of detail, still accepted."
         },
         "level": {
           "enum": [
@@ -36,9 +41,15 @@
           },
           "maxItems": 5
         },
+        "source": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Theme pass stage 3 (2026-11-19): the document or call the tip comes from and its date, e.g. 'Release plan · Nov 14'. Replaces note as the source."
+        },
         "note": {
           "type": "string",
-          "maxLength": 120
+          "maxLength": 120,
+          "description": "Legacy: a short note; before 2026-11-19 the source. Still accepted."
         },
         "topic": {
           "type": "string",

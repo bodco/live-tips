@@ -574,5 +574,53 @@ test('co-driver: a heard question card is replaced in place by its answer (same 
   assert.ok(docs[0].say.startsWith('Once Pomelo'));
 });
 
+// Theme pass stage 3 (2026-11-19): a tip reads as key / detail / phrase / source.
+test('stage 3: answer card: gist is the key, detail under it, source from the engine', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:41:00', kind: 'answer', level: 'info', q: 'when is the production release?', gist: 'Production release: Tue, Nov 24',
+    detail: 'After the Nov 23 review', source: 'Release plan · Nov 14', engine: 'app' }]);
+  const c = get().cards[0];
+  assert.strictEqual(c.key, 'Production release: Tue, Nov 24');
+  assert.strictEqual(c.detail, 'After the Nov 23 review');
+  assert.strictEqual(c.why, 'After the Nov 23 review');
+  assert.strictEqual(c.source, 'Release plan · Nov 14');
+  assert.strictEqual(c.line, '');
+});
+
+test('stage 3: a statement tip with a phrase: gist is the key, the phrase goes under the detail and is what Edit changes', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:42:00', src: '10:41:58', kind: 'tip', level: 'orange', uid: 'k1', gist: '\u{1F7E0} Emily thinks the pilot starts Monday, it is the 10th',
+    detail: 'The status report moved it after the review.', phrase: 'Small correction: the pilot starts on the 10th.', engine: 'app' }]);
+  const c = get().cards[0];
+  assert.strictEqual(c.key, 'Emily thinks the pilot starts Monday, it is the 10th');
+  assert.strictEqual(c.line, 'Small correction: the pilot starts on the 10th.');
+  assert.strictEqual(c.sayIsKey, false);
+  assert.strictEqual(c.say, c.line);
+  f.edit(c.id, 'The pilot starts on the 10th.');
+  const e = get().cards[0];
+  assert.strictEqual(e.line, 'The pilot starts on the 10th.');
+  assert.strictEqual(e.key, 'Emily thinks the pilot starts Monday, it is the 10th');
+});
+
+test('stage 3: a question tip: the question is the small line, the answer is the key', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:43:00', src: '10:42:58', kind: 'tip', level: 'red', gist: '\u{1F3AF} Dana asks: when is the export live?',
+    phrase: 'It is on dev now; production on Tuesday after the review.', engine: 'app' }]);
+  const c = get().cards[0];
+  assert.strictEqual(c.qline, 'Dana: when is the export live?');
+  assert.strictEqual(c.key, 'It is on dev now; production on Tuesday after the review.');
+  assert.strictEqual(c.sayIsKey, true);
+});
+
+test('stage 3: the old format still reads: why is the detail, note the source', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:44:00', kind: 'answer', level: 'info', q: 'find: pilot users', gist: 'Pilot: 5 users, list from the client',
+    why: 'Names come from David by Friday.', note: 'Sources: kickoff-notes.md', engine: 'app' }]);
+  const c = get().cards[0];
+  assert.strictEqual(c.detail, 'Names come from David by Friday.');
+  assert.strictEqual(c.source, 'kickoff-notes.md');
+  assert.strictEqual(c.key, 'Pilot: 5 users, list from the client');
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

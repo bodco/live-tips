@@ -11,10 +11,12 @@ stale_after_s: 20              # automatic tips older than N s are suppressed be
 proactive_default: off
 # 2026-11-05 (owner): tips read like telegrams and needed re-reading. The gist is now a plain sentence about what is
 # happening, a new "why" line gives the context to build an answer, the phrase may be 2-3 natural sentences.
+# Theme pass stage 3 (2026-11-19): a tip reads as key / detail / source. The gist is the key line, "why" is now
+# "detail" (the quieter line under it, why is still read), and "source" names the document and its date.
 limits:
   gist_words_max: 14
-  why_sentences_max: 2
-  why_words_max: 35
+  detail_sentences_max: 2
+  detail_words_max: 35
   phrase_sentences_max: 3
   phrase_words_max_en: 40
   fact_lines_max: 3

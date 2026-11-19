@@ -194,7 +194,7 @@ enum ProjectMeta {
         if p.sample { parts.append(L("proj.meta.sample")) }            // 0.17.0 (5.1)
         if p.status == "archived" { parts.append(L("proj.meta.off")) }
         if p.root.isEmpty { parts.append(L("set.noFolder")) }
-        if model.isSet(.notionToken) { parts.append(L("proj.meta.notion", ["name": p.notionValue.isEmpty ? p.name : p.notionValue])) }
+        if model.notionConnected { parts.append(L("proj.meta.notion", ["name": p.notionValue.isEmpty ? p.name : p.notionValue])) }
         if p.salesEnabled {
             let m = SalesMethods.shared.methods.first { $0.key == p.salesMethod }?.name ?? p.salesMethod
             parts.append(m.isEmpty ? L("proj.sales") : L("proj.meta.sales", ["method": m]))
@@ -245,7 +245,7 @@ struct ProjectSettingsPage: View {
                             .help(L("set.activeOfferedInStart"))
                         LabeledContent(L("proj.inNotion")) {
                             NotionValuePicker(value: $model.registry.projects[i].notionValue, fallback: p.name, model: model)
-                                .disabled(!model.isSet(.notionToken))
+                                .disabled(!model.notionConnected)
                         }
                         .help(L("proj.inNotion.help")).settingsAnchor("pr.notion")
                         Toggle(L("proj.sales"), isOn: $model.registry.projects[i].salesEnabled)

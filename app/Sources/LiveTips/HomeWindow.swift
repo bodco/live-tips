@@ -340,7 +340,9 @@ struct HomeView: View {
         if !CallEngine.shared.problems().isEmpty || CallReadyState.shared.blocked { out.append(Problem(id: "install", text: L("home.finish.install"), run: { SetupWindow.show() })) }
         if !aiReady { out.append(Problem(id: "ai", text: L("home.pill.claude"), run: { SettingsWindow.show(tab: "ai") })) }
         if !calendarOn { out.append(Problem(id: "cal", text: L("home.status.noCalendars"), run: { SettingsWindow.show(tab: "calendars") })) }
-        if !cfg.workRoot.isEmpty, SettingsWindow.model.isSet(.notionToken), MirrorStatus.load(workRoot: cfg.workRoot).health() != "ok" {
+        // INT5: the local copy is optional; only a copy that was turned on and is stale or failing is a problem
+        if !cfg.workRoot.isEmpty, SettingsWindow.model.notionConnected, NotionMirrorService.mode(workRoot: cfg.workRoot) != "none",
+           MirrorStatus.load(workRoot: cfg.workRoot).health() != "ok" {
             out.append(Problem(id: "notion", text: L("home.status.notionStale"), run: { SettingsWindow.show(tab: "notion") }))
         }
         if SpendLedger.monthSpent() >= cfg.budget.monthlyHardUSD * 0.9 {
@@ -955,7 +957,7 @@ struct HomeView: View {
 
     /// First launch (HS row 5): welcome, what Pacenote does, three steps; Recent calls and This week stay hidden.
     private var welcome: some View {
-        let notion = SettingsWindow.model.isSet(.notionToken)
+        let notion = SettingsWindow.model.notionConnected
         let done = [aiReady, calendarOn, notion]
         let firstOpen = done.firstIndex(of: false)
         let left = VStack(alignment: .leading, spacing: 14) {

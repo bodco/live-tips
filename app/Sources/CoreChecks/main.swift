@@ -4291,9 +4291,97 @@ func hotfixF2F6() {
     expect(A.catalog.events["call_ended"]?["lines"] != nil && A.catalog.events["call_started"]?["ready"] != nil, "f7: call_ended lines, call_started ready")
 }
 
+// MARK: 2026-11-19 (INT S2, D52): Connect with Notion through the Pacenote server
+func notionOAuthINT2() {
+    let pair: [String: Any] = ["access_token": "ntn_a1", "refresh_token": "nrt_r1", "workspace_id": "ws-1", "workspace_name": "Acme",
+                               "bot_id": "bot-1", "owner_user_id": "u-1", "workspace_icon": NSNull()]
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    guard var r = NotionOAuthRecord.from(pair: pair, now: t0) else { expect(false, "int2: a pair makes a record"); return }
+    expect(r.accessToken == "ntn_a1" && r.refreshToken == "nrt_r1" && r.workspaceName == "Acme" && r.botID == "bot-1" && r.ownerUserID == "u-1", "int2: fields")
+    expect(NotionOAuthRecord.from(pair: ["access_token": "x"]) == nil, "int2: no refresh token, no record")
+    r.rootPageID = "root-1"
+    expect(NotionOAuthRecord.decode(r.encoded()) == r, "int2: the record round-trips through the Keychain value")
+    expect(NotionOAuthRecord.decode("") == nil && NotionOAuthRecord.decode("{}") == nil && NotionOAuthRecord.decode(nil) == nil, "int2: bad values")
+    let n = NotionOAuthRecord.from(pair: ["access_token": "ntn_a2", "refresh_token": "nrt_r2", "workspace_id": "ws-1"], keeping: r)
+    expect(n?.accessToken == "ntn_a2" && n?.refreshToken == "nrt_r2" && n?.rootPageID == "root-1" && n?.workspaceName == "Acme" && n?.connected == t0,
+           "int2: a refresh keeps the root, the name and the date")
+    let other = NotionOAuthRecord.from(pair: ["access_token": "a", "refresh_token": "b", "workspace_id": "ws-2"], keeping: r)
+    expect(other?.rootPageID == nil, "int2: another workspace starts without a root")
+    // the one token
+    expect(NotionOAuthCore.pick(oauth: r, manual: "ntn_manual") == ("ntn_a1", .oauth), "int2: OAuth wins over the pasted key")
+    expect(NotionOAuthCore.pick(oauth: nil, manual: " ntn_manual ") == ("ntn_manual", .manual), "int2: the pasted key without OAuth")
+    expect(NotionOAuthCore.pick(oauth: nil, manual: "") == (nil, .none), "int2: nothing")
+    // the loopback answer
+    expect(NotionOAuthCore.loopback("/notion?handoff=abcdefghij.klmnopqrstuvwxyz") == .handoff("abcdefghij.klmnopqrstuvwxyz"), "int2: handoff")
+    expect(NotionOAuthCore.loopback("/notion?error=access_denied") == .denied, "int2: cancelled")
+    expect(NotionOAuthCore.loopback("/notion?error=exchange_failed") == .failed("exchange_failed"), "int2: exchange failed")
+    expect(NotionOAuthCore.loopback("/?code=x&state=y") == .bad && NotionOAuthCore.loopback("/notion?handoff=short") == .bad, "int2: not ours")
+    // the server's bodies and answers
+    expect(String(data: NotionOAuthCore.startBody(port: 53682), encoding: .utf8) == #"{"port":53682}"#, "int2: start body")
+    expect(NotionOAuthCore.authorizeURL(Data(#"{"authorize_url":"https://api.notion.com/v1/oauth/authorize?client_id=c"}"#.utf8)) != nil, "int2: Notion's URL")
+    expect(NotionOAuthCore.authorizeURL(Data(#"{"authorize_url":"https://evil.example/x"}"#.utf8)) == nil
+           && NotionOAuthCore.authorizeURL(Data(#"{"authorize_url":"http://api.notion.com/x"}"#.utf8)) == nil, "int2: nothing else is opened")
+    expect(NotionOAuthCore.reconnectNeeded(Data(#"{"type":"notion_reconnect","title":"reconnect_needed"}"#.utf8), status: 409), "int2: reconnect")
+    expect(!NotionOAuthCore.reconnectNeeded(Data(#"{"type":"notion_reconnect"}"#.utf8), status: 503) && !NotionOAuthCore.reconnectNeeded(Data("{}".utf8), status: 409), "int2: not a reconnect")
+    // the blueprint
+    typealias B = NotionBlueprint
+    expect(B.databases(tracker: false).map { $0.kind } == ["meetings"] && B.databases(tracker: true).map { $0.kind } == ["meetings", "tasks", "decisions", "risks"], "int2: databases per module")
+    expect(B.toCreate(chosen: ["meetings": "ds-ct", "tasks": ""], tracker: true).map { $0.kind } == ["tasks", "decisions", "risks"], "int2: a chosen database is never replaced")
+    for db in B.databases(tracker: true) {
+        expect(db.properties.values.filter { $0 == "title" }.count == 1, "int2: one title in \(db.kind)")
+        expect(db.properties["Project"] == "select", "int2: Project in \(db.kind)")
+        for k in db.options.keys { expect(db.properties[k] == "select", "int2: options only on selects (\(db.kind).\(k))") }
+    }
+    expect(B.meetings.properties["Summary"] == "rich_text" && B.meetings.properties["Date"] == "date", "int2: meeting pages (CallExport) find Date and Summary")
+    let root = B.rootPageBody()
+    expect(((root["parent"] as? [String: Any])?["type"] as? String) == "workspace", "int2: the root sits at the top of the workspace")
+    let body = B.databaseBody(B.risks, parentPage: "root-1")
+    let props = ((body["initial_data_source"] as? [String: Any])?["properties"] as? [String: Any]) ?? [:]
+    expect(((body["parent"] as? [String: Any])?["page_id"] as? String) == "root-1" && props.count == B.risks.properties.count, "int2: database body")
+    let sev = ((props["Severity"] as? [String: Any])?["select"] as? [String: Any])?["options"] as? [[String: Any]]
+    expect(sev?.compactMap { $0["name"] as? String } == ["High", "Medium", "Low"], "int2: select options")
+    expect(B.dataSourceID(["data_sources": [["id": "ds-9"]]]) == "ds-9" && B.dataSourceID([:]) == nil, "int2: data source id")
+    let kids: [String: Any] = ["results": [["type": "paragraph", "id": "p"], ["type": "child_database", "id": "db-1", "child_database": ["title": "Meetings"]]]]
+    expect(B.childDatabases(kids) == ["Meetings": "db-1"], "int2: databases under the root")
+    let found: [String: Any] = ["results": [
+        ["object": "page", "id": "x", "parent": ["type": "page_id"], "properties": ["title": ["type": "title", "title": [["plain_text": "Pacenote"]]]]],
+        ["object": "page", "id": "trash", "in_trash": true, "parent": ["type": "workspace"], "properties": ["title": ["type": "title", "title": [["plain_text": "Pacenote"]]]]],
+        ["object": "page", "id": "root-2", "parent": ["type": "workspace"], "properties": ["title": ["type": "title", "title": [["plain_text": "Pacenote"]]]]]]]
+    expect(B.rootInSearch(found) == "root-2", "int2: the root found again, not a nested page or one in the trash")
+    expect(SecretStore.Key(rawValue: "notion_oauth") == .notionOAuth, "int2: the Keychain key")
+}
+
 hotfixF1()
 hotfixF2F6()
 decisionOwnersTP2()
 tipCardPlacementTP4()
+func notionINT3() {
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+    expect(!NotionTokenCheck.needed(viaOAuth: false, lastOK: nil, now: t0), "int3: a pasted key is never checked")
+    expect(NotionTokenCheck.needed(viaOAuth: true, lastOK: nil, now: t0), "int3: OAuth without a check is checked")
+    expect(!NotionTokenCheck.needed(viaOAuth: true, lastOK: t0, now: t0.addingTimeInterval(9 * 60)), "int3: inside the window no check")
+    expect(NotionTokenCheck.needed(viaOAuth: true, lastOK: t0, now: t0.addingTimeInterval(10 * 60)), "int3: after the window a check")
+    expect(NotionTokenCheck.needed(viaOAuth: true, lastOK: t0, now: t0.addingTimeInterval(-60)), "int3: a clock moved back checks again")
+    typealias O = NotionLocalCopyOffer
+    expect(O.shouldShow(connected: true, mirrorMode: "none", choice: "", laterAt: nil, now: t0), "int3: offer after connect")
+    expect(!O.shouldShow(connected: false, mirrorMode: "none", choice: "", laterAt: nil, now: t0), "int3: no offer without Notion")
+    expect(!O.shouldShow(connected: true, mirrorMode: "managed", choice: "", laterAt: nil, now: t0), "int3: no offer when the copy runs")
+    expect(!O.shouldShow(connected: true, mirrorMode: "external", choice: "", laterAt: nil, now: t0), "int3: no offer for the own mirror")
+    expect(!O.shouldShow(connected: true, mirrorMode: "none", choice: "no", laterAt: nil, now: t0), "int3: Not now stays quiet")
+    expect(!O.shouldShow(connected: true, mirrorMode: "none", choice: "later", laterAt: t0, now: t0.addingTimeInterval(86_400)), "int3: Later waits")
+    expect(O.shouldShow(connected: true, mirrorMode: "none", choice: "later", laterAt: t0, now: t0.addingTimeInterval(3 * 86_400)), "int3: Later comes back")
+    let sec = NotionMirrorPacenote.section(root: "root-1", meetings: "m1", tasks: " ", decisions: "d1", risks: "")
+    expect((sec["root_page_id"] as? String) == "root-1" && (sec["databases"] as? [String: String]) == ["meetings": "m1", "decisions": "d1"],
+           "int3: the mirror section keeps only chosen databases")
+    expect(NotionMirrorPacenote.section(root: nil, meetings: "", tasks: "", decisions: "", risks: "")["root_page_id"] == nil, "int3: no root, no key")
+    let cfg: [String: Any] = ["work_root": "/w", "projects_ds": "p1", "databases": ["meetings": "ct"], "mode": "pacenote"]
+    let mg = NotionMirrorPacenote.merged(cfg, section: sec)
+    expect((mg["projects_ds"] as? String) == "p1" && (mg["databases"] as? [String: String]) == ["meetings": "ct"] && mg["pacenote"] != nil,
+           "int3: merging keeps the Control Tower part")
+    expect(NotionMirrorPacenote.mode(mg) == "pacenote" && NotionMirrorPacenote.mode(["work_root": "/w"]) == "control_tower", "int3: mode")
+}
+
+notionOAuthINT2()
+notionINT3()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

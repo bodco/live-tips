@@ -44,6 +44,7 @@ events:
   feature_try_it: [feature]
   demo_opened: [kind]
   onboarding_step: [step, skipped]
+  notion_local_copy: [choice]              # INT S3: Turn on / Later / Not now after Connect with Notion
   google_connect: []
   google_links_read: [n]
   google_export: []

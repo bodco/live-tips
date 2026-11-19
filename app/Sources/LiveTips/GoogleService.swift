@@ -25,6 +25,9 @@ final class LoopbackReceiver {
     private var done: ((String?) -> Void)?
     /// B7: the page after signing in to Pacenote says so (the Google accounts keep the old line).
     var okTitle = "Pacenote is connected to Google"
+    /// INT S2: what an answer that worked carries (Google: `code=`; the Notion handoff from the server: `handoff=`).
+    var okMarker = "code="
+    var failTitle = "Google did not connect"
 
     func start(_ ready: @escaping (UInt16?) -> Void, received: @escaping (String?) -> Void) {
         done = received
@@ -50,12 +53,13 @@ final class LoopbackReceiver {
             let first = req.split(separator: "\r\n").first ?? ""
             let target = first.split(separator: " ").dropFirst().first.map(String.init) ?? ""
             if target.hasPrefix("/favicon") { c.cancel(); return }
-            let ok = target.contains("code=")
+            let ok = target.contains(self?.okMarker ?? "code=")
             let okTitle = self?.okTitle ?? "Pacenote is connected to Google"
+            let failTitle = self?.failTitle ?? "Google did not connect"
             let html = """
             <!doctype html><meta charset="utf-8"><title>Pacenote</title>
             <body style="font:16px -apple-system,sans-serif;margin:15vh auto;max-width:460px;text-align:center;color:#1d1d1f">
-            <h2>\(ok ? okTitle : "Google did not connect")</h2>
+            <h2>\(ok ? okTitle : failTitle)</h2>
             <p>\(ok ? "You can close this tab and go back to Pacenote." : "Go back to Pacenote and try again.")</p></body>
             """
             let resp = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(html.utf8.count)\r\nConnection: close\r\n\r\n" + html

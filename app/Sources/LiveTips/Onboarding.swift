@@ -8,9 +8,10 @@ import SwiftUI
 /// 0.16.0 (D3): seven steps. Welcome (the three moments of a call), Permissions, Folder, AI with the fallback chain,
 /// What to install (required parts locked, optional ones unticked), Your calls (new: Quick or Expert, tips, recording,
 /// consent; it only sets what Settings already has), Ready with a practice call.
+/// INT S3: an optional "Connect your tools" step before Ready (Google calendars, Notion, HubSpot), with Skip.
 @MainActor
 final class OnboardingModel: ObservableObject {
-    enum Step: Int, CaseIterable { case welcome, permissions, folder, ai, install, calls, done }
+    enum Step: Int, CaseIterable { case welcome, permissions, folder, ai, install, calls, tools, done }
     /// 0.24.1 (F2): the step is saved, so an unfinished onboarding opens where it was left after a restart.
     static let stepKey = "onboardingStep"
     @Published var step: Step = .welcome {
@@ -240,6 +241,7 @@ struct OnboardingView: View {
         case .ai: return L("onboarding.claude.title")
         case .install: return L("onb.install.title")
         case .calls: return L("onb.calls.title")
+        case .tools: return L("onb.tools.title")
         case .done: return L("onboarding.done.title")
         }
     }
@@ -252,6 +254,7 @@ struct OnboardingView: View {
         case .ai: return L("onb.ai.body")
         case .install: return L("onb.install.body")
         case .calls: return L("onb.calls.body")
+        case .tools: return L("onb.tools.body")
         case .done: return L("onb.done.body")
         }
     }
@@ -371,6 +374,8 @@ struct OnboardingView: View {
             ComponentsChecklist(provider: provider) { m.next() }
         case .calls:
             OnboardingCallsStep(settings: settings)
+        case .tools:
+            OnboardingToolsStep(settings: settings)
         case .done:
             VStack(spacing: 10) {
                 VStack(spacing: 0) {
@@ -457,6 +462,7 @@ struct OnboardingView: View {
         case .welcome: return L("onb.welcome.cta")
         case .ai: return AIRoute.connected().subtracting([AIRoute.local]).isEmpty ? L("onboarding.claude.continueNoKey") : L("common.continue")
         case .done: return L("onb.done.practiceCta")
+        case .tools: return OnboardingToolsStep.anyConnected ? L("common.continue") : L("onb.tools.skip")
         default: return L("common.continue")
         }
     }
@@ -464,6 +470,7 @@ struct OnboardingView: View {
     func primary() {
         switch m.step {
         case .folder: m.applyFolders(); SampleProjectMaker.makeOnce(settings); m.next()   // 0.17.0 (5.1)
+        case .tools: OnboardingToolsStep.anyConnected ? m.next() : m.skip()               // INT S3: optional
         case .done:
             finish()
             UsageLog.log("practice_call", ["from": "onboarding"])

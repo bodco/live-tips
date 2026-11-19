@@ -49,7 +49,7 @@ public enum UsageLog {
         "decision_added": [], "decision_superseded": [], "auto_added": ["kind", "n"],
         "series_opened": [], "call_page_edited": ["section"], "tip_shown": ["kind"], "tip_action": ["kind", "action"],
         "help_now": [], "ask_typed": [], "hotkey": ["name"], "update_crm": ["fields"], "answer_card_saved": [],
-        "feature_try_it": ["feature"], "demo_opened": ["kind"], "onboarding_step": ["step", "skipped"],
+        "feature_try_it": ["feature"], "demo_opened": ["kind"], "onboarding_step": ["step", "skipped"], "notion_local_copy": ["choice"],
         "google_connect": [], "google_links_read": ["n"], "google_export": [], "google_meet": ["transcript"],
         "tip_rated": ["kind", "verdict", "reason"], "speakers_merged": ["aliases"], "meet_participants": ["n", "named"],
         "telemetry_sent": ["lines", "to"],

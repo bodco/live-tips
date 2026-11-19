@@ -6,6 +6,9 @@ import LiveTipsCore
 /// with the Notion token from the Keychain (--discover) and starts the first full run. After that the
 /// app runs it every 2 hours, never during a call. A mirror the user already runs with their own
 /// launchd job (a config without "managed_by") is left alone: the app only reads its status.
+/// INT5 (S3): without Control Tower the mirror runs in Pacenote mode: the config's "pacenote" section (Pacenote's root
+/// page and the databases chosen in Settings, rewritten before every run) and the plain pages shared with Pacenote,
+/// all under <work>/_notion/. The token is checked (and refreshed on a 401) before every run.
 final class NotionMirrorService: @unchecked Sendable {
     nonisolated(unsafe) static let shared = NotionMirrorService()
     private var running: Process?
@@ -26,7 +29,7 @@ final class NotionMirrorService: @unchecked Sendable {
     }
 
     private var config: AppConfig { AppConfig.load(from: AppPaths.config) }
-    private var token: String? { SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken) }
+    private var token: String? { NotionAuth.token() }
 
     func startSchedule() {
         guard timer == nil else { return }
@@ -73,6 +76,7 @@ final class NotionMirrorService: @unchecked Sendable {
         cfg["secrets_file"] = ""
         cfg["token_env"] = ""
         cfg["managed_by"] = "live-tips"
+        cfg = NotionMirrorPacenote.merged(cfg, section: Self.pacenoteSection(c))
         if let out = try? JSONSerialization.data(withJSONObject: cfg, options: [.prettyPrinted, .sortedKeys]) {
             try? out.write(to: URL(fileURLWithPath: Self.configPath(workRoot: c.workRoot)), options: .atomic)
         }
@@ -85,9 +89,43 @@ final class NotionMirrorService: @unchecked Sendable {
 
     func syncNow() { run([], done: nil) }
 
+    /// Pacenote's root page (from the OAuth connection) and the databases chosen in Settings.
+    static func pacenoteSection(_ c: AppConfig) -> [String: Any] {
+        let st = NotionAuth.store
+        let root = st.has(.notionOAuth) ? NotionOAuthRecord.decode(st.get(.notionOAuth))?.rootPageID : nil
+        return NotionMirrorPacenote.section(root: root, meetings: c.notionMeetingsDB, tasks: c.notionTasks.database,
+                                            decisions: c.notionDecisionsDB, risks: c.notionRisksDB)
+    }
+
+    /// A managed config gets the current "pacenote" section before each run; the person's own mirror is never touched.
+    private static func refreshSection(_ c: AppConfig) {
+        let path = configPath(workRoot: c.workRoot)
+        guard mode(workRoot: c.workRoot) == "managed", let d = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return }
+        let n = NotionMirrorPacenote.merged(o, section: pacenoteSection(c))
+        if let out = try? JSONSerialization.data(withJSONObject: n, options: [.prettyPrinted, .sortedKeys]) {
+            try? out.write(to: URL(fileURLWithPath: path), options: .atomic)
+        }
+    }
+
+    /// "pacenote" (no Control Tower) or "control_tower", from the managed config; "" when there is none.
+    static func layout(workRoot: String) -> String {
+        guard !workRoot.isEmpty, let d = try? Data(contentsOf: URL(fileURLWithPath: configPath(workRoot: workRoot))),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], o["projects_ds"] != nil || o["mode"] != nil else { return "" }
+        return NotionMirrorPacenote.mode(o)
+    }
+
     private func run(_ args: [String], done: (@Sendable (Bool, String) -> Void)?) {
+        guard token != nil else { done?(false, L("nm.tokenFirst")); return }
+        NotionAuth.ensureFresh { [weak self] tok in
+            guard let tok, !tok.isEmpty else { done?(false, L("nm.tokenFirst")); return }
+            self?.launch(args, token: tok, done: done)
+        }
+    }
+
+    private func launch(_ args: [String], token tok: String, done: (@Sendable (Bool, String) -> Void)?) {
         let c = config
-        guard let tok = token else { done?(false, "No Notion token"); return }
+        Self.refreshSection(c)
         let dir = Self.dir(workRoot: c.workRoot)
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.python.isEmpty ? "/usr/bin/python3" : c.engine.python)

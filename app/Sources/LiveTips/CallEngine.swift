@@ -543,14 +543,19 @@ final class CallEngine {
         do { try p.run() } catch { done(error.localizedDescription) }
     }
 
+    /// INT S3: the OAuth token is checked (and refreshed on a 401) before wrapup_notion gets it.
     func writeToNotion(file: String) {
+        NotionAuth.ensureFresh { [weak self] _ in self?.writeToNotionNow(file: file) }
+    }
+
+    private func writeToNotionNow(file: String) {
         let c = config
         // 0.8.5: the call notes do not depend on Notion; they are written even when no meeting page is (once per call).
         let notesComing = writeCallNotes(file: file, config: c,
                                          hasConfig: !projectConfig.isEmpty && FileManager.default.fileExists(atPath: projectConfig))
         guard c.notionWriteSummary else { AppLog.app("notion: not written (meeting pages are off) call=\(AppLog.stem(file))"); return }
         let store = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips")
-        guard AIRoute.canRun(job: "after", config: c), let notionToken = store.get(.notionToken) else {
+        guard AIRoute.canRun(job: "after", config: c), let notionToken = NotionAuth.token() else {
             AppLog.app("notion: not written (\(AIRoute.canRun(job: "after", config: c) ? "no token" : "no AI for after the call")) call=\(AppLog.stem(file))")
             notionResult = "Notion: add the Notion token in Settings > Notion"; notify(notionResult, settingsTab: "notion"); return
         }

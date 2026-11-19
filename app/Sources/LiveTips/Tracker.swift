@@ -160,7 +160,7 @@ struct TrackerScreen: View {
     @State private var newText = ""
     @State private var newProject = ""
 
-    private var notionOn: Bool { TrackerModel.shotNotion || SettingsWindow.model.isSet(.notionToken) }
+    private var notionOn: Bool { TrackerModel.shotNotion || SettingsWindow.model.notionConnected }
     private var me: [String] { ["me"] + SettingsWindow.model.config.nameAliases.map { $0.lowercased() } }
 
     private func isMine(_ i: TrackerItem) -> Bool {

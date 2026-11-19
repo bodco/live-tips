@@ -4,11 +4,16 @@
 Read-only copy of the working Control Tower in Notion, laid out like Notion:
   <work>/<Workspace>/<Project>/_notion/<db>/<date> <title> [<32-hex page id>].md
 
+Pacenote mode (no Control Tower, "Connect with Notion" in the Pacenote app): the config's "pacenote"
+section names Pacenote's own databases; their rows and the plain pages the person shared go to
+  <work>/_notion/<db>/... and <work>/_notion/pages/...
+
 Notion stays the only place where things are edited. This script only reads
 Notion and writes inside `_notion/` folders (and its own state/log folder).
 
 Usage:
   python3 mirror.py --discover find the Control Tower databases with the token and write them to the config
+                               (no Control Tower but a "pacenote" section: Pacenote mode)
   python3 mirror.py            incremental run (pages edited since last run)
   python3 mirror.py --full     full run (re-reads everything, archives deleted pages)
   python3 mirror.py --status   print the last run status and exit
@@ -145,11 +150,15 @@ DB_NAMES = {"tasks": ["tasks tracker", "tasks"], "threads": ["threads"], "meetin
 def discover(cfg):
     """Finds the Control Tower data sources the integration can see (by title) and writes them to the
     config. Several matches for one name (for example the public template and a working copy both
-    shared with the integration): the most recently edited one wins, and all are listed."""
+    shared with the integration): the most recently edited one wins, and all are listed.
+    No Projects database but a "pacenote" section (INT5): Pacenote mode, no Control Tower needed."""
     api = Notion(get_token(cfg), cfg.get("notion_version", "2025-09-03"), cfg.get("markdown_version"), 0.34)
     out = pick_latest(visible_sources(api))
     if "projects" not in out:
+        if cfg.get("pacenote"):
+            return discover_pacenote(cfg, api)
         raise SystemExit("No Projects database visible to this integration: share the Control Tower page with it")
+    cfg.pop("mode", None)
     cfg["projects_ds"] = out.pop("projects")
     cfg["databases"] = out
     atomic_write(CONFIG_PATH, json.dumps(cfg, ensure_ascii=False, indent=1) + "\n")
@@ -158,6 +167,37 @@ def discover(cfg):
     if missing:
         print("not found (not shared with the integration?): " + ", ".join(missing))
     return 0
+
+
+def pacenote_databases(cfg):
+    """Pacenote mode: config key -> data source id from the "pacenote" section (empty ones skipped)."""
+    return {k: v for k, v in ((cfg.get("pacenote") or {}).get("databases") or {}).items() if v}
+
+
+def discover_pacenote(cfg, api):
+    """Checks that the token reaches each of Pacenote's databases; the run itself reads the "pacenote"
+    section every time, so a database chosen later in the app is picked up without a new discover."""
+    ok, bad = [], []
+    for key, ds in sorted(pacenote_databases(cfg).items()):
+        try:
+            api.data_source(ds)
+            ok.append(key)
+        except NotionError as e:
+            bad.append("%s (HTTP %s)" % (key, e.code))
+    cfg["mode"] = "pacenote"
+    cfg["projects_ds"] = ""
+    cfg["databases"] = {}
+    atomic_write(CONFIG_PATH, json.dumps(cfg, ensure_ascii=False, indent=1) + "\n")
+    print("pacenote mode: " + (", ".join(ok) if ok else "no databases yet") + " + shared pages")
+    if bad:
+        print("not reachable with this token: " + ", ".join(bad))
+    return 0
+
+
+def page_is_standalone(page):
+    """A plain page (top of the workspace or under another page), not a database row."""
+    return ((page.get("parent") or {}).get("type") in ("workspace", "page_id", "block_id")
+            and not page.get("in_trash") and not page.get("archived"))
 
 
 def visible_sources(api):
@@ -842,10 +882,16 @@ class MirrorRun:
                                "" if (self.full or self.only_tr) else " since " + self.since))
         self.api = Notion(get_token(cfg), cfg.get("notion_version", "2025-09-03"), cfg.get("markdown_version"),
                           cfg.get("pause_seconds", 0.34))
-        # 1. Workspaces and Projects (always full, they are small).
-        dbs = linked_databases(cfg, self.api.data_source(cfg["projects_ds"]))
-        self.projects = self.api.query_all(cfg["projects_ds"])
-        self.workspaces = self.api.query_all(dbs["_workspaces"]) if dbs.get("_workspaces") else []
+        self.pacenote = cfg.get("mode") == "pacenote"
+        if self.pacenote:
+            # INT5: no Control Tower. Pacenote's own databases and the shared pages, all under <work>/_notion/.
+            dbs = pacenote_databases(cfg)
+            self.projects, self.workspaces = [], []
+        else:
+            # 1. Workspaces and Projects (always full, they are small).
+            dbs = linked_databases(cfg, self.api.data_source(cfg["projects_ds"]))
+            self.projects = self.api.query_all(cfg["projects_ds"])
+            self.workspaces = self.api.query_all(dbs["_workspaces"]) if dbs.get("_workspaces") else []
         self.layout = Layout(cfg, self.workspaces, self.projects)
         self.titles = {k: v.get("title", "") for k, v in self.state["pages"].items()}
         for p in self.projects + self.workspaces:
@@ -854,6 +900,8 @@ class MirrorRun:
         self.rs = Resolver(self.titles, self.users, self.state.setdefault("titles_extra", {}), self.lookup_title,
                            cfg.get("max_page_lookups", 200))
         rows, seen = self.collect_rows(dbs)          # 2. changed rows per database
+        if self.pacenote and not self.only_tr:
+            rows += self.collect_pages(seen)          # 2b. Pacenote mode: plain pages shared with Pacenote
         self.write_projects()                        # 3. projects, current state, workspaces
         self.write_rows(rows)                        # 4. database rows
         archived = self.archive_missing(seen) if self.full else 0     # 5. pages gone from their database
@@ -898,6 +946,37 @@ class MirrorRun:
                 rows.append((key, r))
             log("  %s: %d changed" % (key, len(res)))
         return rows, seen
+
+    def collect_pages(self, seen):
+        """Plain pages the token sees, newest edit first; an incremental run stops at the window."""
+        out, cursor = [], None
+        seen["pages"] = set()
+        try:
+            while True:
+                body = {"filter": {"property": "object", "value": "page"}, "page_size": 100,
+                        "sort": {"direction": "descending", "timestamp": "last_edited_time"}}
+                if cursor:
+                    body["start_cursor"] = cursor
+                r = self.api.req("POST", "/search", body)
+                stop = False
+                for pg in r.get("results", []):
+                    if self.since and (pg.get("last_edited_time") or "") < self.since:
+                        stop = True
+                        break
+                    if not page_is_standalone(pg):
+                        continue
+                    pid = norm_id(pg["id"])
+                    seen["pages"].add(pid)
+                    self.titles[pid] = title_of(pg)
+                    out.append(("pages", pg))
+                if stop or not r.get("has_more"):
+                    break
+                cursor = r.get("next_cursor")
+        except NotionError as e:
+            seen.pop("pages", None)   # never archive pages after a failed listing
+            self.error("pages: %s" % e, "search pages: %s" % e)
+        log("  pages: %d changed" % len(out))
+        return out
 
     def page_text(self, page, key, children, head_extra):
         """(the rendered file, whether a transcript was asked for, its state)."""

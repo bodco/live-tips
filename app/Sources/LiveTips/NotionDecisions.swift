@@ -39,7 +39,7 @@ final class NotionLinksVersion: ObservableObject {
 /// project's active decisions that the preparation and the live engine read.
 @MainActor
 enum NotionAutoAdd {
-    static var hasToken: Bool { SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken) != nil }
+    static var hasToken: Bool { NotionAuth.token() != nil }
 
     /// 40 s after the call (after the register write), when the PM turned the switches on; never for a hidden call.
     static func afterCall(file: String) {

@@ -141,7 +141,7 @@ final class CallPageSync: ObservableObject {
     init(file: String) { self.file = file }
 
     var notionURL: String? {
-        guard SettingsWindow.model.isSet(.notionToken),
+        guard SettingsWindow.model.notionConnected,
               let u = CallHistory.shared.records.first(where: { $0.file == file })?.notionURL, !u.isEmpty else { return nil }
         return u
     }

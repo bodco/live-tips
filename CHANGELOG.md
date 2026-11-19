@@ -5,8 +5,8 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.25.0 (unreleased)
 
-- **A compact tip card under the camera (2026-11-19, theme pass, stage 4):** Settings > General > Calls has a new
-  choice, "Live tips during a call": Classic window (as before) or Compact card. The card is a small panel at the top
+- **A compact tip card under the camera (2026-11-19, theme pass, stage 4):** Settings > General > Advanced > Calls has a
+  new choice, "Live tips during a call": Classic window (as before) or Compact card. The card is a small panel at the top
   centre of the built-in screen, just under the camera (under the notch, or under the menu bar), so your eyes stay near
   the lens. It shows one tip at a time: the question, the key line, the detail and the source, with Mute, Pause, Help
   now, Expand and End call in its top row. With more than one tip, "Previous tip" and "Latest tip" page through them; a

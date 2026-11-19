@@ -3,7 +3,7 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.25.0 (unreleased)
+## 0.25.0 (2026-11-19)
 
 - **Expert steps 1 to 3 in the look of the boards (2026-11-19, R3c-2):** the steps on top are numbered squares, a
   passed step is ticked and the open one is underlined; the main button shows Return (↵). Meeting: the calendar
@@ -131,7 +131,7 @@ Pacenote. Earlier versions are described in the commit messages and in
   ("Release checklist review"), not a run-together key. Without Notion, the Decisions and Risks tabs no longer offer
   New decision or New risk and say that they need Notion; decision dates read "18 Nov".
 
-## 0.24.1 (unreleased)
+Also in this release, the fixes prepared as 0.24.1:
 
 - **Setup installs everything in one go, with no Terminal or browser (2026-11-18):** Pacenote now downloads its own
   Python 3.13 (about 25 MB, checked by its SHA-256) instead of using whatever Python is on the Mac; a Python you

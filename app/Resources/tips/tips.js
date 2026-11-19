@@ -660,7 +660,10 @@
       ${idle ? '' : `<button class="tc-end" type="button" data-act="end-call" title="${esc(t.endCallTip)}">${esc(t.endCall)}</button>`}
     </div>`;
     let note = '';
-    if (S.sys && !ended) note = `<div class="tc-alert warn" role="status"><span>${esc(c2.problem)}</span><button class="tc-link" type="button" data-act="card-expand">${esc(c2.open)}</button></div>`;
+    // 0.25 (review): the meeting-ended countdown shows on the card too, or the call would stop with no way to keep it
+    const me = T().meetEnd;
+    if (S.meetEnd && !ended) note = `<div class="tc-alert warn" role="alert"><span>${esc(me.q({ n: S.meetEnd.left }))}</span><button class="tc-link" type="button" data-act="meetend-keep">${esc(me.keep)}</button><button class="tc-link" type="button" data-act="meetend-stop">${esc(me.stop)}</button></div>`;
+    else if (S.sys && !ended) note = `<div class="tc-alert warn" role="status"><span>${esc(c2.problem)}</span><button class="tc-link" type="button" data-act="card-expand">${esc(c2.open)}</button></div>`;
     else if (al && al.text) note = `<div class="tc-alert${al.level === 'warn' ? ' warn' : ''}" role="status">${esc(al.text)}</div>`;
     const c = pg.card;
     let body;

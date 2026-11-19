@@ -867,7 +867,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     /// The recorder has stopped: the button says so and the window gets a closing card with the file
     /// (2026-10-23: "I was afraid to close the app before it finished the call").
     func showCallEnded(_ info: [AnyHashable: Any]) {
-        if cardMode { expandCard() }     // theme pass stage 4: the after-call screen needs the full window
+        // theme pass stage 4: the after-call screen needs the full window; 0.25 (review): without taking the focus
+        if cardMode { expandCard(activate: false) }
         let saved = info["saved"] as? Bool ?? false
         afterShown = saved
         if saved { pushAfter() }
@@ -1285,7 +1286,9 @@ extension PrompterController {
     }
 
     /// Expand: the same web view (feed, transcript, settings, everything said so far) moves into the normal tips window.
-    func expandCard() {
+    /// Expand (the person's click) brings the window forward and activates Pacenote; the end of a call (activate: false)
+    /// only shows it, so Zoom or Meet keeps the focus.
+    func expandCard(activate: Bool = true) {
         guard cardMode, let panel = window else { return }
         cardMode = false
         let sharing = panel.sharingType, alpha = panel.alphaValue
@@ -1300,8 +1303,12 @@ extension PrompterController {
         panel.orderOut(nil)
         panel.close()                            // windowWillClose: not the current window, the ticker goes on
         push("window.LiveTips && LiveTips.setView && LiveTips.setView('window')")
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if activate {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        } else {
+            window.orderFrontRegardless()
+        }
         DispatchQueue.main.async { [weak self] in self?.layoutTitleButtons() }
     }
 

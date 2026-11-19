@@ -457,7 +457,7 @@ struct SheetQuickDone: View {
 
     /// "built in 38 s · 6 sources read"
     private func builtLine(_ s: MeetingSheet) -> String {
-        let secs = max(1, Int(Date().timeIntervalSince(job.started)))
+        let secs = max(1, Int((job.finishedAt ?? Date()).timeIntervalSince(job.started)))
         let took = secs < 90 ? L("qp.took.s", ["n": "\(secs)"]) : L("qp.took.m", ["m": "\(secs / 60)", "s": "\(secs % 60)"])
         let read = s.sources.filter { $0.access == .ok }.count
         return th.style == .classic ? L("qp.built", ["took": took, "n": "\(read)"]) : L("qp.built", ["took": took, "n": "\(read)"]).uppercased()
@@ -1188,7 +1188,8 @@ struct SheetDraftSourceRow: View {
         let now = source.days ?? def
         return Menu {
             Button(L("ea.s3.daysDefault", ["n": "\(def)"])) { source.days = nil; draft.checkSources() }
-            ForEach([3, 7, 14, 30].filter { $0 != def }, id: \.self) { n in
+            // 0.25 (review): a remembered custom value stays on the list
+            ForEach(Array(Set([3, 7, 14, 30] + (source.days.map { [$0] } ?? []))).filter { $0 != def }.sorted(), id: \.self) { n in
                 Button(L("ea.s3.daysN", ["n": "\(n)"])) { source.days = n; draft.checkSources() }
             }
         } label: {
@@ -1629,7 +1630,7 @@ struct SheetBuildProgress: View {
 
     /// "Built in 1 min 52 s on Claude account · 2 passes · 6 read, 1 skipped"
     private var builtLine: String {
-        let secs = max(1, Int(Date().timeIntervalSince(job.started)))
+        let secs = max(1, Int((job.finishedAt ?? Date()).timeIntervalSince(job.started)))
         let took = secs < 90 ? L("qp.took.s", ["n": "\(secs)"]) : L("qp.took.m", ["m": "\(secs / 60)", "s": "\(secs % 60)"])
         var parts = [L("eb.s5.built", ["took": took, "route": AIRoute.name(draft.route)])]
         if let p = job.passes, p > 1 { parts.append(L("eb.s5.passes", ["n": "\(p)"])) }

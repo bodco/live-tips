@@ -208,6 +208,8 @@ final class SheetJob: ObservableObject, Identifiable {
     @Published var sheetPath: String?
     @Published var notifyWhenDone = false
     let started = Date()
+    /// 0.25 (review): when the job ended, so "Built in" does not grow on every redraw.
+    var finishedAt: Date?
     private var process: Process?
     var title = ""
 
@@ -367,6 +369,7 @@ final class SheetJobs: ObservableObject {
     }
 
     func finished(_ j: SheetJob) {
+        if j.finishedAt == nil { j.finishedAt = Date() }
         objectWillChange.send()
         if let p = j.sheetPath, let id = j.callID, let m = UpNext.shared.items.first(where: { $0.id == id }) {
             m.prepBase = SheetFiles.base(of: p); m.prepFailed = false

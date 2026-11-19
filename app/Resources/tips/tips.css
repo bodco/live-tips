@@ -22,13 +22,17 @@
 html,body{margin:0;height:100%}
 body{background:color-mix(in srgb,var(--bg) calc(var(--fade,1)*100%),transparent);color:var(--text);font:14px/1.4 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
 button{font:inherit;color:inherit;cursor:pointer}
-.app{height:100vh;display:flex;container-type:inline-size;container-name:app}
+/* 0.26.0 (owner 19.11): the shell holds the header over the whole width, then the tips and the side panel. Both are
+   containers named app (the same width), so the narrow rules work for the header too. */
+.shell{height:100vh;display:flex;flex-direction:column;container-type:inline-size;container-name:app}
+.app{flex:1;min-height:0;display:flex;container-type:inline-size;container-name:app}
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
 .pane{display:none}
 .split{display:none}
 
 /* ---------- Header ---------- */
-.bar{height:48px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 16px}
+/* 0.26.0 (owner 19.11): a window too narrow for every control wraps the header to a second row; nothing is cut off */
+.bar{min-height:48px;flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 12px 8px 16px}
 .rec{width:8px;height:8px;border-radius:50%;background:var(--rec);flex:none}
 .rec.paused{background:var(--text-3)}
 .timer{font-weight:600;font-variant-numeric:tabular-nums}
@@ -399,6 +403,20 @@ button{font:inherit;color:inherit;cursor:pointer}
 .sys .sbtn:hover{background:rgba(255,255,255,.3)}
 .sys .sbtn.ghostish{background:transparent;font-weight:500}
 .sys.meetend .strip{background:#E8590C}   /* 2026-11-10: the meeting ended, orange not red */
+/* 0.26.0: the app's notices: error red, warning orange, info a quiet strip; the text wraps (Notion causes are a sentence) */
+.sys.notice .strip .st{white-space:normal;overflow:visible;padding:2px 0;line-height:1.35}
+.sys.notice.lv-warning .strip{background:#E8590C}
+.sys.notice.lv-info .strip{background:var(--pn-surface2,var(--surface-2));color:var(--pn-ink,var(--text));font-weight:500}
+.sys.notice.lv-info .sbtn{background:transparent;color:var(--pn-link,var(--accent));text-decoration:underline;text-underline-offset:2px}
+.sys.notice.lv-info .sbtn:hover{background:transparent}
+/* 0.26.0 (block 2): a question to the PM under the header: quiet strip, the danger button red, Cancel last */
+.sys.ask .strip{background:var(--pn-surface2,var(--surface-2));color:var(--pn-ink,var(--text));align-items:center;flex-wrap:wrap}
+.sys.ask .strip .st{white-space:normal;overflow:visible;padding:2px 0;line-height:1.35;display:flex;flex-direction:column;gap:2px}
+.sys.ask .strip .st .ai{font-weight:400;font-size:12px;color:var(--pn-ink2,var(--text-2))}
+.sys.ask .sbtn{background:var(--pn-surface,var(--surface));color:var(--pn-ink,var(--text));border:1px solid var(--pn-rule,var(--border))}
+.sys.ask .sbtn:hover{background:var(--pn-surface,var(--surface));filter:brightness(.96)}
+.sys.ask .sbtn.danger{background:var(--pn-rec,var(--danger-text));color:#fff;border-color:transparent}
+.sys.ask .sbtn.ghostish{background:transparent;border-color:transparent}
 .sys .body{margin:10px 12px 0;background:var(--surface);border-radius:var(--radius-l);padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-card)}
 .sys .step{font-size:18px;font-weight:600}
 .sys .say{font-size:14px;line-height:1.45;color:var(--text-2)}
@@ -627,7 +645,7 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 .dk-wrap td.t{white-space:normal}
 /* The split view: the slide cards fill one half, the tips the other; no side pane */
 .app.pm-split .pane,.app.pm-split .split{display:none!important}
-.app.pm-split .present.pm.dk{order:0;flex:1 1 0;min-width:0;max-height:none;height:100vh;margin:0;border-radius:0;box-shadow:none;border-right:1px solid var(--separator);padding:10px 12px 0}
+.app.pm-split .present.pm.dk{order:0;flex:1 1 0;min-width:0;max-height:none;height:100%;margin:0;border-radius:0;box-shadow:none;border-right:1px solid var(--separator);padding:10px 12px 0}
 .app.pm-split .main{order:1;flex:1 1 0}
 .app.pm-split.pm-swap .present.pm.dk{order:2;border-right:0;border-left:1px solid var(--separator)}
 .present.dk.sv .dk-cards{scroll-snap-type:y mandatory;margin:0 -12px;padding:0}
@@ -745,6 +763,16 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 [data-style] .hero .src b{color:var(--pn-link);font-weight:600}
 /* Roadbook fills with yellow in both modes since the theme pass (19.11; dark since 0.23.0): text on it in on-accent, never white */
 [data-style="roadbook"] .btn1,[data-style="roadbook"] .icon-btn.pause.resume,[data-style="roadbook"] .menu button:hover,[data-style="roadbook"] .dk-b.pri,[data-style="roadbook"] .dk-card.cur .dk-head .dk-num{color:var(--pn-on-accent)}
+/* 0.26.0 (owner 19.11): one button family across the app in Roadbook and Broadsheet. Square corners, the face of On me
+   (display, heavy, the style's capitals). A button filled with a colour gets no frame; a button on the page's own background
+   is drawn by its frame (2 px, rule-strong), like Help and Start without prep. Links (.btn3) stay text. */
+[data-style] .langbtn,[data-style] .dk-b{border-radius:0}
+[data-style] .btn1,[data-style] .btn2,[data-style] .sbtn{border-radius:0;font-family:var(--pn-font-display);font-weight:800;text-transform:var(--pn-caps);letter-spacing:calc(var(--pn-l-track,0) / 2);font-size:14px}
+[data-style] .btn1{border:0}
+[data-style] .btn2{background:transparent;border:2px solid var(--pn-rule-strong);color:var(--pn-ink)}
+[data-style] .btn2:hover{background:var(--pn-surface2)}
+[data-style="broadsheet"] .btn1,[data-style="broadsheet"] .btn2,[data-style="broadsheet"] .sbtn{font-family:var(--pn-font-text);font-weight:700;text-transform:none;font-size:13px;border-radius:2px}
+[data-style] .menu button,[data-style] .seg2 button,[data-style] .armcard .armseg button,[data-style] .aist .aibtn,[data-style] .who-side button,[data-style] .who-chip,[data-style] .ratebox .chip{border-radius:0}
 /* Help now in an outline (the window's one filled action is gone: a tip, not a button, is the loudest thing here) */
 [data-style] .help{background:transparent;border:2px solid var(--pn-rule-strong);color:var(--pn-ink);font-family:var(--pn-font-display);font-weight:800;text-transform:var(--pn-caps);letter-spacing:calc(var(--pn-l-track,0) / 2)}
 [data-style="broadsheet"] .help{font-family:var(--pn-font-text);font-weight:700;text-transform:none}
@@ -780,7 +808,7 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
    a 12 pt grip strip over the top for dragging, so the top 12 px stay free. Everything of the window is hidden here. */
 .tcard{display:none}
 body.card{background:transparent;height:auto}
-body.card .app,body.card .sheet,body.card .menu,body.card .popover,body.card .toast{display:none!important}
+body.card .shell,body.card .app,body.card .sheet,body.card .menu,body.card .popover,body.card .toast{display:none!important}
 body.card .tcard{display:block;position:relative;margin:0;padding:14px 16px 12px;background:var(--pn-focus,var(--surface));color:var(--pn-ink,var(--text));border:1px solid var(--pn-rule,var(--separator));border-radius:12px;overflow:hidden;font-family:var(--pn-font-text,var(--font))}
 .tc-grip{position:absolute;top:4px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--pn-ink3,var(--text-3));opacity:.35}
 .tc-bar{display:flex;align-items:center;gap:6px;min-height:28px}
@@ -800,6 +828,11 @@ body.card .tcard{display:block;position:relative;margin:0;padding:14px 16px 12px
 .tc-end:hover{color:var(--pn-rec-text,var(--danger-text))}
 .tc-alert{margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--pn-ink2,var(--text-2))}
 .tc-alert.warn{color:var(--pn-rec-text,var(--danger-text))}
+.tc-alert .tc-ntext{flex:1;min-width:0}
+.tc-ask{flex-wrap:wrap;color:var(--pn-ink,var(--text));font-weight:600}
+.tc-link.tc-danger{color:var(--pn-rec-text,var(--danger-text))}
+.tc-link.tc-cancel{color:var(--pn-ink3,var(--text-3));text-decoration:none;font-weight:500}
+.tc-link.tc-x{text-decoration:none;font-size:15px;line-height:1;padding:0 2px;color:var(--pn-ink3,var(--text-3))}
 .tc-link{border:0;background:transparent;padding:0;color:var(--pn-link,var(--accent));font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:2px}
 .tc-tip{margin-top:8px}
 .tc-tip.in{animation:pn-tip-in .45s ease-out both}

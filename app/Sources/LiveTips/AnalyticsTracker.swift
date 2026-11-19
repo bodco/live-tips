@@ -288,7 +288,7 @@ final class AnalyticsTracker {
             "projects": Analytics.bucket(reg.projects.filter { !$0.sample }.count),
             "orgs": Analytics.bucket(orgs),
             "google": GoogleService.shared.connected,
-            "notion": secrets.has(.notionToken),
+            "notion": secrets.has(.notionToken) || secrets.has(.notionOAuth),
             "hubspot": secrets.has(.hubspotKey),
             "calendars": Analytics.bucket(CalendarService.shared.calendars.count)]
         track("settings_snapshot", p)

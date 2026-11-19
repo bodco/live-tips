@@ -362,7 +362,7 @@ struct PacenoteBrowserView: View {
                     .onSubmit { model.submitAddress() }
                     .disabled(model.isBusy)
                 Button { model.addTapped() } label: { Label(L("sheet.browser.add"), systemImage: "plus.circle.fill") }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.pnPrimary)
                     .controlSize(.large)
                     .disabled(model.isBusy || model.web.url == nil)
             }
@@ -427,7 +427,7 @@ struct PacenoteBrowserView: View {
             HStack {
                 Spacer()
                 Button(L("sheet.browser.cancel")) { model.phase = .browsing }.keyboardShortcut(.cancelAction)
-                Button(L("sheet.browser.plan.start")) { model.confirm() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                Button(L("sheet.browser.plan.start")) { model.confirm() }.keyboardShortcut(.defaultAction).buttonStyle(.pnPrimary)
             }
         }
         .padding(20)

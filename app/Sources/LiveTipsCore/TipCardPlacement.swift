@@ -55,3 +55,25 @@ public enum TipCardPlacement {
         return CGRect(x: f.minX, y: y, width: f.width, height: h)
     }
 }
+
+/// 0.26.0 (B, owner 19.11): the tips window that replaces the card (Expand, the end of a call) opens on the card's
+/// display, not on the main one. Size: the saved frame's, else the default, never larger than the visible frame.
+/// Place: the saved one only when it is on the card's display (its centre is there), otherwise top centre of it.
+public enum ExpandedWindowPlacement {
+    public static let gap: CGFloat = 6
+
+    public static func frame(saved: CGRect?, defaultSize: CGSize, on s: TipCardScreen) -> CGRect {
+        let v = s.visible
+        var size = saved?.size ?? defaultSize
+        size.width = min(size.width, v.width); size.height = min(size.height, v.height)
+        if let saved, s.frame.contains(CGPoint(x: saved.midX, y: saved.midY)) {
+            var f = CGRect(origin: saved.origin, size: size)
+            f.origin.x = min(max(f.minX, v.minX), v.maxX - f.width)
+            f.origin.y = min(max(f.minY, v.minY), v.maxY - f.height)
+            return f
+        }
+        let x = (v.midX - size.width / 2).rounded()
+        let y = max(v.minY, v.maxY - size.height - gap)
+        return CGRect(x: x, y: y, width: size.width, height: size.height)
+    }
+}

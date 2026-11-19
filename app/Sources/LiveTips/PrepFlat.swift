@@ -33,6 +33,7 @@ struct PrepSectionHead<Trailing: View>: View {
         }
         .padding(.top, 10).padding(.bottom, 2)
         .overlay(alignment: .top) { Rectangle().fill(PN.C.ruleStrong).frame(height: t.ruleHeavy) }
+        .padding(.top, 8)      // 0.26.0 (owner 19.11): the heavy line does not stick to the field above it
     }
 }
 

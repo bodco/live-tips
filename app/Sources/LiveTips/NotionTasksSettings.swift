@@ -18,7 +18,7 @@ final class NotionTasksSettingsModel: ObservableObject {
     var loadedFor = ""
     let settings = SettingsWindow.model
 
-    var token: String? { SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken) }
+    var token: String? { NotionAuth.token() }
 
     func load(force: Bool = false) {
         let ds = settings.config.notionTasks.database
@@ -181,7 +181,7 @@ struct NotionTasksSection: View {
         Section {
             Toggle(isOn: s.enabled) { InfoLabel(title: L("ntset.enable"), info: L("ntset.enable.i")) }
             if nt.enabled {
-                if !model.isSet(.notionToken) {
+                if !model.notionConnected {
                     Text(L("ntset.connectFirst")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
                 } else {
                     LabeledContent { databasePicker } label: { InfoLabel(title: L("ntset.database"), info: L("ntset.database.i")) }
@@ -191,8 +191,8 @@ struct NotionTasksSection: View {
         } header: { Text(L("ntset.header")).settingsAnchor("int.notion.tasks") } footer: {
             Text(L("ntset.footer")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
         }
-        .onAppear { if dest.items.isEmpty && model.isSet(.notionToken) { dest.find() }; m.load() }
-        if nt.enabled && !nt.database.isEmpty && model.isSet(.notionToken) {
+        .onAppear { if dest.items.isEmpty && model.notionConnected { dest.find() }; m.load() }
+        if nt.enabled && !nt.database.isEmpty && model.notionConnected {
             Section {
                 LabeledContent { propPicker(Binding(get: { nt.projectProperty }, set: { v in
                     model.config.notionTasks.projectProperty = v; model.config.notionTasks.projectType = m.type(v)

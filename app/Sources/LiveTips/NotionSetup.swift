@@ -16,6 +16,14 @@ enum NotionAPI {
     }
 
     static func call(_ token: String, _ method: String, _ path: String, _ body: [String: Any]? = nil) async throws -> [String: Any] {
+        do { return try await once(token, method, path, body) } catch let e as NSError where e.domain == "Notion" && e.code == 401 {
+            // INT S2: the OAuth token gets one refresh through the server and one retry; a pasted key just fails
+            guard let fresh = await NotionAuth.shared.refreshAfter401(token) else { throw e }
+            return try await once(fresh, method, path, body)
+        }
+    }
+
+    private static func once(_ token: String, _ method: String, _ path: String, _ body: [String: Any]?) async throws -> [String: Any] {
         var req = URLRequest(url: URL(string: "https://api.notion.com/v1" + path)!)
         req.httpMethod = method
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -111,9 +119,7 @@ final class NotionDestinationModel: ObservableObject {
     @Published var searched = false
     let settings = SettingsWindow.model
 
-    var token: String? {
-        SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken)
-    }
+    var token: String? { NotionAuth.token() }
 
     func find() {
         guard let t = token else { note = L("nset.saveToken"); return }
@@ -193,7 +199,7 @@ struct NotionDestinationView: View {
                     Spacer()
                     if m.busy { PNSpinner(size: 16) }
                     Button(m.searched ? L("nset.findAgain") : L("nset.find")) { m.find() }.controlSize(.small)
-                        .disabled(m.busy || !settings.isSet(.notionToken))
+                        .disabled(m.busy || !settings.notionConnected)
                 }
                 let dbs = m.items.filter { $0.kind == "data_source" }
                 let pages = m.items.filter { $0.kind == "page" }

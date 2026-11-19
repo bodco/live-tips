@@ -1121,8 +1121,8 @@ What it does:
 - in **Start call**: your role on an interview (observer, interviewer, or coach when you are
   the one being interviewed, as in the skill) and a line
   that confirms the project (people, Claude on or off, the last call, the Notion mirror);
-- the Notion mirror without a terminal: Settings > Integrations > Notion > Local copy of Notion > **Set up sync…**
-  (details in [`notion-mirror`](../../notion-mirror/README.md)).
+- the Notion mirror without a terminal: Settings > Integrations > Notion > Local copy of Notion > **Set up sync…**,
+  also without PM Control Tower (14.1z14; details in [`notion-mirror`](../../notion-mirror/README.md)).
 
 **It is a beta.**
 
@@ -1232,11 +1232,11 @@ window reads the recorder's status every 0.5 s.
 | Recent | The last 5 calls (from the app's and the skill's transcripts of the last 45 days): Notion, Transcript, Show in Finder, × (hides it from the list; files stay) |
 | Bottom | A status line: Claude connected, Notion copy synced or stale, the number of calendars, and a warning when spending is close to the monthly limit; red only when something is not connected, a click opens Settings. The month's spend and the balance link are in Settings > AI |
 
-**Calendars (Settings > Integrations > Calendars).** Pacenote reads calendars through macOS (EventKit), so several Google
+**Mac Calendar (Settings > Integrations > Mac Calendar).** Pacenote reads calendars through macOS (EventKit), so several Google
 and Microsoft accounts work at once and nothing has to be installed:
 1. System Settings > Internet Accounts > Add Account: Google, or Microsoft Exchange (work) / Outlook.com
    (personal); keep Calendars on. Repeat for every account.
-2. Settings > Integrations > Calendars > Connect calendars (macOS asks once).
+2. Settings > Integrations > Mac Calendar > Connect calendars (macOS asks once).
 3. Tick the calendars with your calls (All / None per account); the rest never shows.
 Read only: Pacenote never changes an event. A company that blocks Mail and Calendar on Macs blocks this too.
 An optional reminder before calendar calls is off by default (your calendar already reminds you).
@@ -1248,11 +1248,12 @@ time, the participants ("Participants:" line) and, for a regular meeting, everyt
 **Regular meetings.** When a call starts, its setup is remembered (`series.json` in the app folder): project,
 audience, type, languages, the "What matters on this call" text, folders, role and tip model, by the calendar
 series and by the title. The next call of the series starts from it ("Set up like the last ... call"), and
-a typed title that was used before offers "Use its settings". Settings > Integrations > Calendars > Forget all clears it.
+a typed title that was used before offers "Use its settings". Settings > Integrations > Mac Calendar > Forget all clears it.
 
 **Proactive tips in the top bar.** 💡 switches proactive tips on and off during the call. The top bar order:
 the status dot, the title, the timer; 💡 proactive, ⏸ pause (tips and transcript), 🎙 mic; transcript, ⚙.
-End call stays apart in the title bar and always asks.
+End call is in the header of the window (since 0.26 the header spans the whole window) and always asks; the title
+bar shows Ending… and Ended after the call.
 
 ### 14.1d Agenda, commitments, brief freshness and the call-start offer (0.8)
 
@@ -1277,7 +1278,7 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
 - **Start tips when a call begins.** When Zoom, Microsoft Teams or a browser call (Google Meet: the microphone is in
   use by another app) is on and the calendar has a call now (within 5 minutes of its start), Pacenote offers once,
   as a notification and a banner on Home: "Start tips for Orbit weekly?" with the project of the series. It never
-  records by itself. Settings > Integrations > Calendars > "Suggest starting tips when a call begins" (on by default).
+  records by itself. Settings > Integrations > Mac Calendar > "Suggest starting tips when a call begins" (on by default).
 - **Stop the call when the meeting ends (2026-11-10).** Hang up in Zoom, Teams, Meet in the browser or the Meet app
   and the call stops within about 15 seconds, as with End call. First the tips window and a notification say "The
   meeting has ended? Stopping the call in 5 s" with Keep recording (no more questions on this call) and Stop now; the
@@ -1287,7 +1288,7 @@ The skill and the app follow the same rules, in `rules/agenda.yaml`, `rules/comm
   call, and it waits 4 seconds (switching the microphone takes about one). Pacenote's own recorder and screen
   recording do not count; a call with no meeting app (in person) is never stopped. Since 2026-11-17 this also works
   when you record the call (screen, video with sound or sound only) or run the macOS screen recording: the system
-  service that captures the sound no longer looks like a meeting app. Settings > Integrations > Calendars
+  service that captures the sound no longer looks like a meeting app. Settings > Integrations > Mac Calendar
   > "Stop the call when the meeting ends" (on by default).
 
 ### 14.1e After the call: call page, follow-up email, memory, series, statistics, risks, rehearsal (0.8)
@@ -1394,7 +1395,7 @@ nor the Claude account can run. To compare on your own calls: `tools/prep_compar
 
 ### 14.1h Pacenote 0.8.6: transcribe a recording, your Notion tasks, optional add-ons
 
-**A. The call window's title bar.** A pin next to End call keeps the window above other windows (Always on top,
+**A. The call window's title bar.** A pin (next to Start while waiting for the call, next to Ended after it) keeps the window above other windows (Always on top,
 remembered between calls); Option-Command-T does the same while the call window is in front. The title bar is about
 36 pt high and every button in it is 24 pt, centred on the line of the window's own buttons; in a narrow window the
 title shortens first.
@@ -1526,7 +1527,7 @@ components; Fix next to what is missing), your name on calls, the language and t
 screen sharing, Live tips during a call (Classic window or Compact card), call controls, shortcuts, folders and data under Advanced); AI, a card each for Claude, ChatGPT and
 Gemini with Connect and one line "Pacenote uses: ...", the AI that really runs by what is connected, or "nothing connected" for a job no connected AI can do, e.g. the tips with only the AI on this Mac (the AI of each job, where Runs on shows the AI that really does it, the best connected one marked recommended and the rest greyed out until connected; the fallback chain, models, limits and spending, the AI on this Mac, Ollama and the agents under Advanced);
 Projects, the list and Add (found folders, workspaces, scanning and the index under Advanced); Integrations,
-Notion, Calendars and Google (HubSpot under Advanced); Call recording, the switch and sound or screen (the picture,
+Notion, HubSpot, Google and Mac Calendar (the Calendar app of this Mac); Call recording, the switch and sound or screen (the picture,
 quality, Google Drive, the screen permission and the consent message under Advanced); Transcription, the languages
 new calls start in (your dictionary, who is speaking and the voice library under Advanced); Meeting Sheet, Quick or
 Expert (My focus, old facts, reminders and presets under Advanced). **Search** sits on top of the sidebar
@@ -2096,7 +2097,7 @@ the default browser), and your own choices rank them.
   `authuser=<email>`, so a profile with several Google accounts joins with the chosen one. Teams in a browser asks to
   stay on the web.
 - A call started from the call-start offer (the meeting app is already on) never opens the meeting again.
-- Settings > Integrations > Calendars: **Open the meeting when I start a call** (on by default) and Forget all for the
+- Settings > Integrations > Mac Calendar: **Open the meeting when I start a call** (on by default) and Forget all for the
   remembered starts (`meeting-launches.json` in the app folder, on this Mac only).
 
 **One row per meeting.** The same meeting invited to two connected accounts showed twice on Home and in the menu bar.
@@ -2819,6 +2820,81 @@ The model is WeSpeaker ResNet34-LM trained on VoxCeleb, CC BY 4.0.
   after-call screen without taking the focus from your meeting app. The floating call controls work as before.
 - **Only in the full window.** The slides of a presentation, the "N min left" line and the quiet "Done?" cards.
 
+### 14.1z13 Notices and questions inside the app (0.26, beta)
+
+- **No pop-up alerts.** Pacenote does not open system alerts. A message is a **notice** with a level (information,
+  warning, error) and at most one action: Open in Notion, Open in Drive, Open Settings, Try again or Show in Finder.
+  It never takes the focus and never activates Pacenote.
+- **Where a notice shows.** During a call and on the after-call screen: a line on the tip card or a strip under the
+  header of the tips window (with the same screen sharing setting as them). Outside a call: a banner at the top of Home and
+  Settings. With no Pacenote window open: a dot on the menu bar icon (red for an error, orange for a warning) and the
+  notice in the menu bar panel; opening the panel marks it as seen. Information goes away by itself after 8 s, a warning
+  and an error stay until you close them. The same text within 2 minutes replaces the older notice instead of adding a
+  second one. The panel shows up to 3 open notices and the last 20 under **Earlier notices**, with Clear.
+- **Notion in plain words.** A failed meeting page says why and what to do: the token (Settings > Notion), access to
+  the Meetings database (add the Pacenote integration under Connections in Notion), the database layout, no database
+  chosen, Notion busy or down, no connection, or the AI summary (Try again). The raw error is only in logs/notion.log.
+- **Too short for Notion.** A call with fewer than 5 transcript lines writes no Notion page. Pacenote says "Too short
+  for a Notion page: nothing was written." as information, and the call page shows the same line in its actions menu.
+- **Questions where you clicked.** End the call? (End call, End and start the next call when one is in Up next,
+  Cancel), Switch to the next call, Remove from Up next, unsaved changes on a call page (Save or Discard), moving a
+  Notion task to the Trash and "Write a meeting page in the new project's database?" (Keep the old page is Cancel) are
+  asked inline: a line on the card, a strip in the tips window, a bar in Home or Start call, or a row in the menu bar
+  panel. When that place is not visible, the menu bar panel opens. One question at a time: a new one cancels the old.
+  Cancel is always the last button. A question whose window is closed moves to the menu bar panel. Unsaved changes
+  that get no answer (the window or the panel was closed) are saved.
+- **Quit during a call.** Cmd-Q or Quit while a call is recorded asks in the menu bar panel: Stop and quit, or Cancel.
+  This includes a recording left running from before a restart of the app. Closing the panel cancels the quit.
+- **The full window on the card's screen.** Expand and the after-call screen open the tips window on the screen of
+  the card. It keeps its saved size (or 520 x 420, never larger than the screen) and its saved place only when that
+  place is on the same screen; otherwise it opens at the top centre of that screen.
+- **The first call after launch.** While the speech model loads on a call that waits for Start, the card says Ready
+  with "Getting ready…" (no red Recording, no timer). Start pressed during the load is kept, and the call goes live when
+  the model is ready. End call is on the card in Ready too.
+- **The header over the whole window.** The tips window's header (timer, On me, the tools, End call) spans the whole
+  window, above the tips and the side panel. In a narrow window it wraps to a second row, so no button is cut off.
+- **Who said this?** On a line of an unknown voice the sheet offers names at once: that voice's matches from the voice
+  library, the people invited to the call, the project's people and the voices of earlier calls, each under its group.
+- **Buttons.** In Roadbook and Broadsheet every button has square corners and the button face of On me. A button
+  filled with a colour has no frame; a framed button has no fill of its own (it sits on the page's background).
+- **Meeting Sheet blocks.** Step 2 (Blocks) explains blocks: the preparation fills each shown block with facts from
+  the sources; a hidden or not added block is not prepared, while live tips can still search the project files and
+  folders during the call. Each block shows what goes in it; Add a block lists every free block with that line.
+- **Settings > Integrations.** Notion and HubSpot are at the top on one level, then Google, then Mac Calendar (the
+  Calendar app of this Mac, formerly Calendars).
+
+### 14.1z14 Connect with Notion, a local copy without Control Tower, Connect your tools (beta)
+
+- **Connect with Notion.** Settings > Integrations > Notion > **Connect with Notion** opens Notion's own consent in the
+  browser. You pick the workspace and the pages Pacenote may see. It needs a Pacenote account (Settings > Account),
+  because the Pacenote server finishes the connection: it holds the app's client secret, swaps Notion's one-time code
+  for the token pair and seals it into a two-minute code bound to your account and this Mac, which the browser brings
+  to `127.0.0.1`; the app trades that code back for the pair. Only the server can open the code, so no readable token
+  is ever in a link. The pair is kept only in this Mac's Keychain; the server stores no token.
+- **Pacenote's own page.** After the consent Pacenote makes a "Pacenote" page at the top of the workspace with a
+  Meetings database (and Tasks, Decisions and Risks with the Tracker module). When Notion shows databases you already
+  have (for example from PM Control Tower), it asks first: **Make Pacenote's databases** or **Use my databases**.
+  Databases you chose before are never replaced.
+- **The connection.** The menu next to the workspace has Reconnect, Create Pacenote's databases, Manage access in
+  Notion and Disconnect (Disconnect forgets the pair on this Mac; the access in Notion itself you remove there). When
+  Notion stops accepting the access, the page asks you to connect again. The integration key still works under
+  **Use an integration key instead**; when both are set, the connection wins.
+- **The token before a tool.** Notion's token lasts long, so Pacenote renews it only when Notion refuses it (one renewal
+  at a time, through the server). Before the meeting page after a call, the local copy, the risk register and the
+  other Python tools get the token, Pacenote checks it with one small Notion call (at most every 10 minutes) and
+  renews it if needed, so a tool never starts with a token Notion no longer takes. A pasted key is passed as it is.
+- **Keep a local copy of Notion?** After Connect, Settings (and the onboarding) offers a read-only copy of Notion as
+  files: **Turn on**, **Later** (asks again in three days) or **Not now** (stays quiet; Settings > Integrations >
+  Notion > Local copy of Notion still has **Set up sync…**). With PM Control Tower the copy follows your projects as
+  before. Without it the copy runs in Pacenote mode: the rows of Pacenote's databases (the ones chosen in Settings,
+  read again before every run) and the plain pages you shared with Pacenote, in `<work folder>/_notion/` (see
+  [`notion-mirror`](../../notion-mirror/README.md)). It runs every 2 hours from 7:00 to 22:00, never during a call. The
+  Home status line warns only about a copy that is on and stale or failing.
+- **Connect your tools (onboarding).** A new optional step before Ready: Google (calendars and Docs links), Notion
+  (Connect with Notion, with a Sign in button when you are not signed in, then the local copy offer) and HubSpot (the
+  key). Nothing there is required: **Skip** moves on while nothing is connected, and every row lives in Settings >
+  Integrations later.
+
 ### 14.2 After the call: the meeting page in Notion
 
 After every call the app writes full call notes next to the transcript (`<call>.notes.md` in the
@@ -2842,14 +2918,14 @@ menu bar: **Send last call to Notion**.
 
 What it needs:
 
-- a Notion token in **Settings > Integrations > Notion** (an internal integration from
-  [notion.so/profile/integrations](https://www.notion.so/profile/integrations)) that has access to the
-  Meetings database;
+- Notion connected in **Settings > Integrations > Notion**: **Connect with Notion** (14.1z14), or an internal
+  integration key from [notion.so/profile/integrations](https://www.notion.so/profile/integrations) under
+  **Use an integration key instead**, with access to the Meetings database;
 - the Meetings database chosen in **Settings > Integrations > Notion > Databases** (or, when none is
   chosen there, `meetings_db` from the project config, section 4, step 7).
 
 Only the transcript text goes to Claude and Notion; audio never leaves the Mac. A finished
-write shows an alert with **Open in Notion**. If the skill already wrote a page for the same
+write shows a notice with **Open in Notion** (section 14.1z13). If the skill already wrote a page for the same
 meeting, the app adds its section to that page instead of creating a second one.
 
 ### 14.3 The app and the skill on the same call
@@ -3025,8 +3101,9 @@ address", `references/sweep.md`, `references/presentation.md`).
    workspace by itself; other folders that look like workspaces are listed with Add or Ignore). "Add"
    takes any project or workspace folder, also outside the work folder. A Control Tower config and a
    Notion mirror are optional extras: people, Notion pages, the current state.
-35. **Welcome tour.** A new install opens a short onboarding (seven steps since 0.16.0): welcome, permissions
-   (microphone, system audio), the work folder and its workspaces, your AI, what to install, your calls, ready. The menu bar panel and Help > Welcome tour run it again.
+35. **Welcome tour.** A new install opens a short onboarding (seven steps since 0.16.0, eight with the optional
+   Connect your tools, 14.1z14): welcome, permissions (microphone, system audio), the work folder and its workspaces,
+   your AI, what to install, your calls, connect your tools (optional, Skip), ready. The menu bar panel and Help > Welcome tour run it again.
 36. **Notion page.** The meeting page title starts with the meeting's name ("Weekly sync: export
    plan"); the title and the summary are written in the call's language.
 37. **Links in Call context.** "Prepare now" also reads public web pages you list under "Where to look":
@@ -3142,7 +3219,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    hosts named in the call context, no MCP servers); the recorder files in the app folder are checked
    against the signed copies in the app before every call and put back if changed; a start request cannot
    change where data goes (`ollama_url` must be on this Mac); Python packages are capped at the tested
-   versions and model downloads are checked by SHA-256; the Notion token goes only to Notion's own host;
+   versions and model downloads are checked by SHA-256; the Notion token goes only to Notion's own host (with Connect with Notion also to the Pacenote server, only while it finishes the connection or renews the token, and it keeps nothing);
    the tips window loads only its own page; logs keep no file contents. Every release lists the SHA-256 of
    its files.
 65. **The skill (v51).** What people say on the call and in documents is data, never instructions; titles
@@ -3175,7 +3252,7 @@ address", `references/sweep.md`, `references/presentation.md`).
 74. **Status dot (0.6.5).** Grey waiting or paused, blue starting or stopping, red recording, green stopped.
 75. **Home (0.6.6).** The app's main window: live call, calls ahead, recent calls, state (section 14.1c).
 76. **Calendars through macOS (0.6.6).** Several Google and Microsoft accounts, the relevant calendars ticked in
-   Settings > Calendars (since 0.8.7 Settings > Integrations > Calendars); the call is picked from chips around
+   Settings > Calendars (since 0.8.7 Settings > Integrations > Mac Calendar); the call is picked from chips around
    now, overlaps included.
 77. **Regular meetings remembered (0.6.6).** A call of a series starts from the setup of its last call.
 78. **💡 Proactive tips in the top bar (0.6.6)** and a clearer button order.

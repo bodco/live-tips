@@ -180,7 +180,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         if !args.tips.isEmpty { tips = TailReader(path: args.tips) }
         ticker = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(tick),
                              userInfo: nil, repeats: true)
-        // 0.25 (review 5): the card asks "End call?" with runModal; in the common modes the feed keeps moving meanwhile
+        // 0.25 (review 5): the feed keeps moving in the common modes (menus, scroll tracking, a file panel)
         if let t = ticker { RunLoop.main.add(t, forMode: .common) }
     }
 
@@ -336,6 +336,23 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let queued = pending
         pending.removeAll()
         for js in queued { web.evaluateJavaScript(js, completionHandler: nil) }
+        pushNotice()           // 0.26.0: a notice that came before the page loaded
+        pushAsk()              // 0.26.0 (block 2): an open question (the card became the window, or the page reloaded)
+    }
+
+    /// 0.26.0 (block 2): the open question asked in the tips as a row in the card or a strip in the window; null hides it.
+    func pushAsk() {
+        let a: Ask? = MainActor.assumeIsolated { AskCenter.shared.current }
+        guard let a = a, a.origin == .tips else { push("window.LiveTips && LiveTips.setAsk && LiveTips.setAsk(null)"); return }
+        push("window.LiveTips && LiveTips.setAsk && LiveTips.setAsk(" + jsonLine(a.js) + ")")
+    }
+
+    /// 0.26.0 (block 1): the newest open notice of the app as a line in the card or a strip in the window; null hides it.
+    func pushNotice() {
+        let n: Notice? = MainActor.assumeIsolated { NoticeCenter.shared.active.first }
+        guard let n = n else { push("window.LiveTips && LiveTips.setNotice && LiveTips.setNotice(null)"); return }
+        if window?.isVisible == true { MainActor.assumeIsolated { NoticeCenter.shared.markShown(n.id) } }
+        push("window.LiveTips && LiveTips.setNotice && LiveTips.setNotice(" + jsonLine(n.js) + ")")
     }
 
     func userContentController(_ userContentController: WKUserContentController,
@@ -408,11 +425,12 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                 case "prep": if let m = m, let e = UpNext.shared.prepare(m) { push("window.toastMsg && window.toastMsg(" + jsString(e) + ")") }
                 case "remove":
                     guard let m = m else { return }
-                    let a = NSAlert()
-                    a.messageText = L("tw.removeUpNext", ["title": m.effectiveTitle])
-                    a.informativeText = L("tw.removeInfo")
-                    a.addButton(withTitle: L("tw.remove")); a.addButton(withTitle: L("hk.cancel"))
-                    presentAlert(a) { r in if r == .alertFirstButtonReturn { MainActor.assumeIsolated { UpNext.shared.remove(m) } } }
+                    // 0.26.0 (block 2): asked inline in the card or the window
+                    AskCenter.shared.ask(kind: "remove-upnext", origin: .tips, title: L("tw.removeUpNext", ["title": m.effectiveTitle]),
+                                         info: L("tw.removeInfo"),
+                                         choices: [Ask.Choice(id: "remove", title: L("tw.remove"), role: .danger), .cancel()]) { _ in
+                        UpNext.shared.remove(m)
+                    }
                 default: break
                 }
             }
@@ -537,6 +555,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         guard (notification.object as? NSWindow) === window else { return }
         deckWide = false; trWide = false; setSplit(false, animate: false)
         ticker?.invalidate(); ticker = nil
+        MainActor.assumeIsolated { AskCenter.shared.cancel(origin: .tips) }    // 0.26.0: a question asked here goes with it
     }
 
     /// "End call" in the window's title bar: stops the recording; the transcript and tips stay in the project folder.
@@ -761,6 +780,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func addEndCallButton() {
         let b = pillButton(L("menubar.endCall"), role: .end, action: #selector(endCallClicked))
         b.toolTip = L("tips.endCall.tooltip")
+        // 0.26.0 (owner 19.11): while the call runs End call is only in the header, which now spans the whole window;
+        // this pill shows again for Ending… and for Ended (a click then closes the window).
+        b.isHidden = true
         // Start call while the window waits for the call (standby); it also starts by itself when the other side speaks.
         let g = pillButton(L("home.startCall"), role: .start, action: #selector(startClicked))
         g.toolTip = L("tw.startNowTip")
@@ -820,7 +842,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     /// Up next switch: the call is being ended by the app, not by this window's button.
     func markEnding() {
-        if let b = endButton { applyPill(b, L("tw.ending"), .end); b.isEnabled = false }
+        if let b = endButton { applyPill(b, L("tw.ending"), .end); b.isEnabled = false; b.isHidden = false; layoutTitleButtons() }
         push("window.setEnding && window.setEnding()")
     }
 
@@ -832,38 +854,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     @objc func endCallClicked() {
         if !args.demo { AnalyticsTracker.shared.action("end_call", scr: "tips_window", o: AnalyticsTracker.shared.callOrg) }   // 0.19.0 (S4)
-        // 2026-10-26: End call did nothing on a live call. The app had lost track of the recorder
-        // process, and a modal alert can open behind this floating window. Now: the recorder's own
-        // status decides, and the question is a sheet on this window.
-        let st = EngineStatus.load(path: CallEngine.shared.statusPath)
-        let live = CallEngine.shared.isRunning || ["recording", "standby", "loading_model"].contains(st.state)
-        guard live else { window.close(); return }
-        let a = NSAlert()
-        a.messageText = L("tw.endQ")
-        a.informativeText = L("tw.endInfo")
-        a.addButton(withTitle: L("menubar.endCall"))
-        // 2026-10-27 (Up next): the next planned call can start right after this one.
-        let next: StartCallModel? = MainActor.assumeIsolated { UpNext.shared.first }
-        if let n = next { a.addButton(withTitle: L("tw.endAndStart", ["title": MainActor.assumeIsolated { n.effectiveTitle }])) }
-        a.addButton(withTitle: L("hk.cancel"))
-        presentAlert(a) { [weak self] resp in
-            if let n = next, resp == .alertSecondButtonReturn {
-                MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.performSwitch(to: n) }
-                return
-            }
-            guard resp == .alertFirstButtonReturn else { return }
-            MainActor.assumeIsolated {
-                let owned = CallEngine.shared.isRunning
-                CallEngine.shared.stop()
-                if let b = self?.endButton { self?.applyPill(b, L("tw.ending"), .end) }
-                self?.endButton?.isEnabled = false
-                if !owned {
-                    CallEngine.shared.finishOrphan { file, saved in
-                        self?.showCallEnded(["saved": saved, "file": file, "lines": EngineStatus.load(path: CallEngine.shared.statusPath).lines])
-                    }
-                }
-            }
-        }
+        // 2026-10-26: the recorder's own status decides whether the call is live (the app can lose track of it).
+        // 0.26.0 (block 2): the question is a row in the card or a strip in this window, not an alert.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.askEndCall(from: .tips) }
     }
 
     /// The recorder has stopped: the button says so and the window gets a closing card with the file
@@ -871,6 +864,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func showCallEnded(_ info: [AnyHashable: Any]) {
         // theme pass stage 4: the after-call screen needs the full window; 0.25 (review): without taking the focus
         if cardMode { expandCard(activate: false) }
+        MainActor.assumeIsolated { AskCenter.shared.cancel(kinds: AskRules.callKinds) }   // 0.26.0: End the call? is moot now
         let saved = info["saved"] as? Bool ?? false
         afterShown = saved
         if saved { pushAfter() }
@@ -884,6 +878,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             applyPill(b, saved ? L("tw.endedSaved") : L("tw.ended"), .ended(saved: saved))
             b.isEnabled = true                  // a click now closes the window
             b.toolTip = L("tw.close")
+            b.isHidden = false
         }
         // 2026-10-27 (owner): start the next call from here: closes this window and opens Start call.
         // With a call in Up next the pill starts it at once ("Start next"; the old call has ended already).
@@ -1087,6 +1082,16 @@ extension PrompterController {
             push("window.LiveTips && LiveTips.setFollow(null)")
         case "attach-deck":
             attachDeckLive()
+        case "ask":           // 0.26.0 (block 2): a button of the open question (End call, End and start, Remove, Cancel)
+            if let id = (d["id"] as? String).flatMap(UUID.init(uuidString:)), let b = d["b"] as? String {
+                MainActor.assumeIsolated { AskCenter.shared.answer(id, b) }
+            }
+        case "notice":        // 0.26.0: the notice's action or Close
+            if let id = (d["id"] as? String).flatMap(UUID.init(uuidString:)) {
+                MainActor.assumeIsolated {
+                    if (d["item"] as? String) == "act" { NoticeCenter.shared.perform(id) } else { NoticeCenter.shared.dismiss(id) }
+                }
+            }
         case "meetend":       // 2026-11-10 (owner): the meeting seems to have ended (MeetingEndWatch)
             MainActor.assumeIsolated {
                 if (d["item"] as? String) == "stop" { MeetingEndWatch.shared.stopNow() } else { MeetingEndWatch.shared.keepRecording() }
@@ -1197,8 +1202,9 @@ extension PrompterController {
 
 extension PrompterController {
     /// The normal tips window (title bar with the brand mark, pin, Start and End call), position remembered.
-    func makeCallWindow() {
-        let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+    /// cardScreen (0.26.0, B): the window replaces the card (Expand, the end of a call) and opens on its display.
+    func makeCallWindow(cardScreen: NSScreen? = nil) {
+        let screen = (cardScreen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let w: CGFloat = 520, h: CGFloat = 420     // v36: taller default, the redesign has a dock and an action row
         let rect = NSRect(x: screen.midX - w / 2, y: screen.maxY - h - 6, width: w, height: h)
         window = NSWindow(contentRect: rect,
@@ -1219,12 +1225,19 @@ extension PrompterController {
         window.minSize = NSSize(width: 300, height: 140)
         window.delegate = self
         window.isReleasedWhenClosed = false
+        let hadSaved = UserDefaults.standard.string(forKey: "NSWindow Frame LiveTipsAppPrompter") != nil
         _ = window.setFrameAutosaveName("LiveTipsAppPrompter")   // remembers position and size
         // 2026-11-12 (owner): compact mode is gone; a window last saved as the compact strip (560 x 150 or the
         // 380 x 330 presentation column) opens at the normal size in the same place.
         if Self.wasCompact(window.frame.size) {
             var f = window.frame
             f.origin.y = f.maxY - h; f.size = NSSize(width: w, height: h)
+            window.setFrame(f, display: false)
+        }
+        // 0.26.0 (B): after the card, the saved size always, the saved place only on the card's display.
+        if let cs = cardScreen {
+            let f = ExpandedWindowPlacement.frame(saved: hadSaved ? window.frame : nil,
+                                                  defaultSize: CGSize(width: w, height: h), on: Self.cardScreen(cs))
             window.setFrame(f, display: false)
         }
         // 0.8.6 (A5): a taller title bar (about 36 pt) from an empty compact toolbar; the traffic lights stay centred.
@@ -1294,8 +1307,9 @@ extension PrompterController {
         guard cardMode, let panel = window else { return }
         cardMode = false
         let sharing = panel.sharingType, alpha = panel.alphaValue
+        let cardScreen = panel.screen ?? NSScreen.screens.first { $0.frame.intersects(panel.frame) }
         web.removeFromSuperview()
-        makeCallWindow()
+        makeCallWindow(cardScreen: cardScreen ?? NSScreen.main)
         window.sharingType = sharing             // a change made in Call settings during the card stays
         window.alphaValue = alpha
         web.frame = window.contentView?.bounds ?? NSRect(origin: .zero, size: window.frame.size)
@@ -1321,16 +1335,6 @@ extension PrompterController {
         guard abs(f.height - w.frame.height) > 0.5 || abs(f.minY - w.frame.minY) > 0.5 else { return }
         w.setFrame(f, display: true)
         w.invalidateShadow()
-    }
-
-    /// A question to the PM: a sheet on the window; the card is too small for a sheet, so a modal alert there.
-    func presentAlert(_ a: NSAlert, _ done: @escaping (NSApplication.ModalResponse) -> Void) {
-        if cardMode {
-            NSApp.activate(ignoringOtherApps: true)
-            done(a.runModal())
-        } else {
-            a.beginSheetModal(for: window, completionHandler: done)
-        }
     }
 
     static func cardScreen(_ s: NSScreen) -> TipCardScreen {

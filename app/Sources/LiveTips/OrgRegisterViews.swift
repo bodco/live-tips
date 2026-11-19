@@ -130,7 +130,7 @@ final class OrgRegisterStore: ObservableObject {
     private func say(_ s: String, error: Bool = false) { note = s; noteIsError = error }
 }
 
-/// The due date of a colleague's task, or deleting an item: a small sheet (never an NSAlert).
+/// The due date of a colleague's task, or deleting an item: a small sheet (never a modal alert).
 struct OrgItemSheet: View {
     enum Mode: Identifiable {
         case due(TrackerItem), delete(TrackerItem)

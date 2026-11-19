@@ -7,6 +7,15 @@ import LiveTipsCore
 @MainActor
 enum PyTool {
     static func run(_ module: String, _ args: [String], notion: Bool = false, needsAI: Bool = true, done: @escaping ([String: Any]) -> Void) {
+        guard notion else { launch(module, args, notionToken: nil, needsAI: needsAI, done: done); return }
+        // INT S3: the OAuth token is checked (and refreshed on a 401) before the child gets it
+        NotionAuth.ensureFresh { tok in
+            MainActor.assumeIsolated { launch(module, args, notionToken: tok ?? "", needsAI: needsAI, done: done) }
+        }
+    }
+
+    private static func launch(_ module: String, _ args: [String], notionToken: String?, needsAI: Bool, done: @escaping ([String: Any]) -> Void) {
+        let notion = notionToken != nil
         let c = AppConfig.load(from: AppPaths.config)
         guard !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else {
             done(["ok": false, "error": L("py.noEngine")]); return
@@ -19,7 +28,7 @@ enum PyTool {
         p.arguments = ["-m", "livetips_m0." + module] + args
         p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
         var env = AIRoute.env(job: "after", config: c)
-        if notion { env["NOTION_TOKEN"] = store.get(.notionToken) ?? "" }
+        if let t = notionToken { env["NOTION_TOKEN"] = t }
         env["LT_LEDGER"] = SpendLedger.defaultPath
         env["LT_AI_STAGE"] = "after_" + module
         env["PYTHONDONTWRITEBYTECODE"] = "1"

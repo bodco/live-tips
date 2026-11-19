@@ -443,7 +443,7 @@ final class TranscribeModel: ObservableObject {
     /// then the transcript in blocks of at most 2000 characters, 100 per request. Only on the PM's click.
     func addToNotion() {
         let c = cfg
-        guard let tok = SecretStore(service: Bundle.main.bundleIdentifier ?? "io.github.example.livetips").get(.notionToken) else { note = L("nset.saveToken"); return }
+        guard let tok = NotionAuth.token() else { note = L("nset.saveToken"); return }
         let reg = ProjectRegistry.load(from: AppPaths.projects)
         let proj = reg.projects.first { "project:" + $0.slug == saveTarget }
         var db = c.notionMeetingsDB      // 0.8.7 (F3): one Meetings database for all projects

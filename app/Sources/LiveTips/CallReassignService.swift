@@ -88,7 +88,7 @@ final class CallReassignService {
                 let plan = CallReassign.plan(file: p.file, toRoot: t.root)
                 if plan.sameProject || plan.moves.isEmpty { pending.remove(at: i); changedAny = true; continue }
                 do { try CallReassign.apply(plan) } catch {
-                    CallEngine.shared.notify(L("reassign.err.move", ["why": "\(error)"]))
+                    CallEngine.shared.notify(L("reassign.err.move", ["why": "\(error)"]), level: .error)
                     pending.remove(at: i); changedAny = true; continue
                 }
                 afterMove(old: p.file, new: plan.newFile, fromRoot: plan.fromRoot, to: t, live: true)

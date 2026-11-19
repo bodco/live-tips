@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import LiveTipsCore
 
 /// Pacenote brand (0.8, direction A "Route P"). The shapes are drawn from the brand SVG geometry
 /// (design/pacenote-0.8/brand), so the repository keeps no binary assets: the app icon is drawn at
@@ -37,7 +38,7 @@ enum Brand {
 
     /// Redesign block 2: the menu bar image for a state. A template (macOS tints it for a light or a dark bar) when it
     /// uses no colour; the others draw their line in the bar's own text colour (light or dark bar).
-    static func menuBarImage(_ state: MenuIconState) -> NSImage {
+    static func menuBarImage(_ state: MenuIconState, notice: NoticeLevel? = nil) -> NSImage {
         let img = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             let m = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua, .vibrantLight, .vibrantDark])
@@ -65,14 +66,21 @@ enum Brand {
                 ctx.setLineWidth(1.4)
                 ctx.strokeEllipse(in: CGRect(x: 6 - r, y: 15 - r, width: 2 * r, height: 2 * r))
             }
-            if state == .update {
+            // 0.26.0: a notice waits in the panel: a dot at the top right (over the update dot), red for an error,
+            // orange for a warning, the bar's text colour for info.
+            if let nl = notice {
+                let r: CGFloat = 2.6
+                let c: NSColor = nl == .error ? NSColor(srgbRed: 1, green: 0x3B / 255, blue: 0x30 / 255, alpha: 1) : nl == .warning ? orange : text
+                ctx.setFillColor(c.cgColor)
+                ctx.fillEllipse(in: CGRect(x: 15 - r, y: 3 - r, width: 2 * r, height: 2 * r))
+            } else if state == .update {
                 let r: CGFloat = 2.6
                 ctx.setFillColor(NSColor(srgbRed: 0x0A / 255, green: 0x6C / 255, blue: 1, alpha: 1).cgColor)   // the Classic blue
                 ctx.fillEllipse(in: CGRect(x: 15 - r, y: 3 - r, width: 2 * r, height: 2 * r))
             }
             return true
         }
-        img.isTemplate = state == .idle || state == .waiting
+        img.isTemplate = (state == .idle || state == .waiting) && (notice == nil || notice == .info)
         switch state {
         case .idle: img.accessibilityDescription = "Pacenote"
         case .waiting: img.accessibilityDescription = "Pacenote, waiting for the call"
@@ -80,6 +88,7 @@ enum Brand {
         case .update: img.accessibilityDescription = "Pacenote, update available"
         case .nearLimit: img.accessibilityDescription = "Pacenote, near a spending limit"
         }
+        if notice != nil { img.accessibilityDescription = (img.accessibilityDescription ?? "Pacenote") + ", " + L("notice.waiting") }
         return img
     }
 

@@ -155,8 +155,11 @@ struct PNSecondaryButtonStyle: ButtonStyle {
             .font(t.style == .classic ? .system(size: 13) : t.buttonFont).tracking(t.buttonTracking).textCase(t.caps ? .uppercase : nil)
             .foregroundStyle(PN.C.text)
             .padding(.horizontal, 12).frame(height: 32)
-            .background(PN.C.surface.opacity(configuration.isPressed ? 0.8 : 1))
-            .overlay(shape.stroke(t.style == .classic ? Color.primary.opacity(0.18) : PN.C.field, lineWidth: t.style == .classic ? 1 : 1.5))
+            // 0.26.0 (owner 19.11): in Roadbook and Broadsheet a framed button sits on the page's own background (no fill
+            // of its own), like Start without prep; only the frame draws it.
+            .background(t.style == .classic ? PN.C.surface.opacity(configuration.isPressed ? 0.8 : 1)
+                                            : PN.C.text.opacity(configuration.isPressed ? 0.08 : 0))
+            .overlay(shape.strokeBorder(t.style == .classic ? Color.primary.opacity(0.18) : PN.C.ruleStrong, lineWidth: t.style == .classic ? 1 : 1.5))
             .clipShape(shape)
             .contentShape(shape)
             .opacity(isEnabled ? 1 : 0.45)

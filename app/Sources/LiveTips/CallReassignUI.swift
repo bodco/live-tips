@@ -77,10 +77,7 @@ enum CallReassignUI {
     static func change(file: String, to target: String) {
         guard CallReassignService.shared.target(for: file) != target else { return }
         if let err = CallReassignService.shared.change(file: file, to: target) {
-            let a = NSAlert()
-            a.messageText = L("reassign.failed")
-            a.informativeText = err
-            a.runModal()
+            NoticeCenter.shared.post(L("reassign.failed") + ": " + err, level: .error)     // 0.26.0 (block 3)
         }
     }
 }
@@ -138,7 +135,7 @@ enum NotionCallMove {
                 if (r["other_db"] as? Bool) == true {
                     askNewPage(file: file, oldURL: (r["url"] as? String) ?? "", link: link("meetings"), c: c)
                 } else if (r["ok"] as? Bool) != true {
-                    CallEngine.shared.notify(failure(r))
+                    CallEngine.shared.notify(failure(r), level: .error)
                 } else if (r["updated"] as? Int ?? 0) > 0 {
                     UsageLog.log("call_reassign_notion", ["kind": "meetings"])
                 }
@@ -147,7 +144,7 @@ enum NotionCallMove {
         for kind in ["decisions", "risks"] {
             PyTool.run("notion_move", ["--kind", kind, "--md", file] + link(kind), notion: true, needsAI: false) { r in
                 if (r["ok"] as? Bool) != true {
-                    CallEngine.shared.notify(failure(r))
+                    CallEngine.shared.notify(failure(r), level: .error)
                 }
             }
         }
@@ -161,12 +158,16 @@ enum NotionCallMove {
 
     /// The new project keeps its meetings in another database: a new page there only when the PM says so.
     private static func askNewPage(file: String, oldURL: String, link: [String], c: AppConfig) {
-        let a = NSAlert()
-        a.messageText = L("reassign.notion.otherDB.title")
-        a.informativeText = L("reassign.notion.otherDB.body")
-        a.addButton(withTitle: L("reassign.notion.otherDB.yes"))
-        a.addButton(withTitle: L("reassign.notion.otherDB.no"))
-        guard a.runModal() == .alertFirstButtonReturn else { return }
+        // 0.26.0 (block 3): asked inline (a bar in the open window, else the menu bar panel); "Keep the old page" = Cancel.
+        AskCenter.shared.ask(kind: "notion-new-page", origin: .window, title: L("reassign.notion.otherDB.title"),
+                             info: L("reassign.notion.otherDB.body"),
+                             choices: [Ask.Choice(id: "write", title: L("reassign.notion.otherDB.yes"), role: .primary),
+                                       Ask.Choice(id: AskRules.cancel, title: L("reassign.notion.otherDB.no"), role: .cancel)]) { _ in
+            writeNewPage(file: file, oldURL: oldURL, link: link, c: c)
+        }
+    }
+
+    private static func writeNewPage(file: String, oldURL: String, link: [String], c: AppConfig) {
         guard !c.engine.python.isEmpty else { return }
         let appRoot = c.effectiveAppRoot(appSupport: AppPaths.support.path)
         var args = ["--md", file, "--lt", c.engine.python, (appRoot as NSString).appendingPathComponent("bin/lt"),
@@ -177,7 +178,7 @@ enum NotionCallMove {
         PyTool.run("wrapup_notion", args, notion: true) { r in
             if let usd = r["cost_usd"] as? Double, usd > 0 { SpendDays.add(usd); CallHistory.shared.addCost(file: file, usd) }
             guard (r["ok"] as? Bool) == true, let url = r["url"] as? String else {
-                CallEngine.shared.notify(failure(r)); return
+                CallEngine.shared.notify(failure(r), level: .error); return
             }
             CallHistory.shared.setNotion(file: file, url: url)
             UsageLog.log("call_reassign_notion", ["kind": "new_page"])

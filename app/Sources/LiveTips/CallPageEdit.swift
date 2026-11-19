@@ -25,13 +25,28 @@ enum CallPageEdit {
     /// Writes the edited lists as a new call picture line. Lines are trimmed, empty ones dropped, long dashes replaced.
     /// 0.12.2 (L1): `lists` names the lists the PM changed ("decisions", "open", "risks"); CallLists takes only those
     /// from this line, so editing risks does not freeze the decisions the notes bring later.
+    /// Theme pass stage 2: `owners` (same order as `decisions`) is who made each decision; nil keeps the owner a
+    /// decision with the same text has now (CallLists), so editing one decision or another list keeps the names.
     @discardableResult
-    static func save(file: String, decisions: [String], open: [String], risks: [String], lists: [String]? = nil) -> Bool {
+    static func save(file: String, decisions: [String], open: [String], risks: [String], lists: [String]? = nil,
+                     owners: [String]? = nil) -> Bool {
         let clean: ([String]) -> [String] = { $0.map { $0.replacingOccurrences(of: "\u{2014}", with: "-").trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
         let path = tipsFile(file)
         var o = lastSituation(path)
         o["kind"] = "situation"
-        o["decisions"] = clean(decisions)
+        var known: [String: String] = [:]
+        if owners == nil {
+            for i in CallLists.read(transcript: file).decisionItems where !i.by.isEmpty { known[i.text.lowercased()] = i.by }
+        }
+        var decs: [String] = [], by: [String] = []
+        for (k, d) in decisions.enumerated() {
+            let t = d.replacingOccurrences(of: "\u{2014}", with: "-").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty else { continue }
+            decs.append(t)
+            by.append(owners.map { k < $0.count ? $0[k].trimmingCharacters(in: .whitespaces) : "" } ?? known[t.lowercased()] ?? "")
+        }
+        o["decisions"] = decs
+        if by.contains(where: { !$0.isEmpty }) { o["decision_owners"] = by } else { o.removeValue(forKey: "decision_owners") }
         let updates = ((o["asks"] as? [[String: Any]]) ?? []).filter { ($0["type"] as? String) == "update" }
         o["asks"] = updates + clean(open).map { ["what": $0, "type": "question"] }
         o["risks"] = clean(risks).map { ["what": $0] }

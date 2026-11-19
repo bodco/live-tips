@@ -5,6 +5,15 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.25.0 (unreleased)
 
+- **Who decided, next to each decision; Get ready and the call page redrawn (2026-11-19, theme pass, stage 2):** the
+  call notes now name who made each decision ("**Emily Clark**: the export ships on Tuesday"), and the call page, the
+  export, the server and the Notion decision register (Stated by) carry the name; older notes without names read as
+  before. The call page's Summary puts Decisions (with who decided), Next steps (with the owner and the date) and Risks
+  first, with a follow-up card beside them: whether the draft is there, whom it goes to, and "Review follow-up", which
+  opens the draft. The draft offers "Copy follow-up" and "Open in Mail"; nothing is sent. The Tasks tab is now Next
+  steps. In Get ready the switch at the top ("Quick" / "Expert · all settings") is the one way into Expert, the link
+  under the form is gone, the line asks "What matters today?", and Cancel, Start without prep and "Prepare brief" sit in
+  a band at the bottom.
 - **Roadbook and Broadsheet redrawn, Home acts on the brief (2026-11-19, theme pass, stage 1):** Roadbook moves to a
   warm paper ground in Light and a warm graphite in Dark, and its yellow now fills only the main button (framed in ink in
   Light), so the countdown on Home stands out by its size instead of a yellow plate. Broadsheet gets a lighter graphite

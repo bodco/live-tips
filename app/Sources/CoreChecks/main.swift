@@ -4112,6 +4112,30 @@ func aiDefaultsF3() {
     } else { expect(false, "f3: older routes decode") }
 }
 
+/// Theme pass stage 2: owners next to decisions (CallLists.decisionItems = call_lists.decision_items).
+func decisionOwnersTP2() {
+    let mn = "## Meeting notes\n\n### Decisions\n- [13:25:00] **Emily Clark**: The export goes to production on Tue, Nov 24.\n" +
+        "- [13:40:00] **Emily Clark, you**: CSV download goes through a change request.\n- [13:41:00] **Go with plan B**\n" +
+        "- Keep the deposit at 20 euros\n- None\n"
+    var r = CallLists.resolve(situations: [], notes: mn)
+    expect(r.decisionsFrom == .notes && r.decisions == ["The export goes to production on Tue, Nov 24.", "CSV download goes through a change request.",
+        "Go with plan B", "Keep the deposit at 20 euros"], "tp2: notes decisions without the owner in the text")
+    expect(r.decisionItems.map(\.by) == ["Emily Clark", "Emily Clark, you", "", ""], "tp2: notes owners, a bold decision has none")
+    expect(r.decisionItems.first?.t == "13:25:00", "tp2: the time stays")
+    let sync = CallSync.decisions(r)
+    expect(sync.first?["made_by"] as? String == "Emily Clark" && sync[2]["made_by"] == nil, "tp2: sync sends made_by only when named")
+    let pm: [String: Any] = ["kind": "situation", "source": "call_page", "lists": ["decisions"],
+                             "decisions": ["Ship Tuesday", "Ship Tuesday", "Hold the price"], "decision_owners": ["Mike", "Mike", ""]]
+    r = CallLists.resolve(situations: [pm], notes: mn)
+    expect(r.decisionsFrom == .pm && r.decisions == ["Ship Tuesday", "Hold the price"] && r.decisionItems.map(\.by) == ["Mike", ""], "tp2: PM edit owners")
+    let live: [String: Any] = ["kind": "situation", "decisions": [["what": "Pilot starts Monday", "who": "David Kim"], "Old style line"]]
+    r = CallLists.resolve(situations: [live], notes: nil)
+    expect(r.decisionItems.map(\.by) == ["David Kim", ""] && r.decisions == ["Pilot starts Monday", "Old style line"], "tp2: live objects and strings")
+    let md = MeetingNotes.markdown({ var n = MeetingNotes.Notes(); n.decisions = [MeetingNotes.Item(t: "13:25:00", text: "Ship", by: "Emily")]; return n }(),
+        MeetingNotes.Labels(title: "", tldr: "T", decisions: "Decisions", actions: "A", open: "O", topics: "Tp", unclear: "U"))
+    expect(md.contains("- [13:25] Emily: Ship"), "tp2: export line names the owner")
+}
+
 itemIDs0170()
 pull0170()
 orgCard0170()
@@ -4126,5 +4150,6 @@ appearanceStyleR1()
 prepEstimateTP1()
 updatePromptR()
 aiDefaultsF3()
+decisionOwnersTP2()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

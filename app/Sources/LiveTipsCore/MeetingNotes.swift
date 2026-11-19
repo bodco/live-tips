@@ -6,7 +6,10 @@ import Foundation
 /// language. The same reading as livetips_m0.callnotes.parse_meeting.
 public enum MeetingNotes {
     public struct Item: Equatable { public var t: String; public var text: String
-        public init(t: String = "", text: String) { self.t = t; self.text = text }
+        /// Theme pass stage 2: who made the decision ("Emily Clark", "" when nobody is named). Set by CallLists for
+        /// decisions only; MeetingNotes.parse keeps the raw line ("**Emily Clark**: ...") in `text`.
+        public var by: String = ""
+        public init(t: String = "", text: String, by: String = "") { self.t = t; self.text = text; self.by = by }
         /// "10:06" of "10:06:29".
         public var hhmm: String { String(t.prefix(5)) }
     }
@@ -144,7 +147,7 @@ public enum MeetingNotes {
     /// Markdown for Copy and Export: "#" title (when given), "##" sections, "###" topics, "- " items with their time.
     public static func markdown(_ n: Notes, _ L: Labels, when: String = "", level: Int = 2) -> String {
         let h = String(repeating: "#", count: level) + " ", h3 = String(repeating: "#", count: level + 1) + " "
-        func line(_ i: Item) -> String { "- " + (i.t.isEmpty ? "" : "[" + i.hhmm + "] ") + i.text }
+        func line(_ i: Item) -> String { "- " + (i.t.isEmpty ? "" : "[" + i.hhmm + "] ") + (i.by.isEmpty ? "" : i.by + ": ") + i.text }
         var md = L.title.isEmpty ? "" : String(repeating: "#", count: level - 1) + " " + L.title + "\n"
         if !when.isEmpty { md += "\n" + when + "\n" }
         if !n.tldr.isEmpty { md += "\n" + h + L.tldr + "\n\n" + n.tldr + "\n" }

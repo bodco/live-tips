@@ -49,10 +49,11 @@ struct SheetPrepView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
+                // Theme pass stage 2: the one way into Expert is this switch (the link under the form is gone)
                 PNSegmented(selection: $draft.mode, options: [
                     (SheetMode.quick, L("sheet.ui.quick")),
-                    (SheetMode.expert, L("sheet.ui.expert"))
-                ]).labelsHidden().fixedSize()
+                    (SheetMode.expert, L("sheet.ui.expertAll"))
+                ]).labelsHidden().fixedSize().help(L("sheet.ui.expertAll.help"))
                 if draft.mode == .expert { SheetStepBar(draft: draft) }
                 Spacer()
             }
@@ -76,16 +77,19 @@ struct SheetQuickView: View {
 
     private var m: StartCallModel { draft.model }
 
+    @Environment(\.pnTheme) private var th
+
     var body: some View {
-        Group {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                head
-                if let j = draft.job { SheetQuickDone(draft: draft, job: j) } else { setup }
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    head
+                    if let j = draft.job { SheetQuickDone(draft: draft, job: j) } else { setup }
+                }
+                .padding(24).frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity)
             }
-            .padding(24).frame(maxWidth: 820, alignment: .leading).frame(maxWidth: .infinity)
+            if draft.job == nil { footer }   // theme pass stage 2: the actions sit in a footer band, as in the prototype
         }
-    }
         .trackScreen("sheet_quick")
     }
 
@@ -95,7 +99,8 @@ struct SheetQuickView: View {
         return VStack(alignment: .leading, spacing: 6) {
             Text(t.string(from: m.callDate) + (mins > 0 && mins < 180 ? " · " + L("sheet.ui.inMin", ["n": "\(mins)"]) : ""))
                 .font(PN.sys(13, .semibold)).foregroundStyle(PN.C.accent)
-            Text(m.effectiveTitle).font(PN.sys(26, .bold)).foregroundStyle(PN.C.text)
+            Text(m.effectiveTitle).font(th.homeDisplay(30, th.titleWeight)).tracking(th.dTrack * 30).foregroundStyle(PN.C.text)
+                .fixedSize(horizontal: false, vertical: true)
             if draft.job == nil {
                 Text(problems.isEmpty ? (draft.remembered ? L("sheet.ui.quick.same") : L("sheet.ui.quick.first", ["title": m.effectiveTitle])) : L("sheet.ui.quick.attention"))
                     .font(PN.Font.body).foregroundStyle(problems.isEmpty ? PN.C.text2 : PN.C.pending).fixedSize(horizontal: false, vertical: true)
@@ -128,7 +133,6 @@ struct SheetQuickView: View {
                 setupRow
             }
             special
-            actions
         }
     }
 
@@ -214,22 +218,29 @@ struct SheetQuickView: View {
 
     @ViewBuilder private var special: some View {
         VStack(alignment: .leading, spacing: 4) {
-                Text(L(draft.live ? "sheet.quick.whatChanged" : "sheet.ui.quick.special")).font(PN.Font.body.weight(.semibold))
-                TextField(L("sheet.ui.quick.specialPh"), text: $draft.special).textFieldStyle(.roundedBorder)
+                (Text(L(draft.live ? "sheet.quick.whatChanged" : "sheet.ui.quick.matters")).font(PN.Font.body.weight(.semibold))
+                 + Text("  " + L("sheet.ui.quick.mattersSub")).font(PN.Font.caption).foregroundColor(PN.C.text3))
+                TextField(L("sheet.ui.quick.mattersPh"), text: $draft.special).textFieldStyle(.roundedBorder)
                 ForEach(draft.linksInText, id: \.self) { l in SheetLinkSuggestion(draft: draft, link: l) }
         }
     }
 
-    @ViewBuilder private var actions: some View {
+    /// Theme pass stage 2 (prototype "Get ready"): Cancel on the left; "No time?", Start without prep and
+    /// Prepare brief on the right, in a band under the form.
+    @ViewBuilder private var footer: some View {
         let routeProblem = SheetRoutes.problem(draft.route)
         VStack(alignment: .leading, spacing: 8) {
             if !draft.remembered {
                 Label(L("sheet.ui.quick.remember", ["title": m.effectiveTitle]), systemImage: "arrow.triangle.2.circlepath").font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
             if !draft.note.isEmpty { Text(draft.note).font(PN.Font.caption).foregroundStyle(PN.C.pending).fixedSize(horizontal: false, vertical: true) }
-            HStack(spacing: 10) {
-                Button(L("sheet.ui.quick.openExpert")) { draft.mode = .expert }.buttonStyle(.pnTertiary)
+            HStack(spacing: 12) {
+                HomeLink(L("common.cancel")) { SheetPrepWindow.close(m) }.keyboardShortcut(.cancelAction)
                 Spacer()
+                if !draft.live {
+                    Text(L("sheet.ui.quick.noTime")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                        .multilineTextAlignment(.trailing).frame(maxWidth: 200, alignment: .trailing).fixedSize(horizontal: false, vertical: true)
+                }
                 if draft.live {
                     // 0.10.1 (A4): the old one-click run stays, as the second action
                     Button(L("sheet.ui.live.same")) {
@@ -238,11 +249,14 @@ struct SheetQuickView: View {
                 } else {
                     Button(L("sheet.ui.startWithout")) { startCall() }.buttonStyle(.pnSecondary)
                 }
-                Button(L("sheet.ui.quick.prepare", ["n": "\(draft.estimateSeconds)"])) { if let e = draft.build() { draft.note = e } }
+                Button(L("sheet.ui.quick.prepareBrief", ["n": "\(draft.estimateSeconds)"])) { if let e = draft.build() { draft.note = e } }
                     .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(routeProblem != nil || draft.checking)
             }
-            .padding(.top, 6)
         }
+        .padding(.horizontal, 24).padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PN.C.surface2)
+        .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
     }
 
     /// 0.14.0 (D1 smoke): one label column for the rows under Change; 70 pt wrapped "Meeting name" / "Назва зустрічі".

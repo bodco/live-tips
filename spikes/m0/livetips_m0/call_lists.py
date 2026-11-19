@@ -63,6 +63,40 @@ def clean_items(a: List[dict]) -> List[dict]:
     return out
 
 
+DEC_OWNER_RX = re.compile(r"^\*\*([^*]{1,60})\*\*\s*:\s*")
+
+
+def decision_items(raw, owners=None) -> List[dict]:
+    """Theme pass stage 2 (owners next to decisions): the decisions of one level as {"t", "text", "by"}. A notes line
+    "**Emily Clark**: the decision" (rules/notes.yaml) gives its owner; a live-picture or PM entry may be a dict with
+    "by" / "who" / "made_by"; the PM's edit keeps its owners in "decision_owners" (same order). Plain text, no
+    "nothing" lines, no repeats, as clean_items."""
+    seen, out = set(), []
+    for k, v in enumerate(raw if isinstance(raw, list) else []):
+        t, by = "", ""
+        if isinstance(v, dict):
+            text = v.get("text") or v.get("what") or ""
+            by = v.get("by") or v.get("who") or v.get("made_by") or ""
+            t = v.get("t") or ""
+        elif isinstance(v, str):
+            text = v
+        else:
+            continue
+        text = str(text).replace(chr(0x2014), "-").strip()
+        m = DEC_OWNER_RX.match(text)
+        if m:
+            by = by or m.group(1)
+            text = text[m.end():]
+        if not by and isinstance(owners, list) and k < len(owners) and isinstance(owners[k], str):
+            by = owners[k]
+        p = plain(text)
+        if not p or is_nothing(p) or p.lower() in seen:
+            continue
+        seen.add(p.lower())
+        out.append({"t": t, "text": p, "by": plain(by)})
+    return out
+
+
 def _strings(v) -> List[str]:
     return [x for x in (v or []) if isinstance(x, str)] if isinstance(v, list) else []
 
@@ -165,13 +199,13 @@ def resolve(situations: List[dict], notes: Optional[str]) -> Dict:
 
     e = pm_edit("decisions")
     if e is not None:
-        out["decision_items"], out["decisions_from"] = [{"t": "", "text": x} for x in clean(_strings(e.get("decisions")))], "pm"
-    elif mn and clean_items(mn["decisions"]):
-        out["decision_items"], out["decisions_from"] = clean_items(mn["decisions"]), "notes"
-    elif live is not None and clean(_strings(live.get("decisions"))):
-        out["decision_items"], out["decisions_from"] = [{"t": "", "text": x} for x in clean(_strings(live.get("decisions")))], "live"
+        out["decision_items"], out["decisions_from"] = decision_items(e.get("decisions"), e.get("decision_owners")), "pm"
+    elif mn and decision_items(mn["decisions"]):
+        out["decision_items"], out["decisions_from"] = decision_items(mn["decisions"]), "notes"
+    elif live is not None and decision_items(live.get("decisions")):
+        out["decision_items"], out["decisions_from"] = decision_items(live.get("decisions")), "live"
     elif notes is not None and clean(legacy(notes, ["decisions", "рішення"])):
-        out["decision_items"], out["decisions_from"] = [{"t": "", "text": x} for x in clean(legacy(notes, ["decisions", "рішення"]))], "legacy"
+        out["decision_items"], out["decisions_from"] = decision_items(legacy(notes, ["decisions", "рішення"])), "legacy"
     out["decisions"] = [i["text"] for i in out["decision_items"]]
 
     e = pm_edit("risks")

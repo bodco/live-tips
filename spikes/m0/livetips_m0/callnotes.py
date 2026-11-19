@@ -49,6 +49,7 @@ For every topic: who said what (by name), the numbers and dates, what was decide
 ### Questions
 Every question: who asked whom, the answer (fully / partly / not answered) and what exactly was answered.
 ### Decisions
+Who decided: the decision (the name only when it is clear).
 ### Action items
 Owner: what, by when (as said).
 ### Promises
@@ -92,7 +93,8 @@ Format:
 ### TL;DR
 2-3 sentences: what the call was about and what came out of it.
 ### Decisions
-- [HH:MM:SS] the decision
+- [HH:MM:SS] **Who decided**: the decision (the person who made or confirmed it, several names joined with ", "; when
+  nobody is clear, write the decision alone, without a name)
 ### Action items
 - [HH:MM:SS] **Owner**: what (due: when, only if said)
 ### Open questions

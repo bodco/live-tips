@@ -303,15 +303,18 @@ struct HomeView: View {
                     HomeIconButton(symbol: "calendar.badge.plus", label: L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
                 } else {
                     Button(L("home.planCall")) { StartCallWindow.show(delegate: app, planOnly: true) }
-                        .buttonStyle(PNOutlineButtonStyle()).help(L("home.planCall.help")).fixedSize()
+                        .buttonStyle(PNQuietButtonStyle()).help(L("home.planCall.help")).fixedSize()
                 }
+                // Theme pass (19.11): "New call ⌘N", quiet. It opens Get ready for an untitled call (StartCallWindow.startNow),
+                // not the next meeting, so it must not read as a second way to start that meeting.
                 Button { StartCallWindow.startNow(delegate: app) } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "plus").font(.system(size: 10, weight: .bold))
                         Text(L("home.callNow"))
                         if !icons { Text("⌘N").font(t.homeMono(11)).foregroundStyle(PN.C.text3).textCase(nil) }
                     }
                 }
-                .buttonStyle(PNOutlineButtonStyle()).keyboardShortcut("n", modifiers: .command).help(L("home.startCallNow")).fixedSize()
+                .buttonStyle(PNQuietButtonStyle()).keyboardShortcut("n", modifiers: .command).help(L("home.newCall.help")).fixedSize()
             }
             .padding(.leading, 6)
         }
@@ -511,8 +514,8 @@ struct HomeView: View {
 
     private var heavyRule: some View { Rectangle().fill(PN.C.ruleStrong).frame(height: t.ruleHeavy) }
 
-    /// "Next call in" + "37 min": in Roadbook one line as large as the number, the number on the yellow plate;
-    /// in Broadsheet and Classic a small line over a large number.
+    /// "Next call in" + "37 min": in Roadbook one line as large as the number (theme pass, 19.11: scale, no yellow plate;
+    /// the yellow belongs to the main button); in Classic a small line over a large number. A fill only for the live call.
     private func countdownView(pre: String, num: String, unit: String, fill: Color? = nil, ink: Color? = nil, timer: Date? = nil) -> some View {
         let c = t.countdown
         let w = t.heroWeight
@@ -523,9 +526,9 @@ struct HomeView: View {
             else { Text(num).font(numFont).tracking(track) }
             if !unit.isEmpty { Text(" " + t.cased(unit)).font(unitFont) }
         }
-        .foregroundStyle(ink ?? Color(pnHex: t.hlFg))
-        .padding(.horizontal, (fill ?? t.hlBg.map { Color(pnHex: $0) }) == nil ? 0 : max(t.plateInset, 8))
-        .background(fill ?? t.hlBg.map { Color(pnHex: $0) } ?? .clear)
+        .foregroundStyle(ink ?? PN.C.text)
+        .padding(.horizontal, fill == nil ? 0 : max(t.plateInset, 8))
+        .background(fill ?? .clear)
         .lineLimit(1).minimumScaleFactor(0.4)
         let preText = Text(t.cased(pre)).font(t.homeDisplay(c.pre, w)).tracking(t.style == .broadsheet ? -0.02 * c.pre : 0).foregroundStyle(PN.C.text)
         return Group {
@@ -541,9 +544,10 @@ struct HomeView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func heroTitle(_ text: String, help: String, run: @escaping () -> Void) -> some View {
-        Button(action: run) {
-            Text(text).font(t.homeDisplay(t.titleSize, t.titleWeight)).tracking(t.dTrack * t.titleSize)
+    private func heroTitle(_ text: String, help: String, size: CGFloat? = nil, run: @escaping () -> Void) -> some View {
+        let z = size ?? t.titleSize
+        return Button(action: run) {
+            Text(text).font(t.homeDisplay(z, size == nil ? t.titleWeight : t.heroWeight)).tracking(t.dTrack * z)
                 .foregroundStyle(PN.C.text).lineLimit(2).multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -610,10 +614,23 @@ struct HomeView: View {
         let people = Self.peopleLine(r.event?.attendees ?? r.model?.participants ?? [])
         return VStack(alignment: .leading, spacing: 14) {
             HomeMeta(text: metaLine(r))
-            countdownView(pre: c.pre, num: c.num, unit: c.unit)
-            heroTitle(r.title, help: L("home.openCall.help")) { openCall(r) }
-            if !people.isEmpty { Text(L("home.hero.people", ["people": people])).font(t.homeText(15)).foregroundStyle(PN.C.text2) }
-            HomeTagView(kind: k, text: txt, big: true, sub: "· " + briefLine(r, st))
+            if t.style == .broadsheet {
+                // Theme pass (19.11): Broadsheet's headline is the meeting; under it one line with the countdown and readiness
+                heroTitle(r.title, help: L("home.openCall.help"), size: 60) { openCall(r) }
+                HStack(alignment: .firstTextBaseline, spacing: 14) {
+                    Text([c.pre, c.num, c.unit].filter { !$0.isEmpty }.joined(separator: " ")).font(t.homeText(17, .heavy)).foregroundStyle(PN.C.text)
+                    if let e = r.event { Text(Self.hhmm(e.start) + "-" + Self.hhmm(e.end)).font(t.homeText(17)).foregroundStyle(PN.C.text3) }
+                    HomeTagView(kind: k, text: txt)
+                }
+                .lineLimit(1).accessibilityElement(children: .combine)
+                if !people.isEmpty { Text(L("home.hero.people", ["people": people])).font(t.homeText(15)).foregroundStyle(PN.C.text2) }
+                Text(briefLine(r, st)).font(t.homeText(15)).foregroundStyle(PN.C.text2)
+            } else {
+                countdownView(pre: c.pre, num: c.num, unit: c.unit)
+                heroTitle(r.title, help: L("home.openCall.help")) { openCall(r) }
+                if !people.isEmpty { Text(L("home.hero.people", ["people": people])).font(t.homeText(15)).foregroundStyle(PN.C.text2) }
+                HomeTagView(kind: k, text: txt, big: true, sub: "· " + briefLine(r, st))
+            }
             overlapLines(r)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) { heroButtons(r, st, link: true) }
@@ -623,31 +640,88 @@ struct HomeView: View {
         }
     }
 
-    /// The buttons of the hero for each state (rules of the mockup 1.2: one main action, the rest quieter).
-    @ViewBuilder private func heroButtons(_ r: Ahead, _ st: CallState, link: Bool) -> some View {
+    /// Theme pass (19.11, owner): the main action follows what exists (a brief or not) and whether the meeting has
+    /// begun, never the countdown. No brief: Prepare brief (opens Get ready, as before) + Start without prep. Preparing:
+    /// the progress on the main button + Start call now (the brief joins the call when it is ready). Brief ready: View brief
+    /// + Start call. The meeting has begun: Start call, labelled with what it opens. No AI: Start call + Connect AI.
+    private struct HeroActions {
+        var primary: String
+        var busy: Double? = nil            // a running preparation: its progress, the button shows it and does nothing
+        var run: () -> Void
+        var second: String
+        var secondPlay = false
+        var secondRun: () -> Void
+    }
+
+    private func heroActions(_ r: Ahead, _ st: CallState) -> HeroActions {
         switch st {
         case .ready:
-            heroPrimary(L("home.startCall")) { start(r) }.keyboardShortcut(.defaultAction)
-            Button(L("home.hero.openSheet")) { openCall(r) }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+            return HeroActions(primary: L("home.viewBrief"), run: { openCall(r) }, second: L("home.startCall"), secondPlay: true, secondRun: { start(r) })
         case .live:
-            heroPrimary(live ? L("home.switch") : L("home.startCall")) { start(r) }.keyboardShortcut(.defaultAction)
-            Button(L("home.getReady")) { prepare(r) }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
-        case .preparing, .queued:
-            heroPrimary(L("home.startCall")) { start(r) }.keyboardShortcut(.defaultAction)
-            Button(L("common.cancel")) { if st == .preparing { runner.cancel() } else if let m = r.model { upnext.unqueue(m) } }
-                .buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+            if live { return HeroActions(primary: L("home.switch"), run: { start(r) }, second: HomePrepEstimate.label, secondRun: { prepare(r) }) }
+            let app = platform(r.event)
+            return HeroActions(primary: app.isEmpty ? L("home.startCall.tips") : L("home.startCall.app", ["app": app]), run: { start(r) },
+                               second: HomePrepEstimate.label, secondRun: { prepare(r) })
+        case .preparing:
+            return HeroActions(primary: L("home.check.preparing", ["p": "\(Int(runner.progress * 100))"]), busy: runner.progress, run: {},
+                               second: L("home.hero.startNow"), secondPlay: true, secondRun: { start(r) })
+        case .queued:
+            return HeroActions(primary: L("badge.queued"), busy: 0, run: {}, second: L("home.hero.startNow"), secondPlay: true, secondRun: { start(r) })
         case .noBrief:
-            heroPrimary(L("home.startCall")) { start(r) }.keyboardShortcut(.defaultAction)
-            Button(L("home.hero.connectAI")) { SettingsWindow.show(tab: "ai") }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+            return HeroActions(primary: L("home.startCall"), run: { start(r) }, second: L("home.hero.connectAI"), secondRun: { SettingsWindow.show(tab: "ai") })
         default:
-            heroPrimary(L("home.getReady")) { prepare(r) }.keyboardShortcut(.defaultAction)
-            Button(L("home.startWithout")) { start(r) }.buttonStyle(PNOutlineButtonStyle(height: 48)).fixedSize()
+            return HeroActions(primary: HomePrepEstimate.label, run: { prepare(r) }, second: L("home.startWithoutPrep"), secondPlay: true, secondRun: { start(r) })
         }
+    }
+
+    /// The main button: the accent fill; while a preparation runs, its progress in it and no action.
+    @ViewBuilder private func heroMain(_ a: HeroActions, height: CGFloat) -> some View {
+        if let p = a.busy {
+            Text(a.primary)
+                .font(height >= 44 ? t.heroFont : t.buttonFont).tracking(t.style == .classic ? 0 : t.bTrack * (height >= 44 ? t.bigBtn : t.bSize))
+                .textCase(t.caps ? .uppercase : nil).foregroundStyle(PN.C.onAccent)
+                .padding(.horizontal, height >= 44 ? 26 : 20).frame(height: height)
+                .background(alignment: .leading) {
+                    GeometryReader { g in
+                        ZStack(alignment: .leading) {
+                            PN.C.accentFill
+                            Color.black.opacity(0.12).frame(width: g.size.width * max(0, min(1, p)))
+                        }
+                    }
+                }
+                .overlay(Rectangle().strokeBorder(t.framedAccent ? PN.C.actEdge : Color.clear, lineWidth: 2))
+                .clipShape(RoundedRectangle(cornerRadius: t.style == .classic ? (height >= 44 ? 12 : 9) : 0))
+                .fixedSize()
+                .accessibilityElement(children: .combine).accessibilityAddTraits(.updatesFrequently)
+        } else if height >= 44 {
+            heroPrimary(a.primary, glyph: "↵", run: a.run).keyboardShortcut(.defaultAction)
+        } else {
+            Button(a.primary, action: a.run).buttonStyle(PNSolidButtonStyle(height: height)).keyboardShortcut(.defaultAction).fixedSize()
+        }
+    }
+
+    private func heroSecond(_ a: HeroActions, height: CGFloat) -> some View {
+        Button(action: a.secondRun) {
+            HStack(spacing: 8) {
+                if a.secondPlay { Image(systemName: "play").font(.system(size: height >= 44 ? 12 : 10, weight: .bold)) }
+                Text(a.second)
+            }
+        }
+        .buttonStyle(PNOutlineButtonStyle(height: height)).fixedSize()
+    }
+
+    @ViewBuilder private func heroButtons(_ r: Ahead, _ st: CallState, link: Bool) -> some View {
+        let a = heroActions(r, st)
+        heroMain(a, height: 48)
+        heroSecond(a, height: 48)
         if link { heroLink(r, st).padding(.leading, 8) }
     }
 
     @ViewBuilder private func heroLink(_ r: Ahead, _ st: CallState) -> some View {
         if st == .ready { HomeLink(L("talk.prepareAgain"), size: 15) { prepare(r) } }
+        else if st == .preparing || st == .queued {
+            HomeLink(L("common.cancel"), size: 15, color: PN.C.text2) { if st == .preparing { runner.cancel() } else if let m = r.model { upnext.unqueue(m) } }
+        }
         else { HomeLink(L("home.hero.openPage"), size: 15) { openCall(r) } }
     }
 
@@ -678,9 +752,9 @@ struct HomeView: View {
                 .accessibilityElement(children: .combine)
                 overlapLines(r)
                 HStack(spacing: 12) {
-                    Button(st == .notReady || st == .failed ? L("home.getReady") : L("home.startCall")) { st == .notReady || st == .failed ? prepare(r) : start(r) }
-                        .buttonStyle(PNSolidButtonStyle(height: 40)).keyboardShortcut(.defaultAction).fixedSize()
-                    Button(L("home.hero.openSheet")) { openCall(r) }.buttonStyle(PNOutlineButtonStyle(height: 40)).fixedSize()
+                    let a = heroActions(r, st)
+                    heroMain(a, height: 40)
+                    heroSecond(a, height: 40)
                 }
                 .padding(.top, 4)
             }
@@ -791,7 +865,7 @@ struct HomeView: View {
             HStack(spacing: 10) {
                 Text(Self.hhmm(r.start)).font(t.homeMono(13, .semibold)).foregroundStyle(PN.C.text).frame(width: 50, alignment: .leading)
                 Text(r.title).font(t.homeText(15, .semibold)).foregroundStyle(PN.C.text).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                HomeTagView(kind: k, text: txt)
+                HomeQuietTag(kind: k, text: txt)      // theme pass (19.11): quiet marks with a sign, the hero keeps the loud one
             }
             .padding(.vertical, 10)
             .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
@@ -894,10 +968,18 @@ struct HomeView: View {
             .foregroundStyle(PN.C.text).lineLimit(1).minimumScaleFactor(0.4)
             Text(L("home.welcome.body")).font(t.homeText(17)).foregroundStyle(PN.C.text2).frame(maxWidth: 560, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 4) {
-                Text(L("home.welcome.anyway")).font(t.homeText(15)).foregroundStyle(PN.C.text2)
-                HomeLink(L("home.welcome.anywayLink")) { StartCallWindow.startNow(delegate: app) }
+            // Theme pass (19.11): a call that starts right now gets a button, not a link
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L("home.welcome.anyway")).font(t.homeText(17, .semibold)).foregroundStyle(PN.C.text)
+                Button { StartCallWindow.startNow(delegate: app) } label: {
+                    HStack(spacing: 8) { Image(systemName: "play").font(.system(size: 10, weight: .bold)); Text(L("home.startCallNow")) }
+                }
+                .buttonStyle(PNOutlineButtonStyle(height: 40)).fixedSize()
+                Text(L("home.welcome.anywayHelp")).font(t.homeText(14)).foregroundStyle(PN.C.text3).frame(maxWidth: 520, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.top, 16)
+            .overlay(alignment: .top) { Rectangle().fill(PN.C.ruleStrong).frame(height: 2) }
             .padding(.top, 6)
         }
         let right = VStack(alignment: .leading, spacing: 0) {
@@ -928,16 +1010,25 @@ struct HomeView: View {
                 .overlay(RoundedRectangle(cornerRadius: t.statusSquare ? 0 : 16).strokeBorder(done ? PN.C.ready : (main ? PN.C.ruleStrong : PN.C.field), lineWidth: 1.5))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(t.homeText(17, .semibold)).foregroundStyle(PN.C.text)
-                Text(sub).font(t.homeText(14)).foregroundStyle(PN.C.text3)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(title).font(t.homeText(17, .semibold)).foregroundStyle(PN.C.text)
+                    if main && n == 1 {       // theme pass (19.11): the one step needed for briefs and tips
+                        Text(t.caps ? L("home.steps.startHere").uppercased() : L("home.steps.startHere"))
+                            .font(t.homeMono(11, .semibold)).tracking(t.style == .classic ? 0 : t.lblTrack * 11).foregroundStyle(PN.C.text)
+                    }
+                }
+                Text(sub).font(t.homeText(14)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             if done { Text(t.caps ? L("home.steps.done").uppercased() : L("home.steps.done")).font(t.homeMono(12, .semibold)).foregroundStyle(PN.C.readyText) }
-            else if main { Button(L("home.finish.connect"), action: run).buttonStyle(.pnPrimary).fixedSize() }
+            else if main { Button(n == 1 ? L("home.hero.connectAI") : L("home.finish.connect"), action: run).buttonStyle(.pnPrimary).fixedSize() }
             else { Button(L("home.finish.connect"), action: run).buttonStyle(PNOutlineButtonStyle()).fixedSize() }
         }
-        .padding(.vertical, 14)
-        .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+        .padding(.vertical, 14).padding(.horizontal, main ? 14 : 0)
+        .background(main ? PN.C.focus : Color.clear)
+        .overlay { if main { Rectangle().strokeBorder(PN.C.ruleStrong, lineWidth: 2) } }
+        .overlay(alignment: .top) { if !main { Rectangle().fill(PN.C.rule).frame(height: 1) } }
+        .padding(.vertical, main ? 4 : 0)
         .accessibilityElement(children: .combine)
     }
 

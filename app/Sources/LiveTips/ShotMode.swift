@@ -1108,8 +1108,8 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         ### TL;DR
         The export screen is merged and ships on Tuesday. The pilot starts on November 10 with five users if David sends the test accounts by Friday. The finance team's CSV download and scheduled emails need a change request against the 42 hours left.
         ### Decisions
-        - [10:04:10] The export screen goes to production on Tuesday.
-        - [10:19:40] The CSV download and scheduled emails go through a change request, not into the pilot.
+        - [10:04:10] **Emily Clark**: The export screen goes to production on Tuesday.
+        - [10:19:40] **Emily Clark, you**: The CSV download and scheduled emails go through a change request, not into the pilot.
         ### Action items
         - [10:06:29] **David Kim**: send the test accounts (due: Friday)
         - [10:12:05] **Mike Johnson**: get the penetration test summary from Redwood Security (due: Friday)

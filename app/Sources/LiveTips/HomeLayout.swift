@@ -89,6 +89,63 @@ struct HomeDot: View {
     }
 }
 
+/// Theme pass (19.11, prototype "soft"): the quiet tag of Later today: a small mark in the state's colour and the
+/// words in ink3, the text face, as written (no capitals, no plate).
+struct HomeQuietTag: View {
+    let kind: HomeTag
+    let text: String
+    @Environment(\.pnTheme) private var t
+    var body: some View {
+        HStack(spacing: 6) {
+            HomeDot(color: kind.dot(t), size: 7)
+            Text(text).font(t.homeText(13, .medium)).foregroundStyle(PN.C.text3).lineLimit(1).fixedSize()
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Theme pass (19.11, prototype "btn q"): a quiet header button, no fill, a 1.5 pt line in the rule colour, text in ink2.
+/// For actions that are not this meeting's (Plan a call, New call).
+struct PNQuietButtonStyle: ButtonStyle {
+    var height: CGFloat = 32
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.pnTheme) private var t
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: t.style == .classic ? 7 : 0)
+        configuration.label
+            .font(t.buttonFont)
+            .tracking(t.buttonTracking)
+            .textCase(t.caps ? .uppercase : nil)
+            .foregroundStyle(PN.C.text2)
+            .padding(.horizontal, 12).frame(height: height)
+            .background(PN.C.text.opacity(configuration.isPressed ? 0.08 : 0), in: shape)
+            .overlay(shape.strokeBorder(t.style == .classic ? Color.primary.opacity(0.15) : PN.C.rule, lineWidth: 1.5))
+            .contentShape(shape)
+            .opacity(enabled ? 1 : 0.45)
+    }
+}
+
+/// How long a preparation usually takes (PrepEstimate over state/spend-ledger.jsonl), read again only when the file changes.
+enum HomePrepEstimate {
+    nonisolated(unsafe) private static var stamp: Date?
+    nonisolated(unsafe) private static var value: Int?
+    static func seconds() -> Int? {
+        let path = ((AIRoute.statePath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("spend-ledger.jsonl")
+        let m = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
+        if m != stamp {
+            stamp = m
+            value = m == nil ? nil : (try? String(contentsOfFile: path, encoding: .utf8)).flatMap { PrepEstimate.seconds(ledger: $0) }
+        }
+        return value
+    }
+    /// "Prepare brief · ~40 s", or "Prepare brief" without an estimate.
+    static var label: String {
+        guard let s = seconds() else { return L("home.prepareBrief") }
+        let (n, min) = PrepEstimate.rounded(s)
+        return L("home.prepareBrief.est", ["t": L(min ? "home.est.min" : "home.est.sec", ["n": "\(n)"])])
+    }
+}
+
 /// The status tag of a row (board TAG), or the big status line of the hero (board BIG) with its explanation.
 struct HomeTagView: View {
     let kind: HomeTag
@@ -182,6 +239,7 @@ struct PNSolidButtonStyle: ButtonStyle {
             .foregroundStyle(PN.C.onAccent)
             .padding(.horizontal, 20).frame(height: height)
             .background(PN.C.accentFill.opacity(enabled ? (configuration.isPressed ? 0.85 : 1) : 0.4), in: shape)
+            .overlay(shape.strokeBorder(t.framedAccent ? PN.C.actEdge.opacity(enabled ? 1 : 0.4) : Color.clear, lineWidth: 2))
             .contentShape(shape)
     }
 }
@@ -216,7 +274,8 @@ struct HomeIconButton: View {
     }
 }
 
-/// Text on the highlight plate of the style (Roadbook: the yellow plate; Broadsheet and Classic: no plate).
+/// Text on a plate when a fill is given; otherwise plain text. Theme pass (19.11, owner): on Home the yellow fill is the
+/// main button's only, so the countdown and the big words no longer sit on the highlight plate.
 struct HomePlate: View {
     let text: String
     let font: Font
@@ -225,11 +284,10 @@ struct HomePlate: View {
     var ink: Color? = nil
     @Environment(\.pnTheme) private var t
     var body: some View {
-        let bg = fill ?? t.hlBg.map { Color(pnHex: $0) }
         Text(text).font(font).tracking(tracking)
-            .foregroundStyle(ink ?? Color(pnHex: t.hlFg))
-            .padding(.horizontal, bg == nil ? 0 : max(t.plateInset, fill == nil ? 0 : 8))
-            .background(bg ?? .clear)
+            .foregroundStyle(ink ?? PN.C.text)
+            .padding(.horizontal, fill == nil ? 0 : 8)
+            .background(fill ?? .clear)
     }
 }
 

@@ -8,6 +8,7 @@ import LiveTipsCore
 
 struct CallOutcome: Equatable {
     var decisions: [String] = []
+    var decisionBy: [String] = []       // theme pass stage 2: who made each decision, same order ("" when nobody is named)
     var onMe: [String] = []             // what the PM took on
     var openQuestions: [String] = []    // questions to the PM still open at the end
     var theirs: [(who: String, what: String)] = []   // 0.8: promises made to the PM's side
@@ -15,7 +16,7 @@ struct CallOutcome: Equatable {
     var tasks: [CallLists.Task] = []    // 0.12.2 (L4): the one-rule tasks, for a call whose register has none
 
     static func == (a: CallOutcome, b: CallOutcome) -> Bool {
-        a.decisions == b.decisions && a.onMe == b.onMe && a.openQuestions == b.openQuestions && a.risks == b.risks
+        a.decisions == b.decisions && a.decisionBy == b.decisionBy && a.onMe == b.onMe && a.openQuestions == b.openQuestions && a.risks == b.risks
             && a.theirs.map { $0.who + "|" + $0.what } == b.theirs.map { $0.who + "|" + $0.what } && a.tasks == b.tasks
     }
 
@@ -42,6 +43,7 @@ struct CallOutcome: Equatable {
             .filter { CommitmentRegister.callKey($0.call) == CommitmentRegister.callKey(file) && $0.status != "dropped" }
         if c == nil, !(lists.isEmpty && reg.isEmpty) { c = CallOutcome() }
         c?.decisions = lists.decisions
+        c?.decisionBy = lists.decisionItems.map(\.by)
         c?.risks = lists.risks          // 0.12.2 (L3): risks by the same rule
         c?.tasks = lists.tasks
         // 0.12.2 (L4): on you and on them from the register (the store), else by the one rule

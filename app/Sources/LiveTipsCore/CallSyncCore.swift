@@ -274,15 +274,20 @@ public enum CallSync {
     }
 
     public static func decisions(_ n: MeetingNotes.Notes?) -> [[String: Any]] {
-        (n?.decisions ?? []).prefix(200).compactMap { i in
-            let t = i.text.trimmingCharacters(in: .whitespaces)
-            return MeetingNotes.isNothing(t) ? nil : ["text": String(t.prefix(2000))]
+        CallLists.decisionItems((n?.decisions ?? []).map { ["t": $0.t, "text": $0.text] }).prefix(200).map { i in
+            var o: [String: Any] = ["text": String(i.text.prefix(2000))]
+            if !i.by.isEmpty { o["made_by"] = String(i.by.prefix(200)) }
+            return o
         }
     }
 
     /// 0.12.2 (L2): the call's decisions by the one rule (CallLists), so the server shows what the call page shows.
     public static func decisions(_ l: CallLists.Lists) -> [[String: Any]] {
-        l.decisions.prefix(200).map { ["text": String($0.prefix(2000))] }
+        l.decisionItems.prefix(200).map { i in
+            var o: [String: Any] = ["text": String(i.text.prefix(2000))]
+            if !i.by.isEmpty { o["made_by"] = String(i.by.prefix(200)) }   // theme pass stage 2 (server: Decision.made_by)
+            return o
+        }
     }
 
     /// 0.12.2 (L3): the call's risks by the one rule (CallLists), for PUT /v1/calls/{id}/risks (server 0.4.0).

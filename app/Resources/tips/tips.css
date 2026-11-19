@@ -716,8 +716,8 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 [data-style="roadbook"] .hero .meta,[data-style="roadbook"] .hero .src,[data-style="roadbook"] .hero .ghost,[data-style="roadbook"] .hero .items.pts li.grp{color:rgba(13,13,11,.68)}
 [data-style="roadbook"] .hero .ghost:hover{background:rgba(13,13,11,.12);color:#0D0D0B}
 [data-style="roadbook"] .hero .say{background:#0D0D0B;color:#F1EDE3;padding:10px 12px}
-/* Roadbook dark fills with yellow: white text on it was unreadable (site shots 0.23.0) */
-[data-style="roadbook"][data-theme="dark"] .help,[data-style="roadbook"][data-theme="dark"] .btn1,[data-style="roadbook"][data-theme="dark"] .icon-btn.pause.resume,[data-style="roadbook"][data-theme="dark"] .menu button:hover,[data-style="roadbook"][data-theme="dark"] .dk-b.pri,[data-style="roadbook"][data-theme="dark"] .dk-card.cur .dk-head .dk-num{color:var(--pn-on-accent)}
+/* Roadbook fills with yellow in both modes since the theme pass (19.11; dark since 0.23.0): text on it in on-accent, never white */
+[data-style="roadbook"] .help,[data-style="roadbook"] .btn1,[data-style="roadbook"] .icon-btn.pause.resume,[data-style="roadbook"] .menu button:hover,[data-style="roadbook"] .dk-b.pri,[data-style="roadbook"] .dk-card.cur .dk-head .dk-num{color:var(--pn-on-accent)}
 [data-style="broadsheet"] .hero{background:transparent;border-top:var(--pn-rule-heavy) solid var(--pn-rule-strong);animation:none}
 [data-style="broadsheet"] .hero .say{border-left:4px solid var(--pn-accent);padding:10px 12px}
 [data-style] .ratebox .chip,[data-style] .ratebox input{border-radius:var(--pn-radius-button)}

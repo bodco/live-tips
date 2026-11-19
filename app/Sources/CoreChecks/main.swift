@@ -4028,6 +4028,18 @@ updatesD3()
 orgsB6b()
 prepSecuritySEC01()
 projectsWizard0170()
+// MARK: 2026-11-19 (theme pass, stage 1): the preparation estimate on Home ("Prepare brief · ~40 s")
+func prepEstimateTP1() {
+    let l = [#"{"job":"prep","error":false,"duration_s":38}"#, #"{"job":"prep","error":true,"duration_s":400}"#,
+             #"{"job":"prep_refresh","error":false,"duration_s":900}"#, #"{"job":"prep","error":false,"duration_s":44}"#,
+             #"{"job":"prep","error":false,"duration_s":41.0}"#, "not json"].joined(separator: "\n")
+    expect(PrepEstimate.seconds(ledger: l) == 41, "tp1: the median of the successful prep runs only")
+    expect(PrepEstimate.seconds(ledger: #"{"job":"prep","error":false,"duration_s":38}"#) == nil, "tp1: one run is no estimate")
+    expect(PrepEstimate.seconds(ledger: "") == nil, "tp1: no ledger, no estimate")
+    expect(PrepEstimate.rounded(41) == (40, false) && PrepEstimate.rounded(4) == (10, false), "tp1: seconds round to 10, at least 10")
+    expect(PrepEstimate.rounded(170) == (3, true), "tp1: from 90 s whole minutes")
+}
+
 // MARK: 2026-11-18 (redesign block 1): the style setting (Settings > General > Appearance)
 func appearanceStyleR1() {
     let d = AppConfig()
@@ -4038,6 +4050,9 @@ func appearanceStyleR1() {
     var c = AppConfig(); c.appearanceStyle = "broadsheet"; c.appearance = "light"
     let back = (try? JSONEncoder().encode(c)).flatMap { try? JSONDecoder().decode(AppConfig.self, from: $0) }
     expect(back?.appearanceStyle == "broadsheet" && back?.appearance == "light", "r1: style and mode round-trip")
+    // theme pass (19.11): Classic is out of the picker, a config on Classic reads as Roadbook and keeps its mode
+    let cl = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"appearanceStyle\":\"classic\",\"appearance\":\"dark\"}".utf8))
+    expect(cl?.appearanceStyle == "roadbook" && cl?.appearance == "dark", "theme pass: a config on Classic moves to Roadbook, keeps its mode")
 }
 
 // MARK: 2026-11-18 (0.23.0): the update window on every launch, once per launch and version
@@ -4097,6 +4112,30 @@ func aiDefaultsF3() {
     } else { expect(false, "f3: older routes decode") }
 }
 
+/// Theme pass stage 2: owners next to decisions (CallLists.decisionItems = call_lists.decision_items).
+func decisionOwnersTP2() {
+    let mn = "## Meeting notes\n\n### Decisions\n- [13:25:00] **Emily Clark**: The export goes to production on Tue, Nov 24.\n" +
+        "- [13:40:00] **Emily Clark, you**: CSV download goes through a change request.\n- [13:41:00] **Go with plan B**\n" +
+        "- Keep the deposit at 20 euros\n- None\n"
+    var r = CallLists.resolve(situations: [], notes: mn)
+    expect(r.decisionsFrom == .notes && r.decisions == ["The export goes to production on Tue, Nov 24.", "CSV download goes through a change request.",
+        "Go with plan B", "Keep the deposit at 20 euros"], "tp2: notes decisions without the owner in the text")
+    expect(r.decisionItems.map(\.by) == ["Emily Clark", "Emily Clark, you", "", ""], "tp2: notes owners, a bold decision has none")
+    expect(r.decisionItems.first?.t == "13:25:00", "tp2: the time stays")
+    let sync = CallSync.decisions(r)
+    expect(sync.first?["made_by"] as? String == "Emily Clark" && sync[2]["made_by"] == nil, "tp2: sync sends made_by only when named")
+    let pm: [String: Any] = ["kind": "situation", "source": "call_page", "lists": ["decisions"],
+                             "decisions": ["Ship Tuesday", "Ship Tuesday", "Hold the price"], "decision_owners": ["Mike", "Mike", ""]]
+    r = CallLists.resolve(situations: [pm], notes: mn)
+    expect(r.decisionsFrom == .pm && r.decisions == ["Ship Tuesday", "Hold the price"] && r.decisionItems.map(\.by) == ["Mike", ""], "tp2: PM edit owners")
+    let live: [String: Any] = ["kind": "situation", "decisions": [["what": "Pilot starts Monday", "who": "David Kim"], "Old style line"]]
+    r = CallLists.resolve(situations: [live], notes: nil)
+    expect(r.decisionItems.map(\.by) == ["David Kim", ""] && r.decisions == ["Pilot starts Monday", "Old style line"], "tp2: live objects and strings")
+    let md = MeetingNotes.markdown({ var n = MeetingNotes.Notes(); n.decisions = [MeetingNotes.Item(t: "13:25:00", text: "Ship", by: "Emily")]; return n }(),
+        MeetingNotes.Labels(title: "", tldr: "T", decisions: "Decisions", actions: "A", open: "O", topics: "Tp", unclear: "U"))
+    expect(md.contains("- [13:25] Emily: Ship"), "tp2: export line names the owner")
+}
+
 itemIDs0170()
 pull0170()
 orgCard0170()
@@ -4108,6 +4147,7 @@ orgContext0170()
 salesBlocksS1()
 emailAuthB13()
 appearanceStyleR1()
+prepEstimateTP1()
 updatePromptR()
 /// 0.24.1 (F1, F7): the base set and its loader, Pacenote's own Python, locked packages, sign-in without Terminal, logs.
 func hotfixF1() {
@@ -4220,5 +4260,6 @@ func hotfixF2F6() {
 
 hotfixF1()
 hotfixF2F6()
+decisionOwnersTP2()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

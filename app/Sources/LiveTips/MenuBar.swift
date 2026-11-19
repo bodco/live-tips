@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { AIUsageProbe.shared.start() }     // 0.10.0 (owner 12.11): account usage numbers, 60 s after launch
         // 0.9.5: recordings that were on their way to Google Drive when the app quit go on (after the accounts load)
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { MainActor.assumeIsolated { DriveRecordings.shared.resumeQueue(); CallSyncService.shared.start() } }
+        // 0.26.2 (call folders, B6): flat calls move into their call folders, a few seconds after launch (move only)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { CallMigration.runAtLaunch() }
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
         // 0.24.1 (F3, owner 18.11): the AI of each job follows what is connected: keys now, accounts once their
         // sign-in is checked (and again whenever it changes)
@@ -730,12 +732,11 @@ final class StartCallModel: ObservableObject {
         guard let root = root else { prep = nil; return }
         let live = (root as NSString).appendingPathComponent("live")
         let fm = FileManager.default
-        guard let names = try? fm.contentsOfDirectory(atPath: live) else { prep = nil; return }
         let callTitle = effectiveTitle
         var best: PrepInfo?
         var all: [PrepInfo] = []
-        for n in names where n.hasPrefix("prep-") && n.hasSuffix(".brief.md") {
-            let path = (live as NSString).appendingPathComponent(n)
+        for path in CallLayout.prepFiles(live: live, suffix: ".brief.md") {
+            let n = (path as NSString).lastPathComponent
             guard let m0 = (try? fm.attributesOfItem(atPath: path))?[.modificationDate] as? Date,
                   Date().timeIntervalSince(m0) < 14 * 86400 else { continue }
             // QA 26.10: a prep made in the morning for an evening call is still fresh: its age counts from
@@ -772,7 +773,7 @@ final class StartCallModel: ObservableObject {
     /// Full path of the chosen prep brief (nil = automatic).
     var chosenPrepPath: String? {
         guard let c = chosenPrep, let root = root else { return nil }
-        return ((root as NSString).appendingPathComponent("live") as NSString).appendingPathComponent(c)
+        return CallLayout.prepPath(live: (root as NSString).appendingPathComponent("live"), name: c)
     }
 
     var targetName: String { project?.name ?? workspace?.name ?? L("call.theProject") }
@@ -942,7 +943,7 @@ extension AppDelegate {
         if model.chosenPrep == nil { model.adoptExistingPrep() }
         if model.chosenPrep == nil, let b = model.prepBase, let root = model.root {
             let name = (b as NSString).lastPathComponent + ".brief.md"
-            if FileManager.default.fileExists(atPath: ((root as NSString).appendingPathComponent("live") as NSString).appendingPathComponent(name)) {
+            if CallLayout.prepPath(live: (root as NSString).appendingPathComponent("live"), name: name) != nil {
                 model.chosenPrep = name
             }
         }

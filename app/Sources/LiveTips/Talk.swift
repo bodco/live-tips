@@ -111,7 +111,7 @@ final class TalkModel: ObservableObject {
         load()
     }
 
-    var path: String { base + ".slides.json" }
+    var path: String { CallLayout.sidecar(base, ".slides.json") }
 
     func load() {
         top = TalkFiles.load(path) ?? [:]
@@ -208,7 +208,7 @@ enum TalkWindow {
     }
 
     /// The talk exists for this preparation.
-    static func available(base: String) -> Bool { FileManager.default.fileExists(atPath: base + ".slides.json") }
+    static func available(base: String) -> Bool { FileManager.default.fileExists(atPath: CallLayout.sidecar(base, ".slides.json")) }
 }
 
 struct TalkView: View {
@@ -514,7 +514,7 @@ struct PrepareAgainSheet: View {
 
     @ViewBuilder private var reasons: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let c = call, let fr = Freshness.check(c), let made = Freshness.preparedAt(brief: model.base + ".brief.md") {
+            if let c = call, let fr = Freshness.check(c), let made = Freshness.preparedAt(brief: CallLayout.sidecar(model.base, ".brief.md")) {
                 reason(L("again.age", ["d": "\(max(0, Calendar.current.dateComponents([.day], from: made, to: Date()).day ?? 0))", "n": "\(fr.changes.count)"]), nil)
             }
             if let c = call, let info = c.deck.info, let m = (try? FileManager.default.attributesOfItem(atPath: info.file))?[.modificationDate] as? Date, m > info.readAt {

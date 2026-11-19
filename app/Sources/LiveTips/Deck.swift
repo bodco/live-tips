@@ -556,17 +556,17 @@ enum TalkFiles {
             try? fm.copyItem(atPath: "\(base).\(ext).json", toPath: "\(base).\(ext).prev.json")
         }
         // 2026-10-29 (owner): Prepare again for any call keeps the previous brief too (<base>.brief.prev.md).
-        if fm.fileExists(atPath: base + ".brief.md") {
-            try? fm.removeItem(atPath: base + ".brief.prev.md")
-            try? fm.copyItem(atPath: base + ".brief.md", toPath: base + ".brief.prev.md")
+        if fm.fileExists(atPath: CallLayout.sidecar(base, ".brief.md")) {
+            try? fm.removeItem(atPath: CallLayout.sidecar(base, ".brief.prev.md"))
+            try? fm.copyItem(atPath: CallLayout.sidecar(base, ".brief.md"), toPath: CallLayout.sidecar(base, ".brief.prev.md"))
         }
         var old: [Int: String] = [:]
-        if let o = load(base + ".deck.json"), let s = o["slides"] as? [[String: Any]] {
+        if let o = load(CallLayout.sidecar(base, ".deck.json")), let s = o["slides"] as? [[String: Any]] {
             for x in s { if let n = TalkMerge.num(x) { old[n] = "\(x["title"] ?? "")\n\(x["text"] ?? "")" } }
         }
         if let info = deck?.info {
-            try? fm.removeItem(atPath: base + ".deck.json")
-            try? fm.copyItem(atPath: info.jsonPath, toPath: base + ".deck.json")
+            try? fm.removeItem(atPath: CallLayout.sidecar(base, ".deck.json"))
+            try? fm.copyItem(atPath: info.jsonPath, toPath: CallLayout.sidecar(base, ".deck.json"))
         }
         return old
     }
@@ -575,7 +575,7 @@ enum TalkFiles {
     /// Returns (rewritten, kept) for "Talk updated · {n} slides rewritten, {k} kept with your edits".
     @discardableResult
     static func after(base: String, deck: DeckSetup?, oldTexts: [Int: String]) -> (rewritten: Int, kept: [Int])? {
-        guard var o = load(base + ".slides.json"), let new = o["slides"] as? [[String: Any]] else { return nil }
+        guard var o = load(CallLayout.sidecar(base, ".slides.json")), let new = o["slides"] as? [[String: Any]] else { return nil }
         let prev = slides(base, prev: true)
         let changed = (deck?.info).map { oldTexts.isEmpty ? Set<Int>() : TalkMerge.deckChanges(old: oldTexts, new: $0.texts) } ?? []
         var (merged, kept) = TalkMerge.merge(old: prev, new: new, keepEdits: deck?.keepEdits ?? true, deckChanged: changed)
@@ -586,7 +586,7 @@ enum TalkFiles {
             o["speakers"] = [AppConfig.load(from: AppPaths.config).nameAliases.first ?? "me"] + d.speakers
         }
         o["slides"] = merged
-        save(o, base + ".slides.json")
+        save(o, CallLayout.sidecar(base, ".slides.json"))
         return (merged.count - kept.count, kept)
     }
 
@@ -616,7 +616,7 @@ enum TalkFiles {
         let edited = TalkMerge.edited(prev)
         return """
         The PM attached the deck \(info.file) (\(info.format), \(info.slides.count) slides). Its slide texts are in \
-        \(base).deck.json: read that file, not the deck itself. Also write \(base).slides.json as \
+        \(CallLayout.sidecar(base, ".deck.json")): read that file, not the deck itself. Also write \(CallLayout.sidecar(base, ".slides.json")) as \
         references/presentation.md says (items 8 and 8a): one entry per deck slide, n = the deck slide number, the title \
         from the deck. Who presents (set by the PM, keep it): \(owners). Slide budgets `sec`: all slides together fit the \
         talk time of \(d.talkMin) min (a \(d.duration) min call minus \(d.qaOn ? d.qaMin : 0) min of Q&A at the end). \
@@ -626,7 +626,7 @@ enum TalkFiles {
         colleague's slides are the PM's backup when the colleague drops out (0.9.7, rules/presentation.yaml > backup). \
         `"skip": true` on the 1-3 PM slides that matter least for the goal of the call. Top level: "talk_min": \(d.talkMin), "qa_min": \(d.qaOn ? d.qaMin : 0). \
         \(info.slides.count > 30 ? "The deck is long: write slides.json in passes of 20 slides (write the first 20, then add the next 20 with Edit), so one answer stays short." : "")
-        \(edited.isEmpty || !d.keepEdits ? "" : "The PM edited slides \(TalkMerge.list(edited)) in the previous talk (\(base).slides.prev.json): they stay as they are, write the others.")
+        \(edited.isEmpty || !d.keepEdits ? "" : "The PM edited slides \(TalkMerge.list(edited)) in the previous talk (\(CallLayout.sidecar(base, ".slides.prev.json"))): they stay as they are, write the others.")
         """
     }
 }

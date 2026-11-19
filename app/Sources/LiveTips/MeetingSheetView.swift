@@ -725,7 +725,7 @@ struct SheetVersionsTab: View {
         guard let f = SheetFiles.versions(of: doc.path).first(where: { $0.n == n }), let chosen = try? MeetingSheetIO.load(f.path),
               let cur = doc.sheet else { return }
         let next = (SheetFiles.versions(of: doc.path).map(\.n).max() ?? 0) + 1
-        let keep = doc.base + ".sheet.v\(max(next, (cur.versions?.map(\.n).max() ?? 0) + 1)).json"
+        let keep = CallLayout.sidecar(doc.base, ".sheet.v\(max(next, (cur.versions?.map(\.n).max() ?? 0) + 1)).json")
         // 0.10.0 (Meeting Sheet, hardening): byte copies, so the fields this app does not know stay in both files
         _ = cur; _ = chosen
         guard let curData = try? Data(contentsOf: URL(fileURLWithPath: doc.path)), let chosenData = try? Data(contentsOf: URL(fileURLWithPath: f.path)),
@@ -745,7 +745,7 @@ struct SheetVersionsTab: View {
 enum SheetActions {
     /// The request the sheet was built with (<base>.sheet.request.json), or a minimal one from the sheet.
     static func request(for doc: SheetDoc) -> [String: Any] {
-        let p = doc.base + ".sheet.request.json"
+        let p = CallLayout.sidecar(doc.base, ".sheet.request.json")
         var r = ((try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: p)))) as? [String: Any]) ?? [:]
         r["sheet"] = doc.path
         r["out"] = doc.base

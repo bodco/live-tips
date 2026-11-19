@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 from typing import List, Optional
 
+from . import call_layout
 from . import callinfo
 from .context import index_snippets
 from .oneshot import ask_json, emit
@@ -30,7 +31,7 @@ def transcripts(root: Path) -> List[Path]:
     live = root / "live"
     if not live.is_dir():
         return []
-    files = [p for p in live.iterdir() if CALL_MD.match(p.name)]
+    files = [p for p in call_layout.files(live) if CALL_MD.match(p.name)]
     seen, out = set(), []
     for p in sorted(files, key=lambda x: x.name, reverse=True):          # newest first; the app's and the skill's once
         key = p.name.replace(".app.md", ".md")
@@ -77,7 +78,7 @@ def call_file(root: Path, path) -> Optional[Path]:
     p = Path(str(path or ""))
     if not p.is_absolute():
         p = root / p
-    return p if p.parent.name == "live" and CALL_MD.match(p.name) else None
+    return p if call_layout.live_folder(p).name == "live" and CALL_MD.match(p.name) else None
 
 
 def moment(md: Path, match, default: str = "") -> str:

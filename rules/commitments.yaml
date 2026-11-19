@@ -1,7 +1,7 @@
 # Commitments register (Pacenote 0.8, idea 01). Shared by the skill and the app.
 # Both write the same file; neither ever sends anything outside the Mac.
 schema_version: 1
-file: "<call folder>/commitments.jsonl"     # the project's live/ folder, next to the transcripts
+file: "<live folder>/commitments.jsonl"     # the project's live/ folder, next to the transcripts
 format: >-
   JSON lines, append only. Each line is an event; the register is the events folded by id.
   Never rewrite or delete lines: a later event wins.

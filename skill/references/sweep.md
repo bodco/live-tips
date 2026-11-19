@@ -107,7 +107,7 @@ is older than 3 days -> say so in the sources line (item 4) as
    дзвінка"): a prep is never lighter than the sweep.
 3b. **Previous meetings, read in depth (mandatory, 2026-10-28).** Find the last 3 meetings of this
    series (the same title or calendar series; else the last 3 of this type with these people): their
-   transcripts in `live/` (`<stem>.md`, or `<stem>.named.md` when present; never only the tips) and
+   transcripts in `live/<YYYY-MM-DD>-<slug>/` (or flat in `live/` for old calls) (`<stem>.md`, or `.work/<stem>.named.md` when present; never only the tips) and
    their Meetings DB pages (summary, decisions, action items). Read the newest transcript in full; for
    the older ones read `<stem>.notes.md` when it exists (full call notes that keep every detail,
    rules/notes.yaml), else their transcripts in full, not only the summaries. For each meeting extract: what was discussed (topics, 1-2 lines each, with numbers
@@ -353,8 +353,8 @@ Only when the PM asks during the call ("підготуй зараз", "пере�
 Run the full sweep above in a subagent, with one more source: the transcript of this call up to now (`<stem>.md`).
 What was asked, agreed and left open so far changes the brief, the agenda and the cards. The loop (SKILL.md Step 3)
 never waits: keep answering `@@` lines and giving tips on the current brief. Write the result as
-`<stem>.brief.new.md`, `<stem>.cards.new.json`, `<stem>.facts.new.json` (and `<stem>.sheet.new.json`, see
+`<stem>.brief.new.md`, `<stem>.cards.new.json`, `<stem>.facts.new.json` (all in `.work/`; and `<stem>.sheet.new.json`, see
 `sheet.md`); when all three are written, copy
-`<stem>.brief.md` to `<stem>.brief.prev.md` (one previous version), rename each `.new` file over the current one and
+`<stem>.brief.md` to `.work/<stem>.brief.prev.md` (one previous version), move each `.new` file over the current one (the brief goes back on top, the rest stay in `.work/`) and
 read the new brief on the next turn of the loop. A failed run leaves the current brief as it was. Tell the PM one
 line when it is ready: "Brief updated with what was said so far".

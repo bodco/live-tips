@@ -9,6 +9,7 @@ For each tip/fact/answer (typed window questions excluded) with `src` and `at`:
 import argparse
 import json
 from pathlib import Path
+from . import call_layout
 
 from .report import jl, pct
 from .transcript import hms_to_s
@@ -24,7 +25,7 @@ def main(argv=None):
     for d in a.dirs:
         for tf in sorted(d.glob("*.md.timing.jsonl")):
             stem = tf.name[:-len(".md.timing.jsonl")]
-            tips = jl(d / (stem + ".tips.jsonl"))
+            tips = jl(call_layout.sidecar(d / stem, ".tips.jsonl"))
             if not tips:
                 continue
             timing = {}

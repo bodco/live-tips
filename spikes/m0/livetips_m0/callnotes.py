@@ -21,6 +21,8 @@ import re
 import sys
 import time
 from pathlib import Path
+
+from . import call_layout
 from typing import List
 
 PART_CHARS = 25_000
@@ -304,8 +306,8 @@ def make_meeting_only(md: Path, model: str, lang: str, provider=None, aliases: L
         usd[0] += cost_usd(c.model, c.input_tokens, c.cache_write_5m, c.cache_write_1h, c.cache_read, c.output_tokens) or 0
         return c.text.strip()
 
-    out = md.with_name(md.name[:-3].replace(".named", "") + ".notes.md")
-    named = md.with_name(md.name[:-3] + ".named.md") if not md.name.endswith(".named.md") else md
+    out = call_layout.place(md.name[:-3].replace(".named", "") + ".notes.md", md.parent)
+    named = call_layout.place(md.name[:-3] + ".named.md", md.parent) if not md.name.endswith(".named.md") else md
     text = (named if named.exists() else md).read_text(encoding="utf-8", errors="replace")
     if not lang or lang == "auto":
         lang = call_lang(text)
@@ -324,7 +326,7 @@ def _write(out: Path, text: str) -> None:
 
 
 def _register_tasks(md: Path, notes: str, aliases: List[str]) -> None:
-    """0.12.2 (L4): the notes' Action items complete the call's commitments register (<call folder>/commitments.jsonl,
+    """0.12.2 (L4): the notes' Action items complete the call's commitments register (<live folder>/commitments.jsonl,
     commitments.record_notes); the notes are kept whatever happens."""
     try:
         from . import commitments
@@ -372,7 +374,7 @@ def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str
         usd[0] += u or 0
         return c.text.strip()
 
-    named = md.with_name(md.name[:-3] + ".named.md") if not md.name.endswith(".named.md") else md
+    named = call_layout.place(md.name[:-3] + ".named.md", md.parent) if not md.name.endswith(".named.md") else md
     src = named if named.exists() else md
     text = src.read_text(encoding="utf-8", errors="replace")
     if not lang or lang == "auto":
@@ -400,7 +402,7 @@ def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str
         notes = put_meeting(notes, make_meeting(md, notes, text, lang, ask, names))
     except Exception as e:  # noqa: BLE001
         print("meeting notes: " + str(e)[:200], file=sys.stderr)
-    out = md.with_name(md.name[:-3].replace(".named", "") + ".notes.md")
+    out = call_layout.place(md.name[:-3].replace(".named", "") + ".notes.md", md.parent)
     _write_then_check(out, md, notes, text, lang, ask)
     _register_tasks(md, notes, aliases)
     return {"ok": True, "path": str(out), "coverage": coverage_line(c), "cost_usd": round(usd[0], 4), "parts": len(ps),
@@ -417,7 +419,7 @@ def main(argv=None) -> int:
     ap.add_argument("--meeting", action="store_true",
                     help="0.9.5.2: only the ## Meeting notes section when the notes exist (else the full notes)")
     a = ap.parse_args(argv)
-    notes_file = Path(a.md).with_name(Path(a.md).name[:-3].replace(".named", "") + ".notes.md")
+    notes_file = call_layout.place(Path(a.md).name[:-3].replace(".named", "") + ".notes.md", Path(a.md).parent)
     fn = make_meeting_only if a.meeting and notes_file.exists() else make_notes
     try:
         res = fn(Path(a.md), a.model, a.lang, aliases=[x.strip() for x in a.aliases.split(",") if x.strip()],

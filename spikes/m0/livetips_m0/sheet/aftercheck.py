@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from .. import call_layout as CL
 from typing import Callable, List, Optional
 
 HEAD = "## Meeting Sheet check"
@@ -27,7 +28,7 @@ Reply with JSON only: {"questions": [{"id", "status", "t", "said", "follow_up"}]
 def sheet_for(md: Path) -> Optional[Path]:
     name = md.name[:-3] if md.name.endswith(".md") else md.name
     name = name.replace(".named", "")
-    p = md.with_name(name + ".sheet.json")
+    p = CL.place(name + ".sheet.json", md.parent)
     return p if p.exists() else None
 
 
@@ -56,7 +57,7 @@ def items(sheet: dict, btype: str) -> List[dict]:
 def asked_hint(md: Path) -> set:
     name = md.name[:-3].replace(".named", "") if md.name.endswith(".md") else md.name
     try:
-        st = json.loads(md.with_name(name + ".sheet-live.json").read_text(encoding="utf-8"))
+        st = json.loads(CL.place(name + ".sheet-live.json", md.parent).read_text(encoding="utf-8"))
         return {str(x).replace("ms-q-", "", 1) for x in st.get("asked") or []}
     except Exception:  # noqa: BLE001
         return set()
@@ -163,7 +164,9 @@ def add_to_notes(md: Path, notes: str, transcript: str, lang: str, ask) -> str:
         return notes
     name = md.name[:-3].replace(".named", "") if md.name.endswith(".md") else md.name
     try:
-        md.with_name(name + ".sheet-check.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+        pc = CL.place(name + ".sheet-check.json", md.parent)
+        pc.parent.mkdir(parents=True, exist_ok=True)
+        pc.write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     except OSError:
         pass
     return put_section(notes, render(res, lang))
@@ -173,7 +176,7 @@ def followup_lines(md: Path) -> List[str]:
     """For the follow-up email: what the sheet wanted and the call did not settle."""
     name = md.name[:-3].replace(".named", "") if md.name.endswith(".md") else md.name
     try:
-        res = json.loads(md.with_name(name + ".sheet-check.json").read_text(encoding="utf-8"))
+        res = json.loads(CL.place(name + ".sheet-check.json", md.parent).read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         return []
     out = []

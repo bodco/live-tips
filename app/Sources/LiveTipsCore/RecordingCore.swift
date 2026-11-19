@@ -97,9 +97,9 @@ public enum RecordingFiles {
         if s.hasSuffix(".app") { s = String(s.dropLast(4)) }
         return s
     }
-    /// <root>/live/x.md -> <root>/video
+    /// <root>/live/x.md or <root>/live/<date-slug>/x.md -> <root>/video
     public static func folder(transcript: String) -> String {
-        let live = (transcript as NSString).deletingLastPathComponent
+        let live = CallLayout.liveFolder(of: transcript)   // live/x.md (legacy) and live/<date-slug>/x.md
         return ((live as NSString).deletingLastPathComponent as NSString).appendingPathComponent("video")
     }
     public static func metaPath(transcript: String) -> String {

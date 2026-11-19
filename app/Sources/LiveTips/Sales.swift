@@ -193,7 +193,7 @@ struct SalesMethodInfo: View {
 /// <stem>.sales.json, written by the engine after a sales call; the call page edits it in place.
 enum SalesFile {
     static func url(_ file: String) -> URL {
-        URL(fileURLWithPath: (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".sales.json")
+        URL(fileURLWithPath: CallLayout.sidecar((file.hasSuffix(".md") ? String(file.dropLast(3)) : file), ".sales.json"))
     }
     static func load(_ file: String) -> [String: Any]? {
         (try? Data(contentsOf: url(file))).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }

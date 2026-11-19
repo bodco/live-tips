@@ -142,8 +142,8 @@ public enum CallSync {
     }
 
     public static func stem(_ transcript: String) -> String { transcript.hasSuffix(".md") ? String(transcript.dropLast(3)) : transcript }
-    public static func statePath(transcript t: String) -> String { stem(t) + ".sync.json" }
-    public static func sheetPath(transcript t: String) -> String { stem(t) + ".sheet.json" }
+    public static func statePath(transcript t: String) -> String { CallLayout.sidecar(stem(t), ".sync.json") }
+    public static func sheetPath(transcript t: String) -> String { CallLayout.sidecar(stem(t), ".sheet.json") }
 
     /// "<device>-<file stem>": the same call from two Macs stays two calls, a repeat from one Mac stays one.
     public static func clientCallID(device: String, transcript: String) -> String {
@@ -217,8 +217,8 @@ public enum CallSync {
         return o
     }
 
-    public static func inboxPath(transcript t: String) -> String { stem(t) + ".inbox.jsonl" }
-    public static func sheetCheckPath(transcript t: String) -> String { stem(t) + ".sheet-check.json" }
+    public static func inboxPath(transcript t: String) -> String { CallLayout.sidecar(stem(t), ".inbox.jsonl") }
+    public static func sheetCheckPath(transcript t: String) -> String { CallLayout.sidecar(stem(t), ".sheet-check.json") }
 
     /// 0.13.0 (B8 part 2): the call's numbers, never a text. `tips`: the call's tips files; `inbox`: the window's inbox
     /// (ratings as tip_feedback settings, HELP NOW as the ask "sos"); `talkShare`: the PM's share of the words

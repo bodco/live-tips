@@ -26,6 +26,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from . import call_layout
+
 NOTION = "https://api.notion.com/v1"
 NOTION_VERSION = "2025-09-03"
 ANTHROPIC = "https://api.anthropic.com/v1/messages"
@@ -327,7 +329,7 @@ def wait_meeting(md: Path, seconds: int, step: float = 5.0) -> dict:
 def call_meeting(md: Path) -> dict:
     """The parsed ## Meeting notes of <stem>.notes.md, {} when the notes or the section are not there."""
     from .callnotes import meeting_text, parse_meeting
-    f = Path(str(md)[:-3] + ".notes.md" if str(md).endswith(".md") else str(md) + ".notes.md")
+    f = call_layout.sidecar_of(str(md), ".notes.md") if str(md).endswith(".md") else call_layout.sidecar(str(md), ".notes.md")
     try:
         t = f.read_text(encoding="utf-8")
     except OSError:
@@ -358,7 +360,7 @@ def wrapup_blocks(w: dict, stats: dict, md: Path, prep_used: bool, lang: str = "
 
 def sales_lines(md: Path, T: dict) -> list:
     """0.8.7 (rules/sales.yaml > after_call): the Sales section from <stem>.sales.json, when the call was a sales call."""
-    p = Path(str(md)[:-3] + ".sales.json" if str(md).endswith(".md") else str(md) + ".sales.json")
+    p = call_layout.sidecar_of(str(md), ".sales.json") if str(md).endswith(".md") else call_layout.sidecar(str(md), ".sales.json")
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -403,7 +405,7 @@ def agenda_lines(md: Path, lang: str) -> list:
     """Pacenote 0.8 (rules/agenda.yaml > wrapup): each agenda item with Discussed, Raised or Not raised."""
     from .agenda import last_from_tips, status_label
     stem = str(md)[:-3] if str(md).endswith(".md") else str(md)
-    strip = next((x for x in (last_from_tips(Path(p)) for p in (str(md) + ".tips.jsonl", stem + ".tips.jsonl")) if x), None)
+    strip = next((x for x in (last_from_tips(Path(p)) for p in (call_layout.sidecar(str(md), ".tips.jsonl"), call_layout.sidecar(stem, ".tips.jsonl"))) if x), None)
     return ["{}: {}".format(str(it.get("text", "")).strip(), status_label(it, lang == "uk"))
             for it in strip or [] if str(it.get("text", "")).strip()]
 
@@ -596,9 +598,9 @@ def call_material(a):
     plain = re.sub(r"\\([][<>*_#])", r"\1", clean)
     if stats["transcript"].get("lines_real", 0) < 5:
         raise RuntimeError("fewer than 5 transcript lines: nothing to write")
-    brief_f = Path(str(a.md)[:-3] + ".brief.md")
+    brief_f = call_layout.sidecar_of(str(a.md), ".brief.md")
     brief = brief_f.read_text(encoding="utf-8") if brief_f.exists() else ""
-    brief = (pm_corrections(Path(str(a.md)[:-3] + ".edits.jsonl")).strip() + "\n\n" + brief).strip()
+    brief = (pm_corrections(call_layout.sidecar_of(str(a.md), ".edits.jsonl")).strip() + "\n\n" + brief).strip()
     return stats, plain, brief
 
 

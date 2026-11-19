@@ -237,3 +237,9 @@ items:
     title_uk: "Що було на дзвінку"
     body_en: "The Summary of a past call starts with a short numbered list of what happened, told the way you would retell it to a colleague who missed the call."
     body_uk: "Summary минулого дзвінка починається з короткого пронумерованого списку того, що було, так, як ви б переказали це колезі, що пропустив дзвінок."
+  - id: call_folders
+    version: 0.26.2
+    title_en: "A folder for every call"
+    title_uk: "Окрема папка для кожного дзвінка"
+    body_en: "Each call now has its own folder in the project's live folder: the transcript, notes, brief and sheet on top, the working files hidden inside. Old calls move there by themselves at launch, nothing is deleted."
+    body_uk: "Кожен дзвінок тепер має власну папку в live проєкту: нагорі транскрипт, нотатки, бриф і sheet, робочі файли сховані всередині. Старі дзвінки переїжджають туди самі під час запуску, нічого не видаляється."

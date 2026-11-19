@@ -16,6 +16,7 @@ from typing import Callable, Dict, List, Optional
 
 import jsonschema
 
+from . import call_layout
 from . import usage
 from . import codriver
 from . import agenda as agenda_mod
@@ -765,7 +766,7 @@ class Engine:
                  clock: Callable[[], float], budget=None):
         self.cfg = cfg
         self.context_revision = 0
-        self.correction_path = out_dir / (stem + ".context-correction.txt")
+        self.correction_path = call_layout.sidecar(out_dir / stem, ".context-correction.txt")
         self._agenda_backup = None
         try:
             self.context_correction = self.correction_path.read_text(encoding="utf-8")[:CORRECTION_MAX]
@@ -800,9 +801,9 @@ class Engine:
         self.classify_busy = False
         self.classify_pending: Optional[Line] = None
         self.tipped_lines = set()
-        self.out_tips = JsonlWriter(Path(cfg["tips_out"]) if cfg.get("tips_out") else out_dir / (stem + ".app.tips.jsonl"))
-        self.out_llm = JsonlWriter(out_dir / (stem + ".app.llm.jsonl"))
-        self.out_timing = JsonlWriter(out_dir / (stem + ".app.timing.jsonl"))
+        self.out_tips = JsonlWriter(Path(cfg["tips_out"]) if cfg.get("tips_out") else call_layout.sidecar(out_dir / stem, ".app.tips.jsonl"))
+        self.out_llm = JsonlWriter(call_layout.sidecar(out_dir / stem, ".app.llm.jsonl"))
+        self.out_timing = JsonlWriter(call_layout.sidecar(out_dir / stem, ".app.timing.jsonl"))
         self.tip_validator = jsonschema.Draft202012Validator(rules.model_tip_schema)
         self.cls_validator = jsonschema.Draft202012Validator(rules.classify_schema)
         self.paused = False
@@ -2946,7 +2947,7 @@ class Engine:
             try:                     # 0.8.7: the Sales section and the scorecard of the call page (<stem>.sales.json)
                 md = Path(self.cfg["call_md"])
                 asks = [a for a in (sit.get("asks") or []) if a.get("type") != "update"]
-                self.sales.write(md.with_name(md.name[:-3] + ".sales.json" if md.name.endswith(".md") else md.name + ".sales.json"),
+                self.sales.write(call_layout.sidecar_of(md, ".sales.json") if md.name.endswith(".md") else call_layout.sidecar(md, ".sales.json"),
                                  open_questions=len(asks))
             except Exception as e:  # noqa: BLE001
                 self.out_timing.write({"outcome": "sales_error", "error": repr(e)[:200]})

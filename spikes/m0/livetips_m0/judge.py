@@ -17,6 +17,8 @@ import json
 import random
 from pathlib import Path
 
+from . import call_layout
+
 from .engine import first_json
 from .providers import make_provider
 from .report import jl, pct
@@ -158,10 +160,10 @@ def engine_summary(rs):
 
 def tips_paths(a, stem: str):
     """(the app's tips file or None, the skill's tips file)."""
-    app_path = a.app_tips or (a.run / (stem + ".app.tips.jsonl") if a.run else None)
-    skill_path = a.md.parent / (stem + ".tips.jsonl")
+    app_path = a.app_tips or (call_layout.sidecar(a.run / stem, ".app.tips.jsonl") if a.run else None)
+    skill_path = call_layout.sidecar(a.md.parent / stem, ".tips.jsonl")
     if stem.endswith(".app"):              # the app's own recording: the skill's tips of the same call, if any
-        alt = a.md.parent / (stem[:-4] + ".tips.jsonl")
+        alt = call_layout.sidecar(a.md.parent / stem[:-4], ".tips.jsonl")
         if alt.exists():
             skill_path = alt
     return app_path, skill_path
@@ -248,7 +250,7 @@ def main(argv=None, provider=None):
     model = a.model or (QUICK_MODEL if a.quick else OPUS)
     lines = load_call(a.md, cfg.get("me_label", "Me"))
     stem = a.md.name[:-3] if a.md.name.endswith(".md") else a.md.stem
-    out = a.out or (a.md.parent / (stem + ".judge"))
+    out = a.out or call_layout.sidecar(a.md.parent / stem, ".judge")
     items = items_to_judge(a, stem, lines)
     call_type = resolve_call_type(a, cfg)
     system = system_prompt(call_type, load_slides(a.slides), a.role or str(cfg.get("hiring_role") or ""))

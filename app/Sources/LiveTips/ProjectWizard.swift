@@ -335,7 +335,7 @@ enum SampleProjectMaker {
         do { try fm.createDirectory(atPath: live, withIntermediateDirectories: true) } catch { return nil }
         let stem = (live as NSString).appendingPathComponent(SampleProject.callStem(date: Date().addingTimeInterval(-3600)))
         try? SampleProject.transcript.write(toFile: stem + ".md", atomically: true, encoding: .utf8)
-        try? SampleProject.notes.write(toFile: stem + ".notes.md", atomically: true, encoding: .utf8)
+        try? SampleProject.notes.write(toFile: CallLayout.sidecar(stem, ".notes.md"), atomically: true, encoding: .utf8)
         let ws = (dir as NSString).deletingLastPathComponent
         if !settings.registry.workspaces.contains(where: { ProjectRegistry.norm($0.root) == ProjectRegistry.norm(ws) }),
            ProjectRegistry.norm(ws).hasPrefix(ProjectRegistry.norm(settings.config.workRoot) + "/") {

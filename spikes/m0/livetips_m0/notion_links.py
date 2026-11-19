@@ -4,6 +4,7 @@ text, so the same decision of the same call is never written twice (by a click o
 import json
 import re
 from pathlib import Path
+from . import call_layout
 from typing import Optional
 
 KINDS = ("decisions", "risks", "tasks")
@@ -16,7 +17,7 @@ def norm(text: str) -> str:
 
 def path_for(md) -> Path:
     s = str(md)
-    return Path((s[:-3] if s.endswith(".md") else s) + ".notion.json")
+    return call_layout.sidecar(s[:-3] if s.endswith(".md") else s, ".notion.json")
 
 
 def load(md) -> dict:

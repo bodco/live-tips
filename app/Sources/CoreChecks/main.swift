@@ -4470,8 +4470,118 @@ func meetingRecap0261() {
     expect(!MeetingNotes.markdown(m, lab).contains("What happened"), "0.26.1: no recap without its label")
 }
 
+/// Call folders (rules/call_layout.yaml, 19.11): layout, sidecar paths, migration of the real pacenote-sync file set.
+/// Call folders, block B4: the core paths follow the layout, a call moves between projects folder by folder.
+func callFoldersB4() {
+    let fm = FileManager.default
+    let root = NSTemporaryDirectory() + "pn-b4-\(UUID().uuidString)"
+    let a = root + "/orbit", b = root + "/mine"
+    let folder = "2026-11-18-pacenote-sync", key = "2026-11-18-1512-pacenote-sync", key2 = "2026-11-18-1700-pacenote-sync"
+    let top = a + "/live/" + folder, work = top + "/.work"
+    for d in [work, a + "/video", b + "/live"] { try? fm.createDirectory(atPath: d, withIntermediateDirectories: true) }
+    let tr = top + "/" + key + ".app.md"
+    // core paths
+    expect(CallSync.statePath(transcript: tr) == work + "/" + key + ".app.sync.json", "B4: sync state in .work")
+    expect(CallSync.sheetPath(transcript: tr) == work + "/" + key + ".app.sheet.json" && CallSync.inboxPath(transcript: tr) == work + "/" + key + ".app.inbox.jsonl", "B4: sheet and inbox in .work")
+    expect(CallLists.notesPath(transcript: tr) == top + "/" + key + ".app.notes.md", "B4: notes on top")
+    expect(CallLists.tipsPaths(transcript: tr).allSatisfy { $0.hasPrefix(work + "/") }, "B4: tips in .work")
+    expect(DriveTranscript.metaPath(transcript: tr) == work + "/" + key + ".app.drive.json", "B4: drive meta in .work")
+    expect(RecordingFiles.folder(transcript: tr) == a + "/video", "B4: video stays in <project>/video for a call folder")
+    expect(RecordingFiles.folder(transcript: a + "/live/" + key + ".app.md") == a + "/video", "B4: video folder for a legacy call")
+    expect(CallSync.statePath(transcript: a + "/live/" + key + ".app.md") == a + "/live/" + key + ".app.sync.json", "B4: legacy path unchanged")
+    // reassign of a call in a folder; another call of the same day and title stays
+    let mine = [key + ".app.md", key + ".app.notes.md"], mineWork = [key + ".app.tips.jsonl", key + ".app.sync.json", key + ".app.notion.json"]
+    for n in mine { fm.createFile(atPath: top + "/" + n, contents: Data("x".utf8)) }
+    for n in mineWork { fm.createFile(atPath: work + "/" + n, contents: Data("x".utf8)) }
+    fm.createFile(atPath: top + "/" + key2 + ".app.md", contents: Data("y".utf8))
+    fm.createFile(atPath: work + "/" + key2 + ".app.tips.jsonl", contents: Data("y".utf8))
+    try? fm.createDirectory(atPath: work + "/" + key + ".app.judge", withIntermediateDirectories: true)
+    fm.createFile(atPath: work + "/" + key + ".app.judge/judge.summary.json", contents: Data("{}".utf8))
+    fm.createFile(atPath: a + "/video/" + key + ".recording.mp4", contents: Data("v".utf8))
+    expect(CallReassign.root(of: tr) == a && CallReassign.callFolder(of: tr) == folder && CallReassign.callFolder(of: a + "/live/" + key + ".app.md") == nil, "B4: root and folder of a call")
+    var p = CallReassign.plan(file: tr, toRoot: b)
+    expect(p.newFile == b + "/live/" + folder + "/" + key + ".app.md", "B4: new transcript path in the same folder name (\(p.newFile))")
+    expect(p.moves.count == mine.count + mineWork.count + 1 + 1 && p.canApply, "B4: plan has this call's files, the judge folder and the video (\(p.moves.count))")
+    expect(CallReassign.lastWrite(file: tr) != nil, "B4: last write is found in the folder")
+    p = CallReassign.plan(file: tr, toRoot: b)
+    _ = try? CallReassign.apply(p)
+    for n in mine { expect(fm.fileExists(atPath: b + "/live/" + folder + "/" + n), "B4: moved on top: " + n) }
+    for n in mineWork { expect(fm.fileExists(atPath: b + "/live/" + folder + "/.work/" + n), "B4: moved to .work: " + n) }
+    expect(fm.fileExists(atPath: b + "/live/" + folder + "/.work/" + key + ".app.judge/judge.summary.json") && fm.fileExists(atPath: b + "/video/" + key + ".recording.mp4"), "B4: judge and video moved")
+    expect(fm.fileExists(atPath: top + "/" + key2 + ".app.md") && fm.fileExists(atPath: work + "/" + key2 + ".app.tips.jsonl"), "B4: the other call of that day stays")
+    // the folder is removed only when empty: move the second call too
+    let p2 = CallReassign.plan(file: top + "/" + key2 + ".app.md", toRoot: b)
+    _ = try? CallReassign.apply(p2)
+    expect(!fm.fileExists(atPath: top), "B4: an emptied call folder is removed")
+    // a late file of the first call is swept into the new project's folder
+    try? fm.createDirectory(atPath: work, withIntermediateDirectories: true)
+    fm.createFile(atPath: work + "/" + key + ".app.llm.jsonl", contents: Data("z".utf8))
+    let sw = CallReassign.sweep(key: key, fromRoot: a, toRoot: b, folder: folder)
+    expect(sw.count == 1 && fm.fileExists(atPath: b + "/live/" + folder + "/.work/" + key + ".app.llm.jsonl") && !fm.fileExists(atPath: top), "B4: sweep follows the folder and cleans up")
+    // preps in both layouts
+    let live = b + "/live"
+    fm.createFile(atPath: live + "/prep-2026-11-10-0900-old-meet.brief.md", contents: Data("o".utf8))
+    let pf = live + "/" + folder + "/.work"
+    fm.createFile(atPath: pf + "/prep-2026-11-18-1500-pacenote-sync.brief.md", contents: Data("n".utf8))
+    fm.createFile(atPath: pf + "/prep-2026-11-18-1500-pacenote-sync.sheet.json", contents: Data("n".utf8))
+    let found = CallLayout.prepFiles(live: live, suffix: ".brief.md").map { ($0 as NSString).lastPathComponent }.sorted()
+    expect(found == ["prep-2026-11-10-0900-old-meet.brief.md", "prep-2026-11-18-1500-pacenote-sync.brief.md"], "B4: prepFiles in both layouts \(found)")
+    expect(CallLayout.prepPath(live: live, name: "prep-2026-11-18-1500-pacenote-sync.brief.md") == pf + "/prep-2026-11-18-1500-pacenote-sync.brief.md"
+           && CallLayout.prepPath(live: live, name: "prep-nothing.brief.md") == nil, "B4: prepPath finds a name")
+    expect(CallLayout.files(live: live, includeWork: true).contains(pf + "/" + key + ".app.sync.json") && !CallLayout.files(live: live).contains { $0.contains("/.work/") }, "B4: includeWork adds the service files only when asked")
+}
+
+func callFolders() {
+    let L = CallLayout.self
+    let n = L.parse("prep-2026-11-18-1515-pacenote-sync.sheet.json")
+    expect(n?.prep == true && n?.key == "2026-11-18-1515-pacenote-sync" && n?.folder == "2026-11-18-pacenote-sync" && n?.rest == ".sheet.json", "folders: parse prep \(String(describing: n))")
+    expect(L.parse("commitments.jsonl") == nil && L.parse("2026-11-18-pacenote-sync") == nil, "folders: non-call names")
+    expect(L.parse("2026-11-18-1512-pacenote-sync.app.md")!.visible && !L.parse("2026-11-18-1512-pacenote-sync.app.tips.jsonl")!.visible
+           && L.parse("prep-2026-11-18-1515-pacenote-sync.sheet.md")!.visible && !L.parse("prep-2026-11-18-1515-pacenote-sync.brief.md")!.visible, "folders: visible set")
+    let call = "/p/live/2026-11-18-pacenote-sync/2026-11-18-1512-pacenote-sync.app.md"
+    expect(L.sidecar(of: call, ".tips.jsonl") == "/p/live/2026-11-18-pacenote-sync/.work/2026-11-18-1512-pacenote-sync.app.tips.jsonl", "folders: service sidecar in .work")
+    expect(L.sidecar(of: call, ".notes.md") == "/p/live/2026-11-18-pacenote-sync/2026-11-18-1512-pacenote-sync.app.notes.md", "folders: notes on top")
+    expect(L.sidecar(of: "/p/live/2026-11-18-1512-x.app.md", ".tips.jsonl") == "/p/live/2026-11-18-1512-x.app.tips.jsonl", "folders: legacy flat path unchanged")
+    expect(L.sidecar("/p/live/2026-11-18-x/.work/2026-11-18-1512-x.app", ".speakers.json") == "/p/live/2026-11-18-x/.work/2026-11-18-1512-x.app.speakers.json", "folders: stem inside .work")
+    expect(L.liveFolder(of: call) == "/p/live" && L.liveFolder(of: "/p/live/a.md") == "/p/live" && L.liveFolder(of: "/p/live/d/.work/a.json") == "/p/live", "folders: live folder")
+    // migration on a temp copy of a real call's files
+    let fm = FileManager.default
+    let live = NSTemporaryDirectory() + "pn-folders-\(UUID().uuidString)/live"
+    try? fm.createDirectory(atPath: live + "/sources", withIntermediateDirectories: true)
+    let k = "2026-11-18-1512-pacenote-sync.app"
+    let names = [".brief.md", ".cards.json", ".clean.md", ".facts.json", ".inbox.jsonl", ".md", ".md.timing.jsonl", ".meet.md", ".named.md",
+                 ".notes.md", ".semantic-summary.json", ".semantic.jsonl", ".semantic.npz", ".sheet-live.json", ".sheet.json", ".speakers.json", ".sync.json", ".tips.jsonl"].map { k + $0 }
+        + ["prep-2026-11-18-1515-pacenote-sync.sheet.md", "prep-2026-11-18-1515-pacenote-sync.sheet.json", "commitments.jsonl"]
+    let old = Date(timeIntervalSinceNow: -3600)
+    for x in names { fm.createFile(atPath: live + "/" + x, contents: Data("x".utf8), attributes: [.modificationDate: old]) }
+    try? fm.createDirectory(atPath: live + "/" + k + ".judge", withIntermediateDirectories: true)
+    try? fm.setAttributes([.modificationDate: old], ofItemAtPath: live + "/" + k + ".judge")
+    fm.createFile(atPath: live + "/2026-11-19-0900-standup.app.md", contents: Data("x".utf8))     // just written: busy
+    let dry = L.migrate(live: live, dryRun: true)     // B6: the preview moves and creates nothing
+    expect(dry.moved.count == 21 && dry.skippedBusy == ["2026-11-19-0900-standup"] && dry.conflicts.isEmpty, "folders: dry run reports \(dry.moved.count) \(dry.skippedBusy)")
+    expect(!fm.fileExists(atPath: live + "/2026-11-18-pacenote-sync") && fm.fileExists(atPath: live + "/" + k + ".md") && fm.fileExists(atPath: live + "/" + k + ".tips.jsonl"), "folders: dry run touched nothing")
+    let r = L.migrate(live: live)
+    let dir = live + "/2026-11-18-pacenote-sync"
+    let top = Set(((try? fm.contentsOfDirectory(atPath: dir)) ?? []).filter { !$0.hasPrefix(".") })
+    expect(top == [k + ".md", k + ".notes.md", k + ".brief.md", "prep-2026-11-18-1515-pacenote-sync.sheet.md"], "folders: visible on top \(top.sorted())")
+    expect(fm.fileExists(atPath: dir + "/.work/" + k + ".tips.jsonl") && fm.fileExists(atPath: dir + "/.work/" + k + ".judge"), "folders: service files and .judge in .work")
+    expect(fm.fileExists(atPath: live + "/commitments.jsonl") && fm.fileExists(atPath: live + "/sources"), "folders: register and sources stay")
+    expect(r.moved.count == 21 && r.skippedBusy == ["2026-11-19-0900-standup"] && r.conflicts.isEmpty && fm.fileExists(atPath: live + "/2026-11-19-0900-standup.app.md"), "folders: report \(r.moved.count) \(r.skippedBusy)")
+    expect(L.migrate(live: live, now: Date(timeIntervalSinceNow: 7200)).moved.map { ($0.to as NSString).lastPathComponent } == ["2026-11-19-0900-standup.app.md"], "folders: second run only moves the quiet call")
+    expect(L.migrate(live: live, now: Date(timeIntervalSinceNow: 7200)).isEmpty, "folders: idempotent")
+    expect(L.migrate(live: live, now: Date(timeIntervalSinceNow: 7200), dryRun: true).isEmpty, "folders: dry run after the move reports nothing")
+    fm.createFile(atPath: live + "/" + k + ".tips.jsonl", contents: Data("late".utf8), attributes: [.modificationDate: old])
+    let c = L.migrate(live: live)
+    expect(c.conflicts.count == 1 && fm.fileExists(atPath: live + "/" + k + ".tips.jsonl"), "folders: conflict leaves the file")
+    let listed = L.files(live: live).map { ($0 as NSString).lastPathComponent }
+    expect(listed.contains(k + ".md") && listed.contains("2026-11-19-0900-standup.app.md") && !listed.contains(k + ".sync.json"), "folders: files() lists both layouts, no service files")
+    try? fm.removeItem(atPath: (live as NSString).deletingLastPathComponent)
+}
+
 notionOAuthINT2()
 notionINT3()
 meetingRecap0261()
+callFolders()
+callFoldersB4()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

@@ -227,9 +227,9 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                     d = ["state": "running", "stage": r.stage, "detail": r.detail, "progress": r.progress]
                 } else if mine, let lf = r.liveFailure {
                     d = ["state": "failed", "stage": lf, "note": lf, "kept": true]   // 0.10.0 (round 2): the previous sheet stays, say why
-                } else if !transcriptPath.isEmpty, FileManager.default.fileExists(atPath: String(transcriptPath.dropLast(3)) + ".brief.md") {
+                } else if !transcriptPath.isEmpty, FileManager.default.fileExists(atPath: CallLayout.sidecar(of: transcriptPath, ".brief.md")) {
                     // 0.9.0: when the brief was made, and whether before the call (the brief strip)
-                    let bp = String(transcriptPath.dropLast(3)) + ".brief.md"
+                    let bp = CallLayout.sidecar(of: transcriptPath, ".brief.md")
                     let made = (try? FileManager.default.attributesOfItem(atPath: bp))?[.modificationDate] as? Date
                     let started = EngineStatus.load(path: CallEngine.shared.statusPath).startedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
                     let hf = DateFormatter(); hf.dateFormat = "HH:mm"
@@ -262,7 +262,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         }
         // 2026-10-28 (owner): the full preparation for the Preparation pane, again when it changes.
         if ticks % 4 == 1, !transcriptPath.isEmpty {
-            let bp = stem + ".brief.md"
+            let bp = CallLayout.sidecar(stem, ".brief.md")
             if let m = (try? FileManager.default.attributesOfItem(atPath: bp))?[.modificationDate] as? Date, m != briefMtime,
                let text = try? String(contentsOfFile: bp, encoding: .utf8) {
                 briefMtime = m
@@ -273,7 +273,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             }
         }
         if ticks % 4 == 2, !transcriptPath.isEmpty {
-            let sp = (transcriptPath.hasSuffix(".md") ? String(transcriptPath.dropLast(3)) : transcriptPath) + ".speakers.json"
+            let sp = CallLayout.sidecar(of: transcriptPath, ".speakers.json")
             if let m = (try? FileManager.default.attributesOfItem(atPath: sp))?[.modificationDate] as? Date, m != speakersMtime,
                let s = try? String(contentsOfFile: sp, encoding: .utf8), isJSONObject(s) {
                 speakersMtime = m
@@ -440,7 +440,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             // and the tips engine and the skill see it in the inbox.
             guard let d = message.body as? [String: Any], !transcriptPath.isEmpty else { return }
             var rec = d; rec["at"] = nowHMS()
-            appendLine(jsonLine(rec), to: stem + ".edits.jsonl")
+            appendLine(jsonLine(rec), to: CallLayout.sidecar(stem, ".edits.jsonl"))
             let (ct, cp) = Self.callNames()
             EditLog.add(kind: "card_" + ((d["action"] as? String) ?? "edit"), title: ct, project: cp, file: stem, fields: d)
             if let card = d["card"] as? String, !card.isEmpty { updatePreparedCard(card, d) }
@@ -452,7 +452,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         case "prepdoc":
             // The PM corrected the preparation in the Preparation pane: saved over <stem>.brief.md (the first version is kept).
             guard let text = message.body as? String, !transcriptPath.isEmpty else { return }
-            let bp = stem + ".brief.md", orig = stem + ".brief.orig.md"
+            let bp = CallLayout.sidecar(stem, ".brief.md"), orig = CallLayout.sidecar(stem, ".brief.orig.md")
             if FileManager.default.fileExists(atPath: bp), !FileManager.default.fileExists(atPath: orig) { try? FileManager.default.copyItem(atPath: bp, toPath: orig) }
             let old = (try? String(contentsOfFile: bp, encoding: .utf8)) ?? ""
             try? text.write(toFile: bp, atomically: true, encoding: .utf8)
@@ -512,7 +512,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     /// A prepared card corrected or removed in the window: the same change in <stem>.cards.json, so it fires corrected
     /// (or not at all) for the rest of the call.
     func updatePreparedCard(_ id: String, _ d: [String: Any]) {
-        let path = stem + ".cards.json"
+        let path = CallLayout.sidecar(stem, ".cards.json")
         guard let data = FileManager.default.contents(atPath: path),
               var cards = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]],
               let i = cards.firstIndex(where: { ($0["id"] as? String) == id }) else { return }
@@ -749,7 +749,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     func pushOnYou() {
         guard !transcriptPath.isEmpty else { return }
         pushProject()
-        let folder = (transcriptPath as NSString).deletingLastPathComponent, file = transcriptPath
+        let folder = CallLayout.liveFolder(of: transcriptPath), file = transcriptPath
         let target = Self.callTarget()
         let payload: [String: Any] = MainActor.assumeIsolated {
             NotionTasks.shared.keepFresh()
@@ -1021,7 +1021,7 @@ extension PrompterController {
         case "ext-tick", "onme-remove":
             // 0.8.6 (D4): a register item of an earlier call or a Notion task, ticked or removed in the On me tab
             guard let id = d["id"] as? String, !id.isEmpty else { return }
-            let folder = (transcriptPath as NSString).deletingLastPathComponent
+            let folder = CallLayout.liveFolder(of: transcriptPath)
             let done = d["done"] as? Bool ?? true
             let op = act == "onme-remove" ? "remove" : "tick"
             MainActor.assumeIsolated { NotionTasks.shared.callAction(id: id, folder: folder, op: op, done: done) }

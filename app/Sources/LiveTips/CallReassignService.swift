@@ -98,7 +98,7 @@ final class CallReassignService {
             } else if CallReassign.sweepDone(p) {
                 pending.remove(at: i); changedAny = true
             } else {
-                let moved = CallReassign.sweep(key: p.key, fromRoot: p.fromRoot, toRoot: t.root)
+                let moved = CallReassign.sweep(key: p.key, fromRoot: p.fromRoot, toRoot: t.root, folder: CallReassign.callFolder(of: p.file))
                 if moved.contains(where: { $0.from.hasSuffix(".notes.md") || $0.from.hasSuffix(".notion.json") }) {
                     NotificationCenter.default.post(name: Self.changed, object: nil, userInfo: ["file": p.file])
                 }

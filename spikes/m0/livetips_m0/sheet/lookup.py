@@ -23,6 +23,7 @@ import re
 import threading
 import time
 from pathlib import Path
+from .. import call_layout as CL
 from typing import Iterable, List, Optional
 
 TEXT_EXT = {".md", ".txt", ".csv", ".json", ".yaml", ".yml", ".eml", ".html", ".htm", ".tsv", ".log", ".rst", ".org"}
@@ -603,7 +604,7 @@ def load_sheet_near(brief_path) -> Optional[dict]:
     p = Path(str(brief_path))
     name = p.name
     if name.endswith(".brief.md"):
-        p = p.with_name(name[: -len(".brief.md")] + ".sheet.json")
+        p = CL.place(name[: -len(".brief.md")] + ".sheet.json", p.parent)
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001

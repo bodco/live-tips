@@ -99,7 +99,7 @@ final class CallEngine {
         let fm = FileManager.default
         guard fm.fileExists(atPath: (core as NSString).appendingPathComponent("VERSION")) else { return }   // dev build
         var restored: [String] = []
-        for rel in ["src/transcriber.py", "src/semantic.py", "src/fromfile.py", "src/fetchlink.py", "bin/lt", "bin/read_delta.py", "bin/audiocap"] {
+        for rel in ["src/transcriber.py", "src/semantic.py", "src/fromfile.py", "src/fetchlink.py", "src/call_layout.py", "bin/lt", "bin/read_delta.py", "bin/audiocap"] {
             let src = (core as NSString).appendingPathComponent(rel), dst = (appRoot as NSString).appendingPathComponent(rel)
             guard let a = fm.contents(atPath: src) else { continue }
             if fm.contents(atPath: dst) == a { continue }
@@ -283,16 +283,17 @@ final class CallEngine {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         let fm = FileManager.default
         // 0.9.0 (rules/live_prep.yaml): the brief in use is kept as the one previous version before it is replaced
-        if fm.fileExists(atPath: stem + ".brief.md"), fm.fileExists(atPath: base + ".brief.md") {
-            try? fm.removeItem(atPath: stem + ".brief.prev.md"); try? fm.copyItem(atPath: stem + ".brief.md", toPath: stem + ".brief.prev.md")
+        if fm.fileExists(atPath: CallLayout.sidecar(stem, ".brief.md")), fm.fileExists(atPath: CallLayout.sidecar(base, ".brief.md")) {
+            try? fm.removeItem(atPath: CallLayout.sidecar(stem, ".brief.prev.md")); try? fm.copyItem(atPath: CallLayout.sidecar(stem, ".brief.md"), toPath: CallLayout.sidecar(stem, ".brief.prev.md"))
         }
         // 0.10.0 (Meeting Sheet, phase 7): + .sheet.json, live takes the sheet as its base
-        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json", ".sheet.json"] where fm.fileExists(atPath: base + ext) {
-            let tmp = stem + ext + ".tmp"
+        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json", ".sheet.json"] where fm.fileExists(atPath: CallLayout.sidecar(base, ext)) {
+            let dst = CallLayout.sidecar(stem, ext)
+            let tmp = dst + ".tmp"
             try? fm.removeItem(atPath: tmp)
-            if (try? fm.copyItem(atPath: base + ext, toPath: tmp)) != nil {
-                _ = try? fm.replaceItemAt(URL(fileURLWithPath: stem + ext), withItemAt: URL(fileURLWithPath: tmp))
-                if fm.fileExists(atPath: tmp) { try? fm.moveItem(atPath: tmp, toPath: stem + ext) }
+            if (try? fm.copyItem(atPath: CallLayout.sidecar(base, ext), toPath: tmp)) != nil {
+                _ = try? fm.replaceItemAt(URL(fileURLWithPath: dst), withItemAt: URL(fileURLWithPath: tmp))
+                if fm.fileExists(atPath: tmp) { try? fm.moveItem(atPath: tmp, toPath: dst) }
             }
         }
         notify(L("eng.prepLoaded"))
@@ -320,9 +321,9 @@ final class CallEngine {
             let base = String(chosen.dropLast(chosen.hasSuffix(".sheet.json") ? ".sheet.json".count : ".brief.md".count))
             let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
             for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json", ".sheet.json"] {
-                let dst = stem + ext
-                if FileManager.default.fileExists(atPath: base + ext), !FileManager.default.fileExists(atPath: dst) {
-                    try? FileManager.default.copyItem(atPath: base + ext, toPath: dst)
+                let dst = CallLayout.sidecar(stem, ext)
+                if FileManager.default.fileExists(atPath: CallLayout.sidecar(base, ext)), !FileManager.default.fileExists(atPath: dst) {
+                    try? FileManager.default.copyItem(atPath: CallLayout.sidecar(base, ext), toPath: dst)
                 }
             }
         }
@@ -344,7 +345,7 @@ final class CallEngine {
         guard let chosen = req["prep_file"] as? String, !chosen.isEmpty else { return "" }
         let base = chosen.hasSuffix(".sheet.json") ? String(chosen.dropLast(".sheet.json".count))
             : chosen.hasSuffix(".brief.md") ? String(chosen.dropLast(".brief.md".count)) : chosen
-        guard let data = FileManager.default.contents(atPath: base + ".sheet.json"),
+        guard let data = FileManager.default.contents(atPath: CallLayout.sidecar(base, ".sheet.json")),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "" }
         return (obj["preset"] as? String) ?? ""
     }
@@ -416,7 +417,7 @@ final class CallEngine {
             try? d.write(to: URL(fileURLWithPath: cfgPath), options: .atomic)
         }
         let stem = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
-        let tipsOut = status.tipsFile ?? (file + ".tips.jsonl")
+        let tipsOut = status.tipsFile ?? CallLayout.sidecar(file, ".tips.jsonl")
         appTipsFile = tipsOut
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
@@ -471,7 +472,7 @@ final class CallEngine {
     /// preparations read them instead of the older transcripts. On the "After the call" way; Sonnet on Claude.
     /// 0.9.5.2: true when the notes are being written (the meeting page then waits for their Meeting notes).
     @discardableResult func writeCallNotes(file: String, config c: AppConfig, hasConfig: Bool) -> Bool {
-        let notes = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
+        let notes = CallLayout.sidecar((file.hasSuffix(".md") ? String(file.dropLast(3)) : file), ".notes.md")
         // 0.26.0 (review 2): Try again on a Notion notice must not start the same notes twice; the page waits for them.
         if Self.notesInWork.contains(notes) { AppLog.app("notes: already in work call=\(AppLog.stem(file))"); return true }
         guard !FileManager.default.fileExists(atPath: notes), AIRoute.canRun(job: "after", config: c),
@@ -597,7 +598,7 @@ final class CallEngine {
             args += ["--project-name", projectName]
             if hasConfig { args += ["--project-config", projectConfig] }
             // 0.8.8: a workspace call: its Workspace value (the workspace whose call folder holds the transcript)
-            let wsDir = ((file as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent
+            let wsDir = (CallLayout.liveFolder(of: file) as NSString).deletingLastPathComponent
             args += NotionTargets.workspaceArgs(c, ProjectRegistry.load(from: AppPaths.projects).workspaces.first { $0.root == wsDir }, kind: "meetings")
         }
         if !meetingsDB.isEmpty { args += ["--meetings-db", meetingsDB] }
@@ -680,7 +681,7 @@ final class CallEngine {
         let dir = (file as NSString).deletingLastPathComponent
         var stem = (file as NSString).lastPathComponent
         if stem.hasSuffix(".md") { stem = String(stem.dropLast(3)) }
-        let out = (dir as NSString).appendingPathComponent(stem + ".judge")
+        let out = CallLayout.sidecar((dir as NSString).appendingPathComponent(stem), ".judge")
         let ct = ((callRequest["call_type"] as? String) ?? "").lowercased()
         let callType = ct.contains("present") ? "presentation" : (ct.contains("interview") || ct.contains("hiring")) ? "interview" : "auto"
         var args = ["-m", "livetips_m0.judge", "--config", cfgPath, "--md", file, "--call-type", callType, "--quick", "--out", out]

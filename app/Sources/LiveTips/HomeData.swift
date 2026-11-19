@@ -110,7 +110,7 @@ extension StartCallModel {
     /// The last agenda strip of a call: each item and its state (todo, now, done).
     static func agenda(transcript file: String) -> [(text: String, state: String)] {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-        for p in [file + ".tips.jsonl", stem + ".tips.jsonl"] {
+        for p in [CallLayout.sidecar(file, ".tips.jsonl"), CallLayout.sidecar(stem, ".tips.jsonl")] {
             guard let s = try? String(contentsOfFile: p, encoding: .utf8) else { continue }
             for ln in s.split(separator: "\n").reversed() where ln.contains("\"agenda\"") {
                 guard let o = (try? JSONSerialization.jsonObject(with: Data(ln.utf8))) as? [String: Any], (o["kind"] as? String) == "agenda",
@@ -169,7 +169,7 @@ extension StartCallModel {
         let key = EditLog.seriesKey(effectiveTitle)
         // 2026-10-29 (owner): a preparation that was finished before a held call of its series ended belongs to that
         // call (the PM started it early, the preparation joined it late). The next call of the series is not prepared by it.
-        let made = (try? FileManager.default.attributesOfItem(atPath: base + ".brief.md"))?[.modificationDate] as? Date
+        let made = (try? FileManager.default.attributesOfItem(atPath: CallLayout.sidecar(base, ".brief.md")))?[.modificationDate] as? Date
         if PrepOwnership.belongsToHeld(prepDate: pd, made: made, held: CallHistory.shared.records.filter { EditLog.seriesKey($0.title) == key }
                                         .map { (start: $0.start, end: $0.end ?? $0.start.addingTimeInterval(($0.minutes ?? 120) * 60)) },
                                   before: callDate) { return false }
@@ -182,17 +182,15 @@ extension StartCallModel {
 
     @discardableResult
     func adoptExistingPrep() -> Bool {
-        if let b = prepBase, FileManager.default.fileExists(atPath: b + ".brief.md") { return true }
+        if let b = prepBase, FileManager.default.fileExists(atPath: CallLayout.sidecar(b, ".brief.md")) { return true }
         guard let root = root else { return false }
         let live = (root as NSString).appendingPathComponent("live")
         let fm = FileManager.default
-        guard let names = try? fm.contentsOfDirectory(atPath: live) else { return false }
         let slug = Self.slugify(effectiveTitle)
         let key = EditLog.seriesKey(effectiveTitle)
         let lastHeld = CallHistory.shared.records.filter { EditLog.seriesKey($0.title) == key && $0.start < Date() }.map(\.start).max()
         var best: (String, Date)?
-        for n in names where n.hasPrefix("prep-") && n.hasSuffix("-" + slug + ".brief.md") {
-            let p = (live as NSString).appendingPathComponent(n)
+        for p in CallLayout.prepFiles(live: live, suffix: "-" + slug + ".brief.md") {
             let attrs = try? fm.attributesOfItem(atPath: p)
             guard let made = (attrs?[.creationDate] as? Date) ?? (attrs?[.modificationDate] as? Date) else { continue }
             if let h = lastHeld, made <= h { continue }                     // written before the last call: old
@@ -230,13 +228,14 @@ extension StartCallModel {
         guard let root = root else { return out }
         let live = (root as NSString).appendingPathComponent("live")
         let fm = FileManager.default
-        guard let names = try? fm.contentsOfDirectory(atPath: live) else { return out }
         let want = Self.slugify(effectiveTitle).replacingOccurrences(of: "-", with: "")
         var seen = 0
-        for n in names.sorted(by: >) where n.hasSuffix(".speakers.json") && n.range(of: "^\\d{4}-\\d\\d-\\d\\d-\\d{4}-", options: .regularExpression) != nil {
+        for sp in CallLayout.files(live: live, includeWork: true).sorted(by: { ($0 as NSString).lastPathComponent > ($1 as NSString).lastPathComponent }) {
+            let n = (sp as NSString).lastPathComponent
+            guard n.hasSuffix(".speakers.json"), n.range(of: "^\\d{4}-\\d\\d-\\d\\d-\\d{4}-", options: .regularExpression) != nil else { continue }
             let core = String(n.dropFirst(16)).replacingOccurrences(of: ".app.speakers.json", with: "").replacingOccurrences(of: ".speakers.json", with: "").replacingOccurrences(of: "-", with: "")
             guard !want.isEmpty, core == want else { continue }
-            guard let d = fm.contents(atPath: (live as NSString).appendingPathComponent(n)),
+            guard let d = fm.contents(atPath: sp),
                   let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { continue }
             var found: [String] = ((o["roster"] as? [[String: Any]]) ?? []).compactMap { $0["name"] as? String }
             found += ((o["clusters"] as? [String: [String: Any]]) ?? [:]).values.compactMap { $0["name"] as? String }
@@ -310,7 +309,7 @@ final class CallHistory: ObservableObject {
     /// The tips window writes the rename to <stem>.inbox.jsonl, so it survives a restart or an app update mid-call.
     nonisolated static func renamedTitle(_ file: String) -> String? {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-        guard let s = try? String(contentsOfFile: stem + ".inbox.jsonl", encoding: .utf8) else { return nil }
+        guard let s = try? String(contentsOfFile: CallLayout.sidecar(stem, ".inbox.jsonl"), encoding: .utf8) else { return nil }
         var t: String?
         for ln in s.split(separator: "\n") where ln.contains("\"title\"") {
             if let o = (try? JSONSerialization.jsonObject(with: Data(ln.utf8))) as? [String: Any],
@@ -380,7 +379,7 @@ final class CallHistory: ObservableObject {
 
     nonisolated static func wasPrepared(_ file: String) -> Bool {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-        return FileManager.default.fileExists(atPath: stem + ".brief.md")
+        return FileManager.default.fileExists(atPath: CallLayout.sidecar(stem, ".brief.md"))
     }
 
     func replace(at i: Int, with r: Record) {
@@ -394,6 +393,14 @@ final class CallHistory: ObservableObject {
         guard let i = records.firstIndex(where: { $0.file == file }) else { return }
         change(&records[i])
         persist()
+    }
+
+    /// 0.26.2 (call folders, B6): a migration moved transcripts into call folders: the records follow (same metadata).
+    func relocate(_ moves: [CallLayout.Move]) {
+        let to = Dictionary(moves.map { ($0.from, $0.to) }, uniquingKeysWith: { a, _ in a })
+        var changed = false
+        for i in records.indices { if let n = to[records[i].file] { records[i].file = n; changed = true } }
+        if changed { persist() }
     }
 
     private func persist() {
@@ -420,12 +427,12 @@ final class CallHistory: ObservableObject {
         var added = false
         for (root, name) in roots {
             let live = (root as NSString).appendingPathComponent("live")
-            guard let names = try? fm.contentsOfDirectory(atPath: live) else { continue }
-            for n in names where n.range(of: "^\\d{4}-\\d\\d-\\d\\d-\\d{4}-[^.]+(\\.app)?\\.md$", options: .regularExpression) != nil {
-                let file = (live as NSString).appendingPathComponent(n)
+            for file in CallLayout.files(live: live) {
+                let n = (file as NSString).lastPathComponent
+                guard n.range(of: "^\\d{4}-\\d\\d-\\d\\d-\\d{4}-[^.]+(\\.app)?\\.md$", options: .regularExpression) != nil else { continue }
                 guard !known.contains(file), let start = Self.startFromName(file), Date().timeIntervalSince(start) < 45 * 86400 else { continue }
                 // The skill and the app can record the same call: keep one (the app's).
-                if !n.hasSuffix(".app.md"), names.contains(String(n.dropLast(3)) + ".app.md") { continue }
+                if !n.hasSuffix(".app.md"), fm.fileExists(atPath: String(file.dropLast(3)) + ".app.md") { continue }
                 var title = String(n.dropFirst(16).dropLast(n.hasSuffix(".app.md") ? 7 : 3)).replacingOccurrences(of: "-", with: " ")
                 var source: String?
                 if let h = try? FileHandle(forReadingFrom: URL(fileURLWithPath: file)) {

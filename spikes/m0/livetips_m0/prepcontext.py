@@ -28,6 +28,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from . import call_layout
 from typing import Dict, List, Optional, Tuple
 
 # Characters, not bytes: Cyrillic is two bytes a letter but about the same tokens per character as Latin.
@@ -390,7 +391,7 @@ def with_line(brief: str, line: str) -> str:
 def write_context(base: str, manifest: List[Item], summary: dict) -> None:
     """<base>.context.json: the whole manifest (prep.json keeps only the summary, the ledger nothing)."""
     try:
-        Path(base + ".context.json").write_text(json.dumps({"summary": summary, "manifest": manifest}, ensure_ascii=False,
+        call_layout.sidecar_mk(base, ".context.json").write_text(json.dumps({"summary": summary, "manifest": manifest}, ensure_ascii=False,
                                                            indent=1, default=str), encoding="utf-8")
     except OSError:
         pass
@@ -440,7 +441,7 @@ def main(argv=None) -> int:
     line = summary_line(s, r.get("brief_lang") or "en")
     if a.write and r.get("base"):
         write_context(r["base"], manifest, s)
-        bp = Path(r["base"] + ".brief.md")
+        bp = call_layout.sidecar(r["base"], ".brief.md")
         if bp.exists():
             t = bp.read_text(encoding="utf-8")
             if line not in t:

@@ -13,6 +13,8 @@ import sys
 import time
 from pathlib import Path
 
+from . import call_layout
+
 from .cost import BudgetGuard
 from .engine import Engine
 from .prompt import PromptBuilder
@@ -46,23 +48,23 @@ def build_engine(cfg, md: Path, out: Path, clock, provider=None):
         from .context import build as build_context
         extra = build_context(cfg.get("call_context", ""), cfg.get("project_root"), cfg.get("lt_cmd"))
         if extra:
-            (out / (stem + ".app.context.md")).parent.mkdir(parents=True, exist_ok=True)
-            (out / (stem + ".app.context.md")).write_text(extra, encoding="utf-8")
+            (call_layout.sidecar(out / stem, ".app.context.md")).parent.mkdir(parents=True, exist_ok=True)
+            (call_layout.sidecar(out / stem, ".app.context.md")).write_text(extra, encoding="utf-8")
     if cfg.get("edits_log"):
         # 0.9.4 (rules/learning.yaml > tip_rating): tips the PM rated down on two or more calls, as standing lessons
         from . import learning
         lessons = learning.tip_lessons(learning.load(Path(cfg["edits_log"])))
         if lessons:
             extra = (extra + "\n\n" + lessons).strip()
-    prompt = PromptBuilder(rules, call_meta_from_md(md, cfg), brief_path=Path(str(base) + ".brief.md"),
-                           facts_path=Path(str(base) + ".facts.json"), cards_path=Path(str(base) + ".cards.json"),
+    prompt = PromptBuilder(rules, call_meta_from_md(md, cfg), brief_path=call_layout.sidecar(base, ".brief.md"),
+                           facts_path=call_layout.sidecar(base, ".facts.json"), cards_path=call_layout.sidecar(base, ".cards.json"),
                            extra_context=extra)
     if provider is None:
         provider = make_provider(cfg, lambda name: load_secret(name, cfg.get("secrets_file")))
     b = cfg.get("budget", {})
     budget = BudgetGuard(b.get("ledger", "~/.livetips/spend.json"), b.get("call_soft_usd", 2.0),
                          b.get("call_hard_usd", 5.0), b.get("monthly_hard_usd", 100.0))
-    cfg.setdefault("speakers_file", str(base) + ".speakers.json")
+    cfg.setdefault("speakers_file", str(call_layout.sidecar(base, ".speakers.json")))
     # Pacenote 0.8: the commitments register (rules/commitments.yaml); live mode sets register_dir, a replay
     # writes nothing there unless its config asks for it.
     cfg.setdefault("call_file", str(md))
@@ -115,12 +117,12 @@ def run_info(provider, cfg: dict, **extra) -> dict:
 
 def finish_run_info(out: Path, stem: str) -> dict:
     """Adds what really ran (from llm.jsonl) to run.json, and whether it matches the plan."""
-    p = out / (stem + ".app.run.json")
+    p = call_layout.sidecar(out / stem, ".app.run.json")
     try:
         info = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    seen = observed_models(out / (stem + ".app.llm.jsonl"))
+    seen = observed_models(call_layout.sidecar(out / stem, ".app.llm.jsonl"))
     info["observed"] = seen
     planned = info.get("models") or {}
     info["models_match"] = all(set(k.split(" ")[-1] for k in seen.get(role, {})) <= {m}
@@ -130,7 +132,7 @@ def finish_run_info(out: Path, stem: str) -> dict:
 
 
 def _brief_text(base: Path) -> str:
-    p = Path(str(base) + ".brief.md")
+    p = call_layout.sidecar(base, ".brief.md")
     return p.read_text(encoding="utf-8", errors="replace") if p.exists() else ""
 
 
@@ -171,11 +173,11 @@ def replay(cfg: dict, md: Path, out: Path, minutes=None, start_min=0.0, speed=1.
     out.mkdir(parents=True, exist_ok=True)
     # 0.9.2: a replay into a folder used before starts clean (the writers append; a rerun mixed with the old records)
     for kind in ("tips", "llm", "timing"):
-        p = out / (md.name[:-3] + ".app." + kind + ".jsonl")
+        p = call_layout.sidecar(out / md.name[:-3], ".app." + kind + ".jsonl")
         if p.exists():
             p.write_text("", encoding="utf-8")
     eng, stem = build_engine(cfg, md, out, clock, provider)
-    (out / (stem + ".app.run.json")).write_text(json.dumps(run_info(
+    (call_layout.sidecar(out / stem, ".app.run.json")).write_text(json.dumps(run_info(
         eng.provider, cfg, md=md.name, variant=cfg.get("variant"), cache_ttl=cfg.get("cache_ttl"),
         direct_route=cfg.get("direct_route", True), speed=speed, start_min=start_min,
         minutes=minutes, lines=len(sel), started=time.strftime("%Y-%m-%d %H:%M:%S")), ensure_ascii=False, indent=1))
@@ -188,7 +190,7 @@ def replay(cfg: dict, md: Path, out: Path, minutes=None, start_min=0.0, speed=1.
     span_s = (sel[-1].written - sel[0].written) if len(sel) > 1 else 0
     summary = {"lines": len(sel), "call_span_s": round(span_s, 1), "tips": len(eng.tips),
                "spent_usd": round(eng.budget.call_spent, 4) if eng.budget else None}
-    (out / (stem + ".app.summary.json")).write_text(json.dumps(summary, indent=1))
+    (call_layout.sidecar(out / stem, ".app.summary.json")).write_text(json.dumps(summary, indent=1))
     finish_run_info(out, stem)
     if verbose:
         print(json.dumps(summary))

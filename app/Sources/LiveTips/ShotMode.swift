@@ -43,7 +43,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             let endM = h * 60 + m + len
             let body = "# Live Transcript: \(title)\n\n- Project: demo\n\n" + String(format: "[%02d:%02d:05] Me (en): Hello.\n[%02d:%02d:10] Other (en): Thanks, bye.\n", h, m, endM / 60, endM % 60)
             try? body.write(toFile: f, atomically: true, encoding: .utf8)
-            if days != 2 { try? "# Live Brief: demo\n".write(toFile: String(f.dropLast(3)) + ".brief.md", atomically: true, encoding: .utf8) }
+            if days != 2 { try? "# Live Brief: demo\n".write(toFile: CallLayout.sidecar(of: f, ".brief.md"), atomically: true, encoding: .utf8) }
             // Pacenote 0.8 (F3): the call picture at the end of the call, for Home's Recent and On you.
             let sit: [String: Any] = ["kind": "situation", "t": "10:40:00",
                                       "decisions": days == 0 ? ["Export goes to production on Tuesday", "Pilot starts Monday with 5 users"] : ["Release checklist approved"],
@@ -576,7 +576,7 @@ final class ShotMode: NSObject, NSApplicationDelegate {
     func r2Past(_ tab: String, _ tt: String, width: CGFloat = 1280, prefix: String = "r2") {
         guard let r = demoCall else { next(); return }
         let fm = FileManager.default
-        let sales = Self.r2Stem(r.file) + ".sales.json"
+        let sales = CallLayout.sidecar(Self.r2Stem(r.file), ".sales.json")
         let notes = CallNotes.path(r.file), aside = notes + ".r2aside"
         if tab == "sales", let d = try? JSONSerialization.data(withJSONObject: Self.r2Sales, options: [.prettyPrinted]) { try? d.write(to: URL(fileURLWithPath: sales)) }
         if tab == "none", fm.fileExists(atPath: notes) { try? fm.moveItem(atPath: notes, toPath: aside) }

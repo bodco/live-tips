@@ -38,7 +38,7 @@ struct CallOutcome: Equatable {
     static func read(transcript file: String) -> CallOutcome? {
         let lists = CallLists.read(transcript: file)
         var c = readSituation(transcript: file)
-        let folder = (file as NSString).deletingLastPathComponent
+        let folder = CallLayout.liveFolder(of: file)
         let reg = CommitmentRegister.load(folder: folder)
             .filter { CommitmentRegister.callKey($0.call) == CommitmentRegister.callKey(file) && $0.status != "dropped" }
         if c == nil, !(lists.isEmpty && reg.isEmpty) { c = CallOutcome() }
@@ -59,7 +59,7 @@ struct CallOutcome: Equatable {
 
     private static func readSituation(transcript file: String) -> CallOutcome? {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-        for p in [file + ".tips.jsonl", stem + ".tips.jsonl"] {
+        for p in [CallLayout.sidecar(file, ".tips.jsonl"), CallLayout.sidecar(stem, ".tips.jsonl")] {
             guard let s = try? String(contentsOfFile: p, encoding: .utf8) else { continue }
             for ln in s.split(separator: "\n").reversed() where ln.contains("situation") {
                 guard let o = (try? JSONSerialization.jsonObject(with: Data(ln.utf8))) as? [String: Any],
@@ -90,8 +90,8 @@ final class OutcomeCache {
     func outcome(_ file: String) -> CallOutcome? {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         let fm = FileManager.default
-        let m = [file + ".tips.jsonl", stem + ".tips.jsonl", CallLists.notesPath(transcript: file),   // 0.12.2: notes bring decisions
-                 CommitmentRegister.path(folder: (file as NSString).deletingLastPathComponent)]           // and the register tasks
+        let m = [CallLayout.sidecar(file, ".tips.jsonl"), CallLayout.sidecar(stem, ".tips.jsonl"), CallLists.notesPath(transcript: file),   // 0.12.2: notes bring decisions
+                 CommitmentRegister.path(folder: CallLayout.liveFolder(of: file))]           // and the register tasks
             .compactMap { (try? fm.attributesOfItem(atPath: $0))?[.modificationDate] as? Date }.max() ?? .distantPast
         if let c = cache[file], c.0 == m { return c.1 }
         let o = CallOutcome.read(transcript: file)

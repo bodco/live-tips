@@ -54,6 +54,13 @@ except ImportError:  # pragma: no cover
     fcntl = None
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+import call_layout  # call folders: service files of a call live in <call folder>/.work/
+
+
+def sc(stem, suffix):
+    """`stem + suffix` for a call file: the call folder's .work/ for service files (rules/call_layout.yaml)."""
+    return str(call_layout.sidecar(stem, suffix))
 STATE, CONTROL, LOGS = ROOT / "state", ROOT / "control", ROOT / "logs"
 STATUS = STATE / "status.json"
 MAC_ROOT = None
@@ -398,7 +405,7 @@ def prep_core(path, ext):
 def prep_heading(path, ext):
     """Call title written in the brief heading ("# Live Brief: <title> (prep, ...)"), '' if none."""
     try:
-        brief = str(path)[: -len(ext)] + ".brief.md"
+        brief = sc(str(path)[: -len(ext)], ".brief.md")
         first = open(brief, encoding="utf-8").readline()
     except OSError:
         return ""
@@ -515,7 +522,14 @@ def adopt_prep(s):
     """Copy each missing prep file from a prep-* file younger than 3 h whose title matches the
     call title (slugified). A prep of another call is never adopted: its brief and facts belong
     to a different meeting (another audience, internal facts on a client call)."""
-    live = Path(s).parent
+    live = call_layout.live_folder(Path(s + ".md"))
+    dirs = [live]       # prep files: flat in live/ (old layout) or in a call folder, service ones in its .work/
+    try:
+        for f in sorted(live.iterdir()):
+            if f.is_dir() and not f.name.startswith(".") and "." not in f.name:
+                dirs += [f, f / call_layout.WORK_DIR]
+    except OSError:
+        pass
     title = call_title_slug(s)
     adopted = {}
     exts = (".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".sheet.json")   # 0.10.0: + the Meeting Sheet
@@ -532,9 +546,9 @@ def adopt_prep(s):
             except ValueError:
                 return False
         return False
-    fresh = {ext: [p for p in live.glob("prep-*" + ext) if is_fresh(p)] for ext in exts}
+    fresh = {ext: [p for d in dirs for p in d.glob("prep-*" + ext) if is_fresh(p)] for ext in exts}
     for ext in exts:
-        if os.path.exists(s + ext):
+        if os.path.exists(sc(s, ext)):
             continue
         cands = [p for p in fresh[ext]
                  if title_match(prep_core(str(p), ext), title)
@@ -542,7 +556,7 @@ def adopt_prep(s):
         if not cands:
             continue
         src = max(cands, key=lambda p: p.stat().st_mtime)
-        shutil.copy(src, s + ext)
+        shutil.copy(src, sc(s, ext))
         adopted[ext] = src.name
     return adopted
 
@@ -556,35 +570,35 @@ def cmd_prep_check(args):
         raise LtError(f"folder not found: {os.path.dirname(s)} (wrong transcript path, or pass --mac-root)")
     adopted = adopt_prep(s) if "--adopt-prep" in args else {}
     fixed = []
-    if "--fix" in args and not os.path.exists(s + ".cards.json"):
-        if not is_problem(check_json_list(s + ".facts.json", ("id", "title", "text", "keywords"), "facts")):
-            cards = derive_cards(load_list(s + ".facts.json", "facts"))
+    if "--fix" in args and not os.path.exists(sc(s, ".cards.json")):
+        if not is_problem(check_json_list(sc(s, ".facts.json"), ("id", "title", "text", "keywords"), "facts")):
+            cards = derive_cards(load_list(sc(s, ".facts.json"), "facts"))
             if cards:
-                tmp = s + f".cards.json.{os.getpid()}.tmp"
+                tmp = sc(s, f".cards.json.{os.getpid()}.tmp")
                 json.dump(cards, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-                os.replace(tmp, s + ".cards.json")
+                os.replace(tmp, sc(s, ".cards.json"))
                 fixed.append(f"cards.json derived from {len(cards)} facts")
         else:
             fixed.append("cannot derive cards: facts.json missing or invalid")
-    if not is_problem(check_json_list(s + ".cards.json", ("id", "gist"), "cards")):
-        data = json.load(open(s + ".cards.json", encoding="utf-8"))
-        cards = load_list(s + ".cards.json", "cards")
+    if not is_problem(check_json_list(sc(s, ".cards.json"), ("id", "gist"), "cards")):
+        data = json.load(open(sc(s, ".cards.json"), encoding="utf-8"))
+        cards = load_list(sc(s, ".cards.json"), "cards")
         if "--fix" in args and dead_triggers(cards):
             n = fix_dead_triggers(cards)
-            tmp = s + f".cards.json.{os.getpid()}.tmp"
+            tmp = sc(s, f".cards.json.{os.getpid()}.tmp")
             json.dump({"cards": cards} if isinstance(data, dict) else cards, open(tmp, "w", encoding="utf-8"),
                       ensure_ascii=False, indent=1)
-            os.replace(tmp, s + ".cards.json")
+            os.replace(tmp, sc(s, ".cards.json"))
             fixed.append(f"{n} one-word triggers moved to words (the recorder ignores them; they still match by meaning)")
         dead = dead_triggers(cards)
     else:
         dead = []
     res = {
-        "brief": (f"{os.path.getsize(s + '.brief.md')} bytes" if os.path.exists(s + ".brief.md") else "MISSING"),
-        "cards": check_json_list(s + ".cards.json", ("id", "triggers", "gist"), "cards"),
-        "facts": check_json_list(s + ".facts.json", ("id", "title", "text", "keywords"), "facts"),
-        "outline": check_json_list(s + ".outline.json", ("id", "title", "keywords"), "sections"),
-        "slides": check_json_list(s + ".slides.json", ("title", "body"), "slides"),   # optional, presentation split view
+        "brief": (f"{os.path.getsize(s + '.brief.md')} bytes" if os.path.exists(sc(s, ".brief.md")) else "MISSING"),
+        "cards": check_json_list(sc(s, ".cards.json"), ("id", "triggers", "gist"), "cards"),
+        "facts": check_json_list(sc(s, ".facts.json"), ("id", "title", "text", "keywords"), "facts"),
+        "outline": check_json_list(sc(s, ".outline.json"), ("id", "title", "keywords"), "sections"),
+        "slides": check_json_list(sc(s, ".slides.json"), ("title", "body"), "slides"),   # optional, presentation split view
         "adopted_from_prep": list(adopted), "adopted_sources": adopted,
     }
     if dead:
@@ -614,7 +628,7 @@ def state_lock(base):
     """Same lock as read_delta.py: flock on <stem>.state.lock."""
     fd = None
     try:
-        fd = os.open(base + ".state.lock", os.O_CREAT | os.O_RDWR, 0o644)
+        fd = os.open(sc(base, ".state.lock"), os.O_CREAT | os.O_RDWR, 0o644)
         if fcntl:
             fcntl.flock(fd, fcntl.LOCK_EX)
     except OSError:
@@ -644,7 +658,7 @@ def cmd_state(args):
         print("usage: lt state <transcript> [--set k=<json>]... [--get k]...")
         sys.exit(2)
     base = stem(args[0])
-    path = base + ".state.json"
+    path = sc(base, ".state.json")
     if not os.path.isdir(os.path.dirname(path) or "."):
         raise LtError(f"folder not found: {os.path.dirname(path)} (wrong transcript path, or pass --mac-root)")
     sets, gets, i = {}, [], 1
@@ -804,9 +818,9 @@ def cmd_wrapup_data(args):
     if not os.path.exists(t):
         raise LtError(f"transcript not found: {t} (check the path, or pass --mac-root <work_root>)")
     s = stem(t)
-    sp = read_json_dict(s + ".speakers.json")
-    if os.path.exists(s + ".named.md"):
-        lines, sp_source = open(s + ".named.md", encoding="utf-8").read().splitlines(), "named.md"
+    sp = read_json_dict(sc(s, ".speakers.json"))
+    if os.path.exists(sc(s, ".named.md")):
+        lines, sp_source = open(sc(s, ".named.md"), encoding="utf-8").read().splitlines(), "named.md"
     elif sp.get("clusters"):
         lines, sp_source = apply_speakers(open(t, encoding="utf-8").read().splitlines(), sp), "speakers.json"
     else:
@@ -829,17 +843,17 @@ def cmd_wrapup_data(args):
         langs[m.group(3)] = langs.get(m.group(3), 0) + 1
         speakers[m.group(2)] = speakers.get(m.group(2), 0) + 1
     esc = lambda x: re.sub(r"([\[\]<>*])", r"\\\1", x)
-    clean = s + ".clean.md"
+    clean = sc(s, ".clean.md")
     with open(clean, "w", encoding="utf-8") as f:
         for tm, who, lang, txt in real:
             f.write(esc(f"[{tm}] {who} ({lang}): {txt}") + "\n")
-    tips = jsonl(s + ".tips.jsonl")
+    tips = jsonl(sc(s, ".tips.jsonl"))
     shown = [x for x in tips if x.get("kind") in ("tip", "answer")]
     lags = [d for d in (delay_s(x.get("at"), x.get("src")) for x in shown) if d is not None]
-    late_keys = {(str(x.get("gist")), str(x.get("src"))) for x in jsonl(s + ".late.jsonl")}
+    late_keys = {(str(x.get("gist")), str(x.get("src"))) for x in jsonl(sc(s, ".late.jsonl"))}
     late_keys |= {(str(x.get("gist")), str(x.get("src"))) for x in tips if x.get("late") is True}
     fb = {}
-    for r in jsonl(s + ".feedback.jsonl"):                 # last line per tip wins
+    for r in jsonl(sc(s, ".feedback.jsonl")):                 # last line per tip wins
         p = parse_feedback(r.get("value"))
         if p:
             fb[p["key"]] = p
@@ -850,10 +864,10 @@ def cmd_wrapup_data(args):
             reasons[r_] = reasons.get(r_, 0) + 1
         if p["comment"]:
             comments.append({"tip": p["gist"], "src": p["src"], "verdict": p["verdict"], "comment": p["comment"]})
-    st = read_json_dict(s + ".state.json")
+    st = read_json_dict(sc(s, ".state.json"))
     status = read_status()
     this = bool(status.get("file")) and os.path.basename(str(status.get("file"))) == os.path.basename(t)
-    polls = jsonl(s + ".polls.jsonl")
+    polls = jsonl(sc(s, ".polls.jsonl"))
     think = [p.get("think_gap_s") for p in polls if isinstance(p.get("think_gap_s"), (int, float))]
     res = {
         "transcript": {"lines_total": len(real) + dropped, "lines_real": len(real), "artefacts_dropped": dropped,
@@ -864,7 +878,7 @@ def cmd_wrapup_data(args):
         "tips": {"shown": len(shown), "by_kind": {k: sum(1 for x in tips if x.get("kind") == k)
                                                  for k in sorted({str(x.get("kind")) for x in tips if x.get("kind")})},
                  "facts_shown": sum(1 for x in tips if x.get("kind") == "fact"),
-                 "cards_fired": len(jsonl(s + ".cards-fired.jsonl")),
+                 "cards_fired": len(jsonl(sc(s, ".cards-fired.jsonl"))),
                  "late": len(late_keys),
                  "delay_median_s": statistics.median(lags) if lags else None, "delay_max_s": max(lags) if lags else None},
         "ratings": {"rated_tips": len(fb), "verdicts": verdicts, "reasons": reasons, "comments": comments},
@@ -873,7 +887,7 @@ def cmd_wrapup_data(args):
         "mic": {"stall_restarts": status.get("mic_stall_restarts", 0) if this else None,
                 "audio_lost_s": status.get("audio_lost_s") if this else None,
                 "auto_switched": status.get("mic_auto_switched") if this else None},
-        "find_asks": sum(1 for r in jsonl(s + ".inbox.jsonl") if str(r.get("text", "")).startswith("find:")),
+        "find_asks": sum(1 for r in jsonl(sc(s, ".inbox.jsonl")) if str(r.get("text", "")).startswith("find:")),
         "wrapup_emitted": any(x.get("kind") == "wrapup" for x in tips),
         "skill_state_saved": st.get("skill_state_at") is not None,
         "semantic": semantic_wrapup(s),
@@ -884,7 +898,7 @@ def cmd_wrapup_data(args):
 def semantic_wrapup(s):
     """The Ollama section of the wrap-up from <stem>.semantic-summary.json (written by the recorder
     at stop), or None. `line_uk` is the ready one-liner; useful = rated used + partly."""
-    sm = read_json_dict(s + ".semantic-summary.json")
+    sm = read_json_dict(sc(s, ".semantic-summary.json"))
     if not sm:
         return None
     hits, rated, lat = sm.get("hits") or {}, sm.get("rated") or {}, sm.get("latency_ms") or {}
@@ -913,7 +927,7 @@ def cmd_speakers(args):
     if not os.path.exists(t):
         raise LtError(f"transcript not found: {t} (check the path, or pass --mac-root <work_root>)")
     s = stem(t)
-    sp = read_json_dict(s + ".speakers.json")
+    sp = read_json_dict(sc(s, ".speakers.json"))
     if not sp:
         out({"speakers": "none", "note": "no <stem>.speakers.json: speaker identification was off for this call"})
         return
@@ -932,7 +946,7 @@ def cmd_speakers(args):
             counts[m.group(2)] = counts.get(m.group(2), 0) + 1
     out({"clusters": mapping, "merged": {k: resolve(v) for k, v in merged.items()},
          "overrides": sp.get("overrides") or {}, "skipped": sp.get("skipped") or [], "rev": sp.get("rev"),
-         "lines_per_speaker": counts, "named_file": s + ".named.md" if os.path.exists(s + ".named.md") else None})
+         "lines_per_speaker": counts, "named_file": sc(s, ".named.md") if os.path.exists(sc(s, ".named.md")) else None})
 
 
 # ---------------------------------------------------------------- semantic index / search
@@ -1033,7 +1047,7 @@ def relay_search(query, k, root):
     alive, _ = status_alive(st, probe=2.5)
     if not alive:
         return None
-    proj = local(os.path.dirname(os.path.dirname(st.get("file") or "")))
+    proj = local(str(call_layout.live_folder(Path(st["file"])).parent) if st.get("file") else "")
     if not proj or os.path.realpath(proj) != os.path.realpath(root):
         return None
     rid = secrets.token_hex(6)
@@ -1120,16 +1134,17 @@ def digest_files(live, days, today=None):
     since = (today - timedelta(days=max(0, int(days)))).isoformat()
     calls = []
     try:
-        names = os.listdir(live)
+        paths = call_layout.files(live)       # both layouts: flat and call folders
     except OSError:
         return []
-    for n in names:
+    for fp in paths:
+        n = fp.name
         m = CALL_MD.match(n)
         if not m or n.startswith("prep-") or m.group(3).endswith("-transcript") or "-transcript-" in m.group(3):
             continue
         if m.group(1) < since:
             continue
-        calls.append((m.group(1), m.group(2), os.path.join(live, n)))
+        calls.append((m.group(1), m.group(2), str(fp)))
     calls.sort(reverse=True)
     return calls
 
@@ -1143,11 +1158,11 @@ def digest_call(path, me_label="Я", pm_names=(), cap=8):
     s = stem(path)
     title = re.sub(r"^\d{4}-\d{2}-\d{2}-\d{4}-", "", os.path.basename(s)).replace("-", " ")
     try:
-        if os.path.exists(s + ".named.md"):
-            lines = open(s + ".named.md", encoding="utf-8", errors="replace").read().splitlines()
+        if os.path.exists(sc(s, ".named.md")):
+            lines = open(sc(s, ".named.md"), encoding="utf-8", errors="replace").read().splitlines()
         else:
             lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
-            sp = read_json_dict(s + ".speakers.json")
+            sp = read_json_dict(sc(s, ".speakers.json"))
             if sp.get("clusters"):
                 lines = apply_speakers(lines, sp, me_label)
     except Exception:  # noqa: BLE001
@@ -1185,14 +1200,14 @@ def digest_call(path, me_label="Я", pm_names=(), cap=8):
         elif mine and len(promises) < cap and (PROMISE.search(txt) or DATEISH.search(txt)):
             promises.append({"t": t, "text": _trim(txt, 200)})
     typed = []
-    for r in jsonl(s + ".inbox.jsonl"):
+    for r in jsonl(sc(s, ".inbox.jsonl")):
         if r.get("kind") in ("setting", "settings") or not isinstance(r.get("text"), str) or not r["text"].strip():
             continue
         if len(r["text"].split()) < 4 or WINDOW_CMD.search(r["text"]):
             continue
         typed.append({"t": r.get("t") or "", "kind": r.get("kind") or "note", "text": _trim(r["text"], 200)})
     typed = typed[:cap]
-    st = read_json_dict(s + ".state.json")
+    st = read_json_dict(sc(s, ".state.json"))
     items = []
     ai = st.get("action_items") if isinstance(st.get("action_items"), list) else []
     for a in ai[: cap + 2]:

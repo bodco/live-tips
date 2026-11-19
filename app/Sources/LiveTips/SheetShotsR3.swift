@@ -59,9 +59,9 @@ extension SheetShots {
                        ("Emily", "Jessica"), ("Mike Carter", "Mike Reed"), ("Northwind Studio", "Acme Studio")] { s = s.replacingOccurrences(of: a, with: b) }
         try? s.write(toFile: base + ".sheet.v1.json", atomically: true, encoding: .utf8)
         try? s.write(toFile: base + ".sheet.v2.json", atomically: true, encoding: .utf8)
-        try? s.write(toFile: base + ".sheet.json", atomically: true, encoding: .utf8)
+        try? s.write(toFile: CallLayout.sidecar(base, ".sheet.json"), atomically: true, encoding: .utf8)
         m.prepBase = base
-        return base + ".sheet.json"
+        return CallLayout.sidecar(base, ".sheet.json")
     }
 
     /// The two board calls, made once (a static store: an extension keeps no stored properties).

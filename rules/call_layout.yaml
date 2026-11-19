@@ -1,0 +1,19 @@
+# Call folders (Bohdan 19.11.2026): one folder per call instead of ~30 loose files in <project>/live.
+# The Swift core (LiveTipsCore/CallLayout.swift) and the Python copies (recorder/src/call_layout.py,
+# spikes/m0/livetips_m0/call_layout.py) implement this file; CoreChecks and pytest compare them with it.
+schema_version: 1
+folder: "<YYYY-MM-DD>-<slug>"          # live/2026-11-18-pacenote-sync/; no time, so a prep and its call meet in one folder
+same_day_same_title: one folder        # a second call with the same title that day shares it (file names differ by HHMM)
+file_names: unchanged                  # <YYYY-MM-DD-HHMM>-<slug>.app.tips.jsonl, prep-<...>.sheet.json: the same as before
+work_dir: ".work"                      # service files, hidden in Finder
+visible:                               # what stays in the folder itself; everything else of the call goes to .work/
+  call: [".md", ".app.md", ".notes.md", ".app.notes.md", ".brief.md", ".app.brief.md"]
+  prep: [".sheet.md"]
+stays_in_live: [commitments.jsonl, sources/, .sheet-cache/, anything that is not a call's file]
+video: stays in <project>/video        # 0.9.5 decision
+legacy: a file directly in live/ keeps the old flat rule (its sidecars next to it), so old paths still resolve
+migration:
+  when: every launch, for every project's live/ and the app's own live/
+  how: move (never copy, never delete); idempotent
+  skip_if_written_within_s: 600        # a call that may still be writing
+  conflict: the file stays where it is and is reported (nothing overwritten)

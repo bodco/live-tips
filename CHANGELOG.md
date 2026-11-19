@@ -3,6 +3,21 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.26.2 (unreleased)
+
+- **A folder for every call (2026-11-19):** each call now lives in its own folder,
+  `<project>/live/<date>-<title>/`. On top you see what you read: the transcript, the meeting notes, the brief and the
+  preparation sheet. The working files (cards, facts, tips, sheet data) sit in a hidden `.work/` inside it, so the
+  project's `live/` is a list of calls instead of hundreds of files. Calls on the same day with the same title share
+  one folder. The commitments register, lessons and `sources/` stay in `live/`.
+- **Calls made before move on their own (2026-11-19):** at launch Pacenote moves every old call of every project,
+  workspace and its own folder into its call folder. It only moves: nothing is deleted or overwritten, a call written
+  in the last minutes waits for the next launch, a file that would clash stays where it was, and running it again does
+  nothing. Home, the call pages and Notion links keep working. What moved is counted in the app log (`logs/app.log`).
+- **Reassign, the skill and the tools follow (2026-11-19):** moving a call to another project moves its files and
+  removes the old folder only when it is empty. The Cowork skill, the recorder and the tools write into the call
+  folder and still read the old flat layout.
+
 ## 0.26.1 (2026-11-19)
 
 - **What happened, at the top of the Summary (2026-11-19):** the Meeting notes of a call now start with a short

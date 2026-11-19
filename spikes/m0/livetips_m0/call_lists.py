@@ -15,6 +15,8 @@ PM edits tasks in the commitments register (L4).
 import json
 import re
 from pathlib import Path
+
+from . import call_layout
 from typing import Dict, List, Optional
 
 NOTHING_EXACT = {"немає", "нема", "нічого", "відсутні", "відсутнє", "-", "n/a", "na", "none", "nothing", "no", "нет"}
@@ -234,11 +236,11 @@ def _stem(md: Path) -> str:
 
 
 def tips_paths(md: Path) -> List[Path]:
-    return [Path(str(md) + ".tips.jsonl"), Path(_stem(md) + ".tips.jsonl")]
+    return [call_layout.sidecar(str(md), ".tips.jsonl"), call_layout.sidecar(_stem(md), ".tips.jsonl")]
 
 
 def notes_path(md: Path) -> Path:
-    return Path(_stem(md) + ".notes.md")
+    return call_layout.sidecar(_stem(md), ".notes.md")
 
 
 def situations(md: Path) -> List[dict]:

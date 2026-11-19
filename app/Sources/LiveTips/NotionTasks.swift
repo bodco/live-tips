@@ -303,7 +303,7 @@ final class NotionTasks: ObservableObject {
     func afterCall(file: String) {
         let s = settings
         guard s.ready, s.autoAdd, token != nil else { return }
-        let folder = (file as NSString).deletingLastPathComponent
+        let folder = CallLayout.liveFolder(of: file)
         let key = CommitmentRegister.callKey(file)
         let items = CommitmentRegister.load(folder: folder).filter { $0.mine && $0.status == "open" && $0.notionPage.isEmpty && CommitmentRegister.callKey($0.call) == key }
         guard !items.isEmpty else { return }

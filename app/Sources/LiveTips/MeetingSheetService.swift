@@ -26,22 +26,26 @@ enum SheetFiles {
     /// <root>/live/prep-<yyyy-MM-dd-HHmm>-<slug>: the base a new sheet is written to (the same name the recorder adopts).
     static func newBase(for m: StartCallModel) -> String? {
         guard let live = liveFolder(m) else { return nil }
-        return (live as NSString).appendingPathComponent("prep-\(baseFormat.string(from: m.callDate))-\(StartCallModel.slugify(m.effectiveTitle))")
+        let slug = StartCallModel.slugify(m.effectiveTitle)
+        // call folders: live/<date>-<slug>/prep-<date-time>-<slug>.*, service files go to .work/ (CallLayout.sidecar)
+        return (CallLayout.folder(live: live, date: dayFormat.string(from: m.callDate), slug: slug, create: true) as NSString)
+            .appendingPathComponent("prep-\(baseFormat.string(from: m.callDate))-\(slug)")
     }
 
     /// All sheets of this call's series in its project, newest name first: (path, day in the name).
     static func seriesSheets(_ m: StartCallModel) -> [(path: String, day: String)] {
-        guard let live = liveFolder(m), let names = try? FileManager.default.contentsOfDirectory(atPath: live) else { return [] }
+        guard let live = liveFolder(m) else { return [] }
         let slug = StartCallModel.slugify(m.effectiveTitle)
-        return names.filter { $0.hasPrefix("prep-") && $0.hasSuffix(".sheet.json") }
-            .compactMap { n -> (String, String)? in
+        return CallLayout.prepFiles(live: live, suffix: ".sheet.json")
+            .compactMap { full -> (String, String)? in
+                let n = (full as NSString).lastPathComponent
                 let core = String(n.dropFirst(5).dropLast(".sheet.json".count))      // yyyy-MM-dd-HHmm-<slug>
                 guard core.count > 16 else { return nil }
                 let rest = String(core.dropFirst(16))
                 guard rest == slug || StartCallModel.titleMatch(rest, m.effectiveTitle) else { return nil }
-                return ((live as NSString).appendingPathComponent(n), String(core.prefix(10)))
+                return (full, String(core.prefix(10)))
             }
-            .sorted { $0.0 > $1.0 }
+            .sorted { ($0.0 as NSString).lastPathComponent > ($1.0 as NSString).lastPathComponent }
     }
 
     /// Home and the pages ask many times a second: the answer is kept for 3 seconds per call.
@@ -57,7 +61,7 @@ enum SheetFiles {
 
     static func findPath(for m: StartCallModel) -> String? {
         let fm = FileManager.default
-        if let b = m.prepBase, fm.fileExists(atPath: b + ".sheet.json") { return b + ".sheet.json" }
+        if let b = m.prepBase, fm.fileExists(atPath: CallLayout.sidecar(b, ".sheet.json")) { return CallLayout.sidecar(b, ".sheet.json") }
         let day = dayFormat.string(from: m.callDate)
         return seriesSheets(m).first { $0.day == day }?.path
     }
@@ -364,7 +368,7 @@ final class SheetJobs: ObservableObject {
         j.title = title
         jobs.append(j)
         let base = (request["out"] as? String) ?? ((SheetCLI.stateDir as NSString).appendingPathComponent(j.id.uuidString))
-        j.start(request, requestPath: base + ".sheet.request.json")
+        j.start(request, requestPath: CallLayout.sidecar(base, ".sheet.request.json"))
         return j
     }
 

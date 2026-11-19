@@ -173,7 +173,7 @@ Runtime-папки (не в git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `
 
 ### Формат транскрипту
 
-`<папка проєкту>/live/<YYYY-MM-DD-HHMM>-<назва>.md`:
+`<папка проєкту>/live/<YYYY-MM-DD>-<назва>/<YYYY-MM-DD-HHMM>-<назва>.md` (папка дзвінка; див. "Папки дзвінків" нижче):
 
 ```
 # Live transcript: Status sync
@@ -198,6 +198,18 @@ Runtime-папки (не в git): `.venv/`, `bin/audiocap`, `logs/`, `state/`, `
 підказки, відповіді, action items), `<назва>.polls.jsonl` (кожне опитування),
 `<назва>.tips.jsonl` і `<назва>.inbox.jsonl` (вікно), `<назва>.speakers.json` і
 `<назва>.semantic.jsonl` (коли ці шари увімкнені).
+
+#### Папки дзвінків
+
+Від 0.26.2 кожен дзвінок має папку, `<проєкт>/live/<YYYY-MM-DD>-<назва>/`; дзвінки з однаковою назвою в один день
+ділять її. Нагорі: транскрипт (`.md`, `.app.md`), нотатки зустрічі (`.notes.md`), бриф (`.brief.md`) і sheet
+підготовки (`prep-*.sheet.md`). Усі робочі файли, названі вище (`.state.json`, `.cards.json`, `.facts.json`,
+`.tips.jsonl`, `.inbox.jsonl`, `.speakers.json`, `.semantic.*`, дані sheet, `.judge`), лежать у прихованій `.work/`
+всередині. `commitments.jsonl`, `lessons.md` і `sources/` лишаються в `live/`. У цьому посібнику `<назва>.<x>`
+означає цей файл, де б він не лежав. Дзвінки до 0.26.2 переїжджають на запуску (лише переміщення: нічого не
+видаляється й не перезаписується; дзвінок, записаний за останні хвилини, чекає наступного запуску; файл, що
+збігається за назвою, лишається на місці; результат порахований у `logs/app.log`). Інструменти й скіл і далі читають
+старий плоский формат.
 
 ---
 
@@ -2355,7 +2367,7 @@ Settings > AI > Preparation не може працювати, підказка �
 **Settings > Meeting Sheet.** Як відкривається Get ready і його правила, My focus (до 7 полів угорі кожного sheet,
 наприклад Budget чи Decision maker), коли факт старий (6 місяців), нагадування (30 хвилин) і твої пресети.
 
-**Файли.** Поруч із дзвінком у `<project>/live/`: `<base>.sheet.json` (sheet), `<base>.sheet.md` (людська копія),
+**Файли.** У папці дзвінка, `<project>/live/<date>-<title>/` (`<base>.sheet.md` нагорі, решта в `.work/`): `<base>.sheet.json` (sheet), `<base>.sheet.md` (людська копія),
 `<base>.sheet.v<N>.json` (версії), `<base>.sheet.sources.json` (звіт по джерелах). Для live-шару застосунок також пише
 з sheet файли брифу, карток і фактів; це згенеровані копії, а не другий бриф. Деталі:
 [DEVELOPMENT.md](../../DEVELOPMENT.md#meeting-sheet-0100).
@@ -3171,7 +3183,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    тип зустрічі, мова; назви при наведенні) стоять на місці; контекст, підготовка і More options прокручуються
    під ними. Назва обовʼязкова: Start call з порожньою назвою обводить її червоним і ставить туди курсор. Під
    контекстом: Add folder з папками-плашками, один рядок "Project folder included", потім примітка про
-   Participants. Prepare now читає всю папку проєкту (у її підпапці live/ лежать дзвінки й підготовки), тому
+   Participants. Prepare now читає всю папку проєкту (у її підпапці live/ лежить папка на кожен дзвінок, з його підготовками), тому
    плашка із замком показує папку проєкту.
 49. **Settings > Projects (0.5.7).** ⋯ біля проєкту: Show in Finder, Use Claude for tips, Search this folder
    (обидва увімкнені за замовчуванням), Reindex now, Remove project from Live Tips. Пояснення переїхало в

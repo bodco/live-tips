@@ -2,7 +2,9 @@ import Foundation
 
 /// 0.10.1 (A2, roadmap п.9): moving a call to another project. A call's files live next to its transcript in
 /// <project>/live (<stem>.md, .app.md, .brief.md, .tips.jsonl, .notes.md, .notion.json, <stem>.judge/ ...) and its
-/// recording in <project>/video (<stem>.recording*.mp4|m4a|json). Changing the project moves all of them, the call's
+/// recording in <project>/video (<stem>.recording*.mp4|m4a|json). Call folders (19.11.2026): the files are in
+/// <project>/live/<date>-<slug>/ (top) and its .work/; they go to the same folder name in the new project
+/// (only the files of this call: another call of the same day and title stays), and the emptied folder is removed. Changing the project moves all of them, the call's
 /// items in the commitments register and the app's records; nothing is copied and nothing is deleted.
 /// Spec: research/pacenote-reassign-spec-2026-11-14.md.
 public enum CallReassign {
@@ -47,9 +49,49 @@ public enum CallReassign {
         return n
     }
 
-    /// The project folder of a transcript (<root>/live/<file>).
+    /// The project folder of a transcript (<root>/live/<file> or <root>/live/<date-slug>/<file>).
     public static func root(of file: String) -> String {
-        ((file as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent
+        (CallLayout.liveFolder(of: file) as NSString).deletingLastPathComponent
+    }
+
+    /// The call folder's name ("2026-11-14-weekly-sync") for a call in the new layout, nil for a legacy flat call.
+    public static func callFolder(of file: String) -> String? {
+        var d = (file as NSString).deletingLastPathComponent
+        if (d as NSString).lastPathComponent == CallLayout.workDir { d = (d as NSString).deletingLastPathComponent }
+        return CallLayout.isCallFolder(d) ? (d as NSString).lastPathComponent : nil
+    }
+
+    /// Where the call's files are and where they go: (from, to, isVideo). A call folder has two places (top, .work/).
+    static func places(folder: String?, fromRoot: String, toRoot: String) -> [(from: String, to: String, video: Bool)] {
+        func j(_ a: String, _ b: String) -> String { (a as NSString).appendingPathComponent(b) }
+        var out: [(from: String, to: String, video: Bool)] = []
+        let fl = j(fromRoot, "live"), tl = j(toRoot, "live")
+        if let f = folder {
+            out.append((j(fl, f), j(tl, f), false))
+            out.append((j(j(fl, f), CallLayout.workDir), j(j(tl, f), CallLayout.workDir), false))
+        } else {
+            out.append((fl, tl, false))
+        }
+        out.append((j(fromRoot, "video"), j(toRoot, "video"), true))
+        return out
+    }
+
+    /// After a move: a call folder left without files (and its .work/) goes away. Only empty folders are removed.
+    static func removeEmptyFolders(_ moves: [Move], fm: FileManager = .default) {
+        var dirs = Set<String>()
+        for m in moves {
+            let d = (m.from as NSString).deletingLastPathComponent
+            if CallLayout.isCallFolder(d) { dirs.insert(d) }
+        }
+        for d in dirs.sorted(by: { $0.count > $1.count }) {   // .work/ before its folder
+            let left = ((try? fm.contentsOfDirectory(atPath: d)) ?? []).filter { $0 != ".DS_Store" }
+            if left.isEmpty { try? fm.removeItem(atPath: d) }
+            if (d as NSString).lastPathComponent == CallLayout.workDir {
+                let up = (d as NSString).deletingLastPathComponent
+                let l2 = ((try? fm.contentsOfDirectory(atPath: up)) ?? []).filter { $0 != ".DS_Store" }
+                if l2.isEmpty { try? fm.removeItem(atPath: up) }
+            }
+        }
     }
 
     /// A file of the call: the transcript itself or a name that starts with the call's name and a dot
@@ -64,12 +106,13 @@ public enum CallReassign {
     public static func plan(file: String, toRoot: String, fm: FileManager = .default) -> Plan {
         let from = root(of: file)
         let k = key(file)
-        var p = Plan(file: file, newFile: ((toRoot as NSString).appendingPathComponent("live") as NSString)
-                        .appendingPathComponent((file as NSString).lastPathComponent),
+        let folder = callFolder(of: file)
+        var newDir = (toRoot as NSString).appendingPathComponent("live")
+        if let f = folder { newDir = (newDir as NSString).appendingPathComponent(f) }
+        var p = Plan(file: file, newFile: (newDir as NSString).appendingPathComponent((file as NSString).lastPathComponent),
                      key: k, fromRoot: from, toRoot: toRoot)
         guard !p.sameProject else { return p }
-        for (sub, video) in [("live", false), ("video", true)] {
-            let src = (from as NSString).appendingPathComponent(sub), dst = (toRoot as NSString).appendingPathComponent(sub)
+        for (src, dst, video) in places(folder: folder, fromRoot: from, toRoot: toRoot) {
             guard let names = try? fm.contentsOfDirectory(atPath: src) else { continue }
             for n in names.sorted() where belongs(n, key: k, video: video) {
                 let m = Move(from: (src as NSString).appendingPathComponent(n), to: (dst as NSString).appendingPathComponent(n))
@@ -97,17 +140,17 @@ public enum CallReassign {
                 throw Failure.moveFailed(m.from, error.localizedDescription)
             }
         }
+        removeEmptyFolders(done)
         return done
     }
 
     /// After the move: files of the call that appeared in the old project later (a job that was still writing
     /// next to the old transcript, the notes or the judge). Moved too; a name that exists in the new project stays.
     @discardableResult
-    public static func sweep(key k: String, fromRoot: String, toRoot: String, fm: FileManager = .default) -> [Move] {
+    public static func sweep(key k: String, fromRoot: String, toRoot: String, folder: String? = nil, fm: FileManager = .default) -> [Move] {
         guard fromRoot != toRoot, !k.isEmpty else { return [] }
         var done: [Move] = []
-        for (sub, video) in [("live", false), ("video", true)] {
-            let src = (fromRoot as NSString).appendingPathComponent(sub), dst = (toRoot as NSString).appendingPathComponent(sub)
+        for (src, dst, video) in places(folder: folder, fromRoot: fromRoot, toRoot: toRoot) {
             guard let names = try? fm.contentsOfDirectory(atPath: src) else { continue }
             for n in names where belongs(n, key: k, video: video) {
                 let m = Move(from: (src as NSString).appendingPathComponent(n), to: (dst as NSString).appendingPathComponent(n))
@@ -116,6 +159,7 @@ public enum CallReassign {
                 if (try? fm.moveItem(atPath: m.from, toPath: m.to)) != nil { done.append(m) }
             }
         }
+        removeEmptyFolders(done)
         return done
     }
 
@@ -139,8 +183,7 @@ public enum CallReassign {
     public static func lastWrite(file: String, fm: FileManager = .default) -> Date? {
         let r = root(of: file), k = key(file)
         var newest: Date?
-        for (sub, video) in [("live", false), ("video", true)] {
-            let dir = (r as NSString).appendingPathComponent(sub)
+        for (dir, _, video) in places(folder: callFolder(of: file), fromRoot: r, toRoot: r) {
             for n in (try? fm.contentsOfDirectory(atPath: dir)) ?? [] where belongs(n, key: k, video: video) {
                 if let d = (try? fm.attributesOfItem(atPath: (dir as NSString).appendingPathComponent(n)))?[.modificationDate] as? Date,
                    newest == nil || d > newest! { newest = d }

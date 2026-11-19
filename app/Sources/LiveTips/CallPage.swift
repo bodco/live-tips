@@ -61,7 +61,7 @@ struct CallPageView: View {
     }
 
     private var record: CallHistory.Record? { history.records.first { $0.file == file } }
-    private var folder: String { (file as NSString).deletingLastPathComponent }
+    private var folder: String { CallLayout.liveFolder(of: file) }
     private var folderRoot: String { (folder as NSString).deletingLastPathComponent }      // <root>/live -> <root>
     /// This call's register items in every status (dropped too: a deleted task must not come back from the notes).
     private var callItems: [Commitment] {
@@ -450,7 +450,7 @@ struct CallPageView: View {
 
     // MARK: 0.9.0 tabs
 
-    private var hasSales: Bool { FileManager.default.fileExists(atPath: (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".sales.json") }
+    private var hasSales: Bool { FileManager.default.fileExists(atPath: CallLayout.sidecar((file.hasSuffix(".md") ? String(file.dropLast(3)) : file), ".sales.json")) }
 
     /// Decisions of the call: the call picture's, else the "## Decisions" of the notes (the follow-up email reads those too).
     /// 0.12.1: a line that only says there are none ("Жодних рішень не приймалося.") is not a decision, so the tab no
@@ -950,7 +950,7 @@ struct CallPageView: View {
         meetNote = L("meet.looking")
         let end = r.end ?? r.start.addingTimeInterval((r.minutes ?? 60) * 60)
         let code = CalendarService.shared.events.first { abs($0.start.timeIntervalSince(r.start)) < 1800 && $0.meetCode != nil }?.meetCode
-        let out = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".meet.md"
+        let out = CallLayout.sidecar((file.hasSuffix(".md") ? String(file.dropLast(3)) : file), ".meet.md")
         Task {
             do {
                 guard let m = try await GoogleService.shared.meet(code: code, start: r.start, end: end) else { meetNote = L("meet.none"); return }

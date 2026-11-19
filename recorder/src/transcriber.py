@@ -40,6 +40,7 @@ import numpy as np
 
 # Optional semantic layer (Ollama embeddings). Without it everything works on keywords as before.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import call_layout
 try:
     import semantic as SEM
     SEM_ERR = None
@@ -837,8 +838,8 @@ class Cards:
     <stem>.cards-fired.jsonl, which read_delta.py reports to the skill as @@CARD lines."""
 
     def __init__(self, transcript: Path, tips: Path):
-        self.path = transcript.with_name(transcript.stem + ".cards.json")
-        self.fired_path = transcript.with_name(transcript.stem + ".cards-fired.jsonl")
+        self.path = call_layout.sidecar_of(transcript, ".cards.json")
+        self.fired_path = call_layout.sidecar_of(transcript, ".cards-fired.jsonl")
         self.tips = tips
         self.mtime = None
         self.cards: list[dict] = []
@@ -1070,7 +1071,7 @@ class FactBook:
     the best 1-2 facts are shown at once as kind "fact", with no model in the loop."""
 
     def __init__(self, transcript: Path, tips: Path):
-        self.path = transcript.with_name(transcript.stem + ".facts.json")
+        self.path = call_layout.sidecar_of(transcript, ".facts.json")
         self.tips = tips
         self.mtime = None
         self.facts: list[dict] = []
@@ -1445,7 +1446,7 @@ class Outline:
     time line every 60 s in presentation mode."""
 
     def __init__(self, transcript: Path, tips: Path):
-        self.path = transcript.with_name(transcript.stem + ".outline.json")
+        self.path = call_layout.sidecar_of(transcript, ".outline.json")
         self.tips = tips
         self.mtime = None
         self.sections: list[dict] = []
@@ -1714,7 +1715,7 @@ class Slides:
     2026-10-23: per-slide Q&A shown instantly as an orange card when the other side asks."""
 
     def __init__(self, transcript: Path, tips: Path):
-        self.path = transcript.with_name(transcript.stem + ".slides.json")
+        self.path = call_layout.sidecar_of(transcript, ".slides.json")
         self.tips = tips
         self.mtime = None
         self.bad_mtime = None
@@ -2096,7 +2097,7 @@ class SheetLive:
     never raises; no file = no sheet (everything returns empty and the old files work as before)."""
 
     def __init__(self, transcript: Path, tips: Path):
-        self.path = transcript.with_name(transcript.stem + ".sheet.json")
+        self.path = call_layout.sidecar_of(transcript, ".sheet.json")
         self.tips = tips
         self.mtime = None
         self.sheet: dict | None = None
@@ -2221,7 +2222,7 @@ class SheetLive:
         if not self.sheet:
             return
         try:
-            write_json_atomic(transcript.with_name(transcript.stem + ".sheet-live.json"),
+            write_json_atomic(call_layout.sidecar_of(transcript, ".sheet-live.json"),
                               {"sheet": self.path.name, "asked": sorted(self.asked),
                                "questions": [{"id": q["id"], "text": q["text"]} for q in self.questions],
                                "best_fired": self.best_fired})
@@ -2476,8 +2477,8 @@ class SemanticLive(threading.Thread):
     def __init__(self, cfg: dict, out: Path, tips: Path, facts: "FactBook", cards: "Cards", flags: dict, client):
         super().__init__(daemon=True)
         self.cfg, self.tips, self.facts, self.cards, self.flags, self.client = cfg, tips, facts, cards, flags, client
-        self.log_path = out.with_name(out.stem + ".semantic.jsonl")
-        self.npz = out.with_name(out.stem + ".semantic.npz")
+        self.log_path = call_layout.sidecar_of(out, ".semantic.jsonl")
+        self.npz = call_layout.sidecar_of(out, ".semantic.npz")
         self.q: "collections.deque[tuple]" = collections.deque(maxlen=max(1, int(cfg.get("semantic_queue", 6))))
         self.ev = threading.Event()
         self.stop_ev = threading.Event()
@@ -2926,7 +2927,7 @@ class SemanticLive(threading.Thread):
         with self.acct_lock:
             tot, lat, hits = dict(self.tot), list(self.lat_all), [dict(h) for h in self.hit_list]
         fb = dict(self.feedback)
-        for r in _read_jsonl(out.with_name(out.stem + ".feedback.jsonl")):
+        for r in _read_jsonl(call_layout.sidecar_of(out, ".feedback.jsonl")):
             v = str(r.get("value") or "")
             verdict, sep, rest = v.partition("|")
             if sep:
@@ -2998,7 +2999,7 @@ class SemanticLive(threading.Thread):
                          "only_answer": followed.get("only_answer", 0)},
             "ollama_memory": mem,
         }
-        write_json_atomic(out.with_name(out.stem + ".semantic-summary.json"), res)
+        write_json_atomic(call_layout.sidecar_of(out, ".semantic-summary.json"), res)
         ram = f", Ollama model RAM {mem['size_mb']} MB" if mem else ""
         log(f"semantic summary: {res['minutes']} min, {res['totals']['lines_embedded']} lines, {st['calls']} embed calls, "
             f"latency median {res['latency_ms']['median']} ms p90 {res['latency_ms']['p90']} ms, hits {len(hits)} "
@@ -4400,7 +4401,7 @@ class SpeakerTracker:
                     self.rosters.remember(named)
             if not self.clusters and not self.overrides:
                 return None
-            named = transcript.with_name(transcript.stem + ".named.md")
+            named = call_layout.sidecar_of(transcript, ".named.md")
             text = transcript.read_text(encoding="utf-8")
             tmp = named.with_name(named.name + f".{os.getpid()}.tmp")
             tmp.write_text(apply_speaker_names(text, them_label, self.label), encoding="utf-8")
@@ -4856,9 +4857,13 @@ def main() -> int:
     call_type, audience = normalize_meeting(cfg.get("call_type"), cfg.get("audience"))
     # stem_suffix (".app" from the Live Tips app): two recorders on the same call never share files.
     suffix = re.sub(r"[^a-z0-9.-]", "", str(cfg.get("stem_suffix") or "").lower())
-    out = Path(cfg["project_dir"]) / "live" / f"{dt.datetime.fromtimestamp(started):%Y-%m-%d-%H%M}-{slugify(title)}{suffix}.md"
-    tips_file = out.with_name(out.stem + ".tips.jsonl")
-    inbox_file = out.with_name(out.stem + ".inbox.jsonl")
+    # Call folders (rules/call_layout.yaml): live/<YYYY-MM-DD>-<slug>/ holds the transcript, service files go to .work/.
+    # The file name itself stays <YYYY-MM-DD-HHMM>-<slug><suffix>.md.
+    _slug = slugify(title)
+    _call_dir = call_layout.folder(Path(cfg["project_dir"]) / "live", f"{dt.datetime.fromtimestamp(started):%Y-%m-%d}", _slug, create=True)
+    out = _call_dir / f"{dt.datetime.fromtimestamp(started):%Y-%m-%d-%H%M}-{_slug}{suffix}.md"
+    tips_file = call_layout.sidecar_of(out, ".tips.jsonl")
+    inbox_file = call_layout.sidecar_of(out, ".inbox.jsonl")
     STATE.mkdir(parents=True, exist_ok=True)
     (STATE / "pid").write_text(str(os.getpid()))
     try:
@@ -4956,7 +4961,7 @@ def main() -> int:
                            project=cfg.get("slug") or "", team_names=cfg.get("people_team") or [],
                            remember=cfg.get("voices_remember", True) not in (False, "false", "off", "0", 0),
                            workspace=cfg.get("workspace") or "")
-        tracker = SpeakerTracker(cfg, out.with_name(out.stem + ".speakers.json"), lib,
+        tracker = SpeakerTracker(cfg, call_layout.sidecar_of(out, ".speakers.json"), lib,
                                  emit=lambda item: _append_json(tips_file, item))
         Cards.side_of_sid = tracker.side_for           # 0.9.7: a colleague's line fires no on: them card
         series = slugify(re.sub(r"\.app$", "", _s(cfg.get("title")))) if _s(cfg.get("title")).strip() else ""
@@ -5022,7 +5027,7 @@ def main() -> int:
         if gloss["done"] or now() < gloss["next"]:
             return
         gloss["next"] = now() + 20
-        bp = out.with_name(out.stem + ".brief.md")
+        bp = call_layout.sidecar_of(out, ".brief.md")
         try:
             if not bp.exists():
                 return
@@ -5163,7 +5168,7 @@ def main() -> int:
         talk["lags"] = (talk["lags"] + [t_asr1 - seg.t_end])[-5:]
         # Timing sidecar (latency analysis): where time goes between speech and the line.
         try:
-            with open(str(out) + ".timing.jsonl", "a", encoding="utf-8") as tf:
+            with open(call_layout.sidecar_of(out, ".timing.jsonl"), "a", encoding="utf-8") as tf:
                 tf.write(json.dumps({
                     "t": dt.datetime.fromtimestamp(seg.t_start).strftime("%H:%M:%S"),
                     "ch": seg.channel, "lang": lang, "dur": round(seg.duration, 1),

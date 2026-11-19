@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from .. import call_layout as CL
 from . import readers
 from . import size as Z
 
@@ -376,17 +377,27 @@ def previous_sheets(live: str, title: str, before: Optional[str] = None, n: int 
     """Sheets of the same meeting series (prep-<date>-<slug>.sheet.json), newest first."""
     want = _series_slug(title)
     out = []
-    try:
-        names = sorted(os.listdir(live), reverse=True)
+    found = {}
+    try:   # both layouts: flat in live/, and in the .work/ of each call folder (19.11)
+        for name in os.listdir(live):
+            full = os.path.join(live, name)
+            if name.endswith(".sheet.json") and os.path.isfile(full):
+                found.setdefault(name, full)
+            elif os.path.isdir(full) and "." not in name and re.match(r"^\d{4}-\d\d-\d\d-", name):
+                for sub in (full, os.path.join(full, CL.WORK_DIR)):
+                    if os.path.isdir(sub):
+                        for n2 in os.listdir(sub):
+                            if n2.endswith(".sheet.json"):
+                                found.setdefault(n2, os.path.join(sub, n2))
     except OSError:
         return []
-    for name in names:
+    for name in sorted(found, reverse=True):
         m = re.match(r"^prep-(\d{4}-\d\d-\d\d-\d{4})-(.+)\.sheet\.json$", name)
         if not m or _series_slug(m.group(2)) != want:
             continue
         if before and m.group(1) >= before:
             continue
-        out.append(os.path.join(live, name))
+        out.append(found[name])
         if len(out) >= n:
             break
     return out
@@ -451,7 +462,7 @@ def series_deal_text(live: str, title: str, before: Optional[str] = None, n: int
     for p in reversed(calls):                    # oldest first, so the newest call wins
         stem = re.sub(r"(\.named)?\.md$", "", p)
         try:
-            d = json.loads(open(stem + ".sales.json", encoding="utf-8").read())
+            d = json.loads(open(CL.sidecar(stem, ".sales.json"), encoding="utf-8").read())
         except (OSError, ValueError):
             continue
         days.append(os.path.basename(stem)[:10])
@@ -504,7 +515,7 @@ def auto_sources(req: dict) -> List[dict]:
         calls = [p for p in previous_calls(live, title, 8) if not stamp or os.path.basename(p)[:15] < stamp][:3]
         for p in calls:
             stem = re.sub(r"(\.named)?\.md$", "", p)
-            notes = stem + ".notes.md"
+            notes = str(CL.sidecar(stem, ".notes.md"))
             use = notes if os.path.exists(notes) else p
             day = os.path.basename(stem)[:10]
             try:
@@ -517,7 +528,7 @@ def auto_sources(req: dict) -> List[dict]:
         if not calls:
             prev_sheets = previous_sheets(live, title, stamp)
             if prev_sheets:
-                md = prev_sheets[0][:-len(".json")] + ".md"
+                md = str(CL.sidecar(prev_sheets[0][:-len(".sheet.json")], ".sheet.md"))
                 out.append(_candidate("prev_call", "Previous Meeting Sheet: " + os.path.basename(prev_sheets[0]),
                                       ["same meeting series", "previous sheet"], True,
                                       path=md if os.path.exists(md) else prev_sheets[0]))

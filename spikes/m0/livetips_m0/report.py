@@ -6,6 +6,8 @@ comparison with the skill's own tips for the same call.
 import argparse
 import json
 from pathlib import Path
+
+from . import call_layout
 from typing import Dict, List
 
 from .cost import PRICES_CHECKED
@@ -36,9 +38,9 @@ def jl(p: Path) -> List[dict]:
 def skill_tips(md: Path):
     """The skill's tips for the same call (kind tip/fact/answer without a typed question)."""
     stem = md.name[:-3]
-    tips = jl(md.parent / (stem + ".tips.jsonl"))
+    tips = jl(call_layout.sidecar(md.parent / stem, ".tips.jsonl"))
     timing = {}
-    for r in jl(Path(str(md) + ".timing.jsonl")):
+    for r in jl(call_layout.sidecar(str(md), ".timing.jsonl")):
         timing.setdefault(r.get("t"), r)
     out = []
     for t in tips:

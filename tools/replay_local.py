@@ -37,6 +37,7 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "recorder" / "src"))
+import call_layout  # noqa: E402
 import semantic as SEM  # noqa: E402
 import transcriber as T  # noqa: E402
 
@@ -391,7 +392,7 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     md = a.md.expanduser()
     stem = md.name[:-len(".named.md")] if md.name.endswith(".named.md") else md.stem
-    sib = lambda suf: md.with_name(stem + suf)  # noqa: E731
+    sib = lambda suf: call_layout.sidecar(md.parent / stem, suf)  # noqa: E731
     timing = a.timing or (sib(".md.timing.jsonl") if sib(".md.timing.jsonl").exists() else None)
     facts = a.facts or (sib(".facts.json") if sib(".facts.json").exists() else None)
     cards = a.cards or (sib(".cards.json") if sib(".cards.json").exists() else None)

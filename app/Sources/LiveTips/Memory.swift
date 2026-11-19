@@ -159,7 +159,7 @@ struct SeriesView: View {
         Group {
         let calls = CallPageView.series(of: record)          // newest first
         let df = CallPageView.fmt("EEEdMMM")
-        let folder = (record.file as NSString).deletingLastPathComponent
+        let folder = CallLayout.liveFolder(of: record.file)
         let key = EditLog.seriesKey(record.title)
         let items = register.items(in: folder).filter { $0.series.split(separator: "|", maxSplits: 1).last.map(String.init) == key && $0.status != "dropped" }
         let latest = calls.first, prev = calls.dropFirst().first

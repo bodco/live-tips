@@ -23,6 +23,8 @@ from pathlib import Path
 
 import numpy as np
 
+import call_layout
+
 SR = 16000
 FRAME = 480                 # 30 ms
 MAX_SEG_S = 28.0            # Whisper's window is 30 s
@@ -159,7 +161,7 @@ def header(cfg: dict, title: str, source: str, ref: str, when: str, ui: str) -> 
 
 
 def snapshot_path(md: Path) -> Path:
-    return md.with_name(md.stem + ".speakers.json")
+    return call_layout.sidecar_of(md, ".speakers.json")
 
 
 def write_named(md: Path, snap: dict, T) -> Path:
@@ -178,7 +180,7 @@ def write_named(md: Path, snap: dict, T) -> Path:
             return None
         c = cl.get(s) or {}
         return T.speaker_display(s, c.get("name"))
-    named = md.with_name(md.stem + ".named.md")
+    named = call_layout.sidecar_of(md, ".named.md")
     named.write_text(T.apply_speaker_names(text, "", label), encoding="utf-8")
     return named
 

@@ -148,7 +148,7 @@ enum AfterCall {
     /// The other people on the call (the speaker names), for "To ..." and the meta line.
     @MainActor static func people(_ file: String) -> [String] {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-        guard let d = FileManager.default.contents(atPath: stem + ".speakers.json"),
+        guard let d = FileManager.default.contents(atPath: CallLayout.sidecar(stem, ".speakers.json")),
               let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return [] }
         var names: [String] = []
         for (_, v) in o { if let x = v as? [String: Any], let n = x["name"] as? String, !n.isEmpty, !names.contains(n) { names.append(n) } }

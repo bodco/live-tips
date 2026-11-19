@@ -176,7 +176,7 @@ What `read_delta.py` prints besides the new lines:
 
 ### Transcript format
 
-`<project folder>/live/<YYYY-MM-DD-HHMM>-<title>.md`:
+`<project folder>/live/<YYYY-MM-DD>-<title>/<YYYY-MM-DD-HHMM>-<title>.md` (a call folder; see "Call folders" below):
 
 ```
 # Live transcript: Status sync
@@ -201,6 +201,17 @@ Brief), `<title>.cards.json` (instant cards), `<title>.facts.json` (the fact boo
 action items), `<title>.polls.jsonl` (every poll), `<title>.tips.jsonl` and
 `<title>.inbox.jsonl` (the window), `<title>.speakers.json` and `<title>.semantic.jsonl`
 (when those layers are on).
+
+#### Call folders
+
+Since 0.26.2 every call has a folder, `<project>/live/<YYYY-MM-DD>-<title>/`; calls with the same title on the same day
+share it. On top: the transcript (`.md`, `.app.md`), the meeting notes (`.notes.md`), the brief (`.brief.md`) and the
+preparation sheet (`prep-*.sheet.md`). Every working file named above (`.state.json`, `.cards.json`, `.facts.json`,
+`.tips.jsonl`, `.inbox.jsonl`, `.speakers.json`, `.semantic.*`, sheet data, `.judge`) is in the hidden `.work/` inside
+it. `commitments.jsonl`, `lessons.md` and `sources/` stay in `live/`. In this guide `<title>.<x>` means that file
+wherever it is. Calls made before 0.26.2 are moved at launch (move only: nothing is deleted or overwritten; a call
+written in the last minutes waits for the next launch; a clashing file stays where it was; the result is counted in
+`logs/app.log`). Tools and the skill still read the old flat layout.
 
 ---
 
@@ -2351,7 +2362,7 @@ Settings > AI > Preparation cannot run, the hint names another one that is ready
 sheet, for example Budget or Decision maker), when a fact is old (6 months), the reminder (30 minutes) and your
 presets.
 
-**Files.** Next to the call in `<project>/live/`: `<base>.sheet.json` (the sheet), `<base>.sheet.md` (a readable
+**Files.** In the call's folder, `<project>/live/<date>-<title>/` (`<base>.sheet.md` on top, the rest in `.work/`): `<base>.sheet.json` (the sheet), `<base>.sheet.md` (a readable
 copy), `<base>.sheet.v<N>.json` (versions), `<base>.sheet.sources.json` (the report by source). For the live layer the
 app also writes the brief, cards and facts files from the sheet; they are generated copies, not a second brief.
 Details: [DEVELOPMENT.md](../../DEVELOPMENT.md#meeting-sheet-0100).
@@ -3164,7 +3175,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    and More options scroll under them. The title is required: Start call with an empty title outlines it in
    red and puts the cursor there. Under the context: Add folder with the folders as chips, one line "Project
    folder included", then the Participants note. Prepare now reads the whole project folder (its live/
-   subfolder holds the calls and the preparations), so the lock chip shows the project folder.
+   subfolder holds a folder per call, with its preparations), so the lock chip shows the project folder.
 49. **Settings > Projects (0.5.7).** ⋯ next to a project: Show in Finder, Use Claude for tips, Search this
    folder (both on by default), Reindex now, Remove project from Live Tips. The explanation moved into the
    (i) button. A project imported twice (the same folder with and without a trailing slash) is merged.

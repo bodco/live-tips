@@ -20,6 +20,8 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional
 
+from . import call_layout
+
 PACK_CHARS = 120_000          # about 35-40K tokens: what a 26-35B model on a 32 GB Mac can hold with room to answer
 NUM_CTX = 65_536
 
@@ -53,10 +55,11 @@ def previous_calls(live: str, title: str, n: int = 3) -> List[str]:
     want = slug(title)
     out, stems = [], set()
     try:
-        names = sorted(os.listdir(live), reverse=True)
+        names = sorted((str(p) for p in call_layout.files(live)), key=os.path.basename, reverse=True)
     except OSError:
         return []
-    for name in names:
+    for full in names:
+        name = os.path.basename(full)
         m = re.match(r"^(\d{4}-\d\d-\d\d-\d{4}-[^.]+)(\.app)?\.md$", name)
         if not m:
             continue
@@ -66,8 +69,8 @@ def previous_calls(live: str, title: str, n: int = 3) -> List[str]:
         if m.group(1) in stems:
             continue
         stems.add(m.group(1))
-        named = os.path.join(live, name[:-3] + ".named.md")
-        out.append(named if os.path.exists(named) else os.path.join(live, name))
+        named = str(call_layout.sidecar(full[:-3], ".named.md"))
+        out.append(named if os.path.exists(named) else full)
         if len(out) == n:
             break
     return out
@@ -371,7 +374,7 @@ def main(argv=None) -> int:
         for i, p in enumerate(prev):
             # rules/notes.yaml > preparation: an older call with full notes is read from them (no notes pass)
             stem = re.sub(r"(\.named)?\.md$", "", p)
-            saved = stem + ".notes.md"
+            saved = str(call_layout.sidecar(stem, ".notes.md"))
             if i > 0 and os.path.exists(saved) and not r.get("own_notes"):
                 notes.append(f"### Notes: {os.path.basename(saved)}\n{read_text(saved, 40_000)}")
                 res["sources"].append("Call notes: " + os.path.basename(saved))
@@ -428,12 +431,12 @@ def main(argv=None) -> int:
         brief = with_context_line(brief, ctx, r.get("brief_lang") or "en")
         from .prepcontext import write_context
         write_context(base, manifest, ctx)
-        Path(base + ".brief.md").write_text(brief.rstrip() + "\n\nSources (local model): " + "; ".join(res["sources"]) + "\n",
+        call_layout.sidecar_mk(base, ".brief.md").write_text(brief.rstrip() + "\n\nSources (local model): " + "; ".join(res["sources"]) + "\n",
                                             encoding="utf-8")
         if cards:
-            Path(base + ".cards.json").write_text(json.dumps(cards, ensure_ascii=False, indent=1), encoding="utf-8")
+            call_layout.sidecar_mk(base, ".cards.json").write_text(json.dumps(cards, ensure_ascii=False, indent=1), encoding="utf-8")
         if facts:
-            Path(base + ".facts.json").write_text(json.dumps(facts, ensure_ascii=False, indent=1), encoding="utf-8")
+            call_layout.sidecar_mk(base, ".facts.json").write_text(json.dumps(facts, ensure_ascii=False, indent=1), encoding="utf-8")
         if r.get("lt"):
             say(stage="check")
             fix = ["--fix"] if not cards else []

@@ -59,7 +59,7 @@ enum PyTool {
     /// The registered project or workspace whose folder holds this transcript.
     static func project(of file: String) -> (project: Project?, workspace: Workspace?) {
         let reg = ProjectRegistry.load(from: AppPaths.projects)
-        let dir = ((file as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent
+        let dir = (CallLayout.liveFolder(of: file) as NSString).deletingLastPathComponent
         return (reg.projects.first { !$0.root.isEmpty && $0.root == dir }, reg.workspaces.first { $0.root == dir })
     }
 }

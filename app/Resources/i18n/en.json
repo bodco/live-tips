@@ -2587,6 +2587,7 @@
  "sheet.ui.row.size": "Size",
  "sheet.ui.row.sources": "Sources",
  "sheet.ui.rule.goal_set": "Goal of the meeting is set",
+ "sheet.ui.rule.decider_known": "Who decides is known",
  "sheet.ui.rule.participants_both": "People on both sides",
  "sheet.ui.rule.contact_found": "About the contact is not empty",
  "sheet.ui.rule.qualification_complete": "Every qualification item has a status",

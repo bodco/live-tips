@@ -180,6 +180,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         if !args.tips.isEmpty { tips = TailReader(path: args.tips) }
         ticker = Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(tick),
                              userInfo: nil, repeats: true)
+        // 0.25 (review 5): the card asks "End call?" with runModal; in the common modes the feed keeps moving meanwhile
+        if let t = ticker { RunLoop.main.add(t, forMode: .common) }
     }
 
     @objc func tick() {

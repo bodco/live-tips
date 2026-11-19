@@ -5,6 +5,15 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.25.0 (2026-11-19)
 
+- **Release QA fixes (2026-11-19):** the compact card now shows a risk and "Decided earlier" like a tip (the quiet
+  "Done?" stays in the full window), and its tips keep moving while End call asks. A Transcript call no longer sends
+  the Sales mode that its form hides. The upcoming call's status follows the sheet's readiness (it said "Not ready" in
+  the ready colour), a readiness check whose block is not in the sheet is shown as skipped, not passed, and "Who decides
+  is known" has its name. Expert step 1 shows the calendar switch only when the call has an event. A name at the end of
+  "Participants: ..." no longer keeps the full stop ("Sarah Lee."), while an initial ("Sarah M.") does. Statistics in
+  Ukrainian keeps its title on one line and puts the period buttons on their own row when the window is narrow, with a
+  decimal comma. "Start without prep: ..." lost the space before the colon.
+
 - **Expert steps 1 to 3 in the look of the boards (2026-11-19, R3c-2):** the steps on top are numbered squares, a
   passed step is ticked and the open one is underlined; the main button shows Return (↵). Meeting: the calendar
   switch with its note, Meeting name, When and Project in one row, the kind of meeting as chips with their mode and

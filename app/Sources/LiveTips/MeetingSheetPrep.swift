@@ -344,7 +344,7 @@ struct SheetQuickView: View {
 
     private var liveLine: String {
         var parts = [m.callType == "presentation" ? L("start.type.presentation") : m.callType == "interview" ? L("callSettings.type.interview") : L("sheet.ui.live.regular")]
-        if m.salesEnabled { parts.append(L("page.salesMode")) }
+        if m.salesActive { parts.append(L("page.salesMode")) }
         return parts.joined(separator: " · ")
     }
 
@@ -672,11 +672,13 @@ struct SheetMeetingStep: View {
             VStack(alignment: .leading, spacing: 16) {
                 PrepPageHead(title: L("sheet.ui.s1.title"), sub: L("sheet.ui.s1.sub"))
                 HStack(alignment: .center, spacing: 14) {
-                    PrepChoice(selection: $draft.withEvent, options: [
-                        (true, L("sheet.ui.s1.fromCalendar")),
-                        (false, L("sheet.ui.s1.noEvent"))
-                    ])
-                    .disabled(m.calEventID == nil)
+                    // 0.25 (QA): without an event the choice was a disabled, unreadable switch; the note says it alone
+                    if m.calEventID != nil {
+                        PrepChoice(selection: $draft.withEvent, options: [
+                            (true, L("sheet.ui.s1.fromCalendar")),
+                            (false, L("sheet.ui.s1.noEvent"))
+                        ])
+                    }
                     Text(draft.withEvent && m.calEventID != nil ? L("sheet.ui.s1.event") : L("sheet.ui.s1.noEventNote"))
                         .font(th.homeText(13)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
                 }

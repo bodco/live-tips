@@ -2587,6 +2587,7 @@
  "sheet.ui.row.size": "Розмір",
  "sheet.ui.row.sources": "Джерела",
  "sheet.ui.rule.goal_set": "Мету зустрічі задано",
+ "sheet.ui.rule.decider_known": "Відомо, хто вирішує",
  "sheet.ui.rule.participants_both": "Люди з обох сторін",
  "sheet.ui.rule.contact_found": "Блок про контакт не порожній",
  "sheet.ui.rule.qualification_complete": "Кожен пункт кваліфікації має статус",

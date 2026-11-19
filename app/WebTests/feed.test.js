@@ -665,5 +665,11 @@ test('card pager: the N min left card and quiet cards are not paged; a pinned qu
   assert.strictEqual(p.total, 4); assert.strictEqual(p.card.id, 'p');
 });
 
+test('0.25: a quiet risk and a decision conflict reach the card, a quiet Done? does not', () => {
+  const list = [C('d', NOW - 3000, { quiet: true, kind: 'decision_conflict' }), C('r', NOW - 4000, { quiet: true, kind: 'risk' }), C('q', NOW - 5000, { quiet: true, kind: 'onme' })].concat(LIST3);
+  const p = cardPage(list, {}, NOW);
+  assert.strictEqual(p.total, 5); assert.strictEqual(p.card.id, 'd');
+});
+
 console.log(`feed tests: ${passed} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

@@ -680,10 +680,11 @@
   /** Theme pass stage 4 (2026-11-19): the compact card shows one tip at a time.
    *  list: the visible cards, newest first (tips.js visibleCards). view: {pin, seen}: pin is the tip the PM paged back to
    *  (null follows the newest), seen is the newest tip when the PM paged back, so a tip that arrives later does not take
-   *  the card over, it only shows "new" and "Latest tip". The "N min left" card and quiet cards are not paged.
+   *  the card over, it only shows "new" and "Latest tip". The "N min left" card and quiet "Done?" cards are not paged.
    *  Returns {card, index (1 = the oldest), total, latest, fresh, prevId, latestId}. */
   function cardPage(list, view, now) {
-    const tips = (list || []).filter((c) => c && c.kind !== 'finish' && (!c.quiet || c.pinned));
+    // 0.25 (owner, 19.11): a risk and "Decided earlier" reach the card too; "Done?" stays in the full window
+    const tips = (list || []).filter((c) => c && c.kind !== 'finish' && (!c.quiet || c.pinned || c.kind === 'risk' || c.kind === 'decision_conflict'));
     const total = tips.length;
     if (!total) return { card: null, index: 0, total: 0, latest: true, fresh: false, prevId: null, latestId: null };
     const v = view || {}, t = now == null ? Date.now() : now;

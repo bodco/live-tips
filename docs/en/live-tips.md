@@ -2199,7 +2199,7 @@ Settings > Meeting Sheet decides which one opens: by the rules (each rule can be
 or always Expert. The first time in a series Quick shows "Suggested" and Pacenote remembers the setup for next time.
 
 **Get ready since 0.25.** The switch at the top ("Quick" / "Expert · all settings") is the one way into Expert; the
-link under the form is gone. Quick asks "What matters today?" (before: "Anything special today?"), and Cancel, Start
+link under the form is gone. Quick asks "What matters on this call" (the same field as Start a call; during a live call "What changed?"), and Cancel, Start
 without prep and "Prepare brief" sit in a band at the bottom.
 
 **Who is on the call.** Quick (under People > Change) and Expert step 1 show Our side (on the left) and Their side
@@ -2812,11 +2812,12 @@ The model is WeSpeaker ResNet34-LM trained on VoxCeleb, CC BY 4.0.
   "‹ Previous tip" and "Latest tip ›" page through them ("Tip 2 of 5"); a tip that arrives while you read an older one
   does not replace it, the card marks it "new". A new tip slides in unless Reduce motion is on. Before the first tip the
   card says it is listening and reminds you of Help now (Control-Option-H). A recording problem shows one line with
-  "Open the window".
+  "Open the window". A risk and "Decided earlier" come to the card like a tip.
 - **Expand and the end of the call.** Expand opens the full tips window for the rest of the call (agenda, transcript,
-  presentation, the input). End call asks the same question as in the window. When the call ends, the full window opens
-  with the after-call screen. The floating call controls work as before.
-- **Only in the full window.** The slides of a presentation and the "N min left" line.
+  presentation, the input). End call asks the same question as in the window. "The meeting has ended? Stopping the
+  call in N s" shows on the card with Keep recording and Stop now. When the call ends, the full window opens with the
+  after-call screen without taking the focus from your meeting app. The floating call controls work as before.
+- **Only in the full window.** The slides of a presentation, the "N min left" line and the quiet "Done?" cards.
 
 ### 14.2 After the call: the meeting page in Notion
 

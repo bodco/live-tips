@@ -506,6 +506,8 @@ final class StartCallModel: ObservableObject {
     @Published var salesEnabled = false
     @Published var salesMethod = ""
     @Published var salesTouched = false
+    /// 0.25 (review 7): a Transcript call hides the Sales switch, so the saved choice stays but is not sent with it.
+    var salesActive: Bool { salesEnabled && callType != "transcript" }
     /// 0.8.5 (P2): the deck of a Presentation call, its speakers, slide owners and timing.
     @Published var deck = DeckSetup()
     @Published var publicCall = false            // D3: a webinar or an event with strangers: new voices are not saved
@@ -594,6 +596,10 @@ final class StartCallModel: ObservableObject {
             .split(whereSeparator: { ",;".contains($0) })
             .map { $0.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "-•*"))) }
             .flatMap(PeopleSides.splitGlued)        // 0.14.0: "Inna B. Anton S." lost its comma: two people
+            .map { n -> String in               // 0.25 (QA): "Sarah Lee." ends the sentence; "Sarah M." keeps its initial
+                guard n.hasSuffix("."), let last = n.split(separator: " ").last, last.count > 2 else { return n }
+                return String(n.dropLast())
+            }
             .filter { n in !n.isEmpty && !me.contains(n.lowercased()) }
     }
     @Published var prep: PrepInfo?
@@ -725,7 +731,7 @@ final class StartCallModel: ObservableObject {
                                   workspaceRoot: (ws?.root == root) ? "" : (ws?.root ?? ""), folders: folders,
                                   useProjectFolder: useProjectFolder && workspace?.name != ProjectRegistry.defaultWorkspaceName, callID: id,   // 0.9.0: never read the app folder
                                   deck: callType == "presentation" && deck.info != nil ? deck : nil,
-                                  salesMethod: salesEnabled ? (salesMethod.isEmpty ? "general" : salesMethod) : nil,
+                                  salesMethod: salesActive ? (salesMethod.isEmpty ? "general" : salesMethod) : nil,
                                   company: project?.crmCompanyName ?? "")
     }
 
@@ -816,7 +822,7 @@ final class StartCallModel: ObservableObject {
                 "folders": folders,
                 "sales": { () -> [String: Any] in
                     if !title.isEmpty { UserDefaults.standard.set(salesEnabled ? (salesMethod.isEmpty ? "general" : salesMethod) : "off", forKey: "sales." + EditLog.seriesKey(title)) }
-                    return ["enabled": salesEnabled, "method": salesMethod.isEmpty ? "general" : salesMethod] }(),
+                    return ["enabled": salesActive, "method": salesMethod.isEmpty ? "general" : salesMethod] }(),
                 "workspace_root": { let ws = workspace ?? registry.workspaces.first { w in w.projects.contains(project?.slug ?? "\u{0}") }; return (ws?.root == root) ? "" : (ws?.root ?? "") }()]
     }
 

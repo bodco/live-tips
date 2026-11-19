@@ -493,9 +493,11 @@ struct SheetReadinessTab: View {
                     PageLabel(text: L("sheet.ui.ready.checks")).padding(.bottom, 4)
                     ForEach(Array((s.readiness?.checks ?? []).enumerated()), id: \.offset) { _, c in
                         HStack(spacing: 8) {
-                            Image(systemName: c.dropped == true ? "minus.circle" : c.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                .foregroundStyle(c.dropped == true ? PN.C.text3 : c.ok ? PN.C.turn : PN.C.pending)
-                            Text(ruleText(c.rule)).font(PN.Font.body).foregroundStyle(c.dropped == true ? PN.C.text3 : PN.C.text)
+                            // 0.25 (QA): a skipped check (its block is not in the sheet) is not a passed one
+                            let off = c.dropped == true || c.skipped == true
+                            Image(systemName: off ? "minus.circle" : c.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(off ? PN.C.text3 : c.ok ? PN.C.turn : PN.C.pending)
+                            Text(ruleText(c.rule)).font(PN.Font.body).foregroundStyle(off ? PN.C.text3 : PN.C.text)
                             Spacer()
                             Text(c.dropped == true ? L("sheet.ui.check.dropped") : c.skipped == true ? (c.reason == "block_hidden" ? L("sheet.ui.check.skippedHidden") : L("sheet.ui.check.skipped")) : c.ok ? L("sheet.ui.check.ok") : L("sheet.ui.check.gap"))
                                 .font(PN.Font.caption).foregroundStyle(PN.C.text3)

@@ -182,7 +182,12 @@ struct UpcomingCallPage: View {
         let people = HomeView.peopleLine(model.participants)
         let st = state
         let (kind, text, sub): (HomeTag, String, String) = {
-            if doc != nil && st != .preparing { return (.ready, st.text, L("page.sub.sheetBuilt")) }
+            if doc != nil && st != .preparing {
+                // 0.25 (QA): the tag follows the sheet's readiness (it said "Not ready" in the ready colour)
+                guard let b = SheetCache.shared.badge(for: model) else { return (HomeTag.of(st), st.text, L("page.sub.sheetBuilt")) }
+                let k: HomeTag = b.state == .almost ? .answer : b.state == .notReady ? .notReady : .ready
+                return (k, SheetLabels.readiness(b).text, L("page.sub.sheetBuilt"))
+            }
             switch st {
             case .preparing: return (.answer, st.text, L("home.check.preparing", ["p": "\(Int(runner.progress * 100))"]))
             case .queued: return (.answer, st.text, L("badge.queued"))
@@ -346,9 +351,9 @@ struct UpcomingCallPage: View {
                     }
                 }
             }
-            HStack(spacing: 4) {
+            HStack(spacing: 0) {     // 0.25 (QA): no gap before the tail's colon
                 Text(L("page.notime")).font(t.homeText(14)).foregroundStyle(PN.C.text3)
-                HomeLink(L("sheet.ui.startWithout")) { start() }
+                HomeLink(L("sheet.ui.startWithout")) { start() }.padding(.leading, 4)
                 Text(L("page.notime.tail")).font(t.homeText(14)).foregroundStyle(PN.C.text3)
             }
             .pageRow(14)

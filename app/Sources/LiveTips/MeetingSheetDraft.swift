@@ -127,7 +127,7 @@ final class SheetDraft: ObservableObject {
         if m.callType == "interview" { return "interview" }
         if m.callType == "presentation" { return "internal_presentation" }
         if t.contains("stand") || t.contains("daily") || t.contains("стендап") { return "standup" }
-        if m.salesEnabled { return SheetFiles.earlier(for: m) == nil ? "sales_intro" : "repeat_call" }
+        if m.salesActive { return SheetFiles.earlier(for: m) == nil ? "sales_intro" : "repeat_call" }
         if m.audience == "client" { return "client_sync" }
         return "blank"
     }
@@ -270,7 +270,7 @@ final class SheetDraft: ObservableObject {
         let people: [String: Any] = ["ours": ours.filter { !$0.name.isEmpty }.map(person), "theirs": theirs.filter { !$0.name.isEmpty }.map(person)]
         let options: [String: Any] = ["plan": plan, "special": special, "remind_minutes": remind, "stale_months": SheetPrefs.shared.staleMonths,
                                       "folder_days": SheetPrefs.shared.folderDays,
-                                      "use_project_folder": false, "sales": model.salesEnabled, "hiring_role": model.hiringRole]
+                                      "use_project_folder": false, "sales": model.salesActive, "hiring_role": model.hiringRole]
         var r: [String: Any] = [
             "project": ["slug": model.project?.slug ?? model.workspace?.name.lowercased() ?? "", "root": model.root ?? ""],
             "meeting": meeting, "preset": presetID, "mode": mode.rawValue, "language": language, "route": route,

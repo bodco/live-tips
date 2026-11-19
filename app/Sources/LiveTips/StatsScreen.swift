@@ -21,6 +21,8 @@ struct StatsScreen: View {
     @Environment(\.pnTheme) private var t
     @State private var width: CGFloat = 1280
     private var wide: Bool { width >= 900 }
+    /// 0.25 (QA): the Ukrainian title and period buttons are longer; below this they go to their own row
+    private var headWide: Bool { width >= (L10n.lang == "uk" ? 1180 : 900) }
 
     /// ShotMode: the day selected on the picture of a selected day.
     static var shotDay: Date?
@@ -198,13 +200,13 @@ struct StatsScreen: View {
             VStack(alignment: .leading, spacing: 6) {
                 lbl(metaLine(m))
                 Text(t.cased(L("home.week.detailsTitle"))).font(t.homeDisplay(t.style == .classic ? 32 : 40, t.titleWeight))
-                    .tracking(t.dTrack * 40).foregroundStyle(PN.C.text)
+                    .tracking(t.dTrack * 40).foregroundStyle(PN.C.text).lineLimit(1).fixedSize()
             }
             Spacer(minLength: 8)
-            if wide { periodButtons; scopeMenu }
+            if headWide { periodButtons; scopeMenu }
         }
-        .padding(.horizontal, PageMetrics.side).padding(.top, 24).padding(.bottom, wide ? 18 : 12)
-        if !wide {
+        .padding(.horizontal, PageMetrics.side).padding(.top, 24).padding(.bottom, headWide ? 18 : 12)
+        if !headWide {
             HStack(spacing: 10) { periodButtons; scopeMenu; Spacer(minLength: 0) }
                 .padding(.horizontal, PageMetrics.side).padding(.bottom, 18)
         }
@@ -462,7 +464,7 @@ struct StatsScreen: View {
         let noDecision = ms.filter { $0.1.hasPicture && $0.1.decisions == 0 }.count
         let prep = ms.filter { $0.0.prepared == true }, noPrep = ms.filter { $0.0.prepared != true }
         func perCall(_ xs: [(CallHistory.Record, CallMetrics.Result)]) -> String {
-            xs.isEmpty ? "-" : String(format: "%.1f", Double(xs.reduce(0) { $0 + $1.1.decisions }) / Double(xs.count))
+            xs.isEmpty ? "-" : String(format: "%.1f", Double(xs.reduce(0) { $0 + $1.1.decisions }) / Double(xs.count)).replacingOccurrences(of: ".", with: L10n.lang == "uk" ? "," : ".")
         }
         let items: [(String, String, String)] = [
             (shares.isEmpty ? "-" : "\(Int((shares.reduce(0, +) / Double(shares.count) * 100).rounded()))%", L("stats.talkShare"), L("stats.talkShare.sub")),

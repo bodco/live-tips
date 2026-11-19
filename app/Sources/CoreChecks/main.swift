@@ -152,6 +152,12 @@ func mirrorAndWorkspaces() {
     let old = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"uiLanguage\":\"uk\"}".utf8))
     expect(old?.uiLanguage == "uk" && old?.showInDock == true, "config decodes older files")
     expect(old?.floatingCallControls == true, "older config enables floating controls")
+    expect(old?.tipsWindowMode == "window", "older config keeps the tips window (theme pass stage 4)")
+    let oddMode = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"tipsWindowMode\":\"strip\"}".utf8))
+    expect(oddMode?.tipsWindowMode == "window", "unknown tips mode reads as the window")
+    var cardCfg = AppConfig(); cardCfg.tipsWindowMode = "card"
+    let cardBack = (try? JSONEncoder().encode(cardCfg)).flatMap { try? JSONDecoder().decode(AppConfig.self, from: $0) }
+    expect(cardBack?.tipsWindowMode == "card", "compact card mode round trip")
     let statusPath = NSTemporaryDirectory() + "pacenote-floating-status.json"
     for value in ["on", "off"] {
         try? ("{\"state\":\"recording\",\"tips_paused\":\"" + value + "\"}").write(toFile: statusPath, atomically: true, encoding: .utf8)
@@ -4136,6 +4142,33 @@ func decisionOwnersTP2() {
     expect(md.contains("- [13:25] Emily: Ship"), "tp2: export line names the owner")
 }
 
+func tipCardPlacementTP4() {
+    // MacBook with a notch: 1512 x 982, menu bar 38 = notch; an external display on the left is the main one.
+    let mbp = TipCardScreen(frame: CGRect(x: 0, y: 0, width: 1512, height: 982), visible: CGRect(x: 0, y: 70, width: 1512, height: 874),
+                            safeTop: 38, builtin: true)
+    let ext = TipCardScreen(frame: CGRect(x: -2560, y: 0, width: 2560, height: 1440), visible: CGRect(x: -2560, y: 0, width: 2560, height: 1415), main: true)
+    expect(TipCardPlacement.pick([ext, mbp]) == mbp, "tp4: the built-in display wins over the main one")
+    expect(TipCardPlacement.pick([ext]) == ext, "tp4: no built-in display: the main one")
+    let f = TipCardPlacement.frame(on: mbp, height: 200)
+    expect(f.width == 480 && f.height == 200 && f.midX == 756, "tp4: centred under the camera, prototype width")
+    expect(f.maxY == 982 - 38 - 6, "tp4: hangs below the notch with the gap")
+    // No notch: below the menu bar (the visible frame's top).
+    let old = TipCardScreen(frame: CGRect(x: 0, y: 0, width: 1440, height: 900), visible: CGRect(x: 0, y: 0, width: 1440, height: 875), main: true)
+    expect(TipCardPlacement.frame(on: old, height: 150).maxY == 869, "tp4: no notch: below the menu bar")
+    // Height limits and the resize that keeps the top edge.
+    expect(TipCardPlacement.frame(on: old, height: 10).height == TipCardPlacement.minHeight, "tp4: minimum height")
+    expect(TipCardPlacement.frame(on: old, height: 5000).height == 525, "tp4: at most 60% of the visible height")
+    let moved = CGRect(x: 100, y: 500, width: 480, height: 200)
+    let r = TipCardPlacement.resized(moved, height: 260, on: old)
+    expect(r.maxY == 700 && r.minX == 100 && r.height == 260, "tp4: resize keeps the top edge and x")
+    let low = TipCardPlacement.resized(CGRect(x: 0, y: 20, width: 480, height: 120), height: 300, on: old)
+    expect(low.minY == 0 && low.height == 300, "tp4: resize stays on the visible frame")
+    // A narrow display: the card fits inside with the gap on both sides.
+    let narrow = TipCardScreen(frame: CGRect(x: 0, y: 0, width: 400, height: 800), visible: CGRect(x: 0, y: 0, width: 400, height: 780))
+    let n = TipCardPlacement.frame(on: narrow, height: 150)
+    expect(n.width == 388 && n.minX == 6, "tp4: narrow display")
+}
+
 itemIDs0170()
 pull0170()
 orgCard0170()
@@ -4151,5 +4184,6 @@ prepEstimateTP1()
 updatePromptR()
 aiDefaultsF3()
 decisionOwnersTP2()
+tipCardPlacementTP4()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

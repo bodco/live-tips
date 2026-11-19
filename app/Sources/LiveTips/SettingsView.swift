@@ -1524,6 +1524,16 @@ struct SettingsView: View {
                 Toggle(L("set.hideTheTipsWindow"), isOn: $model.config.stealthDefault)
                     .help(L("set.defaultForNewCalls"))
                     .settingsAnchor("gen.stealth")
+                Picker(selection: $model.config.tipsWindowMode) {
+                    Text(L("set.tipsMode.window")).tag("window")
+                    Text(L("set.tipsMode.card")).tag("card")
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("set.tipsMode"))
+                        Text(L("set.tipsMode.help")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .settingsAnchor("gen.tipsMode")
                 Toggle(isOn: $model.config.floatingCallControls) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L("floating.setting"))

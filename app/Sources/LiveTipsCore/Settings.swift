@@ -207,6 +207,10 @@ public struct AppConfig: Codable, Equatable {
     /// starts on Roadbook; an unknown value reads as the default (PNStyle in the app); "classic" reads as Roadbook (theme pass, 19.11).
     public var appearanceStyle = "roadbook"
     public var floatingCallControls = true
+    /// Theme pass stage 4 (2026-11-19): how live tips show during a call. "window" is the tips window as before,
+    /// "card" is the compact card under the camera (one tip at a time, Expand opens the window). Unknown reads as "window".
+    public var tipsWindowMode = "window"
+    public static let tipsWindowModes = ["window", "card"]
     /// 0.25 (R5): the languages new calls start with ("uk", "en", "uk+en"; the first is the main one). Empty is
     /// Ukrainian, as before; a project whose client speaks English still starts in English.
     public var callLanguage = ""
@@ -308,6 +312,8 @@ public struct AppConfig: Codable, Equatable {
         // The Classic look itself stays in the code (PNStyle.classic) for the shot modes.
         if appearanceStyle == "classic" { appearanceStyle = d.appearanceStyle }
         floatingCallControls = (try? c.decode(Bool.self, forKey: .floatingCallControls)) ?? d.floatingCallControls
+        tipsWindowMode = (try? c.decode(String.self, forKey: .tipsWindowMode)) ?? d.tipsWindowMode
+        if !AppConfig.tipsWindowModes.contains(tipsWindowMode) { tipsWindowMode = d.tipsWindowMode }
         callLanguage = (try? c.decode(String.self, forKey: .callLanguage)) ?? d.callLanguage
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
         notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB

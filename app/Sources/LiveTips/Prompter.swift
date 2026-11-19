@@ -109,6 +109,10 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     var slideSync = SlideSync()
     var thumbsFor = ""
     var afterShown = false           // 0.8.5 (P7): the after-call screen is up; refreshed while the wrap-up finishes
+    /// Theme pass stage 4 (owner, 19.11): Settings > General > Calls > "Live tips during a call" = Compact card. The same
+    /// page in a borderless panel under the camera (body.card); Expand moves this web view into the normal tips window
+    /// for the rest of the call. The setting itself is not changed by Expand.
+    var cardMode = false
 
     init(args: PrompterArgs) { self.args = args }
 
@@ -128,57 +132,20 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                          "prev": HotKeys.shared.combo(.prevSlide).display, "next": HotKeys.shared.combo(.nextSlide).display,
                          "add30": HotKeys.shared.combo(.add30).display]
         if args.demo { prefs["demo"] = "1" }      // 0.8.7 (L3): the first-call banner waits for a real call
+        cardMode = !args.demo && AppConfig.load(from: AppPaths.config).tipsWindowMode == "card"
+        if cardMode { prefs["view"] = "card" }   // the page starts as the card (tips.js: body.card)
         if let d = try? JSONSerialization.data(withJSONObject: prefs), let js = String(data: d, encoding: .utf8) {
             uc.addUserScript(WKUserScript(source: "window.LT_PREFS = " + js + ";", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         let cfg = WKWebViewConfiguration()
         cfg.userContentController = uc
 
-        let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let w: CGFloat = 520, h: CGFloat = 420     // v36: taller default, the redesign has a dock and an action row
-        let rect = NSRect(x: screen.midX - w / 2, y: screen.maxY - h - 6, width: w, height: h)
-        window = NSWindow(contentRect: rect,
-                          styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                          backing: .buffered, defer: false)
-        window.title = args.title                   // the call's name; the brand symbol sits next to it
-        window.tabbingMode = .disallowed
-        window.titlebarAppearsTransparent = true   // the title bar blends with the page background
-        window.level = Self.onTop ? .floating : .normal      // 2026-10-28: "Always on top" is remembered
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        // 0.8 (owner): Settings > General > "Hide the tips window from screen sharing" decides for a new call; the
-        // window's Call settings change it for this call only. Off = the window can be shared and screenshotted.
-        window.sharingType = AppConfig.load(from: AppPaths.config).stealthDefault ? .none : .readOnly
-        window.isMovableByWindowBackground = true
-        window.alphaValue = 1.0                 // opacity fades the page backgrounds only (text stays readable)
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.minSize = NSSize(width: 300, height: 140)
-        window.delegate = self
-        window.isReleasedWhenClosed = false
-        _ = window.setFrameAutosaveName("LiveTipsAppPrompter")   // remembers position and size
-        // 2026-11-12 (owner): compact mode is gone; a window last saved as the compact strip (560 x 150 or the
-        // 380 x 330 presentation column) opens at the normal size in the same place.
-        if Self.wasCompact(window.frame.size) {
-            var f = window.frame
-            f.origin.y = f.maxY - h; f.size = NSSize(width: w, height: h)
-            window.setFrame(f, display: false)
-        }
-        // 0.8.6 (A5): a taller title bar (about 36 pt) from an empty compact toolbar; the traffic lights stay centred.
-        window.toolbar = NSToolbar(identifier: "PacenoteCallWindow")
-        window.toolbarStyle = .unifiedCompact
-        addEndCallButton()
+        if cardMode { makeCardPanel() } else { makeCallWindow() }
         installOnTopKey()
 
-        // 2026-10-23: the title bar (close, minimise, End call) stays solid at any opacity setting.
-        if let tb = window.standardWindowButton(.closeButton)?.superview {
-            tb.wantsLayer = true
-            setLayerColor(tb, .windowBackgroundColor)
-        }
         // 2026-11-12 (owner): the title bar stayed white after a switch to the dark theme: the layer colours are
         // CGColors fixed at creation, so they are resolved again whenever the window's appearance changes.
-        appearanceObs = window.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.reapplyAppearance() } }
-        }
+        observeAppearance()
         NotificationCenter.default.addObserver(forName: CallEngine.callEnded, object: nil, queue: .main) { [weak self] n in
             MainActor.assumeIsolated { self?.showCallEnded(n.userInfo ?? [:]) }
         }
@@ -192,21 +159,22 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
             MainActor.assumeIsolated { self?.reapplyAppearance() }     // 0.23.0: the title bar buttons follow the style too
         }
 
-        web = WKWebView(frame: NSRect(origin: .zero, size: rect.size), configuration: cfg)
+        web = WKWebView(frame: NSRect(origin: .zero, size: window.contentView?.bounds.size ?? window.frame.size), configuration: cfg)
         web.navigationDelegate = self
         if let z = prefs["zoom"] as? Double, z > 0 { web.pageZoom = CGFloat(z) }      // Cmd + and Cmd -, remembered
         web.setValue(false, forKey: "drawsBackground")   // the page's own background can be see-through
         web.autoresizingMask = [.width, .height]
-        window.contentView = web
+        if cardMode { mountCard() } else { window.contentView = web }
         let url = URL(fileURLWithPath: args.html)
         pageURL = url
         web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent().deletingLastPathComponent())   // Resources: tips/ and Fonts/ (@font-face)
 
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.async { [weak self] in self?.layoutTitleButtons() }   // the window buttons have their frames now
-        NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.layoutTitleButtons() }
+        if cardMode {
+            window.orderFrontRegardless()       // the card does not take the focus from the meeting app
+        } else {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.async { [weak self] in self?.layoutTitleButtons() }   // the window buttons have their frames now
         }
 
         if !args.tips.isEmpty { tips = TailReader(path: args.tips) }
@@ -442,7 +410,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
                     a.messageText = L("tw.removeUpNext", ["title": m.effectiveTitle])
                     a.informativeText = L("tw.removeInfo")
                     a.addButton(withTitle: L("tw.remove")); a.addButton(withTitle: L("hk.cancel"))
-                    a.beginSheetModal(for: window) { r in if r == .alertFirstButtonReturn { MainActor.assumeIsolated { UpNext.shared.remove(m) } } }
+                    presentAlert(a) { r in if r == .alertFirstButtonReturn { MainActor.assumeIsolated { UpNext.shared.remove(m) } } }
                 default: break
                 }
             }
@@ -563,6 +531,8 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
 
     /// Back to the normal width before the frame is saved, so the next call does not open twice as wide.
     func windowWillClose(_ notification: Notification) {
+        // Theme pass stage 4: the card closing after Expand is not the current window any more; the call goes on.
+        guard (notification.object as? NSWindow) === window else { return }
         deckWide = false; trWide = false; setSplit(false, animate: false)
         ticker?.invalidate(); ticker = nil
     }
@@ -874,7 +844,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
         let next: StartCallModel? = MainActor.assumeIsolated { UpNext.shared.first }
         if let n = next { a.addButton(withTitle: L("tw.endAndStart", ["title": MainActor.assumeIsolated { n.effectiveTitle }])) }
         a.addButton(withTitle: L("hk.cancel"))
-        a.beginSheetModal(for: window) { [weak self] resp in
+        presentAlert(a) { [weak self] resp in
             if let n = next, resp == .alertSecondButtonReturn {
                 MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.performSwitch(to: n) }
                 return
@@ -897,6 +867,7 @@ final class PrompterController: NSObject, NSWindowDelegate, WKScriptMessageHandl
     /// The recorder has stopped: the button says so and the window gets a closing card with the file
     /// (2026-10-23: "I was afraid to close the app before it finished the call").
     func showCallEnded(_ info: [AnyHashable: Any]) {
+        if cardMode { expandCard() }     // theme pass stage 4: the after-call screen needs the full window
         let saved = info["saved"] as? Bool ?? false
         afterShown = saved
         if saved { pushAfter() }
@@ -1122,6 +1093,10 @@ extension PrompterController {
             if (d["item"] as? String) == "check" {
                 if let u = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") { NSWorkspace.shared.open(u) }
             } else { restartCall() }
+        case "size":        // theme pass stage 4: the card's content height (CSS px), the panel follows it
+            if let h = d["h"] as? Double { resizeCard(h) } else if let h = d["h"] as? Int { resizeCard(Double(h)) }
+        case "expand":      // the card's ⤢: the full tips window for the rest of this call
+            expandCard()
         case "menu":
             switch d["item"] as? String ?? "" {
             case "clear-speakers": sendSetting("speakers_clear", true)
@@ -1213,4 +1188,160 @@ extension PrompterController {
         m.audience = r["audience"] as? String ?? "auto"
         app.performSwitch(to: m)
     }
+}
+
+// MARK: - Theme pass stage 4: the compact tip card under the camera
+
+extension PrompterController {
+    /// The normal tips window (title bar with the brand mark, pin, Start and End call), position remembered.
+    func makeCallWindow() {
+        let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let w: CGFloat = 520, h: CGFloat = 420     // v36: taller default, the redesign has a dock and an action row
+        let rect = NSRect(x: screen.midX - w / 2, y: screen.maxY - h - 6, width: w, height: h)
+        window = NSWindow(contentRect: rect,
+                          styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                          backing: .buffered, defer: false)
+        window.title = args.title                   // the call's name; the brand symbol sits next to it
+        window.tabbingMode = .disallowed
+        window.titlebarAppearsTransparent = true   // the title bar blends with the page background
+        window.level = Self.onTop ? .floating : .normal      // 2026-10-28: "Always on top" is remembered
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // 0.8 (owner): Settings > General > "Hide the tips window from screen sharing" decides for a new call; the
+        // window's Call settings change it for this call only. Off = the window can be shared and screenshotted.
+        window.sharingType = AppConfig.load(from: AppPaths.config).stealthDefault ? .none : .readOnly
+        window.isMovableByWindowBackground = true
+        window.alphaValue = 1.0                 // opacity fades the page backgrounds only (text stays readable)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.minSize = NSSize(width: 300, height: 140)
+        window.delegate = self
+        window.isReleasedWhenClosed = false
+        _ = window.setFrameAutosaveName("LiveTipsAppPrompter")   // remembers position and size
+        // 2026-11-12 (owner): compact mode is gone; a window last saved as the compact strip (560 x 150 or the
+        // 380 x 330 presentation column) opens at the normal size in the same place.
+        if Self.wasCompact(window.frame.size) {
+            var f = window.frame
+            f.origin.y = f.maxY - h; f.size = NSSize(width: w, height: h)
+            window.setFrame(f, display: false)
+        }
+        // 0.8.6 (A5): a taller title bar (about 36 pt) from an empty compact toolbar; the traffic lights stay centred.
+        window.toolbar = NSToolbar(identifier: "PacenoteCallWindow")
+        window.toolbarStyle = .unifiedCompact
+        addEndCallButton()
+
+        // 2026-10-23: the title bar (close, minimise, End call) stays solid at any opacity setting.
+        if let tb = window.standardWindowButton(.closeButton)?.superview {
+            tb.wantsLayer = true
+            setLayerColor(tb, .windowBackgroundColor)
+        }
+        NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.layoutTitleButtons() }
+        }
+    }
+
+    /// The compact card: a borderless panel that floats over the meeting without taking the focus, under the camera on
+    /// every call (TipCardPlacement), not remembered. Hidden from screen sharing by the same setting as the window.
+    func makeCardPanel() {
+        let screens = NSScreen.screens.map(Self.cardScreen)
+        let s = TipCardPlacement.pick(screens)
+            ?? TipCardScreen(frame: CGRect(x: 0, y: 0, width: 1440, height: 900), visible: CGRect(x: 0, y: 0, width: 1440, height: 875))
+        let rect = TipCardPlacement.frame(on: s, height: 168)       // until the page reports its height ("size")
+        let p = TipCardPanel(contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        p.title = args.title
+        p.isFloatingPanel = true
+        p.level = .floating
+        p.hidesOnDeactivate = false             // a panel hides when the app is not active by default; the card stays
+        p.becomesKeyOnlyIfNeeded = true
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        p.sharingType = AppConfig.load(from: AppPaths.config).stealthDefault ? .none : .readOnly
+        p.isOpaque = false
+        p.backgroundColor = .clear
+        p.hasShadow = true
+        p.alphaValue = 1.0
+        p.delegate = self
+        p.isReleasedWhenClosed = false
+        let box = NSView(frame: NSRect(origin: .zero, size: rect.size))
+        box.autoresizesSubviews = true
+        p.contentView = box
+        window = p
+    }
+
+    /// The web view fills the card; a thin native grip on the top edge drags the panel (the web view takes the mouse
+    /// everywhere else). The page leaves CardGrip.height px free at the top for it (tips.css, body.card).
+    func mountCard() {
+        guard let box = window.contentView else { return }
+        web.frame = box.bounds
+        web.autoresizingMask = [.width, .height]
+        box.addSubview(web)
+        let grip = CardGrip(frame: NSRect(x: 0, y: box.bounds.height - CardGrip.height, width: box.bounds.width, height: CardGrip.height))
+        grip.autoresizingMask = [.width, .minYMargin]
+        box.addSubview(grip, positioned: .above, relativeTo: web)
+    }
+
+    func observeAppearance() {
+        appearanceObs = window.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.reapplyAppearance() } }
+        }
+    }
+
+    /// Expand: the same web view (feed, transcript, settings, everything said so far) moves into the normal tips window.
+    func expandCard() {
+        guard cardMode, let panel = window else { return }
+        cardMode = false
+        let sharing = panel.sharingType, alpha = panel.alphaValue
+        web.removeFromSuperview()
+        makeCallWindow()
+        window.sharingType = sharing             // a change made in Call settings during the card stays
+        window.alphaValue = alpha
+        web.frame = window.contentView?.bounds ?? NSRect(origin: .zero, size: window.frame.size)
+        web.autoresizingMask = [.width, .height]
+        window.contentView = web
+        observeAppearance()
+        panel.orderOut(nil)
+        panel.close()                            // windowWillClose: not the current window, the ticker goes on
+        push("window.LiveTips && LiveTips.setView && LiveTips.setView('window')")
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async { [weak self] in self?.layoutTitleButtons() }
+    }
+
+    /// The page's content height in CSS px (ResizeObserver on the card): the panel keeps its top edge.
+    func resizeCard(_ cssHeight: Double) {
+        guard cardMode, let w = window, cssHeight > 0, let ns = w.screen ?? NSScreen.main else { return }
+        let f = TipCardPlacement.resized(w.frame, height: CGFloat(cssHeight) * web.pageZoom, on: Self.cardScreen(ns))
+        guard abs(f.height - w.frame.height) > 0.5 || abs(f.minY - w.frame.minY) > 0.5 else { return }
+        w.setFrame(f, display: true)
+        w.invalidateShadow()
+    }
+
+    /// A question to the PM: a sheet on the window; the card is too small for a sheet, so a modal alert there.
+    func presentAlert(_ a: NSAlert, _ done: @escaping (NSApplication.ModalResponse) -> Void) {
+        if cardMode {
+            NSApp.activate(ignoringOtherApps: true)
+            done(a.runModal())
+        } else {
+            a.beginSheetModal(for: window, completionHandler: done)
+        }
+    }
+
+    static func cardScreen(_ s: NSScreen) -> TipCardScreen {
+        let n = (s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
+        return TipCardScreen(frame: s.frame, visible: s.visibleFrame, safeTop: s.safeAreaInsets.top,
+                             builtin: n != 0 && CGDisplayIsBuiltin(n) != 0, main: s == NSScreen.main)
+    }
+}
+
+/// The card's panel: it can take the keyboard (Help now, the hot keys) without making Pacenote the active app.
+final class TipCardPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+/// The card's drag handle: a transparent strip on the top edge.
+final class CardGrip: NSView {
+    static let height: CGFloat = 12
+    override var mouseDownCanMoveWindow: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .openHand) }
 }

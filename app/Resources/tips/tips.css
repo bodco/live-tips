@@ -774,3 +774,53 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 [data-style] .spkbar .spk-count.todo{color:var(--pn-notready-text)}
 [data-style] .spkbar .spk-chev{border-radius:0}
 [data-style] .spk-chip{border-radius:0}
+
+/* Theme pass stage 4 (prototype "During the call", small card, 2026-11-19): the small card under the camera, body.card.
+   One tip at a time in a 480 pt borderless panel; the app sets the panel's height from the card's (post 'size') and draws
+   a 12 pt grip strip over the top for dragging, so the top 12 px stay free. Everything of the window is hidden here. */
+.tcard{display:none}
+body.card{background:transparent;height:auto}
+body.card .app,body.card .sheet,body.card .menu,body.card .popover,body.card .toast{display:none!important}
+body.card .tcard{display:block;position:relative;margin:0;padding:14px 16px 12px;background:var(--pn-focus,var(--surface));color:var(--pn-ink,var(--text));border:1px solid var(--pn-rule,var(--separator));border-radius:12px;overflow:hidden;font-family:var(--pn-font-text,var(--font))}
+.tc-grip{position:absolute;top:4px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--pn-ink3,var(--text-3));opacity:.35}
+.tc-bar{display:flex;align-items:center;gap:6px;min-height:28px}
+.tc-bar .spacer{flex:1}
+.tc-rec{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--pn-rec-text,var(--danger-text,var(--rec)));white-space:nowrap}
+.tc-rec .dot{width:8px;height:8px;border-radius:50%;background:var(--pn-rec,var(--rec));flex:none}
+.tc-rec.paused,.tc-rec.idle{color:var(--pn-ink3,var(--text-3))}
+.tc-rec.paused .dot{background:transparent;box-shadow:0 0 0 1.5px currentColor inset}
+.tc-rec.idle .dot{background:var(--pn-ink3,var(--text-3))}
+.tc-time{font:600 12px/1 var(--pn-font-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums;color:var(--pn-ink3,var(--text-3))}
+.tc-b{height:28px;min-width:28px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;gap:4px;border:1px solid var(--pn-rule,var(--separator));border-radius:var(--pn-radius-button,6px);background:transparent;color:var(--pn-ink,var(--text));font-size:12px;font-weight:600;white-space:nowrap}
+.tc-b:hover{background:var(--pn-surface2,var(--surface-2))}
+.tc-b.on{background:var(--pn-surface2,var(--surface-2));border-color:var(--pn-ink3,var(--text-3))}
+.tc-b:focus-visible,.tc-end:focus-visible,.tc-link:focus-visible{outline:2px solid var(--pn-link,var(--accent));outline-offset:1px}
+.tc-help{font-size:13px}
+.tc-end{height:28px;padding:0 6px;border:0;background:transparent;color:var(--pn-ink3,var(--text-3));font-size:12px;font-weight:600;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.tc-end:hover{color:var(--pn-rec-text,var(--danger-text))}
+.tc-alert{margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--pn-ink2,var(--text-2))}
+.tc-alert.warn{color:var(--pn-rec-text,var(--danger-text))}
+.tc-link{border:0;background:transparent;padding:0;color:var(--pn-link,var(--accent));font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.tc-tip{margin-top:8px}
+.tc-tip.in{animation:pn-tip-in .45s ease-out both}
+@media (prefers-reduced-motion:reduce){.tc-tip.in{animation:none}}
+.tc-q{font-size:12px;line-height:1.35;color:var(--pn-ink3,var(--text-3))}
+.tc-key{margin-top:2px;font-size:24px;line-height:1.2;font-weight:800;color:var(--pn-ink,var(--text));text-wrap:pretty}
+.tc-tip.long .tc-key{font-size:20px}
+.tc-tip.xlong .tc-key{font-size:18px;font-weight:700}
+.tc-detail{margin-top:2px;font-size:16px;line-height:1.35;font-weight:500;color:var(--pn-ink2,var(--text-2));text-wrap:pretty}
+.tc-src{margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:14px;color:var(--pn-ink3,var(--text-3))}
+.tc-src b{color:var(--pn-link,var(--accent));font-weight:600}
+.tc-chip{font-size:12px;font-weight:700;text-transform:var(--pn-caps,none);letter-spacing:.03em;color:var(--pn-ink,var(--text));border:1px solid var(--pn-rule,var(--separator));border-radius:var(--pn-radius-button,4px);padding:1px 6px}
+.tc-pager{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:8px;border-top:1px solid var(--pn-rule,var(--separator))}
+.tc-pager .spacer{flex:1}
+.tc-pager .tc-b{font-size:13px}
+.tc-of{font-size:13px;color:var(--pn-ink3,var(--text-3))}
+.tc-of b{color:var(--pn-ink,var(--text))}
+.tc-at{font:500 12px/1 var(--pn-font-mono,ui-monospace,monospace);color:var(--pn-ink3,var(--text-3))}
+.tc-empty{margin-top:8px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-size:14px;color:var(--pn-ink2,var(--text-2))}
+.tc-empty b{font-size:18px;font-weight:800;color:var(--pn-ink,var(--text))}
+/* the tip mark from stage 3: a 4 px mark on the left (Roadbook), a 3 px rule on top (Broadsheet) */
+[data-style="roadbook"] .tc-tip{border-left:4px solid var(--tip-mark);padding-left:10px}
+[data-style="broadsheet"] .tc-tip{border-top:3px solid var(--tip-mark);padding-top:6px}
+[data-style="roadbook"] .tc-help{font-family:var(--pn-font-display);font-weight:800;text-transform:var(--pn-caps);font-size:14px}

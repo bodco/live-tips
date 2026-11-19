@@ -677,6 +677,23 @@
 
   Feed.prototype.emit = function () { if (this.setState) this.setState(this.state()); };
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { Feed, clean, hmsToMs };
-  else root.PacenoteFeed = Feed;
+  /** Theme pass stage 4 (2026-11-19): the compact card shows one tip at a time.
+   *  list: the visible cards, newest first (tips.js visibleCards). view: {pin, seen}: pin is the tip the PM paged back to
+   *  (null follows the newest), seen is the newest tip when the PM paged back, so a tip that arrives later does not take
+   *  the card over, it only shows "new" and "Latest tip". The "N min left" card and quiet cards are not paged.
+   *  Returns {card, index (1 = the oldest), total, latest, fresh, prevId, latestId}. */
+  function cardPage(list, view, now) {
+    const tips = (list || []).filter((c) => c && c.kind !== 'finish' && (!c.quiet || c.pinned));
+    const total = tips.length;
+    if (!total) return { card: null, index: 0, total: 0, latest: true, fresh: false, prevId: null, latestId: null };
+    const v = view || {}, t = now == null ? Date.now() : now;
+    let i = v.pin ? tips.findIndex((c) => c.id === v.pin) : 0;   // tips[0] is the newest
+    if (i < 0) i = 0;
+    const newest = tips[0], latest = i === 0;
+    const fresh = latest ? t - newest.at < 60000 : newest.id !== v.seen;
+    return { card: tips[i], index: total - i, total, latest, fresh, prevId: i + 1 < total ? tips[i + 1].id : null, latestId: newest.id };
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { Feed, clean, hmsToMs, cardPage };
+  else { root.PacenoteFeed = Feed; root.PacenoteCardPage = cardPage; }
 })(this);

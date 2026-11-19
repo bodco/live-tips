@@ -2,7 +2,7 @@
 
 Where Pacenote has been and where it is going: what shipped, what we build now, what comes next. Updated with every release.
 
-Updated: 18 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
+Updated: 19 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ## The route
 
@@ -25,7 +25,8 @@ Updated: 18 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ### Now
 
-- **New screen layouts (0.24 and on).** Home has the new layout since 0.24; the call pages, Meeting Sheet, Tracker, Settings and onboarding follow, screen by screen, in all three styles.
+- **New screen layouts (0.24 and on).** Home has the new layout since 0.24; the call pages, Meeting Sheet, Tracker, Settings and onboarding follow, screen by screen, in each style.
+- **Roadbook and Broadsheet redrawn (0.25).** A warmer Roadbook and a lighter Broadsheet Dark, Home that acts on the brief, who decided next to each decision, tips as key, detail and source, and a compact tip card under the camera. Classic leaves the style picker.
 - **Better briefs and tips.** Every call is reviewed after it ends: which tips helped, which were noise, what was missed. The prompts change from that.
 
 ### Next

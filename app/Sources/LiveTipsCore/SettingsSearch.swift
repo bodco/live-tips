@@ -59,6 +59,7 @@ public enum SettingsSearch {
         .init("gen.theme", "general", title: "set.appearance", words: "appearance style mode theme dark light classic roadbook broadsheet вигляд стиль режим тема темна світла"),
         .init("gen.dock", "general", adv("general"), title: "settings.general.dock", words: "dock icon док іконка"),
         .init("gen.stealth", "general", adv("general"), title: "set.hideTheTipsWindow", words: "stealth hide screen sharing tips window приховати вікно підказок"),
+        .init("gen.tipsMode", "general", adv("general"), title: "set.tipsMode", words: "compact card camera tips window mode компактна картка камера вікно підказок"),
         .init("gen.floating", "general", adv("general"), title: "floating.setting", words: "floating controls call buttons кнопки дзвінка"),
         .init("gen.shortcuts", "general", adv("general"), title: "set.shortcuts", words: "shortcuts hotkeys keys keyboard клавіші гарячі"),
         .init("gen.usage", "general", adv("general"), title: "usage.toggle", words: "usage log statistics статистика лог"),

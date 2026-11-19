@@ -3,7 +3,8 @@
  * Native -> web:  the item stream and the recorder status through feed.js (addItems, setStatus, addTranscript,
  *                 setSpeakers, setPrepDoc, setPrep, setUpNext), plus window.LiveTips.setState(partial) for
  *                 window state, LiveTips.setLang('en'|'uk'), setTheme('auto'|'light'|'dark'), setOpacity(0.65..1),
- *                 setMode() (kept, always the full window), togglePause(), toggleMute(), rename(title), setKeys({help, pause, mute}).
+ *                 setMode() (kept, always the full window), togglePause(), toggleMute(), rename(title), setKeys({help, pause, mute}),
+ *                 setView('card'|'window') (theme pass stage 4: the compact card; the app sends 'window' after Expand).
  * Web -> native:  window.webkit.messageHandlers.liveTips.postMessage({action, ...payload}).
  * No emoji, no colored left stripes, nothing smaller than 12 px.
  */
@@ -40,6 +41,7 @@
       unverified: 'Not verified against documents',
       next: (t, m) => `${t} in ${m} min`, notPrepared: 'not prepared', ready: 'brief ready', preparing: 'preparing', prepare: 'Prepare', open: 'Open',
       ask: 'Ask about this project', help: 'Help',
+      card: { rec: 'Recording', help: 'Help now', expand: 'Expand to the tips window', prev: '‹ Previous tip', latest: 'Latest tip ›', of: (p) => `Tip ${p.i} of ${p.n}`, fresh: 'new', problem: 'Recording problem', open: 'Open the window' },
       tabs: { transcript: 'Transcript', onme: (n) => `On me · ${n}`, brief: 'Brief' },
       newVoice: 'New voice:', name: 'Name', client: 'Client', team: 'Team', speakersH: 'Speakers', spkCount: (o) => o.u ? `${o.n}, ${o.u} to name` : `${o.n}`, spkShow: 'Show the speakers', spkHide: 'Hide the speakers', namedOf: (o) => `${o.n} of ${o.m} named`, notNamed: 'not named yet',
       toName: 'to name', mins: (o) => o.m < 1 ? '<1 min' : `${o.m} min`, secsSpoken: (o) => `${o.s} s of speech`, noClip: 'No clip to play: Pacenote never keeps the call audio. The last line helps tell who it is.', soundsLike: (o) => `${o.name} · sounds like ${o.p}%`,
@@ -130,6 +132,7 @@
       unverified: 'Не звірено з документами',
       next: (t, m) => `${t} за ${m} хв`, notPrepared: 'не підготовлено', ready: 'бриф готовий', preparing: 'готується', prepare: 'Підготувати', open: 'Відкрити',
       ask: 'Запитай про проєкт', help: 'Допоможи',
+      card: { rec: 'Запис', help: 'Допоможи', expand: 'Розгорнути у вікно підказок', prev: '‹ Попередня', latest: 'Остання ›', of: (p) => `Підказка ${p.i} з ${p.n}`, fresh: 'нова', problem: 'Проблема із записом', open: 'Відкрити вікно' },
       tabs: { transcript: 'Транскрипт', onme: (n) => `На мені · ${n}`, brief: 'Бриф' },
       newVoice: 'Новий голос:', name: 'Назвати', client: 'Клієнт', team: 'Команда', speakersH: 'Спікери', spkCount: (o) => o.u ? `${o.n}, ${o.u} без імені` : `${o.n}`, spkShow: 'Показати спікерів', spkHide: 'Сховати спікерів', namedOf: (o) => `названо ${o.n} з ${o.m}`, notNamed: 'ще без імені',
       toName: 'назвати', mins: (o) => o.m < 1 ? '<1 хв' : `${o.m} хв`, secsSpoken: (o) => `${o.s} с мовлення`, noClip: 'Кліпу немає: Pacenote не зберігає звук дзвінка. Остання фраза допомагає зрозуміти, хто це.', soundsLike: (o) => `${o.name} · схоже на ${o.p}%`,
@@ -197,6 +200,7 @@
   const S = {
     lang: PREFS.ui_lang === 'uk' ? 'uk' : 'en', theme: 'auto',
     style: ['classic', 'roadbook', 'broadsheet'].includes(PREFS.ui_style) ? PREFS.ui_style : 'roadbook',     // redesign block 1: Settings > General > Appearance
+    view: PREFS.view === 'card' ? 'card' : 'window',     // theme pass stage 4: the app puts 'card' in the prefs for the compact card
     call: { title: '', state: 'live', startedAt: null, paused: false, micOff: false, minutesLeft: null, mode: 'normal', recap: '', briefLine: '', alert: null },
     agenda: [], questions: [], cards: [], onMe: [], next: null, deal: null,
     transcript: [], speakers: {}, brief: null, briefText: '', steps: [], toast: null,
@@ -436,6 +440,10 @@
     if (S.theme === 'auto' && S.style === 'classic') doc.removeAttribute('data-theme');
     else doc.setAttribute('data-theme', S.theme === 'auto' ? (dark ? 'dark' : 'light') : S.theme);
     const app = $('app');
+    // Theme pass stage 4 (2026-11-19): the compact card (Settings > Calls > Live tips during a call). The window's parts stay
+    // in the page (Expand moves this same page into the window) but are not drawn while the card shows.
+    document.body.classList.toggle('card', S.view === 'card');
+    if (S.view === 'card') { guard('card', renderCard); return; }
     // 0.10.0 (Meeting Sheet, phase 7): a stand-up opens in the small window once (my update, today, whom to ask);
     // the PM's own switch back to the full window wins for the rest of the call.
     // 2026-11-12 (owner, live stand-up): no automatic switch to the small window for a stand-up: the compact window
@@ -622,6 +630,69 @@
         (S.call.state === 'ended' ? '' : `<div class="t2">${esc(off ? t.tipsOffSub : t.listeningSub(S.keys.help))}</div>`);
     }
     return true;
+  }
+
+  // Theme pass stage 4 (prototype "During the call", Compact, 2026-11-19): the card under the camera. One tip at a time:
+  // the question line, the key line, the detail, the source with its kind; a pager when there are more. A tip that arrives
+  // while the PM reads an older one does not take the card over: "new" and Latest tip instead (feed.js cardPage).
+  const EXPAND = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 1.5h4v4M12.5 1.5 8 6M5.5 12.5h-4v-4M1.5 12.5 6 8"/></svg>';
+  const hhmm = (at) => { const d = new Date(at); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  function renderCard() {
+    const el = $('tcard'); if (!el) return;
+    const t = T(), c2 = t.card || STR.en.card;
+    const ended = S.call.state === 'ended', isReady = S.call.state === 'ready', idle = isReady || ended;
+    const paused = !!S.call.paused && !ended, micOff = !!S.call.micOff, al = S.call.alert;
+    const recCls = idle ? 'idle' : paused ? 'paused' : 'live';
+    const recLbl = isReady ? t.readyStatus : ended ? t.ended : paused ? t.paused : micOff ? t.muted : c2.rec;
+    const key = (k) => (S.keys && S.keys[k] ? ' (' + S.keys[k] + ')' : '');
+    const pager = window.PacenoteCardPage;
+    const pg = pager ? pager(visibleCards(), { pin: S.ui.cardPin, seen: S.ui.cardSeen }) : { card: null, total: 0 };
+    if (S.ui.cardPin && (!pg.card || pg.card.id !== S.ui.cardPin)) { S.ui.cardPin = null; S.ui.cardSeen = null; }   // that tip was hidden
+    S.ui.cardPage = pg;
+    const bar = `<div class="tc-bar">
+      <span class="tc-rec ${recCls}"><span class="dot" aria-hidden="true"></span><span>${esc(recLbl)}</span></span>
+      <span class="tc-time" id="cTimer"${isReady || !S.call.startedAt ? ' hidden' : ''}></span>
+      <span class="spacer"></span>
+      ${idle ? '' : `<button class="tc-b${micOff ? ' on' : ''}" type="button" data-act="card-mute" aria-pressed="${micOff}" aria-label="${esc(t.ariaMic)}" title="${esc((micOff ? t.menu.unmute : t.menu.mute) + key('mute'))}">${micOff ? MIC_OFF : MIC_ON}</button>
+      <button class="tc-b${paused ? ' on' : ''}" type="button" data-act="card-pause" aria-pressed="${paused}" aria-label="${esc(paused ? t.menu.resume : t.ariaPause)}" title="${esc((paused ? t.menu.resume : t.menu.pause) + key('pause'))}">${paused ? PLAY : PAUSE}</button>
+      <button class="tc-b tc-help" type="button" data-act="card-help" title="${esc(c2.help + key('help'))}">${esc(c2.help)}</button>`}
+      <button class="tc-b" type="button" data-act="card-expand" aria-label="${esc(c2.expand)}" title="${esc(c2.expand)}">${EXPAND}</button>
+      ${idle ? '' : `<button class="tc-end" type="button" data-act="end-call" title="${esc(t.endCallTip)}">${esc(t.endCall)}</button>`}
+    </div>`;
+    let note = '';
+    if (S.sys && !ended) note = `<div class="tc-alert warn" role="status"><span>${esc(c2.problem)}</span><button class="tc-link" type="button" data-act="card-expand">${esc(c2.open)}</button></div>`;
+    else if (al && al.text) note = `<div class="tc-alert${al.level === 'warn' ? ' warn' : ''}" role="status">${esc(al.text)}</div>`;
+    const c = pg.card;
+    let body;
+    if (c) {
+      const kl = c.key != null && !c.commit;
+      const keyText = kl ? c.key : c.say, qText = c.commit ? t.doneQ : kl ? c.qline : c.question;
+      const detail = c.why && !c.commit ? c.why : kl ? c.line : '';
+      const qLine = qText || c.meta || (c.who ? t.asked(c.who) : '');
+      const len = String(keyText || '').length;
+      body = `<div class="tc-tip${len > 150 ? ' xlong' : len > 90 ? ' long' : ''}" aria-live="polite">
+        ${qLine ? `<div class="tc-q">${esc(qLine)}</div>` : ''}
+        ${keyText ? `<div class="tc-key">${esc(keyText)}</div>` : ''}
+        ${detail ? `<div class="tc-detail">${esc(detail)}</div>` : ''}
+        <div class="tc-src"><span class="tc-chip">${esc(kindLabel(c))}</span>${c.source ? `<span>${esc(t.from)} <b>${esc(c.source)}</b></span>` : ''}</div>
+      </div>`;
+      if (pg.total > 1) body += `<div class="tc-pager">
+        ${pg.prevId ? `<button class="tc-b" type="button" data-act="card-prev">${esc(c2.prev)}</button>` : ''}
+        ${pg.latest ? '' : `<button class="tc-b" type="button" data-act="card-latest">${esc(c2.latest)}</button>`}
+        <span class="tc-of">${esc(c2.of({ i: pg.index, n: pg.total }))}${pg.fresh ? ` · <b>${esc(c2.fresh)}</b>` : ''}</span>
+        <span class="spacer"></span><span class="tc-at">${esc(hhmm(c.at))}</span></div>`;
+    } else if (isReady) {
+      body = `<div class="tc-empty"><b>${esc(t.readyTitle)}</b><button class="tc-b tc-help" type="button" data-act="start">${esc(t.startListening)}</button></div>`;
+    } else {
+      const off = S.call.tipsOff && !ended;
+      body = `<div class="tc-empty"><b>${esc(ended ? t.ended : off ? t.tipsOffTitle : t.listeningTitle)}</b>${ended ? '' : `<span>${esc(off ? t.tipsOffSub : t.listeningSub(S.keys.help))}</span>`}</div>`;
+    }
+    const was = el.dataset.id || '', shown = el.dataset.shown === '1';
+    el.innerHTML = '<div class="tc-grip" aria-hidden="true"></div>' + bar + note + body;
+    el.dataset.id = c ? c.id : ''; el.dataset.shown = '1';
+    // the slide-in only for a tip that just arrived (not on the first draw, not when paging back)
+    if (c && shown && was !== c.id && c.id === pg.latestId) { const tip = el.querySelector('.tc-tip'); if (tip) tip.classList.add('in'); }
+    tick();
   }
 
   function kindLabel(c) {
@@ -1247,7 +1318,9 @@
     if (start) {
       const s = Math.max(0, Math.floor((Date.now() - start) / 1000));
       const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-      $('timer').textContent = (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(sec).padStart(2, '0');
+      const v = (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) + ':' + String(sec).padStart(2, '0');
+      $('timer').textContent = v;
+      const ct = $('cTimer'); if (ct) ct.textContent = v;   // theme pass stage 4: the card's clock
     }
   }
 
@@ -1510,6 +1583,13 @@
       case 'theirs-toggle': S.ui.theirsOpen = !(b.getAttribute('aria-expanded') === 'true'); break;
       case 'home': post('menu', { item: 'home' }); return;
       case 'end-call': post('menu', { item: 'end-call' }); return;
+      // theme pass stage 4: the compact card
+      case 'card-mute': toggleMute(); return;
+      case 'card-pause': togglePause(); return;
+      case 'card-help': post('help'); return;
+      case 'card-expand': post('expand'); return;
+      case 'card-prev': { const p = S.ui.cardPage; if (p && p.prevId) { if (!S.ui.cardPin) S.ui.cardSeen = p.latestId; S.ui.cardPin = p.prevId; } render(); return; }
+      case 'card-latest': S.ui.cardPin = null; S.ui.cardSeen = null; render(); return;
       case 'project-change': post('menu', { item: 'project' }); return;   // 0.10.1 (A3)
       case 'hero-min': S.ui.heroMin[id] = !S.ui.heroMin[id]; break;   // 2026-11-02: the speech card folds to its first line
       case 'agenda': {
@@ -1748,6 +1828,16 @@
   setInterval(() => { tick(); }, 1000);
   setInterval(() => { if (!S.ui.editing && !S.ui.briefEdit) render(); }, 30000);   // relative times, the 90 s hero rule
 
+  /** Theme pass stage 4: 'card' | 'window'. The app sends 'window' after Expand moved this page into the tips window. */
+  function setView(v) { S.view = v === 'card' ? 'card' : 'window'; render(); }
+  // The card's height follows its content: the app keeps the top edge under the camera and sets the panel's height.
+  let cardH = 0;
+  if (window.ResizeObserver && $('tcard')) new ResizeObserver(() => {
+    if (S.view !== 'card') return;
+    const h = Math.ceil($('tcard').getBoundingClientRect().height);
+    if (h > 0 && h !== cardH) { cardH = h; post('size', { h }); }
+  }).observe($('tcard'));
+
   // ---------- Public API ----------
   window.LiveTips = {
     setState(partial) {
@@ -1767,7 +1857,7 @@
     setOpacity(v) { document.documentElement.style.setProperty('--fade', String(Math.max(0.35, Math.min(1, +v || 1)))); },
     setMode,
     setKeys(k) { S.keys = Object.assign({}, S.keys, k); render(); },
-    togglePause, toggleMute, toggleProactive, openTab,
+    togglePause, toggleMute, toggleProactive, openTab, setView,
     /** 0.8.5 shortcuts: 'prev' | 'next' | 'add30' | 'mode'. */
     presentKey(k) {
       if (k === 'mode') { S.ui.presentForced = !presenting(); render(); return; }

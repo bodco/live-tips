@@ -511,7 +511,8 @@ The layout since 1.8.0, top to bottom (hover any control for a hint):
   presentation, then pinned cards: 📌 on any tip pins it, the speech, the checklist, the
   status and the wrap-up can be pinned too. An unpinned card goes back to its place in the
   list.
-- **Tips:** the newest on top in a large font, older ones below and dimmer.
+- **Tips:** the newest on top in a large font, older ones below and dimmer. Since 0.25 the newest one shows its
+  gist larger, the detail under it, the phrase in quotes and a "from ..." line with the source.
 - **Bottom row:** one input and the red **HELP** button (it shows its shortcut ⌃⌥H), plus the
   quick-ask chips (below).
 - **`🎙` mute.** The recorder listens to the Mac's microphone and cannot see whether you are
@@ -739,19 +740,28 @@ what is going on and have enough to build your own answer.
    for you, max 14 words ("Mike asks who signs off security", not "Security sign-off owner").
    Always first. Language: Ukrainian when the window interface or the call is Ukrainian,
    otherwise English.
-2. **Why**, a quieter line: 1-2 sentences of context, max 35 words: what exactly is asked,
+2. **Detail** (Why before 0.25), a quieter line: 1-2 sentences of context, max 35 words: what exactly is asked,
    what the brief or the facts say, what to avoid.
 3. **Phrase**, in quotes, in the language of the call. What you can say, as people talk:
    the answer first, then a reason or a next step, 1-3 sentences. In English: simple
    everyday words, active voice, no idioms, up to 40 words.
 4. **Facts**: up to 3 full lines of up to 16 words, with numbers. A tip carries one phrase or one
    fact line; longer only for the speech, "your turn", the agenda, catch me up and 🆘.
-5. **Source**: one short italic line (topic and date).
+5. **Source**: one short line, where the tip comes from and its date ("Release plan · Nov 14"). The AI
+   writes it with the tip; when it leaves it out, the app names the documents of the facts the tip used.
 
 A long phrase gets a smaller font, so the main card does not fill the window. The window menu (⋯) has
 **Hide the main card**: all tips then go to one feed, newest on top, each with its question above it; a click
 on a row still opens that tip big, and **Show the main card** in the feed header brings it back. The choice is kept
 on this Mac.
+
+**In the Pacenote app (0.25).** The tips window draws the same parts as key, detail and source. The newest tip sits
+on a lighter surface with a mark (a yellow bar on the left in Roadbook, a rule on top in Broadsheet) and slides in,
+unless Reduce motion is on: the gist is the large key line, the detail a quieter line under it, the ready phrase in
+quotes, and at the bottom "from Release plan · Nov 14". When someone asks a question, the question is the small line on
+top and the answer is the key. The transcript reads quieter than the tip, Help now is an outlined button and End call
+sits in the window's header (it asks the same question as before). The compact card under the camera (section 14.1z12)
+shows one tip in the same order. Tips written before 0.25 still show their context and source.
 
 **No abbreviations:** "a new request", not CR; "date", not ETA. No ticket keys either, the
 topic name instead. People and product names stay as they are.
@@ -1496,6 +1506,12 @@ only its states (waiting for the call, recording, update, near a spending limit)
 state in the style: Listening (a ring and five sound level bars), Paused (the word on an orange plate), Mic off, Ready.
 Everything that moves stops under Reduce motion.
 
+**Roadbook and Broadsheet redrawn (0.25).** Settings > General > Appearance offers two styles, Roadbook and
+Broadsheet, each with the Mode; Classic is no longer offered (its code stays), and whoever was on it starts on
+Roadbook. Roadbook has a warm paper ground in Light and a warm graphite in Dark, and its yellow fills only the main
+button (framed in ink in Light), not the countdown. Broadsheet Dark is a lighter graphite with a brighter violet for
+the main button and a lighter one for links. "Not ready" is orange text with a mark, without the orange plate.
+
 **Windows and navigation.** Pacenote windows never join a tab group. The call page, a series, a transcript and
 Statistics open inside Home; Back (or Command-[) returns. The follow-up email is a tab of the call page (0.25).
 
@@ -1507,7 +1523,7 @@ the row). On top: Account, who is signed in and the plan (sign-in methods, organ
 calls, devices and the data on the server under Advanced; an invite waiting for your answer shows the organizations on top); General, the **Pacenote is ready** card (account, AI,
 microphone, the sound of the call, the screen when calls are recorded with the screen, Notion's meeting database,
 components; Fix next to what is missing), your name on calls, the language and the look (Dock, the tips window during
-screen sharing, call controls, shortcuts, folders and data under Advanced); AI, a card each for Claude, ChatGPT and
+screen sharing, Live tips during a call (Classic window or Compact card), call controls, shortcuts, folders and data under Advanced); AI, a card each for Claude, ChatGPT and
 Gemini with Connect and one line "Pacenote uses: ...", the AI that really runs by what is connected, or "nothing connected" for a job no connected AI can do, e.g. the tips with only the AI on this Mac (the AI of each job, where Runs on shows the AI that really does it, the best connected one marked recommended and the rest greyed out until connected; the fallback chain, models, limits and spending, the AI on this Mac, Ollama and the agents under Advanced);
 Projects, the list and Add (found folders, workspaces, scanning and the index under Advanced); Integrations,
 Notion, Calendars and Google (HubSpot under Advanced); Call recording, the switch and sound or screen (the picture,
@@ -1615,7 +1631,8 @@ database's own options, chosen by the model, else empty), Context (one sentence 
 meeting page, when there is one), Status Active, Stated by, Project and Workspace. Trade-off, Alternatives rejected,
 Review trigger and Door are written only when they were said on the call; Pacenote never invents them. After the
 write the row shows a grey "In register" with a link. Without Notion, a project or a Decisions database the action is
-greyed out with the reason and a link to Settings.
+greyed out with the reason and a link to Settings. Since 0.25 the call notes name who made each decision, and Stated by
+gets that name; a decision from older notes has none.
 
 **Replaces an earlier decision?** After a decision is added, Pacenote compares it with the project's active
 decisions. When it contradicts one, the page asks "Replaces <old decision, date>?". Only your click marks the old page
@@ -1720,7 +1737,7 @@ Colours follow the call's state, never the project: not ready (orange), ready (g
 Console, the organization filter, "AI ok" or in its place the pill of things to set up, search, transcribe, refresh,
 Settings, Plan a call, Call now Command-N); then the banners (start tips for this call, a new version, an invitation,
 an organization to set up), each a band with Later and one button; then the next call over a heavy line: "Next call in
-37 min" (in Roadbook on the yellow plate, in Broadsheet a large number), the call name, the people, Ready or Not ready
+37 min" (before 0.25 in Roadbook on the yellow plate, in Broadsheet a large number; see below), the call name, the people, Ready or Not ready
 with what that means, one big button, one bordered button and one link, and on the right the rest of today and
 tomorrow with See the whole week (Coming up: every call on a line and the full list, with Show less). Under it Recent
 calls (the last five rows with the state of their notes and a project filter) next to This week (calls, hours on
@@ -1729,6 +1746,16 @@ time on the call on a red plate, Show tips, the Meeting Sheet and End the call. 
 until tomorrow"; without a calendar it offers to connect one and lists the calls planned by hand; the first launch
 shows three steps. In a narrow window the columns go one under the other. Classic uses the same layout.
 
+**Home acts on the brief (0.25).** The main button of the next call follows the brief, not the clock: without a brief
+it is "Prepare brief" (with how long a preparation usually takes, once there are a few) and "Start without prep" next to
+it; while the brief is prepared the button shows its progress and "Start call now" stays one click away (the brief joins
+the call when it is ready); with the brief ready it is "View brief" and "Start call"; once the meeting has begun it is
+"Start call" with what it opens, for example "Google Meet and live tips". Prepare brief still opens Get ready. In
+Roadbook the countdown stands out by its size; in Broadsheet the next call's name is the headline, with the countdown
+and readiness on the line under it. Later today shows quiet marks. The header's Call now is a quiet "New call ⌘N",
+which opens Get ready for an untitled call. On first launch the AI step is marked "Start here" with Connect AI, and a
+call that starts right now has a button.
+
 **Call pages (0.25).** The past and the upcoming call page are laid out as the call page boards of the three looks. A
 bar on top: Back, what the page is ("Past call · 3rd in this series", "Upcoming call · weekly series") and the actions
 (a past call: Ask about this call, Export and the "..." menu; an upcoming call: how soon it starts, Start without prep
@@ -1736,7 +1763,7 @@ and Get ready, or Start call once it is prepared). Then the date line, the name 
 click moves the call to another one), how the call ended (Ended · screen recorded, Transcript only, Ended · not
 synced), the people and the series. Under it a past call has one line per state: Notion (synced when, Retry), Consent,
 Recording (Play, Show in Finder, Open in Drive), Server (Sync now, Don't sync this call) and Organization (who sees it,
-Private). The tabs: Summary, What was discussed, Decisions, Tasks, Risks, Follow-up, Transcript, and Sales for a call
+Private). The tabs: Summary, What was discussed, Decisions, Next steps (Tasks before 0.25), Risks, Follow-up, Transcript, and Sales for a call
 in Sales mode. Summary puts In short and Topics next to Decisions, On you, On them and Risks; a time is a link into the
 transcript. Follow-up is the follow-up email as a tab (Option-Command-I opens it from anywhere on the page). A call
 with no notes says what it has (transcript, recording) and writes the notes with Make meeting notes. On an upcoming
@@ -1763,6 +1790,13 @@ numbers against the period before (calls, time on calls, prepared, the busiest d
 project, and the calls of the selection. Click a day's bar to see that day, click it again for the whole period; a call
 in the list opens its page. On the right: How the calls went, the period in short and AI this month with a link to
 Settings > Usage. Hidden calls never count.
+
+**Who decided, next steps, the follow-up card (0.25).** The call notes name who made each decision ("**Emily Clark**:
+the export ships on Tuesday"); the call page, the export, the server and the Notion decision register (Stated by) carry
+the name, and older notes without names read as before. On a past call Summary puts Decisions (with who decided), Next
+steps (with the owner and the date) and Risks first, with a follow-up card beside them: whether the draft is there,
+whom it goes to, and "Review follow-up", which opens the draft. The draft offers "Copy follow-up" and "Open in Mail";
+nothing is sent. The Tasks tab is now Next steps.
 
 **Call pages.** An upcoming call opens as a page with Setup, Brief, Tasks and Earlier calls; its Setup changes
 apply only on Save. A past call has Summary (Meeting notes since 0.9.5.2, 14.1t), What was discussed, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this
@@ -2163,6 +2197,10 @@ page. It keeps your own set (Settings > Meeting Sheet renames, duplicates and de
 
 Settings > Meeting Sheet decides which one opens: by the rules (each rule can be turned off or flipped), always Quick
 or always Expert. The first time in a series Quick shows "Suggested" and Pacenote remembers the setup for next time.
+
+**Get ready since 0.25.** The switch at the top ("Quick" / "Expert · all settings") is the one way into Expert; the
+link under the form is gone. Quick asks "What matters today?" (before: "Anything special today?"), and Cancel, Start
+without prep and "Prepare brief" sit in a band at the bottom.
 
 **Who is on the call.** Quick (under People > Change) and Expert step 1 show Our side (on the left) and Their side
 next to each other. Names stay on one line (a long one ends with "…", the full name is in the tooltip) and the chips wrap as whole
@@ -2760,6 +2798,25 @@ asked. The library does not learn from a name given this way until you confirm o
 (bodco/live-tips, models-wespeaker-1), the upstream sherpa-onnx file only as a fallback, and checks the same SHA-256 for
 both. The upstream file was re-uploaded without its `feature_normalize_type` metadata, which changes the voice prints.
 The model is WeSpeaker ResNet34-LM trained on VoxCeleb, CC BY 4.0.
+
+### 14.1z12 The tip card under the camera (0.25, beta)
+
+- **Turn it on.** Settings > General > Advanced > Calls, **Live tips during a call**: Classic window (the tips window
+  as before, the default) or Compact card. The search in Settings finds it ("compact card").
+- **Where it sits.** A small panel at the top centre of the built-in screen, just under the camera: under the notch, or
+  under the menu bar on a Mac without one, so your eyes stay near the lens. It never takes the focus from Zoom or Meet.
+  It grows and shrinks with the tip and keeps its top edge in place. Drag it by the strip at the top; a new call puts it
+  back under the camera. It follows the same screen sharing setting as the tips window (Settings > General > Advanced).
+- **What it shows.** The top row: Recording (or Paused, Mic off) with the time on the call, Mute, Pause, Help now,
+  Expand and End call. Under it one tip: the question, the key line, the detail and the source. With more than one tip,
+  "‹ Previous tip" and "Latest tip ›" page through them ("Tip 2 of 5"); a tip that arrives while you read an older one
+  does not replace it, the card marks it "new". A new tip slides in unless Reduce motion is on. Before the first tip the
+  card says it is listening and reminds you of Help now (Control-Option-H). A recording problem shows one line with
+  "Open the window".
+- **Expand and the end of the call.** Expand opens the full tips window for the rest of the call (agenda, transcript,
+  presentation, the input). End call asks the same question as in the window. When the call ends, the full window opens
+  with the after-call screen. The floating call controls work as before.
+- **Only in the full window.** The slides of a presentation and the "N min left" line.
 
 ### 14.2 After the call: the meeting page in Notion
 

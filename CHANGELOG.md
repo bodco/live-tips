@@ -40,6 +40,15 @@ Pacenote. Earlier versions are described in the commit messages and in
   because the AI route is out and another one is ready, Quick prep now says so and offers "Build on" that route, as
   Expert already did.
 
+- **A compact tip card under the camera (2026-11-19, theme pass, stage 4):** Settings > General > Advanced > Calls has a
+  new choice, "Live tips during a call": Classic window (as before) or Compact card. The card is a small panel at the top
+  centre of the built-in screen, just under the camera (under the notch, or under the menu bar), so your eyes stay near
+  the lens. It shows one tip at a time: the question, the key line, the detail and the source, with Mute, Pause, Help
+  now, Expand and End call in its top row. With more than one tip, "Previous tip" and "Latest tip" page through them; a
+  tip that arrives while you read an older one does not replace it, the card marks it "new". The card grows and shrinks
+  with the tip and keeps its top edge in place; drag it by the strip at the top, and a new call puts it back under the
+  camera. It never takes the focus from Zoom or Meet. Expand opens the full tips window for the rest of the call, and the
+  end of a call opens the full window for the after-call screen. The floating call controls work as before.
 - **Live tips read as key, detail and source (2026-11-19, theme pass, stage 3):** a tip now has one strong key line,
   a quieter line of detail under it, the ready phrase in quotes and, at the bottom, where it comes from ("from Release
   plan · Nov 14"). The AI writes the source with each tip, and when it leaves it out Pacenote names the documents of the

@@ -135,6 +135,9 @@ public struct AppConfig: Codable, Equatable {
         /// default (sending call text to another provider is fine, PM 12.11); `autoSwitch` turns the chain off.
         /// The model on this Mac follows `localFallback` when an older config has no chain.
         public var chain: [AIChain.Entry] = AIChain.defaults()
+        /// 0.24.1 (F3, owner 18.11): the AIs that were connected the last time the routes followed them (AIDefaults);
+        /// nil until the first look, so an update never takes over a choice.
+        public var seen: [String]? = nil
         public func order(_ job: String, connected: Set<String>) -> [String] {
             AIChain.order(job: job, chosen: route(job), chain: chain, connected: connected, auto: autoSwitch)
         }
@@ -158,6 +161,7 @@ public struct AppConfig: Codable, Equatable {
             agyAfter = (try? c.decodeIfPresent(String.self, forKey: .agyAfter)) ?? d.agyAfter
             // 0.10.0 (AI chain): an older config has no chain: the default order, the local step as it was
             chain = AIChain.normalized((try? c.decodeIfPresent([AIChain.Entry].self, forKey: .chain)) ?? AIChain.defaults(localOn: localFallback))
+            seen = try? c.decodeIfPresent([String].self, forKey: .seen)
         }
         public func openaiModel(_ job: String) -> String { job == "prep" ? openaiPrep : job == "tips" ? openaiTips : openaiAfter }
         public func geminiModel(_ job: String) -> String { job == "prep" ? geminiPrep : job == "tips" ? geminiTips : geminiAfter }
@@ -199,10 +203,17 @@ public struct AppConfig: Codable, Equatable {
     public var stealthDefault = true
     public var showInDock = true
     public var appearance = "system"       // 0.9.6 (owner): system | light | dark, Settings > General (the mode)
-    /// Redesign block 1 (2026-11-18): classic | roadbook | broadsheet, Settings > General > Appearance. The Pacenote build
-    /// starts on Roadbook; an unknown value reads as the default (PNStyle in the app).
+    /// Redesign block 1 (2026-11-18): roadbook | broadsheet, Settings > General > Appearance. The Pacenote build
+    /// starts on Roadbook; an unknown value reads as the default (PNStyle in the app); "classic" reads as Roadbook (theme pass, 19.11).
     public var appearanceStyle = "roadbook"
     public var floatingCallControls = true
+    /// Theme pass stage 4 (2026-11-19): how live tips show during a call. "window" is the tips window as before,
+    /// "card" is the compact card under the camera (one tip at a time, Expand opens the window). Unknown reads as "window".
+    public var tipsWindowMode = "window"
+    public static let tipsWindowModes = ["window", "card"]
+    /// 0.25 (R5): the languages new calls start with ("uk", "en", "uk+en"; the first is the main one). Empty is
+    /// Ukrainian, as before; a project whose client speaks English still starts in English.
+    public var callLanguage = ""
     public var notionWriteSummary = false
     /// 2026-10-26: where meeting pages go when the project has no Control Tower config (a data source id
     /// chosen or created in Settings or the welcome tour) and its name for the UI.
@@ -297,7 +308,13 @@ public struct AppConfig: Codable, Equatable {
         showInDock = (try? c.decode(Bool.self, forKey: .showInDock)) ?? d.showInDock
         appearance = (try? c.decode(String.self, forKey: .appearance)) ?? d.appearance
         appearanceStyle = (try? c.decode(String.self, forKey: .appearanceStyle)) ?? d.appearanceStyle
+        // Theme pass (19.11, owner): Classic left the style picker; whoever was on it moves to Roadbook at the next start.
+        // The Classic look itself stays in the code (PNStyle.classic) for the shot modes.
+        if appearanceStyle == "classic" { appearanceStyle = d.appearanceStyle }
         floatingCallControls = (try? c.decode(Bool.self, forKey: .floatingCallControls)) ?? d.floatingCallControls
+        tipsWindowMode = (try? c.decode(String.self, forKey: .tipsWindowMode)) ?? d.tipsWindowMode
+        if !AppConfig.tipsWindowModes.contains(tipsWindowMode) { tipsWindowMode = d.tipsWindowMode }
+        callLanguage = (try? c.decode(String.self, forKey: .callLanguage)) ?? d.callLanguage
         notionWriteSummary = (try? c.decode(Bool.self, forKey: .notionWriteSummary)) ?? d.notionWriteSummary
         notionMeetingsDB = (try? c.decode(String.self, forKey: .notionMeetingsDB)) ?? d.notionMeetingsDB
         notionMeetingsName = (try? c.decode(String.self, forKey: .notionMeetingsName)) ?? d.notionMeetingsName

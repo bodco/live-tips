@@ -15,24 +15,21 @@ extension SettingsModel {
     /// The pane and group names in both languages, so "AI" or "Notion" finds what lives there.
     static func searchExtra(_ e: SettingsSearchEntry) -> String {
         var keys = ["settings.tab." + e.pane]
-        if let g = e.group { keys.append(groupKeyPrefix(e) + g) }
+        if let g = e.group { keys.append(groupKey(e, g)) }
         return keys.flatMap { k in [L10n.table("en")[k] ?? "", L10n.table("uk")[k] ?? ""] }.joined(separator: " ")
             + " " + (e.integration ?? "")
     }
 
-    static func groupKeyPrefix(_ e: SettingsSearchEntry) -> String {
-        switch e.pane {
-        case "general": return "gen.group."
-        case "ai": return "ai.group."
-        default: return e.integration == "hubspot" ? "hs.group." : "ntn.group."
-        }
+    /// The string of a result's group: "Advanced" (0.25 R5) or a HubSpot tab.
+    static func groupKey(_ e: SettingsSearchEntry, _ g: String) -> String {
+        g == "advanced" ? "set.advanced" : "hs.group." + g
     }
 
-    /// "Integrations › Notion › Databases", "Projects › Orbit".
+    /// "Integrations › Notion › Advanced", "Projects › Orbit".
     func searchPath(_ e: SettingsSearchEntry) -> String {
         var parts = [L("settings.tab." + e.pane)]
         if let i = e.integration, let it = IntegrationRegistry.items.first(where: { $0.id == i }) { parts.append(it.title) }
-        if let g = e.group { parts.append(L(Self.groupKeyPrefix(e) + g)) }
+        if let g = e.group { parts.append(L(Self.groupKey(e, g))) }
         if e.projectPage, let p = searchProject { parts.append(p.name) }
         return parts.joined(separator: " › ")
     }

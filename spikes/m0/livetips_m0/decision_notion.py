@@ -223,10 +223,11 @@ def parse_snapshot(text: str) -> List[dict]:
 
 
 # ---------------------------------------------------------------- writing
-def call_decisions(md: Path) -> List[str]:
-    """0.12.3: the call's decisions by the one rule of the call page (call_lists: PM edit > notes > live picture)."""
+def call_decisions(md: Path) -> List[dict]:
+    """0.12.3: the call's decisions by the one rule of the call page (call_lists: PM edit > notes > live picture).
+    Theme pass stage 2: each with its owner ("by", "" when nobody is named), which becomes Stated by."""
     from .call_lists import read
-    return read(md)["decisions"]
+    return [{"text": i["text"], "by": i.get("by", "")} for i in read(md)["decision_items"]]
 
 
 def transcript_of(md: Optional[Path]) -> str:
@@ -244,7 +245,7 @@ def call_date(md: Optional[Path]) -> str:
     return dt.date.today().isoformat()
 
 
-def write_one(a, db: str, sc: dict, ids: dict, title: str, transcript: str, check: bool) -> dict:
+def write_one(a, db: str, sc: dict, ids: dict, title: str, transcript: str, check: bool, by: str = "") -> dict:
     title = title.replace(chr(0x2014), "-").strip()[:200]
     had = notion_links.get(a.call_file, "decisions", title)
     if had:
@@ -255,8 +256,8 @@ def write_one(a, db: str, sc: dict, ids: dict, title: str, transcript: str, chec
             d.update({k: v for k, v in model_details(title, transcript, sc, a.model).items() if v})
         except Exception as e:  # noqa: BLE001  (a decision without its details is still written)
             d["_ai_error"] = str(e)[:120]
-    if a.stated_by:
-        d["stated_by"] = a.stated_by
+    if a.stated_by or by:
+        d["stated_by"] = a.stated_by or by
     body = [{"type": "paragraph", "paragraph": {"rich_text": rt("Decided on the call: " + a.call)}}] if a.call else []
     page = notion("POST", "/pages", {"parent": {"type": "data_source_id", "data_source_id": db},
                                      "properties": decision_props(sc, title, d, ids, a.project_name, a.workspace_value),
@@ -336,7 +337,7 @@ def run(a) -> dict:
     if a.from_call:
         if not md:
             raise RuntimeError("--from-call needs --call-file")
-        done = [write_one(a, db, sc, ids, t, transcript, False) for t in call_decisions(md)]
+        done = [write_one(a, db, sc, ids, x["text"], transcript, False, x["by"]) for x in call_decisions(md)]
         new = [d for d in done if not d.get("existing")]
         return {"ok": True, "added": len(new), "skipped": len(done) - len(new), "url": new[0]["url"] if new else None}
     if not a.title.strip():

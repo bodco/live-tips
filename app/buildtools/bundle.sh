@@ -45,6 +45,8 @@ ENG="$APP/Contents/Resources/engine"; mkdir -p "$ENG/spikes/m0"
 rsync -a --exclude __pycache__ --exclude generated "$HERE/../rules/" "$ENG/rules/"
 rsync -a --exclude __pycache__ "$HERE/../spikes/m0/livetips_m0" "$ENG/spikes/m0/"
 cp "$HERE/Resources/setup.sh" "$APP/Contents/Resources/setup.sh"
+# 0.24.1 (F1): the locked Python packages setup.sh installs (exact versions and hashes)
+mkdir -p "$APP/Contents/Resources/python"; cp "$HERE/Resources/python/"*.lock "$APP/Contents/Resources/python/"
 # 0.10.0 (Meeting Sheet, Google Picker): the local page that hosts Google Picker (GooglePicker.swift)
 mkdir -p "$APP/Contents/Resources/google"
 cp "$HERE/Resources/google/picker.html" "$APP/Contents/Resources/google/picker.html"

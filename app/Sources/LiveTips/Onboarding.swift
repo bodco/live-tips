@@ -11,7 +11,14 @@ import SwiftUI
 @MainActor
 final class OnboardingModel: ObservableObject {
     enum Step: Int, CaseIterable { case welcome, permissions, folder, ai, install, calls, done }
-    @Published var step: Step = .welcome
+    /// 0.24.1 (F2): the step is saved, so an unfinished onboarding opens where it was left after a restart.
+    static let stepKey = "onboardingStep"
+    @Published var step: Step = .welcome {
+        didSet {
+            UserDefaults.standard.set(step.rawValue, forKey: Self.stepKey)
+            if step != oldValue { AppLog.app("onboarding: step \(step)") }
+        }
+    }
     @Published var micState = AVCaptureDevice.authorizationStatus(for: .audio)
     /// true granted, false denied, nil not asked yet (or macOS does not say).
     @Published var sysAudio: Bool? = SystemAudioPermission.granted()
@@ -168,6 +175,7 @@ struct OnboardingView: View {
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
             if m.step == .permissions { m.refreshPermissions() }
         }
+        .onAppear { if m.step.rawValue >= OnboardingModel.Step.permissions.rawValue { installInBackground() } }   // 0.24.1 (F2): resumed
         .onChange(of: m.step) {
             if m.step == .permissions { m.refreshPermissions(); installInBackground() }
             if m.step == .folder { m.defaultWorkFolder() }
@@ -181,7 +189,7 @@ struct OnboardingView: View {
         guard !setup.busy else { return }
         Task {
             await setup.checkAll()
-            if !setup.allRequiredOK { await setup.installMissing(includeOptional: false) }   // Claude Code: only on Install
+            if !setup.allRequiredOK { await setup.installMissing() }   // 0.24.1: the whole base set, bge-m3 and voices too
         }
     }
 
@@ -203,13 +211,13 @@ struct OnboardingView: View {
                 }
             }
             .frame(maxWidth: 520, alignment: .leading)
-        } else if failed {
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle").foregroundStyle(PN.C.onMe)
-                Text(L("onboarding.install.failed")).font(PN.Font.caption).foregroundStyle(PN.C.onMe)
-                Button(L("onboarding.install.details")) { SetupWindow.show() }.buttonStyle(.pnTertiary)
+        } else if failed || setup.busy {
+            // 0.24.1 (F1): the one loader (part, MB, percent, time left; what failed with Retry)
+            HStack(alignment: .top, spacing: 8) {
+                SetupLoader(model: setup, showButton: false, compact: true).frame(maxWidth: 460)
+                if failed && !setup.busy { Button(L("onboarding.install.details")) { SetupWindow.show() }.buttonStyle(.pnTertiary) }
             }
-        } else if setup.busy || (done < total && done > 0) {
+        } else if done < total && done > 0 {
             HStack(spacing: 8) {
                 ProgressView(value: Double(done), total: Double(max(total, 1))).frame(width: 160).tint(PN.C.brand)
                 Text(L("onboarding.install.progress", ["done": "\(done)", "total": "\(total)"])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
@@ -396,21 +404,10 @@ struct OnboardingView: View {
                 ("chatgpt", "ChatGPT")
             ]).labelsHidden().frame(maxWidth: 280)
             if provider == "claude" {
-            // 2026-10-29 (owner): preparing calls always needs Claude Code, whichever way pays (plan or API key).
-            if let cc = setup.steps.first(where: { $0.id == "claude" }) {
-                HStack(spacing: 10) {
-                    Image(systemName: cc.state == .ok ? "checkmark.circle.fill" : "terminal").foregroundStyle(cc.state == .ok ? PN.C.turn : PN.C.text3)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(L("setup.step.claude.title")).font(PN.Font.body)
-                        Text(cc.state == .ok ? cc.detail : L("setup.step.claude.why")).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(2)
-                    }
-                    Spacer()
-                    if cc.state == .installing { PNSpinner(size: 16) }
-                    else if cc.state != .ok { Button(L("onboarding.claude.install")) { Task { await setup.installOne("claude") } }.buttonStyle(.pnSecondary).disabled(setup.busy) }
-                }
-                .padding(10).background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
-            }
-            // 0.8.7 (L3): 1) sign in (above), 2) an API key behind a disclosure, 3) continue without Claude, said honestly
+            // 0.24.1 (F1, decision 10): Claude Code is installed when the account is connected, then the sign-in runs
+            // from the app (no Terminal). With an API key nothing is installed: the app talks to the API itself.
+            AccountConnectRow(kind: "claude")
+            // 0.8.7 (L3): 1) the account (above), 2) an API key behind a disclosure, 3) continue without Claude, said honestly
             DisclosureGroup(L("onb.claude.haveKey"), isExpanded: $keyOpen) {
             HStack {
                 SecureField("", text: $m.apiKey, prompt: Text(settings.isSet(.claudeAPIKey) ? L("onboarding.claude.saved") : "sk-ant-…"))
@@ -421,21 +418,11 @@ struct OnboardingView: View {
             Link(L("onboarding.claude.getKey"), destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(PN.Font.caption)
             }
             } else {
-            // 0.9.0: ChatGPT: the account through Codex, or an OpenAI API key; one button sets every job to it
-            CodexAccountRow()
-            Button(L("ai.codex.use")) {
-                settings.config.ai.prep = AIRoute.codex
-                settings.config.ai.tips = AIRoute.codex
-                settings.config.ai.after = AIRoute.codex
-            }.buttonStyle(.pnSecondary).disabled(CodexAccount.cliPath == nil)
+            // 0.24.1 (F3): what is connected becomes the default of every job; no "Use ChatGPT for everything" buttons.
+            AccountConnectRow(kind: "codex")
             KeyRow(title: L("keys.openai.title"), hint: L("keys.openai.hint"), key: .openaiAPIKey, model: settings)
-            Button(L("ai.openai.use")) {
-                settings.config.ai.prep = AIRoute.openai
-                settings.config.ai.tips = AIRoute.openai
-                settings.config.ai.after = AIRoute.openai
-            }.buttonStyle(.pnSecondary).disabled(!settings.isSet(.openaiAPIKey))
             }
-            if ![AIRoute.codex, AIRoute.openai].contains(settings.config.ai.prep) && !settings.isSet(.claudeAPIKey) && !settings.isSet(.openaiAPIKey) && setup.steps.first(where: { $0.id == "claude" })?.state != .ok {
+            if AIRoute.connected().subtracting([AIRoute.local]).isEmpty {
                 Text(L("onb.claude.without")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -468,7 +455,7 @@ struct OnboardingView: View {
     var primaryLabel: String {
         switch m.step {
         case .welcome: return L("onb.welcome.cta")
-        case .ai: return (settings.isSet(.claudeAPIKey) || settings.isSet(.openaiAPIKey) || [AIRoute.codex, AIRoute.openai].contains(settings.config.ai.prep)) ? L("common.continue") : L("onboarding.claude.continueNoKey")
+        case .ai: return AIRoute.connected().subtracting([AIRoute.local]).isEmpty ? L("onboarding.claude.continueNoKey") : L("common.continue")
         case .done: return L("onb.done.practiceCta")
         default: return L("common.continue")
         }
@@ -488,6 +475,7 @@ struct OnboardingView: View {
     /// Done: the onboarding never comes back by itself, and What's new for this version is not shown to a new person.
     func finish() {
         UserDefaults.standard.set(true, forKey: "onboardingDone")
+        AppLog.app("onboarding: done")
         if !settings.config.workRoot.isEmpty { SampleProjectMaker.makeOnce(settings) }    // 0.17.0 (5.1)
         WhatsNewStore.markSeen()
         close()
@@ -673,7 +661,7 @@ final class OnboardingWindow {
     static var window: NSWindow?
     static let model = OnboardingModel()
 
-    static func show() {
+    static func show(resume: Bool = false) {
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: Localized { OnboardingView(m: model, close: { window?.close() }) }))
             w.tabbingMode = .disallowed      // 0.8.7 (A1): never tabs
@@ -682,7 +670,12 @@ final class OnboardingWindow {
             w.isReleasedWhenClosed = false
             window = w
         }
-        model.step = .welcome
+        // 0.24.1 (F2): an unfinished onboarding goes on at its step; opened by hand after Done it starts over
+        let d = UserDefaults.standard
+        let saved = d.object(forKey: OnboardingModel.stepKey) as? Int
+        model.step = resume && !d.bool(forKey: "onboardingDone")
+            ? OnboardingModel.Step(rawValue: OnboardingResume.step(saved: saved, count: OnboardingModel.Step.allCases.count)) ?? .welcome
+            : .welcome
         WhatsNewStore.markSeen()     // 0.16.0 (D3): the onboarding covers this version; What's new does not follow it
         window?.title = L("onboarding.window.title")
         window?.center()

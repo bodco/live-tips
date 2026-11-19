@@ -108,13 +108,35 @@
     return 'neutral';
   };
 
+  // Theme pass stage 3 (2026-11-19): a card reads as key / detail / phrase / source. key = the strongest line (the
+  // answer or what is going on), line = the ready phrase under the detail, qline = the small question line above.
+  // say stays what the PM edits and what Earlier shows; sayIsKey says which of the two lines it is.
+  function keyLines(c, o) {
+    c.detail = c.why;
+    c.qline = ''; c.key = c.say; c.line = ''; c.sayIsKey = true;
+    if (o.answerKind) {
+      if (o.heard || !o.gist) return;
+      c.key = o.gist;
+      if (c.say && c.say !== o.gist) { c.line = c.say; c.sayIsKey = false; }
+      return;
+    }
+    if (o.asked && c.question) {
+      c.qline = (c.who ? c.who + ': ' : '') + c.question;
+      return;
+    }
+    if (o.phrase && c.question === o.gist && c.say === o.phrase) {
+      c.key = o.gist; c.line = o.phrase; c.sayIsKey = false;
+    }
+  }
+
   Feed.prototype.toCard = function (it) {
     const kind = this.kindOf(it);
-    const gist = clean(it.gist), phrase = clean(it.phrase), why = clean(it.why);   // 2026-11-05: why = the context line
+    // 2026-11-05: why = the context line. Theme pass stage 3 (2026-11-19): it is called detail now, why is still read.
+    const gist = clean(it.gist), phrase = clean(it.phrase), why = clean(it.detail || it.why);
     // 0.8.5 (owner): a speech point may carry its full text ({text, full}, speech.md); it opens under the line.
     const pts = (it.items || []).map((x) => ({ t: clean(itemText(x)), f: x && typeof x === 'object' ? clean(x.full) : '' })).filter((p) => p.t);
     const items = pts.map((p) => p.t);
-    let who = '', question = '', say = '', meta = '', source = '', unverified = false;
+    let who = '', question = '', say = '', meta = '', source = '', unverified = false, asked = false, answerKind = false;
     if ((it.kind === 'answer' || it.kind === 'fact') && it.q != null) {
       const q = clean(it.q).replace(/^(find|знайди|пошук)\s*:\s*/i, '');
       const shorter = /^shorter\b|^коротше\b/i.test(q);
@@ -124,13 +146,14 @@
         meta = this.tr(it.trigger === 'heard' ? 'heardMeta' : 'heardAnswer', { q, who: clean(it.who || '') });
         who = clean(it.who || ''); question = q;
       }
+      answerKind = true;
       say = phrase || gist;
       if (!phrase && items.length) { say = gist; }
       if (it.trigger === 'heard') say = clean(it.note) || gist;     // 0.10.0: heard, searching, until the answer comes
     } else {
       let m;
-      if ((m = ASKS_RX.exec(gist))) { who = clean(m[1]); question = clean(m[2]); say = phrase; }
-      else if ((m = ROOM_RX.exec(gist))) { question = clean(m[1]); say = phrase; }
+      if ((m = ASKS_RX.exec(gist))) { who = clean(m[1]); question = clean(m[2]); say = phrase; asked = true; }
+      else if ((m = ROOM_RX.exec(gist))) { question = clean(m[1]); say = phrase; asked = true; }
       else if (phrase) { question = gist; say = phrase; }
       else { say = gist; }
       if (!say) { say = question; question = ''; }
@@ -138,7 +161,9 @@
     let note = clean(it.note);
     if (UNCHECKED_RX.test(note)) { unverified = true; note = ''; }
     note = note.replace(/^(sources?|джерела|джерело)\s*:\s*/i, '');
-    source = note || (items.length && (kind === 'docs' || kind === 'answer') ? items[0] : '');
+    // Theme pass stage 3: the engine's own source line first ("Release plan · Nov 14"), the old note after it
+    const src = clean(it.source).replace(/^(sources?|джерела|джерело)\s*:\s*/i, '');
+    source = src || note || (items.length && (kind === 'docs' || kind === 'answer') ? items[0] : '');
     if (it.trigger === 'heard') source = '';            // the note is already the line under the question
     const id = this.idOf(it);
     const c = {
@@ -147,10 +172,11 @@
       fulls: kind === 'turn' ? pts.map((p) => p.f) : [],
       at: hmsToMs(it.at || it.t, this.now()),
       state: 'active', pinned: false, partial: !!it.partial, late: !!it.late, card: it.card || '', t: it.t || '',
-      raw: { kind: it.kind || 'tip', gist: it.gist || '', why: it.why || '', phrase: it.phrase || '', items: it.items || [] }
+      raw: { kind: it.kind || 'tip', gist: it.gist || '', why: it.detail || it.why || '', phrase: it.phrase || '', items: it.items || [] }
     };
+    keyLines(c, { gist, phrase, asked, answerKind, heard: it.trigger === 'heard' });
     const ed = this.edits[id];
-    if (ed) { if (ed.removed) return null; if (ed.say != null) c.say = ed.say; c.edited = true; }
+    if (ed) { if (ed.removed) return null; if (ed.say != null) { c.say = ed.say; if (c.sayIsKey) c.key = ed.say; else c.line = ed.say; } c.edited = true; }
     const loc = this.local[id];
     if (loc) { if (loc.state) c.state = loc.state; if (loc.pinned != null) c.pinned = loc.pinned; if (loc.rating) c.rating = loc.rating; }   // 0.9.4: a rating set in the window survives the rebuild
     return c;
@@ -589,7 +615,7 @@
   };
   Feed.prototype.edit = function (id, say) {
     this.edits[id] = { say };
-    const c = this.byId[id]; if (c) { c.say = say; c.edited = true; }
+    const c = this.byId[id]; if (c) { c.say = say; if (c.sayIsKey === false) c.line = say; else if (c.key != null) c.key = say; c.edited = true; }
     this.emit();
   };
   Feed.prototype.toggleOnMe = function (id, done) { this.onMeDone[id] = !!done; this.emit(); };
@@ -651,6 +677,24 @@
 
   Feed.prototype.emit = function () { if (this.setState) this.setState(this.state()); };
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { Feed, clean, hmsToMs };
-  else root.PacenoteFeed = Feed;
+  /** Theme pass stage 4 (2026-11-19): the compact card shows one tip at a time.
+   *  list: the visible cards, newest first (tips.js visibleCards). view: {pin, seen}: pin is the tip the PM paged back to
+   *  (null follows the newest), seen is the newest tip when the PM paged back, so a tip that arrives later does not take
+   *  the card over, it only shows "new" and "Latest tip". The "N min left" card and quiet "Done?" cards are not paged.
+   *  Returns {card, index (1 = the oldest), total, latest, fresh, prevId, latestId}. */
+  function cardPage(list, view, now) {
+    // 0.25 (owner, 19.11): a risk and "Decided earlier" reach the card too; "Done?" stays in the full window
+    const tips = (list || []).filter((c) => c && c.kind !== 'finish' && (!c.quiet || c.pinned || c.kind === 'risk' || c.kind === 'decision_conflict'));
+    const total = tips.length;
+    if (!total) return { card: null, index: 0, total: 0, latest: true, fresh: false, prevId: null, latestId: null };
+    const v = view || {}, t = now == null ? Date.now() : now;
+    let i = v.pin ? tips.findIndex((c) => c.id === v.pin) : 0;   // tips[0] is the newest
+    if (i < 0) i = 0;
+    const newest = tips[0], latest = i === 0;
+    const fresh = latest ? t - newest.at < 60000 : newest.id !== v.seen;
+    return { card: tips[i], index: total - i, total, latest, fresh, prevId: i + 1 < total ? tips[i + 1].id : null, latestId: newest.id };
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { Feed, clean, hmsToMs, cardPage };
+  else { root.PacenoteFeed = Feed; root.PacenoteCardPage = cardPage; }
 })(this);

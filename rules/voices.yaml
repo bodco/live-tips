@@ -16,6 +16,11 @@ learning:
   rule: the library learns a voice only from a speaker the PM named (a name given by the meeting series roster is not learned until the PM confirms or renames it), and only from the lines that sound like that speaker's other lines
   core: speaker_lib_learn (0.5, mean cosine of a line to the speaker's other lines)
   mixed: when fewer than half of the lines are in the core, the speaker sounds like more than one voice and nothing is learned
+auto:
+  rule: 0.24.1 (owner) a voice whose best library match is a participant of this call (Start call, the calendar event; a spelling with the same first letter and surname initial when only one participant fits) is named by itself; without participants, only a name used on the same meeting series (Rosters)
+  min: speaker_auto (0.72, cosine), at least 0.05 ahead of the next match, never the PM, never a name already given on this call
+  when: from speaker_auto_s (4 s of the speaker's speech), checked again as the speaker grows; the ask still waits for speaker_prompt_s
+  learning: not learned until the PM confirms or renames it (as the series roster)
 thresholds:
   rule: one line's voice print is noisy (two lines of one person agree at about speaker_same_rho, 0.5, measured on the voice library), so the closeness needed grows with the number of lines behind each side; a fixed threshold let a similar second voice join the first speaker before it formed its own
   expected_same: rho / sqrt((rho + (1 - rho) / n) * (rho + (1 - rho) / m)) for n and m lines

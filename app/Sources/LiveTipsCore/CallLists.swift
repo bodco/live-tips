@@ -62,15 +62,15 @@ public enum CallLists {
             }
         }
 
-        // Decisions
+        // Decisions (theme pass stage 2: each with who made it, `by`)
         if let e = pmEdit("decisions") {
-            out.decisionItems = clean(strings(e["decisions"])).map { MeetingNotes.Item(text: $0) }; out.decisionsFrom = .pm
-        } else if let d = nonEmpty(cleanItems(mn?.decisions ?? [])) {
+            out.decisionItems = decisionItems(e["decisions"], owners: e["decision_owners"]); out.decisionsFrom = .pm
+        } else if let d = nonEmpty(decisionItems((mn?.decisions ?? []).map { ["t": $0.t, "text": $0.text] })) {
             out.decisionItems = d; out.decisionsFrom = .notes
-        } else if let l = live, let d = nonEmpty(clean(strings(l["decisions"]))) {
-            out.decisionItems = d.map { MeetingNotes.Item(text: $0) }; out.decisionsFrom = .live
-        } else if let n = notes, let d = nonEmpty(clean(legacy(n, ["decisions", "рішення"]))) {
-            out.decisionItems = d.map { MeetingNotes.Item(text: $0) }; out.decisionsFrom = .legacy
+        } else if let l = live, let d = nonEmpty(decisionItems(l["decisions"])) {
+            out.decisionItems = d; out.decisionsFrom = .live
+        } else if let n = notes, let d = nonEmpty(decisionItems(legacy(n, ["decisions", "рішення"]))) {
+            out.decisionItems = d; out.decisionsFrom = .legacy
         }
         out.decisions = out.decisionItems.map(\.text)
 
@@ -128,6 +128,33 @@ public enum CallLists {
     }
 
     // MARK: helpers
+
+    /// Theme pass stage 2 (owners next to decisions, = call_lists.decision_items): the decisions of one level. A notes
+    /// line "**Emily Clark**: the decision" (rules/notes.yaml) gives its owner; a live-picture or PM entry may be an
+    /// object with "by" / "who" / "made_by"; the PM's edit keeps its owners in "decision_owners" (same order). Plain
+    /// text, no "nothing" lines, no repeats (as cleanItems). "**Go with plan B**" (no colon) has no owner.
+    static func decisionItems(_ raw: Any?, owners: Any? = nil) -> [MeetingNotes.Item] {
+        let own = (owners as? [Any]) ?? []
+        var seen = Set<String>(), out: [MeetingNotes.Item] = []
+        for (k, v) in ((raw as? [Any]) ?? []).enumerated() {
+            var text = "", by = "", t = ""
+            if let d = v as? [String: Any] {
+                text = (d["text"] as? String) ?? (d["what"] as? String) ?? ""
+                by = (d["by"] as? String) ?? (d["who"] as? String) ?? (d["made_by"] as? String) ?? ""
+                t = (d["t"] as? String) ?? ""
+            } else if let x = v as? String { text = x } else { continue }
+            text = text.replacingOccurrences(of: "\u{2014}", with: "-").trimmingCharacters(in: .whitespaces)
+            if let r = text.range(of: "^\\*\\*([^*]{1,60})\\*\\*\\s*:\\s*", options: .regularExpression) {
+                if by.isEmpty { by = text[r].replacingOccurrences(of: "**", with: "").replacingOccurrences(of: ":", with: "") }
+                text = String(text[r.upperBound...])
+            }
+            if by.isEmpty, k < own.count, let o = own[k] as? String { by = o }
+            let p = plain(text)
+            guard !p.isEmpty, !MeetingNotes.isNothing(p), seen.insert(p.lowercased()).inserted else { continue }
+            out.append(MeetingNotes.Item(t: t, text: p, by: plain(by)))
+        }
+        return out
+    }
 
     static func strings(_ v: Any?) -> [String] { ((v as? [Any]) ?? []).compactMap { $0 as? String } }
     static func whats(_ v: Any?) -> [String] {

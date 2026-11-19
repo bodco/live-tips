@@ -206,7 +206,12 @@
   .tip.card { border-left-style: double; border-left-width: 6px; }
   .tip .q { font-size: 12px; color: var(--muted); letter-spacing: .02em; margin-bottom: 2px; }
   .gist { font-weight: 700; line-height: 1.3; }
-  .why { margin-top: 2px; color: var(--muted); line-height: 1.4; }
+  /* theme pass stage 3 (Pacenote 0.25): key line (gist) strongest on the newest card, detail quieter, source under it */
+  .detail { margin-top: 2px; color: var(--muted); line-height: 1.4; }
+  .tip.latest .gist { font-size: 1.22em; font-weight: 800; line-height: 1.25; }
+  .tip.latest .detail { font-size: 1.05em; }
+  .src { margin-top: 3px; font-size: 13px; color: var(--muted); }
+  .src b { font-weight: 600; color: var(--text); }
   .phrase { margin-top: 3px; }
   .phrase::before { content: "\201C"; color: var(--muted); } .phrase::after { content: "\201D"; color: var(--muted); }
   .items { margin: 4px 0 0; padding-left: 1.3em; font-size: .92em; }
@@ -287,7 +292,7 @@
     #segs { display: none; }
     #dock { max-height: 38%; }
     #pinbox .tip { padding: 3px 6px 3px 10px; font-size: .86em; display: flex; align-items: center; gap: 6px; }
-    #pinbox .tip .phrase, #pinbox .tip .why, #pinbox .tip .items, #pinbox .tip .more, #pinbox .tip .meta, #pinbox .tip .q { display: none; }
+    #pinbox .tip .phrase, #pinbox .tip .why, #pinbox .tip .detail, #pinbox .tip .src, #pinbox .tip .items, #pinbox .tip .more, #pinbox .tip .meta, #pinbox .tip .q { display: none; }
     #pinbox .tip .foot { margin-top: 0; min-height: 0; }
     #pinbox .tip .gist { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     body:has(#alert.show:not(.ok):not(.wait)) #agenda { display: none; }
@@ -834,6 +839,7 @@
       part_tt: 'Partly useful: say what was off',
       no_tt: 'Not useful here',
       late: 'late',
+      from_src: 'from',
       late_tt: 'You had already started answering. Still useful if the topic is open.',
       r_late: 'Late',
       r_off_topic: 'Off topic',
@@ -1123,6 +1129,7 @@
       part_tt: 'Частково корисно: скажи, що не так',
       no_tt: 'Тут не допомогло',
       late: 'запізно',
+      from_src: 'джерело:',
       late_tt: 'Ти вже почав відповідати. Знадобиться, якщо тема ще відкрита.',
       r_late: 'Запізно',
       r_off_topic: 'Не в тему',
@@ -1714,7 +1721,9 @@
     // Local echoes of what you sent: "You: <text>" with the label in the UI language.
     if (it.you != null || it.youKey) html += '<div class="gist">' + i18nSpan('you') + ': ' + (it.youKey ? i18nSpan(it.youKey) : inline(it.you)) + '</div>';
     else if (it.gist) html += '<div class="gist">' + inline(it.gist) + '</div>';
-    if (it.why) html += '<div class="why">' + inline(it.why) + '</div>';   // 2026-11-05: context line
+    // 2026-11-05: context line. Theme pass stage 3 (Pacenote 0.25): key / detail / source; detail was why, still read.
+    var detail = it.detail || it.why;
+    if (detail) html += '<div class="detail">' + inline(detail) + '</div>';
     if (it.phrase) html += '<div class="phrase">' + inline(it.phrase) + '</div>';
     if (it.items && it.items.length) {
       html += '<button class="more" type="button" data-i18n="n_points" data-n="' + it.items.length + '">' + esc(t('n_points', { n: it.items.length })) + '</button>';
@@ -1723,6 +1732,7 @@
       it.items.forEach(function (x) { html += '<li>' + inline(typeof x === 'string' ? x : (x && x.text) || '') + '</li>'; });
       html += '</' + tag + '>';
     }
+    if (it.source && it.kind !== 'consent') html += '<div class="src"><span data-i18n="from_src">' + esc(t('from_src')) + '</span> <b>' + inline(String(it.source).replace(/^(sources?|джерела|джерело)\s*:\s*/i, '')) + '</b></div>';
     var meta = '';
     if (it.t) meta += '<span class="time">' + (kind === 'card' ? '⚡ ' : '') + esc(it.t) + '</span>';
     if (lag != null) meta += '<span class="lag' + (lag > 20 ? ' slow' : '') + '">+' + lag + 's</span>';

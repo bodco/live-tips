@@ -81,8 +81,13 @@ memory, series), `Rehearsal.swift`; statistics in `HomeStats.swift` (`CallMetric
    2.5 GB, and nothing needs an administrator password.
 4. Add your Claude API key in Settings > Keys (it is stored in Keychain) and check the spending limits in Settings > AI.
 
-Requirements: macOS 14.4 or newer on Apple silicon, Python 3.10 or newer (Setup checks it and
-says what to do when it is missing). Expect rough edges: this is a beta.
+Requirements: macOS 14.4 or newer on Apple silicon. Since 0.24.1 Setup downloads its own Python 3.13
+(python-build-standalone, pinned URL and SHA-256 in `app/Resources/setup.sh`, `PY_*`); a Python 3.10 to 3.14 already
+on the Mac is only the fallback. Expect rough edges: this is a beta.
+
+Python packages (0.24.1): `app/Resources/python/{recorder,tips,voices}.lock` hold exact versions with hashes, made from
+the `*.in` files by `app/buildtools/lock.sh` (needs uv); setup.sh installs them with `--require-hashes` and its `check`
+compares the installed versions with the lock, so a release with new locks updates every Mac at its next Install.
 
 ## Using Pacenote: start a call
 

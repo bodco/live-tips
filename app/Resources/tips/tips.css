@@ -269,6 +269,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 @container app (max-width: 459px){
   .onme{padding:0 8px}
   .onme #onmeLbl{display:none}
+  .endcall{padding:0 8px}
 }
 /* Very narrow: hide status word, keep timer */
 @container app (max-width: 400px){
@@ -296,6 +297,17 @@ button{font:inherit;color:inherit;cursor:pointer}
 .status.warn{color:var(--k-onme);font-weight:600}
 .struck{text-decoration:line-through;color:var(--text-3)}
 .hero .say[contenteditable="true"]{outline:2px solid var(--accent-fill);outline-offset:4px;border-radius:4px}
+/* theme pass stage 3: key / detail / phrase / source; the edited line is the one with data-edit */
+.hero [data-edit][contenteditable="true"]{outline:2px solid var(--accent-fill);outline-offset:4px;border-radius:4px}
+.hero .phrase{font-size:16px;line-height:1.45;color:var(--text);text-wrap:pretty}
+.hero .phrase::before{content:"\201C";color:var(--text-3)}
+.hero .phrase::after{content:"\201D";color:var(--text-3)}
+.hero .phrase[contenteditable="true"]::before,.hero .phrase[contenteditable="true"]::after{content:none}
+.hero .src b{font-weight:600;color:var(--text-2)}
+.endcall{flex:none;height:30px;padding:0 12px;border:1.5px solid var(--rec);border-radius:var(--radius-s);background:transparent;color:var(--danger-text);font-weight:600;font-size:13px;white-space:nowrap;cursor:pointer}
+.endcall:hover{background:color-mix(in srgb,var(--rec) 12%,transparent)}
+.endcall:focus-visible{outline:2px solid var(--accent-fill);outline-offset:2px}
+.endcall[hidden]{display:none}
 .hero .acts .btn1{margin-left:8px}
 .briefedit{flex:1;min-height:240px;width:100%;resize:vertical;border:1px solid var(--border);border-radius:var(--radius-m);background:var(--surface);color:var(--text);font:13px/1.5 var(--font-mono);padding:10px}
 .panebody .ctl{display:flex;gap:8px}
@@ -708,18 +720,40 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 [data-style] .empty .t1{font-family:var(--pn-font-display);font-size:30px;font-weight:800;line-height:1;text-transform:var(--pn-caps);letter-spacing:var(--pn-d-track)}
 [data-style="broadsheet"] .empty .t1{font-weight:900}
 
-/* the answer card by style. Roadbook: the "now" fill, no shadow, the speech on a black block. Broadsheet: a heavy rule on top, the speech with a bar */
-[data-style] .hero{border-radius:0;box-shadow:none}
-[data-style] .hero .say{font-family:var(--pn-font-display);letter-spacing:var(--pn-d-track);text-transform:none}
-[data-style="roadbook"] .hero{background:var(--pn-hl-bg);color:var(--pn-hl-fg);animation:none}
-[data-style="roadbook"] .hero .kind,[data-style="roadbook"] .hero .why,[data-style="roadbook"] .hero .q,[data-style="roadbook"] .hero .items{color:var(--pn-hl-fg)}
-[data-style="roadbook"] .hero .meta,[data-style="roadbook"] .hero .src,[data-style="roadbook"] .hero .ghost,[data-style="roadbook"] .hero .items.pts li.grp{color:rgba(13,13,11,.68)}
-[data-style="roadbook"] .hero .ghost:hover{background:rgba(13,13,11,.12);color:#0D0D0B}
-[data-style="roadbook"] .hero .say{background:#0D0D0B;color:#F1EDE3;padding:10px 12px}
-/* Roadbook dark fills with yellow: white text on it was unreadable (site shots 0.23.0) */
-[data-style="roadbook"][data-theme="dark"] .help,[data-style="roadbook"][data-theme="dark"] .btn1,[data-style="roadbook"][data-theme="dark"] .icon-btn.pause.resume,[data-style="roadbook"][data-theme="dark"] .menu button:hover,[data-style="roadbook"][data-theme="dark"] .dk-b.pri,[data-style="roadbook"][data-theme="dark"] .dk-card.cur .dk-head .dk-num{color:var(--pn-on-accent)}
-[data-style="broadsheet"] .hero{background:transparent;border-top:var(--pn-rule-heavy) solid var(--pn-rule-strong);animation:none}
-[data-style="broadsheet"] .hero .say{border-left:4px solid var(--pn-accent);padding:10px 12px}
+/* Theme pass stage 3 (prototype "During the call", 2026-11-19): the newest tip on the focus surface, a 4 px mark on the
+   left (Roadbook) or a 3 px rule on top (Broadsheet). The key line is the strongest text in the window (text face, 800),
+   the detail quieter under it, the ready phrase in quotes, the source readable at 14 px. Replaces the yellow card with the
+   speech on a black block (Roadbook) and the speech with a bar (Broadsheet). */
+[data-style]{--tip-mark:var(--pn-accent)}
+[data-style="broadsheet"][data-theme="dark"]{--tip-mark:#8B88FF}
+[data-style] .hero{border-radius:0;box-shadow:none;background:var(--pn-focus);color:var(--pn-ink);border:1px solid var(--pn-rule);border-left:4px solid var(--tip-mark);padding:16px 20px 10px;gap:6px;animation:pn-tip-in .45s ease-out both}
+[data-style="broadsheet"] .hero{border:0;border-top:3px solid var(--tip-mark);border-bottom:1px solid var(--pn-rule)}
+@keyframes pn-tip-in{from{transform:translateY(-14px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){[data-style] .hero{animation:none}}
+[data-style] .hero .kind{color:var(--pn-ink)}
+[data-style] .hero .meta{color:var(--pn-ink3)}
+[data-style] .hero .q{font-size:13px;color:var(--pn-ink3)}
+[data-style] .hero .say{font-family:var(--pn-font-text);font-size:30px;line-height:1.2;font-weight:800;letter-spacing:0;text-transform:none;color:var(--pn-ink);background:transparent;padding:0;border:0}
+[data-style] .hero.long .say{font-size:24px}
+[data-style] .hero.xlong .say{font-size:20px;font-weight:700}
+[data-style] .hero.finish .say{font-size:20px}
+[data-style] .hero .why{font-size:18px;line-height:1.35;font-weight:500;color:var(--pn-ink2);margin:0}
+[data-style] .hero.long .why,[data-style] .hero.xlong .why{font-size:16px}
+[data-style] .hero .phrase{font-size:15px;color:var(--pn-ink);margin-top:4px}
+[data-style] .hero .items{color:var(--pn-ink2)}
+[data-style] .hero .src{font-size:14px;color:var(--pn-ink3);margin-top:2px}
+[data-style] .hero .src b{color:var(--pn-link);font-weight:600}
+/* Roadbook fills with yellow in both modes since the theme pass (19.11; dark since 0.23.0): text on it in on-accent, never white */
+[data-style="roadbook"] .btn1,[data-style="roadbook"] .icon-btn.pause.resume,[data-style="roadbook"] .menu button:hover,[data-style="roadbook"] .dk-b.pri,[data-style="roadbook"] .dk-card.cur .dk-head .dk-num{color:var(--pn-on-accent)}
+/* Help now in an outline (the window's one filled action is gone: a tip, not a button, is the loudest thing here) */
+[data-style] .help{background:transparent;border:2px solid var(--pn-rule-strong);color:var(--pn-ink);font-family:var(--pn-font-display);font-weight:800;text-transform:var(--pn-caps);letter-spacing:calc(var(--pn-l-track,0) / 2)}
+[data-style="broadsheet"] .help{font-family:var(--pn-font-text);font-weight:700;text-transform:none}
+[data-style] .help:hover{background:var(--pn-surface2)}
+/* End call in the header: a red outline, the label in the recording color */
+[data-style] .endcall{border:2px solid var(--pn-rec);color:var(--pn-rec-text);border-radius:0;font-family:var(--pn-font-display);font-weight:800;text-transform:var(--pn-caps);letter-spacing:calc(var(--pn-l-track,0) / 2);font-size:14px}
+[data-style="broadsheet"] .endcall{font-family:var(--pn-font-text);font-weight:700;text-transform:none;font-size:13px;border-radius:2px}
+/* the transcript reads quieter than the tip */
+[data-style] .tl .tx{color:var(--pn-ink2);font-size:14px}
 [data-style] .ratebox .chip,[data-style] .ratebox input{border-radius:var(--pn-radius-button)}
 [data-style] .seg{border-radius:0}
 [data-style] .agenda-list .st,[data-style] .rec.ready{border-radius:var(--pn-status-radius)}
@@ -740,3 +774,53 @@ h5.who{margin:10px 0 2px;font-size:12px;font-weight:600;color:var(--text-2, var(
 [data-style] .spkbar .spk-count.todo{color:var(--pn-notready-text)}
 [data-style] .spkbar .spk-chev{border-radius:0}
 [data-style] .spk-chip{border-radius:0}
+
+/* Theme pass stage 4 (prototype "During the call", small card, 2026-11-19): the small card under the camera, body.card.
+   One tip at a time in a 480 pt borderless panel; the app sets the panel's height from the card's (post 'size') and draws
+   a 12 pt grip strip over the top for dragging, so the top 12 px stay free. Everything of the window is hidden here. */
+.tcard{display:none}
+body.card{background:transparent;height:auto}
+body.card .app,body.card .sheet,body.card .menu,body.card .popover,body.card .toast{display:none!important}
+body.card .tcard{display:block;position:relative;margin:0;padding:14px 16px 12px;background:var(--pn-focus,var(--surface));color:var(--pn-ink,var(--text));border:1px solid var(--pn-rule,var(--separator));border-radius:12px;overflow:hidden;font-family:var(--pn-font-text,var(--font))}
+.tc-grip{position:absolute;top:4px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--pn-ink3,var(--text-3));opacity:.35}
+.tc-bar{display:flex;align-items:center;gap:6px;min-height:28px}
+.tc-bar .spacer{flex:1}
+.tc-rec{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--pn-rec-text,var(--danger-text,var(--rec)));white-space:nowrap}
+.tc-rec .dot{width:8px;height:8px;border-radius:50%;background:var(--pn-rec,var(--rec));flex:none}
+.tc-rec.paused,.tc-rec.idle{color:var(--pn-ink3,var(--text-3))}
+.tc-rec.paused .dot{background:transparent;box-shadow:0 0 0 1.5px currentColor inset}
+.tc-rec.idle .dot{background:var(--pn-ink3,var(--text-3))}
+.tc-time{font:600 12px/1 var(--pn-font-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums;color:var(--pn-ink3,var(--text-3))}
+.tc-b{height:28px;min-width:28px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;gap:4px;border:1px solid var(--pn-rule,var(--separator));border-radius:var(--pn-radius-button,6px);background:transparent;color:var(--pn-ink,var(--text));font-size:12px;font-weight:600;white-space:nowrap}
+.tc-b:hover{background:var(--pn-surface2,var(--surface-2))}
+.tc-b.on{background:var(--pn-surface2,var(--surface-2));border-color:var(--pn-ink3,var(--text-3))}
+.tc-b:focus-visible,.tc-end:focus-visible,.tc-link:focus-visible{outline:2px solid var(--pn-link,var(--accent));outline-offset:1px}
+.tc-help{font-size:13px}
+.tc-end{height:28px;padding:0 6px;border:0;background:transparent;color:var(--pn-ink3,var(--text-3));font-size:12px;font-weight:600;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.tc-end:hover{color:var(--pn-rec-text,var(--danger-text))}
+.tc-alert{margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--pn-ink2,var(--text-2))}
+.tc-alert.warn{color:var(--pn-rec-text,var(--danger-text))}
+.tc-link{border:0;background:transparent;padding:0;color:var(--pn-link,var(--accent));font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.tc-tip{margin-top:8px}
+.tc-tip.in{animation:pn-tip-in .45s ease-out both}
+@media (prefers-reduced-motion:reduce){.tc-tip.in{animation:none}}
+.tc-q{font-size:12px;line-height:1.35;color:var(--pn-ink3,var(--text-3))}
+.tc-key{margin-top:2px;font-size:24px;line-height:1.2;font-weight:800;color:var(--pn-ink,var(--text));text-wrap:pretty}
+.tc-tip.long .tc-key{font-size:20px}
+.tc-tip.xlong .tc-key{font-size:18px;font-weight:700}
+.tc-detail{margin-top:2px;font-size:16px;line-height:1.35;font-weight:500;color:var(--pn-ink2,var(--text-2));text-wrap:pretty}
+.tc-src{margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:14px;color:var(--pn-ink3,var(--text-3))}
+.tc-src b{color:var(--pn-link,var(--accent));font-weight:600}
+.tc-chip{font-size:12px;font-weight:700;text-transform:var(--pn-caps,none);letter-spacing:.03em;color:var(--pn-ink,var(--text));border:1px solid var(--pn-rule,var(--separator));border-radius:var(--pn-radius-button,4px);padding:1px 6px}
+.tc-pager{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:8px;border-top:1px solid var(--pn-rule,var(--separator))}
+.tc-pager .spacer{flex:1}
+.tc-pager .tc-b{font-size:13px}
+.tc-of{font-size:13px;color:var(--pn-ink3,var(--text-3))}
+.tc-of b{color:var(--pn-ink,var(--text))}
+.tc-at{font:500 12px/1 var(--pn-font-mono,ui-monospace,monospace);color:var(--pn-ink3,var(--text-3))}
+.tc-empty{margin-top:8px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-size:14px;color:var(--pn-ink2,var(--text-2))}
+.tc-empty b{font-size:18px;font-weight:800;color:var(--pn-ink,var(--text))}
+/* the tip mark from stage 3: a 4 px mark on the left (Roadbook), a 3 px rule on top (Broadsheet) */
+[data-style="roadbook"] .tc-tip{border-left:4px solid var(--tip-mark);padding-left:10px}
+[data-style="broadsheet"] .tc-tip{border-top:3px solid var(--tip-mark);padding-top:6px}
+[data-style="roadbook"] .tc-help{font-family:var(--pn-font-display);font-weight:800;text-transform:var(--pn-caps);font-size:14px}

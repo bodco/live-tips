@@ -136,6 +136,10 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             if env["LT_SHOTS_ONLY"] == "codriver" { codriverShots(theme); continue }
             if env["LT_SHOTS_ONLY"] == "site023" { siteShots(theme); continue }   // 0.23.0: the site pictures in Roadbook
             if env["LT_SHOTS_ONLY"] == "home024" { if lang == "en" { home024(theme) }; continue }   // 0.24 (R1): Home by the boards HM, HS, HB
+            if env["LT_SHOTS_ONLY"] == "r5" { if lang == "en" || theme == "light" { r5(theme, uk: lang == "uk") }; continue }   // 0.25 (R5): Settings with Advanced closed and open
+            if env["LT_SHOTS_ONLY"] == "st" { if lang == "en" || theme == "light" { st(theme, uk: lang == "uk") }; continue }   // 0.25 (R4): Statistics by the board ST
+            if env["LT_SHOTS_ONLY"] == "r4" { if lang == "en" { r4(theme) }; continue }   // 0.25 (R4): Tracker and All past calls by the boards TR, TX, PC
+            if env["LT_SHOTS_ONLY"] == "r2" { if lang == "en" || (env["LT_R2_UK"] == "1" && theme == "light") { r2(theme, uk: lang == "uk") }; continue }   // 0.25 (R2): the call pages by the boards CP, CT, UP, UT, SL
             if env["LT_SHOTS_ONLY"] == "redesign" { if lang == "en" || theme == "light" { redesignShots(theme, uk: lang == "uk") }; continue }   // redesign 0.23.0: every style   // 0.10.0: co-driver cards for the site
             if !tipsOnly {
             steps.append { [unowned self] in self.splash(theme) }
@@ -321,6 +325,289 @@ final class ShotMode: NSObject, NSApplicationDelegate {
             }
         }
         steps.append { [unowned self] in HomeView.shotState = ""; PNThemeModel.shared.style = PNStyle.buildDefault; self.next() }
+    }
+
+    /// 0.25 (R2): the past and the upcoming call page by the boards CP, CT, UP, UT, SL, once per style and mode (English).
+    /// Files: r2-past-<tab>-<style>-<mode>.png and r2-up-<tab>-<style>-<mode>.png, 1280 pt wide like the boards.
+    func r2(_ theme: String, uk: Bool = false) {
+        _ = PNFonts.once
+        steps.append { [unowned self] in
+            if let r = self.demoCall { Self.writeDemoNotes(r.file); Self.r2Demo(r.file) }
+            self.next(after: 0.2)
+        }
+        for st in PNStyle.allCases {
+            let tt = st.rawValue + "-" + theme
+            steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
+            for tab in ["summary", "discussed", "decisions", "tasks", "risks", "followup", "transcript", "sales", "none"] {
+                steps.append { [unowned self] in self.r2Past(tab, tt) }
+            }
+            for tab in ["setup", "sheet", "tasks", "earlier"] {
+                steps.append { [unowned self] in self.r2Up(tab, tt) }
+            }
+            // 0.25 (R2 tail): the narrow window (820 pt, one column) and, with LT_R2_UK=1, the Ukrainian run
+            for tab in ["summary", "discussed", "tasks"] { steps.append { [unowned self] in self.r2Past(tab, tt, width: 820, prefix: "r2n") } }
+            for tab in ["setup", "sheet"] { steps.append { [unowned self] in self.r2Up(tab, tt, width: 820, prefix: "r2n") } }
+        }
+        steps.append { [unowned self] in PNThemeModel.shared.style = PNStyle.buildDefault; self.next() }
+    }
+
+    /// 0.25 (R5): every Settings pane with Advanced closed (960 x 660, as it opens) and open (a tall window, the whole pane),
+    /// once per style and mode in English; Ukrainian: Roadbook light only (the Cyrillic fallback). Files: r5-<pane>-<adv|top>-<style>-<mode>.png.
+    /// The Advanced flags are the app's own UserDefaults: saved before and put back after.
+    func r5(_ theme: String, uk: Bool = false) {
+        _ = PNFonts.once
+        let all = ["account", "general", "ai", "projects", "integrations", "recording", "transcription", "sheet"]
+        let only = (ProcessInfo.processInfo.environment["LT_R5_PANES"] ?? "").split(separator: ",").map(String.init)
+        let panes = only.isEmpty ? all : all.filter { only.contains($0) }      // LT_R5_PANES=ai,general: a re-check
+        let keys = panes.map { SettingsSearch.advancedKey($0) }
+        let saved = keys.map { UserDefaults.standard.string(forKey: $0) }
+        func flags(_ v: String) { for k in keys { UserDefaults.standard.set(v, forKey: k) } }
+        for st in PNStyle.allCases where !uk || st == .roadbook {
+            let tt = st.rawValue + "-" + theme
+            steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
+            for pane in panes {
+                for open in [false, true] {
+                    steps.append { [unowned self] in
+                        flags(open ? "1" : "0")
+                        SettingsWindow.show(tab: pane)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [self] in
+                            guard let w = SettingsWindow.window else { next(); return }
+                            w.setContentSize(NSSize(width: 960, height: open ? 1500 : 660))
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [self] in
+                                capture(w, "r5-\(pane)-\(open ? "adv" : "top")-\(tt)")
+                                w.setContentSize(NSSize(width: 960, height: 660))
+                                next()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        steps.append { [unowned self] in
+            SettingsWindow.window?.close()
+            for (k, v) in zip(keys, saved) { if let v = v { UserDefaults.standard.set(v, forKey: k) } else { UserDefaults.standard.removeObject(forKey: k) } }
+            PNThemeModel.shared.style = PNStyle.buildDefault; self.next()
+        }
+    }
+
+    /// 0.25 (R4): Tracker on its three tabs and All past calls, once per style and mode (English), 1280 pt wide.
+    func r4(_ theme: String) {
+        _ = PNFonts.once
+        // The shots clear the Tracker filters (a real project name must not show); the user's own filters come back at the end.
+        let keep = ["trackerTab", "trackerWS", "trackerProject", "trackerCall", "trackerOwner", "trackerStatus"].map { ($0, UserDefaults.standard.object(forKey: $0)) }
+        steps.append { [unowned self] in if let r = self.demoCall { Self.writeDemoNotes(r.file) }; self.next(after: 0.2) }
+        for st in PNStyle.allCases {
+            let tt = st.rawValue + "-" + theme
+            steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
+            // Local first (only what the register keeps on this Mac), then with Notion connected on the demo mirror.
+            for (tab, notion) in [("tasks", false), ("decisions", false), ("tasks", true), ("decisions", true), ("risks", true)] {
+                steps.append { [unowned self] in
+                    if notion { Self.writeDemoMirror() } else { Self.removeDemoMirror() }
+                    TrackerModel.shotNotion = notion
+                    TrackerModel.shared.reload()      // the open Tracker keeps its view: read the mirror again
+                    UserDefaults.standard.set(tab, forKey: "trackerTab")
+                    UserDefaults.standard.set("anyone", forKey: "trackerOwner"); UserDefaults.standard.set("all", forKey: "trackerStatus")
+                    for k in ["trackerWS", "trackerProject", "trackerCall"] { UserDefaults.standard.set("", forKey: k) }
+                    self.r4Route(.tracker, "r4-tracker-\(notion ? "" : "local-")\(tab)-\(tt)")
+                }
+            }
+            steps.append { [unowned self] in Self.removeDemoMirror(); TrackerModel.shotNotion = false; self.next() }
+            steps.append { [unowned self] in self.r4Route(.pastCalls, "r4-past-\(tt)") }
+            steps.append { [unowned self] in
+                if let r = self.demoCall { self.r4Route(.series(r.file), "r4-series-\(tt)") } else { self.next() }
+            }
+        }
+        steps.append { [unowned self] in
+            PNThemeModel.shared.style = PNStyle.buildDefault
+            for (k, v) in keep { if let v { UserDefaults.standard.set(v, forKey: k) } else { UserDefaults.standard.removeObject(forKey: k) } }
+            self.next()
+        }
+    }
+
+    /// 0.25 (R4, board ST): Statistics on this week, on a selected day and on this month, once per style and mode
+    /// (English; Ukrainian in light only), 1280 pt wide, and one narrow picture. The AI status is a demo one.
+    func st(_ theme: String, uk: Bool) {
+        _ = PNFonts.once
+        let keep = ["statsPeriod", "statsScope2", "statsSales"].map { ($0, UserDefaults.standard.object(forKey: $0)) }
+        steps.append { [unowned self] in
+            AIStatusModel.shot = (.ok, [.init(id: "claude", name: "Claude", jobs: "", status: "OK", usage: "62% used", state: "ok"),
+                                        .init(id: "codex", name: "ChatGPT", jobs: "", status: "OK", usage: "18% used", state: "ok")], [])
+            AIStatusModel.shared.refresh(force: true)
+            self.next(after: 0.2)
+        }
+        for st in PNStyle.allCases {
+            let tt = st.rawValue + "-" + theme       // the capture adds "-uk" itself
+            steps.append { [unowned self] in PNThemeModel.shared.style = st; self.next(after: 0.6) }
+            for (period, sel) in [("week", false), ("week", true), ("month", false)] {
+                if uk && (period != "week" || sel) { continue }
+                steps.append { [unowned self] in
+                    UserDefaults.standard.set(period, forKey: "statsPeriod"); UserDefaults.standard.set("", forKey: "statsScope2"); UserDefaults.standard.set(false, forKey: "statsSales")
+                    StatsScreen.shotDay = sel ? Self.busyDay() : nil
+                    NotificationCenter.default.post(name: StatsScreen.shotNote, object: nil)   // the open page keeps its state
+                    self.r4Route(.stats, "st-\(period)\(sel ? "-day" : "")-\(tt)")
+                }
+            }
+        }
+        if !uk && theme == "dark" {
+            steps.append { [unowned self] in
+                PNThemeModel.shared.style = .roadbook; StatsScreen.shotDay = nil
+                NotificationCenter.default.post(name: StatsScreen.shotNote, object: nil)
+                UserDefaults.standard.set("week", forKey: "statsPeriod")
+                self.r4Route(.stats, "st-narrow-roadbook-dark", width: 820)
+            }
+        }
+        steps.append { [unowned self] in
+            PNThemeModel.shared.style = PNStyle.buildDefault; StatsScreen.shotDay = nil; AIStatusModel.shot = nil
+            for (k, v) in keep { if let v { UserDefaults.standard.set(v, forKey: k) } else { UserDefaults.standard.removeObject(forKey: k) } }
+            self.next()
+        }
+    }
+
+    /// The demo day with the most minutes this week (read when the shot is taken, the history is loaded by then).
+    static func busyDay() -> Date? {
+        let c = CallStats.calendar, ws = CallStats.weekStart()
+        let recs = CallHistory.shared.visible.filter { $0.start >= ws }
+        return Dictionary(grouping: recs, by: { c.startOfDay(for: $0.start) })
+            .max { a, b in a.value.reduce(0) { $0 + ($1.minutes ?? 0) } < b.value.reduce(0) { $0 + ($1.minutes ?? 0) } }?.key
+    }
+
+    /// 0.25 (R4): a demo Notion mirror for the Tracker shots, in the layout notion-mirror writes
+    /// (`<project>/_notion/{tasks,decisions,risks}/<page>.md` with a YAML header, `<work>/_notion/MIRROR_STATUS.md`).
+    /// Demo projects and names only. Written before the Notion shots and removed after them, so no other shot sees it.
+    static let demoMirror: [(proj: String, kind: String, id: String, title: String, props: [(String, String)])] = {
+        let d = { (n: Int) -> String in let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.locale = Locale(identifier: "en_US_POSIX"); return f.string(from: Date().addingTimeInterval(Double(n) * 86400)) }
+        let o = "Orbit SaaS Launch", pb = "Internal Delivery Playbook", ow = "Orbit weekly with the client", op = "Orbit pilot planning", rc = "Release checklist review"
+        return [
+            (o, "tasks", "demo-t1", "Prepare the security pack for David", [("Owner", "Mike Johnson"), ("Due date", d(1)), ("Status", "In progress"), ("Meeting", ow)]),
+            (o, "tasks", "demo-t2", "Write the pilot feedback form", [("Owner", "Sarah Lee"), ("Due date", d(9)), ("Status", "Not started"), ("Meeting", op)]),
+            (pb, "tasks", "demo-t3", "Update the release checklist template", [("Owner", "Mike Johnson"), ("Due date", d(-3)), ("Status", "In progress"), ("Meeting", rc)]),
+            (o, "tasks", "demo-t4", "Book QA for the pilot week", [("Owner", "Sarah Lee"), ("Due date", d(-1)), ("Status", "Done"), ("Meeting", op)]),
+            (o, "decisions", "demo-d1", "The export screen goes to production on Tuesday", [("Date", d(0)), ("Status", "Accepted"), ("Meeting", ow), ("Stated by", "Emily Clark")]),
+            (o, "decisions", "demo-d2", "CSV download and scheduled emails go through a change request", [("Date", d(0)), ("Status", "Accepted"), ("Meeting", ow)]),
+            (o, "decisions", "demo-d3", "Move the pilot review to Thursdays", [("Date", d(0)), ("Status", "Proposed"), ("Meeting", ow)]),
+            (o, "decisions", "demo-d4", "Pilot starts Monday with 5 users", [("Date", d(-2)), ("Status", "Accepted"), ("Meeting", op)]),
+            (o, "decisions", "demo-d5", "Keep the old export for one more release", [("Date", d(-6)), ("Status", "Superseded"), ("Meeting", ow)]),
+            (pb, "decisions", "demo-d6", "A release checklist is required for every release", [("Date", d(-1)), ("Status", "Accepted"), ("Meeting", rc)]),
+            (pb, "decisions", "demo-d7", "QA signs off before the release notes go out", [("Date", d(-1)), ("Status", "Proposed"), ("Meeting", rc)]),
+            (o, "risks", "demo-r1", "If the API release slips, the pilot moves a week", [("Severity", "High"), ("Status", "Open"), ("Meeting", ow), ("Owner", "David Kim")]),
+            (o, "risks", "demo-r2", "Test accounts from the client come late", [("Severity", "Medium"), ("Status", "Open"), ("Meeting", ow)]),
+            (pb, "risks", "demo-r3", "Only one QA engineer covers the pilot week", [("Severity", "Medium"), ("Status", "Open"), ("Meeting", "Team sync")]),
+            (pb, "risks", "demo-r4", "Release notes miss the export changes", [("Severity", "Low"), ("Status", "Open"), ("Meeting", rc)]),
+            (o, "risks", "demo-r5", "The security review blocks the January start", [("Severity", "High"), ("Status", "Mitigated"), ("Meeting", op)])]
+    }()
+
+    static var demoMirrorRoots: [String] {
+        let w = demoRoot + "/work/Northwind Studio"
+        return [w + "/Orbit SaaS Launch/_notion", w + "/Internal Delivery Playbook/_notion", demoRoot + "/work/_notion"]
+    }
+
+    static func writeDemoMirror() {
+        let fm = FileManager.default, w = demoRoot + "/work/Northwind Studio"
+        for it in demoMirror {
+            let dir = w + "/" + it.proj + "/_notion/" + it.kind
+            try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            var y = "---\nnotion_id: \(it.id)\ntitle: \"\(it.title)\"\nurl: https://www.notion.so/demo\nproperties:\n"
+            y += "  Project: [\"\(it.proj)\"]\n  Workspace: Northwind Studio\n"
+            for (k, v) in it.props { y += "  \(k): \"\(v)\"\n" }
+            y += "---\n\n# \(it.title)\n"
+            try? y.write(toFile: dir + "/" + it.id + ".md", atomically: true, encoding: .utf8)
+        }
+        try? fm.createDirectory(atPath: demoRoot + "/work/_notion", withIntermediateDirectories: true)
+        let iso = ISO8601DateFormatter()
+        try? "# Mirror status\n\n- result: OK\n- last_run_utc: \(iso.string(from: Date().addingTimeInterval(-240)))\n- pages_in_mirror: \(demoMirror.count)\n- mode: demo\n"
+            .write(toFile: demoRoot + "/work/_notion/MIRROR_STATUS.md", atomically: true, encoding: .utf8)
+    }
+
+    static func removeDemoMirror() {
+        for r in demoMirrorRoots { try? FileManager.default.removeItem(atPath: r) }
+    }
+
+    func r4Route(_ route: HomeNav.Route, _ name: String, width: CGFloat = 1280) {
+        HomeNav.shared.path = []; HomeNav.shared.followUp = nil
+        if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }
+        HomeWindow.window?.setContentSize(NSSize(width: width, height: 1000))
+        HomeNav.shared.open(route)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { [self] in
+            if let win = HomeWindow.window { capture(win, name) }
+            next()
+        }
+    }
+
+    static func r2Stem(_ f: String) -> String { f.hasSuffix(".md") ? String(f.dropLast(3)) : f }
+
+    /// A demo follow-up draft (no AI in shot mode) and the Sales picture written only for the Sales shot. Demo names only.
+    static func r2Demo(_ file: String) {
+        let m = FollowUpModel.of(file)
+        m.subject = "Orbit weekly, Nov 17: the export screen and the pilot"
+        m.body = """
+        Hi Emily,
+
+        Thanks for the time today. A short recap so we stay on the same page:
+
+        - The export screen goes to production on Tuesday.
+        - The pilot starts on November 10 with five users, once David sends the test accounts by Friday.
+        - The CSV download and scheduled emails go through a change request; I will send the options this week.
+
+        One open question on our side: who signs off the change request with you?
+
+        Best,
+        Mike
+        """
+    }
+
+    static let r2Sales: [String: Any] = [
+        "method": "bant",
+        "criteria": [
+            ["criterion": "budget", "what": "", "quote": "", "state": "unknown"],
+            ["criterion": "authority", "what": "Emily decides on the pilot; David signs off security. A contract over $50K goes to their CFO.", "quote": "Anything past fifty goes to our CFO. (David Kim, 10:22)", "state": "known"],
+            ["criterion": "need", "what": "Reporting takes two people a full day each week; they want it under an hour.", "quote": "Mondays are just gone for two of my people. (Emily Clark, 10:08)", "state": "known"],
+            ["criterion": "timeline", "what": "A pilot in Q1 is likely; the exact start depends on the security review.", "quote": "If security is happy, January works. (Emily Clark, 10:31)", "state": "partial"]
+        ],
+        "objections": [
+            ["what": "We tried a reporting tool in 2024 and nobody used it.", "answer": "the pilot starts with one team and the users in the loop from week one."],
+            ["what": "Our data can't leave the US.", "answer": "hosting in the US region; Mike sends the security pack."],
+            ["what": "The price looks high for 40 seats.", "answer": ""]
+        ],
+        "next_step": ["what": "Pilot scoping call with Emily and David", "due": "Thu 19 Nov, 15:00"],
+        "scorecard": ["open_questions": 2, "pm_talk_share": 0.38]
+    ]
+
+    /// One past call shot: the tab, with the Sales picture for "sales" and the notes moved away for "none".
+    func r2Past(_ tab: String, _ tt: String, width: CGFloat = 1280, prefix: String = "r2") {
+        guard let r = demoCall else { next(); return }
+        let fm = FileManager.default
+        let sales = Self.r2Stem(r.file) + ".sales.json"
+        let notes = CallNotes.path(r.file), aside = notes + ".r2aside"
+        if tab == "sales", let d = try? JSONSerialization.data(withJSONObject: Self.r2Sales, options: [.prettyPrinted]) { try? d.write(to: URL(fileURLWithPath: sales)) }
+        if tab == "none", fm.fileExists(atPath: notes) { try? fm.moveItem(atPath: notes, toPath: aside) }
+        CallPageView.shotTab = tab == "none" ? "summary" : tab
+        HomeNav.shared.path = []; HomeNav.shared.followUp = nil
+        if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }
+        HomeWindow.window?.setContentSize(NSSize(width: width, height: width < 1000 ? 1500 : (tab == "transcript" ? 900 : 1100)))
+        CallPageWindow.show(file: r.file)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { NotificationCenter.default.post(name: .pnShotTab, object: tab == "none" ? "summary" : tab) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [self] in
+            if let win = HomeWindow.window { capture(win, "\(prefix)-past-\(tab)-\(tt)\(L10n.lang == "uk" ? "-uk" : "")") }
+            CallPageView.shotTab = nil
+            if tab == "sales" { try? fm.removeItem(atPath: sales) }
+            if tab == "none", fm.fileExists(atPath: aside) { try? fm.moveItem(atPath: aside, toPath: notes) }
+            next()
+        }
+    }
+
+    /// One upcoming call shot (the planned demo call, no Meeting Sheet).
+    func r2Up(_ tab: String, _ tt: String, width: CGFloat = 1280, prefix: String = "r2") {
+        UpcomingCallPage.shotTab = tab
+        HomeNav.shared.path = []; HomeNav.shared.followUp = nil
+        if HomeWindow.window == nil { HomeWindow.show(delegate: AppDelegate()) }
+        HomeWindow.window?.setContentSize(NSSize(width: width, height: width < 1000 ? 1500 : 1000))
+        UpcomingPages.open(planned)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { NotificationCenter.default.post(name: .pnShotTab, object: tab) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [self] in
+            if let win = HomeWindow.window { capture(win, "\(prefix)-up-\(tab)-\(tt)\(L10n.lang == "uk" ? "-uk" : "")") }
+            UpcomingCallPage.shotTab = nil
+            next()
+        }
     }
 
     /// One picture of Home on the demo day of home(): 1280 pt wide like the boards, and 820 pt for the narrow layout.
@@ -821,8 +1108,8 @@ final class ShotMode: NSObject, NSApplicationDelegate {
         ### TL;DR
         The export screen is merged and ships on Tuesday. The pilot starts on November 10 with five users if David sends the test accounts by Friday. The finance team's CSV download and scheduled emails need a change request against the 42 hours left.
         ### Decisions
-        - [10:04:10] The export screen goes to production on Tuesday.
-        - [10:19:40] The CSV download and scheduled emails go through a change request, not into the pilot.
+        - [10:04:10] **Emily Clark**: The export screen goes to production on Tuesday.
+        - [10:19:40] **Emily Clark, you**: The CSV download and scheduled emails go through a change request, not into the pilot.
         ### Action items
         - [10:06:29] **David Kim**: send the test accounts (due: Friday)
         - [10:12:05] **Mike Johnson**: get the penetration test summary from Redwood Security (due: Friday)

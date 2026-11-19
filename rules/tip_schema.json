@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "livetips/tip_schema.json",
   "title": "Live Tips window item",
-  "description": "One line of <stem>.tips.jsonl. Written by the skill (via read_delta) or by the app. 'gist' comes first in model output so it can be shown while streaming.",
+  "description": "One line of <stem>.tips.jsonl. Written by the skill (via read_delta) or by the app. A tip reads as key / detail / source: 'gist' is the key line (first in model output so it can be shown while streaming), 'detail' the quieter line under it, 'phrase' the ready sentence, 'source' the document it comes from.",
   "type": "object",
   "properties": {
     "schema_version": {
@@ -36,10 +36,20 @@
       "type": "string",
       "maxLength": 160
     },
+    "detail": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "Theme pass stage 3 (2026-11-19): the quieter second line under the key line (gist): 1-2 plain sentences of context. Replaces why, which is still read."
+    },
     "why": {
       "type": "string",
       "maxLength": 300,
-      "description": "1-2 plain sentences of context the PM needs to build an answer (2026-11-05)."
+      "description": "Legacy name of detail (2026-11-05 to 2026-11-19), still read."
+    },
+    "source": {
+      "type": "string",
+      "maxLength": 160,
+      "description": "Theme pass stage 3 (2026-11-19): where the tip comes from, a document or call and its date (\"Release plan · Nov 14\"). Older items carry it in note."
     },
     "level": {
       "enum": [

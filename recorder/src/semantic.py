@@ -55,6 +55,20 @@ NEUTRAL_ANCHORS = [
 ]
 
 
+# 0.24.1 (F1): Pacenote's own meaning search model (bge-m3) is served on this port by the app (LocalAI.swift builtinPort).
+BUILTIN_PORT = 11435
+
+
+def builtin_reason(root: "str | None" = None) -> str:
+    """Why the built-in meaning search model does not answer: not installed, or installed and still starting."""
+    import os
+    base = root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    onnx = os.path.join(base, "models", "bge-m3-int8", "model_quantized.onnx")
+    if not os.path.isfile(onnx):
+        return "The meaning search model is not installed (Settings > Components installs it)"
+    return "The meaning search model is starting"
+
+
 class SemanticError(Exception):
     """An embedding call failed. `reason` is a short human-readable cause for status.json."""
 
@@ -180,12 +194,18 @@ class OllamaClient:
             if isinstance(r, (TimeoutError,)) or "timed out" in str(r):
                 raise SemanticError(f"Ollama timeout after {timeout:g} s ({path})") from None
             if isinstance(r, ConnectionRefusedError) or "refused" in str(r).lower():
+                if self._builtin():
+                    # 0.24.1 (F1): the port of Pacenote's own bge-m3 server, not Ollama; say what is really wrong.
+                    raise SemanticError(builtin_reason()) from None
                 raise SemanticError(f"Ollama is not running at {self.url} (ollama serve, or open the Ollama app)") from None
             raise SemanticError(f"Ollama not reachable at {self.url} ({r})") from None
         try:
             return json.loads(body.decode("utf-8"))
         except Exception:  # noqa: BLE001
             raise SemanticError(f"Ollama {path}: invalid JSON") from None
+
+    def _builtin(self) -> bool:
+        return self.url.rstrip("/").endswith(":%d" % BUILTIN_PORT)
 
     @staticmethod
     def _model_missing(e: SemanticError) -> bool:

@@ -220,13 +220,20 @@ enum SalesFile {
 struct SalesStateChip: View {
     let state: String
     let next: () -> Void
+    @Environment(\.pnTheme) private var t
+    // 0.25 (R2, board SL): a 28 pt bordered chip in mono: known in the ready colour, partly on the not-ready plate
     var body: some View {
-        let c = state == "known" ? PN.C.turn : state == "partial" ? PN.C.onMe : PN.C.text3
+        let known = state == "known", partly = state == "partial"
+        let fg: Color = known ? PN.C.readyText : partly ? PN.C.notreadyText : PN.C.text3
+        let bd: Color = known ? PN.C.ready : partly ? PN.C.notready : PN.C.field
+        let bg: Color = partly ? (t.nrBg.map { Color(pnHex: $0) } ?? .clear) : .clear
+        let shape = RoundedRectangle(cornerRadius: t.style == .classic ? 6 : 0)
         Button(action: next) {
-            Text(L("sales.state." + (["known", "partial"].contains(state) ? state : "unknown")))
-                .font(PN.Font.caption.weight(.semibold)).foregroundStyle(c)
-                .padding(.horizontal, 8).padding(.vertical, 2)
-                .background(Capsule().fill(c.opacity(0.14)))
+            Text(t.cased(L("sales.state." + (["known", "partial"].contains(state) ? state : "unknown"))))
+                .font(t.homeMono(11, .semibold)).foregroundStyle(fg)
+                .padding(.horizontal, 8).frame(height: 28)
+                .background(bg, in: shape)
+                .overlay(shape.strokeBorder(bd, lineWidth: 1.5))
                 .fixedSize()
         }
         .buttonStyle(.plain)

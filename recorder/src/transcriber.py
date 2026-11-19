@@ -99,6 +99,8 @@ DEFAULTS = {
     "speaker_lib_learn": 0.5,   # 0.8.5: the library learns only lines this close (mean cosine) to the speaker's other lines
     "speaker_suggest": 0.5,     # library people with cosine >= this are offered as suggestions
     "speaker_auto": 0.72,       # 2026-10-26: a voice this close to a name used on this meeting series is named by itself
+                                # 0.24.1 (owner): ... or to a participant of this call (Start call, the calendar event)
+    "speaker_auto_s": 4.0,      # 0.24.1: s of speech before that check runs (the ask still waits for speaker_prompt_s)
     "speaker_prompt_s": 15.0,   # 2026-10-26 (was 8: short exclamations were asked about); s of speech of an unnamed cluster before the window asks "Who is speaking?"
     "speaker_min_s": 1.0,       # s of speech a segment needs to get an embedding
     "speaker_inherit_s": 1.5,   # a segment without a usable embedding keeps the previous speaker within this gap
@@ -4096,9 +4098,11 @@ class SpeakerTracker:
         c = self.clusters.get(sid or "")
         if not c or c["name"] or sid in self.skipped or sid in self.asked:
             return
-        if c["seconds"] < self._f("speaker_prompt_s"):
+        # 0.24.1 (owner): a known voice of a participant is named as soon as there is enough speech to tell,
+        # not after the ask delay; the check runs again as the speaker grows
+        if c["seconds"] >= self._f("speaker_auto_s") and self._auto_name(sid):
             return
-        if self._auto_name(sid):
+        if c["seconds"] < self._f("speaker_prompt_s"):
             return
         self.asked.add(sid)
         if self.ask_open or self.paused:
@@ -4108,21 +4112,28 @@ class SpeakerTracker:
         self._open_ask(sid)
 
     def _auto_name(self, sid: str) -> bool:
-        """Name a voice by itself when its best library match is a name used on this meeting series
-        (Rosters) with cosine >= speaker_auto, clearly ahead of the next match, and not used yet in this call."""
-        if self.rosters is None:
-            return False
-        roster = {n.casefold() for n in self.rosters.names()}
+        """Name a voice by itself when its best library match is a participant of this call (Start call, the
+        calendar event; 0.24.1, owner) or, without participants, a name used on this meeting series (Rosters),
+        with cosine >= speaker_auto, clearly ahead of the next match, and not used yet in this call."""
         sug = self.clusters[sid].get("suggestions") or []
-        if not roster or not sug:
+        if not sug:
             return False
         top = sug[0]
-        name = _s(top.get("name"))
-        second = float(sug[1]["score"]) if len(sug) > 1 else 0.0
-        if self.participants and name.casefold() not in {p.casefold() for p in self.participants}:
+        if top.get("score") is None:              # people offered without a voice match: never named by themselves
             return False
-        if (name.casefold() not in roster or float(top.get("score") or 0) < self._f("speaker_auto")
-                or float(top["score"]) - second < 0.05 or self.by_name(name, exclude=sid)):
+        name = _s(top.get("name"))
+        second = float(sug[1].get("score") or 0) if len(sug) > 1 else 0.0
+        if self.participants:
+            if not self._is_participant(name):
+                return False
+            why = "a participant of this call"
+        else:
+            roster = {n.casefold() for n in self.rosters.names()} if self.rosters is not None else set()
+            if name.casefold() not in roster:
+                return False
+            why = "the meeting series roster"
+        if (float(top.get("score") or 0) < self._f("speaker_auto") or float(top["score"]) - second < 0.05
+                or self._is_pm(name) or self.by_name(name, exclude=sid)):
             return False
         self.clusters[sid]["name"] = name
         self.auto.add(sid)
@@ -4131,8 +4142,20 @@ class SpeakerTracker:
         self._lib_sync()
         self._save()
         self.emit({"kind": "speaker_auto", "sid": sid, "name": name, "score": top["score"], "at": hhmmss(now())})
-        log(f"speakers: {sid} named {name} by the meeting series roster ({top['score']})")
+        log(f"speakers: {sid} named {name} by {why} ({top['score']})")
         return True
+
+    def _is_participant(self, name: str) -> bool:
+        """The library name is one of this call's participants: the same name, or (a calendar's "M. Turner" for the
+        library's "Mike T.") the same first letter and surname initial as exactly one participant."""
+        k = name.casefold()
+        if any(p.casefold() == k for p in self.participants):
+            return True
+        def _sig(n: str) -> tuple[str, str] | None:
+            t = [w for w in re.split(r"[\s.]+", n.strip()) if w]
+            return (t[0][0].casefold(), t[-1][0].casefold()) if len(t) >= 2 else None
+        sig = _sig(name)
+        return sig is not None and sum(1 for p in self.participants if _sig(p) == sig) == 1
 
     def clear_names(self) -> bool:
         """'Clear speakers' in the window: every name of this call is removed (lines go back to Speaker N),

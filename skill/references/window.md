@@ -8,7 +8,7 @@ Read once early in the call (in a quiet poll after the speech), and again when a
   and the wrap-up. `both` (default): window and chat. `chat`: no window, as before. A missing
   `tips.output` (older settings.yaml) means `both`.
 - One tip = one JSON line (UTF-8, `ensure_ascii` not needed):
-  `{"t":"HH:MM:SS","kind":"tip","level":"red","gist":"🔴 Нова вимога. Не погоджуй зараз.","phrase":"Good idea. I will write it down.","items":["..."],"note":"рішення від 30.09"}`
+  `{"t":"HH:MM:SS","kind":"tip","level":"red","gist":"🔴 Нова вимога. Не погоджуй зараз.","detail":"Цього немає в скоупі, спершу оцінка.","phrase":"Good idea. I will write it down.","items":["..."],"source":"Рішення · 30.09"}`
   - `kind`: `tip` | `answer` (reply to a window question, add `"q":"<the question>"`) |
     `checklist` | `speech` (the PM's theses, Step 2a; `phrase` = the opening sentence,
     `items` = the theses, group names go in the items as plain lines; a thesis with its full
@@ -20,8 +20,9 @@ Read once early in the call (in a quiet poll after the speech), and again when a
     rolling median in the status line. The wrap-up and the hiring analysis report the
     median and max of `at - src`.
   - `level`: `red` | `orange` | `info`; `gist` keeps its emoji;
-  - `phrase` without quotes (the window adds them), `items` for numbered points, `note`
-    for the source; omit empty fields. The same "Tip format" rules apply.
+  - `gist` is the key line, `detail` the quieter line under it (before 0.25 `why`, still read), `phrase`
+    without quotes (the window adds them), `items` for numbered points, `source` for the document and its
+    date (before 0.25 `note`, still read); omit empty fields. The same "Tip format" rules apply.
 - **Agenda strip** (`kind: agenda`): `{"kind":"agenda","gist":"<title>","items":[{"text":"Release date","done":true},{"text":"New export request","done":false}]}`.
   Emit it once the checklist is known (Step 2: the checklist; hiring: the planned or likely
   questions; standup you lead: the people to hear from) and again, whole, each time an item

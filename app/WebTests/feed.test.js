@@ -3,7 +3,7 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-const { Feed, clean, hmsToMs } = require(path.join(__dirname, '../Resources/tips/feed.js'));
+const { Feed, clean, hmsToMs, cardPage } = require(path.join(__dirname, '../Resources/tips/feed.js'));
 
 let failures = 0, passed = 0;
 function test(name, fn) { try { fn(); passed++; } catch (e) { failures++; console.log('FAIL', name, '\n ', e.message); } }
@@ -572,6 +572,103 @@ test('co-driver: a heard question card is replaced in place by its answer (same 
   assert.strictEqual(docs.length, 1, 'one card, not two');
   assert.strictEqual(docs[0].meta, 'Mike asked: When does 3DS start?');
   assert.ok(docs[0].say.startsWith('Once Pomelo'));
+});
+
+// Theme pass stage 3 (2026-11-19): a tip reads as key / detail / phrase / source.
+test('stage 3: answer card: gist is the key, detail under it, source from the engine', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:41:00', kind: 'answer', level: 'info', q: 'when is the production release?', gist: 'Production release: Tue, Nov 24',
+    detail: 'After the Nov 23 review', source: 'Release plan · Nov 14', engine: 'app' }]);
+  const c = get().cards[0];
+  assert.strictEqual(c.key, 'Production release: Tue, Nov 24');
+  assert.strictEqual(c.detail, 'After the Nov 23 review');
+  assert.strictEqual(c.why, 'After the Nov 23 review');
+  assert.strictEqual(c.source, 'Release plan · Nov 14');
+  assert.strictEqual(c.line, '');
+});
+
+test('stage 3: a statement tip with a phrase: gist is the key, the phrase goes under the detail and is what Edit changes', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:42:00', src: '10:41:58', kind: 'tip', level: 'orange', uid: 'k1', gist: '\u{1F7E0} Emily thinks the pilot starts Monday, it is the 10th',
+    detail: 'The status report moved it after the review.', phrase: 'Small correction: the pilot starts on the 10th.', engine: 'app' }]);
+  const c = get().cards[0];
+  assert.strictEqual(c.key, 'Emily thinks the pilot starts Monday, it is the 10th');
+  assert.strictEqual(c.line, 'Small correction: the pilot starts on the 10th.');
+  assert.strictEqual(c.sayIsKey, false);
+  assert.strictEqual(c.say, c.line);
+  f.edit(c.id, 'The pilot starts on the 10th.');
+  const e = get().cards[0];
+  assert.strictEqual(e.line, 'The pilot starts on the 10th.');
+  assert.strictEqual(e.key, 'Emily thinks the pilot starts Monday, it is the 10th');
+});
+
+test('stage 3: a question tip: the question is the small line, the answer is the key', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:43:00', src: '10:42:58', kind: 'tip', level: 'red', gist: '\u{1F3AF} Dana asks: when is the export live?',
+    phrase: 'It is on dev now; production on Tuesday after the review.', engine: 'app' }]);
+  const c = get().cards[0];
+  assert.strictEqual(c.qline, 'Dana: when is the export live?');
+  assert.strictEqual(c.key, 'It is on dev now; production on Tuesday after the review.');
+  assert.strictEqual(c.sayIsKey, true);
+});
+
+test('stage 3: the old format still reads: why is the detail, note the source', () => {
+  const { f, get } = make();
+  f.addItems([{ t: '10:44:00', kind: 'answer', level: 'info', q: 'find: pilot users', gist: 'Pilot: 5 users, list from the client',
+    why: 'Names come from David by Friday.', note: 'Sources: kickoff-notes.md', engine: 'app' }]);
+  const c = get().cards[0];
+  assert.strictEqual(c.detail, 'Names come from David by Friday.');
+  assert.strictEqual(c.source, 'kickoff-notes.md');
+  assert.strictEqual(c.key, 'Pilot: 5 users, list from the client');
+});
+
+// Theme pass stage 4 (2026-11-19): the compact card's pager (feed.js cardPage). The list comes newest first.
+const C = (id, at, extra) => Object.assign({ id, at, kind: 'answer', state: 'active' }, extra || {});
+const LIST3 = [C('c', NOW - 10000), C('b', NOW - 120000), C('a', NOW - 300000)];
+
+test('card pager: no tips, an empty page', () => {
+  const p = cardPage([], {}, NOW);
+  assert.strictEqual(p.card, null); assert.strictEqual(p.total, 0); assert.strictEqual(p.latest, true);
+});
+
+test('card pager: follows the newest; Tip 3 of 3; a tip under a minute old is new', () => {
+  const p = cardPage(LIST3, {}, NOW);
+  assert.strictEqual(p.card.id, 'c'); assert.strictEqual(p.index, 3); assert.strictEqual(p.total, 3);
+  assert.strictEqual(p.latest, true); assert.strictEqual(p.fresh, true);
+  assert.strictEqual(p.prevId, 'b'); assert.strictEqual(p.latestId, 'c');
+  assert.strictEqual(cardPage(LIST3, {}, NOW + 120000).fresh, false);
+});
+
+test('card pager: paging back shows the older tip; the oldest has no previous', () => {
+  const p = cardPage(LIST3, { pin: 'b', seen: 'c' }, NOW);
+  assert.strictEqual(p.card.id, 'b'); assert.strictEqual(p.index, 2); assert.strictEqual(p.latest, false);
+  assert.strictEqual(p.fresh, false); assert.strictEqual(p.prevId, 'a');
+  const q = cardPage(LIST3, { pin: 'a', seen: 'c' }, NOW);
+  assert.strictEqual(q.index, 1); assert.strictEqual(q.prevId, null);
+});
+
+test('card pager: a tip that arrives while paging back does not take the card, it is marked new', () => {
+  const more = [C('d', NOW - 1000)].concat(LIST3);
+  const p = cardPage(more, { pin: 'b', seen: 'c' }, NOW);
+  assert.strictEqual(p.card.id, 'b'); assert.strictEqual(p.index, 2); assert.strictEqual(p.total, 4);
+  assert.strictEqual(p.fresh, true); assert.strictEqual(p.latestId, 'd');
+});
+
+test('card pager: a hidden pinned tip falls back to the newest', () => {
+  const p = cardPage(LIST3.filter((c) => c.id !== 'b'), { pin: 'b', seen: 'c' }, NOW);
+  assert.strictEqual(p.card.id, 'c'); assert.strictEqual(p.latest, true);
+});
+
+test('card pager: the N min left card and quiet cards are not paged; a pinned quiet card is', () => {
+  const list = [C('__finish', NOW, { kind: 'finish' }), C('q', NOW - 5000, { quiet: true }), C('p', NOW - 6000, { quiet: true, pinned: true })].concat(LIST3);
+  const p = cardPage(list, {}, NOW);
+  assert.strictEqual(p.total, 4); assert.strictEqual(p.card.id, 'p');
+});
+
+test('0.25: a quiet risk and a decision conflict reach the card, a quiet Done? does not', () => {
+  const list = [C('d', NOW - 3000, { quiet: true, kind: 'decision_conflict' }), C('r', NOW - 4000, { quiet: true, kind: 'risk' }), C('q', NOW - 5000, { quiet: true, kind: 'onme' })].concat(LIST3);
+  const p = cardPage(list, {}, NOW);
+  assert.strictEqual(p.total, 5); assert.strictEqual(p.card.id, 'd');
 });
 
 console.log(`feed tests: ${passed} passed, ${failures} failed`);

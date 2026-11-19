@@ -152,6 +152,12 @@ func mirrorAndWorkspaces() {
     let old = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"uiLanguage\":\"uk\"}".utf8))
     expect(old?.uiLanguage == "uk" && old?.showInDock == true, "config decodes older files")
     expect(old?.floatingCallControls == true, "older config enables floating controls")
+    expect(old?.tipsWindowMode == "window", "older config keeps the tips window (theme pass stage 4)")
+    let oddMode = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"tipsWindowMode\":\"strip\"}".utf8))
+    expect(oddMode?.tipsWindowMode == "window", "unknown tips mode reads as the window")
+    var cardCfg = AppConfig(); cardCfg.tipsWindowMode = "card"
+    let cardBack = (try? JSONEncoder().encode(cardCfg)).flatMap { try? JSONDecoder().decode(AppConfig.self, from: $0) }
+    expect(cardBack?.tipsWindowMode == "card", "compact card mode round trip")
     let statusPath = NSTemporaryDirectory() + "pacenote-floating-status.json"
     for value in ["on", "off"] {
         try? ("{\"state\":\"recording\",\"tips_paused\":\"" + value + "\"}").write(toFile: statusPath, atomically: true, encoding: .utf8)
@@ -2561,16 +2567,19 @@ func settingsSearchD2() {
     for e in es {
         expect(panes.contains(e.pane), "d2: \(e.id) pane \(e.pane) exists")
         expect(en[e.titleKey] != nil && uk[e.titleKey] != nil, "d2: \(e.id) title \(e.titleKey) in en and uk")
-        if let g = e.defaults[SettingsSearch.generalGroupKey] { expect(SettingsSearch.generalGroups.contains(g) && e.pane == "general", "d2: \(e.id) general group") }
-        if let g = e.defaults[SettingsSearch.aiGroupKey] { expect(SettingsSearch.aiGroups.contains(g) && e.pane == "ai", "d2: \(e.id) ai group") }
-        if let g = e.defaults[SettingsSearch.notionGroupKey] { expect(SettingsSearch.notionGroups.contains(g) && e.integration == "notion", "d2: \(e.id) notion group") }
+        for k in e.defaults.keys where k.hasPrefix(SettingsSearch.advancedPrefix) {
+            let scope = String(k.dropFirst(SettingsSearch.advancedPrefix.count))
+            expect(SettingsSearch.advancedScopes.contains(scope), "r5: \(e.id) Advanced scope \(scope) exists")
+            expect(scope == e.pane || (scope == "notion" && e.integration == "notion") || (scope == "integrations" && e.pane == "integrations"),
+                   "r5: \(e.id) opens the Advanced of its own pane")
+            expect(e.defaults[k] == "1", "r5: \(e.id) opens Advanced")
+        }
         if let g = e.defaults[SettingsSearch.hubspotGroupKey] { expect(SettingsSearch.hubspotGroups.contains(g) && e.integration == "hubspot", "d2: \(e.id) hubspot group") }
         if e.integration != nil { expect(e.pane == "integrations", "d2: \(e.id) integration lives under Integrations") }
         if e.projectPage { expect(e.pane == "projects", "d2: \(e.id) project page lives under Projects") }
         for k in ["gen.group.", "ai.group.", "ntn.group.", "hs.group."] { _ = k }
     }
-    for (p, gs) in [("gen.group.", SettingsSearch.generalGroups), ("ai.group.", SettingsSearch.aiGroups),
-                    ("ntn.group.", SettingsSearch.notionGroups), ("hs.group.", SettingsSearch.hubspotGroups)] {
+    for (p, gs) in [("hs.group.", SettingsSearch.hubspotGroups)] {
         for g in gs { expect(en[p + g] != nil && uk[p + g] != nil && en[p + "sub." + g] != nil && uk[p + "sub." + g] != nil, "d2: group strings \(p)\(g)") }
     }
     // every target the search jumps to carries its anchor in the app (pages that are a target as a whole need none)
@@ -2596,7 +2605,20 @@ func settingsSearchD2() {
     expect(SettingsSearch.score("ab", titles: ["Abc"], extra: "") > SettingsSearch.score("ab", titles: ["x ab"], extra: ""), "d2: prefix beats inside")
     expect(SettingsSearch.score("q", titles: ["x"], extra: "q") == 1, "d2: extra words still match")
     let gen = SettingsSearch.entries.first { $0.id == "gen.lang" }
-    expect(gen?.group == "basics", "d2: the group of an entry")
+    expect(gen?.group == nil && gen?.advanced == false, "r5: Language sits on top of General")
+    // 0.25 (R5): what is needed on top, the rest under one Advanced that the search opens
+    let dock = SettingsSearch.entries.first { $0.id == "gen.dock" }
+    expect(dock?.advanced == true && dock?.group == "advanced", "r5: Dock sits under General's Advanced")
+    expect(SettingsSearch.find("dock", titles: titles).first?.id == "gen.dock", "r5: the search still finds what is under Advanced")
+    for id in ["ai.claude", "ai.openai", "ai.gemini", "int.notion.token", "int.notion.meetDB", "rec.what", "tr.lang", "sh.mode", "acc.head", "acc.plan", "pr.import"] {
+        expect(SettingsSearch.entries.first { $0.id == id }?.advanced == false, "r5: \(id) is on top of its pane")
+    }
+    for id in ["ai.prep", "ai.chain", "ai.spend", "ai.local", "tr.dict", "tr.speakers", "sh.focus", "acc.devices", "acc.delete", "int.notion.local", "int.notion.tasks", "pr.scan", "rec.drive"] {
+        expect(SettingsSearch.entries.first { $0.id == id }?.advanced == true, "r5: \(id) is under Advanced")
+    }
+    expect(SettingsSearch.entries.first { $0.id == "int.hubspot.key" }?.group == "conn", "r5: a HubSpot tab still names its group")
+    expect(en["set.advanced"] != nil && uk["set.advanced"] != nil, "r5: the Advanced label in en and uk")
+    for sc in SettingsSearch.advancedScopes { expect(en["adv.sum." + sc] != nil && uk["adv.sum." + sc] != nil, "r5: Advanced summary of \(sc) in en and uk") }
 }
 
 func orgsB6b() {
@@ -4012,6 +4034,18 @@ updatesD3()
 orgsB6b()
 prepSecuritySEC01()
 projectsWizard0170()
+// MARK: 2026-11-19 (theme pass, stage 1): the preparation estimate on Home ("Prepare brief · ~40 s")
+func prepEstimateTP1() {
+    let l = [#"{"job":"prep","error":false,"duration_s":38}"#, #"{"job":"prep","error":true,"duration_s":400}"#,
+             #"{"job":"prep_refresh","error":false,"duration_s":900}"#, #"{"job":"prep","error":false,"duration_s":44}"#,
+             #"{"job":"prep","error":false,"duration_s":41.0}"#, "not json"].joined(separator: "\n")
+    expect(PrepEstimate.seconds(ledger: l) == 41, "tp1: the median of the successful prep runs only")
+    expect(PrepEstimate.seconds(ledger: #"{"job":"prep","error":false,"duration_s":38}"#) == nil, "tp1: one run is no estimate")
+    expect(PrepEstimate.seconds(ledger: "") == nil, "tp1: no ledger, no estimate")
+    expect(PrepEstimate.rounded(41) == (40, false) && PrepEstimate.rounded(4) == (10, false), "tp1: seconds round to 10, at least 10")
+    expect(PrepEstimate.rounded(170) == (3, true), "tp1: from 90 s whole minutes")
+}
+
 // MARK: 2026-11-18 (redesign block 1): the style setting (Settings > General > Appearance)
 func appearanceStyleR1() {
     let d = AppConfig()
@@ -4022,6 +4056,9 @@ func appearanceStyleR1() {
     var c = AppConfig(); c.appearanceStyle = "broadsheet"; c.appearance = "light"
     let back = (try? JSONEncoder().encode(c)).flatMap { try? JSONDecoder().decode(AppConfig.self, from: $0) }
     expect(back?.appearanceStyle == "broadsheet" && back?.appearance == "light", "r1: style and mode round-trip")
+    // theme pass (19.11): Classic is out of the picker, a config on Classic reads as Roadbook and keeps its mode
+    let cl = try? JSONDecoder().decode(AppConfig.self, from: Data("{\"appearanceStyle\":\"classic\",\"appearance\":\"dark\"}".utf8))
+    expect(cl?.appearanceStyle == "roadbook" && cl?.appearance == "dark", "theme pass: a config on Classic moves to Roadbook, keeps its mode")
 }
 
 // MARK: 2026-11-18 (0.23.0): the update window on every launch, once per launch and version
@@ -4038,6 +4075,100 @@ func updatePromptR() {
     expect(!show("0.23.1", other: true), "up: not over another first-run window")
 }
 
+// MARK: 2026-11-18 (0.24.1, F3): the AI of every job follows what is connected
+func aiDefaultsF3() {
+    var r = AppConfig.AIRoutes()          // prep code, tips api, after code (the old defaults)
+    // the first user: only the Claude API key, never looked before (the update): the jobs move to the key
+    var n = AIDefaults.apply(r, connected: ["api"])
+    expect(n.prep == "api" && n.after == "api" && n.tips == "api", "f3: only the API key does every job")
+    expect(n.seen == ["api"], "f3: what was connected is remembered")
+    // later the Claude account is connected: it becomes the preparation and after-the-call AI, tips stay on the key
+    n = AIDefaults.apply(n, connected: ["api", "code"])
+    expect(n.prep == "code" && n.after == "code" && n.tips == "api", "f3: a new account takes prep and after")
+    // the PM picks the API for prep again: it stays while both are connected
+    n.prep = "api"
+    n = AIDefaults.apply(n, connected: ["api", "code"])
+    expect(n.prep == "api" && n.after == "code", "f3: a choice the PM made stays while its AI is connected")
+    // the ChatGPT account arrives later: it is adopted too (the newest account)
+    n = AIDefaults.apply(n, connected: ["api", "code", "codex"])
+    expect(n.prep == "codex" && n.after == "codex", "f3: a newly connected ChatGPT account becomes the default")
+    // the key is removed: tips go to what is left (an account), never to the model on this Mac or agy
+    n = AIDefaults.apply(n, connected: ["code", "codex", "local", "agy"])
+    expect(n.tips == "code", "f3: tips go to a connected account, never local or agy")
+    // an update with accounts already connected and a working choice: nothing is taken over
+    r = AppConfig.AIRoutes(); r.prep = "api"; r.after = "api"
+    n = AIDefaults.apply(r, connected: ["api", "code"])
+    expect(n.prep == "api" && n.after == "api", "f3: the first look adopts nothing")
+    // nothing connected: the choice stays as it is
+    n = AIDefaults.apply(AppConfig.AIRoutes(), connected: [])
+    expect(n.prep == "code" && n.tips == "api", "f3: nothing connected, nothing moves")
+    // only ChatGPT through the API key: every job on it
+    n = AIDefaults.apply(AppConfig.AIRoutes(), connected: ["openai"])
+    expect(n.prep == "openai" && n.after == "openai" && n.tips == "openai", "f3: only an OpenAI key does every job")
+    // only the Gemini account: prep and after on it, tips cannot (too slow), the choice stays and the engine says why
+    n = AIDefaults.apply(AppConfig.AIRoutes(), connected: ["agy"])
+    expect(n.prep == "agy" && n.after == "agy" && n.tips == "api", "f3: the Gemini account never runs tips")
+    expect(AIDefaults.pick(job: "prep", chosen: "gemini", connected: ["gemini", "code"]) == "gemini", "f3: pick keeps a connected choice")
+    // the config keeps `seen` across a save, an older config without it reads as nil
+    if let d = try? JSONEncoder().encode(n), let back = try? JSONDecoder().decode(AppConfig.AIRoutes.self, from: d) {
+        expect(back.seen == ["agy"], "f3: seen is saved")
+    } else { expect(false, "f3: routes encode") }
+    if let old = try? JSONDecoder().decode(AppConfig.AIRoutes.self, from: Data("{\"prep\":\"api\"}".utf8)) {
+        expect(old.seen == nil && old.prep == "api", "f3: an older config has no seen")
+    } else { expect(false, "f3: older routes decode") }
+}
+
+/// Theme pass stage 2: owners next to decisions (CallLists.decisionItems = call_lists.decision_items).
+func decisionOwnersTP2() {
+    let mn = "## Meeting notes\n\n### Decisions\n- [13:25:00] **Emily Clark**: The export goes to production on Tue, Nov 24.\n" +
+        "- [13:40:00] **Emily Clark, you**: CSV download goes through a change request.\n- [13:41:00] **Go with plan B**\n" +
+        "- Keep the deposit at 20 euros\n- None\n"
+    var r = CallLists.resolve(situations: [], notes: mn)
+    expect(r.decisionsFrom == .notes && r.decisions == ["The export goes to production on Tue, Nov 24.", "CSV download goes through a change request.",
+        "Go with plan B", "Keep the deposit at 20 euros"], "tp2: notes decisions without the owner in the text")
+    expect(r.decisionItems.map(\.by) == ["Emily Clark", "Emily Clark, you", "", ""], "tp2: notes owners, a bold decision has none")
+    expect(r.decisionItems.first?.t == "13:25:00", "tp2: the time stays")
+    let sync = CallSync.decisions(r)
+    expect(sync.first?["made_by"] as? String == "Emily Clark" && sync[2]["made_by"] == nil, "tp2: sync sends made_by only when named")
+    let pm: [String: Any] = ["kind": "situation", "source": "call_page", "lists": ["decisions"],
+                             "decisions": ["Ship Tuesday", "Ship Tuesday", "Hold the price"], "decision_owners": ["Mike", "Mike", ""]]
+    r = CallLists.resolve(situations: [pm], notes: mn)
+    expect(r.decisionsFrom == .pm && r.decisions == ["Ship Tuesday", "Hold the price"] && r.decisionItems.map(\.by) == ["Mike", ""], "tp2: PM edit owners")
+    let live: [String: Any] = ["kind": "situation", "decisions": [["what": "Pilot starts Monday", "who": "David Kim"], "Old style line"]]
+    r = CallLists.resolve(situations: [live], notes: nil)
+    expect(r.decisionItems.map(\.by) == ["David Kim", ""] && r.decisions == ["Pilot starts Monday", "Old style line"], "tp2: live objects and strings")
+    let md = MeetingNotes.markdown({ var n = MeetingNotes.Notes(); n.decisions = [MeetingNotes.Item(t: "13:25:00", text: "Ship", by: "Emily")]; return n }(),
+        MeetingNotes.Labels(title: "", tldr: "T", decisions: "Decisions", actions: "A", open: "O", topics: "Tp", unclear: "U"))
+    expect(md.contains("- [13:25] Emily: Ship"), "tp2: export line names the owner")
+}
+
+func tipCardPlacementTP4() {
+    // MacBook with a notch: 1512 x 982, menu bar 38 = notch; an external display on the left is the main one.
+    let mbp = TipCardScreen(frame: CGRect(x: 0, y: 0, width: 1512, height: 982), visible: CGRect(x: 0, y: 70, width: 1512, height: 874),
+                            safeTop: 38, builtin: true)
+    let ext = TipCardScreen(frame: CGRect(x: -2560, y: 0, width: 2560, height: 1440), visible: CGRect(x: -2560, y: 0, width: 2560, height: 1415), main: true)
+    expect(TipCardPlacement.pick([ext, mbp]) == mbp, "tp4: the built-in display wins over the main one")
+    expect(TipCardPlacement.pick([ext]) == ext, "tp4: no built-in display: the main one")
+    let f = TipCardPlacement.frame(on: mbp, height: 200)
+    expect(f.width == 480 && f.height == 200 && f.midX == 756, "tp4: centred under the camera, prototype width")
+    expect(f.maxY == 982 - 38 - 6, "tp4: hangs below the notch with the gap")
+    // No notch: below the menu bar (the visible frame's top).
+    let old = TipCardScreen(frame: CGRect(x: 0, y: 0, width: 1440, height: 900), visible: CGRect(x: 0, y: 0, width: 1440, height: 875), main: true)
+    expect(TipCardPlacement.frame(on: old, height: 150).maxY == 869, "tp4: no notch: below the menu bar")
+    // Height limits and the resize that keeps the top edge.
+    expect(TipCardPlacement.frame(on: old, height: 10).height == TipCardPlacement.minHeight, "tp4: minimum height")
+    expect(TipCardPlacement.frame(on: old, height: 5000).height == 525, "tp4: at most 60% of the visible height")
+    let moved = CGRect(x: 100, y: 500, width: 480, height: 200)
+    let r = TipCardPlacement.resized(moved, height: 260, on: old)
+    expect(r.maxY == 700 && r.minX == 100 && r.height == 260, "tp4: resize keeps the top edge and x")
+    let low = TipCardPlacement.resized(CGRect(x: 0, y: 20, width: 480, height: 120), height: 300, on: old)
+    expect(low.minY == 0 && low.height == 300, "tp4: resize stays on the visible frame")
+    // A narrow display: the card fits inside with the gap on both sides.
+    let narrow = TipCardScreen(frame: CGRect(x: 0, y: 0, width: 400, height: 800), visible: CGRect(x: 0, y: 0, width: 400, height: 780))
+    let n = TipCardPlacement.frame(on: narrow, height: 150)
+    expect(n.width == 388 && n.minX == 6, "tp4: narrow display")
+}
+
 itemIDs0170()
 pull0170()
 orgCard0170()
@@ -4049,6 +4180,120 @@ orgContext0170()
 salesBlocksS1()
 emailAuthB13()
 appearanceStyleR1()
+prepEstimateTP1()
 updatePromptR()
+/// 0.24.1 (F1, F7): the base set and its loader, Pacenote's own Python, locked packages, sign-in without Terminal, logs.
+func hotfixF1() {
+    let app = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    // the base set: bge-m3 and voices in it, Claude Code not (decisions 10, 11)
+    expect(SetupPlan.base.contains("localai") && SetupPlan.base.contains("voices"), "f1: bge-m3 and voices are in the base set")
+    expect(!SetupPlan.base.contains("claude") && SetupPlan.accountTools.contains("claude") && SetupPlan.accountTools.contains("codex"), "f1: account tools are not components")
+    expect(SetupPlan.base == ComponentCatalog.required, "f1: the base set is what Components calls required")
+    expect(Set(SetupPlan.callBlocking).isSubset(of: Set(SetupPlan.base)) && !SetupPlan.callBlocking.contains("localai") && !SetupPlan.callBlocking.contains("voices"), "f1: bge-m3 and voices do not block a call")
+    // a failure does not stop independent steps
+    expect(SetupPlan.blockedBy("whisper", failed: ["tips"]) == nil, "f1: Whisper still installs when the tips engine failed")
+    expect(SetupPlan.blockedBy("localai", failed: ["python"]) == nil && SetupPlan.blockedBy("core", failed: ["python"]) == nil, "f1: curl steps need no Python")
+    expect(SetupPlan.blockedBy("whisper", failed: ["python"]) == "python" && SetupPlan.blockedBy("tips", failed: ["venv"]) == "venv", "f1: a step waits for what it needs")
+    // the loader
+    expect(SetupPlan.parse("PROGRESS 50 200 B") == SetupPlan.Progress(fraction: 0.25, bytes: 50, total: 200), "f1: progress in bytes")
+    expect(SetupPlan.parse("PROGRESS 3 4 pkg")?.fraction == 0.75 && SetupPlan.parse("PROGRESS 3 4 pkg")?.bytes == nil, "f1: progress in packages")
+    expect(SetupPlan.parse("PROGRESS 1 0 B") == nil && SetupPlan.parse("Collecting numpy") == nil && SetupPlan.parse("PROGRESS 9 4 B")?.fraction == 1, "f1: bad progress lines")
+    let all = ["python", "whisper"]
+    let o = SetupPlan.overall(steps: all, done: ["python"], running: "whisper", fraction: 0.5)
+    expect(abs(o - (25e6 + 810e6) / 1_645e6) < 0.001, "f1: overall weighs steps by size")
+    expect(SetupPlan.overall(steps: [], done: [], running: nil, fraction: 0) == 0, "f1: empty run")
+    expect(SetupPlan.eta(fraction: 0.01, elapsed: 60) == nil && SetupPlan.eta(fraction: 0.5, elapsed: 3) == nil, "f1: no early ETA")
+    expect(SetupPlan.eta(fraction: 0.25, elapsed: 60) == 180, "f1: ETA from the speed so far")
+    expect(SetupPlan.etaText(180) == "3 min" && SetupPlan.etaText(50) == "1 min" && SetupPlan.etaText(12) == "10 s", "f1: ETA text")
+    expect(SetupPlan.errorCode(step: "tips", log: ["ERROR: No matching distribution found for onnxruntime"]) == "python_unsupported", "f1: python_unsupported")
+    expect(SetupPlan.errorCode(step: "python", log: ["ERROR could not download Python."]) == "network", "f1: network")
+    expect(SetupPlan.errorCode(step: "whisper", log: ["Traceback"]) == "model_missing", "f1: model_missing")
+    // setup.sh: Pacenote's own Python, pinned and checked; no browser, no python.org; packages from hashed locks
+    let sh = (try? String(contentsOf: app.appendingPathComponent("Resources/setup.sh"), encoding: .utf8)) ?? ""
+    expect(sh.contains("PY_SHA=\"") && sh.contains("python-build-standalone") && sh.contains("sha_ok \"$t\" \"$PY_SHA\""), "f1: Python is pinned and checked")
+    expect(!sh.contains("python.org") && !sh.contains("open \"https"), "f1: setup never opens a browser")
+    expect(sh.contains("(3, 10) <= sys.version_info[:2] <= (3, 14)"), "f1: system Python only 3.10 to 3.14")
+    expect(sh.contains("pip_lock recorder") && sh.contains("pip_lock tips") && sh.contains("pip_lock voices") && sh.contains("--require-hashes"), "f1: packages from the locks")
+    expect(!sh.contains("pip_in \"anthropic") && !sh.contains("pip_in \"mlx-whisper"), "f1: no unpinned base packages")
+    expect(sh.contains("install:codex)") && sh.contains("CX_SHA=\""), "f1: Codex pinned by hash")
+    for g in ["recorder", "tips", "voices"] {
+        let lock = (try? String(contentsOf: app.appendingPathComponent("Resources/python/\(g).lock"), encoding: .utf8)) ?? ""
+        let pins = lock.split(separator: "\n").filter { $0.first?.isLetter == true }
+        expect(!pins.isEmpty && pins.allSatisfy { $0.contains("==") }, "f1: \(g).lock pins exact versions")
+        expect(lock.components(separatedBy: "--hash=sha256:").count - 1 >= pins.count, "f1: \(g).lock has hashes")
+    }
+    let bundle = (try? String(contentsOf: app.appendingPathComponent("buildtools/bundle.sh"), encoding: .utf8)) ?? ""
+    expect(bundle.contains("Resources/python/\"*.lock"), "f1: the app carries the locks")
+    // sign-in from the app
+    expect(CLILogin.arguments("claude") == ["auth", "login"] && CLILogin.arguments("codex").last == "login", "f1: sign-in arguments")
+    expect(CLILogin.event("Open this URL: https://claude.ai/oauth/authorize?code=1&x=2 ") == .url("https://claude.ai/oauth/authorize?code=1&x=2"), "f1: sign-in URL")
+    expect(CLILogin.event("Paste code here if prompted >") == .askCode && CLILogin.event("Enter the code shown") == .askCode, "f1: asks for a code")
+    expect(CLILogin.event("Successfully logged in") == .done && CLILogin.event("working...") == nil, "f1: sign-in done")
+    // logs (F7)
+    let d0 = Date(timeIntervalSince1970: 1_795_000_000), z = TimeZone(identifier: "Europe/Kyiv")!
+    let fakeHome = "/" + "Users" + "/mike", fakeKey = "sk-" + "ant-" + "api03-ABCDEFGHIJKLMNOPQRSTUV"     // built here: the repo scan
+    let ln = LogFile.line("rec at \(fakeHome)/work key \(fakeKey)", at: d0, zone: z, home: fakeHome)
+    expect(ln.hasPrefix("2026-") && ln.contains("+0200") && ln.contains("~/work") && !ln.contains(fakeHome) && !ln.contains("QRSTUV"), "f7: log line dated, home as ~, key cut")
+    let h = LogFile.header("call x", app: "0.24.1", build: "241", os: "15.4", extra: [("python", "3.13.18"), ("empty", "")], at: d0, zone: z)
+    expect(h.hasPrefix("=== call x | 2026-") && h.contains("Pacenote 0.24.1 (241)") && h.contains("python=3.13.18") && !h.contains("empty="), "f7: run header")
+    let tmp = NSTemporaryDirectory() + "pn-log-\(UUID().uuidString)/a.log"
+    for i in 0..<30 { LogFile.append(String(repeating: "x", count: 40) + "\(i)", to: tmp, maxBytes: 200, keep: 2) }
+    let fm = FileManager.default
+    expect(fm.fileExists(atPath: tmp) && fm.fileExists(atPath: tmp + ".1") && fm.fileExists(atPath: tmp + ".2") && !fm.fileExists(atPath: tmp + ".3"), "f7: logs rotate by size")
+    expect(((try? String(contentsOfFile: tmp, encoding: .utf8)) ?? "").contains("x29"), "f7: logs are appended")
+    try? fm.removeItem(atPath: (tmp as NSString).deletingLastPathComponent)
+}
+
+aiDefaultsF3()
+/// 0.24.1 (F2, F6, F7): an unfinished onboarding comes back; one readiness answer for every start; error codes.
+func hotfixF2F6() {
+    expect(OnboardingResume.shouldShow(done: false, legacyShown: false, baseLikelyReady: false), "f2: a new person sees the onboarding")
+    expect(OnboardingResume.shouldShow(done: false, legacyShown: false, baseLikelyReady: true), "f2: not finished: shown again even when installed")
+    expect(!OnboardingResume.shouldShow(done: true, legacyShown: false, baseLikelyReady: false), "f2: done is done")
+    expect(!OnboardingResume.shouldShow(done: false, legacyShown: true, baseLikelyReady: true), "f2: an older Set up later with all installed is not asked again")
+    expect(OnboardingResume.shouldShow(done: false, legacyShown: true, baseLikelyReady: false), "f2: an older Set up later without the base comes back")
+    expect(OnboardingResume.step(saved: 1, count: 7) == 1 && OnboardingResume.step(saved: nil, count: 7) == 0 && OnboardingResume.step(saved: 9, count: 7) == 6, "f2: resume step")
+    // readiness (decision 9): the first outside user had no tips modules and no Whisper model, and a working API key
+    typealias R = CallReadiness
+    expect(R.check(missing: ["tips", "whisper"], connected: ["api"], routes: ["api", "api", "api"]) == .blocked(["whisper", "tips"]), "f6: no base, no call")
+    expect(R.check(missing: ["localai", "voices"], connected: ["api"], routes: ["api"]) == .ready, "f6: bge-m3 and voices do not block")
+    expect(R.check(missing: [], connected: [], routes: ["api", "api", "api"]) == .transcriptOnly("no_ai"), "f6: no AI: transcript only")
+    expect(R.check(missing: [], connected: [], routes: ["code", "api", "code"]) == .transcriptOnly("account_tool"), "f6: an account without its tool")
+    expect(R.degraded(missing: ["voices", "tips"]) == ["voices"] && R.reason(.blocked(["tips"])) == "base_missing" && R.reason(.ready) == nil, "f6: degraded and reasons")
+    // the base by its files
+    let root = "/A", home = "/H", site = "/A/.venv/lib/python3.13/site-packages"
+    var files: Set<String> = ["/A/python/bin/python3", "/A/src/transcriber.py", "/A/.venv/bin/python",
+                              site + "/mlx_whisper", site + "/numpy", site + "/anthropic", site + "/yaml", site + "/jsonschema",
+                              site + "/onnxruntime", site + "/tokenizers", site + "/sherpa_onnx",
+                              "/A/models/bge-m3-int8/model_quantized.onnx", "/A/models/wespeaker_en_voxceleb_resnet34_LM.onnx"]
+    let hub = "/H/.cache/huggingface/hub/models--mlx-community--whisper-large-v3-turbo/snapshots"
+    var dirs: [String: [String]] = ["/A/.venv/lib": ["python3.13"], hub: ["abc"]]
+    func miss() -> [String] { BaseFiles.missing(appRoot: root, home: home, exists: { files.contains($0) }, list: { dirs[$0] ?? [] }) }
+    expect(miss().isEmpty, "f6: everything in place \(miss())")
+    files.remove(site + "/jsonschema"); dirs[hub] = []
+    expect(miss() == ["tips", "whisper"], "f6: the first user's case \(miss())")
+    dirs["/A/.venv/lib"] = []
+    expect(miss().contains("recorder") && miss().contains("voices"), "f6: no venv packages without site-packages")
+    expect(NothingRecorded.reason(sawLoading: true, sawRecording: false) == "model_loading" && NothingRecorded.reason(sawLoading: false, sawRecording: false) == "not_started"
+           && NothingRecorded.reason(sawLoading: true, sawRecording: true) == "silence", "f6: why nothing was recorded")
+    expect(NothingRecorded.path(transcript: "/x/a.app.md") == "/x/a.app.md.norec.json", "f6: the reason file")
+    // error codes (F7)
+    typealias A = Analytics
+    expect(A.errorCode(message: "No module named 'jsonschema'") == "module_missing", "f7: module_missing")
+    expect(A.errorCode(message: "failed after 0 s (api): Claude Code is not installed") == "not_installed", "f7: not_installed")
+    expect(A.errorCode(message: "The meaning search model is not installed") == "model_missing", "f7: model_missing")
+    expect(A.errorCode(message: "Notion: no meetings database for this project") == "no_destination", "f7: no_destination")
+    expect(A.errorCode(message: "ERROR: No matching distribution found for onnxruntime") == "python_unsupported", "f7: python_unsupported")
+    for c in ["not_installed", "module_missing", "model_missing", "no_destination", "python_unsupported"] {
+        expect(A.catalog.enums["error_code"]?.contains(c) == true, "f7: \(c) in the catalog")
+    }
+    for e in ["install_component", "rec_model_load", "call_blocked"] { expect(A.catalog.events[e] != nil, "f7: \(e) in the catalog") }
+    expect(A.catalog.events["call_ended"]?["lines"] != nil && A.catalog.events["call_started"]?["ready"] != nil, "f7: call_ended lines, call_started ready")
+}
+
+hotfixF1()
+hotfixF2F6()
+decisionOwnersTP2()
+tipCardPlacementTP4()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

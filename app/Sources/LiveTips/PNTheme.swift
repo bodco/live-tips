@@ -20,6 +20,8 @@ enum PNStyle: String, CaseIterable, Identifiable {
     /// The style a fresh install starts on (owner, 2026-11-18: Roadbook in the Pacenote build, marked "default").
     static let buildDefault: PNStyle = .roadbook
     init(config value: String) { self = PNStyle(rawValue: value) ?? PNStyle.buildDefault }
+    /// The styles Settings offers (theme pass, 19.11, owner): Classic left the picker, its code and tokens stay.
+    static let pickable: [PNStyle] = [.roadbook, .broadsheet]
 }
 
 extension Notification.Name {
@@ -58,8 +60,10 @@ struct PNTheme {
     let bg, surface, surface2, frame: UInt32
     let ink, ink2, ink3: UInt32
     let rule, ruleStrong, field: UInt32
-    // Actions and links
-    let accent, onAccent, link: UInt32
+    /// The lighter surface of what has the PM's attention: the current tip, the next setup step (theme pass, 19.11).
+    let focus: UInt32
+    // Actions and links. actEdge: the 2 pt frame of the main button (theme pass: Roadbook Light frames its yellow in ink).
+    let accent, onAccent, actEdge, link: UInt32
     let hlBg: UInt32?
     let hlFg: UInt32
     // The mark
@@ -116,7 +120,16 @@ struct PNTheme {
     }
 
     /// Text on a fill in the link colour (a small "Connect" pill): white in Classic, onAccent in Roadbook, white or the dark ground in Broadsheet.
-    var onLink: UInt32 { style == .classic ? 0xFFFFFF : (style == .broadsheet && dark ? edge : onAccent) }
+    /// Theme pass (19.11): Roadbook's accent became the yellow, so a Light link pill (ink) takes the yellow, a Dark one (light yellow) the ink.
+    var onLink: UInt32 {
+        switch style {
+        case .classic: return 0xFFFFFF
+        case .roadbook: return dark ? onAccent : (markBg ?? 0xFFD60A)
+        case .broadsheet: return dark ? edge : onAccent
+        }
+    }
+    /// The main button draws a frame only when it differs from its fill (Roadbook Light: yellow in an ink frame).
+    var framedAccent: Bool { actEdge != accent }
 
     /// Letter case of buttons, labels and section heads (Roadbook sets them in capitals).
     func cased(_ s: String) -> String { caps ? s.uppercased() : s }
@@ -128,8 +141,8 @@ struct PNTheme {
             style: .classic, dark: d,
             bg: p(0xF5F5F7, 0x1E1E20), surface: p(0xFFFFFF, 0x2C2C2E), surface2: p(0xEEEEF1, 0x3A3A3C), frame: p(0xC7C7CC, 0x48484A),
             ink: p(0x1D1D1F, 0xF5F5F7), ink2: p(0x3A3A3C, 0xC7C7CC), ink3: p(0x6E6E73, 0x98989D),
-            rule: p(0xE5E5EA, 0x3A3A3C), ruleStrong: p(0xC7C7CC, 0x636366), field: p(0x86868B, 0x636366),
-            accent: 0x0A6CFF, onAccent: 0xFFFFFF, link: p(0x0A6CFF, 0x4D9DFF),
+            rule: p(0xE5E5EA, 0x3A3A3C), ruleStrong: p(0xC7C7CC, 0x636366), field: p(0x86868B, 0x636366), focus: p(0xFFFFFF, 0x2C2C2E),
+            accent: 0x0A6CFF, onAccent: 0xFFFFFF, actEdge: 0x0A6CFF, link: p(0x0A6CFF, 0x4D9DFF),
             hlBg: nil, hlFg: p(0x1D1D1F, 0xF5F5F7),
             markBg: nil, markFg: p(0x1D1D1F, 0xF5F5F7), markDot: p(0x0A6CFF, 0x4D9DFF), spDot: p(0x0A6CFF, 0x4D9DFF),
             ready: p(0x15803D, 0x4CD964), readyText: p(0x15803D, 0x4CD964),

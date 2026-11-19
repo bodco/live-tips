@@ -84,7 +84,7 @@ def test_read_files(tmp_path):
 
 def test_auto_add_reads_the_rule(tmp_path):
     md = _call(tmp_path, [LIVE, EDIT_RISKS])
-    assert call_decisions(md) == ["Go with plan B"], "notes decisions, not the last situation's"
+    assert call_decisions(md) == [{"text": "Go with plan B", "by": ""}], "notes decisions, not the last situation's"
     assert call_risks(md) == ["Legal review"], "the PM's risks edit"
     md2 = _call(tmp_path, [LIVE, EDIT_ALL], notes=None, sub="b")
     assert call_decisions(md2) == [] and call_risks(md2) == [], "the PM removed everything: nothing is added"

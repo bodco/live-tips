@@ -130,7 +130,7 @@ TIP_SCRIPTS = ("LATIN", "CYRILLIC", "GREEK")
 GARBLED_TOKEN = re.compile(r"(?<![\w/.])_[A-Z]{4,}\b")
 
 
-def garbled(obj: dict, keys=("gist", "why", "phrase", "note", "items")) -> Optional[str]:
+def garbled(obj: dict, keys=("gist", "detail", "why", "phrase", "note", "source", "items")) -> Optional[str]:
     """Why a tip's text looks garbled ("foreign script", "token"), else None."""
     parts = []
     for k in keys:
@@ -260,10 +260,33 @@ def tip_timing(span: dict, c, done: float) -> None:
     span["tip_done"] = done
 
 
-def tip_item(obj: dict, uid: str, line: Line, trigger: str, done: float, late: bool) -> dict:
+SOURCE_MAX = 160
+
+
+def tip_detail(obj: dict) -> str:
+    """Theme pass stage 3 (2026-11-19): the quieter line under the key line. The model wrote "why" before."""
+    return str(obj.get("detail") or obj.get("why") or "").strip()
+
+
+def tip_source(obj: dict, sources: Optional[Callable[[List[str]], str]] = None) -> str:
+    """Theme pass stage 3: where the tip comes from ("Release plan · Nov 14"). The model's own source first,
+    else the sources of the facts it used (fact_ids, from the fact book and the cards). The old free-text note
+    is left as it is: it was not always a source ("for comparison, not to say"), the windows still read it."""
+    src = str(obj.get("source") or "").strip()
+    if not src and sources and obj.get("fact_ids"):
+        try:
+            src = sources([str(x) for x in obj.get("fact_ids") or []]) or ""
+        except Exception:
+            src = ""
+    src = re.sub(r"^(sources?|джерела|джерело)\s*:\s*", "", src, flags=re.I)
+    return src[:SOURCE_MAX]
+
+
+def tip_item(obj: dict, uid: str, line: Line, trigger: str, done: float, late: bool,
+             sources: Optional[Callable[[List[str]], str]] = None) -> dict:
     item = {"schema_version": 1, "engine": "app", "uid": uid, "t": s_to_hms(done), "src": line.t, "kind": "tip",
-            "level": obj.get("level", "orange"), "gist": obj["gist"], "why": obj.get("why", ""), "phrase": obj.get("phrase", ""),
-            "items": obj.get("items", []), "note": obj.get("note", ""), "topic": obj.get("topic", ""),
+            "level": obj.get("level", "orange"), "gist": obj["gist"], "detail": tip_detail(obj), "phrase": obj.get("phrase", ""),
+            "items": obj.get("items", []), "note": obj.get("note", ""), "source": tip_source(obj, sources), "topic": obj.get("topic", ""),
             "trigger": obj.get("trigger", trigger), "fact_ids": obj.get("fact_ids", []),
             "at": s_to_hms(done), "late": late}
     return {k: v for k, v in item.items() if v not in ("", [], None) or k == "late"}
@@ -318,11 +341,12 @@ def no_ready_answer(kind: str, uk: bool, searching: bool = True) -> dict:
     return {"gist": gist, "phrase": phrase, "level": "info", "topic": kind}
 
 
-def request_item(obj: dict, kind: str, text: str, src: str, done: float) -> dict:
+def request_item(obj: dict, kind: str, text: str, src: str, done: float,
+                 sources: Optional[Callable[[List[str]], str]] = None) -> dict:
     item = {"schema_version": 1, "engine": "app", "t": s_to_hms(done), "src": src,
             "kind": "tip" if kind == "sos" else "answer", "level": "red" if kind == "sos" else obj.get("level", "info"),
-            "gist": obj.get("gist", ""), "why": obj.get("why", ""), "phrase": obj.get("phrase", ""), "items": obj.get("items", []),
-            "note": obj.get("note", ""), "at": s_to_hms(done)}
+            "gist": obj.get("gist", ""), "detail": tip_detail(obj), "phrase": obj.get("phrase", ""), "items": obj.get("items", []),
+            "note": obj.get("note", ""), "source": tip_source(obj, sources), "at": s_to_hms(done)}
     if kind == "ask":
         item["q"] = text
     return {k: v for k, v in item.items() if v not in ("", [], None)}
@@ -1406,7 +1430,8 @@ class Engine:
     def _emit_tip(self, run: "TipRun") -> None:
         line, span, done = run.line, run.span, run.done
         seg_end = line.seg_end if line.seg_end is not None else line.t_s
-        item = tip_item(run.obj, run.uid, line, run.trigger, done, late=(done - seg_end) > self.stale_s)
+        item = tip_item(run.obj, run.uid, line, run.trigger, done, late=(done - seg_end) > self.stale_s,
+                        sources=getattr(self.prompt, "fact_sources", None))
         if not getattr(run, "partial", False):
             usage.log("tip_shown", {"kind": str(item.get("kind", ""))[:40]})     # 0.8.7 (M): the kind only
         with self.lock:
@@ -2050,7 +2075,7 @@ class Engine:
             span["ask_model"] = "prep"
         done = self.clock()
         obj = self._request_answer(c, kind, text, line)
-        item = request_item(obj, kind, text, span["src"], done)
+        item = request_item(obj, kind, text, span["src"], done, sources=getattr(self.prompt, "fact_sources", None))
         if kind == "ask":
             self._log_ask(text, obj)
         with self.lock:
@@ -2081,7 +2106,7 @@ class Engine:
         obj = first_json(c.text) if not c.error else None
         if not obj or obj.get("skip") or not obj.get("gist"):
             return
-        item = request_item(obj, "wrap", "", span["src"], done)
+        item = request_item(obj, "wrap", "", span["src"], done, sources=getattr(self.prompt, "fact_sources", None))
         item.update(kind="tip", level="red", trigger="timer_checkpoint", uid="wrap" + span["src"].replace(":", ""))
         with self.lock:
             self.tips.append(item)

@@ -145,103 +145,188 @@ enum SeriesWindow {
     }
 }
 
+/// 0.25 (R4, board SR-Series): the bar with the next call, the title block, then two columns: what changed since last
+/// time, the open commitments and the questions that stay open; the decisions call by call and the decision register.
 struct SeriesView: View {
     let record: CallHistory.Record
     @ObservedObject var register = Register.shared
+    @Environment(\.pnTheme) private var t
+    @State private var allCalls = false
+
+    private struct SinceRow: Identifiable { let id = UUID(); let kind: String; let text: String }
 
     var body: some View {
         Group {
-        let calls = CallPageView.series(of: record)
+        let calls = CallPageView.series(of: record)          // newest first
         let df = CallPageView.fmt("EEEdMMM")
         let folder = (record.file as NSString).deletingLastPathComponent
         let key = EditLog.seriesKey(record.title)
         let items = register.items(in: folder).filter { $0.series.split(separator: "|", maxSplits: 1).last.map(String.init) == key && $0.status != "dropped" }
         let latest = calls.first, prev = calls.dropFirst().first
-        let sinceLast: [String] = {
+        let newKey = latest.map { CommitmentRegister.callKey($0.file) } ?? ""
+        let open = items.filter { $0.status == "open" }
+        let since: [SinceRow] = {
             guard let l = latest else { return [] }
-            var out = (CallOutcome.read(transcript: l.file)?.decisions ?? []).map { L("series.decided", ["text": $0]) }
+            var out = (CallOutcome.read(transcript: l.file)?.decisions ?? []).map { SinceRow(kind: "decided", text: $0) }
             if let p = prev {
                 out += items.filter { $0.status == "done" && ($0.doneAt.isEmpty ? false : (CommitmentRegister.iso($0.doneAt) ?? .distantPast) > p.start) }
-                    .map { L("series.closed", ["text": $0.text]) }
+                    .map { SinceRow(kind: "closed", text: $0.text + ($0.mine ? "" : " (" + $0.owner + ")")) }
             }
-            // 0.8.7 (D1): new open items are marked "new" in Open commitments, not repeated here
+            out += open.filter { CommitmentRegister.callKey($0.call) == newKey }.map { SinceRow(kind: "new", text: ($0.mine ? "" : $0.owner + ": ") + $0.text) }
+            out += open.filter { CommitmentRegister.callKey($0.call) != newKey }.map { SinceRow(kind: "still", text: $0.text + ($0.mine ? " (" + L("series.you") + ")" : " (" + $0.owner + ")")) }
             return out
         }()
         let lingering = SeriesWindow.lingering(calls)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(record.title).pnTitle().foregroundStyle(PN.C.text)
-                    Text(L("series.sub", ["n": "\(calls.count)", "project": record.project])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                }
-                block(L("series.sinceLast"), sinceLast)
-                if !lingering.isEmpty {
-                    block(L("series.lingering"), lingering.filter { $0.calls > 1 }.map { L("series.openFor", ["text": $0.text, "n": "\($0.calls)", "since": df.string(from: $0.since)]) }
-                          + lingering.filter { $0.calls == 1 }.map { $0.text })
-                }
-                commitmentsByOwner(items.filter { $0.status == "open" }, newKey: latest.map { CommitmentRegister.callKey($0.file) } ?? "")
-                // 0.8.8 (rules/decisions.yaml > series): the register's active decisions of the project (the local snapshot)
-                let reg = NotionAutoAdd.active(PyTool.project(of: record.file).project)
-                if !reg.isEmpty {
-                    block(L("series.register"), reg.prefix(10).map { $0.date + " · " + $0.title + ($0.who.isEmpty ? "" : " (" + $0.who + ")") })
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(L("series.timeline")).pnSection().foregroundStyle(PN.C.text)
-                    ForEach(calls) { c in
-                        let d = CallOutcome.read(transcript: c.file)?.decisions ?? []
-                        VStack(alignment: .leading, spacing: 3) {
-                            Button { CallPageWindow.show(file: c.file) } label: {
-                                Text(df.string(from: c.start)).font(PN.Font.body.weight(.semibold)).foregroundStyle(PN.C.accent)
-                            }.buttonStyle(.plain)
-                            if d.isEmpty { Text(L("series.noDecisions")).font(PN.Font.caption).foregroundStyle(PN.C.text3) }
-                            ForEach(d, id: \.self) { x in Text("• " + x).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true) }
+        let reg = NotionAutoAdd.active(PyTool.project(of: record.file).project)
+        let next = CalendarService.shared.events.first { $0.start > Date() && EditLog.seriesKey($0.title) == key }
+        VStack(spacing: 0) {
+            PageBackBar(crumb: L("series.crumb", ["project": record.project])) {
+                if let n = next { Text(t.caps ? L("series.next", ["date": df.string(from: n.start)]).uppercased() : L("series.next", ["date": df.string(from: n.start)]))
+                    .font(t.homeMono(12, .semibold)).foregroundStyle(PN.C.text2) }
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    PageTitleBlock(meta: L("series.meta", ["n": "\(calls.count)", "project": record.project, "date": calls.last.map { df.string(from: $0.start) } ?? ""]),
+                                   title: record.title) {
+                        Text(L("series.explain")).font(t.homeText(14)).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                    }
+                    PageColumns {
+                        VStack(alignment: .leading, spacing: 26) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                PageSectionHead(title: L("series.sinceLast"),
+                                                count: (prev.map { df.string(from: $0.start) + " → " } ?? "") + (latest.map { df.string(from: $0.start) } ?? ""))
+                                if since.isEmpty { none }
+                                ForEach(since) { r in sinceRow(r) }
+                            }
+                            VStack(alignment: .leading, spacing: 0) {
+                                PageSectionHead(title: L("series.commitments"), count: open.isEmpty ? "" : L("page.tasks.open", ["n": "\(open.count)"]), warn: !open.isEmpty)
+                                if open.isEmpty { none }
+                                ForEach(open.sorted { ($0.mine ? 0 : 1, $0.created) < ($1.mine ? 0 : 1, $1.created) }) { c in commitRow(c, calls: calls, newKey: newKey, df: df) }
+                            }
+                            if !lingering.isEmpty {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    PageSectionHead(title: L("series.lingering"), count: "\(lingering.count)")
+                                    ForEach(Array(lingering.enumerated()), id: \.offset) { _, q in
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(q.text).font(t.homeText(16)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+                                            Text(q.calls > 1 ? L("series.age.openFor", ["n": "\(q.calls)", "date": df.string(from: q.since)]) : L("series.age.new", ["date": df.string(from: q.since)]))
+                                                .font(t.homeMono(12)).foregroundStyle(PN.C.text3)
+                                        }
+                                        .pageRow()
+                                    }
+                                }
+                            }
+                        }
+                    } right: {
+                        VStack(alignment: .leading, spacing: 26) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                PageSectionHead(title: L("series.timeline"))
+                                ForEach(Array(calls.prefix(allCalls ? calls.count : 5).enumerated()), id: \.element.id) { i, c in timelineRow(c, first: i == 0, df: df) }
+                                if calls.count > 5 && !allCalls {
+                                    HomeLink(L("ntask.showAll", ["n": "\(calls.count)"])) { allCalls = true }.padding(.top, 10)
+                                }
+                            }
+                            if !reg.isEmpty {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    PageSectionHead(title: L("series.register"), count: L("series.regActive", ["n": "\(reg.count)"])) {
+                                        HomeLink(L("page.tasks.openTracker")) { HomeNav.shared.open(.tracker) }
+                                    }
+                                    ForEach(Array(reg.prefix(10).enumerated()), id: \.offset) { _, d in
+                                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                            Text(d.title).font(t.homeText(16, .semibold)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                            Text(d.date.isEmpty ? "" : L("series.sinceDate", ["date": d.date])).font(t.homeMono(12)).foregroundStyle(PN.C.text3).fixedSize()
+                                        }
+                                        .pageRow()
+                                    }
+                                }
+                            }
                         }
                     }
+                    .padding(.horizontal, PageMetrics.side).padding(.top, 20).padding(.bottom, 36)
+                    .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
                 }
+                .environment(\.pageFlat, true)
+                .environment(\.pageWide, true)
             }
-            .padding(24).frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(PN.C.bg)
     }
         .trackScreen("series")
     }
 
-    /// 0.8.7 (D2): open commitments grouped by owner (Me first, then people A-Z), the name once per group;
-    /// items from the latest call carry a "new" tag.
-    @ViewBuilder private func commitmentsByOwner(_ list: [Commitment], newKey: String) -> some View {
-        if !list.isEmpty {
-            let owners = Array(Set(list.filter { !$0.mine }.map { $0.owner.isEmpty ? "?" : $0.owner })).sorted { $0.lowercased() < $1.lowercased() }
-            let groups: [(String, [Commitment])] = (list.contains { $0.mine } ? [(L("series.me"), list.filter { $0.mine })] : [])
-                + owners.map { o in (o, list.filter { !$0.mine && ($0.owner.isEmpty ? "?" : $0.owner) == o }) }
-            VStack(alignment: .leading, spacing: 8) {
-                Text(L("series.commitments")).pnSection().foregroundStyle(PN.C.text)
-                ForEach(groups, id: \.0) { g in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(g.0).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3)
-                        ForEach(g.1) { c in
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Text("• " + c.text + (c.due.isEmpty ? "" : " (" + Register.dueText(c.due) + ")"))
-                                    .font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
-                                if CommitmentRegister.callKey(c.call) == newKey {
-                                    Text(L("series.newTag")).font(PN.Font.caption).padding(.horizontal, 5)
-                                        .background(Capsule().fill(PN.C.accent.opacity(0.15))).foregroundStyle(PN.C.accent)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    private var none: some View { Text(L("page.tasks.none")).font(t.homeText(15)).foregroundStyle(PN.C.text3).pageRow() }
+
+    /// "Decided", "Closed" (struck), "New", "Still open" (on the not-ready plate) in a 78 pt column, then the text.
+    private func sinceRow(_ r: SinceRow) -> some View {
+        let kind: HomeTag = r.kind == "closed" ? .ready : r.kind == "new" ? .answer : r.kind == "still" ? .notReady : .neutral
+        let plate = kind.plate(t)
+        let tag = L("series.tag." + r.kind)
+        return HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(t.caps ? tag.uppercased() : tag).font(t.homeMono(11, .semibold))
+                .foregroundStyle(r.kind == "decided" ? PN.C.text : kind.text(t))
+                .padding(.horizontal, plate == nil ? 0 : 5).background(plate ?? .clear)
+                .frame(width: 78, alignment: .leading)
+            Text(r.text).font(t.homeText(16)).foregroundStyle(r.kind == "closed" ? PN.C.text3 : PN.C.text).strikethrough(r.kind == "closed")
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pageRow()
     }
 
-    @ViewBuilder private func block(_ title: String, _ rows: [String]) -> some View {
-        if !rows.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title).pnSection().foregroundStyle(PN.C.text)
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
-                    Text("• " + r).font(PN.Font.body).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+    /// Who, what with how long it is open, and the date of the call where it was promised (a link to it).
+    private func commitRow(_ c: Commitment, calls: [CallHistory.Record], newKey: String, df: DateFormatter) -> some View {
+        let made = c.createdDate ?? Date()
+        let n = calls.filter { $0.start >= made.addingTimeInterval(-3600) }.count
+        let fresh = CommitmentRegister.callKey(c.call) == newKey
+        let callRec = calls.first { CommitmentRegister.callKey($0.file) == CommitmentRegister.callKey(c.call) }
+        return HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(c.mine ? L("series.you") : c.owner).font(t.homeText(15, .semibold)).foregroundStyle(PN.C.text).lineLimit(1).frame(width: 96, alignment: .leading)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(c.text).font(t.homeText(16)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true)
+                Text(fresh || n <= 1 ? L("series.age.new", ["date": df.string(from: made)]) : L("series.age.openFor", ["n": "\(n)", "date": df.string(from: made)]))
+                    .font(t.homeMono(12)).foregroundStyle(fresh || n <= 1 ? PN.C.text3 : PN.C.notreadyText)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let r = callRec {
+                let day = CallPageView.fmt("dMMM").string(from: r.start)
+                Button { CallPageWindow.show(file: r.file) } label: {
+                    Text(day).font(t.homeMono(12, .semibold)).foregroundStyle(PN.C.accent).fixedSize().contentShape(Rectangle())
                 }
+                .buttonStyle(.plain).help(L("page.mn.jump"))
             }
         }
+        .pageRow()
+    }
+
+    /// One call of the series on the line: a square on the line (filled for the latest), the date, length and count,
+    /// the decisions.
+    private func timelineRow(_ c: CallHistory.Record, first: Bool, df: DateFormatter) -> some View {
+        let d = CallOutcome.read(transcript: c.file)?.decisions ?? []
+        let mins = c.minutes.map { L("call.page.minutes", ["n": "\(max(1, Int($0.rounded())))"]) } ?? ""
+        let meta = [mins, d.isEmpty ? "" : L("series.nDecisions", ["n": "\(d.count)"])].filter { !$0.isEmpty }.joined(separator: " · ")
+        return HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 4) {
+                RoundedRectangle(cornerRadius: t.statusSquare ? 0 : 6).fill(first ? PN.C.accent : Color.clear)
+                    .overlay(RoundedRectangle(cornerRadius: t.statusSquare ? 0 : 6).strokeBorder(PN.C.ruleStrong, lineWidth: 1.5))
+                    .frame(width: 12, height: 12)
+                Rectangle().fill(PN.C.rule).frame(width: 2).frame(maxHeight: .infinity)
+            }
+            .frame(width: 24).padding(.top, 4).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Button { CallPageWindow.show(file: c.file) } label: {
+                        Text(t.cased(df.string(from: c.start))).font(t.homeDisplay(20, t.titleWeight)).foregroundStyle(PN.C.text)
+                    }
+                    .buttonStyle(.plain)
+                    Text(meta).font(t.homeMono(12)).foregroundStyle(PN.C.text3)
+                }
+                if d.isEmpty { Text(L("series.noDecisions")).font(t.homeText(15)).foregroundStyle(PN.C.text3) }
+                ForEach(d, id: \.self) { x in Text(x).font(t.homeText(15)).foregroundStyle(PN.C.text).fixedSize(horizontal: false, vertical: true) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.top, 12).padding(.bottom, 10)
+        .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
     }
 }

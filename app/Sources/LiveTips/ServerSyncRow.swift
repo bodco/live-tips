@@ -10,23 +10,23 @@ struct ServerSyncRow: View {
 
     var body: some View {
         if let s = sync.status(file) {
-            HStack(spacing: 8) {
-                Image(systemName: icon(s)).foregroundStyle(warn(s) ? PN.C.onMe : PN.C.text3)
-                Text(text(s)).font(PN.Font.caption).foregroundStyle(warn(s) ? PN.C.onMe : PN.C.text3).lineLimit(2)
-                Spacer()
+            // 0.25 (R2, board SL): a status line; "Pacenote server: " is the key now, the value says the rest
+            PageStatusLine(key: L("sync.line.key"), kind: warn(s) ? .notReady : ok(s) ? .ready : .neutral, value: text(s)) {
                 switch s {
                 case .failed, .waiting:
-                    Button(L("sync.page.retry")) { sync.sync(file) }.buttonStyle(.pnTertiary)
+                    Button(L("sync.page.retry")) { sync.sync(file) }.buttonStyle(.pnRow)
                 case .skipped:
-                    Button(L("sync.call.allow")) { sync.setSkip(false, transcript: file) }.buttonStyle(.pnTertiary)
+                    PageLineLink(L("sync.call.allow")) { sync.setSkip(false, transcript: file) }
+                case .synced:
+                    PageLineLink(L("sync.call.skip")) { sync.setSkip(true, transcript: file) }
                 default:
                     EmptyView()
                 }
             }
-            .padding(.horizontal, 24).padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+
+    private func ok(_ s: CallSync.Status) -> Bool { if case .synced = s { return true }; return false }
 
     private func warn(_ s: CallSync.Status) -> Bool { if case .failed = s { return true }; return false }
 
@@ -47,13 +47,13 @@ struct ServerSyncRow: View {
         case .synced(let d):
             let f = DateFormatter(); f.locale = Locale(identifier: L10n.lang == "uk" ? "uk_UA" : "en_US")
             f.setLocalizedDateFormatFromTemplate(Calendar.current.isDateInToday(d) ? "HHmm" : "dMMMHHmm")
-            return L("sync.page.synced", ["when": f.string(from: d)])
-        case .syncing: return L("sync.page.syncing")
-        case .waiting: return L("sync.page.waiting")
-        case .failed(let e): return L("sync.page.failed", ["err": e])
-        case .skipped: return L("sync.page.skipped")
-        case .deletedElsewhere: return L("sync.page.deleted")
-        case .removed: return L("sync.page.removed")
+            return L("sync.line.synced", ["when": f.string(from: d)])
+        case .syncing: return L("sync.line.syncing")
+        case .waiting: return L("sync.line.waiting")
+        case .failed(let e): return L("sync.line.failed", ["err": e])
+        case .skipped: return L("sync.line.skipped")
+        case .deletedElsewhere: return L("sync.line.deleted")
+        case .removed: return L("sync.line.removed")
         }
     }
 }

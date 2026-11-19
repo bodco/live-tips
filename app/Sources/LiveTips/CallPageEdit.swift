@@ -25,13 +25,28 @@ enum CallPageEdit {
     /// Writes the edited lists as a new call picture line. Lines are trimmed, empty ones dropped, long dashes replaced.
     /// 0.12.2 (L1): `lists` names the lists the PM changed ("decisions", "open", "risks"); CallLists takes only those
     /// from this line, so editing risks does not freeze the decisions the notes bring later.
+    /// Theme pass stage 2: `owners` (same order as `decisions`) is who made each decision; nil keeps the owner a
+    /// decision with the same text has now (CallLists), so editing one decision or another list keeps the names.
     @discardableResult
-    static func save(file: String, decisions: [String], open: [String], risks: [String], lists: [String]? = nil) -> Bool {
+    static func save(file: String, decisions: [String], open: [String], risks: [String], lists: [String]? = nil,
+                     owners: [String]? = nil) -> Bool {
         let clean: ([String]) -> [String] = { $0.map { $0.replacingOccurrences(of: "\u{2014}", with: "-").trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
         let path = tipsFile(file)
         var o = lastSituation(path)
         o["kind"] = "situation"
-        o["decisions"] = clean(decisions)
+        var known: [String: String] = [:]
+        if owners == nil {
+            for i in CallLists.read(transcript: file).decisionItems where !i.by.isEmpty { known[i.text.lowercased()] = i.by }
+        }
+        var decs: [String] = [], by: [String] = []
+        for (k, d) in decisions.enumerated() {
+            let t = d.replacingOccurrences(of: "\u{2014}", with: "-").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty else { continue }
+            decs.append(t)
+            by.append(owners.map { k < $0.count ? $0[k].trimmingCharacters(in: .whitespaces) : "" } ?? known[t.lowercased()] ?? "")
+        }
+        o["decisions"] = decs
+        if by.contains(where: { !$0.isEmpty }) { o["decision_owners"] = by } else { o.removeValue(forKey: "decision_owners") }
         let updates = ((o["asks"] as? [[String: Any]]) ?? []).filter { ($0["type"] as? String) == "update" }
         o["asks"] = updates + clean(open).map { ["what": $0, "type": "question"] }
         o["risks"] = clean(risks).map { ["what": $0] }
@@ -183,30 +198,24 @@ extension CallPageSync {
 struct CallPageSyncLine: View {
     @ObservedObject var sync: CallPageSync
 
+    // 0.25 (R2, board SL): the Notion status line under the call's title (synced and when, syncing, the error and Retry)
     var body: some View {
-        if sync.notionURL != nil && sync.state != .idle {
+        if let url = sync.notionURL {
             TimelineView(.periodic(from: .now, by: 5)) { ctx in
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        switch sync.state {
-                        case .pending, .syncing:
-                            PNSpinner(size: 16); Text(L("callEdit.syncing"))
-                        case .ok:
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(PN.C.turn).accessibilityHidden(true)
-                            Text(L("callEdit.syncedAgo", ["ago": Self.ago(sync.at, ctx.date)]))
-                        case .failed(let e):
-                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(PN.C.onMe).accessibilityHidden(true)
-                            Text(L("callEdit.notSynced", ["err": e])).lineLimit(2)
-                            Button(L("callEdit.retry")) { sync.run() }.buttonStyle(.pnTertiary)
-                        case .idle: EmptyView()
-                        }
+                let (kind, value, err): (HomeTag, String, Bool) = {
+                    switch sync.state {
+                    case .pending, .syncing: return (.answer, L("callEdit.syncing"), false)
+                    case .ok: return (.ready, L("callEdit.syncedAgo", ["ago": Self.ago(sync.at, ctx.date)]), false)
+                    case .failed(let e): return (.notReady, L("callEdit.notSynced", ["err": e]), true)
+                    case .idle: return (.ready, L("callEdit.inNotion"), false)
                     }
-                    if !sync.appended.isEmpty {
-                        Text(L("callEdit.appended", ["list": sync.appended.joined(separator: ", ")]))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                }()
+                PageStatusLine(key: "Notion", kind: kind, value: value,
+                               sub: sync.appended.isEmpty ? "" : L("callEdit.appended", ["list": sync.appended.joined(separator: ", ")])) {
+                    if case .syncing = sync.state { PNSpinner(size: 14) }
+                    if let u = URL(string: url) { PageLineLink(L("callEdit.openPage")) { NSWorkspace.shared.open(u) } }
+                    if err { Button(L("callEdit.retry")) { sync.run() }.buttonStyle(.pnRow) }
                 }
-                .font(PN.Font.caption).foregroundStyle(PN.C.text3)
             }
         }
     }
@@ -250,6 +259,8 @@ struct EditableRow<Leading: View, Trailing: View>: View {
     var copy: String? = nil
     var hoverActions: [PageRowAction] = []
     var menu: [PageRowAction] = []
+    /// 0.25 (R2 tail, board CT): a bordered button shown while the pointer is on the row ("Add to Tracker").
+    var hoverButton: PageRowAction? = nil
     let onSave: (String) -> Void
     @ViewBuilder var leading: () -> Leading
     @ViewBuilder var trailing: () -> Trailing
@@ -262,9 +273,11 @@ struct EditableRow<Leading: View, Trailing: View>: View {
     @State private var promptDate = Date()
     @FocusState private var rowFocus: Bool
     @FocusState private var fieldFocus: Bool
+    @Environment(\.pageFlat) private var flat       // 0.25 (R2): a row of a flat section (boards CT, SL)
+    @Environment(\.pnTheme) private var t
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: flat ? .firstTextBaseline : .top, spacing: flat ? 10 : 8) {
             leading()
             if editing {
                 TextField("", text: $draft, axis: .vertical)
@@ -275,12 +288,12 @@ struct EditableRow<Leading: View, Trailing: View>: View {
                     .accessibilityLabel(L("callEdit.edit"))
             } else {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(text).font(PN.Font.body).foregroundStyle(done ? PN.C.text3 : PN.C.text).strikethrough(done)
+                    Text(text).font(flat ? t.homeText(16) : PN.Font.body).foregroundStyle(done ? PN.C.text3 : PN.C.text).strikethrough(done)
                         .fixedSize(horizontal: false, vertical: true)
                     if !sub.isEmpty || !subTail.isEmpty {
                         (subTail.isEmpty ? Text(sub).foregroundColor(subColor)
                          : Text(sub).foregroundColor(PN.C.text3) + Text((sub.isEmpty ? "" : " · ") + subTail).foregroundColor(subColor))
-                            .font(PN.Font.caption)
+                            .font(flat ? t.homeText(13) : PN.Font.caption)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -297,12 +310,19 @@ struct EditableRow<Leading: View, Trailing: View>: View {
                 }
                 .foregroundStyle(PN.C.text3)
                 .opacity(hover || rowFocus ? 1 : 0)
+                if let hb = hoverButton {
+                    Button(hb.title) { trigger(hb) }.buttonStyle(.pnRow).disabled(!hb.enabled)
+                        .help(hb.enabled ? hb.title : (hb.note.isEmpty ? hb.title : hb.note))
+                        .opacity(hover || rowFocus ? 1 : 0).fixedSize()
+                }
                 trailing()
             }
         }
-        .padding(.vertical, 3).padding(.horizontal, 6)
-        .background(RoundedRectangle(cornerRadius: PN.Radius.s)
-            .fill(rowFocus && !editing ? PN.C.accent.opacity(0.10) : (hover ? PN.C.surface2.opacity(0.6) : Color.clear)))
+        .padding(.vertical, flat ? 9 : 3).padding(.horizontal, flat ? 8 : 6)
+        .background(RoundedRectangle(cornerRadius: flat && t.style != .classic ? 0 : PN.Radius.s)
+            .fill(rowFocus && !editing ? PN.C.accent.opacity(0.10) : (hover ? PN.C.surface2.opacity(flat ? 1 : 0.6) : Color.clear)))
+        .overlay(alignment: .top) { if flat { Rectangle().fill(PN.C.rule).frame(height: 1) } }
+        .padding(.horizontal, flat ? -8 : 0)
         .focusable(!editing)
         .focused($rowFocus)
         .focusEffectDisabled()
@@ -412,9 +432,18 @@ struct AddRowField: View {
     @State private var open = false
     @State private var text = ""
     @FocusState private var focus: Bool
+    @Environment(\.pageFlat) private var flat
 
     var body: some View {
-        if open {
+        if flat {
+            // 0.25 (R2, boards CT, SL): always there, a dashed field under the rows; Return adds the line
+            PageAddField(placeholder: placeholder.isEmpty ? L("page.add.ph") : placeholder, text: $text) {
+                let t = text.replacingOccurrences(of: "\u{2014}", with: "-").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !t.isEmpty { onAdd(t) }
+                text = ""
+            }
+            .pageRow(10)
+        } else if open {
             TextField("", text: $text, prompt: Text(placeholder), axis: .vertical)
                 .textFieldStyle(.roundedBorder).lineLimit(1...4).font(PN.Font.body)
                 .focused($focus)

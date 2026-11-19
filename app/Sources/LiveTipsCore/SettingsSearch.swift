@@ -25,98 +25,105 @@ public struct SettingsSearchEntry: Equatable, Sendable {
         self.projectPage = projectPage; self.titleKey = title; self.words = words
     }
 
-    /// The group shown in the result's path ("Basics", "Access", ...): the first *Group default.
+    /// The setting sits under the pane's collapsed Advanced (0.25 R5): the search opens it before it scrolls there.
+    public var advanced: Bool { defaults.keys.contains { $0.hasPrefix(SettingsSearch.advancedPrefix) } }
+
+    /// The group shown in the result's path: a HubSpot tab, else "advanced" for what sits under Advanced, else none.
     public var group: String? {
         for k in SettingsSearch.groupKeys { if let g = defaults[k] { return g } }
-        return nil
+        return advanced ? "advanced" : nil
     }
 }
 
 public enum SettingsSearch {
-    public static let generalGroupKey = "settingsGeneralGroup"
-    public static let aiGroupKey = "settingsAIGroup"
-    public static let aiProviderKey = "settingsAIProvider"
-    public static let notionGroupKey = "settingsNotionGroup"
     public static let hubspotGroupKey = "settingsHubSpotGroup"
-    static let groupKeys = [generalGroupKey, aiGroupKey, notionGroupKey, hubspotGroupKey]
+    static let groupKeys = [hubspotGroupKey]
 
-    /// The groups of each segmented pane, in order. The app draws its segments from these.
-    public static let generalGroups = ["basics", "calls", "data"]
-    public static let aiGroups = ["access", "jobs", "limits", "mac", "more"]
-    public static let notionGroups = ["conn", "dbs", "after", "local"]
+    /// 0.25 (R5, owner 18.11): every pane shows what is needed on top and the rest under one collapsed Advanced.
+    /// Whether a pane's Advanced is open is kept in UserDefaults under `advancedKey(scope)` ("1" open, "0" closed).
+    public static let advancedPrefix = "settingsAdvanced."
+    public static let advancedScopes = ["account", "general", "ai", "projects", "integrations", "notion", "recording", "transcription", "sheet"]
+    public static func advancedKey(_ scope: String) -> String { advancedPrefix + scope }
+
+    /// The tabs of the HubSpot page, in order. The app draws its segments from these.
     public static let hubspotGroups = ["conn", "match", "data", "qual"]
 
-    private static func g(_ group: String) -> [String: String] { [generalGroupKey: group] }
-    private static func a(_ group: String, _ provider: String? = nil) -> [String: String] {
-        var d = [aiGroupKey: group]; if let p = provider { d[aiProviderKey] = p }; return d
-    }
-    private static func n(_ group: String) -> [String: String] { [notionGroupKey: group] }
+    private static func adv(_ scope: String) -> [String: String] { [advancedKey(scope): "1"] }
     private static func h(_ group: String) -> [String: String] { [hubspotGroupKey: group] }
 
     public static let entries: [SettingsSearchEntry] = [
         // General
-        .init("gen.name", "general", g("basics"), title: "set.yourNameOnCalls", words: "name alias me імʼя ім'я псевдонім"),
-        .init("gen.folder", "general", g("basics"), title: "set.workFolder", words: "folder work root тека папка робоча"),
-        .init("gen.lang", "general", g("basics"), title: "callSettings.uiLang", words: "language english ukrainian мова англійська українська"),
-        .init("gen.theme", "general", g("basics"), title: "set.appearance", words: "appearance style mode theme dark light classic roadbook broadsheet вигляд стиль режим тема темна світла"),
-        .init("gen.dock", "general", g("basics"), title: "settings.general.dock", words: "dock icon док іконка"),
-        .init("gen.stealth", "general", g("calls"), title: "set.hideTheTipsWindow", words: "stealth hide screen sharing tips window приховати вікно підказок"),
-        .init("gen.floating", "general", g("calls"), title: "floating.setting", words: "floating controls call buttons кнопки дзвінка"),
-        .init("gen.shortcuts", "general", g("calls"), title: "set.shortcuts", words: "shortcuts hotkeys keys keyboard клавіші гарячі"),
-        .init("gen.usage", "general", g("data"), title: "usage.toggle", words: "usage log statistics статистика лог"),
-        .init("gen.telemetry", "general", g("data"), title: "telemetry.toggle", words: "telemetry share privacy телеметрія приватність"),
-        .init("gen.addons", "general", g("data"), title: "comp.addons", words: "add-on link downloader video yt-dlp відео"),
-        .init("gen.appfolder", "general", g("data"), title: "set.appFolder", words: "app folder data storage дані тека застосунку"),
+        .init("gen.name", "general", title: "set.yourNameOnCalls", words: "name alias me імʼя ім'я псевдонім"),
+        .init("gen.folder", "general", adv("general"), title: "set.workFolder", words: "folder work root тека папка робоча"),
+        .init("gen.lang", "general", title: "callSettings.uiLang", words: "language english ukrainian мова англійська українська"),
+        .init("gen.theme", "general", title: "set.appearance", words: "appearance style mode theme dark light classic roadbook broadsheet вигляд стиль режим тема темна світла"),
+        .init("gen.dock", "general", adv("general"), title: "settings.general.dock", words: "dock icon док іконка"),
+        .init("gen.stealth", "general", adv("general"), title: "set.hideTheTipsWindow", words: "stealth hide screen sharing tips window приховати вікно підказок"),
+        .init("gen.tipsMode", "general", adv("general"), title: "set.tipsMode", words: "compact card camera tips window mode компактна картка камера вікно підказок"),
+        .init("gen.floating", "general", adv("general"), title: "floating.setting", words: "floating controls call buttons кнопки дзвінка"),
+        .init("gen.shortcuts", "general", adv("general"), title: "set.shortcuts", words: "shortcuts hotkeys keys keyboard клавіші гарячі"),
+        .init("gen.usage", "general", adv("general"), title: "usage.toggle", words: "usage log statistics статистика лог"),
+        .init("gen.telemetry", "general", adv("general"), title: "telemetry.toggle", words: "telemetry share privacy телеметрія приватність"),
+        .init("gen.addons", "general", adv("general"), title: "comp.addons", words: "add-on link downloader video yt-dlp відео"),
+        .init("gen.appfolder", "general", adv("general"), title: "set.appFolder", words: "app folder data storage дані тека застосунку"),
         // Call recording
         .init("rec.what", "recording", title: "rec.set.what", words: "record recording audio video screen запис відео екран звук"),
-        .init("rec.consent", "recording", title: "set.recordingConsent", words: "consent agree permission recording згода дозвіл запис"),
-        .init("rec.privacy", "recording", title: "rec.set.privacy", words: "screen permission privacy дозвіл приватність"),
+        .init("rec.consent", "recording", adv("recording"), title: "set.recordingConsent", words: "consent agree permission recording згода дозвіл запис"),
+        .init("rec.privacy", "recording", adv("recording"), title: "rec.set.privacy", words: "screen permission privacy дозвіл приватність"),
+        .init("rec.picture", "recording", adv("recording"), title: "rec.set.picture", words: "screen window display picture екран вікно дисплей"),
+        .init("rec.quality", "recording", adv("recording"), title: "rec.set.qualityHead", words: "quality codec size hevc якість кодек розмір"),
+        .init("rec.drive", "recording", adv("recording"), title: "rec.set.drive", words: "google drive upload folder вивантаження диск папка"),
         // Transcription, Meeting Sheet, Account, Modules
-        .init("tr.dict", "transcription", title: "dict.head", words: "dictionary words spelling transcript словник слова транскрипт"),
+        .init("tr.lang", "transcription", title: "tr.lang.head", words: "language languages call english ukrainian мова мови дзвінка англійська українська"),
+        .init("tr.speakers", "transcription", adv("transcription"), title: "set.speakers", words: "speakers voices voice library who is speaking голоси спікери мовці хто говорить"),
+        .init("tr.dict", "transcription", adv("transcription"), title: "dict.head", words: "dictionary words spelling transcript словник слова транскрипт"),
         .init("sh.mode", "sheet", title: "sheet.ui.set.modeTitle", words: "quick expert prep підготовка"),
-        .init("sh.focus", "sheet", title: "sheet.ui.myFocus", words: "focus фокус"),
-        .init("sh.timing", "sheet", title: "sheet.ui.set.timing", words: "reminder timing when нагадування коли"),
-        .init("sh.presets", "sheet", title: "sheet.ui.set.presets", words: "presets template шаблони пресети"),
+        .init("sh.focus", "sheet", adv("sheet"), title: "sheet.ui.myFocus", words: "focus фокус"),
+        .init("sh.timing", "sheet", adv("sheet"), title: "sheet.ui.set.timing", words: "reminder timing when нагадування коли"),
+        .init("sh.presets", "sheet", adv("sheet"), title: "sheet.ui.set.presets", words: "presets template шаблони пресети"),
         .init("acc.head", "account", title: "account.head", words: "account sign in login server акаунт вхід сервер"),
-        .init("acc.methods", "account", title: "account.methods.head", words: "password google sign-in methods change reset пароль спосіб входу змінити"),
-        .init("acc.orgs", "account", title: "org.head", words: "organization team invite join manage default private організація команда запрошення приєднатися керувати приватний"),
+        .init("acc.methods", "account", adv("account"), title: "account.methods.head", words: "password google sign-in methods change reset пароль спосіб входу змінити"),
+        .init("acc.orgs", "account", adv("account"), title: "org.head", words: "organization team invite join manage default private організація команда запрошення приєднатися керувати приватний"),
         .init("acc.plan", "account", title: "plan.head", words: "plan plans compare switch team beta price trial limit seats storage request upgrade план плани порівняти змінити команда бета ціна тріал ліміт місця сховище запит"),
-        .init("acc.usage", "account", title: "usage.head", words: "usage use overview calls hours active days використання огляд дзвінки години активні дні"),
+        .init("acc.usage", "account", adv("account"), title: "usage.head", words: "usage use overview calls hours active days використання огляд дзвінки години активні дні"),
         .init("mod.tracker", "modules", title: "modules.tracker", words: "tracker tasks module трекер задачі модуль"),
         // Components (0.16.0, D3)
         .init("comp.disk", "components", title: "cmp.disk", words: "disk space size storage free gb місце диск розмір вільно"),
         .init("comp.optional", "components", title: "settings.tab.components", words: "components remove uninstall delete add-on ollama gemma local model agent yt-dlp компоненти видалити прибрати додаткові модель агент"),
         .init("comp.required", "components", title: "cmp.repair", words: "repair reinstall whisper speech required відновити перевстановити мовлення обовʼязкові"),
         .init("help.whatsnew", "help", title: "wn.history", words: "what's new changes release notes update що нового зміни оновлення"),
+        // after Components: "видалити" / "remove" open Components first
+        .init("acc.devices", "account", adv("account"), title: "account.devices.head", words: "devices mac sign out everywhere пристрої вийти"),
+        .init("acc.delete", "account", adv("account"), title: "account.delete.head", words: "delete export server data видалити експорт дані сервер"),
         // AI
-        .init("ai.claude", "ai", a("access", "claude"), title: "keys.claude.title", words: "claude anthropic api key ключ"),
-        .init("ai.openai", "ai", a("access", "chatgpt"), title: "keys.openai.title", words: "openai chatgpt gpt api key ключ"),
-        .init("ai.gemini", "ai", a("access", "gemini"), title: "keys.gemini.title", words: "gemini google api key ключ"),
-        .init("ai.prep", "ai", a("jobs"), title: "ai.job.prep", words: "prep preparation model brief підготовка модель"),
-        .init("ai.tips", "ai", a("jobs"), title: "ai.job.tips", words: "tips model hints підказки модель"),
-        .init("ai.after", "ai", a("jobs"), title: "ai.job.after", words: "summary notes after model нотатки підсумок"),
-        .init("ai.chain", "ai", a("jobs"), title: "ai.chain.header", words: "fallback out backup chain резерв ланцюг"),
-        .init("ai.spend", "ai", a("limits"), title: "set.spendingLimits", words: "limit spend budget money cost витрати ліміт гроші"),
-        .init("ai.economy", "ai", a("limits"), title: "economy.header", words: "economy cheap save економ"),
-        .init("ai.local", "ai", a("mac"), title: "local.section", words: "ollama gemma local offline локальна модель"),
-        .init("ai.localLayer", "ai", a("mac"), title: "set.localAi", words: "embedding bge search index пошук індекс"),
-        .init("ai.speakers", "ai", a("mac"), title: "set.speakers", words: "speakers voices voice library голоси спікери"),
-        .init("ai.salesWeb", "ai", a("more"), title: "ai.salesWeb.header", words: "web search company research пошук компанія"),
-        .init("ai.agent", "ai", a("more"), title: "agent.header", words: "agent call agent агент"),
+        .init("ai.claude", "ai", title: "keys.claude.title", words: "claude anthropic api key ключ"),
+        .init("ai.openai", "ai", title: "keys.openai.title", words: "openai chatgpt gpt api key ключ"),
+        .init("ai.gemini", "ai", title: "keys.gemini.title", words: "gemini google api key ключ"),
+        .init("ai.prep", "ai", adv("ai"), title: "ai.job.prep", words: "prep preparation model brief підготовка модель"),
+        .init("ai.tips", "ai", adv("ai"), title: "ai.job.tips", words: "tips model hints підказки модель"),
+        .init("ai.after", "ai", adv("ai"), title: "ai.job.after", words: "summary notes after model нотатки підсумок"),
+        .init("ai.chain", "ai", adv("ai"), title: "ai.chain.header", words: "fallback out backup chain резерв ланцюг"),
+        .init("ai.spend", "ai", adv("ai"), title: "set.spendingLimits", words: "limit spend budget money cost витрати ліміт гроші"),
+        .init("ai.economy", "ai", adv("ai"), title: "economy.header", words: "economy cheap save економ"),
+        .init("ai.local", "ai", adv("ai"), title: "local.section", words: "ollama gemma local offline локальна модель"),
+        .init("ai.localLayer", "ai", adv("ai"), title: "set.localAi", words: "embedding bge search index пошук індекс"),
+        .init("ai.salesWeb", "ai", adv("ai"), title: "ai.salesWeb.header", words: "web search company research пошук компанія"),
+        .init("ai.agent", "ai", adv("ai"), title: "agent.header", words: "agent call agent агент"),
         // Integrations
-        .init("int.notion.token", "integrations", n("conn"), integration: "notion", title: "keys.notion.title", words: "notion token key connect ключ токен"),
-        .init("int.notion.dbs", "integrations", n("dbs"), integration: "notion", title: "ntset.databases", words: "notion database meetings tasks risks decisions бази"),
-        .init("int.notion.pages", "integrations", n("after"), integration: "notion", title: "set.meetingPages", words: "notion meeting page summary сторінка зустрічі"),
-        .init("int.notion.tasks", "integrations", n("after"), integration: "notion", title: "ntset.header", words: "notion my tasks on you задачі"),
-        .init("int.notion.local", "integrations", n("local"), integration: "notion", title: "set.localCopyOfNotion", words: "notion mirror local copy sync копія дзеркало"),
+        .init("int.notion.token", "integrations", integration: "notion", title: "keys.notion.title", words: "notion token key connect ключ токен"),
+        .init("int.notion.meetDB", "integrations", integration: "notion", title: "nset.whereMeetingPagesGo", words: "notion meetings database meeting notes база мітингів нотатки"),
+        .init("int.notion.dbs", "integrations", adv("notion"), integration: "notion", title: "ntset.databases", words: "notion database meetings tasks risks decisions бази"),
+        .init("int.notion.pages", "integrations", integration: "notion", title: "set.meetingPages", words: "notion meeting page summary сторінка зустрічі"),
+        .init("int.notion.tasks", "integrations", adv("notion"), integration: "notion", title: "ntset.header", words: "notion my tasks on you задачі"),
+        .init("int.notion.local", "integrations", adv("notion"), integration: "notion", title: "set.localCopyOfNotion", words: "notion mirror local copy sync копія дзеркало"),
         .init("int.calendars", "integrations", integration: "calendars", title: "settings.tab.calendars", words: "calendar events календар"),
         .init("int.google", "integrations", integration: "google", title: "search.google", words: "google drive docs account гугл диск"),
-        .init("int.hubspot.key", "integrations", h("conn"), integration: "hubspot", title: "search.hubspotKey", words: "hubspot crm key connect ключ"),
+        .init("int.hubspot.key", "integrations", h("conn").merging(adv("integrations")) { a, _ in a }, integration: "hubspot", title: "search.hubspotKey", words: "hubspot crm key connect ключ"),
         .init("int.hubspot.match", "integrations", h("match"), integration: "hubspot", title: "int.hubspot.matching", words: "hubspot owner company domain власник"),
         .init("int.hubspot.write", "integrations", h("data"), integration: "hubspot", title: "int.hubspot.canWrite", words: "hubspot write note deal task запис"),
         .init("int.hubspot.qual", "integrations", h("qual"), integration: "hubspot", title: "int.hubspot.qualification", words: "hubspot bant qualification кваліфікація"),
         // Projects
-        .init("pr.scan", "projects", title: "set.scanWorkFolder", words: "scan add project folder workspace сканувати додати проєкт"),
+        .init("pr.scan", "projects", adv("projects"), title: "set.scanWorkFolder", words: "scan add project folder workspace сканувати додати проєкт"),
         .init("pr.import", "projects", title: "set.importControlTowerConfigs", words: "control tower import configs імпорт"),
         .init("pr.notion", "projects", projectPage: true, title: "proj.inNotion", words: "notion name project property назва в notion"),
         .init("pr.sales", "projects", projectPage: true, title: "proj.sales", words: "sales bant spiced meddic продажі"),

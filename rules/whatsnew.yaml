@@ -177,3 +177,39 @@ items:
     title_uk: "Оновлення одним кліком"
     body_en: "A new version opens its window within the hour, also while Pacenote is running. Install and restart now works with one click: a spinner while it downloads and installs, then Pacenote opens again."
     body_uk: "Нова версія відкриває своє вікно протягом години, навіть коли Pacenote вже працює. Install and restart тепер працює одним кліком: спінер, поки оновлення завантажується і ставиться, потім Pacenote відкривається знову."
+  - id: one_install
+    version: 0.25.0
+    title_en: "Setup in one go"
+    title_uk: "Встановлення за один раз"
+    body_en: "One Install puts everything a call needs in place, with its own Python and one loader with MB and time left. Accounts install their program when you connect them, without Terminal."
+    body_uk: "Один Install ставить усе, що потрібно дзвінку, з власним Python і одним лоадером з МБ і часом, що лишився. Акаунти ставлять свою програму, коли ви їх підключаєте, без Терміналу."
+  - id: call_ready
+    version: 0.25.0
+    title_en: "Calls start only when they can work"
+    title_uk: "Дзвінок стартує, лише коли може працювати"
+    body_en: "If speech recognition or the tips engine is missing, the start button says so and installs it in place. Help > Export diagnostics saves the logs for support."
+    body_uk: "Якщо бракує розпізнавання мовлення чи рушія підказок, кнопка старту каже про це і ставить їх на місці. Help > Експорт діагностики зберігає логи для підтримки."
+  - id: call_pages_redrawn
+    version: 0.25.0
+    title_en: "Call pages, redrawn"
+    title_uk: "Сторінки дзвінків по-новому"
+    body_en: "An upcoming call without a Meeting Sheet offers Quick prep and Expert prep side by side. A past call opens on Decisions with who decided, Next steps and Risks, and the follow-up email is its own tab: copy it or open it in Mail, nothing is sent."
+    body_uk: "Майбутній дзвінок без Meeting Sheet пропонує Quick prep і Expert prep поруч. Минулий дзвінок відкривається на Decisions із тим, хто вирішив, Next steps і Risks, а лист після дзвінка став окремою вкладкою: скопіюйте його або відкрийте в Mail, нічого не надсилається."
+  - id: sheet_prep_redrawn
+    version: 0.25.0
+    title_en: "Preparing a Meeting Sheet, redrawn"
+    title_uk: "Підготовка Meeting Sheet по-новому"
+    body_en: "Start a call is now a few numbered sections, and the Quick and Expert steps show what is set and what is missing. When the sources are too big for one pass, you choose right on the page: 2 passes, summarize big sources first, remove some or use a route with a bigger window."
+    body_uk: "Start a call тепер складається з кількох пронумерованих розділів, а кроки Quick і Expert показують, що вже налаштовано і чого бракує. Коли джерела завеликі для одного проходу, ви обираєте просто на сторінці: 2 проходи, спершу стиснути великі джерела, прибрати частину або взяти маршрут із більшим вікном."
+  - id: tip_key_detail_source
+    version: 0.25.0
+    title_en: "Tips you read at a glance"
+    title_uk: "Підказки, які читаються з першого погляду"
+    body_en: "A tip now has one strong key line, a quieter detail under it, the ready phrase in quotes and where it comes from at the bottom. The newest tip stands out in the tips window."
+    body_uk: "Підказка тепер має один виразний ключовий рядок, тихішу деталь під ним, готову фразу в лапках і внизу джерело, звідки вона. Найновіша підказка виділяється у вікні підказок."
+  - id: compact_tip_card
+    version: 0.25.0
+    title_en: "A compact tip card under the camera"
+    title_uk: "Компактна картка підказок під камерою"
+    body_en: "Settings > General > Advanced > Calls > Live tips during a call: choose Compact card. One tip at a time sits just under the camera, so your eyes stay near the lens, and Expand opens the full tips window."
+    body_uk: "Налаштування > Загальні > Додатково > Дзвінки > Підказки під час дзвінка: оберіть Компактна картка. Одна підказка за раз стоїть просто під камерою, тож погляд лишається біля обʼєктива, а Expand відкриває повне вікно підказок."

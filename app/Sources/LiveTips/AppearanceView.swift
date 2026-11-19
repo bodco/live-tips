@@ -1,5 +1,5 @@
 // Settings > General > Appearance (redesign, block 1, 2026-11-18; board SG-General r11, Settings-Appearance r3).
-// Three style cards (Classic, Roadbook, Broadsheet) drawn in the current mode, and the mode: Same as the Mac, Light, Dark.
+// Two style cards (Roadbook, Broadsheet; Classic left the picker in the theme pass, 19.11) drawn in the current mode, and the mode: Same as the Mac, Light, Dark.
 // Both apply at once in every window (PNThemeModel for the style, NSApp.appearance for the mode).
 
 import SwiftUI
@@ -13,7 +13,7 @@ struct AppearanceBlock: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L("set.appearance.style")).pnSection().foregroundStyle(PN.C.text)
             HStack(alignment: .top, spacing: 10) {
-                ForEach(PNStyle.allCases) { s in
+                ForEach(PNStyle.pickable) { s in
                     StyleCard(style: s, selected: PNStyle(config: style) == s) { style = s.rawValue }
                 }
             }

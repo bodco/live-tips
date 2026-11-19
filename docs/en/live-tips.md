@@ -511,7 +511,8 @@ The layout since 1.8.0, top to bottom (hover any control for a hint):
   presentation, then pinned cards: 📌 on any tip pins it, the speech, the checklist, the
   status and the wrap-up can be pinned too. An unpinned card goes back to its place in the
   list.
-- **Tips:** the newest on top in a large font, older ones below and dimmer.
+- **Tips:** the newest on top in a large font, older ones below and dimmer. Since 0.25 the newest one shows its
+  gist larger, the detail under it, the phrase in quotes and a "from ..." line with the source.
 - **Bottom row:** one input and the red **HELP** button (it shows its shortcut ⌃⌥H), plus the
   quick-ask chips (below).
 - **`🎙` mute.** The recorder listens to the Mac's microphone and cannot see whether you are
@@ -739,19 +740,28 @@ what is going on and have enough to build your own answer.
    for you, max 14 words ("Mike asks who signs off security", not "Security sign-off owner").
    Always first. Language: Ukrainian when the window interface or the call is Ukrainian,
    otherwise English.
-2. **Why**, a quieter line: 1-2 sentences of context, max 35 words: what exactly is asked,
+2. **Detail** (Why before 0.25), a quieter line: 1-2 sentences of context, max 35 words: what exactly is asked,
    what the brief or the facts say, what to avoid.
 3. **Phrase**, in quotes, in the language of the call. What you can say, as people talk:
    the answer first, then a reason or a next step, 1-3 sentences. In English: simple
    everyday words, active voice, no idioms, up to 40 words.
 4. **Facts**: up to 3 full lines of up to 16 words, with numbers. A tip carries one phrase or one
    fact line; longer only for the speech, "your turn", the agenda, catch me up and 🆘.
-5. **Source**: one short italic line (topic and date).
+5. **Source**: one short line, where the tip comes from and its date ("Release plan · Nov 14"). The AI
+   writes it with the tip; when it leaves it out, the app names the documents of the facts the tip used.
 
 A long phrase gets a smaller font, so the main card does not fill the window. The window menu (⋯) has
 **Hide the main card**: all tips then go to one feed, newest on top, each with its question above it; a click
 on a row still opens that tip big, and **Show the main card** in the feed header brings it back. The choice is kept
 on this Mac.
+
+**In the Pacenote app (0.25).** The tips window draws the same parts as key, detail and source. The newest tip sits
+on a lighter surface with a mark (a yellow bar on the left in Roadbook, a rule on top in Broadsheet) and slides in,
+unless Reduce motion is on: the gist is the large key line, the detail a quieter line under it, the ready phrase in
+quotes, and at the bottom "from Release plan · Nov 14". When someone asks a question, the question is the small line on
+top and the answer is the key. The transcript reads quieter than the tip, Help now is an outlined button and End call
+sits in the window's header (it asks the same question as before). The compact card under the camera (section 14.1z12)
+shows one tip in the same order. Tips written before 0.25 still show their context and source.
 
 **No abbreviations:** "a new request", not CR; "date", not ETA. No ticket keys either, the
 topic name instead. People and product names stay as they are.
@@ -1496,27 +1506,42 @@ only its states (waiting for the call, recording, update, near a spending limit)
 state in the style: Listening (a ring and five sound level bars), Paused (the word on an orange plate), Mic off, Ready.
 Everything that moves stops under Reduce motion.
 
+**Roadbook and Broadsheet redrawn (0.25).** Settings > General > Appearance offers two styles, Roadbook and
+Broadsheet, each with the Mode; Classic is no longer offered (its code stays), and whoever was on it starts on
+Roadbook. Roadbook has a warm paper ground in Light and a warm graphite in Dark, and its yellow fills only the main
+button (framed in ink in Light), not the countdown. Broadsheet Dark is a lighter graphite with a brighter violet for
+the main button and a lighter one for links. "Not ready" is orange text with a mark, without the orange plate.
+
 **Windows and navigation.** Pacenote windows never join a tab group. The call page, a series, a transcript and
-Statistics open inside Home; Back (or Command-[) returns. The follow-up email is the right panel of the call page.
+Statistics open inside Home; Back (or Command-[) returns. The follow-up email is a tab of the call page (0.25).
 
 **Settings.** The sidebar has four groups: You (Account, General), Calls (Projects, Meeting Sheet, Call recording,
-Transcription), Connections (Integrations, AI) and More (Modules, Components, Usage, Help, About). Settings > AI shows one group
-at a time: Access, Jobs (which AI prepares, tips and writes the notes, and the AI chain), Limits, On this Mac (the
-local model, search, speakers) and Advanced (company research, the agents). Settings > General has three groups:
-Basics (your name, work folder, language, theme, Dock), During calls (the tips window, floating controls, shortcuts)
-and Data (usage log, Help improve Pacenote, add-ons, app folder). Recording consent is under Settings > Call
-recording. **Search** sits on top of the sidebar (Command-F): type a word in English or Ukrainian ("key", "мова",
-"Notion") and the sidebar lists the settings as "Name / Pane › Group"; a click (or Return for the first one) opens
-the pane and the group and marks the row for a moment. Settings > Projects is a short list: the tick offers a
-project in Start call, the line under the name says Notion, Sales, answer cards and what is off; a click opens the
-project's page (In Notion, Sales, answer cards, and what leaves this Mac: AI tips, search in the folder, sync to your
-account); Back or Command-[ returns. Integrations is one list of connections with their state and Connect for the
-ones not set up; a click opens the page. The Notion page has four groups: Connection, Databases, After the call
-(meeting pages, your tasks) and Local copy; HubSpot has Connection, Matching, Reads and writes, Qualification.
-Without a token or key only Connection shows. In Databases, one Meetings, one Tasks and one Risks database serve all
-projects. The project is a property of each page: write its name next to the database (Project if empty) and set
-each project's value on the project's page, In Notion. Fill from project configs takes the databases most of your
-Control Tower configs name.
+Transcription), Connections (Integrations, AI) and More (Modules, Components, Usage, Help, About). Since 0.25 every
+pane shows only what is needed on top and keeps the rest in one collapsed **Advanced** at the bottom; each pane
+remembers whether its Advanced is open, and the search finds what is under Advanced too (it opens Advanced and marks
+the row). On top: Account, who is signed in and the plan (sign-in methods, organizations, your use, who opened your
+calls, devices and the data on the server under Advanced; an invite waiting for your answer shows the organizations on top); General, the **Pacenote is ready** card (account, AI,
+microphone, the sound of the call, the screen when calls are recorded with the screen, Notion's meeting database,
+components; Fix next to what is missing), your name on calls, the language and the look (Dock, the tips window during
+screen sharing, Live tips during a call (Classic window or Compact card), call controls, shortcuts, folders and data under Advanced); AI, a card each for Claude, ChatGPT and
+Gemini with Connect and one line "Pacenote uses: ...", the AI that really runs by what is connected, or "nothing connected" for a job no connected AI can do, e.g. the tips with only the AI on this Mac (the AI of each job, where Runs on shows the AI that really does it, the best connected one marked recommended and the rest greyed out until connected; the fallback chain, models, limits and spending, the AI on this Mac, Ollama and the agents under Advanced);
+Projects, the list and Add (found folders, workspaces, scanning and the index under Advanced); Integrations,
+Notion, Calendars and Google (HubSpot under Advanced); Call recording, the switch and sound or screen (the picture,
+quality, Google Drive, the screen permission and the consent message under Advanced); Transcription, the languages
+new calls start in (your dictionary, who is speaking and the voice library under Advanced); Meeting Sheet, Quick or
+Expert (My focus, old facts, reminders and presets under Advanced). **Search** sits on top of the sidebar
+(Command-F): type a word in English or Ukrainian ("key", "мова", "Notion") and the sidebar lists the settings as
+"Name / Pane › Advanced"; a click (or Return for the first one) opens the pane and marks the row for a moment.
+Settings > Projects: the tick offers a project in Start call, the line under the name says Notion, Sales, answer
+cards and what is off; a click opens the project's page (In Notion, Sales, answer cards, and what leaves this Mac: AI
+tips, search in the folder, sync to your account); Back or Command-[ returns. Integrations is a list of connections
+with their state and Connect for the ones not set up; a click opens the page. On the Notion page, as soon as the
+token is in, Pacenote looks for the database for meeting notes and asks you to pick it (Notion connected without
+it is a problem in the list and on the ready card); the other databases, My tasks and the local copy are under
+Advanced. HubSpot has Connection, Matching, Reads and writes, Qualification. Without a token or key only Connection
+shows. One Meetings, one Tasks and one Risks database serve all projects. The project is a property of each page:
+write its name next to the database (Project if empty) and set each project's value on the project's page, In
+Notion. Fill from project configs takes the databases most of your Control Tower configs name.
 
 **Editing the call page.** Edit (Command-E) turns decisions, items on you and on them (text and due date), open
 questions and risks into fields; Save writes a new call picture and the register's `edit` events. When the call
@@ -1542,7 +1567,7 @@ you or On them, Change owner, Set due, Delete) and a checkbox. The first change 
 as added on the call page) and applies it there, so a deleted task stays deleted. The call's other older tasks stay on
 the page next to it, also after "+ Add".
 
-**Sales methods.** Sales is an option on top of any call type (Start call > Options > Sales), remembered for the
+**Sales methods.** Sales is an option on top of any call type (Start call > the call type section > Sales mode), remembered for the
 series; the default per project is in Settings > Projects. The methods live in `rules/sales.yaml`, a new one is data:
 
 | Method | What Pacenote follows |
@@ -1606,7 +1631,8 @@ database's own options, chosen by the model, else empty), Context (one sentence 
 meeting page, when there is one), Status Active, Stated by, Project and Workspace. Trade-off, Alternatives rejected,
 Review trigger and Door are written only when they were said on the call; Pacenote never invents them. After the
 write the row shows a grey "In register" with a link. Without Notion, a project or a Decisions database the action is
-greyed out with the reason and a link to Settings.
+greyed out with the reason and a link to Settings. Since 0.25 the call notes name who made each decision, and Stated by
+gets that name; a decision from older notes has none.
 
 **Replaces an earlier decision?** After a decision is added, Pacenote compares it with the project's active
 decisions. When it contradicts one, the page asks "Replaces <old decision, date>?". Only your click marks the old page
@@ -1711,7 +1737,7 @@ Colours follow the call's state, never the project: not ready (orange), ready (g
 Console, the organization filter, "AI ok" or in its place the pill of things to set up, search, transcribe, refresh,
 Settings, Plan a call, Call now Command-N); then the banners (start tips for this call, a new version, an invitation,
 an organization to set up), each a band with Later and one button; then the next call over a heavy line: "Next call in
-37 min" (in Roadbook on the yellow plate, in Broadsheet a large number), the call name, the people, Ready or Not ready
+37 min" (before 0.25 in Roadbook on the yellow plate, in Broadsheet a large number; see below), the call name, the people, Ready or Not ready
 with what that means, one big button, one bordered button and one link, and on the right the rest of today and
 tomorrow with See the whole week (Coming up: every call on a line and the full list, with Show less). Under it Recent
 calls (the last five rows with the state of their notes and a project filter) next to This week (calls, hours on
@@ -1719,6 +1745,58 @@ calls, prepared, AI spend this month, account limits, calls not transcribed yet,
 time on the call on a red plate, Show tips, the Meeting Sheet and End the call. Without calls ahead Home says "Clear
 until tomorrow"; without a calendar it offers to connect one and lists the calls planned by hand; the first launch
 shows three steps. In a narrow window the columns go one under the other. Classic uses the same layout.
+
+**Home acts on the brief (0.25).** The main button of the next call follows the brief, not the clock: without a brief
+it is "Prepare brief" (with how long a preparation usually takes, once there are a few) and "Start without prep" next to
+it; while the brief is prepared the button shows its progress and "Start call now" stays one click away (the brief joins
+the call when it is ready); with the brief ready it is "View brief" and "Start call"; once the meeting has begun it is
+"Start call" with what it opens, for example "Google Meet and live tips". Prepare brief still opens Get ready. In
+Roadbook the countdown stands out by its size; in Broadsheet the next call's name is the headline, with the countdown
+and readiness on the line under it. Later today shows quiet marks. The header's Call now is a quiet "New call ⌘N",
+which opens Get ready for an untitled call. On first launch the AI step is marked "Start here" with Connect AI, and a
+call that starts right now has a button.
+
+**Call pages (0.25).** The past and the upcoming call page are laid out as the call page boards of the three looks. A
+bar on top: Back, what the page is ("Past call · 3rd in this series", "Upcoming call · weekly series") and the actions
+(a past call: Ask about this call, Export and the "..." menu; an upcoming call: how soon it starts, Start without prep
+and Get ready, or Start call once it is prepared). Then the date line, the name and a row of facts: the project (a
+click moves the call to another one), how the call ended (Ended · screen recorded, Transcript only, Ended · not
+synced), the people and the series. Under it a past call has one line per state: Notion (synced when, Retry), Consent,
+Recording (Play, Show in Finder, Open in Drive), Server (Sync now, Don't sync this call) and Organization (who sees it,
+Private). The tabs: Summary, What was discussed, Decisions, Next steps (Tasks before 0.25), Risks, Follow-up, Transcript, and Sales for a call
+in Sales mode. Summary puts In short and Topics next to Decisions, On you, On them and Risks; a time is a link into the
+transcript. Follow-up is the follow-up email as a tab (Option-Command-I opens it from anywhere on the page). A call
+with no notes says what it has (transcript, recording) and writes the notes with Make meeting notes. On an upcoming
+call, Setup has The call (project, name, when, kind of call, audience, language, Sales mode), People (from the
+invite), Preparation (what Get ready uses, "Anything special today?", Quick prep and Expert prep) and More settings;
+Meeting Sheet without a sheet offers Quick prep and the five steps of Expert prep side by side.
+Setup also says where the call opens (the meeting app and the browser profile or app), shows Our side and Their side
+with Change the sides (it opens Quick prep), a Recording section (record this call, video or audio, the quality, Upload
+to Google Drive, Recording settings) and Runs on: the AI of the preparation, the tips and the summary. On a past call
+the due date of a commitment sits at the right of its row, Add appears on the decision or risk you point at, and adding
+a risk to the project register asks first.
+
+**Tracker, Past calls and Series (0.25).** The Tracker follows its board: Back, the sync line (or "Kept on this Mac"
+with Connect Notion), the title with New task, the Tasks, Decisions and Risks tabs with counts, the filters (workspace,
+project, call, owner, status) and Find, then the groups: Overdue, This week and Later for tasks, open and Closed for
+decisions and risks. All past calls groups the calls by week, with the date, the name, the project and series, what
+came out of the call and the state of its notes; Summary, Follow-up and Series show on the row you point at. A series
+page shows the next call, Since last time, the open commitments of the series (who, what, open for how many calls, the
+call where it was promised), Questions that stay open, Decisions call by call and the decision register.
+
+**Statistics (0.25).** Home > This week > Statistics opens a page: the period buttons (Today, This week, Last week,
+This month, Last 30 days, Dates…) and the projects or a workspace (the Sales calls switch is in the same menu), four big
+numbers against the period before (calls, time on calls, prepared, the busiest day), minutes on calls by day stacked by
+project, and the calls of the selection. Click a day's bar to see that day, click it again for the whole period; a call
+in the list opens its page. On the right: How the calls went, the period in short and AI this month with a link to
+Settings > Usage. Hidden calls never count.
+
+**Who decided, next steps, the follow-up card (0.25).** The call notes name who made each decision ("**Emily Clark**:
+the export ships on Tuesday"); the call page, the export, the server and the Notion decision register (Stated by) carry
+the name, and older notes without names read as before. On a past call Summary puts Decisions (with who decided), Next
+steps (with the owner and the date) and Risks first, with a follow-up card beside them: whether the draft is there,
+whom it goes to, and "Review follow-up", which opens the draft. The draft offers "Copy follow-up" and "Open in Mail";
+nothing is sent. The Tasks tab is now Next steps.
 
 **Call pages.** An upcoming call opens as a page with Setup, Brief, Tasks and Earlier calls; its Setup changes
 apply only on Save. A past call has Summary (Meeting notes since 0.9.5.2, 14.1t), What was discussed, Decisions, Tasks, Risks, Transcript (and Sales), plus Ask about this
@@ -2103,8 +2181,11 @@ The upcoming call's page has the tabs **Setup**, **Meeting Sheet**, **Readiness*
 without prep before a sheet exists; Start call, Refresh and Export once it does; Building N% and Stop while it builds.
 
 **Presets.** A preset picks the blocks and what "ready" means: Sales intro, Upsell, Repeat call, Client sync,
-Internal or presentation, Stand-up, Interview and Blank. **Save as my preset** on the Blocks step keeps your own set
-(Settings > Meeting Sheet renames, duplicates and deletes them).
+Internal or presentation, Stand-up, Interview and Blank. On Expert step 1 they are chips with their mode (expert or
+quick), with the suggested one named under them. On the Blocks step the shown blocks are listed under My focus (drag
+to reorder, the eye hides a block for this meeting, hidden ones are listed crossed out and come back with their eye),
+and the right column shows what **Ready means** for the preset and **Save as my preset** with its name, right on the
+page. It keeps your own set (Settings > Meeting Sheet renames, duplicates and deletes them).
 
 **Quick or Expert.** **Get ready** opens one of two ways into the same sheet; the switch is in the header.
 
@@ -2117,14 +2198,21 @@ Internal or presentation, Stand-up, Interview and Blank. **Save as my preset** o
 Settings > Meeting Sheet decides which one opens: by the rules (each rule can be turned off or flipped), always Quick
 or always Expert. The first time in a series Quick shows "Suggested" and Pacenote remembers the setup for next time.
 
-**Who is on the call.** Quick (under People > Change) and Expert step 1 show Their side and Our side next to each
-other. Names stay on one line (a long one ends with "…", the full name is in the tooltip) and the chips wrap as whole
+**Get ready since 0.25.** The switch at the top ("Quick" / "Expert · all settings") is the one way into Expert; the
+link under the form is gone. Quick asks "What matters on this call" (the same field as Start a call; during a live call "What changed?"), and Cancel, Start
+without prep and "Prepare brief" sit in a band at the bottom.
+
+**Who is on the call.** Quick (under People > Change) and Expert step 1 show Our side (on the left) and Their side
+next to each other. Names stay on one line (a long one ends with "…", the full name is in the tooltip) and the chips wrap as whole
 chips. Drag a person to the other side, or click the arrow on the chip; × removes them, the field under each side adds
 one ("Name · company"). You are always on Our side. A move applies to this call. On an internal call (audience: team) everyone is on Our side.
 A team member from the project config is recognized under a short spelling ("Emily C.", "E. Carter"), one person
 written two ways is one chip, and two short names that lost their comma ("Jake T. Mike J.") are two people.
 
-**Sources: what you can add.** One panel for everything:
+**Sources: what you can add.** Expert step 3 starts with two tiles, Drop files or folders here (with Choose files)
+and Paste a link or text ("What can I add?" lists the kinds). In this sheet lists the sources with their count and
+size, each with its type and size and an access mark (Access ok, No access) with the fix next to it. The folder's
+suggestions come last. What can go in:
 
 - files: drop them or Choose files (PDF, PowerPoint, Keynote, Excel, Word, CSV, Markdown, text);
 - a pasted link: Google Docs, Sheets, Slides and Drive files, Notion pages, LinkedIn, any web page;
@@ -2136,7 +2224,7 @@ written two ways is one chip, and two short names that lost their comma ("Jake T
   340 searchable during the call". The files read are listed under the folder in the sheet's Sources and report;
   files not taken are not an error. The Size step counts only the files taken. The number of days is in
   Settings > Meeting Sheet (Folders: read files changed in the last N days), and a folder row in Expert Sources can
-  have its own. During the call the search looks through the whole folder, older files too (the same filters:
+  have its own (the "Recent files: last N days" menu under the row). During the call the search looks through the whole folder, older files too (the same filters:
   archived, hidden, generated call files, logs, binaries and older -vN versions are never read);
 - "From the project folder": files with the reason they fit (same contact, title match, fresh, newer version, used by
   the previous sheet). **Nothing is ticked for you**; press Add N ticked;
@@ -2166,10 +2254,11 @@ connected without that permission, Pacenote asks Google once more, then press Co
 **Size.** Before the run the **Size** step counts the sources in tokens for the chosen route and compares them with
 the model's window (from the providers' documentation, `rules/ai.yaml > windows`), keeping room for the answer. It
 shows the biggest sources and one of three states: **Fits in one pass**, **Close to the limit**, **Too much for one
-pass**. When it is too much, Build waits for your choice: two passes (merged into one sheet), summarize the big
+pass**, with the count large over a bar that marks where one pass ends. When it is too much, Build waits for your
+choice, made right on the page next to the biggest sources: two passes (merged into one sheet), summarize the big
 sources first, remove sources, or a bigger route. Nothing is cut silently. The route is the one of Settings > AI >
-Preparation; when it cannot run, Pacenote asks before building on another one, in the build view and on the call
-page (Use / Not now, never a pop-up); a queued run without you, or a run during a live call, switches, says so in the
+Preparation; when it cannot run, Pacenote asks before building on another one, in the build view ("Build on" the
+other route or Try again) and on the call page (Use / Not now), never in a pop-up; a queued run without you, or a run during a live call, switches, says so in the
 report and shows a notice.
 
 **Build.** The **Build** step shows the progress by source and by pass. A source that fails does not stop the rest.
@@ -2270,6 +2359,12 @@ checkbox to leave it out. The default order: Claude account, ChatGPT account, Cl
 Gemini account, model on this Mac. Every connected AI is in the list by default, so the text of a call may go to
 another provider when the chosen one is out. **Switch to the next AI automatically** turns the chain off: then a job
 on an AI that is out stops with the reason, as before.
+
+**The AI of each job follows what is connected (0.24.1).** A job never sits on an AI you have not connected: with
+only a Claude API key, the preparation, the tips and the work after the call all run on it. When you connect an
+account later (Claude or ChatGPT), it becomes the AI for the preparation and the work after the call; the tips stay on
+an API key while you have one. A choice you make in Settings > AI stays as long as its AI is connected. An account
+counts once Pacenote has checked that you are signed in.
 
 - Tips during a call never go to the model on this Mac (19-59 seconds an answer) or to the Gemini account (20-30
   seconds); when every cloud AI is out, the instant cards and facts keep working.
@@ -2657,6 +2752,72 @@ teams, organization projects and invites are managed in the Pacenote console, no
   same place then names it ("Acme: usage is shared with your organization"). **Show what is sent** shows the batches
   waiting to go, as they will go. For now the weekly count of earlier versions goes too, next to it. When you join an
   organization, the join window says it in one line: the organization can see your usage totals, not your calls.
+
+### 14.1z11 First run and readiness of a call (0.24.1, beta)
+
+**One install for the whole base.** Pacenote downloads its own Python 3.13 into the app folder (about 25 MB, its
+SHA-256 pinned in the app); a Python already on the Mac (3.10 to 3.14) is only the fallback when that download fails.
+Then, with one Install: the recorder core, a private Python environment, speech recognition (MLX Whisper), the
+Whisper model (about 1.6 GB), the tips engine modules, the meaning search model bge-m3 (about 590 MB) and speaker
+identification. The Python libraries come from lock files inside the app with exact versions and hashes; when a new
+Pacenote has new locks, Settings > Components shows the parts as out of date and Install brings them in line. A part
+that fails does not stop the rest: the parts that need it say so ("Waits for Python"), the others install, and the
+reason of each failure is on its row with Retry. The loader shows the part, MB of MB, the percent and the time left.
+
+**Accounts.** Claude Code and Codex are not components. Connect a Claude account (Settings > AI or the onboarding) and
+Pacenote installs Claude Code with Anthropic's installer, then runs its sign-in from the app: your browser opens, and
+if the program asks for a code, paste it in the field Pacenote shows. A ChatGPT account installs OpenAI's Codex
+release for this Mac (pinned version and hash) the same way. The Gemini account (Antigravity) is not installed by
+Pacenote yet. With an API key nothing is installed: the preparation and the Meeting Sheet talk to the API directly.
+
+**Readiness of a call.** One check decides for every start (Home, the call page, the menu bar, the hot key, Up next):
+
+| Missing | The call |
+|---|---|
+| Python, recorder core, environment, MLX Whisper, the Whisper model, tips engine modules | Does not start; the reason and Install with the loader in place |
+| Any connected AI | Recording and transcript only, with Connect AI |
+| The chosen account's program or its sign-in | As above, with Connect or an API key |
+| bge-m3 or speaker identification | Starts; Pacenote offers to install it |
+
+End call while the speech model is loading stops at once. A call with no transcript line says "Nothing was
+recorded" with why: the model was still loading, the recorder did not start, or no speech was heard.
+
+**Logs and diagnostics.** logs/app.log is the app's journal, logs/setup.log the full output of every install step;
+every run of a log starts with a header (date and time zone, app, Python and packages, macOS, the call), lines carry
+the date, files are appended and rotated by size. Help > Export diagnostics saves a zip of logs/ and state/ with the
+versions and the components; the home folder is written as ~ and anything that looks like a key is cut.
+
+**A participant's voice is named right away.** When a voice matches a person in the voice library closely (cosine
+0.72 or more, clearly ahead of the next person) and that person is a participant of this call (Start call or the
+calendar event; a calendar spelling with the same first letter and surname initial counts when only one participant
+fits), the speaker is named after about 4 seconds of speech (`speaker_auto_s`). Without participants, only names used on
+the same meeting series are named this way, as before. Anyone else, an unsure match or a name already on this call is
+asked. The library does not learn from a name given this way until you confirm or rename it.
+
+**The speaker model.** setup.sh downloads `wespeaker_en_voxceleb_resnet34_LM.onnx` from Pacenote's own release
+(bodco/live-tips, models-wespeaker-1), the upstream sherpa-onnx file only as a fallback, and checks the same SHA-256 for
+both. The upstream file was re-uploaded without its `feature_normalize_type` metadata, which changes the voice prints.
+The model is WeSpeaker ResNet34-LM trained on VoxCeleb, CC BY 4.0.
+
+### 14.1z12 The tip card under the camera (0.25, beta)
+
+- **Turn it on.** Settings > General > Advanced > Calls, **Live tips during a call**: Classic window (the tips window
+  as before, the default) or Compact card. The search in Settings finds it ("compact card").
+- **Where it sits.** A small panel at the top centre of the built-in screen, just under the camera: under the notch, or
+  under the menu bar on a Mac without one, so your eyes stay near the lens. It never takes the focus from Zoom or Meet.
+  It grows and shrinks with the tip and keeps its top edge in place. Drag it by the strip at the top; a new call puts it
+  back under the camera. It follows the same screen sharing setting as the tips window (Settings > General > Advanced).
+- **What it shows.** The top row: Recording (or Paused, Mic off) with the time on the call, Mute, Pause, Help now,
+  Expand and End call. Under it one tip: the question, the key line, the detail and the source. With more than one tip,
+  "‹ Previous tip" and "Latest tip ›" page through them ("Tip 2 of 5"); a tip that arrives while you read an older one
+  does not replace it, the card marks it "new". A new tip slides in unless Reduce motion is on. Before the first tip the
+  card says it is listening and reminds you of Help now (Control-Option-H). A recording problem shows one line with
+  "Open the window". A risk and "Decided earlier" come to the card like a tip.
+- **Expand and the end of the call.** Expand opens the full tips window for the rest of the call (agenda, transcript,
+  presentation, the input). End call asks the same question as in the window. "The meeting has ended? Stopping the
+  call in N s" shows on the card with Keep recording and Stop now. When the call ends, the full window opens with the
+  after-call screen without taking the focus from your meeting app. The floating call controls work as before.
+- **Only in the full window.** The slides of a presentation, the "N min left" line and the quiet "Done?" cards.
 
 ### 14.2 After the call: the meeting page in Notion
 

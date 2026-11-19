@@ -140,7 +140,7 @@ private struct PNSwitchBody: View {
                     ZStack(alignment: on ? .trailing : .leading) {
                         RoundedRectangle(cornerRadius: round ? 10 : 0)
                             .fill(on ? PN.C.accentFill : Color.clear)
-                            .overlay(RoundedRectangle(cornerRadius: round ? 10 : 0).strokeBorder(on ? PN.C.accentFill : PN.C.field, lineWidth: 1.5))
+                            .overlay(RoundedRectangle(cornerRadius: round ? 10 : 0).strokeBorder(on ? PN.C.actEdge : PN.C.field, lineWidth: 1.5))
                         RoundedRectangle(cornerRadius: round ? 6.5 : 0)
                             .fill(on ? PN.C.onAccent : PN.C.text3)
                             .frame(width: 13, height: 13).padding(.horizontal, 3.5)
@@ -180,7 +180,7 @@ private struct PNCheckboxBody: View {
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
                     ZStack {
                         RoundedRectangle(cornerRadius: r).fill(on ? PN.C.accentFill : Color.clear)
-                        RoundedRectangle(cornerRadius: r).strokeBorder(on ? PN.C.accentFill : PN.C.field, lineWidth: 1.5)
+                        RoundedRectangle(cornerRadius: r).strokeBorder(on ? PN.C.actEdge : PN.C.field, lineWidth: 1.5)
                         if on { Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(PN.C.onAccent) }
                     }
                     .frame(width: 14, height: 14)

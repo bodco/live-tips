@@ -507,6 +507,7 @@ struct OrgStateUpdateLine: View {
     @State private var sheet: IdentifiedState?
     @State private var suggestion = ""
     @State private var problem = ""
+    @Environment(\.pnTheme) private var t
 
     init(file: String, decisions: [String], risks: [String]) {
         self.file = file; self.decisions = decisions; self.risks = risks
@@ -520,16 +521,17 @@ struct OrgStateUpdateLine: View {
 
     var body: some View {
         if let p = project, !done, PacenoteAccount.shared.signedIn, !(decisions.isEmpty && risks.isEmpty) {
-            HStack(spacing: 8) {
-                Image(systemName: "square.and.pencil").foregroundStyle(PN.C.accent)
+            // 0.25 (R2, board SL): a surface2 band with a 3 pt line in the link colour on the left
+            HStack(spacing: 12) {
                 Text(problem.isEmpty ? L("orgctx.offer", ["project": p.orgProjectName.isEmpty ? p.name : p.orgProjectName]) : problem)
-                    .font(PN.Font.caption).foregroundStyle(problem.isEmpty ? PN.C.text2 : PN.C.pending)
-                Spacer(minLength: 4)
-                Button(L("orgctx.offer.review")) { Task { await review(p) } }.buttonStyle(.pnSecondary)
-                Button(L("orgctx.offer.notNow")) { done = true }.buttonStyle(.pnTertiary)
+                    .font(t.homeText(14)).foregroundStyle(problem.isEmpty ? PN.C.text : PN.C.notreadyText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(L("orgctx.offer.review")) { Task { await review(p) } }.buttonStyle(.pnRow)
+                HomeLink(L("orgctx.offer.notNow"), size: 13) { done = true }
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(PN.C.accent.opacity(0.06), in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(PN.C.surface2)
+            .overlay(alignment: .leading) { Rectangle().fill(PN.C.accent).frame(width: 3) }
             .sheet(item: $sheet) { s in
                 StateEditSheet(project: p, start: s.s, draft: suggestion) { ok in sheet = nil; if ok { done = true } }
             }

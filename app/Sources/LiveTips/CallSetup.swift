@@ -57,17 +57,18 @@ struct CallSetupView: View {
                     if live { liveBanner }
                     // 0.8.5 (P1): block 1 and block 2 never move; the type section is always last, so switching
                     // the type changes only that section, below everything already filled.
-                    block(1) { titleRow; timeRow; typeRow }
+                    // 0.25 (R3b, board SU): flat numbered sections under a heavy rule, mono labels, square fields
+                    block(1, title: L("su.sec.call")) { titleRow; timeRow; typeRow }
                     block(2, title: L("start.context")) { projectRow; contextBox }
-                    block(3) { typeSection }
+                    block(3, title: typeTitle) { typeSection }
                     // 2026-11-13 (owner, urgent): Plan a call showed the old "No brief yet" line with no way to prepare.
                     // Every form now shows the Meeting Sheet preparation; Plan a call also gets Quick / Expert (Start call
                     // and Prepare keep theirs in the footer).
-                    if model.callType != "transcript" { prepSection(buttons: mode == .plan) } else { briefLine }
+                    if model.callType != "transcript" { block(4, title: L("sheet.ui.setup.prep")) { prepSection(buttons: mode == .plan) } } else { briefLine }
                     if let h = problemHint { Label(h, systemImage: "info.circle").font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
                     options
                 }
-                .padding(24)
+                .padding(.horizontal, 24).padding(.top, 22).padding(.bottom, 20)
                 }
             }
             // 0.8.7 (G6): one scroll view for the whole form; the footer is pinned and the content ends above it
@@ -91,10 +92,12 @@ struct CallSetupView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(mode == .prepare ? L("call.title.prepare") : mode == .plan ? L("call.title.plan") : saved ? L("call.title.upcoming") : L("call.title.start"))
-                .font(PN.sys(22, .bold)).foregroundStyle(PN.C.text)
+            // 0.25 (R3b, board SU): the display face at 34, in capitals where the style sets them
+            Text(t.cased(mode == .prepare ? L("call.title.prepare") : mode == .plan ? L("call.title.plan") : saved ? L("call.title.upcoming") : L("call.title.start")))
+                .font(t.homeDisplay(34, t.heroWeight)).tracking(t.dTrack * 34).foregroundStyle(PN.C.text)
+                .accessibilityAddTraits(.isHeader)
             if mode != .start {
-                Text(mode == .prepare ? L("call.sub.prepare") : L("call.sub.plan")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                Text(mode == .prepare ? L("call.sub.prepare") : L("call.sub.plan")).font(t.homeText(14)).foregroundStyle(PN.C.text2)
             }
         }
     }
@@ -128,12 +131,21 @@ struct CallSetupView: View {
                     Spacer()
                     Image(systemName: "chevron.up.chevron.down").foregroundStyle(PN.C.text3)
                 }
-                .padding(10).contentShape(Rectangle())
-                .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.s))
-                .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(Color.primary.opacity(0.12)))
+                .padding(.vertical, 8).contentShape(Rectangle())
+                .prepField(height: 40, border: model.target.isEmpty ? PN.C.accent : nil)
             }
             .buttonStyle(.plain)
             .popover(isPresented: $picking, arrowEdge: .bottom) { projectPicker }
+            // 0.25 (R3b, board SU): with no project Start call still works; say where the call goes
+            if model.target.isEmpty && mode == .start {
+                Text((try? AttributedString(markdown: L("su.noProject", ["ws": ProjectRegistry.defaultWorkspaceName]))) ?? AttributedString(L("su.noProject", ["ws": ProjectRegistry.defaultWorkspaceName])))
+                    .font(t.homeText(14)).foregroundStyle(PN.C.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(PN.C.surface2)
+                    .overlay(alignment: .leading) { Rectangle().fill(PN.C.accent).frame(width: 3) }
+            }
         }
     }
 
@@ -150,12 +162,13 @@ struct CallSetupView: View {
         VStack(alignment: .leading, spacing: 6) {
             fieldLabel(L("call.name"))
             TextField("", text: $model.title, prompt: Text(L("call.namePlaceholder")))
-                .textFieldStyle(.roundedBorder).font(PN.sys(15))
+                .textFieldStyle(.plain).font(PN.sys(15))
+                .prepField(height: 36)
                 .focused($titleFocus)
                 .onChange(of: model.title) { model.scanPrep(); copied = false }
             if let e = model.rememberedForTitle {
                 HStack(spacing: 6) {
-                    Text(L("call.remembered", ["title": e.title])).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+                    Text(L("call.remembered", ["title": e.title])).font(t.homeText(13)).foregroundStyle(PN.C.text3)
                     Button(L("call.useSettings")) { model.apply(e); model.scanPrep() }.buttonStyle(.pnTertiary)
                 }
             }
@@ -211,21 +224,29 @@ struct CallSetupView: View {
 
     // MARK: 0.8.5 blocks (P1)
 
-    private func block<C: View>(_ n: Int, title: String? = nil, @ViewBuilder _ content: () -> C) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("\(n)").font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text3)
-                .frame(width: 20, height: 20).background(Circle().fill(PN.C.surface2)).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 14) {
-                if let t = title { Text(t).pnSection().foregroundStyle(PN.C.text) }
-                content()
-            }.frame(maxWidth: .infinity, alignment: .leading)
+    /// 0.25 (R3b, board SU): a flat section: the heavy rule, the mono number and the title, then its fields.
+    private func block<C: View>(_ n: Int, title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PrepSectionHead(number: n, title: title)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The title of section 3 is the call type (board: Regular / Presentation).
+    private var typeTitle: String {
+        switch model.callType {
+        case "presentation": return L("start.type.presentation")
+        case "interview": return L("callSettings.type.interview")
+        case "transcript": return L("callSettings.type.transcript")
+        default: return L("start.type.regular")
         }
     }
 
     /// Call type, Audience and Language next to the title and the time (P1 block 1).
     private var typeRow: some View {
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-            GridRow {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
                 fieldLabel(L("start.callType"))
                 PNSegmented(selection: $model.callType, options: [
                     ("auto", L("start.type.regular")),
@@ -234,60 +255,68 @@ struct CallSetupView: View {
                     ("transcript", L("callSettings.type.transcript"))
                 ]).labelsHidden().fixedSize()
             }
-            GridRow {
-                fieldLabel(L("start.audience"))
-                PNSegmented(selection: $model.audience, options: [
-                    ("auto", L("callSettings.audience.auto")),
-                    ("client", L("callSettings.audience.client")),
-                    ("team", L("callSettings.audience.team"))
-                ]).labelsHidden().fixedSize()
-            }
-            GridRow {
-                fieldLabel(L("start.language"))
-                // 0.8.7 (G4): a pop-up (suggested languages, More… with search), not a chip
-                LanguageMenu(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
-                                            set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
+            HStack(alignment: .bottom, spacing: 24) {
+                VStack(alignment: .leading, spacing: 5) {
+                    fieldLabel(L("start.audience"))
+                    PNSegmented(selection: $model.audience, options: [
+                        ("auto", L("callSettings.audience.auto")),
+                        ("client", L("callSettings.audience.client")),
+                        ("team", L("callSettings.audience.team"))
+                    ]).labelsHidden().fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 5) {
+                    fieldLabel(L("start.language"))
+                    // 0.8.7 (G4): a pop-up (suggested languages, More… with search), not a chip
+                    LanguageMenu(codes: Binding(get: { model.language.split(separator: "+").map(String.init) },
+                                                set: { model.language = $0.joined(separator: "+"); model.languageTouched = true }))
+                }
+                Spacer(minLength: 0)
             }
         }
     }
 
     /// The type section (P1 block 3): Regular hint, the Presentation block, or the interview role.
     @ViewBuilder private var typeSection: some View {
+        // 0.25 (R3b, board SU): the section title is the type; its body is flat, no card
         switch model.callType {
         case "presentation":
             DeckBlock(model: model, onNeedPrep: { if !needProject() { prepareNow() } })
         case "interview":
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L("callSettings.type.interview")).pnSection().foregroundStyle(PN.C.text)
+            VStack(alignment: .leading, spacing: 5) {
+                fieldLabel(L("callSettings.role"))
                 Picker(L("callSettings.role"), selection: $model.hiringRole) {
                     Text(L("callSettings.role.observer")).tag("observer")
                     Text(L("callSettings.role.interviewer")).tag("interviewer")
                     Text(L("callSettings.role.coach")).tag("coach")
-                }.fixedSize()
+                }.labelsHidden().fixedSize()
             }
-            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
         case "transcript":
             // rules/meeting.yaml > call_type.transcript: no tips, the summary and the follow-up after the call
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L("callSettings.type.transcript")).pnSection().foregroundStyle(PN.C.text)
-                Text(L("start.transcriptHint")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            Text(L("start.transcriptHint")).font(t.homeText(14)).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
         default:
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L("start.type.regular")).pnSection().foregroundStyle(PN.C.text)
-                Text(L("start.regularHint")).font(PN.Font.caption).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+            Text(L("start.regularHint")).font(t.homeText(14)).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+        }
+        if model.callType != "transcript" { salesRow }
+    }
+
+    /// 0.25 (R3b, board SU): Sales mode sits with the call type it changes, not under Options (0.8.7 H2: any type).
+    @ViewBuilder private var salesRow: some View {
+        Toggle(isOn: Binding(get: { model.salesEnabled }, set: { model.salesEnabled = $0; model.salesTouched = true })) {
+            Text(L("su.sales")).font(t.homeText(14)).foregroundStyle(PN.C.text)
+        }
+        .toggleStyle(.pnCheckbox)
+        if model.salesEnabled {
+            HStack {
+                SalesMethodPicker(selection: $model.salesMethod)
+                Button { showMethod.toggle() } label: { Image(systemName: "info.circle") }.buttonStyle(.borderless)
+                    .accessibilityLabel(L("sales.method.about"))
+                    .popover(isPresented: $showMethod, arrowEdge: .trailing) { SalesMethodInfo(key: model.salesMethod) }
             }
-            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-            .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.m))
+            .padding(.leading, 24)
         }
     }
 
-    private func fieldLabel(_ s: String) -> some View {
-        Text(s).font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.text2)
-    }
+    private func fieldLabel(_ s: String) -> some View { PrepFieldLabel(text: s) }
 
     // MARK: 4. what matters on this call, with the added folders and files
 
@@ -310,46 +339,44 @@ struct CallSetupView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .padding(6)
-                .frame(height: 110)
-                .background(PN.C.surface, in: RoundedRectangle(cornerRadius: PN.Radius.s))
-                .overlay(RoundedRectangle(cornerRadius: PN.Radius.s).stroke(Color.primary.opacity(0.12)))
+                .padding(.vertical, 6).padding(.horizontal, -4)
+                .frame(height: 100)
+                .prepField()
             chips
             CRMCallRow(model: model)        // 0.8.7 (G7): only when a CRM is connected
         }
     }
 
+    /// 0.25 (R3b, board SU): a framed chip; a left-out one is struck through with "+" to include it again.
     private func chip(_ symbol: String, _ name: String, on: Bool = true, help: String, toggle: @escaping () -> Void, icon: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: symbol)
+        HStack(spacing: 6) {
             Text(name).lineLimit(1).strikethrough(!on)
-            Button(action: toggle) { Image(systemName: icon) }.buttonStyle(.plain).accessibilityLabel(icon == "xmark" ? L("call.remove") : L("call.include"))
+            Button(action: toggle) { Image(systemName: icon).font(.system(size: 10, weight: .semibold)).frame(width: 18, height: 18).contentShape(Rectangle()) }
+                .buttonStyle(.plain).foregroundStyle(PN.C.text3)
+                .accessibilityLabel((icon == "xmark" ? L("call.remove") : L("call.include")) + " " + name)
         }
-        .font(PN.Font.caption)
-        .foregroundStyle(on ? PN.C.accent : PN.C.text3)
-        .padding(.horizontal, 8).padding(.vertical, 3)
-        .background(RoundedRectangle(cornerRadius: PN.Radius.s).fill(on ? PN.C.accent.opacity(0.12) : PN.C.surface2))
+        .font(t.homeText(13))
+        .foregroundStyle(on ? PN.C.text : PN.C.text3)
+        .padding(.leading, 10).padding(.trailing, 4).frame(height: 28)
+        .overlay(RoundedRectangle(cornerRadius: t.style == .classic ? PN.Radius.s : 0).strokeBorder(on ? PN.C.field : PN.C.rule, lineWidth: 1.5))
         .help(help)
     }
 
     private var chips: some View {
-        HStack(alignment: .center, spacing: 6) {
-            Button { model.addFolders() } label: { Label(L("call.addFolder"), systemImage: "folder.badge.plus") }
-                .buttonStyle(.pnTertiary).disabled(model.target.isEmpty)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    // 0.8.7 (G3): the folder of the project chosen above is not repeated; only when left out
-                    if let r = model.root, !model.useProjectFolder {
-                        chip("folder", (r as NSString).lastPathComponent, on: model.useProjectFolder,
-                             help: model.useProjectFolder ? L("call.projectFolder.on", ["path": r]) : L("call.projectFolder.off"),
-                             toggle: { model.useProjectFolder.toggle() }, icon: model.useProjectFolder ? "xmark" : "plus")
-                    }
-                    ForEach(model.folders, id: \.self) { f in
-                        chip(StartCallModel.isDir(f) ? "folder" : "doc", (f as NSString).lastPathComponent, help: f,
-                             toggle: { model.folders.removeAll { $0 == f } }, icon: "xmark")
-                    }
-                }
+        FlowLayout(spacing: 6, lineSpacing: 6) {
+            // 0.8.7 (G3): the folder of the project chosen above is not repeated; only when left out
+            if let r = model.root, !model.useProjectFolder {
+                chip("folder", (r as NSString).lastPathComponent, on: model.useProjectFolder,
+                     help: model.useProjectFolder ? L("call.projectFolder.on", ["path": r]) : L("call.projectFolder.off"),
+                     toggle: { model.useProjectFolder.toggle() }, icon: model.useProjectFolder ? "xmark" : "plus")
             }
+            ForEach(model.folders, id: \.self) { f in
+                chip(StartCallModel.isDir(f) ? "folder" : "doc", (f as NSString).lastPathComponent, help: f,
+                     toggle: { model.folders.removeAll { $0 == f } }, icon: "xmark")
+            }
+            Button("+ " + L("call.addFolder")) { model.addFolders() }
+                .buttonStyle(.plain).font(t.homeText(13, .semibold)).foregroundStyle(PN.C.accent)
+                .frame(height: 28).disabled(model.target.isEmpty)
         }
     }
 
@@ -367,8 +394,10 @@ struct CallSetupView: View {
                 Button(L("call.stop")) { j.stop() }.buttonStyle(.pnTertiary)
                 SheetSwitchPrompt(callID: model.id)       // 0.10.0 (Meeting Sheet, hardening): the route question inline
             } else if let s = sheet {
-                SheetReadinessPill(badge: s.readinessBadge)
-                Text(s.title).font(PN.Font.body).foregroundStyle(PN.C.text).lineLimit(1)
+                // 0.25 (R3b, board SU block 4): a square status mark, when it was built and which version
+                SheetReadinessTag(badge: s.readinessBadge)
+                Text(s.builtAt.map { L("su.prep.built", ["at": SheetLabels.date($0), "n": "\(s.versions?.map(\.n).max() ?? 1)"]) } ?? s.title)
+                    .font(t.homeText(14)).foregroundStyle(PN.C.text2).lineLimit(1)
                 Spacer()
                 Button(L("common.open")) { openSheet() }.buttonStyle(.pnTertiary)
             } else if runner.running && runner.callID == model.id {
@@ -401,9 +430,13 @@ struct CallSetupView: View {
                     }
                     Button(L("rehearse.button")) { RehearsalWindow.show(base: base, title: model.effectiveTitle, call: model) }.buttonStyle(.pnTertiary)
                 }
+            } else if model.target.isEmpty {
+                // 0.25 (R3b, board SU): no project, no sheet; say what the tips use instead
+                Text(L("su.prep.none")).font(t.homeText(14)).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             } else {
                 Image(systemName: "doc.badge.clock").foregroundStyle(PN.C.onMe)
-                Text(model.target.isEmpty ? L("call.chooseProjectFirst") : L("sheet.ui.none")).font(PN.Font.body).foregroundStyle(PN.C.text2)
+                Text(L("sheet.ui.none")).font(PN.Font.body).foregroundStyle(PN.C.text2)
                 if let p = model.prep {
                     Text(L("call.brief.other", ["heading": p.heading])).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1)
                 }
@@ -477,60 +510,67 @@ struct CallSetupView: View {
                        UserDefaults.standard.set(p, forKey: "prompterPrefs") })
     }
 
+    /// 0.25 (R3b, board SU): Options closed show what is set in one line; open, a plain list of label | control rows.
+    /// The set stays the app's (nothing is dropped); Sales moved to section 3, next to the call type.
     private var options: some View {
-        DisclosureGroup(isExpanded: $showOptions) {
-            Form {
-                // 0.8.7 (H2): Sales mode on top of any call type, with the method and its description
-                Toggle(isOn: Binding(get: { model.salesEnabled }, set: { model.salesEnabled = $0; model.salesTouched = true })) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L("sales.toggle"))
-                        Text(L("sales.toggle.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
+        VStack(alignment: .leading, spacing: 0) {
+            Button { withAnimation(.easeOut(duration: 0.15)) { showOptions.toggle() } } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: showOptions ? "chevron.down" : "chevron.right").font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(PN.C.text2).frame(width: 12).accessibilityHidden(true)
+                    Text(L("call.options")).font(t.homeText(15, .semibold)).foregroundStyle(PN.C.text)
+                    if !showOptions {
+                        Text(optionsSummary).font(t.homeText(13)).foregroundStyle(PN.C.text3).lineLimit(1).truncationMode(.tail)
                     }
+                    Spacer(minLength: 0)
                 }
-                if model.salesEnabled {
-                    HStack {
-                        SalesMethodPicker(selection: $model.salesMethod)
-                        Button { showMethod.toggle() } label: { Image(systemName: "info.circle") }.buttonStyle(.borderless)
-                            .accessibilityLabel(L("sales.method.about"))
-                            .popover(isPresented: $showMethod, arrowEdge: .trailing) { SalesMethodInfo(key: model.salesMethod) }
-                    }
+                .padding(.top, 10).padding(.bottom, 6).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .top) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+            .accessibilityValue(showOptions ? L("su.opt.open") : optionsSummary)
+            if showOptions {
+                optRow(L("call.record"), sub: L("su.opt.record.sub")) {
+                    Picker("", selection: $model.recording) {
+                        Text(L("call.record.off")).tag("off")
+                        Text(L("rec.kind.audio")).tag("audio")
+                        Text(L("rec.kind.video")).tag("video")
+                    }.labelsHidden().fixedSize().help(L("call.record.help"))
                 }
-                Picker(L("callSettings.mic"), selection: $model.micDevice) {
-                    Text(L("callSettings.mic.default") + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
-                    Text(L("callSettings.mic.builtin")).tag("builtin")
-                    ForEach(model.micInputs.filter { !$0.builtin }, id: \.uid) { d in Text(d.name).tag("uid:" + d.uid) }
-                    if model.micDevice.hasPrefix("uid:") && !model.micInputs.contains(where: { "uid:" + $0.uid == model.micDevice }) {
-                        Text(L("call.mic.missing", ["name": String(model.micDevice.dropFirst(4))])).tag(model.micDevice)
-                    }
+                optRow(L("call.startRecording")) {
+                    Picker("", selection: $model.standby) {
+                        Text(L("call.startRecording.whenSpeaks")).tag(true)
+                        Text(L("call.startRecording.now")).tag(false)
+                    }.labelsHidden().fixedSize()
                 }
-                Toggle(isOn: proactive) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L("callSettings.proactive"))
-                        Text(L("callSettings.proactive.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                    }
+                optRow(L("callSettings.mic")) {
+                    Picker("", selection: $model.micDevice) {
+                        Text(L("callSettings.mic.default") + (model.defaultInputName.map { " (\($0))" } ?? "")).tag("default")
+                        Text(L("callSettings.mic.builtin")).tag("builtin")
+                        ForEach(model.micInputs.filter { !$0.builtin }, id: \.uid) { d in Text(d.name).tag("uid:" + d.uid) }
+                        if model.micDevice.hasPrefix("uid:") && !model.micInputs.contains(where: { "uid:" + $0.uid == model.micDevice }) {
+                            Text(L("call.mic.missing", ["name": String(model.micDevice.dropFirst(4))])).tag(model.micDevice)
+                        }
+                    }.labelsHidden().fixedSize()
                 }
-                // 0.8.2 (owner): models and the way to Claude live in Settings > AI only, not per call.
-                Picker(L("call.startRecording"), selection: $model.standby) {
-                    Text(L("call.startRecording.whenSpeaks")).tag(true)
-                    Text(L("call.startRecording.now")).tag(false)
+                optRow(L("su.opt.proactive"), sub: L("callSettings.proactive.hint")) {
+                    Toggle("", isOn: proactive).labelsHidden().toggleStyle(.pnSwitch)
                 }
-                Toggle(L("call.publicCall"), isOn: $model.publicCall)
-                // 0.9.5 (owner): a recording of this call; Settings > Call recording has the default and the quality
-                Picker(L("call.record"), selection: $model.recording) {
-                    Text(L("call.record.off")).tag("off")
-                    Text(L("rec.kind.audio")).tag("audio")
-                    Text(L("rec.kind.video")).tag("video")
+                optRow(L("su.opt.publicCall"), sub: L("su.opt.publicCall.sub")) {
+                    Toggle("", isOn: $model.publicCall).labelsHidden().toggleStyle(.pnSwitch)
                 }
-                .help(L("call.record.help"))
-                if let r = model.root {           // 0.8.7 (G3): the project folder in the preparation, here instead of a chip
-                    Toggle(L("call.useProjectFolder"), isOn: $model.useProjectFolder)
-                        .help(model.useProjectFolder ? L("call.projectFolder.on", ["path": r]) : L("call.projectFolder.off"))
+                // 0.8.7 (G3): the project folder in the preparation; with no project it says why it is off
+                optRow(L("su.opt.projectFolder"), sub: model.root == nil ? L("su.opt.projectFolder.none") : "") {
+                    Toggle("", isOn: $model.useProjectFolder).labelsHidden().toggleStyle(.pnSwitch).disabled(model.root == nil)
+                        .help(model.root.map { model.useProjectFolder ? L("call.projectFolder.on", ["path": $0]) : L("call.projectFolder.off") } ?? "")
                 }
                 if !model.prepList.isEmpty {
-                    Picker(L("call.useBrief"), selection: Binding(get: { model.chosenPrep ?? "" },
-                                                                 set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
-                        Text(L("call.useBrief.auto")).tag("")
-                        ForEach(model.prepList, id: \.file) { p in Text("\(p.heading) · \(p.made.formatted(date: .abbreviated, time: .shortened))").tag(p.file) }
+                    optRow(L("call.useBrief")) {
+                        Picker("", selection: Binding(get: { model.chosenPrep ?? "" },
+                                                      set: { model.chosenPrep = $0.isEmpty ? nil : $0; model.scanPrep() })) {
+                            Text(L("call.useBrief.auto")).tag("")
+                            ForEach(model.prepList, id: \.file) { p in Text("\(p.heading) · \(p.made.formatted(date: .abbreviated, time: .shortened))").tag(p.file) }
+                        }.labelsHidden().fixedSize()
                     }
                 }
                 HStack(spacing: 14) {
@@ -542,11 +582,32 @@ struct CallSetupView: View {
                     .buttonStyle(.pnTertiary).disabled(model.target.isEmpty)
                     Button(L("call.prepSettings")) { SettingsWindow.show(tab: "ai") }.buttonStyle(.pnTertiary)
                 }
+                .pageRow(10)
             }
-            .formStyle(.grouped).toggleStyle(.pnSwitch)
-        } label: {
-            Text(L("call.options")).pnSection().foregroundStyle(PN.C.text)
         }
+    }
+
+    /// One row of the open Options: the label on the left (190 pt), the control and a note on the right.
+    private func optRow<C: View>(_ label: String, sub: String = "", @ViewBuilder _ control: () -> C) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(label).font(t.homeText(14)).foregroundStyle(PN.C.text2)
+                .frame(width: 190, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                control()
+                if !sub.isEmpty { Text(sub).font(t.homeText(12)).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .pageRow(8)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Options closed (board): the recording, when it starts, and whether tips come on their own.
+    private var optionsSummary: String {
+        let rec = model.recording == "video" ? L("rec.kind.video") : model.recording == "audio" ? L("rec.kind.audio") : L("su.opt.sum.noRecord")
+        let start = model.standby ? L("call.startRecording.whenSpeaks") : L("call.startRecording.now")
+        let tips = proactive.wrappedValue ? L("su.opt.sum.tipsOn") : L("su.opt.sum.tipsAsk")
+        return [rec, start.prefix(1).lowercased() + start.dropFirst(), tips].joined(separator: " · ")
     }
 
     // MARK: 0.9.0 page mode: three questions, the rest under More settings, Save applies
@@ -790,7 +851,7 @@ struct CallSetupView: View {
 
     /// 0.10.0 (Meeting Sheet): the preparation block, the same on the call page and in Start / Plan / Prepare.
     @ViewBuilder private func prepSection(buttons: Bool) -> some View {
-        question(L("sheet.ui.setup.prep")) {
+        VStack(alignment: .leading, spacing: 10) {
             briefLine
             if buttons {
                 HStack(spacing: 8) {
@@ -824,19 +885,21 @@ struct CallSetupView: View {
             case .page:
                 pageButtons
             case .prepare:
+                // 0.25 (R3b, board SU): Cancel on the left, the way forward on the right
+                Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(L("common.cancel"), action: onCancel).buttonStyle(.pnSecondary).keyboardShortcut(.cancelAction)
                 Button(L("menubar.prepare")) { if !needProject() { onPrepare() } }
                     .buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction).disabled(!canPrepare && !model.target.isEmpty)
             case .start:
-                Button(saved ? L("common.save") : L("call.saveForLater"), action: onSave).buttonStyle(.pnTertiary).disabled(model.target.isEmpty)
-                    .fixedSize()     // 0.8.7.1: never "Зберегти на..."
+                // 0.25 (R3b, board SU): Cancel (and Remove) on the left; Save for later, Prepare, Start call on the right
+                Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 if saved { Button(L("home.removeUpNext"), action: onRemove).buttonStyle(.pnTertiary) }
                 Spacer()
-                Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
+                Button(saved ? L("common.save") : L("call.saveForLater"), action: onSave).buttonStyle(.pnTertiary).disabled(model.target.isEmpty)
+                    .fixedSize()     // 0.8.7.1: never "Зберегти на..."
                 // 2026-10-29 (owner): once the brief is ready the same button prepares again (with one previous version kept).
-                // 0.10.0 (Meeting Sheet, phase 4): Get ready (Quick or Expert); with a sheet it is Refresh (a new version, edits kept).
-                Button(hasSheet ? L("sheet.ui.refresh") : L("home.getReady")) {
+                // 0.10.0 (Meeting Sheet, phase 4): Get ready (Quick or Expert); with a sheet it prepares again (a new version, edits kept).
+                Button(hasSheet ? L("talk.prepareAgain") : L("menubar.prepare")) {
                     if needProject() { return }
                     if hasSheet { refreshSheet() } else if model.callType == "presentation" && model.prep?.matches == true { againClicked() } else { prepareNow() }
                 }
@@ -867,9 +930,9 @@ struct CallSetupView: View {
                 Button(L("home.startCall")) { model.useDefaultTargetIfEmpty(); onStart() }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
                     .fixedSize()     // 0.8.7.1: "Почати дзвінок" broke into two lines in Ukrainian
             case .plan:
+                Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 if saved { Button(L("home.removeUpNext"), action: onRemove).buttonStyle(.pnTertiary) }
                 Spacer()
-                Button(L("common.cancel"), action: onCancel).buttonStyle(.pnTertiary).keyboardShortcut(.cancelAction)
                 Button(live ? L("call.switch") : L("home.startNow")) { model.useDefaultTargetIfEmpty(); (live ? onSwitch : onStart)() }.buttonStyle(.pnSecondary)
                 Button(L("common.save")) { if !needProject() { onSave() } }.buttonStyle(.pnPrimary).keyboardShortcut(.defaultAction)
             }

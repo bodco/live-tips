@@ -1551,7 +1551,7 @@ you or On them, Change owner, Set due, Delete) and a checkbox. The first change 
 as added on the call page) and applies it there, so a deleted task stays deleted. The call's other older tasks stay on
 the page next to it, also after "+ Add".
 
-**Sales methods.** Sales is an option on top of any call type (Start call > Options > Sales), remembered for the
+**Sales methods.** Sales is an option on top of any call type (Start call > the call type section > Sales mode), remembered for the
 series; the default per project is in Settings > Projects. The methods live in `rules/sales.yaml`, a new one is data:
 
 | Method | What Pacenote follows |
@@ -2147,8 +2147,11 @@ The upcoming call's page has the tabs **Setup**, **Meeting Sheet**, **Readiness*
 without prep before a sheet exists; Start call, Refresh and Export once it does; Building N% and Stop while it builds.
 
 **Presets.** A preset picks the blocks and what "ready" means: Sales intro, Upsell, Repeat call, Client sync,
-Internal or presentation, Stand-up, Interview and Blank. **Save as my preset** on the Blocks step keeps your own set
-(Settings > Meeting Sheet renames, duplicates and deletes them).
+Internal or presentation, Stand-up, Interview and Blank. On Expert step 1 they are chips with their mode (expert or
+quick), with the suggested one named under them. On the Blocks step the shown blocks are listed under My focus (drag
+to reorder, the eye hides a block for this meeting, hidden ones are listed crossed out and come back with their eye),
+and the right column shows what **Ready means** for the preset and **Save as my preset** with its name, right on the
+page. It keeps your own set (Settings > Meeting Sheet renames, duplicates and deletes them).
 
 **Quick or Expert.** **Get ready** opens one of two ways into the same sheet; the switch is in the header.
 
@@ -2161,14 +2164,17 @@ Internal or presentation, Stand-up, Interview and Blank. **Save as my preset** o
 Settings > Meeting Sheet decides which one opens: by the rules (each rule can be turned off or flipped), always Quick
 or always Expert. The first time in a series Quick shows "Suggested" and Pacenote remembers the setup for next time.
 
-**Who is on the call.** Quick (under People > Change) and Expert step 1 show Their side and Our side next to each
-other. Names stay on one line (a long one ends with "…", the full name is in the tooltip) and the chips wrap as whole
+**Who is on the call.** Quick (under People > Change) and Expert step 1 show Our side (on the left) and Their side
+next to each other. Names stay on one line (a long one ends with "…", the full name is in the tooltip) and the chips wrap as whole
 chips. Drag a person to the other side, or click the arrow on the chip; × removes them, the field under each side adds
 one ("Name · company"). You are always on Our side. A move applies to this call. On an internal call (audience: team) everyone is on Our side.
 A team member from the project config is recognized under a short spelling ("Emily C.", "E. Carter"), one person
 written two ways is one chip, and two short names that lost their comma ("Jake T. Mike J.") are two people.
 
-**Sources: what you can add.** One panel for everything:
+**Sources: what you can add.** Expert step 3 starts with two tiles, Drop files or folders here (with Choose files)
+and Paste a link or text ("What can I add?" lists the kinds). In this sheet lists the sources with their count and
+size, each with its type and size and an access mark (Access ok, No access) with the fix next to it. The folder's
+suggestions come last. What can go in:
 
 - files: drop them or Choose files (PDF, PowerPoint, Keynote, Excel, Word, CSV, Markdown, text);
 - a pasted link: Google Docs, Sheets, Slides and Drive files, Notion pages, LinkedIn, any web page;
@@ -2180,7 +2186,7 @@ written two ways is one chip, and two short names that lost their comma ("Jake T
   340 searchable during the call". The files read are listed under the folder in the sheet's Sources and report;
   files not taken are not an error. The Size step counts only the files taken. The number of days is in
   Settings > Meeting Sheet (Folders: read files changed in the last N days), and a folder row in Expert Sources can
-  have its own. During the call the search looks through the whole folder, older files too (the same filters:
+  have its own (the "Recent files: last N days" menu under the row). During the call the search looks through the whole folder, older files too (the same filters:
   archived, hidden, generated call files, logs, binaries and older -vN versions are never read);
 - "From the project folder": files with the reason they fit (same contact, title match, fresh, newer version, used by
   the previous sheet). **Nothing is ticked for you**; press Add N ticked;
@@ -2210,10 +2216,11 @@ connected without that permission, Pacenote asks Google once more, then press Co
 **Size.** Before the run the **Size** step counts the sources in tokens for the chosen route and compares them with
 the model's window (from the providers' documentation, `rules/ai.yaml > windows`), keeping room for the answer. It
 shows the biggest sources and one of three states: **Fits in one pass**, **Close to the limit**, **Too much for one
-pass**. When it is too much, Build waits for your choice: two passes (merged into one sheet), summarize the big
+pass**, with the count large over a bar that marks where one pass ends. When it is too much, Build waits for your
+choice, made right on the page next to the biggest sources: two passes (merged into one sheet), summarize the big
 sources first, remove sources, or a bigger route. Nothing is cut silently. The route is the one of Settings > AI >
-Preparation; when it cannot run, Pacenote asks before building on another one, in the build view and on the call
-page (Use / Not now, never a pop-up); a queued run without you, or a run during a live call, switches, says so in the
+Preparation; when it cannot run, Pacenote asks before building on another one, in the build view ("Build on" the
+other route or Try again) and on the call page (Use / Not now), never in a pop-up; a queued run without you, or a run during a live call, switches, says so in the
 report and shows a notice.
 
 **Build.** The **Build** step shows the progress by source and by pass. A source that fails does not stop the rest.

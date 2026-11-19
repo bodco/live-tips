@@ -65,6 +65,7 @@ final class SheetShots: NSObject, NSApplicationDelegate {
             .write(toFile: sales + "/cases/northwind-studio-reporting.md", atomically: true, encoding: .utf8)
         try? "# Pricing notes\n\nDiscovery workshop: fixed price.\n".write(toFile: sales + "/cases/pricing-notes.md", atomically: true, encoding: .utf8)
         prepareB7b(sales: sales)
+        if r3 { prepareR3(work: work) }      // 0.25 (R3a): the board projects (SheetShotsR3.swift)
     }
 
     // MARK: 0.11.0 (B7a, B7b smoke): Settings > Account, Settings > Call recording, the call page's recording line
@@ -341,16 +342,11 @@ final class SheetShots: NSObject, NSApplicationDelegate {
             s.append(prepScene("expert-4-size-\(st)", { [unowned self] in
                 let d = draft(.expert, step: 4)
                 d.size = size(st, total)
-                if st == "too_much" { d.plan = "passes" }       // no modal sheet on the offscreen window
+                if st == "too_much" { d.plan = "passes" }       // 0.25 (R3c): the plan is picked on the page
                 if st != "fits" { d.sources.append(src("file", "Lumenfield board deck 2026.pdf", path: casePath, tokens: total - 1_900)) }
                 return d
             }, tweak: { d in if st == "too_much" { d.plan = "" } }))
         }
-        s.append(Scene(name: "expert-4-too-much-modal", size: NSSize(width: 460, height: 700), make: { [unowned self] in
-            let d = draft(.expert, step: 4); d.size = size("too_much", 262_000); d.plan = ""
-            keep.append(d)
-            return AnyView(SheetTooMuch(draft: d, done: {}).background(Color(nsColor: .windowBackgroundColor)))
-        }))
         s.append(prepScene("expert-5-build", { [unowned self] in let d = draft(.expert, step: 5); d.job = job(done: false, d: d); return d }))
         s.append(prepScene("expert-5-done", { [unowned self] in let d = draft(.expert, step: 5); d.job = job(done: true, d: d); return d }))
         s.append(Scene(name: "switch-prompt-build", size: prep, make: { [unowned self] in
@@ -426,7 +422,8 @@ final class SheetShots: NSObject, NSApplicationDelegate {
         log("launched, work " + work)
         writeSheet()
         let only = ProcessInfo.processInfo.environment["LT_SHEETSHOTS_ONLY"] ?? ""   // a prefix, or several split by commas
-        for (lang, themes) in [("en", ["light", "dark"]), ("uk", ["light"])] {
+        if Self.r3 { r3Queue() }       // 0.25 (R3a): only the preparation screens by the boards, every style
+        for (lang, themes) in Self.r3 ? [] : [("en", ["light", "dark"]), ("uk", ["light"])] {
             queue.append { [unowned self] in L10n.set(lang); next(0.3) }
             for t in themes {
                 queue.append { [unowned self] in theme = t; NSApp.appearance = NSAppearance(named: t == "dark" ? .darkAqua : .aqua); next(0.3) }

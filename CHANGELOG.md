@@ -5,6 +5,41 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.25.0 (unreleased)
 
+- **Expert steps 1 to 3 in the look of the boards (2026-11-19, R3c-2):** the steps on top are numbered squares, a
+  passed step is ticked and the open one is underlined; the main button shows Return (↵). Meeting: the calendar
+  switch with its note, Meeting name, When and Project in one row, the kind of meeting as chips with their mode and
+  the suggested preset under them, What matters on this call, Who is on the call with Our side on the left (framed
+  chips without avatars, the arrow points to the other side; the same in Quick), then Sheet language and Remind me.
+  What to prepare: My focus on top, the shown blocks to drag, the hidden ones crossed out with their eye to bring them
+  back, + Add a block, and on the right Ready means and Save as my preset right on the page (no dialog). Sources: two
+  tiles (drop or choose files, paste a link or text, with "What can I add?"), In this sheet with the count and size,
+  rows with the type and size in mono and an access mark, a folder's days as a short menu under its row, the
+  LinkedIn card with its ways as chips and the form in two columns, and the folder's suggestions at the end.
+
+- **Expert steps 4 and 5 in the look of the boards (2026-11-19, R3c):** on Will it fit? the count is large
+  ("~236K of ~200K tokens one pass reads") over a bar that marks where one pass ends, with Runs on under it. When it is
+  too much, the choice is made right on the page, next to the biggest sources and their share: build in 2 passes,
+  summarize big sources first, remove sources or use a route with a bigger window. The separate "What to do" dialog is
+  gone; Build the sheet still waits until a plan is picked. Building shows the pass, the share in large figures with the
+  stage, a thick bar (yellow while it runs, orange when it stopped, green when done) and the sources as rows of type,
+  title and a status mark, with Retry and Skip on a source that could not open. Done says how long it took, on which
+  route, how many passes and how many sources were read or skipped, and shows the sheet's readiness next to "Open the
+  Meeting Sheet". When the route is out and another one is ready, the footer offers "Build on" that route next to Try
+  again.
+
+- **Start a call and Quick prep in the look of the boards (2026-11-19, R3b):** the Start a call / Plan a call form is
+  now flat numbered sections (01 The call, 02 Context, 03 the call type, 04 Preparation: Meeting Sheet) under a heavy
+  rule, with labels in mono capitals and square framed fields in Roadbook and Broadsheet. Sales mode moved next to the
+  call type it changes. Options closed show what is set in one line ("Sound and screen · when the other side speaks ·
+  tips without asking"); open, they are a plain list of label and control. Without a project the form says the call goes
+  to My calls and that there is no Meeting Sheet to prepare. The buttons read Cancel on the left, then Save for later,
+  Prepare (Prepare again once the sheet is built) and Start call. In Quick prep the date is in mono capitals (during a
+  call: how long it has run), the People, Sources and Setup rows have square status marks, and building shows the share
+  in large figures with the spinner, a yellow bar and the time left, with a note that the window can be closed. A built
+  sheet shows its readiness, how long it took and how many sources were read, then Start call. When the build fails
+  because the AI route is out and another one is ready, Quick prep now says so and offers "Build on" that route, as
+  Expert already did.
+
 - **Live tips read as key, detail and source (2026-11-19, theme pass, stage 3):** a tip now has one strong key line,
   a quieter line of detail under it, the ready phrase in quotes and, at the bottom, where it comes from ("from Release
   plan · Nov 14"). The AI writes the source with each tip, and when it leaves it out Pacenote names the documents of the

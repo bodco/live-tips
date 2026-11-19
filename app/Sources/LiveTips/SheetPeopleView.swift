@@ -36,10 +36,15 @@ struct FlowLayout: Layout {
     }
 }
 
-/// Who is on the call: their side and our side, next to each other. A person moves between the sides by drag and
+/// Who is on the call: our side and their side, next to each other. A person moves between the sides by drag and
 /// drop or by the arrow on the chip (keyboard, VoiceOver, automation). You stay on our side.
+/// 0.25 (R3c-2, boards EA step 1 and QP attn): Our side on the left, framed chips without avatars, the arrow points
+/// to the other side, the field and Add at the bottom of each side.
 struct SheetPeopleView: View {
     @ObservedObject var draft: SheetDraft
+    /// The small head of its own (Quick); Expert puts the view under its section head.
+    var head = true
+    @Environment(\.pnTheme) private var th
     @State private var newOurs = ""
     @State private var newTheirs = ""
     @State private var target: Bool?          // true = our side is under the drag, false = their side
@@ -49,16 +54,18 @@ struct SheetPeopleView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(L("sheet.people.title").uppercased()).pnLabel().kerning(0.4).foregroundStyle(PN.C.text3)
-                Text(L("sheet.people.hint")).font(PN.Font.caption).foregroundStyle(PN.C.text3)
-                Spacer(minLength: 0)
+            if head {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    PrepFieldLabel(text: L("sheet.people.title"))
+                    Spacer(minLength: 0)
+                }
             }
-            HStack(alignment: .top, spacing: 12) {
-                zone(ours: false)
+            HStack(alignment: .top, spacing: 14) {
                 zone(ours: true)
+                zone(ours: false)
             }
-            Text(sourceLine).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
+            Text(sourceLine + " " + L("sheet.people.hint") + ".").font(th.homeText(13)).foregroundStyle(PN.C.text3)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -73,37 +80,39 @@ struct SheetPeopleView: View {
         // Lit only when the person under the drag comes from the other side (dropping on your own side does nothing).
         let from = dragging.flatMap { id in draft.ours.contains { $0.id == id } ? true : (draft.theirs.contains { $0.id == id } ? false : nil) }
         let hot = target == ours && from == !ours
-        let org = ours ? m.targetName : (draft.theirs.first { !$0.company.isEmpty }?.company ?? m.project?.crmCompanyName ?? "")
+        let shape = RoundedRectangle(cornerRadius: th.style == .classic ? PN.Radius.m : 0)
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(L(ours ? "sheet.ui.s1.ours" : "sheet.ui.s1.theirs")).pnSection().foregroundStyle(PN.C.text)
-                if !org.isEmpty { PagePill(text: org, color: ours ? PN.C.answer : PN.C.docs) }
-                Spacer(minLength: 0)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                PrepFieldLabel(text: L(ours ? "sheet.ui.s1.ours" : "sheet.ui.s1.theirs")).accessibilityAddTraits(.isHeader)
                 Text(L(list.count == 1 ? "sheet.people.one" : "sheet.people.n", ["n": "\(list.count)"]))
-                    .font(PN.Font.caption).foregroundStyle(PN.C.text3).monospacedDigit()
+                    .font(th.homeMono(11)).foregroundStyle(PN.C.text3).monospacedDigit()
+                Spacer(minLength: 0)
             }
-            FlowLayout {
+            FlowLayout(spacing: 8, lineSpacing: 8) {
                 ForEach(list) { p in chip(p, ours: ours) }
             }
             if hot {
                 Text(L(ours ? "sheet.people.dropOurs" : "sheet.people.dropTheirs"))
-                    .font(PN.Font.caption.weight(.semibold)).foregroundStyle(PN.C.accent)
-                    .frame(maxWidth: .infinity).padding(.vertical, 5)
-                    .overlay(Capsule().strokeBorder(PN.C.accent, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
+                    .font(th.homeText(13, .semibold)).foregroundStyle(PN.C.text)
+                    .frame(maxWidth: .infinity).padding(.vertical, 6)
+                    .overlay(Rectangle().strokeBorder(PN.C.text, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
             }
             Spacer(minLength: 0)
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 TextField(L("sheet.ui.s1.personPh"), text: ours ? $newOurs : $newTheirs)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain).font(th.homeText(14)).prepField(height: 30)
                     .accessibilityLabel(L(ours ? "sheet.people.addOurs" : "sheet.people.addTheirs"))
                     .onSubmit { add(ours: ours) }
-                Button(L("sheet.ui.add")) { add(ours: ours) }.buttonStyle(.pnTertiary)
+                Button { add(ours: ours) } label: {
+                    Text(L("sheet.ui.add")).font(th.homeText(14, .semibold)).foregroundStyle(PN.C.text)
+                }
+                .buttonStyle(.plain).accessibilityLabel(L(ours ? "sheet.people.addOurs" : "sheet.people.addTheirs"))
             }
         }
         .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: PN.Radius.m).fill(hot ? PN.C.accent.opacity(0.10) : PN.C.bg))
-        .overlay(RoundedRectangle(cornerRadius: PN.Radius.m).strokeBorder(hot ? PN.C.accent : Color.primary.opacity(0.12), lineWidth: hot ? 2 : 1))
+        .frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading)
+        .background(hot ? PNSelect.fill.opacity(0.25) : Color.clear, in: shape)
+        .overlay(shape.strokeBorder(hot ? PN.C.text : PN.C.rule, lineWidth: hot ? 1.5 : 1))
         .dropDestination(for: String.self) { items, _ in
             defer { target = nil; dragging = nil }
             guard let s = items.first, let id = UUID(uuidString: s) else { return false }
@@ -114,23 +123,19 @@ struct SheetPeopleView: View {
     }
 
     private func chip(_ p: DraftPerson, ours: Bool) -> some View {
-        let tint = ours ? PN.C.answer : PN.C.docs
         let other = L(ours ? "sheet.ui.s1.theirs" : "sheet.ui.s1.ours")
+        let shape = RoundedRectangle(cornerRadius: th.style == .classic ? 6 : 0)
         return HStack(spacing: 6) {
-            Text(p.you ? String(p.name.prefix(1)).uppercased() : PeopleSides.initials(p.name))
-                .font(PN.sys(10, .bold)).foregroundStyle(tint)
-                .frame(width: 22, height: 22).background(Circle().fill(tint.opacity(0.14)))
-                .accessibilityHidden(true)
-            Text(p.name).font(PN.sys(13, .medium)).foregroundStyle(PN.C.text)
+            Text(p.name).font(th.homeText(14, .semibold)).foregroundStyle(PN.C.text)
                 .lineLimit(1).truncationMode(.tail).frame(maxWidth: 190, alignment: .leading).fixedSize(horizontal: false, vertical: true)
             if !p.company.isEmpty {
-                Text(p.company).font(PN.Font.caption).foregroundStyle(PN.C.text3).lineLimit(1).fixedSize()
+                Text("· " + p.company).font(th.homeText(13)).foregroundStyle(PN.C.text2).lineLimit(1).fixedSize()
             }
             if p.you {
-                Text(L("sheet.people.always")).font(PN.sys(11)).foregroundStyle(PN.C.text3).lineLimit(1).fixedSize().padding(.trailing, 4)
+                Text(L("sheet.people.always")).font(th.homeText(11)).foregroundStyle(PN.C.text3).lineLimit(1).fixedSize().padding(.trailing, 2)
             } else {
                 Button { _ = move(p.id, toOurs: !ours) } label: {
-                    Image(systemName: "arrow.left.arrow.right").font(PN.sys(11, .semibold)).frame(width: 20, height: 20)
+                    Image(systemName: ours ? "arrow.right" : "arrow.left").font(PN.sys(11, .semibold)).frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain).foregroundStyle(PN.C.text2)
                 .help(L("sheet.people.move", ["name": p.name, "side": other]))
@@ -138,15 +143,15 @@ struct SheetPeopleView: View {
                 Button {
                     if ours { draft.ours.removeAll { $0.id == p.id } } else { draft.theirs.removeAll { $0.id == p.id } }
                 } label: {
-                    Image(systemName: "xmark").font(PN.sys(10, .semibold)).frame(width: 20, height: 20)
+                    Image(systemName: "xmark").font(PN.sys(10, .semibold)).frame(width: 18, height: 20)
                 }
                 .buttonStyle(.plain).foregroundStyle(PN.C.text3)
-                .help(L("call.remove")).accessibilityLabel(L("call.remove"))
+                .help(L("call.remove")).accessibilityLabel(L("call.remove") + ": " + p.name)
             }
         }
-        .padding(.leading, 3).padding(.trailing, 4).padding(.vertical, 3)
-        .background(Capsule().fill(PN.C.surface))
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12)))
+        .padding(.leading, 10).padding(.trailing, 6).frame(minHeight: 30)
+        .background(PN.C.surface, in: shape)
+        .overlay(shape.strokeBorder(PN.C.field, lineWidth: 1.5))
         .help(p.company.isEmpty ? p.name : p.name + ", " + p.company)
         .modifier(ChipDrag(enabled: !p.you, id: p.id, dragging: $dragging))
     }

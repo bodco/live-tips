@@ -213,3 +213,21 @@ items:
     title_uk: "Компактна картка підказок під камерою"
     body_en: "Settings > General > Advanced > Calls > Live tips during a call: choose Compact card. One tip at a time sits just under the camera, so your eyes stay near the lens, and Expand opens the full tips window."
     body_uk: "Налаштування > Загальні > Додатково > Дзвінки > Підказки під час дзвінка: оберіть Компактна картка. Одна підказка за раз стоїть просто під камерою, тож погляд лишається біля обʼєктива, а Expand відкриває повне вікно підказок."
+  - id: connect_notion
+    version: 0.26.0
+    title_en: "Connect with Notion"
+    title_uk: "Connect with Notion"
+    body_en: "Settings > Integrations > Notion connects through Notion's own consent in the browser instead of a pasted key. Pacenote makes its own Pacenote page with the databases it needs, and can keep a local copy of Notion without Control Tower."
+    body_uk: "Налаштування > Integrations > Notion підключається через власну згоду Notion у браузері замість вставленого ключа. Pacenote робить свою сторінку Pacenote з потрібними базами і може тримати локальну копію Notion без Control Tower."
+  - id: notices_inline
+    version: 0.26.0
+    title_en: "No pop-ups during a call"
+    title_uk: "Без спливних вікон під час дзвінка"
+    body_en: "Messages and questions now appear where you are: a line on the card, a strip in the tips window, a banner in Home or the menu bar panel. Nothing takes the focus from your meeting app, and a Notion problem says what to fix."
+    body_uk: "Повідомлення і питання тепер зʼявляються там, де ви: рядок у картці, смужка у вікні підказок, банер у Home або панель menu bar. Ніщо не забирає фокус із застосунку зустрічі, а проблема з Notion каже, що виправити."
+  - id: tips_header
+    version: 0.26.0
+    title_en: "One header in the tips window"
+    title_uk: "Одна шапка у вікні підказок"
+    body_en: "The timer, On me, the tools and End call sit in one header across the whole window, and Who said this? on an unknown voice offers names right away."
+    body_uk: "Таймер, On me, інструменти і End call тепер в одній шапці на всю ширину вікна, а Who said this? на невідомому голосі одразу пропонує імена."

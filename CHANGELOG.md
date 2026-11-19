@@ -3,7 +3,7 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.26.0 (unreleased)
+## 0.26.0 (2026-11-19)
 
 - **Meeting Sheet: blocks explained (2026-11-19):** the Blocks step (Expert, step 2) says what a block is, what happens
   to a block that is hidden or not added, and what "Only if there is data" does. Every block shows what the

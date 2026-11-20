@@ -332,15 +332,15 @@ func engineHealsAPythonWithoutModules() {
 func engineFollowsAMovedAppFolder() {
     // 0.26.3: the app folder moved with the work folder; the engine paths inside it follow at once
     var e = AppConfig.Engine()
-    e.python = "/Users/u/Library/Application Support/LiveTips/.venv/bin/python"
+    e.python = "/Users/example/Library/Application Support/LiveTips/.venv/bin/python"
     e.sidecarPython = e.python; e.sidecarDir = "/Applications/Pacenote.app/Contents/Resources/engine/spikes/m0"
-    let r = e.rebased(from: "/Users/u/Library/Application Support/LiveTips", to: "/Users/u/work/Tools/LiveTips")
-    expect(r?.python == "/Users/u/work/Tools/LiveTips/.venv/bin/python" && r?.sidecarPython == r?.python, "m1: the Python follows the folder")
+    let r = e.rebased(from: "/Users/example/Library/Application Support/LiveTips", to: "/Users/example/work/Tools/LiveTips")
+    expect(r?.python == "/Users/example/work/Tools/LiveTips/.venv/bin/python" && r?.sidecarPython == r?.python, "m1: the Python follows the folder")
     expect(r?.sidecarDir == e.sidecarDir, "m1: the bundled engine stays")
     var mine = AppConfig.Engine(); mine.python = "/opt/mine/bin/python"; mine.sidecarPython = "/opt/mine/bin/python"
-    expect(mine.rebased(from: "/Users/u/Library/Application Support/LiveTips", to: "/x") == nil, "m2: the PM's own Python stays")
-    var near = AppConfig.Engine(); near.python = "/Users/u/LiveTips2/.venv/bin/python"
-    expect(near.rebased(from: "/Users/u/LiveTips", to: "/x") == nil, "m3: a folder with the same start is not inside")
+    expect(mine.rebased(from: "/Users/example/Library/Application Support/LiveTips", to: "/x") == nil, "m2: the PM's own Python stays")
+    var near = AppConfig.Engine(); near.python = "/Users/example/LiveTips2/.venv/bin/python"
+    expect(near.rebased(from: "/Users/example/LiveTips", to: "/x") == nil, "m3: a folder with the same start is not inside")
     expect(e.rebased(from: "/a", to: "/a/") == nil, "m4: the same folder: nothing")
 }
 

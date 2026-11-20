@@ -2,7 +2,7 @@
 
 Where Pacenote has been and where it is going: what shipped, what we build now, what comes next. Updated with every release.
 
-Updated: 19 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
+Updated: 20 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ## The route
 
@@ -15,7 +15,9 @@ Updated: 19 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 - [x] 0.19: Plans in the app
 - [x] 0.20-0.22: Team calls, sales, email sign-in
 - [x] 0.23: Three looks
-- [>] Now: New screen layouts
+- [x] 0.24-0.25: New screen layouts
+- [x] 0.26: Notion and call folders
+- [>] Now: Call language
 - [ ] Next: Two-factor sign-in and emails
 - [ ] Later: Paid plans and mobile
 
@@ -25,15 +27,16 @@ Updated: 19 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ### Now
 
-- **New screen layouts (0.24 and on).** Home has the new layout since 0.24; the call pages, Meeting Sheet, Tracker, Settings and onboarding follow, screen by screen, in each style.
-- **Roadbook and Broadsheet redrawn (0.25).** A warmer Roadbook and a lighter Broadsheet Dark, Home that acts on the brief, who decided next to each decision, tips as key, detail and source, and a compact tip card under the camera. Classic leaves the style picker.
+- **Your call's language, everywhere.** The transcript keeps the language people actually speak, and the brief, tips, notes and follow-up follow the language of the call. Switch it from the tips window.
 - **Better briefs and tips.** Every call is reviewed after it ends: which tips helped, which were noise, what was missed. The prompts change from that.
 
 ### Next
 
 - **Two-factor sign-in.** A code from any authenticator app, backup codes, and an organization policy that makes it required. Touch ID or a passcode when you sign in.
-- **Email sign-in in the console and service emails.** Sign in to the web console with your email and password. Emails for invites, a sign-in from a new device and getting back into two-factor sign-in.
+- **Service emails.** Emails for invites, a sign-in from a new device and getting back into two-factor sign-in.
 - **Call analysis against a standard.** Presets by team type (Sales, PM, Recruiting and more), a scorecard for each kind of call, a score after the call and an overview for team leads.
+- **Prompts you can see.** The prompts behind your brief, preparation and notes in Settings, with your own additions, and which prompt wrote a note.
+- **Delete a call everywhere.** Remove a call you did not mean to record from Pacenote, Notion, your Mac and HubSpot, and pick where it goes from.
 - **Security hardening.** Fixes from our own security review of the app and the update channel, before the team version grows.
 - **Signed and notarized by Apple.** No more "Open Anyway" on first launch and no Keychain prompt after an update.
 
@@ -46,6 +49,9 @@ Updated: 19 November 2026. Visual version: https://pacenote.bodco.pm/roadmap/
 
 ## What shipped
 
+- **20 Nov · 0.26.2-0.26.4. Calls in folders, speakers you can fix.** A folder for every call, and older calls move into theirs on their own. Fix who said what after the call, merge speakers and remember a voice, then Rewrite notes with the right names. Model lists come from your AI provider. Sign in to the web console with your email and password. Fixes from the beta.
+- **19 Nov · 0.26-0.26.1. Connect with Notion.** Connect Notion in one click and keep a local copy of it without Control Tower. Notices inside Pacenote instead of pop-up alerts, questions right where you clicked, and what happened at the top of the Summary.
+- **18-19 Nov · 0.24-0.25. New screen layouts.** Home, the call pages, the Meeting Sheet steps, Tracker, Past calls, Statistics and Settings laid out anew. Roadbook and Broadsheet redrawn, who decided next to each decision, tips as key, detail and source, a compact tip card under the camera. Setup with no Terminal or browser, and updates in one click.
 - **18 Nov · 0.23. Three looks.** Classic, Roadbook and Broadsheet, each light or dark, in Settings > General > Appearance. The new Pacenote mark and motion, the tips window shows its state in the style, and a window and a banner tell you when a new version is out. On the site: plans on Pricing and a Download page.
 - **17-18 Nov · 0.20-0.22. Team calls, sales, email sign-in.** The Team tab for team leads, more sales methods and deal blocks, a speech writer for a deck, and sign-in with email and password next to Google. An account is now required.
 - **17 Nov · 0.19. Plans in the app.** Compare plans and switch an organization's plan in Settings, start a team from Solo, a trial on every plan, your own use for the last 30 days, a Console page for everyone signed in. Product analytics you can turn off: screens, errors by code and speed, never what is said in a call. A recorded call stops by itself when the meeting ends.

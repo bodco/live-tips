@@ -2716,6 +2716,8 @@ func orgsB6b() {
     // private calls (contract 5)
     expect(!PacenoteServer.privateAllowed(acme, alreadyPrivate: false) && PacenoteServer.privateAllowed(acme, alreadyPrivate: true), "b6b: policy off, a private call stays private")
     expect(PacenoteServer.privateAllowed(me.personal, alreadyPrivate: false) && PacenoteServer.privateAllowed(nil, alreadyPrivate: false), "b6b: allowed by default")
+    expect(CallSync.notOnOrgProject(status: 422, problem: "invalid fields: org_project_id") && !CallSync.notOnOrgProject(status: 422, problem: "invalid fields: project_id")
+           && !CallSync.notOnOrgProject(status: 500, problem: "invalid fields: org_project_id"), "0.26.4: 422 not on org project")
     expect(CallSync.privateRefused(status: 422, problem: "private calls are off in this organization") && !CallSync.privateRefused(status: 422, problem: "invalid fields: project_id"), "b6b: 422 private")
     // invites (contract 2)
     let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -2855,6 +2857,8 @@ func projectsWizard0170() {
     let b = ProjectWizardCore.orgProjectBody(name: "  Site  ", memberIDs: ["b", "a", "b"])
     expect(b["name"] as? String == "Site" && b["member_ids"] as? [String] == ["a", "b"], "wiz: org project body")
     expect(ProjectWizardCore.orgProjectBody(name: "S", memberIDs: [])["member_ids"] == nil, "wiz: no members key")
+    expect(ProjectWizardCore.orgProjectBody(name: "S", memberIDs: [], creator: "me")["member_ids"] as? [String] == ["me"], "wiz: creator alone")
+    expect(ProjectWizardCore.orgProjectBody(name: "S", memberIDs: ["b", "me"], creator: "me")["member_ids"] as? [String] == ["b", "me"], "wiz: creator once")
     let ms = ProjectWizardCore.members([["user_id": "u1", "name": "Mike", "status": "active"], ["user_id": "me", "name": "Me"],
                                         ["user_id": "u2", "name": NSNull(), "email": "emily@example.com"],
                                         ["user_id": "u3", "name": "Gone", "status": "left"]], me: "me")

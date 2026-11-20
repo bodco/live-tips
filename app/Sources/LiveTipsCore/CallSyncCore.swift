@@ -207,6 +207,11 @@ public enum CallSync {
         (personal || orgID.isEmpty ? email : email + "|" + orgID) + "|" + localSlug(slug) + (link.isEmpty ? "" : "|" + link)
     }
 
+    /// 0.26.4: a 422 for a link to an organization project I am not on (or one that is gone).
+    public static func notOnOrgProject(status: Int, problem: String) -> Bool {
+        status == 422 && problem.lowercased().contains("invalid fields") && problem.lowercased().contains("org_project_id")
+    }
+
     /// 0.17.0 (D36): a 422 that names the private-calls policy.
     public static func privateRefused(status: Int, problem: String) -> Bool { status == 422 && problem.lowercased().contains("private calls are off") }
 

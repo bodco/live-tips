@@ -2666,7 +2666,7 @@ teams, organization projects and invites are managed in the Pacenote console, no
   new one. 2) The folder: a new folder in your workspace (or "My workspace" in the work folder) or one that exists.
   3) The card: what the project is, the client, the goal, your language and the client's, and terms (spelled right in
   transcripts). 4) Links to where things are: a Drive folder, Notion pages, web pages. 5) For a new organization
-  project, the people on it. Every step after the first can be skipped. Linking to an organization project turns the
+  project, the people on it; you are always on it yourself (since 0.26.4). Every step after the first can be skipped. Linking to an organization project turns the
   project's sync on; otherwise sync stays off until you turn it on.
 - **The card stays on your Mac** and is on the project's page in Settings > Projects (Card: name, what it is,
   client, goal, terms, links). The links are not added to what the preparation may fetch on its own (SEC-01). A

@@ -2946,6 +2946,7 @@
  "account.export.sub": "Everything of yours on the Pacenote server as a zip: export.json with every call and part, and a readable Markdown file per call.",
  "account.export.saved": "Saved {file}",
  "sync.quota.storage": "server storage is full (plan limit {limit} MB)",
+ "sync.notOnOrgProject": "you are not on the organization project this project is linked to. Ask its owner to add you, or unlink it in Settings > Projects > Organization",
  "account.delete.head": "Data on the server",
  "account.delete.sub": "Deletes your account and everything of yours on the Pacenote server. Your content key is destroyed at once, so nothing can be read any more, and the rest is purged within 30 days. Calls on this Mac and files in your Google Drive stay.",
  "account.delete": "Delete server data…",

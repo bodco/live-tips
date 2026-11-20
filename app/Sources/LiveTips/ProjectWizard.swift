@@ -97,7 +97,8 @@ final class ProjectWizardModel: ObservableObject {
         var link: PacenoteServer.OrgProject?
         if isTeam && orgMode == .create {
             do {
-                let body = try JSONSerialization.data(withJSONObject: ProjectWizardCore.orgProjectBody(name: name, memberIDs: Array(picked)))
+                let body = try JSONSerialization.data(withJSONObject: ProjectWizardCore.orgProjectBody(name: name, memberIDs: Array(picked),
+                                                                                                    creator: acct.me?.userID ?? ""))
                 let (d, c) = try await acct.api("POST", "/v1/orgs/\(orgID)/projects", body: body)
                 guard c == 201 || c == 200, let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
                       let id = o["id"] as? String else { error = L("wiz.err.orgProject", ["code": "\(c)"]); return nil }

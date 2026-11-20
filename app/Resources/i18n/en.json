@@ -4271,5 +4271,14 @@
  "onb.tools.addKey": "Add key",
  "onb.tools.hubspot.how": "How to get a key",
  "onb.tools.foot": "Each connection is optional and can be removed in Settings > Integrations. Tokens stay in this Mac's Keychain.",
- "onb.tools.skip": "Skip"
+ "onb.tools.skip": "Skip",
+ "ai.model.priceUnknown": " · price unknown",
+ "ai.models.refresh": "Refresh the list",
+ "ai.models.loading": "Reading the model list from the provider",
+ "ai.models.live": "The list comes from the provider: {n} models. A model without a price in the app is not counted in Spending.",
+ "ai.models.cached": "The last list from the provider: {n} models.",
+ "ai.models.failed": "Could not read the list from the provider, showing the last one ({n} models).",
+ "ai.models.failed.builtin": "Could not read the list from the provider, showing the built-in one.",
+ "ai.models.builtin": "The built-in list. Connect a key and the list shows every text model the provider offers.",
+ "aiusage.noPrice": "no price"
 }

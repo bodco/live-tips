@@ -1885,6 +1885,16 @@ per 1M tokens (input / output, 2026-11-04): $0.30 / $2.50, $0.75 / $3.75 and $2 
 (Argon to $4 / $20 from 1 December 2026, Flash to $1.50 / $7.50 from 1 January 2027), which Pacenote's spending counts
 from those days. Since 0.10.0 a chosen Gemini that is out moves down the AI chain like any AI (14.1y).
 
+**Model lists come from the provider (0.26.2).** With a Claude, OpenAI or Gemini API key connected, the model pickers in
+Settings > AI list what the provider itself offers (GET /models), so a new model, such as Gemini 4 Hydrogen, shows up
+without an app update. Only text models are listed, newest first; embedding, image, audio and live models and dated
+snapshots are left out. The list is read when you open a picker (at most every 6 hours), when you test a key and on
+Refresh the list; the last answer is kept on this Mac and the built-in list shows until the provider has been reached.
+A model you chose stays in the list even when the provider no longer lists it. A model Pacenote has no price for is
+marked "price unknown": it works, but Spending counts nothing for it, and Settings > AI > Usage shows "no price" for it
+instead of $0. Prices are added to the app's table (cost.py and ModelCatalog) with a release. The Gemini account (`agy`)
+list was already read from the CLI.
+
 **Plan B (replaced in 0.10.0 by one AI chain, 14.1y).** Automatic switching had "Use Gemini when Claude or ChatGPT is out", off by default. With it on, a job whose
 chosen way has no credit, has hit its plan limit or has a bad key goes to Gemini and goes back as soon as the chosen
 way answers again. The text of the call then reaches Google, which is why you turn it on yourself.

@@ -5,6 +5,12 @@ Pacenote. Earlier versions are described in the commit messages and in
 
 ## 0.26.2 (unreleased)
 
+- **Model lists come from the provider (2026-11-20):** the model pickers for Claude, OpenAI and Gemini API keys now
+  list what the provider offers, so a new model (Gemini 4 Hydrogen, for one) appears without an app update. Text
+  models only, newest first. The list is read when you open a picker (at most every 6 hours), after a key test and on
+  Refresh the list; the last list is kept on this Mac, and the built-in list shows until the provider has answered. A
+  model without a price in Pacenote is marked "price unknown", and Usage shows "no price" for it instead of $0: its
+  cost is not counted in Spending until the price table gets it.
 - **A folder for every call (2026-11-19):** each call now lives in its own folder,
   `<project>/live/<date>-<title>/`. On top you see what you read: the transcript, the meeting notes, the brief and the
   preparation sheet. The working files (cards, facts, tips, sheet data) sit in a hidden `.work/` inside it, so the

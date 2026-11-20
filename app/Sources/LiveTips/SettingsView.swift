@@ -382,13 +382,16 @@ final class SettingsModel: ObservableObject {
             } else if key == .openaiAPIKey {
                 let (ok, msg) = await KeyTester.openai(key: v)
                 keyState[key] = ok ? .ok(msg) : .failed(msg)
+                if ok { ModelCatalogStore.shared.refresh(.openai, force: true) }
             } else if key == .geminiAPIKey {
                 let (ok, msg) = await KeyTester.gemini(key: v)
                 keyState[key] = ok ? .ok(msg) : .failed(msg)
+                if ok { ModelCatalogStore.shared.refresh(.gemini, force: true) }
             } else if key == .claudeAPIKey {
                 let (ok, msg, ids) = await KeyTester.claude(key: v, workspace: nil)
                 keyState[key] = ok ? .ok(msg) : .failed(SettingsModel.friendly(msg))
                 if ok, !ids.isEmpty { config.knownModels = ids }
+                if ok { ModelCatalogStore.shared.refresh(.claude, force: true) }
             } else {
                 let (ok, msg) = await KeyTester.notion(token: v)
                 keyState[key] = ok ? .ok(msg) : .failed(SettingsModel.friendly(msg))
@@ -513,13 +516,28 @@ struct ModelPicker: View {
     let title: String
     @Binding var selection: String
     let choices: [String]
+    /// 0.26.2: the provider's own model list (ModelCatalogStore) instead of `choices`, once it has been read.
+    var provider: ModelCatalog.Provider? = nil
+    @ObservedObject var catalog = ModelCatalogStore.shared
+
+    private var rows: [(id: String, name: String)] {
+        guard let p = provider, !catalog.entries(p).isEmpty else { return choices.map { (id: $0, name: prettyModel($0)) } }
+        return ModelCatalog.choices(p, live: catalog.entries(p), selected: selection).map { (id: $0.id, name: Self.name($0)) }
+    }
+
+    static func name(_ e: ModelCatalog.Entry) -> String {
+        let pretty = prettyModel(e.id)
+        return (pretty == e.id ? e.label : pretty) + (e.known ? "" : L("ai.model.priceUnknown"))
+    }
+
     var body: some View {
         Picker(title, selection: $selection) {
-            ForEach(choices, id: \.self) { id in
-                Text(prettyModel(id)).tag(id)          // 0.8.7 (F6): the model id only in the tooltip
+            ForEach(rows, id: \.id) { m in
+                Text(m.name).tag(m.id)          // 0.8.7 (F6): the model id only in the tooltip
             }
         }
         .help(selection)
+        .onAppear { if let p = provider { catalog.refresh(p) } }
     }
 }
 
@@ -635,27 +653,24 @@ struct SearchModelRow: View {
     }
 }
 
-/// 0.9.0 (owner, 2026-11-04): the OpenAI model of a job, with its Claude counterpart and price
+/// 0.9.0 (owner, 2026-11-04): the OpenAI model of a job, with its Claude counterpart and price. 0.26.2: the list is
+/// the provider's own (ModelCatalogStore); the hand-written labels with prices live in ModelCatalog.labels.
 /// (developers.openai.com/api/docs/pricing and platform.claude.com/docs/en/about-claude/pricing, checked 2026-11-04).
 struct OpenAIModelPicker: View {
     @Binding var selection: String
     let job: String
-    static let models: [(id: String, label: String)] = [
-        ("gpt-6-luna", "GPT-6 Luna · fastest, like Haiku · $0.10 / $0.50"),
-        ("gpt-6.1-terra", "GPT-6.1 Terra · fast, between Haiku and Sonnet · $1 / $5"),
-        ("gpt-6.1-sol", "GPT-6.1 Sol · balanced, like Sonnet · $2 / $10"),
-        ("gpt-6-astra", "GPT-6 Astra · most capable, above Opus in price · $10 / $50"),
-        ("gpt-5.4-mini", "GPT-5.4 mini · older · $0.75 / $4.50"),
-    ]
+    @ObservedObject var catalog = ModelCatalogStore.shared
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Picker(L("set.model"), selection: $selection) {
-                ForEach(Self.models, id: \.id) { m in
-                    Text(m.label + (m.id == Self.recommended(job) ? L("ai.route.recommended") : "")).tag(m.id)
+                ForEach(ModelCatalog.choices(.openai, live: catalog.entries(.openai), selected: selection), id: \.id) { m in
+                    Text(ModelLabel.text(m, recommended: m.id == Self.recommended(job))).tag(m.id)
                 }
             }
+            ModelListNote(provider: .openai)
             Text(L("ai.openai.model2")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
         }
+        .onAppear { catalog.refresh(.openai) }
     }
     static func recommended(_ job: String) -> String { job == "tips" ? "gpt-6-luna" : "gpt-6.1-sol" }
 }
@@ -663,23 +678,22 @@ struct OpenAIModelPicker: View {
 /// 0.9.3 (owner, 2026-11-04): the Gemini model of a job and its price per 1M input / output tokens (no Claude comparison)
 /// (ai.google.dev/gemini-api/docs/pricing, paid tier, checked 2026-11-04). Google announced rises: Gemini 4 Argon to
 /// $4 / $20 from 2026-12-01, Gemini 3.8 Flash to $1.50 / $7.50 from 2027-01-01 (livetips_m0.cost.PRICE_CHANGES).
+/// 0.26.2: the list is the provider's own (ModelCatalogStore), so Gemini 4 Hydrogen and later models appear by themselves.
 struct GeminiModelPicker: View {
     @Binding var selection: String
     let job: String
-    static let models: [(id: String, label: String)] = [
-        ("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite · fastest · $0.30 / $2.50"),
-        ("gemini-3.8-flash", "Gemini 3.8 Flash · balanced · $0.75 / $3.75"),
-        ("gemini-4-argon", "Gemini 4 Argon · most capable · $2 / $10"),
-    ]
+    @ObservedObject var catalog = ModelCatalogStore.shared
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Picker(L("set.model"), selection: $selection) {
-                ForEach(Self.models, id: \.id) { m in
-                    Text(m.label + (m.id == Self.recommended(job) ? L("ai.route.recommended") : "")).tag(m.id)
+                ForEach(ModelCatalog.choices(.gemini, live: catalog.entries(.gemini), selected: selection), id: \.id) { m in
+                    Text(ModelLabel.text(m, recommended: m.id == Self.recommended(job))).tag(m.id)
                 }
             }
+            ModelListNote(provider: .gemini)
             Text(L("ai.gemini.model2")).font(PN.Font.caption).foregroundStyle(PN.C.text3).fixedSize(horizontal: false, vertical: true)
         }
+        .onAppear { catalog.refresh(.gemini) }
     }
     static func recommended(_ job: String) -> String { job == "tips" ? "gemini-3.5-flash-lite" : "gemini-3.8-flash" }
 }
@@ -1025,8 +1039,8 @@ struct SettingsView: View {
                 } else if run("tips") == AIRoute.gemini {
                     GeminiModelPicker(selection: $model.config.ai.geminiTips, job: "tips")
                 } else if !run("tips").isEmpty {      // nothing connected for the job: no models to pick
-                    ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices).help(L("set.decidesIfATip"))
-                    ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices).help(L("set.writesTheTipYou"))
+                    ModelPicker(title: L("set.classify"), selection: $model.config.models.classify, choices: model.modelChoices, provider: .claude).help(L("set.decidesIfATip"))
+                    ModelPicker(title: L("set.tip"), selection: $model.config.models.tip, choices: model.modelChoices, provider: .claude).help(L("set.writesTheTipYou"))
                 }
                 Toggle(L("set.answerQuestionsToAnyone"), isOn: $model.config.answerAny)
                     .help(L("set.aQuestionAskedTo"))
@@ -1054,7 +1068,7 @@ struct SettingsView: View {
                 } else if run("after") == AIRoute.local {
                     LocalModelRow()
                 } else if !run("after").isEmpty {      // nothing connected for the job: no models to pick
-                    ModelPicker(title: L("set.model"), selection: $model.config.models.analysis, choices: model.modelChoices).help(L("set.summaryAndAnalysisNot"))
+                    ModelPicker(title: L("set.model"), selection: $model.config.models.analysis, choices: model.modelChoices, provider: .claude).help(L("set.summaryAndAnalysisNot"))
                 }
                 Toggle(L("set.rateTipsAfterEach"), isOn: $model.config.judgeAfterCall)
                     .help(L("set.afterTheCallClaude"))

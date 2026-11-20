@@ -754,6 +754,17 @@ struct CallPageView: View {
     private func makeMeeting() {
         making = true; makeNote = ""
         CallEngine.shared.makeMeetingNotes(file: file) { err in
+            // 0.26.3: a missing module heals the engine Python and tries once more
+            if let err, SetupModel.isModuleError(err) {
+                SetupModel.healEnginePython { healed in
+                    guard healed else { making = false; makeNote = L("page.mn.moduleMissing"); return }
+                    CallEngine.shared.makeMeetingNotes(file: file) { err2 in
+                        making = false
+                        if let err2 { makeNote = SetupModel.isModuleError(err2) ? L("page.mn.moduleMissing") : err2 } else { tick += 1 }
+                    }
+                }
+                return
+            }
             making = false
             if let err { makeNote = err } else { tick += 1 }
         }

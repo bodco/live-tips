@@ -589,6 +589,7 @@
     $('helpLbl').textContent = t.help; $('helpKey').textContent = S.keys.help;
     const eb = $('endBtn'); eb.textContent = t.endCall; eb.title = t.endCallTip; eb.hidden = ended || S.call.state === 'ending';
 
+    $('app').classList.toggle('pane-off', !!S.ui.paneOff);
     guard('pane', () => renderPane($('pane'), S.ui.paneTab, false));
     // A sheet opened in a narrow window becomes the side pane when the window gets wide (no double tabs).
     if (S.ui.sheet && isWide()) { S.ui.paneTab = S.ui.sheet; S.ui.sheet = null; }
@@ -1142,10 +1143,12 @@
     return `<div class="tc-alert tc-ask" role="alertdialog" aria-label="${esc(a.text)}"><span class="tc-ntext">${esc(a.text)}</span>${askBtnsCard(a)}</div>`;
   }
   function renderAsk() {
-    let el = $('ask');
+    // 0.26.2: own id. 'ask' is the question form at the bottom: taking it emptied the form, renderNow then failed
+    // on askLbl and the side panel (Transcript, On me, Brief) and the sheet were never drawn.
+    let el = $('askStrip');
     if (!el) {
       const bar = document.querySelector('header.bar'); if (!bar) return;
-      el = document.createElement('section'); el.id = 'ask'; el.className = 'sys ask'; el.setAttribute('role', 'alertdialog');
+      el = document.createElement('section'); el.id = 'askStrip'; el.className = 'sys ask'; el.setAttribute('role', 'alertdialog');
       bar.parentNode.insertBefore(el, bar.nextSibling);
     }
     const a = S.ask;
@@ -1312,9 +1315,9 @@
       body = renderBrief();
     }
     const paneHTML = `
-      ${isSheet ? `<button class="icon-btn close" type="button" data-act="close-sheet" aria-label="${esc(t.close)}">${ICON.x}</button>` : ''}
+      <button class="icon-btn close" type="button" data-act="${isSheet ? 'close-sheet' : 'pane-close'}" aria-label="${esc(t.close)}" title="${esc(t.close)}">${ICON.x}</button>
       ${speakersBlock()}
-      <div class="tabs" role="tablist" ${isSheet ? 'style="margin-right:48px"' : ''}>${tabs.map((k) => `<button class="tab" role="tab" type="button" aria-selected="${k === tab}" data-act="${isSheet ? 'sheet-tab' : 'pane-tab'}" data-tab="${k}">${esc(k === 'onme' ? t.tabs.onme(openN) : k === 'deal' ? t.deal.tab : t.tabs[k])}</button>`).join('')}</div>
+      <div class="tabs" role="tablist" style="margin-right:48px">${tabs.map((k) => `<button class="tab" role="tab" type="button" aria-selected="${k === tab}" data-act="${isSheet ? 'sheet-tab' : 'pane-tab'}" data-tab="${k}">${esc(k === 'onme' ? t.tabs.onme(openN) : k === 'deal' ? t.deal.tab : t.tabs[k])}</button>`).join('')}</div>
       <div class="panebody">${body}</div>
       ${tab === 'transcript' ? `<div class="panefoot"><span>${esc(t.legend)}</span>${S.ui.follow ? `<span>${esc(t.following)}</span>` : `<button class="link" type="button" data-act="follow">${esc(t.jump)}</button>`}</div>` : ''}`;
     if (root.dataset.html !== paneHTML) { root.innerHTML = paneHTML; root.dataset.html = paneHTML; }
@@ -1548,7 +1551,23 @@
   // 0.8.5: the presentation rail shows from 560 px, so a resize redraws it.
   let resizeT = null;
   window.addEventListener('resize', () => { if (S.ui.sheet && isWide()) { render(); return; } });
-  function openTab(tab) { if (isWide()) S.ui.paneTab = tab; else S.ui.sheet = tab; render(); }
+  // 0.26.2 (owner, 20.11): the side panel opens next to the tips. A narrow window grows for it (the native side
+  // keeps the old width and gives it back on Close); in the presentation split it is a sheet as before. The panel
+  // has a Close button: in a wide window it hides the panel, in a grown one the window shrinks back.
+  function paneShown() { return isWide() && !S.ui.paneOff; }
+  function openTab(tab) {
+    S.ui.paneTab = tab; S.ui.paneOff = false; S.ui.briefEdit = false;
+    if (!isWide()) {
+      if ($('app').classList.contains('pm-split')) { S.ui.sheet = tab; }
+      else if (!S.ui.paneGrown) { S.ui.paneGrown = true; post('transcript', { on: true }); }
+    }
+    render();
+  }
+  function closePane() {
+    S.ui.paneOff = true;
+    if (S.ui.paneGrown) { S.ui.paneGrown = false; post('transcript', { on: false }); }
+    render();
+  }
   function cardKey(c) { return (c.card || '') + '|' + (c.t || '') + '|' + String((c.raw && c.raw.gist) || '').slice(0, 60); }
 
   document.addEventListener('toggle', (e) => {
@@ -1664,6 +1683,7 @@
         break;
       }
       case 'pane-tab': S.ui.paneTab = b.dataset.tab; S.ui.briefEdit = false; break;
+      case 'pane-close': closePane(); return;
       case 'deal-cycle': {
         const c = S.deal && S.deal.criteria.find((x) => x.key === b.dataset.key);
         if (c) {
@@ -1870,7 +1890,11 @@
   $('pauseBtn').addEventListener('click', () => togglePause());
   $('bulbBtn').addEventListener('click', () => toggleProactive());
   $('dealBtn').addEventListener('click', () => openTab('deal'));
-  $('onmeBtn').addEventListener('click', () => { if (isWide()) { S.ui.paneTab = 'onme'; } else { S.ui.sheet = S.ui.sheet === 'onme' ? null : 'onme'; } render(); });
+  $('onmeBtn').addEventListener('click', () => {
+    if (S.ui.sheet === 'onme') { S.ui.sheet = null; render(); return; }
+    if ((paneShown() || S.ui.paneGrown) && S.ui.paneTab === 'onme') { closePane(); return; }   // a second click closes it
+    openTab('onme');
+  });
   $('helpBtn').addEventListener('click', () => post('help'));
   $('ask').addEventListener('submit', (e) => {
     e.preventDefault();

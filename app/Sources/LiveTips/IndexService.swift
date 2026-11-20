@@ -188,6 +188,7 @@ final class IndexService: @unchecked Sendable {
         }
         forced.remove(root)
         changedAt[root] = nil
+        LocalAIService.shared.ensure()                   // 0.26.3: the engine sleeps between uses; `lt` would also wake it
         let p = Process()
         p.executableURL = URL(fileURLWithPath: python)
         p.arguments = [lt, "index", root] + watched.dropFirst().flatMap { ["--extra", $0] }

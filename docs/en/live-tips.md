@@ -754,7 +754,10 @@ admin history take?" finds the fact "Admin audit logs: 16 h".
 - **16 GB Mac.** `bge-m3` takes about 1.2 GB next to Whisper (about 1.6 GB); a call makes
   about 7 short embedding requests a minute. The built-in engine uses 2 processor threads and
   indexing runs at background priority (`defaults write io.github.example.livetips embedThreads -int 4`
-  gives the engine more threads). Pre-index before the call. Under memory
+  gives the engine more threads). Since 0.26.3 the built-in engine is not kept running: it starts when a call, the
+  index or a brief needs it (about a second) and quits after 10 minutes without work, so it frees its memory between
+  calls; during a call it stays up (`defaults write io.github.example.livetips embedIdleExit -int 0` keeps it running
+  all the time, another number sets the idle seconds). Pre-index before the call. Under memory
   pressure set `index_enabled: false` (no background indexing) or `semantic_enabled: false`
   in `config.json`.
 
@@ -2809,6 +2812,13 @@ identification. The Python libraries come from lock files inside the app with ex
 Pacenote has new locks, Settings > Components shows the parts as out of date and Install brings them in line. A part
 that fails does not stop the rest: the parts that need it say so ("Waits for Python"), the others install, and the
 reason of each failure is on its row with Retry. The loader shows the part, MB of MB, the percent and the time left.
+
+**When the app folder moves (0.26.3).** The app folder follows the work folder. A move asked while Pacenote installs
+waits until the install ends, and every install step goes to one folder. After the move the private Python environment
+is relinked to the new folder (its installed libraries stay), the engine paths point at the new folder at once, and
+Settings > Components is checked again: what is missing installs by itself, as with Repair. Pacenote also checks at
+launch, after Repair and after a "No module named" error that its Python has the engine's modules, and switches to the
+one it installed when that one works.
 
 **Accounts.** Claude Code and Codex are not components. Connect a Claude account (Settings > AI or the onboarding) and
 Pacenote installs Claude Code with Anthropic's installer, then runs its sign-in from the app: your browser opens, and

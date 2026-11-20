@@ -311,6 +311,39 @@ func enginePathsFollowTheApp() {
     expect(custom.resolved(defaultPython: "/v/bin/python", bundleEngine: "/New.app/e", exists: { _ in true }) == nil, "the PM's own engine is kept")
 }
 
+func engineHealsAPythonWithoutModules() {
+    // 0.26.3 (beta report 20.11): the config kept another Python (it exists), so the Meeting Sheet and the notes failed
+    // with "No module named 'anthropic'" while Settings > Components said Installed.
+    var e = AppConfig.Engine(); e.python = "/usr/bin/python3"; e.sidecarPython = "/usr/bin/python3"; e.sidecarDir = "/App/e"
+    var asked: [String] = []
+    let h = e.healed(defaultPython: "/v/bin/python", works: { asked.append($0); return $0 == "/v/bin/python" })
+    expect(h?.python == "/v/bin/python" && h?.sidecarPython == "/v/bin/python", "h1: a Python without the modules moves to setup's own")
+    expect(h?.sidecarDir == "/App/e", "h1: the engine folder stays")
+    expect(asked.filter { $0 == "/usr/bin/python3" }.count == 1, "h1: each Python runs once")
+    expect(e.healed(defaultPython: "/v/bin/python", works: { _ in false }) == nil, "h2: setup's own broken too: nothing changes")
+    var mine = AppConfig.Engine(); mine.python = "/mine/python"; mine.sidecarPython = "/mine/python"
+    expect(mine.healed(defaultPython: "/v/bin/python", works: { _ in true }) == nil, "h3: the PM's own working Python stays")
+    var ok = AppConfig.Engine(); ok.python = "/v/bin/python"; ok.sidecarPython = "/v/bin/python"
+    expect(ok.healed(defaultPython: "/v/bin/python", works: { _ in fatalError("h4: no run needed") }) == nil, "h4: setup's own is never probed")
+    let a = AppConfig.Engine.probeArgs
+    expect(a.count == 2 && a[0] == "-c" && a[1].contains("'anthropic', 'yaml', 'jsonschema'") && a[1].contains("find_spec"), "h5: the probe")
+}
+
+func engineFollowsAMovedAppFolder() {
+    // 0.26.3: the app folder moved with the work folder; the engine paths inside it follow at once
+    var e = AppConfig.Engine()
+    e.python = "/Users/example/Library/Application Support/LiveTips/.venv/bin/python"
+    e.sidecarPython = e.python; e.sidecarDir = "/Applications/Pacenote.app/Contents/Resources/engine/spikes/m0"
+    let r = e.rebased(from: "/Users/example/Library/Application Support/LiveTips", to: "/Users/example/work/Tools/LiveTips")
+    expect(r?.python == "/Users/example/work/Tools/LiveTips/.venv/bin/python" && r?.sidecarPython == r?.python, "m1: the Python follows the folder")
+    expect(r?.sidecarDir == e.sidecarDir, "m1: the bundled engine stays")
+    var mine = AppConfig.Engine(); mine.python = "/opt/mine/bin/python"; mine.sidecarPython = "/opt/mine/bin/python"
+    expect(mine.rebased(from: "/Users/example/Library/Application Support/LiveTips", to: "/x") == nil, "m2: the PM's own Python stays")
+    var near = AppConfig.Engine(); near.python = "/Users/example/LiveTips2/.venv/bin/python"
+    expect(near.rebased(from: "/Users/example/LiveTips", to: "/x") == nil, "m3: a folder with the same start is not inside")
+    expect(e.rebased(from: "/a", to: "/a/") == nil, "m4: the same folder: nothing")
+}
+
 /// Pacenote 0.8.5: slide owners, talk time and Prepare again (rules/presentation.yaml).
 func presentationCore() {
     let sp = ["Ann Lee", "Bob"]
@@ -736,6 +769,8 @@ usage087()
 await crm087()
 learningPatterns()
 enginePathsFollowTheApp()
+engineHealsAPythonWithoutModules()
+engineFollowsAMovedAppFolder()
 versions()
 commitmentsRegister()
 /// 0.9.5: call recording: settings decode with defaults, presets and sizes, file names, the call window.

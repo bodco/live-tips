@@ -185,6 +185,43 @@ public struct AppConfig: Codable, Equatable {
             if e.sidecarDir.isEmpty || !exists(e.sidecarDir) { e.sidecarDir = bundleEngine }
             return e == self ? nil : e
         }
+
+        /// 0.26.3: the app folder moved from `old` to `new`: the paths inside the old folder follow it; a path outside it
+        /// (the PM's own Python, the app's bundled engine) stays. nil when nothing changes.
+        public func rebased(from old: String, to new: String) -> Engine? {
+            let o = (old as NSString).standardizingPath, n = (new as NSString).standardizingPath
+            guard !o.isEmpty, !n.isEmpty, o != n else { return nil }
+            func move(_ p: String) -> String {
+                let s = (p as NSString).standardizingPath
+                return s.hasPrefix(o + "/") ? n + s.dropFirst(o.count) : p
+            }
+            var e = self
+            e.python = move(e.python); e.sidecarPython = move(e.sidecarPython); e.sidecarDir = move(e.sidecarDir)
+            return e == self ? nil : e
+        }
+
+        /// 0.26.3: what a working engine Python must import. Checked with find_spec, so no package is loaded.
+        public static let probeModules = ["anthropic", "yaml", "jsonschema"]
+        public static var probeArgs: [String] {
+            let mods = probeModules.map { "'\($0)'" }.joined(separator: ", ")
+            return ["-c", "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(m) for m in (\(mods),)) else 1)"]
+        }
+
+        /// 0.26.3: a Python that exists but cannot import what the engine needs (another Python left in the config, so
+        /// "No module named 'anthropic'" while Settings > Components says Installed) is replaced by setup's own
+        /// (`defaultPython`), but only when that one works. A working path, the PM's own choice included, stays.
+        /// `works` runs the interpreter: callers run this off the main thread. nil when nothing changes.
+        public func healed(defaultPython: String, works: (String) -> Bool) -> Engine? {
+            var cache: [String: Bool] = [:]
+            func ok(_ py: String) -> Bool {
+                if let v = cache[py] { return v }
+                let v = !py.isEmpty && works(py); cache[py] = v; return v
+            }
+            var e = self
+            if e.python != defaultPython, !ok(e.python), ok(defaultPython) { e.python = defaultPython }
+            if e.sidecarPython != defaultPython, !ok(e.sidecarPython), ok(defaultPython) { e.sidecarPython = defaultPython }
+            return e == self ? nil : e
+        }
     }
     public var engine = Engine()
     /// How people address the PM on calls (any form); the "your turn" trigger.

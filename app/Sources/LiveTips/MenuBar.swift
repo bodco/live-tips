@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 0.26.2 (call folders, B6): flat calls move into their call folders, a few seconds after launch (move only)
         DispatchQueue.main.asyncAfter(deadline: .now() + 8) { CallMigration.runAtLaunch() }
         SetupModel.repairEnginePaths()      // 0.8.3: the engine follows the app after a rename or a move
+        SetupModel.healEnginePython()       // 0.26.3: and runs a Python that has the engine's modules
         // 0.24.1 (F3, owner 18.11): the AI of each job follows what is connected: keys now, accounts once their
         // sign-in is checked (and again whenever it changes)
         MainActor.assumeIsolated {
@@ -424,6 +425,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let st = EngineStatus.load(path: CallEngine.shared.statusPath)
         guard AskRules.isLive(running: CallEngine.shared.isRunning, state: st.state) else {
             if origin == .tips { tips?.window?.close() }      // the call is over: End call only closes the window
+            return
+        }
+        // 0.26.3 (beta report 20.11): End call pressed again while "End the call?" is open ends the call. Before, every
+        // press replaced the question with a new one, so the call went on until the PM found the question elsewhere.
+        if AskCenter.shared.current?.kind == "end-call" {
+            AppLog.app("call: End call pressed again, ending")
+            AskCenter.shared.cancel(kinds: ["end-call"])
+            endCallNow()
             return
         }
         let next = UpNext.shared.first

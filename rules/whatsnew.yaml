@@ -249,3 +249,9 @@ items:
     title_uk: "Мовців можна виправити після дзвінка"
     body_en: "On a call page's Transcript, click a name to rename, merge or remember the voice, or right-click a line and pick Said by. Then Rewrite notes writes the notes again with the right names."
     body_uk: "У вкладці Transcript сторінки дзвінка клікніть імʼя, щоб перейменувати, обʼєднати чи запамʼятати голос, або правий клік на рядку і Said by. Потім Rewrite notes напише нотатки заново з правильними іменами."
+  - id: fixes_0263
+    version: 0.26.3
+    title_en: "Fixes from the beta"
+    title_uk: "Виправлення з бети"
+    body_en: "The side panel of the tips window works again. Meeting notes, the Meeting Sheet and Notion no longer fail with \"No module named\" after a first setup that went wrong: Pacenote checks its Python and fixes it. Picking the work folder during setup no longer breaks the install. End call pressed twice ends the call. The search engine sleeps between uses."
+    body_uk: "Бічна панель вікна підказок знову працює. Нотатки зустрічі, Meeting Sheet і Notion більше не падають з \"No module named\" після невдалого першого налаштування: Pacenote перевіряє свій Python і виправляє його. Вибір робочої папки під час налаштування більше не ламає встановлення. Повторне натискання End call завершує дзвінок. Пошуковий рушій засинає між використаннями."

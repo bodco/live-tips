@@ -163,7 +163,7 @@ final class CallEngine {
         if let first = problems().first { return first }
         verifyCore()
         if let err = ensureAudioHelper() { return err }
-        LocalAIService.shared.apply()                       // core config: semantic on/off, engine URL
+        LocalAIService.shared.apply(start: true)            // core config: semantic on/off, engine URL; 0.26.3: wake the engine
         if config.localAI.enabled { _ = LocalAIService.shared.waitReady(timeout: 6) }
         callContext = (request["context"] as? String) ?? ""
         callRequest = request
@@ -202,6 +202,7 @@ final class CallEngine {
         do { try p.run() } catch { return L("eng.cantStart", ["err": error.localizedDescription]) }
         recorder = p
         IndexService.shared.pause()        // the indexer waits while Whisper and the tips engine run
+        LocalAIService.shared.holdForCall(true)   // 0.26.3: the embedding engine does not fall asleep during the call
         self.onReady = onReady
         liveSpent = 0; liveTips = 0; renamed = nil
         consentGiven = false; consentRecGiven = false; consentWaits = false
@@ -251,6 +252,7 @@ final class CallEngine {
                 let sc = self.sidecar
                 DispatchQueue.main.asyncAfter(deadline: .now() + 25) { if sc?.isRunning == true { sc?.terminate() } }
                 IndexService.shared.resume()
+                LocalAIService.shared.holdForCall(false)   // 0.26.3: from now on it quits after its idle minutes
                 let f = DateFormatter(); f.dateFormat = "HH:mm"
                 let saved = (st.file ?? self.lastFile).map { FileManager.default.fileExists(atPath: $0) } ?? false
                 self.lastCall = ["tips_usd": self.liveSpent, "tips": self.liveTips, "lines": self.lastLines,

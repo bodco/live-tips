@@ -3,6 +3,12 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.26.4 (unreleased)
+
+- **Privacy, terms and the guide follow the required account (2026-11-20, B13):** the account has been required
+  since 0.22.0; PRIVACY, TERMS and the guide (14.1z3) now say so, describe Continue with email, the password kept
+  only as an Argon2id hash on the server, Sign-in methods, and the service emails sent through Postmark.
+
 ## 0.26.3 (2026-11-20)
 
 - **The side panel of the tips window works again (2026-11-20):** since 0.26.0 the Transcript, On me and Brief panel

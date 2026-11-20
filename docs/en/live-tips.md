@@ -754,7 +754,10 @@ admin history take?" finds the fact "Admin audit logs: 16 h".
 - **16 GB Mac.** `bge-m3` takes about 1.2 GB next to Whisper (about 1.6 GB); a call makes
   about 7 short embedding requests a minute. The built-in engine uses 2 processor threads and
   indexing runs at background priority (`defaults write io.github.example.livetips embedThreads -int 4`
-  gives the engine more threads). Pre-index before the call. Under memory
+  gives the engine more threads). Since 0.26.3 the built-in engine is not kept running: it starts when a call, the
+  index or a brief needs it (about a second) and quits after 10 minutes without work, so it frees its memory between
+  calls; during a call it stays up (`defaults write io.github.example.livetips embedIdleExit -int 0` keeps it running
+  all the time, another number sets the idle seconds). Pre-index before the call. Under memory
   pressure set `index_enabled: false` (no background indexing) or `semantic_enabled: false`
   in `config.json`.
 

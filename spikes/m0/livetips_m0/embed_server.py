@@ -6,12 +6,19 @@ code change: it only points `ollama_url` at this server.
   GET  /api/version   -> {"version": "livetips-embedded-1"}
   GET  /api/tags      -> {"models": [{"name": "bge-m3:latest"}]}
   GET  /api/ps        -> {"models": [{"name": "bge-m3", "size": <rss bytes>}]}
+  GET  /api/keepalive -> {"ok": true}   (0.26.3: counts as use, the app sends it during a call)
   POST /api/embed     {"model", "input": str | [str]} -> {"model", "embeddings": [[...]]}
   POST /api/embeddings {"model", "prompt": str}      -> {"embedding": [...]}
 
 Listens on 127.0.0.1 only. Text in, vectors out; nothing leaves the Mac.
 
   python -m livetips_m0.embed_server --model-dir <dir with model_quantized.onnx and tokenizer.json> [--port 11435]
+                                     [--idle-exit <seconds>]
+
+0.26.3 (owner, 20.11): with --idle-exit the server quits after that many seconds without an embedding request or a
+keepalive (status calls such as /api/version do not count), so the model does not hold memory and CPU for days after a
+call. It binds the port before it loads the model: a second copy started at the same moment exits at once instead of
+loading the model twice. The app and the recorder core start it again when they need it (semantic.wake_builtin).
 """
 from __future__ import annotations
 
@@ -27,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSION = "livetips-embedded-1"
+VERSION = "livetips-embedded-2"     # 2: /api/version also gives pid and idle_exit_s, /api/keepalive
 MODEL_NAME = "bge-m3"
 BATCH = 16
 
@@ -79,6 +86,23 @@ def rss_bytes() -> int:
     return int(r if sys.platform == "darwin" else r * 1024)
 
 
+class Activity:
+    """When the server was last used (an embedding request or a keepalive)."""
+
+    def __init__(self, idle_exit_s: float = 0.0):
+        self.idle_exit_s = float(idle_exit_s or 0)
+        self.last = time.monotonic()
+
+    def touch(self) -> None:
+        self.last = time.monotonic()
+
+    def idle_for(self) -> float:
+        return time.monotonic() - self.last
+
+    def expired(self) -> bool:
+        return self.idle_exit_s > 0 and self.idle_for() >= self.idle_exit_s
+
+
 GET_ROUTES = {
     "/api/version": lambda: {"version": VERSION},
     "/api/tags": lambda: {"models": [{"name": MODEL_NAME + ":latest", "model": MODEL_NAME + ":latest"}]},
@@ -104,7 +128,9 @@ def post_reply(engine, path: str, body):
     return 404, {"error": "not found"}
 
 
-def make_handler(engine: Engine):
+def make_handler(engine, activity: "Activity | None" = None):
+    act = activity or Activity()
+
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):  # quiet: no request text in logs
             pass
@@ -118,11 +144,20 @@ def make_handler(engine: Engine):
             self.wfile.write(b)
 
         def do_GET(self):
+            if self.path == "/api/keepalive":
+                act.touch()
+                return self._send(200, {"ok": True})
+            if self.path == "/api/version":
+                return self._send(200, {"version": VERSION, "pid": os.getpid(), "idle_exit_s": act.idle_exit_s})
             get = GET_ROUTES.get(self.path)
             return self._send(200, get()) if get else self._send(404, {"error": "not found"})
 
         def do_POST(self):
-            code, obj = post_reply(engine, self.path, self._body())
+            act.touch()
+            try:
+                code, obj = post_reply(engine, self.path, self._body())
+            finally:
+                act.touch()                 # a long batch counts until it ends
             return self._send(code, obj)
 
         def _body(self):
@@ -134,21 +169,57 @@ def make_handler(engine: Engine):
     return H
 
 
+class _Later:
+    """The engine, set after the port is bound (requests wait in the listen queue until then)."""
+
+    def __init__(self):
+        self.engine = None
+
+    def embed(self, texts):
+        return self.engine.embed(texts)
+
+
+def watch_idle(srv, activity: Activity, check_s: float = 15.0) -> threading.Thread:
+    """Stops the server once `activity` has expired (0.26.3)."""
+    def loop():
+        while True:
+            time.sleep(check_s)
+            if activity.expired():
+                print(json.dumps({"idle_exit": True, "idle_s": round(activity.idle_for())}), flush=True)
+                srv.shutdown()
+                return
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+    return t
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", required=True, type=Path)
     ap.add_argument("--port", type=int, default=11435)
     ap.add_argument("--threads", type=int, default=int(os.environ.get("LT_EMBED_THREADS", "4")))
+    ap.add_argument("--idle-exit", type=float, default=float(os.environ.get("LT_EMBED_IDLE_EXIT", "0")),
+                    help="quit after this many seconds without use; 0 = never")
     a = ap.parse_args(argv)
     t0 = time.monotonic()
-    engine = Engine(a.model_dir, a.threads)
-    engine.embed(["warm up"])
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(engine))
-    print(json.dumps({"ready": True, "port": a.port, "load_s": round(time.monotonic() - t0, 2), "version": VERSION}), flush=True)
+    later, activity = _Later(), Activity(a.idle_exit)
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(later, activity))
+    except OSError as e:            # another copy already serves the port: nothing to do
+        print(json.dumps({"ready": False, "port": a.port, "error": "port in use (%s)" % e.strerror}), flush=True)
+        return 0
+    later.engine = Engine(a.model_dir, a.threads)
+    later.engine.embed(["warm up"])
+    activity.touch()
+    if activity.idle_exit_s > 0:
+        watch_idle(srv, activity)
+    print(json.dumps({"ready": True, "port": a.port, "load_s": round(time.monotonic() - t0, 2), "version": VERSION,
+                      "pid": os.getpid(), "idle_exit_s": activity.idle_exit_s}), flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+    srv.server_close()
     return 0
 
 

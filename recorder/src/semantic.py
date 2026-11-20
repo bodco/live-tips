@@ -69,14 +69,88 @@ def builtin_reason(root: "str | None" = None) -> str:
     return "The meaning search model is starting"
 
 
+# 0.26.3 (owner, 20.11): the built-in server quits after some idle minutes (embed_server --idle-exit). The app writes how
+# to start it into <app folder>/state/embed-server.json: {"python", "cwd", "args", "log"}. When the port refuses, the
+# core (recorder, `lt index`, the Cowork skill) starts it from that file and waits for it, instead of failing.
+_WAKE_LOCK = threading.Lock()
+_WAKE_LAST = [0.0]
+WAKE_EVERY_S = 30.0          # at most one start attempt per process in this window
+
+
+def launcher_path(root: "str | None" = None) -> str:
+    env = os.environ.get("LT_EMBED_LAUNCHER")
+    if env:
+        return env
+    base = root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, "state", "embed-server.json")
+
+
+def read_launcher(path: str) -> "dict | None":
+    """The start command written by the app, or None when it is missing or not usable."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(d, dict):
+        return None
+    py, args, cwd = d.get("python"), d.get("args"), d.get("cwd")
+    if not (isinstance(py, str) and py and isinstance(args, list) and all(isinstance(a, str) for a in args)):
+        return None
+    if not os.path.isfile(py) or (cwd is not None and not (isinstance(cwd, str) and os.path.isdir(cwd))):
+        return None
+    log = d.get("log")
+    return {"python": py, "args": args, "cwd": cwd, "log": log if isinstance(log, str) and log else None}
+
+
+def wake_builtin(url: str, root: "str | None" = None, wait_s: float = 12.0, spawn=None, ping=None) -> bool:
+    """Starts the built-in server from the launcher file and waits until it answers. True when it answers."""
+    def _ping() -> bool:
+        try:
+            op = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with op.open(url.rstrip("/") + "/api/version", timeout=1.0) as r:
+                return r.status == 200
+        except Exception:  # noqa: BLE001
+            return False
+    ping = ping or _ping
+    with _WAKE_LOCK:
+        if ping():
+            return True
+        now = time.monotonic()
+        if _WAKE_LAST[0] and now - _WAKE_LAST[0] < WAKE_EVERY_S:
+            return False
+        _WAKE_LAST[0] = now
+        launch = read_launcher(launcher_path(root))
+        if not launch:
+            return False
+        try:
+            if spawn:
+                spawn(launch)
+            else:
+                import subprocess  # noqa: PLC0415
+                out = open(launch["log"], "ab") if launch["log"] else subprocess.DEVNULL   # noqa: SIM115
+                env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+                subprocess.Popen([launch["python"]] + launch["args"], cwd=launch["cwd"], stdout=out, stderr=out,
+                                 stdin=subprocess.DEVNULL, env=env, start_new_session=True)
+        except OSError:
+            return False
+        end = time.monotonic() + wait_s
+        while time.monotonic() < end:
+            if ping():
+                return True
+            time.sleep(0.25)
+        return False
+
+
 class SemanticError(Exception):
     """An embedding call failed. `reason` is a short human-readable cause for status.json."""
 
-    def __init__(self, reason: str, status: int | None = None, body: str = ""):
+    def __init__(self, reason: str, status: int | None = None, body: str = "", refused: bool = False):
         super().__init__(reason)
         self.reason = reason
         self.status = status
         self.body = body
+        self.refused = refused          # nothing listens on the port (0.26.3: the built-in server may be asleep)
 
 
 # --------------------------------------------------------------------------- math helpers
@@ -177,6 +251,16 @@ class OllamaClient:
 
     # ---- HTTP
     def _req(self, path: str, payload: dict | None, timeout: float) -> dict:
+        try:
+            return self._req_once(path, payload, timeout)
+        except SemanticError as e:
+            # 0.26.3: the built-in server sleeps after idle minutes; start it and try once more
+            if e.refused and self._builtin() and wake_builtin(self.url):
+                self._health = None
+                return self._req_once(path, payload, timeout)
+            raise
+
+    def _req_once(self, path: str, payload: dict | None, timeout: float) -> dict:
         data = None if payload is None else json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(self.url + path, data=data, method="GET" if data is None else "POST",
                                      headers={"Content-Type": "application/json"})
@@ -196,8 +280,9 @@ class OllamaClient:
             if isinstance(r, ConnectionRefusedError) or "refused" in str(r).lower():
                 if self._builtin():
                     # 0.24.1 (F1): the port of Pacenote's own bge-m3 server, not Ollama; say what is really wrong.
-                    raise SemanticError(builtin_reason()) from None
-                raise SemanticError(f"Ollama is not running at {self.url} (ollama serve, or open the Ollama app)") from None
+                    raise SemanticError(builtin_reason(), refused=True) from None
+                raise SemanticError(f"Ollama is not running at {self.url} (ollama serve, or open the Ollama app)",
+                                    refused=True) from None
             raise SemanticError(f"Ollama not reachable at {self.url} ({r})") from None
         try:
             return json.loads(body.decode("utf-8"))

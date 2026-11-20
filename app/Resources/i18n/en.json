@@ -849,6 +849,7 @@
  "lai.noModel": "Built-in model is not installed in {path}",
  "lai.running": "Built-in engine is running (bge-m3, on this Mac)",
  "lai.notRunning": "Built-in engine is not running yet",
+ "lai.sleeping": "Built-in engine is ready: it starts when a call, the index or a brief needs it and sleeps after 10 idle minutes",
  "lai.ollamaOK": "Ollama answers at {url}",
  "lai.ollamaNo": "Ollama does not answer at {url}",
  "nm.tokenFirst": "Connect Notion in Settings > Integrations > Notion first.",

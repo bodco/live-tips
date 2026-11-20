@@ -2539,17 +2539,35 @@ behaviour before co-driver, set `codriver: false` in the sidecar config.
   and has the switch. An update switches it on once and says so at the next launch; if the usage log itself is off,
   sharing stays off. What goes and what never goes: section 11 and [PRIVACY.md](../../PRIVACY.md).
 
-### 14.1z3 Pacenote account (0.11.0, beta, optional)
+### 14.1z3 Pacenote account (0.11.0, beta; required since 0.22.0)
 
-**Settings > Account** signs you in to the Pacenote server with Google. Nothing else depends on it: without signing in
-Pacenote works exactly as before.
+Since 0.22.0 Pacenote needs an account. The sign-in screen comes first, before onboarding and Home, and comes back
+when the session ends (you signed out, another device signed you out, the password was changed on another Mac, the
+account was deleted); without a session the app offers only Quit. A live call is never cut: the sign-in screen waits
+until the call ends. With a saved session Pacenote works offline as before; a first launch without a network says so
+and offers Retry. Signing in alone sends nothing from your calls: calls go to the server only for projects with Sync
+to Pacenote server on (below). Audio and transcripts stay on your Mac.
 
-- **Sign in with Google** opens the browser. Pacenote asks Google only for your email, name and picture. This is not
+- **Continue with Google** opens the browser. Pacenote asks Google only for your email, name and picture. This is not
   one of the Google accounts in Integrations (calendars, Docs, Drive): you can sign in with a work account and keep
   calendars on another, or the other way round.
+- **Continue with email** (0.22.0, server 0.13.0). One form signs in or, with **Create account**, makes a new account;
+  the address stays when you switch. A new account is made only after you enter the 8-digit code from the email (it
+  works for 15 minutes; Send the code again waits a minute). The password: 10 to 128 characters, no rules about
+  symbols, but not a common password and not your email. **Forgot password?** sends a code and sets a new password;
+  this Mac stays signed in, every other one is signed out. After too many failed attempts the button waits with a countdown. The password is
+  never stored on the Mac; the server keeps only its Argon2id hash. Emails come from no-reply@bodco.pm; when an address
+  cannot receive mail (it bounced or marked an email as spam), Pacenote says so and suggests desk@bodco.pm. Continue
+  with email shows only when the server can send mail. What the emails are and who delivers them:
+  [PRIVACY](../../PRIVACY.md).
+- **One account for Google and the password.** One email address is one account. Continue with Google on an address
+  that already signs in with a password asks for that password once and joins the two; nothing is merged silently.
+- **Sign-in methods** in Settings > Account: Google (connect or disconnect) and the password (**Set a password**,
+  **Change password**, **Remove password**). The last way to sign in cannot be removed. Changing the password signs
+  out your other devices; an email tells you about a changed password or a new way to sign in.
 - After signing in the page shows your workspace (the first sign-in makes a personal one, you are its owner) and the
   Macs signed in to your account. **Sign out** next to another Mac ends its session; **Sign out everywhere** ends all
-  of them, this one too. Nothing on any Mac is deleted.
+  of them, this one too. Nothing on any Mac is deleted; a signed-out Mac shows the sign-in screen.
 - **Delete server data** asks twice, then deletes your account on the server: your content key is destroyed at once,
   the rest is purged within 30 days. Calls on your Mac and files in your Google Drive stay.
 - **What goes there.** Your account and your devices. From 0.12.0 also calls, but only for a project with **Sync to
@@ -2666,7 +2684,7 @@ teams, organization projects and invites are managed in the Pacenote console, no
   new one. 2) The folder: a new folder in your workspace (or "My workspace" in the work folder) or one that exists.
   3) The card: what the project is, the client, the goal, your language and the client's, and terms (spelled right in
   transcripts). 4) Links to where things are: a Drive folder, Notion pages, web pages. 5) For a new organization
-  project, the people on it. Every step after the first can be skipped. Linking to an organization project turns the
+  project, the people on it; you are always on it yourself (since 0.26.4). Every step after the first can be skipped. Linking to an organization project turns the
   project's sync on; otherwise sync stays off until you turn it on.
 - **The card stays on your Mac** and is on the project's page in Settings > Projects (Card: name, what it is,
   client, goal, terms, links). The links are not added to what the preparation may fetch on its own (SEC-01). A

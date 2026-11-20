@@ -255,3 +255,9 @@ items:
     title_uk: "Виправлення з бети"
     body_en: "The side panel of the tips window works again. Meeting notes, the Meeting Sheet and Notion no longer fail with \"No module named\" after a first setup that went wrong: Pacenote checks its Python and fixes it. Picking the work folder during setup no longer breaks the install. End call pressed twice ends the call. The search engine sleeps between uses."
     body_uk: "Бічна панель вікна підказок знову працює. Нотатки зустрічі, Meeting Sheet і Notion більше не падають з \"No module named\" після невдалого першого налаштування: Pacenote перевіряє свій Python і виправляє його. Вибір робочої папки під час налаштування більше не ламає встановлення. Повторне натискання End call завершує дзвінок. Пошуковий рушій засинає між використаннями."
+  - id: fixes_0264
+    version: 0.26.4
+    title_en: "Organization projects sync again"
+    title_uk: "Проєкти організації знову синхронізуються"
+    body_en: "When you start a new organization project in New project, you are now always on it, so its calls sync. Before, they could fail with \"invalid fields: org_project_id\". A project linked to one you are not on now says so and how to fix it."
+    body_uk: "Коли ви створюєте новий проєкт організації в New project, ви тепер завжди в ньому, тож його дзвінки синхронізуються. Раніше вони могли падати з \"invalid fields: org_project_id\". Проєкт, привʼязаний до проєкту організації без вас, тепер каже про це і як виправити."

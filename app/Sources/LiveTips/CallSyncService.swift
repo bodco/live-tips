@@ -458,7 +458,8 @@ final class CallSyncService: ObservableObject {
     /// The server's reason in words; a full storage quota (402) says so with the plan's limit.
     private static func problemText(_ d: Data, _ c: Int) -> String {
         if let q = PacenoteServer.quota(d, status: c), q.name == "storage_mb" { return L("sync.quota.storage", ["limit": "\(q.limit)"]) }
-        return PacenoteServer.problem(d, status: c)
+        let p = PacenoteServer.problem(d, status: c)
+        return CallSync.notOnOrgProject(status: c, problem: p) ? L("sync.notOnOrgProject") : p
     }
 
     private func forgetProject(_ p: Project, orgID: String) {

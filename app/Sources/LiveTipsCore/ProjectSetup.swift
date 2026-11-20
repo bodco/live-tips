@@ -69,10 +69,12 @@ public enum ProjectWizardCore {
         return out
     }
 
-    /// Body of POST /v1/orgs/{id}/projects (contract: name, member_ids).
-    public static func orgProjectBody(name: String, memberIDs: [String]) -> [String: Any] {
+    /// Body of POST /v1/orgs/{id}/projects (contract: name, member_ids). 0.26.4: `creator` (me) is always on it: the
+    /// wizard links my project to the new one, and the server takes that link only from a member (else 422).
+    public static func orgProjectBody(name: String, memberIDs: [String], creator: String = "") -> [String: Any] {
         var b: [String: Any] = ["name": String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))]
-        if !memberIDs.isEmpty { b["member_ids"] = Array(Set(memberIDs)).sorted() }
+        let ids = Set(memberIDs + (creator.isEmpty ? [] : [creator]))
+        if !ids.isEmpty { b["member_ids"] = Array(ids).sorted() }
         return b
     }
 

@@ -3,6 +3,18 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.26.4 (2026-11-20)
+
+- **A new organization project includes the person who made it (2026-11-20):** in New project > start a new
+  organization project, you were added only if you ticked yourself, and you could not tick yourself. The project
+  was then linked to one you were not on, and every call of it failed to sync with "Pacenote server 422: invalid
+  fields: org_project_id". You are now always on the organization project you start. A project still linked to one
+  you are not on says so in plain words: ask the owner to add you, or unlink it in Settings > Projects >
+  Organization.
+- **Privacy, terms and the guide follow the required account (2026-11-20, B13):** the account has been required
+  since 0.22.0; PRIVACY, TERMS and the guide (14.1z3) now say so, describe Continue with email, the password kept
+  only as an Argon2id hash on the server, Sign-in methods, and the service emails sent through Postmark.
+
 ## 0.26.3 (2026-11-20)
 
 - **The side panel of the tips window works again (2026-11-20):** since 0.26.0 the Transcript, On me and Brief panel

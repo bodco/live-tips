@@ -284,6 +284,48 @@ def record_notes(folder, *, call: str, notes: str, aliases: Optional[List[str]] 
     return rec.events + out
 
 
+def migrate_owners(folder, *, call: str, notes: str, aliases: Optional[List[str]] = None, by: str = "app") -> List[dict]:
+    """0.26.2 (speakers on the call page, Rewrite notes): the PM renamed, merged or moved speakers and the notes were
+    written again. An open item of this call that the PM has not touched gets the new owner when the new notes have a
+    similar action under another name, so record_notes then sees it as the same commitment (no "Speaker 2" twin next to
+    "Mike"). The PM's own ticks from the call window (owner me, not from the notes) stay as they are. Returns the
+    events written."""
+    from .callnotes import parse_meeting
+    acts = parse_meeting(notes or "").get("actions") or []
+    if not acts:
+        return []
+    names = {x.strip().lower() for x in (aliases or []) if x.strip()} | {"me", "я", "pm"}
+    first = {n.split()[0] for n in names if n.split()}
+    events = read_events(folder)
+    mine = [e for e in events if call_key(e.get("call")) == call_key(call) or e.get("op") != "add"]
+    from_notes = {e["id"] for e in mine if e.get("op") == "add" and e.get("source") == "notes"}
+    touched = {e.get("id") for e in mine if e.get("op") in ("edit", "drop", "done", "reopen")
+               and e.get("source") not in ("notes", "rewrite")}
+    added = {e["id"]: e.get("text", "") for e in mine if e.get("op") == "add"}
+    new = []
+    for a in acts:
+        tk = notes_task(a.get("text", ""))
+        what = re.sub(r"\s+", " ", tk["what"]).strip()
+        o = tk["owner"].strip()
+        if what and not NOTHING.match(what.rstrip(".!")):
+            new.append((what, "me" if not o or o.lower() in names or o.lower().split()[0] in first else o[:40]))
+    out, at = [], now_iso()
+    for it in fold(events):
+        if call_key(it.get("call")) != call_key(call) or it.get("status") != "open" or it["id"] in touched:
+            continue
+        old = it.get("owner") or "me"
+        if old == "me" and it["id"] not in from_notes:
+            continue
+        texts = (it.get("text", ""), added.get(it["id"], ""))
+        if any(owner_match(old, o) and any(similar(t, w) for t in texts if t) for w, o in new):
+            continue          # the new notes still give it to the same person
+        hit = next((o for w, o in new if not owner_match(old, o) and any(similar(t, w) for t in texts if t)), None)
+        if hit:
+            out.append({"op": "edit", "id": it["id"], "at": at, "owner": hit, "source": "rewrite", "by": by})
+    append(folder, out)
+    return out
+
+
 def mark(folder, cid: str, op: str = "done", source: str = "manual", call: str = "", notion_page: str = "") -> dict:
     e = {"op": op, "id": cid, "at": now_iso()}
     if op == "link":

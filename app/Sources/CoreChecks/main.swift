@@ -4578,10 +4578,70 @@ func callFolders() {
     try? fm.removeItem(atPath: (live as NSString).deletingLastPathComponent)
 }
 
+// 0.26.2 (speakers on the call page, B2): the transcript with the speakers as the PM left them, the edit arguments
+func callSpeakersB2() {
+    let md = """
+    # Call
+    [10:00:01] Me (en): Hi all
+    [10:00:04] Other [S1] (en): Hello Mike
+    [10:00:09] Other [S2] (en): Morning
+    [10:00:12] Other [S3] (en): Same here
+    [10:00:15] Other [S1] (en): Let us start
+    [10:00:20] Other (en): untagged
+    """
+    let snap: [String: Any] = ["clusters": ["S1": ["name": "Emily", "seconds": 12.5, "side": "client"],
+                                            "S2": ["name": NSNull(), "seconds": 3, "suggestions": [["name": "Mike Brown", "score": 0.7]]],
+                                            "S3": ["name": "Mike", "seconds": 2, "named_by": "meet"]],
+                               "overrides": ["10:00:15": "S2", "10:00:01": "S2"], "merged": ["S3": "S2"], "edited_at": 1000.0]
+    let s = CallSpeakers.parse(md: md, snapshot: snap, voicesFile: ["remember": true, "auto": ["S1"]], me: "Me")
+    expect(s.lines.count == 6 && s.editable && s.voices, "speakers: lines and flags")
+    expect(s.speakers.map(\.id) == ["S1", "S2"], "speakers: a merged speaker is gone")
+    expect(s.display(s.lines[1]) == "Emily" && s.display(s.lines[2]) == "Speaker 2", "speakers: names as named.md")
+    expect(s.owner(s.lines[3]) == "S2", "speakers: a merged line goes to its target")
+    expect(s.owner(s.lines[4]) == "S2" && s.display(s.lines[4]) == "Speaker 2", "speakers: a fixed line")
+    expect(!s.isMe(s.lines[0]) && s.owner(s.lines[0]) == "S2", "speakers: a mic line moved to a speaker")
+    expect(s.owner(s.lines[5]) == nil && s.display(s.lines[5]) == "Other", "speakers: an untagged line keeps its label")
+    expect(s.speaker("S1")?.remember == false && s.speaker("S2")?.remember == true, "speakers: a roster name waits for the PM")
+    expect(s.speaker("S2")?.suggestions == ["Mike Brown"], "speakers: suggestions by voice")
+    expect(s.ranked().first?.sid == "S2", "speakers: most lines first")
+    expect(s.plan(rename: "S2", to: " emily ") == .merge("S2", into: "S1"), "speakers: a taken name is a merge")
+    expect(s.plan(rename: "S2", to: "Mike Brown") == .rename("S2", "Mike Brown") && s.plan(rename: "S2", to: "  ") == nil, "speakers: rename")
+    expect(s.plan(line: "10:00:09", to: "EMILY") == .lineTo("10:00:09", sid: "S1"), "speakers: said by a speaker of this call")
+    expect(s.plan(line: "10:00:09", to: "Emily Clark")?.args == ["--fix", "10:00:09=@Emily Clark"], "speakers: said by someone new")
+    expect(CallSpeakers.Edit.remember("S1", false).args == ["--remember", "S1=off"] && CallSpeakers.Edit.side("S1", "team").args == ["--side", "S1=team"], "speakers: args")
+    let meet = CallSpeakers.parse(md: md, snapshot: ["clusters": ["S3": ["name": "Mike", "named_by": "meet"]]], voicesFile: ["remember": true], me: "Me")
+    expect(meet.speaker("S3")?.remember == false, "speakers: a Meet name waits for the PM")
+    let pub = CallSpeakers.parse(md: md, snapshot: ["clusters": ["S1": ["name": "Emily"]]], voicesFile: ["remember": false], me: "Me")
+    expect(pub.speaker("S1")?.remember == false, "speakers: a public call is not remembered")
+    let old = CallSpeakers.parse(md: md, snapshot: ["clusters": ["S1": ["name": "Emily"]]], voicesFile: nil, me: "Me")
+    expect(!old.voices && old.editable, "speakers: a call before 0.26.2 has names only")
+    let file = CallSpeakers.parse(md: md, snapshot: ["clusters": ["S1": ["name": "Emily", "embs": [[0.1]]]]], voicesFile: nil, me: "Me")
+    expect(file.voices, "speakers: a recording keeps its prints in speakers.json")
+    let none = CallSpeakers.parse(md: md, snapshot: nil, voicesFile: nil, me: "Me")
+    expect(!none.editable && none.display(none.lines[1]) == "Speaker 1" && none.isMe(none.lines[0]), "speakers: no speakers file, read only")
+    expect(CallSpeakers.notesStale(editedAt: 1000, notesWritten: Date(timeIntervalSince1970: 900)), "speakers: notes older than the edit")
+    expect(!CallSpeakers.notesStale(editedAt: 1000, notesWritten: Date(timeIntervalSince1970: 1200)) && !CallSpeakers.notesStale(editedAt: nil, notesWritten: Date()), "speakers: notes up to date")
+}
+
 notionOAuthINT2()
 notionINT3()
 meetingRecap0261()
 callFolders()
 callFoldersB4()
+callSpeakersB2()
+
+/// 0.26.2 (speakers on the call page, B3): Rewrite notes.
+func callSpeakersB3() {
+    expect(CallSpeakers.editedAt(snapshot: ["edited_at": 1700000000.5]) == 1700000000.5, "rewrite: edited_at read")
+    expect(CallSpeakers.editedAt(snapshot: ["rev": 2]) == nil && CallSpeakers.editedAt(snapshot: nil) == nil, "rewrite: no edit, no time")
+    let a = CallSpeakers.rewriteArgs(md: "/c/x.app.md", model: "m", aliases: ["Mike", "Mike Johnson"], config: "/p/orbit.md")
+    expect(a.contains("--rewrite") && !a.contains("--meeting"), "rewrite: the full notes, not the meeting part")
+    expect(a.suffix(2) == ["--project-config", "/p/orbit.md"] && a.contains("Mike,Mike Johnson"), "rewrite: config and aliases")
+    expect(!CallSpeakers.rewriteArgs(md: "x", model: "m", aliases: [], config: "").contains("--project-config"), "rewrite: no config")
+    let notes = Date(timeIntervalSince1970: 1000)
+    expect(CallSpeakers.notesStale(editedAt: 1500, notesWritten: notes), "rewrite: an edit after the notes is stale")
+    expect(!CallSpeakers.notesStale(editedAt: 1500, notesWritten: Date(timeIntervalSince1970: 1600)), "rewrite: notes written again are fresh")
+}
+callSpeakersB3()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

@@ -551,6 +551,65 @@ final class CallEngine {
         do { try p.run() } catch { done(error.localizedDescription) }
     }
 
+    /// 0.26.2 (speakers on the call page, B3): Rewrite notes after the PM fixed the speakers. The full notes are written
+    /// again from <stem>.named.md over the old ones (callnotes --rewrite, which also moves this call's untouched register
+    /// items to the new names). The PM's edits on the call page live in the tips file and still win (CallLists). Then the
+    /// call's Notion page gets its Decisions, Action items, Open questions and Risks again (CallPageSync), and the server
+    /// copy the changed notes. On the "After the call" way; the cost goes to SpendDays and the call's history.
+    @MainActor func rewriteCallNotes(file: String, done: @escaping @MainActor (String?) -> Void) {
+        let c = config
+        guard AIRoute.canRun(job: "after", config: c), !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else {
+            done(L("page.mn.noRoute")); return
+        }
+        let notes = CallNotes.path(file)
+        guard !Self.notesInWork.contains(notes) else { done(L("transcript.spk.rewriteBusy")); return }
+        let cfg = PyTool.project(of: file).project?.config
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
+        p.arguments = CallSpeakers.rewriteArgs(md: file, model: "claude-sonnet-5-5", aliases: c.nameAliases,
+                                               config: cfg.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil })
+        p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
+        var env = AIRoute.env(job: "after", config: c)
+        env["LT_AI_STAGE"] = "after_notes"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        p.environment = env
+        AppLog.header("notes.log", "notes rewrite", extra: [("call", AppLog.stem(file))] + AppLog.runtimeExtra)
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notes.log"))
+        let t0 = Date(), prov = Analytics.provider(route: c.ai.after)
+        p.terminationHandler = { proc in
+            Self.notesInWork.remove(notes)
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            let line = String(data: data, encoding: .utf8)?.split(separator: "\n").last.map(String.init) ?? ""
+            let d = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] ?? [:]
+            let ok = proc.terminationStatus == 0 && (d["ok"] as? Bool) == true
+            let ms = Int(Date().timeIntervalSince(t0) * 1000)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    if let usd = d["cost_usd"] as? Double, usd > 0 {
+                        SpendDays.add(usd)
+                        CallHistory.shared.addCost(file: file, usd)
+                    }
+                    AnalyticsTracker.shared.perf("notes_after", ms: ms, provider: prov, ok: ok)
+                    guard ok else {
+                        AnalyticsTracker.shared.error("ai", proc.terminationReason == .uncaughtSignal ? "crashed" : "other", provider: prov, fallbackTo: nil)
+                        AppLog.app("notes: rewrite failed call=\(AppLog.stem(file))")
+                        done((d["error"] as? String).map { L("transcript.spk.rewriteFailed", ["error": String($0.prefix(200))]) } ?? L("page.mn.failed"))
+                        return
+                    }
+                    AppLog.app("notes: rewritten call=\(AppLog.stem(file))")
+                    let sync = CallPageSync.of(file)
+                    for s in ["decisions", "open", "risks", "actions"] { sync.changed(s) }   // no Notion page: nothing happens
+                    CallSyncService.shared.sync(file)
+                    done(nil)
+                }
+            }
+        }
+        Self.notesInWork.insert(notes)
+        do { try p.run() } catch { Self.notesInWork.remove(notes); done(error.localizedDescription) }
+    }
+
     /// `lines`: the real transcript lines when known (the call just ended); a call under NotionGate.minLines gets no page.
     /// INT S3: the OAuth token is checked (and refreshed on a 401) before wrapup_notion gets it.
     func writeToNotion(file: String, lines: Int? = nil) {

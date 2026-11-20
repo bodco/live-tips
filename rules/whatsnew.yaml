@@ -243,3 +243,9 @@ items:
     title_uk: "Окрема папка для кожного дзвінка"
     body_en: "Each call now has its own folder in the project's live folder: the transcript, notes, brief and sheet on top, the working files hidden inside. Old calls move there by themselves at launch, nothing is deleted."
     body_uk: "Кожен дзвінок тепер має власну папку в live проєкту: нагорі транскрипт, нотатки, бриф і sheet, робочі файли сховані всередині. Старі дзвінки переїжджають туди самі під час запуску, нічого не видаляється."
+  - id: speakers_call_page
+    version: 0.26.2
+    title_en: "Fix the speakers after the call"
+    title_uk: "Мовців можна виправити після дзвінка"
+    body_en: "On a call page's Transcript, click a name to rename, merge or remember the voice, or right-click a line and pick Said by. Then Rewrite notes writes the notes again with the right names."
+    body_uk: "У вкладці Transcript сторінки дзвінка клікніть імʼя, щоб перейменувати, обʼєднати чи запамʼятати голос, або правий клік на рядку і Said by. Потім Rewrite notes напише нотатки заново з правильними іменами."

@@ -325,12 +325,15 @@ def _write(out: Path, text: str) -> None:
     os.replace(tmp, out)
 
 
-def _register_tasks(md: Path, notes: str, aliases: List[str]) -> None:
+def _register_tasks(md: Path, notes: str, aliases: List[str], rewrite: bool = False) -> None:
     """0.12.2 (L4): the notes' Action items complete the call's commitments register (<live folder>/commitments.jsonl,
-    commitments.record_notes); the notes are kept whatever happens."""
+    commitments.record_notes); the notes are kept whatever happens. 0.26.2: on Rewrite notes the owners of this call's
+    untouched items follow the new names first (commitments.migrate_owners)."""
     try:
         from . import commitments
         call = md.name.replace(".named.md", ".md")
+        if rewrite:
+            commitments.migrate_owners(md.parent, call=call, notes=notes, aliases=aliases or [])
         commitments.record_notes(md.parent, call=call, notes=notes, aliases=aliases or [])
     except Exception as e:  # noqa: BLE001
         print("register from notes: " + str(e)[:200], file=sys.stderr)
@@ -360,7 +363,8 @@ def _sheet_check(md: Path, notes: str, text: str, lang: str, ask) -> str:
         return notes
 
 
-def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str] = None, config: str = "") -> dict:
+def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str] = None, config: str = "",
+               rewrite: bool = False) -> dict:
     from .oneshot import provider_from_env
     from .cost import cost_usd
     prov = provider or provider_from_env()
@@ -404,7 +408,7 @@ def make_notes(md: Path, model: str, lang: str, provider=None, aliases: List[str
         print("meeting notes: " + str(e)[:200], file=sys.stderr)
     out = call_layout.place(md.name[:-3].replace(".named", "") + ".notes.md", md.parent)
     _write_then_check(out, md, notes, text, lang, ask)
-    _register_tasks(md, notes, aliases)
+    _register_tasks(md, notes, aliases, rewrite)
     return {"ok": True, "path": str(out), "coverage": coverage_line(c), "cost_usd": round(usd[0], 4), "parts": len(ps),
             "error": None}
 
@@ -418,12 +422,15 @@ def main(argv=None) -> int:
     ap.add_argument("--project-config", default="")
     ap.add_argument("--meeting", action="store_true",
                     help="0.9.5.2: only the ## Meeting notes section when the notes exist (else the full notes)")
+    ap.add_argument("--rewrite", action="store_true",
+                    help="0.26.2: the full notes again over the existing ones (the speakers changed), owners migrated")
     a = ap.parse_args(argv)
     notes_file = call_layout.place(Path(a.md).name[:-3].replace(".named", "") + ".notes.md", Path(a.md).parent)
-    fn = make_meeting_only if a.meeting and notes_file.exists() else make_notes
+    fn = make_meeting_only if a.meeting and not a.rewrite and notes_file.exists() else make_notes
+    kw = {"rewrite": True} if a.rewrite else {}
     try:
         res = fn(Path(a.md), a.model, a.lang, aliases=[x.strip() for x in a.aliases.split(",") if x.strip()],
-                         config=a.project_config)
+                         config=a.project_config, **kw)
     except Exception as e:  # noqa: BLE001
         res = {"ok": False, "path": None, "coverage": None, "cost_usd": None, "error": f"{type(e).__name__}: {e}"[:400]}
     print(json.dumps(res, ensure_ascii=False))

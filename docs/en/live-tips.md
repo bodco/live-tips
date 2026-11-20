@@ -673,6 +673,26 @@ apart on the Mac (sherpa-onnx with a WeSpeaker voice model) and you name them.
   everywhere. The app lists the library with **Forget** in Settings > AI > Speakers.
 - **Where voice prints live:** only on this Mac, in `<tool_root>/voices/voices.json` (at most
   20 prints per person). Never put `voices/` in a repository. Section 11 has the privacy side.
+- **Fix it after the call** (0.26.2, app). On the call page's **Transcript** tab the name above a line is a menu:
+  **Rename** (suggestions "Sounds like ..." from the voice library, the project people, or **Type a name...**), **Same
+  person as** (merge two speakers), **Remember this voice** and **Side** (Team / Client). The same menu opens on a right
+  click of a speaker chip; a plain click still filters. Right-click a line for **Said by...**: give only that line to
+  another speaker, a project person or **Someone else...** (a new speaker). Every change applies to the whole call and
+  `<title>.named.md` is written again; the original transcript is never changed. While the call is still recording
+  the tab is read-only.
+- **Voice prints of a call** (0.26.2). On End call the recorder keeps `.work/<title>.voices.json`: one voice print per
+  line, never audio, only on this Mac. A name fixed after the call teaches the voice library by the same rule as
+  during the call (only the lines that sound like the speaker; editing again never adds a print twice). Names from the
+  series roster or from Google Meet and every voice of a public call are not learned until you name the speaker
+  yourself or pick Remember this voice. A call recorded before 0.26.2 has no voice prints: you can fix its names, the
+  voices are not remembered, and the tab says so.
+- **Rewrite notes** (0.26.2). After a speaker change the Transcript and Meeting notes tabs say the notes still use the
+  old names, with **Rewrite notes**. AI writes the whole notes file again from `<title>.named.md` (the After the call
+  way, about the cost of the first notes, counted in your spend and the call history); names are never replaced as
+  text. The old notes stay until the new ones are written, and you can leave the page meanwhile. Open tasks of this
+  call that you have not touched move to their new owner instead of getting a twin; your own edits on the call page
+  (decisions, questions, risks, agenda) stay. On the Notion meeting page, Decisions, Action items, Open questions and
+  Risks are updated; TL;DR, Recap and Topics there keep the old text for now.
 
 Thresholds and how they were tuned: the tools README, "Speaker identification".
 

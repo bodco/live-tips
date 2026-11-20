@@ -3285,6 +3285,22 @@ def _round_emb(v) -> list:
     return [round(float(x), 4) for x in unit(v)]
 
 
+def voice_core(members: list, new_min_s: float, learn: float) -> list | None:
+    """The lines a named speaker teaches the voice library (rules/voices.yaml > learning): the long lines with a
+    voice print, and of those only the core of the voice (a line unlike the speaker's other lines may be someone
+    else's). None when the speaker sounds like more than one voice. Shared by the recorder and fromfile.py edit."""
+    good = [m for m in members if m.get("emb") is not None and float(m.get("dur") or 0) >= new_min_s]
+    good = good or [m for m in members if m.get("emb") is not None]
+    if len(good) >= 2:
+        E = np.array([unit(m["emb"]) for m in good])
+        sim = (E @ E.T - np.eye(len(good))).sum(axis=1) / (len(good) - 1)
+        core = [m for m, x in zip(good, sim) if float(x) >= learn]
+        if len(core) < max(1, len(good) // 2):
+            return None
+        good = core
+    return good
+
+
 class VoiceLibrary:
     """<tool root>/voices/voices.json: {"people": {"Name": {"embeddings": [[...]], "updated": iso,
     "calls": n, "scope": "team" | "project:<slug>"}}}. Local only. Used for suggestions; a name is
@@ -4324,17 +4340,10 @@ class SpeakerTracker:
                 continue
             if sid in self.auto:
                 continue                           # 0.8.5 (rules/voices.yaml > learning): named by the roster, not by the PM
-            good = [m for m in c["members"] if m["emb"] is not None and m["dur"] >= self._f("speaker_new_min_s")]
-            good = good or [m for m in c["members"] if m["emb"] is not None]
-            if len(good) >= 2:
-                # only the core of the voice: a line unlike the speaker's other lines may be someone else's
-                E = np.array([unit(m["emb"]) for m in good])
-                sim = (E @ E.T - np.eye(len(good))).sum(axis=1) / (len(good) - 1)
-                core = [m for m, x in zip(good, sim) if float(x) >= self._f("speaker_lib_learn")]
-                if len(core) < max(1, len(good) // 2):
-                    log(f"voices: {sid} ({c['name']}) sounds like more than one voice, not learned")
-                    continue
-                good = core
+            good = voice_core(c["members"], self._f("speaker_new_min_s"), self._f("speaker_lib_learn"))
+            if good is None:
+                log(f"voices: {sid} ({c['name']}) sounds like more than one voice, not learned")
+                continue
             desired.setdefault(c["name"], []).extend(_round_emb(m["emb"]) for m in good[-10:])
         sides = {c["name"]: c.get("side") for c in self.clusters.values() if c["name"] and c.get("side")}
         if desired == self.lib_added and sides == getattr(self, "lib_sides", {}):
@@ -4389,6 +4398,36 @@ class SpeakerTracker:
             return {"speakers_rev": self.rev, "speaker_now": sn, "speaker_ask_open": self.ask_open,
                     "speakers_count": len(self.clusters)}
 
+    def voices_record(self) -> dict | None:
+        """0.26.2 (speakers on the call page): the voice prints of this call, so the PM can fix speakers after the
+        call and the library still learns the right voice. Per line: the tag it got, its print (rounded as in the
+        library), its length and whether it is a member of its speaker (an unsure print only inherits a tag).
+        Plus what this call already gave the library (lib_added), so an edit replaces it instead of adding twice.
+        Only voice prints, never audio; the file stays in the call's .work/ on this Mac. None without any print."""
+        with self.lock:
+            members = {m["t"] for c in self.clusters.values() for m in c["members"]}
+            lines = {t: {"sid": s.get("sid"), "emb": _round_emb(s["emb"]), "dur": round(float(s.get("dur") or 0), 2),
+                         "member": t in members}
+                     for t, s in sorted(self.segs.items()) if s.get("emb") is not None}
+            if not lines:
+                return None
+            lib = self.lib
+            return {"version": 1, "lines": lines, "lib_added": self.lib_added,
+                    "lib_sides": dict(getattr(self, "lib_sides", {})), "auto": sorted(self.auto),
+                    "remember": bool(lib is not None and lib.remember),
+                    "project": (lib.project if lib is not None else "") or "",
+                    "workspace": (lib.workspace if lib is not None else "") or ""}
+
+    def _save_voices(self, transcript: Path) -> None:
+        try:
+            rec = self.voices_record()
+            if rec is not None:
+                vp = call_layout.sidecar_of(transcript, ".voices.json")
+                vp.parent.mkdir(parents=True, exist_ok=True)
+                write_json_atomic(vp, rec)
+        except Exception as e:  # noqa: BLE001
+            log(f"speakers: cannot write the voice prints ({e!r})")
+
     def finalize(self, transcript: Path, them_label: str) -> Path | None:
         """On stop: final library sync, speakers.json, and <stem>.named.md (the md stays untouched)."""
         with self.lock:
@@ -4399,6 +4438,7 @@ class SpeakerTracker:
                          if c["name"] and c["seconds"] >= 5]
                 if named:
                     self.rosters.remember(named)
+            self._save_voices(transcript)
             if not self.clusters and not self.overrides:
                 return None
             named = call_layout.sidecar_of(transcript, ".named.md")

@@ -13,6 +13,11 @@ Pacenote. Earlier versions are described in the commit messages and in
   Brief menu items now widen the window and show the panel next to the tips instead of covering them. The panel has a
   Close button: in a wide window it hides the panel, in a widened one the window goes back to its width. A second click
   on On me closes it too.
+- **The meaning search engine sleeps between uses (2026-11-20):** the built-in bge-m3 engine used to stay up for good
+  after it started, and one left by an earlier run of the app could hold two processor cores and about 1.3 GB of
+  memory for days. Now it starts when a call, the project index or a brief needs it (about a second) and quits after 10
+  minutes without work; during a call it stays up. At launch Pacenote stops an engine left by an older version. Settings
+  shows "ready" instead of "not running" between uses.
 
 ## 0.26.2 (2026-11-20)
 

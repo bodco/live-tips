@@ -119,6 +119,10 @@ final class OrgContextStore: ObservableObject {
     /// A bge-m3 vector from the built-in engine (127.0.0.1:11435), or nil when it is not running.
     nonisolated static func embed(_ text: String) async -> [Double]? {
         guard let url = URL(string: LocalAIService.builtinURL + "/api/embed") else { return nil }
+        if !LocalAIService.ping(LocalAIService.builtinURL) {      // 0.26.3: the engine sleeps between uses, wake it
+            await MainActor.run { LocalAIService.shared.ensure() }
+            _ = LocalAIService.shared.waitReady(timeout: 10)
+        }
         var r = URLRequest(url: url); r.httpMethod = "POST"; r.timeoutInterval = 20
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.httpBody = try? JSONSerialization.data(withJSONObject: ["model": "bge-m3", "input": String(text.prefix(4000))])

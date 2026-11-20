@@ -3,7 +3,7 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
-## 0.26.2 (unreleased)
+## 0.26.2 (2026-11-20)
 
 - **Model lists come from the provider (2026-11-20):** the model pickers for Claude, OpenAI and Gemini API keys now
   list what the provider offers, so a new model (Gemini 4 Hydrogen, for one) appears without an app update. Text

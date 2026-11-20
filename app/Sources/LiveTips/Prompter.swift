@@ -1071,6 +1071,10 @@ extension PrompterController {
             // 0.9.7 (owner, 11.11): "Expand" in presentation mode: slide cards and tips side by side, the window twice
             // as wide (as in 0.7.5); "Collapse" goes back. {"on": Bool, "grow": "left" | "right"}.
             handle("split", ["on": d["on"] as? Bool ?? false, "grow": d["grow"] as? String ?? "left"] as [String: Any])
+        case "transcript":
+            // 0.26.2 (owner, 20.11): the side panel (Transcript, On me, Brief) opened in a narrow window: the window grows
+            // for it the way it does for the slide cards, and goes back to its width when the panel is closed.
+            handle("transcript", d["on"] as? Bool ?? false)
         case "presenting":
             presentingNow = d["on"] as? Bool ?? false
             HotKeys.shared.setPresenting(presentingNow)

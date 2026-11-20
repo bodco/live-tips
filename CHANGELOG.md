@@ -3,6 +3,17 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased
+
+- **The side panel of the tips window works again (2026-11-20):** since 0.26.0 the Transcript, On me and Brief panel
+  stayed empty, the On me button and the Transcript and Brief menu items did nothing, and the question field at the
+  bottom of the tips was gone. The new inline questions took over the question field by mistake; they now have their
+  own place.
+- **The side panel opens and closes as you expect (2026-11-20):** in a narrow tips window, On me and the Transcript and
+  Brief menu items now widen the window and show the panel next to the tips instead of covering them. The panel has a
+  Close button: in a wide window it hides the panel, in a widened one the window goes back to its width. A second click
+  on On me closes it too.
+
 ## 0.26.2 (2026-11-20)
 
 - **Model lists come from the provider (2026-11-20):** the model pickers for Claude, OpenAI and Gemini API keys now

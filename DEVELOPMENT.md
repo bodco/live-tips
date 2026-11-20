@@ -516,6 +516,20 @@ by hand and never lists `live/` directly.
   folder (`mkdir -p .work` first) and take paths only from `lt start` or `status.json`.
 - **Checks.** CoreChecks `callFolders`, `callFoldersB4`; pytest `spikes/m0/tests/test_call_folders.py`.
 
+## Build cache
+
+Every build uses one shared SwiftPM scratch folder, `~/Library/Caches/livetips-build`
+(`buildtools/bundle.sh` takes it from `LIVETIPS_SCRATCH`, the default is this folder). Rules:
+
+- Build in the shared folder. A separate `livetips-build-<name>` is only for a worktree that builds
+  at the same time as another session; it is removed when that work ends.
+- Bundles made for checks and screenshots (`out-N`, `rel-N` inside the cache) are throwaway.
+- At the end of a work session or before a handoff run `buildtools/prune_cache.sh`
+  (`--dry-run` first to see the list). It keeps the compiled state and the newest 3 `out-*` and
+  `rel-*`, and removes the other bundles and per-worktree caches older than a day.
+
+Without this the cache grew by several GB a day (14 GB in November 2026).
+
 ## Quality gates (ub-mode)
 
 Since 0.8.3 the code is held to [ub-mode](https://github.com/unclebob/ub-mode): every function under CRAP 10

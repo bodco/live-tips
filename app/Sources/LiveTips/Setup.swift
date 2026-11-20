@@ -21,7 +21,25 @@ final class SetupModel: ObservableObject {
     /// The command line tools of the accounts (Claude Code, Codex): not components, installed when an account is connected.
     @Published var tools: [Step] = SetupPlan.accountTools.map { Step(id: $0, optional: true) }
     @Published var log: [String] = []
-    @Published var busy = false
+    /// 0.26.3: a move of the app folder waits for the install and runs when it ends.
+    @Published var busy = false { didSet { if oldValue && !busy && pinDepth == 0 { AppFolderMover.runPending() } } }
+    /// 0.26.3: the app folder of the running installs and checks: every step goes to the same folder even when the
+    /// work folder changes meanwhile (an install split between two folders left a Python without its packages). A
+    /// check can overlap an install, so the pin counts its runs and the last one to end releases it.
+    private var pinnedRoot: String?
+    private var pinDepth = 0
+    /// A move of the app folder waits while this is true.
+    var holdsAppFolder: Bool { busy || pinDepth > 0 }
+    private func pinRoot() {
+        if pinDepth == 0 { pinnedRoot = config.effectiveAppRoot(appSupport: AppPaths.support.path) }
+        pinDepth += 1
+    }
+    private func unpinRoot() {
+        pinDepth = max(0, pinDepth - 1)
+        guard pinDepth == 0 else { return }
+        pinnedRoot = nil
+        if !busy { AppFolderMover.runPending() }
+    }
     // The one loader (0.24.1, F1): what runs, its fraction and bytes, the whole run's progress and time left.
     @Published var running: String?
     @Published var stepFraction = 0.0
@@ -31,7 +49,7 @@ final class SetupModel: ObservableObject {
     @Published var runStarted: Date?
 
     var config: AppConfig { AppConfig.load(from: AppPaths.config) }
-    var appRoot: String { config.effectiveAppRoot(appSupport: AppPaths.support.path) }
+    var appRoot: String { pinnedRoot ?? config.effectiveAppRoot(appSupport: AppPaths.support.path) }
     var script: String { Bundle.main.path(forResource: "setup", ofType: "sh") ?? "" }
     var allRequiredOK: Bool { steps.allSatisfy { $0.optional || $0.state == .ok } }
     /// What a call cannot start without (decision 9).
@@ -88,6 +106,8 @@ final class SetupModel: ObservableObject {
     }
 
     func checkAll() async {
+        pinRoot()
+        defer { unpinRoot() }
         for id in steps.map(\.id) + tools.map(\.id) {
             update(id) { $0.state = .checking }
             var out = ""
@@ -139,7 +159,8 @@ final class SetupModel: ObservableObject {
     func installOne(_ id: String) async {
         guard step(id) != nil, !busy else { return }
         busy = true
-        defer { busy = false; running = nil }
+        pinRoot()
+        defer { unpinRoot(); busy = false; running = nil }
         runSteps = [id]; runDone = []; runStarted = Date()
         AppLog.header("setup.log", "install \(id)", extra: AppLog.runtimeExtra)
         await install(id)
@@ -153,7 +174,8 @@ final class SetupModel: ObservableObject {
     func installMissing(includeOptional: Bool = true) async {
         guard !busy else { return }
         busy = true
-        defer { busy = false; running = nil }
+        pinRoot()
+        defer { unpinRoot(); busy = false; running = nil }
         let todo = steps.filter { $0.state != .ok }.map(\.id)
         runSteps = todo; runDone = []; runStarted = Date()
         AppLog.header("setup.log", "install \(todo.joined(separator: ","))", extra: AppLog.runtimeExtra)
@@ -171,6 +193,7 @@ final class SetupModel: ObservableObject {
         }
         if allRequiredOK {
             applyEngineSettings()
+            Self.healEnginePython()
             LocalAIService.shared.apply()
             log.append(L("setup.log.allSet"))
         } else if !failed.isEmpty {
@@ -193,6 +216,57 @@ final class SetupModel: ObservableObject {
                                         exists: { fm.fileExists(atPath: $0) }) else { return }
         c.engine = e
         try? c.save(to: AppPaths.config)
+    }
+
+    /// 0.26.3: the engine Python must import what the engine needs. A config left pointing at another Python (it
+    /// exists, so `repairEnginePaths` keeps it) made the Meeting Sheet and the meeting notes fail with "No module named
+    /// 'anthropic'" while Settings > Components said Installed. The interpreters run off the main thread; the config is
+    /// read and saved on the main thread. `done(true)` when the engine was switched to setup's own Python.
+    static func healEnginePython(done: (@MainActor (Bool) -> Void)? = nil) {
+        let c0 = AppConfig.load(from: AppPaths.config)
+        let venv = (c0.effectiveAppRoot(appSupport: AppPaths.support.path) as NSString).appendingPathComponent(".venv/bin/python")
+        let engine = c0.engine
+        DispatchQueue.global(qos: .utility).async {
+            let healed = engine.healed(defaultPython: venv, works: Self.pythonWorks)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let h = healed, AppConfig.load(from: AppPaths.config).engine == engine else { done?(false); return }
+                    Self.editConfig { $0.engine.python = h.python; $0.engine.sidecarPython = h.sidecarPython }
+                    AppLog.app("engine python healed: the engine now runs setup's own Python")
+                    done?(true)
+                }
+            }
+        }
+    }
+
+    /// 0.26.3: one change of the config: through Settings when it is open (it saves the file and would otherwise
+    /// write its older copy over this change), else in the file.
+    static func editConfig(_ f: (inout AppConfig) -> Void) {
+        if let m = SettingsModel.live { var c = m.config; f(&c); if c != m.config { m.config = c }; return }
+        var c = AppConfig.load(from: AppPaths.config)
+        f(&c)
+        try? c.save(to: AppPaths.config)
+    }
+
+    /// True when `py` runs and finds the engine's modules (10 s at most).
+    nonisolated static func pythonWorks(_ py: String) -> Bool {
+        guard FileManager.default.isExecutableFile(atPath: py) else { return false }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: py)
+        p.arguments = AppConfig.Engine.probeArgs
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return false }
+        let deadline = Date().addingTimeInterval(10)
+        while p.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        if p.isRunning { p.terminate(); return false }
+        return p.terminationStatus == 0
+    }
+
+    /// 0.26.3: an engine error that means the Python cannot find a module.
+    static func isModuleError(_ s: String) -> Bool {
+        let l = s.lowercased()
+        return l.contains("no module named") || l.contains("modulenotfounderror")
     }
 }
 

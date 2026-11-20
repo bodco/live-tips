@@ -3,6 +3,24 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## Unreleased
+
+- **Meeting notes, the Meeting Sheet and Notion work after a first setup that failed (2026-11-20):** when the first
+  install failed and Pacenote installed its parts again in another folder, the app could keep running an older Python
+  without the AI packages. Meeting notes, the Meeting Sheet and the Notion page then failed with "No module named
+  'anthropic'" (or 'jsonschema') while Settings > Components said Installed. Pacenote now checks at launch, after
+  Repair and after such an error that its Python has what it needs, and switches to the one it installed when that
+  one works. Make meeting notes tries once more by itself; the Meeting Sheet says to press Try again. If nothing
+  working is found, the message points to Settings > Components > Repair instead of a Python error.
+- **Choosing the work folder during the first setup no longer breaks the install (2026-11-20):** the onboarding starts
+  installing before you pick the work folder, and the app folder moves with the work folder. The move ran in the middle
+  of the install, so the parts were split between two folders, and the moved Python environment still pointed at the old
+  folder. Now the move waits for the install, every install step goes to one folder, the Python environment is relinked
+  after a move (its libraries stay, nothing is downloaded again), the engine paths follow at once, and Settings >
+  Components is checked again and repairs what is missing.
+- **End call ends the call when pressed twice (2026-11-20):** pressing End call again while "End the call?" is open
+  now ends the call. Before, every press opened the question again and the call went on recording.
+
 ## 0.26.2 (2026-11-20)
 
 - **Model lists come from the provider (2026-11-20):** the model pickers for Claude, OpenAI and Gemini API keys now

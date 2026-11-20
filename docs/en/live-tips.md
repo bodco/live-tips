@@ -2810,6 +2810,13 @@ Pacenote has new locks, Settings > Components shows the parts as out of date and
 that fails does not stop the rest: the parts that need it say so ("Waits for Python"), the others install, and the
 reason of each failure is on its row with Retry. The loader shows the part, MB of MB, the percent and the time left.
 
+**When the app folder moves (0.26.3).** The app folder follows the work folder. A move asked while Pacenote installs
+waits until the install ends, and every install step goes to one folder. After the move the private Python environment
+is relinked to the new folder (its installed libraries stay), the engine paths point at the new folder at once, and
+Settings > Components is checked again: what is missing installs by itself, as with Repair. Pacenote also checks at
+launch, after Repair and after a "No module named" error that its Python has the engine's modules, and switches to the
+one it installed when that one works.
+
 **Accounts.** Claude Code and Codex are not components. Connect a Claude account (Settings > AI or the onboarding) and
 Pacenote installs Claude Code with Anthropic's installer, then runs its sign-in from the app: your browser opens, and
 if the program asks for a code, paste it in the field Pacenote shows. A ChatGPT account installs OpenAI's Codex

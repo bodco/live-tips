@@ -151,6 +151,15 @@ case "$MODE:$STEP" in
     p=$(find_python) || { echo "ERROR Python is needed first"; exit 1; }
     echo "Creating $VENV with $("$p" --version 2>&1)"; "$p" -m venv --clear "$VENV" && echo "Done" ;;
 
+  relink:venv)
+    # 0.26.3: the app folder moved. A venv keeps absolute paths to its Python (bin/python, pyvenv.cfg), so it points
+    # at the old folder; --upgrade relinks it to the Python of the new folder and keeps the installed packages.
+    [ -d "$VENV" ] || { echo "MISSING no venv"; exit 1; }
+    p=$(find_python) || { echo "ERROR Python is needed first"; exit 1; }
+    # the old links point into the old folder and venv --upgrade stops on them: only dangling python links go
+    for f in "$VENV"/bin/python*; do [ -L "$f" ] && [ ! -e "$f" ] && rm -f "$f"; done
+    "$p" -m venv --upgrade "$VENV" && "$VPY" -c 'import sys' && echo "OK relinked to $("$p" --version 2>&1)" ;;
+
   check:recorder)
     d=$(lock_diff recorder)
     if [ -z "$d" ] && vimport "import mlx_whisper, numpy"; then echo "OK mlx-whisper $("$VPY" -c 'import importlib.metadata as m;print(m.version("mlx-whisper"))' 2>/dev/null)"

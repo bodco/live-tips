@@ -270,6 +270,11 @@ final class SheetJob: ObservableObject, Identifiable {
         if !buffer.isEmpty { consume("\n") }
         process = nil
         if !done && failed == nil { failed = code == 0 ? L("sheet.ui.err.noResult") : (err.isEmpty ? L("sheet.ui.err.engine", ["code": "\(code)"]) : err) }
+        // 0.26.3: "No module named ..." is the engine Python, not the PM: heal it, then Try again works
+        if let f = failed, SetupModel.isModuleError(f) {
+            failed = L("sheet.ui.err.moduleMissing")
+            SetupModel.healEnginePython { [weak self] healed in if healed { self?.failed = L("sheet.ui.err.healed") } }
+        }
         SheetJobs.shared.finished(self)
     }
 

@@ -37,7 +37,7 @@ enum Freshness {
     /// prepared_at from <base>.prep.json, else the brief file's creation time (an edit does not make it fresh).
     static func preparedAt(brief: String) -> Date? {
         let base = brief.hasSuffix(".brief.md") ? String(brief.dropLast(9)) : brief
-        if let d = try? Data(contentsOf: URL(fileURLWithPath: base + ".prep.json")),
+        if let d = try? Data(contentsOf: URL(fileURLWithPath: CallLayout.sidecar(base, ".prep.json"))),
            let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let s = o["prepared_at"] as? String,
            let t = CommitmentRegister.iso(s) { return t }
         let a = try? FileManager.default.attributesOfItem(atPath: brief)
@@ -100,7 +100,7 @@ enum Freshness {
         var o: [String: Any] = ["prepared_at": f.string(from: Date()), "by": "app", "refresh_of": refreshOf.map { f.string(from: $0) } ?? ""]
         for (k, v) in extra { o[k] = v }      // 0.8.5: route, cost_usd, duration_s, turns, tokens (added keys only)
         if let d = try? JSONSerialization.data(withJSONObject: o, options: [.prettyPrinted, .sortedKeys]) {
-            try? d.write(to: URL(fileURLWithPath: base + ".prep.json"), options: .atomic)
+            try? d.write(to: URL(fileURLWithPath: CallLayout.sidecar(base, ".prep.json")), options: .atomic)
         }
     }
 }

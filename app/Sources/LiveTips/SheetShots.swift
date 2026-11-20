@@ -240,9 +240,9 @@ final class SheetShots: NSObject, NSApplicationDelegate {
         versions.append(["n": 2, "built_at": "2026-11-12T18:00:00+02:00", "route": "claude_account", "note": "refresh"])
         o["versions"] = versions
         o["refreshed_at"] = "2026-11-12T18:00:00+02:00"
-        if let d = try? JSONSerialization.data(withJSONObject: o, options: [.prettyPrinted, .sortedKeys]) { try? d.write(to: URL(fileURLWithPath: base + ".sheet.json")) }
+        if let d = try? JSONSerialization.data(withJSONObject: o, options: [.prettyPrinted, .sortedKeys]) { try? d.write(to: URL(fileURLWithPath: CallLayout.sidecar(base, ".sheet.json"))) }
         sales.prepBase = base
-        sheetPath = base + ".sheet.json"
+        sheetPath = CallLayout.sidecar(base, ".sheet.json")
         // A call prepared in 0.9.7: a brief, no sheet.
         if let lb = SheetFiles.newBase(for: legacy) {
             try? FileManager.default.createDirectory(atPath: (lb as NSString).deletingLastPathComponent, withIntermediateDirectories: true)

@@ -7,12 +7,24 @@ description: "Live call assistant. Records the call, shows the PM's speech at th
 
 Live co-pilot for the PM during a call. The local tool `live-transcriber`
 (`{settings.paths.tool_root}`) records the PM's mic and the system audio, transcribes each
-phrase with Whisper on the Mac and appends lines to `<project_root>/live/<YYYY-MM-DD-HHMM>-<title>.md`:
+phrase with Whisper on the Mac and appends lines to `<project_root>/live/<YYYY-MM-DD>-<slug>/<YYYY-MM-DD-HHMM>-<title>.md`:
 
 ```
 [12:30:11] {me_label} (uk): ...
 [12:30:15] {them_label} (en): ...
 ```
+
+**Call folders.** Each call has its own folder `<project_root>/live/<YYYY-MM-DD>-<slug>/` (date and title slug, no
+time: a prep and its call, and two calls with the same title on one day, share it; file names inside do not change).
+On top stay only what the PM reads: the transcript, the notes, the brief and the Meeting Sheet (`.md`, `.app.md`,
+`.notes.md`, `.app.notes.md`, `.brief.md`, `.app.brief.md`, `prep-*.sheet.md`). Every other file of the call
+(`.state.json`, `.cards.json`, `.facts.json`, `.outline.json`, `.slides.json`, `.sheet.json`, `.prep.json`,
+`.tips.jsonl`, `.named.md`, `.judge/` and the rest) is in the hidden `.work/` inside that folder. In this skill and its
+modules `<stem>.<x>` means that rule: next to the transcript for the files on top, in `.work/` for the others
+(`mkdir -p` it before the first write). A file that is NOT in a call folder (`commitments.jsonl`, `lessons.md`,
+`sources/`) stays in `live/` itself. A call file lying directly in `live/` is the old flat layout: its files stay next to
+it and the old paths keep working (the app moves them into folders on its own). Take paths only from `lt start` /
+`status.json`; `lt` and `read_delta.py` resolve the folders themselves.
 
 The job, in one sentence: **give the PM the right fact or phrase at the moment it is needed,
 and fix who does what by when.** Everything else serves that.
@@ -95,7 +107,7 @@ Older step names used in the modules: Step 0 and Step 1 = `start.md` and "Start"
 5. **Nothing is sent to anyone.** No writes to Notion, Jira, Slack or email during or after the
    call without an explicit command, except Step 5 (the call summary into the project's
    internal Meetings DB). Local writes only to live-transcriber control files and this call's
-   files under `<project_root>/live/`. Restricted internal facts (`projects/SKILL.md`, internal
+   files in its folder under `<project_root>/live/` (and `commitments.jsonl`, `lessons.md` in `live/`). Restricted internal facts (`projects/SKILL.md`, internal
    estimates, capacity, defects, security findings) may shape a tip but the tip is marked 🔒 and
    never states them as numbers on a `client` call.
 6. **Never invent.** Every thesis comes from the tracker, notes, documents or the session. A
@@ -179,7 +191,7 @@ lines (tips only for what is still relevant), back to the loop.
 8. Load `workflow-authoring` once if research is on (`research.md`), and read `window.md` and
    (audience `client`) `culture.md` in quiet polls.
 9. **Register, agenda, freshness** (since Pacenote 0.8, rules in "Agenda, commitments, brief
-   freshness" below): read the open items of `<project>/live/commitments.jsonl` (this series first,
+   freshness" below): read the open items of `<project>/live/commitments.jsonl` (in `live/` itself; this series first,
    max 15) and keep them in state as `open_commitments`; emit the agenda strip from the brief's
    checklist; for a prep picked up with `--adopt-prep`, count the project files changed since it
    was made and, when there are any, add `Бриф від {час}, змін після нього: {N}. Оновити?` to the
@@ -187,7 +199,7 @@ lines (tips only for what is still relevant), back to the loop.
    in state (or the file does not exist).
 
 A **prep ahead** ("підготуй live tips до {дзвінок}") runs steps 1, 5 and 6 without recording and
-saves `prep-<YYYY-MM-DD-HHMM>-<title>.*` files; `lt prep-check --adopt-prep` picks them up at the
+saves `prep-<YYYY-MM-DD-HHMM>-<title>.*` files in the folder of that call (`live/<YYYY-MM-DD>-<slug>/`, service ones in its `.work/`); `lt prep-check --adopt-prep` picks them up at the
 start (same project, matching title, younger than 3 hours): say `Бриф з підготовки {час} підхоплено`.
 
 ## The loop (Step 3)
@@ -326,8 +338,8 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - Window: One item `{"kind":"agenda","items":[{"id":"<stable ID>","text":"<item>","state":"todo|now|done|skip","done":true|false,"cur":true|false}]}` each time the state changes; it replaces the previous strip. The PM can change an item's state in the window (`@@SET agenda_state=<stable ID>|todo|now|done|skip`; legacy indices start at 0); the PM's state wins over the model's.
 - After the call: The call summary gets an "Agenda" section: each item with Discussed, Raised or Not raised. Items not raised go into the "What matters" text of the next call of the same series, as one line "Not raised last time: <item>; <item>".
 
-**Commitments register.** File: `<call folder>/commitments.jsonl`. JSON lines, append only. Each line is an event; the register is the events folded by id. Never rewrite or delete lines: a later event wins.
-- `add`: `{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill","from":"<id of the item this one replaces, optional>"}`
+**Commitments register.** File: `<live folder>/commitments.jsonl`. JSON lines, append only. Each line is an event; the register is the events folded by id. Never rewrite or delete lines: a later event wins.
+- `add`: `{"v":1,"op":"add","id":"<id>","text":"<what, max 120 chars>","owner":"me|<name>","project":"<slug>","series":"<series key>","call":"<transcript file name>","t":"HH:MM:SS","created":"<ISO time>","due":"<day or date, or empty>","by":"app|skill|page","from":"<id of the item this one replaces, optional>"}`
 - `done`: `{"v":1,"op":"done","id":"<id>","at":"<ISO time>","source":"manual|detected|notion","call":"<transcript file name, when closed on a call>"}`
 - `reopen`: `{"v":1,"op":"reopen","id":"<id>","at":"<ISO time>"}`
 - `drop`: `{"v":1,"op":"drop","id":"<id>","at":"<ISO time>"}`
@@ -356,7 +368,6 @@ Generated from `rules/agenda.yaml`, `rules/commitments.yaml` and `rules/freshnes
 - Refresh: Refresh = an incremental update: Claude gets the old brief and the list of changed files, reads only those, and rewrites only the sections they change. The checklist and the PM's edits stay. The facts and cards follow the same changes. It never starts by itself.
 - Snapshot: After a preparation or a refresh, write <stem>.prep.json: {"prepared_at": "<ISO time>", "by": "app|skill", "refresh_of": "<ISO time of the previous one, or empty>"}. 0.8.5 (owner: what each stage costs through the API) adds, when known: "route": "api|plan", "cost_usd" (the API price; on the plan the equivalent), "duration_s", "turns", "tokens": {"input", "output", "cache_read", "cache_write"}.
 - Ignored paths: `live/`, `.livetips-index/`, `.git/`, `node_modules/`, `.DS_Store`, `Tools/`; hidden files ignored: yes; stale after 24 h.
-
 
 ### Risks and the follow-up email
 

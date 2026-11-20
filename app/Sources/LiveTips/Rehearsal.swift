@@ -31,7 +31,7 @@ enum RehearsalWindow {
             return slides.enumerated().map { TalkSlide($0.element, index: $0.offset) }.filter { $0.mine }
                 .map { Step(n: $0.n, title: $0.title, say: $0.say.split(separator: "\n").map(String.init), secs: $0.sec, numbers: $0.numbers) }
         }
-        let o = TalkFiles.load(base + ".outline.json")
+        let o = TalkFiles.load(CallLayout.sidecar(base, ".outline.json"))
         let list = (o?["sections"] as? [[String: Any]]) ?? []
         return list.enumerated().filter { ($0.element["who"] as? String) != "other" }.map { i, sec in
             Step(n: i + 1, title: sec["title"] as? String ?? "", say: Array(((sec["points"] as? [String]) ?? []).prefix(3)),
@@ -57,7 +57,7 @@ enum RehearsalWindow {
         try? enc.encode(l).write(to: u, options: .atomic)
     }
     static func talkModified(_ base: String) -> Date? {
-        (try? FileManager.default.attributesOfItem(atPath: base + ".slides.json"))?[.modificationDate] as? Date
+        (try? FileManager.default.attributesOfItem(atPath: CallLayout.sidecar(base, ".slides.json")))?[.modificationDate] as? Date
     }
     /// "Last rehearsal: 27 Oct · score 3.5 of 5" (+ "before update" after Prepare again), or "Not rehearsed yet".
     static func entryLine(base: String) -> (title: String, sub: String) {
@@ -91,7 +91,7 @@ struct RehearsalView: View {
     @State private var busy = false
     @State private var error = ""
 
-    private var lang: String { FollowUpWindow.language(of: base + ".brief.md") }
+    private var lang: String { FollowUpWindow.language(of: CallLayout.sidecar(base, ".brief.md")) }
     private var plan: Int { steps.reduce(0) { $0 + $1.secs } }
     private var colleague: String { TalkFiles.slides(base).first { ($0["who"] as? String) == "other" }?["speaker"] as? String ?? "" }
     /// The client Claude plays: a named participant, else a client from the project config, else nobody named.

@@ -283,6 +283,12 @@ if let i = args.firstIndex(of: "--drive-b7b-test"), i + 2 < args.count {   // 0.
     }
     RunLoop.main.run()
 }
+if let i = args.firstIndex(of: "--call-folders-dry-run"), i + 1 < args.count {   // 0.26.2 (B6): what the launch migration would move
+    let cfg = AppConfig.load(from: AppPaths.config)
+    let text = CallMigration.preview(registry: ProjectRegistry.load(from: AppPaths.projects), appRoot: cfg.effectiveAppRoot(appSupport: AppPaths.support.path))
+    try? text.write(toFile: args[i + 1], atomically: true, encoding: .utf8)
+    exit(0)
+}
 if let i = args.firstIndex(of: "--drive-b7b-cleanup"), i + 2 < args.count {   // 0.11.0 QA: test files to the Drive trash
     let outPath = args[i + 1], ids = Array(args[(i + 2)...])
     MainActor.assumeIsolated {

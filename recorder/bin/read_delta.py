@@ -51,7 +51,16 @@ speaker's name instead (`Emily`, or `Speaker 2` while unnamed), merges and per-l
 Exit code 0 always; an empty delta is just the @@ lines.
 """
 import argparse, json, os, re, sys, time
+from pathlib import Path
 from contextlib import contextmanager
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+import call_layout  # call folders: service files of a call live in <call folder>/.work/
+
+
+def sc(stem, suffix):
+    """`stem + suffix` for a call file: the call folder's .work/ for service files (rules/call_layout.yaml)."""
+    return str(call_layout.sidecar(stem, suffix))
 
 try:
     import fcntl
@@ -271,7 +280,7 @@ def state_lock(base):
     """flock on <stem>.state.lock: read_delta and `lt state` both read-modify-write the state."""
     fd = None
     try:
-        fd = os.open(base + ".state.lock", os.O_CREAT | os.O_RDWR, 0o644)
+        fd = os.open(sc(base, ".state.lock"), os.O_CREAT | os.O_RDWR, 0o644)
         if fcntl:
             fcntl.flock(fd, fcntl.LOCK_EX)
     except OSError:
@@ -306,7 +315,7 @@ def write_state(path, st):
 
 def update_state(base, fn):
     """Locked read-modify-write of <base>.state.json; fn(st) mutates st. Returns st."""
-    path = base + ".state.json"
+    path = sc(base, ".state.json")
     with state_lock(base):
         st = read_state(path)
         fn(st)
@@ -335,9 +344,9 @@ def main():
     a = ap.parse_args()
     T0 = time.time()
     base = a.file[:-3] if a.file.endswith(".md") else a.file
-    tips_path = a.tips or base + ".tips.jsonl"
+    tips_path = a.tips or sc(base, ".tips.jsonl")
 
-    st0 = read_state(base + ".state.json")
+    st0 = read_state(sc(base, ".state.json"))
     if str(a.offset).lower() == "auto":
         offset = int(st0.get("offset") or 0)
         inbox_auto = a.inbox_offset is None
@@ -432,7 +441,7 @@ def main():
                         obj["late_by_s"] = late_by
                         print(f"@@LATE {late_by}s: {str(obj.get('gist', ''))[:80]}")
                         try:   # raw material for the late-tip pattern analysis after the call
-                            with open(base + ".late.jsonl", "a", encoding="utf-8") as lf:
+                            with open(sc(base, ".late.jsonl"), "a", encoding="utf-8") as lf:
                                 lf.write(json.dumps({"gist": obj.get("gist"), "kind": obj.get("kind"),
                                                      "src": obj.get("src"), "at": obj.get("at"),
                                                      "pm_started": pm[0], "pm_line": pm[1],
@@ -524,7 +533,7 @@ def main():
 
     # ---- 3. print the delta
     text, new = read_complete(a.file, offset)
-    speakers = load_speakers(base + ".speakers.json")
+    speakers = load_speakers(sc(base, ".speakers.json"))
     print(name_lines(text, speakers, a.me_label), end="")
     inew = inbox_offset
     settings = []
@@ -543,7 +552,7 @@ def main():
                     settings.append((str(q.get("key")), q.get("value")))
                     if q.get("key") == "tip_feedback":   # kept for the after-call analysis
                         try:
-                            with open(base + ".feedback.jsonl", "a", encoding="utf-8") as ff:
+                            with open(sc(base, ".feedback.jsonl"), "a", encoding="utf-8") as ff:
                                 ff.write(json.dumps({"t": q.get("t"), "value": q.get("value")}, ensure_ascii=False) + "\n")
                         except OSError:
                             pass
@@ -592,7 +601,7 @@ def main():
                 st["stalls_over_60s"] = int(st.get("stalls_over_60s") or 0) + 1
         # Per-poll timing log: `think_gap_s` = Claude's thinking + tool overhead for the previous batch.
         try:
-            with open(base + ".polls.jsonl", "a", encoding="utf-8") as pf:
+            with open(sc(base, ".polls.jsonl"), "a", encoding="utf-8") as pf:
                 pf.write(json.dumps({
                     "start": mac_now_at(T0), "end": mac_now_at(now),
                     "think_gap_s": round(T0 - prev, 1) if isinstance(prev, (int, float)) else None,
@@ -601,7 +610,7 @@ def main():
         except OSError:
             pass
         # Instant cards fired by the recorder since the last poll (shown in the window already).
-        fired = base + ".cards-fired.jsonl"
+        fired = sc(base, ".cards-fired.jsonl")
         coff = int(st.get("cards_offset") or 0)
         try:
             if os.path.getsize(fired) > coff:
@@ -686,8 +695,8 @@ def main():
         except Exception:  # noqa: BLE001
             pass
         same_file = os.path.basename(str(status.get("file") or "")) == os.path.basename(a.file)
-        prep = {"cards": prep_file_state(base + ".cards.json", "cards"),
-                "facts": prep_file_state(base + ".facts.json", "facts")} if recording else {}
+        prep = {"cards": prep_file_state(sc(base, ".cards.json"), "cards"),
+                "facts": prep_file_state(sc(base, ".facts.json"), "facts")} if recording else {}
         has_wrapup = False
         if same_file and status.get("state") == "stopped":
             try:

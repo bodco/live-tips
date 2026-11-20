@@ -33,6 +33,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from . import SCHEMA
+from .. import call_layout as CL
 from . import merge as M
 from . import presets as P
 from . import prompt as PR
@@ -854,7 +855,7 @@ def base_of(req: dict) -> str:
     m = req.get("meeting") or {}
     start = (m.get("start") or now_iso())[:16].replace("T", "-").replace(":", "")
     slug = re.sub(r"[^a-z0-9]+", "-", (m.get("title") or "meeting").lower()).strip("-") or "meeting"
-    return os.path.join(root, "live", f"prep-{start}-{slug}")
+    return os.path.join(root, "live", CL.folder_name(start[:10], slug), f"prep-{start}-{slug}")   # call folders (19.11)
 
 
 def _write_json(path: str, obj) -> None:
@@ -867,7 +868,8 @@ def _write_json(path: str, obj) -> None:
 
 def next_version(base: str) -> int:
     n = 0
-    d, stem = os.path.split(base)
+    stem = os.path.basename(base)
+    d = str(CL.sidecar(base, ".sheet.v1.json").parent)
     try:
         for name in os.listdir(d or "."):
             m = re.match(re.escape(stem) + r"\.sheet\.v(\d+)\.json$", name)
@@ -969,7 +971,7 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
     old = None
     if refresh:
         try:
-            old = json.loads(Path(base + ".sheet.json").read_text(encoding="utf-8"))
+            old = json.loads(CL.sidecar(base, ".sheet.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             old = None
     emit(progress=0.02, stage="sources")
@@ -1232,7 +1234,7 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         notes.append("Claude Code is not installed: built through the Claude API key in packed passes.")
     if use_claude:
         emit(progress=0.13, stage="model", route=route)
-        files = claude_files(usable, texts, os.path.join(os.path.dirname(base), ".sheet-cache", os.path.basename(base)))
+        files = claude_files(usable, texts, os.path.join(str(CL.live_folder(Path(base))), ".sheet-cache", os.path.basename(base)))
         # 0.17.0 (SEC-01): only the pages the PM added himself, never one found automatically (LinkedIn Featured)
         hosts = sorted({urlparse(s["uri"]).hostname for s in usable if s.get("fetch") and s.get("uri") and not s.get("auto")} - {None})
         prompt = PR.agent_prompt(req, blocks_text, usable, files, texts, lang, call_langs)
@@ -1450,14 +1452,16 @@ def build(req: dict, refresh: bool = False, emit=say, responder: Optional[Callab
         return {"error": "the built sheet is invalid", "errors": errs[:20], "code": 1}
     emit(progress=0.96, stage="write")
     rep = report(sheet, failures, notes, asker, meta, time.time() - t0)
-    _write_json(base + f".sheet.v{n}.json", sheet)
-    _write_json(base + ".sheet.json", sheet)
-    _write_json(base + ".sheet.sources.json", rep)
-    _write_json(base + ".sheet.request.json", {k: v for k, v in req.items() if k not in ("fake_answers", "_previous_labels")})
+    _write_json(str(CL.sidecar(base, f".sheet.v{n}.json")), sheet)
+    _write_json(str(CL.sidecar(base, ".sheet.json")), sheet)
+    _write_json(str(CL.sidecar(base, ".sheet.sources.json")), rep)
+    _write_json(str(CL.sidecar(base, ".sheet.request.json")), {k: v for k, v in req.items() if k not in ("fake_answers", "_previous_labels")})
     from . import derive as D
-    Path(base + ".sheet.md").write_text(D.render_md(sheet), encoding="utf-8")
+    p_md = CL.sidecar(base, ".sheet.md")
+    p_md.parent.mkdir(parents=True, exist_ok=True)
+    p_md.write_text(D.render_md(sheet), encoding="utf-8")
     written = D.derive(sheet, base)
-    res = {"done": True, "sheet": base + ".sheet.json", "version": n, "readiness": sheet["readiness"]["state"],
+    res = {"done": True, "sheet": str(CL.sidecar(base, ".sheet.json")), "version": n, "readiness": sheet["readiness"]["state"],
            "facts": sum(len(b.get("facts") or []) for b in sheet["blocks"]), "conflicts": conflicts,
            "route": asker.route, "model": asker.model or "", "tokens": asker.tokens, "cost_usd": round(asker.usd or 0, 4),
            "duration_s": int(time.time() - t0), "failures": failures, "derived": written, "notes": notes,

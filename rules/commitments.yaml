@@ -1,7 +1,7 @@
 # Commitments register (Pacenote 0.8, idea 01). Shared by the skill and the app.
 # Both write the same file; neither ever sends anything outside the Mac.
 schema_version: 1
-file: "<call folder>/commitments.jsonl"     # the project's live/ folder, next to the transcripts
+file: "<live folder>/commitments.jsonl"     # the project's live/ folder, next to the transcripts
 format: >-
   JSON lines, append only. Each line is an event; the register is the events folded by id.
   Never rewrite or delete lines: a later event wins.
@@ -69,3 +69,9 @@ call_page: >-
   and never comes back from the notes. "+ Add" there is by page too. Items by page do not count as the call's own
   register: the untouched picture rows keep showing next to them.
 order: overdue first, then items with a due date (soonest first), then the rest (newest first)
+rewrite: >-
+  0.26.2: when the notes are written again after a speaker change (rules/notes.yaml > rewrite), an open item of this
+  call that the PM has not touched (no edit, drop, done or reopen of his own) and whose action the new notes give to
+  another name gets op edit with the new owner and "source":"rewrite"; record_notes then sees it as the same
+  commitment, so no "Speaker 2" twin appears next to "Mike". Renames, merges and Said by are handled the same way, with
+  no rename log. An item the PM added himself on the call (owner me, not from the notes) never moves.

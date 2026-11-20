@@ -134,7 +134,13 @@ struct AIUsageView: View {
     }
 
     static func modelCells(_ provider: String, _ model: String, _ t: AIUsage.Total) -> [String] {
-        [name(provider) + " · " + model, String(t.requests), tok(t.input), tok(t.output), usd(t.usd)]
+        [name(provider) + " · " + model, String(t.requests), tok(t.input), tok(t.output), usdText(t)]
+    }
+
+    /// 0.26.2: a model without a price in the app costs nothing in the total; the row says so instead of "$0".
+    static func usdText(_ t: AIUsage.Total) -> String {
+        if t.unpriced > 0 && t.unpriced == t.requests { return L("aiusage.noPrice") }
+        return usd(t.usd) + (t.unpriced > 0 ? "+" : "")
     }
 
     private func cells(_ values: [String], header: Bool = false) -> some View {

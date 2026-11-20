@@ -182,7 +182,7 @@ enum CallFilter {
     }
 
     static func root(of file: String) -> String {
-        ((file as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent
+        (CallLayout.liveFolder(of: file) as NSString).deletingLastPathComponent
     }
 
     /// The registered projects that have calls in the list, by name.

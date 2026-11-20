@@ -23,6 +23,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from . import call_layout
 from typing import Callable, List, Optional
 
 TOOLS = ["mcp__pacenote__past_calls", "mcp__pacenote__commitments", "mcp__pacenote__decisions",
@@ -260,7 +261,7 @@ def run(req: dict, runner: Optional[Callable] = None) -> dict:
     """Checks <base>.brief.md; returns the summary written to <base>.verify.json."""
     r = rule()
     base = req["base"]
-    brief_p = Path(base + ".brief.md")
+    brief_p = call_layout.sidecar(base, ".brief.md")
     if not brief_p.exists():
         return {"ok": False, "error": "no brief"}
     model = req.get("model") or r["model"]
@@ -292,10 +293,10 @@ def run(req: dict, runner: Optional[Callable] = None) -> dict:
         res.update(summary)
         res["claims_list"] = claims
         if new != text:
-            Path(base + ".brief.preverify.md").write_text(text, encoding="utf-8")
+            call_layout.sidecar_mk(base, ".brief.preverify.md").write_text(text, encoding="utf-8")
             brief_p.write_text(new, encoding="utf-8")
     res["ok"] = "error" not in res
-    Path(base + ".verify.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+    call_layout.sidecar_mk(base, ".verify.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
     ledger(req.get("state_dir") or "", res["route"], model, usd, res["ok"])
     return res
 

@@ -58,7 +58,7 @@ extension PrompterController {
     func deckNumber(_ show: Int) -> Int? {
         if slideSync.mapFor != stem || slideSync.map.isEmpty {
             slideSync.mapFor = stem; slideSync.map = [:]
-            if let d = FileManager.default.contents(atPath: stem + ".deck.json"),
+            if let d = FileManager.default.contents(atPath: CallLayout.sidecar(stem, ".deck.json")),
                let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let slides = o["slides"] as? [[String: Any]] {
                 for s in slides { if let n = TalkMerge.num(s) { slideSync.map[(s["src"] as? Int) ?? n] = n } }
             }
@@ -70,7 +70,7 @@ extension PrompterController {
     /// The slide thumbnails of the deck read for this call (<stem>.deck.json, the PNGs next to it), once per call.
     func pushThumbs() {
         guard !transcriptPath.isEmpty, thumbsFor != stem else { return }
-        guard let d = FileManager.default.contents(atPath: stem + ".deck.json"),
+        guard let d = FileManager.default.contents(atPath: CallLayout.sidecar(stem, ".deck.json")),
               let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let dir = o["dir"] as? String,
               let slides = o["slides"] as? [[String: Any]] else { return }
         thumbsFor = stem
@@ -104,9 +104,9 @@ extension PrompterController {
                     ["n": s.n, "title": s.title, "who": "me", "sec": sec,
                      "body": s.text.split(separator: "\n").prefix(3).map { ["k": "p", "t": String($0)] }]
                 }
-                TalkFiles.save(["title": (u.lastPathComponent as NSString).deletingPathExtension, "slides": slides], stem + ".slides.json")
-                try? FileManager.default.removeItem(atPath: stem + ".deck.json")
-                try? FileManager.default.copyItem(atPath: info.jsonPath, toPath: stem + ".deck.json")
+                TalkFiles.save(["title": (u.lastPathComponent as NSString).deletingPathExtension, "slides": slides], CallLayout.sidecar(stem, ".slides.json"))
+                try? FileManager.default.removeItem(atPath: CallLayout.sidecar(stem, ".deck.json"))
+                try? FileManager.default.copyItem(atPath: info.jsonPath, toPath: CallLayout.sidecar(stem, ".deck.json"))
                 self.thumbsFor = ""
                 self.pushThumbs()
             } catch {

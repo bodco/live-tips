@@ -11,7 +11,7 @@ enum CallPageEdit {
     /// The tips file that holds the call picture: the app's <file>.tips.jsonl or the skill's <stem>.tips.jsonl.
     static func tipsFile(_ file: String) -> String {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-        return [file + ".tips.jsonl", stem + ".tips.jsonl"].first { FileManager.default.fileExists(atPath: $0) } ?? file + ".tips.jsonl"
+        return [CallLayout.sidecar(file, ".tips.jsonl"), CallLayout.sidecar(stem, ".tips.jsonl")].first { FileManager.default.fileExists(atPath: $0) } ?? CallLayout.sidecar(file, ".tips.jsonl")
     }
 
     static func lastSituation(_ path: String) -> [String: Any] {
@@ -104,7 +104,7 @@ enum CallPageEdit {
                     a.text + ": " + (a.state == "done" ? L("call.page.discussed") : (a.state == "now" || a.state == "raised") ? L("call.page.raised") : L("call.page.notRaised"))
                 }
             case "onYou", "onThem", "actions":
-                let folder = (file as NSString).deletingLastPathComponent
+                let folder = CallLayout.liveFolder(of: file)
                 let me = PyTool.meLabel
                 out["actions"] = Register.shared.items(in: folder)
                     .filter { CommitmentRegister.callKey($0.call) == CommitmentRegister.callKey(file) && $0.status != "dropped" }

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from . import readers
+from .. import call_layout as CL
 
 LIVE_FACTS = {"header", "company", "tech_stack", "contact", "history", "project_context", "action_items",
               "interview_candidate", "qualification", "red_lines", "signals", "fit", "overview", "best_outcome",
@@ -285,7 +286,7 @@ def derive(sheet: dict, base: str) -> List[str]:
     """Writes the live files next to the sheet; returns the paths written."""
     written = []
     def put(suffix, obj):
-        p = base + suffix
+        p = str(CL.sidecar(base, suffix))
         Path(p).parent.mkdir(parents=True, exist_ok=True)
         if isinstance(obj, str):
             Path(p).write_text(obj, encoding="utf-8")

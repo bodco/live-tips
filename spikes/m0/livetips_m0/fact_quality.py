@@ -7,6 +7,7 @@ Judge labels are provisional; missing or disputed labels never become negatives.
 import argparse
 import json
 from pathlib import Path
+from . import call_layout
 
 
 def useful(row):
@@ -62,8 +63,8 @@ def recorded_corpus(stems):
     from .transcript import hms_to_s
     rows = []
     for stem in stems:
-        tips = jl(Path(str(stem) + ".tips.jsonl"))
-        for judge in jl(Path(str(stem) + ".judge/judge.jsonl")):
+        tips = jl(call_layout.sidecar(str(stem), ".tips.jsonl"))
+        for judge in jl(call_layout.sidecar(str(stem), ".judge") / "judge.jsonl"):
             if not judge.get("gist", "").startswith("📌"):
                 continue
             matches = [t for t in tips if t.get("kind") == "fact" and t.get("gist") == judge["gist"]

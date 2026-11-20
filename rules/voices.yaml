@@ -38,3 +38,12 @@ meet:
   marked: named_by meet in <stem>.speakers.json; the voice library does not learn from it (it learns during a call, from names the PM gives)
   suggestions: every other unnamed voice offers the participants first (source meet)
   file: <stem>.meet.md as before; the call page's Google Meet record does the same
+after_call:
+  rule: 0.26.2 (owner) the PM fixes the speakers of a finished call on the call page's Transcript (rename, merge, Remember this voice, Side, Said by on one line); the same fromfile.py edit as for an imported recording, applied to the whole call
+  prints: on End call the recorder writes .work/<stem>.voices.json next to the call (per line - speaker, voice print rounded to 4 digits, length, whether it is in the voice core; lib_added, lib_sides, auto, remember). Voice prints only, never audio, only on this Mac; not written when no line has a print
+  learning: a renamed speaker or a moved line teaches the library by the same core filter as during the call (transcriber.voice_core); lib_added is kept, so editing again never adds a print twice
+  not_learned: roster names (auto), names from Meet (named_by meet) and every voice of a public call wait for the PM's own action (a typed name or Remember this voice)
+  new_person: "--fix <time>=@Name gives a line to the speaker with that name (case ignored) or to a new speaker"
+  old_calls: a call recorded before 0.26.2 has no voices.json - names can be fixed, the library is not touched, the answer carries voices false and the page says so
+  while_recording: no edits while the recorder still writes speakers.json for this call
+  marks: fromfile.py edit writes edited_at (epoch) into speakers.json; when it is newer than the notes, the notes are stale (rules/notes.yaml > rewrite)

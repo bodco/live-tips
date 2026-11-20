@@ -176,7 +176,7 @@ What `read_delta.py` prints besides the new lines:
 
 ### Transcript format
 
-`<project folder>/live/<YYYY-MM-DD-HHMM>-<title>.md`:
+`<project folder>/live/<YYYY-MM-DD>-<title>/<YYYY-MM-DD-HHMM>-<title>.md` (a call folder; see "Call folders" below):
 
 ```
 # Live transcript: Status sync
@@ -201,6 +201,17 @@ Brief), `<title>.cards.json` (instant cards), `<title>.facts.json` (the fact boo
 action items), `<title>.polls.jsonl` (every poll), `<title>.tips.jsonl` and
 `<title>.inbox.jsonl` (the window), `<title>.speakers.json` and `<title>.semantic.jsonl`
 (when those layers are on).
+
+#### Call folders
+
+Since 0.26.2 every call has a folder, `<project>/live/<YYYY-MM-DD>-<title>/`; calls with the same title on the same day
+share it. On top: the transcript (`.md`, `.app.md`), the meeting notes (`.notes.md`), the brief (`.brief.md`) and the
+preparation sheet (`prep-*.sheet.md`). Every working file named above (`.state.json`, `.cards.json`, `.facts.json`,
+`.tips.jsonl`, `.inbox.jsonl`, `.speakers.json`, `.semantic.*`, sheet data, `.judge`) is in the hidden `.work/` inside
+it. `commitments.jsonl`, `lessons.md` and `sources/` stay in `live/`. In this guide `<title>.<x>` means that file
+wherever it is. Calls made before 0.26.2 are moved at launch (move only: nothing is deleted or overwritten; a call
+written in the last minutes waits for the next launch; a clashing file stays where it was; the result is counted in
+`logs/app.log`). Tools and the skill still read the old flat layout.
 
 ---
 
@@ -662,6 +673,26 @@ apart on the Mac (sherpa-onnx with a WeSpeaker voice model) and you name them.
   everywhere. The app lists the library with **Forget** in Settings > AI > Speakers.
 - **Where voice prints live:** only on this Mac, in `<tool_root>/voices/voices.json` (at most
   20 prints per person). Never put `voices/` in a repository. Section 11 has the privacy side.
+- **Fix it after the call** (0.26.2, app). On the call page's **Transcript** tab the name above a line is a menu:
+  **Rename** (suggestions "Sounds like ..." from the voice library, the project people, or **Type a name...**), **Same
+  person as** (merge two speakers), **Remember this voice** and **Side** (Team / Client). The same menu opens on a right
+  click of a speaker chip; a plain click still filters. Right-click a line for **Said by...**: give only that line to
+  another speaker, a project person or **Someone else...** (a new speaker). Every change applies to the whole call and
+  `<title>.named.md` is written again; the original transcript is never changed. While the call is still recording
+  the tab is read-only.
+- **Voice prints of a call** (0.26.2). On End call the recorder keeps `.work/<title>.voices.json`: one voice print per
+  line, never audio, only on this Mac. A name fixed after the call teaches the voice library by the same rule as
+  during the call (only the lines that sound like the speaker; editing again never adds a print twice). Names from the
+  series roster or from Google Meet and every voice of a public call are not learned until you name the speaker
+  yourself or pick Remember this voice. A call recorded before 0.26.2 has no voice prints: you can fix its names, the
+  voices are not remembered, and the tab says so.
+- **Rewrite notes** (0.26.2). After a speaker change the Transcript and Meeting notes tabs say the notes still use the
+  old names, with **Rewrite notes**. AI writes the whole notes file again from `<title>.named.md` (the After the call
+  way, about the cost of the first notes, counted in your spend and the call history); names are never replaced as
+  text. The old notes stay until the new ones are written, and you can leave the page meanwhile. Open tasks of this
+  call that you have not touched move to their new owner instead of getting a twin; your own edits on the call page
+  (decisions, questions, risks, agenda) stay. On the Notion meeting page, Decisions, Action items, Open questions and
+  Risks are updated; TL;DR, Recap and Topics there keep the old text for now.
 
 Thresholds and how they were tuned: the tools README, "Speaker identification".
 
@@ -1874,6 +1905,16 @@ per 1M tokens (input / output, 2026-11-04): $0.30 / $2.50, $0.75 / $3.75 and $2 
 (Argon to $4 / $20 from 1 December 2026, Flash to $1.50 / $7.50 from 1 January 2027), which Pacenote's spending counts
 from those days. Since 0.10.0 a chosen Gemini that is out moves down the AI chain like any AI (14.1y).
 
+**Model lists come from the provider (0.26.2).** With a Claude, OpenAI or Gemini API key connected, the model pickers in
+Settings > AI list what the provider itself offers (GET /models), so a new model, such as Gemini 4 Hydrogen, shows up
+without an app update. Only text models are listed, newest first; embedding, image, audio and live models and dated
+snapshots are left out. The list is read when you open a picker (at most every 6 hours), when you test a key and on
+Refresh the list; the last answer is kept on this Mac and the built-in list shows until the provider has been reached.
+A model you chose stays in the list even when the provider no longer lists it. A model Pacenote has no price for is
+marked "price unknown": it works, but Spending counts nothing for it, and Settings > AI > Usage shows "no price" for it
+instead of $0. Prices are added to the app's table (cost.py and ModelCatalog) with a release. The Gemini account (`agy`)
+list was already read from the CLI.
+
 **Plan B (replaced in 0.10.0 by one AI chain, 14.1y).** Automatic switching had "Use Gemini when Claude or ChatGPT is out", off by default. With it on, a job whose
 chosen way has no credit, has hit its plan limit or has a bad key goes to Gemini and goes back as soon as the chosen
 way answers again. The text of the call then reaches Google, which is why you turn it on yourself.
@@ -2351,7 +2392,7 @@ Settings > AI > Preparation cannot run, the hint names another one that is ready
 sheet, for example Budget or Decision maker), when a fact is old (6 months), the reminder (30 minutes) and your
 presets.
 
-**Files.** Next to the call in `<project>/live/`: `<base>.sheet.json` (the sheet), `<base>.sheet.md` (a readable
+**Files.** In the call's folder, `<project>/live/<date>-<title>/` (`<base>.sheet.md` on top, the rest in `.work/`): `<base>.sheet.json` (the sheet), `<base>.sheet.md` (a readable
 copy), `<base>.sheet.v<N>.json` (versions), `<base>.sheet.sources.json` (the report by source). For the live layer the
 app also writes the brief, cards and facts files from the sheet; they are generated copies, not a second brief.
 Details: [DEVELOPMENT.md](../../DEVELOPMENT.md#meeting-sheet-0100).
@@ -3164,7 +3205,7 @@ address", `references/sweep.md`, `references/presentation.md`).
    and More options scroll under them. The title is required: Start call with an empty title outlines it in
    red and puts the cursor there. Under the context: Add folder with the folders as chips, one line "Project
    folder included", then the Participants note. Prepare now reads the whole project folder (its live/
-   subfolder holds the calls and the preparations), so the lock chip shows the project folder.
+   subfolder holds a folder per call, with its preparations), so the lock chip shows the project folder.
 49. **Settings > Projects (0.5.7).** ⋯ next to a project: Show in Finder, Use Claude for tips, Search this
    folder (both on by default), Reindex now, Remove project from Live Tips. The explanation moved into the
    (i) button. A project imported twice (the same folder with and without a trailing slash) is merged.

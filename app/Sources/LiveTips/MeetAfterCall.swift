@@ -33,9 +33,9 @@ import LiveTipsCore
         var md = "# Google Meet" + (title.isEmpty ? "" : ": " + title) + "\n\n" + f.string(from: m.started) + " · " + m.account + "\n\n## " + L("meet.participants") + "\n\n"
         md += m.participants.map { "- " + $0 }.joined(separator: "\n") + "\n"
         md += "\n## " + L("meet.transcript") + "\n\n" + (m.transcript.isEmpty ? L("meet.noTranscript") : m.transcript) + "\n"
-        try? md.write(toFile: stem + ".meet.md", atomically: true, encoding: .utf8)
+        try? md.write(toFile: CallLayout.sidecar(stem, ".meet.md"), atomically: true, encoding: .utf8)
 
-        let spPath = stem + ".speakers.json"
+        let spPath = CallLayout.sidecar(stem, ".speakers.json")
         guard let d = FileManager.default.contents(atPath: spPath), var o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
               var clusters = o["clusters"] as? [String: Any],
               let text = try? String(contentsOfFile: stem + ".md", encoding: .utf8) else { return 0 }

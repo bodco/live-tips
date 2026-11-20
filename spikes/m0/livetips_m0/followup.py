@@ -6,6 +6,7 @@
 import argparse
 import json
 from pathlib import Path
+from . import call_layout
 
 import yaml
 
@@ -46,7 +47,7 @@ def build_user(md: Path) -> str:
 
 def sales_plan_lines(md: Path) -> list:
     """S1: the mutual action plan and the next step of a sales call, from <stem>.sales.json (edited on the call page)."""
-    p = Path(str(md)[:-3] + ".sales.json" if str(md).endswith(".md") else str(md) + ".sales.json")
+    p = call_layout.sidecar_of(str(md), ".sales.json") if str(md).endswith(".md") else call_layout.sidecar(str(md), ".sales.json")
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):

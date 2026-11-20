@@ -96,7 +96,7 @@ the app's tips are slow or stopped; never change it from the skill.
      recording already runs; the PM answers in chat or in the window ask box. Never block on it.
    - A **prep ahead** makes the start instant: "підготуй live tips до {дзвінок}" (any time
      before the call) runs Step 0 and Step 2 without recording and saves the brief as
-     `<project_root>/live/prep-<YYYY-MM-DD-HHMM>-<title>.brief.md`. At the start, a prep brief
+     `<project_root>/live/<YYYY-MM-DD>-<slug>/prep-<YYYY-MM-DD-HHMM>-<title>.brief.md` (the call folder, SKILL.md > Call folders). At the start, a prep brief
      of the same project (or the same other side for `coach`) younger than 3 hours is reused: no sweep, the speech
      and tips are ready from the first second. Say "Бриф з підготовки {час} підхоплено".
    `settings.start.mode: chat` keeps the start questions (module `references/start-chat.md`).

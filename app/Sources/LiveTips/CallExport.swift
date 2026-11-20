@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// 0.9.0: the call notes (<stem>.notes.md, rules/notes.yaml) read by section, for the Summary tab and the export.
 enum CallNotes {
-    static func path(_ transcript: String) -> String { (transcript.hasSuffix(".md") ? String(transcript.dropLast(3)) : transcript) + ".notes.md" }
+    static func path(_ transcript: String) -> String { CallLayout.sidecar(of: transcript, ".notes.md") }
 
     /// Lines of each "## " section, keyed by the heading in lower case.
     static func sections(_ transcript: String) -> [(String, [String])] {

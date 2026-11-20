@@ -111,7 +111,7 @@ final class UpNext: ObservableObject {
     func prepState(_ m: StartCallModel) -> PrepState {
         if PrepRunner.shared.running && PrepRunner.shared.callID == m.id { return .running }
         if queue.contains(where: { $0 === m }) { return .queued }
-        if let b = m.prepBase, FileManager.default.fileExists(atPath: b + ".brief.md") { return .ready }
+        if let b = m.prepBase, FileManager.default.fileExists(atPath: CallLayout.sidecar(b, ".brief.md")) { return .ready }
         return m.prepFailed ? .failed : .none
     }
 

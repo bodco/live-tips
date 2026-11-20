@@ -785,7 +785,7 @@ struct HomeView: View {
         let project = reg.projects.first { $0.slug == slug }?.name ?? reg.workspaces.first { $0.name.lowercased() == slug.lowercased() }?.name ?? status.project ?? ""
         let people = Self.peopleLine(((req["participants"] as? [String]) ?? []).filter { !$0.isEmpty })
         let stem = (status.file ?? "").hasSuffix(".md") ? String((status.file ?? "").dropLast(3)) : (status.file ?? "")
-        let hasBrief = !stem.isEmpty && FileManager.default.fileExists(atPath: stem + ".brief.md")
+        let hasBrief = !stem.isEmpty && FileManager.default.fileExists(atPath: CallLayout.sidecar(stem, ".brief.md"))
         let preparing = runner.running && runner.joinsCurrentCall
         let failed = !preparing && !hasBrief && runner.joinsCurrentCall ? runner.failure : nil      // 2026-11-17 (owner)
         let briefText = preparing ? L("home.live.briefPreparing") : hasBrief ? L("home.brief.ready")
@@ -1395,7 +1395,7 @@ struct RecentCard: View {
 
     /// One sentence from the call notes (<stem>.notes.md, rules/notes.yaml): the first line of the Summary section.
     static func summary(_ file: String) -> String? {
-        let notes = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
+        let notes = CallLayout.sidecar((file.hasSuffix(".md") ? String(file.dropLast(3)) : file), ".notes.md")
         guard let text = try? String(contentsOfFile: notes, encoding: .utf8) else { return nil }
         return MeetingNotes.homeLine(text)          // 0.17.0: also the TL;DR of the app's own notes
     }

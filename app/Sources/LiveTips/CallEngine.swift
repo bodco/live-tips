@@ -99,7 +99,7 @@ final class CallEngine {
         let fm = FileManager.default
         guard fm.fileExists(atPath: (core as NSString).appendingPathComponent("VERSION")) else { return }   // dev build
         var restored: [String] = []
-        for rel in ["src/transcriber.py", "src/semantic.py", "src/fromfile.py", "src/fetchlink.py", "bin/lt", "bin/read_delta.py", "bin/audiocap"] {
+        for rel in ["src/transcriber.py", "src/semantic.py", "src/fromfile.py", "src/fetchlink.py", "src/call_layout.py", "bin/lt", "bin/read_delta.py", "bin/audiocap"] {
             let src = (core as NSString).appendingPathComponent(rel), dst = (appRoot as NSString).appendingPathComponent(rel)
             guard let a = fm.contents(atPath: src) else { continue }
             if fm.contents(atPath: dst) == a { continue }
@@ -283,16 +283,17 @@ final class CallEngine {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
         let fm = FileManager.default
         // 0.9.0 (rules/live_prep.yaml): the brief in use is kept as the one previous version before it is replaced
-        if fm.fileExists(atPath: stem + ".brief.md"), fm.fileExists(atPath: base + ".brief.md") {
-            try? fm.removeItem(atPath: stem + ".brief.prev.md"); try? fm.copyItem(atPath: stem + ".brief.md", toPath: stem + ".brief.prev.md")
+        if fm.fileExists(atPath: CallLayout.sidecar(stem, ".brief.md")), fm.fileExists(atPath: CallLayout.sidecar(base, ".brief.md")) {
+            try? fm.removeItem(atPath: CallLayout.sidecar(stem, ".brief.prev.md")); try? fm.copyItem(atPath: CallLayout.sidecar(stem, ".brief.md"), toPath: CallLayout.sidecar(stem, ".brief.prev.md"))
         }
         // 0.10.0 (Meeting Sheet, phase 7): + .sheet.json, live takes the sheet as its base
-        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json", ".sheet.json"] where fm.fileExists(atPath: base + ext) {
-            let tmp = stem + ext + ".tmp"
+        for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json", ".sheet.json"] where fm.fileExists(atPath: CallLayout.sidecar(base, ext)) {
+            let dst = CallLayout.sidecar(stem, ext)
+            let tmp = dst + ".tmp"
             try? fm.removeItem(atPath: tmp)
-            if (try? fm.copyItem(atPath: base + ext, toPath: tmp)) != nil {
-                _ = try? fm.replaceItemAt(URL(fileURLWithPath: stem + ext), withItemAt: URL(fileURLWithPath: tmp))
-                if fm.fileExists(atPath: tmp) { try? fm.moveItem(atPath: tmp, toPath: stem + ext) }
+            if (try? fm.copyItem(atPath: CallLayout.sidecar(base, ext), toPath: tmp)) != nil {
+                _ = try? fm.replaceItemAt(URL(fileURLWithPath: dst), withItemAt: URL(fileURLWithPath: tmp))
+                if fm.fileExists(atPath: tmp) { try? fm.moveItem(atPath: tmp, toPath: dst) }
             }
         }
         notify(L("eng.prepLoaded"))
@@ -320,9 +321,9 @@ final class CallEngine {
             let base = String(chosen.dropLast(chosen.hasSuffix(".sheet.json") ? ".sheet.json".count : ".brief.md".count))
             let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
             for ext in [".brief.md", ".cards.json", ".facts.json", ".outline.json", ".slides.json", ".deck.json", ".sheet.json"] {
-                let dst = stem + ext
-                if FileManager.default.fileExists(atPath: base + ext), !FileManager.default.fileExists(atPath: dst) {
-                    try? FileManager.default.copyItem(atPath: base + ext, toPath: dst)
+                let dst = CallLayout.sidecar(stem, ext)
+                if FileManager.default.fileExists(atPath: CallLayout.sidecar(base, ext)), !FileManager.default.fileExists(atPath: dst) {
+                    try? FileManager.default.copyItem(atPath: CallLayout.sidecar(base, ext), toPath: dst)
                 }
             }
         }
@@ -344,7 +345,7 @@ final class CallEngine {
         guard let chosen = req["prep_file"] as? String, !chosen.isEmpty else { return "" }
         let base = chosen.hasSuffix(".sheet.json") ? String(chosen.dropLast(".sheet.json".count))
             : chosen.hasSuffix(".brief.md") ? String(chosen.dropLast(".brief.md".count)) : chosen
-        guard let data = FileManager.default.contents(atPath: base + ".sheet.json"),
+        guard let data = FileManager.default.contents(atPath: CallLayout.sidecar(base, ".sheet.json")),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "" }
         return (obj["preset"] as? String) ?? ""
     }
@@ -416,7 +417,7 @@ final class CallEngine {
             try? d.write(to: URL(fileURLWithPath: cfgPath), options: .atomic)
         }
         let stem = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
-        let tipsOut = status.tipsFile ?? (file + ".tips.jsonl")
+        let tipsOut = status.tipsFile ?? CallLayout.sidecar(file, ".tips.jsonl")
         appTipsFile = tipsOut
         let p = Process()
         p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
@@ -471,7 +472,7 @@ final class CallEngine {
     /// preparations read them instead of the older transcripts. On the "After the call" way; Sonnet on Claude.
     /// 0.9.5.2: true when the notes are being written (the meeting page then waits for their Meeting notes).
     @discardableResult func writeCallNotes(file: String, config c: AppConfig, hasConfig: Bool) -> Bool {
-        let notes = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
+        let notes = CallLayout.sidecar((file.hasSuffix(".md") ? String(file.dropLast(3)) : file), ".notes.md")
         // 0.26.0 (review 2): Try again on a Notion notice must not start the same notes twice; the page waits for them.
         if Self.notesInWork.contains(notes) { AppLog.app("notes: already in work call=\(AppLog.stem(file))"); return true }
         guard !FileManager.default.fileExists(atPath: notes), AIRoute.canRun(job: "after", config: c),
@@ -550,6 +551,65 @@ final class CallEngine {
         do { try p.run() } catch { done(error.localizedDescription) }
     }
 
+    /// 0.26.2 (speakers on the call page, B3): Rewrite notes after the PM fixed the speakers. The full notes are written
+    /// again from <stem>.named.md over the old ones (callnotes --rewrite, which also moves this call's untouched register
+    /// items to the new names). The PM's edits on the call page live in the tips file and still win (CallLists). Then the
+    /// call's Notion page gets its Decisions, Action items, Open questions and Risks again (CallPageSync), and the server
+    /// copy the changed notes. On the "After the call" way; the cost goes to SpendDays and the call's history.
+    @MainActor func rewriteCallNotes(file: String, done: @escaping @MainActor (String?) -> Void) {
+        let c = config
+        guard AIRoute.canRun(job: "after", config: c), !c.engine.sidecarPython.isEmpty, !c.engine.sidecarDir.isEmpty else {
+            done(L("page.mn.noRoute")); return
+        }
+        let notes = CallNotes.path(file)
+        guard !Self.notesInWork.contains(notes) else { done(L("transcript.spk.rewriteBusy")); return }
+        let cfg = PyTool.project(of: file).project?.config
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.sidecarPython)
+        p.arguments = CallSpeakers.rewriteArgs(md: file, model: "claude-sonnet-5-5", aliases: c.nameAliases,
+                                               config: cfg.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil })
+        p.currentDirectoryURL = URL(fileURLWithPath: c.engine.sidecarDir)
+        var env = AIRoute.env(job: "after", config: c)
+        env["LT_AI_STAGE"] = "after_notes"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        p.environment = env
+        AppLog.header("notes.log", "notes rewrite", extra: [("call", AppLog.stem(file))] + AppLog.runtimeExtra)
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.forAppending(path: (appRoot as NSString).appendingPathComponent("logs/notes.log"))
+        let t0 = Date(), prov = Analytics.provider(route: c.ai.after)
+        p.terminationHandler = { proc in
+            Self.notesInWork.remove(notes)
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            let line = String(data: data, encoding: .utf8)?.split(separator: "\n").last.map(String.init) ?? ""
+            let d = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] ?? [:]
+            let ok = proc.terminationStatus == 0 && (d["ok"] as? Bool) == true
+            let ms = Int(Date().timeIntervalSince(t0) * 1000)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    if let usd = d["cost_usd"] as? Double, usd > 0 {
+                        SpendDays.add(usd)
+                        CallHistory.shared.addCost(file: file, usd)
+                    }
+                    AnalyticsTracker.shared.perf("notes_after", ms: ms, provider: prov, ok: ok)
+                    guard ok else {
+                        AnalyticsTracker.shared.error("ai", proc.terminationReason == .uncaughtSignal ? "crashed" : "other", provider: prov, fallbackTo: nil)
+                        AppLog.app("notes: rewrite failed call=\(AppLog.stem(file))")
+                        done((d["error"] as? String).map { L("transcript.spk.rewriteFailed", ["error": String($0.prefix(200))]) } ?? L("page.mn.failed"))
+                        return
+                    }
+                    AppLog.app("notes: rewritten call=\(AppLog.stem(file))")
+                    let sync = CallPageSync.of(file)
+                    for s in ["decisions", "open", "risks", "actions"] { sync.changed(s) }   // no Notion page: nothing happens
+                    CallSyncService.shared.sync(file)
+                    done(nil)
+                }
+            }
+        }
+        Self.notesInWork.insert(notes)
+        do { try p.run() } catch { Self.notesInWork.remove(notes); done(error.localizedDescription) }
+    }
+
     /// `lines`: the real transcript lines when known (the call just ended); a call under NotionGate.minLines gets no page.
     /// INT S3: the OAuth token is checked (and refreshed on a 401) before wrapup_notion gets it.
     func writeToNotion(file: String, lines: Int? = nil) {
@@ -597,7 +657,7 @@ final class CallEngine {
             args += ["--project-name", projectName]
             if hasConfig { args += ["--project-config", projectConfig] }
             // 0.8.8: a workspace call: its Workspace value (the workspace whose call folder holds the transcript)
-            let wsDir = ((file as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent
+            let wsDir = (CallLayout.liveFolder(of: file) as NSString).deletingLastPathComponent
             args += NotionTargets.workspaceArgs(c, ProjectRegistry.load(from: AppPaths.projects).workspaces.first { $0.root == wsDir }, kind: "meetings")
         }
         if !meetingsDB.isEmpty { args += ["--meetings-db", meetingsDB] }
@@ -680,7 +740,7 @@ final class CallEngine {
         let dir = (file as NSString).deletingLastPathComponent
         var stem = (file as NSString).lastPathComponent
         if stem.hasSuffix(".md") { stem = String(stem.dropLast(3)) }
-        let out = (dir as NSString).appendingPathComponent(stem + ".judge")
+        let out = CallLayout.sidecar((dir as NSString).appendingPathComponent(stem), ".judge")
         let ct = ((callRequest["call_type"] as? String) ?? "").lowercased()
         let callType = ct.contains("present") ? "presentation" : (ct.contains("interview") || ct.contains("hiring")) ? "interview" : "auto"
         var args = ["-m", "livetips_m0.judge", "--config", cfgPath, "--md", file, "--call-type", callType, "--quick", "--out", out]

@@ -61,7 +61,7 @@ struct CallPageView: View {
     }
 
     private var record: CallHistory.Record? { history.records.first { $0.file == file } }
-    private var folder: String { (file as NSString).deletingLastPathComponent }
+    private var folder: String { CallLayout.liveFolder(of: file) }
     private var folderRoot: String { (folder as NSString).deletingLastPathComponent }      // <root>/live -> <root>
     /// This call's register items in every status (dropped too: a deleted task must not come back from the notes).
     private var callItems: [Commitment] {
@@ -142,6 +142,7 @@ struct CallPageView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: CallReassignService.changed)) { _ in tick += 1 }   // 0.10.1 (A3)
+        .onReceive(NotificationCenter.default.publisher(for: NotesRewrite.finished)) { n in if (n.object as? String) == file { tick += 1 } }
         .onAppear {
             DriveRecordings.shared.syncTranscript(file, create: false)   // 0.11.0 (B7b): a changed transcript in Drive
             CallSyncService.shared.sync(file)                            // 0.12.0 (B8b): changed notes to the server
@@ -450,7 +451,7 @@ struct CallPageView: View {
 
     // MARK: 0.9.0 tabs
 
-    private var hasSales: Bool { FileManager.default.fileExists(atPath: (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".sales.json") }
+    private var hasSales: Bool { FileManager.default.fileExists(atPath: CallLayout.sidecar((file.hasSuffix(".md") ? String(file.dropLast(3)) : file), ".sales.json")) }
 
     /// Decisions of the call: the call picture's, else the "## Decisions" of the notes (the follow-up email reads those too).
     /// 0.12.1: a line that only says there are none ("Жодних рішень не приймалося.") is not a decision, so the tab no
@@ -490,6 +491,9 @@ struct CallPageView: View {
     /// Theme pass stage 2 (prototype "After the call"): Decisions with who made them, Next steps with the owner and the
     /// date, Risks on the left; the follow-up card, In short and Topics on the right.
     @ViewBuilder private func meetingTab(_ o: CallOutcome) -> some View {
+        if !(CallEngine.shared.isRunning && CallEngine.shared.lastFile == file) && NotesRewrite.stale(file) {
+            NotesStaleBar(file: file).padding(.bottom, 20)     // 0.26.2 (B3): the speakers changed after these notes
+        }
         if let m = CallNotes.meeting(file), !m.isEmpty {
             let lists = CallLists.read(transcript: file)
             PageColumns(side: 380) {
@@ -950,7 +954,7 @@ struct CallPageView: View {
         meetNote = L("meet.looking")
         let end = r.end ?? r.start.addingTimeInterval((r.minutes ?? 60) * 60)
         let code = CalendarService.shared.events.first { abs($0.start.timeIntervalSince(r.start)) < 1800 && $0.meetCode != nil }?.meetCode
-        let out = (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".meet.md"
+        let out = CallLayout.sidecar((file.hasSuffix(".md") ? String(file.dropLast(3)) : file), ".meet.md")
         Task {
             do {
                 guard let m = try await GoogleService.shared.meet(code: code, start: r.start, end: end) else { meetNote = L("meet.none"); return }
@@ -1399,7 +1403,8 @@ struct AgendaChip: View {
 
 // MARK: - Transcript
 
-/// The transcript of a call, opened at a moment ("Jump to 12:34" from the call memory). Read only.
+/// The transcript of a call, opened at a moment ("Jump to 12:34" from the call memory). 0.26.2: after the call the
+/// speakers can be fixed here (names, merges, a line said by someone else), through src/fromfile.py edit.
 @MainActor
 enum TranscriptWindow {
     static func show(file: String, at: String? = nil) { HomeNav.shared.open(.transcript(file, at)) }
@@ -1409,30 +1414,54 @@ struct TranscriptView: View {
     let file: String
     let at: String?
     @State private var q = ""
-    @State private var who: String? = nil       // 2026-11-05 (redesign): one speaker only
-    @State private var lines: [TranscriptLine] = []
+    @State private var who: String? = nil       // 2026-11-05 (redesign): one speaker only (a line key, see key(_:))
+    @State private var sp = CallSpeakers()       // 0.26.2 (speakers on the call page): lines with their speakers
+    @State private var busy = false
+    @State private var failed: String? = nil
+    @State private var renaming: String? = nil   // the speaker being named by hand
+    @State private var saidBy: String? = nil     // the line (hh:mm:ss) being given to someone typed by hand
+    @State private var typed = ""
+    @State private var notesWritten: Date? = nil
     @Environment(\.pnTheme) private var t
+
+    private var lines: [CallSpeakers.Line] { sp.lines }
 
     private var target: Int? {
         guard let at = at else { return nil }
         return lines.first { $0.t >= at }?.id ?? lines.last?.id
     }
 
+    /// 0.26.2: speakers are fixed only after the call (while it records, the recorder owns speakers.json).
+    private var live: Bool { CallEngine.shared.isRunning && CallEngine.shared.lastFile == file }
+    private var canEdit: Bool { sp.editable && !live }
+
+    /// The people of the project the call belongs to (the Rename and "Said by" lists).
+    private var team: [String] {
+        (PyTool.project(of: file).project?.people.map(\.name) ?? []).filter { !$0.isEmpty }
+    }
+
+    /// A speaker of the call ("sid:S2") or an untagged label ("label:Me").
+    private func key(_ l: CallSpeakers.Line) -> String { sp.owner(l).map { "sid:" + $0 } ?? "label:" + l.label }
+    private func name(_ key: String) -> String {
+        if key.hasPrefix("sid:") { let s = String(key.dropFirst(4)); return sp.speaker(s)?.display ?? "Speaker " + String(s.dropFirst()) }
+        return String(key.dropFirst(6))
+    }
+
     /// The speakers with the most lines first (at most 6 chips).
     private var speakers: [String] {
         var n: [String: Int] = [:]
-        for l in lines { n[l.who, default: 0] += 1 }
-        return n.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(6).map(\.key)
+        for l in lines { n[key(l), default: 0] += 1 }
+        return n.sorted { $0.value != $1.value ? $0.value > $1.value : name($0.key) < name($1.key) }.prefix(6).map(\.key)
     }
 
     /// Lines in a row from the same speaker are one turn: the name and the time once.
-    private var turns: [[TranscriptLine]] {
+    private var turns: [[CallSpeakers.Line]] {
         let shown = lines.filter { l in
-            (who == nil || l.who == who) && (q.isEmpty || l.text.localizedCaseInsensitiveContains(q) || l.who.localizedCaseInsensitiveContains(q))
+            (who == nil || key(l) == who) && (q.isEmpty || l.text.localizedCaseInsensitiveContains(q) || sp.display(l).localizedCaseInsensitiveContains(q))
         }
-        var out: [[TranscriptLine]] = []
+        var out: [[CallSpeakers.Line]] = []
         for l in shown {
-            if let last = out.last?.last, last.who == l.who, last.id + 1 == l.id { out[out.count - 1].append(l) } else { out.append([l]) }
+            if let last = out.last?.last, key(last) == key(l), last.id + 1 == l.id { out[out.count - 1].append(l) } else { out.append([l]) }
         }
         return out
     }
@@ -1448,26 +1477,32 @@ struct TranscriptView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             chip(L("transcript.everyone"), on: who == nil) { who = nil }
-                            ForEach(speakers, id: \.self) { s in chip(s, on: who == s) { who = who == s ? nil : s } }
+                            ForEach(speakers, id: \.self) { k in
+                                chip(name(k), on: who == k) { who = who == k ? nil : k }
+                                    .contextMenu { if canEdit, k.hasPrefix("sid:") { speakerMenu(String(k.dropFirst(4))) } }
+                            }
                         }
                     }
                     .padding(.leading, 6)
                 }
                 Spacer(minLength: 0)
+                if busy { PNSpinner(size: 16) }
                 Button(L("home.recent.finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file)]) }.buttonStyle(.pnBar)
             }
             .padding(.horizontal, PageMetrics.side).padding(.vertical, 16)
             .overlay(alignment: .bottom) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+            notes
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(turns, id: \.first!.id) { turn in
                             let first = turn[0]
+                            let me = sp.isMe(first)
                             HStack(alignment: .top, spacing: 14) {
                                 Text(first.t).font(t.homeMono(12)).monospacedDigit().foregroundStyle(PN.C.text3)
                                     .frame(width: 62, alignment: .leading).padding(.top, 2)
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(t.caps ? first.who.uppercased() : first.who).font(t.homeMono(12, .semibold)).foregroundStyle(first.me ? PN.C.text : PN.C.text2)
+                                    turnName(first, me: me)
                                     ForEach(turn) { l in
                                         let hit = l.id == target
                                         Text(l.text).font(t.homeText(16)).lineSpacing(2).foregroundStyle(PN.C.text).textSelection(.enabled)
@@ -1475,13 +1510,14 @@ struct TranscriptView: View {
                                             .padding(.horizontal, hit ? 8 : 0).padding(.vertical, hit ? 2 : 0)
                                             .background(hit ? PN.C.surface2 : .clear)
                                             .overlay(alignment: .leading) { if hit { Rectangle().fill(PN.C.accent).frame(width: 3) } }
+                                            .contextMenu { lineMenu(l) }
                                             .id(l.id)
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .padding(.horizontal, PageMetrics.side).padding(.vertical, 10)
-                            .background(first.me ? PN.C.surface2 : Color.clear)
+                            .background(me ? PN.C.surface2 : Color.clear)
                         }
                         if lines.isEmpty {
                             // 0.24.1 (F6): a call with no line says "Nothing was recorded" and why
@@ -1498,14 +1534,166 @@ struct TranscriptView: View {
                     .padding(.vertical, 6)
                 }
                 .onAppear {
-                    lines = TranscriptLine.read(file, me: PyTool.meLabel)
+                    load()
                     if let t = target { DispatchQueue.main.async { proxy.scrollTo(t, anchor: .center) } }
                 }
             }
         }
         .background(PN.C.bg)
+        .alert(L("transcript.spk.renameTitle"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField(L("transcript.spk.name"), text: $typed)
+            Button(L("common.ok")) { if let s = renaming, let e = sp.plan(rename: s, to: typed) { apply(e) }; renaming = nil }
+            Button(L("common.cancel"), role: .cancel) { renaming = nil }
+        }
+        .alert(L("transcript.spk.saidByTitle"), isPresented: Binding(get: { saidBy != nil }, set: { if !$0 { saidBy = nil } })) {
+            TextField(L("transcript.spk.name"), text: $typed)
+            Button(L("common.ok")) { if let l = saidBy, let e = sp.plan(line: l, to: typed) { apply(e) }; saidBy = nil }
+            Button(L("common.cancel"), role: .cancel) { saidBy = nil }
+        }
     }
         .trackScreen("call_page", sub: "transcript", o: CallSyncService.shared.callOrg(of: file))
+        .onReceive(NotificationCenter.default.publisher(for: NotesRewrite.finished)) { n in if (n.object as? String) == file { load() } }
+    }
+
+    // MARK: speakers (0.26.2)
+
+    /// The speaker's name over a turn: a menu when the speakers can be fixed.
+    @ViewBuilder private func turnName(_ l: CallSpeakers.Line, me: Bool) -> some View {
+        let label = sp.display(l)
+        let text = Text(t.caps ? label.uppercased() : label).font(t.homeMono(12, .semibold)).foregroundStyle(me ? PN.C.text : PN.C.text2)
+        if canEdit, let s = sp.owner(l) {
+            Menu { speakerMenu(s) } label: { text }
+                .menuStyle(.borderlessButton).menuIndicator(.visible).fixedSize()
+                .help(L("transcript.spk.menuHelp"))
+        } else {
+            text
+        }
+    }
+
+    /// Rename (voice suggestions, the project's people, a typed name), Same person as, Remember this voice, Team / Client.
+    @ViewBuilder private func speakerMenu(_ sid: String) -> some View {
+        if let s = sp.speaker(sid) {
+            let taken = Set(sp.speakers.compactMap { $0.name?.lowercased() })
+            Section(L("transcript.spk.rename")) {
+                ForEach(s.suggestions.filter { $0.lowercased() != s.name?.lowercased() }, id: \.self) { n in
+                    Button(L("transcript.spk.soundsLike", ["name": n])) { if let e = sp.plan(rename: sid, to: n) { apply(e) } }
+                }
+                ForEach(team.filter { n in !s.suggestions.contains(n) && n.lowercased() != s.name?.lowercased() }, id: \.self) { n in
+                    // a name another speaker has is the same person: a merge (CallSpeakers.plan)
+                    Button(taken.contains(n.lowercased()) ? L("transcript.spk.sameAs", ["name": n]) : n) { if let e = sp.plan(rename: sid, to: n) { apply(e) } }
+                }
+                Button(L("transcript.spk.typeName")) { typed = s.name ?? ""; renaming = sid }
+            }
+            let others = sp.speakers.filter { $0.id != sid }
+            if !others.isEmpty {
+                Menu(L("tr.samePerson")) {
+                    ForEach(others) { o in Button(o.display) { apply(.merge(sid, into: o.id)) } }
+                }
+            }
+            Divider()
+            if sp.voices {
+                Toggle(L("tr.remember"), isOn: Binding(get: { s.remember }, set: { apply(.remember(sid, $0)) }))
+                    .disabled(s.name == nil)
+            } else {
+                Button(L("transcript.spk.noVoicesShort")) {}.disabled(true)
+            }
+            Menu(L("transcript.spk.side")) {
+                Toggle(L("transcript.spk.team"), isOn: Binding(get: { s.side == "team" }, set: { if $0 { apply(.side(sid, "team")) } }))
+                Toggle(L("transcript.spk.client"), isOn: Binding(get: { s.side == "client" }, set: { if $0 { apply(.side(sid, "client")) } }))
+            }
+        }
+    }
+
+    /// A line: "Said by..." (another speaker of the call, the project's people, a typed name) and Copy.
+    @ViewBuilder private func lineMenu(_ l: CallSpeakers.Line) -> some View {
+        if canEdit {
+            let cur = sp.owner(l)
+            Menu(L("transcript.spk.saidBy")) {
+                ForEach(sp.speakers.filter { $0.id != cur }) { s in Button(s.display) { apply(.lineTo(l.t, sid: s.id)) } }
+                let named = Set(sp.speakers.compactMap { $0.name?.lowercased() })
+                let people = team.filter { !named.contains($0.lowercased()) }
+                if !people.isEmpty {
+                    Divider()
+                    ForEach(people, id: \.self) { n in Button(n) { if let e = sp.plan(line: l.t, to: n) { apply(e) } } }
+                }
+                Divider()
+                Button(L("transcript.spk.someoneElse")) { typed = ""; saidBy = l.t }
+            }
+        }
+        Button(L("reg.copy")) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(l.text, forType: .string) }
+    }
+
+    /// Under the header: why the speakers cannot be fixed now, what this call cannot remember, notes out of date.
+    @ViewBuilder private var notes: some View {
+        let items: [String] = {
+            var out: [String] = []
+            if let f = failed { out.append(L("transcript.spk.failed", ["error": f])) }
+            if live && sp.editable { out.append(L("transcript.spk.live")) }
+            if canEdit {
+                if !sp.voices { out.append(L("transcript.spk.noVoices")) }
+            }
+            return out
+        }()
+        let stale = canEdit && CallSpeakers.notesStale(editedAt: sp.editedAt, notesWritten: notesWritten)
+        if !items.isEmpty || stale {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(items, id: \.self) { s in
+                    Text(s).font(t.homeText(13)).foregroundStyle(PN.C.text2).fixedSize(horizontal: false, vertical: true)
+                }
+                if stale { NotesStaleBar(file: file) }      // 0.26.2 (B3): Rewrite notes
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, PageMetrics.side).padding(.vertical, 10)
+            .background(PN.C.surface2)
+            .overlay(alignment: .bottom) { Rectangle().fill(PN.C.rule).frame(height: 1) }
+        }
+    }
+
+    private func load() {
+        let md = (try? String(contentsOfFile: file, encoding: .utf8)) ?? ""
+        func json(_ suffix: String) -> [String: Any]? {
+            FileManager.default.contents(atPath: CallLayout.sidecar(of: file, suffix))
+                .flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] }
+        }
+        sp = CallSpeakers.parse(md: md, snapshot: json(".speakers.json"), voicesFile: json(".voices.json"), me: PyTool.meLabel)
+        notesWritten = (try? FileManager.default.attributesOfItem(atPath: CallNotes.path(file)))?[.modificationDate] as? Date
+        if let w = who, !lines.contains(where: { key($0) == w }) { who = nil }   // a merged speaker's chip is gone
+    }
+
+    /// One change through src/fromfile.py edit (the same names logic as Transcribe), then the page reads it back.
+    private func apply(_ e: CallSpeakers.Edit) {
+        guard canEdit, !busy else { return }
+        let c = AppConfig.load(from: AppPaths.config)
+        let root = CallEngine.shared.appRoot
+        let pw = PyTool.project(of: file)
+        let args = [(root as NSString).appendingPathComponent("src/fromfile.py"), "edit", "--md", file,
+                    "--project", pw.project?.slug ?? "", "--workspace", pw.project?.workspace ?? pw.workspace?.name ?? ""] + e.args
+        busy = true; failed = nil
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: c.engine.python)
+        p.arguments = args
+        p.currentDirectoryURL = URL(fileURLWithPath: (root as NSString).appendingPathComponent("src"))
+        var env = ProcessInfo.processInfo.environment
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        p.environment = env
+        let out = Pipe(), err = Pipe()
+        p.standardOutput = out; p.standardError = err
+        p.terminationHandler = { proc in
+            let text = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let tail = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let last = text.split(separator: "\n").last(where: { $0.hasPrefix("{") }).map(String.init) ?? ""
+            let obj = (try? JSONSerialization.jsonObject(with: Data(last.utf8))) as? [String: Any]
+            let ok = proc.terminationStatus == 0 && (obj?["ok"] as? Bool) == true
+            let why = ok ? nil : (tail.split(separator: "\n").last.map(String.init) ?? "exit \(proc.terminationStatus)")
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    busy = false
+                    if let w = why { failed = w; AppLog.app("transcript: speakers edit failed (\(w))") }
+                    load()
+                }
+            }
+        }
+        do { try p.run() } catch { busy = false; failed = error.localizedDescription }
     }
 
     private func chip(_ label: String, on: Bool, _ tap: @escaping () -> Void) -> some View {

@@ -6,7 +6,12 @@ apart after the full pass (offline clustering), so the groups are better than li
 
   transcriber.py --from-file <wav> --out <md> --langs uk [--project-dir DIR] [--slug S] [--speakers N]
                  [--title T] [--source file|link] [--source-ref REF] [--people "Ann Lee,Mike Johnson"]
-  fromfile.py edit --md <md> (--name S2=Ann Lee | --merge S3=S1 | --fix 00:12:04=S2 | --remember S2=on|off)
+  fromfile.py edit --md <md> (--name S2=Ann Lee | --merge S3=S1 | --fix 00:12:04=S2 | --fix 00:12:04=@Ann Lee
+                   | --remember S2=on|off | --side S2=team|client)
+
+edit works on recordings and, since 0.26.2, on live calls: a call keeps its voice prints in .work/<stem>.voices.json,
+so a line moved to another speaker takes its voice print along and the library learns the right voice. A call
+recorded before 0.26.2 has no prints: names change, the library does not (the reply says "voices": false).
 
 Progress goes to stdout as JSON lines: {"stage": "...", "done_s": .., "total_s": .., "line": {...}}.
 The run writes <stem>.md, <stem>.speakers.json and <stem>.named.md (the names applied)."""
@@ -18,10 +23,13 @@ import json
 import os
 import re
 import sys
+import time
 import wave
 from pathlib import Path
 
 import numpy as np
+
+import call_layout
 
 SR = 16000
 FRAME = 480                 # 30 ms
@@ -159,7 +167,7 @@ def header(cfg: dict, title: str, source: str, ref: str, when: str, ui: str) -> 
 
 
 def snapshot_path(md: Path) -> Path:
-    return md.with_name(md.stem + ".speakers.json")
+    return call_layout.sidecar_of(md, ".speakers.json")
 
 
 def write_named(md: Path, snap: dict, T) -> Path:
@@ -178,7 +186,7 @@ def write_named(md: Path, snap: dict, T) -> Path:
             return None
         c = cl.get(s) or {}
         return T.speaker_display(s, c.get("name"))
-    named = md.with_name(md.stem + ".named.md")
+    named = call_layout.sidecar_of(md, ".named.md")
     named.write_text(T.apply_speaker_names(text, "", label), encoding="utf-8")
     return named
 
@@ -310,9 +318,94 @@ def T_read(path: Path) -> np.ndarray:
     return read_wav(path)
 
 
+def voices_path(md: Path) -> Path:
+    return call_layout.sidecar_of(md, ".voices.json")
+
+
+def _config(T) -> dict:
+    cfg = dict(T.DEFAULTS)
+    try:
+        cfg.update(json.loads((T.ROOT / "config.json").read_text(encoding="utf-8")))
+    except Exception:  # noqa: BLE001
+        pass
+    return cfg
+
+
+def _resolver(snap: dict):
+    merged = snap.get("merged") or {}
+
+    def resolve(s):
+        seen = set()
+        while s in merged and s not in seen:
+            seen.add(s); s = merged[s]
+        return s
+    return resolve
+
+
+def _cluster_for(cl: dict, merged: dict, name: str, t: str) -> str:
+    """--fix <t>=@Name: the speaker of this call with that name, or a new one (a person the clustering missed)."""
+    for sid, c in cl.items():
+        if sid not in merged and (c.get("name") or "").casefold() == name.casefold():
+            return sid
+    n = max([int(s[1:]) for s in cl if s[1:].isdigit()] + [0]) + 1
+    sid = f"S{n}"
+    cl[sid] = {"name": name, "how": "you", "score": None, "seconds": 0.0, "first": t, "last_quote": None,
+               "suggestions": [], "side": None}
+    return sid
+
+
+def _live_desired(snap: dict, vj: dict, cfg: dict, T) -> tuple[dict, dict]:
+    """A live call: what the library learns from the speakers as the PM left them. A line belongs to the speaker
+    its fix or its tag resolves to (as in named.md), so a moved line teaches its new speaker. A voice named by the
+    meeting roster or by the Google Meet record (named_by meet, rules/voices.yaml > meet), or any voice of a public
+    call, is learned only after the PM names it or turns Remember on."""
+    cl, merged, over = snap.get("clusters") or {}, snap.get("merged") or {}, snap.get("overrides") or {}
+    resolve = _resolver(snap)
+    rem, auto, fixed = snap.get("remember") or {}, set(vj.get("auto") or []), set(vj.get("fixed") or [])
+    by_sid: dict[str, list] = {}
+    for t, ln in sorted((vj.get("lines") or {}).items()):
+        if not (ln.get("member") or t in fixed):
+            continue                         # an unsure print only inherited its tag: it teaches nobody
+        by_sid.setdefault(resolve(over.get(t) or ln.get("sid")), []).append(ln)
+    f = lambda k: float(cfg.get(k, T.DEFAULTS[k]))  # noqa: E731
+    desired, sides = {}, {}
+    for sid, c in cl.items():
+        if sid in merged or not c.get("name"):
+            continue
+        default = bool(vj.get("remember", True)) and sid not in auto and c.get("named_by") != "meet"
+        if not rem.get(sid, default):
+            continue
+        core = T.voice_core(by_sid.get(sid) or [], f("speaker_new_min_s"), f("speaker_lib_learn"))
+        if not core:
+            continue
+        desired.setdefault(c["name"], []).extend(ln["emb"] for ln in core[-10:])
+        if c.get("side"):
+            sides[c["name"]] = c["side"]
+    return desired, sides
+
+
+def _file_desired(snap: dict) -> tuple[dict, dict]:
+    """A recording (0.8.6): each speaker keeps its last voice prints in speakers.json."""
+    cl, merged = snap.get("clusters") or {}, snap.get("merged") or {}
+    desired, sides = {}, {}
+    for sid, c in cl.items():
+        if sid in merged or not c.get("name") or not (snap.get("remember") or {}).get(sid, True):
+            continue
+        embs = list(c.get("embs") or [])
+        for src, dst in merged.items():
+            if dst == sid:
+                embs += list((cl.get(src) or {}).get("embs") or [])
+        if embs:
+            desired.setdefault(c["name"], []).extend(embs[-10:])
+            if c.get("side"):
+                sides[c["name"]] = c["side"]
+    return desired, sides
+
+
 def edit(argv, T) -> int:
     """Renames, merges, line fixes and "Remember this voice", applied to speakers.json; named.md is rewritten.
-    A name with Remember on goes to the voices library (the same apply_call as on calls)."""
+    A name with Remember on goes to the voices library (the same apply_call as on calls), replacing what this
+    call or recording gave the library before."""
     ap = argparse.ArgumentParser(prog="fromfile.py edit")
     ap.add_argument("--md", required=True)
     ap.add_argument("--name", action="append", default=[])
@@ -324,22 +417,43 @@ def edit(argv, T) -> int:
     ap.add_argument("--workspace", default="")
     a = ap.parse_args(argv)
     md = Path(a.md)
-    sp = snapshot_path(md)
+    sp, vp = snapshot_path(md), voices_path(md)
     snap = json.loads(sp.read_text(encoding="utf-8"))
+    vj = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else None
     cl = snap.setdefault("clusters", {})
     for x in a.name:
         sid, _, name = x.partition("=")
         if sid in cl:
             name = name.strip()
             cl[sid].update(name=name or None, how="you" if name else None, score=None)
+            cl[sid].pop("named_by", None)                            # the PM's name now, not Meet's
+            if vj is not None and sid in (vj.get("auto") or []):
+                vj["auto"] = [s for s in vj["auto"] if s != sid]      # the PM named it: it may be learned now
     for x in a.merge:
         src, _, dst = x.partition("=")
         if src in cl and dst in cl and src != dst:
             snap.setdefault("merged", {})[src] = dst
             cl[dst]["seconds"] = round(cl[dst]["seconds"] + cl[src]["seconds"], 1)
+    resolve = _resolver(snap)
     for x in a.fix:
         t, _, sid = x.partition("=")
-        snap.setdefault("overrides", {})[t] = sid
+        if sid.startswith("@"):
+            if not sid[1:].strip():
+                continue
+            sid = _cluster_for(cl, snap.get("merged") or {}, sid[1:].strip(), t)
+        if sid not in cl:
+            continue
+        over = snap.setdefault("overrides", {})
+        if vj is not None:
+            ln = (vj.get("lines") or {}).get(t)
+            if ln:
+                old = resolve(over.get(t) or ln.get("sid"))
+                new = resolve(sid)
+                if old in cl and old != new:
+                    cl[old]["seconds"] = round(max(0.0, float(cl[old].get("seconds") or 0) - ln["dur"]), 1)
+                    cl[new]["seconds"] = round(float(cl[new].get("seconds") or 0) + ln["dur"], 1)
+                vj["fixed"] = sorted(set(vj.get("fixed") or []) | {t})   # the PM says whose line it is
+        over[t] = sid
     for x in a.remember:
         sid, _, v = x.partition("=")
         snap.setdefault("remember", {})[sid] = v != "off"
@@ -348,33 +462,34 @@ def edit(argv, T) -> int:
         if sid in cl and v in ("team", "client"):
             cl[sid]["side"] = v
     snap["rev"] = int(snap.get("rev") or 0) + 1
-    # the voices library learns the named voices marked Remember (replacing this file's earlier contribution)
-    cfg = dict(T.DEFAULTS)
-    lib = T.VoiceLibrary(T.ROOT / str(cfg.get("voices_dir") or "voices") / "voices.json", project=a.project,
-                         remember=True, workspace=a.workspace)
-    desired, sides = {}, {}
-    for sid, c in cl.items():
-        if sid in (snap.get("merged") or {}) or not c.get("name") or not (snap.get("remember") or {}).get(sid, True):
-            continue
-        embs = list(c.get("embs") or [])
-        for src, dst in (snap.get("merged") or {}).items():
-            if dst == sid:
-                embs += list((cl.get(src) or {}).get("embs") or [])
-        if embs:
-            desired.setdefault(c["name"], []).extend(embs[-10:])
-            if c.get("side"):
-                sides[c["name"]] = c["side"]
-    prev = snap.get("lib_added") or {}
-    try:
-        if desired != prev:
-            lib.apply_call(prev, desired, sides)
-            lib.save()
-            snap["lib_added"] = desired
-    except Exception as e:  # noqa: BLE001
-        print(f"voices: cannot update the library ({e!r})", file=sys.stderr)
+    snap["edited_at"] = round(time.time(), 1)     # 0.26.2: notes written before this are out of date
+    cfg = _config(T)
+    voices = vj is not None or any(c.get("embs") for c in cl.values())
+    if voices:
+        if vj is not None:
+            desired, sides = _live_desired(snap, vj, cfg, T)
+            prev = vj.get("lib_added") or {}
+        else:
+            desired, sides = _file_desired(snap)
+            prev = snap.get("lib_added") or {}
+        lib = T.VoiceLibrary(T.ROOT / str(cfg.get("voices_dir") or "voices") / "voices.json",
+                             project=a.project or (vj or {}).get("project") or "", remember=True,
+                             workspace=a.workspace or (vj or {}).get("workspace") or "")
+        try:
+            if desired != prev:
+                lib.apply_call(prev, desired, sides)
+                lib.save()
+                if vj is not None:
+                    vj["lib_added"], vj["lib_sides"] = desired, sides
+                else:
+                    snap["lib_added"] = desired
+        except Exception as e:  # noqa: BLE001
+            print(f"voices: cannot update the library ({e!r})", file=sys.stderr)
     sp.write_text(json.dumps(snap, ensure_ascii=False, indent=1), encoding="utf-8")
+    if vj is not None:
+        vp.write_text(json.dumps(vj, ensure_ascii=False), encoding="utf-8")
     write_named(md, snap, T)
-    emit({"ok": True, "rev": snap["rev"]})
+    emit({"ok": True, "rev": snap["rev"], "voices": voices})
     return 0
 
 

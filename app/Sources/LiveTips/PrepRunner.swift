@@ -86,11 +86,11 @@ final class PrepRunner: ObservableObject {
     /// cannot read or continue it. Returns that folder, or nil when there was nothing.
     static func moveAside(base: String) -> String? {
         let fm = FileManager.default
-        let have = runFiles.filter { fm.fileExists(atPath: base + "." + $0) }
+        let have = runFiles.filter { fm.fileExists(atPath: CallLayout.sidecar(base, "." + $0)) }
         guard !have.isEmpty else { return nil }
         let dir = (runsDir(base) as NSString).appendingPathComponent(stamp() + "-before")
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        for f in have { try? fm.moveItem(atPath: base + "." + f, toPath: (dir as NSString).appendingPathComponent(f)) }
+        for f in have { try? fm.moveItem(atPath: CallLayout.sidecar(base, "." + f), toPath: (dir as NSString).appendingPathComponent(f)) }
         return dir
     }
 
@@ -106,18 +106,18 @@ final class PrepRunner: ObservableObject {
         let route = meta["route"] as? String ?? "", model = meta["model"] as? String ?? ""
         let dir = (runsDir(base) as NSString).appendingPathComponent(stamp() + "-" + route + "-" + Self.folderSafe(model) + (ok ? "" : "-failed"))
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        for f in runFiles where fm.fileExists(atPath: base + "." + f) { try? fm.copyItem(atPath: base + "." + f, toPath: (dir as NSString).appendingPathComponent(f)) }
+        for f in runFiles where fm.fileExists(atPath: CallLayout.sidecar(base, "." + f)) { try? fm.copyItem(atPath: CallLayout.sidecar(base, "." + f), toPath: (dir as NSString).appendingPathComponent(f)) }
         if let d = try? JSONSerialization.data(withJSONObject: meta, options: [.prettyPrinted, .sortedKeys]) {
             try? d.write(to: URL(fileURLWithPath: (dir as NSString).appendingPathComponent("run.json")))
         }
         guard let aside else { return }
         if ok {
             let old = (aside as NSString).appendingPathComponent("brief.md")
-            if fm.fileExists(atPath: old) { try? fm.removeItem(atPath: base + ".brief.prev.md"); try? fm.copyItem(atPath: old, toPath: base + ".brief.prev.md") }
+            if fm.fileExists(atPath: old) { try? fm.removeItem(atPath: CallLayout.sidecar(base, ".brief.prev.md")); try? fm.copyItem(atPath: old, toPath: CallLayout.sidecar(base, ".brief.prev.md")) }
         } else {
-            for f in runFiles where !fm.fileExists(atPath: base + "." + f) {
+            for f in runFiles where !fm.fileExists(atPath: CallLayout.sidecar(base, "." + f)) {
                 let src = (aside as NSString).appendingPathComponent(f)
-                if fm.fileExists(atPath: src) { try? fm.copyItem(atPath: src, toPath: base + "." + f) }
+                if fm.fileExists(atPath: src) { try? fm.copyItem(atPath: src, toPath: CallLayout.sidecar(base, "." + f)) }
             }
         }
     }
@@ -275,7 +275,7 @@ final class PrepRunner: ObservableObject {
     static func salesPrompt(_ r: Request, base: String, web: Bool) -> String {
         guard let m = r.salesMethod else { return "" }
         // 0.8.7 (F4): without a CRM key there is no From CRM section, even when an old snapshot is still on disk
-        let crmLine = !CRMService.shared.connected ? "" : "## From CRM: " + (FileManager.default.fileExists(atPath: base + ".crm.md") ? "Read \(base).crm.md (a CRM snapshot; say how old it is from its Taken line)." : "There is no CRM snapshot.") + "\n"
+        let crmLine = !CRMService.shared.connected ? "" : "## From CRM: " + (FileManager.default.fileExists(atPath: CallLayout.sidecar(base, ".crm.md")) ? "Read \(CallLayout.sidecar(base, ".crm.md")) (a CRM snapshot; say how old it is from its Taken line)." : "There is no CRM snapshot.") + "\n"
         return """
 
         SALES CALL (method: \(m), see rules/sales.yaml in the skill for its criteria). Add these sections to the brief, in this order:
@@ -383,7 +383,11 @@ final class PrepRunner: ObservableObject {
         try? FileManager.default.createDirectory(atPath: live, withIntermediateDirectories: true)
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmm"
         let h = DateFormatter(); h.dateFormat = "yyyy-MM-dd HH:mm"
-        let base = r.refreshBase ?? (live as NSString).appendingPathComponent("prep-\(f.string(from: r.date))-\(StartCallModel.slugify(r.title))")
+        let day = DateFormatter(); day.dateFormat = "yyyy-MM-dd"
+        // call folders: the prep goes into the folder of its call (live/<date>-<slug>/prep-<date-time>-<slug>.*), service files into .work/
+        let slug = StartCallModel.slugify(r.title)
+        let base = r.refreshBase ?? (CallLayout.folder(live: live, date: day.string(from: r.date), slug: slug, create: true) as NSString)
+            .appendingPathComponent("prep-\(f.string(from: r.date))-\(slug)")
         let refs = ["sweep.md", "speech.md"] + (r.callType == "presentation" ? ["presentation.md", "talk.md"] : [])   // 0.9.7: talk.md, the PM's own speech per slide
             + (r.callType == "interview" ? ["hiring.md"] : []) + (r.audience == "client" ? ["culture.md"] : [])
         var notion = [(r.root as NSString).appendingPathComponent("_notion")]
@@ -433,7 +437,7 @@ final class PrepRunner: ObservableObject {
         Sources, in this order: the folders and documents named in the call context (read them fully; .docx with \
         `textutil -convert txt -stdout <file>`), the project config, the Current State and other rows of the local \
         Notion mirror (\(notion.joined(separator: ", "))), the recent calls in \(live) (transcripts *.md and their \
-        *.tips.jsonl, newest first; the digest of the last 14 days is in \(base).digest.md, made by the app), then other \
+        *.tips.jsonl, newest first; the digest of the last 14 days is in \(CallLayout.sidecar(base, ".digest.md")), made by the app), then other \
         project files found with Grep and Glob. Newer facts win; say in the brief which sources were used and what is old.
         """ : """
         The PM EXCLUDED the project folder for this call: do not read, list or search anything in \(r.root) or the \
@@ -456,9 +460,9 @@ final class PrepRunner: ObservableObject {
         Likely pushbacks (2026-11-02, owner)\(r.salesMethod == nil ? ": add the brief's section \"Likely pushbacks and value questions\" (sweep.md, item 4a): 3 to 5 pushbacks on an estimate, a term, a price or the scope and 2 to 4 value questions (why this work, what it gives, what happens without it), each with a short answer taken only from <project>/pacenote/answer-cards.md, the Decision register, the red lines, the risk register and past calls; for work the client cannot see say what it protects and what skipping it costs later; no source: write \"no answer yet\"." : ": not here, a sales call has \"Likely objections\".")
 
         Write exactly these files and nothing else:
-        - \(base).brief.md, first line: "# Live Brief: \(r.title) (prep, \(h.string(from: r.date)))"
-        - \(base).cards.json
-        - \(base).facts.json\(r.callType == "presentation" ? "\n- \(base).outline.json" : "")
+        - \(CallLayout.sidecar(base, ".brief.md")), first line: "# Live Brief: \(r.title) (prep, \(h.string(from: r.date)))"
+        - \(CallLayout.sidecar(base, ".cards.json"))
+        - \(CallLayout.sidecar(base, ".facts.json"))\(r.callType == "presentation" ? "\n- \(CallLayout.sidecar(base, ".outline.json"))" : "")
         The app checks the files with `lt prep-check` when you finish (cards and facts must be valid JSON lists with the \
         fields of the formats). Participants: compare the invitation with the project config and the recent notes; a \
         person in the invitation who has left the project is named as not expected (sweep.md, Names).
@@ -469,8 +473,8 @@ final class PrepRunner: ObservableObject {
         files only: no Notion or Jira APIs, no MCP tools, no web, no subagents.
 
         Call: "\(r.title)", \(h.string(from: r.date)). Project: \(r.projectName) (slug \(r.slug)). Project folder: \(r.root).
-        The brief: \(base).brief.md (the PM's original is \(base).brief.orig.md when it exists: lines that differ are the \
-        PM's edits and stay). Facts: \(base).facts.json, cards: \(base).cards.json.
+        The brief: \(CallLayout.sidecar(base, ".brief.md")) (the PM's original is \(CallLayout.sidecar(base, ".brief.orig.md")) when it exists: lines that differ are the \
+        PM's edits and stay). Facts: \(CallLayout.sidecar(base, ".facts.json")), cards: \(CallLayout.sidecar(base, ".cards.json")).
         Files changed since the brief was made (newest first; read only these, fully):
         \(r.changed.isEmpty ? "(none: the brief is only old; check the project's Current State in the local Notion mirror \(notion.joined(separator: ", ")) and the newest call in \(live))" : r.changed.map { "- " + $0 }.joined(separator: "\n"))
 
@@ -607,8 +611,8 @@ final class PrepRunner: ObservableObject {
             "live": live, "notion": notion, "skill": skill, "base": base, "lt": [c.engine.python, lt], "model": runModel,
             "url": Self.ollamaURL, "use_project_folder": r.useProjectFolder, "brief_lang": L10n.lang,
             "openai_model": c.ai.openaiPrep, "gemini_model": c.ai.geminiPrep, "agy_model": c.ai.agyPrep]
-        if r.deck?.info != nil, FileManager.default.fileExists(atPath: base + ".deck.json") {
-            req["deck"] = base + ".deck.json"
+        if r.deck?.info != nil, FileManager.default.fileExists(atPath: CallLayout.sidecar(base, ".deck.json")) {
+            req["deck"] = CallLayout.sidecar(base, ".deck.json")
             req["deck_lines"] = deckLines
             if let sd = speechDoc { req["speech_doc"] = sd }      // S1-3: the packed ways take it first (codexprep)
         }
@@ -630,7 +634,7 @@ final class PrepRunner: ObservableObject {
             p.arguments = ["-c", script, "sh"] + (p.arguments ?? [])
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
             digestEnv = ["LT_PY": c.engine.python, "LT_BIN": lt, "LT_ROOT": r.root, "LT_EXE": exe]
-            if r.useProjectFolder { digestEnv["LT_DIGEST"] = base + ".digest.md" }
+            if r.useProjectFolder { digestEnv["LT_DIGEST"] = CallLayout.sidecar(base, ".digest.md") }
             if let pa = pa, paVerify {
                 let req = PrepAgent.verifyRequest(pa, base: base, root: r.root, extra: extraDirs, lt: [c.engine.python, lt], claude: exe,
                                                   route: route, stateDir: stateDir, python: c.engine.sidecarPython,
@@ -638,7 +642,7 @@ final class PrepRunner: ObservableObject {
                 let reqPath = (stateDir as NSString).appendingPathComponent("prepverify-request.json")
                 if let d = try? JSONSerialization.data(withJSONObject: req) { try? d.write(to: URL(fileURLWithPath: reqPath)) }
                 digestEnv["LT_VERIFY"] = reqPath
-                digestEnv["LT_BRIEF"] = base + ".brief.md"
+                digestEnv["LT_BRIEF"] = CallLayout.sidecar(base, ".brief.md")
                 digestEnv["LT_SPY"] = c.engine.sidecarPython
                 digestEnv["LT_ENGINE"] = c.engine.sidecarDir
             }
@@ -689,7 +693,7 @@ final class PrepRunner: ObservableObject {
         p.terminationHandler = { [weak self] proc in
             // the app's own check (the skill's prep-check); --fix derives the cards from the facts when they are missing
             var checkLine = ""
-            if !isLocal, FileManager.default.fileExists(atPath: base + ".brief.md") {
+            if !isLocal, FileManager.default.fileExists(atPath: CallLayout.sidecar(base, ".brief.md")) {
                 let chk = Process(); let o = Pipe()
                 chk.executableURL = URL(fileURLWithPath: checkPy); chk.arguments = [lt, "prep-check", base + ".md", "--fix"]
                 chk.standardOutput = o; chk.standardError = FileHandle.nullDevice
@@ -699,8 +703,8 @@ final class PrepRunner: ObservableObject {
                     checkLine = text.range(of: "\"verdict\"[^,}]*", options: .regularExpression).map { String(text[$0]) } ?? ""
                 }
             }
-            let ok = proc.terminationStatus == 0 && FileManager.default.fileExists(atPath: base + ".brief.md")
-                && FileManager.default.fileExists(atPath: base + ".facts.json")
+            let ok = proc.terminationStatus == 0 && FileManager.default.fileExists(atPath: CallLayout.sidecar(base, ".brief.md"))
+                && FileManager.default.fileExists(atPath: CallLayout.sidecar(base, ".facts.json"))
             Task { @MainActor in
                 guard let self = self, self.process === proc else { return }
                 self.stopWait()
@@ -871,7 +875,7 @@ final class PrepRunner: ObservableObject {
 
     /// 0.9.6 Б3: what the checker found (<base>.verify.json of this run) for run.json and the ledger line.
     nonisolated static func verifySummary(base: String, since: Date?) -> [String: Any]? {
-        let path = base + ".verify.json"
+        let path = CallLayout.sidecar(base, ".verify.json")
         if let since = since, let m = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date,
            m < since { return nil }
         guard let d = FileManager.default.contents(atPath: path),
@@ -922,16 +926,17 @@ final class PrepRunner: ObservableObject {
     /// The transcripts of the last 3 calls of the same meeting (same title) in the project's live folder, newest first.
     static func previousCallsBlock(live: String, title: String) -> String {
         let fm = FileManager.default
-        guard let names = try? fm.contentsOfDirectory(atPath: live) else { return "" }
         let want = StartCallModel.slugify(title).replacingOccurrences(of: "-", with: "")
         var picked: [String] = []
-        for n in names.sorted(by: >) where n.range(of: "^\\d{4}-\\d\\d-\\d\\d-\\d{4}-[^.]+(\\.app)?\\.md$", options: .regularExpression) != nil {
+        let all = CallLayout.files(live: live).sorted { ($0 as NSString).lastPathComponent > ($1 as NSString).lastPathComponent }
+        for full in all where (full as NSString).lastPathComponent.range(of: "^\\d{4}-\\d\\d-\\d\\d-\\d{4}-[^.]+(\\.app)?\\.md$", options: .regularExpression) != nil {
+            let n = (full as NSString).lastPathComponent
             let core = String(n.dropFirst(16)).replacingOccurrences(of: ".app.md", with: "").replacingOccurrences(of: ".md", with: "").replacingOccurrences(of: "-", with: "")
             guard !want.isEmpty, core == want || (min(core.count, want.count) >= 4 && (core.contains(want) || want.contains(core))) else { continue }
             let stem = String(n.prefix(16 + max(0, n.count - 16 - (n.hasSuffix(".app.md") ? 7 : 3))))
             if picked.contains(where: { ($0 as NSString).lastPathComponent.hasPrefix(stem) }) { continue }   // app and skill copies of one call
-            let named = (live as NSString).appendingPathComponent(String(n.dropLast(3)) + ".named.md")
-            picked.append(fm.fileExists(atPath: named) ? named : (live as NSString).appendingPathComponent(n))
+            let named = CallLayout.sidecar(String(full.dropLast(3)), ".named.md")
+            picked.append(fm.fileExists(atPath: named) ? named : full)
             if picked.count == 3 { break }
         }
         guard !picked.isEmpty else { return "Previous calls of this meeting: none found by title in \(live); use the Meetings rows of the Notion copy and the digest." }
@@ -940,7 +945,7 @@ final class PrepRunner: ObservableObject {
             guard i > 0 else { return path }
             var stem = path.hasSuffix(".named.md") ? String(path.dropLast(9)) : String(path.dropLast(3))
             if stem.hasSuffix(".named") { stem = String(stem.dropLast(6)) }
-            let notes = stem + ".notes.md"
+            let notes = CallLayout.sidecar(stem, ".notes.md")
             return fm.fileExists(atPath: notes) ? notes + " (its full notes, they keep every detail)" : path
         }
         return "Previous calls of this meeting (read each fully, newest first; the newest is its transcript): " + list.joined(separator: "; ")

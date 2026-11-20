@@ -5,6 +5,7 @@ import os
 import re
 import time
 from pathlib import Path
+from . import call_layout
 
 from . import localprep as prep
 from .codex_provider import CodexProvider, MODEL, find_codex_cli
@@ -130,14 +131,14 @@ class Preparation:
             try:
                 talk = self.slides(brief, self._pack)
                 if talk.get("slides"):
-                    Path(base + ".slides.json").write_text(json.dumps(talk, ensure_ascii=False, indent=1), encoding="utf-8")
+                    call_layout.sidecar_mk(base, ".slides.json").write_text(json.dumps(talk, ensure_ascii=False, indent=1), encoding="utf-8")
                 else:
                     self.slides_error = "no slides in the reply"
             except Exception as error:  # noqa: BLE001  the brief, cards and facts stay; the talk is reported
                 self.slides_error = str(error)[:200]
-        Path(base + ".brief.md").write_text(brief.rstrip() + "\n\nSources: " + "; ".join(sources) + "\n", encoding="utf-8")
+        call_layout.sidecar_mk(base, ".brief.md").write_text(brief.rstrip() + "\n\nSources: " + "; ".join(sources) + "\n", encoding="utf-8")
         for kind, values in (("cards", cards), ("facts", facts)):
-            Path(base + "." + kind + ".json").write_text(json.dumps(values, ensure_ascii=False, indent=1), encoding="utf-8")
+            call_layout.sidecar_mk(base, "." + kind + ".json").write_text(json.dumps(values, ensure_ascii=False, indent=1), encoding="utf-8")
         return sources
 
 

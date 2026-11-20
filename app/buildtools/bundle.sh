@@ -34,7 +34,7 @@ xcrun swift "$HERE/buildtools/make_icon.swift" "$ICONSET" >/dev/null && iconutil
 # the Setup window copies the core into the app folder and installs Python modules and models.
 LT="$HERE/../recorder"
 CORE="$APP/Contents/Resources/core"; mkdir -p "$CORE/src" "$CORE/bin"
-cp "$LT/src/transcriber.py" "$LT/src/semantic.py" "$LT/src/fromfile.py" "$LT/src/fetchlink.py" "$CORE/src/"
+cp "$LT/src/transcriber.py" "$LT/src/semantic.py" "$LT/src/fromfile.py" "$LT/src/fetchlink.py" "$LT/src/call_layout.py" "$CORE/src/"
 cp "$LT/bin/lt" "$LT/bin/read_delta.py" "$CORE/bin/"
 cp "$LT/config.json" "$CORE/config.json"
 xcrun swiftc -O -o "$CORE/bin/audiocap" "$LT/src/audiocap.swift" \

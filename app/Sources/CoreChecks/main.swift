@@ -4470,8 +4470,252 @@ func meetingRecap0261() {
     expect(!MeetingNotes.markdown(m, lab).contains("What happened"), "0.26.1: no recap without its label")
 }
 
+/// Call folders (rules/call_layout.yaml, 19.11): layout, sidecar paths, migration of the real pacenote-sync file set.
+/// Call folders, block B4: the core paths follow the layout, a call moves between projects folder by folder.
+func callFoldersB4() {
+    let fm = FileManager.default
+    let root = NSTemporaryDirectory() + "pn-b4-\(UUID().uuidString)"
+    let a = root + "/orbit", b = root + "/mine"
+    let folder = "2026-11-18-pacenote-sync", key = "2026-11-18-1512-pacenote-sync", key2 = "2026-11-18-1700-pacenote-sync"
+    let top = a + "/live/" + folder, work = top + "/.work"
+    for d in [work, a + "/video", b + "/live"] { try? fm.createDirectory(atPath: d, withIntermediateDirectories: true) }
+    let tr = top + "/" + key + ".app.md"
+    // core paths
+    expect(CallSync.statePath(transcript: tr) == work + "/" + key + ".app.sync.json", "B4: sync state in .work")
+    expect(CallSync.sheetPath(transcript: tr) == work + "/" + key + ".app.sheet.json" && CallSync.inboxPath(transcript: tr) == work + "/" + key + ".app.inbox.jsonl", "B4: sheet and inbox in .work")
+    expect(CallLists.notesPath(transcript: tr) == top + "/" + key + ".app.notes.md", "B4: notes on top")
+    expect(CallLists.tipsPaths(transcript: tr).allSatisfy { $0.hasPrefix(work + "/") }, "B4: tips in .work")
+    expect(DriveTranscript.metaPath(transcript: tr) == work + "/" + key + ".app.drive.json", "B4: drive meta in .work")
+    expect(RecordingFiles.folder(transcript: tr) == a + "/video", "B4: video stays in <project>/video for a call folder")
+    expect(RecordingFiles.folder(transcript: a + "/live/" + key + ".app.md") == a + "/video", "B4: video folder for a legacy call")
+    expect(CallSync.statePath(transcript: a + "/live/" + key + ".app.md") == a + "/live/" + key + ".app.sync.json", "B4: legacy path unchanged")
+    // reassign of a call in a folder; another call of the same day and title stays
+    let mine = [key + ".app.md", key + ".app.notes.md"], mineWork = [key + ".app.tips.jsonl", key + ".app.sync.json", key + ".app.notion.json"]
+    for n in mine { fm.createFile(atPath: top + "/" + n, contents: Data("x".utf8)) }
+    for n in mineWork { fm.createFile(atPath: work + "/" + n, contents: Data("x".utf8)) }
+    fm.createFile(atPath: top + "/" + key2 + ".app.md", contents: Data("y".utf8))
+    fm.createFile(atPath: work + "/" + key2 + ".app.tips.jsonl", contents: Data("y".utf8))
+    try? fm.createDirectory(atPath: work + "/" + key + ".app.judge", withIntermediateDirectories: true)
+    fm.createFile(atPath: work + "/" + key + ".app.judge/judge.summary.json", contents: Data("{}".utf8))
+    fm.createFile(atPath: a + "/video/" + key + ".recording.mp4", contents: Data("v".utf8))
+    expect(CallReassign.root(of: tr) == a && CallReassign.callFolder(of: tr) == folder && CallReassign.callFolder(of: a + "/live/" + key + ".app.md") == nil, "B4: root and folder of a call")
+    var p = CallReassign.plan(file: tr, toRoot: b)
+    expect(p.newFile == b + "/live/" + folder + "/" + key + ".app.md", "B4: new transcript path in the same folder name (\(p.newFile))")
+    expect(p.moves.count == mine.count + mineWork.count + 1 + 1 && p.canApply, "B4: plan has this call's files, the judge folder and the video (\(p.moves.count))")
+    expect(CallReassign.lastWrite(file: tr) != nil, "B4: last write is found in the folder")
+    p = CallReassign.plan(file: tr, toRoot: b)
+    _ = try? CallReassign.apply(p)
+    for n in mine { expect(fm.fileExists(atPath: b + "/live/" + folder + "/" + n), "B4: moved on top: " + n) }
+    for n in mineWork { expect(fm.fileExists(atPath: b + "/live/" + folder + "/.work/" + n), "B4: moved to .work: " + n) }
+    expect(fm.fileExists(atPath: b + "/live/" + folder + "/.work/" + key + ".app.judge/judge.summary.json") && fm.fileExists(atPath: b + "/video/" + key + ".recording.mp4"), "B4: judge and video moved")
+    expect(fm.fileExists(atPath: top + "/" + key2 + ".app.md") && fm.fileExists(atPath: work + "/" + key2 + ".app.tips.jsonl"), "B4: the other call of that day stays")
+    // the folder is removed only when empty: move the second call too
+    let p2 = CallReassign.plan(file: top + "/" + key2 + ".app.md", toRoot: b)
+    _ = try? CallReassign.apply(p2)
+    expect(!fm.fileExists(atPath: top), "B4: an emptied call folder is removed")
+    // a late file of the first call is swept into the new project's folder
+    try? fm.createDirectory(atPath: work, withIntermediateDirectories: true)
+    fm.createFile(atPath: work + "/" + key + ".app.llm.jsonl", contents: Data("z".utf8))
+    let sw = CallReassign.sweep(key: key, fromRoot: a, toRoot: b, folder: folder)
+    expect(sw.count == 1 && fm.fileExists(atPath: b + "/live/" + folder + "/.work/" + key + ".app.llm.jsonl") && !fm.fileExists(atPath: top), "B4: sweep follows the folder and cleans up")
+    // preps in both layouts
+    let live = b + "/live"
+    fm.createFile(atPath: live + "/prep-2026-11-10-0900-old-meet.brief.md", contents: Data("o".utf8))
+    let pf = live + "/" + folder + "/.work"
+    fm.createFile(atPath: pf + "/prep-2026-11-18-1500-pacenote-sync.brief.md", contents: Data("n".utf8))
+    fm.createFile(atPath: pf + "/prep-2026-11-18-1500-pacenote-sync.sheet.json", contents: Data("n".utf8))
+    let found = CallLayout.prepFiles(live: live, suffix: ".brief.md").map { ($0 as NSString).lastPathComponent }.sorted()
+    expect(found == ["prep-2026-11-10-0900-old-meet.brief.md", "prep-2026-11-18-1500-pacenote-sync.brief.md"], "B4: prepFiles in both layouts \(found)")
+    expect(CallLayout.prepPath(live: live, name: "prep-2026-11-18-1500-pacenote-sync.brief.md") == pf + "/prep-2026-11-18-1500-pacenote-sync.brief.md"
+           && CallLayout.prepPath(live: live, name: "prep-nothing.brief.md") == nil, "B4: prepPath finds a name")
+    expect(CallLayout.files(live: live, includeWork: true).contains(pf + "/" + key + ".app.sync.json") && !CallLayout.files(live: live).contains { $0.contains("/.work/") }, "B4: includeWork adds the service files only when asked")
+}
+
+func callFolders() {
+    let L = CallLayout.self
+    let n = L.parse("prep-2026-11-18-1515-pacenote-sync.sheet.json")
+    expect(n?.prep == true && n?.key == "2026-11-18-1515-pacenote-sync" && n?.folder == "2026-11-18-pacenote-sync" && n?.rest == ".sheet.json", "folders: parse prep \(String(describing: n))")
+    expect(L.parse("commitments.jsonl") == nil && L.parse("2026-11-18-pacenote-sync") == nil, "folders: non-call names")
+    expect(L.parse("2026-11-18-1512-pacenote-sync.app.md")!.visible && !L.parse("2026-11-18-1512-pacenote-sync.app.tips.jsonl")!.visible
+           && L.parse("prep-2026-11-18-1515-pacenote-sync.sheet.md")!.visible && !L.parse("prep-2026-11-18-1515-pacenote-sync.brief.md")!.visible, "folders: visible set")
+    let call = "/p/live/2026-11-18-pacenote-sync/2026-11-18-1512-pacenote-sync.app.md"
+    expect(L.sidecar(of: call, ".tips.jsonl") == "/p/live/2026-11-18-pacenote-sync/.work/2026-11-18-1512-pacenote-sync.app.tips.jsonl", "folders: service sidecar in .work")
+    expect(L.sidecar(of: call, ".notes.md") == "/p/live/2026-11-18-pacenote-sync/2026-11-18-1512-pacenote-sync.app.notes.md", "folders: notes on top")
+    expect(L.sidecar(of: "/p/live/2026-11-18-1512-x.app.md", ".tips.jsonl") == "/p/live/2026-11-18-1512-x.app.tips.jsonl", "folders: legacy flat path unchanged")
+    expect(L.sidecar("/p/live/2026-11-18-x/.work/2026-11-18-1512-x.app", ".speakers.json") == "/p/live/2026-11-18-x/.work/2026-11-18-1512-x.app.speakers.json", "folders: stem inside .work")
+    expect(L.liveFolder(of: call) == "/p/live" && L.liveFolder(of: "/p/live/a.md") == "/p/live" && L.liveFolder(of: "/p/live/d/.work/a.json") == "/p/live", "folders: live folder")
+    // migration on a temp copy of a real call's files
+    let fm = FileManager.default
+    let live = NSTemporaryDirectory() + "pn-folders-\(UUID().uuidString)/live"
+    try? fm.createDirectory(atPath: live + "/sources", withIntermediateDirectories: true)
+    let k = "2026-11-18-1512-pacenote-sync.app"
+    let names = [".brief.md", ".cards.json", ".clean.md", ".facts.json", ".inbox.jsonl", ".md", ".md.timing.jsonl", ".meet.md", ".named.md",
+                 ".notes.md", ".semantic-summary.json", ".semantic.jsonl", ".semantic.npz", ".sheet-live.json", ".sheet.json", ".speakers.json", ".sync.json", ".tips.jsonl"].map { k + $0 }
+        + ["prep-2026-11-18-1515-pacenote-sync.sheet.md", "prep-2026-11-18-1515-pacenote-sync.sheet.json", "commitments.jsonl"]
+    let old = Date(timeIntervalSinceNow: -3600)
+    for x in names { fm.createFile(atPath: live + "/" + x, contents: Data("x".utf8), attributes: [.modificationDate: old]) }
+    try? fm.createDirectory(atPath: live + "/" + k + ".judge", withIntermediateDirectories: true)
+    try? fm.setAttributes([.modificationDate: old], ofItemAtPath: live + "/" + k + ".judge")
+    fm.createFile(atPath: live + "/2026-11-19-0900-standup.app.md", contents: Data("x".utf8))     // just written: busy
+    let dry = L.migrate(live: live, dryRun: true)     // B6: the preview moves and creates nothing
+    expect(dry.moved.count == 21 && dry.skippedBusy == ["2026-11-19-0900-standup"] && dry.conflicts.isEmpty, "folders: dry run reports \(dry.moved.count) \(dry.skippedBusy)")
+    expect(!fm.fileExists(atPath: live + "/2026-11-18-pacenote-sync") && fm.fileExists(atPath: live + "/" + k + ".md") && fm.fileExists(atPath: live + "/" + k + ".tips.jsonl"), "folders: dry run touched nothing")
+    let r = L.migrate(live: live)
+    let dir = live + "/2026-11-18-pacenote-sync"
+    let top = Set(((try? fm.contentsOfDirectory(atPath: dir)) ?? []).filter { !$0.hasPrefix(".") })
+    expect(top == [k + ".md", k + ".notes.md", k + ".brief.md", "prep-2026-11-18-1515-pacenote-sync.sheet.md"], "folders: visible on top \(top.sorted())")
+    expect(fm.fileExists(atPath: dir + "/.work/" + k + ".tips.jsonl") && fm.fileExists(atPath: dir + "/.work/" + k + ".judge"), "folders: service files and .judge in .work")
+    expect(fm.fileExists(atPath: live + "/commitments.jsonl") && fm.fileExists(atPath: live + "/sources"), "folders: register and sources stay")
+    expect(r.moved.count == 21 && r.skippedBusy == ["2026-11-19-0900-standup"] && r.conflicts.isEmpty && fm.fileExists(atPath: live + "/2026-11-19-0900-standup.app.md"), "folders: report \(r.moved.count) \(r.skippedBusy)")
+    expect(L.migrate(live: live, now: Date(timeIntervalSinceNow: 7200)).moved.map { ($0.to as NSString).lastPathComponent } == ["2026-11-19-0900-standup.app.md"], "folders: second run only moves the quiet call")
+    expect(L.migrate(live: live, now: Date(timeIntervalSinceNow: 7200)).isEmpty, "folders: idempotent")
+    expect(L.migrate(live: live, now: Date(timeIntervalSinceNow: 7200), dryRun: true).isEmpty, "folders: dry run after the move reports nothing")
+    fm.createFile(atPath: live + "/" + k + ".tips.jsonl", contents: Data("late".utf8), attributes: [.modificationDate: old])
+    let c = L.migrate(live: live)
+    expect(c.conflicts.count == 1 && fm.fileExists(atPath: live + "/" + k + ".tips.jsonl"), "folders: conflict leaves the file")
+    let listed = L.files(live: live).map { ($0 as NSString).lastPathComponent }
+    expect(listed.contains(k + ".md") && listed.contains("2026-11-19-0900-standup.app.md") && !listed.contains(k + ".sync.json"), "folders: files() lists both layouts, no service files")
+    try? fm.removeItem(atPath: (live as NSString).deletingLastPathComponent)
+}
+
+// 0.26.2 (speakers on the call page, B2): the transcript with the speakers as the PM left them, the edit arguments
+func callSpeakersB2() {
+    let md = """
+    # Call
+    [10:00:01] Me (en): Hi all
+    [10:00:04] Other [S1] (en): Hello Mike
+    [10:00:09] Other [S2] (en): Morning
+    [10:00:12] Other [S3] (en): Same here
+    [10:00:15] Other [S1] (en): Let us start
+    [10:00:20] Other (en): untagged
+    """
+    let snap: [String: Any] = ["clusters": ["S1": ["name": "Emily", "seconds": 12.5, "side": "client"],
+                                            "S2": ["name": NSNull(), "seconds": 3, "suggestions": [["name": "Mike Brown", "score": 0.7]]],
+                                            "S3": ["name": "Mike", "seconds": 2, "named_by": "meet"]],
+                               "overrides": ["10:00:15": "S2", "10:00:01": "S2"], "merged": ["S3": "S2"], "edited_at": 1000.0]
+    let s = CallSpeakers.parse(md: md, snapshot: snap, voicesFile: ["remember": true, "auto": ["S1"]], me: "Me")
+    expect(s.lines.count == 6 && s.editable && s.voices, "speakers: lines and flags")
+    expect(s.speakers.map(\.id) == ["S1", "S2"], "speakers: a merged speaker is gone")
+    expect(s.display(s.lines[1]) == "Emily" && s.display(s.lines[2]) == "Speaker 2", "speakers: names as named.md")
+    expect(s.owner(s.lines[3]) == "S2", "speakers: a merged line goes to its target")
+    expect(s.owner(s.lines[4]) == "S2" && s.display(s.lines[4]) == "Speaker 2", "speakers: a fixed line")
+    expect(!s.isMe(s.lines[0]) && s.owner(s.lines[0]) == "S2", "speakers: a mic line moved to a speaker")
+    expect(s.owner(s.lines[5]) == nil && s.display(s.lines[5]) == "Other", "speakers: an untagged line keeps its label")
+    expect(s.speaker("S1")?.remember == false && s.speaker("S2")?.remember == true, "speakers: a roster name waits for the PM")
+    expect(s.speaker("S2")?.suggestions == ["Mike Brown"], "speakers: suggestions by voice")
+    expect(s.ranked().first?.sid == "S2", "speakers: most lines first")
+    expect(s.plan(rename: "S2", to: " emily ") == .merge("S2", into: "S1"), "speakers: a taken name is a merge")
+    expect(s.plan(rename: "S2", to: "Mike Brown") == .rename("S2", "Mike Brown") && s.plan(rename: "S2", to: "  ") == nil, "speakers: rename")
+    expect(s.plan(line: "10:00:09", to: "EMILY") == .lineTo("10:00:09", sid: "S1"), "speakers: said by a speaker of this call")
+    expect(s.plan(line: "10:00:09", to: "Emily Clark")?.args == ["--fix", "10:00:09=@Emily Clark"], "speakers: said by someone new")
+    expect(CallSpeakers.Edit.remember("S1", false).args == ["--remember", "S1=off"] && CallSpeakers.Edit.side("S1", "team").args == ["--side", "S1=team"], "speakers: args")
+    let meet = CallSpeakers.parse(md: md, snapshot: ["clusters": ["S3": ["name": "Mike", "named_by": "meet"]]], voicesFile: ["remember": true], me: "Me")
+    expect(meet.speaker("S3")?.remember == false, "speakers: a Meet name waits for the PM")
+    let pub = CallSpeakers.parse(md: md, snapshot: ["clusters": ["S1": ["name": "Emily"]]], voicesFile: ["remember": false], me: "Me")
+    expect(pub.speaker("S1")?.remember == false, "speakers: a public call is not remembered")
+    let old = CallSpeakers.parse(md: md, snapshot: ["clusters": ["S1": ["name": "Emily"]]], voicesFile: nil, me: "Me")
+    expect(!old.voices && old.editable, "speakers: a call before 0.26.2 has names only")
+    let file = CallSpeakers.parse(md: md, snapshot: ["clusters": ["S1": ["name": "Emily", "embs": [[0.1]]]]], voicesFile: nil, me: "Me")
+    expect(file.voices, "speakers: a recording keeps its prints in speakers.json")
+    let none = CallSpeakers.parse(md: md, snapshot: nil, voicesFile: nil, me: "Me")
+    expect(!none.editable && none.display(none.lines[1]) == "Speaker 1" && none.isMe(none.lines[0]), "speakers: no speakers file, read only")
+    expect(CallSpeakers.notesStale(editedAt: 1000, notesWritten: Date(timeIntervalSince1970: 900)), "speakers: notes older than the edit")
+    expect(!CallSpeakers.notesStale(editedAt: 1000, notesWritten: Date(timeIntervalSince1970: 1200)) && !CallSpeakers.notesStale(editedAt: nil, notesWritten: Date()), "speakers: notes up to date")
+}
+
+/// 0.26.2: the model lists of the API pickers come from the provider: text models only, newest first, a model
+/// without a price in the app marked, the list kept on disk, the built-in list when nothing was read.
+func modelCatalog0262() {
+    func js(_ s: String) -> Data { Data(s.utf8) }
+    let gem = ModelCatalog.parseGemini(js("""
+    {"models": [
+     {"name": "models/gemini-4-hydrogen", "displayName": "Gemini 4 Hydrogen", "supportedGenerationMethods": ["generateContent", "countTokens"]},
+     {"name": "models/gemini-3.5-flash-lite", "displayName": "Gemini 3.5 Flash-Lite", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemini-4-argon", "displayName": "Gemini 4 Argon", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemini-3.8-flash", "displayName": "Gemini 3.8 Flash", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemini-embedding-001", "supportedGenerationMethods": ["embedContent"]},
+     {"name": "models/gemini-4-argon-image", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemini-flash-latest", "supportedGenerationMethods": ["generateContent"]},
+     {"name": "models/gemma-4-31b-it", "supportedGenerationMethods": ["generateContent"]}
+    ], "nextPageToken": "abc"}
+    """))
+    expect(gem.entries.map(\.id) == ["gemini-4-hydrogen", "gemini-3.5-flash-lite", "gemini-4-argon", "gemini-3.8-flash"], "catalog: Gemini text models only \(gem.entries.map(\.id))")
+    expect(gem.next == "abc" && ModelCatalog.parseGemini(js("{\"models\": []}")).next == nil, "catalog: Gemini page token")
+    expect(ModelCatalog.sorted(gem.entries).map(\.id) == ["gemini-4-argon", "gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.5-flash-lite"], "catalog: Gemini newest version first")
+    let hyd = gem.entries[0], lite = gem.entries[1]
+    expect(!hyd.known && hyd.label == "Gemini 4 Hydrogen" && lite.known && lite.label.contains("$0.30"), "catalog: no price for Hydrogen, a label with the price for Flash-Lite")
+
+    let oa = ModelCatalog.parseOpenAI(js("""
+    {"data": [
+     {"id": "gpt-6.1-sol", "created": 200}, {"id": "gpt-7-nova", "created": 300}, {"id": "gpt-6-luna", "created": 100},
+     {"id": "gpt-6-luna-2026-11-04", "created": 100}, {"id": "text-embedding-3-large", "created": 50},
+     {"id": "gpt-6-realtime", "created": 90}, {"id": "whisper-1", "created": 10}, {"id": "gpt-6-image", "created": 90}
+    ]}
+    """))
+    expect(ModelCatalog.sorted(oa.entries).map(\.id) == ["gpt-7-nova", "gpt-6.1-sol", "gpt-6-luna"], "catalog: OpenAI text models, newest first \(oa.entries.map(\.id))")
+    expect(!oa.entries.first(where: { $0.id == "gpt-7-nova" })!.known && oa.entries.first(where: { $0.id == "gpt-6.1-sol" })!.known, "catalog: OpenAI price known or not")
+
+    let cl = ModelCatalog.parseClaude(js("""
+    {"data": [
+     {"id": "claude-haiku-5-5", "display_name": "Claude Haiku 5.5", "created_at": "2026-05-01T00:00:00Z"},
+     {"id": "claude-opus-6", "display_name": "Claude Opus 6", "created_at": "2026-12-01T00:00:00Z"},
+     {"id": "claude-sonnet-5-5", "display_name": "Claude Sonnet 5.5", "created_at": "2026-06-01T00:00:00.123Z"},
+     {"id": "other-model", "display_name": "Other"}
+    ], "has_more": true, "last_id": "claude-sonnet-5-5"}
+    """))
+    expect(ModelCatalog.sorted(cl.entries).map(\.id) == ["claude-opus-6", "claude-sonnet-5-5", "claude-haiku-5-5"], "catalog: Claude by date, newest first")
+    expect(cl.next == "claude-sonnet-5-5" && cl.entries.first(where: { $0.id == "claude-sonnet-5-5" })!.known && !cl.entries.first(where: { $0.id == "claude-opus-6" })!.known, "catalog: Claude page and price")
+    expect(ModelCatalog.parseClaude(js("not json")).entries.isEmpty && ModelCatalog.parseGemini(js("[]")).entries.isEmpty, "catalog: unreadable answer gives nothing")
+
+    // a picker: the provider's list; the built-in one when nothing was read; the chosen model never vanishes
+    expect(ModelCatalog.choices(.gemini, live: [], selected: "gemini-3.8-flash").map(\.id) == ["gemini-4-argon", "gemini-3.8-flash", "gemini-3.5-flash-lite"], "catalog: built-in list, newest first")
+    let withOld = ModelCatalog.choices(.gemini, live: gem.entries, selected: "gemini-2.5-pro").map(\.id)
+    expect(withOld.first == "gemini-4-argon" && withOld.last == "gemini-2.5-pro" && withOld.count == 5, "catalog: a model chosen earlier stays in the list \(withOld)")
+    expect(ModelCatalog.unique(gem.entries + gem.entries).count == 4, "catalog: one row per model")
+
+    // cache and freshness
+    let dir = NSTemporaryDirectory() + "catalog-\(getpid())"
+    ModelCatalog.saveCache(gem.entries, fetchedAt: 1000, dir: dir, provider: .gemini)
+    let back = ModelCatalog.loadCache(dir: dir, provider: .gemini)
+    expect(back?.entries == gem.entries && back?.fetchedAt == 1000 && ModelCatalog.loadCache(dir: dir, provider: .openai) == nil, "catalog: cache round trip")
+    try? FileManager.default.removeItem(atPath: dir)
+    expect(ModelCatalog.isFresh(fetchedAt: 1000, now: 1000 + 3600) && !ModelCatalog.isFresh(fetchedAt: 1000, now: 1000 + 7 * 3600) && !ModelCatalog.isFresh(fetchedAt: 5000, now: 1000), "catalog: fresh for 6 hours")
+    let relabeled = ModelCatalog.relabel([ModelCatalog.Entry(id: "gemini-4-argon", label: "old", known: false)])
+    expect(relabeled[0].known && relabeled[0].label.contains("$2 / $10"), "catalog: a cached list follows the app's price table")
+
+    // spending: a model without a price is counted as a request with no price, not as $0 spent
+    let rows = AIUsage.parse(text: """
+    {"at": "2026-11-20T10:00:00+0200", "job": "live", "route": "gemini", "model": "gemini-4-hydrogen", "input": 100, "output": 20, "usd": null, "error": false}
+    {"at": "2026-11-20T10:01:00+0200", "job": "live", "route": "gemini", "model": "gemini-4-hydrogen", "input": 100, "output": 20, "usd": null, "error": false}
+    {"at": "2026-11-20T10:02:00+0200", "job": "live", "route": "gemini", "model": "gemini-3.5-flash-lite", "input": 100, "output": 20, "usd": 0.001, "error": false}
+    {"at": "2026-11-20T10:03:00+0200", "job": "live", "route": "gemini", "model": "gemini-4-hydrogen", "error": true}
+    """)
+    let by = AIUsage.byModel(rows)
+    let hy = by.first { $0.model == "gemini-4-hydrogen" }?.total, fl = by.first { $0.model == "gemini-3.5-flash-lite" }?.total
+    expect(rows.count == 4 && !rows[0].priced && rows[2].priced && rows[3].priced, "usage: priced flag")
+    expect(hy?.unpriced == 2 && hy?.requests == 3 && fl?.unpriced == 0 && AIUsage.total(rows).unpriced == 2, "usage: unpriced requests counted")
+}
+
 notionOAuthINT2()
+modelCatalog0262()
 notionINT3()
 meetingRecap0261()
+callFolders()
+callFoldersB4()
+callSpeakersB2()
+
+/// 0.26.2 (speakers on the call page, B3): Rewrite notes.
+func callSpeakersB3() {
+    expect(CallSpeakers.editedAt(snapshot: ["edited_at": 1700000000.5]) == 1700000000.5, "rewrite: edited_at read")
+    expect(CallSpeakers.editedAt(snapshot: ["rev": 2]) == nil && CallSpeakers.editedAt(snapshot: nil) == nil, "rewrite: no edit, no time")
+    let a = CallSpeakers.rewriteArgs(md: "/c/x.app.md", model: "m", aliases: ["Mike", "Mike Johnson"], config: "/p/orbit.md")
+    expect(a.contains("--rewrite") && !a.contains("--meeting"), "rewrite: the full notes, not the meeting part")
+    expect(a.suffix(2) == ["--project-config", "/p/orbit.md"] && a.contains("Mike,Mike Johnson"), "rewrite: config and aliases")
+    expect(!CallSpeakers.rewriteArgs(md: "x", model: "m", aliases: [], config: "").contains("--project-config"), "rewrite: no config")
+    let notes = Date(timeIntervalSince1970: 1000)
+    expect(CallSpeakers.notesStale(editedAt: 1500, notesWritten: notes), "rewrite: an edit after the notes is stale")
+    expect(!CallSpeakers.notesStale(editedAt: 1500, notesWritten: Date(timeIntervalSince1970: 1600)), "rewrite: notes written again are fresh")
+}
+callSpeakersB3()
 print("core checks: \(passed) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

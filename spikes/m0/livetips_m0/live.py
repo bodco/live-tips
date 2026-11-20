@@ -14,6 +14,8 @@ import json
 import time
 from pathlib import Path
 
+from . import call_layout
+
 from .commitments import norm_text
 from .replay import build_engine, finish_run_info, run_info
 from .transcript import hms_to_s, parse_line
@@ -214,7 +216,7 @@ class LiveRun:
 
     def __init__(self, cfg, eng, md: Path, inbox: Path = None, from_start: bool = False):
         self.cfg, self.eng = cfg, eng
-        self.t_md, self.t_tm = Tail(md), Tail(Path(str(md) + ".timing.jsonl"))
+        self.t_md, self.t_tm = Tail(md), Tail(call_layout.sidecar(str(md), ".timing.jsonl"))
         self.t_in = Tail(inbox) if inbox else None
         skip_existing(self.t_in)                     # only requests made after the engine attached
         if not from_start:                           # join a running call: skip what is already there
@@ -322,7 +324,7 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
         cfg.setdefault("register_dir", str(md.parent))
     cfg.setdefault("call_md", str(md))         # 0.8.7: the Sales summary goes next to the transcript
     eng, stem = build_engine(cfg, md, out, now_sod, provider)
-    (out / (stem + ".app.run.json")).write_text(json.dumps(run_info(
+    (call_layout.sidecar(out / stem, ".app.run.json")).write_text(json.dumps(run_info(
         eng.provider, cfg, md=md.name, mode="live", variant=cfg.get("variant"),
         cache_ttl=cfg.get("cache_ttl"), started=time.strftime("%Y-%m-%d %H:%M:%S")), ensure_ascii=False, indent=1))
     lr = LiveRun(cfg, eng, md, inbox, from_start)
@@ -337,7 +339,7 @@ def run(cfg, md: Path, out: Path, status: Path = None, idle_min: float = 6.0, po
         eng.final_wrapup()
     except Exception as e:  # noqa: BLE001
         print("wrapup:", repr(e), flush=True)
-    (out / (stem + ".app.summary.json")).write_text(json.dumps(lr.summary(), indent=1))
+    (call_layout.sidecar(out / stem, ".app.summary.json")).write_text(json.dumps(lr.summary(), indent=1))
     finish_run_info(out, stem)
     return eng
 

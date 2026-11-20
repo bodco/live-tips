@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import LiveTipsCore
 
 /// 2026-10-28 (owner): read (and correct) a call's preparation before the call starts: the full
 /// prep-....brief.md in a window, rendered; Edit shows the text, Save writes it back (the first version is kept as
@@ -24,11 +25,10 @@ final class PrepDocWindow {
     /// The brief of a planned or chosen call, if it has been written.
     static func path(for m: StartCallModel) -> String? {
         let fm = FileManager.default
-        if let b = m.prepBase, fm.fileExists(atPath: b + ".brief.md") { return b + ".brief.md" }
+        if let b = m.prepBase, fm.fileExists(atPath: CallLayout.sidecar(b, ".brief.md")) { return CallLayout.sidecar(b, ".brief.md") }
         if let c = m.chosenPrepPath, fm.fileExists(atPath: c) { return c }
         if let p = m.prep, p.matches, let root = m.root {
-            let f = ((root as NSString).appendingPathComponent("live") as NSString).appendingPathComponent(p.file)
-            if fm.fileExists(atPath: f) { return f }
+            if let f = CallLayout.prepPath(live: (root as NSString).appendingPathComponent("live"), name: p.file) { return f }
         }
         return nil
     }

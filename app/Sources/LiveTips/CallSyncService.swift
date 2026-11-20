@@ -437,7 +437,7 @@ final class CallSyncService: ObservableObject {
             }
         } catch { return (q, error.localizedDescription) }
         // the Mac follows: the project's calls on the server now belong to the target
-        for r in CallHistory.shared.records where ((r.file as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent == p.root {
+        for r in CallHistory.shared.records where (CallLayout.liveFolder(of: r.file) as NSString).deletingLastPathComponent == p.root {
             let path = CallSync.statePath(transcript: r.file)
             guard var st = CallSync.State.load(path), !st.callID.isEmpty || !st.orgID.isEmpty else { continue }
             st.orgID = target; st.error = ""
@@ -450,7 +450,7 @@ final class CallSyncService: ObservableObject {
 
     /// After a move: send the project's calls again (each only when its body changed, as always).
     func resync(root: String) {
-        for r in CallHistory.shared.records where ((r.file as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent == root && !r.hidden {
+        for r in CallHistory.shared.records where (CallLayout.liveFolder(of: r.file) as NSString).deletingLastPathComponent == root && !r.hidden {
             sync(r.file)
         }
     }

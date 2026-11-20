@@ -3,6 +3,44 @@
 Pacenote. Earlier versions are described in the commit messages and in
 [docs/en/live-tips.md](docs/en/live-tips.md), section 14.
 
+## 0.26.2 (2026-11-20)
+
+- **Model lists come from the provider (2026-11-20):** the model pickers for Claude, OpenAI and Gemini API keys now
+  list what the provider offers, so a new model (Gemini 4 Hydrogen, for one) appears without an app update. Text
+  models only, newest first. The list is read when you open a picker (at most every 6 hours), after a key test and on
+  Refresh the list; the last list is kept on this Mac, and the built-in list shows until the provider has answered. A
+  model without a price in Pacenote is marked "price unknown", and Usage shows "no price" for it instead of $0: its
+  cost is not counted in Spending until the price table gets it.
+- **A folder for every call (2026-11-19):** each call now lives in its own folder,
+  `<project>/live/<date>-<title>/`. On top you see what you read: the transcript, the meeting notes, the brief and the
+  preparation sheet. The working files (cards, facts, tips, sheet data) sit in a hidden `.work/` inside it, so the
+  project's `live/` is a list of calls instead of hundreds of files. Calls on the same day with the same title share
+  one folder. The commitments register, lessons and `sources/` stay in `live/`.
+- **Calls made before move on their own (2026-11-19):** at launch Pacenote moves every old call of every project,
+  workspace and its own folder into its call folder. It only moves: nothing is deleted or overwritten, a call written
+  in the last minutes waits for the next launch, a file that would clash stays where it was, and running it again does
+  nothing. Home, the call pages and Notion links keep working. What moved is counted in the app log (`logs/app.log`).
+- **Reassign, the skill and the tools follow (2026-11-19):** moving a call to another project moves its files and
+  removes the old folder only when it is empty. The Cowork skill, the recorder and the tools write into the call
+  folder and still read the old flat layout.
+- **Fix the speakers after the call (2026-11-20):** on the Transcript tab of a call page the name above a line is a
+  menu: Rename (with "Sounds like ..." from the voice library and the project people, or a name you type), Same person
+  as (merge two speakers), Remember this voice and Side Team / Client. Right-click a line for Said by... to give just
+  that line to someone else, a person who has no speaker yet included. Every change applies to the whole call and the
+  transcript with names is written again; the original transcript stays as it was. While a call is still recording
+  the page is read-only.
+- **The voice is remembered too (2026-11-20):** the recorder now keeps the voice prints of a call (never the audio)
+  in its hidden `.work/` folder, only on this Mac, so a name you fix after the call teaches the voice library the same
+  way as a name given during the call. Calls recorded before this version have no voice prints: their names can be
+  fixed, the voices are not remembered, and the page says so.
+- **Rewrite notes (2026-11-20):** after a speaker change the Transcript and Meeting notes tabs say the notes still use
+  the old names, with a Rewrite notes button. AI writes the notes again from the transcript with names, on the After
+  the call way, at about the cost of the first notes (counted in your spend and the call history). The old notes stay
+  until the new ones are written. Open tasks of this call that you have not touched move to the new owner instead of
+  getting a twin, and your own edits on the call page (decisions, questions, risks, agenda) stay. On Notion the
+  Decisions, Action items, Open questions and Risks of the meeting page are updated; the TL;DR, Recap and Topics
+  there keep the old text for now.
+
 ## 0.26.1 (2026-11-19)
 
 - **What happened, at the top of the Summary (2026-11-19):** the Meeting notes of a call now start with a short

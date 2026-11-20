@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 from . import presets as P
+from .. import call_layout as CL
 from . import readiness as R
 from . import schema as S
 
@@ -169,8 +170,10 @@ def cmd_derive(a, req, rules):
     path = str(Path(path).expanduser())
     sheet = _read_json(path)
     base = path[:-len(".sheet.json")] if path.endswith(".sheet.json") else path
-    Path(base + ".sheet.md").write_text(D.render_md(sheet), encoding="utf-8")
-    return _out({"written": D.derive(sheet, base) + [base + ".sheet.md"]})
+    p_md = CL.sidecar(base, ".sheet.md")
+    p_md.parent.mkdir(parents=True, exist_ok=True)
+    p_md.write_text(D.render_md(sheet), encoding="utf-8")
+    return _out({"written": D.derive(sheet, base) + [str(p_md)]})
 
 
 def main(argv=None):

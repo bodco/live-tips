@@ -17,6 +17,7 @@ import re
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+from . import call_layout
 from . import callinfo
 from . import commitments as register
 
@@ -33,7 +34,7 @@ def call_files(root: Path) -> List[Path]:
     live = Path(root) / "live"
     if not live.is_dir():
         return []
-    files = [p for p in live.iterdir() if CALL_MD.match(p.name) and not p.name.endswith(NOT_TRANSCRIPT)]
+    files = [p for p in call_layout.files(live) if CALL_MD.match(p.name) and not p.name.endswith(NOT_TRANSCRIPT)]
     seen, out = set(), []
     for p in sorted(files, key=lambda x: x.name, reverse=True):
         key = p.name.replace(".app.md", ".md")
@@ -52,7 +53,7 @@ def notes_file(md: Path) -> Optional[Path]:
     """<stem>.notes.md as callnotes writes it, for the app's copy as well."""
     base = md.name[:-3]
     for name in (base + ".notes.md", base.replace(".app", "") + ".notes.md", base + ".app.notes.md"):
-        p = md.with_name(name)
+        p = call_layout.place(name, md.parent)
         if p.exists():
             return p
     return None

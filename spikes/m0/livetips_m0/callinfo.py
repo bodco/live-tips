@@ -3,6 +3,8 @@ the last agenda strip, the risks. Shared by the follow-up email, the call memory
 import json
 import re
 from pathlib import Path
+
+from . import call_layout
 from typing import List, Optional
 
 from .transcript import LINE_RE
@@ -15,7 +17,7 @@ def stem_of(md: Path) -> str:
 
 def tips_files(md: Path) -> List[Path]:
     """The app's tips file (<file>.tips.jsonl) and the skill's (<stem>.tips.jsonl)."""
-    out = [Path(str(md) + ".tips.jsonl"), Path(stem_of(md) + ".tips.jsonl")]
+    out = [call_layout.sidecar(str(md), ".tips.jsonl"), call_layout.sidecar(stem_of(md), ".tips.jsonl")]
     return [p for p in out if p.exists()]
 
 

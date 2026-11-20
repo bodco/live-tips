@@ -13,7 +13,7 @@ struct CRMLink: Codable, Equatable {
     var dealId = "", dealName = ""
     var contactIds: [String] = []
 
-    static func url(base: String) -> URL { URL(fileURLWithPath: base + ".crm.json") }
+    static func url(base: String) -> URL { URL(fileURLWithPath: CallLayout.sidecar(base, ".crm.json")) }
     static func load(base: String) -> CRMLink? { (try? Data(contentsOf: url(base: base))).flatMap { try? JSONDecoder().decode(CRMLink.self, from: $0) } }
     func save(base: String) { if let d = try? JSONEncoder().encode(self) { try? d.write(to: Self.url(base: base), options: .atomic) } }
 }
@@ -56,9 +56,9 @@ extension CRMService {
             link.companyId = company?.id ?? ""; link.companyName = company?.name ?? ""
             if link.dealId != "none" { link.dealId = deal?.id ?? ""; link.dealName = deal?.name ?? "" }
             link.contactIds = contacts.map(\.id)
-            try? FileManager.default.createDirectory(atPath: (base as NSString).deletingLastPathComponent, withIntermediateDirectories: true)   // 0.8.7.1
+            try? FileManager.default.createDirectory(atPath: (CallLayout.sidecar(base, ".crm.md") as NSString).deletingLastPathComponent, withIntermediateDirectories: true)   // 0.8.7.1; call folders: .work/
             let md = CRMSnapshot.render(provider: c.providerName, company: company, deal: deal, contacts: contacts, activity: acts, taken: Date())
-            try? md.replacingOccurrences(of: "\u{2014}", with: "-").write(toFile: base + ".crm.md", atomically: true, encoding: .utf8)
+            try? md.replacingOccurrences(of: "\u{2014}", with: "-").write(toFile: CallLayout.sidecar(base, ".crm.md"), atomically: true, encoding: .utf8)
             link.save(base: base)
             return (link, "")
         } catch {
@@ -83,8 +83,11 @@ struct CRMCallRow: View {
         // brief already reads it; Refresh was greyed out until a brief existed
         guard let root = model.root, !root.isEmpty else { return nil }
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmm"
-        return ((root as NSString).appendingPathComponent("live") as NSString)
-            .appendingPathComponent("prep-\(f.string(from: model.callDate))-\(StartCallModel.slugify(model.effectiveTitle))")
+        let day = DateFormatter(); day.dateFormat = "yyyy-MM-dd"
+        let slug = StartCallModel.slugify(model.effectiveTitle)
+        // the same folder PrepRunner writes the brief to (call folders)
+        return (CallLayout.folder(live: (root as NSString).appendingPathComponent("live"), date: day.string(from: model.callDate), slug: slug) as NSString)
+            .appendingPathComponent("prep-\(f.string(from: model.callDate))-\(slug)")
     }
     var emails: [String] { model.calEventID.flatMap { CalendarService.shared.event($0)?.emails } ?? [] }
 
@@ -207,7 +210,7 @@ struct CRMUpdateView: View {
         link = CRMLink.load(base: base) ?? CRMLink.load(base: file)
         let o = CallOutcome.read(transcript: file) ?? CallOutcome()     // the call page as edited (E)
         let rec = CallHistory.shared.records.first { $0.file == file }
-        let sales = (try? Data(contentsOf: URL(fileURLWithPath: base + ".sales.json"))).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        let sales = (try? Data(contentsOf: URL(fileURLWithPath: CallLayout.sidecar(base, ".sales.json")))).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
         let next = (sales["next_step"] as? String) ?? ((sales["next_step"] as? [String: Any])?["what"] as? String) ?? ""
         // 0.8.7 (I6.5): the qualification of the call page (criterion -> what) through the mapping of its method
         var qual: [String: String] = [:]

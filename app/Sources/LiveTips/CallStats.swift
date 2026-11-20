@@ -22,7 +22,7 @@ enum CallStats {
     /// A sales call: the engine wrote <stem>.sales.json (rules/sales.yaml > after_call).
     static func isSales(_ r: CallHistory.Record) -> Bool {
         let stem = r.file.hasSuffix(".md") ? String(r.file.dropLast(3)) : r.file
-        return FileManager.default.fileExists(atPath: stem + ".sales.json")
+        return FileManager.default.fileExists(atPath: CallLayout.sidecar(stem, ".sales.json"))
     }
 
     /// The visible calls in [from, to), within a scope ("" all, "p:<key>", "w:<workspace name>"), optionally sales only.

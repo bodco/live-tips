@@ -496,7 +496,7 @@ struct StatsScreen: View {
         var k = 0, n = 0, method = ""
         for r in calls {
             let stem = r.file.hasSuffix(".md") ? String(r.file.dropLast(3)) : r.file
-            guard let d = FileManager.default.contents(atPath: stem + ".sales.json"),
+            guard let d = FileManager.default.contents(atPath: CallLayout.sidecar(stem, ".sales.json")),
                   let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
                   let cs = o["criteria"] as? [[String: Any]] else { continue }
             if method.isEmpty { method = (o["method"] as? String ?? "").uppercased() }

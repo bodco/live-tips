@@ -5,7 +5,7 @@ import LiveTipsCore
 /// Pacenote 0.8.8 (rules/decisions.yaml): the pages one call made in Notion (<stem>.notion.json, written by
 /// decision_notion and risk_notion), so the call page shows "In register" after a restart and nothing is written twice.
 enum NotionCallLinks {
-    static func path(_ file: String) -> String { (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notion.json" }
+    static func path(_ file: String) -> String { CallLayout.sidecar(of: file, ".notion.json") }
 
     /// The same key as notion_links.norm in the engine: lower case, letters and digits, single spaces.
     static func norm(_ s: String) -> String {

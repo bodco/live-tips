@@ -385,16 +385,21 @@ final class TranscribeModel: ObservableObject {
         let live = URL(fileURLWithPath: root).appendingPathComponent("live")
         try? FileManager.default.createDirectory(at: live, withIntermediateDirectories: true)
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmm"; f.locale = Locale(identifier: "en_US_POSIX")
-        let stem = f.string(from: date ?? Date()) + "-" + StartCallModel.slugify(title.isEmpty ? "recording" : title)
-        let dst = live.appendingPathComponent(stem + ".md")
-        if md.deletingLastPathComponent() == live { return }
+        let slug = StartCallModel.slugify(title.isEmpty ? "recording" : title)
+        let stem = f.string(from: date ?? Date()) + "-" + slug
+        // call folders: live/<date>-<slug>/<stem>.md, the service files in .work/
+        let day = DateFormatter(); day.dateFormat = "yyyy-MM-dd"; day.locale = Locale(identifier: "en_US_POSIX")
+        let dir = CallLayout.folder(live: live.path, date: day.string(from: date ?? Date()), slug: slug, create: true)
+        let dstStem = (dir as NSString).appendingPathComponent(stem)
+        let dst = URL(fileURLWithPath: dstStem + ".md")
+        if md.deletingLastPathComponent().path == live.path || md.deletingLastPathComponent().path == dir { return }
         let fm = FileManager.default
-        for (a, b) in [(md, dst), (Self.sp(md), live.appendingPathComponent(stem + ".speakers.json")),
-                       (md.deletingPathExtension().appendingPathExtension("named.md"), live.appendingPathComponent(stem + ".named.md"))] {
+        for (a, b) in [(md, dst), (Self.sp(md), URL(fileURLWithPath: CallLayout.sidecar(dstStem, ".speakers.json"))),
+                       (md.deletingPathExtension().appendingPathExtension("named.md"), URL(fileURLWithPath: CallLayout.sidecar(dstStem, ".named.md")))] {
             try? fm.removeItem(at: b); try? fm.copyItem(at: a, to: b)
         }
         if let a = audio, a.pathExtension == "m4a" {
-            let b = live.appendingPathComponent(stem + ".m4a")
+            let b = URL(fileURLWithPath: dstStem + ".m4a")
             try? fm.removeItem(at: b); try? fm.copyItem(at: a, to: b); audio = b
         }
         self.md = dst

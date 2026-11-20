@@ -40,4 +40,14 @@ meeting_notes: |
   0.12.2 (L1-L3): the call page, Summary, Home, Export, follow-up, CRM and the server read Decisions, Tasks and Risks
   by one rule (LiveTipsCore CallLists): the PM's edit on the call page, else these Meeting notes, else the live call
   picture, else the older notes sections. Notes of schema 2 have no ### Risks: their risks come from the live picture.
-
+rewrite: |
+  0.26.2 (owner: "the notes are always written again by AI, a speaker change only marks them stale"). After a speaker
+  change on the call page (edited_at in speakers.json newer than the notes) the Transcript and Meeting notes tabs show
+  Rewrite notes: `callnotes --rewrite` writes the whole notes file again from <stem>.named.md, Meeting notes included,
+  on the "After the call" way; never a text replace of the names. The old notes stay until the new file is written.
+  Cost and the notes_after timing go to the spend and the call history like the first notes. Before the register is
+  completed, commitments.migrate_owners moves open items of this call to their new owner (rules/commitments.yaml >
+  rewrite). The PM's own edits on the call page (source call_page in the tips file) stay, since CallLists reads them
+  above the notes. Notion: the meeting page's Decisions, Action items, Open questions and Risks are updated (the same
+  sections as an edit on the call page); TL;DR, Recap and Topics there keep their old text. Not while the notes of this
+  call are being written.

@@ -136,14 +136,14 @@ public enum DriveTranscript {
     /// The source file for a call's transcript: the named copy when there is one.
     public static func source(transcript: String) -> String {
         let stem = transcript.hasSuffix(".md") ? String(transcript.dropLast(3)) : transcript
-        let named = stem + ".named.md"
+        let named = CallLayout.sidecar(stem, ".named.md")
         return FileManager.default.fileExists(atPath: named) ? named : transcript
     }
 
     /// <stem>.drive.json next to the transcript: the transcript's own Drive copy (also for calls without a recording).
     public static func metaPath(transcript: String) -> String {
         let stem = transcript.hasSuffix(".md") ? String(transcript.dropLast(3)) : transcript
-        return stem + ".drive.json"
+        return CallLayout.sidecar(stem, ".drive.json")
     }
 
     public struct Line: Equatable {

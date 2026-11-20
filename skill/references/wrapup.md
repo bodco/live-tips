@@ -32,7 +32,7 @@ Action items: ... (хто / що / коли)
 Не покрито з чекліста: ...
 Ollama: ... (рядок `semantic.line_uk` з `lt wrapup-data`, як є; якщо Ollama була вимкнена, пропусти рядок)
 Сигнали клієнта: ... (лише для аудиторії client: цитати з часом і прочитання через culture lens, `culture.md`)
-Транскрипт: {project folder}/live/{file}
+Транскрипт: {project folder}/live/{call folder}/{file} (старий плаский файл: {project folder}/live/{file})
 Notion: {посилання на сторінку з Step 5}
 Далі: звіт по мітингу, change-request, risk-register?
 ```
@@ -45,7 +45,7 @@ user asks, run the same blind judge for the skill's tips: from the engine folder
 on the PM's Claude account through Claude Code with no key, or on the API key (about $0.10), switching by
 itself when one way is out (without a key in the environment it goes through the account). `LT_AI_ROUTE=code`
 or `api` before the command picks the way for this run; never print a key.
-It writes `<stem>.judge/judge.summary.json` next to the transcript; if the app already rated
+It writes `<stem>.judge/judge.summary.json` (in the call folder's `.work/`); if the app already rated
 the call, just read that file. Add one line to the wrap-up: `Оцінка підказок (суддя): skill
 {mean}/5 ({n}), app {mean}/5 ({n}); найгірше: ...` (the `worst` reasons). Without the app,
 skip the judge and keep the counts from `lt wrapup-data` in the "Підказки" line.
@@ -56,7 +56,7 @@ different subject than the checklist, say so in one line instead of listing ever
 item as missed.
 
 **Commitments register (Pacenote 0.8, rules in SKILL.md > "Agenda, commitments, brief freshness").**
-After the wrap-up message, append the call's items to `<project>/live/commitments.jsonl` with one
+After the wrap-up message, append the call's items to `<project>/live/commitments.jsonl` (in `live/` itself, not in the call folder) with one
 device_bash `cat >>` (JSON lines exactly as in the rules, `"by":"skill"`): every action of the call
 picture with `"owner":"me"`, every promise made to the PM's side with the person's name as owner.
 Compute `id` with `python3 -c` (sha1 as the rules say) so the app's record of the same call is

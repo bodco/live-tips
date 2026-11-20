@@ -3,6 +3,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from . import call_layout
 from typing import Dict, List, Optional
 
 LINE_RE = re.compile(r"^\[(\d\d:\d\d:\d\d)\]\s+(.+?)(?:\s+\[(S\d+)\])?\s+\((\w{2})\):\s?(.*)$")
@@ -67,7 +68,7 @@ def load_call(md_path: Path, me_label: str) -> List[Line]:
         if ln:
             lines.append(ln)
             n += 1
-    timing = load_timing(Path(str(md_path) + ".timing.jsonl"))
+    timing = load_timing(call_layout.sidecar(str(md_path), ".timing.jsonl"))
     pool: Dict[tuple, List[dict]] = {}
     for rec in timing:
         pool.setdefault((rec.get("t"), rec.get("ch")), []).append(rec)

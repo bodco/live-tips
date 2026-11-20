@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+
+from . import call_layout
 from typing import Dict, List, Optional
 
 ORDER = {"unknown": 0, "partial": 1, "known": 2}
@@ -76,7 +78,7 @@ def crm_stage(brief_path) -> str:
         return ""
     p = Path(str(brief_path))
     name = p.name
-    p = p.with_name((name[: -len(".brief.md")] if name.endswith(".brief.md") else p.stem) + ".crm.md")
+    p = call_layout.place((name[: -len(".brief.md")] if name.endswith(".brief.md") else p.stem) + ".crm.md", p.parent)
     try:
         for ln in p.read_text(encoding="utf-8").splitlines():
             if ln.strip().lower().startswith("- stage:"):

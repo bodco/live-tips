@@ -65,7 +65,7 @@ final class Register: ObservableObject {
 
     /// The register next to a call's transcript, for the tips window (Mark done on a "Done?" card).
     func markDone(id: String, callFile: String) {
-        let folder = (callFile as NSString).deletingLastPathComponent
+        let folder = CallLayout.liveFolder(of: callFile)
         CommitmentRegister.mark(folder: folder, id: id, op: "done", source: "detected", call: callFile)
         cache[folder] = nil
         version += 1
@@ -124,7 +124,7 @@ final class Register: ObservableObject {
         let f = ISO8601DateFormatter(); f.timeZone = .current
         for r in CallHistory.shared.visible where r.start > since {
             guard let o = CallOutcome.read(transcript: r.file), !o.onMe.isEmpty else { continue }
-            let folder = (r.file as NSString).deletingLastPathComponent
+            let folder = CallLayout.liveFolder(of: r.file)
             let have = CommitmentRegister.load(folder: folder)
             let slug = reg.projects.first { $0.name == r.project || $0.slug == r.project || ($0.root as NSString).lastPathComponent == r.project }?.slug ?? r.project
             var ev: [[String: Any]] = []

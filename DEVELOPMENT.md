@@ -493,6 +493,29 @@ sitemap. The privacy policy and terms of the app (`PRIVACY.md`, `TERMS.md` and t
 versions of the site's pages and are compared with them at every release; the section about the website itself exists
 only on the site.
 
+## Call folders (0.26.2)
+
+One folder per call: `<project>/live/<YYYY-MM-DD>-<slug>/`, made by `CallLayout.folder` (`LiveTipsCore/CallLayout.swift`,
+`recorder/src/call_layout.py`, `spikes/m0/livetips_m0/call_layout.py`; the rules are in `rules/call_layout.yaml` and the
+three implementations are checked against it). On top only what a person reads (`.md`, `.app.md`, `.notes.md`,
+`.app.notes.md`, `.brief.md`, `.app.brief.md`, `prep-*.sheet.md`); everything else of the call is in `.work/`.
+`CallLayout.place(name, in:)` decides where a name goes, `sidecar(of:_:)` replaces `stem + suffix` everywhere, `files(live:)`
+lists both layouts. In `live/` itself stay `commitments.jsonl`, `lessons.md`, `sources/`. Code never builds a call path
+by hand and never lists `live/` directly.
+
+- **Migration.** `CallMigration.runAtLaunch()` (`LiveTips/CallMigration.swift`, 8 s after launch, off the main thread) runs
+  `CallLayout.migrate(live:)` for every active project, workspace and the app's own `live/`. Move only; a call with a file
+  written in the last 10 minutes (`quietSeconds`, 600 s) is skipped until the next launch; a clashing name is left and counted;
+  idempotent. `CallHistory.relocate` rewrites the paths of `history.json` from the report, so notion links, hidden
+  flags and cost stay. The log line in `logs/app.log` has counts and folder names only, never titles.
+- **Dry run.** `migrate(live:dryRun: true)` touches nothing and reports what would move. `Pacenote --call-folders-dry-run
+  <out.txt>` writes that for every live folder (calls, file counts, busy, conflicts) for a look before a release.
+- **Reassign** (`CallReassignService`): moves the call's files, removes the old call folder only when it is empty.
+  `prep-*` files are not moved with a reassign.
+- **Skill and tools.** `skill/SKILL.md` (section Call folders), `recorder/bin/lt` and the sidecars write into the call
+  folder (`mkdir -p .work` first) and take paths only from `lt start` or `status.json`.
+- **Checks.** CoreChecks `callFolders`, `callFoldersB4`; pytest `spikes/m0/tests/test_call_folders.py`.
+
 ## Quality gates (ub-mode)
 
 Since 0.8.3 the code is held to [ub-mode](https://github.com/unclebob/ub-mode): every function under CRAP 10

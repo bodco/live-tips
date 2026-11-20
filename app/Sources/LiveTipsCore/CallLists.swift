@@ -100,11 +100,11 @@ public enum CallLists {
     /// The tips files of a call, the app's <file>.tips.jsonl first, then the skill's <stem>.tips.jsonl.
     public static func tipsPaths(transcript file: String) -> [String] {
         let stem = file.hasSuffix(".md") ? String(file.dropLast(3)) : file
-        return [file + ".tips.jsonl", stem + ".tips.jsonl"]
+        return [CallLayout.sidecar(file, ".tips.jsonl"), CallLayout.sidecar(stem, ".tips.jsonl")]
     }
 
     public static func notesPath(transcript file: String) -> String {
-        (file.hasSuffix(".md") ? String(file.dropLast(3)) : file) + ".notes.md"
+        CallLayout.sidecar(file.hasSuffix(".md") ? String(file.dropLast(3)) : file, ".notes.md")
     }
 
     /// Every situation line of the first tips file that has one, in file order.

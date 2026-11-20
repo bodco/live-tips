@@ -161,14 +161,14 @@ final class SheetRunner: ObservableObject {
         try? FileManager.default.createDirectory(atPath: live, withIntermediateDirectories: true)
         let b = r.refreshBase ?? Self.baseName(live: live, date: r.date, title: r.title)
         let duringCall = Self.isLivePrep(r)
-        let refresh = SheetPipeline.isRefresh(sheetExists: FileManager.default.fileExists(atPath: b + ".sheet.json"),
+        let refresh = SheetPipeline.isRefresh(sheetExists: FileManager.default.fileExists(atPath: CallLayout.sidecar(b, ".sheet.json")),
                                               refreshAsked: r.refreshBase != nil, duringCall: duringCall)
         // An old brief of this call (made before 0.10.0) is kept as the previous version (Restore previous version):
         // the sheet writes <base>.brief.md again as its own copy.
         let fm = FileManager.default
-        if !fm.fileExists(atPath: b + ".sheet.json"), fm.fileExists(atPath: b + ".brief.md") {
-            try? fm.removeItem(atPath: b + ".brief.prev.md")
-            try? fm.copyItem(atPath: b + ".brief.md", toPath: b + ".brief.prev.md")
+        if !fm.fileExists(atPath: CallLayout.sidecar(b, ".sheet.json")), fm.fileExists(atPath: CallLayout.sidecar(b, ".brief.md")) {
+            try? fm.removeItem(atPath: CallLayout.sidecar(b, ".brief.prev.md"))
+            try? fm.copyItem(atPath: CallLayout.sidecar(b, ".brief.md"), toPath: CallLayout.sidecar(b, ".brief.prev.md"))
         }
         let c = AIRoute.effective(AppConfig.load(from: AppPaths.config))
         let chosen = r.callID.flatMap { Self.overrides[$0]?["route"] as? String } ?? c.ai.prep   // 0.10.0 (ui): the route shown in Quick / Expert
@@ -247,9 +247,9 @@ final class SheetRunner: ObservableObject {
         let me = c.nameAliases.first ?? ""
         let theirs: [[String: Any]] = (ev?.attendees ?? []).filter { !$0.isEmpty && $0 != me }.map { ["name": $0] }
         let live = (r.root as NSString).appendingPathComponent("live")
-        let earlier = (try? FileManager.default.contentsOfDirectory(atPath: live))?.contains {
-            $0.hasSuffix(".sheet.json") && $0.contains("-" + StartCallModel.slugify(r.title) + ".sheet")
-        } ?? false
+        let earlier = CallLayout.prepFiles(live: live, suffix: ".sheet.json").contains {
+            ($0 as NSString).lastPathComponent.contains("-" + StartCallModel.slugify(r.title) + ".sheet")
+        }
         // 0.10.0 (Meeting Sheet, phase 7): the running call's transcript (Prepare again during a call) is a "transcript"
         // source of the sheet, not a plain file
         let liveFile = CallEngine.shared.isRunning ? EngineStatus.load(path: CallEngine.shared.statusPath).file : nil

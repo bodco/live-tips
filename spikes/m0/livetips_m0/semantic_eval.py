@@ -21,6 +21,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from . import call_layout
 
 import numpy as np
 
@@ -93,7 +94,7 @@ def cmd_embed(a):
         md = Path(md)
         stem = md.name[:-3]
         lines = [ln for ln in load_call(md, a.me_label) if word_count(ln.text) >= 3]
-        cards_p = md.parent / (stem + ".cards.json")
+        cards_p = call_layout.sidecar(md.parent / stem, ".cards.json")
         cards = []
         if cards_p.exists():
             data = json.loads(cards_p.read_text(encoding="utf-8"))
@@ -110,7 +111,7 @@ def cmd_embed(a):
             cons.append(c.get("on", "any"))
             ctexts += tx
             owner += [k] * len(tx)
-        facts = fact_entries(md.parent / (stem + ".facts.json"), md.parent / (stem + ".brief.md"))
+        facts = fact_entries(call_layout.sidecar(md.parent / stem, ".facts.json"), call_layout.sidecar(md.parent / stem, ".brief.md"))
         ftexts = [". ".join(x for x in (f["title"], f["text"]) if x) for f in facts]
         C = SEM.l2norm(client.embed(ctexts, timeout=60)) if ctexts else np.zeros((0, A.shape[1]), np.float32)
         F = SEM.l2norm(client.embed(ftexts, timeout=60)) if ftexts else np.zeros((0, A.shape[1]), np.float32)
